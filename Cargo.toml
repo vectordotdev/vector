@@ -212,7 +212,7 @@ lapin = { version = "2.2.1", default-features = false, features = ["native-tls"]
 # API
 async-graphql = { version = "5.0.10", default-features = false, optional = true, features = ["chrono"] }
 async-graphql-warp = { version = "5.0.10", default-features = false, optional = true }
-itertools = { version = "0.10.5", default-features = false, optional = true }
+itertools = { version = "0.11.0", default-features = false, optional = true }
 
 # API client
 crossterm = { version = "0.26.1", default-features = false, features = ["event-stream"], optional = true }
@@ -345,7 +345,7 @@ azure_storage_blobs = { git = "https://github.com/Azure/azure-sdk-for-rust.git",
 azure_storage = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "b4544d4920fa3064eb921340054cd9cc130b7664", default-features = false, features = ["azurite_workaround"] }
 base64 = "0.21.2"
 criterion = { version = "0.5.1", features = ["html_reports", "async_tokio"] }
-itertools = { version = "0.10.5", default-features = false }
+itertools = { version = "0.11.0", default-features = false }
 libc = "0.2.146"
 similar-asserts = "1.4.2"
 proptest = "1.2"
