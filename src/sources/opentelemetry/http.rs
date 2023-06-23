@@ -128,11 +128,15 @@ async fn handle_request(
             })?;
 
             match receiver {
-                None => Ok(protobuf(ExportLogsServiceResponse {}).into_response()),
+                None => Ok(protobuf(ExportLogsServiceResponse {
+                    partial_success: None,
+                })
+                .into_response()),
                 Some(receiver) => match receiver.await {
-                    BatchStatus::Delivered => {
-                        Ok(protobuf(ExportLogsServiceResponse {}).into_response())
-                    }
+                    BatchStatus::Delivered => Ok(protobuf(ExportLogsServiceResponse {
+                        partial_success: None,
+                    })
+                    .into_response()),
                     BatchStatus::Errored => Err(warp::reject::custom(Status {
                         code: 2, // UNKNOWN - OTLP doesn't require use of status.code, but we can't encode a None here
                         message: "Error delivering contents to sink".into(),
