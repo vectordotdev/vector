@@ -73,19 +73,23 @@ impl Function for SetSemanticMeaning {
         } else {
             // Semantic meaning can only be assigned to external fields.
             let mut labels = vec![Label::primary(
-                "the target of this semantic meaning is non-external",
+                "this path must point to an event or metadata",
                 span,
             )];
 
             if let Some(variable) = query.as_variable() {
                 labels.push(Label::context(
-                    format!("maybe you meant \".{}\"?", variable.ident()),
+                    format!(
+                        "maybe you meant \".{}\" or \"%{}\"?",
+                        variable.ident(),
+                        variable.ident()
+                    ),
                     span,
                 ));
             }
 
             let error = ExpressionError::Error {
-                message: "semantic meaning defined for non-external target".to_owned(),
+                message: "semantic meaning is not valid for local variables".to_owned(),
                 labels,
                 notes: vec![],
             };
