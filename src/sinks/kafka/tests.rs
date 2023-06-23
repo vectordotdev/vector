@@ -288,7 +288,7 @@ mod integration_test {
         test_telemetry_tags: bool,
     ) {
         if test_telemetry_tags {
-            // We need to configue Vector to emit the service and source tags.
+            // We need to configure Vector to emit the service and source tags.
             // The default is to not emit these.
             init_telemetry(
                 Telemetry {
