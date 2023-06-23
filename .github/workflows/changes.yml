@@ -179,6 +179,7 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ inputs.int_tests }}
     outputs:
+      all-int: ${{ steps.filter.outputs.all-int}}
       amqp: ${{ steps.filter.outputs.amqp }}
       appsignal: ${{ steps.filter.outputs.appsignal}}
       aws: ${{ steps.filter.outputs.aws }}
@@ -213,18 +214,10 @@ jobs:
       - uses: actions/checkout@v3
 
       # creates a yaml file that contains the filters for each integration,
-      # extracted from the output of the `vdev int paths` command, which
+      # extracted from the output of the `vdev int ci-paths` command, which
       # sources the paths from the scripts/integration/.../test.yaml files
       - name: Create filter rules for integrations
-        run: |
-          echo "all-int:" > int_test_filters.yaml
-          echo '- "lib/vector-core/**"' >> int_test_filters.yaml
-
-          cargo vdev int paths >> int_test_filters.yaml
-
-          echo "int_test_filters.yaml="
-          cat int_test_filters.yaml
-          echo ""
+        run: cargo vdev int ci-paths > int_test_filters.yaml
 
       - uses: dorny/paths-filter@v2
         id: filter
