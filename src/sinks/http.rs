@@ -249,7 +249,7 @@ impl SinkConfig for HttpSinkConfig {
             batch.timeout,
             client,
         )
-        .sink_map_err(|error| error!(message = "Fatal HTTP sink error!", %error));
+        .sink_map_err(|error| error!(message = "Fatal HTTP sink error.", %error));
 
         #[allow(deprecated)]
         let sink = super::VectorSink::from_event_sink(sink);
