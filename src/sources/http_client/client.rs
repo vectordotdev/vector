@@ -116,7 +116,7 @@ const fn default_http_method() -> HttpMethod {
 fn query_examples() -> HashMap<String, Vec<String>> {
     HashMap::<_, _>::from_iter(
         [
-            ("field".to_owned(), vec!["value".to_owned()]),
+            ("field1".to_owned(), vec!["value".to_owned()]),
             (
                 "fruit".to_owned(),
                 vec!["mango".to_owned(), "papaya".to_owned(), "kiwi".to_owned()],
