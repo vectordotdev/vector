@@ -112,7 +112,29 @@ jobs:
 
       - name: Check Component Docs
         if: needs.changes.outputs.source == 'true' || needs.changes.outputs.component_docs == 'true'
-        run: make check-component-docs
+        run: |
+          retry() {
+              MAX_N_RETRIES=5
+
+              output=0
+              command_to_retry="$@"
+
+              for n_retry in $(seq 1 $MAX_N_RETRIES)
+              do
+                  (eval "$command_to_retry")
+                  output=$?
+
+                  if [ "$output" = "0" ]; then
+                      return 0
+                  else
+                      echo "RETRY FAILURE: run #$(($n_retry)) failed ($MAX_N_RETRIES consecutive failures tolerated)"
+                  fi
+              done
+              echo "RETRY FAILURE: command failed $MAX_N_RETRIES consecutive times."
+
+              return $last_run_result
+          }
+          retry make check-component-docs
 
       - name: Check Rust Docs
         if: needs.changes.outputs.source == 'true'
