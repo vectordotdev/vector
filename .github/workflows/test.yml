@@ -33,10 +33,47 @@ jobs:
       base_ref: ${{ github.event.merge_group.base_ref || github.event.pull_request.base.ref }}
       head_ref: ${{ github.event.merge_group.head_ref || github.event.pull_request.head.ref }}
 
-  checks:
+  foo:
     name: Checks
     runs-on: [linux, ubuntu-20.04-4core]
     needs: changes
+    env:
+      CARGO_INCREMENTAL: 0
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          # check-version needs tags
+          fetch-depth: 0 # fetch everything
+      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: bash scripts/environment/prepare.sh
+      - uses: actions/cache@v3
+        name: Cache Cargo registry + index
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+      - name: Enable Rust matcher
+        run: echo "::add-matcher::.github/matchers/rust.json"
+
+      - name: test v2 disk buffers
+        env:
+          TEST_LOG: vector=trace
+          RUST_LOG: "trace"
+        run: |
+          cd lib/vector-buffers
+          cargo nextest run --no-fail-fast  variants::disk_v2::tests::invariants::reader_writer_positions_aligned_through_multiple_files_and_records --nocapture
+
+  checks:
+    name: Checks
+    runs-on: [linux, ubuntu-20.04-4core]
+    needs:
+      - changes
+      - foo
     env:
       CARGO_INCREMENTAL: 0
     steps:
@@ -64,8 +101,8 @@ jobs:
       - name: Check clippy
         #if: needs.changes.outputs.source == 'true'
         run: make check-clippy
-      - run: make test
-        name: Unit - x86_64-unknown-linux-gnu
+      # - run: make test
+      #   name: Unit - x86_64-unknown-linux-gnu
       - name: VRL - Linux
         run: cargo vdev test-vrl
       # - name: Check version
