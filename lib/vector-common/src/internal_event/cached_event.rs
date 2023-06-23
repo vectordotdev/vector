@@ -3,6 +3,8 @@ use std::{
     sync::{Arc, RwLock},
 };
 
+use derivative::Derivative;
+
 use super::{InternalEventHandle, RegisterInternalEvent};
 
 /// Metrics (eg. `component_sent_event_bytes_total`) may need to emit tags based on
@@ -14,6 +16,8 @@ use super::{InternalEventHandle, RegisterInternalEvent};
 /// `CachedEvent` is used to maintain a store of these registered metrics. When a
 /// new event is emitted for a previously unseen set of tags an event is registered
 /// and stored in the cache.
+#[derive(Derivative, Default)]
+#[derivative(Clone(bound = ""))]
 pub struct RegisteredEventCache<Event: RegisterTaggedInternalEvent> {
     cache: Arc<
         RwLock<
@@ -33,31 +37,6 @@ pub trait RegisterTaggedInternalEvent: RegisterInternalEvent {
     type Tags;
 
     fn register(tags: &Self::Tags) -> <Self as RegisterInternalEvent>::Handle;
-}
-
-/// Deriving `Clone` for `Cached` doesn't work since the `Event` type is not clone,
-/// we can happily implement our own `clone` however since we are just cloning
-/// the `Arc`.
-/// Worth noting that this is a cheap clone since the cache itself is stored behind
-/// an `Arc`.
-impl<Event: RegisterTaggedInternalEvent> Clone for RegisteredEventCache<Event> {
-    fn clone(&self) -> Self {
-        Self {
-            cache: Arc::clone(&self.cache),
-        }
-    }
-}
-
-impl<Event, EventHandle, Data, Tags> Default for RegisteredEventCache<Event>
-where
-    Data: Sized,
-    EventHandle: InternalEventHandle<Data = Data>,
-    Tags: Ord + Clone,
-    Event: RegisterInternalEvent<Handle = EventHandle> + RegisterTaggedInternalEvent<Tags = Tags>,
-{
-    fn default() -> Self {
-        Self::new()
-    }
 }
 
 impl<Event, EventHandle, Data, Tags> RegisteredEventCache<Event>
