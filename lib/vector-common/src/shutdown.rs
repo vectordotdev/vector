@@ -6,12 +6,11 @@ use std::{
     pin::Pin,
     sync::Arc,
     task::{ready, Context, Poll},
-    time::Duration,
 };
 
 use futures::{future, FutureExt};
 use stream_cancel::{Trigger, Tripwire};
-use tokio::time::{sleep, timeout_at, Instant};
+use tokio::time::{timeout_at, Instant};
 
 use crate::{config::ComponentKey, trigger::DisabledTrigger};
 
@@ -115,7 +114,6 @@ pub struct SourceShutdownCoordinator {
     shutdown_begun_triggers: HashMap<ComponentKey, (IsInternal, Trigger)>,
     shutdown_force_triggers: HashMap<ComponentKey, Trigger>,
     shutdown_complete_tripwires: HashMap<ComponentKey, Tripwire>,
-    internal_telemetry_sources_shutdown_delay: Option<Duration>,
 }
 
 impl SourceShutdownCoordinator {
@@ -243,11 +241,6 @@ impl SourceShutdownCoordinator {
         }
 
         futures::future::join_all(external_sources_complete_futures)
-            .then(move |_| async move {
-                if let Some(delay) = self.internal_telemetry_sources_shutdown_delay {
-                    sleep(delay).await
-                }
-            })
             .then(|_| futures::future::join_all(internal_sources_complete_futures))
             .map(|_| ())
     }
