@@ -54,22 +54,6 @@ fn get_rust_version() -> String {
     }
 }
 
-/// True if a docker image exists that has all of the integration tests
-/// features compiled.
-pub fn full_runner_available() -> Result<bool> {
-    let mut command = dockercmd([
-        "image",
-        "ls",
-        &format!("vector-test-runner-{}", get_rust_version()),
-    ]);
-
-    // $ docker image ls vector-test-runner-1.69.0
-    // REPOSITORY                  TAG       IMAGE ID       CREATED       SIZE
-    // vector-test-runner-1.69.0   latest    7e5e70a96428   13 days ago   1.76GB
-
-    Ok(command.check_output()?.lines().count() == 2)
-}
-
 fn dockercmd<I: AsRef<OsStr>>(args: impl IntoIterator<Item = I>) -> Command {
     let mut command = Command::new(&*CONTAINER_TOOL);
     command.args(args);
@@ -313,7 +297,7 @@ where
 }
 
 pub(super) struct IntegrationTestRunner {
-    // None if building for all integrations
+    // The integration is None when compiling the runner image with the `all-integration-tests` feature.
     integration: Option<String>,
     needs_docker_socket: bool,
     network: Option<String>,
@@ -322,20 +306,10 @@ pub(super) struct IntegrationTestRunner {
 
 impl IntegrationTestRunner {
     pub(super) fn new(
-        integration: String,
-        build_all: bool,
+        integration: Option<String>,
         config: &IntegrationRunnerConfig,
         network: Option<String>,
     ) -> Result<Self> {
-        let full_runner_avail = full_runner_available()?;
-
-        // if the build_all option was specified, the integration is None.
-        // if a full-featured runner image is already available, the integration is None.
-        // otherwise, use the integration specified.
-        let integration = (!build_all)
-            .then(|| (!full_runner_avail).then_some(integration))
-            .flatten();
-
         Ok(Self {
             integration,
             needs_docker_socket: config.needs_docker_socket,

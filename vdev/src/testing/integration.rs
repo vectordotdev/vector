@@ -6,8 +6,7 @@ use tempfile::{Builder, NamedTempFile};
 use super::config::ComposeConfig;
 use super::config::{Environment, IntegrationTestConfig};
 use super::runner::{
-    full_runner_available, ContainerTestRunner as _, IntegrationTestRunner, TestRunner as _,
-    CONTAINER_TOOL, DOCKER_SOCKET,
+    ContainerTestRunner as _, IntegrationTestRunner, TestRunner as _, CONTAINER_TOOL, DOCKER_SOCKET,
 };
 use super::state::EnvsDir;
 use crate::app::CommandExt as _;
@@ -43,9 +42,11 @@ impl IntegrationTest {
         let network_name = format!("vector-integration-tests-{integration}");
         let compose = Compose::new(test_dir, env_config.clone(), network_name.clone())?;
 
+        // None if compiling with all integration test feature flag.
+        let runner_name = (!build_all).then(|| integration.clone());
+
         let runner = IntegrationTestRunner::new(
-            integration.clone(),
-            build_all,
+            runner_name,
             &config.runner,
             compose.is_some().then_some(network_name),
         )?;
@@ -58,9 +59,7 @@ impl IntegrationTest {
             runner,
             compose,
             env_config,
-            // no need to recompile a specific context for a single integration test feature if we've already got a context
-            // with all of the int test features pre compiled.
-            build_all: build_all || full_runner_available()?,
+            build_all,
             retries,
         })
     }
