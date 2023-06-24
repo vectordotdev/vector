@@ -3,7 +3,7 @@ use std::{io, sync::Arc};
 
 use bytes::{BufMut, BytesMut};
 use parquet::{
-    basic::{LogicalType, Repetition},
+    basic::{LogicalType, Repetition, Type as PhysicalType},
     column::writer::{ColumnWriter::*, ColumnWriterImpl},
     data_type::DataType,
     errors::ParquetError,
@@ -48,7 +48,6 @@ pub enum ParquetSerializerError {
     ParquetError {
         error: ParquetError,
     },
-    // TODO: Can this actually happen?
     IoError {
         source: io::Error,
     },
@@ -124,56 +123,115 @@ impl ParquetSerializerConfig {
         match info.logical_type() {
             // Validate LIST types
             Some(LogicalType::List) => {
-                if info.has_repetition() && info.repetition() == Repetition::REPEATED {
-                    return Err(format!(
-                        "Invalid repetition for LIST type. repetition = {:?}",
-                        info.repetition()
-                    ));
-                }
-                if schema.get_fields().len() != 1 {
-                    return Err(format!(
-                        "Invalid LIST type. LIST type must have a single child, found {}.",
-                        schema.get_fields().len()
-                    ));
-                }
+                Self::not_repeated(schema, "LIST")?;
+                let list = Self::single_child(schema, "LIST")?;
 
-                let list = schema.get_fields().get(0).expect("must have a child");
-                let info = list.get_basic_info();
-                if !info.has_repetition() || info.repetition() != Repetition::REPEATED {
-                    return Err(format!(
-                        "Invalid repetition for child of LIST type. repetition = {:?}",
-                        if info.has_repetition() {
-                            info.repetition()
-                        } else {
-                            Repetition::REQUIRED
-                        }
-                    ));
-                }
-                if list.get_fields().len() != 1 {
-                    return Err(format!(
-                        "Invalid LIST type. Child of LIST type must have a single child, found {}.",
-                        list.get_fields().len()
-                    ));
-                }
+                Self::repeated(list, "child of LIST")?;
+                let element = Self::single_child(list, "list of LIST")?;
 
-                let element = list.get_fields().get(0).expect("must have a child");
-                let info = element.get_basic_info();
-                if info.has_repetition() && info.repetition() == Repetition::REPEATED {
-                    return Err(format!(
-                        "Invalid repetition for element of LIST type. repetition = {:?}",
-                        info.repetition()
-                    ));
-                }
-
+                Self::not_repeated(element, "element of LIST")?;
                 self.validate_logical_schema(element)?;
             }
-            _ => {
+            // Validate MAP types
+            Some(LogicalType::Map) => {
+                Self::not_repeated(schema, "MAP")?;
+                let key_value = Self::single_child(schema, "MAP")?;
+
+                Self::repeated(key_value, "child of MAP")?;
+                match key_value.get_fields().len() {
+                    1 | 2 => (),
+                    _ => {
+                        return Err(format!(
+                            "Invalid MAP type. key_value of MAP type must have one or two children, found {}.",
+                            key_value.get_fields().len()
+                        ));
+                    }
+                }
+
+                let mut found_key = false;
+                for element in key_value.get_fields() {
+                    match element.name() {
+                        "key" => {
+                            found_key = true;
+                            Self::required(element, "key of MAP")?;
+                            if !element.is_primitive()
+                                || element.get_physical_type() != PhysicalType::BYTE_ARRAY
+                            {
+                                return Err(
+                                    "Invalid primitive type for key of MAP type. Must be binary."
+                                        .to_string(),
+                                );
+                            }
+                        }
+                        _ => self.validate_logical_schema(element)?,
+                    }
+                }
+                if !found_key {
+                    return Err(
+                        "Invalid MAP type. key_value of MAP type must have a child named \"key\"."
+                            .to_string(),
+                    );
+                }
+            }
+            _ if schema.is_group() => {
                 for field in schema.get_fields() {
                     self.validate_logical_schema(field)?;
                 }
             }
+            _ => (),
         }
         Ok(())
+    }
+
+    fn not_repeated(ty: &Type, kind: &str) -> Result<(), String> {
+        let info = ty.get_basic_info();
+        if info.has_repetition() && info.repetition() == Repetition::REPEATED {
+            Err(format!(
+                "Invalid repetition for {kind} type. repetition = {:?}",
+                info.repetition()
+            ))
+        } else {
+            Ok(())
+        }
+    }
+
+    fn repeated(ty: &Type, kind: &str) -> Result<(), String> {
+        let info = ty.get_basic_info();
+        if !info.has_repetition() || info.repetition() != Repetition::REPEATED {
+            Err(format!(
+                "Invalid repetition for {kind} type. repetition = {:?}",
+                if info.has_repetition() {
+                    info.repetition()
+                } else {
+                    Repetition::REQUIRED
+                }
+            ))
+        } else {
+            Ok(())
+        }
+    }
+
+    fn required(ty: &Type, kind: &str) -> Result<(), String> {
+        let info = ty.get_basic_info();
+        if !info.has_repetition() || info.repetition() == Repetition::REQUIRED {
+            Err(format!(
+                "Invalid repetition for {kind} type. repetition = {:?}",
+                info.repetition()
+            ))
+        } else {
+            Ok(())
+        }
+    }
+
+    fn single_child<'a>(ty: &'a Type, kind: &str) -> Result<&'a Type, String> {
+        let len = ty.get_fields().len();
+        if len != 1 {
+            Err(format!(
+                "Invalid {kind} type. Expected one child, found {len}.",
+            ))
+        } else {
+            Ok(ty.get_fields().get(0).expect("Should have a child."))
+        }
     }
 }
 
@@ -391,7 +449,6 @@ impl<'a, T, F: Fn(&Value) -> Result<T, ParquetSerializerError>> Column<'a, T, F>
                 Value::Null => None,
                 // Invalid type, error
                 value => {
-                    // TODO: Check out if field paths for errors make sense
                     return Err(ParquetSerializerError::InvalidValueType {
                         field: self.path(level),
                         actual_type: value.kind_str().to_string(),
@@ -454,6 +511,51 @@ impl<'a, T, F: Fn(&Value) -> Result<T, ParquetSerializerError>> Column<'a, T, F>
                                 field: self.path(level),
                                 actual_type: value.kind_str().to_string(),
                                 expected_type: "array".to_string(),
+                            });
+                        }
+                    }
+                    Some(LogicalType::Map) => {
+                        if let Value::Object(object) = value {
+                            let key_value = level.descend(info);
+                            let element_level = key_value.descend_repeated();
+
+                            if self
+                                .levels
+                                .get(element_level.level)
+                                .expect("This must be valid MAP")
+                                .name()
+                                == "key"
+                            {
+                                // Key field
+                                if object.is_empty() {
+                                    self.push_value(None, key_value);
+                                } else {
+                                    let mut now = element_level;
+                                    for key in object.keys() {
+                                        let value = (self.extract)(&Value::from(key.as_str()))?;
+                                        self.push_value(Some(value), now.descend_required());
+                                        now = now.next();
+                                    }
+                                }
+                            } else {
+                                // Value field
+                                if object.is_empty() {
+                                    self.push_value(None, key_value);
+                                } else {
+                                    let mut now = element_level;
+                                    for value in object.values() {
+                                        self.process_value(Some(value), now)?;
+                                        now = now.next();
+                                    }
+                                }
+                            }
+
+                            Ok(())
+                        } else {
+                            return Err(ParquetSerializerError::InvalidValueType {
+                                field: self.path(level),
+                                actual_type: value.kind_str().to_string(),
+                                expected_type: "object".to_string(),
                             });
                         }
                     }
@@ -1105,6 +1207,91 @@ mod tests {
                     }
                 }
             }
+            "#
+                .to_string(),
+            },
+        };
+
+        assert!(config.build().is_err());
+    }
+
+    #[test]
+    fn test_map() {
+        let message_type = r#"
+            message test {
+                optional group answers (MAP){
+                    repeated group key_value {
+                        required binary key (UTF8);
+                        optional boolean value;
+                    }
+                }
+            }
+            "#;
+
+        let events = vec![
+            log_event! {},
+            log_event! {"answers" => Value::Null},
+            log_event! {"answers" => btreemap!{}},
+            log_event! {"answers" => btreemap!{
+                "test1" => Value::Null,
+                "test2" => Value::Boolean(true),
+                "test3" => Value::Null,
+            }},
+        ];
+
+        validate(
+            message_type,
+            events,
+            2,
+            |i, path, row_group_reader| match path {
+                "answers.key_value.key" => {
+                    let reader = match row_group_reader.get_column_reader(i).unwrap() {
+                        ColumnReader::ByteArrayColumnReader(r) => r,
+                        _ => panic!("Wrong column type"),
+                    };
+                    assert_column(
+                        6,
+                        &[
+                            Bytes::from("test1").into(),
+                            Bytes::from("test2").into(),
+                            Bytes::from("test3").into(),
+                        ],
+                        Some(&[0, 0, 0, 0, 1, 1]),
+                        Some(&[0, 0, 1, 2, 2, 2]),
+                        reader,
+                    );
+                }
+                "answers.key_value.value" => {
+                    let reader = match row_group_reader.get_column_reader(i).unwrap() {
+                        ColumnReader::BoolColumnReader(r) => r,
+                        _ => panic!("Wrong column type"),
+                    };
+                    assert_column(
+                        6,
+                        &[true],
+                        Some(&[0, 0, 0, 0, 1, 1]),
+                        Some(&[0, 0, 1, 2, 3, 2]),
+                        reader,
+                    );
+                }
+                _ => panic!("Unexpected column"),
+            },
+        );
+    }
+
+    #[test]
+    fn illegal_map_scheme() {
+        let config = ParquetSerializerConfig {
+            parquet: ParquetSerializerOptions {
+                schema: r#"
+                message test {
+                    optional group answers (MAP){
+                        repeated group key_value {
+                            required binary str (UTF8);
+                            optional boolean value;
+                        }
+                    }
+                }
             "#
                 .to_string(),
             },
