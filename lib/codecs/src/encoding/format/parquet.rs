@@ -497,6 +497,37 @@ mod tests {
         }
     }
 
+    fn validate(
+        schema: &str,
+        events: Vec<Event>,
+        num_columns: usize,
+        validate: impl Fn(usize, &str, &dyn RowGroupReader),
+    ) {
+        let schema = Arc::new(parse_message_type(schema).unwrap());
+        let mut encoder = ParquetSerializer::new(schema);
+
+        let mut buffer = BytesMut::new();
+        encoder.encode(events, &mut buffer).unwrap();
+
+        let reader = SerializedFileReader::new(buffer.freeze()).unwrap();
+
+        let parquet_metadata = reader.metadata();
+        assert_eq!(parquet_metadata.num_row_groups(), 1);
+
+        let row_group_reader = reader.get_row_group(0).unwrap();
+        assert_eq!(row_group_reader.num_columns(), num_columns);
+
+        let metadata = row_group_reader.metadata();
+        let mut visited = HashSet::new();
+        for (i, column) in metadata.columns().iter().enumerate() {
+            let path = column.column_path().string();
+            assert!(visited.insert(path.clone()));
+            validate(i, &path, row_group_reader.as_ref());
+        }
+
+        assert_eq!(visited.len(), num_columns);
+    }
+
     #[test]
     fn test_serialize() {
         let message_type = r#"
@@ -545,26 +576,12 @@ mod tests {
             },
         ];
 
-        let schema = Arc::new(parse_message_type(message_type).unwrap());
-        let mut encoder = ParquetSerializer::new(schema);
-
-        let mut buffer = BytesMut::new();
-        encoder.encode(events, &mut buffer).unwrap();
-
-        let reader = SerializedFileReader::new(buffer.freeze()).unwrap();
-
-        let parquet_metadata = reader.metadata();
-        assert_eq!(parquet_metadata.num_row_groups(), 1);
-
-        let row_group_reader = reader.get_row_group(0).unwrap();
-        assert_eq!(row_group_reader.num_columns(), 7);
-
-        let metadata = row_group_reader.metadata();
-        let mut visited = HashSet::new();
-        for (i, column) in metadata.columns().iter().enumerate() {
-            match column.column_path().string().as_str() {
+        validate(
+            message_type,
+            events,
+            7,
+            |i, path, row_group_reader| match path {
                 "a.b" => {
-                    assert!(visited.insert("a.b"));
                     let reader = match row_group_reader.get_column_reader(i).unwrap() {
                         ColumnReader::BoolColumnReader(r) => r,
                         _ => panic!("Wrong column type"),
@@ -572,7 +589,6 @@ mod tests {
                     assert_column(2, &[true, false], None, None, reader);
                 }
                 "a.c" => {
-                    assert!(visited.insert("a.c"));
                     let reader = match row_group_reader.get_column_reader(i).unwrap() {
                         ColumnReader::Int64ColumnReader(r) => r,
                         _ => panic!("Wrong column type"),
@@ -580,7 +596,6 @@ mod tests {
                     assert_column(2, &[2], None, Some(&[1, 0]), reader);
                 }
                 "d.e" => {
-                    assert!(visited.insert("d.e"));
                     let reader = match row_group_reader.get_column_reader(i).unwrap() {
                         ColumnReader::Int64ColumnReader(r) => r,
                         _ => panic!("Wrong column type"),
@@ -588,7 +603,6 @@ mod tests {
                     assert_column(2, &[3], None, Some(&[2, 0]), reader);
                 }
                 "f.g" => {
-                    assert!(visited.insert("f.g"));
                     let reader = match row_group_reader.get_column_reader(i).unwrap() {
                         ColumnReader::Int64ColumnReader(r) => r,
                         _ => panic!("Wrong column type"),
@@ -596,7 +610,6 @@ mod tests {
                     assert_column(3, &[4, 5], Some(&[0, 1, 0]), Some(&[1, 1, 0]), reader);
                 }
                 "h" => {
-                    assert!(visited.insert("h"));
                     let reader = match row_group_reader.get_column_reader(i).unwrap() {
                         ColumnReader::ByteArrayColumnReader(r) => r,
                         _ => panic!("Wrong column type"),
@@ -610,7 +623,6 @@ mod tests {
                     );
                 }
                 "i.j" => {
-                    assert!(visited.insert("i.j"));
                     let reader = match row_group_reader.get_column_reader(i).unwrap() {
                         ColumnReader::Int64ColumnReader(r) => r,
                         _ => panic!("Wrong column type"),
@@ -618,7 +630,6 @@ mod tests {
                     assert_column(3, &[6, 9, 11], Some(&[0, 0, 1]), Some(&[1, 1, 1]), reader);
                 }
                 "i.k" => {
-                    assert!(visited.insert("i.k"));
                     let reader = match row_group_reader.get_column_reader(i).unwrap() {
                         ColumnReader::DoubleColumnReader(r) => r,
                         _ => panic!("Wrong column type"),
@@ -632,10 +643,8 @@ mod tests {
                     );
                 }
                 _ => panic!("Unexpected column"),
-            }
-        }
-
-        assert_eq!(visited.len(), 7);
+            },
+        );
     }
 
     #[test]
@@ -657,26 +666,12 @@ mod tests {
             },
         ];
 
-        let schema = Arc::new(parse_message_type(message_type).unwrap());
-        let mut encoder = ParquetSerializer::new(schema);
-
-        let mut buffer = BytesMut::new();
-        encoder.encode(events, &mut buffer).unwrap();
-
-        let reader = SerializedFileReader::new(buffer.freeze()).unwrap();
-
-        let parquet_metadata = reader.metadata();
-        assert_eq!(parquet_metadata.num_row_groups(), 1);
-
-        let row_group_reader = reader.get_row_group(0).unwrap();
-        assert_eq!(row_group_reader.num_columns(), 1);
-
-        let metadata = row_group_reader.metadata();
-        let mut visited = HashSet::new();
-        for (i, column) in metadata.columns().iter().enumerate() {
-            match column.column_path().string().as_str() {
+        validate(
+            message_type,
+            events,
+            1,
+            |i, path, row_group_reader| match path {
                 "geo.city_name" => {
-                    assert!(visited.insert("geo.city_name"));
                     let reader = match row_group_reader.get_column_reader(i).unwrap() {
                         ColumnReader::ByteArrayColumnReader(r) => r,
                         _ => panic!("Wrong column type"),
@@ -690,10 +685,157 @@ mod tests {
                     );
                 }
                 _ => panic!("Unexpected column"),
-            }
-        }
+            },
+        );
+    }
 
-        assert_eq!(visited.len(), 1);
+    #[test]
+    fn test_value_null_stack_optional() {
+        let message_type = r#"
+            message test {
+                optional group a{
+                    optional group b{
+                        optional boolean c;
+                    }
+                }            
+            }
+            "#;
+
+        let events = vec![
+            log_event! {},
+            log_event! {"a" => Value::Null},
+            log_event! {"a.b" => Value::Null},
+            log_event! {"a.b.c" => Value::Null},
+            log_event! {"a.b.c" => Value::Boolean(true)},
+        ];
+
+        validate(
+            message_type,
+            events,
+            1,
+            |i, path, row_group_reader| match path {
+                "a.b.c" => {
+                    let reader = match row_group_reader.get_column_reader(i).unwrap() {
+                        ColumnReader::BoolColumnReader(r) => r,
+                        _ => panic!("Wrong column type"),
+                    };
+                    assert_column(5, &[true], None, Some(&[0, 0, 1, 2, 3]), reader);
+                }
+                _ => panic!("Unexpected column"),
+            },
+        );
+    }
+
+    #[test]
+    fn test_value_null_repeated_optional() {
+        let message_type = r#"
+            message test {
+                repeated group a{
+                    optional boolean b;
+                }            
+            }
+            "#;
+
+        let events = vec![
+            log_event! {},
+            log_event! {"a" => Value::Null},
+            log_event! {"a.b" => Value::Null},
+            log_event! {"a.b" => Value::Boolean(false)},
+            log_event! {"a" => vec![
+                btreemap! { "b" => Value::Null },
+                btreemap! { "b" => Value::Boolean(true) }
+            ]},
+        ];
+        validate(
+            message_type,
+            events,
+            1,
+            |i, path, row_group_reader| match path {
+                "a.b" => {
+                    let reader = match row_group_reader.get_column_reader(i).unwrap() {
+                        ColumnReader::BoolColumnReader(r) => r,
+                        _ => panic!("Wrong column type"),
+                    };
+                    assert_column(
+                        6,
+                        &[false, true],
+                        Some(&[0, 0, 0, 0, 0, 1]),
+                        Some(&[0, 0, 1, 2, 1, 2]),
+                        reader,
+                    );
+                }
+                _ => panic!("Unexpected column"),
+            },
+        );
+    }
+
+    #[test]
+    fn test_value_null_repeated() {
+        let message_type = r#"
+            message test {
+                repeated boolean a;
+            }
+            "#;
+
+        let events = vec![
+            log_event! {},
+            log_event! {"a" => Value::Null},
+            log_event! {"a" => Value::Boolean(false)},
+            log_event! {"a" => vec![
+                Value::Null,
+                Value::Boolean(true),
+                Value::Null,
+            ]},
+        ];
+
+        validate(
+            message_type,
+            events,
+            1,
+            |i, path, row_group_reader| match path {
+                "a" => {
+                    let reader = match row_group_reader.get_column_reader(i).unwrap() {
+                        ColumnReader::BoolColumnReader(r) => r,
+                        _ => panic!("Wrong column type"),
+                    };
+                    assert_column(
+                        6,
+                        &[false, true],
+                        Some(&[0, 0, 0, 0, 1, 1]),
+                        Some(&[0, 0, 1, 0, 1, 0]),
+                        reader,
+                    );
+                }
+                _ => panic!("Unexpected column"),
+            },
+        );
+    }
+
+    #[test]
+    fn test_value_empty_repeated() {
+        let message_type = r#"
+            message test {
+                repeated boolean a;
+            }
+            "#;
+
+        let events = vec![log_event! {"a" => Vec::<Value>::new()}];
+
+        validate(
+            message_type,
+            events,
+            1,
+            |i, path, row_group_reader| match path {
+                "a" => {
+                    let reader = match row_group_reader.get_column_reader(i).unwrap() {
+                        ColumnReader::BoolColumnReader(r) => r,
+                        _ => panic!("Wrong column type"),
+                    };
+                    assert_column(1, &[], Some(&[0]), Some(&[0]), reader);
+                }
+                _ => panic!("Unexpected column"),
+            },
+        );
     }
 
     #[test]
@@ -718,26 +860,12 @@ mod tests {
             }]
         }];
 
-        let schema = Arc::new(parse_message_type(message_type).unwrap());
-        let mut encoder = ParquetSerializer::new(schema);
-
-        let mut buffer = BytesMut::new();
-        encoder.encode(events, &mut buffer).unwrap();
-
-        let reader = SerializedFileReader::new(buffer.freeze()).unwrap();
-
-        let parquet_metadata = reader.metadata();
-        assert_eq!(parquet_metadata.num_row_groups(), 1);
-
-        let row_group_reader = reader.get_row_group(0).unwrap();
-        assert_eq!(row_group_reader.num_columns(), 2);
-
-        let metadata = row_group_reader.metadata();
-        let mut visited = HashSet::new();
-        for (i, column) in metadata.columns().iter().enumerate() {
-            match column.column_path().string().as_str() {
+        validate(
+            message_type,
+            events,
+            2,
+            |i, path, row_group_reader| match path {
                 "answer.name" => {
-                    assert!(visited.insert("answer.name"));
                     let reader = match row_group_reader.get_column_reader(i).unwrap() {
                         ColumnReader::ByteArrayColumnReader(r) => r,
                         _ => panic!("Wrong column type"),
@@ -751,7 +879,6 @@ mod tests {
                     );
                 }
                 "answer.ttl" => {
-                    assert!(visited.insert("answer.ttl"));
                     let reader = match row_group_reader.get_column_reader(i).unwrap() {
                         ColumnReader::Int64ColumnReader(r) => r,
                         _ => panic!("Wrong column type"),
@@ -759,9 +886,7 @@ mod tests {
                     assert_column(2, &[0, 3600], Some(&[0, 1]), Some(&[2, 2]), reader);
                 }
                 _ => panic!("Unexpected column"),
-            }
-        }
-
-        assert_eq!(visited.len(), 2);
+            },
+        );
     }
 }
