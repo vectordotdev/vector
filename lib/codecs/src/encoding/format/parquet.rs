@@ -683,7 +683,7 @@ impl Level {
         }
     }
 
-    /// Undefines by one level
+    /// Undefine by one level
     fn undefine(self) -> Self {
         Self {
             def_level: self.def_level - 1,
