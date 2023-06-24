@@ -3,14 +3,14 @@ use std::{io, sync::Arc};
 
 use bytes::{BufMut, BytesMut};
 use parquet::{
-    basic::Repetition,
+    basic::{LogicalType, Repetition},
     column::writer::{ColumnWriter::*, ColumnWriterImpl},
     data_type::DataType,
     errors::ParquetError,
     file::{properties::WriterProperties, writer::SerializedFileWriter},
     schema::{
         parser::parse_message_type,
-        types::{ColumnDescriptor, Type, TypePtr},
+        types::{BasicTypeInfo, ColumnDescriptor, Type, TypePtr},
     },
 };
 use serde::{Deserialize, Serialize};
@@ -99,6 +99,8 @@ impl ParquetSerializerConfig {
     pub fn build(&self) -> Result<ParquetSerializer, BuildError> {
         let schema = parse_message_type(&self.parquet.schema)
             .map_err(|error| format!("Failed building Parquet serializer: {}", error))?;
+        self.validate_logical_schema(&schema)
+            .map_err(|error| format!("Failed building Parquet serializer: {}", error))?;
         Ok(ParquetSerializer {
             schema: Arc::new(schema),
         })
@@ -115,6 +117,63 @@ impl ParquetSerializerConfig {
         // NOTE: This isn't yet doable. We don't have meanings to
         // to specify for requirement.
         schema::Requirement::empty()
+    }
+
+    fn validate_logical_schema(&self, schema: &Type) -> Result<(), String> {
+        let info = schema.get_basic_info();
+        match info.logical_type() {
+            // Validate LIST types
+            Some(LogicalType::List) => {
+                if info.has_repetition() && info.repetition() == Repetition::REPEATED {
+                    return Err(format!(
+                        "Invalid repetition for LIST type. repetition = {:?}",
+                        info.repetition()
+                    ));
+                }
+                if schema.get_fields().len() != 1 {
+                    return Err(format!(
+                        "Invalid LIST type. LIST type must have a single child, found {}.",
+                        schema.get_fields().len()
+                    ));
+                }
+
+                let list = schema.get_fields().get(0).expect("must have a child");
+                let info = list.get_basic_info();
+                if !info.has_repetition() || info.repetition() != Repetition::REPEATED {
+                    return Err(format!(
+                        "Invalid repetition for child of LIST type. repetition = {:?}",
+                        if info.has_repetition() {
+                            info.repetition()
+                        } else {
+                            Repetition::REQUIRED
+                        }
+                    ));
+                }
+                if list.get_fields().len() != 1 {
+                    return Err(format!(
+                        "Invalid LIST type. Child of LIST type must have a single child, found {}.",
+                        list.get_fields().len()
+                    ));
+                }
+
+                let element = list.get_fields().get(0).expect("must have a child");
+                let info = element.get_basic_info();
+                if info.has_repetition() && info.repetition() == Repetition::REPEATED {
+                    return Err(format!(
+                        "Invalid repetition for element of LIST type. repetition = {:?}",
+                        info.repetition()
+                    ));
+                }
+
+                self.validate_logical_schema(element)?;
+            }
+            _ => {
+                for field in schema.get_fields() {
+                    self.validate_logical_schema(field)?;
+                }
+            }
+        }
+        Ok(())
     }
 }
 
@@ -311,10 +370,10 @@ impl<'a, T, F: Fn(&Value) -> Result<T, ParquetSerializerError>> Column<'a, T, F>
         for event in events {
             match event {
                 Event::Log(log) => {
-                    self.extract_value(log.value(), 0, 0, 0, 1)?;
+                    self.extract_value(log.value(), Level::root())?;
                 }
                 Event::Trace(trace) => {
-                    self.extract_value(trace.value(), 0, 0, 0, 1)?;
+                    self.extract_value(trace.value(), Level::root())?;
                 }
                 Event::Metric(_) => {
                     panic!("Metrics are not supported.");
@@ -325,111 +384,209 @@ impl<'a, T, F: Fn(&Value) -> Result<T, ParquetSerializerError>> Column<'a, T, F>
     }
 
     /// Will push at least one value, or error.
-    fn extract_value(
-        &mut self,
-        value: &Value,
-        start_rep_level: i16,
-        rep_level: i16,
-        def_level: i16,
-        level: usize,
-    ) -> Result<(), ParquetSerializerError> {
-        if let Some(part) = self.levels.get(level) {
+    fn extract_value(&mut self, value: &Value, level: Level) -> Result<(), ParquetSerializerError> {
+        if let Some(part) = self.levels.get(level.level) {
             let sub = match value {
                 Value::Object(object) => object.get(part.name()),
                 Value::Null => None,
                 // Invalid type, error
                 value => {
+                    // TODO: Check out if field paths for errors make sense
                     return Err(ParquetSerializerError::InvalidValueType {
                         field: self.path(level),
                         actual_type: value.kind_str().to_string(),
                         expected_type: "object".to_string(),
-                    })
+                    });
                 }
             };
 
-            match sub {
-                Some(Value::Null) | None if part.is_optional() => {
-                    self.push_value(None, start_rep_level, def_level);
-                    Ok(())
-                }
-                // Illegal null, error
-                Some(Value::Null) | None => Err(ParquetSerializerError::MissingField {
-                    field: self.path(level),
-                }),
-                Some(value) => {
-                    let info = part.get_basic_info();
-                    if info.has_repetition() && info.repetition() == Repetition::REPEATED {
-                        self.extract_flat(
-                            value,
-                            start_rep_level,
-                            rep_level + 1,
-                            def_level + 1,
-                            level + 1,
-                        )
-                    } else {
-                        self.extract_value(
-                            value,
-                            start_rep_level,
-                            rep_level,
-                            if part.is_optional() {
-                                def_level + 1
-                            } else {
-                                def_level
-                            },
-                            level + 1,
-                        )
-                    }
-                }
-            }
+            self.process_value(sub, level)
+        } else if matches!(value, Value::Null) {
+            self.push_value(None, level.undefine());
+            Ok(())
         } else {
             let value = (self.extract)(value)?;
-            self.push_value(Some(value), start_rep_level, def_level);
+            self.push_value(Some(value), level);
             Ok(())
         }
     }
 
     /// Will push at least one value, or error.
-    fn extract_flat(
+    fn process_value(
         &mut self,
-        value: &Value,
-        start_rep_level: i16,
-        rep_level: i16,
-        def_level: i16,
-        level: usize,
+        value: Option<&Value>,
+        level: Level,
     ) -> Result<(), ParquetSerializerError> {
+        let part = self
+            .levels
+            .get(level.level)
+            .expect("We should have checked this before hand.");
         match value {
-            Value::Array(array) => {
-                let mut next_rep_level = start_rep_level;
-                for value in array {
-                    self.extract_flat(value, next_rep_level, rep_level, def_level, level)?;
-                    next_rep_level = rep_level;
-                }
+            Some(Value::Null) | None if part.is_optional() => {
+                self.push_value(None, level);
                 Ok(())
             }
-            _ => self.extract_value(value, start_rep_level, rep_level, def_level, level),
+            // Illegal null, error
+            Some(Value::Null) | None => Err(ParquetSerializerError::MissingField {
+                field: self.path(level),
+            }),
+            Some(value) => {
+                let info = part.get_basic_info();
+                match info.logical_type() {
+                    Some(LogicalType::List) => {
+                        if let Value::Array(array) = value {
+                            let list_level = level.descend(info);
+                            let element_level = list_level.descend_repeated();
+
+                            if array.is_empty() {
+                                self.push_value(None, list_level);
+                            } else {
+                                let mut now = element_level;
+                                for element in array {
+                                    self.process_value(Some(element), now)?;
+                                    now = now.next();
+                                }
+                            }
+
+                            Ok(())
+                        } else {
+                            return Err(ParquetSerializerError::InvalidValueType {
+                                field: self.path(level),
+                                actual_type: value.kind_str().to_string(),
+                                expected_type: "array".to_string(),
+                            });
+                        }
+                    }
+                    _ => self.extract_flat(value, level.descend(info)),
+                }
+            }
         }
     }
 
-    fn push_value(&mut self, value: Option<T>, rep_level: i16, def_level: i16) {
+    /// Will push at least one value, or error.
+    fn extract_flat(&mut self, value: &Value, level: Level) -> Result<(), ParquetSerializerError> {
+        match value {
+            Value::Array(array) if level.repeated => {
+                if array.is_empty() {
+                    self.push_value(None, level.undefine());
+                } else {
+                    let mut now = level;
+                    for value in array {
+                        self.extract_value(value, now)?;
+                        now = now.next();
+                    }
+                }
+
+                Ok(())
+            }
+            _ => self.extract_value(value, level),
+        }
+    }
+
+    fn push_value(&mut self, value: Option<T>, level: Level) {
         if let Some(rep_levels) = &mut self.rep_levels {
-            rep_levels.push(rep_level);
+            rep_levels.push(level.start_rep_level);
         }
         if let Some(def_levels) = &mut self.def_levels {
-            def_levels.push(def_level);
+            def_levels.push(level.def_level);
         }
         if let Some(value) = value {
             self.values.push(value);
         }
     }
 
-    fn path(&self, level: usize) -> String {
+    fn path(&self, level: Level) -> String {
         let mut path = String::new();
-        for level in &self.levels[1..level] {
+        for level in &self.levels[1..level.level] {
             path.push_str(level.name());
             path.push('.');
         }
-        path.push_str(self.levels[level].name());
+        path.push_str(self.levels[level.level].name());
         path
+    }
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+struct Level {
+    start_rep_level: i16,
+    rep_level: i16,
+    def_level: i16,
+    level: usize,
+    // If this level can be null
+    optional: bool,
+    // If this level is repeated
+    repeated: bool,
+}
+
+impl Level {
+    fn root() -> Self {
+        Self {
+            start_rep_level: 0,
+            rep_level: 0,
+            def_level: 0,
+            level: 1,
+            optional: false,
+            repeated: false,
+        }
+    }
+
+    fn next(self) -> Self {
+        assert!(self.repeated);
+        Self {
+            start_rep_level: self.rep_level,
+            ..self
+        }
+    }
+
+    /// Descend implies that the level is defined.
+    fn descend(self, info: &BasicTypeInfo) -> Self {
+        if info.has_repetition() {
+            match info.repetition() {
+                Repetition::OPTIONAL => self.descend_optional(),
+                Repetition::REPEATED => self.descend_repeated(),
+                Repetition::REQUIRED => self.descend_required(),
+            }
+        } else {
+            self.descend_required()
+        }
+    }
+
+    fn descend_required(self) -> Self {
+        Self {
+            level: self.level + 1,
+            repeated: false,
+            optional: false,
+            ..self
+        }
+    }
+
+    fn descend_optional(self) -> Self {
+        Self {
+            def_level: self.def_level + 1,
+            level: self.level + 1,
+            repeated: false,
+            optional: true,
+            ..self
+        }
+    }
+
+    fn descend_repeated(self) -> Self {
+        Self {
+            rep_level: self.rep_level + 1,
+            def_level: self.def_level + 1,
+            level: self.level + 1,
+            repeated: true,
+            optional: true,
+            ..self
+        }
+    }
+
+    /// Undefines by one level
+    fn undefine(self) -> Self {
+        Self {
+            def_level: self.def_level - 1,
+            ..self
+        }
     }
 }
 
@@ -888,5 +1045,71 @@ mod tests {
                 _ => panic!("Unexpected column"),
             },
         );
+    }
+
+    #[test]
+    fn test_list() {
+        let message_type = r#"
+            message test {
+                optional group answers (LIST){
+                    repeated group list {
+                        optional boolean element;
+                    }
+                }
+            }
+            "#;
+
+        let events = vec![
+            log_event! {},
+            log_event! {"answers" => Value::Null},
+            log_event! {"answers" => Vec::<Value>::new()},
+            log_event! {"answers" => vec![
+                Value::Null,
+                Value::Boolean(true),
+                Value::Null,
+            ]},
+        ];
+
+        validate(
+            message_type,
+            events,
+            1,
+            |i, path, row_group_reader| match path {
+                "answers.list.element" => {
+                    let reader = match row_group_reader.get_column_reader(i).unwrap() {
+                        ColumnReader::BoolColumnReader(r) => r,
+                        _ => panic!("Wrong column type"),
+                    };
+                    assert_column(
+                        6,
+                        &[true],
+                        Some(&[0, 0, 0, 0, 1, 1]),
+                        Some(&[0, 0, 1, 2, 3, 2]),
+                        reader,
+                    );
+                }
+                _ => panic!("Unexpected column"),
+            },
+        );
+    }
+
+    #[test]
+    fn illegal_list_scheme() {
+        let config = ParquetSerializerConfig {
+            parquet: ParquetSerializerOptions {
+                schema: r#"
+            message test {
+                optional group answers (LIST){
+                    optional group list {
+                        optional boolean element;
+                    }
+                }
+            }
+            "#
+                .to_string(),
+            },
+        };
+
+        assert!(config.build().is_err());
     }
 }
