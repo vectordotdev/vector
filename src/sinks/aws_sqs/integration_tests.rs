@@ -1,11 +1,9 @@
 #![cfg(all(test, feature = "aws-sqs-integration-tests"))]
 
 use std::collections::HashMap;
-use std::str::FromStr;
 
-use aws_sdk_sqs::{model::QueueAttributeName, Client as SqsClient, Endpoint, Region};
+use aws_sdk_sqs::{model::QueueAttributeName, Client as SqsClient, Region};
 use codecs::TextSerializerConfig;
-use http::Uri;
 use tokio::time::{sleep, Duration};
 
 use super::{config::SqsSinkConfig, sink::SqsSink};
@@ -32,7 +30,7 @@ async fn create_test_client() -> SqsClient {
     create_client::<SqsClientBuilder>(
         &auth,
         Some(Region::new("localstack")),
-        Some(Endpoint::immutable(Uri::from_str(&endpoint).unwrap())),
+        Some(endpoint),
         &proxy,
         &None,
         true,

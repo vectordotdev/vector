@@ -158,21 +158,23 @@ metrics = "0.21.0"
 metrics-tracing-context = { version = "0.14.0", default-features = false }
 
 # AWS - Official SDK
-aws-sdk-s3 = { version = "0.21.0", default-features = false, features = ["native-tls"], optional = true }
-aws-sdk-sqs = { version = "0.21.0", default-features = false, features = ["native-tls"], optional = true }
-aws-sdk-cloudwatch = { version = "0.21.0", default-features = false, features = ["native-tls"], optional = true }
-aws-sdk-cloudwatchlogs = { version = "0.21.0", default-features = false, features = ["native-tls"], optional = true }
-aws-sdk-elasticsearch = {version = "0.21.0", default-features = false, features = ["native-tls"], optional = true }
-aws-sdk-firehose = { version = "0.21.0", default-features = false, features = ["native-tls"], optional = true }
-aws-sdk-kinesis = { version = "0.21.0", default-features = false, features = ["native-tls"], optional = true }
-aws-types = { version = "0.51.0", default-features = false, features = ["hardcoded-credentials"], optional = true }
-aws-sigv4 = { version = "0.55.3", default-features = false, features = ["sign-http"], optional = true }
-aws-config = { version = "0.51.0", default-features = false, features = ["native-tls"], optional = true }
-aws-smithy-async = { version = "0.51.0", default-features = false, optional = true }
-aws-smithy-client = { version = "0.51.0", default-features = false, features = ["client-hyper"], optional = true}
-aws-smithy-http = { version = "0.51.0", default-features = false, features = ["event-stream"], optional = true }
-aws-smithy-http-tower = { version = "0.54.4", default-features = false, optional = true }
-aws-smithy-types = { version = "0.51.0", default-features = false, optional = true }
+# depending on a fork to circumvent https://github.com/awslabs/aws-sdk-rust/issues/749
+aws-sdk-s3 = { git = "https://github.com/vectordotdev/aws-sdk-rust", rev = "3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670", default-features = false, features = ["native-tls"], optional = true }
+aws-sdk-sqs = { git = "https://github.com/vectordotdev/aws-sdk-rust", rev = "3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670", default-features = false, features = ["native-tls"], optional = true }
+aws-sdk-cloudwatch = { git = "https://github.com/vectordotdev/aws-sdk-rust", rev = "3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670", default-features = false, features = ["native-tls"], optional = true }
+aws-sdk-cloudwatchlogs = { git = "https://github.com/vectordotdev/aws-sdk-rust", rev = "3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670", default-features = false, features = ["native-tls"], optional = true }
+aws-sdk-elasticsearch = { git = "https://github.com/vectordotdev/aws-sdk-rust", rev = "3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670", default-features = false, features = ["native-tls"], optional = true }
+aws-sdk-firehose = { git = "https://github.com/vectordotdev/aws-sdk-rust", rev = "3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670", default-features = false, features = ["native-tls"], optional = true }
+aws-sdk-kinesis = { git = "https://github.com/vectordotdev/aws-sdk-rust", rev = "3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670", default-features = false, features = ["native-tls"], optional = true }
+aws-types = { git = "https://github.com/vectordotdev/aws-sdk-rust", rev = "3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670", default-features = false, optional = true }
+aws-sigv4 = { git = "https://github.com/vectordotdev/aws-sdk-rust", rev = "3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670", default-features = false, features = ["sign-http"], optional = true }
+aws-config = { git = "https://github.com/vectordotdev/aws-sdk-rust", rev = "3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670", default-features = false, features = ["native-tls"], optional = true }
+aws-credential-types = { git = "https://github.com/vectordotdev/aws-sdk-rust", rev = "3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670", default-features = false, features = ["hardcoded-credentials"], optional = true }
+aws-smithy-async = { git = "https://github.com/vectordotdev/aws-sdk-rust", rev = "3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670", default-features = false, optional = true }
+aws-smithy-client = { git = "https://github.com/vectordotdev/aws-sdk-rust", rev = "3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670", default-features = false, features = ["client-hyper"], optional = true}
+aws-smithy-http = { git = "https://github.com/vectordotdev/aws-sdk-rust", rev = "3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670", default-features = false, features = ["event-stream"], optional = true }
+aws-smithy-http-tower = { git = "https://github.com/vectordotdev/aws-sdk-rust", rev = "3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670", default-features = false, optional = true }
+aws-smithy-types = { git = "https://github.com/vectordotdev/aws-sdk-rust", rev = "3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670", default-features = false, optional = true }
 
 # Azure
 azure_core = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "b4544d4920fa3064eb921340054cd9cc130b7664", default-features = false, features = ["enable_reqwest"], optional = true }
@@ -434,6 +436,7 @@ api-client = [
 
 aws-core = [
   "aws-config",
+  "dep:aws-credential-types",
   "dep:aws-sigv4",
   "dep:aws-types",
   "dep:aws-smithy-async",
