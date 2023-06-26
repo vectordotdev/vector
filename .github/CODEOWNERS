@@ -27,7 +27,6 @@ src/sinks/blackhole/ @dsmith3197 @vectordotdev/integrations-team
 src/sinks/clickhouse/ @dsmith3197 @vectordotdev/integrations-team
 src/sinks/console/ @dsmith3197 @vectordotdev/integrations-team
 src/sinks/databend/ @spencergilbert @vectordotdev/integrations-team
-src/sinks/datadog_archives.rs @neuronull @vectordotdev/integrations-team
 src/sinks/datadog_events/ @neuronull @vectordotdev/integrations-team
 src/sinks/datadog_logs/ @neuronull @vectordotdev/integrations-team
 src/sinks/datadog_metrics/ @neuronull @vectordotdev/integrations-team

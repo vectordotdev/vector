@@ -611,7 +611,6 @@ sinks-logs = [
   "sinks-clickhouse",
   "sinks-console",
   "sinks-databend",
-  "sinks-datadog_archives",
   "sinks-datadog_events",
   "sinks-datadog_logs",
   "sinks-datadog_traces",
@@ -670,7 +669,6 @@ sinks-chronicle = []
 sinks-clickhouse = []
 sinks-console = []
 sinks-databend = []
-sinks-datadog_archives = ["sinks-aws_s3", "sinks-azure_blob", "sinks-gcp"]
 sinks-datadog_events = []
 sinks-datadog_logs = []
 sinks-datadog_metrics = ["protobuf-build"]
