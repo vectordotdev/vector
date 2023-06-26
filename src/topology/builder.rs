@@ -541,14 +541,7 @@ impl<'a> Builder<'a> {
                     BufferType::Memory { .. } => "memory",
                     BufferType::DiskV2 { .. } => "disk",
                 };
-                let buffer_span = error_span!(
-                    "sink",
-                    component_kind = "sink",
-                    component_id = %key.id(),
-                    component_type = typetag,
-                    component_name = %key.id(),
-                    buffer_type,
-                );
+                let buffer_span = error_span!("sink", buffer_type);
                 let buffer = sink
                     .buffer
                     .build(
