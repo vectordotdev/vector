@@ -245,10 +245,7 @@ impl<'a> Builder<'a> {
                 let mut rx = builder.add_source_output(output.clone());
 
                 let (mut fanout, control) = Fanout::new();
-                let source = Arc::new(OutputId {
-                    component: key.clone(),
-                    port: output.port.clone(),
-                });
+                let source = Arc::new(key.clone());
 
                 let pump = async move {
                     debug!("Source pump starting.");

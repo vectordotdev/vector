@@ -10,9 +10,9 @@ use http::StatusCode;
 use snafu::Snafu;
 use vector_common::{
     json_size::JsonSize,
-    request_metadata::{MetaDescriptive, RequestMetadata},
+    request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata},
 };
-use vector_core::{internal_event::CountByteSize, stream::DriverResponse};
+use vector_core::stream::DriverResponse;
 
 use crate::{
     event::{EventFinalizers, EventStatus, Finalizable},
@@ -35,8 +35,12 @@ impl Finalizable for AzureBlobRequest {
 }
 
 impl MetaDescriptive for AzureBlobRequest {
-    fn get_metadata(&self) -> RequestMetadata {
-        self.request_metadata
+    fn get_metadata(&self) -> &RequestMetadata {
+        &self.request_metadata
+    }
+
+    fn metadata_mut(&mut self) -> &mut RequestMetadata {
+        &mut self.request_metadata
     }
 }
 
@@ -64,8 +68,7 @@ impl RetryLogic for AzureBlobRetryLogic {
 #[derive(Debug)]
 pub struct AzureBlobResponse {
     pub inner: PutBlockBlobResponse,
-    pub count: usize,
-    pub events_byte_size: JsonSize,
+    pub events_byte_size: GroupedCountByteSize,
     pub byte_size: usize,
 }
 
@@ -74,8 +77,8 @@ impl DriverResponse for AzureBlobResponse {
         EventStatus::Delivered
     }
 
-    fn events_sent(&self) -> CountByteSize {
-        CountByteSize(self.count, self.events_byte_size)
+    fn events_sent(&self) -> &GroupedCountByteSize {
+        &self.events_byte_size
     }
 
     fn bytes_sent(&self) -> Option<usize> {

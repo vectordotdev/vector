@@ -472,6 +472,8 @@ pub async fn load_configs(
     #[cfg(not(feature = "enterprise-tests"))]
     config::init_log_schema(config.global.log_schema.clone(), true);
 
+    config::init_telemetry(config.global.telemetry.clone(), true);
+
     if !config.healthchecks.enabled {
         info!("Health checks are disabled.");
     }

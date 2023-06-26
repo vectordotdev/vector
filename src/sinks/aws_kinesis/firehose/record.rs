@@ -66,9 +66,8 @@ impl SendRecord for KinesisFirehoseClient {
             .instrument(info_span!("request").or_current())
             .await
             .map(|output: PutRecordBatchOutput| KinesisResponse {
-                count: rec_count,
                 failure_count: output.failed_put_count().unwrap_or(0) as usize,
-                events_byte_size: JsonSize::new(total_size),
+                events_byte_size: CountByteSize(rec_count, JsonSize::new(total_size)).into(),
             })
     }
 }

@@ -13,9 +13,9 @@ use hyper::{service::Service, Body, Request};
 use tower::ServiceExt;
 use vector_common::{
     json_size::JsonSize,
-    request_metadata::{MetaDescriptive, RequestMetadata},
+    request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata},
 };
-use vector_core::{internal_event::CountByteSize, stream::DriverResponse, ByteSizeOf};
+use vector_core::{stream::DriverResponse, ByteSizeOf};
 
 use crate::sinks::elasticsearch::sign_request;
 use crate::{
@@ -57,8 +57,12 @@ impl Finalizable for ElasticsearchRequest {
 }
 
 impl MetaDescriptive for ElasticsearchRequest {
-    fn get_metadata(&self) -> RequestMetadata {
-        self.metadata
+    fn get_metadata(&self) -> &RequestMetadata {
+        &self.metadata
+    }
+
+    fn metadata_mut(&mut self) -> &mut RequestMetadata {
+        &mut self.metadata
     }
 }
 
@@ -149,7 +153,7 @@ pub struct ElasticsearchResponse {
     pub http_response: Response<Bytes>,
     pub event_status: EventStatus,
     pub batch_size: usize,
-    pub events_byte_size: JsonSize,
+    pub events_byte_size: GroupedCountByteSize,
 }
 
 impl DriverResponse for ElasticsearchResponse {
@@ -157,8 +161,8 @@ impl DriverResponse for ElasticsearchResponse {
         self.event_status
     }
 
-    fn events_sent(&self) -> CountByteSize {
-        CountByteSize(self.batch_size, self.events_byte_size)
+    fn events_sent(&self) -> &GroupedCountByteSize {
+        &self.events_byte_size
     }
 }
 
@@ -173,12 +177,13 @@ impl Service<ElasticsearchRequest> for ElasticsearchService {
     }
 
     // Emission of internal events for errors and dropped events is handled upstream by the caller.
-    fn call(&mut self, req: ElasticsearchRequest) -> Self::Future {
+    fn call(&mut self, mut req: ElasticsearchRequest) -> Self::Future {
         let mut http_service = self.batch_service.clone();
         Box::pin(async move {
             http_service.ready().await?;
             let batch_size = req.batch_size;
-            let events_byte_size = req.events_byte_size;
+            let events_byte_size =
+                std::mem::take(req.metadata_mut()).into_events_estimated_json_encoded_byte_size();
             let http_response = http_service.call(req).await?;
 
             let event_status = get_event_status(&http_response);
