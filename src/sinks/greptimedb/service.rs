@@ -6,7 +6,7 @@ use futures_util::future::BoxFuture;
 
 use greptimedb_client::api::v1::auth_header::AuthScheme;
 use greptimedb_client::api::v1::*;
-use greptimedb_client::{Client, Database, Error as GreptimeError, DEFAULT_SCHEMA_NAME};
+use greptimedb_client::{Client, Database, Error as GreptimeError};
 use tower::Service;
 use vector_common::finalization::{EventFinalizers, EventStatus, Finalizable};
 use vector_common::internal_event::CountByteSize;
@@ -28,8 +28,8 @@ impl RetryLogic for GreptimeDBRetryLogic {
     type Response = GreptimeDBBatchOutput;
     type Error = GreptimeError;
 
-    fn is_retriable_error(&self, _error: &Self::Error) -> bool {
-        true
+    fn is_retriable_error(&self, error: &Self::Error) -> bool {
+        error.is_retriable()
     }
 }
 
@@ -110,10 +110,7 @@ pub struct GreptimeDBService {
 impl GreptimeDBService {
     pub fn new(config: &GreptimeDBConfig) -> Self {
         let grpc_client = Client::with_urls(vec![&config.endpoint]);
-        let mut client = Database::new_with_dbname(
-            config.dbname.as_deref().unwrap_or(DEFAULT_SCHEMA_NAME),
-            grpc_client,
-        );
+        let mut client = Database::new_with_dbname(&config.dbname, grpc_client);
 
         if let (Some(username), Some(password)) = (&config.username, &config.password) {
             client.set_auth(AuthScheme::Basic(Basic {
@@ -121,6 +118,8 @@ impl GreptimeDBService {
                 password: password.clone().into(),
             }))
         };
+
+        // TODO: tls configuration
 
         GreptimeDBService {
             client: Arc::new(client),

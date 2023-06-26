@@ -117,7 +117,6 @@ fn encode_distribution(samples: &[Sample], columns: &mut Vec<Column>) {
     {
         columns.push(f64_field("min", stats.min));
         columns.push(f64_field("max", stats.max));
-        columns.push(f64_field("median", stats.median));
         columns.push(f64_field("avg", stats.avg));
         columns.push(f64_field("sum", stats.sum));
         columns.push(f64_field("count", stats.count as f64));
@@ -266,11 +265,10 @@ mod tests {
             },
         );
         let insert = metric_to_insert_request(metric);
-        assert_eq!(insert.columns.len(), 12);
+        assert_eq!(insert.columns.len(), 11);
 
         assert_eq!(get_column(&insert.columns, "max"), 3.0);
         assert_eq!(get_column(&insert.columns, "min"), 1.0);
-        assert_eq!(get_column(&insert.columns, "median"), 2.0);
         assert_eq!(get_column(&insert.columns, "avg"), 2.0);
         assert_eq!(get_column(&insert.columns, "sum"), 16.0);
         assert_eq!(get_column(&insert.columns, "count"), 8.0);
