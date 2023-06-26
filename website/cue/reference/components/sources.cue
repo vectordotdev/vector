@@ -94,7 +94,7 @@ components: sources: [Name=string]: {
 								type: string: {
 									default: features.codecs.default_framing
 									enum: {
-										bytes:               "Byte frames are passed through as-is according to the underlying I/O boundaries (e.g. split between messages or stream segments)."
+										bytes:               "Byte frames are passed through as-is according to the underlying I/O boundaries (e.g. split between messages, payloads, or streams)."
 										character_delimited: "Byte frames which are delimited by a chosen character."
 										length_delimited:    "Byte frames which are prefixed by an unsigned big-endian 32-bit integer indicating the length."
 										newline_delimited:   "Byte frames which are delimited by a newline character."

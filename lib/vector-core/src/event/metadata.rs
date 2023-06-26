@@ -1,15 +1,16 @@
 #![deny(missing_docs)]
 
-use std::collections::BTreeMap;
-use std::sync::Arc;
+use std::{collections::BTreeMap, sync::Arc};
 
 use serde::{Deserialize, Serialize};
-use vector_common::EventDataEq;
+use vector_common::{config::ComponentKey, EventDataEq};
 use vrl::value::{Kind, Secrets, Value};
 
 use super::{BatchNotifier, EventFinalizer, EventFinalizers, EventStatus};
-use crate::config::{LogNamespace, OutputId};
-use crate::{schema, ByteSizeOf};
+use crate::{
+    config::{LogNamespace, OutputId},
+    schema, ByteSizeOf,
+};
 
 const DATADOG_API_KEY: &str = "datadog_api_key";
 const SPLUNK_HEC_TOKEN: &str = "splunk_hec_token";
@@ -30,7 +31,7 @@ pub struct EventMetadata {
     finalizers: EventFinalizers,
 
     /// The id of the source
-    source_id: Option<Arc<OutputId>>,
+    source_id: Option<Arc<ComponentKey>>,
 
     /// The id of the component this event originated from. This is used to
     /// determine which schema definition to attach to an event in transforms.
@@ -82,8 +83,8 @@ impl EventMetadata {
 
     /// Returns a reference to the metadata source id.
     #[must_use]
-    pub fn source_id(&self) -> Option<&OutputId> {
-        self.source_id.as_deref()
+    pub fn source_id(&self) -> Option<&Arc<ComponentKey>> {
+        self.source_id.as_ref()
     }
 
     /// Returns a reference to the metadata parent id. This is the `OutputId`
@@ -94,7 +95,7 @@ impl EventMetadata {
     }
 
     /// Sets the `source_id` in the metadata to the provided value.
-    pub fn set_source_id(&mut self, source_id: Arc<OutputId>) {
+    pub fn set_source_id(&mut self, source_id: Arc<ComponentKey>) {
         self.source_id = Some(source_id);
     }
 

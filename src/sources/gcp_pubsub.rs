@@ -618,7 +618,7 @@ impl PubsubSource {
 
         let count = events.len();
         match self.out.send_batch(events).await {
-            Err(error) => emit!(StreamClosedError { error, count }),
+            Err(_) => emit!(StreamClosedError { count }),
             Ok(()) => match notifier {
                 None => ack_ids
                     .send(ids)

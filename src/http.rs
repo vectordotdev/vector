@@ -53,10 +53,12 @@ impl HttpError {
 }
 
 pub type HttpClientFuture = <HttpClient as Service<http::Request<Body>>>::Future;
+type HttpProxyConnector = ProxyConnector<HttpsConnector<HttpConnector>>;
 
 pub struct HttpClient<B = Body> {
-    client: Client<ProxyConnector<HttpsConnector<HttpConnector>>, B>,
+    client: Client<HttpProxyConnector, B>,
     user_agent: HeaderValue,
+    proxy_connector: HttpProxyConnector,
 }
 
 impl<B> HttpClient<B>
@@ -77,14 +79,18 @@ where
         proxy_config: &ProxyConfig,
         client_builder: &mut client::Builder,
     ) -> Result<HttpClient<B>, HttpError> {
-        let proxy = build_proxy_connector(tls_settings.into(), proxy_config)?;
-        let client = client_builder.build(proxy);
+        let proxy_connector = build_proxy_connector(tls_settings.into(), proxy_config)?;
+        let client = client_builder.build(proxy_connector.clone());
 
         let version = crate::get_version();
         let user_agent = HeaderValue::from_str(&format!("Vector/{}", version))
             .expect("Invalid header value for version!");
 
-        Ok(HttpClient { client, user_agent })
+        Ok(HttpClient {
+            client,
+            user_agent,
+            proxy_connector,
+        })
     }
 
     pub fn send(
@@ -95,6 +101,7 @@ where
         let _enter = span.enter();
 
         default_request_headers(&mut request, &self.user_agent);
+        self.maybe_add_proxy_headers(&mut request);
 
         emit!(http_client::AboutToSendHttpRequest { request: &request });
 
@@ -134,6 +141,17 @@ where
         .instrument(span.clone().or_current());
 
         Box::pin(fut)
+    }
+
+    fn maybe_add_proxy_headers(&self, request: &mut Request<B>) {
+        if let Some(proxy_headers) = self.proxy_connector.http_headers(request.uri()) {
+            for (k, v) in proxy_headers {
+                let request_headers = request.headers_mut();
+                if !request_headers.contains_key(k) {
+                    request_headers.insert(k, v.into());
+                }
+            }
+        }
     }
 }
 
@@ -216,6 +234,7 @@ impl<B> Clone for HttpClient<B> {
         Self {
             client: self.client.clone(),
             user_agent: self.user_agent.clone(),
+            proxy_connector: self.proxy_connector.clone(),
         }
     }
 }

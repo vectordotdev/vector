@@ -109,12 +109,13 @@ where
         }
     }
 
-    fn call(&mut self, req: HecRequest) -> Self::Future {
+    fn call(&mut self, mut req: HecRequest) -> Self::Future {
         let ack_finalizer_tx = self.ack_finalizer_tx.clone();
         let ack_slot = self.current_ack_slot.take();
 
-        let events_count = req.get_metadata().event_count();
-        let events_byte_size = req.get_metadata().events_estimated_json_encoded_byte_size();
+        let metadata = std::mem::take(req.metadata_mut());
+        let events_count = metadata.event_count();
+        let events_byte_size = metadata.into_events_estimated_json_encoded_byte_size();
         let response = self.inner.call(req);
 
         Box::pin(async move {

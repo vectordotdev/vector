@@ -69,8 +69,9 @@ where
                 self.batch_settings,
             )
             .map(|(key, events)| {
-                let metadata =
-                    RequestMetadata::from_batch(events.iter().map(|req| req.get_metadata()));
+                let metadata = RequestMetadata::from_batch(
+                    events.iter().map(|req| req.get_metadata().clone()),
+                );
                 BatchKinesisRequest {
                     key,
                     events,
@@ -159,7 +160,7 @@ where
                 partition_key: self.key.partition_key.clone(),
             },
             events: self.events.to_vec(),
-            metadata: self.metadata,
+            metadata: self.metadata.clone(),
         }
     }
 }
@@ -177,8 +178,12 @@ impl<R> MetaDescriptive for BatchKinesisRequest<R>
 where
     R: Record + Clone,
 {
-    fn get_metadata(&self) -> RequestMetadata {
-        self.metadata
+    fn get_metadata(&self) -> &RequestMetadata {
+        &self.metadata
+    }
+
+    fn metadata_mut(&mut self) -> &mut RequestMetadata {
+        &mut self.metadata
     }
 }
 

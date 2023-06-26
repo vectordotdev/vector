@@ -20,7 +20,10 @@ pub(crate) const QUEUED_MIN_MESSAGES: u64 = 100000;
 
 /// Configuration for the `kafka` sink.
 #[serde_as]
-#[configurable_component(sink("kafka"))]
+#[configurable_component(sink(
+    "kafka",
+    "Publish observability event data to Apache Kafka topics."
+))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct KafkaSinkConfig {
@@ -262,6 +265,7 @@ impl GenerateConfig for KafkaSinkConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "kafka")]
 impl SinkConfig for KafkaSinkConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let sink = KafkaSink::new(self.clone())?;

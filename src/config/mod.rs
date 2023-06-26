@@ -54,7 +54,7 @@ pub use loading::{
 };
 pub use provider::ProviderConfig;
 pub use secret::SecretBackend;
-pub use sink::{SinkConfig, SinkContext, SinkHealthcheckOptions, SinkOuter};
+pub use sink::{BoxedSink, SinkConfig, SinkContext, SinkHealthcheckOptions, SinkOuter};
 pub use source::{BoxedSource, SourceConfig, SourceContext, SourceOuter};
 pub use transform::{
     get_transform_output_ids, BoxedTransform, TransformConfig, TransformContext, TransformOuter,
@@ -63,7 +63,7 @@ pub use unit_test::{build_unit_tests, build_unit_tests_main, UnitTestResult};
 pub use validation::warnings;
 pub use vars::{interpolate, ENVIRONMENT_VARIABLE_INTERPOLATION_REGEX};
 pub use vector_core::config::{
-    init_log_schema, log_schema, proxy::ProxyConfig, LogSchema, OutputId,
+    init_log_schema, init_telemetry, log_schema, proxy::ProxyConfig, telemetry, LogSchema, OutputId,
 };
 
 #[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq)]
@@ -1314,6 +1314,7 @@ mod resource_tests {
     proptest! {
         #[test]
         fn valid(addr: IpAddr, port1 in specport(), port2 in specport()) {
+            prop_assume!(port1 != port2);
             let components = vec![
                 ("sink_0", vec![tcp(addr, 0)]),
                 ("sink_1", vec![tcp(addr, port1)]),

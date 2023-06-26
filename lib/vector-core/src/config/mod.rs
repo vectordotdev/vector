@@ -8,6 +8,7 @@ mod global_options;
 mod log_schema;
 pub mod output_id;
 pub mod proxy;
+mod telemetry;
 
 use crate::event::LogEvent;
 pub use global_options::GlobalOptions;
@@ -15,6 +16,7 @@ pub use log_schema::{init_log_schema, log_schema, LogSchema};
 use lookup::{lookup_v2::ValuePath, path, PathPrefix};
 pub use output_id::OutputId;
 use serde::{Deserialize, Serialize};
+pub use telemetry::{init_telemetry, telemetry, Tags, Telemetry};
 pub use vector_common::config::ComponentKey;
 use vector_config::configurable_component;
 use vrl::value::Value;

@@ -26,7 +26,7 @@ use crate::{
 pub(super) const HOST: &str = "https://cloud.humio.com";
 
 /// Configuration for the `humio_logs` sink.
-#[configurable_component(sink("humio_logs"))]
+#[configurable_component(sink("humio_logs", "Deliver log event data to Humio."))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct HumioLogsConfig {
@@ -168,6 +168,7 @@ impl GenerateConfig for HumioLogsConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "humio_logs")]
 impl SinkConfig for HumioLogsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         self.build_hec_config().build(cx).await

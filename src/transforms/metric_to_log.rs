@@ -348,6 +348,7 @@ mod tests {
     use similar_asserts::assert_eq;
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
+    use vector_common::config::ComponentKey;
     use vector_core::metric_tags;
 
     use super::*;
@@ -412,7 +413,7 @@ mod tests {
         .with_tags(Some(tags()))
         .with_timestamp(Some(ts()));
         let mut metadata = counter.metadata().clone();
-        metadata.set_source_id(Arc::new(OutputId::from("in")));
+        metadata.set_source_id(Arc::new(ComponentKey::from("in")));
         metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
         metadata.set_schema_definition(&Arc::new(schema_definition(LogNamespace::Legacy)));
 
@@ -442,7 +443,7 @@ mod tests {
         )
         .with_timestamp(Some(ts()));
         let mut metadata = gauge.metadata().clone();
-        metadata.set_source_id(Arc::new(OutputId::from("in")));
+        metadata.set_source_id(Arc::new(ComponentKey::from("in")));
         metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
         metadata.set_schema_definition(&Arc::new(schema_definition(LogNamespace::Legacy)));
 
@@ -472,7 +473,7 @@ mod tests {
         )
         .with_timestamp(Some(ts()));
         let mut metadata = set.metadata().clone();
-        metadata.set_source_id(Arc::new(OutputId::from("in")));
+        metadata.set_source_id(Arc::new(ComponentKey::from("in")));
         metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
         metadata.set_schema_definition(&Arc::new(schema_definition(LogNamespace::Legacy)));
 
@@ -504,7 +505,7 @@ mod tests {
         )
         .with_timestamp(Some(ts()));
         let mut metadata = distro.metadata().clone();
-        metadata.set_source_id(Arc::new(OutputId::from("in")));
+        metadata.set_source_id(Arc::new(ComponentKey::from("in")));
         metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
         metadata.set_schema_definition(&Arc::new(schema_definition(LogNamespace::Legacy)));
 
@@ -555,7 +556,7 @@ mod tests {
         )
         .with_timestamp(Some(ts()));
         let mut metadata = histo.metadata().clone();
-        metadata.set_source_id(Arc::new(OutputId::from("in")));
+        metadata.set_source_id(Arc::new(ComponentKey::from("in")));
         metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
         metadata.set_schema_definition(&Arc::new(schema_definition(LogNamespace::Legacy)));
 
@@ -604,7 +605,7 @@ mod tests {
         )
         .with_timestamp(Some(ts()));
         let mut metadata = summary.metadata().clone();
-        metadata.set_source_id(Arc::new(OutputId::from("in")));
+        metadata.set_source_id(Arc::new(ComponentKey::from("in")));
         metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
         metadata.set_schema_definition(&Arc::new(schema_definition(LogNamespace::Legacy)));
 

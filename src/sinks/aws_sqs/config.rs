@@ -32,7 +32,10 @@ pub(super) enum BuildError {
 }
 
 /// Configuration for the `aws_sqs` sink.
-#[configurable_component(sink("aws_sqs"))]
+#[configurable_component(sink(
+    "aws_sqs",
+    "Publish observability events to AWS Simple Queue Service topics."
+))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct SqsSinkConfig {
@@ -111,6 +114,7 @@ impl GenerateConfig for SqsSinkConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "aws_sqs")]
 impl SinkConfig for SqsSinkConfig {
     async fn build(
         &self,
@@ -149,7 +153,7 @@ impl SqsSinkConfig {
         create_client::<SqsClientBuilder>(
             &self.auth,
             self.region.region(),
-            self.region.endpoint()?,
+            self.region.endpoint(),
             proxy,
             &self.tls,
             true,

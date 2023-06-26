@@ -25,7 +25,10 @@ use crate::{
 };
 
 /// Configuration for the `azure_blob` sink.
-#[configurable_component(sink("azure_blob"))]
+#[configurable_component(sink(
+    "azure_blob",
+    "Store your observability data in Azure Blob Storage."
+))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct AzureBlobSinkConfig {
@@ -164,6 +167,7 @@ impl GenerateConfig for AzureBlobSinkConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "azure_blob")]
 impl SinkConfig for AzureBlobSinkConfig {
     async fn build(&self, _cx: SinkContext) -> Result<(VectorSink, Healthcheck)> {
         let client = azure_common::config::build_client(

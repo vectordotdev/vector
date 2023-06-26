@@ -97,7 +97,10 @@ impl SinkBatchSettings for ChronicleUnstructuredDefaultBatchSettings {
 }
 
 /// Configuration for the `gcp_chronicle_unstructured` sink.
-#[configurable_component(sink("gcp_chronicle_unstructured"))]
+#[configurable_component(sink(
+    "gcp_chronicle_unstructured",
+    "Store unstructured log events in Google Chronicle."
+))]
 #[derive(Clone, Debug)]
 pub struct ChronicleUnstructuredConfig {
     /// The endpoint to send data to.
@@ -190,6 +193,7 @@ pub enum ChronicleError {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "gcp_chronicle_unstructured")]
 impl SinkConfig for ChronicleUnstructuredConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let creds = self.auth.build(Scope::MalachiteIngestion).await?;
@@ -282,8 +286,12 @@ impl Finalizable for ChronicleRequest {
 }
 
 impl MetaDescriptive for ChronicleRequest {
-    fn get_metadata(&self) -> RequestMetadata {
-        self.metadata
+    fn get_metadata(&self) -> &RequestMetadata {
+        &self.metadata
+    }
+
+    fn metadata_mut(&mut self) -> &mut RequestMetadata {
+        &mut self.metadata
     }
 }
 
@@ -470,7 +478,7 @@ impl Service<ChronicleRequest> for ChronicleService {
             HeaderValue::from_str(&request.body.len().to_string()).unwrap(),
         );
 
-        let metadata = request.get_metadata();
+        let metadata = request.get_metadata().clone();
 
         let mut http_request = builder.body(Body::from(request.body)).unwrap();
         self.creds.apply(&mut http_request);

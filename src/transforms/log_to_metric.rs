@@ -414,6 +414,7 @@ mod tests {
     use std::time::Duration;
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
+    use vector_common::config::ComponentKey;
     use vector_core::metric_tags;
 
     use super::*;
@@ -516,7 +517,7 @@ mod tests {
         // definitions aren't valid for metrics yet, it's just set to the default (anything).
         metadata.set_schema_definition(&Arc::new(Definition::any()));
         metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
-        metadata.set_source_id(Arc::new(OutputId::from("in")));
+        metadata.set_source_id(Arc::new(ComponentKey::from("in")));
         let metric = do_transform(config, event).await.unwrap();
 
         assert_eq!(
@@ -551,7 +552,7 @@ mod tests {
         // definitions aren't valid for metrics yet, it's just set to the default (anything).
         metadata.set_schema_definition(&Arc::new(Definition::any()));
         metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
-        metadata.set_source_id(Arc::new(OutputId::from("in")));
+        metadata.set_source_id(Arc::new(ComponentKey::from("in")));
 
         let metric = do_transform(config, event).await.unwrap();
 
@@ -643,8 +644,8 @@ mod tests {
         // definitions aren't valid for metrics yet, it's just set to the default (anything).
         metadata.set_schema_definition(&Arc::new(Definition::any()));
         metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
+        metadata.set_source_id(Arc::new(ComponentKey::from("in")));
 
-        metadata.set_source_id(Arc::new(OutputId::from("in")));
         let metric = do_transform(config, event).await.unwrap();
 
         assert_eq!(
@@ -691,7 +692,7 @@ mod tests {
         // definitions aren't valid for metrics yet, it's just set to the default (anything).
         metadata.set_schema_definition(&Arc::new(Definition::any()));
         metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
-        metadata.set_source_id(Arc::new(OutputId::from("in")));
+        metadata.set_source_id(Arc::new(ComponentKey::from("in")));
         let metric = do_transform(config, event).await.unwrap();
 
         assert_eq!(
@@ -723,7 +724,7 @@ mod tests {
         let mut metadata = event.metadata().clone();
         // definitions aren't valid for metrics yet, it's just set to the default (anything).
         metadata.set_schema_definition(&Arc::new(Definition::any()));
-        metadata.set_source_id(Arc::new(OutputId::from("in")));
+        metadata.set_source_id(Arc::new(ComponentKey::from("in")));
         metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
 
         let metric = do_transform(config, event).await.unwrap();
@@ -757,7 +758,7 @@ mod tests {
         // definitions aren't valid for metrics yet, it's just set to the default (anything).
         metadata.set_schema_definition(&Arc::new(Definition::any()));
 
-        metadata.set_source_id(Arc::new(OutputId::from("in")));
+        metadata.set_source_id(Arc::new(ComponentKey::from("in")));
         metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
 
         let metric = do_transform(config, event).await.unwrap();
@@ -843,10 +844,12 @@ mod tests {
         event.as_mut_log().insert("status", "42");
         event.as_mut_log().insert("backtrace", "message");
         let mut metadata = event.metadata().clone();
+
         // definitions aren't valid for metrics yet, it's just set to the default (anything).
         metadata.set_schema_definition(&Arc::new(Definition::any()));
         metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
-        metadata.set_source_id(Arc::new(OutputId::from("in")));
+        metadata.set_source_id(Arc::new(ComponentKey::from("in")));
+
         let output = do_transform_multiple_events(config, event, 2).await;
 
         assert_eq!(2, output.len());
@@ -900,10 +903,11 @@ mod tests {
         event.as_mut_log().insert("worker", "abc");
         event.as_mut_log().insert("service", "xyz");
         let mut metadata = event.metadata().clone();
+
         // definitions aren't valid for metrics yet, it's just set to the default (anything).
         metadata.set_schema_definition(&Arc::new(Definition::any()));
         metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
-        metadata.set_source_id(Arc::new(OutputId::from("in")));
+        metadata.set_source_id(Arc::new(ComponentKey::from("in")));
 
         let output = do_transform_multiple_events(config, event, 2).await;
 
@@ -949,7 +953,8 @@ mod tests {
         // definitions aren't valid for metrics yet, it's just set to the default (anything).
         metadata.set_schema_definition(&Arc::new(Definition::any()));
         metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
-        metadata.set_source_id(Arc::new(OutputId::from("in")));
+        metadata.set_source_id(Arc::new(ComponentKey::from("in")));
+
         let metric = do_transform(config, event).await.unwrap();
 
         assert_eq!(
@@ -978,10 +983,12 @@ mod tests {
 
         let event = create_event("response_time", "2.5");
         let mut metadata = event.metadata().clone();
+
         // definitions aren't valid for metrics yet, it's just set to the default (anything).
         metadata.set_schema_definition(&Arc::new(Definition::any()));
         metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
-        metadata.set_source_id(Arc::new(OutputId::from("in")));
+        metadata.set_source_id(Arc::new(ComponentKey::from("in")));
+
         let metric = do_transform(config, event).await.unwrap();
 
         assert_eq!(
@@ -1014,7 +1021,8 @@ mod tests {
         // definitions aren't valid for metrics yet, it's just set to the default (anything).
         metadata.set_schema_definition(&Arc::new(Definition::any()));
         metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
-        metadata.set_source_id(Arc::new(OutputId::from("in")));
+        metadata.set_source_id(Arc::new(ComponentKey::from("in")));
+
         let metric = do_transform(config, event).await.unwrap();
 
         assert_eq!(

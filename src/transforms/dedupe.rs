@@ -288,6 +288,7 @@ mod tests {
 
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
+    use vector_common::config::ComponentKey;
     use vector_core::config::OutputId;
 
     use crate::config::schema::Definition;
@@ -363,7 +364,7 @@ mod tests {
             tx.send(event1.clone()).await.unwrap();
             let new_event = out.recv().await.unwrap();
 
-            event1.set_source_id(Arc::new(OutputId::from("in")));
+            event1.set_source_id(Arc::new(ComponentKey::from("in")));
             event1.set_upstream_id(Arc::new(OutputId::from("transform")));
             // the schema definition is copied from the source for dedupe
             event1
@@ -376,7 +377,7 @@ mod tests {
             tx.send(event2.clone()).await.unwrap();
             let new_event = out.recv().await.unwrap();
 
-            event2.set_source_id(Arc::new(OutputId::from("in")));
+            event2.set_source_id(Arc::new(ComponentKey::from("in")));
             event2.set_upstream_id(Arc::new(OutputId::from("transform")));
             // the schema definition is copied from the source for dedupe
             event2
@@ -423,7 +424,7 @@ mod tests {
             tx.send(event1.clone()).await.unwrap();
             let new_event = out.recv().await.unwrap();
 
-            event1.set_source_id(Arc::new(OutputId::from("in")));
+            event1.set_source_id(Arc::new(ComponentKey::from("in")));
             event1.set_upstream_id(Arc::new(OutputId::from("transform")));
             // the schema definition is copied from the source for dedupe
             event1
@@ -436,7 +437,7 @@ mod tests {
             tx.send(event2.clone()).await.unwrap();
             let new_event = out.recv().await.unwrap();
 
-            event2.set_source_id(Arc::new(OutputId::from("in")));
+            event2.set_source_id(Arc::new(ComponentKey::from("in")));
             event2.set_upstream_id(Arc::new(OutputId::from("transform")));
             // the schema definition is copied from the source for dedupe
             event2
@@ -486,7 +487,7 @@ mod tests {
             tx.send(event1.clone()).await.unwrap();
             let new_event = out.recv().await.unwrap();
 
-            event1.set_source_id(Arc::new(OutputId::from("in")));
+            event1.set_source_id(Arc::new(ComponentKey::from("in")));
             event1.set_upstream_id(Arc::new(OutputId::from("transform")));
             // the schema definition is copied from the source for dedupe
             event1
@@ -536,7 +537,7 @@ mod tests {
             tx.send(event1.clone()).await.unwrap();
             let new_event = out.recv().await.unwrap();
 
-            event1.set_source_id(Arc::new(OutputId::from("in")));
+            event1.set_source_id(Arc::new(ComponentKey::from("in")));
             event1.set_upstream_id(Arc::new(OutputId::from("transform")));
 
             // the schema definition is copied from the source for dedupe
@@ -550,7 +551,7 @@ mod tests {
             tx.send(event2.clone()).await.unwrap();
             let new_event = out.recv().await.unwrap();
 
-            event2.set_source_id(Arc::new(OutputId::from("in")));
+            event2.set_source_id(Arc::new(ComponentKey::from("in")));
             event2.set_upstream_id(Arc::new(OutputId::from("transform")));
             // the schema definition is copied from the source for dedupe
             event2
@@ -564,7 +565,7 @@ mod tests {
             tx.send(event1.clone()).await.unwrap();
             let new_event = out.recv().await.unwrap();
 
-            event1.set_source_id(Arc::new(OutputId::from("in")));
+            event1.set_source_id(Arc::new(ComponentKey::from("in")));
             assert_eq!(new_event, event1);
 
             drop(tx);
@@ -605,7 +606,7 @@ mod tests {
             tx.send(event1.clone()).await.unwrap();
             let new_event = out.recv().await.unwrap();
 
-            event1.set_source_id(Arc::new(OutputId::from("in")));
+            event1.set_source_id(Arc::new(ComponentKey::from("in")));
             event1.set_upstream_id(Arc::new(OutputId::from("transform")));
             // the schema definition is copied from the source for dedupe
             event1
@@ -618,7 +619,7 @@ mod tests {
             tx.send(event2.clone()).await.unwrap();
             let new_event = out.recv().await.unwrap();
 
-            event2.set_source_id(Arc::new(OutputId::from("in")));
+            event2.set_source_id(Arc::new(ComponentKey::from("in")));
             event2.set_upstream_id(Arc::new(OutputId::from("transform")));
             // the schema definition is copied from the source for dedupe
             event2
@@ -668,7 +669,7 @@ mod tests {
             tx.send(event1.clone()).await.unwrap();
             let new_event = out.recv().await.unwrap();
 
-            event1.set_source_id(Arc::new(OutputId::from("in")));
+            event1.set_source_id(Arc::new(ComponentKey::from("in")));
             event1.set_upstream_id(Arc::new(OutputId::from("transform")));
             // the schema definition is copied from the source for dedupe
             event1
@@ -681,7 +682,7 @@ mod tests {
             tx.send(event2.clone()).await.unwrap();
             let new_event = out.recv().await.unwrap();
 
-            event2.set_source_id(Arc::new(OutputId::from("in")));
+            event2.set_source_id(Arc::new(ComponentKey::from("in")));
             event2.set_upstream_id(Arc::new(OutputId::from("transform")));
             // the schema definition is copied from the source for dedupe
             event2
@@ -724,7 +725,7 @@ mod tests {
             tx.send(event1.clone()).await.unwrap();
             let new_event = out.recv().await.unwrap();
 
-            event1.set_source_id(Arc::new(OutputId::from("in")));
+            event1.set_source_id(Arc::new(ComponentKey::from("in")));
             event1.set_upstream_id(Arc::new(OutputId::from("transform")));
             // the schema definition is copied from the source for dedupe
             event1
@@ -737,7 +738,7 @@ mod tests {
             tx.send(event2.clone()).await.unwrap();
             let new_event = out.recv().await.unwrap();
 
-            event2.set_source_id(Arc::new(OutputId::from("in")));
+            event2.set_source_id(Arc::new(ComponentKey::from("in")));
             event2.set_upstream_id(Arc::new(OutputId::from("transform")));
             // the schema definition is copied from the source for dedupe
             event2

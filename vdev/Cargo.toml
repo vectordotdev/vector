@@ -20,11 +20,11 @@ directories = "5.0.1"
 # remove this when stabilized https://doc.rust-lang.org/stable/std/path/fn.absolute.html
 dunce = "1.0.4"
 glob = { version = "0.3.1", default-features = false }
-hashlink = { version = "0.8.2", features = ["serde_impl"] }
 hex = "0.4.3"
+indexmap = { version = "1.9", default-features = false, features = ["serde"] }
 indicatif = { version = "0.17.5", features = ["improved_unicode"] }
-itertools = "0.10.5"
-log = "0.4.18"
+itertools = "0.11.0"
+log = "0.4.19"
 once_cell = "1.18"
 os_info = { version = "3.7.0", default-features = false }
 # watch https://github.com/epage/anstyle for official interop with Clap
@@ -33,8 +33,8 @@ paste = "1.0.12"
 regex = { version = "1.8.4", default-features = false, features = ["std", "perf"] }
 reqwest = { version = "0.11", features = ["json", "blocking"] }
 serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0.96"
+serde_json = "1.0.97"
 serde_yaml = "0.9.21"
-sha2 = "0.10.6"
+sha2 = "0.10.7"
 tempfile = "3.6.0"
 toml = { version = "0.7.4", default-features = false, features = ["parse"] }

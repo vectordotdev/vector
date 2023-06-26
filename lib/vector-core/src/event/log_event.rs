@@ -15,7 +15,9 @@ use lookup::lookup_v2::TargetPath;
 use lookup::PathPrefix;
 use serde::{Deserialize, Serialize, Serializer};
 use vector_common::{
+    internal_event::OptionalTag,
     json_size::{JsonSize, NonZeroJsonSize},
+    request_metadata::{EventCountTags, GetEventCountTags},
     EventDataEq,
 };
 
@@ -25,8 +27,8 @@ use super::{
     metadata::EventMetadata,
     util, EventFinalizers, Finalizable, Value,
 };
-use crate::config::log_schema;
 use crate::config::LogNamespace;
+use crate::config::{log_schema, telemetry};
 use crate::{event::MaybeAsLogMut, ByteSizeOf};
 use lookup::{metadata_path, path};
 
@@ -209,6 +211,26 @@ impl Finalizable for LogEvent {
 impl EstimatedJsonEncodedSizeOf for LogEvent {
     fn estimated_json_encoded_size_of(&self) -> JsonSize {
         self.inner.estimated_json_encoded_size_of()
+    }
+}
+
+impl GetEventCountTags for LogEvent {
+    fn get_tags(&self) -> EventCountTags {
+        let source = if telemetry().tags().emit_source {
+            self.metadata().source_id().cloned().into()
+        } else {
+            OptionalTag::Ignored
+        };
+
+        let service = if telemetry().tags().emit_service {
+            self.get_by_meaning("service")
+                .map(ToString::to_string)
+                .into()
+        } else {
+            OptionalTag::Ignored
+        };
+
+        EventCountTags { source, service }
     }
 }
 

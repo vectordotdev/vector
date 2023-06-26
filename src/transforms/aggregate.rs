@@ -155,6 +155,7 @@ mod tests {
     use futures::stream;
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
+    use vector_common::config::ComponentKey;
     use vrl::value::Kind;
 
     use super::*;
@@ -176,7 +177,7 @@ mod tests {
         value: metric::MetricValue,
     ) -> Event {
         let mut event = Event::Metric(Metric::new(name, kind, value))
-            .with_source_id(Arc::new(OutputId::from("in")))
+            .with_source_id(Arc::new(ComponentKey::from("in")))
             .with_upstream_id(Arc::new(OutputId::from("transform")));
         event.metadata_mut().set_schema_definition(&Arc::new(
             Definition::new_with_default_metadata(Kind::any_object(), [LogNamespace::Legacy]),

@@ -127,11 +127,9 @@ pub(super) fn unix_datagram(
     let max_length = config
         .framing
         .and_then(|framing| match framing {
-            FramingConfig::CharacterDelimited {
-                character_delimited,
-            } => character_delimited.max_length,
-            FramingConfig::NewlineDelimited { newline_delimited } => newline_delimited.max_length,
-            FramingConfig::OctetCounting { octet_counting } => octet_counting.max_length,
+            FramingConfig::CharacterDelimited(config) => config.character_delimited.max_length,
+            FramingConfig::NewlineDelimited(config) => config.newline_delimited.max_length,
+            FramingConfig::OctetCounting(config) => config.octet_counting.max_length,
             _ => None,
         })
         .unwrap_or_else(crate::serde::default_max_length);

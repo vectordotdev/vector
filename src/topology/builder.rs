@@ -19,7 +19,6 @@ use tracing::Instrument;
 use vector_common::internal_event::{
     self, CountByteSize, EventsSent, InternalEventHandle as _, Registered,
 };
-use vector_config::NamedComponent;
 use vector_core::config::LogNamespace;
 use vector_core::transform::update_runtime_schema_definition;
 use vector_core::{
@@ -43,7 +42,7 @@ use super::{
 use crate::{
     config::{
         ComponentKey, DataType, EnrichmentTableConfig, Input, Inputs, OutputId, ProxyConfig,
-        SinkConfig, SinkContext, SourceContext, TransformContext, TransformOuter, TransformOutput,
+        SinkContext, SourceContext, TransformContext, TransformOuter, TransformOutput,
     },
     event::{EventArray, EventContainer},
     internal_events::EventsReceived,
@@ -247,10 +246,7 @@ impl<'a> Builder<'a> {
                 let mut rx = builder.add_source_output(output.clone(), key.clone());
 
                 let (mut fanout, control) = Fanout::new();
-                let source = Arc::new(OutputId {
-                    component: key.clone(),
-                    port: output.port.clone(),
-                });
+                let source = Arc::new(key.clone());
 
                 let pump = async move {
                     debug!("Source pump starting.");

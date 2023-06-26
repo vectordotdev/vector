@@ -27,7 +27,10 @@ use crate::{
 };
 
 /// Configuration of the `splunk_hec_metrics` sink.
-#[configurable_component(sink("splunk_hec_metrics"))]
+#[configurable_component(sink(
+    "splunk_hec_metrics",
+    "Deliver metric data to Splunk's HTTP Event Collector."
+))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct HecMetricsSinkConfig {
@@ -138,6 +141,7 @@ impl GenerateConfig for HecMetricsSinkConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "splunk_hec_metrics")]
 impl SinkConfig for HecMetricsSinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let client = create_client(&self.tls, cx.proxy())?;

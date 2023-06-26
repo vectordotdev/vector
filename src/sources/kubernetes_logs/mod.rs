@@ -21,10 +21,7 @@ use k8s_paths_provider::K8sPathsProvider;
 use kube::{
     api::Api,
     config::{self, KubeConfigOptions},
-    runtime::{
-        reflector::{self},
-        watcher, WatchStreamExt,
-    },
+    runtime::{reflector, watcher, WatchStreamExt},
     Client, Config as ClientConfig,
 };
 use lifecycle::Lifecycle;
@@ -871,8 +868,7 @@ impl Source {
             .map(|result| {
                 match result {
                     Ok(Ok(())) => info!(message = "Event processing loop completed gracefully."),
-                    Ok(Err(error)) => emit!(StreamClosedError {
-                        error,
+                    Ok(Err(_)) => emit!(StreamClosedError {
                         count: events_count
                     }),
                     Err(error) => emit!(KubernetesLifecycleError {
