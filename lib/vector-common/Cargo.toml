@@ -55,7 +55,7 @@ ordered-float = { version = "3.7.0", default-features = false }
 paste = "1.0.12"
 pin-project = { version = "1.1.0", default-features = false }
 ryu = { version = "1", default-features = false }
-serde_json = { version = "1.0.97", default-features = false, features = ["std", "raw_value"] }
+serde_json = { version = "1.0.99", default-features = false, features = ["std", "raw_value"] }
 serde = { version = "1.0.164", optional = true, features = ["derive"] }
 smallvec = { version = "1", default-features = false }
 snafu = { version = "0.7", optional = true }
