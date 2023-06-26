@@ -577,9 +577,6 @@ const fn max_compression_overhead_len(compressed_limit: usize) -> usize {
     // We calculate the overhead as the zlib header/trailer plus the worst case overhead of
     // compressing `compressed_limit` bytes, such that we assume all of the data we write may not be
     // compressed at all.
-    //
-    // [1] https://www.zlib.net/zlib_tech.html
-    // [2] https://www.bolet.org/~pornin/deflate-flush-fr.html
     ZLIB_HEADER_TRAILER + max_compressed_overhead_len(compressed_limit)
 }
 

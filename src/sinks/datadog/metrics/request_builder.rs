@@ -293,7 +293,6 @@ fn encode_now_or_never(
                 payload.len(),
                 processed.estimated_json_encoded_size_of(),
             );
-            debug!("dd metrics request metadata: {:?}", request_metadata);
 
             ((ddmetrics_metadata, request_metadata), payload)
         })
