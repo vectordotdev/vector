@@ -10,10 +10,7 @@ use http::{
 use hyper::Body;
 use snafu::ResultExt;
 use tower::Service;
-use vector_common::{
-    json_size::JsonSize,
-    request_metadata::{MetaDescriptive, RequestMetadata},
-};
+use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
 use vector_core::{
     event::{EventFinalizers, EventStatus, Finalizable},
     internal_event::CountByteSize,
@@ -64,7 +61,6 @@ pub struct DatadogMetricsRequest {
     pub uri: Uri,
     pub content_type: &'static str,
     pub finalizers: EventFinalizers,
-    pub raw_bytes: usize,
     pub metadata: RequestMetadata,
 }
 
@@ -125,9 +121,7 @@ impl MetaDescriptive for DatadogMetricsRequest {
 pub struct DatadogMetricsResponse {
     status_code: StatusCode,
     body: Bytes,
-    batch_size: usize,
-    byte_size: JsonSize,
-    raw_byte_size: usize,
+    request_metadata: RequestMetadata,
 }
 
 impl DriverResponse for DatadogMetricsResponse {
@@ -142,11 +136,15 @@ impl DriverResponse for DatadogMetricsResponse {
     }
 
     fn events_sent(&self) -> CountByteSize {
-        CountByteSize(self.batch_size, self.byte_size)
+        CountByteSize(
+            self.request_metadata.event_count(),
+            self.request_metadata
+                .events_estimated_json_encoded_byte_size(),
+        )
     }
 
     fn bytes_sent(&self) -> Option<usize> {
-        Some(self.raw_byte_size)
+        Some(self.request_metadata.request_wire_size())
     }
 }
 
@@ -185,11 +183,7 @@ impl Service<DatadogMetricsRequest> for DatadogMetricsService {
         let api_key = self.api_key.clone();
 
         Box::pin(async move {
-            let byte_size = request
-                .get_metadata()
-                .events_estimated_json_encoded_byte_size();
-            let batch_size = request.get_metadata().event_count();
-            let raw_byte_size = request.raw_bytes;
+            let request_metadata = request.get_metadata();
 
             let request = request
                 .into_http_request(api_key)
@@ -208,9 +202,7 @@ impl Service<DatadogMetricsRequest> for DatadogMetricsService {
             Ok(DatadogMetricsResponse {
                 status_code: parts.status,
                 body,
-                batch_size,
-                byte_size,
-                raw_byte_size,
+                request_metadata,
             })
         })
     }
