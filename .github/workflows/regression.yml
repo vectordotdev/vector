@@ -292,6 +292,7 @@ jobs:
         with:
           ref: ${{ needs.compute-metadata.outputs.baseline-sha }}
           path: baseline-vector
+          submodules: "recursive"
 
       - name: Set up Docker Buildx
         id: buildx
@@ -329,6 +330,7 @@ jobs:
         with:
           ref: ${{ needs.compute-metadata.outputs.comparison-sha }}
           path: comparison-vector
+          submodules: "recursive"
 
       - name: Set up Docker Buildx
         id: buildx
