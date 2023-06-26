@@ -23,7 +23,7 @@ glob = { version = "0.3.1", default-features = false }
 hex = "0.4.3"
 indexmap = { version = "1.9", default-features = false, features = ["serde"] }
 indicatif = { version = "0.17.5", features = ["improved_unicode"] }
-itertools = "0.10.5"
+itertools = "0.11.0"
 log = "0.4.19"
 once_cell = "1.18"
 os_info = { version = "3.7.0", default-features = false }
