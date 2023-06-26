@@ -89,3 +89,24 @@ impl InternalEvent for WsConnectionError {
         Some("WsConnectionError")
     }
 }
+
+pub struct WsMessageReceived {
+    pub url: String,
+}
+
+impl InternalEvent for WsMessageReceived {
+    fn emit(self) {
+        trace!(
+            message = "Event received.",
+            url =  %self.url,
+        );
+        counter!(
+            "component_received_events_total", 1,
+            "uri" => self.url.clone(),
+        );
+    }
+
+    fn name(&self) -> Option<&'static str> {
+        Some("WsMessageReceived")
+    }
+}
