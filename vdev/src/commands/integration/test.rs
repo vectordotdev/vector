@@ -25,7 +25,8 @@ pub struct Cli {
     build_all: bool,
 
     /// Number of retries to allow on each integration test case.
-    retries: Option<u8>,
+    #[arg(short = 'r', long)]
+    retries: u8,
 
     /// Extra test command arguments
     args: Vec<String>,

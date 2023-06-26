@@ -22,7 +22,7 @@ pub struct IntegrationTest {
     compose: Option<Compose>,
     env_config: Environment,
     build_all: bool,
-    retries: Option<u8>,
+    retries: u8,
 }
 
 impl IntegrationTest {
@@ -30,7 +30,7 @@ impl IntegrationTest {
         integration: impl Into<String>,
         environment: impl Into<String>,
         build_all: bool,
-        retries: Option<u8>,
+        retries: u8,
     ) -> Result<Self> {
         let integration = integration.into();
         let environment = environment.into();
@@ -109,9 +109,9 @@ impl IntegrationTest {
             args.push("--no-capture".to_string());
         }
 
-        if let Some(retries) = self.retries {
+        if self.retries > 0 {
             args.push("--retries".to_string());
-            args.push(retries.to_string());
+            args.push(self.retries.to_string());
         }
 
         self.runner
