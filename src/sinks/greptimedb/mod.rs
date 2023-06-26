@@ -60,7 +60,7 @@ fn default_dbname() -> String {
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct GreptimeDBConfig {
-    /// The GreptimeDB [database](database) name to connect.
+    /// The GreptimeDB [database][database] name to connect.
     ///
     /// Default to `public`, the default database of GreptimeDB.
     ///

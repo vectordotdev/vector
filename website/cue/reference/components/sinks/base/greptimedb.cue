@@ -60,20 +60,44 @@ base: components: sinks: greptimedb: configuration: {
 		}
 	}
 	dbname: {
-		description: "The database name to connect"
-		required:    false
-		type: string: examples: [
-			"public",
-		]
+		description: """
+			The GreptimeDB [database][database] name to connect.
+
+			Default to `public`, the default database of GreptimeDB.
+
+			Database can be created via `create database` statement on
+			GreptimeDB. If you are using GreptimeCloud, use `dbname` from the
+			connection information of your instance.
+
+			[database]: https://docs.greptime.com/user-guide/concepts/key-concepts#database
+			"""
+		required: false
+		type: string: {
+			default: "public"
+			examples: [
+				"public",
+			]
+		}
 	}
 	endpoint: {
-		description: "The host and port of greptimedb grpc service"
-		required:    true
-		type: string: examples: ["example.com:4001"]
+		description: """
+			The host and port of GreptimeDB gRPC service.
+
+			This sink uses GreptimeDB's gRPC interface for data ingestion. By
+			default, GreptimeDB listens to port 4001 for gRPC protocol.
+
+			The address _must_ include a port.
+			"""
+		required: true
+		type: string: examples: ["example.com:4001", "1nge17d2r3ns.ap-southeast-1.aws.greptime.cloud:4001"]
 	}
 	password: {
-		description: "The password of greptimedb"
-		required:    false
+		description: """
+			The password for your GreptimeDB instance.
+
+			This is required if your instance has authentication enabled.
+			"""
+		required: false
 		type: string: examples: ["password"]
 	}
 	request: {
@@ -219,94 +243,13 @@ base: components: sinks: greptimedb: configuration: {
 			}
 		}
 	}
-	tls: {
-		description: "TLS configuration."
-		required:    false
-		type: object: options: {
-			alpn_protocols: {
-				description: """
-					Sets the list of supported ALPN protocols.
-
-					Declare the supported ALPN protocols, which are used during negotiation with peer. They are prioritized in the order
-					that they are defined.
-					"""
-				required: false
-				type: array: items: type: string: examples: ["h2"]
-			}
-			ca_file: {
-				description: """
-					Absolute path to an additional CA certificate file.
-
-					The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
-					"""
-				required: false
-				type: string: examples: ["/path/to/certificate_authority.crt"]
-			}
-			crt_file: {
-				description: """
-					Absolute path to a certificate file used to identify this server.
-
-					The certificate must be in DER, PEM (X.509), or PKCS#12 format. Additionally, the certificate can be provided as
-					an inline string in PEM format.
-
-					If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
-					"""
-				required: false
-				type: string: examples: ["/path/to/host_certificate.crt"]
-			}
-			key_file: {
-				description: """
-					Absolute path to a private key file used to identify this server.
-
-					The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
-					"""
-				required: false
-				type: string: examples: ["/path/to/host_certificate.key"]
-			}
-			key_pass: {
-				description: """
-					Passphrase used to unlock the encrypted key file.
-
-					This has no effect unless `key_file` is set.
-					"""
-				required: false
-				type: string: examples: ["${KEY_PASS_ENV_VAR}", "PassWord1"]
-			}
-			verify_certificate: {
-				description: """
-					Enables certificate verification.
-
-					If enabled, certificates must not be expired and must be issued by a trusted
-					issuer. This verification operates in a hierarchical manner, checking that the leaf certificate (the
-					certificate presented by the client/server) is not only valid, but that the issuer of that certificate is also valid, and
-					so on until the verification process reaches a root certificate.
-
-					Relevant for both incoming and outgoing connections.
-
-					Do NOT set this to `false` unless you understand the risks of not verifying the validity of certificates.
-					"""
-				required: false
-				type: bool: {}
-			}
-			verify_hostname: {
-				description: """
-					Enables hostname verification.
-
-					If enabled, the hostname used to connect to the remote host must be present in the TLS certificate presented by
-					the remote host, either as the Common Name or as an entry in the Subject Alternative Name extension.
-
-					Only relevant for outgoing connections.
-
-					Do NOT set this to `false` unless you understand the risks of not verifying the remote hostname.
-					"""
-				required: false
-				type: bool: {}
-			}
-		}
-	}
 	username: {
-		description: "The username of greptimedb"
-		required:    false
+		description: """
+			The username for your GreptimeDB instance.
+
+			This is required if your instance has authentication enabled.
+			"""
+		required: false
 		type: string: examples: ["username"]
 	}
 }

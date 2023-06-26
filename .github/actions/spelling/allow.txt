@@ -296,6 +296,7 @@ gql
 grafana
 graphiql
 greptime
+greptimecloud
 greptimedb
 gvisor
 gws
