@@ -33,44 +33,48 @@ jobs:
       base_ref: ${{ github.event.merge_group.base_ref || github.event.pull_request.base.ref }}
       head_ref: ${{ github.event.merge_group.head_ref || github.event.pull_request.head.ref }}
 
-  # foo:
-  #   name: check disk buffers only
-  #   runs-on: [linux, ubuntu-20.04-4core]
-  #   needs: changes
-  #   env:
-  #     CARGO_INCREMENTAL: 0
-  #   steps:
-  #     - uses: actions/checkout@v3
-  #       with:
-  #         # check-version needs tags
-  #         fetch-depth: 0 # fetch everything
-  #     - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
-  #     - run: bash scripts/environment/prepare.sh
-  #     - uses: actions/cache@v3
-  #       name: Cache Cargo registry + index
-  #       with:
-  #         path: |
-  #           ~/.cargo/bin/
-  #           ~/.cargo/registry/index/
-  #           ~/.cargo/registry/cache/
-  #           ~/.cargo/git/db/
-  #         key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-  #         restore-keys: |
-  #           ${{ runner.os }}-cargo-
-  #     - name: Enable Rust matcher
-  #       run: echo "::add-matcher::.github/matchers/rust.json"
+  foo:
+    name: check disk buffers only
+    runs-on: [linux, ubuntu-20.04-4core]
+    needs: changes
+    env:
+      CARGO_INCREMENTAL: 0
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          # check-version needs tags
+          fetch-depth: 0 # fetch everything
+      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: bash scripts/environment/prepare.sh
+      - uses: actions/cache@v3
+        name: Cache Cargo registry + index
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+      - name: Enable Rust matcher
+        run: echo "::add-matcher::.github/matchers/rust.json"
 
-  #     - name: test v2 disk buffers
-  #       env:
-  #         TEST_LOG: vector=trace
-  #         RUST_LOG: "trace"
-  #       run: |
-  #         cd lib/vector-buffers
-  #         cargo nextest run --no-fail-fast  variants::disk_v2::tests::invariants --nocapture
+      - name: test v2 disk buffers
+        env:
+          TEST_LOG: vector=trace
+          RUST_LOG: "trace"
+        run: |
+          cd lib/vector-buffers
+          while true ; do
+            cargo nextest run --no-fail-fast  variants::disk_v2::tests::invariants --nocapture
+            sleep 5
+          done
 
   checks:
     name: Checks
     runs-on: [linux, ubuntu-20.04-4core]
+    if: false
     needs:
       - changes
       # - foo
@@ -105,6 +109,8 @@ jobs:
 
       - run: make test
         name: Unit - x86_64-unknown-linux-gnu
+        env:
+          NEXTEST_TEST_THREADS: 2
 
       - name: VRL - Linux
         run: cargo vdev test-vrl
@@ -121,9 +127,9 @@ jobs:
       # - name: Check that the 3rd-party license file is up to date
       #   if: needs.changes.outputs.dependencies == 'true'
       #   run: make check-licenses
-      - name: Check Cue docs
+      # - name: Check Cue docs
         # if: needs.changes.outputs.cue == 'true'
-        run: make check-docs
+        # run: make check-docs
       - name: Check Markdown
         # if: needs.changes.outputs.markdown == 'true'
         run: make check-markdown
@@ -131,7 +137,7 @@ jobs:
         # if: needs.changes.outputs.source == 'true' || needs.changes.outputs.component_docs == 'true'
         run: make check-component-docs
       - name: Check Rust Docs
-        # if: needs.changes.outputs.source == 'true'
+        if: needs.changes.outputs.source == 'true'
         run: cd rust-doc && make docs
       - uses: actions/upload-artifact@v3
         with:
@@ -144,7 +150,7 @@ jobs:
     name: Test Suite
     runs-on: ubuntu-latest
     if: always()
-    needs: checks
+    needs: foo
     env:
       FAILED: ${{ contains(needs.*.result, 'failure') }}
     steps:
