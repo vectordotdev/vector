@@ -16,8 +16,8 @@ use super::{InternalEventHandle, RegisterInternalEvent};
 /// `CachedEvent` is used to maintain a store of these registered metrics. When a
 /// new event is emitted for a previously unseen set of tags an event is registered
 /// and stored in the cache.
-#[derive(Derivative, Default)]
-#[derivative(Clone(bound = ""))]
+#[derive(Derivative)]
+#[derivative(Clone(bound = ""), Default(bound = ""))]
 pub struct RegisteredEventCache<Event: RegisterTaggedInternalEvent> {
     cache: Arc<
         RwLock<
@@ -36,7 +36,7 @@ pub trait RegisterTaggedInternalEvent: RegisterInternalEvent {
     /// that will be used when registering the event.
     type Tags;
 
-    fn register(tags: &Self::Tags) -> <Self as RegisterInternalEvent>::Handle;
+    fn register(tags: Self::Tags) -> <Self as RegisterInternalEvent>::Handle;
 }
 
 impl<Event, EventHandle, Data, Tags> RegisteredEventCache<Event>
@@ -46,13 +46,6 @@ where
     Tags: Ord + Clone,
     Event: RegisterInternalEvent<Handle = EventHandle> + RegisterTaggedInternalEvent<Tags = Tags>,
 {
-    #[must_use]
-    pub fn new() -> Self {
-        Self {
-            cache: Arc::default(),
-        }
-    }
-
     /// Emits the event with the given tags.
     /// It will register the event and store in the cache if this has not already
     /// been done.
@@ -65,7 +58,7 @@ where
         if let Some(event) = read.get(tags) {
             event.emit(value);
         } else {
-            let event = <Event as RegisterTaggedInternalEvent>::register(tags);
+            let event = <Event as RegisterTaggedInternalEvent>::register(tags.clone());
             event.emit(value);
 
             // Ensure the read lock is dropped so we can write.

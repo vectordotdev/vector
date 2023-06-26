@@ -85,15 +85,15 @@ crate::registered_event!(
 
     fn emit(&self, data: CountByteSize) {
         let CountByteSize(count, byte_size) = data;
-        trace!(message = "Events sent.", count = %count, byte_size = %byte_size);
+        trace!(message = "Events sent.", %count, %byte_size);
 
         self.events.increment(count as u64);
         self.event_bytes.increment(byte_size.get() as u64);
     }
 
-    fn register(tags: &EventCountTags) {
+    fn register(tags: EventCountTags) {
         super::register(TaggedEventsSent::new(
-            tags.clone(),
+            tags,
         ))
     }
 );

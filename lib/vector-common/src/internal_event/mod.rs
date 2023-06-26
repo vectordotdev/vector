@@ -219,7 +219,7 @@ macro_rules! registered_event {
         fn emit(&$slf:ident, $data_name:ident: $data:ident)
             $emit_body:block
 
-        $(fn register($tags_name:ident: &$tags:ty)
+        $(fn register($tags_name:ident: $tags:ty)
             $register_body:block)?
     ) => {
         paste::paste!{
@@ -253,7 +253,7 @@ macro_rules! registered_event {
                 type Tags = $tags;
 
                 fn register(
-                    $tags_name: &$tags,
+                    $tags_name: $tags,
                 ) -> <TaggedEventsSent as super::RegisterInternalEvent>::Handle {
                     $register_body
                 }

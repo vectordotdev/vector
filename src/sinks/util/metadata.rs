@@ -45,12 +45,7 @@ impl RequestMetadataBuilder {
     where
         E: ByteSizeOf + GetEventCountTags + EstimatedJsonEncodedSizeOf,
     {
-        let mut size = if config::telemetry().has_tags() {
-            GroupedCountByteSize::new_tagged()
-        } else {
-            GroupedCountByteSize::new_untagged()
-        };
-
+        let mut size = config::telemetry().create_request_count_byte_size();
         size.add_event(event, event.estimated_json_encoded_size_of());
 
         Self {

@@ -99,7 +99,7 @@ where
         pin!(batched_input);
 
         let bytes_sent = protocol.map(|protocol| register(BytesSent { protocol }));
-        let events_sent = RegisteredEventCache::new();
+        let events_sent = RegisteredEventCache::default();
 
         loop {
             // Core behavior of the loop:
