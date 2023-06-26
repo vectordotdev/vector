@@ -19,25 +19,33 @@ impl<'a> InternalEvent for TemplateRenderingError<'a> {
         }
         msg.push('.');
 
-        error!(
-            message = %msg,
-            error = %self.error,
-            error_type = error_type::TEMPLATE_FAILED,
-            stage = error_stage::PROCESSING,
-            internal_log_rate_limit = true,
-        );
-
-        counter!(
-            "component_errors_total", 1,
-            "error_type" => error_type::TEMPLATE_FAILED,
-            "stage" => error_stage::PROCESSING,
-        );
-
         if self.drop_event {
+            error!(
+                message = %msg,
+                error = %self.error,
+                error_type = error_type::TEMPLATE_FAILED,
+                stage = error_stage::PROCESSING,
+                internal_log_rate_limit = true,
+            );
+
+            counter!(
+                "component_errors_total", 1,
+                "error_type" => error_type::TEMPLATE_FAILED,
+                "stage" => error_stage::PROCESSING,
+            );
+
             emit!(ComponentEventsDropped::<UNINTENTIONAL> {
                 count: 1,
                 reason: "Failed to render template.",
             });
+        } else {
+            warn!(
+                message = %msg,
+                error = %self.error,
+                error_type = error_type::TEMPLATE_FAILED,
+                stage = error_stage::PROCESSING,
+                internal_log_rate_limit = true,
+            );
         }
     }
 }

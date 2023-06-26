@@ -15,92 +15,100 @@ on:
       head_ref:
         required: true
         type: string
+      int_tests:
+        required: false
+        type: boolean
+        default: false
+      source:
+        required: false
+        type: boolean
+        default: true
     outputs:
       source:
-        value: ${{ jobs.changes.outputs.source }}
+        value: ${{ jobs.source.outputs.source }}
       dependencies:
-        value: ${{ jobs.changes.outputs.dependencies }}
+        value: ${{ jobs.source.outputs.dependencies }}
       internal_events:
-        value: ${{ jobs.changes.outputs.internal_events }}
+        value: ${{ jobs.source.outputs.internal_events }}
       cue:
-        value: ${{ jobs.changes.outputs.cue }}
+        value: ${{ jobs.source.outputs.cue }}
       component_docs:
-        value: ${{ jobs.changes.outputs.component_docs }}
+        value: ${{ jobs.source.outputs.component_docs }}
       markdown:
-        value: ${{ jobs.changes.outputs.markdown }}
+        value: ${{ jobs.source.outputs.markdown }}
       install:
-        value: ${{ jobs.changes.outputs.install }}
+        value: ${{ jobs.source.outputs.install }}
       k8s:
-        value: ${{ jobs.changes.outputs.k8s }}
+        value: ${{ jobs.source.outputs.k8s }}
       all-int:
-        value: ${{ jobs.changes.outputs.all-int }}
+        value: ${{ jobs.int_tests.outputs.all-int }}
       amqp:
-        value: ${{ jobs.changes.outputs.amqp }}
+        value: ${{ jobs.int_tests.outputs.amqp }}
       appsignal:
-        value: ${{ jobs.changes.outputs.appsignal }}
+        value: ${{ jobs.int_tests.outputs.appsignal }}
       aws:
-        value: ${{ jobs.changes.outputs.aws }}
+        value: ${{ jobs.int_tests.outputs.aws }}
       axiom:
-        value: ${{ jobs.changes.outputs.axiom }}
+        value: ${{ jobs.int_tests.outputs.axiom }}
       azure:
-        value: ${{ jobs.changes.outputs.azure }}
+        value: ${{ jobs.int_tests.outputs.azure }}
       clickhouse:
-        value: ${{ jobs.changes.outputs.clickhouse }}
+        value: ${{ jobs.int_tests.outputs.clickhouse }}
       databend:
-        value: ${{ jobs.changes.outputs.databend }}
+        value: ${{ jobs.int_tests.outputs.databend }}
       datadog:
-        value: ${{ jobs.changes.outputs.datadog }}
+        value: ${{ jobs.int_tests.outputs.datadog }}
       dnstap:
-        value: ${{ jobs.changes.outputs.dnstap }}
+        value: ${{ jobs.int_tests.outputs.dnstap }}
       docker-logs:
-        value: ${{ jobs.changes.outputs.docker-logs }}
+        value: ${{ jobs.int_tests.outputs.docker-logs }}
       elasticsearch:
-        value: ${{ jobs.changes.outputs.elasticsearch }}
+        value: ${{ jobs.int_tests.outputs.elasticsearch }}
       eventstoredb:
-        value: ${{ jobs.changes.outputs.eventstoredb }}
+        value: ${{ jobs.int_tests.outputs.eventstoredb }}
       fluent:
-        value: ${{ jobs.changes.outputs.fluent }}
+        value: ${{ jobs.int_tests.outputs.fluent }}
       gcp:
-        value: ${{ jobs.changes.outputs.gcp }}
+        value: ${{ jobs.int_tests.outputs.gcp }}
       humio:
-        value: ${{ jobs.changes.outputs.humio }}
+        value: ${{ jobs.int_tests.outputs.humio }}
       http-client:
-        value: ${{ jobs.changes.outputs.http-client }}
+        value: ${{ jobs.int_tests.outputs.http-client }}
       influxdb:
-        value: ${{ jobs.changes.outputs.influxdb }}
+        value: ${{ jobs.int_tests.outputs.influxdb }}
       kafka:
-        value: ${{ jobs.changes.outputs.kafka }}
+        value: ${{ jobs.int_tests.outputs.kafka }}
       logstash:
-        value: ${{ jobs.changes.outputs.logstash }}
+        value: ${{ jobs.int_tests.outputs.logstash }}
       loki:
-        value: ${{ jobs.changes.outputs.loki }}
+        value: ${{ jobs.int_tests.outputs.loki }}
       mongodb:
-        value: ${{ jobs.changes.outputs.mongodb }}
+        value: ${{ jobs.int_tests.outputs.mongodb }}
       nats:
-        value: ${{ jobs.changes.outputs.nats }}
+        value: ${{ jobs.int_tests.outputs.nats }}
       nginx:
-        value: ${{ jobs.changes.outputs.nginx }}
+        value: ${{ jobs.int_tests.outputs.nginx }}
       opentelemetry:
-        value: ${{ jobs.changes.outputs.opentelemetry }}
+        value: ${{ jobs.int_tests.outputs.opentelemetry }}
       postgres:
-        value: ${{ jobs.changes.outputs.postgres }}
+        value: ${{ jobs.int_tests.outputs.postgres }}
       prometheus:
-        value: ${{ jobs.changes.outputs.prometheus }}
+        value: ${{ jobs.int_tests.outputs.prometheus }}
       pulsar:
-        value: ${{ jobs.changes.outputs.pulsar }}
+        value: ${{ jobs.int_tests.outputs.pulsar }}
       redis:
-        value: ${{ jobs.changes.outputs.redis }}
+        value: ${{ jobs.int_tests.outputs.redis }}
       splunk:
-        value: ${{ jobs.changes.outputs.splunk }}
+        value: ${{ jobs.int_tests.outputs.splunk }}
       webhdfs:
-        value: ${{ jobs.changes.outputs.webhdfs }}
+        value: ${{ jobs.int_tests.outputs.webhdfs }}
 
 jobs:
-  changes:
+  # Detects changes that are not specific to integration tests
+  source:
     runs-on: ubuntu-20.04
-    # Set job outputs to values from filter step
+    if: ${{ inputs.source }}
     outputs:
-      # General source code
       source: ${{ steps.filter.outputs.source }}
       dependencies: ${{ steps.filter.outputs.dependencies }}
       internal_events: ${{ steps.filter.outputs.internal_events }}
@@ -108,40 +116,7 @@ jobs:
       component_docs: ${{ steps.filter.outputs.component_docs }}
       markdown: ${{ steps.filter.outputs.markdown }}
       install: ${{ steps.filter.outputs.install }}
-      # K8s
       k8s: ${{ steps.filter.outputs.k8s }}
-      # Integrations
-      all-int: ${{ steps.filter.outputs.all-int }}
-      amqp: ${{ steps.filter.outputs.amqp }}
-      appsignal: ${{ steps.filter.outputs.appsignal}}
-      aws: ${{ steps.filter.outputs.aws }}
-      axiom: ${{ steps.filter.outputs.axiom }}
-      azure: ${{ steps.filter.outputs.azure }}
-      clickhouse: ${{ steps.filter.outputs.clickhouse }}
-      databend: ${{ steps.filter.outputs.databend }}
-      datadog: ${{ steps.filter.outputs.datadog }}
-      dnstap: ${{ steps.filter.outputs.dnstap }}
-      docker-logs: ${{ steps.filter.outputs.docker-logs }}
-      elasticsearch: ${{ steps.filter.outputs.elasticsearch }}
-      eventstoredb: ${{ steps.filter.outputs.eventstoredb }}
-      fluent: ${{ steps.filter.outputs.fluent }}
-      gcp: ${{ steps.filter.outputs.gcp }}
-      humio: ${{ steps.filter.outputs.humio }}
-      http-client: ${{ steps.filter.outputs.http-client }}
-      influxdb: ${{ steps.filter.outputs.influxdb }}
-      kafka: ${{ steps.filter.outputs.kafka }}
-      logstash: ${{ steps.filter.outputs.logstash }}
-      loki: ${{ steps.filter.outputs.loki }}
-      mongodb: ${{ steps.filter.outputs.mongodb }}
-      nats: ${{ steps.filter.outputs.nats }}
-      nginx: ${{ steps.filter.outputs.nginx }}
-      opentelemetry: ${{ steps.filter.outputs.opentelemetry }}
-      postgres: ${{ steps.filter.outputs.postgres }}
-      prometheus: ${{ steps.filter.outputs.prometheus }}
-      pulsar: ${{ steps.filter.outputs.pulsar }}
-      redis: ${{ steps.filter.outputs.redis }}
-      splunk: ${{ steps.filter.outputs.splunk }}
-      webhdfs: ${{ steps.filter.outputs.webhdfs }}
     steps:
     - uses: actions/checkout@v3
 
@@ -198,181 +173,55 @@ jobs:
             - "distribution/install.sh"
           k8s:
             - "src/sources/kubernetes_logs/**"
-          all-int:
-            - "lib/vector-core/**"
-          amqp:
-            - "src/amqp.rs"
-            - "src/internal_events/amqp.rs"
-            - "src/sinks/amqp/**"
-            - "src/sources/amqp.rs"
-            - "src/sources/util/**"
-            - "src/sinks/util/**"
-            - "scripts/integration/amqp/**"
-          appsignal:
-            - "src/sinks/appsignal/**"
-            - "src/sinks/util/**"
-            - "scripts/integration/appsignal/**"
-          aws:
-            - "src/aws/**"
-            - "src/internal_events/aws*"
-            - "src/sources/aws_ecs_metrics/**"
-            - "src/sources/aws_kinesis_firehose/**"
-            - "src/sources/aws_s3/**"
-            - "src/sources/aws_sqs/**"
-            - "src/sources/util/**"
-            - "src/sinks/aws_cloudwatch_logs/**"
-            - "src/sinks/aws_cloudwatch_metrics/**"
-            - "src/sinks/aws_kinesis/**"
-            - "src/sinks/aws_s3/**"
-            - "src/sinks/aws_sqs/**"
-            - "src/sinks/util/**"
-            - "src/transforms/aws*"
-            - "scripts/integration/aws/**"
-          axiom:
-            - "src/sinks/axiom.rs"
-            - "src/sinks/util/**"
-            - "scripts/integration/axiom/**"
-          azure:
-            - "src/sinks/azure_**"
-            - "src/sinks/util/**"
-            - "scripts/integration/azure/**"
-          clickhouse:
-            - "src/sinks/clickhouse/**"
-            - "src/sinks/util/**"
-            - "scripts/integration/clickhouse/**"
-          databend:
-            - "src/sinks/databend/**"
-            - "src/sinks/util/**"
-            - "scripts/integration/databend/**"
-          datadog:
-            - "src/common/datadog.rs"
-            - "src/internal_events/datadog_*"
-            - "src/sources/datadog_agent/**"
-            - "src/sinks/datadog/**"
-            - "src/sinks/datadog_archives.rs"
-            - "src/sinks/util/**"
-            - "scripts/integration/datadog-agent/**"
-            - "scripts/integration/datadog-logs/**"
-            - "scripts/integration/datadog-metrics/**"
-            - "scripts/integration/datadog-traces/**"
-          dnstap:
-            - "src/internal_events/dnstap.rs"
-            - "src/sources/dnstap/**"
-            - "scripts/integration/dnstap/**"
-          docker-logs:
-            - "src/docker.rs"
-            - "src/internal_events/docker_logs.rs"
-            - "src/sources/docker_logs/**"
-            - "src/sources/util/**"
-            - "scripts/integration/docker-logs/**"
-          elasticsearch:
-            - "src/sinks/elasticsearch/**"
-            - "src/sinks/util/**"
-            - "scripts/integration/elasticsearch/**"
-          eventstoredb:
-            - "src/internal_events/eventstoredb_metrics.rs"
-            - "src/sources/eventstoredb_metrics/**"
-            - "src/sources/util/**"
-            - "scripts/integration/eventstoredb/**"
-          fluent:
-            - "src/internal_events/fluent.rs"
-            - "src/sources/fluent/**"
-            - "src/sources/util/**"
-            - "scripts/integration/fluent/**"
-          gcp:
-            - "src/internal_events/gcp_pubsub.rs"
-            - "src/sources/gcp_pubsub.rs"
-            - "src/sources/util/**"
-            - "src/sinks/gcp/**"
-            - "src/sinks/util/**"
-            - "src/gcp.rs"
-            - "scripts/integration/gcp/**"
-            - "scripts/integration/chronicle/**"
-          humio:
-            - "src/sinks/humio/**"
-            - "src/sinks/util/**"
-            - "scripts/integration/humio/**"
-          http-client:
-            - "src/sinks/http-client/**"
-            - "src/sinks/util/**"
-            - "scripts/integration/http-client/**"
-          influxdb:
-            - "src/internal_events/influxdb.rs"
-            - "src/sinks/influxdb/**"
-            - "src/sinks/util/**"
-            - "scripts/integration/influxdb/**"
-          kafka:
-            - "src/internal_events/kafka.rs"
-            - "src/sinks/kafka/**"
-            - "src/sinks/util/**"
-            - "src/sources/kafka.rs"
-            - "src/sources/util/**"
-            - "src/kafka.rs"
-            - "scripts/integration/kafka/**"
-          logstash:
-            - "src/sources/logstash.rs"
-            - "src/sources/util/**"
-            - "scripts/integration/logstash/**"
-          loki:
-            - "src/internal_events/loki.rs"
-            - "src/sinks/loki/**"
-            - "src/sinks/util/**"
-            - "scripts/integration/loki/**"
-          mongodb:
-            - "src/internal_events/mongodb_metrics.rs"
-            - "src/sources/mongodb_metrics/**"
-            - "src/sources/util/**"
-            - "scripts/integration/mongodb/**"
-          nats:
-            - "src/internal_events/nats.rs"
-            - "src/sources/nats.rs"
-            - "src/sources/util/**"
-            - "src/sinks/nats.rs"
-            - "src/sinks/util/**"
-            - "src/nats.rs"
-            - "scripts/integration/nats/**"
-          nginx:
-            - "src/internal_events/nginx_metrics.rs"
-            - "src/sources/nginx_metrics/**"
-            - "src/sources/util/**"
-            - "scripts/integration/nginx/**"
-          opentelemetry:
-            - "src/sources/opentelemetry/**"
-            - "src/sources/util/**"
-            - "scripts/integration/opentelemetry/**"
-          postgres:
-            - "src/internal_events/postgresql_metrics.rs"
-            - "src/sources/postgresql_metrics.rs"
-            - "src/sources/util/**"
-            - "scripts/integration/postgres/**"
-          prometheus:
-            - "src/internal_events/prometheus.rs"
-            - "src/sources/prometheus/**"
-            - "src/sources/util/**"
-            - "src/sinks/prometheus/**"
-            - "src/sinks/util/**"
-            - "scripts/integration/prometheus/**"
-          pulsar:
-            - "src/internal_events/pulsar.rs"
-            - "src/sinks/pulsar/**"
-            - "src/sinks/util/**"
-            - "scripts/integration/pulsar/**"
-          redis:
-            - "src/internal_events/redis.rs"
-            - "src/sources/redis/**"
-            - "src/sources/util/**"
-            - "src/sinks/redis.rs"
-            - "src/sinks/util/**"
-            - "scripts/integration/redis/**"
-          splunk:
-            - "src/internal_events/splunk_hec.rs"
-            - "src/sources/splunk_hec/**"
-            - "src/sources/util/**"
-            - "src/sinks/splunk_hec/**"
-            - "src/sinks/util/**"
-            - "scripts/integration/splunk/**"
-          webhdfs:
-            - "src/sinks/webhdfs/**"
-            - "src/sinks/util/**"
-            - "scripts/integration/webhdfs/**"
 
+  # Detects changes that are specific to integration tests
+  int_tests:
+    runs-on: ubuntu-latest
+    if: ${{ inputs.int_tests }}
+    outputs:
+      all-int: ${{ steps.filter.outputs.all-int}}
+      amqp: ${{ steps.filter.outputs.amqp }}
+      appsignal: ${{ steps.filter.outputs.appsignal}}
+      aws: ${{ steps.filter.outputs.aws }}
+      axiom: ${{ steps.filter.outputs.axiom }}
+      azure: ${{ steps.filter.outputs.azure }}
+      clickhouse: ${{ steps.filter.outputs.clickhouse }}
+      databend: ${{ steps.filter.outputs.databend }}
+      datadog: ${{ steps.filter.outputs.datadog }}
+      dnstap: ${{ steps.filter.outputs.dnstap }}
+      docker-logs: ${{ steps.filter.outputs.docker-logs }}
+      elasticsearch: ${{ steps.filter.outputs.elasticsearch }}
+      eventstoredb: ${{ steps.filter.outputs.eventstoredb }}
+      fluent: ${{ steps.filter.outputs.fluent }}
+      gcp: ${{ steps.filter.outputs.gcp }}
+      humio: ${{ steps.filter.outputs.humio }}
+      http-client: ${{ steps.filter.outputs.http-client }}
+      influxdb: ${{ steps.filter.outputs.influxdb }}
+      kafka: ${{ steps.filter.outputs.kafka }}
+      logstash: ${{ steps.filter.outputs.logstash }}
+      loki: ${{ steps.filter.outputs.loki }}
+      mongodb: ${{ steps.filter.outputs.mongodb }}
+      nats: ${{ steps.filter.outputs.nats }}
+      nginx: ${{ steps.filter.outputs.nginx }}
+      opentelemetry: ${{ steps.filter.outputs.opentelemetry }}
+      postgres: ${{ steps.filter.outputs.postgres }}
+      prometheus: ${{ steps.filter.outputs.prometheus }}
+      pulsar: ${{ steps.filter.outputs.pulsar }}
+      redis: ${{ steps.filter.outputs.redis }}
+      splunk: ${{ steps.filter.outputs.splunk }}
+      webhdfs: ${{ steps.filter.outputs.webhdfs }}
+    steps:
+      - uses: actions/checkout@v3
+
+      # creates a yaml file that contains the filters for each integration,
+      # extracted from the output of the `vdev int ci-paths` command, which
+      # sources the paths from the scripts/integration/.../test.yaml files
+      - name: Create filter rules for integrations
+        run: cargo vdev int ci-paths > int_test_filters.yaml
+
+      - uses: dorny/paths-filter@v2
+        id: filter
+        with:
+          base: ${{ inputs.base_ref }}
+          ref: ${{ inputs.head_ref }}
+          filters: int_test_filters.yaml

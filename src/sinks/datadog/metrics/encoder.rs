@@ -22,7 +22,7 @@ use super::config::{
 use crate::{
     common::datadog::{DatadogMetricType, DatadogPoint, DatadogSeriesMetric},
     proto::fds::get_protobuf_descriptors,
-    sinks::util::{encode_namespace, Compression, Compressor},
+    sinks::util::{encode_namespace, request_builder::EncodeResult, Compression, Compressor},
 };
 
 const SERIES_PAYLOAD_HEADER: &[u8] = b"{\"series\":[";
@@ -318,7 +318,7 @@ impl DatadogMetricsEncoder {
         self.encode_single_metric(metric)
     }
 
-    pub fn finish(&mut self) -> Result<(Bytes, Vec<Metric>, usize), FinishError> {
+    pub fn finish(&mut self) -> Result<(EncodeResult<Bytes>, Vec<Metric>), FinishError> {
         // Write any payload footer necessary for the configured endpoint.
         let n = write_payload_footer(self.endpoint, &mut self.state.writer)
             .context(CompressionFailedSnafu)?;
@@ -348,7 +348,10 @@ impl DatadogMetricsEncoder {
 
         if recommended_splits == 1 {
             // "One" split means no splits needed: our payload didn't exceed either of the limits.
-            Ok((payload, processed, raw_bytes_written))
+            Ok((
+                EncodeResult::compressed(payload, raw_bytes_written),
+                processed,
+            ))
         } else {
             Err(FinishError::TooLarge {
                 metrics: processed,

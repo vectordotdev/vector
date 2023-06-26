@@ -2,17 +2,14 @@ use bytes::Bytes;
 use snafu::Snafu;
 use std::sync::Arc;
 use vector_common::request_metadata::RequestMetadata;
-use vector_core::{
-    event::{EventFinalizers, Finalizable, Metric},
-    ByteSizeOf, EstimatedJsonEncodedSizeOf,
-};
+use vector_core::event::{EventFinalizers, Finalizable, Metric};
 
 use super::{
     config::{DatadogMetricsEndpoint, DatadogMetricsEndpointConfiguration},
     encoder::{CreateError, DatadogMetricsEncoder, EncoderError, FinishError},
     service::DatadogMetricsRequest,
 };
-use crate::sinks::util::IncrementalRequestBuilder;
+use crate::sinks::util::{metadata::RequestMetadataBuilder, IncrementalRequestBuilder};
 
 #[derive(Debug, Snafu)]
 pub enum RequestBuilderError {
@@ -159,7 +156,7 @@ impl IncrementalRequestBuilder<((Option<Arc<str>>, DatadogMetricsEndpoint), Vec<
             // If we encoded one or more metrics this pass, finalize the payload.
             if n > 0 {
                 match encoder.finish() {
-                    Ok((payload, mut metrics, uncompressed_payload_len)) => {
+                    Ok((encode_result, mut metrics)) => {
                         let finalizers = metrics.take_finalizers();
                         let metadata = DDMetricsMetadata {
                             api_key: api_key.as_ref().map(Arc::clone),
@@ -167,15 +164,13 @@ impl IncrementalRequestBuilder<((Option<Arc<str>>, DatadogMetricsEndpoint), Vec<
                             finalizers,
                         };
 
-                        let request_metadata = RequestMetadata::new(
-                            metrics.len(),
-                            metrics.size_of(),
-                            uncompressed_payload_len,
-                            payload.len(),
-                            metrics.estimated_json_encoded_size_of(),
-                        );
+                        let request_metadata =
+                            RequestMetadataBuilder::from_events(&metrics).build(&encode_result);
 
-                        results.push(Ok(((metadata, request_metadata), payload)));
+                        results.push(Ok((
+                            (metadata, request_metadata),
+                            encode_result.into_payload(),
+                        )));
                     }
                     Err(err) => match err {
                         // The encoder informed us that the resulting payload was too big, so we're
@@ -278,7 +273,7 @@ fn encode_now_or_never(
 
     encoder
         .finish()
-        .map(|(payload, mut processed, uncompressed_payload_len)| {
+        .map(|(encode_result, mut processed)| {
             let finalizers = processed.take_finalizers();
             let ddmetrics_metadata = DDMetricsMetadata {
                 api_key,
@@ -286,15 +281,13 @@ fn encode_now_or_never(
                 finalizers,
             };
 
-            let request_metadata = RequestMetadata::new(
-                processed.len(),
-                processed.size_of(),
-                uncompressed_payload_len,
-                payload.len(),
-                processed.estimated_json_encoded_size_of(),
-            );
+            let request_metadata =
+                RequestMetadataBuilder::from_events(&processed).build(&encode_result);
 
-            ((ddmetrics_metadata, request_metadata), payload)
+            (
+                (ddmetrics_metadata, request_metadata),
+                encode_result.into_payload(),
+            )
         })
         .map_err(|_| RequestBuilderError::FailedToSplit {
             dropped_events: metrics_len as u64,

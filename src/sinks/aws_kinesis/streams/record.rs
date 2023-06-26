@@ -82,9 +82,8 @@ impl SendRecord for KinesisStreamClient {
             .instrument(info_span!("request").or_current())
             .await
             .map(|output: PutRecordsOutput| KinesisResponse {
-                count: rec_count,
                 failure_count: output.failed_record_count().unwrap_or(0) as usize,
-                events_byte_size: JsonSize::new(total_size),
+                events_byte_size: CountByteSize(rec_count, JsonSize::new(total_size)).into(),
             })
     }
 }
