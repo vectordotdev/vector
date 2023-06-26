@@ -450,8 +450,6 @@ where
             drop_on_error: config.drop_on_error,
             drop_on_abort: config.drop_on_abort,
             reroute_dropped: config.reroute_dropped,
-            // default_schema_definition: Arc::new(default_schema_definition),
-            // dropped_schema_definition: Arc::new(dropped_schema_definition),
             runner,
             metric_tag_values: config.metric_tag_values,
         })

@@ -57,7 +57,7 @@ impl Builder {
         component_key: ComponentKey,
     ) -> LimitedReceiver<EventArray> {
         let lag_time = self.lag_time.clone();
-        let log_definition = output.schema_definition.clone().map(Arc::new);
+        let log_definition = output.schema_definition.clone();
         let output_id = OutputId {
             component: component_key,
             port: output.port.clone(),

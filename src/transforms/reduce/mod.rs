@@ -142,7 +142,6 @@ impl TransformConfig for ReduceConfig {
             .reduce(Definition::merge)
             .unwrap_or_else(Definition::any);
 
-        // for (output, input) in input_definitions {
         let mut schema_definition = merged_definition;
 
         for (key, merge_strategy) in self.merge_strategies.iter() {

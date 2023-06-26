@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use std::{collections::HashMap, fmt, num::NonZeroUsize};
 
 use bitmask_enum::bitmask;
@@ -111,7 +112,7 @@ pub struct SourceOutput {
     // NOTE: schema definitions are only implemented/supported for log-type events. There is no
     // inherent blocker to support other types as well, but it'll require additional work to add
     // the relevant schemas, and store them separately in this type.
-    pub schema_definition: Option<schema::Definition>,
+    pub schema_definition: Option<Arc<schema::Definition>>,
 }
 
 impl SourceOutput {
@@ -129,7 +130,7 @@ impl SourceOutput {
         Self {
             port: None,
             ty,
-            schema_definition: Some(schema_definition),
+            schema_definition: Some(Arc::new(schema_definition)),
         }
     }
 
@@ -166,11 +167,14 @@ impl SourceOutput {
     /// A simple definition is just the default for the namespace. For the Vector namespace the
     /// meanings are included.
     /// Schema enabled is set in the users configuration.
+    #[cfg(any(feature = "test", test))]
     #[must_use]
     pub fn schema_definition(&self, schema_enabled: bool) -> Option<schema::Definition> {
+        use std::ops::Deref;
+
         self.schema_definition.as_ref().map(|definition| {
             if schema_enabled {
-                definition.clone()
+                definition.deref().clone()
             } else {
                 let mut new_definition =
                     schema::Definition::default_for_namespace(definition.log_namespaces());
