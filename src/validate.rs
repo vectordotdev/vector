@@ -135,10 +135,12 @@ pub fn validate_config(opts: &Opts, fmt: &mut Formatter) -> Option<Config> {
         fmt.title(format!("Failed to load {:?}", &paths_list));
         fmt.sub_error(errors);
     };
+    config::init_log_schema(&paths, true)
+        .map_err(&mut report_error)
+        .ok()?;
     let (builder, load_warnings) = config::load_builder_from_paths(&paths)
         .map_err(&mut report_error)
         .ok()?;
-    config::init_log_schema(builder.global.log_schema.clone(), true);
 
     // Build
     let (config, build_warnings) = builder
