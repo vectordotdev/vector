@@ -48,7 +48,7 @@ components: sources: kubernetes_logs: {
 				""",
 		]
 		warnings: ["""
-				This source is only tested on Linux. Your miileage may vary for clusters on Windows.
+				This source is only tested on Linux. Your mileage may vary for clusters on Windows.
 			"""]
 		notices: []
 	}
