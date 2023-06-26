@@ -439,7 +439,7 @@ dependencies = [
  "fnv",
  "futures-util",
  "http",
- "indexmap",
+ "indexmap 1.9.3",
  "mime",
  "multer",
  "num-traits",
@@ -488,7 +488,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d461325bfb04058070712296601dfe5e5bd6cdff84780a0a8c569ffb15c87eb3"
 dependencies = [
  "bytes 1.4.0",
- "indexmap",
+ "indexmap 1.9.3",
  "serde",
  "serde_json",
 ]
@@ -1562,7 +1562,7 @@ dependencies = [
  "base64 0.13.1",
  "bitvec",
  "hex",
- "indexmap",
+ "indexmap 1.9.3",
  "js-sys",
  "lazy_static",
  "rand 0.8.5",
@@ -2956,6 +2956,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "equivalent"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "88bffebc5d80432c9b140ee17875ff173a8ab62faad5b257da912bd2f6c1c0a1"
+
+[[package]]
 name = "erased-serde"
 version = "0.3.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3096,7 +3102,7 @@ dependencies = [
  "flate2",
  "futures 0.3.28",
  "glob",
- "indexmap",
+ "indexmap 1.9.3",
  "libc",
  "quickcheck",
  "scan_fmt",
@@ -3543,7 +3549,7 @@ dependencies = [
  "futures-sink",
  "futures-util",
  "http",
- "indexmap",
+ "indexmap 1.9.3",
  "slab",
  "tokio",
  "tokio-util",
@@ -4063,6 +4069,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "indexmap"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d5477fe2230a79769d8dc68e0eabf5437907c0457a5614a9e8dddb67f65eb65d"
+dependencies = [
+ "equivalent",
+ "hashbrown 0.14.0",
+]
+
+[[package]]
 name = "indicatif"
 version = "0.17.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4441,7 +4457,7 @@ dependencies = [
  "secrecy",
  "serde",
  "serde_json",
- "serde_yaml 0.9.21",
+ "serde_yaml 0.9.22",
  "thiserror",
  "tokio",
  "tokio-util",
@@ -4909,7 +4925,7 @@ dependencies = [
  "crossbeam-epoch",
  "crossbeam-utils",
  "hashbrown 0.13.2",
- "indexmap",
+ "indexmap 1.9.3",
  "metrics",
  "num_cpus",
  "ordered-float 3.7.0",
@@ -5127,7 +5143,7 @@ version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "af5a8477ac96877b5bd1fd67e0c28736c12943aba24eda92b127e036b0c8f400"
 dependencies = [
- "indexmap",
+ "indexmap 1.9.3",
  "itertools 0.10.5",
  "ndarray",
  "noisy_float",
@@ -5848,7 +5864,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e6d5014253a1331579ce62aa67443b4a658c5e7dd03d4bc6d302b94474888143"
 dependencies = [
  "fixedbitset",
- "indexmap",
+ "indexmap 1.9.3",
 ]
 
 [[package]]
@@ -6230,7 +6246,7 @@ dependencies = [
 name = "prometheus-parser"
 version = "0.1.0"
 dependencies = [
- "indexmap",
+ "indexmap 1.9.3",
  "nom",
  "num_enum 0.6.1",
  "prost",
@@ -7359,7 +7375,7 @@ version = "1.0.97"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bdf3bf93142acad5821c99197022e170842cdbc1c30482b98750c688c640842a"
 dependencies = [
- "indexmap",
+ "indexmap 1.9.3",
  "itoa",
  "ryu",
  "serde",
@@ -7445,7 +7461,7 @@ dependencies = [
  "base64 0.13.1",
  "chrono",
  "hex",
- "indexmap",
+ "indexmap 1.9.3",
  "serde",
  "serde_json",
  "serde_with_macros 2.3.2",
@@ -7482,7 +7498,7 @@ version = "0.8.26"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "578a7433b776b56a35785ed5ce9a7e777ac0598aac5a6dd1b4b18a307c7fc71b"
 dependencies = [
- "indexmap",
+ "indexmap 1.9.3",
  "ryu",
  "serde",
  "yaml-rust",
@@ -7490,11 +7506,11 @@ dependencies = [
 
 [[package]]
 name = "serde_yaml"
-version = "0.9.21"
+version = "0.9.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d9d684e3ec7de3bf5466b32bd75303ac16f0736426e5a4e0d6e489559ce1249c"
+checksum = "452e67b9c20c37fa79df53201dc03839651086ed9bbe92b3ca585ca9fdaa7d85"
 dependencies = [
- "indexmap",
+ "indexmap 2.0.0",
  "itoa",
  "ryu",
  "serde",
@@ -8440,7 +8456,7 @@ version = "0.19.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "92d964908cec0d030b812013af25a0e57fddfadb1e066ecc6681d86253129d4f"
 dependencies = [
- "indexmap",
+ "indexmap 1.9.3",
  "serde",
  "serde_spanned",
  "toml_datetime",
@@ -8501,7 +8517,7 @@ checksum = "b8fa9be0de6cf49e536ce1851f987bd21a43b771b09473c3549a6c853db37c1c"
 dependencies = [
  "futures-core",
  "futures-util",
- "indexmap",
+ "indexmap 1.9.3",
  "pin-project",
  "pin-project-lite",
  "rand 0.8.5",
@@ -9085,7 +9101,7 @@ dependencies = [
  "dunce",
  "glob",
  "hex",
- "indexmap",
+ "indexmap 1.9.3",
  "indicatif",
  "itertools 0.11.0",
  "log",
@@ -9097,7 +9113,7 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
- "serde_yaml 0.9.21",
+ "serde_yaml 0.9.22",
  "sha2 0.10.7",
  "tempfile",
  "toml 0.7.4",
@@ -9188,7 +9204,7 @@ dependencies = [
  "hyper",
  "hyper-openssl",
  "hyper-proxy",
- "indexmap",
+ "indexmap 1.9.3",
  "indoc",
  "infer 0.14.0",
  "inventory",
@@ -9249,7 +9265,7 @@ dependencies = [
  "serde_bytes",
  "serde_json",
  "serde_with 2.3.2",
- "serde_yaml 0.9.21",
+ "serde_yaml 0.9.22",
  "sha2 0.10.7",
  "similar-asserts",
  "smallvec",
@@ -9353,7 +9369,7 @@ dependencies = [
  "rand 0.8.5",
  "rkyv",
  "serde",
- "serde_yaml 0.9.21",
+ "serde_yaml 0.9.22",
  "snafu",
  "temp-dir",
  "tokio",
@@ -9379,7 +9395,7 @@ dependencies = [
  "crossbeam-utils",
  "derivative",
  "futures 0.3.28",
- "indexmap",
+ "indexmap 1.9.3",
  "metrics",
  "nom",
  "ordered-float 3.7.0",
@@ -9409,7 +9425,7 @@ dependencies = [
  "chrono",
  "chrono-tz",
  "encoding_rs",
- "indexmap",
+ "indexmap 1.9.3",
  "inventory",
  "no-proxy",
  "num-traits",
@@ -9479,7 +9495,7 @@ dependencies = [
  "headers",
  "http",
  "hyper-proxy",
- "indexmap",
+ "indexmap 1.9.3",
  "metrics",
  "metrics-tracing-context",
  "metrics-util",
@@ -9642,7 +9658,7 @@ dependencies = [
  "hex",
  "hmac",
  "hostname",
- "indexmap",
+ "indexmap 1.9.3",
  "indoc",
  "itertools 0.10.5",
  "lalrpop",
