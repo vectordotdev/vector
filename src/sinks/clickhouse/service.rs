@@ -101,7 +101,7 @@ impl RetryLogic for ClickhouseRetryLogic {
     }
 }
 
-/// ClickhouseService is a Tower service used to send logs to Clickhouse.
+/// `ClickhouseService` is a `Tower` service used to send logs to Clickhouse.
 #[derive(Debug, Clone)]
 pub struct ClickhouseService {
     client: HttpClient,
