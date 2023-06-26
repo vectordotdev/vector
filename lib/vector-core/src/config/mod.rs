@@ -167,7 +167,6 @@ impl SourceOutput {
     /// A simple definition is just the default for the namespace. For the Vector namespace the
     /// meanings are included.
     /// Schema enabled is set in the users configuration.
-    #[cfg(any(feature = "test", test))]
     #[must_use]
     pub fn schema_definition(&self, schema_enabled: bool) -> Option<schema::Definition> {
         use std::ops::Deref;

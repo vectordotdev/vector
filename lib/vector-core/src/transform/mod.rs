@@ -300,16 +300,16 @@ impl TransformOutputs {
 }
 
 #[allow(clippy::implicit_hasher)]
+/// `event`: The event that will be updated
+/// `output_id`: The `output_id` that the current even is being sent to (will be used as the new `parent_id`)
+/// `log_schema_definitions`: A mapping of parent `OutputId` to definitions, that will be used to lookup the new runtime definition of the event
 pub fn update_runtime_schema_definition(
-    // The event that will be updated
     mut event: EventMutRef,
-    // The output_id that the current even is being sent to (will be used as the new parent_id)
     output_id: &Arc<OutputId>,
-    // A mapping of parent OutputId's to definitions, that will be used to lookup the new runtime definition of the event
     log_schema_definitions: &HashMap<OutputId, Arc<Definition>>,
 ) {
     if let EventMutRef::Log(log) = &mut event {
-        if let Some(parent_component_id) = log.metadata_mut().upstream_id() {
+        if let Some(parent_component_id) = log.metadata().upstream_id() {
             if let Some(definition) = log_schema_definitions.get(parent_component_id) {
                 log.metadata_mut().set_schema_definition(definition);
             }
