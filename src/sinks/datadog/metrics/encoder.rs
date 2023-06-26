@@ -279,7 +279,8 @@ impl DatadogMetricsEncoder {
         // assume the worst case while our limits assume the worst case _overhead_.  Maybe our
         // numbers are technically off in the end, but `finish` catches that for us, too.
         let compressed_len = self.state.writer.get_ref().len();
-        if compressed_len + n > self.compressed_limit {
+        let max_compressed_metric_len = n + max_compressed_overhead_len(n);
+        if compressed_len + max_compressed_metric_len > self.compressed_limit {
             return Ok(false);
         }
 
@@ -566,25 +567,38 @@ const fn max_uncompressed_header_len() -> usize {
     SERIES_PAYLOAD_HEADER.len() + SERIES_PAYLOAD_FOOTER.len()
 }
 
+// Datadog ingest APIs accept zlib, which is what we're accounting for here. By default, zlib
+// has a 2 byte header and 4 byte CRC trailer. [1]
+//
+// [1] https://www.zlib.net/zlib_tech.html
+const ZLIB_HEADER_TRAILER: usize = 6;
+
 const fn max_compression_overhead_len(compressed_limit: usize) -> usize {
-    // Datadog ingest APIs accept zlib, which is what we're accounting for here. By default, zlib
-    // has a 2 byte header and 4 byte CRC trailer. Additionally, Deflate, the underlying
-    // compression algorithm, has a technique to ensure that input data can't be encoded in such a
-    // way where it's expanded by a meaningful amount.
-    //
-    // This technique allows storing blocks of uncompressed data with only 5 bytes of overhead per
-    // block. Technically, the blocks can be up to 65KB in Deflate, but modern zlib implementations
-    // use block sizes of 16KB. [1][2]
-    //
-    // With all of that said, we calculate the overhead as the header plus trailer plus the given
-    // compressed size limit, minus the known overhead, multiplied such that it accounts for the
-    // worse case of entirely uncompressed data.
+    // We calculate the overhead as the zlib header/trailer plus the worst case overhead of
+    // compressing `compressed_limit` bytes, such that we assume all of the data we write may not be
+    // compressed at all.
     //
     // [1] https://www.zlib.net/zlib_tech.html
     // [2] https://www.bolet.org/~pornin/deflate-flush-fr.html
-    const HEADER_TRAILER: usize = 6;
+    ZLIB_HEADER_TRAILER + max_compressed_overhead_len(compressed_limit)
+}
+
+const fn max_compressed_overhead_len(len: usize) -> usize {
+    // Datadog ingest APIs accept zlib, which is what we're accounting for here.
+    //
+    // Deflate, the underlying compression algorithm, has a technique to ensure that input data
+    // can't be encoded in such a way where it's expanded by a meaningful amount. This technique
+    // allows storing blocks of uncompressed data with only 5 bytes of overhead per block.
+    // Technically, the blocks can be up to 65KB in Deflate, but modern zlib implementations use
+    // block sizes of 16KB. [1][2]
+    //
+    // We calculate the overhead of compressing a given `len` bytes as the worst case of that many
+    // bytes being written to the compressor and being unable to be compressed at all
+    //
+    // [1] https://www.zlib.net/zlib_tech.html
+    // [2] https://www.bolet.org/~pornin/deflate-flush-fr.html
     const STORED_BLOCK_SIZE: usize = 16384;
-    HEADER_TRAILER + (1 + compressed_limit.saturating_sub(HEADER_TRAILER) / STORED_BLOCK_SIZE) * 5
+    (1 + len.saturating_sub(ZLIB_HEADER_TRAILER) / STORED_BLOCK_SIZE) * 5
 }
 
 const fn validate_payload_size_limits(
