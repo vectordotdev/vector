@@ -107,11 +107,10 @@ impl ShutdownSignal {
     }
 }
 
-type IsInternal = bool;
-
 #[derive(Debug, Default)]
 pub struct SourceShutdownCoordinator {
-    shutdown_begun_triggers: HashMap<ComponentKey, (IsInternal, Trigger)>,
+    shutdown_begun_external_triggers: HashMap<ComponentKey, Trigger>,
+    shutdown_begun_internal_triggers: HashMap<ComponentKey, Trigger>,
     shutdown_force_triggers: HashMap<ComponentKey, Trigger>,
     shutdown_complete_tripwires: HashMap<ComponentKey, Tripwire>,
 }
@@ -129,8 +128,13 @@ impl SourceShutdownCoordinator {
         let (force_shutdown_trigger, force_shutdown_tripwire) = Tripwire::new();
         let (shutdown_complete_trigger, shutdown_complete_tripwire) = Tripwire::new();
 
-        self.shutdown_begun_triggers
-            .insert(id.clone(), (internal, shutdown_begun_trigger));
+        if internal {
+            self.shutdown_begun_internal_triggers
+                .insert(id.clone(), shutdown_begun_trigger);
+        } else {
+            self.shutdown_begun_external_triggers
+                .insert(id.clone(), shutdown_begun_trigger);
+        }
         self.shutdown_force_triggers
             .insert(id.clone(), force_shutdown_trigger);
         self.shutdown_complete_tripwires
@@ -151,11 +155,24 @@ impl SourceShutdownCoordinator {
     ///
     /// Panics if the other coordinator already had its triggers removed.
     pub fn takeover_source(&mut self, id: &ComponentKey, other: &mut Self) {
-        let existing = self.shutdown_begun_triggers.insert(
+        let existing = self.shutdown_begun_internal_triggers.insert(
             id.clone(),
-            other.shutdown_begun_triggers.remove(id).unwrap_or_else(|| {
+            other.shutdown_begun_internal_triggers.remove(id).unwrap_or_else(|| {
                 panic!(
-                    "Other ShutdownCoordinator didn't have a shutdown_begun_trigger for \"{id}\""
+                    "Other ShutdownCoordinator didn't have a shutdown_begun_internal_trigger for \"{id}\""
+                )
+            }),
+        );
+        assert!(
+            existing.is_none(),
+            "ShutdownCoordinator already has a shutdown_begin_trigger for source \"{id}\""
+        );
+
+        let existing = self.shutdown_begun_external_triggers.insert(
+            id.clone(),
+            other.shutdown_begun_external_triggers.remove(id).unwrap_or_else(|| {
+                panic!(
+                    "Other ShutdownCoordinator didn't have a shutdown_begun_external_triggers for \"{id}\""
                 )
             }),
         );
@@ -207,11 +224,10 @@ impl SourceShutdownCoordinator {
         let mut internal_sources_complete_futures = Vec::new();
         let mut external_sources_complete_futures = Vec::new();
 
-        let shutdown_begun_triggers = self.shutdown_begun_triggers;
         let mut shutdown_complete_tripwires = self.shutdown_complete_tripwires;
         let mut shutdown_force_triggers = self.shutdown_force_triggers;
 
-        for (id, (internal, trigger)) in shutdown_begun_triggers {
+        for (id, trigger) in self.shutdown_begun_external_triggers {
             trigger.cancel();
 
             let shutdown_complete_tripwire =
@@ -232,12 +248,31 @@ impl SourceShutdownCoordinator {
                 id.clone(),
                 deadline,
             );
+            external_sources_complete_futures.push(source_complete);
+        }
 
-            if internal {
-                internal_sources_complete_futures.push(source_complete);
-            } else {
-                external_sources_complete_futures.push(source_complete);
-            }
+        for (id, trigger) in self.shutdown_begun_internal_triggers {
+            trigger.cancel();
+
+            let shutdown_complete_tripwire =
+                shutdown_complete_tripwires.remove(&id).unwrap_or_else(|| {
+                    panic!(
+                "shutdown_complete_tripwire for source \"{id}\" not found in the ShutdownCoordinator"
+            )
+                });
+            let shutdown_force_trigger = shutdown_force_triggers.remove(&id).unwrap_or_else(|| {
+                panic!(
+                    "shutdown_force_trigger for source \"{id}\" not found in the ShutdownCoordinator"
+                )
+            });
+
+            let source_complete = SourceShutdownCoordinator::shutdown_source_complete(
+                shutdown_complete_tripwire,
+                shutdown_force_trigger,
+                id.clone(),
+                deadline,
+            );
+            internal_sources_complete_futures.push(source_complete);
         }
 
         futures::future::join_all(external_sources_complete_futures)
@@ -260,11 +295,15 @@ impl SourceShutdownCoordinator {
         id: &ComponentKey,
         deadline: Instant,
     ) -> impl Future<Output = bool> {
-        let (_, begin_shutdown_trigger) =
-            self.shutdown_begun_triggers.remove(id).unwrap_or_else(|| {
-                panic!(
-                "shutdown_begun_trigger for source \"{id}\" not found in the ShutdownCoordinator"
-            )
+        let begin_shutdown_trigger =
+            self.shutdown_begun_external_triggers.remove(id).unwrap_or_else(|| {
+                self.shutdown_begun_internal_triggers.remove(id).unwrap_or_else(
+                    || {
+                        panic!(
+                            "shutdown_begun_trigger for source \"{id}\" not found in the ShutdownCoordinator"
+                        )
+                    }
+                )
             });
         // This is what actually triggers the source to begin shutting down.
         begin_shutdown_trigger.cancel();
