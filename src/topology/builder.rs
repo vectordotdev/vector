@@ -945,6 +945,8 @@ fn build_task_transform(
         component: key.clone(),
         port: None,
     });
+
+    // Task transforms can only write to the default output, so only a single schema def map is needed
     let schema_definition_map = outputs
         .iter()
         .find(|x| x.port.is_none())
