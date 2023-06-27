@@ -20,6 +20,9 @@ impl Cli {
                 "website/node_modules",
                 "--ignore",
                 "target",
+                // The following is a submodule and should be excluded from formatting checks
+                "--ignore",
+                "lib/opentelemetry-proto/src/proto/opentelemetry-proto",
                 ".",
             ],
             true,
