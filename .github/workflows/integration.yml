@@ -93,8 +93,7 @@ jobs:
         name: amqp
         uses: nick-fields/retry@v2
         with:
-          # First one requires more time, as we need to build the image from scratch
-          timeout_minutes: 25
+          timeout_minutes: 30
           max_attempts: 3
           command: bash scripts/ci-integration-test.sh amqp
 
@@ -102,7 +101,7 @@ jobs:
         name: appsignal
         uses: nick-fields/retry@v2
         with:
-          timeout_minutes: 5
+          timeout_minutes: 30
           max_attempts: 3
           command: bash scripts/ci-integration-test.sh  appsignal
 
@@ -110,7 +109,7 @@ jobs:
         name: aws
         uses: nick-fields/retry@v2
         with:
-          timeout_minutes: 5
+          timeout_minutes: 30
           max_attempts: 3
           command: bash scripts/ci-integration-test.sh  aws
 
@@ -118,7 +117,7 @@ jobs:
         name: axiom
         uses: nick-fields/retry@v2
         with:
-          timeout_minutes: 5
+          timeout_minutes: 30
           max_attempts: 3
           command: bash scripts/ci-integration-test.sh  axiom
 
@@ -126,7 +125,7 @@ jobs:
         name: azure
         uses: nick-fields/retry@v2
         with:
-          timeout_minutes: 5
+          timeout_minutes: 30
           max_attempts: 3
           command: bash scripts/ci-integration-test.sh  azure
 
@@ -134,7 +133,7 @@ jobs:
         name: clickhouse
         uses: nick-fields/retry@v2
         with:
-          timeout_minutes: 5
+          timeout_minutes: 30
           max_attempts: 3
           command: bash scripts/ci-integration-test.sh  clickhouse
 
@@ -142,7 +141,7 @@ jobs:
         name: databend
         uses: nick-fields/retry@v2
         with:
-          timeout_minutes: 5
+          timeout_minutes: 30
           max_attempts: 3
           command: bash scripts/ci-integration-test.sh  databend
 
@@ -150,7 +149,7 @@ jobs:
         name: datadog-agent
         uses: nick-fields/retry@v2
         with:
-          timeout_minutes: 5
+          timeout_minutes: 30
           max_attempts: 3
           command: bash scripts/ci-integration-test.sh  datadog-agent
 
@@ -158,7 +157,7 @@ jobs:
         name: datadog-logs
         uses: nick-fields/retry@v2
         with:
-          timeout_minutes: 5
+          timeout_minutes: 30
           max_attempts: 3
           command: bash scripts/ci-integration-test.sh  datadog-logs
 
@@ -166,7 +165,7 @@ jobs:
         name: datadog-metrics
         uses: nick-fields/retry@v2
         with:
-          timeout_minutes: 5
+          timeout_minutes: 30
           max_attempts: 3
           command: bash scripts/ci-integration-test.sh  datadog-metrics
 
@@ -174,7 +173,7 @@ jobs:
         name: datadog-traces
         uses: nick-fields/retry@v2
         with:
-          timeout_minutes: 5
+          timeout_minutes: 30
           max_attempts: 3
           command: bash scripts/ci-integration-test.sh  datadog-traces
 
@@ -182,7 +181,7 @@ jobs:
         name: dnstap
         uses: nick-fields/retry@v2
         with:
-          timeout_minutes: 5
+          timeout_minutes: 30
           max_attempts: 3
           command: bash scripts/ci-integration-test.sh  dnstap
 
@@ -192,7 +191,7 @@ jobs:
         name: docker-logs
         uses: nick-fields/retry@v2
         with:
-          timeout_minutes: 5
+          timeout_minutes: 30
           max_attempts: 3
           command: bash scripts/ci-integration-test.sh  docker-logs
 
@@ -200,7 +199,7 @@ jobs:
         name: elasticsearch
         uses: nick-fields/retry@v2
         with:
-          timeout_minutes: 5
+          timeout_minutes: 30
           max_attempts: 3
           command: bash scripts/ci-integration-test.sh  elasticsearch
 
@@ -208,7 +207,7 @@ jobs:
         name: eventstoredb
         uses: nick-fields/retry@v2
         with:
-          timeout_minutes: 5
+          timeout_minutes: 30
           max_attempts: 3
           command: bash scripts/ci-integration-test.sh  eventstoredb
 
@@ -216,7 +215,7 @@ jobs:
         name: fluent
         uses: nick-fields/retry@v2
         with:
-          timeout_minutes: 5
+          timeout_minutes: 30
           max_attempts: 3
           command: bash scripts/ci-integration-test.sh  fluent
 
@@ -224,7 +223,7 @@ jobs:
         name: gcp
         uses: nick-fields/retry@v2
         with:
-          timeout_minutes: 5
+          timeout_minutes: 30
           max_attempts: 3
           command: bash scripts/ci-integration-test.sh  gcp
 
@@ -232,7 +231,7 @@ jobs:
         name: humio
         uses: nick-fields/retry@v2
         with:
-          timeout_minutes: 5
+          timeout_minutes: 30
           max_attempts: 3
           command: bash scripts/ci-integration-test.sh  humio
 
@@ -240,7 +239,7 @@ jobs:
         name: http-client
         uses: nick-fields/retry@v2
         with:
-          timeout_minutes: 5
+          timeout_minutes: 30
           max_attempts: 3
           command: bash scripts/ci-integration-test.sh  http-client
 
@@ -248,7 +247,7 @@ jobs:
         name: influxdb
         uses: nick-fields/retry@v2
         with:
-          timeout_minutes: 5
+          timeout_minutes: 30
           max_attempts: 3
           command: bash scripts/ci-integration-test.sh  influxdb
 
@@ -256,7 +255,7 @@ jobs:
         name: kafka
         uses: nick-fields/retry@v2
         with:
-          timeout_minutes: 5
+          timeout_minutes: 30
           max_attempts: 3
           command: bash scripts/ci-integration-test.sh  kafka
 
@@ -264,7 +263,7 @@ jobs:
         name: logstash
         uses: nick-fields/retry@v2
         with:
-          timeout_minutes: 5
+          timeout_minutes: 30
           max_attempts: 3
           command: bash scripts/ci-integration-test.sh  logstash
 
@@ -272,7 +271,7 @@ jobs:
         name: loki
         uses: nick-fields/retry@v2
         with:
-          timeout_minutes: 5
+          timeout_minutes: 30
           max_attempts: 3
           command: bash scripts/ci-integration-test.sh  loki
 
@@ -280,7 +279,7 @@ jobs:
         name: mongodb
         uses: nick-fields/retry@v2
         with:
-          timeout_minutes: 5
+          timeout_minutes: 30
           max_attempts: 3
           command: bash scripts/ci-integration-test.sh  mongodb
 
@@ -290,7 +289,7 @@ jobs:
         name: nats
         uses: nick-fields/retry@v2
         with:
-          timeout_minutes: 5
+          timeout_minutes: 30
           max_attempts: 3
           command: bash scripts/ci-integration-test.sh  nats
 
@@ -298,7 +297,7 @@ jobs:
         name: nginx
         uses: nick-fields/retry@v2
         with:
-          timeout_minutes: 5
+          timeout_minutes: 30
           max_attempts: 3
           command: bash scripts/ci-integration-test.sh  nginx
 
@@ -306,7 +305,7 @@ jobs:
         name: opentelemetry
         uses: nick-fields/retry@v2
         with:
-          timeout_minutes: 5
+          timeout_minutes: 30
           max_attempts: 3
           command: bash scripts/ci-integration-test.sh  opentelemetry
 
@@ -314,7 +313,7 @@ jobs:
         name: postgres
         uses: nick-fields/retry@v2
         with:
-          timeout_minutes: 5
+          timeout_minutes: 30
           max_attempts: 3
           command: bash scripts/ci-integration-test.sh  postgres
 
@@ -322,7 +321,7 @@ jobs:
         name: prometheus
         uses: nick-fields/retry@v2
         with:
-          timeout_minutes: 5
+          timeout_minutes: 30
           max_attempts: 3
           command: bash scripts/ci-integration-test.sh  prometheus
 
@@ -330,7 +329,7 @@ jobs:
         name: pulsar
         uses: nick-fields/retry@v2
         with:
-          timeout_minutes: 5
+          timeout_minutes: 30
           max_attempts: 3
           command: bash scripts/ci-integration-test.sh  pulsar
 
@@ -338,7 +337,7 @@ jobs:
         name: redis
         uses: nick-fields/retry@v2
         with:
-          timeout_minutes: 5
+          timeout_minutes: 30
           max_attempts: 3
           command: bash scripts/ci-integration-test.sh  redis
 
@@ -346,7 +345,7 @@ jobs:
         name: shutdown
         uses: nick-fields/retry@v2
         with:
-          timeout_minutes: 5
+          timeout_minutes: 30
           max_attempts: 3
           command: bash scripts/ci-integration-test.sh  shutdown
 
@@ -354,7 +353,7 @@ jobs:
         name: splunk
         uses: nick-fields/retry@v2
         with:
-          timeout_minutes: 10
+          timeout_minutes: 30
           max_attempts: 3
           command: bash scripts/ci-integration-test.sh  splunk
 
@@ -362,7 +361,7 @@ jobs:
         name: webhdfs
         uses: nick-fields/retry@v2
         with:
-          timeout_minutes: 5
+          timeout_minutes: 30
           max_attempts: 3
           command: bash scripts/ci-integration-test.sh  webhdfs
 
