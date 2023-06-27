@@ -48,6 +48,8 @@ jobs:
       comment_valid: ${{ steps.comment.outputs.isTeamMember }}
     steps:
     - uses: actions/checkout@v3
+      with:
+        submodules: "recursive"
 
     - name: Collect file changes
       id: changes
@@ -129,6 +131,7 @@ jobs:
       - uses: actions/checkout@v3
         with:
           fetch-depth: 1000
+          submodules: "recursive"
 
       # If triggered by issue comment, the event payload doesn't directly contain the head and base sha from the PR.
       # But, we can retrieve this info from some commands.
@@ -287,6 +290,8 @@ jobs:
       - uses: colpal/actions-clean@v1
 
       - uses: actions/checkout@v3
+        with:
+          submodules: "recursive"
 
       - uses: actions/checkout@v3
         with:
@@ -325,6 +330,8 @@ jobs:
       - uses: colpal/actions-clean@v1
 
       - uses: actions/checkout@v3
+        with:
+          submodules: "recursive"
 
       - uses: actions/checkout@v3
         with:
@@ -475,6 +482,7 @@ jobs:
       - uses: actions/checkout@v3
         with:
           ref: ${{ needs.compute-metadata.outputs.comparison-sha }}
+          submodules: "recursive"
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v2.2.0
@@ -594,6 +602,8 @@ jobs:
       - compute-metadata
     steps:
       - uses: actions/checkout@v3
+        with:
+          submodules: "recursive"
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v2.2.0
@@ -685,6 +695,7 @@ jobs:
       - uses: actions/checkout@v3
         with:
           ref: ${{ needs.compute-metadata.outputs.comparison-sha }}
+          submodules: "recursive"
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v2.2.0
