@@ -119,6 +119,8 @@ jobs:
       k8s: ${{ steps.filter.outputs.k8s }}
     steps:
     - uses: actions/checkout@v3
+      with:
+        submodules: "recursive"
 
     - uses: dorny/paths-filter@v2
       id: filter
@@ -212,6 +214,8 @@ jobs:
       webhdfs: ${{ steps.filter.outputs.webhdfs }}
     steps:
       - uses: actions/checkout@v3
+        with:
+          submodules: "recursive"
 
       # creates a yaml file that contains the filters for each integration,
       # extracted from the output of the `vdev int ci-paths` command, which
