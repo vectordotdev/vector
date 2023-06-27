@@ -33,7 +33,7 @@ paste = "1.0.12"
 regex = { version = "1.8.4", default-features = false, features = ["std", "perf"] }
 reqwest = { version = "0.11", features = ["json", "blocking"] }
 serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0.97"
+serde_json = "1.0.99"
 serde_yaml = "0.9.22"
 sha2 = "0.10.7"
 tempfile = "3.6.0"
