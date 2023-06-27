@@ -6,6 +6,7 @@ rustflags = [
   "-Dclippy::print_stdout",
   "-Dclippy::print_stderr",
   "-Dclippy::dbg_macro",
+  "-Dwarnings",
 ]
 
 # We need to bring in `libstdc++` for things that build against C++ (librdkafka, etc) which comes along in the
