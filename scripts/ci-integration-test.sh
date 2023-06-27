@@ -21,6 +21,8 @@ set -x
 
 INTEGRATION=$1
 
+cargo vdev -v int start "${INTEGRATION}"
+sleep 15
 cargo vdev -v int test --retries 2 -a "${INTEGRATION}"
 RET=$?
 cargo vdev -v int stop "${INTEGRATION}"
