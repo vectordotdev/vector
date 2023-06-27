@@ -70,7 +70,7 @@ static TRANSFORM_CONCURRENCY_LIMIT: Lazy<usize> = Lazy::new(|| {
         .unwrap_or_else(crate::num_threads)
 });
 
-const INTERNAL_SOURCES: [&str; 3] = ["internal_logs", "internal_metrics", "datadog_traces"];
+const INTERNAL_SOURCES: [&str; 2] = ["internal_logs", "intgernal_metrics"];
 
 /// Builds only the new pieces, and doesn't check their topology.
 pub async fn build_pieces(
