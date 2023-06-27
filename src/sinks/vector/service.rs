@@ -8,11 +8,8 @@ use hyper_proxy::ProxyConnector;
 use prost::Message;
 use tonic::{body::BoxBody, IntoRequest};
 use tower::Service;
-use vector_common::{
-    json_size::JsonSize,
-    request_metadata::{MetaDescriptive, RequestMetadata},
-};
-use vector_core::{internal_event::CountByteSize, stream::DriverResponse};
+use vector_common::request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata};
+use vector_core::stream::DriverResponse;
 
 use super::VectorSinkError;
 use crate::{
@@ -31,8 +28,7 @@ pub struct VectorService {
 }
 
 pub struct VectorResponse {
-    events_count: usize,
-    events_byte_size: JsonSize,
+    events_byte_size: GroupedCountByteSize,
 }
 
 impl DriverResponse for VectorResponse {
@@ -40,8 +36,8 @@ impl DriverResponse for VectorResponse {
         EventStatus::Delivered
     }
 
-    fn events_sent(&self) -> CountByteSize {
-        CountByteSize(self.events_count, self.events_byte_size)
+    fn events_sent(&self) -> &GroupedCountByteSize {
+        &self.events_byte_size
     }
 }
 
@@ -59,8 +55,12 @@ impl Finalizable for VectorRequest {
 }
 
 impl MetaDescriptive for VectorRequest {
-    fn get_metadata(&self) -> RequestMetadata {
-        self.metadata
+    fn get_metadata(&self) -> &RequestMetadata {
+        &self.metadata
+    }
+
+    fn metadata_mut(&mut self) -> &mut RequestMetadata {
+        &mut self.metadata
     }
 }
 
@@ -103,13 +103,11 @@ impl Service<VectorRequest> for VectorService {
     }
 
     // Emission of internal events for errors and dropped events is handled upstream by the caller.
-    fn call(&mut self, list: VectorRequest) -> Self::Future {
+    fn call(&mut self, mut list: VectorRequest) -> Self::Future {
         let mut service = self.clone();
         let byte_size = list.request.encoded_len();
-        let events_count = list.get_metadata().event_count();
-        let events_byte_size = list
-            .get_metadata()
-            .events_estimated_json_encoded_byte_size();
+        let metadata = std::mem::take(list.metadata_mut());
+        let events_byte_size = metadata.into_events_estimated_json_encoded_byte_size();
 
         let future = async move {
             service
@@ -121,10 +119,7 @@ impl Service<VectorRequest> for VectorService {
                         protocol: &service.protocol,
                         endpoint: &service.endpoint,
                     });
-                    VectorResponse {
-                        events_count,
-                        events_byte_size,
-                    }
+                    VectorResponse { events_byte_size }
                 })
                 .map_err(|source| VectorSinkError::Request { source }.into())
                 .await

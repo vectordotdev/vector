@@ -41,7 +41,7 @@ impl RequestBuilder<PulsarEvent> for PulsarRequestBuilder {
         &self,
         mut input: PulsarEvent,
     ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
-        let builder = RequestMetadataBuilder::from_events(&input);
+        let builder = RequestMetadataBuilder::from_event(&input.event);
         let metadata = PulsarMetadata {
             finalizers: input.event.take_finalizers(),
             key: input.key,

@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use vector_core::config::OutputId;
+use vector_common::config::ComponentKey;
 use vector_core::metric_tags;
 
 use super::*;
@@ -85,8 +85,8 @@ async fn drop_event(config: TagCardinalityLimitConfig) {
 
         let new_event3 = out.recv().await;
 
-        event1.set_source_id(Arc::new(OutputId::from("in")));
-        event2.set_source_id(Arc::new(OutputId::from("in")));
+        event1.set_source_id(Arc::new(ComponentKey::from("in")));
+        event2.set_source_id(Arc::new(ComponentKey::from("in")));
 
         assert_eq!(new_event1, Some(event1));
         assert_eq!(new_event2, Some(event2));
@@ -131,9 +131,9 @@ async fn drop_tag(config: TagCardinalityLimitConfig) {
         drop(tx);
         topology.stop().await;
 
-        event1.set_source_id(Arc::new(OutputId::from("in")));
-        event2.set_source_id(Arc::new(OutputId::from("in")));
-        event3.set_source_id(Arc::new(OutputId::from("in")));
+        event1.set_source_id(Arc::new(ComponentKey::from("in")));
+        event2.set_source_id(Arc::new(ComponentKey::from("in")));
+        event3.set_source_id(Arc::new(ComponentKey::from("in")));
 
         assert_eq!(new_event1, Some(event1));
         assert_eq!(new_event2, Some(event2));
@@ -203,9 +203,9 @@ async fn drop_tag_multi_value(config: TagCardinalityLimitConfig) {
         let new_event2 = out.recv().await;
         let new_event3 = out.recv().await;
 
-        event1.set_source_id(Arc::new(OutputId::from("in")));
-        event2.set_source_id(Arc::new(OutputId::from("in")));
-        event3.set_source_id(Arc::new(OutputId::from("in")));
+        event1.set_source_id(Arc::new(ComponentKey::from("in")));
+        event2.set_source_id(Arc::new(ComponentKey::from("in")));
+        event3.set_source_id(Arc::new(ComponentKey::from("in")));
 
         drop(tx);
         topology.stop().await;
@@ -253,9 +253,9 @@ async fn separate_value_limit_per_tag(config: TagCardinalityLimitConfig) {
         drop(tx);
         topology.stop().await;
 
-        event1.set_source_id(Arc::new(OutputId::from("in")));
-        event2.set_source_id(Arc::new(OutputId::from("in")));
-        event3.set_source_id(Arc::new(OutputId::from("in")));
+        event1.set_source_id(Arc::new(ComponentKey::from("in")));
+        event2.set_source_id(Arc::new(ComponentKey::from("in")));
+        event3.set_source_id(Arc::new(ComponentKey::from("in")));
 
         assert_eq!(new_event1, Some(event1));
         assert_eq!(new_event2, Some(event2));

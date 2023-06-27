@@ -42,8 +42,12 @@ impl ElementCount for DatadogEventsRequest {
 }
 
 impl MetaDescriptive for DatadogEventsRequest {
-    fn get_metadata(&self) -> RequestMetadata {
-        self.request_metadata
+    fn get_metadata(&self) -> &RequestMetadata {
+        &self.request_metadata
+    }
+
+    fn metadata_mut(&mut self) -> &mut RequestMetadata {
+        &mut self.request_metadata
     }
 }
 
@@ -86,7 +90,7 @@ impl RequestBuilder<Event> for DatadogEventsRequestBuilder {
     }
 
     fn split_input(&self, event: Event) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
-        let builder = RequestMetadataBuilder::from_events(&event);
+        let builder = RequestMetadataBuilder::from_event(&event);
 
         let mut log = event.into_log();
         let metadata = Metadata {

@@ -245,10 +245,7 @@ impl<'a> Builder<'a> {
                 let mut rx = builder.add_source_output(output.clone());
 
                 let (mut fanout, control) = Fanout::new();
-                let source = Arc::new(OutputId {
-                    component: key.clone(),
-                    port: output.port.clone(),
-                });
+                let source = Arc::new(key.clone());
 
                 let pump = async move {
                     debug!("Source pump starting.");
@@ -515,6 +512,16 @@ impl<'a> Builder<'a> {
             let typetag = sink.inner.get_component_name();
             let input_type = sink.inner.input().data_type();
 
+            let span = error_span!(
+                "sink",
+                component_kind = "sink",
+                component_id = %key.id(),
+                component_type = %sink.inner.get_component_name(),
+                // maintained for compatibility
+                component_name = %key.id(),
+            );
+            let _entered_span = span.enter();
+
             // At this point, we've validated that all transforms are valid, including any
             // transform that mutates the schema provided by their sources. We can now validate the
             // schema expectations of each individual sink.
@@ -534,14 +541,7 @@ impl<'a> Builder<'a> {
                     BufferType::Memory { .. } => "memory",
                     BufferType::DiskV2 { .. } => "disk",
                 };
-                let buffer_span = error_span!(
-                    "sink",
-                    component_kind = "sink",
-                    component_id = %key.id(),
-                    component_type = typetag,
-                    component_name = %key.id(),
-                    buffer_type,
-                );
+                let buffer_span = error_span!("sink", buffer_type);
                 let buffer = sink
                     .buffer
                     .build(

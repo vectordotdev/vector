@@ -38,6 +38,8 @@ jobs:
     with:
       base_ref: ${{ github.event.pull_request.base.ref }}
       head_ref: ${{ github.event.pull_request.head.ref  }}
+      source: false
+      int_tests: true
     secrets: inherit
 
   # Calls the Integration Test workflow for each integration that was detected to have files changed that impact it.

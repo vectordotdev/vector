@@ -58,6 +58,8 @@ pub const FILE_SOURCE_TAGS: [&str; 1] = ["file"];
 /// The most basic set of tags for sinks, regardless of whether or not they push data or have it pulled out.
 pub const SINK_TAGS: [&str; 1] = ["protocol"];
 
+pub const DATA_VOLUME_SINK_TAGS: [&str; 2] = ["source", "service"];
+
 /// The standard set of tags for all sinks that write a file.
 pub const FILE_SINK_TAGS: [&str; 2] = ["file", "protocol"];
 
@@ -117,6 +119,17 @@ pub static SINK_TESTS: Lazy<ComponentTests> = Lazy::new(|| {
             "component_sent_events_total",
             "component_sent_event_bytes_total",
         ],
+    }
+});
+
+pub static DATA_VOLUME_SINK_TESTS: Lazy<ComponentTests> = Lazy::new(|| {
+    ComponentTests {
+        events: &["BytesSent", "EventsSent"], // EventsReceived is emitted in the topology
+        tagged_counters: &[
+            "component_sent_events_total",
+            "component_sent_event_bytes_total",
+        ],
+        untagged_counters: &[],
     }
 });
 
@@ -426,6 +439,32 @@ where
     I: Into<EventArray>,
 {
     assert_sink_compliance(tags, async move {
+        let events = events.map(Into::into);
+        sink.run(events).await.expect("Running sink failed")
+    })
+    .await;
+}
+
+/// Convenience wrapper for running sink tests
+pub async fn assert_data_volume_sink_compliance<T>(tags: &[&str], f: impl Future<Output = T>) -> T {
+    init_test();
+
+    let result = f.await;
+
+    DATA_VOLUME_SINK_TESTS.assert(tags);
+
+    result
+}
+
+pub async fn run_and_assert_data_volume_sink_compliance<S, I>(
+    sink: VectorSink,
+    events: S,
+    tags: &[&str],
+) where
+    S: Stream<Item = I> + Send,
+    I: Into<EventArray>,
+{
+    assert_data_volume_sink_compliance(tags, async move {
         let events = events.map(Into::into);
         sink.run(events).await.expect("Running sink failed")
     })

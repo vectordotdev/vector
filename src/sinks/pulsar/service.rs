@@ -6,7 +6,6 @@ use bytes::Bytes;
 use pulsar::producer::Message;
 use pulsar::{Error as PulsarError, Executor, MultiTopicProducer, ProducerOptions, Pulsar};
 use tokio::sync::Mutex;
-use vector_common::internal_event::CountByteSize;
 
 use crate::internal_events::PulsarSendingError;
 use crate::sinks::{prelude::*, pulsar::request_builder::PulsarMetadata};
@@ -20,7 +19,7 @@ pub(super) struct PulsarRequest {
 
 pub struct PulsarResponse {
     byte_size: usize,
-    event_byte_size: JsonSize,
+    event_byte_size: GroupedCountByteSize,
 }
 
 impl DriverResponse for PulsarResponse {
@@ -28,8 +27,8 @@ impl DriverResponse for PulsarResponse {
         EventStatus::Delivered
     }
 
-    fn events_sent(&self) -> CountByteSize {
-        CountByteSize(1, self.event_byte_size)
+    fn events_sent(&self) -> &GroupedCountByteSize {
+        &self.event_byte_size
     }
 
     fn bytes_sent(&self) -> Option<usize> {
@@ -44,8 +43,12 @@ impl Finalizable for PulsarRequest {
 }
 
 impl MetaDescriptive for PulsarRequest {
-    fn get_metadata(&self) -> RequestMetadata {
-        self.request_metadata
+    fn get_metadata(&self) -> &RequestMetadata {
+        &self.request_metadata
+    }
+
+    fn metadata_mut(&mut self) -> &mut RequestMetadata {
+        &mut self.request_metadata
     }
 }
 
@@ -134,7 +137,7 @@ impl<Exe: Executor> Service<PulsarRequest> for PulsarService<Exe> {
                         byte_size,
                         event_byte_size: request
                             .request_metadata
-                            .events_estimated_json_encoded_byte_size(),
+                            .into_events_estimated_json_encoded_byte_size(),
                     }),
                     Err(e) => {
                         emit!(PulsarSendingError {
