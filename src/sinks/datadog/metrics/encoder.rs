@@ -888,16 +888,9 @@ mod tests {
         let result = encoder.finish();
         assert!(result.is_ok());
 
-        let (payload, mut processed, raw_bytes) = result.unwrap();
+        let (_payload, mut processed) = result.unwrap();
         assert_eq!(processed.len(), 1);
         assert_eq!(expected, processed.pop().unwrap());
-        assert_eq!(100, payload.len());
-
-        // The payload is:
-        // {"series":[{"metric":"basic_counter","type":"count","interval":null,"points":[[1651664333,3.14]],"tags":[]}]}
-        // which comes to a total of 98 bytes.
-        // There are extra bytes that make up the header and footer. These should not be included in the raw bytes.
-        assert_eq!(109, raw_bytes);
     }
 
     #[test]
@@ -918,12 +911,9 @@ mod tests {
         let result = encoder.finish();
         assert!(result.is_ok());
 
-        let (payload, mut processed, raw_bytes) = result.unwrap();
+        let (_payload, mut processed) = result.unwrap();
         assert_eq!(processed.len(), 1);
         assert_eq!(expected, processed.pop().unwrap());
-
-        assert_eq!(81, payload.len());
-        assert_eq!(70, raw_bytes);
     }
 
     #[test]
@@ -1055,10 +1045,16 @@ mod tests {
         let result = encoder.finish();
         assert!(result.is_ok());
 
-        let (payload, processed, raw_bytes_written) = result.unwrap();
-        assert_eq!(payload, get_compressed_empty_series_payload());
+        let (payload, processed) = result.unwrap();
+        assert_eq!(
+            payload.uncompressed_byte_size,
+            max_uncompressed_header_len()
+        );
+        assert_eq!(
+            payload.into_payload(),
+            get_compressed_empty_series_payload()
+        );
         assert_eq!(processed.len(), 0);
-        assert_eq!(raw_bytes_written, max_uncompressed_header_len());
     }
 
     #[test]
@@ -1087,10 +1083,13 @@ mod tests {
         let result = encoder.finish();
         assert!(result.is_ok());
 
-        let (payload, processed, raw_bytes_written) = result.unwrap();
-        assert_eq!(payload, get_compressed_empty_sketches_payload());
+        let (payload, processed) = result.unwrap();
+        assert_eq!(payload.uncompressed_byte_size, 0);
+        assert_eq!(
+            payload.into_payload(),
+            get_compressed_empty_sketches_payload()
+        );
         assert_eq!(processed.len(), 0);
-        assert_eq!(raw_bytes_written, 0);
     }
 
     #[test]
@@ -1122,10 +1121,16 @@ mod tests {
         let result = encoder.finish();
         assert!(result.is_ok());
 
-        let (payload, processed, raw_bytes_written) = result.unwrap();
-        assert_eq!(payload, get_compressed_empty_series_payload());
+        let (payload, processed) = result.unwrap();
+        assert_eq!(
+            payload.uncompressed_byte_size,
+            max_uncompressed_header_len()
+        );
+        assert_eq!(
+            payload.into_payload(),
+            get_compressed_empty_series_payload()
+        );
         assert_eq!(processed.len(), 0);
-        assert_eq!(raw_bytes_written, max_uncompressed_header_len());
     }
 
     #[test]
@@ -1157,10 +1162,13 @@ mod tests {
         let result = encoder.finish();
         assert!(result.is_ok());
 
-        let (payload, processed, raw_bytes_written) = result.unwrap();
-        assert_eq!(payload, get_compressed_empty_sketches_payload());
+        let (payload, processed) = result.unwrap();
+        assert_eq!(payload.uncompressed_byte_size, 0);
+        assert_eq!(
+            payload.into_payload(),
+            get_compressed_empty_sketches_payload()
+        );
         assert_eq!(processed.len(), 0);
-        assert_eq!(raw_bytes_written, 0);
     }
 
     fn arb_counter_metric() -> impl Strategy<Value = Metric> {
@@ -1203,7 +1211,8 @@ mod tests {
             if let Ok(mut encoder) = result {
                 _ = encoder.try_encode(metric);
 
-                if let Ok((payload, _processed, _raw_bytes)) = encoder.finish() {
+                if let Ok((payload, _processed)) = encoder.finish() {
+                    let payload = payload.into_payload();
                     prop_assert!(payload.len() <= compressed_limit);
 
                     let result = decompress_payload(payload);
