@@ -4,7 +4,7 @@
 # This is useful to allow retrying the integration test at a higher level than
 # the nextest and reduce code duplication in the workflow file.
 
-set -euo pipefail
+set -u
 
 if [[ -z "${CI:-}" ]]; then
   echo "Aborted: this script is for use in CI." >&2
