@@ -244,7 +244,6 @@ despite seeing usages of raw strings, please take the opportunity when writing
 new code or modifying existing, to use constants or update existing raw strings
 to use constants.
 
-
 ### Feature flags
 
 When a new component (a source, transform, or sink) is added, it has to be put
