@@ -49,18 +49,10 @@ fn bench_add_fields(c: &mut Criterion) {
         let (tx, rx) = futures::channel::mpsc::channel::<Event>(1);
 
         let mut rx: Pin<Box<dyn Stream<Item = Event> + Send>> = match transform {
-            Transform::Function(t) => {
-                let mut t = t.clone();
-                Box::pin(rx.flat_map(move |v| {
-                    let mut buf = OutputBuffer::with_capacity(1);
-                    t.transform(&mut buf, v);
-                    stream::iter(buf.into_events())
-                }))
-            }
-            Transform::Synchronous(_t) => {
-                unreachable!("no sync transform used in these benches");
-            }
             Transform::Task(t) => t.transform_events(Box::pin(rx)),
+            _ => {
+                unreachable!("no other transform used in these benches");
+            }
         };
 
         group.bench_function(name.to_owned(), |b| {
@@ -125,18 +117,10 @@ fn bench_field_filter(c: &mut Criterion) {
         let (tx, rx) = futures::channel::mpsc::channel::<Event>(num_events as usize);
 
         let mut rx: Pin<Box<dyn Stream<Item = Event> + Send>> = match transform {
-            Transform::Function(t) => {
-                let mut t = t.clone();
-                Box::pin(rx.flat_map(move |v| {
-                    let mut buf = OutputBuffer::with_capacity(1);
-                    t.transform(&mut buf, v);
-                    stream::iter(buf.into_events())
-                }))
-            }
-            Transform::Synchronous(_t) => {
-                unreachable!("no sync transform used in these benches");
-            }
             Transform::Task(t) => t.transform_events(Box::pin(rx)),
+            _ => {
+                unreachable!("no other transform used in these benches");
+            }
         };
 
         group.bench_function(name.to_owned(), |b| {

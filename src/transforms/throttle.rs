@@ -1,8 +1,7 @@
-use std::{num::NonZeroU32, pin::Pin, time::Duration};
+use std::{num::NonZeroU32, time::Duration};
 
-use async_stream::stream;
-use futures::{Stream, StreamExt};
-use governor::{clock, Quota, RateLimiter};
+use dashmap::DashMap;
+use governor::{clock, middleware::NoOpMiddleware, state::InMemoryState, Quota, RateLimiter};
 use serde_with::serde_as;
 use snafu::Snafu;
 use vector_config::configurable_component;
@@ -15,7 +14,7 @@ use crate::{
     internal_events::{TemplateRenderingError, ThrottleEventDiscarded},
     schema,
     template::Template,
-    transforms::{TaskTransform, Transform},
+    transforms::{TickTransform, Transform, TransformOutputsBuf},
 };
 
 /// Configuration for the `throttle` transform.
@@ -51,7 +50,8 @@ impl_generate_config_from_default!(ThrottleConfig);
 #[typetag::serde(name = "throttle")]
 impl TransformConfig for ThrottleConfig {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
-        Throttle::new(self, context, clock::MonotonicClock).map(Transform::event_task)
+        let throttle = Throttle::new(self, context, clock::MonotonicClock)?;
+        Ok(Transform::tick(throttle, self.window_secs * 2))
     }
 
     fn input(&self) -> Input {
@@ -72,13 +72,11 @@ impl TransformConfig for ThrottleConfig {
     }
 }
 
-#[derive(Clone)]
 pub struct Throttle<C: clock::Clock<Instant = I>, I: clock::Reference> {
-    quota: Quota,
-    flush_keys_interval: Duration,
     key_field: Option<Template>,
+    limiter:
+        RateLimiter<Option<String>, DashMap<Option<String>, InMemoryState>, C, NoOpMiddleware<I>>,
     exclude: Option<Condition>,
-    clock: C,
 }
 
 impl<C, I> Throttle<C, I>
@@ -104,6 +102,9 @@ where
             Some(quota) => quota.allow_burst(threshold),
             None => return Err(Box::new(ConfigError::NonZero)),
         };
+
+        let limiter = RateLimiter::dashmap_with_clock(quota, &clock);
+
         let exclude = config
             .exclude
             .as_ref()
@@ -111,92 +112,65 @@ where
             .transpose()?;
 
         Ok(Self {
-            quota,
-            clock,
-            flush_keys_interval,
+            limiter,
             key_field: config.key_field.clone(),
             exclude,
         })
     }
 }
 
-impl<C, I> TaskTransform<Event> for Throttle<C, I>
+impl<C, I> TickTransform for Throttle<C, I>
 where
     C: clock::Clock<Instant = I> + Send + 'static,
     I: clock::Reference + Send + 'static,
 {
-    fn transform(
-        self: Box<Self>,
-        mut input_rx: Pin<Box<dyn Stream<Item = Event> + Send>>,
-    ) -> Pin<Box<dyn Stream<Item = Event> + Send>>
-    where
-        Self: 'static,
-    {
-        let mut flush_keys = tokio::time::interval(self.flush_keys_interval * 2);
-
-        let limiter = RateLimiter::dashmap_with_clock(self.quota, &self.clock);
-
-        Box::pin(stream! {
-          loop {
-            let done = tokio::select! {
-                biased;
-
-                maybe_event = input_rx.next() => {
-                    match maybe_event {
-                        None => true,
-                        Some(event) => {
-                            let (throttle, event) = match self.exclude.as_ref() {
-                                Some(condition) => {
-                                    let (result, event) = condition.check(event);
-                                    (!result, event)
-                                },
-                                _ => (true, event)
-                            };
-                            let output = if throttle {
-                                let key = self.key_field.as_ref().and_then(|t| {
-                                    t.render_string(&event)
-                                        .map_err(|error| {
-                                            emit!(TemplateRenderingError {
-                                                error,
-                                                field: Some("key_field"),
-                                                drop_event: false,
-                                            })
-                                        })
-                                        .ok()
-                                });
-
-                                match limiter.check_key(&key) {
-                                    Ok(()) => {
-                                        Some(event)
-                                    }
-                                    _ => {
-                                        if let Some(key) = key {
-                                            emit!(ThrottleEventDiscarded{key})
-                                        } else {
-                                            emit!(ThrottleEventDiscarded{key: "None".to_string()})
-                                        }
-                                        None
-                                    }
-                                }
-                            } else {
-                                Some(event)
-                            };
-                            if let Some(event) = output {
-                                yield event;
-                            }
-                            false
-                        }
-                    }
-                }
-                _ = flush_keys.tick() => {
-                    limiter.retain_recent();
-                    false
-                }
-            };
-            if done { break }
-          }
-        })
+    fn tick(&mut self, _output: &mut TransformOutputsBuf) {
+        self.limiter.retain_recent();
     }
+
+    fn transform(&mut self, event: Event, output: &mut TransformOutputsBuf) {
+        let (throttle, event) = match self.exclude.as_ref() {
+            Some(condition) => {
+                let (result, event) = condition.check(event);
+                (!result, event)
+            }
+            _ => (true, event),
+        };
+        let value = if throttle {
+            let key = self.key_field.as_ref().and_then(|t| {
+                t.render_string(&event)
+                    .map_err(|error| {
+                        emit!(TemplateRenderingError {
+                            error,
+                            field: Some("key_field"),
+                            drop_event: false,
+                        })
+                    })
+                    .ok()
+            });
+
+            match self.limiter.check_key(&key) {
+                Ok(()) => Some(event),
+                _ => {
+                    if let Some(key) = key {
+                        emit!(ThrottleEventDiscarded { key })
+                    } else {
+                        emit!(ThrottleEventDiscarded {
+                            key: "None".to_string()
+                        })
+                    }
+                    None
+                }
+            }
+        } else {
+            Some(event)
+        };
+        if let Some(event) = value {
+            output.push(event);
+        }
+    }
+
+    fn finish(&mut self, _output: &mut TransformOutputsBuf) {}
 }
 
 #[derive(Debug, Snafu)]
@@ -207,10 +181,6 @@ pub enum ConfigError {
 
 #[cfg(test)]
 mod tests {
-    use std::task::Poll;
-
-    use futures::SinkExt;
-
     use super::*;
     use crate::{
         event::LogEvent, test_util::components::assert_transform_compliance,
@@ -235,56 +205,33 @@ window_secs = 5
         )
         .unwrap();
 
-        let throttle = Throttle::new(&config, &TransformContext::default(), clock.clone())
-            .map(Transform::event_task)
-            .unwrap();
+        let mut throttle =
+            Throttle::new(&config, &TransformContext::default(), clock.clone()).unwrap();
 
-        let throttle = throttle.into_task();
+        let mut out = TransformOutputsBuf::new_with_primary();
+        throttle.transform(LogEvent::default().into(), &mut out);
+        throttle.transform(LogEvent::default().into(), &mut out);
 
-        let (mut tx, rx) = futures::channel::mpsc::channel(10);
-        let mut out_stream = throttle.transform_events(Box::pin(rx));
-
-        // tokio interval is always immediately ready, so we poll once to make sure
-        // we trip it/set the interval in the future
-        assert_eq!(Poll::Pending, futures::poll!(out_stream.next()));
-
-        tx.send(LogEvent::default().into()).await.unwrap();
-        tx.send(LogEvent::default().into()).await.unwrap();
-
-        let mut count = 0_u8;
-        while count < 2 {
-            if let Some(_event) = out_stream.next().await {
-                count += 1;
-            } else {
-                panic!("Unexpectedly received None in output stream");
-            }
-        }
-        assert_eq!(2, count);
+        assert_eq!(2, out.len());
 
         clock.advance(Duration::from_secs(2));
 
-        tx.send(LogEvent::default().into()).await.unwrap();
+        throttle.transform(LogEvent::default().into(), &mut out);
 
-        // We should be back to pending, having the second event dropped
-        assert_eq!(Poll::Pending, futures::poll!(out_stream.next()));
+        // Still only two
+        assert_eq!(2, out.len());
 
         clock.advance(Duration::from_secs(3));
 
-        tx.send(LogEvent::default().into()).await.unwrap();
+        throttle.transform(LogEvent::default().into(), &mut out);
 
         // The rate limiter should now be refreshed and allow an additional event through
-        if let Some(_event) = out_stream.next().await {
-        } else {
-            panic!("Unexpectedly received None in output stream");
-        }
+        assert_eq!(3, out.len());
 
-        // We should be back to pending, having nothing waiting for us
-        assert_eq!(Poll::Pending, futures::poll!(out_stream.next()));
+        throttle.finish(&mut out);
 
-        tx.disconnect();
-
-        // And still nothing there
-        assert_eq!(Poll::Ready(None), futures::poll!(out_stream.next()));
+        // And still three
+        assert_eq!(3, out.len());
     }
 
     #[tokio::test]
@@ -301,65 +248,41 @@ exists(.special)
         )
         .unwrap();
 
-        let throttle = Throttle::new(&config, &TransformContext::default(), clock.clone())
-            .map(Transform::event_task)
-            .unwrap();
+        let mut throttle =
+            Throttle::new(&config, &TransformContext::default(), clock.clone()).unwrap();
 
-        let throttle = throttle.into_task();
+        let mut out = TransformOutputsBuf::new_with_primary();
 
-        let (mut tx, rx) = futures::channel::mpsc::channel(10);
-        let mut out_stream = throttle.transform_events(Box::pin(rx));
+        throttle.transform(LogEvent::default().into(), &mut out);
+        throttle.transform(LogEvent::default().into(), &mut out);
 
-        // tokio interval is always immediately ready, so we poll once to make sure
-        // we trip it/set the interval in the future
-        assert_eq!(Poll::Pending, futures::poll!(out_stream.next()));
-
-        tx.send(LogEvent::default().into()).await.unwrap();
-        tx.send(LogEvent::default().into()).await.unwrap();
-
-        let mut count = 0_u8;
-        while count < 2 {
-            if let Some(_event) = out_stream.next().await {
-                count += 1;
-            } else {
-                panic!("Unexpectedly received None in output stream");
-            }
-        }
-        assert_eq!(2, count);
+        assert_eq!(2, out.len());
 
         clock.advance(Duration::from_secs(2));
 
-        tx.send(LogEvent::default().into()).await.unwrap();
+        throttle.transform(LogEvent::default().into(), &mut out);
 
-        // We should be back to pending, having the second event dropped
-        assert_eq!(Poll::Pending, futures::poll!(out_stream.next()));
+        // Still only two
+        assert_eq!(2, out.len());
 
         let mut special_log = LogEvent::default();
         special_log.insert("special", "true");
-        tx.send(special_log.into()).await.unwrap();
+
+        throttle.transform(special_log.into(), &mut out);
         // The rate limiter should allow this log through regardless of current limit
-        if let Some(_event) = out_stream.next().await {
-        } else {
-            panic!("Unexpectedly received None in output stream");
-        }
+        assert_eq!(3, out.len());
 
         clock.advance(Duration::from_secs(3));
 
-        tx.send(LogEvent::default().into()).await.unwrap();
+        throttle.transform(LogEvent::default().into(), &mut out);
 
         // The rate limiter should now be refreshed and allow an additional event through
-        if let Some(_event) = out_stream.next().await {
-        } else {
-            panic!("Unexpectedly received None in output stream");
-        }
+        assert_eq!(4, out.len());
 
-        // We should be back to pending, having nothing waiting for us
-        assert_eq!(Poll::Pending, futures::poll!(out_stream.next()));
+        throttle.finish(&mut out);
 
-        tx.disconnect();
-
-        // And still nothing there
-        assert_eq!(Poll::Ready(None), futures::poll!(out_stream.next()));
+        // And nothing more
+        assert_eq!(4, out.len());
     }
 
     #[tokio::test]
@@ -374,43 +297,23 @@ key_field = "{{ bucket }}"
         )
         .unwrap();
 
-        let throttle = Throttle::new(&config, &TransformContext::default(), clock.clone())
-            .map(Transform::event_task)
-            .unwrap();
+        let mut throttle = Throttle::new(&config, &TransformContext::default(), clock).unwrap();
 
-        let throttle = throttle.into_task();
-
-        let (mut tx, rx) = futures::channel::mpsc::channel(10);
-        let mut out_stream = throttle.transform_events(Box::pin(rx));
-
-        // tokio interval is always immediately ready, so we poll once to make sure
-        // we trip it/set the interval in the future
-        assert_eq!(Poll::Pending, futures::poll!(out_stream.next()));
+        let mut out = TransformOutputsBuf::new_with_primary();
 
         let mut log_a = LogEvent::default();
         log_a.insert("bucket", "a");
         let mut log_b = LogEvent::default();
         log_b.insert("bucket", "b");
-        tx.send(log_a.into()).await.unwrap();
-        tx.send(log_b.into()).await.unwrap();
+        throttle.transform(log_a.into(), &mut out);
+        throttle.transform(log_b.into(), &mut out);
 
-        let mut count = 0_u8;
-        while count < 2 {
-            if let Some(_event) = out_stream.next().await {
-                count += 1;
-            } else {
-                panic!("Unexpectedly received None in output stream");
-            }
-        }
-        assert_eq!(2, count);
+        assert_eq!(2, out.len());
 
-        // We should be back to pending, having nothing waiting for us
-        assert_eq!(Poll::Pending, futures::poll!(out_stream.next()));
+        throttle.finish(&mut out);
 
-        tx.disconnect();
-
-        // And still nothing there
-        assert_eq!(Poll::Ready(None), futures::poll!(out_stream.next()));
+        // And nothing more
+        assert_eq!(2, out.len());
     }
 
     #[tokio::test]

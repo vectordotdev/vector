@@ -1,6 +1,4 @@
-use futures::{Stream, StreamExt};
 use hashbrown::HashMap;
-use std::{future::ready, pin::Pin};
 
 use crate::transforms::tag_cardinality_limit::config::LimitExceededAction;
 use crate::{
@@ -9,7 +7,7 @@ use crate::{
         TagCardinalityLimitRejectingEvent, TagCardinalityLimitRejectingTag,
         TagCardinalityValueLimitReached,
     },
-    transforms::TaskTransform,
+    transforms::{TickTransform, TransformOutputsBuf},
 };
 
 mod config;
@@ -132,15 +130,14 @@ impl TagCardinalityLimit {
     }
 }
 
-impl TaskTransform<Event> for TagCardinalityLimit {
-    fn transform(
-        self: Box<Self>,
-        task: Pin<Box<dyn Stream<Item = Event> + Send>>,
-    ) -> Pin<Box<dyn Stream<Item = Event> + Send>>
-    where
-        Self: 'static,
-    {
-        let mut inner = self;
-        Box::pin(task.filter_map(move |v| ready(inner.transform_one(v))))
+impl TickTransform for TagCardinalityLimit {
+    fn transform(&mut self, event: Event, output: &mut TransformOutputsBuf) {
+        if let Some(v) = self.transform_one(event) {
+            output.push(v)
+        }
     }
+
+    fn tick(&mut self, _output: &mut TransformOutputsBuf) {}
+
+    fn finish(&mut self, _output: &mut TransformOutputsBuf) {}
 }

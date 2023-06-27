@@ -49,7 +49,10 @@ use crate::{
     source_sender::CHUNK_SIZE,
     spawn_named,
     topology::task::TaskError,
-    transforms::{SyncTransform, TaskTransform, Transform, TransformOutputs, TransformOutputsBuf},
+    transforms::{
+        SyncTransform, TaskTransform, TickTransform, Transform, TransformOutputs,
+        TransformOutputsBuf,
+    },
     utilization::wrap,
     SourceSender,
 };
@@ -726,9 +729,10 @@ fn build_transform(
     input_rx: BufferReceiver<EventArray>,
 ) -> (Task, HashMap<OutputId, fanout::ControlChannel>) {
     match transform {
-        // TODO: avoid the double boxing for function transforms here
-        Transform::Function(t) => build_sync_transform(Box::new(t), node, input_rx),
-        Transform::Synchronous(t) => build_sync_transform(t, node, input_rx),
+        Transform::Function(t) | Transform::Synchronous(t) => {
+            build_sync_transform(t, node, input_rx)
+        }
+        Transform::Tick(t, i) => build_tick_transform(t, i, node, input_rx),
         Transform::Task(t) => build_task_transform(
             t,
             input_rx,
@@ -737,6 +741,52 @@ fn build_transform(
             &node.key,
         ),
     }
+}
+
+// TODO: this is almost the same as `build_sync_transform`
+fn build_tick_transform(
+    t: Box<dyn TickTransform>,
+    interval: tokio::time::Duration,
+    node: TransformNode,
+    input_rx: BufferReceiver<EventArray>,
+) -> (Task, HashMap<OutputId, fanout::ControlChannel>) {
+    let (outputs, controls) = TransformOutputs::new(node.outputs);
+
+    let runner = TickRunner::new(
+        t,
+        interval,
+        input_rx,
+        node.input_details.data_type(),
+        outputs,
+    );
+    let transform = runner.run().boxed();
+
+    let transform = async move {
+        debug!("Tick transform starting.");
+
+        match transform.await {
+            Ok(v) => {
+                debug!("Tick transform finished normally.");
+                Ok(v)
+            }
+            Err(e) => {
+                debug!("Tick transform finished with an error.");
+                Err(e)
+            }
+        }
+    };
+
+    let mut output_controls = HashMap::new();
+    for (name, control) in controls {
+        let id = name
+            .map(|name| OutputId::from((&node.key, name)))
+            .unwrap_or_else(|| OutputId::from(&node.key));
+        output_controls.insert(id, control);
+    }
+
+    let task = Task::new(node.key.clone(), node.typetag, transform);
+
+    (task, output_controls)
 }
 
 fn build_sync_transform(
@@ -914,6 +964,100 @@ impl Runner {
                     }
                 }
             }
+        }
+
+        Ok(TaskOutput::Transform)
+    }
+}
+
+// TODO: this is almost the same as `Runner`
+struct TickRunner {
+    transform: Box<dyn TickTransform>,
+    interval: tokio::time::Duration,
+    input_rx: Option<BufferReceiver<EventArray>>,
+    input_type: DataType,
+    outputs: TransformOutputs,
+    timer: crate::utilization::Timer,
+    last_report: Instant,
+    events_received: Registered<EventsReceived>,
+}
+
+impl TickRunner {
+    fn new(
+        transform: Box<dyn TickTransform>,
+        interval: tokio::time::Duration,
+        input_rx: BufferReceiver<EventArray>,
+        input_type: DataType,
+        outputs: TransformOutputs,
+    ) -> Self {
+        Self {
+            transform,
+            interval,
+            input_rx: Some(input_rx),
+            input_type,
+            outputs,
+            timer: crate::utilization::Timer::new(),
+            last_report: Instant::now(),
+            events_received: register!(EventsReceived),
+        }
+    }
+
+    fn on_events_received(&mut self, events: &EventArray) {
+        let stopped = self.timer.stop_wait();
+        if stopped.duration_since(self.last_report).as_secs() >= 5 {
+            self.timer.report();
+            self.last_report = stopped;
+        }
+
+        self.events_received.emit(CountByteSize(
+            events.len(),
+            events.estimated_json_encoded_size_of(),
+        ));
+    }
+
+    async fn send_outputs(&mut self, outputs_buf: &mut TransformOutputsBuf) -> crate::Result<()> {
+        self.timer.start_wait();
+        self.outputs.send(outputs_buf).await
+    }
+
+    async fn run(mut self) -> TaskResult {
+        // 128 is an arbitrary, smallish constant
+        const INLINE_BATCH_SIZE: usize = 128;
+
+        let mut interval = tokio::time::interval(self.interval);
+
+        let mut outputs_buf = self.outputs.new_buf_with_capacity(INLINE_BATCH_SIZE);
+
+        let mut input_rx = self
+            .input_rx
+            .take()
+            .expect("can't run runner twice")
+            .into_stream()
+            .filter(move |events| ready(filter_events_type(events, self.input_type)));
+
+        let mut done = false;
+        self.timer.start_wait();
+        while !done {
+            tokio::select! {
+                _ = interval.tick() => {
+                    self.transform.tick(&mut outputs_buf);
+                }
+                maybe_event_array = input_rx.next() => {
+                    match maybe_event_array {
+                        Some(events) => {
+                            self.on_events_received(&events);
+                            self.transform.transform_all(events, &mut outputs_buf);
+                        }
+                        None => {
+                            self.transform.finish(&mut outputs_buf);
+                            done = true;
+                        }
+                    }
+                }
+            }
+            self.send_outputs(&mut outputs_buf)
+                .await
+                .map_err(TaskError::wrapped)?;
         }
 
         Ok(TaskOutput::Transform)

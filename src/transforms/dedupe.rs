@@ -1,7 +1,6 @@
-use std::{future::ready, num::NonZeroUsize, pin::Pin};
+use std::num::NonZeroUsize;
 
 use bytes::Bytes;
-use futures::{Stream, StreamExt};
 use lru::LruCache;
 use vector_config::configurable_component;
 use vector_core::config::{clone_input_definitions, LogNamespace};
@@ -14,7 +13,7 @@ use crate::{
     event::{Event, Value},
     internal_events::DedupeEventsDropped,
     schema,
-    transforms::{TaskTransform, Transform},
+    transforms::{TickTransform, Transform, TransformOutputsBuf},
 };
 
 /// Options to control what fields to match against.
@@ -146,7 +145,13 @@ impl GenerateConfig for DedupeConfig {
 #[typetag::serde(name = "dedupe")]
 impl TransformConfig for DedupeConfig {
     async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
-        Ok(Transform::event_task(Dedupe::new(self.clone())))
+        // TODO: we're only using tick here because `FunctionTransform` requires `Clone`. As we
+        // refine the model to better differentiate function-style vs concurrent (which is what
+        // needs `Clone`), this can go away and we can use the more appropriate trait.
+        Ok(Transform::tick(
+            Dedupe::new(self.clone()),
+            tokio::time::Duration::from_secs(60),
+        ))
     }
 
     fn input(&self) -> Input {
@@ -269,17 +274,16 @@ fn build_cache_entry(event: &Event, fields: &FieldMatchConfig) -> CacheEntry {
     }
 }
 
-impl TaskTransform<Event> for Dedupe {
-    fn transform(
-        self: Box<Self>,
-        task: Pin<Box<dyn Stream<Item = Event> + Send>>,
-    ) -> Pin<Box<dyn Stream<Item = Event> + Send>>
-    where
-        Self: 'static,
-    {
-        let mut inner = self;
-        Box::pin(task.filter_map(move |v| ready(inner.transform_one(v))))
+impl TickTransform for Dedupe {
+    fn transform(&mut self, event: Event, output: &mut TransformOutputsBuf) {
+        if let Some(v) = self.transform_one(event) {
+            output.push(v);
+        }
     }
+
+    fn tick(&mut self, _output: &mut TransformOutputsBuf) {}
+
+    fn finish(&mut self, _output: &mut TransformOutputsBuf) {}
 }
 
 #[cfg(test)]

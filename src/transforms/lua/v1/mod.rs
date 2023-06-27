@@ -1,6 +1,3 @@
-use std::{future::ready, pin::Pin};
-
-use futures::{stream, Stream, StreamExt};
 use ordered_float::NotNan;
 use snafu::{ResultExt, Snafu};
 use vector_config::configurable_component;
@@ -12,7 +9,7 @@ use crate::{
     event::{Event, Value},
     internal_events::{LuaGcTriggered, LuaScriptError},
     schema,
-    transforms::{TaskTransform, Transform},
+    transforms::{FunctionTransform, OutputBuffer, Transform},
 };
 
 #[derive(Debug, Snafu)]
@@ -41,7 +38,7 @@ impl LuaConfig {
         warn!(
             "DEPRECATED The `lua` transform API version 1 is deprecated. Please convert your script to version 2."
         );
-        Lua::new(self.source.clone(), self.search_dirs.clone()).map(Transform::event_task)
+        Lua::new(self.source.clone(), self.search_dirs.clone()).map(Transform::function)
     }
 
     pub fn input(&self) -> Input {
@@ -181,31 +178,11 @@ impl Lua {
     }
 }
 
-impl TaskTransform<Event> for Lua {
-    fn transform(
-        self: Box<Self>,
-        task: Pin<Box<dyn Stream<Item = Event> + Send>>,
-    ) -> Pin<Box<dyn Stream<Item = Event> + Send>>
-    where
-        Self: 'static,
-    {
-        let mut inner = self;
-        Box::pin(
-            task.filter_map(move |event| {
-                let mut output = Vec::with_capacity(1);
-                ready(match inner.process(event) {
-                    Ok(event) => {
-                        output.extend(event.into_iter());
-                        Some(stream::iter(output))
-                    }
-                    Err(error) => {
-                        emit!(LuaScriptError { error });
-                        None
-                    }
-                })
-            })
-            .flatten(),
-        )
+impl FunctionTransform for Lua {
+    fn transform(&mut self, output: &mut OutputBuffer, event: Event) {
+        if let Some(v) = self.transform_one(event) {
+            output.push(v);
+        }
     }
 }
 

@@ -9175,6 +9175,7 @@ dependencies = [
  "criterion",
  "crossterm 0.26.1",
  "csv",
+ "dashmap",
  "derivative",
  "dirs-next",
  "dnsmsg-parser",
