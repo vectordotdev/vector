@@ -421,6 +421,7 @@ fn get_log_levels(default: &str) -> String {
 
 pub fn build_runtime(threads: Option<usize>, thread_name: &str) -> Result<Runtime, ExitCode> {
     let mut rt_builder = runtime::Builder::new_multi_thread();
+    rt_builder.max_blocking_threads(20_000);
     rt_builder.enable_all().thread_name(thread_name);
 
     if let Some(threads) = threads {
