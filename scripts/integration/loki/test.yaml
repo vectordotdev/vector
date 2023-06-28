@@ -8,3 +8,11 @@ env:
 
 matrix:
   version: [2.4.1]
+
+# changes to these files/paths will invoke the integration test in CI
+# expressions are evaluated using https://github.com/micromatch/picomatch
+paths:
+- "src/internal_events/loki.rs"
+- "src/sinks/loki/**"
+- "src/sinks/util/**"
+- "scripts/integration/loki/**"

@@ -409,6 +409,7 @@ mod tests {
     use std::time::Duration;
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
+    use vector_common::config::ComponentKey;
     use vector_core::metric_tags;
 
     use super::*;
@@ -508,7 +509,7 @@ mod tests {
 
         let event = create_event("status", "42");
         let mut metadata = event.metadata().clone();
-        metadata.set_source_id(Arc::new(OutputId::from("in")));
+        metadata.set_source_id(Arc::new(ComponentKey::from("in")));
         let metric = do_transform(config, event).await.unwrap();
 
         assert_eq!(
@@ -540,7 +541,7 @@ mod tests {
         event.as_mut_log().insert("method", "post");
         event.as_mut_log().insert("code", "200");
         let mut metadata = event.metadata().clone();
-        metadata.set_source_id(Arc::new(OutputId::from("in")));
+        metadata.set_source_id(Arc::new(ComponentKey::from("in")));
 
         let metric = do_transform(config, event).await.unwrap();
 
@@ -629,7 +630,7 @@ mod tests {
 
         let event = create_event("backtrace", "message");
         let mut metadata = event.metadata().clone();
-        metadata.set_source_id(Arc::new(OutputId::from("in")));
+        metadata.set_source_id(Arc::new(ComponentKey::from("in")));
         let metric = do_transform(config, event).await.unwrap();
 
         assert_eq!(
@@ -673,7 +674,7 @@ mod tests {
 
         let event = create_event("amount", "33.99");
         let mut metadata = event.metadata().clone();
-        metadata.set_source_id(Arc::new(OutputId::from("in")));
+        metadata.set_source_id(Arc::new(ComponentKey::from("in")));
         let metric = do_transform(config, event).await.unwrap();
 
         assert_eq!(
@@ -703,7 +704,7 @@ mod tests {
 
         let event = create_event("amount", "33.99");
         let mut metadata = event.metadata().clone();
-        metadata.set_source_id(Arc::new(OutputId::from("in")));
+        metadata.set_source_id(Arc::new(ComponentKey::from("in")));
         let metric = do_transform(config, event).await.unwrap();
 
         assert_eq!(
@@ -731,7 +732,7 @@ mod tests {
 
         let event = create_event("memory_rss", "123");
         let mut metadata = event.metadata().clone();
-        metadata.set_source_id(Arc::new(OutputId::from("in")));
+        metadata.set_source_id(Arc::new(ComponentKey::from("in")));
         let metric = do_transform(config, event).await.unwrap();
 
         assert_eq!(
@@ -815,7 +816,7 @@ mod tests {
         event.as_mut_log().insert("status", "42");
         event.as_mut_log().insert("backtrace", "message");
         let mut metadata = event.metadata().clone();
-        metadata.set_source_id(Arc::new(OutputId::from("in")));
+        metadata.set_source_id(Arc::new(ComponentKey::from("in")));
         let output = do_transform_multiple_events(config, event, 2).await;
 
         assert_eq!(2, output.len());
@@ -869,7 +870,7 @@ mod tests {
         event.as_mut_log().insert("worker", "abc");
         event.as_mut_log().insert("service", "xyz");
         let mut metadata = event.metadata().clone();
-        metadata.set_source_id(Arc::new(OutputId::from("in")));
+        metadata.set_source_id(Arc::new(ComponentKey::from("in")));
 
         let output = do_transform_multiple_events(config, event, 2).await;
 
@@ -912,7 +913,7 @@ mod tests {
 
         let event = create_event("user_ip", "1.2.3.4");
         let mut metadata = event.metadata().clone();
-        metadata.set_source_id(Arc::new(OutputId::from("in")));
+        metadata.set_source_id(Arc::new(ComponentKey::from("in")));
         let metric = do_transform(config, event).await.unwrap();
 
         assert_eq!(
@@ -941,7 +942,7 @@ mod tests {
 
         let event = create_event("response_time", "2.5");
         let mut metadata = event.metadata().clone();
-        metadata.set_source_id(Arc::new(OutputId::from("in")));
+        metadata.set_source_id(Arc::new(ComponentKey::from("in")));
         let metric = do_transform(config, event).await.unwrap();
 
         assert_eq!(
@@ -971,7 +972,7 @@ mod tests {
 
         let event = create_event("response_time", "2.5");
         let mut metadata = event.metadata().clone();
-        metadata.set_source_id(Arc::new(OutputId::from("in")));
+        metadata.set_source_id(Arc::new(ComponentKey::from("in")));
         let metric = do_transform(config, event).await.unwrap();
 
         assert_eq!(

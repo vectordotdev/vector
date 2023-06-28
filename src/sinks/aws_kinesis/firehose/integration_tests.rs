@@ -139,7 +139,7 @@ async fn firehose_client() -> aws_sdk_firehose::Client {
     create_client::<KinesisFirehoseClientBuilder>(
         &auth,
         region_endpoint.region(),
-        region_endpoint.endpoint().unwrap(),
+        region_endpoint.endpoint(),
         &proxy,
         &None,
         true,
@@ -158,7 +158,7 @@ async fn ensure_elasticsearch_domain(domain_name: String) -> String {
                     .await
                     .unwrap(),
             )
-            .endpoint_resolver(test_region_endpoint().endpoint().unwrap().unwrap())
+            .endpoint_url(test_region_endpoint().endpoint().unwrap())
             .region(test_region_endpoint().region())
             .build(),
     );

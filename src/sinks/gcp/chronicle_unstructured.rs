@@ -286,8 +286,12 @@ impl Finalizable for ChronicleRequest {
 }
 
 impl MetaDescriptive for ChronicleRequest {
-    fn get_metadata(&self) -> RequestMetadata {
-        self.metadata
+    fn get_metadata(&self) -> &RequestMetadata {
+        &self.metadata
+    }
+
+    fn metadata_mut(&mut self) -> &mut RequestMetadata {
+        &mut self.metadata
     }
 }
 
@@ -474,7 +478,7 @@ impl Service<ChronicleRequest> for ChronicleService {
             HeaderValue::from_str(&request.body.len().to_string()).unwrap(),
         );
 
-        let metadata = request.get_metadata();
+        let metadata = request.get_metadata().clone();
 
         let mut http_request = builder.body(Body::from(request.body)).unwrap();
         self.creds.apply(&mut http_request);

@@ -30,7 +30,9 @@ pub use vector_common::{
     finalization::{EventFinalizers, EventStatus, Finalizable},
     internal_event::CountByteSize,
     json_size::JsonSize,
-    request_metadata::{MetaDescriptive, RequestMetadata},
+    request_metadata::{
+        EventCountTags, GetEventCountTags, GroupedCountByteSize, MetaDescriptive, RequestMetadata,
+    },
 };
 pub use vector_config::configurable_component;
 pub use vector_core::{

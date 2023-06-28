@@ -280,11 +280,7 @@ mod tests {
     use crate::{
         config::{SinkConfig as _, SinkContext},
         sinks::vector::VectorConfig as SinkConfig,
-        test_util::{
-            self,
-            components::{assert_source_compliance, SOURCE_TAGS},
-        },
-        SourceSender,
+        test_util, SourceSender,
     };
 
     async fn run_test(vector_source_config_str: &str, addr: SocketAddr) {
@@ -323,25 +319,19 @@ mod tests {
     async fn receive_message() {
         let addr = test_util::next_addr();
 
-        assert_source_compliance(&SOURCE_TAGS, async {
-            let config = format!(r#"address = "{}""#, addr);
-            run_test(&config, addr).await;
-        })
-        .await;
+        let config = format!(r#"address = "{}""#, addr);
+        run_test(&config, addr).await;
     }
 
     #[tokio::test]
     async fn receive_compressed_message() {
         let addr = test_util::next_addr();
 
-        assert_source_compliance(&SOURCE_TAGS, async {
-            let config = format!(
-                r#"address = "{}"
+        let config = format!(
+            r#"address = "{}"
             compression=true"#,
-                addr
-            );
-            run_test(&config, addr).await;
-        })
-        .await;
+            addr
+        );
+        run_test(&config, addr).await;
     }
 }

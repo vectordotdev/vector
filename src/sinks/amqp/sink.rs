@@ -26,25 +26,6 @@ pub(super) struct AmqpEvent {
     pub(super) properties: BasicProperties,
 }
 
-impl EventCount for AmqpEvent {
-    fn event_count(&self) -> usize {
-        // An AmqpEvent represents one event.
-        1
-    }
-}
-
-impl ByteSizeOf for AmqpEvent {
-    fn allocated_bytes(&self) -> usize {
-        self.event.size_of()
-    }
-}
-
-impl EstimatedJsonEncodedSizeOf for AmqpEvent {
-    fn estimated_json_encoded_size_of(&self) -> JsonSize {
-        self.event.estimated_json_encoded_size_of()
-    }
-}
-
 pub(super) struct AmqpSink {
     pub(super) channel: Arc<lapin::Channel>,
     exchange: Template,

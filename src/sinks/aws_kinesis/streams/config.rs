@@ -119,7 +119,7 @@ impl KinesisStreamsSinkConfig {
         create_client::<KinesisClientBuilder>(
             &self.base.auth,
             self.base.region.region(),
-            self.base.region.endpoint()?,
+            self.base.region.endpoint(),
             proxy,
             &self.base.tls,
             true,
@@ -190,14 +190,15 @@ impl RetryLogic for KinesisRetryLogic {
     type Response = KinesisResponse;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
-        if let SdkError::ServiceError { err, raw: _ } = error {
+        if let SdkError::ServiceError(inner) = error {
             // Note that if the request partially fails (records sent to one
             // partition fail but the others do not, for example), Vector
             // does not retry. This line only covers a failure for the entire
             // request.
             //
             // https://github.com/vectordotdev/vector/issues/359
-            if let PutRecordsErrorKind::ProvisionedThroughputExceededException(_) = err.kind {
+            if let PutRecordsErrorKind::ProvisionedThroughputExceededException(_) = inner.err().kind
+            {
                 return true;
             }
         }

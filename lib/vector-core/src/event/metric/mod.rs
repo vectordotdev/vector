@@ -11,10 +11,16 @@ use std::{
 };
 
 use chrono::{DateTime, Utc};
-use vector_common::{json_size::JsonSize, EventDataEq};
+use vector_common::{
+    internal_event::OptionalTag,
+    json_size::JsonSize,
+    request_metadata::{EventCountTags, GetEventCountTags},
+    EventDataEq,
+};
 use vector_config::configurable_component;
 
 use crate::{
+    config::telemetry,
     event::{
         estimated_json_encoded_size_of::EstimatedJsonEncodedSizeOf, BatchNotifier, EventFinalizer,
         EventFinalizers, EventMetadata, Finalizable,
@@ -473,6 +479,28 @@ impl EstimatedJsonEncodedSizeOf for Metric {
 impl Finalizable for Metric {
     fn take_finalizers(&mut self) -> EventFinalizers {
         self.metadata.take_finalizers()
+    }
+}
+
+impl GetEventCountTags for Metric {
+    fn get_tags(&self) -> EventCountTags {
+        let source = if telemetry().tags().emit_source {
+            self.metadata().source_id().cloned().into()
+        } else {
+            OptionalTag::Ignored
+        };
+
+        // Currently there is no way to specify a tag that means the service,
+        // so we will be hardcoding it to "service".
+        let service = if telemetry().tags().emit_service {
+            self.tags()
+                .and_then(|tags| tags.get("service").map(ToString::to_string))
+                .into()
+        } else {
+            OptionalTag::Ignored
+        };
+
+        EventCountTags { source, service }
     }
 }
 

@@ -100,6 +100,7 @@ mod test {
 
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
+    use vector_common::config::ComponentKey;
     use vector_core::event::{Metric, MetricKind, MetricValue};
 
     use super::*;
@@ -127,7 +128,7 @@ mod test {
             let mut log = Event::from(LogEvent::from("message"));
             tx.send(log.clone()).await.unwrap();
 
-            log.set_source_id(Arc::new(OutputId::from("in")));
+            log.set_source_id(Arc::new(ComponentKey::from("in")));
             assert_eq!(out.recv().await.unwrap(), log);
 
             let metric = Event::from(Metric::new(

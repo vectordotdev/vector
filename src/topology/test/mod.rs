@@ -26,7 +26,7 @@ use tokio::{
     time::{sleep, Duration},
 };
 use vector_buffers::{BufferConfig, BufferType, WhenFull};
-use vector_core::config::OutputId;
+use vector_common::config::ComponentKey;
 
 mod backpressure;
 mod compliance;
@@ -148,7 +148,7 @@ async fn topology_source_and_sink() {
 
     let res = out1.flat_map(into_event_stream).collect::<Vec<_>>().await;
 
-    event.set_source_id(Arc::new(OutputId::from("in1")));
+    event.set_source_id(Arc::new(ComponentKey::from("in1")));
 
     assert_eq!(vec![event], res);
 }
@@ -181,8 +181,8 @@ async fn topology_multiple_sources() {
 
     topology.stop().await;
 
-    event1.set_source_id(Arc::new(OutputId::from("in1")));
-    event2.set_source_id(Arc::new(OutputId::from("in2")));
+    event1.set_source_id(Arc::new(ComponentKey::from("in1")));
+    event2.set_source_id(Arc::new(ComponentKey::from("in2")));
 
     assert_eq!(out_event1, Some(event1.into()));
     assert_eq!(out_event2, Some(event2.into()));
@@ -217,7 +217,7 @@ async fn topology_multiple_sinks() {
     let res2 = out2.flat_map(into_event_stream).collect::<Vec<_>>().await;
 
     // We should see that both sinks got the exact same event:
-    event.set_source_id(Arc::new(OutputId::from("in1")));
+    event.set_source_id(Arc::new(ComponentKey::from("in1")));
     let expected = vec![event];
     assert_eq!(expected, res1);
     assert_eq!(expected, res2);
@@ -291,7 +291,7 @@ async fn topology_remove_one_source() {
     drop(in2);
     topology.stop().await;
 
-    event1.set_source_id(Arc::new(OutputId::from("in1")));
+    event1.set_source_id(Arc::new(ComponentKey::from("in1")));
 
     let res = h_out1.await.unwrap();
     assert_eq!(vec![event1], res);
@@ -330,7 +330,7 @@ async fn topology_remove_one_sink() {
     let res1 = out1.flat_map(into_event_stream).collect::<Vec<_>>().await;
     let res2 = out2.flat_map(into_event_stream).collect::<Vec<_>>().await;
 
-    event.set_source_id(Arc::new(OutputId::from("in1")));
+    event.set_source_id(Arc::new(ComponentKey::from("in1")));
 
     assert_eq!(vec![event], res1);
     assert_eq!(Vec::<Event>::new(), res2);
@@ -441,7 +441,7 @@ async fn topology_swap_source() {
     // as we've removed it from the topology prior to the sends.
     assert_eq!(Vec::<Event>::new(), res1);
 
-    event2.set_source_id(Arc::new(OutputId::from("in2")));
+    event2.set_source_id(Arc::new(ComponentKey::from("in2")));
     assert_eq!(vec![event2], res2);
 }
 
@@ -553,7 +553,7 @@ async fn topology_swap_sink() {
     // the new sink, which _was_ rebuilt:
     assert_eq!(Vec::<Event>::new(), res1);
 
-    event1.set_source_id(Arc::new(OutputId::from("in1")));
+    event1.set_source_id(Arc::new(ComponentKey::from("in1")));
     assert_eq!(vec![event1], res2);
 }
 
@@ -660,8 +660,8 @@ async fn topology_rebuild_connected() {
 
     let res = h_out1.await.unwrap();
 
-    event1.set_source_id(Arc::new(OutputId::from("in1")));
-    event2.set_source_id(Arc::new(OutputId::from("in1")));
+    event1.set_source_id(Arc::new(ComponentKey::from("in1")));
+    event2.set_source_id(Arc::new(ComponentKey::from("in1")));
 
     assert_eq!(vec![event1, event2], res);
 }
@@ -714,7 +714,7 @@ async fn topology_rebuild_connected_transform() {
     let res2 = h_out2.await.unwrap();
     assert_eq!(Vec::<Event>::new(), res1);
 
-    event.set_source_id(Arc::new(OutputId::from("in1")));
+    event.set_source_id(Arc::new(ComponentKey::from("in1")));
 
     assert_eq!(vec![event], res2);
 }
@@ -897,11 +897,11 @@ async fn source_metadata_reaches_sink() {
     topology.stop().await;
 
     assert_eq!(
-        out_event1.into_log().metadata().source_id().unwrap(),
-        &OutputId::from("in1")
+        **out_event1.into_log().metadata().source_id().unwrap(),
+        ComponentKey::from("in1")
     );
     assert_eq!(
-        out_event2.into_log().metadata().source_id().unwrap(),
-        &OutputId::from("in2")
+        **out_event2.into_log().metadata().source_id().unwrap(),
+        ComponentKey::from("in2")
     );
 }
