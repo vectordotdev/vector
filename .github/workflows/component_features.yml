@@ -3,8 +3,8 @@ name: Component Features - Linux
 on:
   workflow_call:
   workflow_dispatch:
-  schedule:
-    - cron: '20 16 * * 2-6'
+  # schedule:
+  #   - cron: '20 16 * * 2-6'
     # At midnight UTC Tue-Sat
     # - cron: '0 0 * * 2-6'
 
