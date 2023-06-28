@@ -9,7 +9,6 @@
   - [Code style](#code-style)
     - [Logging style](#logging-style)
     - [Panics](#panics)
-    - [Const strings](#const-strings)
   - [Feature flags](#feature-flags)
   - [Dependencies](#dependencies)
 - [Guidelines](#guidelines)
@@ -230,19 +229,6 @@ to a bug within Vector. In this situation Vector cannot safely proceed. Issuing
 a panic here is acceptable.
 
 All potential panics *MUST* be clearly documented in the function documentation.
-
-#### Const strings
-
-When re-typing raw string literals repeatedly, this can lead to typo errors,
-especially when names ares simiilar. In general, when reasonable, it is preferred
-to use [Compile-time constants](https://doc.rust-lang.org/std/keyword.const.html)
-when dealing with non-dynamic strings. For example, when working with field names
-for event metadata.
-
-This has not always been a consistently enforced code style for the project, so
-despite seeing usages of raw strings, please take the opportunity when writing
-new code or modifying existing, to use constants or update existing raw strings
-to use constants.
 
 ### Feature flags
 
