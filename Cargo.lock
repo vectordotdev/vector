@@ -1939,9 +1939,9 @@ checksum = "8a2dd5a6fe8c6e3502f568a6353e5273bbb15193ad9a89e457b9970798efbea1"
 
 [[package]]
 name = "clipboard-win"
-version = "4.4.2"
+version = "4.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c4ab1b92798304eedc095b53942963240037c0516452cb11aeba709d420b2219"
+checksum = "7191c27c2357d9b7ef96baac1773290d4ca63b24205b82a3fd8a0637afcf0362"
 dependencies = [
  "error-code",
  "str-buf",
@@ -2605,13 +2605,13 @@ dependencies = [
 
 [[package]]
 name = "derive_arbitrary"
-version = "1.3.0"
+version = "1.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f3cdeb9ec472d588e539a818b2dee436825730da08ad0017c4b1a17676bdc8b7"
+checksum = "53e0efad4403bfc52dc201159c4b842a246a14b98c64b55dfd0f2d89729dfeb8"
 dependencies = [
  "proc-macro2 1.0.63",
  "quote 1.0.28",
- "syn 1.0.109",
+ "syn 2.0.10",
 ]
 
 [[package]]
@@ -2732,14 +2732,14 @@ dependencies = [
 
 [[package]]
 name = "dns-lookup"
-version = "1.0.8"
+version = "2.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "53ecafc952c4528d9b51a458d1a8904b81783feff9fde08ab6ed2545ff396872"
+checksum = "8f332aa79f9e9de741ac013237294ef42ce2e9c6394dc7d766725812f1238812"
 dependencies = [
  "cfg-if",
  "libc",
- "socket2 0.4.9",
- "winapi",
+ "socket2 0.5.3",
+ "windows-sys 0.48.0",
 ]
 
 [[package]]
@@ -4510,9 +4510,9 @@ dependencies = [
 
 [[package]]
 name = "lalrpop"
-version = "0.19.12"
+version = "0.20.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0a1cbf952127589f2851ab2046af368fd20645491bb4b376f04b7f94d7a9837b"
+checksum = "da4081d44f4611b66c6dd725e6de3169f9f63905421e8626fcb86b6a898998b8"
 dependencies = [
  "ascii-canvas",
  "bit-set",
@@ -4523,7 +4523,7 @@ dependencies = [
  "lalrpop-util",
  "petgraph",
  "regex",
- "regex-syntax 0.6.29",
+ "regex-syntax 0.7.2",
  "string_cache",
  "term",
  "tiny-keccak",
@@ -4532,9 +4532,9 @@ dependencies = [
 
 [[package]]
 name = "lalrpop-util"
-version = "0.19.12"
+version = "0.20.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d3c48237b9604c5a4702de6b824e02006c3214327564636aef27c1028a8fa0ed"
+checksum = "3f35c735096c0293d313e8f2a641627472b83d01b937177fe76e5e2708d31e0d"
 
 [[package]]
 name = "lapin"
@@ -6469,9 +6469,9 @@ dependencies = [
 
 [[package]]
 name = "quoted_printable"
-version = "0.4.7"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a24039f627d8285853cc90dcddf8c1ebfaa91f834566948872b225b9a28ed1b6"
+checksum = "79ec282e887b434b68c18fe5c121d38e72a5cf35119b59e54ec5b992ea9c8eb0"
 
 [[package]]
 name = "radium"
@@ -7122,11 +7122,11 @@ dependencies = [
 
 [[package]]
 name = "rustyline"
-version = "11.0.0"
+version = "12.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5dfc8644681285d1fb67a467fb3021bfea306b99b4146b166a1fe3ada965eece"
+checksum = "994eca4bca05c87e86e15d90fc7a91d1be64b4482b38cb2d27474568fe7c9db9"
 dependencies = [
- "bitflags 1.3.2",
+ "bitflags 2.3.2",
  "cfg-if",
  "clipboard-win",
  "libc",
@@ -9071,6 +9071,7 @@ dependencies = [
  "getrandom 0.2.10",
  "rand 0.8.5",
  "serde",
+ "wasm-bindgen",
 ]
 
 [[package]]
@@ -9627,9 +9628,9 @@ checksum = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"
 
 [[package]]
 name = "vrl"
-version = "0.4.0"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a6236fdfaaa956af732a73630b8a8b43ef75e0a42fed6b94cf3c1c19c99daca5"
+checksum = "ee149a42aa313d18cf7a7e6b54e06df03b4a0e6e5dd42a2b8b6d5eeb98d582c1"
 dependencies = [
  "aes",
  "ansi_term",
@@ -9640,6 +9641,7 @@ dependencies = [
  "bytes 1.4.0",
  "cbc",
  "cfb-mode",
+ "cfg-if",
  "charset",
  "chrono",
  "chrono-tz",
@@ -9653,14 +9655,13 @@ dependencies = [
  "dyn-clone",
  "exitcode",
  "flate2",
- "getrandom 0.2.10",
  "grok",
  "hex",
  "hmac",
  "hostname",
- "indexmap 1.9.3",
+ "indexmap 2.0.0",
  "indoc",
- "itertools 0.10.5",
+ "itertools 0.11.0",
  "lalrpop",
  "lalrpop-util",
  "md-5",
