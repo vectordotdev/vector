@@ -217,24 +217,36 @@ fn log_schema_multiple_config_files() {
     let input_dir = create_directory();
     let input_file = input_dir.join("input_file");
 
-    overwrite_file(config_dir.join("vector.toml"),r#"
+    overwrite_file(
+        config_dir.join("vector.toml"),
+        r#"
     data_dir = "${VECTOR_DATA_DIR}"
     log_schema.host_key = "test_host"
-    "# );
+    "#,
+    );
 
-    overwrite_file(sources_config_dir.join("in_file.toml"),r#"
+    overwrite_file(
+        sources_config_dir.join("in_file.toml"),
+        r#"
     type = "file"
     include = ["${VECTOR_TEST_INPUT_FILE}"]
-    "# );
+    "#,
+    );
 
-    overwrite_file(sinks_config_dir.join("out_console.toml"),r#"
+    overwrite_file(
+        sinks_config_dir.join("out_console.toml"),
+        r#"
     inputs = ["in_file"]
     type = "console"
     encoding.codec = "json"
-    "# );
+    "#,
+    );
 
-    overwrite_file(input_file.clone(),r#"42
-    "# );
+    overwrite_file(
+        input_file.clone(),
+        r#"42
+    "#,
+    );
 
     cmd.arg("--quiet")
         .env("VECTOR_CONFIG_DIR", config_dir)
@@ -242,10 +254,7 @@ fn log_schema_multiple_config_files() {
         .env("VECTOR_TEST_INPUT_FILE", input_file.clone());
 
     // Run vector
-    let vector = cmd
-        .stdout(std::process::Stdio::piped())
-        .spawn()
-        .unwrap();
+    let vector = cmd.stdout(std::process::Stdio::piped()).spawn().unwrap();
 
     // Give vector time to start.
     sleep(STARTUP_TIME);
