@@ -14,7 +14,7 @@ remap: functions: from_unix_timestamp: {
 			name:        "value"
 			description: "The Unix timestamp to convert."
 			required:    true
-			type: ["timestamp"]
+			type: ["integer"]
 		},
 		{
 			name:        "unit"
