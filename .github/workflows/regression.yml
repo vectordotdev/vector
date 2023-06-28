@@ -318,7 +318,7 @@ jobs:
 
   build-comparison:
     name: Build comparison Vector container
-    runs-on: [linux, ubuntu-20.04core]
+    runs-on: [linux, ubuntu-20.04-4core]
     needs:
       - compute-metadata
     steps:
