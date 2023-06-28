@@ -53,7 +53,7 @@ jobs:
 
   build-x86_64-unknown-linux-gnu:
     name: Build - x86_64-unknown-linux-gnu
-    runs-on: [linux, ubuntu-20.04-8core]
+    runs-on: [linux, ubuntu-20.04-4core]
     needs: changes
     if: github.event_name != 'pull_request' || needs.changes.outputs.k8s == 'true'
     # cargo-deb requires a release build, but we don't need optimizations for tests
@@ -129,7 +129,7 @@ jobs:
   # See https://github.community/t/feature-request-and-use-case-example-to-allow-matrix-in-if-s/126067
   compute-k8s-test-plan:
     name: Compute K8s test plan
-    runs-on: [linux, ubuntu-20.04-8core]
+    runs-on: ubuntu-latest
     needs: changes
     if: github.event_name != 'pull_request' || needs.changes.outputs.k8s == 'true'
     outputs:
@@ -190,7 +190,7 @@ jobs:
 
   test-e2e-kubernetes:
     name: K8s ${{ matrix.kubernetes_version.version }} / ${{ matrix.container_runtime }} (${{ matrix.kubernetes_version.role }})
-    runs-on: [linux, ubuntu-20.04-8core]
+    runs-on: [linux, ubuntu-20.04-4core]
     needs:
       - build-x86_64-unknown-linux-gnu
       - compute-k8s-test-plan
