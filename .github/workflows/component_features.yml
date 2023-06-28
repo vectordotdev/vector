@@ -3,7 +3,7 @@ name: Component Features - Linux
 on:
   workflow_call:
   schedule:
-    - cron: '05 16 * * 2-6'
+    - cron: '20 16 * * 2-6'
     # At midnight UTC Tue-Sat
     # - cron: '0 0 * * 2-6'
 
@@ -22,7 +22,6 @@ jobs:
 
   check-component-features:
     runs-on: ${{ github.event_name == 'schedule' && 'ubuntu-latest' || fromJSON('["linux", "ubuntu-20.04-8core"]') }}
-    if: github.event_name == 'issue_comment'
     steps:
       - name: (PR comment) Get PR branch
         if: github.event_name == 'issue_comment'
