@@ -80,7 +80,7 @@ Example event from the `datadog agent logs` source (with JSON decoder)
 
 ```json
 {
-  "ddsource": "keaton",
+  "ddsource": "vector",
   "ddtags": "env:prod",
   "hostname": "alpha",
   "foo": "foo field",
@@ -119,7 +119,7 @@ Source metadata fields (`%datadog_agent`)
 
 ```json
 {
-    "ddsource": "keaton",
+    "ddsource": "vector",
     "ddtags": "env:prod",
     "hostname": "alpha",
     "service": "cernan",
