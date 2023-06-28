@@ -59,13 +59,23 @@ jobs:
           || contains(github.event.comment.body, '/ci-run-regression')
       )
     steps:
-      - name: Validate issue comment
+      - name: Get PR comment author
         id: comment
         uses: tspascoal/get-user-teams-membership@v2
         with:
           username: ${{ github.actor }}
           team: 'Vector'
           GITHUB_TOKEN: ${{ secrets.GH_PAT_ORG }}
+
+      - name: Validate author membership
+        env:
+          isTeamMember: ${{ steps.comment.outputs.isTeamMember }}
+        run: |
+          if [ "${{ steps.comment.outputs.isTeamMember }}" = "false" ] ; then
+            exit 1
+          else
+            exit 0
+          fi
 
   cli:
     needs: validate
