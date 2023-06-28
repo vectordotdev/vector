@@ -465,7 +465,7 @@ pub async fn load_configs(
         paths = ?config_paths.iter().map(<&PathBuf>::from).collect::<Vec<_>>()
     );
 
-    // config::init_log_schema should be called before initialization sources
+    // config::init_log_schema should be called before initializing sources.
     #[cfg(not(feature = "enterprise-tests"))]
     config::init_log_schema(&config_paths, true).map_err(handle_config_errors)?;
 
