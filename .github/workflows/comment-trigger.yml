@@ -66,6 +66,10 @@ jobs:
           username: ${{ github.actor }}
           team: 'Vector'
           GITHUB_TOKEN: ${{ secrets.GH_PAT_ORG }}
+      - run: "echo ${{ steps.comment.outputs.isTeamMember }}"
+        shell: bash
+      - run: "echo ${{ steps.comment.outputs.teams }}"
+        shell: bash
 
   cli:
     needs: validate
