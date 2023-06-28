@@ -1,3 +1,4 @@
+//! Functionality to handle enrichment tables.
 pub use enrichment::{Condition, IndexHandle, Table};
 use enum_dispatch::enum_dispatch;
 use vector_config::{configurable_component, NamedComponent};
@@ -26,10 +27,8 @@ pub enum EnrichmentTables {
     Geoip(geoip::GeoipConfig),
 }
 
-// We can't use `enum_dispatch` here because it doesn't support associated constants.
+// TODO: Use `enum_dispatch` here.
 impl NamedComponent for EnrichmentTables {
-    const NAME: &'static str = "_invalid_usage";
-
     fn get_component_name(&self) -> &'static str {
         match self {
             Self::File(config) => config.get_component_name(),

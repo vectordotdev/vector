@@ -1,11 +1,21 @@
-args:
-- --features
+features:
 - gcp-integration-tests
-- --lib
-- '::gcp::'
+
+test_filter: '::gcp::'
 
 env:
   EMULATOR_ADDRESS: http://gcloud-pubsub:8681
 
 matrix:
   version: [latest]
+
+# changes to these files/paths will invoke the integration test in CI
+# expressions are evaluated using https://github.com/micromatch/picomatch
+paths:
+- "src/internal_events/gcp_pubsub.rs"
+- "src/sources/gcp_pubsub.rs"
+- "src/sources/util/**"
+- "src/sinks/gcp/**"
+- "src/sinks/util/**"
+- "src/gcp.rs"
+- "scripts/integration/gcp/**"

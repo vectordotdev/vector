@@ -8,7 +8,7 @@ metadata:
     app.kubernetes.io/name: vector
     app.kubernetes.io/instance: vector
     app.kubernetes.io/component: Stateless-Aggregator
-    app.kubernetes.io/version: "0.27.0-distroless-libc"
+    app.kubernetes.io/version: "0.30.0-distroless-libc"
   annotations:
 spec:
   clusterIP: None

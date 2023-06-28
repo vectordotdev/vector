@@ -1,8 +1,13 @@
 use std::{collections::BTreeMap, fmt::Debug};
 
+use lookup::lookup_v2::TargetPath;
 use serde::{Deserialize, Serialize};
 use vector_buffers::EventCount;
-use vector_common::EventDataEq;
+use vector_common::{
+    json_size::JsonSize,
+    request_metadata::{EventCountTags, GetEventCountTags},
+    EventDataEq,
+};
 
 use super::{
     BatchNotifier, EstimatedJsonEncodedSizeOf, EventFinalizer, EventFinalizers, EventMetadata,
@@ -67,8 +72,9 @@ impl TraceEvent {
         self.0.as_map().expect("inner value must be a map")
     }
 
-    pub fn get(&self, key: impl AsRef<str>) -> Option<&Value> {
-        self.0.get(key.as_ref())
+    #[allow(clippy::needless_pass_by_value)] // TargetPath is always a reference
+    pub fn get<'a>(&self, key: impl TargetPath<'a>) -> Option<&Value> {
+        self.0.get(key)
     }
 
     pub fn get_mut(&mut self, key: impl AsRef<str>) -> Option<&mut Value> {
@@ -107,7 +113,7 @@ impl ByteSizeOf for TraceEvent {
 }
 
 impl EstimatedJsonEncodedSizeOf for TraceEvent {
-    fn estimated_json_encoded_size_of(&self) -> usize {
+    fn estimated_json_encoded_size_of(&self) -> JsonSize {
         self.0.estimated_json_encoded_size_of()
     }
 }
@@ -139,5 +145,11 @@ impl AsRef<LogEvent> for TraceEvent {
 impl AsMut<LogEvent> for TraceEvent {
     fn as_mut(&mut self) -> &mut LogEvent {
         &mut self.0
+    }
+}
+
+impl GetEventCountTags for TraceEvent {
+    fn get_tags(&self) -> EventCountTags {
+        self.0.get_tags()
     }
 }

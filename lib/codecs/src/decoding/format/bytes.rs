@@ -3,13 +3,13 @@ use lookup::lookup_v2::parse_value_path;
 use lookup::OwnedTargetPath;
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
-use value::Kind;
 use vector_core::config::LogNamespace;
 use vector_core::{
     config::{log_schema, DataType},
     event::{Event, LogEvent},
     schema,
 };
+use vrl::value::Kind;
 
 use super::Deserializer;
 
@@ -99,8 +99,8 @@ impl Deserializer for BytesDeserializer {
 
 #[cfg(test)]
 mod tests {
-    use value::Value;
     use vector_core::config::log_schema;
+    use vrl::value::Value;
 
     use super::*;
 

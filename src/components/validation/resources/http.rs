@@ -164,7 +164,7 @@ fn spawn_input_http_server(
 
         // Mark ourselves as completed now that we've sent all inputs to the source, and
         // additionally signal the HTTP server to also gracefully shutdown.
-        let _ = http_server_shutdown_tx.send(());
+        _ = http_server_shutdown_tx.send(());
         resource_completed.mark_as_done();
 
         debug!("HTTP server external input resource completed.");
@@ -278,7 +278,7 @@ fn spawn_output_http_server(
         debug!("HTTP server external output resource started.");
 
         resource_shutdown_rx.wait().await;
-        let _ = http_server_shutdown_tx.send(());
+        _ = http_server_shutdown_tx.send(());
         resource_completed.mark_as_done();
 
         debug!("HTTP server external output resource completed.");
@@ -401,7 +401,7 @@ fn socketaddr_from_uri(uri: &Uri) -> SocketAddr {
     SocketAddr::from((uri_host, uri_port))
 }
 
-fn encode_test_event(
+pub fn encode_test_event(
     encoder: &mut Encoder<encoding::Framer>,
     buf: &mut BytesMut,
     event: TestEvent,

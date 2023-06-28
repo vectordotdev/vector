@@ -8,8 +8,8 @@ rustup default "$(rustup show active-toolchain | awk '{print $1;}')"
 if [[ "$(cargo-deb --version)" != "1.41.3" ]] ; then
   rustup run stable cargo install cargo-deb --version 1.41.3 --force --locked
 fi
-if [[ "$(cross --version | grep cross)" != "cross 0.2.4" ]] ; then
-  rustup run stable cargo install cross --version 0.2.4 --force --locked
+if [[ "$(cross --version | grep cross)" != "cross 0.2.5" ]] ; then
+  rustup run stable cargo install cross --version 0.2.5 --force --locked
 fi
 if [[ "$(cargo-nextest --version)" != "cargo-nextest 0.9.47" ]] ; then
   rustup run stable cargo install cargo-nextest --version 0.9.47 --force --locked
@@ -17,10 +17,9 @@ fi
 if ! cargo deny --version >& /dev/null ; then
   rustup run stable cargo install cargo-deny --force --locked
 fi
-
-cd scripts
-bundle install
-cd ..
+if ! rust-license-tool --help >& /dev/null ; then
+  cargo install --git https://github.com/DataDog/rust-license-tool
+fi
 
 # Currently fixing this to version 0.30 since version 0.31 has introduced
 # a change that means it only works with versions of node > 10.

@@ -3,15 +3,16 @@
 use core::fmt::Debug;
 use std::collections::BTreeMap;
 
+use lookup::lookup_v2::ConfigValuePath;
 use lookup::{
     event_path,
     lookup_v2::{parse_value_path, OwnedValuePath},
     PathPrefix,
 };
 use serde::{Deserialize, Deserializer};
-use value::Value;
 use vector_config::configurable_component;
 use vector_core::event::{LogEvent, MaybeAsLogMut};
+use vrl::value::Value;
 
 use crate::{event::Event, serde::skip_serializing_if_default};
 
@@ -19,11 +20,11 @@ use crate::{event::Event, serde::skip_serializing_if_default};
 #[configurable_component(no_deser)]
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Transformer {
-    /// List of fields that will be included in the encoded event.
+    /// List of fields that are included in the encoded event.
     #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
-    only_fields: Option<Vec<OwnedValuePath>>,
+    only_fields: Option<Vec<ConfigValuePath>>,
 
-    /// List of fields that will be excluded from the encoded event.
+    /// List of fields that are excluded from the encoded event.
     #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
     except_fields: Option<Vec<String>>,
 
@@ -70,6 +71,7 @@ impl Transformer {
     ) -> Result<Self, crate::Error> {
         Self::validate_fields(only_fields.as_ref(), except_fields.as_ref())?;
 
+        let only_fields = only_fields.map(|x| x.into_iter().map(ConfigValuePath).collect());
         Ok(Self {
             only_fields,
             except_fields,
@@ -78,7 +80,8 @@ impl Transformer {
     }
 
     /// Get the `Transformer`'s `only_fields`.
-    pub const fn only_fields(&self) -> &Option<Vec<OwnedValuePath>> {
+    #[cfg(test)]
+    pub const fn only_fields(&self) -> &Option<Vec<ConfigValuePath>> {
         &self.only_fields
     }
 
@@ -179,8 +182,15 @@ impl Transformer {
     ///
     /// Returns `Err` if the new `except_fields` fail validation, i.e. are not mutually exclusive
     /// with `only_fields`.
+    #[cfg(test)]
     pub fn set_except_fields(&mut self, except_fields: Option<Vec<String>>) -> crate::Result<()> {
-        Self::validate_fields(self.only_fields.as_ref(), except_fields.as_ref())?;
+        Self::validate_fields(
+            self.only_fields
+                .clone()
+                .map(|x| x.into_iter().map(|x| x.0).collect())
+                .as_ref(),
+            except_fields.as_ref(),
+        )?;
 
         self.except_fields = except_fields;
 
@@ -308,7 +318,10 @@ mod tests {
         let mut event = Event::Log(LogEvent::from("Demo"));
         let timestamp = event
             .as_mut_log()
-            .get(log_schema().timestamp_key())
+            .get((
+                lookup::PathPrefix::Event,
+                log_schema().timestamp_key().unwrap(),
+            ))
             .unwrap()
             .clone();
         let timestamp = timestamp.as_timestamp().unwrap();
@@ -320,7 +333,10 @@ mod tests {
 
         match event
             .as_mut_log()
-            .get(log_schema().timestamp_key())
+            .get((
+                lookup::PathPrefix::Event,
+                log_schema().timestamp_key().unwrap(),
+            ))
             .unwrap()
         {
             Value::Integer(_) => {}

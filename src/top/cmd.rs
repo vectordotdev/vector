@@ -1,5 +1,6 @@
 use std::time::Duration;
 
+use chrono::Local;
 use futures_util::future::join_all;
 use tokio::sync::oneshot;
 use url::Url;
@@ -71,7 +72,7 @@ pub async fn cmd(opts: &super::Opts) -> exitcode::ExitCode {
                     continue;
                 }
             };
-            let _ = tx.send(EventType::InitializeState(state)).await;
+            _ = tx.send(EventType::InitializeState(state)).await;
 
             let subscription_client = match connect_subscription_client(ws_url.clone()).await {
                 Ok(c) => c,
@@ -85,21 +86,23 @@ pub async fn cmd(opts: &super::Opts) -> exitcode::ExitCode {
             let finished =
                 metrics::subscribe(subscription_client, tx.clone(), opts_clone.interval as i64);
 
-            let _ = tx
-                .send(EventType::ConnectionUpdated(ConnectionStatus::Connected))
+            _ = tx
+                .send(EventType::ConnectionUpdated(ConnectionStatus::Connected(
+                    Local::now(),
+                )))
                 .await;
             // Tasks spawned in metrics::subscribe finish when the subscription
             // streams have completed. Currently, subscription streams only
             // complete when the underlying web socket connection to the GraphQL
             // server drops.
-            let _ = join_all(finished).await;
-            let _ = tx
+            _ = join_all(finished).await;
+            _ = tx
                 .send(EventType::ConnectionUpdated(
                     ConnectionStatus::Disconnected(RECONNECT_DELAY),
                 ))
                 .await;
             if opts_clone.no_reconnect {
-                let _ = shutdown_tx.send(());
+                _ = shutdown_tx.send(());
                 break;
             }
         }
@@ -111,10 +114,10 @@ pub async fn cmd(opts: &super::Opts) -> exitcode::ExitCode {
             connection.abort();
             exitcode::OK
         }
-        _ => {
+        Err(err) => {
             #[allow(clippy::print_stderr)]
             {
-                eprintln!("Your terminal doesn't support building a dashboard. Exiting.");
+                eprintln!("Encountered error: {}", err);
             }
             connection.abort();
             exitcode::IOERR

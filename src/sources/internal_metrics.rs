@@ -6,11 +6,10 @@ use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
 use vector_common::internal_event::{CountByteSize, InternalEventHandle as _};
 use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
-use vector_core::EstimatedJsonEncodedSizeOf;
+use vector_core::{config::LogNamespace, ByteSizeOf, EstimatedJsonEncodedSizeOf};
 
 use crate::{
-    config::{log_schema, DataType, Output, SourceConfig, SourceContext},
+    config::{log_schema, SourceConfig, SourceContext, SourceOutput},
     internal_events::{EventsReceived, InternalMetricsBytesReceived, StreamClosedError},
     metrics::Controller,
     shutdown::ShutdownSignal,
@@ -19,13 +18,17 @@ use crate::{
 
 /// Configuration for the `internal_metrics` source.
 #[serde_as]
-#[configurable_component(source("internal_metrics"))]
+#[configurable_component(source(
+    "internal_metrics",
+    "Expose internal metrics emitted by the running Vector instance."
+))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields, default)]
 pub struct InternalMetricsConfig {
     /// The interval between metric gathering, in seconds.
     #[serde_as(as = "serde_with::DurationSeconds<f64>")]
     #[serde(default = "default_scrape_interval")]
+    #[configurable(metadata(docs::human_name = "Scrape Interval"))]
     pub scrape_interval_secs: Duration,
 
     #[configurable(derived)]
@@ -53,7 +56,7 @@ impl Default for InternalMetricsConfig {
 pub struct TagsConfig {
     /// Overrides the name of the tag used to add the peer host to each metric.
     ///
-    /// The value will be the peer host's address, including the port i.e. `1.2.3.4:9000`.
+    /// The value is the peer host's address, including the port. For example, `1.2.3.4:9000`.
     ///
     /// By default, the [global `log_schema.host_key` option][global_host_key] is used.
     ///
@@ -66,7 +69,7 @@ pub struct TagsConfig {
     /// Sets the name of the tag to use to add the current process ID to each metric.
     ///
     ///
-    /// By default, this is not set and the tag will not be automatically added.
+    /// By default, this is not set and the tag is not automatically added.
     #[configurable(metadata(docs::examples = "pid"))]
     pub pid_key: Option<String>,
 }
@@ -95,6 +98,7 @@ fn default_host_key() -> String {
 impl_generate_config_from_default!(InternalMetricsConfig);
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "internal_metrics")]
 impl SourceConfig for InternalMetricsConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         if self.scrape_interval_secs.is_zero() {
@@ -132,8 +136,8 @@ impl SourceConfig for InternalMetricsConfig {
         ))
     }
 
-    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
-        vec![Output::default(DataType::Metric)]
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
+        vec![SourceOutput::new_metrics()]
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -162,10 +166,11 @@ impl<'a> InternalMetrics<'a> {
 
             let metrics = self.controller.capture_metrics();
             let count = metrics.len();
-            let byte_size = metrics.estimated_json_encoded_size_of();
+            let byte_size = metrics.size_of();
+            let json_size = metrics.estimated_json_encoded_size_of();
 
             emit!(InternalMetricsBytesReceived { byte_size });
-            events_received.emit(CountByteSize(count, byte_size));
+            events_received.emit(CountByteSize(count, json_size));
 
             let batch = metrics.into_iter().map(|mut metric| {
                 // A metric starts out with a default "vector" namespace, but will be overridden
@@ -185,8 +190,8 @@ impl<'a> InternalMetrics<'a> {
                 metric
             });
 
-            if let Err(error) = self.out.send_batch(batch).await {
-                emit!(StreamClosedError { error, count });
+            if (self.out.send_batch(batch).await).is_err() {
+                emit!(StreamClosedError { count });
                 return Err(());
             }
         }

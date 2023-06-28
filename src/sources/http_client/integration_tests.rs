@@ -16,7 +16,6 @@ use crate::{
     SourceSender,
 };
 use codecs::decoding::DeserializerConfig;
-use vector_config::NamedComponent;
 use vector_core::config::log_schema;
 
 use super::{
@@ -97,7 +96,7 @@ async fn collected_logs_json() {
         endpoint: format!("{}/logs/json.json", dufs_address()),
         interval: INTERVAL,
         query: HashMap::new(),
-        decoding: DeserializerConfig::Json,
+        decoding: DeserializerConfig::Json(Default::default()),
         framing: default_framing_message_based(),
         headers: HashMap::new(),
         method: HttpMethod::Get,
@@ -121,7 +120,7 @@ async fn collected_metrics_native_json() {
         endpoint: format!("{}/metrics/native.json", dufs_address()),
         interval: INTERVAL,
         query: HashMap::new(),
-        decoding: DeserializerConfig::NativeJson,
+        decoding: DeserializerConfig::NativeJson(Default::default()),
         framing: default_framing_message_based(),
         headers: HashMap::new(),
         method: HttpMethod::Get,
@@ -150,7 +149,7 @@ async fn collected_trace_native_json() {
         endpoint: format!("{}/traces/native.json", dufs_address()),
         interval: INTERVAL,
         query: HashMap::new(),
-        decoding: DeserializerConfig::NativeJson,
+        decoding: DeserializerConfig::NativeJson(Default::default()),
         framing: default_framing_message_based(),
         headers: HashMap::new(),
         method: HttpMethod::Get,
@@ -174,7 +173,7 @@ async fn unauthorized_no_auth() {
         endpoint: format!("{}/logs/json.json", dufs_auth_address()),
         interval: INTERVAL,
         query: HashMap::new(),
-        decoding: DeserializerConfig::Json,
+        decoding: DeserializerConfig::Json(Default::default()),
         framing: default_framing_message_based(),
         headers: HashMap::new(),
         method: HttpMethod::Get,
@@ -192,7 +191,7 @@ async fn unauthorized_wrong_auth() {
         endpoint: format!("{}/logs/json.json", dufs_auth_address()),
         interval: INTERVAL,
         query: HashMap::new(),
-        decoding: DeserializerConfig::Json,
+        decoding: DeserializerConfig::Json(Default::default()),
         framing: default_framing_message_based(),
         headers: HashMap::new(),
         method: HttpMethod::Get,
@@ -213,7 +212,7 @@ async fn authorized() {
         endpoint: format!("{}/logs/json.json", dufs_auth_address()),
         interval: INTERVAL,
         query: HashMap::new(),
-        decoding: DeserializerConfig::Json,
+        decoding: DeserializerConfig::Json(Default::default()),
         framing: default_framing_message_based(),
         headers: HashMap::new(),
         method: HttpMethod::Get,
@@ -234,7 +233,7 @@ async fn tls_invalid_ca() {
         endpoint: format!("{}/logs/json.json", dufs_https_address()),
         interval: INTERVAL,
         query: HashMap::new(),
-        decoding: DeserializerConfig::Json,
+        decoding: DeserializerConfig::Json(Default::default()),
         framing: default_framing_message_based(),
         headers: HashMap::new(),
         method: HttpMethod::Get,
@@ -255,7 +254,7 @@ async fn tls_valid() {
         endpoint: format!("{}/logs/json.json", dufs_https_address()),
         interval: INTERVAL,
         query: HashMap::new(),
-        decoding: DeserializerConfig::Json,
+        decoding: DeserializerConfig::Json(Default::default()),
         framing: default_framing_message_based(),
         headers: HashMap::new(),
         method: HttpMethod::Get,
@@ -277,7 +276,7 @@ async fn shutdown() {
         endpoint: format!("{}/logs/json.json", dufs_address()),
         interval: INTERVAL,
         query: HashMap::new(),
-        decoding: DeserializerConfig::Json,
+        decoding: DeserializerConfig::Json(Default::default()),
         framing: default_framing_message_based(),
         headers: HashMap::new(),
         method: HttpMethod::Get,
@@ -304,5 +303,5 @@ async fn shutdown() {
     assert!(shutdown_success);
 
     // Ensure source actually shut down successfully.
-    let _ = source_handle.await.unwrap();
+    _ = source_handle.await.unwrap();
 }

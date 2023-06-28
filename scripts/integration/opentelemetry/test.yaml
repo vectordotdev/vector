@@ -1,8 +1,7 @@
-args:
-- --features
+features:
 - opentelemetry-integration-tests
-- --lib
-- '::opentelemetry::'
+
+test_filter: '::opentelemetry::'
 
 runner:
   env:
@@ -11,3 +10,10 @@ runner:
 
 matrix:
   version: [0.56.0]
+
+# changes to these files/paths will invoke the integration test in CI
+# expressions are evaluated using https://github.com/micromatch/picomatch
+paths:
+- "src/sources/opentelemetry/**"
+- "src/sources/util/**"
+- "scripts/integration/opentelemetry/**"

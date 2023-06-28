@@ -14,8 +14,9 @@ pub struct LargeEventDroppedError {
 
 impl InternalEvent for LargeEventDroppedError {
     fn emit(self) {
+        let reason = "Event larger than batch max_bytes.";
         error!(
-            message = "Event larger than batch max_bytes.",
+            message = reason,
             batch_max_bytes = %self.max_length,
             length = %self.length,
             error_type = error_type::CONDITION_FAILED,
@@ -28,14 +29,6 @@ impl InternalEvent for LargeEventDroppedError {
             "error_type" => error_type::CONDITION_FAILED,
             "stage" => error_stage::SENDING,
         );
-        emit!(ComponentEventsDropped::<UNINTENTIONAL> {
-            count: 1,
-            reason: "Event larger than batch max_bytes."
-        });
-        // deprecated
-        counter!(
-            "events_discarded_total", 1,
-            "reason" => "oversized",
-        );
+        emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
     }
 }

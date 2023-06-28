@@ -5,32 +5,32 @@ use futures::FutureExt;
 use rdkafka::ClientConfig;
 use serde_with::serde_as;
 use vector_config::configurable_component;
+use vrl::value::Kind;
 
 use crate::{
-    codecs::EncodingConfig,
-    config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
     kafka::{KafkaAuthConfig, KafkaCompression},
     serde::json::to_string,
     sinks::{
         kafka::sink::{healthcheck, KafkaSink},
-        util::{BatchConfig, NoDefaultsBatchSettings},
-        Healthcheck, VectorSink,
+        prelude::*,
     },
-    template::Template,
 };
 
 pub(crate) const QUEUED_MIN_MESSAGES: u64 = 100000;
 
 /// Configuration for the `kafka` sink.
 #[serde_as]
-#[configurable_component(sink("kafka"))]
+#[configurable_component(sink(
+    "kafka",
+    "Publish observability event data to Apache Kafka topics."
+))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct KafkaSinkConfig {
     /// A comma-separated list of Kafka bootstrap servers.
     ///
-    /// These are the servers in a Kafka cluster that a client should use to "bootstrap" its
-    /// connection to the cluster, allowing discovering all other hosts in the cluster.
+    /// These are the servers in a Kafka cluster that a client should use to bootstrap its
+    /// connection to the cluster, allowing discovery of all the other hosts in the cluster.
     ///
     /// Must be in the form of `host:port`, and comma-separated.
     #[configurable(metadata(docs::examples = "10.14.22.123:9092,10.14.23.332:9092"))]
@@ -44,9 +44,9 @@ pub struct KafkaSinkConfig {
     ))]
     pub topic: Template,
 
-    /// The log field name or tags key to use for the topic key.
+    /// The log field name or tag key to use for the topic key.
     ///
-    /// If the field does not exist in the log or in tags, a blank value will be used. If
+    /// If the field does not exist in the log or in the tags, a blank value is used. If
     /// unspecified, the key is not sent.
     ///
     /// Kafka uses a hash of the key to choose the partition or uses round-robin if the record has
@@ -78,12 +78,14 @@ pub struct KafkaSinkConfig {
     #[serde(default = "default_socket_timeout_ms")]
     #[configurable(metadata(docs::examples = 30000, docs::examples = 60000))]
     #[configurable(metadata(docs::advanced))]
+    #[configurable(metadata(docs::human_name = "Socket Timeout"))]
     pub socket_timeout_ms: Duration,
 
     /// Local message timeout, in milliseconds.
     #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
     #[configurable(metadata(docs::examples = 150000, docs::examples = 450000))]
     #[serde(default = "default_message_timeout_ms")]
+    #[configurable(metadata(docs::human_name = "Message Timeout"))]
     #[configurable(metadata(docs::advanced))]
     pub message_timeout_ms: Duration,
 
@@ -102,7 +104,7 @@ pub struct KafkaSinkConfig {
 
     /// The log field name to use for the Kafka headers.
     ///
-    /// If omitted, no headers will be written.
+    /// If omitted, no headers are written.
     #[configurable(metadata(docs::advanced))]
     #[serde(alias = "headers_field")] // accidentally released as `headers_field` in 0.18
     #[configurable(metadata(docs::examples = "headers"))]
@@ -263,6 +265,7 @@ impl GenerateConfig for KafkaSinkConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "kafka")]
 impl SinkConfig for KafkaSinkConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let sink = KafkaSink::new(self.clone())?;
@@ -271,7 +274,10 @@ impl SinkConfig for KafkaSinkConfig {
     }
 
     fn input(&self) -> Input {
+        let requirements = Requirement::empty().optional_meaning("timestamp", Kind::timestamp());
+
         Input::new(self.encoding.config().input_type() & (DataType::Log | DataType::Metric))
+            .with_schema_requirement(requirements)
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {

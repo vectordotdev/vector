@@ -3,6 +3,8 @@ use std::{collections::BTreeMap, sync::Arc};
 use chrono::{TimeZone, Utc};
 use codecs::{JsonSerializerConfig, TextSerializerConfig};
 use futures_util::StreamExt;
+use lookup::lookup_v2::OptionalValuePath;
+use lookup::{OwnedValuePath, PathPrefix};
 use serde::Deserialize;
 use vector_core::{
     config::log_schema,
@@ -10,12 +12,13 @@ use vector_core::{
 };
 
 use super::sink::HecProcessedEvent;
+use crate::sinks::splunk_hec::common::config_timestamp_key;
 use crate::{
     codecs::{Encoder, EncodingConfig},
     config::{SinkConfig, SinkContext},
     sinks::{
         splunk_hec::{
-            common::{timestamp_key, EndpointTarget},
+            common::EndpointTarget,
             logs::{config::HecLogsSinkConfig, encoder::HecLogsEncoder, sink::process_log},
         },
         util::{encoding::Encoder as _, test::build_test_server, Compression},
@@ -48,7 +51,7 @@ struct HecEventText {
 
 fn get_processed_event_timestamp(
     timestamp: Option<Value>,
-    timestamp_key: &str,
+    timestamp_key: Option<OwnedValuePath>,
 ) -> HecProcessedEvent {
     let mut event = Event::Log(LogEvent::from("hello world"));
     event
@@ -62,10 +65,16 @@ fn get_processed_event_timestamp(
     event.as_mut_log().insert("key", "value");
     event.as_mut_log().insert("int_val", 123);
 
-    if timestamp.is_some() {
-        event.as_mut_log().insert(timestamp_key, timestamp);
-    } else {
-        event.as_mut_log().remove(timestamp_key);
+    if let Some(timestamp_key) = &timestamp_key {
+        if timestamp.is_some() {
+            event
+                .as_mut_log()
+                .insert((PathPrefix::Event, timestamp_key), timestamp);
+        } else {
+            event
+                .as_mut_log()
+                .remove((PathPrefix::Event, timestamp_key));
+        }
     }
 
     let sourcetype = Template::try_from("{{ event_sourcetype }}".to_string()).ok();
@@ -91,10 +100,10 @@ fn get_processed_event_timestamp(
 
 fn get_processed_event() -> HecProcessedEvent {
     get_processed_event_timestamp(
-        Some(value::Value::Timestamp(
+        Some(vrl::value::Value::Timestamp(
             Utc.timestamp_nanos(1638366107111456123),
         )),
-        &timestamp_key(),
+        config_timestamp_key().path,
     )
 }
 
@@ -146,7 +155,7 @@ fn splunk_encode_log_event_json() {
         &serde_json::Value::from("hello world")
     );
     assert!(event
-        .get(&log_schema().timestamp_key().to_string())
+        .get(log_schema().timestamp_key().unwrap().to_string().as_str())
         .is_none());
 
     assert_eq!(hec_data.source, Some("test_source".to_string()));
@@ -203,7 +212,9 @@ async fn splunk_passthrough_token() {
         tls: None,
         acknowledgements: Default::default(),
         timestamp_nanos_key: None,
-        timestamp_key: log_schema().timestamp_key().into(),
+        timestamp_key: OptionalValuePath {
+            path: log_schema().timestamp_key().cloned(),
+        },
         auto_extract_timestamp: None,
         endpoint_target: EndpointTarget::Event,
     };
@@ -245,7 +256,7 @@ fn splunk_encode_log_event_json_timestamps() {
 
     fn get_hec_data_for_timestamp_test(
         timestamp: Option<Value>,
-        timestamp_key: &str,
+        timestamp_key: Option<OwnedValuePath>,
     ) -> HecEventJson {
         let processed_event = get_processed_event_timestamp(timestamp, timestamp_key);
         let encoder = hec_encoder(JsonSerializerConfig::default().into());
@@ -256,15 +267,20 @@ fn splunk_encode_log_event_json_timestamps() {
         serde_json::from_slice::<HecEventJson>(&bytes).unwrap()
     }
 
+    let timestamp = lookup::owned_value_path!("timestamp");
+
     // no timestamp_key is provided
-    let mut hec_data = get_hec_data_for_timestamp_test(None, "");
+    let mut hec_data = get_hec_data_for_timestamp_test(None, None);
     assert_eq!(hec_data.time, None);
 
     // timestamp_key is provided but timestamp is not valid type
-    hec_data = get_hec_data_for_timestamp_test(Some(value::Value::Integer(0)), &timestamp_key());
+    hec_data = get_hec_data_for_timestamp_test(
+        Some(vrl::value::Value::Integer(0)),
+        Some(timestamp.clone()),
+    );
     assert_eq!(hec_data.time, None);
 
     // timestamp_key is provided but no timestamp in the event
-    let hec_data = get_hec_data_for_timestamp_test(None, &timestamp_key());
+    let hec_data = get_hec_data_for_timestamp_test(None, Some(timestamp));
     assert_eq!(hec_data.time, None);
 }

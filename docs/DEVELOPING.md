@@ -218,6 +218,17 @@ Yep!
 warn!(message = "Failed to merge value.", %error);
 ```
 
+#### Panics
+
+As a general rule, code in Vector should *not* panic.
+
+However, there are very rare situations where the code makes certain assumptions
+about the given state and if those assumptions are not met this is clearly due
+to a bug within Vector. In this situation Vector cannot safely proceed. Issuing
+a panic here is acceptable.
+
+All potential panics *MUST* be clearly documented in the function documentation.
+
 ### Feature flags
 
 When a new component (a source, transform, or sink) is added, it has to be put

@@ -406,21 +406,21 @@ mod test {
         }
     }
 
+    const BUFFER_CONFIG_NO_MATCH_ERR: &str =
+        "data did not match any variant of untagged enum BufferConfig";
+
     #[test]
     fn parse_empty() {
         let source = "";
         let error = serde_yaml::from_str::<BufferConfig>(source).unwrap_err();
-        assert_eq!(error.to_string(), "EOF while parsing a value");
+        assert_eq!(error.to_string(), BUFFER_CONFIG_NO_MATCH_ERR);
     }
 
     #[test]
     fn parse_only_invalid_keys() {
         let source = "foo: 314";
         let error = serde_yaml::from_str::<BufferConfig>(source).unwrap_err();
-        assert_eq!(
-            error.to_string(),
-            "data did not match any variant of untagged enum BufferConfig"
-        );
+        assert_eq!(error.to_string(), BUFFER_CONFIG_NO_MATCH_ERR);
     }
 
     #[test]
@@ -429,10 +429,7 @@ mod test {
 max_events: 42
 "#;
         let error = serde_yaml::from_str::<BufferConfig>(source).unwrap_err();
-        assert_eq!(
-            error.to_string(),
-            "data did not match any variant of untagged enum BufferConfig"
-        );
+        assert_eq!(error.to_string(), BUFFER_CONFIG_NO_MATCH_ERR);
     }
 
     #[test]

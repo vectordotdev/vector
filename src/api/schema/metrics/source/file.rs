@@ -37,29 +37,14 @@ impl<'a> FileSourceMetricFile<'a> {
         &*self.name
     }
 
-    /// Metric indicating events processed for the current file
-    async fn processed_events_total(&self) -> Option<metrics::ProcessedEventsTotal> {
-        self.metrics.processed_events_total()
-    }
-
-    /// Metric indicating bytes processed for the current file
-    async fn processed_bytes_total(&self) -> Option<metrics::ProcessedBytesTotal> {
-        self.metrics.processed_bytes_total()
-    }
-
-    /// Metric indicating incoming events for the current file
-    async fn events_in_total(&self) -> Option<metrics::EventsInTotal> {
-        self.metrics.events_in_total()
+    /// Metric indicating bytes received for the current file
+    async fn received_bytes_total(&self) -> Option<metrics::ReceivedBytesTotal> {
+        self.metrics.received_bytes_total()
     }
 
     /// Metric indicating received events for the current file
     async fn received_events_total(&self) -> Option<metrics::ReceivedEventsTotal> {
         self.metrics.received_events_total()
-    }
-
-    /// Metric indicating outgoing events for the current file
-    async fn events_out_total(&self) -> Option<metrics::EventsOutTotal> {
-        self.metrics.events_out_total()
     }
 
     /// Metric indicating outgoing events for the current file
@@ -93,38 +78,24 @@ impl FileSourceMetrics {
 #[derive(Enum, Copy, Clone, Eq, PartialEq)]
 pub enum FileSourceMetricFilesSortFieldName {
     Name,
-    ProcessedBytesTotal,
-    ProcessedEventsTotal,
+    ReceivedBytesTotal,
     ReceivedEventsTotal,
-    EventsInTotal,
     SentEventsTotal,
-    EventsOutTotal,
 }
 
 impl sort::SortableByField<FileSourceMetricFilesSortFieldName> for FileSourceMetricFile<'_> {
     fn sort(&self, rhs: &Self, field: &FileSourceMetricFilesSortFieldName) -> Ordering {
         match field {
             FileSourceMetricFilesSortFieldName::Name => Ord::cmp(&self.name, &rhs.name),
-            FileSourceMetricFilesSortFieldName::ProcessedBytesTotal => Ord::cmp(
+            FileSourceMetricFilesSortFieldName::ReceivedBytesTotal => Ord::cmp(
                 &self
                     .metrics
-                    .processed_bytes_total()
-                    .map(|m| m.get_processed_bytes_total() as i64)
+                    .received_bytes_total()
+                    .map(|m| m.get_received_bytes_total() as i64)
                     .unwrap_or(0),
                 &rhs.metrics
-                    .processed_bytes_total()
-                    .map(|m| m.get_processed_bytes_total() as i64)
-                    .unwrap_or(0),
-            ),
-            FileSourceMetricFilesSortFieldName::ProcessedEventsTotal => Ord::cmp(
-                &self
-                    .metrics
-                    .processed_events_total()
-                    .map(|m| m.get_processed_events_total() as i64)
-                    .unwrap_or(0),
-                &rhs.metrics
-                    .processed_events_total()
-                    .map(|m| m.get_processed_events_total() as i64)
+                    .received_bytes_total()
+                    .map(|m| m.get_received_bytes_total() as i64)
                     .unwrap_or(0),
             ),
             FileSourceMetricFilesSortFieldName::ReceivedEventsTotal => Ord::cmp(
@@ -138,17 +109,6 @@ impl sort::SortableByField<FileSourceMetricFilesSortFieldName> for FileSourceMet
                     .map(|m| m.get_received_events_total() as i64)
                     .unwrap_or(0),
             ),
-            FileSourceMetricFilesSortFieldName::EventsInTotal => Ord::cmp(
-                &self
-                    .metrics
-                    .events_in_total()
-                    .map(|m| m.get_events_in_total() as i64)
-                    .unwrap_or(0),
-                &rhs.metrics
-                    .events_in_total()
-                    .map(|m| m.get_events_in_total() as i64)
-                    .unwrap_or(0),
-            ),
             FileSourceMetricFilesSortFieldName::SentEventsTotal => Ord::cmp(
                 &self
                     .metrics
@@ -158,17 +118,6 @@ impl sort::SortableByField<FileSourceMetricFilesSortFieldName> for FileSourceMet
                 &rhs.metrics
                     .sent_events_total()
                     .map(|m| m.get_sent_events_total() as i64)
-                    .unwrap_or(0),
-            ),
-            FileSourceMetricFilesSortFieldName::EventsOutTotal => Ord::cmp(
-                &self
-                    .metrics
-                    .events_out_total()
-                    .map(|m| m.get_events_out_total() as i64)
-                    .unwrap_or(0),
-                &rhs.metrics
-                    .events_out_total()
-                    .map(|m| m.get_events_out_total() as i64)
                     .unwrap_or(0),
             ),
         }
@@ -223,19 +172,9 @@ impl FileSourceMetrics {
         .await
     }
 
-    /// Events processed for the current file source
-    pub async fn processed_events_total(&self) -> Option<metrics::ProcessedEventsTotal> {
-        self.0.processed_events_total()
-    }
-
-    /// Bytes processed for the current file source
-    pub async fn processed_bytes_total(&self) -> Option<metrics::ProcessedBytesTotal> {
-        self.0.processed_bytes_total()
-    }
-
-    /// Total incoming events for the current file source
-    pub async fn events_in_total(&self) -> Option<metrics::EventsInTotal> {
-        self.0.events_in_total()
+    /// Total received bytes for the current file source
+    pub async fn received_bytes_total(&self) -> Option<metrics::ReceivedBytesTotal> {
+        self.0.received_bytes_total()
     }
 
     /// Total received events for the current file source
@@ -243,12 +182,7 @@ impl FileSourceMetrics {
         self.0.received_events_total()
     }
 
-    /// Total outgoing events for the current file source
-    pub async fn events_out_total(&self) -> Option<metrics::EventsOutTotal> {
-        self.0.events_out_total()
-    }
-
-    /// Total outgoing events for the current file source
+    /// Total sent events for the current file source
     pub async fn sent_events_total(&self) -> Option<metrics::SentEventsTotal> {
         self.0.sent_events_total()
     }
@@ -272,8 +206,8 @@ mod tests {
         fn new(name: &'static str, events_processed: f64, bytes_processed: f64) -> Self {
             Self {
                 name,
-                events_metric: metric("processed_events_total", events_processed),
-                bytes_metric: metric("processed_bytes_total", bytes_processed),
+                events_metric: metric("component_sent_events_total", events_processed),
+                bytes_metric: metric("component_received_bytes_total", bytes_processed),
             }
         }
 
@@ -343,7 +277,7 @@ mod tests {
 
         let mut files = vec![t1.get_metric(), t2.get_metric(), t3.get_metric()];
         let fields = vec![SortField::<FileSourceMetricFilesSortFieldName> {
-            field: FileSourceMetricFilesSortFieldName::ProcessedEventsTotal,
+            field: FileSourceMetricFilesSortFieldName::SentEventsTotal,
             direction: sort::Direction::Asc,
         }];
 
@@ -362,7 +296,7 @@ mod tests {
 
         let mut files = vec![t1.get_metric(), t2.get_metric(), t3.get_metric()];
         let fields = vec![SortField::<FileSourceMetricFilesSortFieldName> {
-            field: FileSourceMetricFilesSortFieldName::ProcessedEventsTotal,
+            field: FileSourceMetricFilesSortFieldName::SentEventsTotal,
             direction: sort::Direction::Desc,
         }];
 
@@ -374,14 +308,14 @@ mod tests {
     }
 
     #[test]
-    fn processed_bytes_asc() {
+    fn received_bytes_asc() {
         let t1 = FileSourceMetricTest::new("a", 1000.00, 100.00);
         let t2 = FileSourceMetricTest::new("b", 500.00, 300.00);
         let t3 = FileSourceMetricTest::new("c", 250.00, 200.00);
 
         let mut files = vec![t1.get_metric(), t2.get_metric(), t3.get_metric()];
         let fields = vec![SortField::<FileSourceMetricFilesSortFieldName> {
-            field: FileSourceMetricFilesSortFieldName::ProcessedBytesTotal,
+            field: FileSourceMetricFilesSortFieldName::ReceivedBytesTotal,
             direction: sort::Direction::Asc,
         }];
 
@@ -393,14 +327,14 @@ mod tests {
     }
 
     #[test]
-    fn processed_bytes_desc() {
+    fn received_bytes_desc() {
         let t1 = FileSourceMetricTest::new("a", 1000.00, 100.00);
         let t2 = FileSourceMetricTest::new("b", 500.00, 300.00);
         let t3 = FileSourceMetricTest::new("c", 250.00, 200.00);
 
         let mut files = vec![t1.get_metric(), t2.get_metric(), t3.get_metric()];
         let fields = vec![SortField::<FileSourceMetricFilesSortFieldName> {
-            field: FileSourceMetricFilesSortFieldName::ProcessedBytesTotal,
+            field: FileSourceMetricFilesSortFieldName::ReceivedBytesTotal,
             direction: sort::Direction::Desc,
         }];
 

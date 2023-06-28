@@ -15,14 +15,12 @@ use tokio::sync::{
     Mutex,
 };
 use uuid::Uuid;
-use value::Kind;
-use vector_core::config::LogNamespace;
 
 pub use self::unit_test_components::{
     UnitTestSinkCheck, UnitTestSinkConfig, UnitTestSinkResult, UnitTestSourceConfig,
     UnitTestStreamSinkConfig, UnitTestStreamSourceConfig,
 };
-use super::{compiler::expand_globs, graph::Graph, OutputId, TransformConfig};
+use super::{compiler::expand_globs, graph::Graph, transform::get_transform_output_ids, OutputId};
 use crate::{
     conditions::Condition,
     config::{
@@ -30,7 +28,7 @@ use crate::{
         TestDefinition, TestInput, TestInputValue, TestOutput,
     },
     event::{Event, LogEvent, Value},
-    schema, signal,
+    signal,
     topology::{
         self,
         builder::{self, Pieces},
@@ -74,11 +72,24 @@ impl UnitTest {
     }
 }
 
+/// Loads Log Schema from configurations and sets global schema.
+/// Once this is done, configurations can be correctly loaded using
+/// configured log schema defaults.
+/// If deny is set, will panic if schema has already been set.
+fn init_log_schema_from_paths(
+    config_paths: &[ConfigPath],
+    deny_if_set: bool,
+) -> Result<(), Vec<String>> {
+    let (builder, _) = config::loading::load_builder_from_paths(config_paths)?;
+    vector_core::config::init_log_schema(builder.global.log_schema, deny_if_set);
+    Ok(())
+}
+
 pub async fn build_unit_tests_main(
     paths: &[ConfigPath],
     signal_handler: &mut signal::SignalHandler,
 ) -> Result<Vec<UnitTest>, Vec<String>> {
-    config::init_log_schema(paths, false)?;
+    init_log_schema_from_paths(paths, false)?;
     let (mut secrets_backends_loader, _) = loading::load_secret_backends_from_paths(paths)?;
     let (config_builder, _) = if secrets_backends_loader.has_secrets_to_retrieve() {
         let resolved_secrets = secrets_backends_loader
@@ -175,14 +186,11 @@ impl UnitTestBuildMetadata {
             .transforms
             .iter()
             .flat_map(|(key, transform)| {
-                transform
-                    .inner
-                    .outputs(&schema::Definition::any(), builder.schema.log_namespace())
-                    .into_iter()
-                    .map(|output| OutputId {
-                        component: key.clone(),
-                        port: output.port,
-                    })
+                get_transform_output_ids(
+                    transform.inner.as_ref(),
+                    key.clone(),
+                    builder.schema.log_namespace(),
+                )
             })
             .collect::<HashSet<_>>();
 
@@ -446,24 +454,13 @@ async fn build_unit_test(
 fn get_loose_end_outputs_sink(config: &ConfigBuilder) -> Option<SinkOuter<String>> {
     let config = config.clone();
     let transform_ids = config.transforms.iter().flat_map(|(key, transform)| {
-        transform
-            .inner
-            .outputs(
-                &schema::Definition::new_with_default_metadata(
-                    Kind::any(),
-                    [LogNamespace::Legacy, LogNamespace::Vector],
-                ),
-                config.schema.log_namespace(),
-            )
-            .iter()
-            .map(|output| {
-                if let Some(port) = &output.port {
-                    OutputId::from((key, port.clone())).to_string()
-                } else {
-                    key.to_string()
-                }
-            })
-            .collect::<Vec<_>>()
+        get_transform_output_ids(
+            transform.inner.as_ref(),
+            key.clone(),
+            config.schema.log_namespace(),
+        )
+        .map(|output| output.to_string())
+        .collect::<Vec<_>>()
     });
 
     let mut loose_end_outputs = Vec::new();

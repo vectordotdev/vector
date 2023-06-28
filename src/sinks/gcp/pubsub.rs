@@ -45,7 +45,10 @@ impl SinkBatchSettings for PubsubDefaultBatchSettings {
 }
 
 /// Configuration for the `gcp_pubsub` sink.
-#[configurable_component(sink("gcp_pubsub"))]
+#[configurable_component(sink(
+    "gcp_pubsub",
+    "Publish observability events to GCP's Pub/Sub messaging system."
+))]
 #[derive(Clone, Debug)]
 pub struct PubsubConfig {
     /// The project name to which to publish events.
@@ -59,7 +62,7 @@ pub struct PubsubConfig {
     /// The endpoint to which to publish events.
     ///
     /// The scheme (`http` or `https`) must be specified. No path should be included since the paths defined
-    /// by the [`GCP Pub/Sub`][pubsub_api] api are used.
+    /// by the [`GCP Pub/Sub`][pubsub_api] API are used.
     ///
     /// The trailing slash `/` must not be included.
     ///
@@ -111,6 +114,7 @@ impl GenerateConfig for PubsubConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "gcp_pubsub")]
 impl SinkConfig for PubsubConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let sink = PubsubSink::from_config(self).await?;
@@ -135,6 +139,7 @@ impl SinkConfig for PubsubConfig {
         )
         .sink_map_err(|error| error!(message = "Fatal gcp_pubsub sink error.", %error));
 
+        #[allow(deprecated)]
         Ok((VectorSink::from_event_sink(sink), healthcheck))
     }
 

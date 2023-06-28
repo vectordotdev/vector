@@ -45,7 +45,7 @@ impl SqsSource {
     pub async fn run(self, out: SourceSender, shutdown: ShutdownSignal) -> Result<(), ()> {
         let mut task_handles = vec![];
         let finalizer = self.acknowledgements.then(|| {
-            let (finalizer, mut ack_stream) = Finalizer::new(shutdown.clone());
+            let (finalizer, mut ack_stream) = Finalizer::new(Some(shutdown.clone()));
             let client = self.client.clone();
             let queue_url = self.queue_url.clone();
             tokio::spawn(
@@ -180,7 +180,7 @@ impl SqsSource {
                         }
                     }
                 }
-                Err(error) => emit!(StreamClosedError { error, count }),
+                Err(_) => emit!(StreamClosedError { count }),
             }
         }
     }
@@ -222,7 +222,6 @@ mod tests {
     use crate::codecs::DecodingConfig;
     use chrono::SecondsFormat;
     use lookup::path;
-    use vector_config::NamedComponent;
 
     use super::*;
     use crate::config::{log_schema, SourceConfig};
@@ -234,10 +233,10 @@ mod tests {
             log_namespace: Some(true),
             ..Default::default()
         };
-        let definition = config.outputs(LogNamespace::Vector)[0]
-            .clone()
-            .log_schema_definition
-            .unwrap();
+        let definitions = config
+            .outputs(LogNamespace::Vector)
+            .remove(0)
+            .schema_definition(true);
 
         let message = "test";
         let now = Utc::now();
@@ -277,7 +276,7 @@ mod tests {
                 .to_string_lossy(),
             now.to_rfc3339_opts(SecondsFormat::AutoSi, true)
         );
-        definition.assert_valid_for_event(&events[0]);
+        definitions.unwrap().assert_valid_for_event(&events[0]);
     }
 
     #[tokio::test]
@@ -286,10 +285,10 @@ mod tests {
             log_namespace: None,
             ..Default::default()
         };
-        let definition = config.outputs(LogNamespace::Legacy)[0]
-            .clone()
-            .log_schema_definition
-            .unwrap();
+        let definitions = config
+            .outputs(LogNamespace::Legacy)
+            .remove(0)
+            .schema_definition(true);
 
         let message = "test";
         let now = Utc::now();
@@ -322,12 +321,15 @@ mod tests {
             events[0]
                 .clone()
                 .as_log()
-                .get(log_schema().timestamp_key())
+                .get((
+                    lookup::PathPrefix::Event,
+                    log_schema().timestamp_key().unwrap()
+                ))
                 .unwrap()
                 .to_string_lossy(),
             now.to_rfc3339_opts(SecondsFormat::AutoSi, true)
         );
-        definition.assert_valid_for_event(&events[0]);
+        definitions.unwrap().assert_valid_for_event(&events[0]);
     }
 
     #[test]

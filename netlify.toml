@@ -53,12 +53,6 @@ status = 302
 force = true
 
 [[redirects]]
-from = "https://roadmap.vector.dev/*"
-to = "https://airtable.com/shriTZW5LeOE4cIyJ"
-status = 302
-force = true
-
-[[redirects]]
 from = "https://sh.vector.dev/*"
 to = "http://sh.vector.dev.s3-website-us-east-1.amazonaws.com/:splat"
 status = 200

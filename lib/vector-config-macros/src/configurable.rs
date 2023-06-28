@@ -52,7 +52,7 @@ pub fn derive_configurable_impl(input: TokenStream) -> TokenStream {
             Data::Struct(style, fields) => {
                 build_struct_generate_schema_fn(&container, style, fields)
             }
-            Data::Enum(variants) => build_enum_generate_schema_fn(variants),
+            Data::Enum(variants) => build_enum_generate_schema_fn(&container, variants),
         },
     };
 
@@ -111,7 +111,7 @@ fn build_metadata_fn(container: &Container<'_>) -> proc_macro2::TokenStream {
     let container_metadata = generate_container_metadata(&meta_ident, container);
 
     quote! {
-        fn metadata() -> ::vector_config::Metadata<Self> {
+        fn metadata() -> ::vector_config::Metadata {
             #container_metadata
             #meta_ident
         }
@@ -129,27 +129,82 @@ fn build_to_value_fn(_container: &Container<'_>) -> proc_macro2::TokenStream {
 
 fn build_virtual_newtype_schema_fn(virtual_ty: Type) -> proc_macro2::TokenStream {
     quote! {
-        fn generate_schema(schema_gen: &mut ::vector_config::schemars::gen::SchemaGenerator) -> std::result::Result<::vector_config::schemars::schema::SchemaObject, ::vector_config::GenerateError> {
-            ::vector_config::schema::get_or_generate_schema::<#virtual_ty>(schema_gen, None)
+        fn generate_schema(schema_gen: &::std::cell::RefCell<::vector_config::schema::SchemaGenerator>) -> std::result::Result<::vector_config::schema::SchemaObject, ::vector_config::GenerateError> {
+            ::vector_config::schema::get_or_generate_schema(
+                &<#virtual_ty as ::vector_config::Configurable>::as_configurable_ref(),
+                schema_gen,
+                None,
+            )
         }
     }
 }
 
-fn build_enum_generate_schema_fn(variants: &[Variant<'_>]) -> proc_macro2::TokenStream {
+fn build_enum_generate_schema_fn(
+    container: &Container,
+    variants: &[Variant<'_>],
+) -> proc_macro2::TokenStream {
+    // First, figure out if we have a potentially "ambiguous" enum schema. This will influence the
+    // code we generate, which will, at runtime, attempt to figure out if we need to emit an `anyOf`
+    // schema, rather than a `oneOf` schema, to handle validation of enums where variants overlap in
+    // ambiguous ways.
+    let is_potentially_ambiguous = is_enum_schema_potentially_ambiguous(container, variants);
+
+    // Now we'll generate the code for building the schema for each individual variant. This will be
+    // slightly influenced by whether or not we think the enum schema is potentially ambiguous. If
+    // so, we generate some extra code that populates the necessary data to make the call at runtime.
     let mapped_variants = variants
         .iter()
         // Don't map this variant if it's marked to be skipped for both serialization and deserialization.
         .filter(|variant| variant.visible())
-        .map(generate_enum_variant_schema);
+        .map(|variant| generate_enum_variant_schema(variant, is_potentially_ambiguous));
+
+    // Generate a small little code block that will try and vary the schema approach between `anyOf`
+    // and `oneOf` if we determine that the data in the discriminant map indicates ambiguous variant
+    // schemas.
+    //
+    // If we never generate any entries in the discriminant map, then this will end up just calling
+    // the `oneOf` method.
+    let generate_block = quote! {
+        if ::vector_config::schema::has_ambiguous_discriminants(&discriminant_map) {
+            Ok(::vector_config::schema::generate_any_of_schema(&subschemas))
+        } else {
+            Ok(::vector_config::schema::generate_one_of_schema(&subschemas))
+        }
+    };
 
     quote! {
-        fn generate_schema(schema_gen: &mut ::vector_config::schemars::gen::SchemaGenerator) -> std::result::Result<::vector_config::schemars::schema::SchemaObject, ::vector_config::GenerateError> {
+        fn generate_schema(schema_gen: &::std::cell::RefCell<::vector_config::schema::SchemaGenerator>) -> std::result::Result<::vector_config::schema::SchemaObject, ::vector_config::GenerateError> {
             let mut subschemas = ::std::vec::Vec::new();
+            let mut discriminant_map = ::std::collections::HashMap::new();
 
             #(#mapped_variants)*
 
-            Ok(::vector_config::schema::generate_one_of_schema(&subschemas))
+            #generate_block
         }
+    }
+}
+
+fn is_enum_schema_potentially_ambiguous(container: &Container, variants: &[Variant]) -> bool {
+    let tagging = container
+        .tagging()
+        .expect("enums must always have a tagging mode");
+    match tagging {
+        Tagging::None => {
+            // If we have fewer than two variants, then there's no ambiguity.
+            if variants.len() < 2 {
+                return false;
+            }
+
+            // All variants must be struct variants (i.e. named fields) otherwise we cannot
+            // reasonably determine if they're ambiguous or not.
+            variants.iter().all(|variant| {
+                let fields = variant.fields();
+                !fields.is_empty() && fields.iter().all(|field| field.ident().is_some())
+            })
+        }
+
+        // All other tagging modes have a discriminant, and so can never be ambiguous.
+        _ => false,
     }
 }
 
@@ -169,9 +224,14 @@ fn build_struct_generate_schema_fn(
 fn generate_struct_field(field: &Field<'_>) -> proc_macro2::TokenStream {
     let field_metadata_ref = Ident::new("field_metadata", Span::call_site());
     let field_metadata = generate_field_metadata(&field_metadata_ref, field);
+    let field_schema_ty = get_field_schema_ty(field);
 
     let spanned_generate_schema = quote_spanned! {field.span()=>
-        ::vector_config::schema::get_or_generate_schema(schema_gen, Some(#field_metadata_ref))?
+        ::vector_config::schema::get_or_generate_schema(
+            &<#field_schema_ty as ::vector_config::Configurable>::as_configurable_ref(),
+            schema_gen,
+            Some(#field_metadata_ref),
+        )?
     };
 
     quote! {
@@ -263,7 +323,7 @@ fn build_named_struct_generate_schema_fn(
         .map(|field| generate_named_struct_field(container, field));
 
     quote! {
-        fn generate_schema(schema_gen: &mut ::vector_config::schemars::gen::SchemaGenerator) -> std::result::Result<::vector_config::schemars::schema::SchemaObject, ::vector_config::GenerateError> {
+        fn generate_schema(schema_gen: &::std::cell::RefCell<::vector_config::schema::SchemaGenerator>) -> std::result::Result<::vector_config::schema::SchemaObject, ::vector_config::GenerateError> {
             let mut properties = ::vector_config::indexmap::IndexMap::new();
             let mut required = ::std::collections::BTreeSet::new();
             let mut flattened_subschemas = ::std::vec::Vec::new();
@@ -273,9 +333,11 @@ fn build_named_struct_generate_schema_fn(
 
             let had_unflatted_properties = !properties.is_empty();
 
+            let additional_properties = None;
             let mut schema = ::vector_config::schema::generate_struct_schema(
                 properties,
                 required,
+                additional_properties,
             );
 
             // If we have any flattened subschemas, deal with them now.
@@ -306,7 +368,7 @@ fn build_tuple_struct_generate_schema_fn(fields: &[Field<'_>]) -> proc_macro2::T
         .map(generate_tuple_struct_field);
 
     quote! {
-        fn generate_schema(schema_gen: &mut ::vector_config::schemars::gen::SchemaGenerator) -> std::result::Result<::vector_config::schemars::schema::SchemaObject, ::vector_config::GenerateError> {
+        fn generate_schema(schema_gen: &::std::cell::RefCell<::vector_config::schema::SchemaGenerator>) -> std::result::Result<::vector_config::schema::SchemaObject, ::vector_config::GenerateError> {
             let mut subschemas = ::std::collections::Vec::new();
 
             #(#mapped_fields)*
@@ -332,7 +394,7 @@ fn build_newtype_struct_generate_schema_fn(fields: &[Field<'_>]) -> proc_macro2:
     let field_schema = mapped_fields.remove(0);
 
     quote! {
-        fn generate_schema(schema_gen: &mut ::vector_config::schemars::gen::SchemaGenerator) -> std::result::Result<::vector_config::schemars::schema::SchemaObject, ::vector_config::GenerateError> {
+        fn generate_schema(schema_gen: &::std::cell::RefCell<::vector_config::schema::SchemaGenerator>) -> std::result::Result<::vector_config::schema::SchemaObject, ::vector_config::GenerateError> {
             #field_schema
 
             Ok(subschema)
@@ -409,7 +471,7 @@ fn generate_field_metadata(meta_ident: &Ident, field: &Field<'_>) -> proc_macro2
     let maybe_custom_attributes = get_metadata_custom_attributes(meta_ident, field.metadata());
 
     quote! {
-        let mut #meta_ident = ::vector_config::Metadata::<#field_schema_ty>::default();
+        let mut #meta_ident = ::vector_config::Metadata::default();
         #maybe_clear_title_description
         #maybe_title
         #maybe_description
@@ -455,7 +517,7 @@ fn generate_variant_metadata(
     // container it exists within. We also don't want to use the metadata of the enum container, as
     // it might have values that would conflict with the metadata of this specific variant.
     quote! {
-        let mut #meta_ident = ::vector_config::Metadata::<()>::default();
+        let mut #meta_ident = ::vector_config::Metadata::default();
         #maybe_title
         #maybe_description
         #maybe_deprecated
@@ -479,7 +541,7 @@ fn generate_variant_tag_metadata(
     // container it exists within. We also don't want to use the metadata of the enum container, as
     // it might have values that would conflict with the metadata of this specific variant.
     quote! {
-        let mut #meta_ident = ::vector_config::Metadata::<()>::default();
+        let mut #meta_ident = ::vector_config::Metadata::default();
         #maybe_title
         #maybe_description
     }
@@ -654,8 +716,18 @@ fn generate_named_enum_field(field: &Field<'_>) -> proc_macro2::TokenStream {
 fn generate_enum_struct_named_variant_schema(
     variant: &Variant<'_>,
     post_fields: Option<proc_macro2::TokenStream>,
+    is_potentially_ambiguous: bool,
 ) -> proc_macro2::TokenStream {
     let mapped_fields = variant.fields().iter().map(generate_named_enum_field);
+
+    // If this variant is part of a potentially ambiguous enum schema, we add this variant's
+    // required fields to the discriminant map, keyed off of the variant name.
+    let maybe_fill_discriminant_map = is_potentially_ambiguous.then(|| {
+        let variant_name = variant.ident().to_string();
+        quote! {
+            discriminant_map.insert(#variant_name, required.clone());
+        }
+    });
 
     quote! {
         {
@@ -666,9 +738,12 @@ fn generate_enum_struct_named_variant_schema(
 
             #post_fields
 
+            #maybe_fill_discriminant_map
+
             ::vector_config::schema::generate_struct_schema(
                 properties,
-                required
+                required,
+                None
             )
         }
     }
@@ -703,7 +778,10 @@ fn generate_enum_variant_tag_schema(variant: &Variant<'_>) -> proc_macro2::Token
     }
 }
 
-fn generate_enum_variant_schema(variant: &Variant<'_>) -> proc_macro2::TokenStream {
+fn generate_enum_variant_schema(
+    variant: &Variant<'_>,
+    is_potentially_ambiguous: bool,
+) -> proc_macro2::TokenStream {
     // For the sake of all examples below, we'll use JSON syntax to represent the following enum
     // variants:
     //
@@ -731,7 +809,7 @@ fn generate_enum_variant_schema(variant: &Variant<'_>) -> proc_macro2::TokenStre
             let (wrapped, variant_schema) = match variant.style() {
                 Style::Struct => (
                     true,
-                    generate_enum_struct_named_variant_schema(variant, None),
+                    generate_enum_struct_named_variant_schema(variant, None, false),
                 ),
                 Style::Tuple => panic!("tuple variants should be rejected during AST parsing"),
                 Style::Newtype => (true, generate_enum_newtype_struct_variant_schema(variant)),
@@ -779,7 +857,7 @@ fn generate_enum_variant_schema(variant: &Variant<'_>) -> proc_macro2::TokenStre
                         }
                     }
                 };
-                generate_enum_struct_named_variant_schema(variant, Some(tag_field))
+                generate_enum_struct_named_variant_schema(variant, Some(tag_field), false)
             }
             Style::Tuple => panic!("tuple variants should be rejected during AST parsing"),
             Style::Newtype => {
@@ -833,7 +911,9 @@ fn generate_enum_variant_schema(variant: &Variant<'_>) -> proc_macro2::TokenStre
             // tagging, so we handle that one by hand.
             let tag_schema = generate_enum_variant_tag_schema(variant);
             let maybe_content_schema = match variant.style() {
-                Style::Struct => Some(generate_enum_struct_named_variant_schema(variant, None)),
+                Style::Struct => Some(generate_enum_struct_named_variant_schema(
+                    variant, None, false,
+                )),
                 Style::Tuple => panic!("tuple variants should be rejected during AST parsing"),
                 Style::Newtype => Some(generate_enum_newtype_struct_variant_schema(variant)),
                 Style::Unit => None,
@@ -856,7 +936,8 @@ fn generate_enum_variant_schema(variant: &Variant<'_>) -> proc_macro2::TokenStre
 
                 ::vector_config::schema::generate_struct_schema(
                     wrapper_properties,
-                    wrapper_required
+                    wrapper_required,
+                    None
                 )
             }
         }
@@ -885,7 +966,11 @@ fn generate_enum_variant_schema(variant: &Variant<'_>) -> proc_macro2::TokenStre
             // TODO: actually implement the aforementioned higher-level check
 
             match variant.style() {
-                Style::Struct => generate_enum_struct_named_variant_schema(variant, None),
+                Style::Struct => generate_enum_struct_named_variant_schema(
+                    variant,
+                    None,
+                    is_potentially_ambiguous,
+                ),
                 Style::Tuple => panic!("tuple variants should be rejected during AST parsing"),
                 Style::Newtype => generate_enum_newtype_struct_variant_schema(variant),
                 Style::Unit => quote! { ::vector_config::schema::generate_null_schema() },
@@ -910,7 +995,8 @@ fn generate_single_field_struct_schema(
 
             ::vector_config::schema::generate_struct_schema(
                 wrapper_properties,
-                wrapper_required
+                wrapper_required,
+                None
             )
         }
     }
@@ -922,7 +1008,7 @@ fn generate_enum_variant_apply_metadata(variant: &Variant<'_>) -> proc_macro2::T
 
     quote! {
         #variant_metadata
-        ::vector_config::schema::apply_metadata(&mut subschema, #variant_metadata_ref);
+        ::vector_config::schema::apply_base_metadata(&mut subschema, #variant_metadata_ref);
     }
 }
 
@@ -932,7 +1018,7 @@ fn generate_enum_variant_tag_apply_metadata(variant: &Variant<'_>) -> proc_macro
 
     quote! {
         #variant_tag_metadata
-        ::vector_config::schema::apply_metadata(&mut tag_subschema, #variant_tag_metadata_ref);
+        ::vector_config::schema::apply_base_metadata(&mut tag_subschema, #variant_tag_metadata_ref);
     }
 }
 

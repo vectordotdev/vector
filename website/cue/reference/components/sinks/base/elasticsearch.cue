@@ -15,7 +15,7 @@ base: components: sinks: elasticsearch: configuration: {
 				Whether or not end-to-end acknowledgements are enabled.
 
 				When enabled for a sink, any source connected to that sink, where the source supports
-				end-to-end acknowledgements as well, will wait for events to be acknowledged by the sink
+				end-to-end acknowledgements as well, waits for events to be acknowledged by the sink
 				before acknowledging them at the source.
 
 				Enabling or disabling acknowledgements at the sink level takes precedence over any global
@@ -38,8 +38,8 @@ base: components: sinks: elasticsearch: configuration: {
 
 					If the [cluster state version endpoint][es_version] isn't reachable, a warning is logged to
 					stdout, and the version is assumed to be V6 if the `suppress_type_name` option is set to
-					true. Otherwise, the version is assumed to be V8. In the future, the sink will instead
-					return an Error during configuration parsing, since a wronly assumed version could lead to
+					`true`. Otherwise, the version is assumed to be V8. In the future, the sink instead
+					returns an error during configuration parsing, since a wrongly assumed version could lead to
 					incorrect API calls.
 
 					[es_version]: https://www.elastic.co/guide/en/elasticsearch/reference/current/cluster-state.html#cluster-state-api-path-params
@@ -108,7 +108,7 @@ base: components: sinks: elasticsearch: configuration: {
 				description: """
 					Timeout for successfully loading any credentials, in seconds.
 
-					Relevant when the default credentials chain is used or `assume_role`.
+					Relevant when the default credentials chain or `assume_role` is used.
 					"""
 				relevant_when: "strategy = \"aws\""
 				required:      false
@@ -131,13 +131,16 @@ base: components: sinks: elasticsearch: configuration: {
 					"""
 				relevant_when: "strategy = \"aws\""
 				required:      false
-				type: string: examples: ["develop"]
+				type: string: {
+					default: "default"
+					examples: ["develop"]
+				}
 			}
 			region: {
 				description: """
 					The [AWS region][aws_region] to send STS requests to.
 
-					If not set, this will default to the configured region
+					If not set, this defaults to the configured region
 					for the service itself.
 
 					[aws_region]: https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints
@@ -194,10 +197,10 @@ base: components: sinks: elasticsearch: configuration: {
 		type: object: options: {
 			max_bytes: {
 				description: """
-					The maximum size of a batch that will be processed by a sink.
+					The maximum size of a batch that is processed by a sink.
 
 					This is based on the uncompressed size of the batched events, before they are
-					serialized / compressed.
+					serialized/compressed.
 					"""
 				required: false
 				type: uint: {
@@ -228,7 +231,7 @@ base: components: sinks: elasticsearch: configuration: {
 				description: """
 					Action to use when making requests to the [Elasticsearch Bulk API][es_bulk].
 
-					Currently, Vector only supports `index` and `create`. `update` and `delete` actions are not supported.
+					Only `index` and `create` actions are supported.
 
 					[es_bulk]: https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html
 					"""
@@ -271,6 +274,11 @@ base: components: sinks: elasticsearch: configuration: {
 
 					[zlib]: https://zlib.net/
 					"""
+				zstd: """
+					[Zstandard][zstd] compression.
+
+					[zstd]: https://facebook.github.io/zstd/
+					"""
 			}
 		}
 	}
@@ -286,8 +294,8 @@ base: components: sinks: elasticsearch: configuration: {
 					from the `data_stream` configuration field of the same name.
 
 					If enabled, the value of the `data_stream.type`, `data_stream.dataset`, and
-					`data_stream.namespace` event fields will be used if they are present. Otherwise, the values
-					set here in the configuration will be used.
+					`data_stream.namespace` event fields are used if they are present. Otherwise, the values
+					set in this configuration are used.
 					"""
 				required: false
 				type: bool: default: true
@@ -369,12 +377,12 @@ base: components: sinks: elasticsearch: configuration: {
 		required:    false
 		type: object: options: {
 			except_fields: {
-				description: "List of fields that will be excluded from the encoded event."
+				description: "List of fields that are excluded from the encoded event."
 				required:    false
 				type: array: items: type: string: {}
 			}
 			only_fields: {
-				description: "List of fields that will be included in the encoded event."
+				description: "List of fields that are included in the encoded event."
 				required:    false
 				type: array: items: type: string: {}
 			}
@@ -434,8 +442,8 @@ base: components: sinks: elasticsearch: configuration: {
 				description: """
 					Name of the tag in the metric to use for the source host.
 
-					If present, the value of the tag is set on the generated log event in the "host" field,
-					where the field key will use the [global `host_key` option][global_log_schema_host_key].
+					If present, the value of the tag is set on the generated log event in the `host` field,
+					where the field key uses the [global `host_key` option][global_log_schema_host_key].
 
 					[global_log_schema_host_key]: https://vector.dev/docs/reference/configuration//global-options#log_schema.host_key
 					"""
@@ -446,8 +454,8 @@ base: components: sinks: elasticsearch: configuration: {
 				description: """
 					Controls how metric tag values are encoded.
 
-					When set to `single`, only the last non-bare value of tags will be displayed with the
-					metric.  When set to `full`, all metric tags will be exposed as separate assignments as
+					When set to `single`, only the last non-bare value of tags are displayed with the
+					metric.  When set to `full`, all metric tags are exposed as separate assignments as
 					described by [the `native_json` codec][vector_native_json].
 
 					[vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
@@ -456,22 +464,22 @@ base: components: sinks: elasticsearch: configuration: {
 				type: string: {
 					default: "single"
 					enum: {
-						full: "All tags will be exposed as arrays of either string or null values."
+						full: "All tags are exposed as arrays of either string or null values."
 						single: """
-															Tag values will be exposed as single strings, the same as they were before this config
-															option. Tags with multiple values will show the last assigned value, and null values will be
-															ignored.
+															Tag values are exposed as single strings, the same as they were before this config
+															option. Tags with multiple values show the last assigned value, and null values
+															are ignored.
 															"""
 					}
 				}
 			}
 			timezone: {
 				description: """
-					The name of the timezone to apply to timestamp conversions that do not contain an explicit
+					The name of the time zone to apply to timestamp conversions that do not contain an explicit
 					time zone.
 
 					This overrides the [global `timezone`][global_timezone] option. The time zone name may be
-					any name in the [TZ database][tz_database], or `local` to indicate system local time.
+					any name in the [TZ database][tz_database] or `local` to indicate system local time.
 
 					[global_timezone]: https://vector.dev/docs/reference/configuration//global-options#timezone
 					[tz_database]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
@@ -487,9 +495,9 @@ base: components: sinks: elasticsearch: configuration: {
 		type: string: {
 			default: "bulk"
 			enum: {
-				bulk: "Ingests documents in bulk, via the bulk API `index` action."
+				bulk: "Ingests documents in bulk, using the bulk API `index` action."
 				data_stream: """
-					Ingests documents in bulk, via the bulk API `create` action.
+					Ingests documents in bulk, using the bulk API `create` action.
 
 					Elasticsearch Data Streams only support the `create` action.
 					"""
@@ -638,7 +646,7 @@ base: components: sinks: elasticsearch: configuration: {
 				description: """
 					The amount of time to wait before attempting the first retry for a failed request.
 
-					After the first retry has failed, the fibonacci sequence will be used to select future backoffs.
+					After the first retry has failed, the fibonacci sequence is used to select future backoffs.
 					"""
 				required: false
 				type: uint: {
@@ -658,7 +666,7 @@ base: components: sinks: elasticsearch: configuration: {
 				description: """
 					The time a request can take before being aborted.
 
-					It is highly recommended that you do not lower this value below the service’s internal timeout, as this could
+					Datadog highly recommends that you do not lower this value below the service's internal timeout, as this could
 					create orphaned requests, pile on retries, and result in duplicate data downstream.
 					"""
 				required: false
@@ -686,7 +694,7 @@ base: components: sinks: elasticsearch: configuration: {
 
 			The `type` field was deprecated in Elasticsearch 7.x and removed in Elasticsearch 8.x.
 
-			If enabled, the `doc_type` option will be ignored.
+			If enabled, the `doc_type` option is ignored.
 			"""
 		required: false
 		type: bool: default: false
@@ -699,8 +707,8 @@ base: components: sinks: elasticsearch: configuration: {
 				description: """
 					Sets the list of supported ALPN protocols.
 
-					Declare the supported ALPN protocols, which are used during negotiation with peer. Prioritized in the order
-					they are defined.
+					Declare the supported ALPN protocols, which are used during negotiation with peer. They are prioritized in the order
+					that they are defined.
 					"""
 				required: false
 				type: array: items: type: string: examples: ["h2"]
@@ -748,10 +756,10 @@ base: components: sinks: elasticsearch: configuration: {
 				description: """
 					Enables certificate verification.
 
-					If enabled, certificates must be valid in terms of not being expired, as well as being issued by a trusted
-					issuer. This verification operates in a hierarchical manner, checking that not only the leaf certificate (the
-					certificate presented by the client/server) is valid, but also that the issuer of that certificate is valid, and
-					so on until reaching a root certificate.
+					If enabled, certificates must not be expired and must be issued by a trusted
+					issuer. This verification operates in a hierarchical manner, checking that the leaf certificate (the
+					certificate presented by the client/server) is not only valid, but that the issuer of that certificate is also valid, and
+					so on until the verification process reaches a root certificate.
 
 					Relevant for both incoming and outgoing connections.
 

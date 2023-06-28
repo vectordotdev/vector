@@ -11,6 +11,10 @@ releases: "0.26.0": {
 			Annotating namespace labels in the `kubernetes_logs` source cannot be disabled by
 			setting `namespace_labels` to `""`. Fixed in v0.27.0.
 			""",
+		"""
+			The `log_schema` config options do not allow configuration of nested paths using `.`s.
+			Instead it treats them as flat. Fixed in v0.27.1.
+			""",
 	]
 
 	description: """

@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 pub mod auth;
 pub mod region;
 
@@ -7,14 +8,14 @@ use std::pin::Pin;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::task::{Context, Poll};
-use std::time::{Duration, SystemTime};
+use std::time::SystemTime;
 
 pub use auth::{AwsAuthentication, ImdsAuthentication};
 use aws_config::meta::region::ProvideRegion;
 use aws_credential_types::provider::{ProvideCredentials, SharedCredentialsProvider};
 use aws_sigv4::http_request::{SignableRequest, SigningSettings};
 use aws_sigv4::SigningParams;
-use aws_smithy_async::rt::sleep::{AsyncSleep, Sleep};
+use aws_smithy_async::rt::sleep::TokioSleep;
 use aws_smithy_client::bounds::SmithyMiddleware;
 use aws_smithy_client::erase::{DynConnector, DynMiddleware};
 use aws_smithy_client::{Builder, SdkError};
@@ -46,7 +47,7 @@ pub fn is_retriable_error<T>(error: &SdkError<T>) -> bool {
         SdkError::ResponseError(err) => check_response(err.raw()),
         SdkError::ServiceError(err) => check_response(err.raw()),
         _ => {
-            warn!("AWS returned an unhandled error, retrying request.");
+            warn!("AWS returned unknown error, retrying request.");
             true
         }
     }
@@ -92,7 +93,7 @@ pub trait ClientBuilder {
 
     fn default_middleware() -> Self::DefaultMiddleware;
 
-    fn build(client: aws_smithy_client::Client, config: &aws_types::SdkConfig) -> Self::Client;
+    fn build(client: aws_smithy_client::Client, config: &SdkConfig) -> Self::Client;
 }
 
 pub async fn create_smithy_client<T: ClientBuilder>(
@@ -107,11 +108,11 @@ pub async fn create_smithy_client<T: ClientBuilder>(
     let connector = if proxy.enabled {
         let proxy = build_proxy_connector(tls_settings, proxy)?;
         let hyper_client = aws_smithy_client::hyper_ext::Adapter::builder().build(proxy);
-        aws_smithy_client::erase::DynConnector::new(hyper_client)
+        DynConnector::new(hyper_client)
     } else {
         let tls_connector = build_tls_connector(tls_settings)?;
         let hyper_client = aws_smithy_client::hyper_ext::Adapter::builder().build(tls_connector);
-        aws_smithy_client::erase::DynConnector::new(hyper_client)
+        DynConnector::new(hyper_client)
     };
 
     let middleware_builder = ServiceBuilder::new()
@@ -122,7 +123,7 @@ pub async fn create_smithy_client<T: ClientBuilder>(
     let mut client_builder = Builder::new()
         .connector(connector)
         .middleware(middleware)
-        .sleep_impl(Arc::new(TokioSleep));
+        .sleep_impl(Arc::new(TokioSleep::new()));
     client_builder.set_retry_config(Some(retry_config.into()));
 
     Ok(client_builder.build())
@@ -156,6 +157,7 @@ pub async fn create_client<T: ClientBuilder>(
 
     // Build the configuration first.
     let mut config_builder = SdkConfig::builder()
+        .credentials_cache(auth.credentials_cache().await?)
         .credentials_provider(auth.credentials_provider(region.clone()).await?)
         .region(region.clone())
         .retry_config(retry_config.clone());
@@ -198,15 +200,6 @@ pub async fn sign_request(
     Ok(())
 }
 
-#[derive(Debug)]
-pub struct TokioSleep;
-
-impl AsyncSleep for TokioSleep {
-    fn sleep(&self, duration: Duration) -> Sleep {
-        Sleep::new(tokio::time::sleep(duration))
-    }
-}
-
 /// Layer for capturing the payload size for AWS API client requests and emitting internal telemetry.
 #[derive(Clone)]
 struct CaptureRequestSize {
@@ -247,8 +240,7 @@ where
 {
     type Response = S::Response;
     type Error = S::Error;
-    type Future =
-        Pin<Box<dyn Future<Output = std::result::Result<Self::Response, Self::Error>> + Send>>;
+    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         self.inner.poll_ready(cx)
@@ -258,7 +250,6 @@ where
         // Attach a body callback that will capture the bytes sent by interrogating the body chunks that get read as it
         // sends the request out over the wire. We'll read the shared atomic counter, which will contain the number of
         // bytes "read", aka the bytes it actually sent, if and only if we get back a successful response.
-
         let (req, maybe_bytes_sent) = if self.enabled {
             let shared_bytes_sent = Arc::new(AtomicUsize::new(0));
             let (request, properties) = req.into_parts();
@@ -267,7 +258,7 @@ where
             let body = {
                 let shared_bytes_sent = Arc::clone(&shared_bytes_sent);
 
-                body.map(move |body| {
+                body.map_immutable(move |body| {
                     let body = MeasuredBody::new(body, Arc::clone(&shared_bytes_sent));
                     SdkBody::from_dyn(BoxBody::new(body))
                 })
@@ -337,7 +328,6 @@ impl Body for MeasuredBody {
             Poll::Ready(Some(Ok(data))) => {
                 this.shared_bytes_sent
                     .fetch_add(data.len(), Ordering::Release);
-
                 Poll::Ready(Some(Ok(data)))
             }
             Poll::Ready(None) => Poll::Ready(None),

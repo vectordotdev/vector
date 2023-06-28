@@ -4,11 +4,12 @@ use bytes::Bytes;
 use futures::{Stream, StreamExt};
 use lru::LruCache;
 use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
+use vector_core::config::{clone_input_definitions, LogNamespace};
 
 use crate::{
     config::{
-        log_schema, DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
+        log_schema, DataType, GenerateConfig, Input, OutputId, TransformConfig, TransformContext,
+        TransformOutput,
     },
     event::{Event, Value},
     internal_events::DedupeEventsDropped,
@@ -19,7 +20,7 @@ use crate::{
 /// Options to control what fields to match against.
 ///
 /// When no field matching configuration is specified, events are matched using the `timestamp`,
-/// `host`, and `message` fields from an event. The specific field names used will be those set in
+/// `host`, and `message` fields from an event. The specific field names used are those set in
 /// the global [`log schema`][global_log_schema] configuration.
 ///
 /// [global_log_schema]: https://vector.dev/docs/reference/configuration/global-options/#log_schema
@@ -68,7 +69,7 @@ pub struct CacheConfig {
 }
 
 /// Configuration for the `dedupe` transform.
-#[configurable_component(transform("dedupe"))]
+#[configurable_component(transform("dedupe", "Deduplicate logs passing through a topology."))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct DedupeConfig {
@@ -102,11 +103,14 @@ fn default_cache_config() -> CacheConfig {
 //   structure can vary significantly. This should probably either become a required field
 //   in the future, or maybe the "semantic meaning" can be utilized here.
 fn default_match_fields() -> Vec<String> {
-    vec![
-        log_schema().timestamp_key().into(),
+    let mut fields = vec![
         log_schema().host_key().into(),
         log_schema().message_key().into(),
-    ]
+    ];
+    if let Some(timestamp_key) = log_schema().timestamp_key() {
+        fields.push(timestamp_key.to_string());
+    }
+    fields
 }
 
 impl DedupeConfig {
@@ -139,6 +143,7 @@ impl GenerateConfig for DedupeConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "dedupe")]
 impl TransformConfig for DedupeConfig {
     async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
         Ok(Transform::event_task(Dedupe::new(self.clone())))
@@ -148,8 +153,16 @@ impl TransformConfig for DedupeConfig {
         Input::log()
     }
 
-    fn outputs(&self, merged_definition: &schema::Definition, _: LogNamespace) -> Vec<Output> {
-        vec![Output::default(DataType::Log).with_schema_definition(merged_definition.clone())]
+    fn outputs(
+        &self,
+        _: enrichment::TableRegistry,
+        input_definitions: &[(OutputId, schema::Definition)],
+        _: LogNamespace,
+    ) -> Vec<TransformOutput> {
+        vec![TransformOutput::new(
+            DataType::Log,
+            clone_input_definitions(input_definitions),
+        )]
     }
 }
 
@@ -271,10 +284,11 @@ impl TaskTransform<Event> for Dedupe {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeMap;
+    use std::{collections::BTreeMap, sync::Arc};
 
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
+    use vector_common::config::ComponentKey;
 
     use crate::{
         event::{Event, LogEvent, Value},
@@ -347,12 +361,16 @@ mod tests {
             // First event should always be passed through as-is.
             tx.send(event1.clone()).await.unwrap();
             let new_event = out.recv().await.unwrap();
+
+            event1.set_source_id(Arc::new(ComponentKey::from("in")));
             assert_eq!(new_event, event1);
 
             // Second event differs in matched field so should be output even though it
             // has the same value for unmatched field.
             tx.send(event2.clone()).await.unwrap();
             let new_event = out.recv().await.unwrap();
+
+            event2.set_source_id(Arc::new(ComponentKey::from("in")));
             assert_eq!(new_event, event2);
 
             // Third event has the same value for "matched" as first event, so it should be dropped.
@@ -393,12 +411,16 @@ mod tests {
             // First event should always be passed through as-is.
             tx.send(event1.clone()).await.unwrap();
             let new_event = out.recv().await.unwrap();
+
+            event1.set_source_id(Arc::new(ComponentKey::from("in")));
             assert_eq!(new_event, event1);
 
             // Second event has a different matched field name with the same value,
             // so it should not be considered a dupe
             tx.send(event2.clone()).await.unwrap();
             let new_event = out.recv().await.unwrap();
+
+            event2.set_source_id(Arc::new(ComponentKey::from("in")));
             assert_eq!(new_event, event2);
 
             drop(tx);
@@ -442,6 +464,8 @@ mod tests {
             // First event should always be passed through as-is.
             tx.send(event1.clone()).await.unwrap();
             let new_event = out.recv().await.unwrap();
+
+            event1.set_source_id(Arc::new(ComponentKey::from("in")));
             assert_eq!(new_event, event1);
 
             // Second event is the same just with different field order, so it
@@ -485,18 +509,24 @@ mod tests {
             // First event should always be passed through as-is.
             tx.send(event1.clone()).await.unwrap();
             let new_event = out.recv().await.unwrap();
+
+            event1.set_source_id(Arc::new(ComponentKey::from("in")));
             assert_eq!(new_event, event1);
 
             // Second event gets output because it's not a dupe. This causes the first
             // Event to be evicted from the cache.
             tx.send(event2.clone()).await.unwrap();
             let new_event = out.recv().await.unwrap();
+
+            event2.set_source_id(Arc::new(ComponentKey::from("in")));
             assert_eq!(new_event, event2);
 
             // Third event is a dupe but gets output anyway because the first
             // event has aged out of the cache.
             tx.send(event1.clone()).await.unwrap();
             let new_event = out.recv().await.unwrap();
+
+            event1.set_source_id(Arc::new(ComponentKey::from("in")));
             assert_eq!(new_event, event1);
 
             drop(tx);
@@ -536,12 +566,16 @@ mod tests {
             // First event should always be passed through as-is.
             tx.send(event1.clone()).await.unwrap();
             let new_event = out.recv().await.unwrap();
+
+            event1.set_source_id(Arc::new(ComponentKey::from("in")));
             assert_eq!(new_event, event1);
 
             // Second event should also get passed through even though the string
             // representations of "matched" are the same.
             tx.send(event2.clone()).await.unwrap();
             let new_event = out.recv().await.unwrap();
+
+            event2.set_source_id(Arc::new(ComponentKey::from("in")));
             assert_eq!(new_event, event2);
 
             drop(tx);
@@ -585,12 +619,16 @@ mod tests {
             // First event should always be passed through as-is.
             tx.send(event1.clone()).await.unwrap();
             let new_event = out.recv().await.unwrap();
+
+            event1.set_source_id(Arc::new(ComponentKey::from("in")));
             assert_eq!(new_event, event1);
 
             // Second event should also get passed through even though the string
             // representations of "matched" are the same.
             tx.send(event2.clone()).await.unwrap();
             let new_event = out.recv().await.unwrap();
+
+            event2.set_source_id(Arc::new(ComponentKey::from("in")));
             assert_eq!(new_event, event2);
 
             drop(tx);
@@ -622,17 +660,21 @@ mod tests {
             let mut event1 = Event::Log(LogEvent::from("message"));
             event1.as_mut_log().insert("matched", Value::Null);
 
-            let event2 = Event::Log(LogEvent::from("message"));
+            let mut event2 = Event::Log(LogEvent::from("message"));
 
             // First event should always be passed through as-is.
             tx.send(event1.clone()).await.unwrap();
             let new_event = out.recv().await.unwrap();
+
+            event1.set_source_id(Arc::new(ComponentKey::from("in")));
             assert_eq!(new_event, event1);
 
             // Second event should also get passed through as null is different than
             // missing
             tx.send(event2.clone()).await.unwrap();
             let new_event = out.recv().await.unwrap();
+
+            event2.set_source_id(Arc::new(ComponentKey::from("in")));
             assert_eq!(new_event, event2);
 
             drop(tx);

@@ -111,10 +111,10 @@ async fn ensure_pipeline_in_params() {
 
     let config = ElasticsearchConfig {
         endpoints: vec![http_server()],
-        bulk: Some(BulkConfig {
+        bulk: BulkConfig {
             index,
             ..Default::default()
-        }),
+        },
         pipeline: Some(pipeline.clone()),
         batch: batch_settings(),
         ..Default::default()
@@ -131,10 +131,10 @@ async fn structures_events_correctly() {
     let index = gen_index();
     let config = ElasticsearchConfig {
         endpoints: vec![http_server()],
-        bulk: Some(BulkConfig {
+        bulk: BulkConfig {
             index: index.clone(),
             ..Default::default()
-        }),
+        },
         doc_type: "log_lines".to_string(),
         id_key: Some("my_id".into()),
         compression: Compression::None,
@@ -155,7 +155,12 @@ async fn structures_events_correctly() {
     input_event.insert("foo", "bar");
     drop(batch);
 
-    let timestamp = input_event[crate::config::log_schema().timestamp_key()].clone();
+    let timestamp = input_event[crate::config::log_schema()
+        .timestamp_key()
+        .unwrap()
+        .to_string()
+        .as_str()]
+    .clone();
 
     run_and_assert_sink_compliance(
         sink,
@@ -219,7 +224,7 @@ async fn auto_version_http() {
         batch: batch_settings(),
         ..Default::default()
     };
-    let _ = ElasticsearchCommon::parse_single(&config)
+    _ = ElasticsearchCommon::parse_single(&config)
         .await
         .expect("Config error");
 }
@@ -244,7 +249,7 @@ async fn auto_version_https() {
         batch: batch_settings(),
         ..Default::default()
     };
-    let _ = ElasticsearchCommon::parse_single(&config)
+    _ = ElasticsearchCommon::parse_single(&config)
         .await
         .expect("Config error");
 }
@@ -257,6 +262,7 @@ async fn auto_version_aws() {
         auth: Some(ElasticsearchAuth::Aws(AwsAuthentication::Default {
             load_timeout_secs: Some(5),
             imds: ImdsAuthentication::default(),
+            region: None,
         })),
         endpoints: vec![aws_server()],
         aws: Some(RegionOrEndpoint::with_region(String::from("localstack"))),
@@ -265,7 +271,7 @@ async fn auto_version_aws() {
         ..Default::default()
     };
 
-    let _ = ElasticsearchCommon::parse_single(&config)
+    _ = ElasticsearchCommon::parse_single(&config)
         .await
         .expect("Config error");
 }
@@ -341,6 +347,7 @@ async fn insert_events_on_aws() {
             auth: Some(ElasticsearchAuth::Aws(AwsAuthentication::Default {
                 load_timeout_secs: Some(5),
                 imds: ImdsAuthentication::default(),
+                region: None,
             })),
             endpoints: vec![aws_server()],
             aws: Some(RegionOrEndpoint::with_region(String::from("localstack"))),
@@ -363,6 +370,7 @@ async fn insert_events_on_aws_with_compression() {
             auth: Some(ElasticsearchAuth::Aws(AwsAuthentication::Default {
                 load_timeout_secs: Some(5),
                 imds: ImdsAuthentication::default(),
+                region: None,
             })),
             endpoints: vec![aws_server()],
             aws: Some(RegionOrEndpoint::with_region(String::from("localstack"))),
@@ -422,10 +430,10 @@ async fn insert_events_in_data_stream() {
     let cfg = ElasticsearchConfig {
         endpoints: vec![http_server()],
         mode: ElasticsearchMode::DataStream,
-        bulk: Some(BulkConfig {
+        bulk: BulkConfig {
             index: Template::try_from(stream_index.clone()).expect("unable to parse template"),
             ..Default::default()
-        }),
+        },
         batch: batch_settings(),
         ..Default::default()
     };
@@ -464,10 +472,10 @@ async fn distributed_insert_events() {
         batch: batch_settings(),
         ..Default::default()
     };
-    config.bulk = Some(BulkConfig {
+    config.bulk = BulkConfig {
         index: gen_index(),
         ..Default::default()
-    });
+    };
     run_insert_tests_with_multiple_endpoints(&config).await;
 }
 
@@ -495,10 +503,10 @@ async fn distributed_insert_events_failover() {
         batch: batch_settings(),
         ..Default::default()
     };
-    config.bulk = Some(BulkConfig {
+    config.bulk = BulkConfig {
         index: gen_index(),
         ..Default::default()
-    });
+    };
     run_insert_tests_with_multiple_endpoints(&config).await;
 }
 
@@ -507,10 +515,10 @@ async fn run_insert_tests(
     break_events: bool,
     status: BatchStatus,
 ) {
-    config.bulk = Some(BulkConfig {
+    config.bulk = BulkConfig {
         index: gen_index(),
         ..Default::default()
-    });
+    };
     run_insert_tests_with_config(&config, break_events, status).await;
 }
 
@@ -543,7 +551,7 @@ async fn run_insert_tests_with_config(
             "{}",
             Utc::now().format(".ds-logs-generic-default-%Y.%m.%d-000001")
         ),
-        ElasticsearchMode::Bulk => config.bulk.as_ref().unwrap().index.to_string(),
+        ElasticsearchMode::Bulk => config.bulk.index.to_string(),
     };
     let base_url = common.base_url.clone();
 
@@ -623,7 +631,7 @@ async fn run_insert_tests_with_config(
                 obj.remove("data_stream");
                 // Un-rewrite the timestamp field
                 let timestamp = obj.remove(DATA_STREAM_TIMESTAMP_KEY).unwrap();
-                obj.insert(log_schema().timestamp_key().into(), timestamp);
+                obj.insert(log_schema().timestamp_key().unwrap().to_string(), timestamp);
             }
             assert!(input.contains(hit));
         }
@@ -641,7 +649,7 @@ async fn run_insert_tests_with_multiple_endpoints(config: &ElasticsearchConfig) 
             "{}",
             Utc::now().format(".ds-logs-generic-default-%Y.%m.%d-000001")
         ),
-        ElasticsearchMode::Bulk => config.bulk.as_ref().unwrap().index.to_string(),
+        ElasticsearchMode::Bulk => config.bulk.index.to_string(),
     };
 
     let (sink, healthcheck) = config
@@ -664,7 +672,7 @@ async fn run_insert_tests_with_multiple_endpoints(config: &ElasticsearchConfig) 
 
     // make sure writes are all visible
     for common in commons {
-        let _ = flush(common).await;
+        _ = flush(common).await;
     }
 
     let client = create_http_client();

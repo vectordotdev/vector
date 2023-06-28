@@ -1,6 +1,6 @@
 [package]
 name = "vector"
-version = "0.28.0"
+version = "0.31.0"
 authors = ["Vector Contributors <vector@datadoghq.com>"]
 edition = "2021"
 description = "A lightweight and ultra-fast tool for building observability pipelines"
@@ -10,6 +10,7 @@ readme = "README.md"
 publish = false
 default-run = "vector"
 autobenches = false # our benchmarks are not runnable on their own either way
+# Minimum supported rust version
 rust-version = "1.66.0"
 
 [[bin]]
@@ -85,22 +86,19 @@ depends = ""
 members = [
   ".",
   "lib/codecs",
-  "lib/datadog/filter",
-  "lib/datadog/grok",
-  "lib/datadog/search-syntax",
   "lib/dnsmsg-parser",
+  "lib/docs-renderer",
   "lib/enrichment",
   "lib/fakedata",
   "lib/file-source",
   "lib/k8s-e2e-tests",
   "lib/k8s-test-framework",
   "lib/loki-logproto",
-  "lib/lookup",
+  "lib/vector-lookup",
   "lib/portpicker",
   "lib/prometheus-parser",
   "lib/opentelemetry-proto",
   "lib/tracing-limit",
-  "lib/value",
   "lib/vector-api-client",
   "lib/vector-buffers",
   "lib/vector-common",
@@ -108,17 +106,11 @@ members = [
   "lib/vector-config-common",
   "lib/vector-config-macros",
   "lib/vector-core",
-  "lib/vector-vrl-functions",
-  "lib/vrl/cli",
-  "lib/vrl/compiler",
-  "lib/vrl/core",
-  "lib/vrl/diagnostic",
-  "lib/vrl/parser",
-  "lib/vrl/stdlib",
-  "lib/vrl/tests",
-  "lib/vrl/proptests",
-  "lib/vrl/vrl",
-  "lib/vrl/web-playground",
+  "lib/vector-lookup",
+  "lib/vector-vrl/cli",
+  "lib/vector-vrl/functions",
+  "lib/vector-vrl/tests",
+  "lib/vector-vrl/web-playground",
   "vdev",
 ]
 
@@ -129,12 +121,11 @@ dnsmsg-parser = { path = "lib/dnsmsg-parser", optional = true }
 enrichment = { path = "lib/enrichment" }
 fakedata = { path = "lib/fakedata", optional = true }
 file-source = { path = "lib/file-source", optional = true }
-lookup = { path = "lib/lookup" }
+lookup = { package = "vector-lookup", path = "lib/vector-lookup" }
 portpicker = { path = "lib/portpicker" }
 prometheus-parser = { path = "lib/prometheus-parser", optional = true }
 opentelemetry-proto = { path = "lib/opentelemetry-proto", optional = true }
 tracing-limit = { path = "lib/tracing-limit" }
-value = { path = "lib/value" }
 vector-api-client = { path = "lib/vector-api-client", optional = true }
 vector-buffers = { path = "lib/vector-buffers", default-features = false }
 vector-common = { path = "lib/vector-common" }
@@ -142,48 +133,48 @@ vector-config = { path = "lib/vector-config" }
 vector-config-common = { path = "lib/vector-config-common" }
 vector-config-macros = { path = "lib/vector-config-macros" }
 vector-core = { path = "lib/vector-core", default-features = false, features = ["vrl"] }
-vector-vrl-functions = { path = "lib/vector-vrl-functions" }
-vrl-cli = { path = "lib/vrl/cli", optional = true }
+vector-vrl-functions = { path = "lib/vector-vrl/functions" }
 loki-logproto = { path = "lib/loki-logproto", optional = true }
 
 # Tokio / Futures
-async-stream = { version = "0.3.3", default-features = false }
-async-trait = { version = "0.1.64", default-features = false }
-futures = { version = "0.3.26", default-features = false, features = ["compat", "io-compat"], package = "futures" }
-tokio = { version = "1.25.0", default-features = false, features = ["full"] }
+async-stream = { version = "0.3.5", default-features = false }
+async-trait = { version = "0.1.68", default-features = false }
+futures = { version = "0.3.28", default-features = false, features = ["compat", "io-compat"], package = "futures" }
+tokio = { version = "1.28.2", default-features = false, features = ["full"] }
 tokio-openssl = { version = "0.6.3", default-features = false }
-tokio-stream = { version = "0.1.11", default-features = false, features = ["net", "sync", "time"] }
+tokio-stream = { version = "0.1.14", default-features = false, features = ["net", "sync", "time"] }
 tokio-util = { version = "0.7", default-features = false, features = ["io", "time"] }
-console-subscriber = { version = "0.1.8", default-features = false, optional = true }
+console-subscriber = { version = "0.1.9", default-features = false, optional = true }
 
 # Tracing
 tracing = { version = "0.1.34", default-features = false }
 tracing-core = { version = "0.1.26", default-features = false }
 tracing-futures = { version = "0.2.5", default-features = false, features = ["futures-03"] }
-tracing-subscriber = { version = "0.3.16", default-features = false, features = ["ansi", "env-filter", "fmt", "json", "registry", "tracing-log"] }
+tracing-subscriber = { version = "0.3.17", default-features = false, features = ["ansi", "env-filter", "fmt", "json", "registry", "tracing-log"] }
 tracing-tower = { git = "https://github.com/tokio-rs/tracing", default-features = false, rev = "e0642d949891546a3bb7e47080365ee7274f05cd" }
 
 # Metrics
-metrics = "0.20.1"
-metrics-tracing-context = { version = "0.12.0", default-features = false }
+metrics = "0.21.0"
+metrics-tracing-context = { version = "0.14.0", default-features = false }
 
 # AWS - Official SDK
-aws-sdk-s3 = { version = "0.23.0", default-features = false, features = ["native-tls"], optional = true }
-aws-sdk-sqs = { version = "0.23.0", default-features = false, features = ["native-tls"], optional = true }
-aws-sdk-cloudwatch = { version = "0.23.0", default-features = false, features = ["native-tls"], optional = true }
-aws-sdk-cloudwatchlogs = { version = "0.23.0", default-features = false, features = ["native-tls"], optional = true }
-aws-sdk-elasticsearch = {version = "0.23.0", default-features = false, features = ["native-tls"], optional = true }
-aws-sdk-firehose = { version = "0.23.0", default-features = false, features = ["native-tls"], optional = true }
-aws-sdk-kinesis = { version = "0.23.0", default-features = false, features = ["native-tls"], optional = true }
-aws-types = { version = "0.53.0", default-features = false, optional = true }
-aws-sigv4 = { version = "0.53.0", default-features = false, features = ["sign-http"], optional = true }
-aws-config = { version = "0.53.0", default-features = false, features = ["native-tls"], optional = true }
-aws-credential-types = { version = "0.53.0", default-features = false, features = ["hardcoded-credentials"], optional = true }
-aws-smithy-async = { version = "0.53.1", default-features = false, optional = true }
-aws-smithy-client = { version = "0.53.1", default-features = false, features = ["client-hyper"], optional = true}
-aws-smithy-http = { version = "0.53.1", default-features = false, features = ["event-stream"], optional = true }
-aws-smithy-http-tower = { version = "0.54.1", default-features = false, optional = true }
-aws-smithy-types = { version = "0.53.1", default-features = false, optional = true }
+# depending on a fork to circumvent https://github.com/awslabs/aws-sdk-rust/issues/749
+aws-sdk-s3 = { git = "https://github.com/vectordotdev/aws-sdk-rust", rev = "3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670", default-features = false, features = ["native-tls"], optional = true }
+aws-sdk-sqs = { git = "https://github.com/vectordotdev/aws-sdk-rust", rev = "3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670", default-features = false, features = ["native-tls"], optional = true }
+aws-sdk-cloudwatch = { git = "https://github.com/vectordotdev/aws-sdk-rust", rev = "3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670", default-features = false, features = ["native-tls"], optional = true }
+aws-sdk-cloudwatchlogs = { git = "https://github.com/vectordotdev/aws-sdk-rust", rev = "3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670", default-features = false, features = ["native-tls"], optional = true }
+aws-sdk-elasticsearch = { git = "https://github.com/vectordotdev/aws-sdk-rust", rev = "3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670", default-features = false, features = ["native-tls"], optional = true }
+aws-sdk-firehose = { git = "https://github.com/vectordotdev/aws-sdk-rust", rev = "3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670", default-features = false, features = ["native-tls"], optional = true }
+aws-sdk-kinesis = { git = "https://github.com/vectordotdev/aws-sdk-rust", rev = "3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670", default-features = false, features = ["native-tls"], optional = true }
+aws-types = { git = "https://github.com/vectordotdev/aws-sdk-rust", rev = "3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670", default-features = false, optional = true }
+aws-sigv4 = { git = "https://github.com/vectordotdev/aws-sdk-rust", rev = "3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670", default-features = false, features = ["sign-http"], optional = true }
+aws-config = { git = "https://github.com/vectordotdev/aws-sdk-rust", rev = "3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670", default-features = false, features = ["native-tls"], optional = true }
+aws-credential-types = { git = "https://github.com/vectordotdev/aws-sdk-rust", rev = "3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670", default-features = false, features = ["hardcoded-credentials"], optional = true }
+aws-smithy-async = { git = "https://github.com/vectordotdev/aws-sdk-rust", rev = "3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670", default-features = false, optional = true }
+aws-smithy-client = { git = "https://github.com/vectordotdev/aws-sdk-rust", rev = "3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670", default-features = false, features = ["client-hyper"], optional = true}
+aws-smithy-http = { git = "https://github.com/vectordotdev/aws-sdk-rust", rev = "3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670", default-features = false, features = ["event-stream"], optional = true }
+aws-smithy-http-tower = { git = "https://github.com/vectordotdev/aws-sdk-rust", rev = "3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670", default-features = false, optional = true }
+aws-smithy-types = { git = "https://github.com/vectordotdev/aws-sdk-rust", rev = "3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670", default-features = false, optional = true }
 
 # Azure
 azure_core = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "b4544d4920fa3064eb921340054cd9cc130b7664", default-features = false, features = ["enable_reqwest"], optional = true }
@@ -191,139 +182,141 @@ azure_identity = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev 
 azure_storage = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "b4544d4920fa3064eb921340054cd9cc130b7664", default-features = false, optional = true }
 azure_storage_blobs = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "b4544d4920fa3064eb921340054cd9cc130b7664", default-features = false, optional = true }
 
+# OpenDAL
+opendal = {version = "0.37", default-features = false, features = ["native-tls", "services-webhdfs"], optional = true}
+
 # Tower
 tower = { version = "0.4.13", default-features = false, features = ["buffer", "limit", "retry", "timeout", "util", "balance", "discover"] }
-tower-http = { version = "0.3.5", default-features = false, features = ["decompression-gzip"]}
+tower-http = { version = "0.4.1", default-features = false, features = ["decompression-gzip"]}
 # Serde
-serde = { version = "1.0.152", default-features = false, features = ["derive"] }
+serde = { version = "1.0.164", default-features = false, features = ["derive"] }
 serde-toml-merge = { version = "0.3.0", default-features = false }
 serde_bytes = { version = "0.11.9", default-features = false, features = ["std"], optional = true }
-serde_json = { version = "1.0.93", default-features = false, features = ["raw_value"] }
-serde_with = { version = "2.2.0", default-features = false, features = ["macros", "std"] }
-serde_yaml = { version = "0.9.17", default-features = false }
+serde_json = { version = "1.0.99", default-features = false, features = ["raw_value"] }
+serde_with = { version = "2.3.2", default-features = false, features = ["macros", "std"] }
+serde_yaml = { version = "0.9.22", default-features = false }
 
 # Messagepack
 rmp-serde = { version = "1.1.1", default-features = false, optional = true }
 rmpv = { version = "1.0.0", default-features = false, features = ["with-serde"], optional = true }
 
 # Prost
-prost = { version = "0.11.6", default-features = false, features = ["std"] }
-prost-types = { version = "0.11.6", default-features = false, optional = true }
+prost = { version = "0.11", default-features = false, features = ["std"] }
+prost-types = { version = "0.11", default-features = false, optional = true }
 
 # GCP
 goauth = { version = "0.13.1", optional = true }
 smpl_jwt = { version = "0.7.1", default-features = false, optional = true }
 
 # AMQP
-lapin = { version = "2.1.1", default-features = false, optional = true }
+lapin = { version = "2.2.1", default-features = false, features = ["native-tls"], optional = true }
 
 # API
-async-graphql = { version = "5.0.6", default-features = false, optional = true, features = ["chrono"] }
-async-graphql-warp = { version = "5.0.6", default-features = false, optional = true }
-itertools = { version = "0.10.5", default-features = false, optional = true }
+async-graphql = { version = "5.0.10", default-features = false, optional = true, features = ["chrono"] }
+async-graphql-warp = { version = "5.0.10", default-features = false, optional = true }
+itertools = { version = "0.11.0", default-features = false, optional = true }
 
 # API client
-crossterm = { version = "0.26.0", default-features = false, features = ["event-stream"], optional = true }
+crossterm = { version = "0.26.1", default-features = false, features = ["event-stream"], optional = true }
 num-format = { version = "0.4.4", default-features = false, features = ["with-num-bigint"], optional = true }
 number_prefix = { version = "0.4.0", default-features = false, features = ["std"], optional = true }
 tui = { version = "0.19.0", optional = true, default-features = false, features = ["crossterm"] }
 
 # Datadog Pipelines
-datadog-filter = { path = "lib/datadog/filter" }
-datadog-search-syntax = { path = "lib/datadog/search-syntax" }
+
 hex = { version = "0.4.3", default-features = false, optional = true }
-sha2 = { version = "0.10.6", default-features = false, optional = true }
+sha2 = { version = "0.10.7", default-features = false, optional = true }
 
 # VRL Lang
-vrl = { path = "lib/vrl/vrl" }
-vrl-stdlib = { path = "lib/vrl/stdlib" }
+vrl = { package = "vrl", version = "0.4.0", features = ["cli", "test"] }
 
 # External libs
 arc-swap = { version = "1.6", default-features = false, optional = true }
-async-compression = { version = "0.3.15", default-features = false, features = ["tokio", "gzip", "zstd"], optional = true }
+async-compression = { version = "0.4.0", default-features = false, features = ["tokio", "gzip", "zstd"], optional = true }
 apache-avro = { version = "0.14.0", default-features = false, optional = true }
-axum = { version = "0.6.6", default-features = false, features = ["http1", "json"] }
-base64 = { version = "0.21.0", default-features = false, optional = true }
+axum = { version = "0.6.18", default-features = false }
+base64 = { version = "0.21.2", default-features = false, optional = true }
 bloom = { version = "0.3.2", default-features = false, optional = true }
-bollard = { version = "0.14.0", default-features = false, features = ["ssl", "chrono"] }
+bollard = { version = "0.14.0", default-features = false, features = ["ssl", "chrono"], optional = true }
 bytes = { version = "1.4.0", default-features = false, features = ["serde"] }
-bytesize = { version = "1.1.0", default-features = false }
-chrono = { version = "0.4.22", default-features = false, features = ["serde"] }
+bytesize = { version = "1.2.0", default-features = false }
+chrono = { version = "0.4.26", default-features = false, features = ["serde"] }
 cidr-utils = { version = "0.5.10", default-features = false }
-clap = { version = "4.1.6", default-features = false, features = ["derive", "error-context", "env", "help", "std", "string", "usage", "wrap_help"] }
+clap = { version = "4.1.14", default-features = false, features = ["derive", "error-context", "env", "help", "std", "string", "usage", "wrap_help"] }
 colored = { version = "2.0.0", default-features = false }
 csv = { version = "1.2", default-features = false }
 derivative = { version = "2.2.0", default-features = false }
 dirs-next = { version = "2.0.0", default-features = false, optional = true }
-dyn-clone = { version = "1.0.10", default-features = false }
+dyn-clone = { version = "1.0.11", default-features = false }
 encoding_rs = { version = "0.8.32", default-features = false, features = ["serde"] }
 enum_dispatch = { version = "0.3.11", default-features = false }
 exitcode = { version = "1.1.2", default-features = false }
-flate2 = { version = "1.0.25", default-features = false, features = ["default"] }
-futures-util = { version = "0.3.25", default-features = false }
+flate2 = { version = "1.0.26", default-features = false, features = ["default"] }
+futures-util = { version = "0.3.28", default-features = false }
 glob = { version = "0.3.1", default-features = false }
 governor = { version = "0.5.1", default-features = false, features = ["dashmap", "jitter", "std"], optional = true }
 grok = { version = "2.0.0", default-features = false, optional = true }
-h2 = { version = "0.3.15", default-features = false, optional = true }
+h2 = { version = "0.3.20", default-features = false, optional = true }
 hash_hasher = { version = "2.0.0", default-features = false }
-hashbrown = { version = "0.13.2", default-features = false, optional = true, features = ["ahash"] }
+hashbrown = { version = "0.14.0", default-features = false, optional = true, features = ["ahash"] }
 headers = { version = "0.3.8", default-features = false }
 hostname = { version = "0.3.1", default-features = false }
-http = { version = "0.2.8", default-features = false }
+http = { version = "0.2.9", default-features = false }
 http-body = { version = "0.4.5", default-features = false }
-hyper = { version = "0.14.24", default-features = false, features = ["client", "runtime", "http1", "http2", "server", "stream"] }
+hyper = { version = "0.14.26", default-features = false, features = ["client", "runtime", "http1", "http2", "server", "stream"] }
 hyper-openssl = { version = "0.9.2", default-features = false }
 hyper-proxy = { version = "0.9.1", default-features = false, features = ["openssl-tls"] }
-indexmap = { version = "~1.9.2", default-features = false, features = ["serde"] }
-infer = { version = "0.12.0", default-features = false, optional = true}
-indoc = { version = "2.0.0", default-features = false }
-inventory = { version = "0.3.3", default-features = false }
-k8s-openapi = { version = "0.16.0", default-features = false, features = ["api", "v1_19"], optional = true }
-kube = { version = "0.75.0", default-features = false, features = ["client", "native-tls", "runtime"], optional = true }
-listenfd = { version = "1.0.0", default-features = false, optional = true }
+indexmap = { version = "~1.9.3", default-features = false, features = ["serde"] }
+infer = { version = "0.14.0", default-features = false, optional = true}
+indoc = { version = "2.0.1", default-features = false }
+inventory = { version = "0.3.6", default-features = false }
+k8s-openapi = { version = "0.18.0", default-features = false, features = ["api", "v1_26"], optional = true }
+kube = { version = "0.82.0", default-features = false, features = ["client", "openssl-tls", "runtime"], optional = true }
+listenfd = { version = "1.0.1", default-features = false, optional = true }
 logfmt = { version = "0.0.2", default-features = false, optional = true }
-lru = { version = "0.9.0", default-features = false, optional = true }
+lru = { version = "0.10.0", default-features = false, optional = true }
 maxminddb = { version = "0.23.0", default-features = false, optional = true }
 md-5 = { version = "0.10", default-features = false, optional = true }
-mongodb = { version = "2.3.1", default-features = false, features = ["tokio-runtime"], optional = true }
+mongodb = { version = "2.6.0", default-features = false, features = ["tokio-runtime"], optional = true }
 nats = { version = "0.24.0", default-features = false, optional = true }
-nkeys = { version = "0.2.0", default-features = false, optional = true }
+nkeys = { version = "0.3.0", default-features = false, optional = true }
 nom = { version = "7.1.3", default-features = false, optional = true }
-notify = { version = "5.1.0", default-features = false, features = ["macos_fsevent"] }
-once_cell = { version = "1.17", default-features = false }
-openssl = { version = "0.10.45", default-features = false, features = ["vendored"] }
+notify = { version = "6.0.1", default-features = false, features = ["macos_fsevent"] }
+once_cell = { version = "1.18", default-features = false }
+openssl = { version = "0.10.55", default-features = false, features = ["vendored"] }
 openssl-probe = { version = "0.1.5", default-features = false }
-ordered-float = { version = "3.4.0", default-features = false }
-paste = "1.0.11"
-percent-encoding = { version = "2.2.0", default-features = false }
-pin-project = { version = "1.0.12", default-features = false }
+ordered-float = { version = "3.7.0", default-features = false }
+paste = "1.0.12"
+percent-encoding = { version = "2.3.0", default-features = false }
+pin-project = { version = "1.1.0", default-features = false }
 postgres-openssl = { version = "0.5.0", default-features = false, features = ["runtime"], optional = true }
-pulsar = { version = "5.1.0", default-features = false, features = ["tokio-runtime", "auth-oauth2", "flate2", "lz4", "snap", "zstd"], optional = true }
+pulsar = { version = "6.0.1", default-features = false, features = ["tokio-runtime", "auth-oauth2", "flate2", "lz4", "snap", "zstd"], optional = true }
 rand = { version = "0.8.5", default-features = false, features = ["small_rng"] }
 rand_distr = { version = "0.4.3", default-features = false }
-rdkafka = { version = "0.29.0", default-features = false, features = ["tokio", "libz", "ssl", "zstd"], optional = true }
-redis = { version = "0.22.3", default-features = false, features = ["connection-manager", "tokio-comp", "tokio-native-tls-comp"], optional = true }
-regex = { version = "1.7.1", default-features = false, features = ["std", "perf"] }
+rdkafka = { version = "0.32.2", default-features = false, features = ["tokio", "libz", "ssl", "zstd"], optional = true }
+redis = { version = "0.23.0", default-features = false, features = ["connection-manager", "tokio-comp", "tokio-native-tls-comp"], optional = true }
+regex = { version = "1.8.4", default-features = false, features = ["std", "perf"] }
 roaring = { version = "0.10.1", default-features = false, optional = true }
 seahash = { version = "4.1.0", default-features = false }
-semver = { version = "1.0.16", default-features = false, features = ["serde", "std"], optional = true }
+semver = { version = "1.0.17", default-features = false, features = ["serde", "std"], optional = true }
 smallvec = { version = "1", default-features = false, features = ["union", "serde"] }
 snafu = { version = "0.7.4", default-features = false, features = ["futures"] }
 snap = { version = "1.1.0", default-features = false, optional = true }
-socket2 = { version = "0.4.7", default-features = false }
+socket2 = { version = "0.5.3", default-features = false }
 stream-cancel = { version = "0.8.1", default-features = false }
 strip-ansi-escapes = { version = "0.1.1", default-features = false }
-syslog = { version = "6.0.1", default-features = false, optional = true }
+syslog = { version = "6.1.0", default-features = false, optional = true }
 tikv-jemallocator = { version = "0.5.0", default-features = false, optional = true }
 tokio-postgres = { version = "0.7.7", default-features = false, features = ["runtime", "with-chrono-0_4"], optional = true }
-tokio-tungstenite = {version = "0.18.0", default-features = false, features = ["connect"], optional = true}
-toml = { version = "0.7.2", default-features = false, features = ["parse", "display"] }
-tonic = { version = "0.8", optional = true, default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "gzip"] }
+tokio-tungstenite = {version = "0.19.0", default-features = false, features = ["connect"], optional = true}
+toml = { version = "0.7.5", default-features = false, features = ["parse", "display"] }
+tonic = { version = "0.9", optional = true, default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "gzip"] }
 trust-dns-proto = { version = "0.22.0", default-features = false, features = ["dnssec"], optional = true }
-typetag = { version = "0.2.5", default-features = false }
-url = { version = "2.3.1", default-features = false, features = ["serde"] }
+typetag = { version = "0.2.8", default-features = false }
+url = { version = "2.4.0", default-features = false, features = ["serde"] }
 uuid = { version = "1", default-features = false, features = ["serde", "v4"] }
-warp = { version = "0.3.3", default-features = false }
+warp = { version = "0.3.5", default-features = false }
+zstd = { version = "0.12.3", default-features = false }
 arr_macro = { version = "0.2.1" }
 
 # depending on fork for bumped nix dependency
@@ -331,64 +324,67 @@ arr_macro = { version = "0.2.1" }
 heim = { git = "https://github.com/vectordotdev/heim.git", branch = "update-nix", default-features = false, features = ["disk"] }
 
 # make sure to update the external docs when the Lua version changes
-mlua = { version = "0.8.7", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
+mlua = { version = "0.8.9", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
 
 [target.'cfg(windows)'.dependencies]
-windows-service = "0.5.0"
+windows-service = "0.6.0"
 
 [target.'cfg(unix)'.dependencies]
 atty = { version = "0.2.14", default-features = false }
 nix = { version = "0.26.2", default-features = false, features = ["socket", "signal"] }
 
 [build-dependencies]
-prost-build = { version = "0.11.6", default-features = false, optional = true }
-tonic-build = { version = "0.8", default-features = false, features = ["transport", "prost"], optional = true }
+prost-build = { version = "0.11", default-features = false, optional = true }
+tonic-build = { version = "0.9", default-features = false, features = ["transport", "prost"], optional = true }
 openssl-src = { version = "111", default-features = false, features = ["force-engine"] }
 
 [dev-dependencies]
 approx = "0.5.1"
-assert_cmd = { version = "2.0.8", default-features = false }
+assert_cmd = { version = "2.0.11", default-features = false }
 azure_core = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "b4544d4920fa3064eb921340054cd9cc130b7664", default-features = false, features = ["enable_reqwest", "azurite_workaround"] }
 azure_identity = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "b4544d4920fa3064eb921340054cd9cc130b7664", default-features = false, features = ["enable_reqwest"] }
 azure_storage_blobs = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "b4544d4920fa3064eb921340054cd9cc130b7664", default-features = false, features = ["azurite_workaround"] }
 azure_storage = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "b4544d4920fa3064eb921340054cd9cc130b7664", default-features = false, features = ["azurite_workaround"] }
-base64 = "0.21.0"
-criterion = { version = "0.4.0", features = ["html_reports", "async_tokio"] }
-itertools = { version = "0.10.5", default-features = false }
-libc = "0.2.139"
+base64 = "0.21.2"
+criterion = { version = "0.5.1", features = ["html_reports", "async_tokio"] }
+itertools = { version = "0.11.0", default-features = false, features = ["use_alloc"] }
+libc = "0.2.147"
 similar-asserts = "1.4.2"
-proptest = "1.1"
+proptest = "1.2"
 quickcheck = "1.0.3"
 reqwest = { version = "0.11", features = ["json"] }
-tempfile = "3.3.0"
+tempfile = "3.6.0"
 test-generator = "0.3.1"
 tokio-test = "0.4.2"
-tokio = { version = "1.25.0", features = ["test-util"] }
+tokio = { version = "1.28.2", features = ["test-util"] }
 tower-test = "0.4.0"
-value = { path = "lib/value", features = ["test"] }
 vector-core = { path = "lib/vector-core", default-features = false, features = ["vrl", "test"] }
-wiremock = "0.5.17"
+wiremock = "0.5.19"
 zstd = { version = "0.12.3", default-features = false }
 
 [patch.crates-io]
 # Removes dependency on `time` v0.1
 # https://github.com/chronotope/chrono/pull/578
-chrono = { git = "https://github.com/vectordotdev/chrono.git", branch = "no-default-time-v0.4.22-1" }
+chrono = { git = "https://github.com/vectordotdev/chrono.git", tag = "v0.4.26-no-default-time-1" }
 # The upgrade for `tokio-util` >= 0.6.9 is blocked on https://github.com/vectordotdev/vector/issues/11257.
 tokio-util = { git = "https://github.com/vectordotdev/tokio", branch = "tokio-util-0.7.4-framed-read-continue-on-error" }
+nix = { git = "https://github.com/vectordotdev/nix.git", branch = "memfd/gnu/musl" }
+# The `heim` crates depend on `ntapi` 0.3.7 on Windows, but that version has an
+# unaligned access bug fixed in the following revision.
+ntapi = { git = "https://github.com/MSxDOS/ntapi.git", rev = "24fc1e47677fc9f6e38e5f154e6011dc9b270da6" }
 
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin
-default = ["api", "api-client", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "rdkafka?/gssapi-vendored", "vrl-cli", "enterprise", "component-validation-runner"]
+default = ["api", "api-client", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "rdkafka?/gssapi-vendored", "enterprise", "component-validation-runner"]
 # Default features for `cargo docs`. The same as `default` but without `rdkafka?/gssapi-vendored` which would require installing libsasl in our doc build environment.
-docs = ["api", "api-client", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vrl-cli", "enterprise", "component-validation-runner"]
+docs = ["api", "api-client", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "enterprise", "component-validation-runner"]
 # Default features for *-unknown-linux-* which make use of `cmake` for dependencies
-default-cmake = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "rdkafka?/gssapi-vendored", "vrl-cli", "enterprise"]
+default-cmake = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "rdkafka?/gssapi-vendored", "enterprise"]
 # Default features for *-pc-windows-msvc
 # TODO: Enable SASL https://github.com/vectordotdev/vector/pull/3081#issuecomment-659298042
-default-msvc = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "transforms", "vrl-cli", "enterprise"]
-default-musl = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "rdkafka?/gssapi-vendored", "vrl-cli", "enterprise"]
-default-no-api-client = ["api", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "rdkafka?/gssapi-vendored", "vrl-cli", "enterprise"]
+default-msvc = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "transforms", "enterprise"]
+default-musl = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "rdkafka?/gssapi-vendored", "enterprise"]
+default-no-api-client = ["api", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "rdkafka?/gssapi-vendored", "enterprise"]
 default-no-vrl-cli = ["api", "sinks", "sources", "sources-dnstap", "transforms", "unix", "rdkafka?/gssapi-vendored", "enterprise"]
 tokio-console = ["dep:console-subscriber", "tokio/tracing"]
 
@@ -398,16 +394,16 @@ all-metrics = ["sinks-metrics", "sources-metrics", "transforms-metrics", "enterp
 # Target specific release features.
 # The `make` tasks will select this according to the appropriate triple.
 # Use this section to turn off or on specific features for specific triples.
-target-aarch64-unknown-linux-gnu = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vrl-cli", "enterprise"]
-target-aarch64-unknown-linux-musl = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vrl-cli", "enterprise"]
-target-armv7-unknown-linux-gnueabihf = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vrl-cli", "enterprise"]
-target-armv7-unknown-linux-musleabihf = ["api", "api-client", "rdkafka?/cmake_build", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "vrl-cli", "enterprise"]
-target-x86_64-unknown-linux-gnu = ["api", "api-client", "rdkafka?/cmake_build", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "rdkafka?/gssapi-vendored", "vrl-cli", "enterprise"]
-target-x86_64-unknown-linux-musl = ["api", "api-client", "rdkafka?/cmake_build", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vrl-cli", "enterprise"]
+target-aarch64-unknown-linux-gnu = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "enterprise"]
+target-aarch64-unknown-linux-musl = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "enterprise"]
+target-armv7-unknown-linux-gnueabihf = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "enterprise"]
+target-armv7-unknown-linux-musleabihf = ["api", "api-client", "rdkafka?/cmake_build", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "enterprise"]
+target-x86_64-unknown-linux-gnu = ["api", "api-client", "rdkafka?/cmake_build", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "rdkafka?/gssapi-vendored", "enterprise"]
+target-x86_64-unknown-linux-musl = ["api", "api-client", "rdkafka?/cmake_build", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "enterprise"]
 # Does not currently build
-target-powerpc64le-unknown-linux-gnu = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vrl-cli", "enterprise"]
+target-powerpc64le-unknown-linux-gnu = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "enterprise"]
 # Currently doesn't build due to lack of support for 64-bit atomics
-target-powerpc-unknown-linux-gnu = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vrl-cli", "enterprise"]
+target-powerpc-unknown-linux-gnu = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "enterprise"]
 
 # Enables features that work only on systems providing `cfg(unix)`
 unix = ["tikv-jemallocator", "allocation-tracing"]
@@ -417,7 +413,7 @@ allocation-tracing = []
 # transforms and sinks should depend on this feature.
 kubernetes = ["dep:k8s-openapi", "dep:kube"]
 
-docker = ["dep:dirs-next"]
+docker = ["dep:bollard", "dep:dirs-next"]
 
 # API
 api = [
@@ -601,7 +597,7 @@ transforms-throttle = ["dep:governor"]
 sinks = ["sinks-logs", "sinks-metrics"]
 sinks-logs = [
   "sinks-amqp",
-  "sinks-apex",
+  "sinks-appsignal",
   "sinks-aws_cloudwatch_logs",
   "sinks-aws_kinesis_firehose",
   "sinks-aws_kinesis_streams",
@@ -614,7 +610,7 @@ sinks-logs = [
   "sinks-chronicle",
   "sinks-clickhouse",
   "sinks-console",
-  "sinks-datadog_archives",
+  "sinks-databend",
   "sinks-datadog_events",
   "sinks-datadog_logs",
   "sinks-datadog_traces",
@@ -626,7 +622,7 @@ sinks-logs = [
   "sinks-humio",
   "sinks-influxdb",
   "sinks-kafka",
-  "sinks-logdna",
+  "sinks-mezmo",
   "sinks-loki",
   "sinks-nats",
   "sinks-new_relic_logs",
@@ -638,9 +634,11 @@ sinks-logs = [
   "sinks-socket",
   "sinks-splunk_hec",
   "sinks-vector",
+  "sinks-webhdfs",
   "sinks-websocket",
 ]
 sinks-metrics = [
+  "sinks-appsignal",
   "sinks-aws_cloudwatch_metrics",
   "sinks-blackhole",
   "sinks-console",
@@ -656,7 +654,7 @@ sinks-metrics = [
 ]
 
 sinks-amqp = ["lapin"]
-sinks-apex = []
+sinks-appsignal = []
 sinks-aws_cloudwatch_logs = ["aws-core", "dep:aws-sdk-cloudwatchlogs"]
 sinks-aws_cloudwatch_metrics = ["aws-core", "dep:aws-sdk-cloudwatch"]
 sinks-aws_kinesis_firehose = ["aws-core", "dep:aws-sdk-firehose"]
@@ -670,7 +668,7 @@ sinks-blackhole = []
 sinks-chronicle = []
 sinks-clickhouse = []
 sinks-console = []
-sinks-datadog_archives = ["sinks-aws_s3", "sinks-azure_blob", "sinks-gcp"]
+sinks-databend = []
 sinks-datadog_events = []
 sinks-datadog_logs = []
 sinks-datadog_metrics = ["protobuf-build"]
@@ -683,14 +681,14 @@ sinks-http = []
 sinks-humio = ["sinks-splunk_hec", "transforms-metric_to_log"]
 sinks-influxdb = []
 sinks-kafka = ["dep:rdkafka"]
-sinks-logdna = []
+sinks-mezmo = []
 sinks-loki = ["loki-logproto"]
 sinks-nats = ["dep:nats", "dep:nkeys"]
 sinks-new_relic_logs = ["sinks-http"]
 sinks-new_relic = []
 sinks-papertrail = ["dep:syslog"]
 sinks-prometheus = ["aws-core", "dep:base64", "dep:prometheus-parser", "dep:snap"]
-sinks-pulsar = ["dep:apache-avro", "dep:pulsar"]
+sinks-pulsar = ["dep:apache-avro", "dep:pulsar", "dep:lru"]
 sinks-redis = ["dep:redis"]
 sinks-sematext = ["sinks-elasticsearch", "sinks-influxdb"]
 sinks-socket = ["sinks-utils-udp"]
@@ -699,6 +697,7 @@ sinks-statsd = ["sinks-utils-udp", "tokio-util/net"]
 sinks-utils-udp = []
 sinks-vector = ["sinks-utils-udp", "dep:tonic", "protobuf-build"]
 sinks-websocket = ["dep:tokio-tungstenite"]
+sinks-webhdfs = ["dep:opendal"]
 
 # Datadog integration
 enterprise = [
@@ -719,12 +718,13 @@ nightly = []
 # Testing-related features
 all-integration-tests = [
   "amqp-integration-tests",
-  "apex-integration-tests",
+  "appsignal-integration-tests",
   "aws-integration-tests",
   "axiom-integration-tests",
   "azure-integration-tests",
   "chronicle-integration-tests",
   "clickhouse-integration-tests",
+  "databend-integration-tests",
   "datadog-agent-integration-tests",
   "datadog-logs-integration-tests",
   "datadog-metrics-integration-tests",
@@ -752,9 +752,11 @@ all-integration-tests = [
   "redis-integration-tests",
   "splunk-integration-tests",
   "dnstap-integration-tests",
+  "webhdfs-integration-tests",
 ]
 
 amqp-integration-tests = ["sources-amqp", "sinks-amqp"]
+appsignal-integration-tests = ["sinks-appsignal"]
 
 aws-integration-tests = [
   "aws-cloudwatch-logs-integration-tests",
@@ -771,7 +773,6 @@ azure-integration-tests = [
   "azure-blob-integration-tests"
 ]
 
-apex-integration-tests = ["sinks-apex"]
 aws-cloudwatch-logs-integration-tests = ["sinks-aws_cloudwatch_logs"]
 aws-cloudwatch-metrics-integration-tests = ["sinks-aws_cloudwatch_metrics"]
 aws-ec2-metadata-integration-tests = ["transforms-aws_ec2_metadata"]
@@ -784,6 +785,7 @@ axiom-integration-tests = ["sinks-axiom"]
 azure-blob-integration-tests = ["sinks-azure_blob"]
 chronicle-integration-tests = ["sinks-gcp"]
 clickhouse-integration-tests = ["sinks-clickhouse"]
+databend-integration-tests = ["sinks-databend"]
 datadog-agent-integration-tests = ["sources-datadog_agent"]
 datadog-logs-integration-tests = ["sinks-datadog_logs"]
 datadog-metrics-integration-tests = ["sinks-datadog_metrics"]
@@ -810,7 +812,8 @@ prometheus-integration-tests = ["sinks-prometheus", "sources-prometheus", "sinks
 pulsar-integration-tests = ["sinks-pulsar"]
 redis-integration-tests = ["sinks-redis", "sources-redis"]
 splunk-integration-tests = ["sinks-splunk_hec"]
-dnstap-integration-tests = ["sources-dnstap"]
+dnstap-integration-tests = ["sources-dnstap", "dep:bollard"]
+webhdfs-integration-tests = ["sinks-webhdfs"]
 disable-resolv-conf = []
 shutdown-tests = ["api", "sinks-blackhole", "sinks-console", "sinks-prometheus", "sources", "transforms-lua", "transforms-remap", "unix"]
 cli-tests = ["sinks-blackhole", "sinks-socket", "sources-demo_logs", "sources-file"]

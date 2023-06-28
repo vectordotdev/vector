@@ -14,7 +14,7 @@ use vector_core::EstimatedJsonEncodedSizeOf;
 
 use self::types::Stats;
 use crate::{
-    config::{self, Output, SourceConfig, SourceContext},
+    config::{SourceConfig, SourceContext, SourceOutput},
     http::HttpClient,
     internal_events::{
         EventStoreDbMetricsHttpError, EventStoreDbStatsParsingError, EventsReceived,
@@ -27,7 +27,10 @@ pub mod types;
 
 /// Configuration for the `eventstoredb_metrics` source.
 #[serde_as]
-#[configurable_component(source("eventstoredb_metrics"))]
+#[configurable_component(source(
+    "eventstoredb_metrics",
+    "Receive metrics from collected by a EventStoreDB."
+))]
 #[derive(Clone, Debug, Default)]
 pub struct EventStoreDbConfig {
     /// Endpoint to scrape stats from.
@@ -38,6 +41,7 @@ pub struct EventStoreDbConfig {
     /// The interval between scrapes, in seconds.
     #[serde(default = "default_scrape_interval_secs")]
     #[serde_as(as = "serde_with::DurationSeconds<u64>")]
+    #[configurable(metadata(docs::human_name = "Scrape Interval"))]
     scrape_interval_secs: Duration,
 
     /// Overrides the default namespace for the metrics emitted by the source.
@@ -58,6 +62,7 @@ pub fn default_endpoint() -> String {
 impl_generate_config_from_default!(EventStoreDbConfig);
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "eventstoredb_metrics")]
 impl SourceConfig for EventStoreDbConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         eventstoredb(
@@ -68,8 +73,8 @@ impl SourceConfig for EventStoreDbConfig {
         )
     }
 
-    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
-        vec![Output::default(config::DataType::Metric)]
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
+        vec![SourceOutput::new_metrics()]
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -132,8 +137,8 @@ fn eventstoredb(
 
                                 events_received.emit(CountByteSize(count, byte_size));
 
-                                if let Err(error) = cx.out.send_batch(metrics).await {
-                                    emit!(StreamClosedError { count, error });
+                                if (cx.out.send_batch(metrics).await).is_err() {
+                                    emit!(StreamClosedError { count });
                                     break;
                                 }
                             }

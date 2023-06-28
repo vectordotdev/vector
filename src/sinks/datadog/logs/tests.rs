@@ -11,28 +11,29 @@ use futures::{
 use http::request::Parts;
 use hyper::StatusCode;
 use indoc::indoc;
-use vector_core::event::{BatchNotifier, BatchStatus, Event, LogEvent};
+use vector_core::{
+    config::{init_telemetry, Tags, Telemetry},
+    event::{BatchNotifier, BatchStatus, Event, LogEvent},
+};
 
 use crate::{
     config::SinkConfig,
     http::HttpError,
     sinks::{
-        datadog::logs::DatadogLogsConfig,
-        datadog::DatadogApiError,
         util::retries::RetryLogic,
         util::test::{build_test_server_status, load_sink},
     },
     test_util::{
         components::{
-            run_and_assert_sink_compliance, run_and_assert_sink_error, COMPONENT_ERROR_TAGS,
-            SINK_TAGS,
+            run_and_assert_data_volume_sink_compliance, run_and_assert_sink_compliance,
+            run_and_assert_sink_error, COMPONENT_ERROR_TAGS, DATA_VOLUME_SINK_TAGS, SINK_TAGS,
         },
         next_addr, random_lines_with_stream,
     },
     tls::TlsError,
 };
 
-use super::service::LogApiRetry;
+use super::{super::DatadogApiError, config::DatadogLogsConfig, service::LogApiRetry};
 
 // The sink must support v1 and v2 API endpoints which have different codes for
 // signaling status. This enum allows us to signal which API endpoint and what
@@ -73,6 +74,13 @@ fn event_with_api_key(msg: &str, key: &str) -> Event {
     e
 }
 
+#[derive(PartialEq)]
+enum TestType {
+    Happy,
+    Telemetry,
+    Error,
+}
+
 /// Starts a test sink with random lines running into it
 ///
 /// This function starts a Datadog Logs sink with a simplistic configuration and
@@ -85,8 +93,20 @@ fn event_with_api_key(msg: &str, key: &str) -> Event {
 async fn start_test_detail(
     api_status: ApiStatus,
     batch_status: BatchStatus,
-    is_error: bool,
+    test_type: TestType,
 ) -> (Vec<String>, Receiver<(http::request::Parts, Bytes)>) {
+    if test_type == TestType::Telemetry {
+        init_telemetry(
+            Telemetry {
+                tags: Tags {
+                    emit_service: true,
+                    emit_source: true,
+                },
+            },
+            true,
+        );
+    }
+
     let config = indoc! {r#"
             default_api_key = "atoken"
             compression = "none"
@@ -97,7 +117,7 @@ async fn start_test_detail(
     // Swap out the endpoint so we can force send it
     // to our local server
     let endpoint = format!("http://{}", addr);
-    config.endpoint = Some(endpoint.clone());
+    config.dd_common.endpoint = Some(endpoint.clone());
 
     let (sink, _) = config.build(cx).await.unwrap();
 
@@ -107,10 +127,12 @@ async fn start_test_detail(
     let (batch, receiver) = BatchNotifier::new_with_receiver();
     let (expected, events) = random_lines_with_stream(100, 10, Some(batch));
 
-    if is_error {
-        run_and_assert_sink_error(sink, events, &COMPONENT_ERROR_TAGS).await;
-    } else {
-        run_and_assert_sink_compliance(sink, events, &SINK_TAGS).await;
+    match test_type {
+        TestType::Happy => run_and_assert_sink_compliance(sink, events, &SINK_TAGS).await,
+        TestType::Error => run_and_assert_sink_error(sink, events, &COMPONENT_ERROR_TAGS).await,
+        TestType::Telemetry => {
+            run_and_assert_data_volume_sink_compliance(sink, events, &DATA_VOLUME_SINK_TAGS).await
+        }
     }
 
     assert_eq!(receiver.await, batch_status);
@@ -122,22 +144,29 @@ async fn start_test_success(
     api_status: ApiStatus,
     batch_status: BatchStatus,
 ) -> (Vec<String>, Receiver<(http::request::Parts, Bytes)>) {
-    start_test_detail(api_status, batch_status, false).await
+    start_test_detail(api_status, batch_status, TestType::Happy).await
+}
+
+async fn start_test_telemetry(
+    api_status: ApiStatus,
+    batch_status: BatchStatus,
+) -> (Vec<String>, Receiver<(http::request::Parts, Bytes)>) {
+    start_test_detail(api_status, batch_status, TestType::Telemetry).await
 }
 
 async fn start_test_error(
     api_status: ApiStatus,
     batch_status: BatchStatus,
 ) -> (Vec<String>, Receiver<(http::request::Parts, Bytes)>) {
-    start_test_detail(api_status, batch_status, true).await
+    start_test_detail(api_status, batch_status, TestType::Error).await
 }
 
-#[tokio::test]
 /// Assert the basic functionality of the sink in good conditions
 ///
 /// This test rigs the sink to return OKv1 to responses, checks that all batches
 /// were delivered and then asserts that every message is able to be
 /// deserialized.
+#[tokio::test]
 async fn smoke() {
     let (expected, rx) = start_test_success(ApiStatus::OKv1, BatchStatus::Delivered).await;
 
@@ -174,6 +203,13 @@ async fn smoke() {
         let delta = Utc::now().timestamp_millis() - timestamp;
         assert!(delta > 0 && delta < 1000);
     }
+}
+
+/// Assert the sink emits source and service tags when run with telemetry configured.
+#[tokio::test]
+async fn telemetry() {
+    let (expected, rx) = start_test_telemetry(ApiStatus::OKv1, BatchStatus::Delivered).await;
+    let _ = rx.take(expected.len()).collect::<Vec<_>>().await;
 }
 
 #[tokio::test]
@@ -236,7 +272,7 @@ async fn api_key_in_metadata_inner(api_status: ApiStatus) {
     let addr = next_addr();
     // Swap out the endpoint so we can force send it to our local server
     let endpoint = format!("http://{}", addr);
-    config.endpoint = Some(endpoint.clone());
+    config.dd_common.endpoint = Some(endpoint.clone());
 
     let (sink, _) = config.build(cx).await.unwrap();
 
@@ -316,7 +352,7 @@ async fn multiple_api_keys_inner(api_status: ApiStatus) {
     // Swap out the endpoint so we can force send it
     // to our local server
     let endpoint = format!("http://{}", addr);
-    config.endpoint = Some(endpoint.clone());
+    config.dd_common.endpoint = Some(endpoint.clone());
 
     let (sink, _) = config.build(cx).await.unwrap();
 
@@ -378,7 +414,7 @@ async fn enterprise_headers_inner(api_status: ApiStatus) {
     let addr = next_addr();
     // Swap out the endpoint so we can force send it to our local server
     let endpoint = format!("http://{}", addr);
-    config.endpoint = Some(endpoint.clone());
+    config.dd_common.endpoint = Some(endpoint.clone());
 
     let (sink, _) = config.build(cx).await.unwrap();
 
@@ -441,7 +477,7 @@ async fn no_enterprise_headers_inner(api_status: ApiStatus) {
     let addr = next_addr();
     // Swap out the endpoint so we can force send it to our local server
     let endpoint = format!("http://{}", addr);
-    config.endpoint = Some(endpoint.clone());
+    config.dd_common.endpoint = Some(endpoint.clone());
 
     let (sink, _) = config.build(cx).await.unwrap();
 

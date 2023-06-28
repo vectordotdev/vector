@@ -5,7 +5,7 @@ use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
 
 use crate::{
-    config::{GenerateConfig, Input, Output, TransformConfig, TransformContext},
+    config::{GenerateConfig, Input, OutputId, TransformConfig, TransformContext, TransformOutput},
     schema,
     transforms::Transform,
 };
@@ -39,7 +39,7 @@ pub struct LuaConfigV1 {
     config: v1::LuaConfig,
 }
 
-/// Marker type for the version two of the configuration for the `lua` transform.
+/// Marker type for version two of the configuration for the `lua` transform.
 #[configurable_component]
 #[derive(Clone, Debug)]
 enum V2 {
@@ -62,7 +62,10 @@ pub struct LuaConfigV2 {
 }
 
 /// Configuration for the `lua` transform.
-#[configurable_component(transform("lua"))]
+#[configurable_component(transform(
+    "lua",
+    "Modify event data using the Lua programming language."
+))]
 #[derive(Clone, Debug)]
 #[serde(untagged)]
 pub enum LuaConfig {
@@ -84,6 +87,7 @@ impl GenerateConfig for LuaConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "lua")]
 impl TransformConfig for LuaConfig {
     async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
         match self {
@@ -99,10 +103,15 @@ impl TransformConfig for LuaConfig {
         }
     }
 
-    fn outputs(&self, merged_definition: &schema::Definition, _: LogNamespace) -> Vec<Output> {
+    fn outputs(
+        &self,
+        _: enrichment::TableRegistry,
+        input_definitions: &[(OutputId, schema::Definition)],
+        _: LogNamespace,
+    ) -> Vec<TransformOutput> {
         match self {
-            LuaConfig::V1(v1) => v1.config.outputs(merged_definition),
-            LuaConfig::V2(v2) => v2.config.outputs(merged_definition),
+            LuaConfig::V1(v1) => v1.config.outputs(input_definitions),
+            LuaConfig::V2(v2) => v2.config.outputs(input_definitions),
         }
     }
 }

@@ -1,20 +1,50 @@
+use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 
 use async_trait::async_trait;
-use enum_dispatch::enum_dispatch;
+use dyn_clone::DynClone;
 use serde::Serialize;
-use vector_config::{configurable_component, Configurable, NamedComponent};
-use vector_core::config::LogNamespace;
+use vector_config::{
+    configurable_component,
+    schema::{SchemaGenerator, SchemaObject},
+    Configurable, GenerateError, Metadata, NamedComponent,
+};
+use vector_config_common::attributes::CustomAttribute;
 use vector_core::{
-    config::{GlobalOptions, Input, Output},
+    config::{GlobalOptions, Input, LogNamespace, TransformOutput},
     schema,
     transform::Transform,
 };
 
-use crate::transforms::Transforms;
-
 use super::schema::Options as SchemaOptions;
+use super::OutputId;
 use super::{id::Inputs, ComponentKey};
+
+pub type BoxedTransform = Box<dyn TransformConfig>;
+
+impl Configurable for BoxedTransform {
+    fn referenceable_name() -> Option<&'static str> {
+        Some("vector::transforms::Transforms")
+    }
+
+    fn metadata() -> Metadata {
+        let mut metadata = Metadata::default();
+        metadata.set_description("Configurable transforms in Vector.");
+        metadata.add_custom_attribute(CustomAttribute::kv("docs::enum_tagging", "internal"));
+        metadata.add_custom_attribute(CustomAttribute::kv("docs::enum_tag_field", "type"));
+        metadata
+    }
+
+    fn generate_schema(gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
+        vector_config::component::TransformDescription::generate_schemas(gen)
+    }
+}
+
+impl<T: TransformConfig + 'static> From<T> for BoxedTransform {
+    fn from(that: T) -> Self {
+        Box::new(that)
+    }
+}
 
 /// Fully resolved transform component.
 #[configurable_component]
@@ -22,14 +52,14 @@ use super::{id::Inputs, ComponentKey};
 #[derive(Clone, Debug)]
 pub struct TransformOuter<T>
 where
-    T: Configurable + Serialize,
+    T: Configurable + Serialize + 'static,
 {
     #[configurable(derived)]
     pub inputs: Inputs<T>,
 
     #[configurable(metadata(docs::hidden))]
     #[serde(flatten)]
-    pub inner: Transforms,
+    pub inner: BoxedTransform,
 }
 
 impl<T> TransformOuter<T>
@@ -39,12 +69,11 @@ where
     pub(crate) fn new<I, IT>(inputs: I, inner: IT) -> Self
     where
         I: IntoIterator<Item = T>,
-        IT: Into<Transforms>,
+        IT: Into<BoxedTransform>,
     {
-        TransformOuter {
-            inputs: Inputs::from_iter(inputs),
-            inner: inner.into(),
-        }
+        let inputs = Inputs::from_iter(inputs);
+        let inner = inner.into();
+        TransformOuter { inputs, inner }
     }
 
     pub(super) fn map_inputs<U>(self, f: impl Fn(&T) -> U) -> TransformOuter<U>
@@ -80,9 +109,9 @@ pub struct TransformContext {
 
     /// Tracks the schema IDs assigned to schemas exposed by the transform.
     ///
-    /// Given a transform can expose multiple [`Output`] channels, the ID is tied to the identifier of
-    /// that `Output`.
-    pub schema_definitions: HashMap<Option<String>, schema::Definition>,
+    /// Given a transform can expose multiple [`TransformOutput`] channels, the ID is tied to the identifier of
+    /// that `TransformOutput`.
+    pub schema_definitions: HashMap<Option<String>, HashMap<OutputId, schema::Definition>>,
 
     /// The schema definition created by merging all inputs of the transform.
     ///
@@ -100,7 +129,7 @@ impl Default for TransformContext {
             key: Default::default(),
             globals: Default::default(),
             enrichment_tables: Default::default(),
-            schema_definitions: HashMap::from([(None, schema::Definition::any())]),
+            schema_definitions: HashMap::from([(None, HashMap::new())]),
             merged_schema_definition: schema::Definition::any(),
             schema: SchemaOptions::default(),
         }
@@ -119,7 +148,9 @@ impl TransformContext {
     }
 
     #[cfg(any(test, feature = "test"))]
-    pub fn new_test(schema_definitions: HashMap<Option<String>, schema::Definition>) -> Self {
+    pub fn new_test(
+        schema_definitions: HashMap<Option<String>, HashMap<OutputId, schema::Definition>>,
+    ) -> Self {
         Self {
             schema_definitions,
             ..Default::default()
@@ -141,8 +172,8 @@ impl TransformContext {
 
 /// Generalized interface for describing and building transform components.
 #[async_trait]
-#[enum_dispatch]
-pub trait TransformConfig: NamedComponent + core::fmt::Debug + Send + Sync {
+#[typetag::serde(tag = "type")]
+pub trait TransformConfig: DynClone + NamedComponent + core::fmt::Debug + Send + Sync {
     /// Builds the transform with the given context.
     ///
     /// If the transform is built successfully, `Ok(...)` is returned containing the transform.
@@ -162,9 +193,10 @@ pub trait TransformConfig: NamedComponent + core::fmt::Debug + Send + Sync {
     /// of events flowing through the transform.
     fn outputs(
         &self,
-        merged_definition: &schema::Definition,
+        enrichment_tables: enrichment::TableRegistry,
+        input_definitions: &[(OutputId, schema::Definition)],
         global_log_namespace: LogNamespace,
-    ) -> Vec<Output>;
+    ) -> Vec<TransformOutput>;
 
     /// Validates that the configuration of the transform is valid.
     ///
@@ -202,4 +234,26 @@ pub trait TransformConfig: NamedComponent + core::fmt::Debug + Send + Sync {
     fn nestable(&self, _parents: &HashSet<&'static str>) -> bool {
         true
     }
+}
+
+dyn_clone::clone_trait_object!(TransformConfig);
+
+/// Often we want to call outputs just to retrieve the OutputId's without needing
+/// the schema definitions.
+pub fn get_transform_output_ids<T: TransformConfig + ?Sized>(
+    transform: &T,
+    key: ComponentKey,
+    global_log_namespace: LogNamespace,
+) -> impl Iterator<Item = OutputId> + '_ {
+    transform
+        .outputs(
+            enrichment::TableRegistry::default(),
+            &[(key.clone().into(), schema::Definition::any())],
+            global_log_namespace,
+        )
+        .into_iter()
+        .map(move |output| OutputId {
+            component: key.clone(),
+            port: output.port,
+        })
 }

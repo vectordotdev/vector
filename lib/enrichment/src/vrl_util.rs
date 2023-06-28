@@ -1,13 +1,9 @@
 //! Utilities shared between both VRL functions.
 use std::collections::BTreeMap;
 
-use ::value::Value;
-use vrl::{
-    diagnostic::{Label, Span},
-    prelude::*,
-};
-
 use crate::{Case, Condition, IndexHandle, TableRegistry};
+use vrl::diagnostic::{Label, Span};
+use vrl::prelude::*;
 
 #[derive(Debug)]
 pub enum Error {
@@ -42,7 +38,7 @@ impl DiagnosticMessage for Error {
 }
 
 /// Evaluates the condition object to search the enrichment tables with.
-pub(crate) fn evaluate_condition(key: &str, value: Value) -> Result<Condition> {
+pub(crate) fn evaluate_condition(key: &str, value: Value) -> ExpressionResult<Condition> {
     Ok(match value {
         Value::Object(map) if map.contains_key("from") && map.contains_key("to") => {
             Condition::BetweenDates {
@@ -122,8 +118,8 @@ mod tests {
                         (
                             "from".into(),
                             (expression::Literal::from(
-                                Utc.ymd(2015, 5, 15)
-                                    .and_hms_opt(0, 0, 0)
+                                Utc.with_ymd_and_hms(2015, 5, 15, 0, 0, 0)
+                                    .single()
                                     .expect("invalid timestamp"),
                             ))
                             .into(),
@@ -131,8 +127,8 @@ mod tests {
                         (
                             "to".into(),
                             (expression::Literal::from(
-                                Utc.ymd(2015, 6, 15)
-                                    .and_hms_opt(0, 0, 0)
+                                Utc.with_ymd_and_hms(2015, 6, 15, 0, 0, 0)
+                                    .single()
                                     .expect("invalid timestamp"),
                             ))
                             .into(),

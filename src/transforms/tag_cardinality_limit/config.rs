@@ -1,4 +1,8 @@
-use crate::config::{DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext};
+use std::collections::HashMap;
+
+use crate::config::{
+    DataType, GenerateConfig, Input, OutputId, TransformConfig, TransformContext, TransformOutput,
+};
 use crate::schema;
 use crate::transforms::tag_cardinality_limit::TagCardinalityLimit;
 use crate::transforms::Transform;
@@ -6,7 +10,10 @@ use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
 
 /// Configuration for the `tag_cardinality_limit` transform.
-#[configurable_component(transform("tag_cardinality_limit"))]
+#[configurable_component(transform(
+    "tag_cardinality_limit",
+    "Limit the cardinality of tags on metrics events as a safeguard against cardinality explosion."
+))]
 #[derive(Clone, Debug)]
 pub struct TagCardinalityLimitConfig {
     /// How many distinct values to accept for any given key.
@@ -53,6 +60,7 @@ pub struct BloomFilterConfig {
     /// The larger the cache size, the less likely it is to have a false positive, or a case where
     /// we allow a new value for tag even after we have reached the configured limits.
     #[serde(default = "default_cache_size")]
+    #[configurable(metadata(docs::human_name = "Cache Size per Key"))]
     pub cache_size_per_key: usize,
 }
 
@@ -93,6 +101,7 @@ impl GenerateConfig for TagCardinalityLimitConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "tag_cardinality_limit")]
 impl TransformConfig for TagCardinalityLimitConfig {
     async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
         Ok(Transform::event_task(TagCardinalityLimit::new(
@@ -104,7 +113,12 @@ impl TransformConfig for TagCardinalityLimitConfig {
         Input::metric()
     }
 
-    fn outputs(&self, _: &schema::Definition, _: LogNamespace) -> Vec<Output> {
-        vec![Output::default(DataType::Metric)]
+    fn outputs(
+        &self,
+        _: enrichment::TableRegistry,
+        _: &[(OutputId, schema::Definition)],
+        _: LogNamespace,
+    ) -> Vec<TransformOutput> {
+        vec![TransformOutput::new(DataType::Metric, HashMap::new())]
     }
 }

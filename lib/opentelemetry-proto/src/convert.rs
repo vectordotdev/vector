@@ -3,11 +3,11 @@ use chrono::{DateTime, TimeZone, Utc};
 use lookup::path;
 use ordered_float::NotNan;
 use std::collections::BTreeMap;
-use value::Value;
 use vector_core::{
     config::{log_schema, LegacyKey, LogNamespace},
     event::{Event, LogEvent},
 };
+use vrl::value::Value;
 
 use super::proto::{
     common::v1::{any_value::Value as PBValue, KeyValue},
@@ -201,14 +201,14 @@ impl ResourceLog {
         log_namespace.insert_source_metadata(
             SOURCE_NAME,
             &mut log,
-            Some(LegacyKey::Overwrite(path!(log_schema().timestamp_key()))),
+            log_schema().timestamp_key().map(LegacyKey::Overwrite),
             path!("timestamp"),
             timestamp,
         );
 
         log_namespace.insert_vector_metadata(
             &mut log,
-            path!(log_schema().source_type_key()),
+            Some(log_schema().source_type_key()),
             path!("source_type"),
             Bytes::from_static(SOURCE_NAME.as_bytes()),
         );

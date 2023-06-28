@@ -9,4 +9,5 @@ These test setups are organized into a set of integrations, located in subdirect
     mod start,
     mod stop,
     mod test,
+    mod ci_paths,
 }

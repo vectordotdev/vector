@@ -102,7 +102,7 @@ pub fn spawn_thread<'a>(
 #[cfg(unix)]
 fn raise_sighup() {
     use nix::sys::signal;
-    let _ = signal::raise(signal::Signal::SIGHUP).map_err(|error| {
+    _ = signal::raise(signal::Signal::SIGHUP).map_err(|error| {
         error!(message = "Unable to reload configuration file. Restart Vector to reload it.", cause = %error)
     });
 }

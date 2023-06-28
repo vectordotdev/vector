@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 use std::{collections::HashMap, fmt, fs::remove_dir_all, path::PathBuf};
 
 use clap::Parser;
@@ -134,12 +135,10 @@ pub fn validate_config(opts: &Opts, fmt: &mut Formatter) -> Option<Config> {
         fmt.title(format!("Failed to load {:?}", &paths_list));
         fmt.sub_error(errors);
     };
-    config::init_log_schema(&paths, true)
-        .map_err(&mut report_error)
-        .ok()?;
     let (builder, load_warnings) = config::load_builder_from_paths(&paths)
         .map_err(&mut report_error)
         .ok()?;
+    config::init_log_schema(builder.global.log_schema.clone(), true);
 
     // Build
     let (config, build_warnings) = builder
@@ -219,6 +218,7 @@ async fn validate_healthchecks(
             fmt.error(error);
         };
 
+        trace!("Healthcheck for {id} starting.");
         match tokio::spawn(healthcheck).await {
             Ok(Ok(_)) => {
                 if config
@@ -239,6 +239,7 @@ async fn validate_healthchecks(
             }
             Err(_) => failed(format!("Health check for \"{}\" panicked", id)),
         }
+        trace!("Healthcheck for {id} done.");
     }
 
     validated

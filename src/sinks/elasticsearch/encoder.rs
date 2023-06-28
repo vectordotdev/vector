@@ -2,6 +2,10 @@ use std::{io, io::Write};
 
 use serde::Serialize;
 use vector_buffers::EventCount;
+use vector_common::{
+    json_size::JsonSize,
+    request_metadata::{EventCountTags, GetEventCountTags},
+};
 use vector_core::{event::Event, ByteSizeOf, EstimatedJsonEncodedSizeOf};
 
 use crate::{
@@ -34,7 +38,7 @@ impl ByteSizeOf for ProcessedEvent {
 }
 
 impl EstimatedJsonEncodedSizeOf for ProcessedEvent {
-    fn estimated_json_encoded_size_of(&self) -> usize {
+    fn estimated_json_encoded_size_of(&self) -> JsonSize {
         self.log.estimated_json_encoded_size_of()
     }
 }
@@ -43,6 +47,12 @@ impl EventCount for ProcessedEvent {
     fn event_count(&self) -> usize {
         // An Elasticsearch ProcessedEvent is mapped one-to-one with an event.
         1
+    }
+}
+
+impl GetEventCountTags for ProcessedEvent {
+    fn get_tags(&self) -> EventCountTags {
+        self.log.get_tags()
     }
 }
 
@@ -134,7 +144,7 @@ mod tests {
     fn suppress_type_with_id() {
         let mut writer = Vec::new();
 
-        let _ = write_bulk_action(
+        _ = write_bulk_action(
             &mut writer,
             "ACTION",
             "INDEX",
@@ -162,7 +172,7 @@ mod tests {
     fn suppress_type_without_id() {
         let mut writer = Vec::new();
 
-        let _ = write_bulk_action(&mut writer, "ACTION", "INDEX", "TYPE", true, &None);
+        _ = write_bulk_action(&mut writer, "ACTION", "INDEX", "TYPE", true, &None);
 
         let value: serde_json::Value = serde_json::from_slice(&writer).unwrap();
         let value = value.as_object().unwrap();
@@ -182,7 +192,7 @@ mod tests {
     fn type_with_id() {
         let mut writer = Vec::new();
 
-        let _ = write_bulk_action(
+        _ = write_bulk_action(
             &mut writer,
             "ACTION",
             "INDEX",
@@ -211,7 +221,7 @@ mod tests {
     fn type_without_id() {
         let mut writer = Vec::new();
 
-        let _ = write_bulk_action(&mut writer, "ACTION", "INDEX", "TYPE", false, &None);
+        _ = write_bulk_action(&mut writer, "ACTION", "INDEX", "TYPE", false, &None);
 
         let value: serde_json::Value = serde_json::from_slice(&writer).unwrap();
         let value = value.as_object().unwrap();

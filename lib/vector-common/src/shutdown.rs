@@ -152,30 +152,26 @@ impl SourceShutdownCoordinator {
             id.clone(),
             other.shutdown_begun_triggers.remove(id).unwrap_or_else(|| {
                 panic!(
-                    "Other ShutdownCoordinator didn't have a shutdown_begun_trigger for \"{}\"",
-                    id
+                    "Other ShutdownCoordinator didn't have a shutdown_begun_trigger for \"{id}\""
                 )
             }),
         );
         assert!(
             existing.is_none(),
-            "ShutdownCoordinator already has a shutdown_begin_trigger for source \"{}\"",
-            id
+            "ShutdownCoordinator already has a shutdown_begin_trigger for source \"{id}\""
         );
 
         let existing = self.shutdown_force_triggers.insert(
             id.clone(),
             other.shutdown_force_triggers.remove(id).unwrap_or_else(|| {
                 panic!(
-                    "Other ShutdownCoordinator didn't have a shutdown_force_trigger for \"{}\"",
-                    id
+                    "Other ShutdownCoordinator didn't have a shutdown_force_trigger for \"{id}\""
                 )
             }),
         );
         assert!(
             existing.is_none(),
-            "ShutdownCoordinator already has a shutdown_force_trigger for source \"{}\"",
-            id
+            "ShutdownCoordinator already has a shutdown_force_trigger for source \"{id}\""
         );
 
         let existing = self.shutdown_complete_tripwires.insert(
@@ -185,15 +181,13 @@ impl SourceShutdownCoordinator {
                 .remove(id)
                 .unwrap_or_else(|| {
                     panic!(
-                        "Other ShutdownCoordinator didn't have a shutdown_complete_tripwire for \"{}\"",
-                        id
+                        "Other ShutdownCoordinator didn't have a shutdown_complete_tripwire for \"{id}\""
                     )
                 }),
         );
         assert!(
             existing.is_none(),
-            "ShutdownCoordinator already has a shutdown_complete_tripwire for source \"{}\"",
-            id
+            "ShutdownCoordinator already has a shutdown_complete_tripwire for source \"{id}\""
         );
     }
 
@@ -206,7 +200,7 @@ impl SourceShutdownCoordinator {
     ///
     /// Panics if this coordinator has had its triggers removed (ie
     /// has been taken over with `Self::takeover_source`).
-    pub fn shutdown_all(self, deadline: Instant) -> impl Future<Output = ()> {
+    pub fn shutdown_all(self, deadline: Option<Instant>) -> impl Future<Output = ()> {
         let mut complete_futures = Vec::new();
 
         let shutdown_begun_triggers = self.shutdown_begun_triggers;
@@ -219,14 +213,12 @@ impl SourceShutdownCoordinator {
             let shutdown_complete_tripwire =
                 shutdown_complete_tripwires.remove(&id).unwrap_or_else(|| {
                     panic!(
-                "shutdown_complete_tripwire for source \"{}\" not found in the ShutdownCoordinator",
-                id
+                "shutdown_complete_tripwire for source \"{id}\" not found in the ShutdownCoordinator"
             )
                 });
             let shutdown_force_trigger = shutdown_force_triggers.remove(&id).unwrap_or_else(|| {
                 panic!(
-                    "shutdown_force_trigger for source \"{}\" not found in the ShutdownCoordinator",
-                    id
+                    "shutdown_force_trigger for source \"{id}\" not found in the ShutdownCoordinator"
                 )
             });
 
@@ -260,8 +252,7 @@ impl SourceShutdownCoordinator {
     ) -> impl Future<Output = bool> {
         let begin_shutdown_trigger = self.shutdown_begun_triggers.remove(id).unwrap_or_else(|| {
             panic!(
-                "shutdown_begun_trigger for source \"{}\" not found in the ShutdownCoordinator",
-                id
+                "shutdown_begun_trigger for source \"{id}\" not found in the ShutdownCoordinator"
             )
         });
         // This is what actually triggers the source to begin shutting down.
@@ -272,21 +263,19 @@ impl SourceShutdownCoordinator {
             .remove(id)
             .unwrap_or_else(|| {
                 panic!(
-                "shutdown_complete_tripwire for source \"{}\" not found in the ShutdownCoordinator",
-                id
+                "shutdown_complete_tripwire for source \"{id}\" not found in the ShutdownCoordinator"
             )
             });
         let shutdown_force_trigger = self.shutdown_force_triggers.remove(id).unwrap_or_else(|| {
             panic!(
-                "shutdown_force_trigger for source \"{}\" not found in the ShutdownCoordinator",
-                id
+                "shutdown_force_trigger for source \"{id}\" not found in the ShutdownCoordinator"
             )
         });
         SourceShutdownCoordinator::shutdown_source_complete(
             shutdown_complete_tripwire,
             shutdown_force_trigger,
             id.clone(),
-            deadline,
+            Some(deadline),
         )
     }
 
@@ -299,30 +288,36 @@ impl SourceShutdownCoordinator {
             .cloned()
             .map(|tripwire| tripwire.then(tripwire_handler).boxed());
 
-        future::join_all(futures).map(|_| ()).boxed()
+        future::join_all(futures)
+            .map(|_| info!("All sources have finished."))
+            .boxed()
     }
 
     fn shutdown_source_complete(
         shutdown_complete_tripwire: Tripwire,
         shutdown_force_trigger: Trigger,
         id: ComponentKey,
-        deadline: Instant,
+        deadline: Option<Instant>,
     ) -> impl Future<Output = bool> {
         async move {
-            // Call `shutdown_force_trigger.disable()` on drop.
-            let shutdown_force_trigger = DisabledTrigger::new(shutdown_force_trigger);
-
             let fut = shutdown_complete_tripwire.then(tripwire_handler);
-            if timeout_at(deadline, fut).await.is_ok() {
-                shutdown_force_trigger.into_inner().disable();
-                true
+            if let Some(deadline) = deadline {
+                // Call `shutdown_force_trigger.disable()` on drop.
+                let shutdown_force_trigger = DisabledTrigger::new(shutdown_force_trigger);
+                if timeout_at(deadline, fut).await.is_ok() {
+                    shutdown_force_trigger.into_inner().disable();
+                    true
+                } else {
+                    error!(
+                        "Source '{}' failed to shutdown before deadline. Forcing shutdown.",
+                        id,
+                    );
+                    shutdown_force_trigger.into_inner().cancel();
+                    false
+                }
             } else {
-                error!(
-                    "Source '{}' failed to shutdown before deadline. Forcing shutdown.",
-                    id,
-                );
-                shutdown_force_trigger.into_inner().cancel();
-                false
+                fut.await;
+                true
             }
         }
         .boxed()

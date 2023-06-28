@@ -1,6 +1,7 @@
 use std::convert::TryFrom;
 
 use aws_sdk_cloudwatchlogs::Client as CloudwatchLogsClient;
+use aws_sdk_cloudwatchlogs::Region;
 use chrono::Duration;
 use codecs::TextSerializerConfig;
 use futures::{stream, StreamExt};
@@ -114,7 +115,13 @@ async fn cloudwatch_insert_log_events_sorted() {
             let timestamp = chrono::Utc::now() - Duration::days(1);
 
             events.iter_logs_mut().for_each(|log| {
-                log.insert(log_schema().timestamp_key(), Value::Timestamp(timestamp));
+                log.insert(
+                    (
+                        lookup::PathPrefix::Event,
+                        log_schema().timestamp_key().unwrap(),
+                    ),
+                    Value::Timestamp(timestamp),
+                );
             });
         }
         doit = true;
@@ -180,7 +187,13 @@ async fn cloudwatch_insert_out_of_range_timestamp() {
     let mut add_event = |offset: Duration| {
         let line = input_lines.next().unwrap();
         let mut event = LogEvent::from(line.clone());
-        event.insert(log_schema().timestamp_key(), now + offset);
+        event.insert(
+            (
+                lookup::PathPrefix::Event,
+                log_schema().timestamp_key().unwrap(),
+            ),
+            now + offset,
+        );
         events.push(Event::Log(event));
         line
     };
@@ -445,9 +458,8 @@ async fn cloudwatch_healthcheck() {
 
 async fn create_client_test() -> CloudwatchLogsClient {
     let auth = AwsAuthentication::test_auth();
-    let region = Some(aws_types::region::Region::new("localstack"));
-    let watchlogs_address = watchlogs_address();
-    let endpoint = Some(watchlogs_address);
+    let region = Some(Region::new("localstack"));
+    let endpoint = Some(watchlogs_address());
     let proxy = ProxyConfig::default();
 
     create_client::<CloudwatchLogsClientBuilder>(&auth, region, endpoint, &proxy, &None, true)
@@ -457,7 +469,7 @@ async fn create_client_test() -> CloudwatchLogsClient {
 
 async fn ensure_group() {
     let client = create_client_test().await;
-    let _ = client
+    _ = client
         .create_log_group()
         .log_group_name(GROUP_NAME)
         .send()

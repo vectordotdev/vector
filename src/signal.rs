@@ -1,4 +1,6 @@
-use tokio::sync::broadcast;
+#![allow(missing_docs)]
+
+use tokio::{runtime::Runtime, sync::broadcast};
 use tokio_stream::{Stream, StreamExt};
 
 use super::config::ConfigBuilder;
@@ -21,6 +23,22 @@ pub enum SignalTo {
     Quit,
 }
 
+/// Convenience struct for app setup handling.
+pub struct SignalPair {
+    pub handler: SignalHandler,
+    pub receiver: SignalRx,
+}
+
+impl SignalPair {
+    /// Create a new signal handler pair, and set them up to receive OS signals.
+    pub fn new(runtime: &Runtime) -> Self {
+        let (handler, receiver) = SignalHandler::new();
+        let signals = os_signals(runtime);
+        handler.forever(runtime, signals);
+        Self { handler, receiver }
+    }
+}
+
 /// SignalHandler is a general `ControlTo` message receiver and transmitter. It's used by
 /// OS signals and providers to surface control events to the root of the application.
 pub struct SignalHandler {
@@ -31,7 +49,7 @@ pub struct SignalHandler {
 impl SignalHandler {
     /// Create a new signal handler with space for 128 control messages at a time, to
     /// ensure the channel doesn't overflow and drop signals.
-    pub fn new() -> (Self, SignalRx) {
+    fn new() -> (Self, SignalRx) {
         let (tx, rx) = broadcast::channel(128);
         let handler = Self {
             tx,
@@ -53,14 +71,14 @@ impl SignalHandler {
 
     /// Takes a stream who's elements are convertible to `SignalTo`, and spawns a permanent
     /// task for transmitting to the receiver.
-    pub fn forever<T, S>(&mut self, stream: S)
+    fn forever<T, S>(&self, runtime: &Runtime, stream: S)
     where
         T: Into<SignalTo> + Send + Sync,
         S: Stream<Item = T> + 'static + Send,
     {
         let tx = self.tx.clone();
 
-        tokio::spawn(async move {
+        runtime.spawn(async move {
             tokio::pin!(stream);
 
             while let Some(value) = stream.next().await {
@@ -112,37 +130,53 @@ impl SignalHandler {
     pub fn clear(&mut self) {
         for shutdown_tx in self.shutdown_txs.drain(..) {
             // An error just means the channel was already shut down; safe to ignore.
-            let _ = shutdown_tx.send(());
+            _ = shutdown_tx.send(());
         }
     }
 }
 
 /// Signals from OS/user.
 #[cfg(unix)]
-pub fn os_signals() -> impl Stream<Item = SignalTo> {
+fn os_signals(runtime: &Runtime) -> impl Stream<Item = SignalTo> {
     use tokio::signal::unix::{signal, SignalKind};
 
-    let mut sigint = signal(SignalKind::interrupt()).expect("Signal handlers should not panic.");
-    let mut sigterm = signal(SignalKind::terminate()).expect("Signal handlers should not panic.");
-    let mut sigquit = signal(SignalKind::quit()).expect("Signal handlers should not panic.");
-    let mut sighup = signal(SignalKind::hangup()).expect("Signal handlers should not panic.");
+    // The `signal` function must be run within the context of a Tokio runtime.
+    runtime.block_on(async {
+        let mut sigint = signal(SignalKind::interrupt()).expect("Failed to set up SIGINT handler.");
+        let mut sigterm =
+            signal(SignalKind::terminate()).expect("Failed to set up SIGTERM handler.");
+        let mut sigquit = signal(SignalKind::quit()).expect("Failed to set up SIGQUIT handler.");
+        let mut sighup = signal(SignalKind::hangup()).expect("Failed to set up SIGHUP handler.");
 
-    async_stream::stream! {
-        loop {
-            let signal = tokio::select! {
-                _ = sigint.recv() => SignalTo::Shutdown,
-                _ = sigterm.recv() => SignalTo::Shutdown,
-                _ = sigquit.recv() => SignalTo::Quit,
-                _ = sighup.recv() => SignalTo::ReloadFromDisk,
-            };
-            yield signal;
+        async_stream::stream! {
+            loop {
+                let signal = tokio::select! {
+                    _ = sigint.recv() => {
+                        info!(message = "Signal received.", signal = "SIGINT");
+                        SignalTo::Shutdown
+                    },
+                    _ = sigterm.recv() => {
+                        info!(message = "Signal received.", signal = "SIGTERM");
+                        SignalTo::Shutdown
+                    } ,
+                    _ = sigquit.recv() => {
+                        info!(message = "Signal received.", signal = "SIGQUIT");
+                        SignalTo::Quit
+                    },
+                    _ = sighup.recv() => {
+                        info!(message = "Signal received.", signal = "SIGHUP");
+                        SignalTo::ReloadFromDisk
+                    },
+                };
+                yield signal;
+            }
         }
-    }
+    })
 }
 
 /// Signals from OS/user.
 #[cfg(windows)]
-pub(crate) fn os_signals() -> impl Stream<Item = SignalTo> {
+fn os_signals(_: &Runtime) -> impl Stream<Item = SignalTo> {
     use futures::future::FutureExt;
 
     async_stream::stream! {

@@ -35,7 +35,7 @@ pub enum SocketListenAddrParseError {
 //
 // `SocketListenAddr` is valid for any socket based source, such as `fluent` and `logstash`.
 //  Socket activation is just a way for the program to get a socket for listening on.
-//  Systemd can open the port, if it is a privledged number. That way the program does not
+//  Systemd can open the port, if it is a privileged number. That way the program does not
 //  need to worry about dropping ports.
 //  This is particularly common in non-containerized environments.
 #[configurable_component]

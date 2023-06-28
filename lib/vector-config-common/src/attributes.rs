@@ -47,4 +47,12 @@ impl CustomAttribute {
             value: serde_json::to_value(value).expect("should not fail to serialize value to JSON"),
         }
     }
+
+    pub const fn is_flag(&self) -> bool {
+        matches!(self, Self::Flag(_))
+    }
+
+    pub const fn is_kv(&self) -> bool {
+        matches!(self, Self::KeyValue { .. })
+    }
 }

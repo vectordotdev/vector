@@ -36,15 +36,12 @@ impl<'a> ToLua<'a> for LuaEvent {
 
 impl<'a> FromLua<'a> for Event {
     fn from_lua(value: LuaValue<'a>, lua: &'a Lua) -> LuaResult<Self> {
-        let table = match &value {
-            LuaValue::Table(t) => t,
-            _ => {
-                return Err(LuaError::FromLuaConversionError {
-                    from: value.type_name(),
-                    to: "Event",
-                    message: Some("Event should be a Lua table".to_string()),
-                })
-            }
+        let LuaValue::Table(table) = &value else {
+            return Err(LuaError::FromLuaConversionError {
+                from: value.type_name(),
+                to: "Event",
+                message: Some("Event should be a Lua table".to_string()),
+            })
         };
         match (table.raw_get("log")?, table.raw_get("metric")?) {
             (LuaValue::Table(log), LuaValue::Nil) => {

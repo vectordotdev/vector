@@ -662,7 +662,7 @@ mod tests {
     };
 
     use bytes::{BufMut, Bytes, BytesMut};
-    use chrono::{DateTime, TimeZone, Utc};
+    use chrono::{DateTime, TimeZone, Timelike, Utc};
     use flate2::read::ZlibDecoder;
     use proptest::{
         arbitrary::any, collection::btree_map, num::f64::POSITIVE as ARB_POSITIVE_F64, prop_assert,
@@ -706,9 +706,9 @@ mod tests {
     fn get_compressed_empty_series_payload() -> Bytes {
         let mut compressor = get_compressor();
 
-        let _ = write_payload_header(DatadogMetricsEndpoint::Series, &mut compressor)
+        _ = write_payload_header(DatadogMetricsEndpoint::Series, &mut compressor)
             .expect("should not fail");
-        let _ = write_payload_footer(DatadogMetricsEndpoint::Series, &mut compressor)
+        _ = write_payload_footer(DatadogMetricsEndpoint::Series, &mut compressor)
             .expect("should not fail");
 
         compressor.finish().expect("should not fail").freeze()
@@ -722,8 +722,9 @@ mod tests {
     }
 
     fn ts() -> DateTime<Utc> {
-        Utc.ymd(2018, 11, 14)
-            .and_hms_nano_opt(8, 9, 10, 11)
+        Utc.with_ymd_and_hms(2018, 11, 14, 8, 9, 10)
+            .single()
+            .and_then(|t| t.with_nanosecond(11))
             .expect("invalid timestamp")
     }
 
@@ -1000,7 +1001,7 @@ mod tests {
                 compressed_limit,
             );
             if let Ok(mut encoder) = result {
-                let _ = encoder.try_encode(metric);
+                _ = encoder.try_encode(metric);
 
                 if let Ok((payload, _processed, _raw_bytes)) = encoder.finish() {
                     prop_assert!(payload.len() <= compressed_limit);

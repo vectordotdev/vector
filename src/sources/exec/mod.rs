@@ -20,14 +20,14 @@ use tokio::{
 };
 use tokio_stream::wrappers::IntervalStream;
 use tokio_util::codec::FramedRead;
-use value::Kind;
 use vector_common::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
-use vector_config::{configurable_component, NamedComponent};
+use vector_config::configurable_component;
 use vector_core::{config::LegacyKey, EstimatedJsonEncodedSizeOf};
+use vrl::value::Kind;
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
-    config::{Output, SourceConfig, SourceContext},
+    config::{SourceConfig, SourceContext, SourceOutput},
     event::Event,
     internal_events::{
         ExecChannelClosedError, ExecCommandExecuted, ExecEventsReceived, ExecFailedError,
@@ -43,7 +43,7 @@ use vector_core::config::{log_schema, LogNamespace};
 pub mod sized_bytes_codec;
 
 /// Configuration for the `exec` source.
-#[configurable_component(source("exec"))]
+#[configurable_component(source("exec", "Collect output from a process running on the host."))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct ExecConfig {
@@ -56,7 +56,7 @@ pub struct ExecConfig {
     #[configurable(derived)]
     pub streaming: Option<StreamingConfig>,
 
-    /// The command to be run, plus any arguments required.
+    /// The command to run, plus any arguments required.
     #[configurable(metadata(docs::examples = "echo", docs::examples = "Hello World!"))]
     pub command: Vec<String>,
 
@@ -67,7 +67,7 @@ pub struct ExecConfig {
     #[serde(default = "default_include_stderr")]
     pub include_stderr: bool,
 
-    /// The maximum buffer size allowed before a log event will be generated.
+    /// The maximum buffer size allowed before a log event is generated.
     #[serde(default = "default_maximum_buffer_size")]
     pub maximum_buffer_size_bytes: usize,
 
@@ -103,7 +103,7 @@ pub enum Mode {
 pub struct ScheduledConfig {
     /// The interval, in seconds, between scheduled command runs.
     ///
-    /// If the command takes longer than `exec_interval_secs` to run, it will be killed.
+    /// If the command takes longer than `exec_interval_secs` to run, it is killed.
     #[serde(default = "default_exec_interval_secs")]
     exec_interval_secs: u64,
 }
@@ -117,8 +117,9 @@ pub struct StreamingConfig {
     #[serde(default = "default_respawn_on_exit")]
     respawn_on_exit: bool,
 
-    /// The amount of time, in seconds, that Vector will wait before rerunning a streaming command that exited.
+    /// The amount of time, in seconds, before rerunning a streaming command that exited.
     #[serde(default = "default_respawn_interval_secs")]
+    #[configurable(metadata(docs::human_name = "Respawn Interval"))]
     respawn_interval_secs: u64,
 }
 
@@ -220,6 +221,7 @@ impl ExecConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "exec")]
 impl SourceConfig for ExecConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         self.validate()?;
@@ -265,7 +267,7 @@ impl SourceConfig for ExecConfig {
         }
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         let log_namespace = global_log_namespace.merge(Some(self.log_namespace.unwrap_or(false)));
 
         let schema_definition = self
@@ -303,7 +305,10 @@ impl SourceConfig for ExecConfig {
                 None,
             );
 
-        vec![Output::default(self.decoding.output_type()).with_schema_definition(schema_definition)]
+        vec![SourceOutput::new_logs(
+            self.decoding.output_type(),
+            schema_definition,
+        )]
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -493,8 +498,8 @@ async fn run_command(
                         for event in &mut events {
                             handle_event(&config, &hostname, &Some(stream.to_string()), pid, event, log_namespace);
                         }
-                        if let Err(error) = out.send_batch(events).await {
-                            emit!(StreamClosedError { count, error });
+                        if (out.send_batch(events).await).is_err() {
+                            emit!(StreamClosedError { count });
                             break;
                         }
                     },
@@ -685,7 +690,7 @@ fn spawn_reader_thread<R: 'static + AsyncRead + Unpin + std::marker::Send>(
     sender: Sender<((SmallVec<[Event; 1]>, usize), &'static str)>,
 ) {
     // Start the green background thread for collecting
-    let _ = Box::pin(tokio::spawn(async move {
+    drop(tokio::spawn(async move {
         debug!("Start capturing {} command output.", origin);
 
         let mut stream = FramedRead::new(reader, decoder);
@@ -718,6 +723,7 @@ mod tests {
     use bytes::Bytes;
     use std::io::Cursor;
     use vector_core::event::EventMetadata;
+    use vrl::value;
 
     #[cfg(unix)]
     use futures::task::Poll;
@@ -756,7 +762,12 @@ mod tests {
         assert_eq!(log[COMMAND_KEY], config.command.into());
         assert_eq!(log[log_schema().message_key()], "hello world".into());
         assert_eq!(log[log_schema().source_type_key()], "exec".into());
-        assert!(log.get(log_schema().timestamp_key()).is_some());
+        assert!(log
+            .get((
+                lookup::PathPrefix::Event,
+                log_schema().timestamp_key().unwrap()
+            ))
+            .is_some());
     }
 
     #[test]
@@ -767,7 +778,7 @@ mod tests {
         let pid = Some(8888_u32);
 
         let mut event: Event =
-            LogEvent::from_parts(vrl::value!("hello world"), EventMetadata::default()).into();
+            LogEvent::from_parts(value!("hello world"), EventMetadata::default()).into();
 
         handle_event(
             &config,
@@ -783,24 +794,24 @@ mod tests {
 
         assert_eq!(
             meta.get(path!(ExecConfig::NAME, "host")).unwrap(),
-            &vrl::value!("Some.Machine")
+            &value!("Some.Machine")
         );
         assert_eq!(
             meta.get(path!(ExecConfig::NAME, STREAM_KEY)).unwrap(),
-            &vrl::value!(STDOUT)
+            &value!(STDOUT)
         );
         assert_eq!(
             meta.get(path!(ExecConfig::NAME, PID_KEY)).unwrap(),
-            &vrl::value!(8888_i64)
+            &value!(8888_i64)
         );
         assert_eq!(
             meta.get(path!(ExecConfig::NAME, COMMAND_KEY)).unwrap(),
-            &vrl::value!(config.command)
+            &value!(config.command)
         );
-        assert_eq!(log.value(), &vrl::value!("hello world"));
+        assert_eq!(log.value(), &value!("hello world"));
         assert_eq!(
             meta.get(path!("vector", "source_type")).unwrap(),
-            &vrl::value!("exec")
+            &value!("exec")
         );
         assert!(meta
             .get(path!("vector", "ingest_timestamp"))
@@ -832,7 +843,12 @@ mod tests {
         assert_eq!(log[COMMAND_KEY], config.command.into());
         assert_eq!(log[log_schema().message_key()], "hello world".into());
         assert_eq!(log[log_schema().source_type_key()], "exec".into());
-        assert!(log.get(log_schema().timestamp_key()).is_some());
+        assert!(log
+            .get((
+                lookup::PathPrefix::Event,
+                log_schema().timestamp_key().unwrap()
+            ))
+            .is_some());
     }
 
     #[test]
@@ -843,7 +859,7 @@ mod tests {
         let pid = Some(8888_u32);
 
         let mut event: Event =
-            LogEvent::from_parts(vrl::value!("hello world"), EventMetadata::default()).into();
+            LogEvent::from_parts(value!("hello world"), EventMetadata::default()).into();
 
         handle_event(
             &config,
@@ -859,24 +875,24 @@ mod tests {
 
         assert_eq!(
             meta.get(path!(ExecConfig::NAME, "host")).unwrap(),
-            &vrl::value!("Some.Machine")
+            &value!("Some.Machine")
         );
         assert_eq!(
             meta.get(path!(ExecConfig::NAME, STREAM_KEY)).unwrap(),
-            &vrl::value!(STDOUT)
+            &value!(STDOUT)
         );
         assert_eq!(
             meta.get(path!(ExecConfig::NAME, PID_KEY)).unwrap(),
-            &vrl::value!(8888_i64)
+            &value!(8888_i64)
         );
         assert_eq!(
             meta.get(path!(ExecConfig::NAME, COMMAND_KEY)).unwrap(),
-            &vrl::value!(config.command)
+            &value!(config.command)
         );
-        assert_eq!(log.value(), &vrl::value!("hello world"));
+        assert_eq!(log.value(), &value!("hello world"));
         assert_eq!(
             meta.get(path!("vector", "source_type")).unwrap(),
-            &vrl::value!("exec")
+            &value!("exec")
         );
         assert!(meta
             .get(path!("vector", "ingest_timestamp"))
@@ -1029,7 +1045,12 @@ mod tests {
             assert_eq!(log[log_schema().message_key()], "Hello World!".into());
             assert_eq!(log[log_schema().host_key()], "Some.Machine".into());
             assert!(log.get(PID_KEY).is_some());
-            assert!(log.get(log_schema().timestamp_key()).is_some());
+            assert!(log
+                .get((
+                    lookup::PathPrefix::Event,
+                    log_schema().timestamp_key().unwrap()
+                ))
+                .is_some());
 
             assert_eq!(8, log.all_fields().unwrap().count());
         } else {

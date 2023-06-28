@@ -36,7 +36,10 @@ impl SinkBatchSettings for StackdriverMetricsDefaultBatchSettings {
 }
 
 /// Configuration for the `gcp_stackdriver_metrics` sink.
-#[configurable_component(sink("gcp_stackdriver_metrics"))]
+#[configurable_component(sink(
+    "gcp_stackdriver_metrics",
+    "Deliver metrics to GCP's Cloud Monitoring system."
+))]
 #[derive(Clone, Debug, Default)]
 pub struct StackdriverConfig {
     #[serde(skip, default = "default_endpoint")]
@@ -93,6 +96,7 @@ fn default_endpoint() -> String {
 impl_generate_config_from_default!(StackdriverConfig);
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "gcp_stackdriver_metrics")]
 impl SinkConfig for StackdriverConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let auth = self.auth.build(Scope::MonitoringWrite).await?;
@@ -108,6 +112,7 @@ impl SinkConfig for StackdriverConfig {
         let client = HttpClient::new(tls_settings, cx.proxy())?;
         let batch_settings = self.batch.into_batch_settings()?;
 
+        auth.spawn_regenerate_token();
         let sink = HttpEventSink {
             config: self.clone(),
             started,
@@ -125,6 +130,7 @@ impl SinkConfig for StackdriverConfig {
             |error| error!(message = "Fatal gcp_stackdriver_metrics sink error.", %error),
         );
 
+        #[allow(deprecated)]
         Ok((VectorSink::from_event_sink(sink), healthcheck))
     }
 
@@ -215,11 +221,11 @@ impl HttpSink for HttpEventSink {
 
         let series = gcp::GcpSeries {
             time_series: &[gcp::GcpSerie {
-                metric: gcp::GcpTypedResource {
+                metric: gcp::GcpMetric {
                     r#type: metric_type,
                     labels: metric_labels,
                 },
-                resource: gcp::GcpTypedResource {
+                resource: gcp::GcpResource {
                     r#type: self.config.resource.r#type.clone(),
                     labels: self.config.resource.labels.clone(),
                 },

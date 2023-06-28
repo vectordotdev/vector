@@ -14,7 +14,12 @@ use crossbeam_utils::atomic::AtomicCell;
 use lookup::lookup_v2::TargetPath;
 use lookup::PathPrefix;
 use serde::{Deserialize, Serialize, Serializer};
-use vector_common::EventDataEq;
+use vector_common::{
+    internal_event::OptionalTag,
+    json_size::{JsonSize, NonZeroJsonSize},
+    request_metadata::{EventCountTags, GetEventCountTags},
+    EventDataEq,
+};
 
 use super::{
     estimated_json_encoded_size_of::EstimatedJsonEncodedSizeOf,
@@ -22,8 +27,8 @@ use super::{
     metadata::EventMetadata,
     util, EventFinalizers, Finalizable, Value,
 };
-use crate::config::log_schema;
 use crate::config::LogNamespace;
+use crate::config::{log_schema, telemetry};
 use crate::{event::MaybeAsLogMut, ByteSizeOf};
 use lookup::{metadata_path, path};
 
@@ -36,7 +41,7 @@ struct Inner {
     size_cache: AtomicCell<Option<NonZeroUsize>>,
 
     #[serde(skip)]
-    json_encoded_size_cache: AtomicCell<Option<NonZeroUsize>>,
+    json_encoded_size_cache: AtomicCell<Option<NonZeroJsonSize>>,
 }
 
 impl Inner {
@@ -73,12 +78,12 @@ impl ByteSizeOf for Inner {
 }
 
 impl EstimatedJsonEncodedSizeOf for Inner {
-    fn estimated_json_encoded_size_of(&self) -> usize {
+    fn estimated_json_encoded_size_of(&self) -> JsonSize {
         self.json_encoded_size_cache
             .load()
             .unwrap_or_else(|| {
                 let size = self.fields.estimated_json_encoded_size_of();
-                let size = NonZeroUsize::new(size).expect("Size cannot be zero");
+                let size = NonZeroJsonSize::new(size).expect("Size cannot be zero");
 
                 self.json_encoded_size_cache.store(Some(size));
                 size
@@ -146,7 +151,10 @@ impl LogEvent {
     pub fn from_str_legacy(msg: impl Into<String>) -> Self {
         let mut log = LogEvent::default();
         log.insert(log_schema().message_key(), msg.into());
-        log.insert(log_schema().timestamp_key(), Utc::now());
+        if let Some(timestamp_key) = log_schema().timestamp_key() {
+            log.insert((PathPrefix::Event, timestamp_key), Utc::now());
+        }
+
         log
     }
 
@@ -201,8 +209,28 @@ impl Finalizable for LogEvent {
 }
 
 impl EstimatedJsonEncodedSizeOf for LogEvent {
-    fn estimated_json_encoded_size_of(&self) -> usize {
+    fn estimated_json_encoded_size_of(&self) -> JsonSize {
         self.inner.estimated_json_encoded_size_of()
+    }
+}
+
+impl GetEventCountTags for LogEvent {
+    fn get_tags(&self) -> EventCountTags {
+        let source = if telemetry().tags().emit_source {
+            self.metadata().source_id().cloned().into()
+        } else {
+            OptionalTag::Ignored
+        };
+
+        let service = if telemetry().tags().emit_service {
+            self.get_by_meaning("service")
+                .map(|value| value.to_string_lossy().to_string())
+                .into()
+        } else {
+            OptionalTag::Ignored
+        };
+
+        EventCountTags { source, service }
     }
 }
 
@@ -384,9 +412,8 @@ impl LogEvent {
     /// Merge all fields specified at `fields` from `incoming` to `current`.
     pub fn merge(&mut self, mut incoming: LogEvent, fields: &[impl AsRef<str>]) {
         for field in fields {
-            let incoming_val = match incoming.remove(field.as_ref()) {
-                None => continue,
-                Some(val) => val,
+            let Some(incoming_val) = incoming.remove(field.as_ref()) else {
+                continue
             };
             match self.get_mut(field.as_ref()) {
                 None => {
@@ -420,7 +447,7 @@ impl LogEvent {
     pub fn timestamp_path(&self) -> Option<String> {
         match self.namespace() {
             LogNamespace::Vector => self.find_key_by_meaning("timestamp"),
-            LogNamespace::Legacy => Some(log_schema().timestamp_key().to_owned()),
+            LogNamespace::Legacy => log_schema().timestamp_key().map(ToString::to_string),
         }
     }
 
@@ -439,10 +466,10 @@ impl LogEvent {
     /// or from the `source_type` key set on the "Global Log Schema" (Legacy namespace).
     // TODO: This can eventually return a `&TargetOwnedPath` once Semantic meaning and the
     //   "Global Log Schema" are updated to the new path lookup code
-    pub fn source_type_path(&self) -> Option<String> {
+    pub fn source_type_path(&self) -> &'static str {
         match self.namespace() {
-            LogNamespace::Vector => self.find_key_by_meaning("source_type"),
-            LogNamespace::Legacy => Some(log_schema().source_type_key().to_owned()),
+            LogNamespace::Vector => "%vector.source_type",
+            LogNamespace::Legacy => log_schema().source_type_key(),
         }
     }
 
@@ -460,19 +487,17 @@ impl LogEvent {
     pub fn get_timestamp(&self) -> Option<&Value> {
         match self.namespace() {
             LogNamespace::Vector => self.get_by_meaning("timestamp"),
-            LogNamespace::Legacy => self.get((PathPrefix::Event, log_schema().timestamp_key())),
+            LogNamespace::Legacy => log_schema()
+                .timestamp_key()
+                .and_then(|key| self.get((PathPrefix::Event, key))),
         }
     }
 
     /// Removes the `timestamp` from the event. This is either from the "timestamp" semantic meaning (Vector namespace)
     /// or from the timestamp key set on the "Global Log Schema" (Legacy namespace).
     pub fn remove_timestamp(&mut self) -> Option<Value> {
-        match self.namespace() {
-            LogNamespace::Vector => self
-                .find_key_by_meaning("timestamp")
-                .and_then(|key| self.remove(key.as_str())),
-            LogNamespace::Legacy => self.remove((PathPrefix::Event, log_schema().timestamp_key())),
-        }
+        self.timestamp_path()
+            .and_then(|key| self.remove(key.as_str()))
     }
 
     /// Fetches the `host` of the event. This is either from the "host" semantic meaning (Vector namespace)
@@ -521,8 +546,9 @@ mod test_utils {
             let mut log = LogEvent::default();
 
             log.insert(log_schema().message_key(), message);
-            log.insert(log_schema().timestamp_key(), Utc::now());
-
+            if let Some(timestamp_key) = log_schema().timestamp_key() {
+                log.insert((PathPrefix::Event, timestamp_key), Utc::now());
+            }
             log
         }
     }
@@ -693,7 +719,7 @@ mod test {
     use super::*;
     use crate::test_util::open_fixture;
     use lookup::event_path;
-    use vrl_lib::value;
+    use vrl::value;
 
     // The following two tests assert that renaming a key has no effect if the
     // keys are equivalent, whether the key exists in the log or not.

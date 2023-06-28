@@ -1,7 +1,7 @@
 package metadata
 
 urls: {
-	apex:                                       "https://apex.sh/logs/"
+	appsignal:                                  "https://www.appsignal.com/"
 	azure_blob_storage:                         "https://azure.microsoft.com/en-us/services/storage/blobs/"
 	azure_event_hubs:                           "https://learn.microsoft.com/en-us/azure/event-hubs/"
 	azure_event_hubs_kafka:                     "https://learn.microsoft.com/en-us/azure/event-hubs/event-hubs-for-kafka-ecosystem-overview"
@@ -120,6 +120,9 @@ urls: {
 	cue:                                        "https://cuelang.org/"
 	csv:                                        "\(wikipedia)/wiki/Comma-separated_values"
 	dag:                                        "\(wikipedia)/wiki/Directed_acyclic_graph"
+	databend:                                   "https://databend.rs"
+	databend_rest:                              "https://databend.rs/doc/integrations/api/rest"
+	databend_cloud:                             "https://www.databend.com"
 	datadog:                                    "https://www.datadoghq.com"
 	datadog_agent:                              "https://docs.datadoghq.com/agent/"
 	datadog_agent_doc:                          "\(datadog_docs)/agent/vector_aggregation/"
@@ -241,6 +244,7 @@ urls: {
 	heroku:                                     "https://www.heroku.com"
 	heroku_http_log_drain:                      "https://devcenter.heroku.com/articles/log-drains#https-drains"
 	heroku_start:                               "https://devcenter.heroku.com/start"
+	hmac:                                       "\(wikipedia)/wiki/HMAC"
 	homebrew:                                   "https://brew.sh/"
 	homebrew_services:                          "\(github)/Homebrew/homebrew-services"
 	honeycomb:                                  "https://honeycomb.io"
@@ -304,7 +308,7 @@ urls: {
 	librdkafka:                                 "\(github)/edenhill/librdkafka"
 	librdkafka_config:                          "\(github)/edenhill/librdkafka/blob/master/CONFIGURATION.md"
 	linux_capability:                           "https://man7.org/linux/man-pages/man7/capabilities.7.html"
-	logdna:                                     "https://logdna.com/"
+	mezmo:                                      "https://mezmo.com/"
 	logfmt:                                     "https://brandur.org/logfmt"
 	logfmt_specs:                               "https://pkg.go.dev/github.com/kr/logfmt#section-documentation"
 	logstash:                                   "https://www.elastic.co/logstash"
@@ -409,6 +413,7 @@ urls: {
 	prometheus_remote_integrations:             "https://prometheus.io/docs/operating/integrations/#remote-endpoints-and-storage"
 	prometheus_remote_write:                    "https://prometheus.io/docs/prometheus/latest/configuration/configuration/#remote_write"
 	prometheus_remote_write_protocol:           "https://docs.google.com/document/d/1LPhVRSFkGNSuU1fBd81ulhsCPR4hkSZyyBj1SZ8fWOM/edit#heading=h.n0d0vphea3fe"
+	prometheus_remote_write_spec:               "https://prometheus.io/docs/concepts/remote_write_spec/#protocol"
 	protobuf:                                   "https://developers.google.com/protocol-buffers"
 	pulsar:                                     "https://pulsar.apache.org/"
 	pulsar_protocol:                            "https://pulsar.apache.org/docs/en/develop-binary-protocol/"
@@ -583,7 +588,6 @@ urls: {
 	vector_remap_transform:                     "/docs/reference/configuration/transforms/remap/"
 	vector_remap_transform_multiple:            "/docs/reference/configuration/transforms/remap/#emitting-multiple-log-events"
 	vector_repo:                                "\(github)/vectordotdev/vector"
-	vector_roadmap:                             "https://roadmap.vector.dev"
 	vector_roles:                               "/docs/setup/deployment/roles"
 	vector_route_transform:                     "/docs/reference/configuration/transforms/route"
 	vector_rpm_source_files:                    "\(vector_repo)/tree/master/distribution/rpm"
@@ -648,5 +652,5 @@ urls: {
 	ytt:                                        "https://carvel.dev/ytt/"
 	yum:                                        "\(wikipedia)/wiki/Yum_(software)"
 	zlib:                                       "https://www.zlib.net"
-	zstd:                                       "https://zstd.net"
+	zstd:                                       "https://facebook.github.io/zstd"
 }

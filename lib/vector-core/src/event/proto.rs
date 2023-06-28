@@ -10,10 +10,10 @@ use crate::{
 mod proto_event {
     include!(concat!(env!("OUT_DIR"), "/event.rs"));
 }
-pub use proto_event::*;
-
 pub use event_wrapper::Event;
 pub use metric::Value as MetricValue;
+pub use proto_event::*;
+use vrl::value::Value as VrlValue;
 
 use super::{array, metric::MetricSketch};
 
@@ -92,7 +92,7 @@ impl From<Trace> for Event {
 impl From<Log> for event::LogEvent {
     fn from(log: Log) -> Self {
         let mut event_log = if let Some(value) = log.value {
-            Self::from(decode_value(value).unwrap_or(::value::Value::Null))
+            Self::from(decode_value(value).unwrap_or(VrlValue::Null))
         } else {
             // This is for backwards compatibility. Only `value` should be set
             let fields = log
@@ -285,7 +285,7 @@ impl From<event::LogEvent> for WithMetadata<Log> {
         // Once this backwards compatibility is no longer required, "fields" can
         // be entirely removed from the Log object
 
-        let data = if let ::value::Value::Object(fields) = value {
+        let data = if let VrlValue::Object(fields) = value {
             // using only "fields" to prevent having to use the dummy value
             Log {
                 fields: fields
@@ -299,7 +299,7 @@ impl From<event::LogEvent> for WithMetadata<Log> {
             let mut dummy = BTreeMap::new();
             // must insert at least 1 field, otherwise it is emitted entirely.
             // this value is ignored in the decoding step (since value is provided)
-            dummy.insert(".".to_owned(), encode_value(::value::Value::Null));
+            dummy.insert(".".to_owned(), encode_value(VrlValue::Null));
             Log {
                 fields: dummy,
                 value: Some(encode_value(value)),

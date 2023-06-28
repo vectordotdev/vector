@@ -55,7 +55,7 @@ _values: {
 // * `removed` - The component has been removed.
 #DevelopmentStatus: "beta" | "stable" | "deprecated" | "removed"
 
-#EncodingCodec: "json" | "logfmt" | "text" | "native" | "native_json" | "avro" | "gelf"
+#EncodingCodec: "json" | "logfmt" | "text" | "csv" | "native" | "native_json" | "avro" | "gelf"
 
 #Endpoint: {
 	description: string
@@ -392,12 +392,12 @@ _values: {
 	#Syntax: {
 		name:        !=""
 		description: !=""
-		example:     !=""
+		example:     string | null
 	}
 
 	#ConditionExample: {
 		title:    !=""
-		name:     "vrl" | "datadog_search"
+		name:     "vrl" | "datadog_search" | "is_log" | "is_metric" | "is_trace"
 		example:  !=""
 		vrl_only: bool | *false
 	}
@@ -415,6 +415,21 @@ _values: {
 			name:        "datadog_search"
 			description: "A [Datadog Search](\(urls.datadog_search_syntax)) query string."
 			example:     #"*stack"#
+		},
+		{
+			name:        "is_log"
+			description: "Whether the incoming event is a log."
+			example:     null
+		},
+		{
+			name:        "is_metric"
+			description: "Whether the incoming event is a metric."
+			example:     null
+		},
+		{
+			name:        "is_trace"
+			description: "Whether the incoming event is a trace."
+			example:     null
 		},
 	]
 
@@ -646,7 +661,7 @@ _coercing_fields: """
 	2. The [time format specifiers](\(urls.chrono_time_formats)) from Rust's
 	   `chrono` library.
 
-	### Types
+	**Types**
 
 	* `bool`
 	* `string`
@@ -655,7 +670,7 @@ _coercing_fields: """
 	* `date`
 	* `timestamp` (see the table below for formats)
 
-	### Timestamp Formats
+	**Timestamp Formats**
 
 	Format | Description | Example
 	:------|:------------|:-------

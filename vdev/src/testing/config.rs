@@ -3,9 +3,9 @@ use std::path::{Path, PathBuf};
 use std::{env, fs};
 
 use anyhow::{bail, Context, Result};
-use hashlink::LinkedHashMap;
+use indexmap::IndexMap;
 use itertools::{self, Itertools};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_yaml::Value;
 
 use crate::{app, util};
@@ -37,20 +37,49 @@ impl RustToolchainConfig {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct ComposeConfig {
     pub services: BTreeMap<String, ComposeService>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub volumes: BTreeMap<String, Value>,
+    #[serde(default)]
+    pub networks: BTreeMap<String, BTreeMap<String, String>>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct ComposeService {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub image: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hostname: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub container_name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub build: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub command: Option<Command>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ports: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub env_file: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub volumes: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub environment: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub depends_on: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub healthcheck: Option<Value>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(untagged)]
+pub enum Command {
+    Single(String),
+    Multiple(Vec<String>),
 }
 
 impl ComposeConfig {
-    #[cfg(unix)]
     pub fn parse(path: &Path) -> Result<Self> {
         let contents =
             fs::read_to_string(path).with_context(|| format!("failed to read {path:?}"))?;
@@ -62,17 +91,25 @@ impl ComposeConfig {
 #[serde(deny_unknown_fields)]
 pub struct IntegrationTestConfig {
     /// The list of arguments to add to the command line for the test runner
-    pub args: Vec<String>,
+    pub args: Option<Vec<String>>,
     /// The set of environment variables to set in both the services and the runner. Variables with
     /// no value are treated as "passthrough" -- they must be set by the caller of `vdev` and are
     /// passed into the containers.
     #[serde(default)]
     pub env: Environment,
     /// The matrix of environment configurations values.
-    matrix: LinkedHashMap<String, Vec<String>>,
+    matrix: IndexMap<String, Vec<String>>,
     /// Configuration specific to the compose services.
     #[serde(default)]
     pub runner: IntegrationRunnerConfig,
+
+    pub features: Vec<String>,
+
+    pub test: Option<String>,
+
+    pub test_filter: Option<String>,
+
+    pub paths: Option<Vec<String>>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize)]
@@ -105,7 +142,7 @@ impl IntegrationTestConfig {
         Ok(config)
     }
 
-    pub fn environments(&self) -> LinkedHashMap<String, Environment> {
+    pub fn environments(&self) -> IndexMap<String, Environment> {
         self.matrix
             .values()
             .multi_cartesian_product()

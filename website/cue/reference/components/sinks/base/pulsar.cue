@@ -15,7 +15,7 @@ base: components: sinks: pulsar: configuration: {
 				Whether or not end-to-end acknowledgements are enabled.
 
 				When enabled for a sink, any source connected to that sink, where the source supports
-				end-to-end acknowledgements as well, will wait for events to be acknowledged by the sink
+				end-to-end acknowledgements as well, waits for events to be acknowledged by the sink
 				before acknowledging them at the source.
 
 				Enabling or disabling acknowledgements at the sink level takes precedence over any global
@@ -86,12 +86,24 @@ base: components: sinks: pulsar: configuration: {
 	batch: {
 		description: "Event batching behavior."
 		required:    false
-		type: object: options: batch_size: {
-			description: "The maximum size of a batch, in events, before it is flushed."
-			required:    false
-			type: uint: {
-				examples: [1000]
-				unit: "events"
+		type: object: options: {
+			max_bytes: {
+				description: "The maximum size of a batch before it is flushed."
+				required:    false
+				type: uint: unit: "bytes"
+			}
+			max_events: {
+				description: """
+					The maximum amount of events in a batch before it is flushed.
+
+					Note this is an unsigned 32 bit integer which is a smaller capacity than
+					many of the other sink batch settings.
+					"""
+				required: false
+				type: uint: {
+					examples: [1000]
+					unit: "events"
+				}
 			}
 		}
 	}
@@ -132,6 +144,11 @@ base: components: sinks: pulsar: configuration: {
 
 						[apache_avro]: https://avro.apache.org/
 						"""
+					csv: """
+						Encodes an event as a CSV message.
+
+						This codec must be configured with fields to encode.
+						"""
 					gelf: """
 						Encodes an event as a [GELF][gelf] message.
 
@@ -148,7 +165,7 @@ base: components: sinks: pulsar: configuration: {
 						[logfmt]: https://brandur.org/logfmt
 						"""
 					native: """
-						Encodes an event in Vector’s [native Protocol Buffers format][vector_native_protobuf].
+						Encodes an event in the [native Protocol Buffers format][vector_native_protobuf].
 
 						This codec is **[experimental][experimental]**.
 
@@ -156,7 +173,7 @@ base: components: sinks: pulsar: configuration: {
 						[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
 						"""
 					native_json: """
-						Encodes an event in Vector’s [native JSON format][vector_native_json].
+						Encodes an event in the [native JSON format][vector_native_json].
 
 						This codec is **[experimental][experimental]**.
 
@@ -166,26 +183,44 @@ base: components: sinks: pulsar: configuration: {
 					raw_message: """
 						No encoding.
 
-						This "encoding" simply uses the `message` field of a log event.
+						This encoding uses the `message` field of a log event.
 
-						Users should take care if they're modifying their log events (such as by using a `remap`
-						transform, etc) and removing the message field while doing additional parsing on it, as this
+						Be careful if you are modifying your log events (for example, by using a `remap`
+						transform) and removing the message field while doing additional parsing on it, as this
 						could lead to the encoding emitting empty strings for the given event.
 						"""
 					text: """
 						Plain text encoding.
 
-						This "encoding" simply uses the `message` field of a log event. For metrics, it uses an
+						This encoding uses the `message` field of a log event. For metrics, it uses an
 						encoding that resembles the Prometheus export format.
 
-						Users should take care if they're modifying their log events (such as by using a `remap`
-						transform, etc) and removing the message field while doing additional parsing on it, as this
+						Be careful if you are modifying your log events (for example, by using a `remap`
+						transform) and removing the message field while doing additional parsing on it, as this
 						could lead to the encoding emitting empty strings for the given event.
 						"""
 				}
 			}
+			csv: {
+				description:   "The CSV Serializer Options."
+				relevant_when: "codec = \"csv\""
+				required:      true
+				type: object: options: fields: {
+					description: """
+						Configures the fields that will be encoded, as well as the order in which they
+						appear in the output.
+
+						If a field is not present in the event, the output will be an empty string.
+
+						Values of type `Array`, `Object`, and `Regex` are not supported and the
+						output will be an empty string.
+						"""
+					required: true
+					type: array: items: type: string: {}
+				}
+			}
 			except_fields: {
-				description: "List of fields that will be excluded from the encoded event."
+				description: "List of fields that are excluded from the encoded event."
 				required:    false
 				type: array: items: type: string: {}
 			}
@@ -193,25 +228,25 @@ base: components: sinks: pulsar: configuration: {
 				description: """
 					Controls how metric tag values are encoded.
 
-					When set to `single`, only the last non-bare value of tags will be displayed with the
-					metric.  When set to `full`, all metric tags will be exposed as separate assignments.
+					When set to `single`, only the last non-bare value of tags are displayed with the
+					metric.  When set to `full`, all metric tags are exposed as separate assignments.
 					"""
 				relevant_when: "codec = \"json\" or codec = \"text\""
 				required:      false
 				type: string: {
 					default: "single"
 					enum: {
-						full: "All tags will be exposed as arrays of either string or null values."
+						full: "All tags are exposed as arrays of either string or null values."
 						single: """
-															Tag values will be exposed as single strings, the same as they were before this config
-															option. Tags with multiple values will show the last assigned value, and null values will be
-															ignored.
+															Tag values are exposed as single strings, the same as they were before this config
+															option. Tags with multiple values show the last assigned value, and null values
+															are ignored.
 															"""
 					}
 				}
 			}
 			only_fields: {
-				description: "List of fields that will be included in the encoded event."
+				description: "List of fields that are included in the encoded event."
 				required:    false
 				type: array: items: type: string: {}
 			}
@@ -235,18 +270,38 @@ base: components: sinks: pulsar: configuration: {
 		type: string: examples: ["pulsar://127.0.0.1:6650"]
 	}
 	partition_key_field: {
-		description: "Log field to use as Pulsar message key."
-		required:    false
+		description: """
+			The log field name or tags key to use for the partition key.
+
+			If the field does not exist in the log event or metric tags, a blank value will be used.
+
+			If omitted, the key is not sent.
+
+			Pulsar uses a hash of the key to choose the topic-partition or uses round-robin if the record has no key.
+			"""
+		required: false
 		type: string: examples: ["message", "my_field"]
 	}
 	producer_name: {
-		description: "The name of the producer. If not specified, the default name assigned by Pulsar will be used."
+		description: "The name of the producer. If not specified, the default name assigned by Pulsar is used."
 		required:    false
 		type: string: examples: ["producer-name"]
+	}
+	properties_key: {
+		description: """
+			The log field name to use for the Pulsar properties key.
+
+			If omitted, no properties will be written.
+			"""
+		required: false
+		type: string: {}
 	}
 	topic: {
 		description: "The Pulsar topic name to write events to."
 		required:    true
-		type: string: examples: ["topic-1234"]
+		type: string: {
+			examples: ["topic-1234"]
+			syntax: "template"
+		}
 	}
 }

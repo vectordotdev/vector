@@ -1,0 +1,17 @@
+test_filter: '::webhdfs::'
+
+features:
+- webhdfs-integration-tests
+
+env:
+  WEBHDFS_ENDPOINT: http://namenode.local:9870
+
+matrix:
+  hadoop: ['2.0.0-hadoop3.2.1-java8']
+
+# changes to these files/paths will invoke the integration test in CI
+# expressions are evaluated using https://github.com/micromatch/picomatch
+paths:
+- "src/sinks/webhdfs/**"
+- "src/sinks/util/**"
+- "scripts/integration/webhdfs/**"

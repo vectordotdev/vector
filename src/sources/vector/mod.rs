@@ -1,3 +1,4 @@
+//! The `vector` source. See [VectorConfig].
 use std::net::SocketAddr;
 
 use chrono::Utc;
@@ -5,7 +6,7 @@ use codecs::NativeDeserializerConfig;
 use futures::TryFutureExt;
 use tonic::{Request, Response, Status};
 use vector_common::internal_event::{CountByteSize, InternalEventHandle as _};
-use vector_config::{configurable_component, NamedComponent};
+use vector_config::configurable_component;
 use vector_core::{
     config::LogNamespace,
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event},
@@ -14,8 +15,8 @@ use vector_core::{
 
 use crate::{
     config::{
-        DataType, GenerateConfig, Output, Resource, SourceAcknowledgementsConfig, SourceConfig,
-        SourceContext,
+        DataType, GenerateConfig, Resource, SourceAcknowledgementsConfig, SourceConfig,
+        SourceContext, SourceOutput,
     },
     internal_events::{EventsReceived, StreamClosedError},
     proto::vector as proto,
@@ -25,7 +26,7 @@ use crate::{
     SourceSender,
 };
 
-/// Marker type for the version two of the configuration for the `vector` source.
+/// Marker type for version two of the configuration for the `vector` source.
 #[configurable_component]
 #[derive(Clone, Debug)]
 enum VectorConfigVersion {
@@ -35,7 +36,7 @@ enum VectorConfigVersion {
 }
 
 #[derive(Debug, Clone)]
-pub struct Service {
+struct Service {
     pipeline: SourceSender,
     acknowledgements: bool,
     log_namespace: LogNamespace,
@@ -77,7 +78,7 @@ impl proto::Service for Service {
             .send_batch(events)
             .map_err(|error| {
                 let message = error.to_string();
-                emit!(StreamClosedError { error, count });
+                emit!(StreamClosedError { count });
                 Status::unavailable(message)
             })
             .and_then(|_| handle_batch_status(receiver))
@@ -113,7 +114,7 @@ async fn handle_batch_status(receiver: Option<BatchStatusReceiver>) -> Result<()
 }
 
 /// Configuration for the `vector` source.
-#[configurable_component(source("vector"))]
+#[configurable_component(source("vector", "Collect observability data from a Vector instance."))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct VectorConfig {
@@ -168,6 +169,7 @@ impl GenerateConfig for VectorConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "vector")]
 impl SourceConfig for VectorConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<Source> {
         let tls_settings = MaybeTlsSettings::from_config(&self.tls, true)?;
@@ -189,14 +191,14 @@ impl SourceConfig for VectorConfig {
         Ok(Box::pin(source))
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
 
         let schema_definition = NativeDeserializerConfig
             .schema_definition(log_namespace)
             .with_standard_vector_source_metadata();
 
-        vec![Output::default(DataType::all()).with_schema_definition(schema_definition)]
+        vec![SourceOutput::new_logs(DataType::all(), schema_definition)]
     }
 
     fn resources(&self) -> Vec<Resource> {
@@ -211,8 +213,8 @@ impl SourceConfig for VectorConfig {
 #[cfg(test)]
 mod test {
     use lookup::owned_value_path;
-    use value::{kind::Collection, Kind};
     use vector_core::{config::LogNamespace, schema::Definition};
+    use vrl::value::{kind::Collection, Kind};
 
     use crate::config::SourceConfig;
 
@@ -227,10 +229,10 @@ mod test {
     fn output_schema_definition_vector_namespace() {
         let config = VectorConfig::default();
 
-        let definition = config.outputs(LogNamespace::Vector)[0]
-            .clone()
-            .log_schema_definition
-            .unwrap();
+        let definitions = config
+            .outputs(LogNamespace::Vector)
+            .remove(0)
+            .schema_definition(true);
 
         let expected_definition =
             Definition::new_with_default_metadata(Kind::any(), [LogNamespace::Vector])
@@ -245,17 +247,17 @@ mod test {
                     None,
                 );
 
-        assert_eq!(definition, expected_definition)
+        assert_eq!(definitions, Some(expected_definition))
     }
 
     #[test]
     fn output_schema_definition_legacy_namespace() {
         let config = VectorConfig::default();
 
-        let definition = config.outputs(LogNamespace::Legacy)[0]
-            .clone()
-            .log_schema_definition
-            .unwrap();
+        let definitions = config
+            .outputs(LogNamespace::Legacy)
+            .remove(0)
+            .schema_definition(true);
 
         let expected_definition = Definition::new_with_default_metadata(
             Kind::object(Collection::empty()),
@@ -264,7 +266,7 @@ mod test {
         .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None)
         .with_event_field(&owned_value_path!("timestamp"), Kind::timestamp(), None);
 
-        assert_eq!(definition, expected_definition)
+        assert_eq!(definitions, Some(expected_definition))
     }
 }
 
@@ -278,11 +280,7 @@ mod tests {
     use crate::{
         config::{SinkConfig as _, SinkContext},
         sinks::vector::VectorConfig as SinkConfig,
-        test_util::{
-            self,
-            components::{assert_source_compliance, SOURCE_TAGS},
-        },
-        SourceSender,
+        test_util, SourceSender,
     };
 
     async fn run_test(vector_source_config_str: &str, addr: SocketAddr) {
@@ -321,25 +319,19 @@ mod tests {
     async fn receive_message() {
         let addr = test_util::next_addr();
 
-        assert_source_compliance(&SOURCE_TAGS, async {
-            let config = format!(r#"address = "{}""#, addr);
-            run_test(&config, addr).await;
-        })
-        .await;
+        let config = format!(r#"address = "{}""#, addr);
+        run_test(&config, addr).await;
     }
 
     #[tokio::test]
     async fn receive_compressed_message() {
         let addr = test_util::next_addr();
 
-        assert_source_compliance(&SOURCE_TAGS, async {
-            let config = format!(
-                r#"address = "{}"
+        let config = format!(
+            r#"address = "{}"
             compression=true"#,
-                addr
-            );
-            run_test(&config, addr).await;
-        })
-        .await;
+            addr
+        );
+        run_test(&config, addr).await;
     }
 }

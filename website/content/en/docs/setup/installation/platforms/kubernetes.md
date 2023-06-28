@@ -13,7 +13,7 @@ tested with Kubernetes versions **1.19** or higher.
 
 ## Install
 
-You can install Vector on Kubernetes using either [Helm](#helm) or [kubectl](#kubectl).
+You can install Vector on Kubernetes using [Helm](#helm), [kubectl](#kubectl) or [Vector Operator](#vector-operator)
 
 ### Helm
 
@@ -143,6 +143,12 @@ kubectl apply -k .
 ```shell
 "kubectl logs -n vector statefulset/vector"
 ```
+
+### Vector Operator
+
+The [Vector Operator](https://github.com/kaasops/vector-operator) is community supported resource. The operator deploys and configures a Vector Agent as a DaemonSet on every Node to collect container and application logs from the Node's file system.
+
+For additional information, see the [documentation](https://github.com/kaasops/vector-operator/tree/main/docs).
 
 ## Deployment
 

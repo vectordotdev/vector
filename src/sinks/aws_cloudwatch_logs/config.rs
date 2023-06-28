@@ -4,6 +4,8 @@ use codecs::JsonSerializerConfig;
 use futures::FutureExt;
 use tower::ServiceBuilder;
 use vector_config::configurable_component;
+use vector_core::schema;
+use vrl::value::Kind;
 
 use crate::{
     aws::{
@@ -12,8 +14,8 @@ use crate::{
     },
     codecs::{Encoder, EncodingConfig},
     config::{
-        log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Input, ProxyConfig,
-        SinkConfig, SinkContext,
+        AcknowledgementsConfig, DataType, GenerateConfig, Input, ProxyConfig, SinkConfig,
+        SinkContext,
     },
     sinks::{
         aws_cloudwatch_logs::{
@@ -47,7 +49,10 @@ impl ClientBuilder for CloudwatchLogsClientBuilder {
 }
 
 /// Configuration for the `aws_cloudwatch_logs` sink.
-#[configurable_component(sink("aws_cloudwatch_logs"))]
+#[configurable_component(sink(
+    "aws_cloudwatch_logs",
+    "Publish log events to AWS CloudWatch Logs."
+))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct CloudwatchLogsSinkConfig {
@@ -78,7 +83,7 @@ pub struct CloudwatchLogsSinkConfig {
 
     /// Dynamically create a [log group][log_group] if it does not already exist.
     ///
-    /// This will ignore `create_missing_stream` directly after creating the group and will create
+    /// This ignores `create_missing_stream` directly after creating the group and creates
     /// the first stream.
     ///
     /// [log_group]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html
@@ -134,7 +139,7 @@ impl CloudwatchLogsSinkConfig {
         create_client::<CloudwatchLogsClientBuilder>(
             &self.auth,
             self.region.region(),
-            self.region.endpoint()?,
+            self.region.endpoint(),
             proxy,
             &self.tls,
             true,
@@ -159,6 +164,7 @@ impl CloudwatchLogsSinkConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "aws_cloudwatch_logs")]
 impl SinkConfig for CloudwatchLogsSinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let batcher_settings = self.batch.into_batcher_settings()?;
@@ -184,7 +190,6 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
             request_builder: CloudwatchRequestBuilder {
                 group_template: self.group_name.clone(),
                 stream_template: self.stream_name.clone(),
-                log_schema: log_schema().clone(),
                 transformer,
                 encoder,
             },
@@ -196,7 +201,11 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
     }
 
     fn input(&self) -> Input {
+        let requirement =
+            schema::Requirement::empty().optional_meaning("timestamp", Kind::timestamp());
+
         Input::new(self.encoding.config().input_type() & DataType::Log)
+            .with_schema_requirement(requirement)
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {

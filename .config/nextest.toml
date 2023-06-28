@@ -16,3 +16,4 @@ fail-fast = false
 [profile.default.junit]
 # output test results at target/nextest/default/junit.xml
 path = "junit.xml"
+store-failure-output = true

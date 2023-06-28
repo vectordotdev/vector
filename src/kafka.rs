@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 use std::path::{Path, PathBuf};
 
 use rdkafka::{consumer::ConsumerContext, ClientConfig, ClientContext, Statistics};
@@ -56,9 +57,11 @@ pub struct KafkaAuthConfig {
 pub struct KafkaSaslConfig {
     /// Enables SASL authentication.
     ///
-    /// Only `PLAIN` and `SCRAM`-based mechanisms are supported when configuring SASL authentication via `sasl.*`. For
-    /// other mechanisms, `librdkafka_options.*` must be used directly to configure other `librdkafka`-specific values
-    /// i.e. `sasl.kerberos.*` and so on.
+    /// Only `PLAIN`- and `SCRAM`-based mechanisms are supported when configuring SASL authentication using `sasl.*`. For
+    /// other mechanisms, `librdkafka_options.*` must be used directly to configure other `librdkafka`-specific values.
+    /// If using `sasl.kerberos.*` as an example, where `*` is `service.name`, `principal`, `kinit.md`, etc., then
+    /// `librdkafka_options.*` as a result becomes `librdkafka_options.sasl.kerberos.service.name`,
+    /// `librdkafka_options.sasl.kerberos.principal`, etc.
     ///
     /// See the [librdkafka documentation](https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md) for details.
     ///
@@ -150,12 +153,15 @@ fn pathbuf_to_string(path: &Path) -> crate::Result<&str> {
 }
 
 #[derive(Default)]
-pub(crate) struct KafkaStatisticsContext;
+pub(crate) struct KafkaStatisticsContext {
+    pub(crate) expose_lag_metrics: bool,
+}
 
 impl ClientContext for KafkaStatisticsContext {
     fn stats(&self, statistics: Statistics) {
         emit!(KafkaStatisticsReceived {
-            statistics: &statistics
+            statistics: &statistics,
+            expose_lag_metrics: self.expose_lag_metrics,
         });
     }
 }

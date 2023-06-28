@@ -19,9 +19,9 @@ pub fn all_fields_non_object_root(value: &Value) -> FieldsIter {
     FieldsIter::non_object(value)
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 enum LeafIter<'a> {
-    Root(&'a Value),
+    Root((&'a Value, bool)),
     Map(btree_map::Iter<'a, String, Value>),
     Array(iter::Enumerate<slice::Iter<'a, Value>>),
 }
@@ -55,7 +55,7 @@ impl<'a> FieldsIter<'a> {
     /// will be treated as an object with a single "message" key
     fn non_object(value: &'a Value) -> FieldsIter<'a> {
         FieldsIter {
-            stack: vec![LeafIter::Root(value)],
+            stack: vec![LeafIter::Root((value, false))],
             path: vec![],
         }
     }
@@ -131,8 +131,10 @@ impl<'a> Iterator for FieldsIter<'a> {
                         }
                     }
                 },
-                Some(LeafIter::Root(value)) => {
-                    return Some(("message".to_owned(), value));
+                Some(LeafIter::Root((value, visited))) => {
+                    let result = (!*visited).then(|| ("message".to_owned(), *value));
+                    *visited = true;
+                    return result;
                 }
             };
         }
@@ -208,5 +210,14 @@ mod test {
 
         let collected: Vec<_> = all_fields(&fields).map(|(k, v)| (k, v.clone())).collect();
         assert_eq!(collected, expected);
+    }
+
+    #[test]
+    fn test_non_object_root() {
+        let value = Value::Integer(3);
+        let collected: Vec<_> = all_fields_non_object_root(&value)
+            .map(|(k, v)| (k, v.clone()))
+            .collect();
+        assert_eq!(collected, vec![("message".to_owned(), value)]);
     }
 }

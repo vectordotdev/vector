@@ -49,7 +49,7 @@ suitable for complex data definitions.
 
 Cue can be [installed](https://cuelang.org/docs/install/) from package managers,
 however it may be necessary to install it from source in order to use the correct
-version that Vector depends on. Currently Vector is using `v0.4.2`. Using a CUE
+version that Vector depends on. Currently Vector is using `v0.5.0`. Using a CUE
 version different than this may result in CUE check/build errors. We are aiming
 to improve the developer experience around external tool dependencies ([#15909](https://github.com/vectordotdev/vector/issues/15909)).
 
@@ -61,7 +61,7 @@ properly formatted. To run CUE's autoformatting, first [install cue](https://cue
 then run this command from the `vector` root:
 
 ```bash
-cue fmt ./docs/**/*.cue
+cue fmt ./website/**/*.cue
 ```
 
 If that rewrites any files, make sure to commit your changes or else you'll see

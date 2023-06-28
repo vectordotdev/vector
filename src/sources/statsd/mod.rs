@@ -14,23 +14,24 @@ use serde_with::serde_as;
 use smallvec::{smallvec, SmallVec};
 use tokio_util::udp::UdpFramed;
 use vector_common::internal_event::{CountByteSize, InternalEventHandle as _, Registered};
-use vector_config::{configurable_component, NamedComponent};
+use vector_config::configurable_component;
 use vector_core::EstimatedJsonEncodedSizeOf;
 
 use self::parser::ParseError;
 use super::util::net::{try_bind_udp_socket, SocketListenAddr, TcpNullAcker, TcpSource};
 use crate::{
     codecs::Decoder,
-    config::{self, GenerateConfig, Output, Resource, SourceConfig, SourceContext},
+    config::{GenerateConfig, Resource, SourceConfig, SourceContext, SourceOutput},
     event::Event,
     internal_events::{
         EventsReceived, SocketBindError, SocketBytesReceived, SocketMode, SocketReceiveError,
         StreamClosedError,
     },
+    net,
     shutdown::ShutdownSignal,
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsSettings, TlsSourceConfig},
-    udp, SourceSender,
+    SourceSender,
 };
 
 pub mod parser;
@@ -43,7 +44,7 @@ use unix::{statsd_unix, UnixConfig};
 use vector_core::config::LogNamespace;
 
 /// Configuration for the `statsd` source.
-#[configurable_component(source("statsd"))]
+#[configurable_component(source("statsd", "Collect metrics emitted by the StatsD aggregator."))]
 #[derive(Clone, Debug)]
 #[serde(tag = "mode", rename_all = "snake_case")]
 #[configurable(metadata(docs::enum_tag_description = "The type of socket to use."))]
@@ -68,8 +69,6 @@ pub struct UdpConfig {
     address: SocketListenAddr,
 
     /// The size of the receive buffer used for each connection.
-    ///
-    /// Generally this should not need to be configured.
     receive_buffer_bytes: Option<usize>,
 }
 
@@ -100,15 +99,14 @@ pub struct TcpConfig {
     /// The timeout before a connection is forcefully closed during shutdown.
     #[serde(default = "default_shutdown_timeout_secs")]
     #[serde_as(as = "serde_with::DurationSeconds<u64>")]
+    #[configurable(metadata(docs::human_name = "Shutdown Timeout"))]
     shutdown_timeout_secs: Duration,
 
     /// The size of the receive buffer used for each connection.
-    ///
-    /// Generally this should not need to be configured.
     #[configurable(metadata(docs::type_unit = "bytes"))]
     receive_buffer_bytes: Option<usize>,
 
-    /// The maximum number of TCP connections that will be allowed at any given time.
+    /// The maximum number of TCP connections that are allowed at any given time.
     #[configurable(metadata(docs::type_unit = "connections"))]
     connection_limit: Option<u32>,
 }
@@ -144,6 +142,7 @@ impl GenerateConfig for StatsdConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "statsd")]
 impl SourceConfig for StatsdConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         match self {
@@ -165,6 +164,7 @@ impl SourceConfig for StatsdConfig {
                     tls,
                     tls_client_metadata_key,
                     config.receive_buffer_bytes,
+                    None,
                     cx,
                     false.into(),
                     config.connection_limit,
@@ -177,8 +177,8 @@ impl SourceConfig for StatsdConfig {
         }
     }
 
-    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
-        vec![Output::default(config::DataType::Metric)]
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
+        vec![SourceOutput::new_metrics()]
     }
 
     fn resources(&self) -> Vec<Resource> {
@@ -275,7 +275,7 @@ async fn statsd_udp(
         .await?;
 
     if let Some(receive_buffer_bytes) = config.receive_buffer_bytes {
-        if let Err(error) = udp::set_receive_buffer_size(&socket, receive_buffer_bytes) {
+        if let Err(error) = net::set_receive_buffer_size(&socket, receive_buffer_bytes) {
             warn!(message = "Failed configuring receive buffer size on UDP socket.", %error);
         }
     }
@@ -295,8 +295,8 @@ async fn statsd_udp(
         match frame {
             Ok(((events, _byte_size), _sock)) => {
                 let count = events.len();
-                if let Err(error) = out.send_batch(events).await {
-                    emit!(StreamClosedError { error, count });
+                if (out.send_batch(events).await).is_err() {
+                    emit!(StreamClosedError { count });
                 }
             }
             Err(error) => {
@@ -488,7 +488,7 @@ mod test {
         // everything that was in up without having to know the exact count.
         sleep(Duration::from_millis(250)).await;
         shutdown
-            .shutdown_all(Instant::now() + Duration::from_millis(100))
+            .shutdown_all(Some(Instant::now() + Duration::from_millis(100)))
             .await;
 
         // Read all the events into a `MetricState`, which handles normalizing metrics and tracking
@@ -580,7 +580,7 @@ mod test {
         // everything that was in up without having to know the exact count.
         sleep(Duration::from_millis(250)).await;
         shutdown
-            .shutdown_all(Instant::now() + Duration::from_millis(100))
+            .shutdown_all(Some(Instant::now() + Duration::from_millis(100)))
             .await;
     }
 }

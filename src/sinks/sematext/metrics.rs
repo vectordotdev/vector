@@ -8,7 +8,7 @@ use indoc::indoc;
 use tower::Service;
 use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
-use vector_core::EstimatedJsonEncodedSizeOf;
+use vector_core::{ByteSizeOf, EstimatedJsonEncodedSizeOf};
 
 use super::Region;
 use crate::{
@@ -47,7 +47,7 @@ impl SinkBatchSettings for SematextMetricsDefaultBatchSettings {
 }
 
 /// Configuration for the `sematext_metrics` sink.
-#[configurable_component(sink("sematext_metrics"))]
+#[configurable_component(sink("sematext_metrics", "Publish metric events to Sematext."))]
 #[derive(Clone, Debug)]
 pub struct SematextMetricsConfig {
     /// Sets the default namespace for any metrics sent.
@@ -68,7 +68,7 @@ pub struct SematextMetricsConfig {
     #[configurable(metadata(docs::examples = "https://example.com"))]
     pub endpoint: Option<String>,
 
-    /// The token that will be used to write to Sematext.
+    /// The token that is used to write to Sematext.
     #[configurable(metadata(docs::examples = "${SEMATEXT_TOKEN}"))]
     #[configurable(metadata(docs::examples = "some-sematext-token"))]
     pub token: SensitiveString,
@@ -121,6 +121,7 @@ const US_ENDPOINT: &str = "https://spm-receiver.sematext.com";
 const EU_ENDPOINT: &str = "https://spm-receiver.eu.sematext.com";
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "sematext_metrics")]
 impl SinkConfig for SematextMetricsConfig {
     async fn build(&self, cx: SinkContext) -> Result<(VectorSink, Healthcheck)> {
         let client = HttpClient::new(None, cx.proxy())?;
@@ -185,14 +186,16 @@ impl SematextMetricsService {
             )
             .with_flat_map(move |event: Event| {
                 stream::iter({
-                    let byte_size = event.estimated_json_encoded_size_of();
+                    let byte_size = event.size_of();
+                    let json_byte_size = event.estimated_json_encoded_size_of();
                     normalizer
                         .normalize(event.into_metric())
-                        .map(|item| Ok(EncodedEvent::new(item, byte_size)))
+                        .map(|item| Ok(EncodedEvent::new(item, byte_size, json_byte_size)))
                 })
             })
             .sink_map_err(|error| error!(message = "Fatal sematext metrics sink error.", %error));
 
+        #[allow(deprecated)]
         Ok(VectorSink::from_event_sink(sink))
     }
 }
@@ -256,7 +259,8 @@ fn encode_events(
     metrics: Vec<Metric>,
 ) -> EncodedEvent<Bytes> {
     let mut output = BytesMut::new();
-    let byte_size = metrics.estimated_json_encoded_size_of();
+    let byte_size = metrics.size_of();
+    let json_byte_size = metrics.estimated_json_encoded_size_of();
     for metric in metrics.into_iter() {
         let (series, data, _metadata) = metric.into_parts();
         let namespace = series
@@ -292,7 +296,7 @@ fn encode_events(
     if !output.is_empty() {
         output.truncate(output.len() - 1);
     }
-    EncodedEvent::new(output.freeze(), byte_size)
+    EncodedEvent::new(output.freeze(), byte_size, json_byte_size)
 }
 
 fn to_fields(label: String, value: f64) -> HashMap<String, Field> {
@@ -303,7 +307,7 @@ fn to_fields(label: String, value: f64) -> HashMap<String, Field> {
 
 #[cfg(test)]
 mod tests {
-    use chrono::{offset::TimeZone, Utc};
+    use chrono::{offset::TimeZone, Timelike, Utc};
     use futures::StreamExt;
     use indoc::indoc;
     use vector_core::metric_tags;
@@ -332,8 +336,8 @@ mod tests {
         )
         .with_namespace(Some("jvm"))
         .with_timestamp(Some(
-            Utc.ymd(2020, 8, 18)
-                .and_hms_nano_opt(21, 0, 0, 0)
+            Utc.with_ymd_and_hms(2020, 8, 18, 21, 0, 0)
+                .single()
                 .expect("invalid timestamp"),
         ))];
 
@@ -351,8 +355,8 @@ mod tests {
             MetricValue::Counter { value: 42.0 },
         )
         .with_timestamp(Some(
-            Utc.ymd(2020, 8, 18)
-                .and_hms_nano_opt(21, 0, 0, 0)
+            Utc.with_ymd_and_hms(2020, 8, 18, 21, 0, 0)
+                .single()
                 .expect("invalid timestamp"),
         ))];
 
@@ -372,8 +376,8 @@ mod tests {
             )
             .with_namespace(Some("jvm"))
             .with_timestamp(Some(
-                Utc.ymd(2020, 8, 18)
-                    .and_hms_nano_opt(21, 0, 0, 0)
+                Utc.with_ymd_and_hms(2020, 8, 18, 21, 0, 0)
+                    .single()
                     .expect("invalid timestamp"),
             )),
             Metric::new(
@@ -383,8 +387,9 @@ mod tests {
             )
             .with_namespace(Some("jvm"))
             .with_timestamp(Some(
-                Utc.ymd(2020, 8, 18)
-                    .and_hms_nano_opt(21, 0, 0, 1)
+                Utc.with_ymd_and_hms(2020, 8, 18, 21, 0, 0)
+                    .single()
+                    .and_then(|t| t.with_nanosecond(1))
                     .expect("invalid timestamp"),
             )),
         ];
@@ -441,7 +446,9 @@ mod tests {
                 )
                 .with_namespace(Some(*namespace))
                 .with_tags(Some(metric_tags!("os.host" => "somehost")))
-                .with_timestamp(Some(Utc.ymd(2020, 8, 18).and_hms_nano_opt(21, 0, 0, i as u32).expect("invalid timestamp"))),
+                    .with_timestamp(Some(Utc.with_ymd_and_hms(2020, 8, 18, 21, 0, 0).single()
+                                         .and_then(|t| t.with_nanosecond(i as u32))
+                                         .expect("invalid timestamp"))),
             );
             events.push(event);
         }

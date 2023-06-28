@@ -33,7 +33,7 @@ impl<'a> Field<'a> {
         let original = serde.original;
 
         let name = serde.attrs.name().deserialize_name();
-        let default_value = get_serde_default_value(serde.attrs.default());
+        let default_value = get_serde_default_value(&serde.ty, serde.attrs.default());
 
         Attributes::from_attributes(&original.attrs)
             .and_then(|attrs| {

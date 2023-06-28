@@ -1,3 +1,4 @@
+//! Emits a heartbeat internal metric.
 use std::time::{Duration, Instant};
 
 use tokio::time::interval;

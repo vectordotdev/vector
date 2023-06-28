@@ -40,7 +40,7 @@ use bytes_path::BytesPath;
 
 /// Configuration for the `file` sink.
 #[serde_as]
-#[configurable_component(sink("file"))]
+#[configurable_component(sink("file", "Output observability events into files."))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct FileSinkConfig {
@@ -56,11 +56,12 @@ pub struct FileSinkConfig {
 
     /// The amount of time that a file can be idle and stay open.
     ///
-    /// After not receiving any events in this amount of time, the file will be flushed and closed.
+    /// After not receiving any events in this amount of time, the file is flushed and closed.
     #[serde(default = "default_idle_timeout")]
     #[serde_as(as = "serde_with::DurationSeconds<u64>")]
     #[serde(rename = "idle_timeout_secs")]
     #[configurable(metadata(docs::examples = 600))]
+    #[configurable(metadata(docs::human_name = "Idle Timeout"))]
     pub idle_timeout: Duration,
 
     #[serde(flatten)]
@@ -103,7 +104,7 @@ const fn default_idle_timeout() -> Duration {
 // TODO: Why doesn't this already use `crate::sinks::util::Compression`
 // `crate::sinks::util::Compression` doesn't support zstd yet
 #[configurable_component]
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum Compression {
     /// [Gzip][gzip] compression.
@@ -117,13 +118,8 @@ pub enum Compression {
     Zstd,
 
     /// No compression.
+    #[default]
     None,
-}
-
-impl Default for Compression {
-    fn default() -> Self {
-        Compression::None
-    }
 }
 
 enum OutFile {
@@ -174,6 +170,7 @@ impl OutFile {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "file")]
 impl SinkConfig for FileSinkConfig {
     async fn build(
         &self,

@@ -7,13 +7,15 @@ use hyper::Body;
 use serde_json::{json, map};
 use snafu::Snafu;
 use vector_config::configurable_component;
+use vrl::value::Kind;
 
 use crate::{
     codecs::Transformer,
-    config::{log_schema, AcknowledgementsConfig, Input, SinkConfig, SinkContext},
+    config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext},
     event::{Event, Value},
     gcp::{GcpAuthConfig, GcpAuthenticator, Scope},
     http::HttpClient,
+    schema,
     sinks::{
         gcs_common::config::healthcheck_response,
         util::{
@@ -34,7 +36,10 @@ enum HealthcheckError {
 }
 
 /// Configuration for the `gcp_stackdriver_logs` sink.
-#[configurable_component(sink("gcp_stackdriver_logs"))]
+#[configurable_component(sink(
+    "gcp_stackdriver_logs",
+    "Deliver logs to GCP's Cloud Operations suite."
+))]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct StackdriverConfig {
@@ -200,6 +205,7 @@ fn label_examples() -> HashMap<String, String> {
 impl_generate_config_from_default!(StackdriverConfig);
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "gcp_stackdriver_logs")]
 impl SinkConfig for StackdriverConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let auth = self.auth.build(Scope::LoggingWrite).await?;
@@ -235,11 +241,15 @@ impl SinkConfig for StackdriverConfig {
         )
         .sink_map_err(|error| error!(message = "Fatal gcp_stackdriver_logs sink error.", %error));
 
+        #[allow(deprecated)]
         Ok((VectorSink::from_event_sink(sink), healthcheck))
     }
 
     fn input(&self) -> Input {
-        Input::log()
+        let requirement =
+            schema::Requirement::empty().required_meaning("timestamp", Kind::timestamp());
+
+        Input::log().with_schema_requirement(requirement)
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
@@ -306,7 +316,7 @@ impl HttpEventEncoder<serde_json::Value> for StackdriverEventEncoder {
         );
 
         // If the event contains a timestamp, send it in the main message so gcp can pick it up.
-        if let Some(timestamp) = log.get(log_schema().timestamp_key()) {
+        if let Some(timestamp) = log.get_timestamp() {
             entry.insert("timestamp".into(), json!(timestamp));
         }
 
@@ -516,8 +526,8 @@ mod tests {
         log.insert(
             "timestamp",
             Value::Timestamp(
-                Utc.ymd(2020, 1, 1)
-                    .and_hms_opt(12, 30, 0)
+                Utc.with_ymd_and_hms(2020, 1, 1, 12, 30, 0)
+                    .single()
                     .expect("invalid timestamp"),
             ),
         );

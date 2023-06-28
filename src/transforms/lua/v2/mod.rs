@@ -7,10 +7,11 @@ use vector_config::configurable_component;
 pub use vector_core::event::lua;
 use vector_core::transform::runtime_transform::{RuntimeTransform, Timer};
 
+use crate::config::OutputId;
 use crate::event::lua::event::LuaEvent;
 use crate::schema::Definition;
 use crate::{
-    config::{self, DataType, Input, Output, CONFIG_PATHS},
+    config::{self, DataType, Input, TransformOutput, CONFIG_PATHS},
     event::Event,
     internal_events::{LuaBuildError, LuaGcTriggered},
     schema,
@@ -67,6 +68,7 @@ pub struct LuaConfig {
     /// If not specified, the modules are looked up in the configuration directories.
     #[serde(default = "default_config_paths")]
     #[configurable(metadata(docs::examples = "/etc/vector/lua"))]
+    #[configurable(metadata(docs::human_name = "Search Directories"))]
     search_dirs: Vec<PathBuf>,
 
     #[configurable(derived)]
@@ -76,11 +78,11 @@ pub struct LuaConfig {
     #[serde(default)]
     timers: Vec<TimerConfig>,
 
-    /// When set to `single`, metric tag values will be exposed as single strings, the
-    /// same as they were before this config option. Tags with multiple values will show the last assigned value, and null values
-    /// will be ignored.
+    /// When set to `single`, metric tag values are exposed as single strings, the
+    /// same as they were before this config option. Tags with multiple values show the last assigned value, and null values
+    /// are ignored.
     ///
-    /// When set to `full`, all metric tags will be exposed as arrays of either string or null
+    /// When set to `full`, all metric tags are exposed as arrays of either string or null
     /// values.
     #[serde(default)]
     metric_tag_values: MetricTagValues,
@@ -155,6 +157,7 @@ struct HooksConfig {
 struct TimerConfig {
     /// The interval to execute the handler, in seconds.
     #[serde_as(as = "serde_with::DurationSeconds<u64>")]
+    #[configurable(metadata(docs::human_name = "Interval"))]
     interval_seconds: Duration,
 
     /// The handler function which is called when the timer ticks.
@@ -177,11 +180,30 @@ impl LuaConfig {
         Input::new(DataType::Metric | DataType::Log)
     }
 
-    pub fn outputs(&self, merged_definition: &schema::Definition) -> Vec<Output> {
+    pub fn outputs(
+        &self,
+        input_definitions: &[(OutputId, schema::Definition)],
+    ) -> Vec<TransformOutput> {
         // Lua causes the type definition to be reset
-        let definition = Definition::default_for_namespace(merged_definition.log_namespaces());
+        let namespaces = input_definitions
+            .iter()
+            .flat_map(|(_output, definition)| definition.log_namespaces().clone())
+            .collect();
 
-        vec![Output::default(DataType::Metric | DataType::Log).with_schema_definition(definition)]
+        let definition = input_definitions
+            .iter()
+            .map(|(output, _definition)| {
+                (
+                    output.clone(),
+                    Definition::default_for_namespace(&namespaces),
+                )
+            })
+            .collect();
+
+        vec![TransformOutput::new(
+            DataType::Metric | DataType::Log,
+            definition,
+        )]
     }
 }
 
@@ -319,7 +341,7 @@ impl Lua {
             emit!(LuaGcTriggered {
                 used_memory: self.lua.used_memory()
             });
-            let _ = self
+            _ = self
                 .lua
                 .gc_collect()
                 .context(RuntimeErrorGcSnafu)
@@ -349,7 +371,7 @@ impl RuntimeTransform for Lua {
         F: FnMut(Event),
     {
         let lua = &self.lua;
-        let _ = lua
+        _ = lua
             .scope(|scope| -> mlua::Result<()> {
                 lua.registry_value::<mlua::Function>(&self.hook_process)?
                     .call((
@@ -371,7 +393,7 @@ impl RuntimeTransform for Lua {
         F: FnMut(Event),
     {
         let lua = &self.lua;
-        let _ = lua
+        _ = lua
             .scope(|scope| -> mlua::Result<()> {
                 match &self.hook_init {
                     Some(key) => lua
@@ -391,7 +413,7 @@ impl RuntimeTransform for Lua {
         F: FnMut(Event),
     {
         let lua = &self.lua;
-        let _ = lua
+        _ = lua
             .scope(|scope| -> mlua::Result<()> {
                 match &self.hook_shutdown {
                     Some(key) => lua
@@ -411,7 +433,7 @@ impl RuntimeTransform for Lua {
         F: FnMut(Event),
     {
         let lua = &self.lua;
-        let _ = lua
+        _ = lua
             .scope(|scope| -> mlua::Result<()> {
                 let handler_key = &self.timers[timer.id as usize].1;
                 lua.registry_value::<mlua::Function>(handler_key)?

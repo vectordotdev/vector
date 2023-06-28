@@ -109,7 +109,8 @@ impl EncodingConfigWithFraming {
             }
             (
                 None,
-                Serializer::Gelf(_)
+                Serializer::Csv(_)
+                | Serializer::Gelf(_)
                 | Serializer::Logfmt(_)
                 | Serializer::NativeJson(_)
                 | Serializer::RawMessage(_)
@@ -144,7 +145,7 @@ where
 
 #[cfg(test)]
 mod test {
-    use lookup::lookup_v2::parse_value_path;
+    use lookup::lookup_v2::{parse_value_path, ConfigValuePath};
 
     use super::*;
     use crate::codecs::encoding::TimestampFormat;
@@ -169,7 +170,7 @@ mod test {
 
         assert_eq!(
             transformer.only_fields(),
-            &Some(vec![parse_value_path("a.b[0]").unwrap()])
+            &Some(vec![ConfigValuePath(parse_value_path("a.b[0]").unwrap())])
         );
         assert_eq!(
             transformer.except_fields(),
@@ -204,7 +205,7 @@ mod test {
 
         assert_eq!(
             transformer.only_fields(),
-            &Some(vec![parse_value_path("a.b[0]").unwrap()])
+            &Some(vec![ConfigValuePath(parse_value_path("a.b[0]").unwrap())])
         );
         assert_eq!(
             transformer.except_fields(),
@@ -236,7 +237,7 @@ mod test {
 
         assert_eq!(
             transformer.only_fields(),
-            &Some(vec![parse_value_path("a.b[0]").unwrap()])
+            &Some(vec![ConfigValuePath(parse_value_path("a.b[0]").unwrap())])
         );
         assert_eq!(
             transformer.except_fields(),

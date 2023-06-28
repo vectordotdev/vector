@@ -28,23 +28,24 @@ use tokio::{
     time::sleep,
 };
 use tokio_util::codec::FramedRead;
-use value::{kind::Collection, Kind, Value};
 use vector_common::{
     finalizer::OrderedFinalizer,
     internal_event::{
         ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol, Registered,
     },
 };
-use vector_config::{configurable_component, NamedComponent};
+use vector_config::configurable_component;
 use vector_core::{
     config::{LegacyKey, LogNamespace},
     schema::Definition,
     EstimatedJsonEncodedSizeOf,
 };
+use vrl::value::{kind::Collection, Kind, Value};
 
 use crate::{
     config::{
-        log_schema, DataType, Output, SourceAcknowledgementsConfig, SourceConfig, SourceContext,
+        log_schema, DataType, SourceAcknowledgementsConfig, SourceConfig, SourceContext,
+        SourceOutput,
     },
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, LogEvent},
     internal_events::{
@@ -93,7 +94,7 @@ enum BuildError {
 type Matches = HashMap<String, HashSet<String>>;
 
 /// Configuration for the `journald` source.
-#[configurable_component(source("journald"))]
+#[configurable_component(source("journald", "Collect logs from JournalD."))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct JournaldConfig {
@@ -109,14 +110,14 @@ pub struct JournaldConfig {
     ///
     /// If empty or not present, all units are accepted.
     ///
-    /// Unit names lacking a `.` will have `.service` appended to make them a valid service unit name.
+    /// Unit names lacking a `.` have `.service` appended to make them a valid service unit name.
     #[serde(default)]
     #[configurable(metadata(docs::examples = "ntpd", docs::examples = "sysinit.target"))]
     pub include_units: Vec<String>,
 
     /// A list of unit names to exclude from monitoring.
     ///
-    /// Unit names lacking a `.` will have `.service` appended to make them a valid service unit
+    /// Unit names lacking a `.` have `.service` appended to make them a valid service unit
     /// name.
     #[serde(default)]
     #[configurable(metadata(docs::examples = "badservice", docs::examples = "sysinit.target"))]
@@ -126,7 +127,7 @@ pub struct JournaldConfig {
     ///
     /// If empty or not present, all journal fields are accepted.
     ///
-    /// If `include_units` is specified, it will be merged into this list.
+    /// If `include_units` is specified, it is merged into this list.
     #[serde(default)]
     #[configurable(metadata(
         docs::additional_props_description = "The set of field values to match in journal entries that are to be included."
@@ -134,10 +135,10 @@ pub struct JournaldConfig {
     #[configurable(metadata(docs::examples = "matches_examples()"))]
     pub include_matches: Matches,
 
-    /// A list of sets of field/value pairs that, if any are present in a journal entry, will cause
-    /// the entry to be excluded from this source.
+    /// A list of sets of field/value pairs that, if any are present in a journal entry,
+    /// excludes the entry from this source.
     ///
-    /// If `exclude_units` is specified, it will be merged into this list.
+    /// If `exclude_units` is specified, it is merged into this list.
     #[serde(default)]
     #[configurable(metadata(
         docs::additional_props_description = "The set of field values to match in journal entries that are to be excluded."
@@ -151,6 +152,7 @@ pub struct JournaldConfig {
     /// permissions to this directory.
     #[serde(default)]
     #[configurable(metadata(docs::examples = "/var/lib/vector"))]
+    #[configurable(metadata(docs::human_name = "Data Directory"))]
     pub data_dir: Option<PathBuf>,
 
     /// The systemd journal is read in batches, and a checkpoint is set at the end of each batch.
@@ -168,9 +170,19 @@ pub struct JournaldConfig {
 
     /// The full path of the journal directory.
     ///
-    /// If not set, `journalctl` will use the default system journal path.
+    /// If not set, `journalctl` uses the default system journal path.
     #[serde(default)]
     pub journal_directory: Option<PathBuf>,
+
+    /// The [journal namespace][journal-namespace].
+    ///
+    /// This value is passed to `journalctl` through the [`--namespace` option][journalctl-namespace-option].
+    /// If not set, `journalctl` uses the default namespace.
+    ///
+    /// [journal-namespace]: https://www.freedesktop.org/software/systemd/man/systemd-journald.service.html#Journal%20Namespaces
+    /// [journalctl-namespace-option]: https://www.freedesktop.org/software/systemd/man/journalctl.html#--namespace=NAMESPACE
+    #[serde(default)]
+    pub journal_namespace: Option<String>,
 
     #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
@@ -288,6 +300,7 @@ impl Default for JournaldConfig {
             batch_size: default_batch_size(),
             journalctl_path: None,
             journal_directory: None,
+            journal_namespace: None,
             acknowledgements: Default::default(),
             remap_priority: false,
             log_namespace: None,
@@ -300,6 +313,7 @@ impl_generate_config_from_default!(JournaldConfig);
 type Record = HashMap<String, String>;
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "journald")]
 impl SourceConfig for JournaldConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         if self.remap_priority {
@@ -338,6 +352,7 @@ impl SourceConfig for JournaldConfig {
         let starter = StartJournalctl::new(
             journalctl_path,
             self.journal_directory.clone(),
+            self.journal_namespace.clone(),
             self.current_boot_only,
             self.since_now,
         );
@@ -362,11 +377,11 @@ impl SourceConfig for JournaldConfig {
         ))
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         let schema_definition =
             self.schema_definition(global_log_namespace.merge(self.log_namespace));
 
-        vec![Output::default(DataType::Log).with_schema_definition(schema_definition)]
+        vec![SourceOutput::new_logs(DataType::Log, schema_definition)]
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -591,8 +606,8 @@ impl<'a> Batch<'a> {
                         finalizer.finalize(cursor, self.receiver).await;
                     }
                 }
-                Err(error) => {
-                    emit!(StreamClosedError { error, count });
+                Err(_) => {
+                    emit!(StreamClosedError { count });
                     // `out` channel is closed, don't restart journalctl.
                     self.exiting = Some(false);
                 }
@@ -607,6 +622,7 @@ type JournalStream = BoxStream<'static, Result<Bytes, BoxedFramingError>>;
 struct StartJournalctl {
     path: PathBuf,
     journal_dir: Option<PathBuf>,
+    journal_namespace: Option<String>,
     current_boot_only: bool,
     since_now: bool,
 }
@@ -615,12 +631,14 @@ impl StartJournalctl {
     const fn new(
         path: PathBuf,
         journal_dir: Option<PathBuf>,
+        journal_namespace: Option<String>,
         current_boot_only: bool,
         since_now: bool,
     ) -> Self {
         Self {
             path,
             journal_dir,
+            journal_namespace,
             current_boot_only,
             since_now,
         }
@@ -636,6 +654,10 @@ impl StartJournalctl {
 
         if let Some(dir) = &self.journal_dir {
             command.arg(format!("--directory={}", dir.display()));
+        }
+
+        if let Some(namespace) = &self.journal_namespace {
+            command.arg(format!("--namespace={}", namespace));
         }
 
         if self.current_boot_only {
@@ -677,7 +699,7 @@ struct RunningJournalctl(Child);
 impl Drop for RunningJournalctl {
     fn drop(&mut self) {
         if let Some(pid) = self.0.id().and_then(|pid| pid.try_into().ok()) {
-            let _ = kill(Pid::from_raw(pid), Signal::SIGTERM);
+            _ = kill(Pid::from_raw(pid), Signal::SIGTERM);
         }
     }
 }
@@ -724,7 +746,9 @@ fn enrich_log_event(log: &mut LogEvent, log_namespace: LogNamespace) {
         }
         LogNamespace::Legacy => {
             if let Some(ts) = timestamp {
-                log.insert((PathPrefix::Event, log_schema().timestamp_key()), ts);
+                if let Some(timestamp_key) = log_schema().timestamp_key() {
+                    log.insert((PathPrefix::Event, timestamp_key), ts);
+                }
             }
         }
     }
@@ -732,7 +756,7 @@ fn enrich_log_event(log: &mut LogEvent, log_namespace: LogNamespace) {
     // Add source type.
     log_namespace.insert_vector_metadata(
         log,
-        log_schema().source_type_key(),
+        Some(log_schema().source_type_key()),
         path!("source_type"),
         JournaldConfig::NAME,
     );
@@ -885,7 +909,7 @@ impl Finalizer {
         shutdown: ShutdownSignal,
     ) -> Self {
         if acknowledgements {
-            let (finalizer, mut ack_stream) = OrderedFinalizer::new(shutdown);
+            let (finalizer, mut ack_stream) = OrderedFinalizer::new(Some(shutdown));
             tokio::spawn(async move {
                 while let Some((status, cursor)) = ack_stream.next().await {
                     if status == BatchStatus::Delivered {
@@ -1044,7 +1068,7 @@ mod tests {
 
     use tempfile::tempdir;
     use tokio::time::{sleep, timeout, Duration, Instant};
-    use value::{kind::Collection, Value};
+    use vrl::value::{kind::Collection, Value};
 
     use super::*;
     use crate::{
@@ -1104,7 +1128,7 @@ mod tests {
 
             sleep(Duration::from_millis(100)).await;
             shutdown
-                .shutdown_all(Instant::now() + Duration::from_secs(1))
+                .shutdown_all(Some(Instant::now() + Duration::from_secs(1)))
                 .await;
 
             timeout(Duration::from_secs(1), rx.collect()).await.unwrap()
@@ -1395,30 +1419,56 @@ mod tests {
         let path = PathBuf::from("journalctl");
 
         let journal_dir = None;
+        let journal_namespace = None;
         let current_boot_only = false;
         let cursor = None;
         let since_now = false;
 
-        let command = create_command(&path, journal_dir, current_boot_only, since_now, cursor);
+        let command = create_command(
+            &path,
+            journal_dir,
+            journal_namespace,
+            current_boot_only,
+            since_now,
+            cursor,
+        );
         let cmd_line = format!("{:?}", command);
         assert!(!cmd_line.contains("--directory="));
+        assert!(!cmd_line.contains("--namespace="));
         assert!(!cmd_line.contains("--boot"));
         assert!(cmd_line.contains("--since=2000-01-01"));
 
-        let since_now = true;
         let journal_dir = None;
+        let journal_namespace = None;
+        let since_now = true;
 
-        let command = create_command(&path, journal_dir, current_boot_only, since_now, cursor);
+        let command = create_command(
+            &path,
+            journal_dir,
+            journal_namespace,
+            current_boot_only,
+            since_now,
+            cursor,
+        );
         let cmd_line = format!("{:?}", command);
         assert!(cmd_line.contains("--since=now"));
 
         let journal_dir = Some(PathBuf::from("/tmp/journal-dir"));
+        let journal_namespace = Some(String::from("my_namespace"));
         let current_boot_only = true;
         let cursor = Some("2021-01-01");
 
-        let command = create_command(&path, journal_dir, current_boot_only, since_now, cursor);
+        let command = create_command(
+            &path,
+            journal_dir,
+            journal_namespace,
+            current_boot_only,
+            since_now,
+            cursor,
+        );
         let cmd_line = format!("{:?}", command);
         assert!(cmd_line.contains("--directory=/tmp/journal-dir"));
+        assert!(cmd_line.contains("--namespace=my_namespace"));
         assert!(cmd_line.contains("--boot"));
         assert!(cmd_line.contains("--after-cursor="));
     }
@@ -1426,12 +1476,19 @@ mod tests {
     fn create_command(
         path: &Path,
         journal_dir: Option<PathBuf>,
+        journal_namespace: Option<String>,
         current_boot_only: bool,
         since_now: bool,
         cursor: Option<&str>,
     ) -> Command {
-        StartJournalctl::new(path.into(), journal_dir, current_boot_only, since_now)
-            .make_command(cursor)
+        StartJournalctl::new(
+            path.into(),
+            journal_dir,
+            journal_namespace,
+            current_boot_only,
+            since_now,
+        )
+        .make_command(cursor)
     }
 
     fn message(event: &Event) -> Value {
@@ -1439,7 +1496,7 @@ mod tests {
     }
 
     fn timestamp(event: &Event) -> Value {
-        event.as_log()[log_schema().timestamp_key()].clone()
+        event.as_log()[log_schema().timestamp_key().unwrap().to_string()].clone()
     }
 
     fn value_ts(secs: i64, usecs: u32) -> Value {
@@ -1462,10 +1519,10 @@ mod tests {
             ..Default::default()
         };
 
-        let definition = config.outputs(LogNamespace::Vector)[0]
-            .clone()
-            .log_schema_definition
-            .unwrap();
+        let definitions = config
+            .outputs(LogNamespace::Vector)
+            .remove(0)
+            .schema_definition(true);
 
         let expected_definition =
             Definition::new_with_default_metadata(Kind::bytes().or_null(), [LogNamespace::Vector])
@@ -1495,17 +1552,17 @@ mod tests {
                     Some("host"),
                 );
 
-        assert_eq!(definition, expected_definition)
+        assert_eq!(definitions, Some(expected_definition))
     }
 
     #[test]
     fn output_schema_definition_legacy_namespace() {
         let config = JournaldConfig::default();
 
-        let definition = config.outputs(LogNamespace::Legacy)[0]
-            .clone()
-            .log_schema_definition
-            .unwrap();
+        let definitions = config
+            .outputs(LogNamespace::Legacy)
+            .remove(0)
+            .schema_definition(true);
 
         let expected_definition = Definition::new_with_default_metadata(
             Kind::object(Collection::empty()),
@@ -1520,7 +1577,7 @@ mod tests {
         )
         .unknown_fields(Kind::bytes());
 
-        assert_eq!(definition, expected_definition)
+        assert_eq!(definitions, Some(expected_definition))
     }
 
     fn matches_schema(config: &JournaldConfig, namespace: LogNamespace) {
@@ -1551,16 +1608,13 @@ mod tests {
         }"#;
 
         let json: serde_json::Value = serde_json::from_str(record).unwrap();
-        let mut event = Event::from(LogEvent::from(value::Value::from(json)));
+        let mut event = Event::from(LogEvent::from(vrl::value::Value::from(json)));
 
         event.as_mut_log().insert("timestamp", chrono::Utc::now());
 
-        let definition = config.outputs(namespace)[0]
-            .clone()
-            .log_schema_definition
-            .unwrap();
+        let definitions = config.outputs(namespace).remove(0).schema_definition(true);
 
-        definition.assert_valid_for_event(&event)
+        definitions.unwrap().assert_valid_for_event(&event);
     }
 
     #[test]

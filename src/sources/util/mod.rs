@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 #[cfg(any(feature = "sources-http_server"))]
 mod body_decoding;
 mod encoding_config;

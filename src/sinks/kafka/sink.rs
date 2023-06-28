@@ -1,5 +1,4 @@
-use async_trait::async_trait;
-use futures::{future, stream::BoxStream, StreamExt};
+use futures::future;
 use rdkafka::{
     consumer::{BaseConsumer, Consumer},
     error::KafkaError,
@@ -9,21 +8,14 @@ use rdkafka::{
 use snafu::{ResultExt, Snafu};
 use tokio::time::Duration;
 use tower::limit::ConcurrencyLimit;
-use vector_core::config::log_schema;
 
 use super::config::{KafkaRole, KafkaSinkConfig};
 use crate::{
-    codecs::{Encoder, Transformer},
-    event::{Event, LogEvent},
     kafka::KafkaStatisticsContext,
-    sinks::{
-        kafka::{
-            config::QUEUED_MIN_MESSAGES, request_builder::KafkaRequestBuilder,
-            service::KafkaService,
-        },
-        util::{builder::SinkBuilderExt, StreamSink},
+    sinks::kafka::{
+        config::QUEUED_MIN_MESSAGES, request_builder::KafkaRequestBuilder, service::KafkaService,
     },
-    template::{Template, TemplateParseError},
+    sinks::prelude::*,
 };
 
 #[derive(Debug, Snafu)]
@@ -48,7 +40,7 @@ pub(crate) fn create_producer(
     client_config: ClientConfig,
 ) -> crate::Result<FutureProducer<KafkaStatisticsContext>> {
     let producer = client_config
-        .create_with_context(KafkaStatisticsContext)
+        .create_with_context(KafkaStatisticsContext::default())
         .context(KafkaCreateFailedSnafu)?;
     Ok(producer)
 }
@@ -80,7 +72,6 @@ impl KafkaSink {
             topic_template: self.topic,
             transformer: self.transformer,
             encoder: self.encoder,
-            log_schema: log_schema(),
         };
 
         input

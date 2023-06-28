@@ -17,7 +17,7 @@ use crate::{
 use super::http_sink::build_http_sink;
 
 /// Configuration for the `clickhouse` sink.
-#[configurable_component(sink("clickhouse"))]
+#[configurable_component(sink("clickhouse", "Deliver log data to a ClickHouse database."))]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct ClickhouseConfig {
@@ -26,11 +26,11 @@ pub struct ClickhouseConfig {
     #[configurable(metadata(docs::examples = "http://localhost:8123"))]
     pub endpoint: UriSerde,
 
-    /// The table that data will be inserted into.
+    /// The table that data is inserted into.
     #[configurable(metadata(docs::examples = "mytable"))]
     pub table: String,
 
-    /// The database that contains the table that data will be inserted into.
+    /// The database that contains the table that data is inserted into.
     #[configurable(metadata(docs::examples = "mydatabase"))]
     pub database: Option<String>,
 
@@ -79,6 +79,7 @@ pub struct ClickhouseConfig {
 impl_generate_config_from_default!(ClickhouseConfig);
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "clickhouse")]
 impl SinkConfig for ClickhouseConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         // later we can build different sink(http, native) here

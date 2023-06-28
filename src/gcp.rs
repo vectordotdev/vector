@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 use std::{
     sync::{Arc, RwLock},
     time::Duration,
@@ -69,7 +70,7 @@ pub enum GcpError {
 pub struct GcpAuthConfig {
     /// An [API key][gcp_api_key].
     ///
-    /// Either an API key, or a path to a service account credentials JSON file can be specified.
+    /// Either an API key or a path to a service account credentials JSON file can be specified.
     ///
     /// If both are unset, the `GOOGLE_APPLICATION_CREDENTIALS` environment variable is checked for a filename. If no
     /// filename is named, an attempt is made to fetch an instance service account for the compute instance the program is
@@ -79,9 +80,9 @@ pub struct GcpAuthConfig {
     /// [gcp_api_key]: https://cloud.google.com/docs/authentication/api-keys
     pub api_key: Option<SensitiveString>,
 
-    /// Path to a [service account] credentials JSON file.
+    /// Path to a [service account][gcp_service_account_credentials] credentials JSON file.
     ///
-    /// Either an API key, or a path to a service account credentials JSON file can be specified.
+    /// Either an API key or a path to a service account credentials JSON file can be specified.
     ///
     /// If both are unset, the `GOOGLE_APPLICATION_CREDENTIALS` environment variable is checked for a filename. If no
     /// filename is named, an attempt is made to fetch an instance service account for the compute instance the program is

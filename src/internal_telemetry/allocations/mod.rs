@@ -93,7 +93,7 @@ impl Tracer for MainTracer {
     #[inline(always)]
     fn trace_allocation(&self, object_size: usize, group_id: AllocationGroupId) {
         // Handle the case when thread local destructor is ran.
-        let _ = GROUP_MEM_STATS.try_with(|t| {
+        _ = GROUP_MEM_STATS.try_with(|t| {
             t.stats.allocations[group_id.as_raw() as usize]
                 .fetch_add(object_size as u64, Ordering::Relaxed)
         });
@@ -102,7 +102,7 @@ impl Tracer for MainTracer {
     #[inline(always)]
     fn trace_deallocation(&self, object_size: usize, source_group_id: AllocationGroupId) {
         // Handle the case when thread local destructor is ran.
-        let _ = GROUP_MEM_STATS.try_with(|t| {
+        _ = GROUP_MEM_STATS.try_with(|t| {
             t.stats.deallocations[source_group_id.as_raw() as usize]
                 .fetch_add(object_size as u64, Ordering::Relaxed)
         });

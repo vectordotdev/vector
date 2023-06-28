@@ -6,7 +6,9 @@ on:
       git_ref:
         type: string
         required: true
-      mode:
+        # channel is the dir/namespace packages are organized into.
+        # Options are release/nightly/custom.
+      channel:
         type: string
         required: true
 
@@ -21,6 +23,7 @@ env:
   # observing issues fetching boringssl via HTTPS in the OSX build, seeing if this helps
   # can be removed when we switch back to the upstream openssl-sys crate
   CARGO_NET_GIT_FETCH_WITH_CLI: true
+  CHANNEL: ${{ inputs.channel }}
 
 jobs:
   generate-publish-metadata:
@@ -36,6 +39,7 @@ jobs:
         uses: actions/checkout@v3
         with:
           ref: ${{ inputs.git_ref }}
+          submodules: "recursive"
       - name: Generate publish metadata
         id: generate-publish-metadata
         run: make ci-generate-publish-metadata
@@ -53,6 +57,7 @@ jobs:
         uses: actions/checkout@v3
         with:
           ref: ${{ inputs.git_ref }}
+          submodules: "recursive"
       - name: Bootstrap runner environment (Ubuntu-specific)
         run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - name: Bootstrap runner environment (generic)
@@ -78,6 +83,7 @@ jobs:
         uses: actions/checkout@v3
         with:
           ref: ${{ inputs.git_ref }}
+          submodules: "recursive"
       - name: Bootstrap runner environment (Ubuntu-specific)
         run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - name: Bootstrap runner environment (generic)
@@ -103,6 +109,7 @@ jobs:
         uses: actions/checkout@v3
         with:
           ref: ${{ inputs.git_ref }}
+          submodules: "recursive"
       - name: Bootstrap runner environment (Ubuntu-specific)
         run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - name: Bootstrap runner environment (generic)
@@ -130,6 +137,7 @@ jobs:
         uses: actions/checkout@v3
         with:
           ref: ${{ inputs.git_ref }}
+          submodules: "recursive"
       - name: Bootstrap runner environment (Ubuntu-specific)
         run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - name: Bootstrap runner environment (generic)
@@ -157,6 +165,7 @@ jobs:
         uses: actions/checkout@v3
         with:
           ref: ${{ inputs.git_ref }}
+          submodules: "recursive"
       - name: Bootstrap runner environment (Ubuntu-specific)
         run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - name: Bootstrap runner environment (generic)
@@ -184,6 +193,7 @@ jobs:
         uses: actions/checkout@v3
         with:
           ref: ${{ inputs.git_ref }}
+          submodules: "recursive"
       - name: Bootstrap runner environment (Ubuntu-specific)
         run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - name: Bootstrap runner environment (generic)
@@ -211,6 +221,7 @@ jobs:
         uses: actions/checkout@v3
         with:
           ref: ${{ inputs.git_ref }}
+          submodules: "recursive"
       - name: Bootstrap runner environment (macOS-specific)
         run: bash scripts/environment/bootstrap-macos-10.sh
       - name: Build Vector
@@ -241,6 +252,7 @@ jobs:
         uses: actions/checkout@v3
         with:
           ref: ${{ inputs.git_ref }}
+          submodules: "recursive"
       - name: Bootstrap runner environment (Windows-specific)
         run: .\scripts\environment\bootstrap-windows-2019.ps1
       - name: Install Wix
@@ -308,6 +320,7 @@ jobs:
         uses: actions/checkout@v3
         with:
           ref: ${{ inputs.git_ref }}
+          submodules: "recursive"
       - name: Download staged package artifacts (x86_64-unknown-linux-gnu)
         uses: actions/download-artifact@v3
         with:
@@ -364,6 +377,7 @@ jobs:
         uses: actions/checkout@v3
         with:
           ref: ${{ inputs.git_ref }}
+          submodules: "recursive"
       - name: Download staged package artifacts (x86_64-unknown-linux-gnu)
         uses: actions/download-artifact@v3
         with:
@@ -391,6 +405,7 @@ jobs:
         uses: actions/checkout@v3
         with:
           ref: ${{ inputs.git_ref }}
+          submodules: "recursive"
       - name: Download staged package artifacts (x86_64-apple-darwin)
         uses: actions/download-artifact@v3
         with:
@@ -421,18 +436,19 @@ jobs:
         uses: actions/checkout@v3
         with:
           ref: ${{ inputs.git_ref }}
+          submodules: "recursive"
       - name: Login to DockerHub
         uses: docker/login-action@v2.1.0
         with:
           username: ${{ secrets.CI_DOCKER_USERNAME }}
           password: ${{ secrets.CI_DOCKER_PASSWORD }}
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v2.1.0
+        uses: docker/setup-qemu-action@v2.2.0
         with:
           platforms: all
       - name: Set up Docker Buildx
         id: buildx
-        uses: docker/setup-buildx-action@v2.4.1
+        uses: docker/setup-buildx-action@v2.7.0
         with:
           version: latest
           install: true
@@ -496,6 +512,7 @@ jobs:
         uses: actions/checkout@v3
         with:
           ref: ${{ inputs.git_ref }}
+          submodules: "recursive"
       - name: Download staged package artifacts (aarch64-unknown-linux-gnu)
         uses: actions/download-artifact@v3
         with:
@@ -545,7 +562,7 @@ jobs:
   publish-github:
     name: Publish to GitHub
     # We only publish to GitHub for versioned releases, not nightlies.
-    if: ${{ inputs.mode == 'Release' }}
+    if: inputs.channel == 'release'
     runs-on: ubuntu-20.04
     needs:
       - generate-publish-metadata
@@ -567,6 +584,7 @@ jobs:
         uses: actions/checkout@v3
         with:
           ref: ${{ inputs.git_ref }}
+          submodules: "recursive"
       - name: Download staged package artifacts (aarch64-unknown-linux-gnu)
         uses: actions/download-artifact@v3
         with:
@@ -615,7 +633,7 @@ jobs:
   publish-homebrew:
     name: Publish to Homebrew
     # We only publish to Homebrew for versioned releases, not nightlies.
-    if: ${{ inputs.mode == 'Release' }}
+    if: inputs.channel == 'release'
     runs-on: ubuntu-20.04
     needs:
       - generate-publish-metadata
@@ -627,6 +645,7 @@ jobs:
         uses: actions/checkout@v3
         with:
           ref: ${{ inputs.git_ref }}
+          submodules: "recursive"
       - name: Publish update to Homebrew tap
         env:
           GITHUB_TOKEN: ${{ secrets.GH_PACKAGE_PUBLISHER_TOKEN }}
@@ -635,7 +654,7 @@ jobs:
   publish-cloudsmith:
     name: Publish to Cloudsmith
     # We only publish to CloudSmith for versioned releases, not nightlies.
-    if: ${{ inputs.mode == 'Release' }}
+    if:  inputs.channel == 'release'
     runs-on: ubuntu-20.04
     needs:
       - generate-publish-metadata
@@ -652,6 +671,7 @@ jobs:
         uses: actions/checkout@v3
         with:
           ref: ${{ inputs.git_ref }}
+          submodules: "recursive"
       - name: Download staged package artifacts (aarch64-unknown-linux-gnu)
         uses: actions/download-artifact@v3
         with:
@@ -748,7 +768,7 @@ jobs:
 
   publish-failure:
     name: Send Publish Failure Notification
-    if: failure()
+    if: failure() && inputs.channel != 'custom'
     runs-on: ubuntu-20.04
     needs:
       - generate-publish-metadata
@@ -773,4 +793,4 @@ jobs:
         DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
       uses: Ilshidur/action-discord@0.3.2
       with:
-        args: "${{ inputs.mode }} failed: <https://github.com/${{github.repository}}/actions/runs/${{github.run_id}}>"
+        args: "${{ inputs.channel }} failed: <https://github.com/${{github.repository}}/actions/runs/${{github.run_id}}>"

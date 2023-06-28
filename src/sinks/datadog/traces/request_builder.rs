@@ -9,7 +9,10 @@ use bytes::Bytes;
 use prost::Message;
 use snafu::Snafu;
 use vector_common::request_metadata::RequestMetadata;
-use vector_core::event::{EventFinalizers, Finalizable};
+use vector_core::{
+    event::{EventFinalizers, Finalizable},
+    EstimatedJsonEncodedSizeOf,
+};
 
 use super::{
     apm_stats::{compute_apm_stats, Aggregator},
@@ -122,6 +125,7 @@ impl IncrementalRequestBuilder<(PartitionKey, Vec<Event>)> for DatadogTracesRequ
             .for_each(|r| match r {
                 Ok((payload, mut processed)) => {
                     let uncompressed_size = payload.len();
+                    let json_size = processed.estimated_json_encoded_size_of();
                     let metadata = DDTracesMetadata {
                         api_key: key
                             .api_key
@@ -139,11 +143,8 @@ impl IncrementalRequestBuilder<(PartitionKey, Vec<Event>)> for DatadogTracesRequ
                             let bytes = compressor.into_inner().freeze();
 
                             // build RequestMetadata
-                            let builder = RequestMetadataBuilder::new(
-                                n,
-                                uncompressed_size,
-                                uncompressed_size,
-                            );
+                            let builder =
+                                RequestMetadataBuilder::new(n, uncompressed_size, json_size);
                             let bytes_len = NonZeroUsize::new(bytes.len())
                                 .expect("payload should never be zero length");
                             let request_metadata = builder.with_request_size(bytes_len);

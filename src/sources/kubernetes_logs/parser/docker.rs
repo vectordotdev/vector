@@ -1,9 +1,8 @@
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
-use lookup::path;
+use lookup::{path, OwnedTargetPath};
 use serde_json::Value as JsonValue;
 use snafu::{OptionExt, ResultExt, Snafu};
-use vector_config::NamedComponent;
 use vector_core::config::{LegacyKey, LogNamespace};
 
 use crate::{
@@ -81,7 +80,7 @@ fn parse_json(log: &mut LogEvent, log_namespace: LogNamespace) -> Result<(), Par
                     TIMESTAMP_KEY => log_namespace.insert_source_metadata(
                         Config::NAME,
                         log,
-                        Some(LegacyKey::Overwrite(path!(log_schema().timestamp_key()))),
+                        log_schema().timestamp_key().map(LegacyKey::Overwrite),
                         path!("timestamp"),
                         value,
                     ),
@@ -106,24 +105,32 @@ fn normalize_event(
 ) -> Result<(), NormalizationError> {
     // Parse timestamp.
     let timestamp_key = match log_namespace {
-        LogNamespace::Vector => "%kubernetes_logs.timestamp",
-        LogNamespace::Legacy => log_schema().timestamp_key(),
+        LogNamespace::Vector => Some(OwnedTargetPath::metadata(lookup::owned_value_path!(
+            "kubernetes_logs",
+            "timestamp"
+        ))),
+        LogNamespace::Legacy => log_schema()
+            .timestamp_key()
+            .map(|path| OwnedTargetPath::event(path.clone())),
     };
-    let time = log.remove(timestamp_key).context(TimeFieldMissingSnafu)?;
 
-    let time = match time {
-        Value::Bytes(val) => val,
-        _ => return Err(NormalizationError::TimeValueUnexpectedType),
-    };
-    let time = DateTime::parse_from_rfc3339(String::from_utf8_lossy(time.as_ref()).as_ref())
-        .context(TimeParsingSnafu)?;
-    log_namespace.insert_source_metadata(
-        Config::NAME,
-        log,
-        Some(LegacyKey::Overwrite(path!(log_schema().timestamp_key()))),
-        path!("timestamp"),
-        time.with_timezone(&Utc),
-    );
+    if let Some(timestamp_key) = timestamp_key {
+        let time = log.remove(&timestamp_key).context(TimeFieldMissingSnafu)?;
+
+        let time = match time {
+            Value::Bytes(val) => val,
+            _ => return Err(NormalizationError::TimeValueUnexpectedType),
+        };
+        let time = DateTime::parse_from_rfc3339(String::from_utf8_lossy(time.as_ref()).as_ref())
+            .context(TimeParsingSnafu)?;
+        log_namespace.insert_source_metadata(
+            Config::NAME,
+            log,
+            log_schema().timestamp_key().map(LegacyKey::Overwrite),
+            path!("timestamp"),
+            time.with_timezone(&Utc),
+        );
+    }
 
     // Parse message, remove trailing newline and detect if it's partial.
     let message_key = match log_namespace {
@@ -199,7 +206,8 @@ enum NormalizationError {
 #[cfg(test)]
 pub mod tests {
     use super::{super::test_util, *};
-    use crate::{test_util::trace_init, transforms::Transform};
+    use crate::test_util::trace_init;
+    use vrl::value;
 
     fn make_long_string(base: &str, len: usize) -> String {
         base.chars().cycle().take(len).collect()
@@ -213,7 +221,7 @@ pub mod tests {
                     r#"{"log": "The actual log line\n", "stream": "stderr", "time": "2016-10-05T00:00:30.082640485Z"}"#,
                 ),
                 vec![test_util::make_log_event(
-                    vrl::value!("The actual log line"),
+                    value!("The actual log line"),
                     "2016-10-05T00:00:30.082640485Z",
                     "stderr",
                     false,
@@ -225,7 +233,7 @@ pub mod tests {
                     r#"{"log": "A line without newline char at the end", "stream": "stdout", "time": "2016-10-05T00:00:30.082640485Z"}"#,
                 ),
                 vec![test_util::make_log_event(
-                    vrl::value!("A line without newline char at the end"),
+                    value!("A line without newline char at the end"),
                     "2016-10-05T00:00:30.082640485Z",
                     "stdout",
                     false,
@@ -243,7 +251,7 @@ pub mod tests {
                     .join(""),
                 ),
                 vec![test_util::make_log_event(
-                    vrl::value!(make_long_string("partial ", 16 * 1024)),
+                    value!(make_long_string("partial ", 16 * 1024)),
                     "2016-10-05T00:00:30.082640485Z",
                     "stdout",
                     true,
@@ -263,7 +271,7 @@ pub mod tests {
                     .join(""),
                 ),
                 vec![test_util::make_log_event(
-                    vrl::value!(make_long_string("non-partial ", 16 * 1024 - 1)),
+                    value!(make_long_string("non-partial ", 16 * 1024 - 1)),
                     "2016-10-05T00:00:30.082640485Z",
                     "stdout",
                     false,
@@ -307,12 +315,10 @@ pub mod tests {
         trace_init();
 
         test_util::test_parser(
-            || {
-                Transform::function(Docker {
-                    log_namespace: LogNamespace::Vector,
-                })
+            || Docker {
+                log_namespace: LogNamespace::Vector,
             },
-            |bytes| Event::Log(LogEvent::from(vrl::value!(bytes))),
+            |bytes| Event::Log(LogEvent::from(value!(bytes))),
             valid_cases(LogNamespace::Vector),
         );
     }
@@ -322,10 +328,8 @@ pub mod tests {
         trace_init();
 
         test_util::test_parser(
-            || {
-                Transform::function(Docker {
-                    log_namespace: LogNamespace::Legacy,
-                })
+            || Docker {
+                log_namespace: LogNamespace::Legacy,
             },
             |bytes| Event::Log(LogEvent::from(bytes)),
             valid_cases(LogNamespace::Legacy),
@@ -340,7 +344,7 @@ pub mod tests {
 
         for bytes in cases {
             let mut parser = Docker::new(LogNamespace::Vector);
-            let input = LogEvent::from(vrl::value!(bytes));
+            let input = LogEvent::from(value!(bytes));
             let mut output = OutputBuffer::default();
             parser.transform(&mut output, input.into());
 

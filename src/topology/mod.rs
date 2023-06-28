@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 //! Topology contains all topology based types.
 //!
 //! Topology is broken up into two main sections. The first
@@ -24,7 +25,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-pub use controller::{ReloadOutcome, TopologyController};
+pub use controller::{ReloadOutcome, SharedTopologyController, TopologyController};
 use futures::{Future, FutureExt};
 pub(super) use running::RunningTopology;
 use tokio::sync::{mpsc, watch};
@@ -159,7 +160,7 @@ async fn handle_errors(
         .and_then(|res| res)
         .map_err(|e| {
             error!("An error occurred that Vector couldn't handle: {}.", e);
-            let _ = abort_tx.send(());
+            _ = abort_tx.send(());
             e
         })
 }
@@ -171,7 +172,7 @@ fn retain<T>(vec: &mut Vec<T>, mut retain_filter: impl FnMut(&mut T) -> bool) {
         if retain_filter(data) {
             i += 1;
         } else {
-            let _ = vec.remove(i);
+            _ = vec.remove(i);
         }
     }
 }
