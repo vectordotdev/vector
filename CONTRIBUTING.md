@@ -219,7 +219,7 @@ Unit tests can be run by calling `cargo vdev test`.
 
 Integration tests are not run by default when running
 `cargo vdev test`. Instead, they are accessible via the integration subcommand (example:
-`cargo vdev int test aws` runs aws-related integration tests). You can find the list of available integration tests using `cargo vdev int show`
+`cargo vdev int test aws` runs aws-related integration tests). You can find the list of available integration tests using `cargo vdev int show`. Integration tests require docker or podman to run.
 
 
 ### Deprecations
