@@ -3126,7 +3126,7 @@ dependencies = [
  "flate2",
  "futures 0.3.28",
  "glob",
- "indexmap 1.9.3",
+ "indexmap 2.0.0",
  "libc",
  "quickcheck",
  "scan_fmt",
@@ -4106,6 +4106,7 @@ checksum = "d5477fe2230a79769d8dc68e0eabf5437907c0457a5614a9e8dddb67f65eb65d"
 dependencies = [
  "equivalent",
  "hashbrown 0.14.0",
+ "serde",
 ]
 
 [[package]]
@@ -6294,7 +6295,7 @@ dependencies = [
 name = "prometheus-parser"
 version = "0.1.0"
 dependencies = [
- "indexmap 1.9.3",
+ "indexmap 2.0.0",
  "nom",
  "num_enum 0.6.1",
  "prost",
@@ -9156,7 +9157,7 @@ dependencies = [
  "dunce",
  "glob",
  "hex",
- "indexmap 1.9.3",
+ "indexmap 2.0.0",
  "indicatif",
  "itertools 0.11.0",
  "log",
@@ -9259,7 +9260,7 @@ dependencies = [
  "hyper",
  "hyper-openssl",
  "hyper-proxy",
- "indexmap 1.9.3",
+ "indexmap 2.0.0",
  "indoc",
  "infer 0.14.0",
  "inventory",
@@ -9450,7 +9451,7 @@ dependencies = [
  "crossbeam-utils",
  "derivative",
  "futures 0.3.28",
- "indexmap 1.9.3",
+ "indexmap 2.0.0",
  "metrics",
  "nom",
  "ordered-float 3.7.0",
@@ -9480,7 +9481,7 @@ dependencies = [
  "chrono",
  "chrono-tz",
  "encoding_rs",
- "indexmap 1.9.3",
+ "indexmap 2.0.0",
  "inventory",
  "no-proxy",
  "num-traits",
@@ -9550,7 +9551,7 @@ dependencies = [
  "headers",
  "http",
  "hyper-proxy",
- "indexmap 1.9.3",
+ "indexmap 2.0.0",
  "metrics",
  "metrics-tracing-context",
  "metrics-util",

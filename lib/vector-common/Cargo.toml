@@ -48,7 +48,7 @@ chrono = { version = "0.4", default-features = false, optional = true, features 
 crossbeam-utils = { version = "0.8.16", default-features = false }
 derivative = { version = "2.2.0", default-features = false }
 futures = { version = "0.3.28", default-features = false, features = ["std"] }
-indexmap = { version = "~1.9.3", default-features = false }
+indexmap = { version = "~2.0.0", default-features = false, features = ["std"] }
 metrics = "0.21.0"
 nom = { version = "7", optional = true }
 ordered-float = { version = "3.7.0", default-features = false }
