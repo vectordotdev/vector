@@ -1,6 +1,7 @@
 Component,Origin,License,Copyright
 Inflector,https://github.com/whatisinternet/inflector,BSD-2-Clause,Josh Teeter<joshteeter@gmail.com>
 RustyXML,https://github.com/Florob/RustyXML,MIT OR Apache-2.0,Florian Zeitz <florob@babelmonkeys.de>
+addr2line,https://github.com/gimli-rs/addr2line,Apache-2.0 OR MIT,The addr2line Authors
 adler,https://github.com/jonas-schievink/adler,0BSD OR MIT OR Apache-2.0,Jonas Schievink <jonasschievink@gmail.com>
 adler32,https://github.com/remram44/adler32-rs,Zlib,Remi Rampin <remirampin@gmail.com>
 aes,https://github.com/RustCrypto/block-ciphers,MIT OR Apache-2.0,RustCrypto Developers
@@ -72,6 +73,7 @@ azure_storage,https://github.com/azure/azure-sdk-for-rust,MIT,Microsoft Corp.
 azure_storage_blobs,https://github.com/azure/azure-sdk-for-rust,MIT,Microsoft Corp.
 backoff,https://github.com/ihrwein/backoff,MIT OR Apache-2.0,Tibor Benke <ihrwein@gmail.com>
 backon,https://github.com/Xuanwo/backon,Apache-2.0,Xuanwo <github@xuanwo.io>
+backtrace,https://github.com/rust-lang/backtrace-rs,MIT OR Apache-2.0,The Rust Project Developers
 base16,https://github.com/thomcc/rust-base16,CC0-1.0,Thom Chiovoloni <tchiovoloni@mozilla.com>
 base64,https://github.com/marshallpierce/rust-base64,MIT OR Apache-2.0,"Alice Maz <alice@alicemaz.com>, Marshall Pierce <marshall@mpierce.org>"
 base64-simd,https://github.com/Nugine/simd,MIT,The base64-simd Authors
@@ -214,6 +216,7 @@ futures-util,https://github.com/rust-lang/futures-rs,MIT OR Apache-2.0,The futur
 generic-array,https://github.com/fizyk20/generic-array,MIT,"Bartłomiej Kamiński <fizyk20@gmail.com>, Aaron Trent <novacrazy@gmail.com>"
 getrandom,https://github.com/rust-random/getrandom,MIT OR Apache-2.0,The Rand Project Developers
 ghost,https://github.com/dtolnay/ghost,MIT OR Apache-2.0,David Tolnay <dtolnay@gmail.com>
+gimli,https://github.com/gimli-rs/gimli,MIT OR Apache-2.0,The gimli Authors
 glob,https://github.com/rust-lang/glob,MIT OR Apache-2.0,The Rust Project Developers
 goauth,https://github.com/durch/rust-goauth,MIT,Drazen Urch <github@drazenur.ch>
 governor,https://github.com/antifuchs/governor,MIT,Andreas Fuchs <asf@boinkor.net>
@@ -347,6 +350,7 @@ num_threads,https://github.com/jhpratt/num_threads,MIT OR Apache-2.0,Jacob Pratt
 number_prefix,https://github.com/ogham/rust-number-prefix,MIT,Benjamin Sago <ogham@bsago.me>
 oauth2,https://github.com/ramosbugs/oauth2-rs,MIT OR Apache-2.0,"Alex Crichton <alex@alexcrichton.com>, Florin Lipan <florinlipan@gmail.com>, David A. Ramos <ramos@cs.stanford.edu>"
 objc,http://github.com/SSheldon/rust-objc,MIT,Steven Sheldon
+object,https://github.com/gimli-rs/object,Apache-2.0 OR MIT,The object Authors
 ofb,https://github.com/RustCrypto/block-modes,MIT OR Apache-2.0,RustCrypto Developers
 once_cell,https://github.com/matklad/once_cell,MIT OR Apache-2.0,Aleksey Kladov <aleksey.kladov@gmail.com>
 onig,http://github.com/iwillspeak/rust-onig,MIT,"Will Speak <will@willspeak.me>, Ivan Ivashchenko <defuz@me.com>"
@@ -432,6 +436,7 @@ roaring,https://github.com/RoaringBitmap/roaring-rs,MIT OR Apache-2.0,"Wim Looma
 roxmltree,https://github.com/RazrFalcon/roxmltree,MIT OR Apache-2.0,Evgeniy Reizner <razrfalcon@gmail.com>
 roxmltree,https://github.com/RazrFalcon/roxmltree,MIT OR Apache-2.0,Yevhenii Reizner <razrfalcon@gmail.com>
 rust_decimal,https://github.com/paupino/rust-decimal,MIT,Paul Mason <paul@form1.co.nz>
+rustc-demangle,https://github.com/alexcrichton/rustc-demangle,MIT OR Apache-2.0,Alex Crichton <alex@alexcrichton.com>
 rustc-hash,https://github.com/rust-lang-nursery/rustc-hash,Apache-2.0 OR MIT,The Rust Project Developers
 rustc_version,https://github.com/Kimundi/rustc-version-rs,MIT OR Apache-2.0,Marvin Löbel <loebel.marvin@gmail.com>
 rustc_version_runtime,https://github.com/seppo0010/rustc-version-runtime-rs,MIT,Sebastian Waisbrot <seppo0010@gmail.com>
