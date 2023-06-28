@@ -6,7 +6,7 @@ on:
 jobs:
   cross-linux:
     name: Cross - ${{ matrix.target }}
-    runs-on: [linux, ubuntu-20.04-8core]
+    runs-on: ubuntu-latest
     env:
       CARGO_INCREMENTAL: 0
     strategy:
