@@ -25,6 +25,14 @@ impl EventCountTags {
             service: OptionalTag::Specified(None),
         }
     }
+
+    #[must_use]
+    pub fn new_unspecified() -> Self {
+        Self {
+            source: OptionalTag::Ignored,
+            service: OptionalTag::Ignored,
+        }
+    }
 }
 
 /// Must be implemented by events to get the tags that will be attached to
@@ -133,7 +141,7 @@ impl GroupedCountByteSize {
                 }
             }
             GroupedCountByteSize::Untagged { size } => {
-                event_cache.emit(&EventCountTags::new_empty(), *size);
+                event_cache.emit(&EventCountTags::new_unspecified(), *size);
             }
         }
     }

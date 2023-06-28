@@ -224,7 +224,7 @@ impl GetEventCountTags for LogEvent {
 
         let service = if telemetry().tags().emit_service {
             self.get_by_meaning("service")
-                .map(ToString::to_string)
+                .map(|value| value.to_string_lossy().to_string())
                 .into()
         } else {
             OptionalTag::Ignored
