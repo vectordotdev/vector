@@ -415,16 +415,21 @@ async fn kafka_source(
         ));
     }
 
-    let msg_task = handle_messages(
-        config,
-        Arc::clone(&consumer),
-        decoder,
-        shutdown,
-        out,
-        log_namespace,
-        #[cfg(test)]
-        eof,
-    );
+    let msg_consumer = Arc::clone(&consumer);
+    let span = info_span!("kafka_source");
+    let msg_task = tokio::task::spawn_blocking(move || {
+        let _enter = span.enter();
+        handle_messages(
+            config,
+            msg_consumer,
+            decoder,
+            shutdown,
+            out,
+            log_namespace,
+            #[cfg(test)]
+            eof,
+        );
+    });
 
     if let Some(ack_task) = ack_task {
         _ = tokio::join!(msg_task, ack_task);
@@ -693,60 +698,56 @@ fn handle_messages(
     mut out: SourceSender,
     log_namespace: LogNamespace,
     #[cfg(test)] eof: bool,
-) -> JoinHandle<()> {
-    tokio::task::spawn_blocking(move || {
+) -> () {
+    #[cfg(test)]
+    let mut eof_partitions = std::collections::HashSet::new();
+
+    Handle::current().block_on(async move {
         let mut stream = consumer.stream();
-        let handle = Handle::current();
-        let mut done: bool = false;
+        loop {
+            tokio::select! {
+                _ = &mut shutdown => {
+                    consumer.context().shutdown();
+                    break
+                },
 
-        #[cfg(test)]
-        let mut eof_partitions = std::collections::HashSet::new();
-
-        while !done {
-            handle.block_on(async {
-                tokio::select! {
-                    _ = &mut shutdown => {
-                        consumer.context().shutdown();
-                        done = true
-                    },
-                    message = stream.next() => match message {
-                        None => unreachable!("MessageStream never returns Ready(None)"),
-                        Some(Err(error)) => match error {
-                            #[cfg(test)]
-                            rdkafka::error::KafkaError::PartitionEOF(partition) if eof => {
-                                // NB this is not production ready EOF detection! Hence cfg(test) on this branch
-                                // Used only in tests when we can be certain only one topic is being consumed,
-                                // and new messages are not written after EOF is seen
-                                // Also: RdKafka only tells us the partition, so
-                                // we are assuming single-topic consumers when using this.
-                                // Also also: due to rebalances, we might get notified about an EOF partition
-                                // more than once, so we use a Set to exit once we've seen EOF on all currently-assigned partitions
-                                eof_partitions.insert(partition);
-                                if let Ok(assignment) = consumer.assignment() {
-                                    // All currently assigned partitions have reached EOF
-                                    if assignment.elements().iter().all(|tp| eof_partitions.contains(&tp.partition())) {
-                                        consumer.context().shutdown();
-                                        done = true;
-                                    }
+                message = stream.next() => match message {
+                    None => unreachable!("MessageStream never returns Ready(None)"),
+                    Some(Err(error)) => match error {
+                        #[cfg(test)]
+                        rdkafka::error::KafkaError::PartitionEOF(partition) if eof => {
+                            // NB this is not production ready EOF detection! Hence cfg(test) on this branch
+                            // Used only in tests when we can be certain only one topic is being consumed,
+                            // and new messages are not written after EOF is seen
+                            // Also: RdKafka only tells us the partition, so
+                            // we are assuming single-topic consumers when using this.
+                            // Also also: due to rebalances, we might get notified about an EOF partition
+                            // more than once, so we use a Set to exit once we've seen EOF on all currently-assigned partitions
+                            eof_partitions.insert(partition);
+                            if let Ok(assignment) = consumer.assignment() {
+                                // All currently assigned partitions have reached EOF
+                                if assignment.elements().iter().all(|tp| eof_partitions.contains(&tp.partition())) {
+                                    consumer.context().shutdown();
+                                    break
                                 }
-                            },
-                            _ => emit!(KafkaReadError { error }),
+                            }
                         },
-                        Some(Ok(msg)) => {
-                            emit!(KafkaBytesReceived {
-                                byte_size: msg.payload_len(),
-                                protocol: "tcp",
-                                topic: msg.topic(),
-                                partition: msg.partition(),
-                            });
-
-                            parse_message(msg, decoder.clone(), config.keys(), &mut out, &consumer, log_namespace).await;
-                        }
+                        _ => emit!(KafkaReadError { error }),
                     },
-                }
-            })
+                    Some(Ok(msg)) => {
+                        emit!(KafkaBytesReceived {
+                            byte_size: msg.payload_len(),
+                            protocol: "tcp",
+                            topic: msg.topic(),
+                            partition: msg.partition(),
+                        });
+
+                        parse_message(msg, decoder.clone(), config.keys(), &mut out, &consumer, log_namespace).await;
+                    }
+                },
+            }
         }
-    })
+    });
 }
 
 async fn parse_message(
