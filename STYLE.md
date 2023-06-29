@@ -24,6 +24,18 @@ As an additional note, `rustfmt` sometimes can fail to format code within macros
 to see such code that doesn't look like it's formatted correctly, you may need to manually tweak it
 if `rustfmt` cannot be persuaded to format it correctly for you. :)
 
+### Const strings
+
+When re-typing the same raw string literal more than once, this can lead to typo
+errors, especially when names ares similar. In general, when reasonable, it is
+preferred to use [Compile-time constants](https://doc.rust-lang.org/std/keyword.const.html)
+when dealing with non-dynamic strings. For example, when working with field names
+for event metadata.
+
+As this has not always been a consistently enforced code style for the project,
+please take the opportunity to update existing raw strings to use constants
+when modifying existing code
+
 ## Code Organization
 
 Code is primarily split into two main directories: `lib/` and `src/`.

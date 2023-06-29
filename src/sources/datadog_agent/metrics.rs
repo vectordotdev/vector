@@ -212,7 +212,7 @@ fn decode_datadog_series_v2(
         return Ok(Vec::new());
     }
 
-    let metrics = decode_ddseries_v2(body, &api_key, events_received).map_err(|error| {
+    let metrics = decode_ddseries_v2(body, &api_key).map_err(|error| {
         ErrorMessage::new(
             StatusCode::UNPROCESSABLE_ENTITY,
             format!("Error decoding Datadog sketch: {:?}", error),
@@ -230,7 +230,6 @@ fn decode_datadog_series_v2(
 pub(crate) fn decode_ddseries_v2(
     frame: Bytes,
     api_key: &Option<Arc<str>>,
-    events_received: &Registered<EventsReceived>,
 ) -> crate::Result<Vec<Event>> {
     let payload = MetricPayload::decode(frame)?;
     let decoded_metrics: Vec<Event> = payload
@@ -335,11 +334,6 @@ pub(crate) fn decode_ddseries_v2(
             metric.into()
         })
         .collect();
-
-    events_received.emit(CountByteSize(
-        decoded_metrics.len(),
-        decoded_metrics.estimated_json_encoded_size_of(),
-    ));
 
     Ok(decoded_metrics)
 }

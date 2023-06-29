@@ -18,7 +18,7 @@ jobs:
         with:
           username: ${{ github.actor }}
           team: vector
-          GITHUB_TOKEN: ${{ secrets.GH_PROJECT_PAT }}
+          GITHUB_TOKEN: ${{ secrets.GH_PAT_ORG }}
       - uses: actions/add-to-project@v0.5.0
         if: ${{ steps.checkVectorMember.outputs.isTeamMember == 'false' }}
         with:

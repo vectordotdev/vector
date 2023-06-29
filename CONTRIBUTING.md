@@ -24,6 +24,7 @@ Vector team member will find this document useful.
       - [Daily tests](#daily-tests)
     - [Flakey tests](#flakey-tests)
       - [Test harness](#test-harness)
+  - [Running Tests Locally](#running-tests-locally)
   - [Deprecations](#deprecations)
   - [Dependencies](#dependencies)
 - [Next steps](#next-steps)
@@ -209,6 +210,17 @@ any pull request with:
 ```bash
 /test -t <name>
 ```
+
+### Running Tests Locally
+
+To run tests locally, use [cargo vdev](https://github.com/vectordotdev/vector/blob/master/vdev/README.md).
+
+Unit tests can be run by calling `cargo vdev test`.
+
+Integration tests are not run by default when running
+`cargo vdev test`. Instead, they are accessible via the integration subcommand (example:
+`cargo vdev int test aws` runs aws-related integration tests). You can find the list of available integration tests using `cargo vdev int show`. Integration tests require docker or podman to run.
+
 
 ### Deprecations
 
