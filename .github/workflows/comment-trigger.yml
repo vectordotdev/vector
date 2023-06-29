@@ -14,7 +14,6 @@
 # /ci-run-unit-mac            : runs Unit - Mac
 # /ci-run-unit-windows        : runs Unit - Windows
 # /ci-run-environment         : runs Environment Suite
-# /ci-run-install             : runs Update install.sh Suite
 # /ci-run-regression          : runs Regression Detection Suite
 
 name: Comment Trigger
@@ -55,7 +54,6 @@ jobs:
           || contains(github.event.comment.body, '/ci-run-unit-mac')
           || contains(github.event.comment.body, '/ci-run-unit-windows')
           || contains(github.event.comment.body, '/ci-run-environment')
-          || contains(github.event.comment.body, '/ci-run-install')
           || contains(github.event.comment.body, '/ci-run-regression')
       )
     steps:
@@ -111,12 +109,6 @@ jobs:
     needs: validate
     if: contains(github.event.comment.body, '/ci-run-all') || contains(github.event.comment.body, '/ci-run-environment')
     uses: ./.github/workflows/environment.yml
-    secrets: inherit
-
-  install:
-    needs: validate
-    if: contains(github.event.comment.body, '/ci-run-all') || contains(github.event.comment.body, '/ci-run-install')
-    uses: ./.github/workflows/install-sh.yml
     secrets: inherit
 
   regression:
