@@ -13,6 +13,7 @@ This is a checklist to use whilst reviewing code for Vector's sinks.
 - [ ] Is it using the sink prelude?
 - [ ] Sensible feature flags?
 - [ ] Is the code modularised into `mod.rs`, `config.rs`, `sink.rs`,  `request_builder.rs`, `service.rs`
+- [ ] Does the code follow our [style guidelines].
 
 ## Documentation
 
@@ -27,3 +28,5 @@ This is a checklist to use whilst reviewing code for Vector's sinks.
 - [ ] Are the Request settings configurable?
 - [ ] Proxy settings?
 - [ ] Batch settings?
+
+[style guidelines]: https://github.com/vectordotdev/vector/blob/master/STYLE.md
