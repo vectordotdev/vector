@@ -288,7 +288,7 @@ openssl-probe = { version = "0.1.5", default-features = false }
 ordered-float = { version = "3.7.0", default-features = false }
 paste = "1.0.12"
 percent-encoding = { version = "2.3.0", default-features = false }
-pin-project = { version = "1.1.0", default-features = false }
+pin-project = { version = "1.1.1", default-features = false }
 postgres-openssl = { version = "0.5.0", default-features = false, features = ["runtime"], optional = true }
 pulsar = { version = "6.0.1", default-features = false, features = ["tokio-runtime", "auth-oauth2", "flate2", "lz4", "snap", "zstd"], optional = true }
 rand = { version = "0.8.5", default-features = false, features = ["small_rng"] }

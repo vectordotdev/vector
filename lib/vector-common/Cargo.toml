@@ -53,7 +53,7 @@ metrics = "0.21.0"
 nom = { version = "7", optional = true }
 ordered-float = { version = "3.7.0", default-features = false }
 paste = "1.0.12"
-pin-project = { version = "1.1.0", default-features = false }
+pin-project = { version = "1.1.1", default-features = false }
 ryu = { version = "1", default-features = false }
 serde_json = { version = "1.0.99", default-features = false, features = ["std", "raw_value"] }
 serde = { version = "1.0.164", optional = true, features = ["derive"] }

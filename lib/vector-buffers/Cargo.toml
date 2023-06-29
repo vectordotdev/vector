@@ -19,7 +19,7 @@ futures = { version = "0.3.28", default-features = false, features = ["std"] }
 memmap2 = { version = "0.7.1", default-features = false }
 metrics = "0.21.0"
 num-traits = { version = "0.2.15", default-features = false }
-pin-project = { version = "1.1.0", default-features = false }
+pin-project = { version = "1.1.1", default-features = false }
 rkyv = { version = "0.7.40", default-features = false, features = ["size_32", "std", "strict", "validation"] }
 serde = { version = "1.0.164", default-features = false, features = ["derive"] }
 snafu = { version = "0.7.4", default-features = false, features = ["std"] }
