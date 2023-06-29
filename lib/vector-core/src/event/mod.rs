@@ -5,7 +5,7 @@ use std::{
     sync::Arc,
 };
 
-use crate::ByteSizeOf;
+use crate::{config::OutputId, ByteSizeOf};
 pub use array::{into_event_stream, EventArray, EventContainer, LogArray, MetricArray, TraceArray};
 pub use estimated_json_encoded_size_of::EstimatedJsonEncodedSizeOf;
 pub use finalization::{
@@ -309,10 +309,22 @@ impl Event {
         self.metadata_mut().set_source_id(source_id);
     }
 
+    /// Sets the `upstream_id` in the event metadata to the provided value.
+    pub fn set_upstream_id(&mut self, upstream_id: Arc<OutputId>) {
+        self.metadata_mut().set_upstream_id(upstream_id);
+    }
+
     /// Sets the `source_id` in the event metadata to the provided value.
     #[must_use]
     pub fn with_source_id(mut self, source_id: Arc<ComponentKey>) -> Self {
         self.metadata_mut().set_source_id(source_id);
+        self
+    }
+
+    /// Sets the `upstream_id` in the event metadata to the provided value.
+    #[must_use]
+    pub fn with_upstream_id(mut self, upstream_id: Arc<OutputId>) -> Self {
+        self.metadata_mut().set_upstream_id(upstream_id);
         self
     }
 }
