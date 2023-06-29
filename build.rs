@@ -132,13 +132,13 @@ fn main() {
         println!("cargo:rerun-if-changed=proto/vector.proto");
 
         // Create and store the "file descriptor set" from the compiled Protocol Buffers packages.
+        //
         // This allows us to use runtime reflection to manually build Protocol Buffers payloads
         // in a type-safe way, which is necessary for incrementally building certain payloads, like
         // the ones generated in the `datadog_metrics` sink.
-        let protobuf_fds_path = std::env::var("OUT_DIR")
-            .map(PathBuf::from)
-            .map(|path| path.join("protobuf-fds.bin"))
-            .expect("OUT_DIR environment variable not set");
+        let protobuf_fds_path =
+            PathBuf::from(std::env::var("OUT_DIR").expect("OUT_DIR environment variable not set"))
+                .join("protobuf-fds.bin");
 
         let mut prost_build = prost_build::Config::new();
         prost_build

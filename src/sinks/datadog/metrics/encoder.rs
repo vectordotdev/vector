@@ -21,7 +21,7 @@ use super::config::{
 };
 use crate::{
     common::datadog::{DatadogMetricType, DatadogPoint, DatadogSeriesMetric},
-    proto::fds::get_protobuf_descriptors,
+    proto::fds::protobuf_descriptors,
     sinks::util::{encode_namespace, request_builder::EncodeResult, Compression, Compressor},
 };
 
@@ -364,7 +364,7 @@ impl DatadogMetricsEncoder {
 fn get_sketch_payload_sketches_field_number() -> u32 {
     static SKETCH_PAYLOAD_SKETCHES_FIELD_NUM: OnceCell<u32> = OnceCell::new();
     *SKETCH_PAYLOAD_SKETCHES_FIELD_NUM.get_or_init(|| {
-        let descriptors = get_protobuf_descriptors();
+        let descriptors = protobuf_descriptors();
         let descriptor = descriptors
             .get_message_by_name("datadog.agentpayload.SketchPayload")
             .expect("should not fail to find `SketchPayload` message in descriptor pool");
@@ -770,25 +770,19 @@ mod tests {
     {
         let mut sketches = Vec::new();
         for metric in metrics {
-            match metric.value() {
-                MetricValue::Sketch { sketch } => match sketch {
-                    MetricSketch::AgentDDSketch(ddsketch) => {
-                        // Don't encode any empty sketches.
-                        if ddsketch.is_empty() {
-                            continue;
-                        }
-
-                        let sketch = sketch_to_proto_message(
-                            metric,
-                            ddsketch,
-                            default_namespace,
-                            log_schema,
-                        );
-
-                        sketches.push(sketch);
+            let MetricValue::Sketch { sketch } = metric.value() else { panic!("must be sketch") };
+            match sketch {
+                MetricSketch::AgentDDSketch(ddsketch) => {
+                    // Don't encode any empty sketches.
+                    if ddsketch.is_empty() {
+                        continue;
                     }
-                },
-                _ => panic!("bad"),
+
+                    let sketch =
+                        sketch_to_proto_message(metric, ddsketch, default_namespace, log_schema);
+
+                    sketches.push(sketch);
+                }
             }
         }
 
