@@ -457,6 +457,25 @@ impl Definition {
         self
     }
 
+    /// If the schema definition depends on the `LogNamespace`, this combines the individual
+    /// definitions for each `LogNamespace`.
+    pub fn combine_log_namespaces(
+        log_namespaces: &BTreeSet<LogNamespace>,
+        legacy: Self,
+        vector: Self,
+    ) -> Self {
+        let mut combined =
+            Definition::new_with_default_metadata(Kind::never(), log_namespaces.clone());
+
+        if log_namespaces.contains(&LogNamespace::Legacy) {
+            combined = combined.merge(legacy);
+        }
+        if log_namespaces.contains(&LogNamespace::Vector) {
+            combined = combined.merge(vector);
+        }
+        combined
+    }
+
     /// Returns an `OwnedTargetPath` into an event, based on the provided `meaning`, if the meaning exists.
     pub fn meaning_path(&self, meaning: &str) -> Option<&OwnedTargetPath> {
         match self.meaning.get(meaning) {
