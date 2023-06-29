@@ -114,8 +114,8 @@ async fn listen(
                             handle_events(&mut events, received_from.clone());
 
                             let count = events.len();
-                            if let Err(error) = out.send_batch(events).await {
-                                emit!(StreamClosedError { error, count });
+                            if (out.send_batch(events).await).is_err() {
+                                emit!(StreamClosedError { count });
                             }
                         },
                         Some(Err(error)) => {

@@ -75,7 +75,7 @@ impl RetryLogic for NewRelicApiRetry {
 }
 
 /// Configuration for the `new_relic` sink.
-#[configurable_component(sink("new_relic"))]
+#[configurable_component(sink("new_relic", "Deliver events to New Relic."))]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct NewRelicConfig {
@@ -139,6 +139,7 @@ impl NewRelicConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "new_relic")]
 impl SinkConfig for NewRelicConfig {
     async fn build(
         &self,

@@ -26,6 +26,7 @@ pub struct AggregateConfig {
     ///
     /// During this time frame, metrics with the same series data (name, namespace, tags, and so on) are aggregated.
     #[serde(default = "default_interval_ms")]
+    #[configurable(metadata(docs::human_name = "Flush Interval"))]
     pub interval_ms: u64,
 }
 
@@ -154,6 +155,7 @@ mod tests {
     use futures::stream;
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
+    use vector_common::config::ComponentKey;
 
     use super::*;
     use crate::{
@@ -172,7 +174,8 @@ mod tests {
         kind: metric::MetricKind,
         value: metric::MetricValue,
     ) -> Event {
-        Event::Metric(Metric::new(name, kind, value)).with_source_id(Arc::new(OutputId::from("in")))
+        Event::Metric(Metric::new(name, kind, value))
+            .with_source_id(Arc::new(ComponentKey::from("in")))
     }
 
     #[test]

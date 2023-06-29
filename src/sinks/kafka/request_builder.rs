@@ -37,7 +37,7 @@ impl KafkaRequestBuilder {
             })
             .ok()?;
 
-        let metadata_builder = RequestMetadataBuilder::from_events(&event);
+        let metadata_builder = RequestMetadataBuilder::from_event(&event);
 
         let metadata = KafkaRequestMetadata {
             finalizers: event.take_finalizers(),

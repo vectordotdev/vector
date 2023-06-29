@@ -1,17 +1,10 @@
 use bytes::Bytes;
 use std::collections::HashMap;
 use std::io;
-use vector_common::finalization::EventFinalizers;
-use vector_common::request_metadata::RequestMetadata;
 
-use crate::sinks::pulsar::encoder::PulsarEncoder;
-use crate::sinks::pulsar::sink::PulsarEvent;
-use crate::sinks::util::metadata::RequestMetadataBuilder;
-use crate::sinks::util::request_builder::EncodeResult;
-use crate::sinks::util::{Compression, RequestBuilder};
-use crate::{
-    event::{Event, Finalizable},
-    sinks::pulsar::service::PulsarRequest,
+use crate::sinks::{
+    prelude::*,
+    pulsar::{encoder::PulsarEncoder, service::PulsarRequest, sink::PulsarEvent},
 };
 
 #[derive(Clone)]
@@ -48,7 +41,7 @@ impl RequestBuilder<PulsarEvent> for PulsarRequestBuilder {
         &self,
         mut input: PulsarEvent,
     ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
-        let builder = RequestMetadataBuilder::from_events(&input);
+        let builder = RequestMetadataBuilder::from_event(&input.event);
         let metadata = PulsarMetadata {
             finalizers: input.event.take_finalizers(),
             key: input.key,

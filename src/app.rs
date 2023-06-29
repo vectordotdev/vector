@@ -1,5 +1,7 @@
 #![allow(missing_docs)]
-use std::{collections::HashMap, num::NonZeroUsize, path::PathBuf};
+use std::{
+    collections::HashMap, num::NonZeroUsize, path::PathBuf, process::ExitStatus, time::Duration,
+};
 
 use exitcode::ExitCode;
 use futures::StreamExt;
@@ -32,6 +34,11 @@ use crate::{
     trace,
 };
 
+#[cfg(unix)]
+use std::os::unix::process::ExitStatusExt;
+#[cfg(windows)]
+use std::os::windows::process::ExitStatusExt;
+
 pub static WORKER_THREADS: OnceNonZeroUsize = OnceNonZeroUsize::new();
 
 use crate::internal_events::{VectorQuit, VectorStarted, VectorStopped};
@@ -62,10 +69,14 @@ impl ApplicationConfig {
     ) -> Result<Self, ExitCode> {
         let config_paths = opts.config_paths_with_formats();
 
+        let graceful_shutdown_duration = (!opts.no_graceful_shutdown_limit)
+            .then(|| Duration::from_secs(u64::from(opts.graceful_shutdown_limit_secs)));
+
         let config = load_configs(
             &config_paths,
             opts.watch_config,
             opts.require_healthy,
+            graceful_shutdown_duration,
             signal_handler,
         )
         .await?;
@@ -141,10 +152,10 @@ impl ApplicationConfig {
 }
 
 impl Application {
-    pub fn run() {
+    pub fn run() -> ExitStatus {
         let (runtime, app) = Self::prepare_start().unwrap_or_else(|code| std::process::exit(code));
 
-        runtime.block_on(app.run());
+        runtime.block_on(app.run())
     }
 
     pub fn prepare_start() -> Result<(Runtime, StartedApplication), ExitCode> {
@@ -238,7 +249,7 @@ pub struct StartedApplication {
 }
 
 impl StartedApplication {
-    pub async fn run(self) {
+    pub async fn run(self) -> ExitStatus {
         self.main().await.shutdown().await
     }
 
@@ -313,7 +324,7 @@ pub struct FinishedApplication {
 }
 
 impl FinishedApplication {
-    pub async fn shutdown(self) {
+    pub async fn shutdown(self) -> ExitStatus {
         let FinishedApplication {
             signal,
             mut signal_rx,
@@ -331,18 +342,42 @@ impl FinishedApplication {
             SignalTo::Shutdown => {
                 emit!(VectorStopped);
                 tokio::select! {
-                    _ = topology_controller.stop() => (), // Graceful shutdown finished
+                    _ = topology_controller.stop() => ExitStatus::from_raw({
+                            #[cfg(windows)]
+                            {
+                                exitcode::OK as u32
+                            }
+                            #[cfg(unix)]
+                            exitcode::OK
+                    }), // Graceful shutdown finished
                     _ = signal_rx.recv() => {
                         // It is highly unlikely that this event will exit from topology.
                         emit!(VectorQuit);
                         // Dropping the shutdown future will immediately shut the server down
+                        ExitStatus::from_raw({
+                            #[cfg(windows)]
+                            {
+                                exitcode::UNAVAILABLE as u32
+                            }
+                            #[cfg(unix)]
+                            exitcode::OK
+                        })
                     }
+
                 }
             }
             SignalTo::Quit => {
                 // It is highly unlikely that this event will exit from topology.
                 emit!(VectorQuit);
                 drop(topology_controller);
+                ExitStatus::from_raw({
+                    #[cfg(windows)]
+                    {
+                        exitcode::UNAVAILABLE as u32
+                    }
+                    #[cfg(unix)]
+                    exitcode::OK
+                })
             }
             _ => unreachable!(),
         }
@@ -374,7 +409,7 @@ fn get_log_levels(default: &str) -> String {
                 format!("codec={}", level),
                 format!("vrl={}", level),
                 format!("file_source={}", level),
-                "tower_limit=trace".to_owned(),
+                format!("tower_limit={}", level),
                 format!("rdkafka={}", level),
                 format!("buffers={}", level),
                 format!("lapin={}", level),
@@ -386,6 +421,7 @@ fn get_log_levels(default: &str) -> String {
 
 pub fn build_runtime(threads: Option<usize>, thread_name: &str) -> Result<Runtime, ExitCode> {
     let mut rt_builder = runtime::Builder::new_multi_thread();
+    rt_builder.max_blocking_threads(20_000);
     rt_builder.enable_all().thread_name(thread_name);
 
     if let Some(threads) = threads {
@@ -410,6 +446,7 @@ pub async fn load_configs(
     config_paths: &[ConfigPath],
     watch_config: bool,
     require_healthy: Option<bool>,
+    graceful_shutdown_duration: Option<Duration>,
     signal_handler: &mut SignalHandler,
 ) -> Result<Config, ExitCode> {
     let config_paths = config::process_paths(config_paths).ok_or(exitcode::CONFIG)?;
@@ -436,10 +473,13 @@ pub async fn load_configs(
     #[cfg(not(feature = "enterprise-tests"))]
     config::init_log_schema(config.global.log_schema.clone(), true);
 
+    config::init_telemetry(config.global.telemetry.clone(), true);
+
     if !config.healthchecks.enabled {
         info!("Health checks are disabled.");
     }
     config.healthchecks.set_require_healthy(require_healthy);
+    config.graceful_shutdown_duration = graceful_shutdown_duration;
 
     Ok(config)
 }

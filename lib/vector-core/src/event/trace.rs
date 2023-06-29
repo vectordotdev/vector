@@ -3,7 +3,11 @@ use std::{collections::BTreeMap, fmt::Debug};
 use lookup::lookup_v2::TargetPath;
 use serde::{Deserialize, Serialize};
 use vector_buffers::EventCount;
-use vector_common::EventDataEq;
+use vector_common::{
+    json_size::JsonSize,
+    request_metadata::{EventCountTags, GetEventCountTags},
+    EventDataEq,
+};
 
 use super::{
     BatchNotifier, EstimatedJsonEncodedSizeOf, EventFinalizer, EventFinalizers, EventMetadata,
@@ -109,7 +113,7 @@ impl ByteSizeOf for TraceEvent {
 }
 
 impl EstimatedJsonEncodedSizeOf for TraceEvent {
-    fn estimated_json_encoded_size_of(&self) -> usize {
+    fn estimated_json_encoded_size_of(&self) -> JsonSize {
         self.0.estimated_json_encoded_size_of()
     }
 }
@@ -141,5 +145,11 @@ impl AsRef<LogEvent> for TraceEvent {
 impl AsMut<LogEvent> for TraceEvent {
     fn as_mut(&mut self) -> &mut LogEvent {
         &mut self.0
+    }
+}
+
+impl GetEventCountTags for TraceEvent {
+    fn get_tags(&self) -> EventCountTags {
+        self.0.get_tags()
     }
 }

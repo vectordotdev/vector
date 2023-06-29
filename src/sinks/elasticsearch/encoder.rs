@@ -2,6 +2,10 @@ use std::{io, io::Write};
 
 use serde::Serialize;
 use vector_buffers::EventCount;
+use vector_common::{
+    json_size::JsonSize,
+    request_metadata::{EventCountTags, GetEventCountTags},
+};
 use vector_core::{event::Event, ByteSizeOf, EstimatedJsonEncodedSizeOf};
 
 use crate::{
@@ -34,7 +38,7 @@ impl ByteSizeOf for ProcessedEvent {
 }
 
 impl EstimatedJsonEncodedSizeOf for ProcessedEvent {
-    fn estimated_json_encoded_size_of(&self) -> usize {
+    fn estimated_json_encoded_size_of(&self) -> JsonSize {
         self.log.estimated_json_encoded_size_of()
     }
 }
@@ -43,6 +47,12 @@ impl EventCount for ProcessedEvent {
     fn event_count(&self) -> usize {
         // An Elasticsearch ProcessedEvent is mapped one-to-one with an event.
         1
+    }
+}
+
+impl GetEventCountTags for ProcessedEvent {
+    fn get_tags(&self) -> EventCountTags {
+        self.log.get_tags()
     }
 }
 

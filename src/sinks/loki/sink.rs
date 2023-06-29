@@ -1,44 +1,25 @@
 use std::{collections::HashMap, num::NonZeroUsize};
 
 use bytes::{Bytes, BytesMut};
-use futures::{stream::BoxStream, StreamExt};
 use once_cell::sync::Lazy;
 use regex::Regex;
 use snafu::Snafu;
 use tokio_util::codec::Encoder as _;
-use vector_common::request_metadata::RequestMetadata;
-use vector_core::{
-    event::{Event, EventFinalizers, Finalizable, Value},
-    partition::Partitioner,
-    sink::StreamSink,
-    stream::BatcherSettings,
-    ByteSizeOf,
-};
 
 use super::{
     config::{LokiConfig, OutOfOrderAction},
     event::{LokiBatchEncoder, LokiEvent, LokiRecord, PartitionKey},
     service::{LokiRequest, LokiRetryLogic, LokiService},
 };
+use crate::sinks::loki::config::{CompressionConfigAdapter, ExtendedCompression};
 use crate::sinks::loki::event::LokiBatchEncoding;
-use crate::sinks::{
-    loki::config::{CompressionConfigAdapter, ExtendedCompression},
-    util::metadata::RequestMetadataBuilder,
-};
 use crate::{
-    codecs::{Encoder, Transformer},
     http::{get_http_scheme_from_uri, HttpClient},
     internal_events::{
-        LokiEventUnlabeled, LokiOutOfOrderEventDropped, LokiOutOfOrderEventRewritten,
-        SinkRequestBuildError, TemplateRenderingError,
+        LokiEventUnlabeledError, LokiOutOfOrderEventDroppedError, LokiOutOfOrderEventRewritten,
+        SinkRequestBuildError,
     },
-    sinks::util::{
-        builder::SinkBuilderExt,
-        request_builder::EncodeResult,
-        service::{ServiceBuilderExt, Svc},
-        Compression, RequestBuilder,
-    },
-    template::Template,
+    sinks::prelude::*,
 };
 
 #[derive(Clone)]
@@ -268,6 +249,7 @@ impl EventEncoder {
     pub(super) fn encode_event(&mut self, mut event: Event) -> Option<LokiRecord> {
         let tenant_id = self.key_partitioner.partition(&event);
         let finalizers = event.take_finalizers();
+        let json_byte_size = event.estimated_json_encoded_size_of();
         let mut labels = self.build_labels(&event);
         self.remove_label_fields(&mut event);
 
@@ -280,6 +262,8 @@ impl EventEncoder {
             event.as_mut_log().remove_timestamp();
         }
 
+        let event_count_tags = event.get_tags();
+
         self.transformer.transform(&mut event);
         let mut bytes = BytesMut::new();
         self.encoder.encode(event, &mut bytes).ok();
@@ -288,7 +272,7 @@ impl EventEncoder {
         // `{agent="vector"}` label. This can happen if the only
         // label is a templatable one but the event doesn't match.
         if labels.is_empty() {
-            emit!(LokiEventUnlabeled);
+            emit!(LokiEventUnlabeledError);
             labels = vec![("agent".to_string(), "vector".to_string())]
         }
 
@@ -302,6 +286,8 @@ impl EventEncoder {
             },
             partition,
             finalizers,
+            json_byte_size,
+            event_count_tags,
         })
     }
 }
@@ -486,7 +472,7 @@ impl LokiSink {
                     }
                     Some((partition, result))
                 } else {
-                    emit!(LokiOutOfOrderEventDropped { count: batch.len() });
+                    emit!(LokiOutOfOrderEventDroppedError { count: batch.len() });
                     None
                 }
             })

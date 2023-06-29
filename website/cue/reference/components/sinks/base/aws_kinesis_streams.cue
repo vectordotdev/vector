@@ -176,6 +176,11 @@ base: components: sinks: aws_kinesis_streams: configuration: {
 
 					[zlib]: https://zlib.net/
 					"""
+				zstd: """
+					[Zstandard][zstd] compression.
+
+					[zstd]: https://facebook.github.io/zstd/
+					"""
 			}
 		}
 	}
@@ -483,6 +488,11 @@ base: components: sinks: aws_kinesis_streams: configuration: {
 				}
 			}
 		}
+	}
+	request_retry_partial: {
+		description: "Whether or not to retry successful requests containing partial failures."
+		required:    false
+		type: bool: default: false
 	}
 	stream_name: {
 		description: """

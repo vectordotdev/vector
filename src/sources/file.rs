@@ -18,7 +18,10 @@ use tokio::{sync::oneshot, task::spawn_blocking};
 use tracing::{Instrument, Span};
 use vector_common::finalizer::OrderedFinalizer;
 use vector_config::configurable_component;
-use vector_core::config::{LegacyKey, LogNamespace};
+use vector_core::{
+    config::{LegacyKey, LogNamespace},
+    EstimatedJsonEncodedSizeOf,
+};
 use vrl::value::Kind;
 
 use super::util::{EncodingConfig, MultilineConfig};
@@ -118,6 +121,7 @@ pub struct FileConfig {
     #[serde(alias = "ignore_older", default)]
     #[configurable(metadata(docs::type_unit = "seconds"))]
     #[configurable(metadata(docs::examples = 600))]
+    #[configurable(metadata(docs::human_name = "Ignore Older Files"))]
     pub ignore_older_secs: Option<u64>,
 
     /// The maximum size of a line before it is discarded.
@@ -146,6 +150,7 @@ pub struct FileConfig {
     /// [global_data_dir]: https://vector.dev/docs/reference/configuration/global-options/#data_dir
     #[serde(default)]
     #[configurable(metadata(docs::examples = "/var/local/lib/vector/"))]
+    #[configurable(metadata(docs::human_name = "Data Directory"))]
     pub data_dir: Option<PathBuf>,
 
     /// Enables adding the file offset to each event and sets the name of the log field used.
@@ -157,7 +162,7 @@ pub struct FileConfig {
     #[configurable(metadata(docs::examples = "offset"))]
     pub offset_key: Option<OptionalValuePath>,
 
-    /// Delay between file discovery calls.
+    /// The delay between file discovery calls.
     ///
     /// This controls the interval at which files are searched. A higher value results in greater
     /// chances of some short-lived files being missed between searches, but a lower value increases
@@ -168,6 +173,7 @@ pub struct FileConfig {
     )]
     #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
     #[configurable(metadata(docs::type_unit = "milliseconds"))]
+    #[configurable(metadata(docs::human_name = "Glob Minimum Cooldown"))]
     pub glob_minimum_cooldown_ms: Duration,
 
     #[configurable(derived)]
@@ -208,7 +214,7 @@ pub struct FileConfig {
     #[serde(default)]
     pub oldest_first: bool,
 
-    /// Timeout from reaching `EOF` after which the file is removed from the filesystem, unless new data is written in the meantime.
+    /// After reaching EOF, the number of seconds to wait before removing the file, unless new data is written.
     ///
     /// If not specified, files are not removed.
     #[serde(alias = "remove_after", default)]
@@ -216,6 +222,7 @@ pub struct FileConfig {
     #[configurable(metadata(docs::examples = 0))]
     #[configurable(metadata(docs::examples = 5))]
     #[configurable(metadata(docs::examples = 60))]
+    #[configurable(metadata(docs::human_name = "Wait Time Before Removing File"))]
     pub remove_after_secs: Option<u64>,
 
     /// String sequence used to separate one file line from another.
@@ -652,9 +659,9 @@ pub fn file_source(
                 Ok(()) => {
                     debug!("Finished sending.");
                 }
-                Err(error) => {
+                Err(_) => {
                     let (count, _) = messages.size_hint();
-                    emit!(StreamClosedError { error, count });
+                    emit!(StreamClosedError { count });
                 }
             }
         });
@@ -739,12 +746,6 @@ fn create_event(
     meta: &EventMetadata,
     log_namespace: LogNamespace,
 ) -> LogEvent {
-    emit!(FileEventsReceived {
-        count: 1,
-        file,
-        byte_size: line.len(),
-    });
-
     let deserializer = BytesDeserializer::new();
     let mut event = deserializer.parse_single(line, log_namespace);
 
@@ -790,6 +791,12 @@ fn create_event(
         path!("path"),
         file,
     );
+
+    emit!(FileEventsReceived {
+        count: 1,
+        file,
+        byte_size: event.estimated_json_encoded_size_of(),
+    });
 
     event
 }

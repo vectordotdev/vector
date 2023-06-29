@@ -13,7 +13,7 @@ on:
 
 concurrency:
   # `github.event.number` exists for pull requests, otherwise fall back to SHA for merge queue
-  group: ${{ github.workflow }}-${{ github.event.number || github.event.merge_group.base_sha }}
+  group: ${{ github.workflow }}-${{ github.event.number || github.event.merge_group.head_sha }}
   cancel-in-progress: true
 
 env:
@@ -38,6 +38,8 @@ jobs:
     with:
       base_ref: ${{ github.event.pull_request.base.ref }}
       head_ref: ${{ github.event.pull_request.head.ref  }}
+      source: false
+      int_tests: true
     secrets: inherit
 
   # Calls the Integration Test workflow for each integration that was detected to have files changed that impact it.
@@ -121,9 +123,11 @@ jobs:
           - test_name: 'webhdfs'
             if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.int-all == 'true' || needs.changes.outputs.webhdfs == 'true' }}
 
+  # This is a required status check, so it always needs to run if prior jobs failed, in order to mark the status correctly.
   integration:
     name: Integration Test Suite
     runs-on: ubuntu-latest
+    if: always()
     needs:
       - integration-matrix
     env:

@@ -14,7 +14,12 @@ use crossbeam_utils::atomic::AtomicCell;
 use lookup::lookup_v2::TargetPath;
 use lookup::PathPrefix;
 use serde::{Deserialize, Serialize, Serializer};
-use vector_common::EventDataEq;
+use vector_common::{
+    internal_event::OptionalTag,
+    json_size::{JsonSize, NonZeroJsonSize},
+    request_metadata::{EventCountTags, GetEventCountTags},
+    EventDataEq,
+};
 
 use super::{
     estimated_json_encoded_size_of::EstimatedJsonEncodedSizeOf,
@@ -22,8 +27,8 @@ use super::{
     metadata::EventMetadata,
     util, EventFinalizers, Finalizable, Value,
 };
-use crate::config::log_schema;
 use crate::config::LogNamespace;
+use crate::config::{log_schema, telemetry};
 use crate::{event::MaybeAsLogMut, ByteSizeOf};
 use lookup::{metadata_path, path};
 
@@ -36,7 +41,7 @@ struct Inner {
     size_cache: AtomicCell<Option<NonZeroUsize>>,
 
     #[serde(skip)]
-    json_encoded_size_cache: AtomicCell<Option<NonZeroUsize>>,
+    json_encoded_size_cache: AtomicCell<Option<NonZeroJsonSize>>,
 }
 
 impl Inner {
@@ -73,12 +78,12 @@ impl ByteSizeOf for Inner {
 }
 
 impl EstimatedJsonEncodedSizeOf for Inner {
-    fn estimated_json_encoded_size_of(&self) -> usize {
+    fn estimated_json_encoded_size_of(&self) -> JsonSize {
         self.json_encoded_size_cache
             .load()
             .unwrap_or_else(|| {
                 let size = self.fields.estimated_json_encoded_size_of();
-                let size = NonZeroUsize::new(size).expect("Size cannot be zero");
+                let size = NonZeroJsonSize::new(size).expect("Size cannot be zero");
 
                 self.json_encoded_size_cache.store(Some(size));
                 size
@@ -204,8 +209,28 @@ impl Finalizable for LogEvent {
 }
 
 impl EstimatedJsonEncodedSizeOf for LogEvent {
-    fn estimated_json_encoded_size_of(&self) -> usize {
+    fn estimated_json_encoded_size_of(&self) -> JsonSize {
         self.inner.estimated_json_encoded_size_of()
+    }
+}
+
+impl GetEventCountTags for LogEvent {
+    fn get_tags(&self) -> EventCountTags {
+        let source = if telemetry().tags().emit_source {
+            self.metadata().source_id().cloned().into()
+        } else {
+            OptionalTag::Ignored
+        };
+
+        let service = if telemetry().tags().emit_service {
+            self.get_by_meaning("service")
+                .map(|value| value.to_string_lossy().to_string())
+                .into()
+        } else {
+            OptionalTag::Ignored
+        };
+
+        EventCountTags { source, service }
     }
 }
 

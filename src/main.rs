@@ -3,8 +3,10 @@
 extern crate vector;
 use vector::app::Application;
 
+use std::process::ExitCode;
+
 #[cfg(unix)]
-fn main() {
+fn main() -> ExitCode {
     #[cfg(feature = "allocation-tracing")]
     {
         use crate::vector::internal_telemetry::allocations::{
@@ -35,14 +37,17 @@ fn main() {
         }
     }
 
-    Application::run();
+    let exit_code = Application::run().code().unwrap_or(exitcode::UNAVAILABLE) as u8;
+    ExitCode::from(exit_code)
 }
 
 #[cfg(windows)]
-pub fn main() {
+pub fn main() -> ExitCode {
     // We need to be able to run vector in User Interactive mode. We first try
     // to run vector as a service. If we fail, we consider that we are in
     // interactive mode and then fallback to console mode.  See
     // https://docs.microsoft.com/en-us/dotnet/api/system.environment.userinteractive?redirectedfrom=MSDN&view=netcore-3.1#System_Environment_UserInteractive
-    vector::vector_windows::run().unwrap_or_else(|_| Application::run());
+    let exit_code = vector::vector_windows::run()
+        .unwrap_or_else(|_| Application::run().code().unwrap_or(exitcode::UNAVAILABLE));
+    ExitCode::from(exit_code as u8)
 }

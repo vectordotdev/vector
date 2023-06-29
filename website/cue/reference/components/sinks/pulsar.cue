@@ -65,8 +65,6 @@ components: sinks: pulsar: {
 	}
 
 	telemetry: metrics: {
-		component_discarded_events_total: components.sources.internal_metrics.output.metrics.component_discarded_events_total
-		component_errors_total:           components.sources.internal_metrics.output.metrics.component_errors_total
-		encode_errors_total:              components.sources.internal_metrics.output.metrics.encode_errors_total
+		encode_errors_total: components.sources.internal_metrics.output.metrics.encode_errors_total
 	}
 }

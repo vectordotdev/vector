@@ -326,8 +326,4 @@ components: transforms: log_to_metric: {
 				"""
 		}
 	}
-
-	telemetry: metrics: {
-		processing_errors_total: components.sources.internal_metrics.output.metrics.processing_errors_total
-	}
 }

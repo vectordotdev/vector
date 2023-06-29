@@ -144,7 +144,7 @@ async fn process_stream(
                     bytes_received.emit(ByteSize(byte_size));
                     events_received.emit(CountByteSize(
                          events.len(),
-                        events.estimated_json_encoded_size_of(),
+                         events.estimated_json_encoded_size_of(),
                     ));
 
                     let now = Utc::now();
@@ -195,9 +195,9 @@ async fn process_stream(
             debug!("Finished sending.");
             Ok(())
         }
-        Err(error) => {
+        Err(_) => {
             let (count, _) = stream.size_hint();
-            emit!(StreamClosedError { error, count });
+            emit!(StreamClosedError { count });
             Err(())
         }
     }

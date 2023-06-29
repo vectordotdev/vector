@@ -12,7 +12,7 @@ use url::Url;
 #[command(rename_all = "kebab-case")]
 pub struct Opts {
     /// Interval to sample metrics at, in milliseconds
-    #[arg(default_value = "500", short = 'i', long)]
+    #[arg(default_value = "1000", short = 'i', long)]
     interval: u32,
 
     /// Vector GraphQL API server endpoint
@@ -20,10 +20,12 @@ pub struct Opts {
     url: Option<Url>,
 
     /// Humanize metrics, using numeric suffixes - e.g. 1,100 = 1.10 k, 1,000,000 = 1.00 M
-    #[arg(short = 'H', long)]
+    #[arg(short = 'H', long, default_value_t = true)]
     human_metrics: bool,
 
-    /// Whether to reconnect if the underlying Vector API connection drops. By default, top will attempt to reconnect if the connection drops.
+    /// Whether to reconnect if the underlying Vector API connection drops.
+    ///
+    /// By default, top will attempt to reconnect if the connection drops.
     #[arg(short, long)]
     no_reconnect: bool,
 }

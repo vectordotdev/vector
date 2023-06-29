@@ -8,6 +8,7 @@
   - [Makefile](#makefile)
   - [Code style](#code-style)
     - [Logging style](#logging-style)
+    - [Panics](#panics)
   - [Feature flags](#feature-flags)
   - [Dependencies](#dependencies)
 - [Guidelines](#guidelines)

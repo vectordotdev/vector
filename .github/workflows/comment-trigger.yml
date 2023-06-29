@@ -34,10 +34,12 @@ env:
   # can be removed when we switch back to the upstream openssl-sys crate
   CARGO_NET_GIT_FETCH_WITH_CLI: true
 
-# TODO: temporarily disabling concurrency groups at request of GitHub Support, to see if it resolves
-#       the issue we are having.
+# The below concurrency group settings would let us cancel in progress runs that were triggered with the
+# same comment on a given PR, which could save on time consuming runs.
+# But GH does not currently support the github.event.comment.body as part of the concurrency name, this
+# appears to be due to the potential length of it.
 #concurrency:
-#  group: ${{ github.workflow }}-${{ github.event.issue_comment.issue.id }}-${{ github.event.comment.body }}
+#  group: ${{ github.workflow }}-${{ github.event.issue.id }}-${{ github.event.comment.body }}
 #  cancel-in-progress: true
 
 jobs:

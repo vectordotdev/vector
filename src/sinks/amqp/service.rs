@@ -1,6 +1,9 @@
 //! The main tower service that takes the request created by the request builder
 //! and sends it to `AMQP`.
-use crate::internal_events::sink::{AmqpAcknowledgementError, AmqpDeliveryError};
+use crate::{
+    internal_events::sink::{AmqpAcknowledgementError, AmqpDeliveryError},
+    sinks::prelude::*,
+};
 use bytes::Bytes;
 use futures::future::BoxFuture;
 use lapin::{options::BasicPublishOptions, BasicProperties};
@@ -9,13 +12,6 @@ use std::{
     sync::Arc,
     task::{Context, Poll},
 };
-use tower::Service;
-use vector_common::{
-    finalization::{EventFinalizers, EventStatus, Finalizable},
-    internal_event::CountByteSize,
-    request_metadata::{MetaDescriptive, RequestMetadata},
-};
-use vector_core::stream::DriverResponse;
 
 /// The request contains the data to send to `AMQP` together
 /// with the information need to route the message.
@@ -55,14 +51,19 @@ impl Finalizable for AmqpRequest {
 }
 
 impl MetaDescriptive for AmqpRequest {
-    fn get_metadata(&self) -> RequestMetadata {
-        self.metadata
+    fn get_metadata(&self) -> &RequestMetadata {
+        &self.metadata
+    }
+
+    fn metadata_mut(&mut self) -> &mut RequestMetadata {
+        &mut self.metadata
     }
 }
 
 /// A successful response from `AMQP`.
 pub(super) struct AmqpResponse {
     byte_size: usize,
+    json_size: GroupedCountByteSize,
 }
 
 impl DriverResponse for AmqpResponse {
@@ -70,8 +71,8 @@ impl DriverResponse for AmqpResponse {
         EventStatus::Delivered
     }
 
-    fn events_sent(&self) -> CountByteSize {
-        CountByteSize(1, self.byte_size)
+    fn events_sent(&self) -> &GroupedCountByteSize {
+        &self.json_size
     }
 
     fn bytes_sent(&self) -> Option<usize> {
@@ -128,14 +129,20 @@ impl Service<AmqpRequest> for AmqpService {
                 Ok(result) => match result.await {
                     Ok(lapin::publisher_confirm::Confirmation::Nack(_)) => {
                         warn!("Received Negative Acknowledgement from AMQP server.");
-                        Ok(AmqpResponse { byte_size })
+                        Ok(AmqpResponse {
+                            json_size: req.metadata.into_events_estimated_json_encoded_byte_size(),
+                            byte_size,
+                        })
                     }
                     Err(error) => {
                         // TODO: In due course the caller could emit these on error.
                         emit!(AmqpAcknowledgementError { error: &error });
                         Err(AmqpError::AmqpAcknowledgementFailed { error })
                     }
-                    Ok(_) => Ok(AmqpResponse { byte_size }),
+                    Ok(_) => Ok(AmqpResponse {
+                        json_size: req.metadata.into_events_estimated_json_encoded_byte_size(),
+                        byte_size,
+                    }),
                 },
                 Err(error) => {
                     // TODO: In due course the caller could emit these on error.

@@ -98,6 +98,7 @@ async fn kinesis_put_records_without_partition_key() {
         tls: Default::default(),
         auth: Default::default(),
         acknowledgements: Default::default(),
+        request_retry_partial: Default::default(),
     };
 
     let config = KinesisStreamsSinkConfig {
@@ -174,7 +175,7 @@ async fn client() -> aws_sdk_kinesis::Client {
     create_client::<KinesisClientBuilder>(
         &auth,
         region.region(),
-        region.endpoint().unwrap(),
+        region.endpoint(),
         &proxy,
         &None,
         true,

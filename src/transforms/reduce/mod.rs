@@ -47,12 +47,14 @@ pub struct ReduceConfig {
     #[serde(default = "default_expire_after_ms")]
     #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
     #[derivative(Default(value = "default_expire_after_ms()"))]
+    #[configurable(metadata(docs::human_name = "Expire After"))]
     pub expire_after_ms: Duration,
 
     /// The interval to check for and flush any expired events, in milliseconds.
     #[serde(default = "default_flush_period_ms")]
     #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
     #[derivative(Default(value = "default_flush_period_ms()"))]
+    #[configurable(metadata(docs::human_name = "Flush Period"))]
     pub flush_period_ms: Duration,
 
     /// The maximum number of events to group together.

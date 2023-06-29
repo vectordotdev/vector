@@ -78,7 +78,7 @@ impl Encoder<Event> for (Transformer, crate::codecs::Encoder<()>) {
 /// * `writer`           - The object implementing io::Write to write data to.
 /// * `n_events_pending` - The number of events that are dropped if this write fails.
 /// * `buf`              - The buffer to write.
-pub(crate) fn write_all(
+pub fn write_all(
     writer: &mut dyn io::Write,
     n_events_pending: usize,
     buf: &[u8],

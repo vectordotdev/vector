@@ -40,7 +40,7 @@ use bytes_path::BytesPath;
 
 /// Configuration for the `file` sink.
 #[serde_as]
-#[configurable_component(sink("file"))]
+#[configurable_component(sink("file", "Output observability events into files."))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct FileSinkConfig {
@@ -61,6 +61,7 @@ pub struct FileSinkConfig {
     #[serde_as(as = "serde_with::DurationSeconds<u64>")]
     #[serde(rename = "idle_timeout_secs")]
     #[configurable(metadata(docs::examples = 600))]
+    #[configurable(metadata(docs::human_name = "Idle Timeout"))]
     pub idle_timeout: Duration,
 
     #[serde(flatten)]
@@ -169,6 +170,7 @@ impl OutFile {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "file")]
 impl SinkConfig for FileSinkConfig {
     async fn build(
         &self,

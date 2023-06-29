@@ -90,6 +90,7 @@ pub(super) struct Config {
     #[serde(default = "default_visibility_timeout_secs")]
     #[derivative(Default(value = "default_visibility_timeout_secs()"))]
     #[configurable(metadata(docs::type_unit = "seconds"))]
+    #[configurable(metadata(docs::human_name = "Visibility Timeout"))]
     pub(super) visibility_timeout_secs: u32,
 
     /// Whether to delete the message once it is processed.
@@ -573,9 +574,9 @@ impl IngestorProcess {
 
         let send_error = match self.out.send_event_stream(&mut stream).await {
             Ok(_) => None,
-            Err(error) => {
+            Err(_) => {
                 let (count, _) = stream.size_hint();
-                emit!(StreamClosedError { error, count });
+                emit!(StreamClosedError { count });
                 Some(crate::source_sender::ClosedError)
             }
         };

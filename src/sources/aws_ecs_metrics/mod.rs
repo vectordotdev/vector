@@ -87,6 +87,7 @@ pub struct AwsEcsMetricsSourceConfig {
     /// The interval between scrapes, in seconds.
     #[serde(default = "default_scrape_interval_secs")]
     #[serde_as(as = "serde_with::DurationSeconds<u64>")]
+    #[configurable(metadata(docs::human_name = "Scrape Interval"))]
     scrape_interval_secs: Duration,
 
     /// The namespace of the metric.
@@ -206,8 +207,8 @@ async fn aws_ecs_metrics(
                                     endpoint: uri.path(),
                                 });
 
-                                if let Err(error) = out.send_batch(metrics).await {
-                                    emit!(StreamClosedError { error, count });
+                                if (out.send_batch(metrics).await).is_err() {
+                                    emit!(StreamClosedError { count });
                                     return Err(());
                                 }
                             }

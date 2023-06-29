@@ -6,9 +6,9 @@ use crate::{
     event::{Metric, MetricValue},
 };
 
-pub struct ProcessedBytesTotal(Metric);
+pub struct SentBytesTotal(Metric);
 
-impl ProcessedBytesTotal {
+impl SentBytesTotal {
     pub const fn new(m: Metric) -> Self {
         Self(m)
     }
@@ -17,7 +17,7 @@ impl ProcessedBytesTotal {
         self.0.timestamp()
     }
 
-    pub fn get_processed_bytes_total(&self) -> f64 {
+    pub fn get_sent_bytes_total(&self) -> f64 {
         match self.0.value() {
             MetricValue::Counter { value } => *value,
             _ => 0.00,
@@ -26,32 +26,33 @@ impl ProcessedBytesTotal {
 }
 
 #[Object]
-impl ProcessedBytesTotal {
-    /// Metric timestamp
+impl SentBytesTotal {
+    /// Metric timestamp.
     pub async fn timestamp(&self) -> Option<DateTime<Utc>> {
         self.get_timestamp()
     }
 
-    /// Total number of bytes processed
-    pub async fn processed_bytes_total(&self) -> f64 {
-        self.get_processed_bytes_total()
+    /// Total number of bytes sent.
+    pub async fn sent_bytes_total(&self) -> f64 {
+        self.get_sent_bytes_total()
     }
 }
 
-impl From<Metric> for ProcessedBytesTotal {
+impl From<Metric> for SentBytesTotal {
     fn from(m: Metric) -> Self {
         Self(m)
     }
 }
 
-pub struct ComponentProcessedBytesTotal {
+pub struct ComponentSentBytesTotal {
     component_key: ComponentKey,
     metric: Metric,
 }
 
-impl ComponentProcessedBytesTotal {
-    /// Returns a new `ComponentProcessedBytesTotal` struct, which is a GraphQL type. The
-    /// component id is hoisted for clear field resolution in the resulting payload
+impl ComponentSentBytesTotal {
+    /// Returns a new `ComponentSentBytesTotal` for the given metric.
+    ///
+    /// Expects that the metric contains a tag for the component ID the metric is referenced to.
     pub fn new(metric: Metric) -> Self {
         let component_key = metric.tag_value("component_id").expect(
             "Returned a metric without a `component_id`, which shouldn't happen. Please report.",
@@ -66,25 +67,25 @@ impl ComponentProcessedBytesTotal {
 }
 
 #[Object]
-impl ComponentProcessedBytesTotal {
-    /// Component id
+impl ComponentSentBytesTotal {
+    /// Component ID.
     async fn component_id(&self) -> &str {
         self.component_key.id()
     }
 
-    /// Bytes processed total metric
-    async fn metric(&self) -> ProcessedBytesTotal {
-        ProcessedBytesTotal::new(self.metric.clone())
+    /// Metric for total bytes sent.
+    async fn metric(&self) -> SentBytesTotal {
+        SentBytesTotal::new(self.metric.clone())
     }
 }
 
-pub struct ComponentProcessedBytesThroughput {
+pub struct ComponentSentBytesThroughput {
     component_key: ComponentKey,
     throughput: i64,
 }
 
-impl ComponentProcessedBytesThroughput {
-    /// Returns a new `ComponentProcessedBytesThroughput`, set to the provided id/throughput values
+impl ComponentSentBytesThroughput {
+    /// Returns a new `ComponentSentBytesThroughput` for the given component.
     pub const fn new(component_key: ComponentKey, throughput: i64) -> Self {
         Self {
             component_key,
@@ -94,13 +95,13 @@ impl ComponentProcessedBytesThroughput {
 }
 
 #[Object]
-impl ComponentProcessedBytesThroughput {
-    /// Component id
+impl ComponentSentBytesThroughput {
+    /// Component ID.
     async fn component_id(&self) -> &str {
         self.component_key.id()
     }
 
-    /// Bytes processed throughput
+    /// Throughput of bytes sent.
     async fn throughput(&self) -> i64 {
         self.throughput
     }

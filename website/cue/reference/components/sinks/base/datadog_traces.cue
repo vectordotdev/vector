@@ -81,6 +81,11 @@ base: components: sinks: datadog_traces: configuration: {
 
 				[zlib]: https://zlib.net/
 				"""
+			zstd: """
+				[Zstandard][zstd] compression.
+
+				[zstd]: https://facebook.github.io/zstd/
+				"""
 		}
 	}
 	default_api_key: {

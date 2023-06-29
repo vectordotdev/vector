@@ -19,13 +19,13 @@ use tower::Service;
 use tracing::Instrument;
 use vector_common::{
     finalization::{EventStatus, Finalizable},
-    request_metadata::{MetaDescriptive, RequestMetadata},
+    json_size::JsonSize,
+    request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata},
 };
 use vector_core::{
-    internal_event::CountByteSize,
     sink::StreamSink,
     stream::{BatcherSettings, DriverResponse},
-    ByteSizeOf,
+    EstimatedJsonEncodedSizeOf,
 };
 
 use crate::{
@@ -152,8 +152,12 @@ pub struct OpenDalRequest {
 }
 
 impl MetaDescriptive for OpenDalRequest {
-    fn get_metadata(&self) -> RequestMetadata {
-        self.request_metadata
+    fn get_metadata(&self) -> &RequestMetadata {
+        &self.request_metadata
+    }
+
+    fn metadata_mut(&mut self) -> &mut RequestMetadata {
+        &mut self.request_metadata
     }
 }
 
@@ -168,7 +172,7 @@ impl Finalizable for OpenDalRequest {
 pub struct OpenDalMetadata {
     pub partition_key: String,
     pub count: usize,
-    pub byte_size: usize,
+    pub byte_size: JsonSize,
     pub finalizers: EventFinalizers,
 }
 
@@ -204,7 +208,7 @@ impl RequestBuilder<(String, Vec<Event>)> for OpenDalRequestBuilder {
         let opendal_metadata = OpenDalMetadata {
             partition_key,
             count: events.len(),
-            byte_size: events.size_of(),
+            byte_size: events.estimated_json_encoded_size_of(),
             finalizers,
         };
 
@@ -236,8 +240,7 @@ impl RequestBuilder<(String, Vec<Event>)> for OpenDalRequestBuilder {
 /// OpenDalResponse is the response returned by OpenDAL services.
 #[derive(Debug)]
 pub struct OpenDalResponse {
-    pub count: usize,
-    pub events_byte_size: usize,
+    pub events_byte_size: GroupedCountByteSize,
     pub byte_size: usize,
 }
 
@@ -246,8 +249,8 @@ impl DriverResponse for OpenDalResponse {
         EventStatus::Delivered
     }
 
-    fn events_sent(&self) -> CountByteSize {
-        CountByteSize(self.count, self.events_byte_size)
+    fn events_sent(&self) -> &GroupedCountByteSize {
+        &self.events_byte_size
     }
 
     fn bytes_sent(&self) -> Option<usize> {
@@ -276,8 +279,9 @@ impl Service<OpenDalRequest> for OpenDalService {
                 .in_current_span()
                 .await;
             result.map(|_| OpenDalResponse {
-                count: request.metadata.count,
-                events_byte_size: request.metadata.byte_size,
+                events_byte_size: request
+                    .request_metadata
+                    .into_events_estimated_json_encoded_byte_size(),
                 byte_size,
             })
         })

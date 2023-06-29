@@ -3,12 +3,13 @@ use std::io;
 use bytes::{BufMut, BytesMut};
 use flate2::write::{GzEncoder, ZlibEncoder};
 
-use super::Compression;
+use super::{zstd::ZstdEncoder, Compression};
 
 enum Writer {
     Plain(bytes::buf::Writer<BytesMut>),
     Gzip(GzEncoder<bytes::buf::Writer<BytesMut>>),
     Zlib(ZlibEncoder<bytes::buf::Writer<BytesMut>>),
+    Zstd(ZstdEncoder<bytes::buf::Writer<BytesMut>>),
 }
 
 impl Writer {
@@ -17,6 +18,7 @@ impl Writer {
             Writer::Plain(inner) => inner.get_ref(),
             Writer::Gzip(inner) => inner.get_ref().get_ref(),
             Writer::Zlib(inner) => inner.get_ref().get_ref(),
+            Writer::Zstd(inner) => inner.get_ref().get_ref(),
         }
     }
 }
@@ -28,6 +30,11 @@ impl From<Compression> for Writer {
             Compression::None => Writer::Plain(writer),
             Compression::Gzip(level) => Writer::Gzip(GzEncoder::new(writer, level.as_flate2())),
             Compression::Zlib(level) => Writer::Zlib(ZlibEncoder::new(writer, level.as_flate2())),
+            Compression::Zstd(level) => {
+                let encoder = ZstdEncoder::new(writer, level.into())
+                    .expect("Zstd encoder should not fail on init.");
+                Writer::Zstd(encoder)
+            }
         }
     }
 }
@@ -39,6 +46,7 @@ impl io::Write for Writer {
             Writer::Plain(inner_buf) => inner_buf.write(buf),
             Writer::Gzip(writer) => writer.write(buf),
             Writer::Zlib(writer) => writer.write(buf),
+            Writer::Zstd(writer) => writer.write(buf),
         }
     }
 
@@ -47,6 +55,7 @@ impl io::Write for Writer {
             Writer::Plain(writer) => writer.flush(),
             Writer::Gzip(writer) => writer.flush(),
             Writer::Zlib(writer) => writer.flush(),
+            Writer::Zstd(writer) => writer.flush(),
         }
     }
 }
@@ -88,6 +97,7 @@ impl Compressor {
             Writer::Plain(writer) => writer,
             Writer::Gzip(writer) => writer.finish()?,
             Writer::Zlib(writer) => writer.finish()?,
+            Writer::Zstd(writer) => writer.finish()?,
         }
         .into_inner();
 
@@ -112,6 +122,9 @@ impl Compressor {
             Writer::Zlib(writer) => writer
                 .finish()
                 .expect("zlib writer should not fail to finish"),
+            Writer::Zstd(writer) => writer
+                .finish()
+                .expect("zstd writer should not fail to finish"),
         }
         .into_inner()
     }

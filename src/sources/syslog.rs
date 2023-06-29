@@ -6,7 +6,7 @@ use bytes::Bytes;
 use chrono::Utc;
 use codecs::{
     decoding::{Deserializer, Framer},
-    BytesDecoder, OctetCountingDecoder, SyslogDeserializer, SyslogDeserializerConfig,
+    BytesDecoder, OctetCountingDecoder, SyslogDeserializerConfig,
 };
 use futures::StreamExt;
 use listenfd::ListenFd;
@@ -29,11 +29,12 @@ use crate::{
     event::Event,
     internal_events::StreamClosedError,
     internal_events::{SocketBindError, SocketMode, SocketReceiveError},
+    net,
     shutdown::ShutdownSignal,
     sources::util::net::{try_bind_udp_socket, SocketListenAddr, TcpNullAcker, TcpSource},
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsSettings, TlsSourceConfig},
-    udp, SourceSender,
+    SourceSender,
 };
 
 /// Configuration for the `syslog` source.
@@ -116,7 +117,7 @@ pub enum Mode {
 
         /// Unix file mode bits to be applied to the unix socket file as its designated file permissions.
         ///
-        /// Note: The file mode value can be specified in any numeric format supported by your configuration
+        /// The file mode value can be specified in any numeric format supported by your configuration
         /// language, but it is most intuitive to use an octal number.
         socket_file_mode: Option<u32>,
     },
@@ -223,9 +224,9 @@ impl SourceConfig for SyslogConfig {
                     Framer::OctetCounting(OctetCountingDecoder::new_with_max_length(
                         self.max_length,
                     )),
-                    Deserializer::Syslog(SyslogDeserializer {
-                        source: Some(SyslogConfig::NAME),
-                    }),
+                    Deserializer::Syslog(
+                        SyslogDeserializerConfig::from_source(SyslogConfig::NAME).build(),
+                    ),
                 );
 
                 build_unix_stream_source(
@@ -279,9 +280,7 @@ impl TcpSource for SyslogTcpSource {
     fn decoder(&self) -> Self::Decoder {
         Decoder::new(
             Framer::OctetCounting(OctetCountingDecoder::new_with_max_length(self.max_length)),
-            Deserializer::Syslog(SyslogDeserializer {
-                source: Some(SyslogConfig::NAME),
-            }),
+            Deserializer::Syslog(SyslogDeserializerConfig::from_source(SyslogConfig::NAME).build()),
         )
     }
 
@@ -318,7 +317,7 @@ pub fn udp(
         })?;
 
         if let Some(receive_buffer_bytes) = receive_buffer_bytes {
-            if let Err(error) = udp::set_receive_buffer_size(&socket, receive_buffer_bytes) {
+            if let Err(error) = net::set_receive_buffer_size(&socket, receive_buffer_bytes) {
                 warn!(message = "Failed configuring receive buffer size on UDP socket.", %error);
             }
         }
@@ -333,9 +332,9 @@ pub fn udp(
             socket,
             Decoder::new(
                 Framer::Bytes(BytesDecoder::new()),
-                Deserializer::Syslog(SyslogDeserializer {
-                    source: Some(SyslogConfig::NAME),
-                }),
+                Deserializer::Syslog(
+                    SyslogDeserializerConfig::from_source(SyslogConfig::NAME).build(),
+                ),
             ),
         )
         .take_until(shutdown)
@@ -365,9 +364,9 @@ pub fn udp(
                 debug!("Finished sending.");
                 Ok(())
             }
-            Err(error) => {
+            Err(_) => {
                 let (count, _) = stream.size_hint();
-                emit!(StreamClosedError { error, count });
+                emit!(StreamClosedError { count });
                 Err(())
             }
         }
@@ -473,9 +472,7 @@ mod test {
         bytes: Bytes,
         log_namespace: LogNamespace,
     ) -> Option<Event> {
-        let parser = SyslogDeserializer {
-            source: Some(SyslogConfig::NAME),
-        };
+        let parser = SyslogDeserializerConfig::from_source(SyslogConfig::NAME).build();
         let mut events = parser.parse(bytes, LogNamespace::Legacy).ok()?;
         handle_events(
             &mut events,
@@ -1152,7 +1149,7 @@ mod test {
 
             // Shutdown the source, and make sure we've got all the messages we sent in.
             shutdown
-                .shutdown_all(Instant::now() + Duration::from_millis(100))
+                .shutdown_all(Some(Instant::now() + Duration::from_millis(100)))
                 .await;
             shutdown_complete.await;
 
@@ -1229,7 +1226,7 @@ mod test {
             sleep(Duration::from_secs(1)).await;
 
             shutdown
-                .shutdown_all(Instant::now() + Duration::from_millis(100))
+                .shutdown_all(Some(Instant::now() + Duration::from_millis(100)))
                 .await;
             shutdown_complete.await;
 
@@ -1306,7 +1303,7 @@ mod test {
 
             // Shutdown the source, and make sure we've got all the messages we sent in.
             shutdown
-                .shutdown_all(Instant::now() + Duration::from_millis(100))
+                .shutdown_all(Some(Instant::now() + Duration::from_millis(100)))
                 .await;
             shutdown_complete.await;
 

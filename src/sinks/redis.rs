@@ -109,7 +109,7 @@ impl SinkBatchSettings for RedisDefaultBatchSettings {
 }
 
 /// Configuration for the `redis` sink.
-#[configurable_component(sink("redis"))]
+#[configurable_component(sink("redis", "Publish observability data to Redis."))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct RedisSinkConfig {
@@ -171,6 +171,7 @@ impl GenerateConfig for RedisSinkConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "redis")]
 impl SinkConfig for RedisSinkConfig {
     async fn build(
         &self,
@@ -235,6 +236,7 @@ impl RedisSinkConfig {
             })
             .sink_map_err(|error| error!(message = "Sink failed to flush.", %error));
 
+        #[allow(deprecated)]
         Ok(super::VectorSink::from_event_sink(sink))
     }
 
@@ -293,9 +295,11 @@ fn encode_event(
 
     // Errors are handled by `Encoder`.
     encoder.encode(event, &mut bytes).ok()?;
+
+    let byte_size = bytes.len();
     let value = bytes.freeze();
 
-    let event = EncodedEvent::new(RedisKvEntry { key, value }, event_byte_size);
+    let event = EncodedEvent::new(RedisKvEntry { key, value }, byte_size, event_byte_size);
     Some(event)
 }
 

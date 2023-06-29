@@ -60,6 +60,7 @@ pub struct BloomFilterConfig {
     /// The larger the cache size, the less likely it is to have a false positive, or a case where
     /// we allow a new value for tag even after we have reached the configured limits.
     #[serde(default = "default_cache_size")]
+    #[configurable(metadata(docs::human_name = "Cache Size per Key"))]
     pub cache_size_per_key: usize,
 }
 

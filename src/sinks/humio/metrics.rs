@@ -38,7 +38,7 @@ use crate::{
 // `humio_logs` config here.
 //
 // [1]: https://github.com/serde-rs/serde/issues/1504
-#[configurable_component(sink("humio_metrics"))]
+#[configurable_component(sink("humio_metrics", "Deliver metric event data to Humio."))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct HumioMetricsConfig {
@@ -151,6 +151,7 @@ impl GenerateConfig for HumioMetricsConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "humio_metrics")]
 impl SinkConfig for HumioMetricsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let transform = self

@@ -39,7 +39,7 @@ default-features = false
 features = []
 
 [dependencies.indexmap]
-version = "~1.9.3"
+version = "~2.0.0"
 default-features = false
 features = ["serde"]
 
@@ -69,14 +69,14 @@ default-features = false
 features = []
 
 [dependencies.tokio]
-version = "1.28.1"
+version = "1.29.0"
 default-features = false
 features = ["full"]
 
 [dev-dependencies]
-criterion = "0.4"
+criterion = "0.5"
 quickcheck = "1"
-tempfile = "3.5.0"
+tempfile = "3.6.0"
 similar-asserts = "1.4.2"
 
 [[bench]]

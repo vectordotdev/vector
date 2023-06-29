@@ -31,7 +31,10 @@ use crate::{
 };
 
 /// Configuration for the `splunk_hec_logs` sink.
-#[configurable_component(sink("splunk_hec_logs"))]
+#[configurable_component(sink(
+    "splunk_hec_logs",
+    "Deliver log data to Splunk's HTTP Event Collector."
+))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct HecLogsSinkConfig {
@@ -183,6 +186,7 @@ impl GenerateConfig for HecLogsSinkConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "splunk_hec_logs")]
 impl SinkConfig for HecLogsSinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         if self.auto_extract_timestamp.is_some() && self.endpoint_target == EndpointTarget::Raw {

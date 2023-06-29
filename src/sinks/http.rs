@@ -2,7 +2,6 @@ use std::io::Write;
 
 use bytes::{BufMut, Bytes, BytesMut};
 use codecs::encoding::{CharacterDelimitedEncoder, Framer, Serializer};
-use flate2::write::{GzEncoder, ZlibEncoder};
 use futures::{future, FutureExt, SinkExt};
 use http::{
     header::{HeaderName, HeaderValue, AUTHORIZATION},
@@ -23,14 +22,14 @@ use crate::{
     sinks::util::{
         self,
         http::{BatchedHttpSink, HttpEventEncoder, RequestConfig},
-        BatchConfig, Buffer, Compression, RealtimeSizeBasedDefaultBatchSettings,
+        BatchConfig, Buffer, Compression, Compressor, RealtimeSizeBasedDefaultBatchSettings,
         TowerRequestConfig, UriSerde,
     },
     tls::{TlsConfig, TlsSettings},
 };
 
 /// Configuration for the `http` sink.
-#[configurable_component(sink("http"))]
+#[configurable_component(sink("http", "Deliver observability event data to an HTTP server."))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct HttpSinkConfig {
@@ -202,6 +201,7 @@ fn default_sink(encoding: EncodingConfigWithFraming) -> HttpSink {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "http")]
 impl SinkConfig for HttpSinkConfig {
     async fn build(
         &self,
@@ -252,6 +252,7 @@ impl SinkConfig for HttpSinkConfig {
         )
         .sink_map_err(|error| error!(message = "Fatal HTTP sink error.", %error));
 
+        #[allow(deprecated)]
         let sink = super::VectorSink::from_event_sink(sink);
 
         Ok((sink, healthcheck))
@@ -375,24 +376,21 @@ impl util::http::HttpSink for HttpSink {
             builder = builder.header("Content-Type", content_type);
         }
 
-        match self.compression {
-            Compression::Gzip(level) => {
-                builder = builder.header("Content-Encoding", "gzip");
+        let compression = self.compression;
 
-                let buffer = BytesMut::new();
-                let mut w = GzEncoder::new(buffer.writer(), level.as_flate2());
-                w.write_all(&body).expect("Writing to Vec can't fail");
-                body = w.finish().expect("Writing to Vec can't fail").into_inner();
-            }
-            Compression::Zlib(level) => {
-                builder = builder.header("Content-Encoding", "deflate");
+        if compression.is_compressed() {
+            builder = builder.header(
+                "Content-Encoding",
+                compression
+                    .content_encoding()
+                    .expect("Encoding should be specified."),
+            );
 
-                let buffer = BytesMut::new();
-                let mut w = ZlibEncoder::new(buffer.writer(), level.as_flate2());
-                w.write_all(&body).expect("Writing to Vec can't fail");
-                body = w.finish().expect("Writing to Vec can't fail").into_inner();
-            }
-            Compression::None => {}
+            let mut compressor = Compressor::from(compression);
+            compressor
+                .write_all(&body)
+                .expect("Writing to Vec can't fail.");
+            body = compressor.finish().expect("Writing to Vec can't fail.");
         }
 
         let headers = builder
@@ -477,12 +475,12 @@ mod tests {
         encoding::FramingConfig, JsonSerializerConfig, NewlineDelimitedEncoderConfig,
         TextSerializerConfig,
     };
-    use flate2::read::MultiGzDecoder;
+    use flate2::{read::MultiGzDecoder, read::ZlibDecoder};
     use futures::{channel::mpsc, stream, StreamExt};
     use headers::{Authorization, HeaderMapExt};
     use http::request::Parts;
     use hyper::{Method, Response, StatusCode};
-    use serde::Deserialize;
+    use serde::{de, Deserialize};
     use vector_core::event::{BatchNotifier, BatchStatus, LogEvent};
 
     use super::*;
@@ -812,7 +810,36 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn json_compression() {
+    async fn json_gzip_compression() {
+        json_compression("gzip").await;
+    }
+
+    #[tokio::test]
+    async fn json_zstd_compression() {
+        json_compression("zstd").await;
+    }
+
+    #[tokio::test]
+    async fn json_zlib_compression() {
+        json_compression("zlib").await;
+    }
+
+    #[tokio::test]
+    async fn json_gzip_compression_with_payload_wrapper() {
+        json_compression_with_payload_wrapper("gzip").await;
+    }
+
+    #[tokio::test]
+    async fn json_zlib_compression_with_payload_wrapper() {
+        json_compression_with_payload_wrapper("zlib").await;
+    }
+
+    #[tokio::test]
+    async fn json_zstd_compression_with_payload_wrapper() {
+        json_compression_with_payload_wrapper("zstd").await;
+    }
+
+    async fn json_compression(compression: &str) {
         components::assert_sink_compliance(&HTTP_SINK_TAGS, async {
             let num_lines = 1000;
 
@@ -820,7 +847,7 @@ mod tests {
 
             let config = r#"
         uri = "http://$IN_ADDR/frames"
-        compression = "gzip"
+        compression = "$COMPRESSION"
         encoding.codec = "json"
         method = "post"
 
@@ -829,7 +856,9 @@ mod tests {
         user = "waldo"
         password = "hunter2"
     "#
-            .replace("$IN_ADDR", &in_addr.to_string());
+            .replace("$IN_ADDR", &in_addr.to_string())
+            .replace("$COMPRESSION", compression);
+
             let config: HttpSinkConfig = toml::from_str(&config).unwrap();
 
             let cx = SinkContext::new_test();
@@ -856,8 +885,7 @@ mod tests {
                         Some(Authorization::basic("waldo", "hunter2")),
                         parts.headers.typed_get()
                     );
-                    let lines: Vec<serde_json::Value> =
-                        serde_json::from_reader(MultiGzDecoder::new(body.reader())).unwrap();
+                    let lines: Vec<serde_json::Value> = parse_compressed_json(compression, body);
                     stream::iter(lines)
                 })
                 .map(|line| line.get("message").unwrap().as_str().unwrap().to_owned())
@@ -870,8 +898,7 @@ mod tests {
         .await;
     }
 
-    #[tokio::test]
-    async fn json_compression_with_payload_wrapper() {
+    async fn json_compression_with_payload_wrapper(compression: &str) {
         components::assert_sink_compliance(&HTTP_SINK_TAGS, async {
             let num_lines = 1000;
 
@@ -879,7 +906,7 @@ mod tests {
 
             let config = r#"
         uri = "http://$IN_ADDR/frames"
-        compression = "gzip"
+        compression = "$COMPRESSION"
         encoding.codec = "json"
         payload_prefix = '{"data":'
         payload_suffix = "}"
@@ -890,7 +917,9 @@ mod tests {
         user = "waldo"
         password = "hunter2"
     "#
-            .replace("$IN_ADDR", &in_addr.to_string());
+            .replace("$IN_ADDR", &in_addr.to_string())
+            .replace("$COMPRESSION", compression);
+
             let config: HttpSinkConfig = toml::from_str(&config).unwrap();
 
             let cx = SinkContext::new_test();
@@ -918,8 +947,8 @@ mod tests {
                         parts.headers.typed_get()
                     );
 
-                    let message: serde_json::Value =
-                        serde_json::from_reader(MultiGzDecoder::new(body.reader())).unwrap();
+                    let message: serde_json::Value = parse_compressed_json(compression, body);
+
                     let lines: Vec<serde_json::Value> =
                         message["data"].as_array().unwrap().to_vec();
                     stream::iter(lines)
@@ -932,6 +961,18 @@ mod tests {
             assert_eq!(input_lines, output_lines);
         })
         .await;
+    }
+
+    fn parse_compressed_json<T>(compression: &str, buf: Bytes) -> T
+    where
+        T: de::DeserializeOwned,
+    {
+        match compression {
+            "gzip" => serde_json::from_reader(MultiGzDecoder::new(buf.reader())).unwrap(),
+            "zstd" => serde_json::from_reader(zstd::Decoder::new(buf.reader()).unwrap()).unwrap(),
+            "zlib" => serde_json::from_reader(ZlibDecoder::new(buf.reader())).unwrap(),
+            _ => panic!("undefined compression: {}", compression),
+        }
     }
 
     async fn get_received(

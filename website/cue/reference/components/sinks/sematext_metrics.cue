@@ -64,9 +64,6 @@ components: sinks: sematext_metrics: {
 	}
 
 	telemetry: metrics: {
-		component_sent_events_total:      components.sources.internal_metrics.output.metrics.component_sent_events_total
-		component_sent_event_bytes_total: components.sources.internal_metrics.output.metrics.component_sent_event_bytes_total
-		encode_errors_total:              components.sources.internal_metrics.output.metrics.encode_errors_total
-		processing_errors_total:          components.sources.internal_metrics.output.metrics.processing_errors_total
+		encode_errors_total: components.sources.internal_metrics.output.metrics.encode_errors_total
 	}
 }

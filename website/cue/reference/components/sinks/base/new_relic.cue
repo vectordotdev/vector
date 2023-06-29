@@ -97,6 +97,11 @@ base: components: sinks: new_relic: configuration: {
 
 					[zlib]: https://zlib.net/
 					"""
+				zstd: """
+					[Zstandard][zstd] compression.
+
+					[zstd]: https://facebook.github.io/zstd/
+					"""
 			}
 		}
 	}
