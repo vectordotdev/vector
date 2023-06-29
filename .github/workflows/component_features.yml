@@ -1,20 +1,35 @@
+# Component Features - Linux
+#
+# Validates that each component feature compiles
+#
+# Runs on:
+#  - scheduled UTC midnight Tues-Sat
+#  - on PR comment (see comment-trigger.yml)
+#  - on demand from github actions UI
+
 name: Component Features - Linux
 
 on:
   workflow_call:
+  workflow_dispatch:
+  schedule:
+    # At midnight UTC Tue-Sat
+    - cron: '0 0 * * 2-6'
 
 jobs:
   check-component-features:
-    runs-on: [linux, ubuntu-20.04-8core]
+    # use free tier on schedule and 8 core to expedite results on demand invocation
+    runs-on: ${{ github.event_name == 'schedule' && 'ubuntu-latest' || fromJSON('["linux", "ubuntu-20.04-8core"]') }}
+    if: github.event_name == 'issue_comment' || github.event_name == 'workflow_dispatch'
     steps:
       - name: (PR comment) Get PR branch
-        if: ${{ github.event_name == 'issue_comment' }}
+        if: github.event_name == 'issue_comment'
         uses: xt0rted/pull-request-comment-branch@v2
         id: comment-branch
 
       - name: (PR comment) Set latest commit status as pending
+        if: github.event_name == 'issue_comment'
         uses: myrotvorets/set-commit-status-action@v1.1.7
-        if: ${{ github.event_name == 'issue_comment' }}
         with:
           sha: ${{ steps.comment-branch.outputs.head_sha }}
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -22,13 +37,13 @@ jobs:
           status: pending
 
       - name: (PR comment) Checkout PR branch
-        if: ${{ github.event_name == 'issue_comment' }}
+        if: github.event_name == 'issue_comment'
         uses: actions/checkout@v3
         with:
           ref: ${{ steps.comment-branch.outputs.head_ref }}
 
       - name: Checkout branch
-        if: ${{ github.event_name != 'issue_comment' }}
+        if: github.event_name != 'issue_comment'
         uses: actions/checkout@v3
 
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
@@ -37,8 +52,8 @@ jobs:
       - run: make check-component-features
 
       - name: (PR comment) Set latest commit status as ${{ job.status }}
-        uses: myrotvorets/set-commit-status-action@v1.1.7
         if: always() && github.event_name == 'issue_comment'
+        uses: myrotvorets/set-commit-status-action@v1.1.7
         with:
           sha: ${{ steps.comment-branch.outputs.head_sha }}
           token: ${{ secrets.GITHUB_TOKEN }}
