@@ -9,7 +9,7 @@ jobs:
   sync-install:
     runs-on: ubuntu-20.04
     steps:
-      - name: (PR comment) Get PR branch
+      - name: (PR comment) Echo
         run: echo test issue comment
         if: ${{ github.event_name == 'issue_comment' }}
 
