@@ -748,32 +748,3 @@ jobs:
           release: "any-version"
           republish: "true"
           file: "target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.armv7.rpm"
-
-  publish-failure:
-    name: Send Publish Failure Notification
-    if: failure() && inputs.channel != 'custom'
-    runs-on: ubuntu-20.04
-    needs:
-      - generate-publish-metadata
-      - build-x86_64-unknown-linux-gnu-packages
-      - build-x86_64-unknown-linux-musl-packages
-      - build-aarch64-unknown-linux-musl-packages
-      - build-aarch64-unknown-linux-gnu-packages
-      - build-x86_64-apple-darwin-packages
-      - build-x86_64-pc-windows-msvc-packages
-      - build-armv7-unknown-linux-gnueabihf-packages
-      - build-armv7-unknown-linux-musleabihf-packages
-      - deb-verify
-      - rpm-verify
-      - macos-verify
-      - publish-docker
-      - publish-s3
-      - publish-cloudsmith
-      - publish-github
-    steps:
-    - name: Send notification to Discord
-      env:
-        DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
-      uses: Ilshidur/action-discord@0.3.2
-      with:
-        args: "${{ inputs.channel }} failed: <https://github.com/${{github.repository}}/actions/runs/${{github.run_id}}>"
