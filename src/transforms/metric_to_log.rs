@@ -104,136 +104,7 @@ impl TransformConfig for MetricToLogConfig {
         global_log_namespace: LogNamespace,
     ) -> Vec<TransformOutput> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
-        let mut schema_definition =
-            Definition::default_for_namespace(&BTreeSet::from([log_namespace]))
-                .with_event_field(&owned_value_path!("name"), Kind::bytes(), None)
-                .with_event_field(
-                    &owned_value_path!("namespace"),
-                    Kind::bytes().or_undefined(),
-                    None,
-                )
-                .with_event_field(
-                    &owned_value_path!("tags"),
-                    Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
-                    None,
-                )
-                .with_event_field(&owned_value_path!("kind"), Kind::bytes(), None)
-                .with_event_field(
-                    &owned_value_path!("counter"),
-                    Kind::object(Collection::empty().with_known("value", Kind::float()))
-                        .or_undefined(),
-                    None,
-                )
-                .with_event_field(
-                    &owned_value_path!("gauge"),
-                    Kind::object(Collection::empty().with_known("value", Kind::float()))
-                        .or_undefined(),
-                    None,
-                )
-                .with_event_field(
-                    &owned_value_path!("set"),
-                    Kind::object(Collection::empty().with_known(
-                        "values",
-                        Kind::array(Collection::empty().with_unknown(Kind::bytes())),
-                    ))
-                    .or_undefined(),
-                    None,
-                )
-                .with_event_field(
-                    &owned_value_path!("distribution"),
-                    Kind::object(
-                        Collection::empty()
-                            .with_known(
-                                "samples",
-                                Kind::array(
-                                    Collection::empty().with_unknown(Kind::object(
-                                        Collection::empty()
-                                            .with_known("value", Kind::float())
-                                            .with_known("rate", Kind::integer()),
-                                    )),
-                                ),
-                            )
-                            .with_known("statistic", Kind::bytes()),
-                    )
-                    .or_undefined(),
-                    None,
-                )
-                .with_event_field(
-                    &owned_value_path!("aggregated_histogram"),
-                    Kind::object(
-                        Collection::empty()
-                            .with_known(
-                                "buckets",
-                                Kind::array(
-                                    Collection::empty().with_unknown(Kind::object(
-                                        Collection::empty()
-                                            .with_known("upper_limit", Kind::float())
-                                            .with_known("count", Kind::integer()),
-                                    )),
-                                ),
-                            )
-                            .with_known("count", Kind::integer())
-                            .with_known("sum", Kind::float()),
-                    )
-                    .or_undefined(),
-                    None,
-                )
-                .with_event_field(
-                    &owned_value_path!("aggregated_summary"),
-                    Kind::object(
-                        Collection::empty()
-                            .with_known(
-                                "quantiles",
-                                Kind::array(
-                                    Collection::empty().with_unknown(Kind::object(
-                                        Collection::empty()
-                                            .with_known("quantile", Kind::float())
-                                            .with_known("value", Kind::float()),
-                                    )),
-                                ),
-                            )
-                            .with_known("count", Kind::integer())
-                            .with_known("sum", Kind::float()),
-                    )
-                    .or_undefined(),
-                    None,
-                )
-                .with_event_field(
-                    &owned_value_path!("sketch"),
-                    Kind::any().or_undefined(),
-                    None,
-                );
-
-        match log_namespace {
-            LogNamespace::Vector => {
-                // from serializing the Metric (Legacy moves it to another field)
-                schema_definition = schema_definition.with_event_field(
-                    &owned_value_path!("timestamp"),
-                    Kind::bytes().or_undefined(),
-                    None,
-                );
-
-                // This is added as a "marker" field to determine which namespace is being used at runtime.
-                // This is normally handled automatically by sources, but this is a special case.
-                schema_definition = schema_definition.with_metadata_field(
-                    &owned_value_path!("vector"),
-                    Kind::object(Collection::empty()),
-                    None,
-                );
-            }
-            LogNamespace::Legacy => {
-                if let Some(timestamp_key) = log_schema().timestamp_key() {
-                    schema_definition =
-                        schema_definition.with_event_field(timestamp_key, Kind::timestamp(), None);
-                }
-
-                schema_definition = schema_definition.with_event_field(
-                    &parse_value_path(log_schema().host_key()).expect("valid host key"),
-                    Kind::bytes().or_undefined(),
-                    None,
-                );
-            }
-        }
+        let schema_definition = schema_definition(log_namespace);
 
         vec![TransformOutput::new(
             DataType::Log,
@@ -247,6 +118,137 @@ impl TransformConfig for MetricToLogConfig {
     fn enable_concurrency(&self) -> bool {
         true
     }
+}
+
+fn schema_definition(log_namespace: LogNamespace) -> Definition {
+    let mut schema_definition = Definition::default_for_namespace(&BTreeSet::from([log_namespace]))
+        .with_event_field(&owned_value_path!("name"), Kind::bytes(), None)
+        .with_event_field(
+            &owned_value_path!("namespace"),
+            Kind::bytes().or_undefined(),
+            None,
+        )
+        .with_event_field(
+            &owned_value_path!("tags"),
+            Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
+            None,
+        )
+        .with_event_field(&owned_value_path!("kind"), Kind::bytes(), None)
+        .with_event_field(
+            &owned_value_path!("counter"),
+            Kind::object(Collection::empty().with_known("value", Kind::float())).or_undefined(),
+            None,
+        )
+        .with_event_field(
+            &owned_value_path!("gauge"),
+            Kind::object(Collection::empty().with_known("value", Kind::float())).or_undefined(),
+            None,
+        )
+        .with_event_field(
+            &owned_value_path!("set"),
+            Kind::object(Collection::empty().with_known(
+                "values",
+                Kind::array(Collection::empty().with_unknown(Kind::bytes())),
+            ))
+            .or_undefined(),
+            None,
+        )
+        .with_event_field(
+            &owned_value_path!("distribution"),
+            Kind::object(
+                Collection::empty()
+                    .with_known(
+                        "samples",
+                        Kind::array(
+                            Collection::empty().with_unknown(Kind::object(
+                                Collection::empty()
+                                    .with_known("value", Kind::float())
+                                    .with_known("rate", Kind::integer()),
+                            )),
+                        ),
+                    )
+                    .with_known("statistic", Kind::bytes()),
+            )
+            .or_undefined(),
+            None,
+        )
+        .with_event_field(
+            &owned_value_path!("aggregated_histogram"),
+            Kind::object(
+                Collection::empty()
+                    .with_known(
+                        "buckets",
+                        Kind::array(
+                            Collection::empty().with_unknown(Kind::object(
+                                Collection::empty()
+                                    .with_known("upper_limit", Kind::float())
+                                    .with_known("count", Kind::integer()),
+                            )),
+                        ),
+                    )
+                    .with_known("count", Kind::integer())
+                    .with_known("sum", Kind::float()),
+            )
+            .or_undefined(),
+            None,
+        )
+        .with_event_field(
+            &owned_value_path!("aggregated_summary"),
+            Kind::object(
+                Collection::empty()
+                    .with_known(
+                        "quantiles",
+                        Kind::array(
+                            Collection::empty().with_unknown(Kind::object(
+                                Collection::empty()
+                                    .with_known("quantile", Kind::float())
+                                    .with_known("value", Kind::float()),
+                            )),
+                        ),
+                    )
+                    .with_known("count", Kind::integer())
+                    .with_known("sum", Kind::float()),
+            )
+            .or_undefined(),
+            None,
+        )
+        .with_event_field(
+            &owned_value_path!("sketch"),
+            Kind::any().or_undefined(),
+            None,
+        );
+
+    match log_namespace {
+        LogNamespace::Vector => {
+            // from serializing the Metric (Legacy moves it to another field)
+            schema_definition = schema_definition.with_event_field(
+                &owned_value_path!("timestamp"),
+                Kind::bytes().or_undefined(),
+                None,
+            );
+
+            // This is added as a "marker" field to determine which namespace is being used at runtime.
+            // This is normally handled automatically by sources, but this is a special case.
+            schema_definition = schema_definition.with_metadata_field(
+                &owned_value_path!("vector"),
+                Kind::object(Collection::empty()),
+                None,
+            );
+        }
+        LogNamespace::Legacy => {
+            if let Some(timestamp_key) = log_schema().timestamp_key() {
+                schema_definition =
+                    schema_definition.with_event_field(timestamp_key, Kind::timestamp(), None);
+            }
+
+            schema_definition = schema_definition.with_event_field(
+                &parse_value_path(log_schema().host_key()).expect("valid host key"),
+                Kind::bytes().or_undefined(),
+                None,
+            );
+        }
+    }
+    schema_definition
 }
 
 #[derive(Clone, Debug)]
@@ -412,6 +414,8 @@ mod tests {
         .with_timestamp(Some(ts()));
         let mut metadata = counter.metadata().clone();
         metadata.set_source_id(Arc::new(ComponentKey::from("in")));
+        metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
+        metadata.set_schema_definition(&Arc::new(schema_definition(LogNamespace::Legacy)));
 
         let log = do_transform(counter).await.unwrap();
         let collected: Vec<_> = log.all_fields().unwrap().collect();
@@ -440,6 +444,8 @@ mod tests {
         .with_timestamp(Some(ts()));
         let mut metadata = gauge.metadata().clone();
         metadata.set_source_id(Arc::new(ComponentKey::from("in")));
+        metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
+        metadata.set_schema_definition(&Arc::new(schema_definition(LogNamespace::Legacy)));
 
         let log = do_transform(gauge).await.unwrap();
         let collected: Vec<_> = log.all_fields().unwrap().collect();
@@ -468,6 +474,8 @@ mod tests {
         .with_timestamp(Some(ts()));
         let mut metadata = set.metadata().clone();
         metadata.set_source_id(Arc::new(ComponentKey::from("in")));
+        metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
+        metadata.set_schema_definition(&Arc::new(schema_definition(LogNamespace::Legacy)));
 
         let log = do_transform(set).await.unwrap();
         let collected: Vec<_> = log.all_fields().unwrap().collect();
@@ -498,6 +506,8 @@ mod tests {
         .with_timestamp(Some(ts()));
         let mut metadata = distro.metadata().clone();
         metadata.set_source_id(Arc::new(ComponentKey::from("in")));
+        metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
+        metadata.set_schema_definition(&Arc::new(schema_definition(LogNamespace::Legacy)));
 
         let log = do_transform(distro).await.unwrap();
         let collected: Vec<_> = log.all_fields().unwrap().collect();
@@ -547,6 +557,8 @@ mod tests {
         .with_timestamp(Some(ts()));
         let mut metadata = histo.metadata().clone();
         metadata.set_source_id(Arc::new(ComponentKey::from("in")));
+        metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
+        metadata.set_schema_definition(&Arc::new(schema_definition(LogNamespace::Legacy)));
 
         let log = do_transform(histo).await.unwrap();
         let collected: Vec<_> = log.all_fields().unwrap().collect();
@@ -594,6 +606,8 @@ mod tests {
         .with_timestamp(Some(ts()));
         let mut metadata = summary.metadata().clone();
         metadata.set_source_id(Arc::new(ComponentKey::from("in")));
+        metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
+        metadata.set_schema_definition(&Arc::new(schema_definition(LogNamespace::Legacy)));
 
         let log = do_transform(summary).await.unwrap();
         let collected: Vec<_> = log.all_fields().unwrap().collect();

@@ -10,10 +10,12 @@ use opentelemetry_proto::proto::{
 };
 use similar_asserts::assert_eq;
 use std::collections::BTreeMap;
+use std::sync::Arc;
 use tonic::Request;
 use vector_core::config::LogNamespace;
 use vrl::value;
 
+use crate::config::OutputId;
 use crate::{
     config::{SourceConfig, SourceContext},
     event::{into_event_stream, Event, EventStatus, LogEvent, Value},
@@ -269,7 +271,11 @@ async fn receive_grpc_logs_legacy_namespace() {
             ("observed_timestamp", Utc.timestamp_nanos(2).into()),
             ("source_type", "opentelemetry".into()),
         ]);
-        let expect_event = Event::from(LogEvent::from(expect_vec));
+        let mut expect_event = Event::from(LogEvent::from(expect_vec));
+        expect_event.set_upstream_id(Arc::new(OutputId {
+            component: "test".into(),
+            port: Some("logs".into()),
+        }));
         assert_eq!(actual_event, expect_event);
     })
     .await;

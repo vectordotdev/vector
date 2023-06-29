@@ -961,9 +961,12 @@ mod tests {
                     MetricValue::Counter { value: 1.0 },
                 );
 
-                let expected = metric
+                let mut expected = metric
                     .clone()
                     .with_value(MetricValue::Counter { value: 2.0 });
+                expected
+                    .metadata_mut()
+                    .set_upstream_id(Arc::new(OutputId::from("transform")));
 
                 tx.send(metric.into()).await.unwrap();
 

@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use std::{collections::HashMap, fmt, num::NonZeroUsize};
 
 use bitmask_enum::bitmask;
@@ -111,7 +112,7 @@ pub struct SourceOutput {
     // NOTE: schema definitions are only implemented/supported for log-type events. There is no
     // inherent blocker to support other types as well, but it'll require additional work to add
     // the relevant schemas, and store them separately in this type.
-    pub schema_definition: Option<schema::Definition>,
+    pub schema_definition: Option<Arc<schema::Definition>>,
 }
 
 impl SourceOutput {
@@ -129,7 +130,7 @@ impl SourceOutput {
         Self {
             port: None,
             ty,
-            schema_definition: Some(schema_definition),
+            schema_definition: Some(Arc::new(schema_definition)),
         }
     }
 
@@ -168,17 +169,15 @@ impl SourceOutput {
     /// Schema enabled is set in the users configuration.
     #[must_use]
     pub fn schema_definition(&self, schema_enabled: bool) -> Option<schema::Definition> {
+        use std::ops::Deref;
+
         self.schema_definition.as_ref().map(|definition| {
             if schema_enabled {
-                definition.clone()
+                definition.deref().clone()
             } else {
                 let mut new_definition =
                     schema::Definition::default_for_namespace(definition.log_namespaces());
-
-                if definition.log_namespaces().contains(&LogNamespace::Vector) {
-                    new_definition.add_meanings(definition.meanings());
-                }
-
+                new_definition.add_meanings(definition.meanings());
                 new_definition
             }
         })
@@ -203,7 +202,7 @@ pub struct TransformOutput {
     /// enabled, at least one definition  should be output. If the transform
     /// has multiple connected sources, it is possible to have multiple output
     /// definitions - one for each input.
-    log_schema_definitions: HashMap<OutputId, schema::Definition>,
+    pub log_schema_definitions: HashMap<OutputId, schema::Definition>,
 }
 
 impl TransformOutput {
@@ -245,11 +244,7 @@ impl TransformOutput {
                 .map(|(output, definition)| {
                     let mut new_definition =
                         schema::Definition::default_for_namespace(definition.log_namespaces());
-
-                    if definition.log_namespaces().contains(&LogNamespace::Vector) {
-                        new_definition.add_meanings(definition.meanings());
-                    }
-
+                    new_definition.add_meanings(definition.meanings());
                     (output.clone(), new_definition)
                 })
                 .collect()
@@ -606,7 +601,10 @@ mod test {
 
         // There should be the default legacy definition without schemas enabled.
         assert_eq!(
-            Some(schema::Definition::default_legacy_namespace()),
+            Some(
+                schema::Definition::default_legacy_namespace()
+                    .with_meaning(OwnedTargetPath::event(owned_value_path!("zork")), "zork")
+            ),
             output.schema_definition(false)
         );
     }
