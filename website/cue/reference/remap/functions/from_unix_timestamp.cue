@@ -43,14 +43,14 @@ remap: functions: from_unix_timestamp: {
 		{
 			title: "Convert from a Unix timestamp (milliseconds)"
 			source: #"""
-				from_unix_timestamp(5000, unit: "milliseconds")
+				from_unix_timestamp!(5000, unit: "milliseconds")
 				"""#
 			return: "1970-01-01T00:00:05Z"
 		},
 		{
 			title: "Convert from a Unix timestamp (nanoseconds)"
 			source: #"""
-				from_unix_timestamp(5000, unit: "nanoseconds")
+				from_unix_timestamp!(5000, unit: "nanoseconds")
 				"""#
 			return: "1970-01-01T00:00:00.000005Z"
 		},
