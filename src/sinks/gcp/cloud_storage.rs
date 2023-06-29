@@ -429,7 +429,7 @@ mod tests {
     async fn component_spec_compliance() {
         let mock_endpoint = spawn_blackhole_http_server(always_200_response).await;
 
-        let context = SinkContext::new_test();
+        let context = SinkContext::default();
 
         let tls = TlsSettings::default();
         let client =

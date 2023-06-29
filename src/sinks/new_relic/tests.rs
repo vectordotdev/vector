@@ -28,7 +28,7 @@ async fn component_spec_compliance() {
         .expect("config should be valid");
     config.override_uri = Some(mock_endpoint);
 
-    let context = SinkContext::new_test();
+    let context = SinkContext::default();
     let (sink, _healthcheck) = config.build(context).await.unwrap();
 
     let event = Event::Log(LogEvent::from("simple message"));

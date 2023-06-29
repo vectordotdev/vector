@@ -162,7 +162,7 @@ mod integration_tests {
         assert!(!token.is_empty(), "$AXIOM_TOKEN required");
         let dataset = env::var("AXIOM_DATASET").unwrap();
 
-        let cx = SinkContext::new_test();
+        let cx = SinkContext::default();
 
         let config = AxiomConfig {
             url: Some(url.clone()),

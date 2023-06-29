@@ -35,7 +35,7 @@ async fn cloudwatch_metrics_healthcheck() {
 
 #[tokio::test]
 async fn cloudwatch_metrics_put_data() {
-    let cx = SinkContext::new_test();
+    let cx = SinkContext::default();
     let config = config();
     let client = config.create_client(&cx.globals.proxy).await.unwrap();
     let sink = CloudWatchMetricsSvc::new(config, client).unwrap();
@@ -94,7 +94,7 @@ async fn cloudwatch_metrics_put_data() {
 
 #[tokio::test]
 async fn cloudwatch_metrics_namespace_partitioning() {
-    let cx = SinkContext::new_test();
+    let cx = SinkContext::default();
     let config = config();
     let client = config.create_client(&cx.globals.proxy).await.unwrap();
     let sink = CloudWatchMetricsSvc::new(config, client).unwrap();

@@ -251,7 +251,7 @@ mod integration_tests {
     async fn humio_insert_message() {
         wait_ready().await;
 
-        let cx = SinkContext::new_test();
+        let cx = SinkContext::default();
 
         let repo = create_repository().await;
 
@@ -301,7 +301,7 @@ mod integration_tests {
     async fn humio_insert_source() {
         wait_ready().await;
 
-        let cx = SinkContext::new_test();
+        let cx = SinkContext::default();
 
         let repo = create_repository().await;
 
@@ -337,7 +337,7 @@ mod integration_tests {
             let mut config = config(&repo.default_ingest_token);
             config.event_type = Template::try_from("json".to_string()).ok();
 
-            let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
+            let (sink, _) = config.build(SinkContext::default()).await.unwrap();
 
             let message = random_string(100);
             let mut event = LogEvent::from(message.clone());
@@ -363,7 +363,7 @@ mod integration_tests {
         {
             let config = config(&repo.default_ingest_token);
 
-            let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
+            let (sink, _) = config.build(SinkContext::default()).await.unwrap();
 
             let message = random_string(100);
             let event = LogEvent::from(message.clone());

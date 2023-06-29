@@ -62,7 +62,7 @@ async fn firehose_put_records() {
 
     let config = KinesisFirehoseSinkConfig { batch, base };
 
-    let cx = SinkContext::new_test();
+    let cx = SinkContext::default();
 
     let (sink, _) = config.build(cx).await.unwrap();
 

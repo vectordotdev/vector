@@ -906,7 +906,7 @@ mod integration_tests {
         let now = Utc::now();
         let measure = format!("vector-{}", now.timestamp_nanos());
 
-        let cx = SinkContext::new_test();
+        let cx = SinkContext::default();
 
         let config = InfluxDbLogsConfig {
             namespace: None,

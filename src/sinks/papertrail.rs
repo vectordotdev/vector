@@ -213,7 +213,7 @@ mod tests {
         config.endpoint = mock_endpoint.into();
         config.tls = Some(TlsEnableableConfig::default());
 
-        let context = SinkContext::new_test();
+        let context = SinkContext::default();
         let (sink, _healthcheck) = config.build(context).await.unwrap();
 
         let event = Event::Log(LogEvent::from("simple message"));
