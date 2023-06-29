@@ -5,14 +5,14 @@ This is a checklist to use whilst reviewing code for Vector's sinks.
 - [ ] Does it work? Do you understand what it is supposed to be doing?
 - [ ] Does the retry logic make sense?
 - [ ] Are they emitting the correct metrics?
-- [ ] Are the tests testing that they are are emitting the correct metrics?
+- [ ] Are the tests testing that they are emitting the correct metrics?
 - [ ] Are there integration tests?
 
 ## Code structure
 
 - [ ] Is it using the sink prelude?
 - [ ] Sensible feature flags?
-- [ ] Is the code modularised into `mod.rs`, `config.rs`, `sink.rs`,  `request_builder.rs`, `service.rs`
+- [ ] Is the code modularized into `mod.rs`, `config.rs`, `sink.rs`,  `request_builder.rs`, `service.rs`
 - [ ] Does the code follow our [style guidelines].
 
 ## Documentation
