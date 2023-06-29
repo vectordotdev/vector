@@ -466,12 +466,14 @@ pub async fn load_configs(
         paths = ?config_paths.iter().map(<&PathBuf>::from).collect::<Vec<_>>()
     );
 
+    // config::init_log_schema should be called before initializing sources.
+    #[cfg(not(feature = "enterprise-tests"))]
+    config::init_log_schema(&config_paths, true).map_err(handle_config_errors)?;
+
     let mut config =
         config::load_from_paths_with_provider_and_secrets(&config_paths, signal_handler)
             .await
             .map_err(handle_config_errors)?;
-    #[cfg(not(feature = "enterprise-tests"))]
-    config::init_log_schema(config.global.log_schema.clone(), true);
 
     config::init_telemetry(config.global.telemetry.clone(), true);
 
