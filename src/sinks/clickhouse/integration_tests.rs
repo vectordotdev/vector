@@ -63,7 +63,7 @@ async fn insert_events() {
         )
         .await;
 
-    let (sink, _hc) = config.build(SinkContext::new_test()).await.unwrap();
+    let (sink, _hc) = config.build(SinkContext::default()).await.unwrap();
 
     let (mut input_event, mut receiver) = make_event();
     input_event
@@ -114,7 +114,7 @@ async fn skip_unknown_fields() {
         .create_table(&table, "host String, timestamp String, message String")
         .await;
 
-    let (sink, _hc) = config.build(SinkContext::new_test()).await.unwrap();
+    let (sink, _hc) = config.build(SinkContext::default()).await.unwrap();
 
     let (mut input_event, mut receiver) = make_event();
     input_event.as_mut_log().insert("unknown", "mysteries");
@@ -167,7 +167,7 @@ async fn insert_events_unix_timestamps() {
         )
         .await;
 
-    let (sink, _hc) = config.build(SinkContext::new_test()).await.unwrap();
+    let (sink, _hc) = config.build(SinkContext::default()).await.unwrap();
 
     let (mut input_event, _receiver) = make_event();
 
@@ -235,7 +235,7 @@ timestamp_format = "unix""#,
         )
         .await;
 
-    let (sink, _hc) = config.build(SinkContext::new_test()).await.unwrap();
+    let (sink, _hc) = config.build(SinkContext::default()).await.unwrap();
 
     let (mut input_event, _receiver) = make_event();
 
@@ -298,7 +298,7 @@ async fn no_retry_on_incorrect_data() {
         .create_table(&table, "host String, timestamp String")
         .await;
 
-    let (sink, _hc) = config.build(SinkContext::new_test()).await.unwrap();
+    let (sink, _hc) = config.build(SinkContext::default()).await.unwrap();
 
     let (input_event, mut receiver) = make_event();
 
@@ -340,7 +340,7 @@ async fn no_retry_on_incorrect_data_warp() {
         batch,
         ..Default::default()
     };
-    let (sink, _hc) = config.build(SinkContext::new_test()).await.unwrap();
+    let (sink, _hc) = config.build(SinkContext::default()).await.unwrap();
 
     let (input_event, mut receiver) = make_event();
 

@@ -627,7 +627,7 @@ mod tests {
         "#;
         let config: HttpSinkConfig = toml::from_str(config).unwrap();
 
-        let cx = SinkContext::new_test();
+        let cx = SinkContext::default();
 
         _ = config.build(cx).await.unwrap();
     }
@@ -861,7 +861,7 @@ mod tests {
 
             let config: HttpSinkConfig = toml::from_str(&config).unwrap();
 
-            let cx = SinkContext::new_test();
+            let cx = SinkContext::default();
 
             let (sink, _) = config.build(cx).await.unwrap();
             let (rx, trigger, server) = build_test_server(in_addr);
@@ -922,7 +922,7 @@ mod tests {
 
             let config: HttpSinkConfig = toml::from_str(&config).unwrap();
 
-            let cx = SinkContext::new_test();
+            let cx = SinkContext::default();
 
             let (sink, _) = config.build(cx).await.unwrap();
             let (rx, trigger, server) = build_test_server(in_addr);
@@ -1029,7 +1029,7 @@ mod tests {
         );
         let config: HttpSinkConfig = toml::from_str(&config).unwrap();
 
-        let cx = SinkContext::new_test();
+        let cx = SinkContext::default();
 
         let (sink, _) = config.build(cx).await.unwrap();
         (in_addr, sink)

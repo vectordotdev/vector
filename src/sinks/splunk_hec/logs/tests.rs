@@ -218,7 +218,7 @@ async fn splunk_passthrough_token() {
         auto_extract_timestamp: None,
         endpoint_target: EndpointTarget::Event,
     };
-    let cx = SinkContext::new_test();
+    let cx = SinkContext::default();
 
     let (sink, _) = config.build(cx).await.unwrap();
 

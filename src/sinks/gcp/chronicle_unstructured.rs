@@ -541,7 +541,7 @@ mod integration_tests {
         log_type: &str,
         auth_path: &str,
     ) -> crate::Result<(VectorSink, crate::sinks::Healthcheck)> {
-        let cx = SinkContext::new_test();
+        let cx = SinkContext::default();
         config(log_type, auth_path).build(cx).await
     }
 

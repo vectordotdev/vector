@@ -299,7 +299,7 @@ mod tests {
         // but the sink side already does such a test and this is good
         // to ensure interoperability.
         let sink: SinkConfig = toml::from_str(vector_source_config_str).unwrap();
-        let cx = SinkContext::new_test();
+        let cx = SinkContext::default();
         let (sink, _) = sink.build(cx).await.unwrap();
 
         let (mut events, stream) = test_util::random_events_with_stream(100, 100, None);

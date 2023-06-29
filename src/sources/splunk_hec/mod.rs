@@ -1290,7 +1290,7 @@ mod tests {
             auto_extract_timestamp: None,
             endpoint_target: Default::default(),
         }
-        .build(SinkContext::new_test())
+        .build(SinkContext::default())
         .await
         .unwrap()
     }

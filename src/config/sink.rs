@@ -235,7 +235,7 @@ pub trait SinkConfig: DynClone + NamedComponent + core::fmt::Debug + Send + Sync
 
 dyn_clone::clone_trait_object!(SinkConfig);
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug, Default)]
 pub struct SinkContext {
     pub healthcheck: SinkHealthcheckOptions,
     pub globals: GlobalOptions,
@@ -244,16 +244,6 @@ pub struct SinkContext {
 }
 
 impl SinkContext {
-    #[cfg(test)]
-    pub fn new_test() -> Self {
-        Self {
-            healthcheck: SinkHealthcheckOptions::default(),
-            globals: GlobalOptions::default(),
-            proxy: ProxyConfig::default(),
-            schema: schema::Options::default(),
-        }
-    }
-
     pub const fn globals(&self) -> &GlobalOptions {
         &self.globals
     }

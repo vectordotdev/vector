@@ -459,7 +459,7 @@ mod tests {
             default_headers: HeaderMap::new(),
         };
 
-        let context = SinkContext::new_test();
+        let context = SinkContext::default();
         let client =
             HttpClient::new(None, &context.proxy).expect("should not fail to create HTTP client");
 
@@ -617,7 +617,7 @@ mod tests {
         "#,
         )
         .unwrap();
-        if config.build(SinkContext::new_test()).await.is_ok() {
+        if config.build(SinkContext::default()).await.is_ok() {
             panic!("config.build failed to error");
         }
     }
@@ -657,7 +657,7 @@ mod tests {
         "#,
         )
         .unwrap();
-        if config.build(SinkContext::new_test()).await.is_ok() {
+        if config.build(SinkContext::default()).await.is_ok() {
             panic!("config.build failed to error");
         }
     }

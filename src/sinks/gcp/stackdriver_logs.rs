@@ -451,7 +451,7 @@ mod tests {
         config.auth.api_key = Some("fake".to_string().into());
         config.endpoint = mock_endpoint.to_string();
 
-        let context = SinkContext::new_test();
+        let context = SinkContext::default();
         let (sink, _healthcheck) = config.build(context).await.unwrap();
 
         let event = Event::Log(LogEvent::from("simple message"));
@@ -659,7 +659,7 @@ mod tests {
             resource.namespace = "office"
         "#})
         .unwrap();
-        if config.build(SinkContext::new_test()).await.is_ok() {
+        if config.build(SinkContext::default()).await.is_ok() {
             panic!("config.build failed to error");
         }
     }

@@ -51,7 +51,7 @@ fn s3_address() -> String {
 
 #[tokio::test]
 async fn s3_insert_message_into_with_flat_key_prefix() {
-    let cx = SinkContext::new_test();
+    let cx = SinkContext::default();
 
     let bucket = uuid::Uuid::new_v4().to_string();
 
@@ -85,7 +85,7 @@ async fn s3_insert_message_into_with_flat_key_prefix() {
 
 #[tokio::test]
 async fn s3_insert_message_into_with_folder_key_prefix() {
-    let cx = SinkContext::new_test();
+    let cx = SinkContext::default();
 
     let bucket = uuid::Uuid::new_v4().to_string();
 
@@ -119,7 +119,7 @@ async fn s3_insert_message_into_with_folder_key_prefix() {
 
 #[tokio::test]
 async fn s3_insert_message_into_with_ssekms_key_id() {
-    let cx = SinkContext::new_test();
+    let cx = SinkContext::default();
 
     let bucket = uuid::Uuid::new_v4().to_string();
 
@@ -156,7 +156,7 @@ async fn s3_insert_message_into_with_ssekms_key_id() {
 
 #[tokio::test]
 async fn s3_rotate_files_after_the_buffer_size_is_reached() {
-    let cx = SinkContext::new_test();
+    let cx = SinkContext::default();
 
     let bucket = uuid::Uuid::new_v4().to_string();
 
@@ -213,7 +213,7 @@ async fn s3_gzip() {
     // to 1000, and using gzip compression.  We test to ensure that all of the keys we end up
     // writing represent the sum total of the lines: we expect 3 batches, each of which should
     // have 1000 lines.
-    let cx = SinkContext::new_test();
+    let cx = SinkContext::default();
 
     let bucket = uuid::Uuid::new_v4().to_string();
 
@@ -258,7 +258,7 @@ async fn s3_zstd() {
     // to 1000, and using zstd compression.  We test to ensure that all of the keys we end up
     // writing represent the sum total of the lines: we expect 3 batches, each of which should
     // have 1000 lines.
-    let cx = SinkContext::new_test();
+    let cx = SinkContext::default();
 
     let bucket = uuid::Uuid::new_v4().to_string();
 
@@ -303,7 +303,7 @@ async fn s3_zstd() {
 // https://github.com/localstack/localstack/issues/4166
 #[tokio::test]
 async fn s3_insert_message_into_object_lock() {
-    let cx = SinkContext::new_test();
+    let cx = SinkContext::default();
 
     let bucket = uuid::Uuid::new_v4().to_string();
 
@@ -357,7 +357,7 @@ async fn s3_insert_message_into_object_lock() {
 
 #[tokio::test]
 async fn acknowledges_failures() {
-    let cx = SinkContext::new_test();
+    let cx = SinkContext::default();
 
     let bucket = uuid::Uuid::new_v4().to_string();
 
@@ -408,7 +408,7 @@ async fn s3_healthchecks_invalid_bucket() {
 
 #[tokio::test]
 async fn s3_flush_on_exhaustion() {
-    let cx = SinkContext::new_test();
+    let cx = SinkContext::default();
 
     let bucket = uuid::Uuid::new_v4().to_string();
     create_bucket(&bucket, false).await;
