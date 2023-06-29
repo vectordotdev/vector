@@ -10,6 +10,10 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
       - name: (PR comment) Get PR branch
+        run: echo test issue comment
+        if: ${{ github.event_name == 'issue_comment' }}
+
+      - name: (PR comment) Get PR branch
         if: ${{ github.event_name == 'issue_comment' }}
         uses: xt0rted/pull-request-comment-branch@v2
         id: comment-branch
