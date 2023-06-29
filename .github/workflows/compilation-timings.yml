@@ -17,8 +17,6 @@ jobs:
     steps:
       - uses: colpal/actions-clean@v1
       - uses: actions/checkout@v3
-        with:
-          submodules: "recursive"
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: cargo clean
@@ -35,8 +33,6 @@ jobs:
     steps:
       - uses: colpal/actions-clean@v1
       - uses: actions/checkout@v3
-        with:
-          submodules: "recursive"
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: cargo clean
@@ -48,8 +44,6 @@ jobs:
     steps:
       - uses: colpal/actions-clean@v1
       - uses: actions/checkout@v3
-        with:
-          submodules: "recursive"
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: cargo clean
@@ -61,8 +55,6 @@ jobs:
     steps:
       - uses: colpal/actions-clean@v1
       - uses: actions/checkout@v3
-        with:
-          submodules: "recursive"
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: cargo clean
@@ -76,8 +68,6 @@ jobs:
     steps:
       - uses: colpal/actions-clean@v1
       - uses: actions/checkout@v3
-        with:
-          submodules: "recursive"
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: cargo clean
