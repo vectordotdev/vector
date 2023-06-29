@@ -85,13 +85,6 @@ jobs:
     needs: cross-linux
     if: needs.cross-linux.result == 'success' && github.event_name == 'issue_comment'
     steps:
-      - name: Validate issue comment
-        uses: tspascoal/get-user-teams-membership@v2
-        with:
-          username: ${{ github.actor }}
-          team: 'Vector'
-          GITHUB_TOKEN: ${{ secrets.GH_PAT_ORG }}
-
       - name: (PR comment) Get PR branch
         uses: xt0rted/pull-request-comment-branch@v2
         id: comment-branch
