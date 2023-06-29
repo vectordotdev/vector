@@ -12,7 +12,7 @@ path = "tests/integration/lib.rs"
 
 [dependencies]
 chrono = { version = "0.4.19", default-features = false }
-chrono-tz = { version = "0.8.2", default-features = false }
+chrono-tz = { version = "0.8.3", default-features = false }
 encoding_rs = { version = "0.8", default-features = false, features = ["alloc", "serde"] }
 indexmap = { version = "2.0", default-features = false, features = ["std"] }
 inventory = { version = "0.3" }

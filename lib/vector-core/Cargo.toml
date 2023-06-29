@@ -78,7 +78,7 @@ prost-build = "0.11"
 
 [dev-dependencies]
 base64 = "0.21.2"
-chrono-tz = { version = "0.8.2", default-features = false }
+chrono-tz = { version = "0.8.3", default-features = false }
 criterion = { version = "0.5.1", features = ["html_reports"] }
 env-test-util = "1.0.1"
 quickcheck = "1"

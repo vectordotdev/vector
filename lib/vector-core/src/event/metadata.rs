@@ -7,7 +7,10 @@ use vector_common::{config::ComponentKey, EventDataEq};
 use vrl::value::{Kind, Secrets, Value};
 
 use super::{BatchNotifier, EventFinalizer, EventFinalizers, EventStatus};
-use crate::{config::LogNamespace, schema, ByteSizeOf};
+use crate::{
+    config::{LogNamespace, OutputId},
+    schema, ByteSizeOf,
+};
 
 const DATADOG_API_KEY: &str = "datadog_api_key";
 const SPLUNK_HEC_TOKEN: &str = "splunk_hec_token";
@@ -30,8 +33,15 @@ pub struct EventMetadata {
     /// The id of the source
     source_id: Option<Arc<ComponentKey>>,
 
+    /// The id of the component this event originated from. This is used to
+    /// determine which schema definition to attach to an event in transforms.
+    /// This should always have a value set for events in transforms. It will always be `None`
+    /// in a source, and there is currently no use-case for reading the value in a sink.
+    upstream_id: Option<Arc<OutputId>>,
+
     /// An identifier for a globally registered schema definition which provides information about
     /// the event shape (type information, and semantic meaning of fields).
+    /// This definition is only currently valid for logs, and shouldn't be used for other event types.
     ///
     /// TODO(Jean): must not skip serialization to track schemas across restarts.
     #[serde(default = "default_schema_definition", skip)]
@@ -71,15 +81,27 @@ impl EventMetadata {
         &mut self.secrets
     }
 
-    /// Returns a reference to the metadata source.
+    /// Returns a reference to the metadata source id.
     #[must_use]
     pub fn source_id(&self) -> Option<&Arc<ComponentKey>> {
         self.source_id.as_ref()
     }
 
+    /// Returns a reference to the metadata parent id. This is the `OutputId`
+    /// of the previous component the event was sent through (if any).
+    #[must_use]
+    pub fn upstream_id(&self) -> Option<&OutputId> {
+        self.upstream_id.as_deref()
+    }
+
     /// Sets the `source_id` in the metadata to the provided value.
     pub fn set_source_id(&mut self, source_id: Arc<ComponentKey>) {
         self.source_id = Some(source_id);
+    }
+
+    /// Sets the `upstream_id` in the metadata to the provided value.
+    pub fn set_upstream_id(&mut self, upstream_id: Arc<OutputId>) {
+        self.upstream_id = Some(upstream_id);
     }
 
     /// Return the datadog API key, if it exists
@@ -111,6 +133,7 @@ impl Default for EventMetadata {
             finalizers: Default::default(),
             schema_definition: default_schema_definition(),
             source_id: None,
+            upstream_id: None,
         }
     }
 }

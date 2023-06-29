@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::sync::Arc;
 use std::{
     collections::BTreeMap,
     fs::File,
@@ -376,8 +375,6 @@ where
     drop_on_error: bool,
     drop_on_abort: bool,
     reroute_dropped: bool,
-    default_schema_definition: Arc<schema::Definition>,
-    dropped_schema_definition: Arc<schema::Definition>,
     runner: Runner,
     metric_tag_values: MetricTagValues,
 }
@@ -444,28 +441,6 @@ where
         program: Program,
         runner: Runner,
     ) -> crate::Result<Self> {
-        let default_schema_definition = context
-            .schema_definitions
-            .get(&None)
-            .expect("default schema required")
-            // TODO we can now have multiple possible definitions.
-            // This is going to need to be updated to store these possible definitions and then
-            // choose the correct one based on the input the event has come from.
-            .iter()
-            .map(|(_output, definition)| definition.clone())
-            .next()
-            .unwrap_or_else(Definition::any);
-
-        let dropped_schema_definition = context
-            .schema_definitions
-            .get(&Some(DROPPED.to_owned()))
-            .or_else(|| context.schema_definitions.get(&None))
-            .expect("dropped schema required")
-            .iter()
-            .map(|(_output, definition)| definition.clone())
-            .next()
-            .unwrap_or_else(Definition::any);
-
         Ok(Remap {
             component_key: context.key.clone(),
             program,
@@ -475,8 +450,6 @@ where
             drop_on_error: config.drop_on_error,
             drop_on_abort: config.drop_on_abort,
             reroute_dropped: config.reroute_dropped,
-            default_schema_definition: Arc::new(default_schema_definition),
-            dropped_schema_definition: Arc::new(dropped_schema_definition),
             runner,
             metric_tag_values: config.metric_tag_values,
         })
@@ -587,13 +560,11 @@ where
 
         match result {
             Ok(_) => match target.into_events() {
-                TargetEvents::One(event) => {
-                    push_default(event, output, &self.default_schema_definition)
+                TargetEvents::One(event) => push_default(event, output),
+                TargetEvents::Logs(events) => events.for_each(|event| push_default(event, output)),
+                TargetEvents::Traces(events) => {
+                    events.for_each(|event| push_default(event, output))
                 }
-                TargetEvents::Logs(events) => events
-                    .for_each(|event| push_default(event, output, &self.default_schema_definition)),
-                TargetEvents::Traces(events) => events
-                    .for_each(|event| push_default(event, output, &self.default_schema_definition)),
             },
             Err(reason) => {
                 let (reason, error, drop) = match reason {
@@ -617,12 +588,12 @@ where
                 if !drop {
                     let event = original_event.expect("event will be set");
 
-                    push_default(event, output, &self.default_schema_definition);
+                    push_default(event, output);
                 } else if self.reroute_dropped {
                     let mut event = original_event.expect("event will be set");
 
                     self.annotate_dropped(&mut event, reason, error);
-                    push_dropped(event, output, &self.dropped_schema_definition);
+                    push_dropped(event, output);
                 }
             }
         }
@@ -630,29 +601,13 @@ where
 }
 
 #[inline]
-fn push_default(
-    mut event: Event,
-    output: &mut TransformOutputsBuf,
-    schema_definition: &Arc<schema::Definition>,
-) {
-    event
-        .metadata_mut()
-        .set_schema_definition(schema_definition);
-
-    output.push(event)
+fn push_default(event: Event, output: &mut TransformOutputsBuf) {
+    output.push(None, event)
 }
 
 #[inline]
-fn push_dropped(
-    mut event: Event,
-    output: &mut TransformOutputsBuf,
-    schema_definition: &Arc<schema::Definition>,
-) {
-    event
-        .metadata_mut()
-        .set_schema_definition(schema_definition);
-
-    output.push_named(DROPPED, event)
+fn push_dropped(event: Event, output: &mut TransformOutputsBuf) {
+    output.push(Some(DROPPED), event);
 }
 
 /// If the VRL returns a value that is not an array (see [`merge_array_definitions`]),
@@ -721,6 +676,7 @@ pub enum BuildError {
 #[cfg(test)]
 mod tests {
     use std::collections::{HashMap, HashSet};
+    use std::sync::Arc;
 
     use indoc::{formatdoc, indoc};
     use vector_core::{config::GlobalOptions, event::EventMetadata, metric_tags};
@@ -841,10 +797,6 @@ mod tests {
         let result1 = transform_one(&mut tform, event1).unwrap();
         assert_eq!(get_field_string(&result1, "message"), "event1");
         assert_eq!(get_field_string(&result1, "foo"), "bar");
-        assert_eq!(
-            result1.metadata().schema_definition(),
-            &test_default_schema_definition()
-        );
         assert!(tform.runner().runtime.is_empty());
 
         let event2 = {
@@ -854,10 +806,6 @@ mod tests {
         let result2 = transform_one(&mut tform, event2).unwrap();
         assert_eq!(get_field_string(&result2, "message"), "event2");
         assert_eq!(result2.as_log().get("foo"), Some(&Value::Null));
-        assert_eq!(
-            result2.metadata().schema_definition(),
-            &test_default_schema_definition()
-        );
         assert!(tform.runner().runtime.is_empty());
     }
 
@@ -889,11 +837,6 @@ mod tests {
         assert_eq!(get_field_string(&result, "foo"), "bar");
         assert_eq!(get_field_string(&result, "bar"), "baz");
         assert_eq!(get_field_string(&result, "copy"), "buz");
-
-        assert_eq!(
-            result.metadata().schema_definition(),
-            &test_default_schema_definition()
-        );
     }
 
     #[test]
@@ -927,17 +870,8 @@ mod tests {
 
         let r = result.next().unwrap();
         assert_eq!(get_field_string(&r, "message"), "foo");
-        assert_eq!(
-            r.metadata().schema_definition(),
-            &test_default_schema_definition()
-        );
         let r = result.next().unwrap();
         assert_eq!(get_field_string(&r, "message"), "bar");
-
-        assert_eq!(
-            r.metadata().schema_definition(),
-            &test_default_schema_definition()
-        );
     }
 
     #[test]
@@ -1103,7 +1037,9 @@ mod tests {
                     "zork",
                     MetricKind::Incremental,
                     MetricValue::Counter { value: 1.0 },
-                    metadata.with_schema_definition(&Arc::new(test_default_schema_definition())),
+                    // The schema definition is set in the topology, which isn't used in this test. Setting the definition
+                    // to the actual value to skip the assertion here
+                    metadata
                 )
                 .with_namespace(Some("zerk"))
                 .with_tags(Some(metric_tags! {
@@ -1313,8 +1249,11 @@ mod tests {
                     "counter",
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 1.0 },
-                    EventMetadata::default()
-                        .with_schema_definition(&Arc::new(test_default_schema_definition())),
+                    // The schema definition is set in the topology, which isn't used in this test. Setting the definition
+                    // to the actual value to skip the assertion here
+                    EventMetadata::default().with_schema_definition(&Arc::new(
+                        output.metadata().schema_definition().clone()
+                    )),
                 )
                 .with_tags(Some(metric_tags! {
                     "hello" => "world",
@@ -1331,8 +1270,11 @@ mod tests {
                     "counter",
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 1.0 },
-                    EventMetadata::default()
-                        .with_schema_definition(&Arc::new(test_dropped_schema_definition())),
+                    // The schema definition is set in the topology, which isn't used in this test. Setting the definition
+                    // to the actual value to skip the assertion here
+                    EventMetadata::default().with_schema_definition(&Arc::new(
+                        output.metadata().schema_definition().clone()
+                    )),
                 )
                 .with_tags(Some(metric_tags! {
                     "hello" => "goodbye",
@@ -1352,8 +1294,11 @@ mod tests {
                     "counter",
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 1.0 },
-                    EventMetadata::default()
-                        .with_schema_definition(&Arc::new(test_dropped_schema_definition())),
+                    // The schema definition is set in the topology, which isn't used in this test. Setting the definition
+                    // to the actual value to skip the assertion here
+                    EventMetadata::default().with_schema_definition(&Arc::new(
+                        output.metadata().schema_definition().clone()
+                    )),
                 )
                 .with_tags(Some(metric_tags! {
                     "not_hello" => "oops",

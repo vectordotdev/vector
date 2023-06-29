@@ -12,7 +12,7 @@ use tracing::Instrument;
 use crate::sinks::azure_common::config::{AzureBlobRequest, AzureBlobResponse};
 
 #[derive(Clone)]
-pub(crate) struct AzureBlobService {
+pub struct AzureBlobService {
     client: Arc<ContainerClient>,
 }
 
