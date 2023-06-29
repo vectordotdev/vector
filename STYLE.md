@@ -333,7 +333,7 @@ specifics of when and where you might need to use it vs the one from `std::sync`
 
 Vector makes the distinction between configuration items that are essential to understand data
 pipelines and runtime flags that determine the details of the runtime behavior. The main configuration
-generally lives in a `vector.toml` file in the current directory or at `/etc/vector/vector.toml`.
+generally lives in a file in the current directory or in `/etc/vector`.
 
 Examples of main configuration fields are source, transformation, and sink declaration, as well as
 information about where any disk buffers should be persisted.
@@ -345,4 +345,4 @@ An example of a runtime flag is
 `vector run --no-forced-shutdown`, which tells Vector to ignore SIGINTs and to continue running
 as normal until a SIGKILL is received. In this case, as the configuration describes the desired runtime
 behavior in a specific environment and not to the underlying data pipeline, no corresponding field in
-the `vector.toml` should exist.
+the configuration file should exist.
