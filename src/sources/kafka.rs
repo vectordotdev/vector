@@ -765,23 +765,22 @@ async fn parse_message(
     let context = consumer.context();
 
     if let Some((count, mut stream)) = parse_stream(&msg, decoder, keys, log_namespace) {
-        match finalizer {
-            Some(finalizer) => {
-                let (batch, receiver) = BatchNotifier::new_with_receiver();
-                let mut stream = stream.map(|event| event.with_batch_notifier(&batch));
-                match out.send_event_stream(&mut stream).await {
-                    Err(error) => {
-                        emit!(StreamClosedError { count });
-                    }
-                    Ok(_) => {
-                        // Drop stream to avoid borrowing `msg`: "[...] borrow might be used
-                        // here, when `stream` is dropped and runs the destructor [...]".
-                        drop(stream);
-                        finalizer.add(msg.into(), receiver);
-                    }
+        if context.acknowledgements {
+            let (batch, receiver) = BatchNotifier::new_with_receiver();
+            let mut stream = stream.map(|event| event.with_batch_notifier(&batch));
+            match out.send_event_stream(&mut stream).await {
+                Err(_) => {
+                    emit!(StreamClosedError { count });
+                }
+                Ok(_) => {
+                    // Drop stream to avoid borrowing `msg`: "[...] borrow might be used
+                    // here, when `stream` is dropped and runs the destructor [...]".
+                    drop(stream);
+                    context.add_finalizer_entry(msg.into(), receiver);
                 }
             }
-            None => match out.send_event_stream(&mut stream).await {
+        } else {
+            match out.send_event_stream(&mut stream).await {
                 Err(_) => {
                     emit!(StreamClosedError { count });
                 }
