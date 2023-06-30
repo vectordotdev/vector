@@ -25,7 +25,7 @@ remap: functions: set_semantic_meaning: {
 				The name of the meaning to assign.
 				"""
 			required: true
-			type: ["path"]
+			type: ["string"]
 		},
 	]
 	internal_failure_reasons: [
