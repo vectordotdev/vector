@@ -3,7 +3,7 @@ title: Log Namespacing
 short: Log Namespacing
 description: Changing Vector's data model
 authors: ["fuchsnj"]
-date: "2023-??-??"
+date: "2023-06-30"
 badges:
   type: announcement
   domains: ["data model"]
