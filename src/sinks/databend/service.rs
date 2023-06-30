@@ -29,6 +29,7 @@ impl RetryLogic for DatabendRetryLogic {
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
         match error {
             DatabendError::Server { code, message: _ } => match *code {
+                400 => true,
                 429 => true,
                 // general server error
                 500 => true,
