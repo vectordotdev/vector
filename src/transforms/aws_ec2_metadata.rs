@@ -755,13 +755,11 @@ mod integration_tests {
     use tokio_stream::wrappers::ReceiverStream;
 
     use super::*;
-    use crate::config::schema::Definition;
     use crate::{
         event::{metric, LogEvent, Metric},
         test_util::{components::assert_transform_compliance, next_addr},
         transforms::test::create_topology,
     };
-    use enrichment::TableRegistry;
     use std::collections::BTreeMap;
     use vector_common::assert_event_data_eq;
     use vrl::value::Value;
