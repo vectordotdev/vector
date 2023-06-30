@@ -71,6 +71,8 @@ static TRANSFORM_CONCURRENCY_LIMIT: Lazy<usize> = Lazy::new(|| {
         .unwrap_or_else(crate::num_threads)
 });
 
+const INTERNAL_SOURCES: [&str; 2] = ["internal_logs", "internal_metrics"];
+
 /// Builds only the new pieces, and doesn't check their topology.
 pub async fn build_pieces(
     config: &super::Config,
@@ -313,8 +315,9 @@ impl<'a> Builder<'a> {
 
             let pipeline = builder.build();
 
-            let (shutdown_signal, force_shutdown_tripwire) =
-                self.shutdown_coordinator.register_source(key);
+            let (shutdown_signal, force_shutdown_tripwire) = self
+                .shutdown_coordinator
+                .register_source(key, INTERNAL_SOURCES.contains(&typetag));
 
             let context = SourceContext {
                 key: key.clone(),
