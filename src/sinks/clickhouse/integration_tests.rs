@@ -24,7 +24,7 @@ use crate::{
     config::{log_schema, SinkConfig, SinkContext},
     sinks::util::{BatchConfig, Compression, TowerRequestConfig},
     test_util::{
-        components::{run_and_assert_sink_compliance, HTTP_SINK_TAGS},
+        components::{run_and_assert_sink_compliance, SINK_TAGS},
         random_string, trace_init,
     },
 };
@@ -70,12 +70,8 @@ async fn insert_events() {
         .as_mut_log()
         .insert("items", vec!["item1", "item2"]);
 
-    run_and_assert_sink_compliance(
-        sink,
-        stream::once(ready(input_event.clone())),
-        &HTTP_SINK_TAGS,
-    )
-    .await;
+    run_and_assert_sink_compliance(sink, stream::once(ready(input_event.clone())), &SINK_TAGS)
+        .await;
 
     let output = client.select_all(&table).await;
     assert_eq!(1, output.rows);
@@ -119,12 +115,8 @@ async fn skip_unknown_fields() {
     let (mut input_event, mut receiver) = make_event();
     input_event.as_mut_log().insert("unknown", "mysteries");
 
-    run_and_assert_sink_compliance(
-        sink,
-        stream::once(ready(input_event.clone())),
-        &HTTP_SINK_TAGS,
-    )
-    .await;
+    run_and_assert_sink_compliance(sink, stream::once(ready(input_event.clone())), &SINK_TAGS)
+        .await;
 
     let output = client.select_all(&table).await;
     assert_eq!(1, output.rows);
@@ -171,12 +163,8 @@ async fn insert_events_unix_timestamps() {
 
     let (mut input_event, _receiver) = make_event();
 
-    run_and_assert_sink_compliance(
-        sink,
-        stream::once(ready(input_event.clone())),
-        &HTTP_SINK_TAGS,
-    )
-    .await;
+    run_and_assert_sink_compliance(sink, stream::once(ready(input_event.clone())), &SINK_TAGS)
+        .await;
 
     let output = client.select_all(&table).await;
     assert_eq!(1, output.rows);
@@ -239,12 +227,8 @@ timestamp_format = "unix""#,
 
     let (mut input_event, _receiver) = make_event();
 
-    run_and_assert_sink_compliance(
-        sink,
-        stream::once(ready(input_event.clone())),
-        &HTTP_SINK_TAGS,
-    )
-    .await;
+    run_and_assert_sink_compliance(sink, stream::once(ready(input_event.clone())), &SINK_TAGS)
+        .await;
 
     let output = client.select_all(&table).await;
     assert_eq!(1, output.rows);
@@ -292,10 +276,10 @@ async fn no_retry_on_incorrect_data() {
     };
 
     let client = ClickhouseClient::new(host);
-    // the event contains a message field, but its being omitted to
-    // fail the request.
+    // The event contains a message field, but it's of type String, which will cause
+    // the request to fail.
     client
-        .create_table(&table, "host String, timestamp String")
+        .create_table(&table, "host String, timestamp String, message Int32")
         .await;
 
     let (sink, _hc) = config.build(SinkContext::default()).await.unwrap();
@@ -351,7 +335,7 @@ async fn no_retry_on_incorrect_data_warp() {
         .unwrap()
         .unwrap();
 
-    assert_eq!(receiver.try_recv(), Ok(BatchStatus::Errored));
+    assert_eq!(receiver.try_recv(), Ok(BatchStatus::Rejected));
 }
 
 fn make_event() -> (Event, BatchStatusReceiver) {
@@ -378,7 +362,6 @@ impl ClickhouseClient {
         let response = self
             .client
             .post(&self.host)
-            //
             .body(format!(
                 "CREATE TABLE {}
                     ({})
