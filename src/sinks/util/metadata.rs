@@ -1,6 +1,5 @@
 use std::num::NonZeroUsize;
 
-use vector_buffers::EventCount;
 use vector_core::{config, ByteSizeOf, EstimatedJsonEncodedSizeOf};
 
 use vector_common::{
@@ -21,21 +20,19 @@ pub struct RequestMetadataBuilder {
 impl RequestMetadataBuilder {
     pub fn from_events<E>(events: &[E]) -> Self
     where
-        E: ByteSizeOf + EventCount + GetEventCountTags + EstimatedJsonEncodedSizeOf,
+        E: ByteSizeOf + GetEventCountTags + EstimatedJsonEncodedSizeOf,
     {
         let mut size = config::telemetry().create_request_count_byte_size();
 
-        let mut event_count = 0;
         let mut events_byte_size = 0;
 
         for event in events {
-            event_count += 1;
             events_byte_size += event.size_of();
             size.add_event(event, event.estimated_json_encoded_size_of());
         }
 
         Self {
-            event_count,
+            event_count: events.len(),
             events_byte_size,
             events_estimated_json_encoded_byte_size: size,
         }

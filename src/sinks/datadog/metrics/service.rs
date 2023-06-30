@@ -60,7 +60,6 @@ pub struct DatadogMetricsRequest {
     pub uri: Uri,
     pub content_type: &'static str,
     pub finalizers: EventFinalizers,
-    pub raw_bytes: usize,
     pub metadata: RequestMetadata,
 }
 
@@ -125,8 +124,7 @@ impl MetaDescriptive for DatadogMetricsRequest {
 pub struct DatadogMetricsResponse {
     status_code: StatusCode,
     body: Bytes,
-    byte_size: GroupedCountByteSize,
-    raw_byte_size: usize,
+    request_metadata: RequestMetadata,
 }
 
 impl DriverResponse for DatadogMetricsResponse {
@@ -141,11 +139,12 @@ impl DriverResponse for DatadogMetricsResponse {
     }
 
     fn events_sent(&self) -> &GroupedCountByteSize {
-        &self.byte_size
+        self.request_metadata
+            .events_estimated_json_encoded_byte_size()
     }
 
     fn bytes_sent(&self) -> Option<usize> {
-        Some(self.raw_byte_size)
+        Some(self.request_metadata.request_wire_size())
     }
 }
 
@@ -184,9 +183,7 @@ impl Service<DatadogMetricsRequest> for DatadogMetricsService {
         let api_key = self.api_key.clone();
 
         Box::pin(async move {
-            let metadata = std::mem::take(request.metadata_mut());
-            let byte_size = metadata.into_events_estimated_json_encoded_byte_size();
-            let raw_byte_size = request.raw_bytes;
+            let request_metadata = std::mem::take(request.metadata_mut());
 
             let request = request
                 .into_http_request(api_key)
@@ -205,8 +202,7 @@ impl Service<DatadogMetricsRequest> for DatadogMetricsService {
             Ok(DatadogMetricsResponse {
                 status_code: parts.status,
                 body,
-                byte_size,
-                raw_byte_size,
+                request_metadata,
             })
         })
     }

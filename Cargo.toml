@@ -205,8 +205,9 @@ serde_yaml = { version = "0.9.22", default-features = false }
 rmp-serde = { version = "1.1.1", default-features = false, optional = true }
 rmpv = { version = "1.0.0", default-features = false, features = ["with-serde"], optional = true }
 
-# Prost
+# Prost / Protocol Buffers
 prost = { version = "0.11", default-features = false, features = ["std"] }
+prost-reflect = { version = "0.11", default-features = false, optional = true }
 prost-types = { version = "0.11", default-features = false, optional = true }
 
 # GCP
@@ -673,7 +674,7 @@ sinks-console = []
 sinks-databend = []
 sinks-datadog_events = []
 sinks-datadog_logs = []
-sinks-datadog_metrics = ["protobuf-build"]
+sinks-datadog_metrics = ["protobuf-build", "dep:prost-reflect"]
 sinks-datadog_traces = ["protobuf-build", "dep:rmpv", "dep:rmp-serde", "dep:serde_bytes"]
 sinks-elasticsearch = ["aws-core", "transforms-metric_to_log"]
 sinks-file = ["dep:async-compression"]
