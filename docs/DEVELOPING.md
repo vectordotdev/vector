@@ -123,6 +123,8 @@ Loosely, you'll need the following:
 - **To build Vector:** Have working Rustup, Protobuf tools, C++/C build tools (LLVM, GCC, or MSVC), Python, and Perl, `make` (the GNU one preferably), `bash`, `cmake`, `GNU coreutils`, and `autotools`.
 - **To run integration tests:** Have `docker` available, or a real live version of that service. (Use `AUTOSPAWN=false`)
 - **To run `make check-component-features`:** Have `remarshal` installed.
+- **To run `make check-licenses` or `cargo vdev build licenses`:** Have `rust-license-tool` [installed](https://github.com/DataDog/rust-license-tool).
+- **To run `cargo vdev build component-docs`:** Have `cue` [installed](https://cuelang.org/docs/install/).
 
 If you find yourself needing to run something inside the Docker environment described above, that's totally fine, they won't collide or hurt each other. In this case, you'd just run `make environment-generate`.
 
@@ -156,6 +158,8 @@ cargo bench transforms::example
 # Format your code before pushing!
 make fmt
 cargo fmt
+# Build component documentation for the website
+cargo vdev build component-docs
 ```
 
 If you run `make` you'll see a full list of all our tasks. Some of these will start Docker containers, sign commits, or even make releases. These are not common development commands and your mileage may vary.
