@@ -26,8 +26,12 @@ pub struct ClickhouseRequest {
 }
 
 impl MetaDescriptive for ClickhouseRequest {
-    fn get_metadata(&self) -> RequestMetadata {
-        self.metadata
+    fn get_metadata(&self) -> &RequestMetadata {
+        &self.metadata
+    }
+
+    fn metadata_mut(&mut self) -> &mut RequestMetadata {
+        &mut self.metadata
     }
 }
 
@@ -38,8 +42,9 @@ impl Finalizable for ClickhouseRequest {
 }
 
 pub struct ClickhouseResponse {
-    metadata: RequestMetadata,
     http_response: Response<Bytes>,
+    events_byte_size: GroupedCountByteSize,
+    raw_byte_size: usize,
 }
 
 impl DriverResponse for ClickhouseResponse {
@@ -50,15 +55,12 @@ impl DriverResponse for ClickhouseResponse {
         }
     }
 
-    fn events_sent(&self) -> CountByteSize {
-        CountByteSize(
-            self.metadata.event_count(),
-            self.metadata.events_estimated_json_encoded_byte_size(),
-        )
+    fn events_sent(&self) -> &GroupedCountByteSize {
+        &self.events_byte_size
     }
 
     fn bytes_sent(&self) -> Option<usize> {
-        Some(self.metadata.request_encoded_size())
+        Some(self.raw_byte_size)
     }
 }
 
@@ -166,8 +168,11 @@ impl Service<ClickhouseRequest> for ClickhouseService {
             let (parts, body) = response.into_parts();
             let body = body::to_bytes(body).await?;
             Ok(ClickhouseResponse {
-                metadata: request.metadata,
                 http_response: hyper::Response::from_parts(parts, body),
+                raw_byte_size: request.metadata.request_encoded_size(),
+                events_byte_size: request
+                    .metadata
+                    .into_events_estimated_json_encoded_byte_size(),
             })
         })
     }
