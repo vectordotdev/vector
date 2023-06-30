@@ -451,6 +451,7 @@ jobs:
       - name: Build and publish Docker images
         env:
           PLATFORM: "linux/amd64,linux/arm64,linux/arm/v7"
+          REPO: ghcr.io/kamilkisiela/vector
         run: |
           make release-docker
 

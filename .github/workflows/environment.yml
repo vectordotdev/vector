@@ -54,7 +54,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@818d4b7b91585d195f67373fd9cb0332e31a7175
         with:
-          images: kamilkisiela/vector-dev
+          images: ghcr.io/kamilkisiela/vector-dev
           flavor: |
             latest=true
           tags: type=sha, format=long
