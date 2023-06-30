@@ -94,7 +94,7 @@ clang --version
 The output of the following command should contain `WebAssembly`:
 ```shell
 llvm-config --targets-built # WebAssembly should be in the results
-# Example: AArch64 AMDGPU ARM AVR BPF Hexagon Lanai LoongArch Mips MSP430 NVPTX PowerPC RISCV Sparc SystemZ VE WebAssembly X86 XCore
+# Example: AArch64 <omitted> WebAssembly <omitted>
 ```
 
 ## Examples
