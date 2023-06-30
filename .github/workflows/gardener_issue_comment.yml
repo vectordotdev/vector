@@ -31,7 +31,7 @@ jobs:
             query($item_id: ID!) {
               node(id: $item_id) {
                 ... on Issue {
-                  projectItems(first: 10) {
+                  projectItems(first: 50) {
                     ... on ProjectV2ItemConnection {
                       nodes {
                         fieldValueByName(name: "Status") {
