@@ -62,8 +62,7 @@ encoding.codec = "json"
 
 ### Data Layout
 
-There are three distinct types of data that Vector handles.
-
+When handling log events, information is categorized into one of the following groups:
 (Examples are from the `datadog_agent` source)
 
 - Event Data: The decoded event data. (eg: the log itself)
