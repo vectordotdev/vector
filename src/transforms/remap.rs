@@ -240,7 +240,7 @@ impl TransformConfig for RemapConfig {
             .compile_vrl_program(enrichment_tables, merged_definition)
             .map(|(program, _, _, external_context)| {
                 (
-                    program.final_type_state(),
+                    program.final_type_info().state,
                     external_context
                         .get_custom::<MeaningList>()
                         .cloned()

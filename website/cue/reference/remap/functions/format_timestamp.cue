@@ -19,6 +19,12 @@ remap: functions: format_timestamp: {
 			required:    true
 			type: ["string"]
 		},
+		{
+			name:        "timezone"
+			description: "The timezone to use when formatting the timestamp. The uses the TZ identifier, or 'local'"
+			required:    false
+			type: ["string"]
+		},
 	]
 	internal_failure_reasons: []
 	return: types: ["string"]

@@ -65,7 +65,7 @@ vector-common = { path = "../vector-common" }
 vector-config = { path = "../vector-config" }
 vector-config-common = { path = "../vector-config-common" }
 vector-config-macros = { path = "../vector-config-macros" }
-vrl = { version = "0.4.0" }
+vrl.workspace = true
 
 [target.'cfg(target_os = "macos")'.dependencies]
 security-framework = "2.9.1"
@@ -94,7 +94,7 @@ rand = "0.8.5"
 rand_distr = "0.4.3"
 tracing-subscriber = { version = "0.3.17", default-features = false, features = ["env-filter", "fmt", "ansi", "registry"] }
 vector-common = { path = "../vector-common", default-features = false, features = ["test"] }
-vrl = { version = "0.4.0", default-features = false, features = ["value", "arbitrary", "lua", "test"] }
+vrl.workspace = true
 
 [features]
 api = ["dep:async-graphql"]

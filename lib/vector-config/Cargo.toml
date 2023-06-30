@@ -26,7 +26,7 @@ snafu = { version = "0.7.4", default-features = false }
 toml = { version = "0.7.5", default-features = false }
 tracing = { version = "0.1.34", default-features = false }
 url = { version = "2.4.0", default-features = false, features = ["serde"] }
-vrl = { version = "0.4.0", default-features = false, features = ["compiler"] }
+vrl.workspace = true
 vector-config-common = { path = "../vector-config-common" }
 vector-config-macros = { path = "../vector-config-macros" }
 
