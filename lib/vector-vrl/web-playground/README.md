@@ -13,7 +13,7 @@ To build the project we need to use `wasm-pack`. This compiles our Rust code
 to WebAssembly which can then be used within the browser. Install it by running:
 
 ```shell
-cargo install wasm-pack
+cargo install --locked --version 0.10.3 wasm-pack
 ```
 
 After installing `wasm-pack` we must compile our project by running:
@@ -72,7 +72,7 @@ with this [issue filter][vrl-wasm-unsupported-filter].
 If you are getting compilation errors on macOS here are some things to check:
 ```shell
 xcode-select -p
-# '/Library/Developer/CommandLineTools
+# Example: '/Library/Developer/CommandLineTools
 # To change this use: xcode-select -s
 ```
 
@@ -85,6 +85,7 @@ xcode-select --install
 Check your `llvm` installation and ensure that there are no conflicting installations. Check that the following command returns the expected version:
 ```shell
 clang --version
+# Example:
 # Homebrew clang version 16.0.6
 # Target: arm64-apple-darwin22.5.0
 # Thread model: posix

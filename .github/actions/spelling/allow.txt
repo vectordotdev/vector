@@ -1,6 +1,6 @@
 ANSIX
 APAC
-APPSIGNALƒ
+APPSIGNAL
 Acro
 Ainol
 Airis
