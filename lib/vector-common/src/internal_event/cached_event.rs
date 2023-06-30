@@ -17,8 +17,9 @@ use super::{InternalEventHandle, RegisterInternalEvent};
 /// new event is emitted for a previously unseen set of tags an event is registered
 /// and stored in the cache.
 #[derive(Derivative)]
-#[derivative(Clone(bound = ""), Default(bound = ""))]
-pub struct RegisteredEventCache<Event: RegisterTaggedInternalEvent> {
+#[derivative(Clone(bound = ""), Default(bound = "T: Default"))]
+pub struct RegisteredEventCache<T: Clone, Event: RegisterTaggedInternalEvent> {
+    fixed_tags: T,
     cache: Arc<
         RwLock<
             BTreeMap<
@@ -36,16 +37,31 @@ pub trait RegisterTaggedInternalEvent: RegisterInternalEvent {
     /// that will be used when registering the event.
     type Tags;
 
-    fn register(tags: Self::Tags) -> <Self as RegisterInternalEvent>::Handle;
+    /// The type that contains data necessary to extract the tags that will
+    /// be fixed and only need setting up front when the cache is first created.
+    type Fixed;
+
+    fn register(fixed: Self::Fixed, tags: Self::Tags) -> <Self as RegisterInternalEvent>::Handle;
 }
 
-impl<Event, EventHandle, Data, Tags> RegisteredEventCache<Event>
+impl<Event, EventHandle, Data, Tags, FixedTags> RegisteredEventCache<FixedTags, Event>
 where
     Data: Sized,
     EventHandle: InternalEventHandle<Data = Data>,
     Tags: Ord + Clone,
-    Event: RegisterInternalEvent<Handle = EventHandle> + RegisterTaggedInternalEvent<Tags = Tags>,
+    FixedTags: Clone,
+    Event: RegisterInternalEvent<Handle = EventHandle>
+        + RegisterTaggedInternalEvent<Tags = Tags, Fixed = FixedTags>,
 {
+    /// Create a new event cache with a set of fixed tags. These tags are passed to
+    /// all registered events.
+    pub fn new(fixed_tags: FixedTags) -> Self {
+        Self {
+            fixed_tags,
+            cache: Default::default(),
+        }
+    }
+
     /// Emits the event with the given tags.
     /// It will register the event and store in the cache if this has not already
     /// been done.
@@ -58,7 +74,10 @@ where
         if let Some(event) = read.get(tags) {
             event.emit(value);
         } else {
-            let event = <Event as RegisterTaggedInternalEvent>::register(tags.clone());
+            let event = <Event as RegisterTaggedInternalEvent>::register(
+                self.fixed_tags.clone(),
+                tags.clone(),
+            );
             event.emit(value);
 
             // Ensure the read lock is dropped so we can write.
