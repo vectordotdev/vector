@@ -65,11 +65,13 @@ encoding.codec = "json"
 There are three distinct types of data that Vector handles.
 
 (Examples are from the `datadog_agent` source)
+
 - Event Data: The decoded event data. (eg: the log itself)
 - Source Metadata: Metadata provided by the source of the event. (eg: hostname / tags)
 - Vector Metadata: Metadata provided by Vector. (eg: the time when Vector received the event)
 
 #### Without Log Namespacing
+
 All three of these are placed at the root of the event. The exact layout depends on the source,
 some fields are configurable, and the [global log schema] can change the name / location of some
 fields.
@@ -91,6 +93,7 @@ Example log event from the `datadog_agent` source (with the JSON decoder)
 ```
 
 #### With Log Namespacing
+
 When enabled, the layout of this data is well-defined and consistent.
 
 Event Data (and _only_ Event Data) is placed at the root of the event (eg: `.`).
@@ -106,6 +109,7 @@ with fields. Now it is possible for event to be any type, such as a string.
 Example log event from the `datadog agent` source. (same data as the example above)
 
 Event root (`.`)
+
 ```json
 {
   "foo": "foo field",
@@ -127,6 +131,7 @@ Source metadata fields (`%datadog_agent`)
 ```
 
 Source vector fields (`%vector`)
+
 ```json
 {
   "source_type": "datadog_agent",
