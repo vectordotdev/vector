@@ -6,7 +6,7 @@ authors: ["fuchsnj"]
 date: "2023-??-??"
 badges:
   type: announcement
-  domains: ["log namespacing"]
+  domains: ["data model"]
 tags: []
 ---
 
@@ -23,7 +23,6 @@ the source originally created the event) but it can easily cause data collisions
 
 Log namespacing also unblocks powerful features being worked on, such as end-to-end type checking
 of events in Vector.
-
 
 ## How to enable
 
@@ -61,14 +60,13 @@ encoding.codec = "json"
 
 ## How It Works
 
-
 ### Data Layout
 
 There are three distinct types of data that Vector handles.
 
-(Examples are from the `http_client` source)
-- Event Data: The decoded event data. (eg: the decoded HTTP body)
-- Source Metadata: Metadata provided by the source of the event. (eg: the HTTP headers)
+(Examples are from the `datadog_agent` source)
+- Event Data: The decoded event data. (eg: the log itself)
+- Source Metadata: Metadata provided by the source of the event. (eg: hostname / tags)
 - Vector Metadata: Metadata provided by Vector. (eg: the time when Vector received the event)
 
 #### Without Log Namespacing
@@ -105,7 +103,7 @@ it's recommended to use a [remap] transform to add data to the event as needed.
 It's important to note that previously the type of an event (`.`) would always be an object
 with fields. Now it is possible for event to be any type, such as a string.
 
-Example event from the `datadog agent logs` source. (same data as the example above)
+Example log event from the `datadog agent` source. (same data as the example above)
 
 Event root (`.`)
 ```json
@@ -134,6 +132,18 @@ Source vector fields (`%vector`)
 "source_type": "datadog_agent",
 "ingest_timestamp": "1970-02-14T20:44:58.236Z"
 }
+```
+
+Here is a sample VRL script accessing different parts of an event when log namespacing is enabled.
+
+```coffee
+event = .
+field_from_event = .foo
+
+all_metadata = %
+tags = %datadog_agent.ddtags
+timestamp = %vector.ingest_timestamp
+
 ```
 
 ### Semantic Meaning
