@@ -53,15 +53,16 @@ Some functions of VRL are not supported or don't work as expected at the
 moment due to WASM limitations with some Rust crates, in
 the future we will modify the functions so that they are supported.
 
-List of functions that aren't supported at the moment:
+List of functions that aren't supported at the moment. All of them exist,
+but they will either error (enrichment functions) or abort (all the others) at runtime.
 
-- `log()`
-- `decrypt()`
-- `encrypt()`
-- `get_hostname()`
-- `parse_groks()`
-- `random_bytes()`
-- `reverse_dns()`
+- `log`
+- `get_hostname`
+- `parse_grok`
+- `parse_groks`
+- `reverse_dns`
+- `find_enrichment_table_records`
+- `get_enrichment_table_record`
 
 Functions from VRL stdlib that are currently not supported can be found
 with this [issue filter][vrl-wasm-unsupported-filter]

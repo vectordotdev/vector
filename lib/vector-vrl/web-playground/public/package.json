@@ -8,7 +8,5 @@
   ],
   "module": "vector_vrl_web_playground.js",
   "types": "vector_vrl_web_playground.d.ts",
-  "sideEffects": [
-    "./snippets/*"
-  ]
+  "sideEffects": false
 }
