@@ -24,7 +24,7 @@ async fn test_greptimedb_sink() {
     );
 
     let (config, _) = load_sink::<GreptimeDBConfig>(&cfg).unwrap();
-    let (sink, _hc) = config.build(SinkContext::new_test()).await.unwrap();
+    let (sink, _hc) = config.build(SinkContext::default()).await.unwrap();
 
     let query_client = query_client();
 

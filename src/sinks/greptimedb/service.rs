@@ -46,7 +46,9 @@ impl GreptimeDBRequest {
         for mut metric in metrics.into_iter() {
             finalizers.merge(metric.take_finalizers());
             estimated_request_size += sizer.estimated_size_of(&metric);
-            request_metadata_builder.track_event(&metric);
+
+            request_metadata_builder.track_event(metric.clone());
+
             items.push(metric_to_insert_request(metric));
         }
 
@@ -68,15 +70,19 @@ impl Finalizable for GreptimeDBRequest {
 }
 
 impl MetaDescriptive for GreptimeDBRequest {
-    fn get_metadata(&self) -> RequestMetadata {
-        self.metadata
+    fn get_metadata(&self) -> &RequestMetadata {
+        &self.metadata
+    }
+
+    fn metadata_mut(&mut self) -> &mut RequestMetadata {
+        &mut self.metadata
     }
 }
 
 #[derive(Debug)]
 pub struct GreptimeDBBatchOutput {
-    item_count: u32,
-    metadata: RequestMetadata,
+    pub item_count: u32,
+    pub metadata: RequestMetadata,
 }
 
 impl DriverResponse for GreptimeDBBatchOutput {
@@ -84,11 +90,8 @@ impl DriverResponse for GreptimeDBBatchOutput {
         EventStatus::Delivered
     }
 
-    fn events_sent(&self) -> CountByteSize {
-        CountByteSize(
-            self.item_count as usize,
-            self.metadata.events_estimated_json_encoded_byte_size(),
-        )
+    fn events_sent(&self) -> &GroupedCountByteSize {
+        self.metadata.events_estimated_json_encoded_byte_size()
     }
 
     fn bytes_sent(&self) -> Option<usize> {
@@ -171,7 +174,7 @@ impl Service<GreptimeDBRequest> for GreptimeDBService {
         let client = Arc::clone(&self.client);
 
         Box::pin(async move {
-            let metadata = req.get_metadata();
+            let metadata = req.get_metadata().clone();
             let result = client.insert(req.items).await?;
 
             Ok(GreptimeDBBatchOutput {
