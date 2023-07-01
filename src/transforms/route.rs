@@ -42,13 +42,13 @@ impl SyncTransform for Route {
         for (output_name, condition) in &self.conditions {
             let (result, event) = condition.check(event.clone());
             if result {
-                output.push_named(output_name, event);
+                output.push(Some(output_name), event);
             } else {
                 check_failed += 1;
             }
         }
         if check_failed == self.conditions.len() {
-            output.push_named(UNMATCHED_ROUTE, event);
+            output.push(Some(UNMATCHED_ROUTE), event);
         }
     }
 }

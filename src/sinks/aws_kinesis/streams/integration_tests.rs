@@ -52,7 +52,7 @@ fn kinesis_address() -> String {
 //        base,
 //    };
 //
-//    let cx = SinkContext::new_test();
+//    let cx = SinkContext::default();
 //
 //    let sink = config.build(cx).await.unwrap().0;
 //
@@ -107,7 +107,7 @@ async fn kinesis_put_records_without_partition_key() {
         base,
     };
 
-    let cx = SinkContext::new_test();
+    let cx = SinkContext::default();
 
     let sink = config.build(cx).await.unwrap().0;
 
@@ -175,7 +175,7 @@ async fn client() -> aws_sdk_kinesis::Client {
     create_client::<KinesisClientBuilder>(
         &auth,
         region.region(),
-        region.endpoint().unwrap(),
+        region.endpoint(),
         &proxy,
         &None,
         true,

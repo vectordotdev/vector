@@ -13,10 +13,9 @@ use http::{
 use hyper::Body;
 use tower::Service;
 use tracing::Instrument;
-use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
+use vector_common::request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata};
 use vector_core::{
     event::{EventFinalizers, EventStatus, Finalizable},
-    internal_event::CountByteSize,
     stream::DriverResponse,
 };
 
@@ -39,8 +38,12 @@ impl Finalizable for NewRelicApiRequest {
 }
 
 impl MetaDescriptive for NewRelicApiRequest {
-    fn get_metadata(&self) -> RequestMetadata {
-        self.metadata
+    fn get_metadata(&self) -> &RequestMetadata {
+        &self.metadata
+    }
+
+    fn metadata_mut(&mut self) -> &mut RequestMetadata {
+        &mut self.metadata
     }
 }
 
@@ -55,11 +58,8 @@ impl DriverResponse for NewRelicApiResponse {
         self.event_status
     }
 
-    fn events_sent(&self) -> CountByteSize {
-        CountByteSize(
-            self.metadata.event_count(),
-            self.metadata.events_estimated_json_encoded_byte_size(),
-        )
+    fn events_sent(&self) -> &GroupedCountByteSize {
+        self.metadata.events_estimated_json_encoded_byte_size()
     }
 
     fn bytes_sent(&self) -> Option<usize> {
@@ -97,7 +97,7 @@ impl Service<NewRelicApiRequest> for NewRelicApiService {
         };
 
         let payload_len = request.payload.len();
-        let metadata = request.get_metadata();
+        let metadata = request.get_metadata().clone();
         let http_request = http_request
             .header(CONTENT_LENGTH, payload_len)
             .body(Body::from(request.payload))

@@ -1,11 +1,8 @@
 use std::{collections::HashMap, io};
 
-use crate::sinks::prelude::*;
+use crate::sinks::{prelude::*, util::encoding::Encoder};
 use bytes::Bytes;
 use serde::{ser::SerializeSeq, Serialize};
-use vector_buffers::EventCount;
-
-use crate::sinks::util::encoding::{write_all, Encoder};
 
 pub type Labels = Vec<(String, String)>;
 
@@ -155,6 +152,7 @@ pub struct LokiRecord {
     pub event: LokiEvent,
     pub json_byte_size: JsonSize,
     pub finalizers: EventFinalizers,
+    pub event_count_tags: EventCountTags,
 }
 
 impl ByteSizeOf for LokiRecord {
@@ -183,6 +181,12 @@ impl EventCount for LokiRecord {
 impl Finalizable for LokiRecord {
     fn take_finalizers(&mut self) -> EventFinalizers {
         std::mem::take(&mut self.finalizers)
+    }
+}
+
+impl GetEventCountTags for LokiRecord {
+    fn get_tags(&self) -> EventCountTags {
+        self.event_count_tags.clone()
     }
 }
 

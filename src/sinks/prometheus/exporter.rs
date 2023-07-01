@@ -894,7 +894,7 @@ mod tests {
         let mut receiver = BatchNotifier::apply_to(&mut events[..]);
         assert_eq!(receiver.try_recv(), Err(TryRecvError::Empty));
 
-        let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
+        let (sink, _) = config.build(SinkContext::default()).await.unwrap();
         let (_, delayed_event) = create_metric_gauge(Some("delayed".to_string()), 123.4);
         let sink_handle = tokio::spawn(run_and_assert_sink_compliance(
             sink,
@@ -958,7 +958,7 @@ mod tests {
         let mut receiver = BatchNotifier::apply_to(&mut events[..]);
         assert_eq!(receiver.try_recv(), Err(TryRecvError::Empty));
 
-        let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
+        let (sink, _) = config.build(SinkContext::default()).await.unwrap();
         let (_, delayed_event) = create_metric_gauge(Some("delayed".to_string()), 123.4);
         let sink_handle = tokio::spawn(run_and_assert_sink_compliance(
             sink,
@@ -1422,7 +1422,7 @@ mod integration_tests {
             flush_period_secs: Duration::from_secs(2),
             ..Default::default()
         };
-        let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
+        let (sink, _) = config.build(SinkContext::default()).await.unwrap();
         let (name, event) = tests::create_metric_gauge(None, 123.4);
         let (_, delayed_event) = tests::create_metric_gauge(Some("delayed".to_string()), 123.4);
 
@@ -1460,7 +1460,7 @@ mod integration_tests {
             flush_period_secs: Duration::from_secs(3),
             ..Default::default()
         };
-        let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
+        let (sink, _) = config.build(SinkContext::default()).await.unwrap();
         let (tx, rx) = mpsc::unbounded_channel();
         let input_events = UnboundedReceiverStream::new(rx);
 
@@ -1517,7 +1517,7 @@ mod integration_tests {
             flush_period_secs: Duration::from_secs(3),
             ..Default::default()
         };
-        let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
+        let (sink, _) = config.build(SinkContext::default()).await.unwrap();
         let (tx, rx) = mpsc::unbounded_channel();
         let input_events = UnboundedReceiverStream::new(rx);
 

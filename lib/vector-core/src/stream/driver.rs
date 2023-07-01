@@ -5,10 +5,10 @@ use tokio::{pin, select};
 use tower::Service;
 use tracing::Instrument;
 use vector_common::internal_event::{
-    register, ByteSize, BytesSent, CallError, CountByteSize, EventsSent, InternalEventHandle as _,
-    Output, PollReadyError, Registered, SharedString,
+    register, ByteSize, BytesSent, CallError, InternalEventHandle as _, PollReadyError, Registered,
+    RegisteredEventCache, SharedString, TaggedEventsSent,
 };
-use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
+use vector_common::request_metadata::{GroupedCountByteSize, MetaDescriptive};
 
 use super::FuturesUnorderedCount;
 use crate::{
@@ -18,7 +18,7 @@ use crate::{
 
 pub trait DriverResponse {
     fn event_status(&self) -> EventStatus;
-    fn events_sent(&self) -> CountByteSize;
+    fn events_sent(&self) -> &GroupedCountByteSize;
 
     /// Return the number of bytes that were sent in the request that returned this response.
     // TODO, remove the default implementation once all sinks have
@@ -99,7 +99,7 @@ where
         pin!(batched_input);
 
         let bytes_sent = protocol.map(|protocol| register(BytesSent { protocol }));
-        let events_sent = register(EventsSent::from(Output(None)));
+        let events_sent = RegisteredEventCache::default();
 
         loop {
             // Core behavior of the loop:
@@ -167,8 +167,7 @@ where
                         let finalizers = req.take_finalizers();
                         let bytes_sent = bytes_sent.clone();
                         let events_sent = events_sent.clone();
-
-                        let metadata = req.get_metadata();
+                        let event_count = req.get_metadata().event_count();
 
                         let fut = svc.call(req)
                             .err_into()
@@ -176,7 +175,7 @@ where
                                 result,
                                 request_id,
                                 finalizers,
-                                &metadata,
+                                event_count,
                                 &bytes_sent,
                                 &events_sent,
                             ))
@@ -202,13 +201,13 @@ where
         result: Result<Svc::Response, Svc::Error>,
         request_id: usize,
         finalizers: EventFinalizers,
-        metadata: &RequestMetadata,
+        event_count: usize,
         bytes_sent: &Option<Registered<BytesSent>>,
-        events_sent: &Registered<EventsSent>,
+        events_sent: &RegisteredEventCache<TaggedEventsSent>,
     ) {
         match result {
             Err(error) => {
-                Self::emit_call_error(Some(error), request_id, metadata.event_count());
+                Self::emit_call_error(Some(error), request_id, event_count);
                 finalizers.update_status(EventStatus::Rejected);
             }
             Ok(response) => {
@@ -220,10 +219,12 @@ where
                             bytes_sent.emit(ByteSize(byte_size));
                         }
                     }
-                    events_sent.emit(response.events_sent());
+
+                    response.events_sent().emit_event(events_sent);
+
                 // This condition occurs specifically when the `HttpBatchService::call()` is called *within* the `Service::call()`
                 } else if response.event_status() == EventStatus::Rejected {
-                    Self::emit_call_error(None, request_id, metadata.event_count());
+                    Self::emit_call_error(None, request_id, event_count);
                     finalizers.update_status(EventStatus::Rejected);
                 }
             }
@@ -264,7 +265,7 @@ mod tests {
     use vector_common::{
         finalization::{BatchNotifier, EventFinalizer, EventFinalizers, EventStatus, Finalizable},
         json_size::JsonSize,
-        request_metadata::RequestMetadata,
+        request_metadata::{GroupedCountByteSize, RequestMetadata},
     };
     use vector_common::{internal_event::CountByteSize, request_metadata::MetaDescriptive};
 
@@ -298,20 +299,34 @@ mod tests {
     }
 
     impl MetaDescriptive for DelayRequest {
-        fn get_metadata(&self) -> RequestMetadata {
-            self.2
+        fn get_metadata(&self) -> &RequestMetadata {
+            &self.2
+        }
+
+        fn metadata_mut(&mut self) -> &mut RequestMetadata {
+            &mut self.2
         }
     }
 
-    struct DelayResponse;
+    struct DelayResponse {
+        events_sent: GroupedCountByteSize,
+    }
+
+    impl DelayResponse {
+        fn new() -> Self {
+            Self {
+                events_sent: CountByteSize(1, JsonSize::new(1)).into(),
+            }
+        }
+    }
 
     impl DriverResponse for DelayResponse {
         fn event_status(&self) -> EventStatus {
             EventStatus::Delivered
         }
 
-        fn events_sent(&self) -> CountByteSize {
-            CountByteSize(1, JsonSize::new(1))
+        fn events_sent(&self) -> &GroupedCountByteSize {
+            &self.events_sent
         }
     }
 
@@ -396,7 +411,7 @@ mod tests {
                 drop(permit);
                 drop(req);
 
-                Ok(DelayResponse)
+                Ok(DelayResponse::new())
             })
         }
     }

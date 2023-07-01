@@ -4,7 +4,6 @@ use bytes::Bytes;
 use http::StatusCode;
 use snafu::Snafu;
 use tracing::Instrument;
-use vector_core::internal_event::CountByteSize;
 
 use crate::sinks::loki::config::{CompressionConfigAdapter, ExtendedCompression};
 use crate::{
@@ -50,11 +49,8 @@ impl DriverResponse for LokiResponse {
         EventStatus::Delivered
     }
 
-    fn events_sent(&self) -> CountByteSize {
-        CountByteSize(
-            self.metadata.event_count(),
-            self.metadata.events_estimated_json_encoded_byte_size(),
-        )
+    fn events_sent(&self) -> &GroupedCountByteSize {
+        self.metadata.events_estimated_json_encoded_byte_size()
     }
 
     fn bytes_sent(&self) -> Option<usize> {
@@ -78,8 +74,12 @@ impl Finalizable for LokiRequest {
 }
 
 impl MetaDescriptive for LokiRequest {
-    fn get_metadata(&self) -> RequestMetadata {
-        self.metadata
+    fn get_metadata(&self) -> &RequestMetadata {
+        &self.metadata
+    }
+
+    fn metadata_mut(&mut self) -> &mut RequestMetadata {
+        &mut self.metadata
     }
 }
 
@@ -120,7 +120,7 @@ impl Service<LokiRequest> for LokiService {
         };
         let mut req = http::Request::post(&self.endpoint.uri).header("Content-Type", content_type);
 
-        let metadata = request.get_metadata();
+        let metadata = request.get_metadata().clone();
 
         if let Some(tenant_id) = request.tenant_id {
             req = req.header("X-Scope-OrgID", tenant_id);

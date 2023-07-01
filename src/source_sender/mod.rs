@@ -1,4 +1,5 @@
 #![allow(missing_docs)]
+use std::sync::Arc;
 use std::{collections::HashMap, fmt};
 
 use chrono::Utc;
@@ -19,6 +20,8 @@ use vrl::value::Value;
 
 mod errors;
 
+use crate::config::{ComponentKey, OutputId};
+use crate::schema::Definition;
 pub use errors::{ClosedError, StreamSendError};
 use lookup::PathPrefix;
 
@@ -48,17 +51,37 @@ impl Builder {
         }
     }
 
-    pub fn add_source_output(&mut self, output: SourceOutput) -> LimitedReceiver<EventArray> {
+    pub fn add_source_output(
+        &mut self,
+        output: SourceOutput,
+        component_key: ComponentKey,
+    ) -> LimitedReceiver<EventArray> {
         let lag_time = self.lag_time.clone();
+        let log_definition = output.schema_definition.clone();
+        let output_id = OutputId {
+            component: component_key,
+            port: output.port.clone(),
+        };
         match output.port {
             None => {
-                let (inner, rx) =
-                    Inner::new_with_buffer(self.buf_size, DEFAULT_OUTPUT.to_owned(), lag_time);
+                let (inner, rx) = Inner::new_with_buffer(
+                    self.buf_size,
+                    DEFAULT_OUTPUT.to_owned(),
+                    lag_time,
+                    log_definition,
+                    output_id,
+                );
                 self.inner = Some(inner);
                 rx
             }
             Some(name) => {
-                let (inner, rx) = Inner::new_with_buffer(self.buf_size, name.clone(), lag_time);
+                let (inner, rx) = Inner::new_with_buffer(
+                    self.buf_size,
+                    name.clone(),
+                    lag_time,
+                    log_definition,
+                    output_id,
+                );
                 self.named_inners.insert(name, inner);
                 rx
             }
@@ -91,9 +114,15 @@ impl SourceSender {
         }
     }
 
-    pub fn new_with_buffer(n: usize) -> (Self, LimitedReceiver<EventArray>) {
+    #[cfg(test)]
+    pub fn new_test_sender_with_buffer(n: usize) -> (Self, LimitedReceiver<EventArray>) {
         let lag_time = Some(register_histogram!(LAG_TIME_NAME));
-        let (inner, rx) = Inner::new_with_buffer(n, DEFAULT_OUTPUT.to_owned(), lag_time);
+        let output_id = OutputId {
+            component: "test".to_string().into(),
+            port: None,
+        };
+        let (inner, rx) =
+            Inner::new_with_buffer(n, DEFAULT_OUTPUT.to_owned(), lag_time, None, output_id);
         (
             Self {
                 inner: Some(inner),
@@ -105,14 +134,14 @@ impl SourceSender {
 
     #[cfg(test)]
     pub fn new_test() -> (Self, impl Stream<Item = Event> + Unpin) {
-        let (pipe, recv) = Self::new_with_buffer(TEST_BUFFER_SIZE);
+        let (pipe, recv) = Self::new_test_sender_with_buffer(TEST_BUFFER_SIZE);
         let recv = recv.into_stream().flat_map(into_event_stream);
         (pipe, recv)
     }
 
     #[cfg(test)]
     pub fn new_test_finalize(status: EventStatus) -> (Self, impl Stream<Item = Event> + Unpin) {
-        let (pipe, recv) = Self::new_with_buffer(TEST_BUFFER_SIZE);
+        let (pipe, recv) = Self::new_test_sender_with_buffer(TEST_BUFFER_SIZE);
         // In a source test pipeline, there is no sink to acknowledge
         // events, so we have to add a map to the receiver to handle the
         // finalization.
@@ -131,7 +160,7 @@ impl SourceSender {
     pub fn new_test_errors(
         error_at: impl Fn(usize) -> bool,
     ) -> (Self, impl Stream<Item = Event> + Unpin) {
-        let (pipe, recv) = Self::new_with_buffer(TEST_BUFFER_SIZE);
+        let (pipe, recv) = Self::new_test_sender_with_buffer(TEST_BUFFER_SIZE);
         // In a source test pipeline, there is no sink to acknowledge
         // events, so we have to add a map to the receiver to handle the
         // finalization.
@@ -161,7 +190,11 @@ impl SourceSender {
     ) -> impl Stream<Item = EventArray> + Unpin {
         // The lag_time parameter here will need to be filled in if this function is ever used for
         // non-test situations.
-        let (inner, recv) = Inner::new_with_buffer(100, name.clone(), None);
+        let output_id = OutputId {
+            component: "test".to_string().into(),
+            port: Some(name.clone()),
+        };
+        let (inner, recv) = Inner::new_with_buffer(100, name.clone(), None, None, output_id);
         let recv = recv.into_stream().map(move |mut events| {
             events.iter_events_mut().for_each(|mut event| {
                 let metadata = event.metadata_mut();
@@ -225,6 +258,11 @@ struct Inner {
     output: String,
     lag_time: Option<Histogram>,
     events_sent: Registered<EventsSent>,
+    /// The schema definition that will be attached to Log events sent through here
+    log_definition: Option<Arc<Definition>>,
+    /// The OutputId related to this source sender. This is set as the `upstream_id` in
+    /// `EventMetadata` for all event sent through here.
+    output_id: Arc<OutputId>,
 }
 
 impl fmt::Debug for Inner {
@@ -242,6 +280,8 @@ impl Inner {
         n: usize,
         output: String,
         lag_time: Option<Histogram>,
+        log_definition: Option<Arc<Definition>>,
+        output_id: OutputId,
     ) -> (Self, LimitedReceiver<EventArray>) {
         let (tx, rx) = channel::limited(n);
         (
@@ -252,16 +292,29 @@ impl Inner {
                 events_sent: register!(EventsSent::from(internal_event::Output(Some(
                     output.into()
                 )))),
+                log_definition,
+                output_id: Arc::new(output_id),
             },
             rx,
         )
     }
 
-    async fn send(&mut self, events: EventArray) -> Result<(), ClosedError> {
+    async fn send(&mut self, mut events: EventArray) -> Result<(), ClosedError> {
         let reference = Utc::now().timestamp_millis();
         events
             .iter_events()
             .for_each(|event| self.emit_lag_time(event, reference));
+
+        events.iter_events_mut().for_each(|mut event| {
+            // attach runtime schema definitions from the source
+            if let Some(log_definition) = &self.log_definition {
+                event.metadata_mut().set_schema_definition(log_definition);
+            }
+            event
+                .metadata_mut()
+                .set_upstream_id(Arc::clone(&self.output_id));
+        });
+
         let byte_size = events.estimated_json_encoded_size_of();
         let count = events.len();
         self.inner.send(events).await.map_err(|_| ClosedError)?;
@@ -290,23 +343,10 @@ impl Inner {
         E: Into<Event> + ByteSizeOf,
         I: IntoIterator<Item = E>,
     {
-        let reference = Utc::now().timestamp_millis();
         let events = events.into_iter().map(Into::into);
         for events in array::events_into_arrays(events, Some(CHUNK_SIZE)) {
-            events
-                .iter_events()
-                .for_each(|event| self.emit_lag_time(event, reference));
-            let cbs = CountByteSize(events.len(), events.estimated_json_encoded_size_of());
-            match self.inner.send(events).await {
-                Ok(()) => {
-                    self.events_sent.emit(cbs);
-                }
-                Err(error) => {
-                    return Err(error.into());
-                }
-            }
+            self.send(events).await?;
         }
-
         Ok(())
     }
 

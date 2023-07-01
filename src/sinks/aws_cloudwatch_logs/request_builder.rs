@@ -39,8 +39,12 @@ impl Finalizable for CloudwatchRequest {
 }
 
 impl MetaDescriptive for CloudwatchRequest {
-    fn get_metadata(&self) -> RequestMetadata {
-        self.metadata
+    fn get_metadata(&self) -> &RequestMetadata {
+        &self.metadata
+    }
+
+    fn metadata_mut(&mut self) -> &mut RequestMetadata {
+        &mut self.metadata
     }
 }
 
@@ -87,7 +91,7 @@ impl CloudwatchRequestBuilder {
         self.transformer.transform(&mut event);
         let mut message_bytes = BytesMut::new();
 
-        let builder = RequestMetadataBuilder::from_events(&event);
+        let builder = RequestMetadataBuilder::from_event(&event);
 
         if self.encoder.encode(event, &mut message_bytes).is_err() {
             // The encoder handles internal event emission for Error and EventsDropped.

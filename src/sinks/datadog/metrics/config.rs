@@ -59,6 +59,11 @@ impl DatadogMetricsEndpoint {
             DatadogMetricsEndpoint::Sketches => "application/x-protobuf",
         }
     }
+
+    // Gets whether or not this is a series endpoint.
+    pub const fn is_series(self) -> bool {
+        matches!(self, Self::Series)
+    }
 }
 
 /// Maps Datadog metric endpoints to their actual URI.

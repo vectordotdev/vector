@@ -46,13 +46,17 @@ jobs:
     runs-on: ubuntu-latest
     if: contains(github.event.comment.body, '/ci-run-integration') || contains(github.event.comment.body, '/ci-run-all')
     steps:
-      - name: Validate issue comment
-        if: github.event_name == 'issue_comment'
+      - name: Get PR comment author
+        id: comment
         uses: tspascoal/get-user-teams-membership@v2
         with:
           username: ${{ github.actor }}
           team: 'Vector'
           GITHUB_TOKEN: ${{ secrets.GH_PAT_ORG }}
+
+      - name: Validate author membership
+        if: steps.comment.outputs.isTeamMember == 'false'
+        run: exit 1
 
       - name: (PR comment) Get PR branch
         uses: xt0rted/pull-request-comment-branch@v2

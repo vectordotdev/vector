@@ -162,7 +162,7 @@ impl AwsSqsConfig {
         create_client::<SqsClientBuilder>(
             &self.auth,
             self.region.region(),
-            self.region.endpoint()?,
+            self.region.endpoint(),
             &cx.proxy,
             &self.tls,
             false,

@@ -74,12 +74,6 @@ jobs:
     needs: changes
     secrets: inherit
 
-  check-component-features:
-    if: needs.changes.outputs.source == 'true'
-    uses: ./.github/workflows/component_features.yml
-    needs: changes
-    secrets: inherit
-
   cross-linux:
     # We run cross checks when dependencies change to ensure they still build.
     # This helps us avoid adopting dependencies that aren't compatible with other architectures.
@@ -117,7 +111,6 @@ jobs:
       - test-misc
       - test-environment
       - check-msrv
-      - check-component-features
       - cross-linux
       - unit-mac
       - unit-windows

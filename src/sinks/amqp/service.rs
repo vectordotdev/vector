@@ -22,7 +22,6 @@ pub(super) struct AmqpRequest {
     properties: BasicProperties,
     finalizers: EventFinalizers,
     metadata: RequestMetadata,
-    event_json_size: JsonSize,
 }
 
 impl AmqpRequest {
@@ -33,7 +32,6 @@ impl AmqpRequest {
         properties: BasicProperties,
         finalizers: EventFinalizers,
         metadata: RequestMetadata,
-        event_json_size: JsonSize,
     ) -> Self {
         Self {
             body,
@@ -42,7 +40,6 @@ impl AmqpRequest {
             properties,
             finalizers,
             metadata,
-            event_json_size,
         }
     }
 }
@@ -54,15 +51,19 @@ impl Finalizable for AmqpRequest {
 }
 
 impl MetaDescriptive for AmqpRequest {
-    fn get_metadata(&self) -> RequestMetadata {
-        self.metadata
+    fn get_metadata(&self) -> &RequestMetadata {
+        &self.metadata
+    }
+
+    fn metadata_mut(&mut self) -> &mut RequestMetadata {
+        &mut self.metadata
     }
 }
 
 /// A successful response from `AMQP`.
 pub(super) struct AmqpResponse {
     byte_size: usize,
-    json_size: JsonSize,
+    json_size: GroupedCountByteSize,
 }
 
 impl DriverResponse for AmqpResponse {
@@ -70,8 +71,8 @@ impl DriverResponse for AmqpResponse {
         EventStatus::Delivered
     }
 
-    fn events_sent(&self) -> CountByteSize {
-        CountByteSize(1, self.json_size)
+    fn events_sent(&self) -> &GroupedCountByteSize {
+        &self.json_size
     }
 
     fn bytes_sent(&self) -> Option<usize> {
@@ -129,7 +130,7 @@ impl Service<AmqpRequest> for AmqpService {
                     Ok(lapin::publisher_confirm::Confirmation::Nack(_)) => {
                         warn!("Received Negative Acknowledgement from AMQP server.");
                         Ok(AmqpResponse {
-                            json_size: req.event_json_size,
+                            json_size: req.metadata.into_events_estimated_json_encoded_byte_size(),
                             byte_size,
                         })
                     }
@@ -139,7 +140,7 @@ impl Service<AmqpRequest> for AmqpService {
                         Err(AmqpError::AmqpAcknowledgementFailed { error })
                     }
                     Ok(_) => Ok(AmqpResponse {
-                        json_size: req.event_json_size,
+                        json_size: req.metadata.into_events_estimated_json_encoded_byte_size(),
                         byte_size,
                     }),
                 },
