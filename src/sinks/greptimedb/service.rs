@@ -3,19 +3,14 @@ use std::sync::Arc;
 use std::task::Poll;
 
 use futures_util::future::BoxFuture;
-
 use greptimedb_client::api::v1::auth_header::AuthScheme;
 use greptimedb_client::api::v1::*;
+use greptimedb_client::channel_manager::*;
 use greptimedb_client::{Client, Database, Error as GreptimeError};
 use tower::Service;
-use vector_common::finalization::{EventFinalizers, EventStatus, Finalizable};
-use vector_common::internal_event::CountByteSize;
-use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
 use vector_core::event::Metric;
-use vector_core::stream::DriverResponse;
 
-use crate::sinks::prelude::RetryLogic;
-use crate::sinks::util::metadata::RequestMetadataBuilder;
+use crate::sinks::prelude::*;
 
 use super::batch::GreptimeDBBatchSizer;
 use super::request_builder::metric_to_insert_request;
@@ -108,8 +103,20 @@ pub struct GreptimeDBService {
 }
 
 impl GreptimeDBService {
-    pub fn new(config: &GreptimeDBConfig) -> Self {
-        let grpc_client = Client::with_urls(vec![&config.endpoint]);
+    pub fn try_new(config: &GreptimeDBConfig) -> crate::Result<Self> {
+        let grpc_client = if let Some(tls_config) = &config.tls {
+            let channel_config = ChannelConfig {
+                client_tls: Self::try_from_tls_config(tls_config),
+                ..Default::default()
+            };
+            Client::with_manager_and_urls(
+                ChannelManager::with_tls_config(channel_config).map_err(Box::new)?,
+                vec![&config.endpoint],
+            )
+        } else {
+            Client::with_urls(vec![&config.endpoint])
+        };
+
         let mut client = Database::new_with_dbname(&config.dbname, grpc_client);
 
         if let (Some(username), Some(password)) = (&config.username, &config.password) {
@@ -119,10 +126,33 @@ impl GreptimeDBService {
             }))
         };
 
-        // TODO: tls configuration
-
-        GreptimeDBService {
+        Ok(GreptimeDBService {
             client: Arc::new(client),
+        })
+    }
+
+    fn try_from_tls_config(tls_config: &TlsConfig) -> Option<ClientTlsOption> {
+        if let Some(ca_path) = tls_config.ca_file.as_ref() {
+            let cert_path = tls_config.crt_file.as_ref().expect(
+                "Client cert file is required for greptimedb sink when custom CA specified",
+            );
+            let key_path = tls_config
+                .key_file
+                .as_ref()
+                .expect("Client key file is required for greptimedb sink when custom CA specified");
+            if tls_config.key_pass.is_some() {
+                warn!(
+                    message = "TLS key file with password is not supported by greptimedb client at the moment."
+                );
+            }
+
+            Some(ClientTlsOption {
+                server_ca_cert_path: ca_path.clone(),
+                client_key_path: key_path.clone(),
+                client_cert_path: cert_path.clone(),
+            })
+        } else {
+            None
         }
     }
 }

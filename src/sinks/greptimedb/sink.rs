@@ -2,14 +2,11 @@ use async_trait::async_trait;
 
 use futures::StreamExt;
 use futures_util::stream::BoxStream;
-use vector_core::event::{Event, Metric, MetricValue};
-use vector_core::sink::StreamSink;
-use vector_core::stream::BatcherSettings;
+use vector_core::event::{Metric, MetricValue};
 
+use crate::sinks::prelude::*;
 use crate::sinks::util::buffer::metrics::MetricNormalize;
 use crate::sinks::util::buffer::metrics::MetricSet;
-use crate::sinks::util::service::Svc;
-use crate::sinks::util::SinkBuilderExt;
 
 use super::batch::GreptimeDBBatchSizer;
 use super::service::{GreptimeDBRequest, GreptimeDBRetryLogic, GreptimeDBService};

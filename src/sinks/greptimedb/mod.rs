@@ -25,10 +25,9 @@ use tower::ServiceBuilder;
 use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 use vector_core::config::{AcknowledgementsConfig, Input};
+use vector_core::tls::TlsConfig;
 
-use crate::config::{SinkConfig, SinkContext};
-use crate::sinks::util::{BatchConfig, SinkBatchSettings};
-use crate::sinks::{Healthcheck, VectorSink};
+use crate::sinks::prelude::*;
 
 use self::service::GreptimeDBRetryLogic;
 
@@ -111,6 +110,9 @@ pub struct GreptimeDBConfig {
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     pub acknowledgements: AcknowledgementsConfig,
+
+    #[configurable(derived)]
+    pub tls: Option<TlsConfig>,
 }
 
 impl_generate_config_from_default!(GreptimeDBConfig);
@@ -122,7 +124,7 @@ impl SinkConfig for GreptimeDBConfig {
         let request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
         let service = ServiceBuilder::new()
             .settings(request_settings, GreptimeDBRetryLogic)
-            .service(service::GreptimeDBService::new(self));
+            .service(service::GreptimeDBService::try_new(self)?);
         let sink = sink::GreptimeDBSink {
             service,
             batch_settings: self.batch.into_batcher_settings()?,
