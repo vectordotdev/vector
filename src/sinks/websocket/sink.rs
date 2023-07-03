@@ -7,10 +7,7 @@ use std::{
 use async_trait::async_trait;
 use bytes::BytesMut;
 use futures::{pin_mut, sink::SinkExt, stream::BoxStream, Sink, Stream, StreamExt};
-use tokio_tungstenite::tungstenite::{
-    error::{Error as WsError, ProtocolError},
-    protocol::Message,
-};
+use tokio_tungstenite::tungstenite::{error::Error as WsError, protocol::Message};
 use tokio_util::codec::Encoder as _;
 use vector_core::{
     internal_event::{
@@ -21,7 +18,10 @@ use vector_core::{
 
 use crate::{
     codecs::{Encoder, Transformer},
-    common::{ping::PingInterval, websocket::WebSocketConnector},
+    common::{
+        ping::PingInterval,
+        websocket::{is_closed, WebSocketConnector},
+    },
     emit,
     event::{Event, EventStatus, Finalizable},
     internal_events::{ConnectionOpen, OpenGauge, WsConnectionError, WsConnectionShutdown},
@@ -203,15 +203,6 @@ impl StreamSink<Event> for WebSocketSink {
     }
 }
 
-const fn is_closed(error: &WsError) -> bool {
-    matches!(
-        error,
-        WsError::ConnectionClosed
-            | WsError::AlreadyClosed
-            | WsError::Protocol(ProtocolError::ResetWithoutClosingHandshake)
-    )
-}
-
 #[cfg(test)]
 mod tests {
     use std::net::SocketAddr;
@@ -222,7 +213,10 @@ mod tests {
     use tokio::time::timeout;
     use tokio_tungstenite::{
         accept_async, accept_hdr_async,
-        tungstenite::handshake::server::{Request, Response},
+        tungstenite::{
+            error::ProtocolError,
+            handshake::server::{Request, Response},
+        },
     };
 
     use super::*;

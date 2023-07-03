@@ -6,7 +6,7 @@ use tokio_tungstenite::{
     client_async_with_config,
     tungstenite::{
         client::{uri_mode, IntoClientRequest},
-        error::{Error as WsError, UrlError},
+        error::{Error as WsError, ProtocolError, UrlError},
         handshake::client::Request as WsRequest,
         protocol::WebSocketConfig,
         stream::Mode as UriMode,
@@ -142,4 +142,13 @@ impl WebSocketConnector {
     pub(crate) async fn healthcheck(&self) -> crate::Result<()> {
         self.connect().await.map(|_| ()).map_err(Into::into)
     }
+}
+
+pub(crate) const fn is_closed(error: &WsError) -> bool {
+    matches!(
+        error,
+        WsError::ConnectionClosed
+            | WsError::AlreadyClosed
+            | WsError::Protocol(ProtocolError::ResetWithoutClosingHandshake)
+    )
 }
