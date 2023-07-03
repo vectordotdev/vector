@@ -48,7 +48,7 @@ jobs:
     steps:
       - name: Get PR comment author
         if: |
-          github.event_name == 'issue_comment' &&
+          github.event_name == 'issue_comment' && github.event.issue.pull_request &&
             ( contains(github.event.comment.body, '/ci-run-all') ||
               contains(github.event.comment.body, '/ci-run-k8s')
             )
