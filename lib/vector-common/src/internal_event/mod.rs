@@ -256,7 +256,7 @@ macro_rules! registered_event {
                 fn register(
                     $fixed_name: $fixed_tags,
                     $tags_name: $tags,
-                ) -> <TaggedEventsSent as super::RegisterInternalEvent>::Handle {
+                ) -> <$event as super::RegisterInternalEvent>::Handle {
                     $register_body
                 }
             })?

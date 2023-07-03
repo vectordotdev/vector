@@ -86,3 +86,43 @@ where
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    #![allow(unreachable_pub)]
+    use metrics::{register_counter, Counter};
+
+    use super::*;
+
+    crate::registered_event!(
+        TestEvent {
+            fixed: String,
+            dynamic: String,
+        } => {
+            event: Counter = {
+                register_counter!("test_event_total", "fixed" => self.fixed, "dynamic" => self.dynamic)
+            },
+        }
+
+        fn emit(&self, count: u64) {
+            self.event.increment(count);
+        }
+
+        fn register(fixed: String, dynamic: String) {
+            crate::internal_event::register(TestEvent {
+                fixed,
+                dynamic,
+            })
+        }
+    );
+
+    #[test]
+    fn test_fixed_tag() {
+        let event: RegisteredEventCache<String, TestEvent> =
+            RegisteredEventCache::new("fixed".to_string());
+
+        for tag in 1..=5 {
+            event.emit(&format!("dynamic{tag}"), tag);
+        }
+    }
+}
