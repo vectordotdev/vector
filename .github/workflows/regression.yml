@@ -280,7 +280,7 @@ jobs:
 
   build-baseline:
     name: Build baseline Vector container
-    runs-on: [linux, ubuntu-20.04-8core]
+    runs-on: [linux, ubuntu-20.04-4core]
     needs:
       - compute-metadata
     steps:
@@ -295,7 +295,7 @@ jobs:
 
       - name: Set up Docker Buildx
         id: buildx
-        uses: docker/setup-buildx-action@v2.7.0
+        uses: docker/setup-buildx-action@v2.8.0
 
       - name: Build 'vector' target image
         uses: docker/build-push-action@v4.1.1
@@ -317,7 +317,7 @@ jobs:
 
   build-comparison:
     name: Build comparison Vector container
-    runs-on: [linux, soak-builder]
+    runs-on: [linux, ubuntu-20.04-4core]
     needs:
       - compute-metadata
     steps:
@@ -332,7 +332,7 @@ jobs:
 
       - name: Set up Docker Buildx
         id: buildx
-        uses: docker/setup-buildx-action@v2.7.0
+        uses: docker/setup-buildx-action@v2.8.0
 
       - name: Build 'vector' target image
         uses: docker/build-push-action@v4.1.1

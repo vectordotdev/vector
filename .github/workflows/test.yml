@@ -122,12 +122,6 @@ jobs:
         if: needs.changes.outputs.source == 'true' || needs.changes.outputs.cue == 'true'
         run: cargo vdev test-vrl
 
-      - uses: actions/upload-artifact@v3
-        with:
-          name: "config-schema.json"
-          path: "/tmp/vector-config-schema.json"
-        if: success() || failure()
-
   # This is a required status check, so it always needs to run if prior jobs failed, in order to mark the status correctly.
   all-checks:
     name: Test Suite

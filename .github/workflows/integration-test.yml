@@ -30,8 +30,8 @@ env:
 
 jobs:
   test-integration:
-    runs-on: [linux, ubuntu-20.04-8core]
-    timeout-minutes: 30
+    runs-on: [linux, ubuntu-20.04-4core]
+    timeout-minutes: 40
     if: inputs.if || github.event_name == 'workflow_dispatch'
     steps:
       - name: (PR comment) Get PR branch

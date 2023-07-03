@@ -39,7 +39,7 @@ async fn check_batch_size() {
 
     let config = KinesisFirehoseSinkConfig { batch, base };
 
-    let cx = SinkContext::new_test();
+    let cx = SinkContext::default();
     let res = config.build(cx).await;
 
     assert_eq!(
@@ -69,7 +69,7 @@ async fn check_batch_events() {
 
     let config = KinesisFirehoseSinkConfig { batch, base };
 
-    let cx = SinkContext::new_test();
+    let cx = SinkContext::default();
     let res = config.build(cx).await;
 
     assert_eq!(

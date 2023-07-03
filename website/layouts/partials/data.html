@@ -257,6 +257,39 @@
       </a>
     </span>
 
+    <div
+      class="mt-3 border-2 rounded-md border-yellow-400 flex flex-col space-y-1.5 py-2 px-3">
+      <span>
+        <h4
+          x-data="{ show: false }" x-on:mouseover="show = true" x-on:mouseleave="show = false"
+          id="warning" class="flex items-center text-dark dark:text-gray-200 js-toc-ignore">
+          <span>Warning</span>
+          <a class="ml-2" x-show="show" href="#warning" style="display: none;"><svg
+            xmlns="http://www.w3.org/2000/svg" class="text-secondary dark:text-primary h-4 w-4"
+            fill="none"
+            viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14"></path>
+              </svg>
+          </a>
+        </h4>
+      </span>
+      <div class="flex space-x-5 items-center">
+        <div class="flex-shrink-0">
+          <svg xmlns="http://www.w3.org/2000/svg" class="text-yellow-500 h-5 w-5" fill="none"
+               viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+        </div>
+        <div class="prose dark:prose-dark max-w-none leading-snug">The fields shown below will be
+          different if log namespacing is enabled.
+          See <a href="/blog/log-namespacing/">Log Namespacing</a> for
+          more details
+        </div>
+      </div>
+    </div>
+
     <div class="mt-3 border rounded divide-y dark:border-gray-700 dark:divide-gray-700">
       {{ template "logs_output" . }}
     </div>

@@ -107,9 +107,11 @@ impl ShutdownSignal {
     }
 }
 
+type IsInternal = bool;
+
 #[derive(Debug, Default)]
 pub struct SourceShutdownCoordinator {
-    shutdown_begun_triggers: HashMap<ComponentKey, Trigger>,
+    shutdown_begun_triggers: HashMap<ComponentKey, (IsInternal, Trigger)>,
     shutdown_force_triggers: HashMap<ComponentKey, Trigger>,
     shutdown_complete_tripwires: HashMap<ComponentKey, Tripwire>,
 }
@@ -121,13 +123,14 @@ impl SourceShutdownCoordinator {
     pub fn register_source(
         &mut self,
         id: &ComponentKey,
+        internal: bool,
     ) -> (ShutdownSignal, impl Future<Output = ()>) {
         let (shutdown_begun_trigger, shutdown_begun_tripwire) = Tripwire::new();
         let (force_shutdown_trigger, force_shutdown_tripwire) = Tripwire::new();
         let (shutdown_complete_trigger, shutdown_complete_tripwire) = Tripwire::new();
 
         self.shutdown_begun_triggers
-            .insert(id.clone(), shutdown_begun_trigger);
+            .insert(id.clone(), (internal, shutdown_begun_trigger));
         self.shutdown_force_triggers
             .insert(id.clone(), force_shutdown_trigger);
         self.shutdown_complete_tripwires
@@ -201,13 +204,14 @@ impl SourceShutdownCoordinator {
     /// Panics if this coordinator has had its triggers removed (ie
     /// has been taken over with `Self::takeover_source`).
     pub fn shutdown_all(self, deadline: Option<Instant>) -> impl Future<Output = ()> {
-        let mut complete_futures = Vec::new();
+        let mut internal_sources_complete_futures = Vec::new();
+        let mut external_sources_complete_futures = Vec::new();
 
         let shutdown_begun_triggers = self.shutdown_begun_triggers;
         let mut shutdown_complete_tripwires = self.shutdown_complete_tripwires;
         let mut shutdown_force_triggers = self.shutdown_force_triggers;
 
-        for (id, trigger) in shutdown_begun_triggers {
+        for (id, (internal, trigger)) in shutdown_begun_triggers {
             trigger.cancel();
 
             let shutdown_complete_tripwire =
@@ -229,10 +233,16 @@ impl SourceShutdownCoordinator {
                 deadline,
             );
 
-            complete_futures.push(source_complete);
+            if internal {
+                internal_sources_complete_futures.push(source_complete);
+            } else {
+                external_sources_complete_futures.push(source_complete);
+            }
         }
 
-        futures::future::join_all(complete_futures).map(|_| ())
+        futures::future::join_all(external_sources_complete_futures)
+            .then(|_| futures::future::join_all(internal_sources_complete_futures))
+            .map(|_| ())
     }
 
     /// Sends the signal to the given source to begin shutting down. Returns a future that resolves
@@ -250,11 +260,12 @@ impl SourceShutdownCoordinator {
         id: &ComponentKey,
         deadline: Instant,
     ) -> impl Future<Output = bool> {
-        let begin_shutdown_trigger = self.shutdown_begun_triggers.remove(id).unwrap_or_else(|| {
-            panic!(
+        let (_, begin_shutdown_trigger) =
+            self.shutdown_begun_triggers.remove(id).unwrap_or_else(|| {
+                panic!(
                 "shutdown_begun_trigger for source \"{id}\" not found in the ShutdownCoordinator"
             )
-        });
+            });
         // This is what actually triggers the source to begin shutting down.
         begin_shutdown_trigger.cancel();
 
@@ -336,7 +347,7 @@ mod test {
         let mut shutdown = SourceShutdownCoordinator::default();
         let id = ComponentKey::from("test");
 
-        let (shutdown_signal, _) = shutdown.register_source(&id);
+        let (shutdown_signal, _) = shutdown.register_source(&id, false);
 
         let deadline = Instant::now() + Duration::from_secs(1);
         let shutdown_complete = shutdown.shutdown_source(&id, deadline);
@@ -352,7 +363,7 @@ mod test {
         let mut shutdown = SourceShutdownCoordinator::default();
         let id = ComponentKey::from("test");
 
-        let (_shutdown_signal, force_shutdown_tripwire) = shutdown.register_source(&id);
+        let (_shutdown_signal, force_shutdown_tripwire) = shutdown.register_source(&id, false);
 
         let deadline = Instant::now() + Duration::from_secs(1);
         let shutdown_complete = shutdown.shutdown_source(&id, deadline);

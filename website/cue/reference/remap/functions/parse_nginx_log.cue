@@ -35,8 +35,9 @@ remap: functions: parse_nginx_log: {
 			description: "The format to use for parsing the log."
 			required:    true
 			enum: {
-				"combined": "Nginx combined format"
-				"error":    "Default Nginx error format"
+				"combined":             "Nginx combined format"
+				"error":                "Default Nginx error format"
+				"ingress_upstreaminfo": "Provides detailed upstream information (Nginx Ingress Controller)"
 			}
 			type: ["string"]
 		},

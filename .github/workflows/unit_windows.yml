@@ -8,14 +8,6 @@ jobs:
   test-windows:
     runs-on: [windows, windows-2019-8core]
     steps:
-      - name: Validate issue comment
-        if: github.event_name == 'issue_comment'
-        uses: tspascoal/get-user-teams-membership@v2
-        with:
-          username: ${{ github.actor }}
-          team: 'Vector'
-          GITHUB_TOKEN: ${{ secrets.GH_PAT_ORG }}
-
       - name: (PR comment) Get PR branch
         if: ${{ github.event_name == 'issue_comment' }}
         uses: xt0rted/pull-request-comment-branch@v2

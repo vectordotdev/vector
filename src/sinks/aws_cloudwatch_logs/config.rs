@@ -139,7 +139,7 @@ impl CloudwatchLogsSinkConfig {
         create_client::<CloudwatchLogsClientBuilder>(
             &self.auth,
             self.region.region(),
-            self.region.endpoint()?,
+            self.region.endpoint(),
             proxy,
             &self.tls,
             true,

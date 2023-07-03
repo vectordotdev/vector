@@ -1,20 +1,17 @@
-use vector_config::configurable_component;
+use http::{Request, StatusCode, Uri};
+use hyper::Body;
 
-use crate::{
-    codecs::Transformer,
-    config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext},
-    http::Auth,
-    sinks::{
-        util::{
-            BatchConfig, Compression, RealtimeSizeBasedDefaultBatchSettings, TowerRequestConfig,
-            UriSerde,
-        },
-        Healthcheck, VectorSink,
-    },
-    tls::TlsConfig,
+use super::{
+    service::{ClickhouseRetryLogic, ClickhouseService},
+    sink::ClickhouseSink,
 };
-
-use super::http_sink::build_http_sink;
+use crate::{
+    http::{get_http_scheme_from_uri, Auth, HttpClient, MaybeAuth},
+    sinks::{
+        prelude::*,
+        util::{RealtimeSizeBasedDefaultBatchSettings, UriSerde},
+    },
+};
 
 /// Configuration for the `clickhouse` sink.
 #[configurable_component(sink("clickhouse", "Deliver log data to a ClickHouse database."))]
@@ -82,9 +79,41 @@ impl_generate_config_from_default!(ClickhouseConfig);
 #[typetag::serde(name = "clickhouse")]
 impl SinkConfig for ClickhouseConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        // later we can build different sink(http, native) here
-        // according to the clickhouseConfig
-        build_http_sink(self, cx).await
+        let endpoint = self.endpoint.with_default_parts().uri;
+        let protocol = get_http_scheme_from_uri(&endpoint);
+
+        let auth = self.auth.choose_one(&self.endpoint.auth)?;
+
+        let tls_settings = TlsSettings::from_options(&self.tls)?;
+        let client = HttpClient::new(tls_settings, &cx.proxy)?;
+
+        let service = ClickhouseService::new(
+            client.clone(),
+            auth.clone(),
+            &endpoint,
+            self.database.as_deref(),
+            self.table.as_str(),
+            self.skip_unknown_fields,
+            self.date_time_best_effort,
+        )?;
+
+        let request_limits = self.request.unwrap_with(&Default::default());
+        let service = ServiceBuilder::new()
+            .settings(request_limits, ClickhouseRetryLogic::default())
+            .service(service);
+
+        let batch_settings = self.batch.into_batcher_settings()?;
+        let sink = ClickhouseSink::new(
+            batch_settings,
+            self.compression,
+            self.encoding.clone(),
+            service,
+            protocol,
+        );
+
+        let healthcheck = Box::pin(healthcheck(client, endpoint, auth));
+
+        Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }
 
     fn input(&self) -> Input {
@@ -93,5 +122,32 @@ impl SinkConfig for ClickhouseConfig {
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
+    }
+}
+
+async fn healthcheck(client: HttpClient, endpoint: Uri, auth: Option<Auth>) -> crate::Result<()> {
+    // TODO: check if table exists?
+    let uri = format!("{}/?query=SELECT%201", endpoint);
+    let mut request = Request::get(uri).body(Body::empty()).unwrap();
+
+    if let Some(auth) = auth {
+        auth.apply(&mut request);
+    }
+
+    let response = client.send(request).await?;
+
+    match response.status() {
+        StatusCode::OK => Ok(()),
+        status => Err(HealthcheckError::UnexpectedStatus { status }.into()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<ClickhouseConfig>();
     }
 }

@@ -411,6 +411,7 @@ timespan
 timestamped
 tzdata
 ubuntu
+upstreaminfo
 useragents
 usergroups
 userguide

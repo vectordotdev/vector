@@ -262,6 +262,8 @@ impl EventEncoder {
             event.as_mut_log().remove_timestamp();
         }
 
+        let event_count_tags = event.get_tags();
+
         self.transformer.transform(&mut event);
         let mut bytes = BytesMut::new();
         self.encoder.encode(event, &mut bytes).ok();
@@ -285,6 +287,7 @@ impl EventEncoder {
             partition,
             finalizers,
             json_byte_size,
+            event_count_tags,
         })
     }
 }

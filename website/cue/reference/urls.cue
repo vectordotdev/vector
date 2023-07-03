@@ -313,6 +313,7 @@ urls: {
 	logfmt_specs:                               "https://pkg.go.dev/github.com/kr/logfmt#section-documentation"
 	logstash:                                   "https://www.elastic.co/logstash"
 	logstash_protocol:                          "https://github.com/elastic/logstash-forwarder/blob/master/PROTOCOL.md"
+	log_namespacing_blog:                       "/blog/log-namespacing/"
 	loki:                                       "https://grafana.com/oss/loki/"
 	loki_multi_tenancy:                         "\(github)/grafana/loki/blob/master/docs/operations/multi-tenancy.md"
 	log_event_source:                           "\(vector_repo)/blob/master/src/event/"

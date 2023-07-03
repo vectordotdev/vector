@@ -2,7 +2,7 @@ use std::io::Read;
 use std::sync::Arc;
 use std::task;
 
-use aws_types::credentials::SharedCredentialsProvider;
+use aws_credential_types::provider::SharedCredentialsProvider;
 use aws_types::region::Region;
 use bytes::{Bytes, BytesMut};
 use futures::{future::BoxFuture, stream, FutureExt, SinkExt};
@@ -624,7 +624,7 @@ mod tests {
 
             let config = format!("endpoint = \"http://{}/write\"\n{}", addr, config);
             let config: RemoteWriteConfig = toml::from_str(&config).unwrap();
-            let cx = SinkContext::new_test();
+            let cx = SinkContext::default();
 
             let (sink, _) = config.build(cx).await.unwrap();
             sink.run_events(events).await.unwrap();
@@ -709,7 +709,7 @@ mod integration_tests {
         assert_sink_compliance(&HTTP_SINK_TAGS, async {
             let database = onboarding_v1(url).await;
 
-            let cx = SinkContext::new_test();
+            let cx = SinkContext::default();
 
             let config = RemoteWriteConfig {
                 endpoint: format!("{}/api/v1/prom/write?db={}", url, database),

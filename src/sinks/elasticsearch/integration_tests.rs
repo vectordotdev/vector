@@ -146,7 +146,7 @@ async fn structures_events_correctly() {
         .expect("Config error");
     let base_url = common.base_url.clone();
 
-    let cx = SinkContext::new_test();
+    let cx = SinkContext::default();
     let (sink, _hc) = config.build(cx.clone()).await.unwrap();
 
     let (batch, mut receiver) = BatchNotifier::new_with_receiver();
@@ -555,7 +555,7 @@ async fn run_insert_tests_with_config(
     };
     let base_url = common.base_url.clone();
 
-    let cx = SinkContext::new_test();
+    let cx = SinkContext::default();
     let (sink, healthcheck) = config
         .build(cx.clone())
         .await
@@ -639,7 +639,7 @@ async fn run_insert_tests_with_config(
 }
 
 async fn run_insert_tests_with_multiple_endpoints(config: &ElasticsearchConfig) {
-    let cx = SinkContext::new_test();
+    let cx = SinkContext::default();
     let commons = ElasticsearchCommon::parse_many(config, cx.proxy())
         .await
         .expect("Config error");

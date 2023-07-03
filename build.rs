@@ -1,4 +1,11 @@
-use std::{collections::HashSet, env, fs::File, io::Write, path::Path, process::Command};
+use std::{
+    collections::HashSet,
+    env,
+    fs::File,
+    io::Write,
+    path::{Path, PathBuf},
+    process::Command,
+};
 
 struct TrackedEnv {
     tracked: HashSet<String>,
@@ -124,8 +131,19 @@ fn main() {
         println!("cargo:rerun-if-changed=proto/google/rpc/status.proto");
         println!("cargo:rerun-if-changed=proto/vector.proto");
 
+        // Create and store the "file descriptor set" from the compiled Protocol Buffers packages.
+        //
+        // This allows us to use runtime reflection to manually build Protocol Buffers payloads
+        // in a type-safe way, which is necessary for incrementally building certain payloads, like
+        // the ones generated in the `datadog_metrics` sink.
+        let protobuf_fds_path =
+            PathBuf::from(std::env::var("OUT_DIR").expect("OUT_DIR environment variable not set"))
+                .join("protobuf-fds.bin");
+
         let mut prost_build = prost_build::Config::new();
-        prost_build.btree_map(["."]);
+        prost_build
+            .btree_map(["."])
+            .file_descriptor_set_path(protobuf_fds_path);
 
         tonic_build::configure()
             .protoc_arg("--experimental_allow_proto3_optional")

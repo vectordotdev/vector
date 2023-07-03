@@ -995,7 +995,7 @@ mod integration_tests {
         crate::test_util::trace_init();
         let database = onboarding_v1(url).await;
 
-        let cx = SinkContext::new_test();
+        let cx = SinkContext::default();
 
         let config = InfluxDbConfig {
             endpoint: url.to_string(),
@@ -1090,7 +1090,7 @@ mod integration_tests {
         let endpoint = address_v2();
         onboarding_v2(&endpoint).await;
 
-        let cx = SinkContext::new_test();
+        let cx = SinkContext::default();
 
         let config = InfluxDbConfig {
             endpoint,

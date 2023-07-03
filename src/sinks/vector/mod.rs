@@ -77,7 +77,7 @@ mod tests {
         let config = format!(r#"address = "http://{}/""#, in_addr);
         let config: VectorConfig = toml::from_str(&config).unwrap();
 
-        let cx = SinkContext::new_test();
+        let cx = SinkContext::default();
 
         let (sink, _) = config.build(cx).await.unwrap();
         let (rx, trigger, server) = build_test_server_generic(in_addr, move || {
@@ -121,7 +121,7 @@ mod tests {
         let config = format!(r#"address = "http://{}/""#, in_addr);
         let config: VectorConfig = toml::from_str(&config).unwrap();
 
-        let cx = SinkContext::new_test();
+        let cx = SinkContext::default();
 
         let (sink, _) = config.build(cx).await.unwrap();
         let (_rx, trigger, server) = build_test_server_generic(in_addr, move || {

@@ -330,7 +330,7 @@ async fn splunk_passthrough_token() {
         acknowledgements: Default::default(),
         default_namespace: None,
     };
-    let cx = SinkContext::new_test();
+    let cx = SinkContext::default();
 
     let (sink, _) = config.build(cx).await.unwrap();
 
