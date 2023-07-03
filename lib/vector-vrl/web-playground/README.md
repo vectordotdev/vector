@@ -31,6 +31,7 @@ For more information on Rust and WebAssembly please visit
 [the Rust book wasm chapter][rust-book-wasm]
 
 ## Run locally
+
 The `src/lib.rs` file is the entry point of the `web-playground` crate.
 This file is necessary so we can use the `run_vrl()` function in the browser.
 Notice our `index.html` imports the VRL wasm module from `./vrl_web_playground.js`
@@ -69,7 +70,9 @@ Functions from VRL stdlib that are currently not supported can be found
 with this [issue filter][vrl-wasm-unsupported-filter].
 
 ### macOS Troubleshooting
+
 If you are getting compilation errors on macOS here are some things to check:
+
 ```shell
 xcode-select -p
 # Example: '/Library/Developer/CommandLineTools
@@ -77,12 +80,14 @@ xcode-select -p
 ```
 
 You can clean and reinstall with:
+
 ```shell
 rm -rf /Library/Developer/CommandLineTools # might require sudo elevation
 xcode-select --install
 ```
 
 Check your `llvm` installation and ensure that there are no conflicting installations. Check that the following command returns the expected version:
+
 ```shell
 clang --version
 # Example:
@@ -93,6 +98,7 @@ clang --version
 ```
 
 The output of the following command should contain `WebAssembly`:
+
 ```shell
 llvm-config --targets-built # WebAssembly should be in the results
 # Example: AArch64 <omitted> WebAssembly <omitted>
