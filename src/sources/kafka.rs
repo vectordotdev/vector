@@ -702,7 +702,7 @@ fn handle_messages(
     mut out: SourceSender,
     log_namespace: LogNamespace,
     #[cfg(test)] eof: bool,
-) -> () {
+) {
     #[cfg(test)]
     let mut eof_partitions = std::collections::HashSet::new();
 
