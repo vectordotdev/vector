@@ -14,7 +14,7 @@ use crate::sinks::prelude::*;
 
 use super::batch::GreptimeDBBatchSizer;
 use super::request_builder::metric_to_insert_request;
-use super::GreptimeDBConfig;
+use super::{GreptimeDBConfig, GreptimeDBConfigError};
 
 #[derive(Clone, Default)]
 pub(super) struct GreptimeDBRetryLogic;
@@ -109,7 +109,7 @@ impl GreptimeDBService {
     pub fn try_new(config: &GreptimeDBConfig) -> crate::Result<Self> {
         let grpc_client = if let Some(tls_config) = &config.tls {
             let channel_config = ChannelConfig {
-                client_tls: Self::try_from_tls_config(tls_config),
+                client_tls: Self::try_from_tls_config(tls_config)?,
                 ..Default::default()
             };
             Client::with_manager_and_urls(
@@ -134,28 +134,30 @@ impl GreptimeDBService {
         })
     }
 
-    fn try_from_tls_config(tls_config: &TlsConfig) -> Option<ClientTlsOption> {
+    fn try_from_tls_config(tls_config: &TlsConfig) -> crate::Result<Option<ClientTlsOption>> {
         if let Some(ca_path) = tls_config.ca_file.as_ref() {
-            let cert_path = tls_config.crt_file.as_ref().expect(
-                "Client cert file is required for greptimedb sink when custom CA specified",
-            );
+            let cert_path = tls_config
+                .crt_file
+                .as_ref()
+                .ok_or(GreptimeDBConfigError::TlsMissingCert)?;
             let key_path = tls_config
                 .key_file
                 .as_ref()
-                .expect("Client key file is required for greptimedb sink when custom CA specified");
+                .ok_or(GreptimeDBConfigError::TlsMissingKey)?;
+
             if tls_config.key_pass.is_some() {
                 warn!(
                     message = "TLS key file with password is not supported by greptimedb client at the moment."
                 );
             }
 
-            Some(ClientTlsOption {
+            Ok(Some(ClientTlsOption {
                 server_ca_cert_path: ca_path.clone(),
                 client_key_path: key_path.clone(),
                 client_cert_path: cert_path.clone(),
-            })
+            }))
         } else {
-            None
+            Ok(None)
         }
     }
 }

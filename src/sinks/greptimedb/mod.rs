@@ -21,6 +21,7 @@
 //!
 use futures_util::FutureExt;
 use greptimedb_client::Client;
+use snafu::Snafu;
 use tower::ServiceBuilder;
 use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
@@ -147,6 +148,14 @@ fn healthcheck(config: &GreptimeDBConfig) -> crate::Result<super::Healthcheck> {
     let client = Client::with_urls(vec![&config.endpoint]);
 
     Ok(async move { client.health_check().await.map_err(|error| error.into()) }.boxed())
+}
+
+#[derive(Debug, Snafu)]
+pub enum GreptimeDBConfigError {
+    #[snafu(display("greptimedb TLS Config Error: missing key"))]
+    TlsMissingKey,
+    #[snafu(display("greptimedb TLS Config Error: missing cert"))]
+    TlsMissingCert,
 }
 
 #[cfg(test)]
