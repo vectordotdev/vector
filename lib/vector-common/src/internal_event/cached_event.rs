@@ -58,7 +58,7 @@ where
     pub fn new(fixed_tags: FixedTags) -> Self {
         Self {
             fixed_tags,
-            cache: Default::default(),
+            cache: Arc::default(),
         }
     }
 
