@@ -45,15 +45,13 @@ jobs:
   validate:
     name: Validate comment
     runs-on: ubuntu-latest
-    if: |
-      github.event_name != 'issue_comment' ||
-      ( github.event.issue.pull_request &&
-        ( contains(github.event.comment.body, '/ci-run-all') ||
-          contains(github.event.comment.body, '/ci-run-k8s')
-        )
-      )
     steps:
       - name: Get PR comment author
+        if: |
+          github.event_name == 'issue_comment' &&
+            ( contains(github.event.comment.body, '/ci-run-all') ||
+              contains(github.event.comment.body, '/ci-run-k8s')
+            )
         id: comment
         uses: tspascoal/get-user-teams-membership@v2
         with:
@@ -76,7 +74,7 @@ jobs:
   build-x86_64-unknown-linux-gnu:
     name: Build - x86_64-unknown-linux-gnu
     runs-on: [linux, ubuntu-20.04-4core]
-    needs: [changes, validate]
+    needs: changes
     if: github.event_name != 'pull_request' || needs.changes.outputs.k8s == 'true'
     # cargo-deb requires a release build, but we don't need optimizations for tests
     env:
@@ -141,7 +139,7 @@ jobs:
   compute-k8s-test-plan:
     name: Compute K8s test plan
     runs-on: ubuntu-latest
-    needs: [changes, validate]
+    needs: changes
     if: github.event_name != 'pull_request' || needs.changes.outputs.k8s == 'true'
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
@@ -195,7 +193,6 @@ jobs:
     name: K8s ${{ matrix.kubernetes_version.version }} / ${{ matrix.container_runtime }} (${{ matrix.kubernetes_version.role }})
     runs-on: [linux, ubuntu-20.04-4core]
     needs:
-      - validate
       - build-x86_64-unknown-linux-gnu
       - compute-k8s-test-plan
     strategy:
@@ -246,7 +243,7 @@ jobs:
   final-result:
     name: K8s E2E Suite
     runs-on: ubuntu-latest
-    needs: [test-e2e-kubernetes, validate]
+    needs: test-e2e-kubernetes
     if: |
       always() && (github.event_name != 'issue_comment' || (github.event.issue.pull_request
         && (contains(github.event.comment.body, '/ci-run-k8s') || contains(github.event.comment.body, '/ci-run-all'))))
