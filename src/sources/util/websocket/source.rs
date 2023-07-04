@@ -1,10 +1,12 @@
 use std::{io, num::NonZeroU64};
 
+use bytes::BytesMut;
 use chrono::Utc;
 use futures::{pin_mut, sink::SinkExt, Sink, Stream, StreamExt};
 use lookup::{metadata_path, path};
 use tokio::time::{Duration, Instant};
 use tokio_tungstenite::tungstenite::{error::Error as WsError, Message};
+use tokio_util::codec::Decoder as DecoderTrait;
 
 use crate::{
     codecs::Decoder,
@@ -123,30 +125,61 @@ pub(crate) async fn recv_from_websocket(
                             Ok(())
                         }
                     },
+
                     Ok(Message::Pong(_)) => {
                         last_pong = Instant::now();
                         Ok(())
                     },
+
                     Ok(Message::Text(msg_txt)) => {
                         Ok(handle_text_message(&mut out.clone(), WebSocketEvent{
                             name: DEFAULT_SOURCE_NAME.to_owned(),
                             payload: msg_txt,
                             log_namespace: &params.log_namespace,
                         }, config.uri.clone(),
-                        params.decoder.clone()).await)
+                        ).await)
                     },
-                    Ok(Message::Binary(_msg_bytes)) => {
-                        warn!("Unsupported message type received: binary");
-                        Ok(())
+
+                    Ok(Message::Binary(msg_bytes)) => {
+                        let mut buf: BytesMut = msg_bytes.iter().collect();
+                        match params.decoder.clone().decode(&mut buf)
+                            .map(|maybe_msg| async {
+                                maybe_msg.and_then(|(msg, _)| {
+                                    msg.into_iter().nth(0)
+                                }).and_then(|e| {
+                                    if let Event::Log(log_evt) = e {
+                                        Some(WebSocketEvent{
+                                            name: DEFAULT_SOURCE_NAME.to_owned(),
+                                            payload: log_evt.value().to_string(),
+                                            log_namespace: &params.log_namespace,
+                                        })
+                                    } else {
+                                        warn!("Decoded unsupported event: {:?}", e);
+                                        None
+                                    }
+                                }).map(|evt| async {
+                                    handle_text_message(&mut out.clone(), evt, config.uri.clone()).await
+                                }).ok_or(())?.await;
+                                Ok::<(), ()>(())
+                            }).map_err(|err| {error!("Failed to process binary message: {}", err);}) {
+                                Ok(_) => Ok(()),
+                                Err(e) => {
+                                    error!("Failed to send binary message: {:?}", e);
+                                    Ok(())
+                                }
+                            }
                     },
+
                     Ok(Message::Close(_)) => {
                         info!("Received message: connection closed from server");
                         Err(WsError::ConnectionClosed)
                     },
+
                     Ok(Message::Frame(_)) => {
                         warn!("Unsupported message type received: frame");
                         Ok(())
                     },
+
                     Err(e) => Err(e),
                 }
             }
@@ -196,7 +229,6 @@ async fn handle_text_message<'a>(
     out: &mut SourceSender,
     msg: WebSocketEvent<'a>,
     endpoint: String,
-    _decoder: Decoder,
 ) -> () {
     emit!(WsMessageReceived { url: endpoint });
 
