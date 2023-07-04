@@ -17,8 +17,8 @@ use super::{InternalEventHandle, RegisterInternalEvent};
 /// new event is emitted for a previously unseen set of tags an event is registered
 /// and stored in the cache.
 #[derive(Derivative)]
-#[derivative(Clone(bound = ""), Default(bound = "T: Default"))]
-pub struct RegisteredEventCache<T: Clone, Event: RegisterTaggedInternalEvent> {
+#[derivative(Clone(bound = "T: Clone"))]
+pub struct RegisteredEventCache<T, Event: RegisterTaggedInternalEvent> {
     fixed_tags: T,
     cache: Arc<
         RwLock<
