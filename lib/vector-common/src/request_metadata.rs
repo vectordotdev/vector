@@ -129,9 +129,9 @@ impl GroupedCountByteSize {
     }
 
     /// Emits our counts to a `RegisteredEvent` cached event.
-    pub fn emit_event<T, H>(&self, event_cache: &RegisteredEventCache<T>)
+    pub fn emit_event<T, H>(&self, event_cache: &RegisteredEventCache<(), T>)
     where
-        T: RegisterTaggedInternalEvent<Tags = EventCountTags, Handle = H>,
+        T: RegisterTaggedInternalEvent<Tags = EventCountTags, Fixed = (), Handle = H>,
         H: InternalEventHandle<Data = CountByteSize>,
     {
         match self {
