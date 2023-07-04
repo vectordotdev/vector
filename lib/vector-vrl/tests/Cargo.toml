@@ -7,7 +7,7 @@ publish = false
 
 [dependencies]
 enrichment = { path = "../../enrichment" }
-vrl = { version = "0.4.0", features = ["test_framework"]}
+vrl.workspace = true
 vector-vrl-functions = { path = "../../vector-vrl/functions" }
 
 ansi_term = "0.12"

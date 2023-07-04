@@ -10,4 +10,4 @@ license = "MPL-2.0"
 serde = { version = "1.0.164", default-features = false, features = ["derive", "alloc"] }
 vector-config = { path = "../vector-config" }
 vector-config-macros = { path = "../vector-config-macros" }
-vrl = { version = "0.4.0", default-features = false, features = ["path"] }
+vrl.workspace = true

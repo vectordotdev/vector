@@ -872,7 +872,7 @@ mod test {
         source_id: &ComponentKey,
         shutdown: &mut SourceShutdownCoordinator,
     ) -> (SocketAddr, JoinHandle<Result<(), ()>>) {
-        let (shutdown_signal, _) = shutdown.register_source(source_id);
+        let (shutdown_signal, _) = shutdown.register_source(source_id, false);
         init_udp_inner(sender, source_id, shutdown_signal, None, false).await
     }
 

@@ -114,7 +114,12 @@ members = [
   "vdev",
 ]
 
+[workspace.dependencies]
+vrl = { version = "0.5.0", features = ["cli", "test", "test_framework", "arbitrary"] }
+
 [dependencies]
+vrl.workspace = true
+
 # Internal libs
 codecs = { path = "lib/codecs", default-features = false }
 dnsmsg-parser = { path = "lib/dnsmsg-parser", optional = true }
@@ -200,8 +205,9 @@ serde_yaml = { version = "0.9.22", default-features = false }
 rmp-serde = { version = "1.1.1", default-features = false, optional = true }
 rmpv = { version = "1.0.0", default-features = false, features = ["with-serde"], optional = true }
 
-# Prost
+# Prost / Protocol Buffers
 prost = { version = "0.11", default-features = false, features = ["std"] }
+prost-reflect = { version = "0.11", default-features = false, optional = true }
 prost-types = { version = "0.11", default-features = false, optional = true }
 
 # GCP
@@ -226,9 +232,6 @@ tui = { version = "0.19.0", optional = true, default-features = false, features 
 
 hex = { version = "0.4.3", default-features = false, optional = true }
 sha2 = { version = "0.10.7", default-features = false, optional = true }
-
-# VRL Lang
-vrl = { package = "vrl", version = "0.4.0", features = ["cli", "test"] }
 
 # External libs
 arc-swap = { version = "1.6", default-features = false, optional = true }
@@ -274,7 +277,7 @@ k8s-openapi = { version = "0.18.0", default-features = false, features = ["api",
 kube = { version = "0.82.0", default-features = false, features = ["client", "openssl-tls", "runtime"], optional = true }
 listenfd = { version = "1.0.1", default-features = false, optional = true }
 logfmt = { version = "0.0.2", default-features = false, optional = true }
-lru = { version = "0.10.0", default-features = false, optional = true }
+lru = { version = "0.10.1", default-features = false, optional = true }
 maxminddb = { version = "0.23.0", default-features = false, optional = true }
 md-5 = { version = "0.10", default-features = false, optional = true }
 mongodb = { version = "2.6.0", default-features = false, features = ["tokio-runtime"], optional = true }
@@ -288,7 +291,7 @@ openssl-probe = { version = "0.1.5", default-features = false }
 ordered-float = { version = "3.7.0", default-features = false }
 paste = "1.0.12"
 percent-encoding = { version = "2.3.0", default-features = false }
-pin-project = { version = "1.1.0", default-features = false }
+pin-project = { version = "1.1.1", default-features = false }
 postgres-openssl = { version = "0.5.0", default-features = false, features = ["runtime"], optional = true }
 pulsar = { version = "6.0.1", default-features = false, features = ["tokio-runtime", "auth-oauth2", "flate2", "lz4", "snap", "zstd"], optional = true }
 rand = { version = "0.8.5", default-features = false, features = ["small_rng"] }
@@ -671,7 +674,7 @@ sinks-console = []
 sinks-databend = []
 sinks-datadog_events = []
 sinks-datadog_logs = []
-sinks-datadog_metrics = ["protobuf-build"]
+sinks-datadog_metrics = ["protobuf-build", "dep:prost-reflect"]
 sinks-datadog_traces = ["protobuf-build", "dep:rmpv", "dep:rmp-serde", "dep:serde_bytes"]
 sinks-elasticsearch = ["aws-core", "transforms-metric_to_log"]
 sinks-file = ["dep:async-compression"]

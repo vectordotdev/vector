@@ -9,4 +9,4 @@ license = "MPL-2.0"
 [dependencies]
 clap = { version = "4.1.14", features = ["derive"] }
 vector-vrl-functions = { path = "../functions" }
-vrl = { version = "0.4.0", default-features = false, features = ["stdlib", "cli"] }
+vrl.workspace = true

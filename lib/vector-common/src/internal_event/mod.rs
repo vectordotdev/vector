@@ -1,6 +1,6 @@
 mod bytes_received;
 mod bytes_sent;
-mod cached_event;
+pub mod cached_event;
 pub mod component_events_dropped;
 mod events_received;
 mod events_sent;
@@ -256,7 +256,7 @@ macro_rules! registered_event {
                 fn register(
                     $fixed_name: $fixed_tags,
                     $tags_name: $tags,
-                ) -> <$event as super::RegisterInternalEvent>::Handle {
+                ) -> <Self as $crate::internal_event::RegisterInternalEvent>::Handle {
                     $register_body
                 }
             })?

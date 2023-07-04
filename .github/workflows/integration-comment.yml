@@ -69,90 +69,299 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           status: pending
 
-  test-integration:
-    uses: ./.github/workflows/integration-test.yml
-    with:
-      if: ${{ matrix.run.if }}
-      test_name: ${{ matrix.run.test_name }}
+  integration-tests:
     needs: prep-pr
-    secrets: inherit
-    strategy:
-      fail-fast: false
-      matrix:
-        run:
-          - test_name: 'amqp'
-            if: ${{ contains(github.event.comment.body, '/ci-run-integration-amqp')          || contains(github.event.comment.body, '/ci-run-all') }}
-          - test_name: 'appsignal'
-            if: ${{ contains(github.event.comment.body, '/ci-run-integration-appsignal')     || contains(github.event.comment.body, '/ci-run-all') }}
-          - test_name: 'aws'
-            if: ${{ contains(github.event.comment.body, '/ci-run-integration-aws')           || contains(github.event.comment.body, '/ci-run-all') }}
-          - test_name: 'axiom'
-            if: ${{ contains(github.event.comment.body, '/ci-run-integration-axiom')         || contains(github.event.comment.body, '/ci-run-all') }}
-          - test_name: 'azure'
-            if: ${{ contains(github.event.comment.body, '/ci-run-integration-azure')         || contains(github.event.comment.body, '/ci-run-all') }}
-          - test_name: 'clickhouse'
-            if: ${{ contains(github.event.comment.body, '/ci-run-integration-clickhouse')    || contains(github.event.comment.body, '/ci-run-all') }}
-          - test_name: 'databend'
-            if: ${{ contains(github.event.comment.body, '/ci-run-integration-databend')      || contains(github.event.comment.body, '/ci-run-all') }}
-          - test_name: 'datadog-agent'
-            if: ${{ contains(github.event.comment.body, '/ci-run-integration-datadog')       || contains(github.event.comment.body, '/ci-run-all') }}
-          - test_name: 'datadog-logs'
-            if: ${{ contains(github.event.comment.body, '/ci-run-integration-datadog')       || contains(github.event.comment.body, '/ci-run-all') }}
-          - test_name: 'datadog-metrics'
-            if: ${{ contains(github.event.comment.body, '/ci-run-integration-datadog')       || contains(github.event.comment.body, '/ci-run-all') }}
-          - test_name: 'datadog-traces'
-            if: ${{ contains(github.event.comment.body, '/ci-run-integration-datadog')       || contains(github.event.comment.body, '/ci-run-all') }}
-          - test_name: 'dnstap'
-            if: ${{ contains(github.event.comment.body, '/ci-run-integration-dnstap')        || contains(github.event.comment.body, '/ci-run-all') }}
-          - test_name: 'docker-logs'
-            if: ${{ contains(github.event.comment.body, '/ci-run-integration-docker-logs')   || contains(github.event.comment.body, '/ci-run-all') }}
-          - test_name: 'elasticsearch'
-            if: ${{ contains(github.event.comment.body, '/ci-run-integration-elasticsearch') || contains(github.event.comment.body, '/ci-run-all') }}
-          - test_name: 'eventstoredb'
-            if: ${{ contains(github.event.comment.body, '/ci-run-integration-eventstoredb')  || contains(github.event.comment.body, '/ci-run-all') }}
-          - test_name: 'fluent'
-            if: ${{ contains(github.event.comment.body, '/ci-run-integration-fluent')        || contains(github.event.comment.body, '/ci-run-all') }}
-          - test_name: 'gcp'
-            if: ${{ contains(github.event.comment.body, '/ci-run-integration-gcp')           || contains(github.event.comment.body, '/ci-run-all') }}
-          - test_name: 'humio'
-            if: ${{ contains(github.event.comment.body, '/ci-run-integration-humio')         || contains(github.event.comment.body, '/ci-run-all') }}
-          - test_name: 'http-client'
-            if: ${{ contains(github.event.comment.body, '/ci-run-integration-http-client')   || contains(github.event.comment.body, '/ci-run-all') }}
-          - test_name: 'influxdb'
-            if: ${{ contains(github.event.comment.body, '/ci-run-integration-influxdb')      || contains(github.event.comment.body, '/ci-run-all') }}
-          - test_name: 'kafka'
-            if: ${{ contains(github.event.comment.body, '/ci-run-integration-kafka')         || contains(github.event.comment.body, '/ci-run-all') }}
-          - test_name: 'logstash'
-            if: ${{ contains(github.event.comment.body, '/ci-run-integration-logstash')      || contains(github.event.comment.body, '/ci-run-all') }}
-          - test_name: 'loki'
-            if: ${{ contains(github.event.comment.body, '/ci-run-integration-loki')          || contains(github.event.comment.body, '/ci-run-all') }}
-          - test_name: 'mongodb'
-            if: ${{ contains(github.event.comment.body, '/ci-run-integration-mongodb')       || contains(github.event.comment.body, '/ci-run-all') }}
-          - test_name: 'nats'
-            if: ${{ contains(github.event.comment.body, '/ci-run-integration-nats')          || contains(github.event.comment.body, '/ci-run-all') }}
-          - test_name: 'nginx'
-            if: ${{ contains(github.event.comment.body, '/ci-run-integration-nginx')         || contains(github.event.comment.body, '/ci-run-all') }}
-          - test_name: 'opentelemetry'
-            if: ${{ contains(github.event.comment.body, '/ci-run-integration-opentelemetry') || contains(github.event.comment.body, '/ci-run-all') }}
-          - test_name: 'postgres'
-            if: ${{ contains(github.event.comment.body, '/ci-run-integration-postgres')      || contains(github.event.comment.body, '/ci-run-all') }}
-          - test_name: 'prometheus'
-            if: ${{ contains(github.event.comment.body, '/ci-run-integration-prometheus')    || contains(github.event.comment.body, '/ci-run-all') }}
-          - test_name: 'pulsar'
-            if: ${{ contains(github.event.comment.body, '/ci-run-integration-pulsar')        || contains(github.event.comment.body, '/ci-run-all') }}
-          - test_name: 'redis'
-            if: ${{ contains(github.event.comment.body, '/ci-run-integration-redis')         || contains(github.event.comment.body, '/ci-run-all') }}
-          - test_name: 'shutdown'
-            if: ${{ contains(github.event.comment.body, '/ci-run-integration-shutdown')      || contains(github.event.comment.body, '/ci-run-all') }}
-          - test_name: 'splunk'
-            if: ${{ contains(github.event.comment.body, '/ci-run-integration-splunk')        || contains(github.event.comment.body, '/ci-run-all') }}
-          - test_name: 'webhdfs'
-            if: ${{ contains(github.event.comment.body, '/ci-run-integration-webhdfs')       || contains(github.event.comment.body, '/ci-run-all') }}
+    runs-on: [linux, ubuntu-20.04-4core]
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: "recursive"
+
+      - run: sudo npm -g install @datadog/datadog-ci
+
+      - run: docker image prune -af ; docker container prune -f
+
+      - name: amqp
+        if: ${{ contains(github.event.comment.body, '/ci-run-integration-amqp') || contains(github.event.comment.body, '/ci-run-all') }}
+        uses: nick-fields/retry@v2
+        with:
+          # First one requires more time, as we need to build the image from scratch
+          timeout_minutes: 30
+          max_attempts: 3
+          command: bash scripts/ci-integration-test.sh amqp
+
+      - name: appsignal
+        if: ${{ contains(github.event.comment.body, '/ci-run-integration-appsignal') || contains(github.event.comment.body, '/ci-run-all') }}
+        uses: nick-fields/retry@v2
+        with:
+          timeout_minutes: 30
+          max_attempts: 3
+          command: bash scripts/ci-integration-test.sh appsignal
+
+      - name: aws
+        if: ${{ contains(github.event.comment.body, '/ci-run-integration-aws') || contains(github.event.comment.body, '/ci-run-all') }}
+        uses: nick-fields/retry@v2
+        with:
+          timeout_minutes: 30
+          max_attempts: 3
+          command: bash scripts/ci-integration-test.sh aws
+
+      - name: axiom
+        if: ${{ contains(github.event.comment.body, '/ci-run-integration-axiom') || contains(github.event.comment.body, '/ci-run-all') }}
+        uses: nick-fields/retry@v2
+        with:
+          timeout_minutes: 30
+          max_attempts: 3
+          command: bash scripts/ci-integration-test.sh axiom
+
+      - name: azure
+        if: ${{ contains(github.event.comment.body, '/ci-run-integration-azure') || contains(github.event.comment.body, '/ci-run-all') }}
+        uses: nick-fields/retry@v2
+        with:
+          timeout_minutes: 30
+          max_attempts: 3
+          command: bash scripts/ci-integration-test.sh azure
+
+      - name: clickhouse
+        if: ${{ contains(github.event.comment.body, '/ci-run-integration-clickhouse') || contains(github.event.comment.body, '/ci-run-all') }}
+        uses: nick-fields/retry@v2
+        with:
+          timeout_minutes: 30
+          max_attempts: 3
+          command: bash scripts/ci-integration-test.sh clickhouse
+
+      - name: databend
+        if: ${{ contains(github.event.comment.body, '/ci-run-integration-databend') || contains(github.event.comment.body, '/ci-run-all') }}
+        uses: nick-fields/retry@v2
+        with:
+          timeout_minutes: 30
+          max_attempts: 3
+          command: bash scripts/ci-integration-test.sh databend
+
+      - name: datadog-agent
+        if: ${{ contains(github.event.comment.body, '/ci-run-integration-datadog-agent') || contains(github.event.comment.body, '/ci-run-all') }}
+        uses: nick-fields/retry@v2
+        with:
+          timeout_minutes: 30
+          max_attempts: 3
+          command: bash scripts/ci-integration-test.sh datadog-agent
+
+      - name: datadog-logs
+        if: ${{ contains(github.event.comment.body, '/ci-run-integration-datadog-logs') || contains(github.event.comment.body, '/ci-run-all') }}
+        uses: nick-fields/retry@v2
+        with:
+          timeout_minutes: 30
+          max_attempts: 3
+          command: bash scripts/ci-integration-test.sh datadog-logs
+
+      - name: datadog-metrics
+        if: ${{ contains(github.event.comment.body, '/ci-run-integration-datadog-metrics') || contains(github.event.comment.body, '/ci-run-all') }}
+        uses: nick-fields/retry@v2
+        with:
+          timeout_minutes: 30
+          max_attempts: 3
+          command: bash scripts/ci-integration-test.sh datadog-metrics
+
+      - name: datadog-traces
+        if: ${{ contains(github.event.comment.body, '/ci-run-integration-datadog-traces') || contains(github.event.comment.body, '/ci-run-all') }}
+        uses: nick-fields/retry@v2
+        with:
+          timeout_minutes: 30
+          max_attempts: 3
+          command: bash scripts/ci-integration-test.sh datadog-traces
+
+      - name: dnstap
+        if: ${{ contains(github.event.comment.body, '/ci-run-integration-dnstap') || contains(github.event.comment.body, '/ci-run-all') }}
+        uses: nick-fields/retry@v2
+        with:
+          timeout_minutes: 30
+          max_attempts: 3
+          command: bash scripts/ci-integration-test.sh dnstap
+
+      - run: docker image prune -af --filter=label!=vector-test-runner=true ; docker container prune -f
+
+      - name: docker-logs
+        if: ${{ contains(github.event.comment.body, '/ci-run-integration-docker-logs') || contains(github.event.comment.body, '/ci-run-all') }}
+        uses: nick-fields/retry@v2
+        with:
+          timeout_minutes: 30
+          max_attempts: 3
+          command: bash scripts/ci-integration-test.sh docker-logs
+
+      - name: elasticsearch
+        if: ${{ contains(github.event.comment.body, '/ci-run-integration-elasticsearch') || contains(github.event.comment.body, '/ci-run-all') }}
+        uses: nick-fields/retry@v2
+        with:
+          timeout_minutes: 30
+          max_attempts: 3
+          command: bash scripts/ci-integration-test.sh elasticsearch
+
+      - name: eventstoredb
+        if: ${{ contains(github.event.comment.body, '/ci-run-integration-eventstoredb') || contains(github.event.comment.body, '/ci-run-all') }}
+        uses: nick-fields/retry@v2
+        with:
+          timeout_minutes: 30
+          max_attempts: 3
+          command: bash scripts/ci-integration-test.sh eventstoredb
+
+      - name: fluent
+        if: ${{ contains(github.event.comment.body, '/ci-run-integration-fluent') || contains(github.event.comment.body, '/ci-run-all') }}
+        uses: nick-fields/retry@v2
+        with:
+          timeout_minutes: 30
+          max_attempts: 3
+          command: bash scripts/ci-integration-test.sh fluent
+
+      - name: gcp
+        if: ${{ contains(github.event.comment.body, '/ci-run-integration-gcp') || contains(github.event.comment.body, '/ci-run-all') }}
+        uses: nick-fields/retry@v2
+        with:
+          timeout_minutes: 30
+          max_attempts: 3
+          command: bash scripts/ci-integration-test.sh gcp
+
+      - name: humio
+        if: ${{ contains(github.event.comment.body, '/ci-run-integration-humio') || contains(github.event.comment.body, '/ci-run-all') }}
+        uses: nick-fields/retry@v2
+        with:
+          timeout_minutes: 30
+          max_attempts: 3
+          command: bash scripts/ci-integration-test.sh humio
+
+      - name: http-client
+        if: ${{ contains(github.event.comment.body, '/ci-run-integration-http-client') || contains(github.event.comment.body, '/ci-run-all') }}
+        uses: nick-fields/retry@v2
+        with:
+          timeout_minutes: 30
+          max_attempts: 3
+          command: bash scripts/ci-integration-test.sh http-client
+
+      - name: influxdb
+        if: ${{ contains(github.event.comment.body, '/ci-run-integration-influxdb') || contains(github.event.comment.body, '/ci-run-all') }}
+        uses: nick-fields/retry@v2
+        with:
+          timeout_minutes: 30
+          max_attempts: 3
+          command: bash scripts/ci-integration-test.sh influxdb
+
+      - name: kafka
+        if: ${{ contains(github.event.comment.body, '/ci-run-integration-kafka') || contains(github.event.comment.body, '/ci-run-all') }}
+        uses: nick-fields/retry@v2
+        with:
+          timeout_minutes: 30
+          max_attempts: 3
+          command: bash scripts/ci-integration-test.sh kafka
+
+      - name: logstash
+        if: ${{ contains(github.event.comment.body, '/ci-run-integration-logstash') || contains(github.event.comment.body, '/ci-run-all') }}
+        uses: nick-fields/retry@v2
+        with:
+          timeout_minutes: 30
+          max_attempts: 3
+          command: bash scripts/ci-integration-test.sh logstash
+
+      - name: loki
+        if: ${{ contains(github.event.comment.body, '/ci-run-integration-loki') || contains(github.event.comment.body, '/ci-run-all') }}
+        uses: nick-fields/retry@v2
+        with:
+          timeout_minutes: 30
+          max_attempts: 3
+          command: bash scripts/ci-integration-test.sh loki
+
+      - name: mongodb
+        if: ${{ contains(github.event.comment.body, '/ci-run-integration-mongodb') || contains(github.event.comment.body, '/ci-run-all') }}
+        uses: nick-fields/retry@v2
+        with:
+          timeout_minutes: 30
+          max_attempts: 3
+          command: bash scripts/ci-integration-test.sh mongodb
+
+      - run: docker image prune -af --filter=label!=vector-test-runner=true ; docker container prune -f
+
+      - name: nats
+        if: ${{ contains(github.event.comment.body, '/ci-run-integration-nats') || contains(github.event.comment.body, '/ci-run-all') }}
+        uses: nick-fields/retry@v2
+        with:
+          timeout_minutes: 30
+          max_attempts: 3
+          command: bash scripts/ci-integration-test.sh nats
+
+      - name: nginx
+        if: ${{ contains(github.event.comment.body, '/ci-run-integration-nginx') || contains(github.event.comment.body, '/ci-run-all') }}
+        uses: nick-fields/retry@v2
+        with:
+          timeout_minutes: 30
+          max_attempts: 3
+          command: bash scripts/ci-integration-test.sh nginx
+
+      - name: opentelemetry
+        if: ${{ contains(github.event.comment.body, '/ci-run-integration-opentelemetry') || contains(github.event.comment.body, '/ci-run-all') }}
+        uses: nick-fields/retry@v2
+        with:
+          timeout_minutes: 30
+          max_attempts: 3
+          command: bash scripts/ci-integration-test.sh opentelemetry
+
+      - name: postgres
+        if: ${{ contains(github.event.comment.body, '/ci-run-integration-postgres') || contains(github.event.comment.body, '/ci-run-all') }}
+        uses: nick-fields/retry@v2
+        with:
+          timeout_minutes: 30
+          max_attempts: 3
+          command: bash scripts/ci-integration-test.sh postgres
+
+      - name: prometheus
+        if: ${{ contains(github.event.comment.body, '/ci-run-integration-prometheus') || contains(github.event.comment.body, '/ci-run-all') }}
+        uses: nick-fields/retry@v2
+        with:
+          timeout_minutes: 30
+          max_attempts: 3
+          command: bash scripts/ci-integration-test.sh prometheus
+
+      - name: pulsar
+        if: ${{ contains(github.event.comment.body, '/ci-run-integration-pulsar') || contains(github.event.comment.body, '/ci-run-all') }}
+        uses: nick-fields/retry@v2
+        with:
+          timeout_minutes: 30
+          max_attempts: 3
+          command: bash scripts/ci-integration-test.sh pulsar
+
+      - name: redis
+        if: ${{ contains(github.event.comment.body, '/ci-run-integration-redis') || contains(github.event.comment.body, '/ci-run-all') }}
+        uses: nick-fields/retry@v2
+        with:
+          timeout_minutes: 30
+          max_attempts: 3
+          command: bash scripts/ci-integration-test.sh redis
+
+      - name: shutdown
+        if: ${{ contains(github.event.comment.body, '/ci-run-integration-shutdown') || contains(github.event.comment.body, '/ci-run-all') }}
+        uses: nick-fields/retry@v2
+        with:
+          timeout_minutes: 30
+          max_attempts: 3
+          command: bash scripts/ci-integration-test.sh shutdown
+
+      - name: splunk
+        if: ${{ contains(github.event.comment.body, '/ci-run-integration-splunk') || contains(github.event.comment.body, '/ci-run-all') }}
+        uses: nick-fields/retry@v2
+        with:
+          timeout_minutes: 30
+          max_attempts: 3
+          command: bash scripts/ci-integration-test.sh splunk
+
+      - name: webhdfs
+        if: ${{ contains(github.event.comment.body, '/ci-run-integration-webhdfs') || contains(github.event.comment.body, '/ci-run-all') }}
+        uses: nick-fields/retry@v2
+        with:
+          timeout_minutes: 30
+          max_attempts: 3
+          command: bash scripts/ci-integration-test.sh webhdfs
 
   update-pr-status:
     name: Signal result to PR
     runs-on: ubuntu-latest
-    needs: test-integration
+    needs: integration-tests
     if: always() && (contains(github.event.comment.body, '/ci-run-integration') || contains(github.event.comment.body, '/ci-run-all'))
     steps:
       - name: Validate issue comment

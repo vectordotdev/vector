@@ -21,10 +21,17 @@ pub struct IntegrationTest {
     runner: IntegrationTestRunner,
     compose: Option<Compose>,
     env_config: Environment,
+    build_all: bool,
+    retries: u8,
 }
 
 impl IntegrationTest {
-    pub fn new(integration: impl Into<String>, environment: impl Into<String>) -> Result<Self> {
+    pub fn new(
+        integration: impl Into<String>,
+        environment: impl Into<String>,
+        build_all: bool,
+        retries: u8,
+    ) -> Result<Self> {
         let integration = integration.into();
         let environment = environment.into();
         let (test_dir, config) = IntegrationTestConfig::load(&integration)?;
@@ -34,8 +41,12 @@ impl IntegrationTest {
         };
         let network_name = format!("vector-integration-tests-{integration}");
         let compose = Compose::new(test_dir, env_config.clone(), network_name.clone())?;
+
+        // None if compiling with all integration test feature flag.
+        let runner_name = (!build_all).then(|| integration.clone());
+
         let runner = IntegrationTestRunner::new(
-            integration.clone(),
+            runner_name,
             &config.runner,
             compose.is_some().then_some(network_name),
         )?;
@@ -48,6 +59,8 @@ impl IntegrationTest {
             runner,
             compose,
             env_config,
+            build_all,
+            retries,
         })
     }
 
@@ -69,7 +82,12 @@ impl IntegrationTest {
         let mut args = self.config.args.clone().unwrap_or_default();
 
         args.push("--features".to_string());
-        args.push(self.config.features.join(","));
+
+        args.push(if self.build_all {
+            "all-integration-tests".to_string()
+        } else {
+            self.config.features.join(",")
+        });
 
         // If the test field is not present then use the --lib flag
         match self.config.test {
@@ -89,6 +107,11 @@ impl IntegrationTest {
         // Some arguments are not compatible with the --no-capture arg
         if !args.contains(&"--test-threads".to_string()) {
             args.push("--no-capture".to_string());
+        }
+
+        if self.retries > 0 {
+            args.push("--retries".to_string());
+            args.push(self.retries.to_string());
         }
 
         self.runner
