@@ -13,7 +13,7 @@ To build the project we need to use `wasm-pack`. This compiles our Rust code
 to WebAssembly which can then be used within the browser. Install it by running:
 
 ```shell
-cargo install --version 0.10.3 wasm-pack
+cargo install --locked --version 0.10.3 wasm-pack
 ```
 
 After installing `wasm-pack` we must compile our project by running:
@@ -29,6 +29,8 @@ function originally written in Rust.
 For more information on Rust and WebAssembly please visit
 [the mozilla docs][mozilla-wasm-rust-docs] or
 [the Rust book wasm chapter][rust-book-wasm]
+
+## Run locally
 
 The `src/lib.rs` file is the entry point of the `web-playground` crate.
 This file is necessary so we can use the `run_vrl()` function in the browser.
@@ -65,7 +67,42 @@ but they will either error (enrichment functions) or abort (all the others) at r
 - `get_enrichment_table_record`
 
 Functions from VRL stdlib that are currently not supported can be found
-with this [issue filter][vrl-wasm-unsupported-filter]
+with this [issue filter][vrl-wasm-unsupported-filter].
+
+### macOS Troubleshooting
+
+If you are getting compilation errors on macOS here are some things to check:
+
+```shell
+xcode-select -p
+# Example: '/Library/Developer/CommandLineTools
+# To change this use: xcode-select -s
+```
+
+You can clean and reinstall with:
+
+```shell
+rm -rf /Library/Developer/CommandLineTools # might require sudo elevation
+xcode-select --install
+```
+
+Check your `llvm` installation and ensure that there are no conflicting installations. Check that the following command returns the expected version:
+
+```shell
+clang --version
+# Example:
+# Homebrew clang version 16.0.6
+# Target: arm64-apple-darwin22.5.0
+# Thread model: posix
+# InstalledDir: /opt/homebrew/opt/llvm/bin
+```
+
+The output of the following command should contain `WebAssembly`:
+
+```shell
+llvm-config --targets-built # WebAssembly should be in the results
+# Example: AArch64 <omitted> WebAssembly <omitted>
+```
 
 ## Examples
 
