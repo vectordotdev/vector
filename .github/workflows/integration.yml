@@ -37,6 +37,7 @@ env:
 jobs:
 
   changes:
+    if: github.event_name == 'pull_request'
     uses: ./.github/workflows/changes.yml
     with:
       base_ref: ${{ github.event.pull_request.base.ref }}
@@ -49,39 +50,40 @@ jobs:
     name: Integration Tests
     runs-on: [linux, ubuntu-20.04-4core]
     needs: changes
-    if: |
+    if: always() && (
       github.event_name == 'merge_group' || (
-        needs.changes.outputs.all-int == 'true'
-          || needs.changes.outputs.amqp == 'true'
-          || needs.changes.outputs.appsignal == 'true'
-          || needs.changes.outputs.aws == 'true'
-          || needs.changes.outputs.axiom == 'true'
-          || needs.changes.outputs.azure == 'true'
-          || needs.changes.outputs.clickhouse == 'true'
-          || needs.changes.outputs.databend == 'true'
-          || needs.changes.outputs.datadog == 'true'
-          || needs.changes.outputs.dnstap == 'true'
-          || needs.changes.outputs.docker-logs == 'true'
-          || needs.changes.outputs.elasticsearch == 'true'
-          || needs.changes.outputs.eventstoredb == 'true'
-          || needs.changes.outputs.fluent == 'true'
-          || needs.changes.outputs.gcp == 'true'
-          || needs.changes.outputs.humio == 'true'
-          || needs.changes.outputs.http-client == 'true'
-          || needs.changes.outputs.influxdb == 'true'
-          || needs.changes.outputs.kafka == 'true'
-          || needs.changes.outputs.logstash == 'true'
-          || needs.changes.outputs.loki == 'true'
-          || needs.changes.outputs.mongodb == 'true'
-          || needs.changes.outputs.nats == 'true'
-          || needs.changes.outputs.nginx == 'true'
-          || needs.changes.outputs.opentelemetry == 'true'
-          || needs.changes.outputs.postgres == 'true'
-          || needs.changes.outputs.prometheus == 'true'
-          || needs.changes.outputs.pulsar == 'true'
-          || needs.changes.outputs.redis == 'true'
-          || needs.changes.outputs.splunk == 'true'
-          || needs.changes.outputs.webhdfs == 'true'
+          needs.changes.outputs.all-int == 'true'
+            || needs.changes.outputs.amqp == 'true'
+            || needs.changes.outputs.appsignal == 'true'
+            || needs.changes.outputs.aws == 'true'
+            || needs.changes.outputs.axiom == 'true'
+            || needs.changes.outputs.azure == 'true'
+            || needs.changes.outputs.clickhouse == 'true'
+            || needs.changes.outputs.databend == 'true'
+            || needs.changes.outputs.datadog == 'true'
+            || needs.changes.outputs.dnstap == 'true'
+            || needs.changes.outputs.docker-logs == 'true'
+            || needs.changes.outputs.elasticsearch == 'true'
+            || needs.changes.outputs.eventstoredb == 'true'
+            || needs.changes.outputs.fluent == 'true'
+            || needs.changes.outputs.gcp == 'true'
+            || needs.changes.outputs.humio == 'true'
+            || needs.changes.outputs.http-client == 'true'
+            || needs.changes.outputs.influxdb == 'true'
+            || needs.changes.outputs.kafka == 'true'
+            || needs.changes.outputs.logstash == 'true'
+            || needs.changes.outputs.loki == 'true'
+            || needs.changes.outputs.mongodb == 'true'
+            || needs.changes.outputs.nats == 'true'
+            || needs.changes.outputs.nginx == 'true'
+            || needs.changes.outputs.opentelemetry == 'true'
+            || needs.changes.outputs.postgres == 'true'
+            || needs.changes.outputs.prometheus == 'true'
+            || needs.changes.outputs.pulsar == 'true'
+            || needs.changes.outputs.redis == 'true'
+            || needs.changes.outputs.splunk == 'true'
+            || needs.changes.outputs.webhdfs == 'true'
+        )
       )
     timeout-minutes: 75
     steps:
