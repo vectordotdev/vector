@@ -55,7 +55,7 @@ jobs:
           )"
 
           # Extract the item in the Gardener project
-          current_status=$(echo $project_items | jq -r '.data.node.projectItems.nodes[] | select(.project.id == $project_id) | .fieldValueByName.name')
+          current_status=$(echo $project_items | jq -c -r --arg project_id $project_id '.data.node.projectItems.nodes[] | select(.project.id == $project_id) | .fieldValueByName.name')
 
           if [ -z "$current_status" ] ; then
             echo "Issue not found in Gardener board"
