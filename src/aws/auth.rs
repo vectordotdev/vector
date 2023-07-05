@@ -221,13 +221,11 @@ impl AwsAuthentication {
                 ));
                 if let Some(assume_role) = assume_role {
                     let auth_region = region.clone().map(Region::new).unwrap_or(service_region);
-                    let providerBuilder = AssumeRoleProviderBuilder::new(assume_role)
-                        .region(auth_region);
-                    if !(external_id.is_empty()) {
-                        providerBuilder.external_id(external_id);
-                    }
-                    let provider = providerBuilder
-                        .build();
+                    let auth_external_id = external_id.clone().unwrap();
+                    let provider = AssumeRoleProviderBuilder::new(assume_role)
+                        .region(auth_region)
+                        .external_id(auth_external_id)
+                        .build(provider);
                     return Ok(SharedCredentialsProvider::new(provider));
                 }
                 Ok(provider)
@@ -249,15 +247,17 @@ impl AwsAuthentication {
             }
             AwsAuthentication::Role {
                 assume_role,
+                external_id,
                 imds,
                 region,
                 ..
             } => {
                 let auth_region = region.clone().map(Region::new).unwrap_or(service_region);
+                let auth_external_id = external_id.clone().unwrap();
                 let provider = AssumeRoleProviderBuilder::new(assume_role)
                     .region(auth_region.clone())
+                    .external_id(auth_external_id)
                     .build(default_credentials_provider(auth_region, *imds).await?);
-
                 Ok(SharedCredentialsProvider::new(provider))
             }
             AwsAuthentication::Default { imds, region, .. } => Ok(SharedCredentialsProvider::new(
@@ -276,6 +276,7 @@ impl AwsAuthentication {
             access_key_id: "dummy".to_string().into(),
             secret_access_key: "dummy".to_string().into(),
             assume_role: None,
+            external_id: None,
             region: None,
         }
     }
@@ -312,6 +313,7 @@ mod tests {
     #[derive(Serialize, Deserialize, Clone, Debug)]
     struct ComponentConfig {
         assume_role: Option<String>,
+        external_id: Option<String>,
         #[serde(default)]
         auth: AwsAuthentication,
     }
@@ -414,6 +416,20 @@ mod tests {
     }
 
     #[test]
+    fn parsing_external_id_with_assume_role() {
+        let config = toml::from_str::<ComponentConfig>(
+            r#"
+            auth.assume_role = "root"
+            auth.external_id = "id"
+            auth.load_timeout_secs = 10
+        "#,
+        )
+            .unwrap();
+
+        assert!(matches!(config.auth, AwsAuthentication::Role { .. }));
+    }
+
+    #[test]
     fn parsing_assume_role_with_imds_client() {
         let config = toml::from_str::<ComponentConfig>(
             r#"
@@ -428,11 +444,13 @@ mod tests {
         match config.auth {
             AwsAuthentication::Role {
                 assume_role,
+                external_id,
                 load_timeout_secs,
                 imds,
                 region,
             } => {
                 assert_eq!(&assume_role, "root");
+                assert_eq!(external_id, None);
                 assert_eq!(load_timeout_secs, None);
                 assert!(matches!(
                     imds,
@@ -463,11 +481,44 @@ mod tests {
         match config.auth {
             AwsAuthentication::Role {
                 assume_role,
+                external_id,
                 load_timeout_secs,
                 imds,
                 region,
             } => {
                 assert_eq!(&assume_role, "auth.root");
+                assert_eq!(external_id, None);
+                assert_eq!(load_timeout_secs, Some(10));
+                assert!(matches!(imds, ImdsAuthentication { .. }));
+                assert_eq!(region.unwrap(), "us-west-2");
+            }
+            _ => panic!(),
+        }
+    }
+
+    #[test]
+    fn parsing_both_external_id() {
+        let config = toml::from_str::<ComponentConfig>(
+            r#"
+            auth.assume_role = "auth.root"
+            external_id = "id"
+            auth.external_id = "auth.id"
+            auth.load_timeout_secs = 10
+            auth.region = "us-west-2"
+        "#,
+        )
+            .unwrap();
+
+        match config.auth {
+            AwsAuthentication::Role {
+                assume_role,
+                external_id,
+                load_timeout_secs,
+                imds,
+                region,
+            } => {
+                assert_eq!(&assume_role, "auth.root");
+                assert_eq!(external_id.unwrap(), "auth.id");
                 assert_eq!(load_timeout_secs, Some(10));
                 assert!(matches!(imds, ImdsAuthentication { .. }));
                 assert_eq!(region.unwrap(), "us-west-2");
@@ -513,6 +564,38 @@ mod tests {
                     &SensitiveString::from("other".to_string())
                 );
                 assert_eq!(&assume_role, &Some("root".to_string()));
+            }
+            _ => panic!(),
+        }
+    }
+
+    #[test]
+    fn parsing_static_with_assume_role_and_external_id() {
+        let config = toml::from_str::<ComponentConfig>(
+            r#"
+            auth.access_key_id = "key"
+            auth.secret_access_key = "other"
+            auth.assume_role = "root"
+            auth.external_id = "id"
+        "#,
+        )
+            .unwrap();
+
+        match config.auth {
+            AwsAuthentication::AccessKey {
+                access_key_id,
+                secret_access_key,
+                assume_role,
+                external_id,
+                ..
+            } => {
+                assert_eq!(&access_key_id, &SensitiveString::from("key".to_string()));
+                assert_eq!(
+                    &secret_access_key,
+                    &SensitiveString::from("other".to_string())
+                );
+                assert_eq!(&assume_role, &Some("root".to_string()));
+                assert_eq!(&external_id, &Some("id".to_string()));
             }
             _ => panic!(),
         }
