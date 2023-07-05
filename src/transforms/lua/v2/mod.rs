@@ -459,19 +459,12 @@ impl RuntimeTransform for Lua {
 }
 
 #[cfg(test)]
-fn format_error(error: &mlua::Error) -> String {
-    match error {
-        mlua::Error::CallbackError { traceback, cause } => format_error(cause) + "\n" + traceback,
-        err => err.to_string(),
-    }
-}
-
-#[cfg(test)]
 mod tests {
-    use std::future::Future;
-    use std::sync::Arc;
-    use tokio::sync::mpsc;
-    use tokio::sync::mpsc::{Receiver, Sender};
+    use std::{future::Future, sync::Arc};
+
+    use similar_asserts::assert_eq;
+    use tokio::sync::mpsc::{self, Receiver, Sender};
+    use tokio::sync::Mutex;
     use tokio_stream::wrappers::ReceiverStream;
 
     use super::*;
@@ -482,8 +475,17 @@ mod tests {
             metric::{Metric, MetricKind, MetricValue},
             Event, LogEvent, Value,
         },
-        test_util::trace_init,
+        test_util,
     };
+
+    fn format_error(error: &mlua::Error) -> String {
+        match error {
+            mlua::Error::CallbackError { traceback, cause } => {
+                format_error(cause) + "\n" + traceback
+            }
+            err => err.to_string(),
+        }
+    }
 
     fn from_config(config: &str) -> crate::Result<Box<Lua>> {
         Lua::new(&toml::from_str(config).unwrap()).map(Box::new)
@@ -491,8 +493,9 @@ mod tests {
 
     async fn run_transform<T: Future>(
         config: &str,
-        func: impl FnOnce(Sender<Event>, Arc<tokio::sync::Mutex<Receiver<Event>>>) -> T,
+        func: impl FnOnce(Sender<Event>, Arc<Mutex<Receiver<Event>>>) -> T,
     ) -> T::Output {
+        test_util::trace_init();
         assert_transform_compliance(async move {
             let config = super::super::LuaConfig::V2(toml::from_str(config).unwrap());
             let (tx, rx) = mpsc::channel(1);
@@ -500,9 +503,8 @@ mod tests {
 
             let out = Arc::new(tokio::sync::Mutex::new(out));
 
-            let result = func(tx.clone(), Arc::clone(&out)).await;
+            let result = func(tx, Arc::clone(&out)).await;
 
-            drop(tx);
             topology.stop().await;
             assert_eq!(out.lock().await.recv().await, None);
 
@@ -511,10 +513,19 @@ mod tests {
         .await
     }
 
+    async fn next_event(out: &Arc<Mutex<Receiver<Event>>>) -> Event {
+        let event = out
+            .lock()
+            .await
+            .recv()
+            .await
+            .expect("Event was not received");
+        assert_eq!(event.source_id(), Some(&Arc::new(ComponentKey::from("in"))));
+        event
+    }
+
     #[tokio::test]
     async fn lua_add_field() {
-        trace_init();
-
         run_transform(
             r#"
             version = "2"
@@ -528,10 +539,7 @@ mod tests {
                 let event = Event::Log(LogEvent::from("program me"));
                 tx.send(event).await.unwrap();
 
-                assert_eq!(
-                    out.lock().await.recv().await.unwrap().as_log()["hello"],
-                    "goodbye".into()
-                );
+                assert_eq!(next_event(&out).await.as_log()["hello"], "goodbye".into());
             },
         )
         .await;
@@ -539,8 +547,6 @@ mod tests {
 
     #[tokio::test]
     async fn lua_read_field() {
-        trace_init();
-
         run_transform(
             r#"
             version = "2"
@@ -555,10 +561,7 @@ mod tests {
                 let event = Event::Log(LogEvent::from("Hello, my name is Bob."));
                 tx.send(event).await.unwrap();
 
-                assert_eq!(
-                    out.lock().await.recv().await.unwrap().as_log()["name"],
-                    "Bob".into()
-                );
+                assert_eq!(next_event(&out).await.as_log()["name"], "Bob".into());
             },
         )
         .await;
@@ -566,8 +569,6 @@ mod tests {
 
     #[tokio::test]
     async fn lua_remove_field() {
-        trace_init();
-
         run_transform(
             r#"
             version = "2"
@@ -583,10 +584,7 @@ mod tests {
 
                 tx.send(event.into()).await.unwrap();
 
-                assert_eq!(
-                    out.lock().await.recv().await.unwrap().as_log().get("name"),
-                    None
-                );
+                assert_eq!(next_event(&out).await.as_log().get("name"), None);
             },
         )
         .await;
@@ -594,8 +592,6 @@ mod tests {
 
     #[tokio::test]
     async fn lua_drop_event() {
-        trace_init();
-
         run_transform(
             r#"
             version = "2"
@@ -616,8 +612,6 @@ mod tests {
 
     #[tokio::test]
     async fn lua_duplicate_event() {
-        trace_init();
-
         run_transform(
             r#"
             version = "2"
@@ -641,8 +635,6 @@ mod tests {
 
     #[tokio::test]
     async fn lua_read_empty_field() {
-        trace_init();
-
         run_transform(
             r#"
             version = "2"
@@ -660,10 +652,7 @@ mod tests {
                 let event = LogEvent::default();
                 tx.send(event.into()).await.unwrap();
 
-                assert_eq!(
-                    out.lock().await.recv().await.unwrap().as_log()["result"],
-                    "empty".into()
-                );
+                assert_eq!(next_event(&out).await.as_log()["result"], "empty".into());
             },
         )
         .await;
@@ -671,7 +660,6 @@ mod tests {
 
     #[tokio::test]
     async fn lua_integer_value() {
-        trace_init();
         run_transform(
             r#"
             version = "2"
@@ -685,10 +673,7 @@ mod tests {
                 let event = LogEvent::default();
                 tx.send(event.into()).await.unwrap();
 
-                assert_eq!(
-                    out.lock().await.recv().await.unwrap().as_log()["number"],
-                    Value::Integer(3)
-                );
+                assert_eq!(next_event(&out).await.as_log()["number"], Value::Integer(3));
             },
         )
         .await;
@@ -696,8 +681,6 @@ mod tests {
 
     #[tokio::test]
     async fn lua_numeric_value() {
-        trace_init();
-
         run_transform(
             r#"
             version = "2"
@@ -712,7 +695,7 @@ mod tests {
                 tx.send(event.into()).await.unwrap();
 
                 assert_eq!(
-                    out.lock().await.recv().await.unwrap().as_log()["number"],
+                    next_event(&out).await.as_log()["number"],
                     Value::from(3.14159)
                 );
             },
@@ -722,8 +705,6 @@ mod tests {
 
     #[tokio::test]
     async fn lua_boolean_value() {
-        trace_init();
-
         run_transform(
             r#"
             version = "2"
@@ -738,7 +719,7 @@ mod tests {
                 tx.send(event.into()).await.unwrap();
 
                 assert_eq!(
-                    out.lock().await.recv().await.unwrap().as_log()["bool"],
+                    next_event(&out).await.as_log()["bool"],
                     Value::Boolean(true)
                 );
             },
@@ -748,7 +729,6 @@ mod tests {
 
     #[tokio::test]
     async fn lua_non_coercible_value() {
-        trace_init();
         run_transform(
             r#"
             version = "2"
@@ -762,10 +742,7 @@ mod tests {
                 let event = LogEvent::default();
                 tx.send(event.into()).await.unwrap();
 
-                assert_eq!(
-                    out.lock().await.recv().await.unwrap().as_log().get("junk"),
-                    None
-                );
+                assert_eq!(next_event(&out).await.as_log().get("junk"), None);
             },
         )
         .await;
@@ -773,8 +750,6 @@ mod tests {
 
     #[tokio::test]
     async fn lua_non_string_key_write() -> crate::Result<()> {
-        trace_init();
-
         let mut transform = from_config(
             r#"
             hooks.process = """function (event, emit)
@@ -800,8 +775,6 @@ mod tests {
 
     #[tokio::test]
     async fn lua_non_string_key_read() {
-        trace_init();
-
         run_transform(
             r#"
             version = "2"
@@ -815,16 +788,7 @@ mod tests {
                 let event = LogEvent::default();
                 tx.send(event.into()).await.unwrap();
 
-                assert_eq!(
-                    out.lock()
-                        .await
-                        .recv()
-                        .await
-                        .unwrap()
-                        .as_log()
-                        .get("result"),
-                    None
-                );
+                assert_eq!(next_event(&out).await.as_log().get("result"), None);
             },
         )
         .await;
@@ -832,8 +796,6 @@ mod tests {
 
     #[tokio::test]
     async fn lua_script_error() -> crate::Result<()> {
-        trace_init();
-
         let mut transform = from_config(
             r#"
             hooks.process = """function (event, emit)
@@ -854,8 +816,6 @@ mod tests {
 
     #[tokio::test]
     async fn lua_syntax_error() -> crate::Result<()> {
-        trace_init();
-
         let err = from_config(
             r#"
             hooks.process = """function (event, emit)
@@ -875,7 +835,6 @@ mod tests {
     #[tokio::test]
     async fn lua_load_file() {
         use std::{fs::File, io::Write};
-        trace_init();
 
         let dir = tempfile::tempdir().unwrap();
         let mut file = File::create(dir.path().join("script2.lua")).unwrap();
@@ -913,7 +872,7 @@ mod tests {
                 tx.send(event.into()).await.unwrap();
 
                 assert_eq!(
-                    out.lock().await.recv().await.unwrap().as_log()["\"new field\""],
+                    next_event(&out).await.as_log()["\"new field\""],
                     "new value".into()
                 );
             },
@@ -923,7 +882,6 @@ mod tests {
 
     #[tokio::test]
     async fn lua_pairs() {
-        trace_init();
         run_transform(
             r#"
             version = "2"
@@ -941,7 +899,7 @@ mod tests {
                 event.insert("friend", "Alice");
                 tx.send(event.into()).await.unwrap();
 
-                let output = out.lock().await.recv().await.unwrap();
+                let output = next_event(&out).await;
 
                 assert_eq!(output.as_log()["name"], "nameBob".into());
                 assert_eq!(output.as_log()["friend"], "friendAlice".into());
@@ -952,7 +910,6 @@ mod tests {
 
     #[tokio::test]
     async fn lua_metric() {
-        trace_init();
         run_transform(
             r#"
             version = "2"
@@ -972,16 +929,13 @@ mod tests {
                 let mut expected = metric
                     .clone()
                     .with_value(MetricValue::Counter { value: 2.0 });
-                expected
-                    .metadata_mut()
-                    .set_upstream_id(Arc::new(OutputId::from("transform")));
+                let metadata = expected.metadata_mut();
+                metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
+                metadata.set_source_id(Arc::new(ComponentKey::from("in")));
 
                 tx.send(metric.into()).await.unwrap();
 
-                assert_eq!(
-                    out.lock().await.recv().await.unwrap().as_metric(),
-                    &expected
-                );
+                assert_eq!(next_event(&out).await.as_metric(), &expected);
             },
         )
         .await;
@@ -989,7 +943,6 @@ mod tests {
 
     #[tokio::test]
     async fn lua_multiple_events() {
-        trace_init();
         run_transform(
             r#"
             version = "2"
