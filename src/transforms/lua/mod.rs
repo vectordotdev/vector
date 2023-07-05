@@ -1,24 +1,14 @@
 pub mod v1;
 pub mod v2;
 
-use std::sync::{Arc, OnceLock};
-
 use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
+use vector_core::config::{ComponentKey, LogNamespace};
 
 use crate::{
-    config::{
-        ComponentKey, GenerateConfig, Input, OutputId, TransformConfig, TransformContext,
-        TransformOutput,
-    },
+    config::{GenerateConfig, Input, OutputId, TransformConfig, TransformContext, TransformOutput},
     schema,
     transforms::Transform,
 };
-
-pub(self) fn global_source_id() -> Arc<ComponentKey> {
-    static GLOBAL: OnceLock<Arc<ComponentKey>> = OnceLock::new();
-    Arc::clone(GLOBAL.get_or_init(|| Arc::new(ComponentKey::from("lua"))))
-}
 
 /// Marker type for the version one of the configuration for the `lua` transform.
 #[configurable_component]
@@ -99,10 +89,14 @@ impl GenerateConfig for LuaConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "lua")]
 impl TransformConfig for LuaConfig {
-    async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
+    async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
+        let key = context
+            .key
+            .as_ref()
+            .map_or_else(|| ComponentKey::from("lua"), Clone::clone);
         match self {
             LuaConfig::V1(v1) => v1.config.build(),
-            LuaConfig::V2(v2) => v2.config.build(),
+            LuaConfig::V2(v2) => v2.config.build(key),
         }
     }
 

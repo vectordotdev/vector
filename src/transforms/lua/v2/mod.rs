@@ -7,7 +7,6 @@ use vector_config::configurable_component;
 pub use vector_core::event::lua;
 use vector_core::transform::runtime_transform::{RuntimeTransform, Timer};
 
-use super::global_source_id;
 use crate::config::{ComponentKey, OutputId};
 use crate::event::lua::event::LuaEvent;
 use crate::schema::Definition;
@@ -173,8 +172,8 @@ struct TimerConfig {
 }
 
 impl LuaConfig {
-    pub fn build(&self) -> crate::Result<Transform> {
-        Lua::new(self).map(Transform::event_task)
+    pub fn build(&self, key: ComponentKey) -> crate::Result<Transform> {
+        Lua::new(self, key).map(Transform::event_task)
     }
 
     pub fn input(&self) -> Input {
@@ -224,6 +223,7 @@ pub struct Lua {
     hook_shutdown: Option<mlua::RegistryKey>,
     timers: Vec<(Timer, mlua::RegistryKey)>,
     multi_value_tags: bool,
+    source_id: Arc<ComponentKey>,
 }
 
 // Helper to create `RegistryKey` from Lua function code
@@ -234,7 +234,7 @@ fn make_registry_value(lua: &mlua::Lua, source: &str) -> mlua::Result<mlua::Regi
 }
 
 impl Lua {
-    pub fn new(config: &LuaConfig) -> crate::Result<Self> {
+    pub fn new(config: &LuaConfig, key: ComponentKey) -> crate::Result<Self> {
         // In order to support loading C modules in Lua, we need to create unsafe instance
         // without debug library.
         let lua = unsafe {
@@ -302,6 +302,7 @@ impl Lua {
             hook_process,
             hook_shutdown,
             multi_value_tags,
+            source_id: Arc::new(key),
         })
     }
 
@@ -378,7 +379,7 @@ impl RuntimeTransform for Lua {
         F: FnMut(Event),
     {
         let lua = &self.lua;
-        let source_id = event.source_id().map_or_else(global_source_id, Arc::clone);
+        let source_id = Arc::clone(event.source_id().unwrap_or(&self.source_id));
         _ = lua
             .scope(|scope| -> mlua::Result<()> {
                 lua.registry_value::<mlua::Function>(&self.hook_process)?
@@ -406,7 +407,7 @@ impl RuntimeTransform for Lua {
                 match &self.hook_init {
                     Some(key) => lua
                         .registry_value::<mlua::Function>(key)?
-                        .call(wrap_emit_fn(scope, emit_fn, global_source_id())?),
+                        .call(wrap_emit_fn(scope, emit_fn, Arc::clone(&self.source_id))?),
                     None => Ok(()),
                 }
             })
@@ -426,7 +427,7 @@ impl RuntimeTransform for Lua {
                 match &self.hook_shutdown {
                     Some(key) => lua
                         .registry_value::<mlua::Function>(key)?
-                        .call(wrap_emit_fn(scope, emit_fn, global_source_id())?),
+                        .call(wrap_emit_fn(scope, emit_fn, Arc::clone(&self.source_id))?),
                     None => Ok(()),
                 }
             })
@@ -445,7 +446,7 @@ impl RuntimeTransform for Lua {
             .scope(|scope| -> mlua::Result<()> {
                 let handler_key = &self.timers[timer.id as usize].1;
                 lua.registry_value::<mlua::Function>(handler_key)?
-                    .call(wrap_emit_fn(scope, emit_fn, global_source_id())?)
+                    .call(wrap_emit_fn(scope, emit_fn, Arc::clone(&self.source_id))?)
             })
             .context(RuntimeErrorTimerHandlerSnafu)
             .map_err(|error| error!(%error, rate_limit = 30));
@@ -488,7 +489,7 @@ mod tests {
     }
 
     fn from_config(config: &str) -> crate::Result<Box<Lua>> {
-        Lua::new(&toml::from_str(config).unwrap()).map(Box::new)
+        Lua::new(&toml::from_str(config).unwrap(), "transform".into()).map(Box::new)
     }
 
     async fn run_transform<T: Future>(
