@@ -469,7 +469,7 @@ mod tests {
     use tokio_stream::wrappers::ReceiverStream;
 
     use super::*;
-    use crate::test_util::components::assert_transform_compliance;
+    use crate::test_util::{components::assert_transform_compliance, random_string};
     use crate::transforms::test::create_topology;
     use crate::{
         event::{
@@ -514,15 +514,55 @@ mod tests {
         .await
     }
 
-    async fn next_event(out: &Arc<Mutex<Receiver<Event>>>) -> Event {
+    async fn next_event(out: &Arc<Mutex<Receiver<Event>>>, source: &str) -> Event {
         let event = out
             .lock()
             .await
             .recv()
             .await
             .expect("Event was not received");
-        assert_eq!(event.source_id(), Some(&Arc::new(ComponentKey::from("in"))));
+        assert_eq!(
+            event.source_id(),
+            Some(&Arc::new(ComponentKey::from(source)))
+        );
         event
+    }
+
+    #[tokio::test]
+    async fn lua_runs_init_hook() {
+        let line1 = random_string(9);
+        run_transform(
+            &format!(
+                r#"
+            version = "2"
+            hooks.init = """function (emit)
+                event = {{log={{message="{line1}"}}}}
+                emit(event)
+            end
+            """
+            hooks.process = """function (event, emit)
+                emit(event)
+            end
+            """
+            "#
+            ),
+            |tx, out| async move {
+                let line2 = random_string(9);
+                tx.send(Event::Log(LogEvent::from(line2.as_str())))
+                    .await
+                    .unwrap();
+                drop(tx);
+                assert_eq!(
+                    next_event(&out, "transform").await.as_log()["message"],
+                    line1.into()
+                );
+                assert_eq!(
+                    next_event(&out, "in").await.as_log()["message"],
+                    line2.into(),
+                );
+            },
+        )
+        .await;
     }
 
     #[tokio::test]
@@ -540,7 +580,10 @@ mod tests {
                 let event = Event::Log(LogEvent::from("program me"));
                 tx.send(event).await.unwrap();
 
-                assert_eq!(next_event(&out).await.as_log()["hello"], "goodbye".into());
+                assert_eq!(
+                    next_event(&out, "in").await.as_log()["hello"],
+                    "goodbye".into()
+                );
             },
         )
         .await;
@@ -562,7 +605,7 @@ mod tests {
                 let event = Event::Log(LogEvent::from("Hello, my name is Bob."));
                 tx.send(event).await.unwrap();
 
-                assert_eq!(next_event(&out).await.as_log()["name"], "Bob".into());
+                assert_eq!(next_event(&out, "in").await.as_log()["name"], "Bob".into());
             },
         )
         .await;
@@ -585,7 +628,7 @@ mod tests {
 
                 tx.send(event.into()).await.unwrap();
 
-                assert_eq!(next_event(&out).await.as_log().get("name"), None);
+                assert_eq!(next_event(&out, "in").await.as_log().get("name"), None);
             },
         )
         .await;
@@ -653,7 +696,10 @@ mod tests {
                 let event = LogEvent::default();
                 tx.send(event.into()).await.unwrap();
 
-                assert_eq!(next_event(&out).await.as_log()["result"], "empty".into());
+                assert_eq!(
+                    next_event(&out, "in").await.as_log()["result"],
+                    "empty".into()
+                );
             },
         )
         .await;
@@ -674,7 +720,10 @@ mod tests {
                 let event = LogEvent::default();
                 tx.send(event.into()).await.unwrap();
 
-                assert_eq!(next_event(&out).await.as_log()["number"], Value::Integer(3));
+                assert_eq!(
+                    next_event(&out, "in").await.as_log()["number"],
+                    Value::Integer(3)
+                );
             },
         )
         .await;
@@ -696,7 +745,7 @@ mod tests {
                 tx.send(event.into()).await.unwrap();
 
                 assert_eq!(
-                    next_event(&out).await.as_log()["number"],
+                    next_event(&out, "in").await.as_log()["number"],
                     Value::from(3.14159)
                 );
             },
@@ -720,7 +769,7 @@ mod tests {
                 tx.send(event.into()).await.unwrap();
 
                 assert_eq!(
-                    next_event(&out).await.as_log()["bool"],
+                    next_event(&out, "in").await.as_log()["bool"],
                     Value::Boolean(true)
                 );
             },
@@ -743,7 +792,7 @@ mod tests {
                 let event = LogEvent::default();
                 tx.send(event.into()).await.unwrap();
 
-                assert_eq!(next_event(&out).await.as_log().get("junk"), None);
+                assert_eq!(next_event(&out, "in").await.as_log().get("junk"), None);
             },
         )
         .await;
@@ -789,7 +838,7 @@ mod tests {
                 let event = LogEvent::default();
                 tx.send(event.into()).await.unwrap();
 
-                assert_eq!(next_event(&out).await.as_log().get("result"), None);
+                assert_eq!(next_event(&out, "in").await.as_log().get("result"), None);
             },
         )
         .await;
@@ -873,7 +922,7 @@ mod tests {
                 tx.send(event.into()).await.unwrap();
 
                 assert_eq!(
-                    next_event(&out).await.as_log()["\"new field\""],
+                    next_event(&out, "in").await.as_log()["\"new field\""],
                     "new value".into()
                 );
             },
@@ -900,7 +949,7 @@ mod tests {
                 event.insert("friend", "Alice");
                 tx.send(event.into()).await.unwrap();
 
-                let output = next_event(&out).await;
+                let output = next_event(&out, "in").await;
 
                 assert_eq!(output.as_log()["name"], "nameBob".into());
                 assert_eq!(output.as_log()["friend"], "friendAlice".into());
@@ -936,7 +985,7 @@ mod tests {
 
                 tx.send(metric.into()).await.unwrap();
 
-                assert_eq!(next_event(&out).await.as_metric(), &expected);
+                assert_eq!(next_event(&out, "in").await.as_metric(), &expected);
             },
         )
         .await;
