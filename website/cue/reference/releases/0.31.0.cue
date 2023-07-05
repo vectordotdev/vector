@@ -246,7 +246,7 @@ releases: "0.31.0": {
 			type: "enhancement"
 			scopes: ["aws_kinesis_firehose sink", "aws_kinesis_streams sink"]
 			description: """
-				The `aws_kinesis_firehose` and `aws_kinesis_streams ` sinks are now able to retry requests
+				The `aws_kinesis_firehose` and `aws_kinesis_streams` sinks are now able to retry requests
 				with partial failures by setting `request_retry_partial` to true. The default is
 				`false` to avoid writing duplicate data if proper event idempotency is not in place.
 				"""
