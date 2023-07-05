@@ -16,9 +16,8 @@ name: K8S E2E Suite
 
 on:
   workflow_dispatch:
+  workflow_call:
   pull_request:
-  issue_comment:
-    types: [created]
   merge_group:
     types: [checks_requested]
   schedule:
@@ -27,7 +26,6 @@ on:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.number || github.event.comment.html_url || github.event.merge_group.head_sha || github.event.schedule || github.sha }}
-
   cancel-in-progress: true
 
 env:
@@ -42,34 +40,7 @@ env:
   PROFILE: debug
 
 jobs:
-  validate:
-    name: Validate comment
-    runs-on: ubuntu-latest
-    # As this is the root job in the dependency graph, the entire workflow will be skipped
-    # for any PR comments not containing '/ci-run-all' or '/ci-run-k8s'.
-    if: |
-      github.event_name != 'issue_comment' ||
-      ( github.event.issue.pull_request &&
-        ( contains(github.event.comment.body, '/ci-run-all') ||
-          contains(github.event.comment.body, '/ci-run-k8s')
-        )
-      )
-    steps:
-      - name: Get PR comment author
-        if: github.event_name == 'issue_comment'
-        id: comment
-        uses: tspascoal/get-user-teams-membership@v2
-        with:
-          username: ${{ github.actor }}
-          team: 'Vector'
-          GITHUB_TOKEN: ${{ secrets.GH_PAT_ORG }}
-
-      - name: Validate author membership
-        if: steps.comment.outputs.isTeamMember == 'false' # evaluates to false if previous step is skipped
-        run: exit 1
-
   changes:
-    needs: validate
     # Only evaluate files changed on pull request trigger
     if: github.event_name == 'pull_request'
     uses: ./.github/workflows/changes.yml
@@ -204,10 +175,15 @@ jobs:
     needs:
       - build-x86_64-unknown-linux-gnu
       - compute-k8s-test-plan
+    if: always() # because `changes` job might be skipped
     strategy:
       matrix: ${{ fromJson(needs.compute-k8s-test-plan.outputs.matrix) }}
       fail-fast: false
     steps:
+      - name: Bail if deps failed
+        if: contains(needs.*.result, 'failure') == 'true'
+        run: exit 1
+
       - name: (PR comment) Get PR branch
         if: ${{ github.event_name == 'issue_comment' }}
         uses: xt0rted/pull-request-comment-branch@v2
@@ -253,19 +229,17 @@ jobs:
     name: K8s E2E Suite
     runs-on: ubuntu-latest
     needs: test-e2e-kubernetes
-    if: |
-      always() && (github.event_name != 'issue_comment' || (github.event.issue.pull_request
-        && (contains(github.event.comment.body, '/ci-run-k8s') || contains(github.event.comment.body, '/ci-run-all'))))
+    if: always()
     env:
       FAILED: ${{ contains(needs.*.result, 'failure') }}
     steps:
       - name: (PR comment) Get PR branch
-        if: success() && github.event_name == 'issue_comment'
+        if: github.event_name == 'issue_comment' && env.FAILED != 'true'
         uses: xt0rted/pull-request-comment-branch@v2
         id: comment-branch
 
       - name: (PR comment) Submit PR result as success
-        if: success() && github.event_name == 'issue_comment'
+        if: github.event_name == 'issue_comment' && env.FAILED != 'true'
         uses: myrotvorets/set-commit-status-action@v1.1.7
         with:
           sha: ${{ steps.comment-branch.outputs.head_sha }}
