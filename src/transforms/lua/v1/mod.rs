@@ -146,6 +146,7 @@ impl Lua {
     }
 
     fn process(&mut self, event: Event) -> Result<Option<Event>, mlua::Error> {
+        let source_id = event.source_id().cloned();
         let lua = &self.lua;
         let globals = lua.globals();
 
@@ -156,7 +157,15 @@ impl Lua {
 
         let result = globals
             .raw_get::<_, Option<LuaEvent>>("event")
-            .map(|option| option.map(|lua_event| lua_event.inner));
+            .map(|option| {
+                option.map(|lua_event| {
+                    let mut event = lua_event.inner;
+                    if let Some(source_id) = source_id {
+                        event.set_source_id(source_id);
+                    }
+                    event
+                })
+            });
 
         self.invocations_after_gc += 1;
         if self.invocations_after_gc % GC_INTERVAL == 0 {

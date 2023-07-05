@@ -1,14 +1,24 @@
 pub mod v1;
 pub mod v2;
 
+use std::sync::{Arc, OnceLock};
+
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
 
 use crate::{
-    config::{GenerateConfig, Input, OutputId, TransformConfig, TransformContext, TransformOutput},
+    config::{
+        ComponentKey, GenerateConfig, Input, OutputId, TransformConfig, TransformContext,
+        TransformOutput,
+    },
     schema,
     transforms::Transform,
 };
+
+pub(self) fn global_source_id() -> Arc<ComponentKey> {
+    static GLOBAL: OnceLock<Arc<ComponentKey>> = OnceLock::new();
+    Arc::clone(GLOBAL.get_or_init(|| Arc::new(ComponentKey::from("lua"))))
+}
 
 /// Marker type for the version one of the configuration for the `lua` transform.
 #[configurable_component]

@@ -1,11 +1,4 @@
-use std::{
-    collections::HashSet,
-    env,
-    fs::File,
-    io::Write,
-    path::{Path, PathBuf},
-    process::Command,
-};
+use std::{collections::HashSet, env, fs::File, io::Write, path::Path, process::Command};
 
 struct TrackedEnv {
     tracked: HashSet<String>,

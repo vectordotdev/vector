@@ -1,4 +1,4 @@
-use std::{path::PathBuf, time::Duration};
+use std::{path::PathBuf, sync::Arc, time::Duration};
 
 use codecs::MetricTagValues;
 use serde_with::serde_as;
@@ -7,7 +7,8 @@ use vector_config::configurable_component;
 pub use vector_core::event::lua;
 use vector_core::transform::runtime_transform::{RuntimeTransform, Timer};
 
-use crate::config::OutputId;
+use super::global_source_id;
+use crate::config::{ComponentKey, OutputId};
 use crate::event::lua::event::LuaEvent;
 use crate::schema::Definition;
 use crate::{
@@ -306,9 +307,13 @@ impl Lua {
 
     #[cfg(test)]
     fn process(&mut self, event: Event, output: &mut Vec<Event>) -> Result<(), mlua::Error> {
+        let source_id = event.source_id().cloned();
         let lua = &self.lua;
         let result = lua.scope(|scope| {
-            let emit = scope.create_function_mut(|_, event: Event| {
+            let emit = scope.create_function_mut(|_, mut event: Event| {
+                if let Some(source_id) = &source_id {
+                    event.set_source_id(Arc::clone(source_id));
+                }
                 output.push(event);
                 Ok(())
             })?;
@@ -355,11 +360,13 @@ impl Lua {
 fn wrap_emit_fn<'lua, 'scope, F: 'scope>(
     scope: &mlua::Scope<'lua, 'scope>,
     mut emit_fn: F,
+    source_id: Arc<ComponentKey>,
 ) -> mlua::Result<mlua::Function<'lua>>
 where
     F: FnMut(Event),
 {
-    scope.create_function_mut(move |_, event: Event| -> mlua::Result<()> {
+    scope.create_function_mut(move |_, mut event: Event| -> mlua::Result<()> {
+        event.set_source_id(Arc::clone(&source_id));
         emit_fn(event);
         Ok(())
     })
@@ -371,6 +378,7 @@ impl RuntimeTransform for Lua {
         F: FnMut(Event),
     {
         let lua = &self.lua;
+        let source_id = event.source_id().map_or_else(global_source_id, Arc::clone);
         _ = lua
             .scope(|scope| -> mlua::Result<()> {
                 lua.registry_value::<mlua::Function>(&self.hook_process)?
@@ -379,7 +387,7 @@ impl RuntimeTransform for Lua {
                             event,
                             metric_multi_value_tags: self.multi_value_tags,
                         },
-                        wrap_emit_fn(scope, emit_fn)?,
+                        wrap_emit_fn(scope, emit_fn, source_id)?,
                     ))
             })
             .context(RuntimeErrorHooksProcessSnafu)
@@ -398,7 +406,7 @@ impl RuntimeTransform for Lua {
                 match &self.hook_init {
                     Some(key) => lua
                         .registry_value::<mlua::Function>(key)?
-                        .call(wrap_emit_fn(scope, emit_fn)?),
+                        .call(wrap_emit_fn(scope, emit_fn, global_source_id())?),
                     None => Ok(()),
                 }
             })
@@ -418,7 +426,7 @@ impl RuntimeTransform for Lua {
                 match &self.hook_shutdown {
                     Some(key) => lua
                         .registry_value::<mlua::Function>(key)?
-                        .call(wrap_emit_fn(scope, emit_fn)?),
+                        .call(wrap_emit_fn(scope, emit_fn, global_source_id())?),
                     None => Ok(()),
                 }
             })
@@ -437,7 +445,7 @@ impl RuntimeTransform for Lua {
             .scope(|scope| -> mlua::Result<()> {
                 let handler_key = &self.timers[timer.id as usize].1;
                 lua.registry_value::<mlua::Function>(handler_key)?
-                    .call(wrap_emit_fn(scope, emit_fn)?)
+                    .call(wrap_emit_fn(scope, emit_fn, global_source_id())?)
             })
             .context(RuntimeErrorTimerHandlerSnafu)
             .map_err(|error| error!(%error, rate_limit = 30));
