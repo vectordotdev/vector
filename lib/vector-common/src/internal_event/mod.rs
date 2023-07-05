@@ -194,7 +194,7 @@ impl From<Protocol> for SharedString {
 macro_rules! registered_event {
     // A registered event struct with no fields (zero-sized type).
     ($event:ident => $($tail:tt)*) => {
-        #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+        #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
         pub struct $event;
 
         $crate::registered_event!(=> $event $($tail)*);
