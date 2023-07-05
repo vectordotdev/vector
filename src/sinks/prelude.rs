@@ -28,11 +28,9 @@ pub use tower::{Service, ServiceBuilder};
 pub use vector_buffers::EventCount;
 pub use vector_common::{
     finalization::{EventFinalizers, EventStatus, Finalizable},
-    internal_event::CountByteSize,
+    internal_event::{CountByteSize, TaggedEventsSent},
     json_size::JsonSize,
-    request_metadata::{
-        EventCountTags, GetEventCountTags, GroupedCountByteSize, MetaDescriptive, RequestMetadata,
-    },
+    request_metadata::{GetEventCountTags, GroupedCountByteSize, MetaDescriptive, RequestMetadata},
 };
 pub use vector_config::configurable_component;
 pub use vector_core::{

@@ -152,7 +152,7 @@ pub struct LokiRecord {
     pub event: LokiEvent,
     pub json_byte_size: JsonSize,
     pub finalizers: EventFinalizers,
-    pub event_count_tags: EventCountTags,
+    pub event_count_tags: TaggedEventsSent,
 }
 
 impl ByteSizeOf for LokiRecord {
@@ -185,7 +185,7 @@ impl Finalizable for LokiRecord {
 }
 
 impl GetEventCountTags for LokiRecord {
-    fn get_tags(&self) -> EventCountTags {
+    fn get_tags(&self) -> TaggedEventsSent {
         self.event_count_tags.clone()
     }
 }
