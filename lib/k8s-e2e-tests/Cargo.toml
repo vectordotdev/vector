@@ -15,7 +15,7 @@ regex = "1"
 reqwest = { version = "0.11.18", features = ["json"] }
 serde_json = "1"
 tokio = { version = "1.29.0", features = ["full"] }
-indoc = "2.0.1"
+indoc = "2.0.2"
 env_logger = "0.10"
 tracing = { version = "0.1", features = ["log"] }
 rand = "0.8"
