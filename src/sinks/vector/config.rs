@@ -25,7 +25,7 @@ use crate::{
         },
         Healthcheck, VectorSink as VectorSinkType,
     },
-    tls::{tls_connector_builder, MaybeTlsSettings, TlsEnableableConfig},
+    tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
 
 /// Configuration for the `vector` sink.
@@ -210,21 +210,6 @@ fn new_client(
     tls_settings: &MaybeTlsSettings,
     proxy_config: &ProxyConfig,
 ) -> crate::Result<hyper::Client<ProxyConnector<HttpsConnector<HttpConnector>>, BoxBody>> {
-    let mut http = HttpConnector::new();
-    http.enforce_http(false);
-
-    let tls = tls_connector_builder(tls_settings)?;
-    let mut https = HttpsConnector::with_connector(http, tls)?;
-
-    let settings = tls_settings.tls().cloned();
-    https.set_callback(move |c, _uri| {
-        if let Some(settings) = &settings {
-            settings.apply_connect_configuration(c);
-        }
-
-        Ok(())
-    });
-
     let proxy = build_proxy_connector(tls_settings.clone(), proxy_config)?;
 
     Ok(hyper::Client::builder().http2_only(true).build(proxy))
