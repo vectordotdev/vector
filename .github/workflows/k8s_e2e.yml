@@ -176,7 +176,7 @@ jobs:
       - build-x86_64-unknown-linux-gnu
       - compute-k8s-test-plan
     # because `changes` job might be skipped
-    if: ${{ !failure() && !cancelled() }}
+    if: always() && needs.build-x86_64-unknown-linux-gnu.result == 'success' && needs.compute-k8s-test-plan.result == 'success'
     strategy:
       matrix: ${{ fromJson(needs.compute-k8s-test-plan.outputs.matrix) }}
       fail-fast: false
