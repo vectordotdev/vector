@@ -15,6 +15,7 @@
 # /ci-run-unit-windows        : runs Unit - Windows
 # /ci-run-environment         : runs Environment Suite
 # /ci-run-regression          : runs Regression Detection Suite
+# /ci-run-k8s                 : runs K8s E2E Suite
 
 name: Comment Trigger
 
@@ -55,6 +56,7 @@ jobs:
           || contains(github.event.comment.body, '/ci-run-unit-windows')
           || contains(github.event.comment.body, '/ci-run-environment')
           || contains(github.event.comment.body, '/ci-run-regression')
+          || contains(github.event.comment.body, '/ci-run-k8s')
       )
     steps:
       - name: Get PR comment author
@@ -115,4 +117,10 @@ jobs:
     needs: validate
     if: contains(github.event.comment.body, '/ci-run-all') || contains(github.event.comment.body, '/ci-run-regression')
     uses: ./.github/workflows/regression.yml
+    secrets: inherit
+
+  k8s:
+    needs: validate
+    if: contains(github.event.comment.body, '/ci-run-all') || contains(github.event.comment.body, '/ci-run-k8s')
+    uses: ./.github/workflows/k8s_e2e.yml
     secrets: inherit

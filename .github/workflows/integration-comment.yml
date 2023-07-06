@@ -377,9 +377,9 @@ jobs:
         uses: xt0rted/pull-request-comment-branch@v2
         id: comment-branch
 
-      - name: (PR comment) Submit PR result as ${{ needs.test-integration.result }}
+      - name: (PR comment) Submit PR result as ${{ needs.integration-tests.result }}
         uses: myrotvorets/set-commit-status-action@v1.1.7
         with:
           sha: ${{ steps.comment-branch.outputs.head_sha }}
           token: ${{ secrets.GITHUB_TOKEN }}
-          status: ${{ needs.test-integration.result }}
+          status: ${{ needs.integration-tests.result }}
