@@ -20,6 +20,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GH_PROJECT_PAT }}
         run: |
           issue_id=${{ github.event.issue.node_id }}
+          echo "issue_id: $issue_id"
 
           # IDs fetched from https://docs.github.com/en/graphql/overview/explorer
           project_id="PVT_kwDOAQFeYs4AAsTr" # Gardener
@@ -40,6 +41,7 @@ jobs:
                           }
                         }
                         ... on ProjectV2Item {
+                          id
                           project {
                             ... on ProjectV2 {
                               id
@@ -55,7 +57,9 @@ jobs:
           )"
 
           # Extract the item in the Gardener project
-          current_status=$(echo $project_items | jq -c -r --arg project_id $project_id '.data.node.projectItems.nodes[] | select(.project.id == $project_id) | .fieldValueByName.name')
+          project=$(echo $project_items | jq -c -r --arg project_id $project_id '.data.node.projectItems.nodes[] | select(.project.id == $project_id)')
+          current_status=$(echo $project | jq -c '.fieldValueByName.name')
+          item_id=$(echo $project | jq -c '.id')
 
           if [ -z "$current_status" ] ; then
             echo "Issue not found in Gardener board"
