@@ -63,6 +63,10 @@ impl ConditionalConfig for VrlConfig {
                 .to_string()
         })?;
 
+        if !program.final_type_info().result.is_boolean() {
+            return Err("VRL conditions must return a boolean.".into());
+        }
+
         if !warnings.is_empty() {
             let warnings = Formatter::new(&self.source, warnings).colored().to_string();
             warn!(message = "VRL compilation warning.", %warnings);
@@ -231,6 +235,12 @@ mod test {
                 ),
                 r#".name == "zork" && .tags.host == "zoobub" && .kind == "incremental""#,
                 Ok(()),
+                Ok(()),
+            ),
+            (
+                log_event![],
+                r#""i_return_a_string""#,
+                Err("VRL conditions must return a boolean.".into()),
                 Ok(()),
             ),
         ];
