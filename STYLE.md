@@ -342,7 +342,7 @@ For configuration items that purely inform details of Vector's runtime behavior,
 corresponding configuration fields should be used.
 
 An example of a runtime flag is
-`vector run --no-forced-shutdown`, which tells Vector to ignore SIGINTs and to continue running
+`vector run --no-graceful-shutdown-limit`, which tells Vector to ignore SIGINTs and to continue running
 as normal until a SIGKILL is received. In this case, as the configuration describes the desired runtime
 behavior in a specific environment and not to the underlying data pipeline, no corresponding field in
 the configuration file should exist.
