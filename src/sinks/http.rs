@@ -29,7 +29,7 @@ use crate::{
 };
 
 /// Configuration for the `http` sink.
-#[configurable_component(sink("http"))]
+#[configurable_component(sink("http", "Deliver observability event data to an HTTP server."))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct HttpSinkConfig {
@@ -201,6 +201,7 @@ fn default_sink(encoding: EncodingConfigWithFraming) -> HttpSink {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "http")]
 impl SinkConfig for HttpSinkConfig {
     async fn build(
         &self,
@@ -251,6 +252,7 @@ impl SinkConfig for HttpSinkConfig {
         )
         .sink_map_err(|error| error!(message = "Fatal HTTP sink error.", %error));
 
+        #[allow(deprecated)]
         let sink = super::VectorSink::from_event_sink(sink);
 
         Ok((sink, healthcheck))
@@ -625,7 +627,7 @@ mod tests {
         "#;
         let config: HttpSinkConfig = toml::from_str(config).unwrap();
 
-        let cx = SinkContext::new_test();
+        let cx = SinkContext::default();
 
         _ = config.build(cx).await.unwrap();
     }
@@ -859,7 +861,7 @@ mod tests {
 
             let config: HttpSinkConfig = toml::from_str(&config).unwrap();
 
-            let cx = SinkContext::new_test();
+            let cx = SinkContext::default();
 
             let (sink, _) = config.build(cx).await.unwrap();
             let (rx, trigger, server) = build_test_server(in_addr);
@@ -920,7 +922,7 @@ mod tests {
 
             let config: HttpSinkConfig = toml::from_str(&config).unwrap();
 
-            let cx = SinkContext::new_test();
+            let cx = SinkContext::default();
 
             let (sink, _) = config.build(cx).await.unwrap();
             let (rx, trigger, server) = build_test_server(in_addr);
@@ -1027,7 +1029,7 @@ mod tests {
         );
         let config: HttpSinkConfig = toml::from_str(&config).unwrap();
 
-        let cx = SinkContext::new_test();
+        let cx = SinkContext::default();
 
         let (sink, _) = config.build(cx).await.unwrap();
         (in_addr, sink)

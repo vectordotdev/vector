@@ -70,7 +70,7 @@ fn get_counter(batch: BatchNotifier) -> Event {
 
 #[tokio::test]
 async fn splunk_insert_counter_metric() {
-    let cx = SinkContext::new_test();
+    let cx = SinkContext::default();
 
     let mut config = config().await;
     config.index = Template::try_from("testmetrics".to_string()).ok();
@@ -93,7 +93,7 @@ async fn splunk_insert_counter_metric() {
 
 #[tokio::test]
 async fn splunk_insert_gauge_metric() {
-    let cx = SinkContext::new_test();
+    let cx = SinkContext::default();
 
     let mut config = config().await;
     config.index = Template::try_from("testmetrics".to_string()).ok();
@@ -116,7 +116,7 @@ async fn splunk_insert_gauge_metric() {
 
 #[tokio::test]
 async fn splunk_insert_multiple_counter_metrics() {
-    let cx = SinkContext::new_test();
+    let cx = SinkContext::default();
 
     let mut config = config().await;
     config.index = Template::try_from("testmetrics".to_string()).ok();
@@ -143,7 +143,7 @@ async fn splunk_insert_multiple_counter_metrics() {
 
 #[tokio::test]
 async fn splunk_insert_multiple_gauge_metrics() {
-    let cx = SinkContext::new_test();
+    let cx = SinkContext::default();
 
     let mut config = config().await;
     config.index = Template::try_from("testmetrics".to_string()).ok();

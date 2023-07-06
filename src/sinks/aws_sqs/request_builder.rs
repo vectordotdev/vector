@@ -93,7 +93,7 @@ impl RequestBuilder<Event> for SqsRequestBuilder {
             None => None,
         };
 
-        let builder = RequestMetadataBuilder::from_events(&event);
+        let builder = RequestMetadataBuilder::from_event(&event);
 
         let sqs_metadata = SqsMetadata {
             finalizers: event.take_finalizers(),
@@ -154,7 +154,11 @@ impl Finalizable for SendMessageEntry {
 }
 
 impl MetaDescriptive for SendMessageEntry {
-    fn get_metadata(&self) -> RequestMetadata {
-        self.metadata
+    fn get_metadata(&self) -> &RequestMetadata {
+        &self.metadata
+    }
+
+    fn metadata_mut(&mut self) -> &mut RequestMetadata {
+        &mut self.metadata
     }
 }

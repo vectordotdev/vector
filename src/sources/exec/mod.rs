@@ -498,8 +498,8 @@ async fn run_command(
                         for event in &mut events {
                             handle_event(&config, &hostname, &Some(stream.to_string()), pid, event, log_namespace);
                         }
-                        if let Err(error) = out.send_batch(events).await {
-                            emit!(StreamClosedError { count, error });
+                        if (out.send_batch(events).await).is_err() {
+                            emit!(StreamClosedError { count });
                             break;
                         }
                     },

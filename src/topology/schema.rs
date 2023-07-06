@@ -6,7 +6,7 @@ use vector_core::config::SourceOutput;
 pub(super) use crate::schema::Definition;
 
 use crate::{
-    config::{ComponentKey, Config, OutputId, SinkConfig, SinkOuter, TransformOutput},
+    config::{ComponentKey, Config, OutputId, SinkOuter, TransformOutput},
     topology,
 };
 

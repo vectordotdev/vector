@@ -4,8 +4,8 @@ use crate::{
         util::GrpcAddress,
         ComponentConfiguration, ComponentType, ValidationConfiguration,
     },
-    config::{BoxedSource, BoxedTransform, ConfigBuilder},
-    sinks::{vector::VectorConfig as VectorSinkConfig, Sinks},
+    config::{BoxedSink, BoxedSource, BoxedTransform, ConfigBuilder},
+    sinks::vector::VectorConfig as VectorSinkConfig,
     sources::vector::VectorConfig as VectorSourceConfig,
     test_util::next_addr,
 };
@@ -78,7 +78,7 @@ impl TopologyBuilder {
         }
     }
 
-    fn from_sink(sink: Sinks) -> Self {
+    fn from_sink(sink: BoxedSink) -> Self {
         let (input_edge, input_source) = build_input_edge();
 
         let mut config_builder = ConfigBuilder::default();
@@ -130,7 +130,7 @@ fn build_input_edge() -> (InputEdge, impl Into<BoxedSource>) {
     (input_edge, input_source)
 }
 
-fn build_output_edge() -> (OutputEdge, impl Into<Sinks>) {
+fn build_output_edge() -> (OutputEdge, impl Into<BoxedSink>) {
     let output_listen_addr = GrpcAddress::from(next_addr());
     debug!(endpoint = %output_listen_addr, "Creating controlled output edge.");
 

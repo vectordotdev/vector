@@ -42,7 +42,7 @@ jobs:
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2.2.0
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2.6.0
+        uses: docker/setup-buildx-action@v2.8.0
       - name: Login to DockerHub
         uses: docker/login-action@v2.1.0
         if: github.ref == 'refs/heads/master'
@@ -51,7 +51,7 @@ jobs:
           password: ${{ secrets.CI_DOCKER_PASSWORD }}
       - name: Extract metadata (tags, labels) for Docker
         id: meta
-        uses: docker/metadata-action@2c0bd771b40637d97bf205cbccdd294a32112176
+        uses: docker/metadata-action@818d4b7b91585d195f67373fd9cb0332e31a7175
         with:
           images: timberio/vector-dev
           flavor: |
@@ -63,7 +63,7 @@ jobs:
             org.opencontainers.image.title=Vector development environment
             org.opencontainers.image.url=https://github.com/vectordotdev/vector
       - name: Build and push
-        uses: docker/build-push-action@v4.0.0
+        uses: docker/build-push-action@v4.1.1
         with:
           context: .
           file: ./scripts/environment/Dockerfile

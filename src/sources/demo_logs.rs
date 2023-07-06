@@ -255,7 +255,7 @@ async fn demo_logs_source(
                             now,
                         );
                         log_namespace.insert_source_metadata(
-                            "service",
+                            DemoLogsConfig::NAME,
                             log,
                             Some(LegacyKey::InsertIfEmpty(path!("service"))),
                             path!("service"),
@@ -264,8 +264,8 @@ async fn demo_logs_source(
 
                         event
                     });
-                    out.send_batch(events).await.map_err(|error| {
-                        emit!(StreamClosedError { error, count });
+                    out.send_batch(events).await.map_err(|_| {
+                        emit!(StreamClosedError { count });
                     })?;
                 }
                 Err(error) => {

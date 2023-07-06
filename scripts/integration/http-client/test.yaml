@@ -10,3 +10,10 @@ env:
 
 matrix:
   version: ["v0.34.1"]
+
+# changes to these files/paths will invoke the integration test in CI
+# expressions are evaluated using https://github.com/micromatch/picomatch
+paths:
+- "src/sources/http_client/**"
+- "src/sources/util/**"
+- "scripts/integration/http-client/**"

@@ -483,7 +483,7 @@ mod tests {
 
         let mut receiver = create_count_receiver(addr, tls.clone(), true, None);
 
-        let context = SinkContext::new_test();
+        let context = SinkContext::default();
         let (sink, _healthcheck) = config.build(context).await.unwrap();
 
         let (_lines, events) = random_lines_with_stream(10, 100, None);
@@ -511,7 +511,7 @@ mod tests {
     ) {
         let mut receiver = create_count_receiver(addr, tls, false, auth);
 
-        let context = SinkContext::new_test();
+        let context = SinkContext::default();
         let (sink, _healthcheck) = config.build(context).await.unwrap();
 
         let (lines, events) = random_lines_with_stream(10, 100, None);

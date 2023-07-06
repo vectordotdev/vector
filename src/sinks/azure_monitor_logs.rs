@@ -39,7 +39,10 @@ fn default_host() -> String {
 }
 
 /// Configuration for the `azure_monitor_logs` sink.
-#[configurable_component(sink("azure_monitor_logs"))]
+#[configurable_component(sink(
+    "azure_monitor_logs",
+    "Publish log events to the Azure Monitor Logs service."
+))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct AzureMonitorLogsConfig {
@@ -177,6 +180,7 @@ const SHARED_KEY: &str = "SharedKey";
 const API_VERSION: &str = "2016-04-01";
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "azure_monitor_logs")]
 impl SinkConfig for AzureMonitorLogsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let batch_settings = self
@@ -204,6 +208,7 @@ impl SinkConfig for AzureMonitorLogsConfig {
         )
         .sink_map_err(|error| error!(message = "Fatal azure_monitor_logs sink error.", %error));
 
+        #[allow(deprecated)]
         Ok((VectorSink::from_event_sink(sink), healthcheck))
     }
 
@@ -454,7 +459,7 @@ mod tests {
             default_headers: HeaderMap::new(),
         };
 
-        let context = SinkContext::new_test();
+        let context = SinkContext::default();
         let client =
             HttpClient::new(None, &context.proxy).expect("should not fail to create HTTP client");
 
@@ -471,6 +476,7 @@ mod tests {
         .sink_map_err(|error| error!(message = "Fatal azure_monitor_logs sink error.", %error));
 
         let event = Event::Log(LogEvent::from("simple message"));
+        #[allow(deprecated)]
         run_and_assert_sink_compliance(
             VectorSink::from_event_sink(sink),
             stream::once(ready(event)),
@@ -611,7 +617,7 @@ mod tests {
         "#,
         )
         .unwrap();
-        if config.build(SinkContext::new_test()).await.is_ok() {
+        if config.build(SinkContext::default()).await.is_ok() {
             panic!("config.build failed to error");
         }
     }
@@ -651,7 +657,7 @@ mod tests {
         "#,
         )
         .unwrap();
-        if config.build(SinkContext::new_test()).await.is_ok() {
+        if config.build(SinkContext::default()).await.is_ok() {
             panic!("config.build failed to error");
         }
     }

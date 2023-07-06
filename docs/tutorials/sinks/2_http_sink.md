@@ -366,9 +366,9 @@ impl DriverResponse for BasicResponse {
         EventStatus::Delivered
     }
 
-    fn events_sent(&self) -> CountByteSize {
+    fn events_sent(&self) -> RequestCountByteSize {
         // (events count, byte size)
-        CountByteSize(1, self.byte_size)
+        CountByteSize(1, self.byte_size).into()
     }
 }
 ```

@@ -1,12 +1,8 @@
 use bytes::Bytes;
-use serde_json::error::Category;
 use snafu::Snafu;
-use std::{num::NonZeroUsize, sync::Arc};
+use std::sync::Arc;
 use vector_common::request_metadata::RequestMetadata;
-use vector_core::{
-    event::{EventFinalizers, Finalizable, Metric},
-    EstimatedJsonEncodedSizeOf,
-};
+use vector_core::event::{EventFinalizers, Finalizable, Metric};
 
 use super::{
     config::{DatadogMetricsEndpoint, DatadogMetricsEndpointConfiguration},
@@ -17,19 +13,19 @@ use crate::sinks::util::{metadata::RequestMetadataBuilder, IncrementalRequestBui
 
 #[derive(Debug, Snafu)]
 pub enum RequestBuilderError {
-    #[snafu(display("Failed to build the request builder: {}", error_type))]
-    FailedToBuild { error_type: &'static str },
+    #[snafu(
+        context(false),
+        display("Failed to build the request builder: {source}")
+    )]
+    FailedToBuild { source: CreateError },
 
-    #[snafu(display("Encoding of a metric failed ({})", reason))]
-    FailedToEncode {
-        reason: &'static str,
-        dropped_events: u64,
-    },
+    #[snafu(context(false), display("Failed to encode metric: {source}"))]
+    FailedToEncode { source: EncoderError },
 
-    #[snafu(display("A split payload was still too big to encode/compress within size limits"))]
+    #[snafu(display("A split payload was still too big to encode/compress within size limits."))]
     FailedToSplit { dropped_events: u64 },
 
-    #[snafu(display("An unexpected error occurred"))]
+    #[snafu(display("An unexpected error occurred: {error_type}"))]
     Unexpected {
         error_type: &'static str,
         dropped_events: u64,
@@ -37,78 +33,28 @@ pub enum RequestBuilderError {
 }
 
 impl RequestBuilderError {
-    /// Converts this error into its constituent parts: the error reason, and how many events were
-    /// dropped as a result.
-    pub const fn into_parts(self) -> (&'static str, &'static str, u64) {
+    /// Converts this error into its constituent parts: the error reason, the error type, and how
+    /// many events were dropped as a result.
+    pub fn into_parts(self) -> (String, &'static str, u64) {
         match self {
-            Self::FailedToBuild { error_type } => {
-                ("Failed to build the request builder.", error_type, 0)
-            }
-            Self::FailedToEncode {
-                reason,
-                dropped_events,
-            } => ("Encoding of a metric failed.", reason, dropped_events),
+            Self::FailedToBuild { source } => (source.to_string(), source.as_error_type(), 0),
+            // Encoding errors always happen at the per-metric level, so we could only ever drop a
+            // single metric/event at a time.
+            Self::FailedToEncode { source } => (source.to_string(), source.as_error_type(), 1),
             Self::FailedToSplit { dropped_events } => (
-                "A split payload was still too big to encode/compress withing size limits.",
+                "A split payload was still too big to encode/compress withing size limits."
+                    .to_string(),
                 "split_failed",
                 dropped_events,
             ),
             Self::Unexpected {
                 error_type,
                 dropped_events,
-            } => ("An unexpected error occurred.", error_type, dropped_events),
-        }
-    }
-}
-
-impl From<CreateError> for RequestBuilderError {
-    fn from(e: CreateError) -> Self {
-        match e {
-            CreateError::InvalidLimits => Self::FailedToBuild {
-                error_type: "invalid_payload_limits",
-            },
-        }
-    }
-}
-
-impl From<EncoderError> for RequestBuilderError {
-    fn from(e: EncoderError) -> Self {
-        match e {
-            // Series metrics (JSON) are encoded incrementally, so we can only ever lose a single
-            // metric for a JSON encoding failure.
-            EncoderError::JsonEncodingFailed { source } => Self::FailedToEncode {
-                reason: match source.classify() {
-                    Category::Io => "json_io",
-                    Category::Syntax => "json_syntax",
-                    Category::Data => "json_data",
-                    Category::Eof => "json_eof",
-                },
-                dropped_events: 1,
-            },
-            // Sketch metrics (Protocol Buffers) are encoded in a single shot, so naturally we would
-            // expect `dropped_events` to be 1-N, instead of always 1.  We should never emit this
-            // metric when calling `try_encode`, which is where we'd see the JSON variant of it.
-            // This is because sketch encoding happens at the end.
-            //
-            // Thus, we default `dropped_events` to 1, and if we actually hit this error when
-            // finishing up a payload, we'll fix up the true number of dropped events at that point.
-            EncoderError::ProtoEncodingFailed { .. } => Self::FailedToEncode {
-                // `prost` states that for an encoding error specifically, it can only ever fail due
-                // to insufficient capacity in the encoding buffer.
-                reason: "protobuf_insufficient_buf_capacity",
-                dropped_events: 1,
-            },
-            // Not all metric types for valid depending on the configured endpoint of the encoder.
-            EncoderError::InvalidMetric { metric_value, .. } => Self::FailedToEncode {
-                // TODO: At some point, it would be nice to use `const_format` to build the reason
-                // as "<invalid metric_type> _via_<endpoint>" to better understand in what context
-                // metric X is being considered as invalid.  Practically it's not a huge issue,
-                // because the number of metric types are fixed and we should be able to inspect the
-                // code for issues, or if it became a big problem, we could just go ahead and do the
-                // `const_format` work... but it'd be nice to be ahead of curve when trivially possible.
-                reason: metric_value,
-                dropped_events: 1,
-            },
+            } => (
+                "An unexpected error occurred.".to_string(),
+                error_type,
+                dropped_events,
+            ),
         }
     }
 }
@@ -118,7 +64,6 @@ pub struct DDMetricsMetadata {
     api_key: Option<Arc<str>>,
     endpoint: DatadogMetricsEndpoint,
     finalizers: EventFinalizers,
-    raw_bytes: usize,
 }
 
 /// Incremental request builder specific to Datadog metrics.
@@ -211,24 +156,21 @@ impl IncrementalRequestBuilder<((Option<Arc<str>>, DatadogMetricsEndpoint), Vec<
             // If we encoded one or more metrics this pass, finalize the payload.
             if n > 0 {
                 match encoder.finish() {
-                    Ok((payload, mut metrics, raw_bytes_written)) => {
-                        let json_size = metrics.estimated_json_encoded_size_of();
+                    Ok((encode_result, mut metrics)) => {
                         let finalizers = metrics.take_finalizers();
                         let metadata = DDMetricsMetadata {
                             api_key: api_key.as_ref().map(Arc::clone),
                             endpoint,
                             finalizers,
-                            raw_bytes: raw_bytes_written,
                         };
-                        let builder = RequestMetadataBuilder::new(
-                            metrics.len(),
-                            raw_bytes_written,
-                            json_size,
-                        );
-                        let bytes_len = NonZeroUsize::new(payload.len())
-                            .expect("payload should never be zero length");
-                        let request_metadata = builder.with_request_size(bytes_len);
-                        results.push(Ok(((metadata, request_metadata), payload)));
+
+                        let request_metadata =
+                            RequestMetadataBuilder::from_events(&metrics).build(&encode_result);
+
+                        results.push(Ok((
+                            (metadata, request_metadata),
+                            encode_result.into_payload(),
+                        )));
                     }
                     Err(err) => match err {
                         // The encoder informed us that the resulting payload was too big, so we're
@@ -299,7 +241,6 @@ impl IncrementalRequestBuilder<((Option<Arc<str>>, DatadogMetricsEndpoint), Vec<
             uri,
             content_type: ddmetrics_metadata.endpoint.content_type(),
             finalizers: ddmetrics_metadata.finalizers,
-            raw_bytes: ddmetrics_metadata.raw_bytes,
             metadata: request_metadata,
         }
     }
@@ -332,21 +273,21 @@ fn encode_now_or_never(
 
     encoder
         .finish()
-        .map(|(payload, mut processed, raw_bytes_written)| {
-            let json_size = processed.estimated_json_encoded_size_of();
+        .map(|(encode_result, mut processed)| {
             let finalizers = processed.take_finalizers();
             let ddmetrics_metadata = DDMetricsMetadata {
                 api_key,
                 endpoint,
                 finalizers,
-                raw_bytes: raw_bytes_written,
             };
-            let builder = RequestMetadataBuilder::new(metrics_len, raw_bytes_written, json_size);
-            let bytes_len =
-                NonZeroUsize::new(payload.len()).expect("payload should never be zero length");
-            let request_metadata = builder.with_request_size(bytes_len);
 
-            ((ddmetrics_metadata, request_metadata), payload)
+            let request_metadata =
+                RequestMetadataBuilder::from_events(&processed).build(&encode_result);
+
+            (
+                (ddmetrics_metadata, request_metadata),
+                encode_result.into_payload(),
+            )
         })
         .map_err(|_| RequestBuilderError::FailedToSplit {
             dropped_events: metrics_len as u64,

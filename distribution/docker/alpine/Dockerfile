@@ -1,4 +1,4 @@
-FROM docker.io/alpine:3.14 AS builder
+FROM docker.io/alpine:3.18 AS builder
 
 WORKDIR /vector
 
@@ -7,7 +7,7 @@ RUN tar -xvf vector-0*-"$(cat /etc/apk/arch)"-unknown-linux-musl*.tar.gz --strip
 
 RUN mkdir -p /var/lib/vector
 
-FROM docker.io/alpine:3.14
+FROM docker.io/alpine:3.18
 RUN apk --no-cache add ca-certificates tzdata
 
 COPY --from=builder /vector/bin/* /usr/local/bin/

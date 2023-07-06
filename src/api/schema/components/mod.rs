@@ -11,7 +11,6 @@ use std::{
 use async_graphql::{Enum, InputObject, Interface, Object, Subscription};
 use once_cell::sync::Lazy;
 use tokio_stream::{wrappers::BroadcastStream, Stream, StreamExt};
-use vector_config::NamedComponent;
 use vector_core::internal_event::DEFAULT_OUTPUT;
 
 use crate::{

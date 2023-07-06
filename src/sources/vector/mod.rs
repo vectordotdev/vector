@@ -78,7 +78,7 @@ impl proto::Service for Service {
             .send_batch(events)
             .map_err(|error| {
                 let message = error.to_string();
-                emit!(StreamClosedError { error, count });
+                emit!(StreamClosedError { count });
                 Status::unavailable(message)
             })
             .and_then(|_| handle_batch_status(receiver))
@@ -280,11 +280,7 @@ mod tests {
     use crate::{
         config::{SinkConfig as _, SinkContext},
         sinks::vector::VectorConfig as SinkConfig,
-        test_util::{
-            self,
-            components::{assert_source_compliance, SOURCE_TAGS},
-        },
-        SourceSender,
+        test_util, SourceSender,
     };
 
     async fn run_test(vector_source_config_str: &str, addr: SocketAddr) {
@@ -303,7 +299,7 @@ mod tests {
         // but the sink side already does such a test and this is good
         // to ensure interoperability.
         let sink: SinkConfig = toml::from_str(vector_source_config_str).unwrap();
-        let cx = SinkContext::new_test();
+        let cx = SinkContext::default();
         let (sink, _) = sink.build(cx).await.unwrap();
 
         let (mut events, stream) = test_util::random_events_with_stream(100, 100, None);
@@ -323,25 +319,19 @@ mod tests {
     async fn receive_message() {
         let addr = test_util::next_addr();
 
-        assert_source_compliance(&SOURCE_TAGS, async {
-            let config = format!(r#"address = "{}""#, addr);
-            run_test(&config, addr).await;
-        })
-        .await;
+        let config = format!(r#"address = "{}""#, addr);
+        run_test(&config, addr).await;
     }
 
     #[tokio::test]
     async fn receive_compressed_message() {
         let addr = test_util::next_addr();
 
-        assert_source_compliance(&SOURCE_TAGS, async {
-            let config = format!(
-                r#"address = "{}"
+        let config = format!(
+            r#"address = "{}"
             compression=true"#,
-                addr
-            );
-            run_test(&config, addr).await;
-        })
-        .await;
+            addr
+        );
+        run_test(&config, addr).await;
     }
 }

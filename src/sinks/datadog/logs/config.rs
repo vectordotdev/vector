@@ -46,7 +46,7 @@ impl SinkBatchSettings for DatadogLogsDefaultBatchSettings {
 }
 
 /// Configuration for the `datadog_logs` sink.
-#[configurable_component(sink("datadog_logs"))]
+#[configurable_component(sink("datadog_logs", "Publish log events to Datadog."))]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct DatadogLogsConfig {
@@ -160,6 +160,7 @@ impl DatadogLogsConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "datadog_logs")]
 impl SinkConfig for DatadogLogsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let client = self.create_client(&cx.proxy)?;
@@ -193,7 +194,7 @@ impl SinkConfig for DatadogLogsConfig {
 
 #[cfg(test)]
 mod test {
-    use crate::sinks::datadog::logs::DatadogLogsConfig;
+    use super::super::config::DatadogLogsConfig;
 
     #[test]
     fn generate_config() {

@@ -574,9 +574,9 @@ impl IngestorProcess {
 
         let send_error = match self.out.send_event_stream(&mut stream).await {
             Ok(_) => None,
-            Err(error) => {
+            Err(_) => {
                 let (count, _) = stream.size_hint();
-                emit!(StreamClosedError { error, count });
+                emit!(StreamClosedError { count });
                 Some(crate::source_sender::ClosedError)
             }
         };

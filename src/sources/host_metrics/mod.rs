@@ -296,8 +296,8 @@ impl HostMetricsConfig {
             bytes_received.emit(ByteSize(0));
             let metrics = generator.capture_metrics().await;
             let count = metrics.len();
-            if let Err(error) = out.send_batch(metrics).await {
-                emit!(StreamClosedError { count, error });
+            if (out.send_batch(metrics).await).is_err() {
+                emit!(StreamClosedError { count });
                 return Err(());
             }
         }

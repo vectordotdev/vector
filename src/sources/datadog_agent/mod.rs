@@ -443,8 +443,8 @@ pub(crate) async fn handle_request(
             } else {
                 out.send_batch(events).await
             }
-            .map_err(move |error: crate::source_sender::ClosedError| {
-                emit!(StreamClosedError { error, count });
+            .map_err(|_| {
+                emit!(StreamClosedError { count });
                 warp::reject::custom(ApiError::ServerShutdown)
             })?;
             match receiver {

@@ -235,7 +235,7 @@ impl ValidatableComponent for HttpClientConfig {
         let config = Self {
             endpoint: uri.to_string(),
             interval: Duration::from_secs(1),
-            decoding: DeserializerConfig::Json,
+            decoding: DeserializerConfig::Json(Default::default()),
             ..Default::default()
         };
 
@@ -307,8 +307,7 @@ impl http_client::HttpClientContext for HttpClientContext {
     fn on_response(&mut self, _url: &Uri, _header: &Parts, body: &Bytes) -> Option<Vec<Event>> {
         // get the body into a byte array
         let mut buf = BytesMut::new();
-        let body = String::from_utf8_lossy(body);
-        buf.extend_from_slice(body.as_bytes());
+        buf.extend_from_slice(body);
 
         let events = self.decode_events(&mut buf);
 

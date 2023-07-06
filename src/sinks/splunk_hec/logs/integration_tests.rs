@@ -127,7 +127,7 @@ async fn config(encoding: EncodingConfig, indexed_fields: Vec<String>) -> HecLog
 
 #[tokio::test]
 async fn splunk_insert_message() {
-    let cx = SinkContext::new_test();
+    let cx = SinkContext::default();
 
     let config = config(TextSerializerConfig::default().into(), vec![]).await;
     let (sink, _) = config.build(cx).await.unwrap();
@@ -147,7 +147,7 @@ async fn splunk_insert_message() {
 
 #[tokio::test]
 async fn splunk_insert_raw_message() {
-    let cx = SinkContext::new_test();
+    let cx = SinkContext::default();
 
     let config = HecLogsSinkConfig {
         endpoint_target: EndpointTarget::Raw,
@@ -172,7 +172,7 @@ async fn splunk_insert_raw_message() {
 
 #[tokio::test]
 async fn splunk_insert_broken_token() {
-    let cx = SinkContext::new_test();
+    let cx = SinkContext::default();
 
     let mut config = config(TextSerializerConfig::default().into(), vec![]).await;
     config.default_token = "BROKEN_TOKEN".to_string().into();
@@ -188,7 +188,7 @@ async fn splunk_insert_broken_token() {
 
 #[tokio::test]
 async fn splunk_insert_source() {
-    let cx = SinkContext::new_test();
+    let cx = SinkContext::default();
 
     let mut config = config(TextSerializerConfig::default().into(), vec![]).await;
     config.source = Template::try_from("/var/log/syslog".to_string()).ok();
@@ -206,7 +206,7 @@ async fn splunk_insert_source() {
 
 #[tokio::test]
 async fn splunk_insert_index() {
-    let cx = SinkContext::new_test();
+    let cx = SinkContext::default();
 
     let mut config = config(TextSerializerConfig::default().into(), vec![]).await;
     config.index = Template::try_from("custom_index".to_string()).ok();
@@ -223,7 +223,7 @@ async fn splunk_insert_index() {
 
 #[tokio::test]
 async fn splunk_index_is_interpolated() {
-    let cx = SinkContext::new_test();
+    let cx = SinkContext::default();
 
     let indexed_fields = vec!["asdf".to_string()];
     let mut config = config(JsonSerializerConfig::default().into(), indexed_fields).await;
@@ -244,7 +244,7 @@ async fn splunk_index_is_interpolated() {
 
 #[tokio::test]
 async fn splunk_insert_many() {
-    let cx = SinkContext::new_test();
+    let cx = SinkContext::default();
 
     let config = config(TextSerializerConfig::default().into(), vec![]).await;
     let (sink, _) = config.build(cx).await.unwrap();
@@ -257,7 +257,7 @@ async fn splunk_insert_many() {
 
 #[tokio::test]
 async fn splunk_custom_fields() {
-    let cx = SinkContext::new_test();
+    let cx = SinkContext::default();
 
     let indexed_fields = vec!["asdf".into()];
     let config = config(JsonSerializerConfig::default().into(), indexed_fields).await;
@@ -277,7 +277,7 @@ async fn splunk_custom_fields() {
 
 #[tokio::test]
 async fn splunk_hostname() {
-    let cx = SinkContext::new_test();
+    let cx = SinkContext::default();
 
     let indexed_fields = vec!["asdf".into()];
     let config = config(JsonSerializerConfig::default().into(), indexed_fields).await;
@@ -300,7 +300,7 @@ async fn splunk_hostname() {
 
 #[tokio::test]
 async fn splunk_sourcetype() {
-    let cx = SinkContext::new_test();
+    let cx = SinkContext::default();
 
     let indexed_fields = vec!["asdf".to_string()];
     let mut config = config(JsonSerializerConfig::default().into(), indexed_fields).await;
@@ -324,7 +324,7 @@ async fn splunk_sourcetype() {
 
 #[tokio::test]
 async fn splunk_configure_hostname() {
-    let cx = SinkContext::new_test();
+    let cx = SinkContext::default();
 
     let config = HecLogsSinkConfig {
         host_key: "roast".into(),
@@ -355,7 +355,7 @@ async fn splunk_configure_hostname() {
 
 #[tokio::test]
 async fn splunk_indexer_acknowledgements() {
-    let cx = SinkContext::new_test();
+    let cx = SinkContext::default();
 
     let acknowledgements_config = HecClientAcknowledgementsConfig {
         query_interval: NonZeroU8::new(1).unwrap(),
@@ -385,7 +385,7 @@ async fn splunk_indexer_acknowledgements() {
 
 #[tokio::test]
 async fn splunk_indexer_acknowledgements_disabled_on_server() {
-    let cx = SinkContext::new_test();
+    let cx = SinkContext::default();
 
     let config = config(
         JsonSerializerConfig::default().into(),
@@ -414,7 +414,7 @@ async fn splunk_auto_extracted_timestamp() {
         .map(|version| !version.starts_with("7."))
         .unwrap_or(true)
     {
-        let cx = SinkContext::new_test();
+        let cx = SinkContext::default();
 
         let config = HecLogsSinkConfig {
             auto_extract_timestamp: Some(true),
@@ -467,7 +467,7 @@ async fn splunk_non_auto_extracted_timestamp() {
         .map(|version| !version.starts_with("7."))
         .unwrap_or(true)
     {
-        let cx = SinkContext::new_test();
+        let cx = SinkContext::default();
 
         let config = HecLogsSinkConfig {
             auto_extract_timestamp: Some(false),

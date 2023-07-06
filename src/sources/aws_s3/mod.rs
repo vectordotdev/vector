@@ -3,7 +3,7 @@ use std::{convert::TryInto, io::ErrorKind};
 use async_compression::tokio::bufread;
 use aws_sdk_s3::types::ByteStream;
 use codecs::decoding::{DeserializerConfig, FramingConfig, NewlineDelimitedDecoderOptions};
-use codecs::BytesDeserializerConfig;
+use codecs::{BytesDeserializerConfig, NewlineDelimitedDecoderConfig};
 use futures::{stream, stream::StreamExt, TryStreamExt};
 use lookup::owned_value_path;
 use snafu::Snafu;
@@ -133,9 +133,9 @@ pub struct AwsS3Config {
 
 const fn default_framing() -> FramingConfig {
     // This is used for backwards compatibility. It used to be the only (hardcoded) option.
-    FramingConfig::NewlineDelimited {
+    FramingConfig::NewlineDelimited(NewlineDelimitedDecoderConfig {
         newline_delimited: NewlineDelimitedDecoderOptions { max_length: None },
-    }
+    })
 }
 
 impl_generate_config_from_default!(AwsS3Config);
@@ -228,10 +228,7 @@ impl AwsS3Config {
             .region()
             .ok_or(CreateSqsIngestorError::RegionMissing)?;
 
-        let endpoint = self
-            .region
-            .endpoint()
-            .map_err(|_| CreateSqsIngestorError::InvalidEndpoint)?;
+        let endpoint = self.region.endpoint();
 
         let s3_client = create_client::<S3ClientBuilder>(
             &self.auth,
@@ -925,7 +922,7 @@ mod integration_tests {
         create_client::<S3ClientBuilder>(
             &auth,
             region_endpoint.region(),
-            region_endpoint.endpoint().unwrap(),
+            region_endpoint.endpoint(),
             &proxy_config,
             &None,
             false,
@@ -944,7 +941,7 @@ mod integration_tests {
         create_client::<SqsClientBuilder>(
             &auth,
             region_endpoint.region(),
-            region_endpoint.endpoint().unwrap(),
+            region_endpoint.endpoint(),
             &proxy_config,
             &None,
             false,
