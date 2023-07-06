@@ -19,7 +19,7 @@ cargo install --locked --version 0.10.3 wasm-pack
 After installing `wasm-pack` we must compile our project by running:
 
 ```shell
-wasm-pack build --target web --out-dir public
+wasm-pack build --target web --out-dir public/pkg
 ```
 
 Notice the `public` directory was populated with `.wasm`, and `.js`,
@@ -41,6 +41,7 @@ the web browser console.
 To see this in action we host `index.html` locally, for example by running:
 
 ```shell
+cd public
 python3 -m http.server
 ```
 
