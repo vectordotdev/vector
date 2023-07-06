@@ -10,10 +10,12 @@ use chrono::{DateTime, Utc};
 use once_cell::sync::OnceCell;
 use prost::Message;
 use snafu::{ResultExt, Snafu};
+use vector_common::request_metadata::GroupedCountByteSize;
 use vector_core::{
-    config::{log_schema, LogSchema},
+    config::{log_schema, telemetry, LogSchema},
     event::{metric::MetricSketch, Metric, MetricTags, MetricValue},
     metrics::AgentDDSketch,
+    EstimatedJsonEncodedSizeOf,
 };
 
 use super::config::{
@@ -122,6 +124,7 @@ struct EncoderState {
     written: usize,
     buf: Vec<u8>,
     processed: Vec<Metric>,
+    byte_size: GroupedCountByteSize,
 }
 
 impl Default for EncoderState {
@@ -131,6 +134,7 @@ impl Default for EncoderState {
             written: 0,
             buf: Vec::with_capacity(1024),
             processed: Vec::new(),
+            byte_size: telemetry().create_request_count_byte_size(),
         }
     }
 }
@@ -201,6 +205,10 @@ impl DatadogMetricsEncoder {
 
         // Clear our temporary buffer before any encoding.
         self.state.buf.clear();
+
+        self.state
+            .byte_size
+            .add_event(&metric, metric.estimated_json_encoded_size_of());
 
         match self.endpoint {
             // Series metrics are encoded via JSON, in an incremental fashion.
@@ -349,7 +357,7 @@ impl DatadogMetricsEncoder {
         if recommended_splits == 1 {
             // "One" split means no splits needed: our payload didn't exceed either of the limits.
             Ok((
-                EncodeResult::compressed(payload, raw_bytes_written),
+                EncodeResult::compressed(payload, raw_bytes_written, self.state.byte_size.clone()),
                 processed,
             ))
         } else {

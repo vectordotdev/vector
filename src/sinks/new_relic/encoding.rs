@@ -1,6 +1,8 @@
 use std::io;
 
 use serde::Serialize;
+use vector_common::request_metadata::GroupedCountByteSize;
+use vector_core::config::telemetry;
 
 use super::{NewRelicApiModel, NewRelicSinkError};
 use crate::sinks::util::encoding::{as_tracked_write, Encoder};
@@ -12,7 +14,7 @@ impl Encoder<Result<NewRelicApiModel, NewRelicSinkError>> for NewRelicEncoder {
         &self,
         input: Result<NewRelicApiModel, NewRelicSinkError>,
         writer: &mut dyn io::Write,
-    ) -> io::Result<usize> {
+    ) -> io::Result<(usize, GroupedCountByteSize)> {
         let json = match input? {
             NewRelicApiModel::Events(ev_api_model) => to_json(&ev_api_model)?,
             NewRelicApiModel::Metrics(met_api_model) => to_json(&met_api_model)?,
@@ -22,7 +24,11 @@ impl Encoder<Result<NewRelicApiModel, NewRelicSinkError>> for NewRelicEncoder {
             writer.write_all(json)?;
             Ok(())
         })?;
-        io::Result::Ok(size)
+
+        // TODO This should not be zero.
+        let byte_size = telemetry().create_request_count_byte_size();
+
+        io::Result::Ok((size, byte_size))
     }
 }
 
