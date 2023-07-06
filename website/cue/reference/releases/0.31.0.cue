@@ -183,7 +183,7 @@ releases: "0.31.0": {
 				Vector's graceful shutdown time limit is now configurable (via
 				`--graceful-shutdown-limit-secs`) and able to be disabled (via
 				`--no-graceful-shutdown-limit`). See the [CLI
-				docs](docs/reference/cli/) for more.
+				docs](/docs/reference/cli/) for more.
 				"""
 			pr_numbers: [17479]
 		},
@@ -296,7 +296,7 @@ releases: "0.31.0": {
 				The `component_sent_event_bytes_total` and `component_sent_event_total` metrics can
 				now optionally have a `service` and `source` tag added to them, driven from event
 				data, from the added [`telemetry` global config
-				options](docs/reference/configuration/global-options/#telemetry). This can be used
+				options](/docs/reference/configuration/global-options/#telemetry). This can be used
 				to break down processing volume by service and source.
 				"""
 			pr_numbers: [17549]
