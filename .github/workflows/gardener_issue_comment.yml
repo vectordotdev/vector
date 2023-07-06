@@ -26,44 +26,43 @@ jobs:
           status_field_id="PVTF_lADOAQFeYs4AAsTrzgAXRuU" # Status
           triage_option_id="2a08fafa"
 
-          # ensures that the issue is already on board but also seems to be the only way to fetch
-          # the item id
-          item_id="$(gh api graphql -f query='
-            mutation($project_id: ID!, $content_id: ID!) {
-                addProjectV2ItemById(input: {projectId: $project_id, contentId: $content_id}) {
-                  item {
-                    id
-                  }
-                }
-            }' -f project_id="$project_id" -f content_id="$issue_id" -q '.data.addProjectV2ItemById.item.id'
-          )"
-
-          echo "item_id: $item_id"
-
-          if [ -z "$item_id" ] ; then
-            echo "Issue not found in Gardener board"
-            exit 0
-          else
-            echo "Found issue on Gardener board"
-          fi
-
-          current_status="$(gh api graphql -f query='
+          # Query for project items for the given issue
+          project_items="$(gh api graphql -f query='
             query($item_id: ID!) {
               node(id: $item_id) {
-                ... on ProjectV2Item {
-                  fieldValueByName(name: "Status") {
-                    ... on ProjectV2ItemFieldSingleSelectValue {
-                      name
+                ... on Issue {
+                  projectItems(first: 50) {
+                    ... on ProjectV2ItemConnection {
+                      nodes {
+                        fieldValueByName(name: "Status") {
+                          ... on ProjectV2ItemFieldSingleSelectValue {
+                            name
+                          }
+                        }
+                        ... on ProjectV2Item {
+                          project {
+                            ... on ProjectV2 {
+                              id
+                            }
+                          }
+                        }
+                      }
                     }
                   }
                 }
               }
-            }' -f item_id="$item_id"
+            }' -f item_id="$issue_id"
           )"
 
-          current_status=$(echo $current_status | jq -c -r '.["data"]["node"]["fieldValueByName"]["name"]')
+          # Extract the item in the Gardener project
+          current_status=$(echo $project_items | jq -c -r --arg project_id $project_id '.data.node.projectItems.nodes[] | select(.project.id == $project_id) | .fieldValueByName.name')
 
-          echo "Current issue status is: '${current_status}'"
+          if [ -z "$current_status" ] ; then
+            echo "Issue not found in Gardener board"
+            exit 0
+          else
+            echo "Found issue on Gardener board. Current issue status is: '${current_status}'"
+          fi
 
           if [ "$current_status" = "Blocked / Waiting" ] ; then
             echo "Moving issue from 'Blocked / Waiting' to 'Triage'"
