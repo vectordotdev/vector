@@ -420,9 +420,11 @@ rdkafka,https://github.com/fede1024/rust-rdkafka,MIT,Federico Giraud <giraud.fed
 redis,https://github.com/redis-rs/redis-rs,BSD-3-Clause,The redis Authors
 redox_syscall,https://gitlab.redox-os.org/redox-os/syscall,MIT,Jeremy Soller <jackpot51@gmail.com>
 redox_users,https://gitlab.redox-os.org/redox-os/users,MIT,"Jose Narvaez <goyox86@gmail.com>, Wesley Hershberger <mggmugginsmc@gmail.com>"
-regex,https://github.com/rust-lang/regex,MIT OR Apache-2.0,The Rust Project Developers
+regex,https://github.com/rust-lang/regex,MIT OR Apache-2.0,"The Rust Project Developers, Andrew Gallant <jamslam@gmail.com>"
 regex-automata,https://github.com/BurntSushi/regex-automata,Unlicense OR MIT,Andrew Gallant <jamslam@gmail.com>
 regex-automata,https://github.com/rust-lang/regex/tree/master/regex-automata,MIT OR Apache-2.0,"The Rust Project Developers, Andrew Gallant <jamslam@gmail.com>"
+regex-syntax,https://github.com/rust-lang/regex,MIT OR Apache-2.0,The Rust Project Developers
+regex-syntax,https://github.com/rust-lang/regex/tree/master/regex-syntax,MIT OR Apache-2.0,"The Rust Project Developers, Andrew Gallant <jamslam@gmail.com>"
 rend,https://github.com/djkoloski/rend,MIT,David Koloski <djkoloski@gmail.com>
 reqwest,https://github.com/seanmonstar/reqwest,MIT OR Apache-2.0,Sean McArthur <sean@seanmonstar.com>
 resolv-conf,http://github.com/tailhook/resolv-conf,MIT OR Apache-2.0,paul@colomiets.name
