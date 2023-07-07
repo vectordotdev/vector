@@ -37,6 +37,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.merge_group.head_sha || github.sha }}
   cancel-in-progress: true
 
+env:
+  SINGLE_MACHINE_PERFORMANCE_API: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_API }}
+
 jobs:
 
   # Only run this workflow if files changed in areas that could possibly introduce a regression
@@ -456,8 +459,6 @@ jobs:
       - compute-metadata
       - upload-baseline-image-to-ecr
       - upload-comparison-image-to-ecr
-    env:
-      SINGLE_MACHINE_PERFORMANCE_API: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_API }}
     steps:
       - name: Check status, in-progress
         env:
@@ -595,8 +596,6 @@ jobs:
     needs:
       - submit-job
       - compute-metadata
-    env:
-      SINGLE_MACHINE_PERFORMANCE_API: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_API }}
     steps:
       - uses: actions/checkout@v3
 
@@ -675,8 +674,6 @@ jobs:
     needs:
       - submit-job
       - compute-metadata
-    env:
-      SINGLE_MACHINE_PERFORMANCE_API: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_API }}
     steps:
       - name: Check status, in-progress
         env:
