@@ -253,6 +253,7 @@ impl RetryLogic for VectorGrpcRetryLogic {
                     | OutOfRange
                     | Unimplemented
                     | Unauthenticated
+                    | DataLoss
             ),
             _ => true,
         }
