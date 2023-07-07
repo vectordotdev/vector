@@ -252,7 +252,7 @@ derivative = { version = "2.2.0", default-features = false }
 dirs-next = { version = "2.0.0", default-features = false, optional = true }
 dyn-clone = { version = "1.0.11", default-features = false }
 encoding_rs = { version = "0.8.32", default-features = false, features = ["serde"] }
-enum_dispatch = { version = "0.3.11", default-features = false }
+enum_dispatch = { version = "0.3.12", default-features = false }
 exitcode = { version = "1.1.2", default-features = false }
 flate2 = { version = "1.0.26", default-features = false, features = ["default"] }
 futures-util = { version = "0.3.28", default-features = false }
