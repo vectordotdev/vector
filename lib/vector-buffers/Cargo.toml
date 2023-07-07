@@ -37,7 +37,7 @@ criterion = { version = "0.5", features = ["html_reports", "async_tokio"] }
 crossbeam-queue = "0.3.8"
 hdrhistogram = "7.5.2"
 metrics-tracing-context = { version = "0.14.0", default-features = false }
-metrics-util = { version = "0.15.0", default-features = false, features = ["debugging"] }
+metrics-util = { version = "0.15.1", default-features = false, features = ["debugging"] }
 once_cell = "1.18"
 proptest = "1.2"
 quickcheck = "1.0"
