@@ -11,9 +11,8 @@ pub struct Cli {}
 
 impl Cli {
     pub fn exec(&self) -> Result<()> {
-        // changes to vector-core should test all integrations
+        // placeholder for changes that should run all integration tests
         println!("all-int:");
-        println!("- \"lib/vector-core/**\"");
 
         // paths for each integration are defined in their respective config files.
         for (integration, config) in IntegrationTestConfig::collect_all()? {
