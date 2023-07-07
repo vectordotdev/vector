@@ -89,7 +89,12 @@ jobs:
           # First one requires more time, as we need to build the image from scratch
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh amqp
+          shell: bash
+          command: scripts/ci-integration-test.sh amqp
+
+      # Due to https://github.com/nick-fields/retry/issues/54 , we cannot use the retry GHA with uploading the test
+      # results to DD, because it requires the env var to be passed in. So we must do that in a separate step.
+      - run: ./scripts/upload-test-results.sh
 
       - name: appsignal
         if: ${{ contains(github.event.comment.body, '/ci-run-integration-appsignal') || contains(github.event.comment.body, '/ci-run-all') }}
@@ -97,7 +102,10 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh appsignal
+          shell: bash
+          command: scripts/ci-integration-test.sh appsignal
+
+      - run: ./scripts/upload-test-results.sh
 
       - name: aws
         if: ${{ contains(github.event.comment.body, '/ci-run-integration-aws') || contains(github.event.comment.body, '/ci-run-all') }}
@@ -105,7 +113,10 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh aws
+          shell: bash
+          command: scripts/ci-integration-test.sh aws
+
+      - run: ./scripts/upload-test-results.sh
 
       - name: axiom
         if: ${{ contains(github.event.comment.body, '/ci-run-integration-axiom') || contains(github.event.comment.body, '/ci-run-all') }}
@@ -113,7 +124,10 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh axiom
+          shell: bash
+          command: scripts/ci-integration-test.sh axiom
+
+      - run: ./scripts/upload-test-results.sh
 
       - name: azure
         if: ${{ contains(github.event.comment.body, '/ci-run-integration-azure') || contains(github.event.comment.body, '/ci-run-all') }}
@@ -121,7 +135,10 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh azure
+          shell: bash
+          command: scripts/ci-integration-test.sh azure
+
+      - run: ./scripts/upload-test-results.sh
 
       - name: clickhouse
         if: ${{ contains(github.event.comment.body, '/ci-run-integration-clickhouse') || contains(github.event.comment.body, '/ci-run-all') }}
@@ -129,7 +146,10 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh clickhouse
+          shell: bash
+          command: scripts/ci-integration-test.sh clickhouse
+
+      - run: ./scripts/upload-test-results.sh
 
       - name: databend
         if: ${{ contains(github.event.comment.body, '/ci-run-integration-databend') || contains(github.event.comment.body, '/ci-run-all') }}
@@ -137,7 +157,10 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh databend
+          shell: bash
+          command: scripts/ci-integration-test.sh databend
+
+      - run: ./scripts/upload-test-results.sh
 
       - name: datadog-agent
         if: ${{ contains(github.event.comment.body, '/ci-run-integration-datadog-agent') || contains(github.event.comment.body, '/ci-run-all') }}
@@ -145,7 +168,10 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh datadog-agent
+          shell: bash
+          command: scripts/ci-integration-test.sh datadog-agent
+
+      - run: ./scripts/upload-test-results.sh
 
       - name: datadog-logs
         if: ${{ contains(github.event.comment.body, '/ci-run-integration-datadog-logs') || contains(github.event.comment.body, '/ci-run-all') }}
@@ -153,7 +179,10 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh datadog-logs
+          shell: bash
+          command: scripts/ci-integration-test.sh datadog-logs
+
+      - run: ./scripts/upload-test-results.sh
 
       - name: datadog-metrics
         if: ${{ contains(github.event.comment.body, '/ci-run-integration-datadog-metrics') || contains(github.event.comment.body, '/ci-run-all') }}
@@ -161,7 +190,10 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh datadog-metrics
+          shell: bash
+          command: scripts/ci-integration-test.sh datadog-metrics
+
+      - run: ./scripts/upload-test-results.sh
 
       - name: datadog-traces
         if: ${{ contains(github.event.comment.body, '/ci-run-integration-datadog-traces') || contains(github.event.comment.body, '/ci-run-all') }}
@@ -169,7 +201,10 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh datadog-traces
+          shell: bash
+          command: scripts/ci-integration-test.sh datadog-traces
+
+      - run: ./scripts/upload-test-results.sh
 
       - name: dnstap
         if: ${{ contains(github.event.comment.body, '/ci-run-integration-dnstap') || contains(github.event.comment.body, '/ci-run-all') }}
@@ -177,7 +212,10 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh dnstap
+          shell: bash
+          command: scripts/ci-integration-test.sh dnstap
+
+      - run: ./scripts/upload-test-results.sh
 
       - run: docker image prune -af --filter=label!=vector-test-runner=true ; docker container prune -f
 
@@ -187,7 +225,10 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh docker-logs
+          shell: bash
+          command: scripts/ci-integration-test.sh docker-logs
+
+      - run: ./scripts/upload-test-results.sh
 
       - name: elasticsearch
         if: ${{ contains(github.event.comment.body, '/ci-run-integration-elasticsearch') || contains(github.event.comment.body, '/ci-run-all') }}
@@ -195,7 +236,10 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh elasticsearch
+          shell: bash
+          command: scripts/ci-integration-test.sh elasticsearch
+
+      - run: ./scripts/upload-test-results.sh
 
       - name: eventstoredb
         if: ${{ contains(github.event.comment.body, '/ci-run-integration-eventstoredb') || contains(github.event.comment.body, '/ci-run-all') }}
@@ -203,7 +247,10 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh eventstoredb
+          shell: bash
+          command: scripts/ci-integration-test.sh eventstoredb
+
+      - run: ./scripts/upload-test-results.sh
 
       - name: fluent
         if: ${{ contains(github.event.comment.body, '/ci-run-integration-fluent') || contains(github.event.comment.body, '/ci-run-all') }}
@@ -211,7 +258,10 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh fluent
+          shell: bash
+          command: scripts/ci-integration-test.sh fluent
+
+      - run: ./scripts/upload-test-results.sh
 
       - name: gcp
         if: ${{ contains(github.event.comment.body, '/ci-run-integration-gcp') || contains(github.event.comment.body, '/ci-run-all') }}
@@ -219,7 +269,10 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh gcp
+          shell: bash
+          command: scripts/ci-integration-test.sh gcp
+
+      - run: ./scripts/upload-test-results.sh
 
       - name: humio
         if: ${{ contains(github.event.comment.body, '/ci-run-integration-humio') || contains(github.event.comment.body, '/ci-run-all') }}
@@ -227,7 +280,10 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh humio
+          shell: bash
+          command: scripts/ci-integration-test.sh humio
+
+      - run: ./scripts/upload-test-results.sh
 
       - name: http-client
         if: ${{ contains(github.event.comment.body, '/ci-run-integration-http-client') || contains(github.event.comment.body, '/ci-run-all') }}
@@ -235,7 +291,10 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh http-client
+          shell: bash
+          command: scripts/ci-integration-test.sh http-client
+
+      - run: ./scripts/upload-test-results.sh
 
       - name: influxdb
         if: ${{ contains(github.event.comment.body, '/ci-run-integration-influxdb') || contains(github.event.comment.body, '/ci-run-all') }}
@@ -243,7 +302,10 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh influxdb
+          shell: bash
+          command: scripts/ci-integration-test.sh influxdb
+
+      - run: ./scripts/upload-test-results.sh
 
       - name: kafka
         if: ${{ contains(github.event.comment.body, '/ci-run-integration-kafka') || contains(github.event.comment.body, '/ci-run-all') }}
@@ -251,7 +313,10 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh kafka
+          shell: bash
+          command: scripts/ci-integration-test.sh kafka
+
+      - run: ./scripts/upload-test-results.sh
 
       - name: logstash
         if: ${{ contains(github.event.comment.body, '/ci-run-integration-logstash') || contains(github.event.comment.body, '/ci-run-all') }}
@@ -259,7 +324,10 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh logstash
+          shell: bash
+          command: scripts/ci-integration-test.sh logstash
+
+      - run: ./scripts/upload-test-results.sh
 
       - name: loki
         if: ${{ contains(github.event.comment.body, '/ci-run-integration-loki') || contains(github.event.comment.body, '/ci-run-all') }}
@@ -267,7 +335,10 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh loki
+          shell: bash
+          command: scripts/ci-integration-test.sh loki
+
+      - run: ./scripts/upload-test-results.sh
 
       - name: mongodb
         if: ${{ contains(github.event.comment.body, '/ci-run-integration-mongodb') || contains(github.event.comment.body, '/ci-run-all') }}
@@ -275,7 +346,10 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh mongodb
+          shell: bash
+          command: scripts/ci-integration-test.sh mongodb
+
+      - run: ./scripts/upload-test-results.sh
 
       - run: docker image prune -af --filter=label!=vector-test-runner=true ; docker container prune -f
 
@@ -285,7 +359,10 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh nats
+          shell: bash
+          command: scripts/ci-integration-test.sh nats
+
+      - run: ./scripts/upload-test-results.sh
 
       - name: nginx
         if: ${{ contains(github.event.comment.body, '/ci-run-integration-nginx') || contains(github.event.comment.body, '/ci-run-all') }}
@@ -293,7 +370,10 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh nginx
+          shell: bash
+          command: scripts/ci-integration-test.sh nginx
+
+      - run: ./scripts/upload-test-results.sh
 
       - name: opentelemetry
         if: ${{ contains(github.event.comment.body, '/ci-run-integration-opentelemetry') || contains(github.event.comment.body, '/ci-run-all') }}
@@ -301,7 +381,10 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh opentelemetry
+          shell: bash
+          command: scripts/ci-integration-test.sh opentelemetry
+
+      - run: ./scripts/upload-test-results.sh
 
       - name: postgres
         if: ${{ contains(github.event.comment.body, '/ci-run-integration-postgres') || contains(github.event.comment.body, '/ci-run-all') }}
@@ -309,7 +392,10 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh postgres
+          shell: bash
+          command: scripts/ci-integration-test.sh postgres
+
+      - run: ./scripts/upload-test-results.sh
 
       - name: prometheus
         if: ${{ contains(github.event.comment.body, '/ci-run-integration-prometheus') || contains(github.event.comment.body, '/ci-run-all') }}
@@ -317,7 +403,10 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh prometheus
+          shell: bash
+          command: scripts/ci-integration-test.sh prometheus
+
+      - run: ./scripts/upload-test-results.sh
 
       - name: pulsar
         if: ${{ contains(github.event.comment.body, '/ci-run-integration-pulsar') || contains(github.event.comment.body, '/ci-run-all') }}
@@ -325,7 +414,10 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh pulsar
+          shell: bash
+          command: scripts/ci-integration-test.sh pulsar
+
+      - run: ./scripts/upload-test-results.sh
 
       - name: redis
         if: ${{ contains(github.event.comment.body, '/ci-run-integration-redis') || contains(github.event.comment.body, '/ci-run-all') }}
@@ -333,7 +425,10 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh redis
+          shell: bash
+          command: scripts/ci-integration-test.sh redis
+
+      - run: ./scripts/upload-test-results.sh
 
       - name: shutdown
         if: ${{ contains(github.event.comment.body, '/ci-run-integration-shutdown') || contains(github.event.comment.body, '/ci-run-all') }}
@@ -341,7 +436,10 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh shutdown
+          shell: bash
+          command: scripts/ci-integration-test.sh shutdown
+
+      - run: ./scripts/upload-test-results.sh
 
       - name: splunk
         if: ${{ contains(github.event.comment.body, '/ci-run-integration-splunk') || contains(github.event.comment.body, '/ci-run-all') }}
@@ -349,7 +447,10 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh splunk
+          shell: bash
+          command: scripts/ci-integration-test.sh splunk
+
+      - run: ./scripts/upload-test-results.sh
 
       - name: webhdfs
         if: ${{ contains(github.event.comment.body, '/ci-run-integration-webhdfs') || contains(github.event.comment.body, '/ci-run-all') }}
@@ -357,7 +458,10 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh webhdfs
+          shell: bash
+          command: scripts/ci-integration-test.sh webhdfs
+
+      - run: ./scripts/upload-test-results.sh
 
   update-pr-status:
     name: Signal result to PR
