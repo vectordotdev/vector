@@ -244,6 +244,7 @@ compiletime
 coredns
 corejs
 coreutils
+curta
 daemonset
 databend
 datacenter
