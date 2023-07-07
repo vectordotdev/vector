@@ -8,7 +8,7 @@ publish = false
 [dependencies]
 async-graphql = { version = "5.0.10", default-features = false, features = ["playground" ], optional = true }
 async-trait = { version = "0.1", default-features = false }
-bitmask-enum = { version = "2.1.0", default-features = false }
+bitmask-enum = { version = "2.2.0", default-features = false }
 bytes = { version = "1.4.0", default-features = false, features = ["serde"] }
 chrono = { version = "0.4.19", default-features = false, features = ["serde"] }
 crossbeam-utils = { version = "0.8.16", default-features = false }
