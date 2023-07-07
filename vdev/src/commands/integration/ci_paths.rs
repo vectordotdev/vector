@@ -12,7 +12,7 @@ pub struct Cli {}
 impl Cli {
     pub fn exec(&self) -> Result<()> {
         // placeholder for changes that should run all integration tests
-        println!("all-int:");
+        println!("all-int: []");
 
         // paths for each integration are defined in their respective config files.
         for (integration, config) in IntegrationTestConfig::collect_all()? {
