@@ -3428,17 +3428,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ghost"
-version = "0.1.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eb19fe8de3ea0920d282f7b77dd4227aea6b8b999b42cdf0ca41b2472b14443a"
-dependencies = [
- "proc-macro2 1.0.63",
- "quote 1.0.29",
- "syn 1.0.109",
-]
-
-[[package]]
 name = "gimli"
 version = "0.27.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4182,12 +4171,9 @@ dependencies = [
 
 [[package]]
 name = "inventory"
-version = "0.3.6"
+version = "0.3.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e0539b5de9241582ce6bd6b0ba7399313560151e58c9aaf8b74b711b1bdce644"
-dependencies = [
- "ghost",
-]
+checksum = "c38a87a1e0e2752433cd4b26019a469112a25fb43b30f5ee9b3b898925c5a0f9"
 
 [[package]]
 name = "io-lifetimes"
