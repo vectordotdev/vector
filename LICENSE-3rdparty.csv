@@ -215,7 +215,6 @@ futures-timer,https://github.com/async-rs/futures-timer,MIT OR Apache-2.0,Alex C
 futures-util,https://github.com/rust-lang/futures-rs,MIT OR Apache-2.0,The futures-util Authors
 generic-array,https://github.com/fizyk20/generic-array,MIT,"Bartłomiej Kamiński <fizyk20@gmail.com>, Aaron Trent <novacrazy@gmail.com>"
 getrandom,https://github.com/rust-random/getrandom,MIT OR Apache-2.0,The Rand Project Developers
-ghost,https://github.com/dtolnay/ghost,MIT OR Apache-2.0,David Tolnay <dtolnay@gmail.com>
 gimli,https://github.com/gimli-rs/gimli,MIT OR Apache-2.0,The gimli Authors
 glob,https://github.com/rust-lang/glob,MIT OR Apache-2.0,The Rust Project Developers
 goauth,https://github.com/durch/rust-goauth,MIT,Drazen Urch <github@drazenur.ch>
