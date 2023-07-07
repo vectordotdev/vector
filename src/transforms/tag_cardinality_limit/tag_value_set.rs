@@ -27,7 +27,7 @@ impl fmt::Debug for TagValueSetStorage {
 impl AcceptedTagValueSet {
     pub fn new(value_limit: usize, mode: &Mode) -> Self {
         let storage = match &mode {
-            Mode::Exact => TagValueSetStorage::Set(HashSet::with_capacity(value_limit as usize)),
+            Mode::Exact => TagValueSetStorage::Set(HashSet::with_capacity(value_limit)),
             Mode::Probabilistic(config) => {
                 let num_bits = config.cache_size_per_key / 8; // Convert bytes to bits
                 TagValueSetStorage::Bloom(BloomFilter::with_size(num_bits))
@@ -39,7 +39,7 @@ impl AcceptedTagValueSet {
     pub fn contains(&self, value: &TagValueSet) -> bool {
         match &self.storage {
             TagValueSetStorage::Set(set) => set.contains(value),
-            TagValueSetStorage::Bloom(bloom) => bloom.contains(&value),
+            TagValueSetStorage::Bloom(bloom) => bloom.contains(value),
         }
     }
 
