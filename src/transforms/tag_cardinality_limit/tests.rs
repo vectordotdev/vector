@@ -31,7 +31,7 @@ fn make_metric(tags: MetricTags) -> Event {
 }
 
 const fn make_transform_hashset(
-    value_limit: u32,
+    value_limit: usize,
     limit_exceeded_action: LimitExceededAction,
 ) -> TagCardinalityLimitConfig {
     TagCardinalityLimitConfig {
@@ -42,7 +42,7 @@ const fn make_transform_hashset(
 }
 
 const fn make_transform_bloom(
-    value_limit: u32,
+    value_limit: usize,
     limit_exceeded_action: LimitExceededAction,
 ) -> TagCardinalityLimitConfig {
     TagCardinalityLimitConfig {
