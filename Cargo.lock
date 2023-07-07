@@ -1528,7 +1528,7 @@ checksum = "602bda35f33aeb571cef387dcd4042c643a8bf689d8aaac2cc47ea24cb7bc7e0"
 dependencies = [
  "chrono",
  "serde",
- "serde_with 2.3.2",
+ "serde_with 2.3.3",
 ]
 
 [[package]]
@@ -2501,6 +2501,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "darling"
+version = "0.20.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0558d22a7b463ed0241e993f76f09f30b126687447751a8638587b864e4b3944"
+dependencies = [
+ "darling_core 0.20.1",
+ "darling_macro 0.20.1",
+]
+
+[[package]]
 name = "darling_core"
 version = "0.13.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2529,6 +2539,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "darling_core"
+version = "0.20.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ab8bfa2e259f8ee1ce5e97824a3c55ec4404a0d772ca7fa96bf19f0752a046eb"
+dependencies = [
+ "fnv",
+ "ident_case",
+ "proc-macro2 1.0.63",
+ "quote 1.0.29",
+ "strsim 0.10.0",
+ "syn 2.0.23",
+]
+
+[[package]]
 name = "darling_macro"
 version = "0.13.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2548,6 +2572,17 @@ dependencies = [
  "darling_core 0.14.2",
  "quote 1.0.29",
  "syn 1.0.109",
+]
+
+[[package]]
+name = "darling_macro"
+version = "0.20.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "29a358ff9f12ec09c3e61fef9b5a9902623a695a46a917b07f269bff1445611a"
+dependencies = [
+ "darling_core 0.20.1",
+ "quote 1.0.29",
+ "syn 2.0.23",
 ]
 
 [[package]]
@@ -2926,7 +2961,7 @@ dependencies = [
  "once_cell",
  "proc-macro2 1.0.63",
  "quote 1.0.29",
- "syn 2.0.10",
+ "syn 2.0.23",
 ]
 
 [[package]]
@@ -7511,9 +7546,9 @@ dependencies = [
 
 [[package]]
 name = "serde_with"
-version = "2.3.2"
+version = "2.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "331bb8c3bf9b92457ab7abecf07078c13f7d270ba490103e84e8b014490cd0b0"
+checksum = "07ff71d2c147a7b57362cead5e22f772cd52f6ab31cfcd9edcd7f6aeb2a0afbe"
 dependencies = [
  "base64 0.13.1",
  "chrono",
@@ -7521,7 +7556,22 @@ dependencies = [
  "indexmap 1.9.3",
  "serde",
  "serde_json",
- "serde_with_macros 2.3.2",
+ "time",
+]
+
+[[package]]
+name = "serde_with"
+version = "3.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9f02d8aa6e3c385bf084924f660ce2a3a6bd333ba55b35e8590b321f35d88513"
+dependencies = [
+ "base64 0.21.2",
+ "chrono",
+ "hex",
+ "indexmap 1.9.3",
+ "serde",
+ "serde_json",
+ "serde_with_macros 3.0.0",
  "time",
 ]
 
@@ -7539,14 +7589,14 @@ dependencies = [
 
 [[package]]
 name = "serde_with_macros"
-version = "2.3.2"
+version = "3.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "859011bddcc11f289f07f467cc1fe01c7a941daa4d8f6c40d4d1c92eb6d9319c"
+checksum = "edc7d5d3932fb12ce722ee5e64dd38c504efba37567f0c402f6ca728c3b8b070"
 dependencies = [
- "darling 0.14.2",
+ "darling 0.20.1",
  "proc-macro2 1.0.63",
  "quote 1.0.29",
- "syn 1.0.109",
+ "syn 2.0.23",
 ]
 
 [[package]]
@@ -9324,7 +9374,7 @@ dependencies = [
  "serde-toml-merge",
  "serde_bytes",
  "serde_json",
- "serde_with 2.3.2",
+ "serde_with 3.0.0",
  "serde_yaml 0.9.22",
  "sha2 0.10.7",
  "similar-asserts",
@@ -9492,7 +9542,7 @@ dependencies = [
  "once_cell",
  "serde",
  "serde_json",
- "serde_with 2.3.2",
+ "serde_with 3.0.0",
  "snafu",
  "toml 0.7.5",
  "tracing 0.1.37",
@@ -9584,7 +9634,7 @@ dependencies = [
  "security-framework",
  "serde",
  "serde_json",
- "serde_with 2.3.2",
+ "serde_with 3.0.0",
  "similar-asserts",
  "smallvec",
  "snafu",
