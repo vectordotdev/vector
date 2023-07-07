@@ -50,7 +50,7 @@ jobs:
     name: Detect user team membership
     runs-on: ubuntu-latest
     outputs:
-      IS_TEAM_MEMBER: ${{ jobs.author.outputs.isTeamMember }}
+      IS_TEAM_MEMBER: ${{ steps.author.outputs.isTeamMember }}
     steps:
       - name: Get PR author
         if: github.event_name == 'pull_request'
