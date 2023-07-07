@@ -52,6 +52,27 @@ jobs:
                     }
                   }
                 }
+                ... on PullRequest {
+                  projectItems(first: 50) {
+                    ... on ProjectV2ItemConnection {
+                      nodes {
+                        fieldValueByName(name: "Status") {
+                          ... on ProjectV2ItemFieldSingleSelectValue {
+                            name
+                          }
+                        }
+                        ... on ProjectV2Item {
+                          id
+                          project {
+                            ... on ProjectV2 {
+                              id
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
               }
             }' -f item_id="$issue_id"
           )"
