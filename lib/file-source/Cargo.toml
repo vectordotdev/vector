@@ -19,7 +19,7 @@ vector-config-common = { path = "../vector-config-common", default-features = fa
 vector-config-macros = { path = "../vector-config-macros", default-features = false }
 
 [dependencies.bstr]
-version = "1.5"
+version = "1.6"
 default-features = false
 features = []
 
