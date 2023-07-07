@@ -143,7 +143,7 @@ loki-logproto = { path = "lib/loki-logproto", optional = true }
 
 # Tokio / Futures
 async-stream = { version = "0.3.5", default-features = false }
-async-trait = { version = "0.1.68", default-features = false }
+async-trait = { version = "0.1.71", default-features = false }
 futures = { version = "0.3.28", default-features = false, features = ["compat", "io-compat"], package = "futures" }
 tokio = { version = "1.29.0", default-features = false, features = ["full"] }
 tokio-openssl = { version = "0.6.3", default-features = false }
