@@ -239,7 +239,7 @@ async-compression = { version = "0.4.0", default-features = false, features = ["
 apache-avro = { version = "0.14.0", default-features = false, optional = true }
 axum = { version = "0.6.18", default-features = false }
 base64 = { version = "0.21.2", default-features = false, optional = true }
-bloom = { version = "0.3.2", default-features = false, optional = true }
+bloomy  = { version = "1.2.0", default-features = false, optional = true }
 bollard = { version = "0.14.0", default-features = false, features = ["ssl", "chrono"], optional = true }
 bytes = { version = "1.4.0", default-features = false, features = ["serde"] }
 bytesize = { version = "1.2.0", default-features = false }
@@ -593,7 +593,7 @@ transforms-reduce = []
 transforms-remap = []
 transforms-route = []
 transforms-sample = []
-transforms-tag_cardinality_limit = ["dep:bloom", "dep:hashbrown"]
+transforms-tag_cardinality_limit = ["dep:bloomy", "dep:hashbrown"]
 transforms-throttle = ["dep:governor"]
 
 # Sinks

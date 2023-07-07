@@ -1384,14 +1384,8 @@ version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0700ddab506f33b20a03b13996eccd309a48e5ff77d0d95926aa0210fb4e95f1"
 dependencies = [
- "bit-vec 0.6.3",
+ "bit-vec",
 ]
-
-[[package]]
-name = "bit-vec"
-version = "0.4.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "02b4ff8b16e6076c3e14220b39fbc1fabb6737522281a388998046859400895f"
 
 [[package]]
 name = "bit-vec"
@@ -1475,12 +1469,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "bloom"
-version = "0.3.2"
+name = "bloomy"
+version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d00ac8e5056d6d65376a3c1aa5c7c34850d6949ace17f0266953a254eb3d6fe8"
+checksum = "489d2af57852b78a86478273ac6a1ef912061b6af3a439694c49f309f6ea3bdd"
 dependencies = [
- "bit-vec 0.4.4",
+ "siphasher",
 ]
 
 [[package]]
@@ -2926,7 +2920,7 @@ dependencies = [
  "once_cell",
  "proc-macro2 1.0.63",
  "quote 1.0.29",
- "syn 2.0.10",
+ "syn 2.0.23",
 ]
 
 [[package]]
@@ -6402,7 +6396,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e6eb95b2e36b92d3e0536be87eaf7accb17db39f5a44452759b43f1328e82dc9"
 dependencies = [
  "async-trait",
- "bit-vec 0.6.3",
+ "bit-vec",
  "bytes 1.4.0",
  "chrono",
  "crc",
@@ -9221,7 +9215,7 @@ dependencies = [
  "azure_storage",
  "azure_storage_blobs",
  "base64 0.21.2",
- "bloom",
+ "bloomy",
  "bollard",
  "bytes 1.4.0",
  "bytesize",
