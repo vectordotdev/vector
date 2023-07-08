@@ -2,12 +2,10 @@ use std::num::NonZeroUsize;
 use std::sync::Arc;
 use std::task::Poll;
 
-use futures_util::future::BoxFuture;
 use greptimedb_client::api::v1::auth_header::AuthScheme;
 use greptimedb_client::api::v1::*;
 use greptimedb_client::channel_manager::*;
 use greptimedb_client::{Client, Database, Error as GreptimeError};
-use tower::Service;
 use vector_core::event::Metric;
 
 use crate::sinks::prelude::*;
