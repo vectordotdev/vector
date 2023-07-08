@@ -159,7 +159,7 @@ tracing-subscriber = { version = "0.3.17", default-features = false, features = 
 tracing-tower = { git = "https://github.com/tokio-rs/tracing", default-features = false, rev = "e0642d949891546a3bb7e47080365ee7274f05cd" }
 
 # Metrics
-metrics = "0.21.0"
+metrics = "0.21.1"
 metrics-tracing-context = { version = "0.14.0", default-features = false }
 
 # AWS - Official SDK
