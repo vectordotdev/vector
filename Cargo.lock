@@ -1523,7 +1523,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "822462c1e7b17b31961798a6874b36daea6818e99e0cb7d3b7b0fa3c477751c3"
 dependencies = [
  "borsh-derive",
- "hashbrown 0.12.3",
+ "hashbrown 0.13.1",
 ]
 
 [[package]]
@@ -6780,7 +6780,7 @@ version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fa250384981ea14565685dea16a9ccc4d1c541a13f82b9c168572264d1df8c56"
 dependencies = [
- "aho-corasick 1.0.1",
+ "aho-corasick",
  "memchr",
  "regex-syntax 0.7.3",
 ]
@@ -8286,9 +8286,9 @@ checksum = "cda74da7e1a664f795bb1f8a87ec406fb89a02522cf6e50620d016add6dbbf5c"
 
 [[package]]
 name = "tokio"
-version = "1.29.0"
+version = "1.29.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "374442f06ee49c3a28a8fc9f01a2596fed7559c6b99b31279c3261778e77d84f"
+checksum = "532826ff75199d5833b9d2c5fe410f29235e25704ee5f0ef599fb51c21f4a4da"
 dependencies = [
  "autocfg",
  "backtrace",
