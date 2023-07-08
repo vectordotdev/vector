@@ -23,7 +23,7 @@ serde = { version = "1.0", default-features = false }
 serde_json = { version = "1.0", default-features = false, features = ["std"] }
 serde_with = { version = "2.3.2", default-features = false, features = ["std"] }
 snafu = { version = "0.7.4", default-features = false }
-toml = { version = "0.7.5", default-features = false }
+toml = { version = "0.7.6", default-features = false }
 tracing = { version = "0.1.34", default-features = false }
 url = { version = "2.4.0", default-features = false, features = ["serde"] }
 vrl.workspace = true
