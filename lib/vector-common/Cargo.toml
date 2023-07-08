@@ -60,7 +60,7 @@ serde = { version = "1.0.164", optional = true, features = ["derive"] }
 smallvec = { version = "1", default-features = false }
 snafu = { version = "0.7", optional = true }
 stream-cancel = { version = "0.8.1", default-features = false }
-tokio = { version = "1.29.0", default-features = false, features = ["macros", "time"] }
+tokio = { version = "1.29.1", default-features = false, features = ["macros", "time"] }
 tracing = { version = "0.1.34", default-features = false }
 vrl.workspace = true
 vector-config = { path = "../vector-config" }
@@ -69,6 +69,6 @@ vector-config-macros = { path = "../vector-config-macros" }
 
 [dev-dependencies]
 futures = { version = "0.3.28", default-features = false, features = ["async-await", "std"] }
-tokio = { version = "1.29.0", default-features = false, features = ["rt", "time"] }
+tokio = { version = "1.29.1", default-features = false, features = ["rt", "time"] }
 quickcheck = "1"
 quickcheck_macros = "1"

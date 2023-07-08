@@ -24,7 +24,7 @@ rkyv = { version = "0.7.40", default-features = false, features = ["size_32", "s
 serde = { version = "1.0.164", default-features = false, features = ["derive"] }
 snafu = { version = "0.7.4", default-features = false, features = ["std"] }
 tokio-util = { version = "0.7.0", default-features = false }
-tokio = { version = "1.29.0", default-features = false, features = ["rt", "macros", "rt-multi-thread", "sync", "fs", "io-util", "time"] }
+tokio = { version = "1.29.1", default-features = false, features = ["rt", "macros", "rt-multi-thread", "sync", "fs", "io-util", "time"] }
 tracing = { version = "0.1.34", default-features = false, features = ["attributes"] }
 vector-config = { path = "../vector-config", default-features = false }
 vector-config-common = { path = "../vector-config-common", default-features = false }
