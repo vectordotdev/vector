@@ -105,6 +105,35 @@ impl Configurable for serde_with::DurationSeconds<f64, serde_with::formats::Stri
     }
 }
 
+impl Configurable for serde_with::DurationSecondsWithFrac<f64, serde_with::formats::Strict> {
+    fn referenceable_name() -> Option<&'static str> {
+        // We're masking the type parameters here because we only deal with fractional seconds via this
+        // version, and handle whole seconds with `DurationSeconds<u64, Strict>`, which we
+        // expose as `serde_with::DurationSeconds`.
+        Some("serde_with::DurationFractionalSeconds")
+    }
+
+    fn metadata() -> Metadata {
+        let mut metadata = Metadata::default();
+        metadata.set_description("A span of time, in fractional seconds.");
+        metadata.add_custom_attribute(CustomAttribute::kv(
+            constants::DOCS_META_NUMERIC_TYPE,
+            NumberClass::FloatingPoint,
+        ));
+        metadata.add_custom_attribute(CustomAttribute::kv(
+            constants::DOCS_META_TYPE_UNIT,
+            "seconds",
+        ));
+        metadata
+    }
+
+    fn generate_schema(_: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
+        // This boils down to a number schema, but we just need to shuttle around the metadata so
+        // that we can call the relevant schema generation function.
+        Ok(generate_number_schema::<f64>())
+    }
+}
+
 impl Configurable for serde_with::DurationMilliSeconds<u64, serde_with::formats::Strict> {
     fn referenceable_name() -> Option<&'static str> {
         // We're masking the type parameters here because we only deal with whole milliseconds via this
