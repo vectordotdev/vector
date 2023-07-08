@@ -3,6 +3,13 @@ use vector_core::{
     stream::batcher::limiter::ItemBatchSize,
 };
 
+use super::request_builder::{
+    DISTRIBUTION_QUANTILES, DISTRIBUTION_STAT_FIELD_COUNT, SUMMARY_STAT_FIELD_COUNT,
+};
+
+const F64_BYTE_SIZE: usize = 8;
+const I64_BYTE_SIZE: usize = 8;
+
 #[derive(Default)]
 pub(super) struct GreptimeDBBatchSizer;
 
@@ -20,14 +27,16 @@ impl GreptimeDBBatchSizer {
             .sum()
         })
             .unwrap_or(0)
+            // timestamp
+            + I64_BYTE_SIZE
             +
         // value size
             match item.value() {
-                MetricValue::Counter { .. } | MetricValue::Gauge { .. } | MetricValue::Set { ..} => 8,
-                MetricValue::Distribution { .. } => 8 * 10,
-                MetricValue::AggregatedHistogram { buckets, .. }  => 8 * (buckets.len() + 2),
-                MetricValue::AggregatedSummary { quantiles, .. } => 8 * (quantiles.len() + 2),
-                MetricValue::Sketch { .. } => 8 * 10,
+                MetricValue::Counter { .. } | MetricValue::Gauge { .. } | MetricValue::Set { ..} => F64_BYTE_SIZE,
+                MetricValue::Distribution { .. } => F64_BYTE_SIZE * (DISTRIBUTION_QUANTILES.len() + DISTRIBUTION_STAT_FIELD_COUNT),
+                MetricValue::AggregatedHistogram { buckets, .. }  => F64_BYTE_SIZE * (buckets.len() + SUMMARY_STAT_FIELD_COUNT),
+                MetricValue::AggregatedSummary { quantiles, .. } => F64_BYTE_SIZE * (quantiles.len() + SUMMARY_STAT_FIELD_COUNT),
+                MetricValue::Sketch { .. } => F64_BYTE_SIZE * (DISTRIBUTION_QUANTILES.len() + DISTRIBUTION_STAT_FIELD_COUNT),
             }
     }
 }

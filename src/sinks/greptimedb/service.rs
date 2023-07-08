@@ -143,9 +143,13 @@ impl GreptimeDBService {
                 .as_ref()
                 .ok_or(GreptimeDBConfigError::TlsMissingKey)?;
 
-            if tls_config.key_pass.is_some() {
+            if tls_config.key_pass.is_some()
+                || tls_config.alpn_protocols.is_some()
+                || tls_config.verify_certificate.is_some()
+                || tls_config.verify_hostname.is_some()
+            {
                 warn!(
-                    message = "TLS key file with password is not supported by greptimedb client at the moment."
+                    message = "TlsConfig: key_pass, alpn_protocols, verify_certificate and verify_hostname are not supported by greptimedb client at the moment."
                 );
             }
 
@@ -174,7 +178,7 @@ impl Service<GreptimeDBRequest> for GreptimeDBService {
         let client = Arc::clone(&self.client);
 
         Box::pin(async move {
-            let metadata = req.get_metadata().clone();
+            let metadata = req.metadata;
             let result = client.insert(req.items).await?;
 
             Ok(GreptimeDBBatchOutput {
