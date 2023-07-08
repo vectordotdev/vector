@@ -19,21 +19,13 @@
 //! - Distribution, Histogram and Summary, Sketch: Statistical attributes like
 //! `sum`, `count`, "max", "min", quantiles and buckets are stored as columns.
 //!
-use futures_util::FutureExt;
 use greptimedb_client::Client;
 use snafu::Snafu;
-use tower::ServiceBuilder;
 use vector_common::sensitive_string::SensitiveString;
-use vector_config::configurable_component;
-use vector_core::config::{AcknowledgementsConfig, Input};
-use vector_core::tls::TlsConfig;
 
 use crate::sinks::prelude::*;
 
 use self::service::GreptimeDBRetryLogic;
-
-use super::prelude::ServiceBuilderExt;
-use super::util::TowerRequestConfig;
 
 mod batch;
 #[cfg(all(test, feature = "greptimedb-integration-tests"))]
@@ -57,7 +49,8 @@ fn default_dbname() -> String {
 
 /// Configuration items for GreptimeDB
 #[configurable_component(sink("greptimedb", "Ingest metrics data into GreptimeDB."))]
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Derivative)]
+#[derivative(Default)]
 #[serde(deny_unknown_fields)]
 pub struct GreptimeDBConfig {
     /// The GreptimeDB [database][database] name to connect.
@@ -70,6 +63,7 @@ pub struct GreptimeDBConfig {
     ///
     /// [database]: https://docs.greptime.com/user-guide/concepts/key-concepts#database
     #[configurable(metadata(docs::examples = "public"))]
+    #[derivative(Default(value = "default_dbname()"))]
     #[serde(default = "default_dbname")]
     pub dbname: String,
     /// The host and port of GreptimeDB gRPC service.
