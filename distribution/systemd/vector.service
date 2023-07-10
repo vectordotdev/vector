@@ -1,8 +1,8 @@
 [Unit]
 Description=Vector
 Documentation=https://vector.dev
-After=network-online.target
-Requires=network-online.target
+After=network-online.target local-fs.target remote-fs.target time-sync.target
+Requires=network-online.target local-fs.target remote-fs.target time-sync.target
 
 [Service]
 User=vector
