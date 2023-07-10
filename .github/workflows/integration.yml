@@ -114,7 +114,7 @@ jobs:
           command: bash scripts/ci-integration-test.sh amqp
 
       - if: (github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.appsignal == 'true') &&
-          (github.event_name != 'pull_request' || $PR_AUTHOR_IS_TEAM_MEMBER == 'true')
+          (github.event_name != 'pull_request' || env.PR_AUTHOR_IS_TEAM_MEMBER == 'true')
         name: appsignal
         uses: nick-fields/retry@v2
         with:
@@ -131,7 +131,7 @@ jobs:
           command: bash scripts/ci-integration-test.sh  aws
 
       - if: (github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.axiom == 'true') &&
-          (github.event_name != 'pull_request' || $PR_AUTHOR_IS_TEAM_MEMBER == 'true')
+          (github.event_name != 'pull_request' || env.PR_AUTHOR_IS_TEAM_MEMBER == 'true')
         name: axiom
         uses: nick-fields/retry@v2
         with:
@@ -156,7 +156,7 @@ jobs:
           command: bash scripts/ci-integration-test.sh  clickhouse
 
       - if: (github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.databend == 'true') &&
-          (github.event_name != 'pull_request' || $PR_AUTHOR_IS_TEAM_MEMBER == 'true')
+          (github.event_name != 'pull_request' || env.PR_AUTHOR_IS_TEAM_MEMBER == 'true')
         name: databend
         uses: nick-fields/retry@v2
         with:
@@ -165,7 +165,7 @@ jobs:
           command: bash scripts/ci-integration-test.sh  databend
 
       - if: (github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.datadog == 'true') &&
-          (github.event_name != 'pull_request' || $PR_AUTHOR_IS_TEAM_MEMBER == 'true')
+          (github.event_name != 'pull_request' || env.PR_AUTHOR_IS_TEAM_MEMBER == 'true')
         name: datadog-agent
         uses: nick-fields/retry@v2
         with:
@@ -174,7 +174,7 @@ jobs:
           command: bash scripts/ci-integration-test.sh  datadog-agent
 
       - if: (github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.datadog == 'true') &&
-          (github.event_name != 'pull_request' || $PR_AUTHOR_IS_TEAM_MEMBER == 'true')
+          (github.event_name != 'pull_request' || env.PR_AUTHOR_IS_TEAM_MEMBER == 'true')
         name: datadog-logs
         uses: nick-fields/retry@v2
         with:
@@ -183,7 +183,7 @@ jobs:
           command: bash scripts/ci-integration-test.sh  datadog-logs
 
       - if: (github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.datadog == 'true') &&
-          (github.event_name != 'pull_request' || $PR_AUTHOR_IS_TEAM_MEMBER == 'true')
+          (github.event_name != 'pull_request' || env.PR_AUTHOR_IS_TEAM_MEMBER == 'true')
         name: datadog-metrics
         uses: nick-fields/retry@v2
         with:
@@ -192,7 +192,7 @@ jobs:
           command: bash scripts/ci-integration-test.sh  datadog-metrics
 
       - if: (github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.datadog == 'true') &&
-          (github.event_name != 'pull_request' || $PR_AUTHOR_IS_TEAM_MEMBER == 'true')
+          (github.event_name != 'pull_request' || env.PR_AUTHOR_IS_TEAM_MEMBER == 'true')
         name: datadog-traces
         uses: nick-fields/retry@v2
         with:
