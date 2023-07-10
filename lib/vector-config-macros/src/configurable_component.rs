@@ -49,11 +49,11 @@ impl TypedComponent {
             .ok()
             .map(|component_type| {
                 let component_name = match items.next() {
-                    Some(NestedMeta::Lit(Lit::Str(component_name))) => Some(component_name.clone()),
+                    Some(NestedMeta::Lit(Lit::Str(component_name))) => Some(component_name),
                     _ => None,
                 };
                 let description = match items.next() {
-                    Some(NestedMeta::Lit(Lit::Str(description))) => Some(description.clone()),
+                    Some(NestedMeta::Lit(Lit::Str(description))) => Some(description),
                     _ => None,
                 };
                 Self {
