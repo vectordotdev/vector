@@ -58,6 +58,9 @@ cp -a %{_builddir}/bin/vector %{buildroot}%{_bindir}
 cp -a %{_builddir}/config/vector.toml %{buildroot}%{_sysconfdir}/%{_name}/vector.toml
 cp -a %{_builddir}/config/examples/. %{buildroot}%{_sysconfdir}/%{_name}/examples
 cp -a %{_builddir}/systemd/vector.service %{buildroot}%{_unitdir}/vector.service
+cp -a %{_builddir}/systemd/vector@.service %{buildroot}%{_unitdir}/vector@.service
+cp -a %{_builddir}/systemd/hardened-vector.service %{buildroot}%{_unitdir}/hardened-vector.service
+cp -a %{_builddir}/systemd/hardened-vector@.service %{buildroot}%{_unitdir}/hardened-vector@.service
 cp -a %{_builddir}/systemd/vector.default %{buildroot}%{_sysconfdir}/default/vector
 
 %post
