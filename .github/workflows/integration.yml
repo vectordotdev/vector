@@ -46,10 +46,25 @@ jobs:
       int_tests: true
     secrets: inherit
 
+  detect-user:
+    name: Detect user team membership
+    runs-on: ubuntu-latest
+    outputs:
+      IS_TEAM_MEMBER: ${{ steps.author.outputs.isTeamMember }}
+    steps:
+      - name: Get PR author
+        if: github.event_name == 'pull_request'
+        id: author
+        uses: tspascoal/get-user-teams-membership@v2
+        with:
+          username: ${{ github.actor }}
+          team: 'Vector'
+          GITHUB_TOKEN: ${{ secrets.GH_PAT_ORG }}
+
   integration-tests:
     name: Integration Tests
     runs-on: [linux, ubuntu-20.04-4core]
-    needs: changes
+    needs: [changes, detect-user]
     if: always() && (
       github.event_name == 'merge_group' || (
           needs.changes.outputs.all-int == 'true'
@@ -103,7 +118,8 @@ jobs:
           max_attempts: 3
           command: bash scripts/ci-integration-test.sh amqp
 
-      - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.appsignal == 'true' }}
+      - if: (github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.appsignal == 'true') &&
+          (github.event_name != 'pull_request' || needs.detect-user.outputs.IS_TEAM_MEMBER == 'true')
         name: appsignal
         uses: nick-fields/retry@v2
         with:
@@ -119,7 +135,8 @@ jobs:
           max_attempts: 3
           command: bash scripts/ci-integration-test.sh  aws
 
-      - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.axiom == 'true' }}
+      - if: (github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.axiom == 'true') &&
+          (github.event_name != 'pull_request' || needs.detect-user.outputs.IS_TEAM_MEMBER == 'true')
         name: axiom
         uses: nick-fields/retry@v2
         with:
@@ -143,7 +160,8 @@ jobs:
           max_attempts: 3
           command: bash scripts/ci-integration-test.sh  clickhouse
 
-      - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.databend == 'true' }}
+      - if: (github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.databend == 'true') &&
+          (github.event_name != 'pull_request' || needs.detect-user.outputs.IS_TEAM_MEMBER == 'true')
         name: databend
         uses: nick-fields/retry@v2
         with:
@@ -151,7 +169,8 @@ jobs:
           max_attempts: 3
           command: bash scripts/ci-integration-test.sh  databend
 
-      - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.datadog == 'true' }}
+      - if: (github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.datadog == 'true') &&
+          (github.event_name != 'pull_request' || needs.detect-user.outputs.IS_TEAM_MEMBER == 'true')
         name: datadog-agent
         uses: nick-fields/retry@v2
         with:
@@ -159,7 +178,8 @@ jobs:
           max_attempts: 3
           command: bash scripts/ci-integration-test.sh  datadog-agent
 
-      - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.datadog == 'true' }}
+      - if: (github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.datadog == 'true') &&
+          (github.event_name != 'pull_request' || needs.detect-user.outputs.IS_TEAM_MEMBER == 'true')
         name: datadog-logs
         uses: nick-fields/retry@v2
         with:
@@ -167,7 +187,8 @@ jobs:
           max_attempts: 3
           command: bash scripts/ci-integration-test.sh  datadog-logs
 
-      - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.datadog == 'true' }}
+      - if: (github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.datadog == 'true') &&
+          (github.event_name != 'pull_request' || needs.detect-user.outputs.IS_TEAM_MEMBER == 'true')
         name: datadog-metrics
         uses: nick-fields/retry@v2
         with:
@@ -175,7 +196,8 @@ jobs:
           max_attempts: 3
           command: bash scripts/ci-integration-test.sh  datadog-metrics
 
-      - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.datadog == 'true' }}
+      - if: (github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.datadog == 'true') &&
+          (github.event_name != 'pull_request' || needs.detect-user.outputs.IS_TEAM_MEMBER == 'true')
         name: datadog-traces
         uses: nick-fields/retry@v2
         with:
