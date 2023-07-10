@@ -256,7 +256,7 @@ impl InputHandler {
                         if let Event::Log(ref mut log) = event {
                             self.log_namespace.insert_vector_metadata(
                                 log,
-                                Some(log_schema().source_type_key()),
+                                log_schema().source_type_key(),
                                 path!("source_type"),
                                 Bytes::from(RedisSourceConfig::NAME),
                             );
@@ -482,7 +482,7 @@ mod integration_test {
         for event in events {
             assert_eq!(event.as_log()[log_schema().message_key()], text.into());
             assert_eq!(
-                event.as_log()[log_schema().source_type_key()],
+                event.as_log()[log_schema().source_type_key().unwrap().to_string()],
                 RedisSourceConfig::NAME.into()
             );
         }

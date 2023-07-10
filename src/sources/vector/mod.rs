@@ -273,6 +273,7 @@ mod test {
 #[cfg(feature = "sinks-vector")]
 #[cfg(test)]
 mod tests {
+    use vrl::path::PathPrefix;
     use vector_common::assert_event_data_eq;
     use vector_core::config::log_schema;
 
@@ -305,10 +306,11 @@ mod tests {
         let (mut events, stream) = test_util::random_events_with_stream(100, 100, None);
         sink.run(stream).await.unwrap();
 
+        let source_type_key = log_schema().source_type_key().unwrap();
         for event in &mut events {
             event
                 .as_mut_log()
-                .insert(log_schema().source_type_key(), "vector");
+                .insert((PathPrefix::Event, source_type_key), "vector");
         }
 
         let output = test_util::collect_ready(rx).await;

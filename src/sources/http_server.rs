@@ -662,7 +662,7 @@ mod tests {
                 ))
                 .is_some());
             assert_eq!(
-                log[log_schema().source_type_key()],
+                log[log_schema().source_type_key().unwrap().to_string()],
                 SimpleHttpConfig::NAME.into()
             );
             assert_eq!(log["http_path"], "/".into());
@@ -958,9 +958,11 @@ mod tests {
                 log_schema().timestamp_key().unwrap()
             ))
             .is_some());
+
+        let source_type_key_value = log.get((lookup::PathPrefix::Event, log_schema().source_type_key().unwrap())).unwrap();
         assert_eq!(
-            log[log_schema().source_type_key()],
-            SimpleHttpConfig::NAME.into()
+            source_type_key_value.to_string(),
+            SimpleHttpConfig::NAME
         );
         assert_eq!(log["http_path"], "/".into());
     }
@@ -1131,7 +1133,7 @@ mod tests {
                 ))
                 .is_some());
             assert_eq!(
-                log[log_schema().source_type_key()],
+                log[log_schema().source_type_key().unwrap().to_string()],
                 SimpleHttpConfig::NAME.into()
             );
         }
@@ -1184,7 +1186,7 @@ mod tests {
                 ))
                 .is_some());
             assert_eq!(
-                log[log_schema().source_type_key()],
+                log[log_schema().source_type_key().unwrap().to_string()],
                 SimpleHttpConfig::NAME.into()
             );
         }
@@ -1200,7 +1202,7 @@ mod tests {
                 ))
                 .is_some());
             assert_eq!(
-                log[log_schema().source_type_key()],
+                log[log_schema().source_type_key().unwrap().to_string()],
                 SimpleHttpConfig::NAME.into()
             );
         }

@@ -209,7 +209,7 @@ impl TcpSource for LogstashSource {
 
             self.log_namespace.insert_vector_metadata(
                 log,
-                Some(log_schema().source_type_key()),
+                log_schema().source_type_key(),
                 path!("source_type"),
                 Bytes::from_static(LogstashConfig::NAME.as_bytes()),
             );

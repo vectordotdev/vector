@@ -84,7 +84,7 @@ async fn collected_logs_bytes() {
     // panics if not log event
     let log = events[0].as_log();
     assert_eq!(
-        log[log_schema().source_type_key()],
+        log[log_schema().source_type_key().unwrap().to_string()],
         HttpClientConfig::NAME.into()
     );
 }
@@ -108,7 +108,7 @@ async fn collected_logs_json() {
     // panics if not log event
     let log = events[0].as_log();
     assert_eq!(
-        log[log_schema().source_type_key()],
+        log[log_schema().source_type_key().unwrap().to_string()],
         HttpClientConfig::NAME.into()
     );
 }

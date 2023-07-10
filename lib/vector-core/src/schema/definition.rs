@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::config::{log_schema, LegacyKey, LogNamespace};
-use lookup::lookup_v2::{parse_value_path, TargetPath};
+use lookup::lookup_v2::TargetPath;
 use lookup::{owned_value_path, OwnedTargetPath, OwnedValuePath, PathPrefix};
 use vrl::value::{kind::Collection, Kind};
 
@@ -144,9 +144,7 @@ impl Definition {
     #[must_use]
     pub fn with_standard_vector_source_metadata(self) -> Self {
         self.with_vector_metadata(
-            parse_value_path(log_schema().source_type_key())
-                .ok()
-                .as_ref(),
+            log_schema().source_type_key(),
             &owned_value_path!("source_type"),
             Kind::bytes(),
             None,

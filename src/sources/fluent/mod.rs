@@ -587,7 +587,7 @@ impl From<FluentEvent<'_>> for LogEvent {
 
         log_namespace.insert_vector_metadata(
             &mut log,
-            Some(log_schema().source_type_key()),
+            log_schema().source_type_key(),
             path!("source_type"),
             Bytes::from_static(FluentConfig::NAME.as_bytes()),
         );
@@ -665,7 +665,7 @@ mod tests {
         Event::Log(LogEvent::from(BTreeMap::from([
             (String::from("message"), Value::from(name)),
             (
-                String::from(log_schema().source_type_key()),
+                log_schema().source_type_key().unwrap().to_string(),
                 Value::from(FluentConfig::NAME),
             ),
             (String::from("tag"), Value::from("tag.name")),

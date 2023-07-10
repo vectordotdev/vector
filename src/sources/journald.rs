@@ -756,7 +756,7 @@ fn enrich_log_event(log: &mut LogEvent, log_namespace: LogNamespace) {
     // Add source type.
     log_namespace.insert_vector_metadata(
         log,
-        Some(log_schema().source_type_key()),
+        log_schema().source_type_key(),
         path!("source_type"),
         JournaldConfig::NAME,
     );
@@ -1165,7 +1165,7 @@ mod tests {
             Value::Bytes("System Initialization".into())
         );
         assert_eq!(
-            received[0].as_log()[log_schema().source_type_key()],
+            received[0].as_log()[log_schema().source_type_key().unwrap().to_string()],
             "journald".into()
         );
         assert_eq!(timestamp(&received[0]), value_ts(1578529839, 140001000));

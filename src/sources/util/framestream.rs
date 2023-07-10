@@ -350,7 +350,7 @@ pub trait FrameHandler {
     fn socket_send_buffer_size(&self) -> Option<usize>;
     fn host_key(&self) -> &Option<OwnedValuePath>;
     fn timestamp_key(&self) -> Option<&OwnedValuePath>;
-    fn source_type_key(&self) -> &str;
+    fn source_type_key(&self) -> Option<&OwnedValuePath>;
 }
 
 /**
@@ -603,6 +603,7 @@ mod test {
         time::{Duration, Instant},
     };
     use tokio_util::codec::{length_delimited, Framed};
+    use vrl::path::PathPrefix;
     use vector_core::config::{LegacyKey, LogNamespace};
 
     use super::{
@@ -630,7 +631,7 @@ mod test {
         extra_task_handling_routine: F,
         host_key: Option<OwnedValuePath>,
         timestamp_key: Option<OwnedValuePath>,
-        source_type_key: String,
+        source_type_key: Option<OwnedValuePath>,
         log_namespace: LogNamespace,
     }
 
@@ -648,7 +649,7 @@ mod test {
                 extra_task_handling_routine: extra_routine,
                 host_key: Some(owned_value_path!("test_framestream")),
                 timestamp_key: Some(owned_value_path!("my_timestamp")),
-                source_type_key: "source_type".to_string(),
+                source_type_key: Some(owned_value_path!("source_type")),
                 log_namespace: LogNamespace::Legacy,
             }
         }
@@ -665,7 +666,7 @@ mod test {
         fn handle_event(&self, received_from: Option<Bytes>, frame: Bytes) -> Option<Event> {
             let mut log_event = LogEvent::from(frame);
 
-            log_event.insert(log_schema().source_type_key(), "framestream");
+            log_event.insert((PathPrefix::Event, log_schema().source_type_key().unwrap()), "framestream");
             if let Some(host) = received_from {
                 self.log_namespace.insert_source_metadata(
                     "framestream",
@@ -711,8 +712,8 @@ mod test {
             self.timestamp_key.as_ref()
         }
 
-        fn source_type_key(&self) -> &str {
-            self.source_type_key.as_str()
+        fn source_type_key(&self) -> Option<&OwnedValuePath> {
+            self.source_type_key.as_ref()
         }
     }
 

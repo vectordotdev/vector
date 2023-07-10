@@ -1,3 +1,4 @@
+use vrl::owned_value_path;
 use vector_config::configurable_component;
 
 use crate::lookup_v2::PathParseError;
@@ -55,6 +56,10 @@ pub struct OptionalValuePath {
 impl OptionalValuePath {
     pub fn none() -> Self {
         Self { path: None }
+    }
+
+    pub fn new(path: &str) -> Self {
+        Self { path: Some(owned_value_path!(path)) }
     }
 }
 

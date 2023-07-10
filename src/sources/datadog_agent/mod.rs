@@ -334,7 +334,8 @@ impl DatadogAgentSource {
                     .expect("static regex always compiles"),
             },
             log_schema_host_key: log_schema().host_key(),
-            log_schema_source_type_key: log_schema().source_type_key(),
+            log_schema_source_type_key: log_schema().source_type_key()
+                .map_or("", |key| Box::leak(key.to_string().into_boxed_str())),
             decoder,
             protocol,
             logs_schema_definition: Arc::new(logs_schema_definition),
