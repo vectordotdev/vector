@@ -36,6 +36,7 @@ Celkon
 Ceph
 Chromecast
 Citrix
+Cloudflare
 Cloudfone
 Cmx
 Coby
