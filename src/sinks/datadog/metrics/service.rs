@@ -193,6 +193,7 @@ impl Service<DatadogMetricsRequest> for DatadogMetricsService {
                 .context(BuildRequestSnafu)
                 .map_err(|error| DatadogApiError::HttpError { error })?;
 
+            info!("sending DD metrics");
             let result = client.send(request).await;
             let (parts, body) = DatadogApiError::from_result(result)?.into_parts();
 
