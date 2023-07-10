@@ -54,6 +54,9 @@ assets = [
   ["config/vector.toml", "/etc/vector/vector.toml", "644"],
   ["config/examples/*", "/etc/vector/examples/", "644"],
   ["distribution/systemd/vector.service", "/lib/systemd/system/vector.service", "644"],
+  ["distribution/systemd/vector@.service", "/lib/systemd/system/vector@.service", "644"],
+  ["distribution/systemd/hardened-vector.service", "/lib/systemd/system/hardened-vector.service", "644"],
+  ["distribution/systemd/hardened-vector@.service", "/lib/systemd/system/hardened-vector@.service", "644"],
   ["distribution/systemd/vector.default", "/etc/default/vector", "600"]
 ]
 license-file = ["target/debian-license.txt"]
