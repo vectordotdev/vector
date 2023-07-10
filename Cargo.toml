@@ -235,7 +235,7 @@ sha2 = { version = "0.10.7", default-features = false, optional = true }
 
 # External libs
 arc-swap = { version = "1.6", default-features = false, optional = true }
-async-compression = { version = "0.4.0", default-features = false, features = ["tokio", "gzip", "zstd"], optional = true }
+async-compression = { version = "0.4.1", default-features = false, features = ["tokio", "gzip", "zstd"], optional = true }
 apache-avro = { version = "0.14.0", default-features = false, optional = true }
 axum = { version = "0.6.18", default-features = false }
 base64 = { version = "0.21.2", default-features = false, optional = true }

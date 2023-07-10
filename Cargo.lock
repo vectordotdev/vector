@@ -357,9 +357,9 @@ dependencies = [
 
 [[package]]
 name = "async-compression"
-version = "0.4.0"
+version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5b0122885821398cc923ece939e24d1056a2384ee719432397fa9db87230ff11"
+checksum = "62b74f44609f0f91493e3082d3734d98497e094777144380ea4db9f9905dd5b6"
 dependencies = [
  "flate2",
  "futures-core",
@@ -9184,7 +9184,7 @@ dependencies = [
  "arc-swap",
  "arr_macro",
  "assert_cmd",
- "async-compression 0.4.0",
+ "async-compression 0.4.1",
  "async-graphql",
  "async-graphql-warp",
  "async-stream",
