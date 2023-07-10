@@ -368,7 +368,7 @@ impl<'a> Container<'a> {
     /// standard `#[deprecated]` attribute, neither automatically applying it nor deriving the
     /// deprecation status of a field when it is present.
     pub fn deprecated(&self) -> bool {
-        self.attrs.deprecated.is_some()
+        self.attrs.deprecated.is_present()
     }
 
     /// Metadata (custom attributes) for the container, if any.

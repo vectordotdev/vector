@@ -16,12 +16,12 @@ chrono-tz = { version = "0.8.3", default-features = false }
 encoding_rs = { version = "0.8", default-features = false, features = ["alloc", "serde"] }
 indexmap = { version = "2.0", default-features = false, features = ["std"] }
 inventory = { version = "0.3" }
-no-proxy = { version  = "0.3.1", default-features = false, features = ["serialize"] }
+no-proxy = { version = "0.3.1", default-features = false, features = ["serialize"] }
 num-traits = { version = "0.2.15", default-features = false }
 once_cell = { version = "1", default-features = false }
 serde = { version = "1.0", default-features = false }
 serde_json = { version = "1.0", default-features = false, features = ["std"] }
-serde_with = { version = "2.3.2", default-features = false, features = ["std"] }
+serde_with = { version = "3.0.0", default-features = false, features = ["std"] }
 snafu = { version = "0.7.5", default-features = false }
 toml = { version = "0.7.6", default-features = false }
 tracing = { version = "0.1.34", default-features = false }
@@ -32,4 +32,4 @@ vector-config-macros = { path = "../vector-config-macros" }
 
 [dev-dependencies]
 assert-json-diff = { version = "2", default-features = false }
-serde_with = { version = "2.3.2", default-features = false, features = ["std", "macros"] }
+serde_with = { version = "3.0.0", default-features = false, features = ["std", "macros"] }
