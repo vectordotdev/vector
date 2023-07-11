@@ -293,10 +293,14 @@ impl LogEvent {
     }
 
     pub fn get_by_meaning(&self, meaning: impl AsRef<str>) -> Option<&Value> {
-        self.metadata()
-            .schema_definition()
-            .meaning_path(meaning.as_ref())
-            .and_then(|path| self.get(path))
+        if let Some(dropped) = self.metadata().dropped_field(&meaning) {
+            Some(dropped)
+        } else {
+            self.metadata()
+                .schema_definition()
+                .meaning_path(meaning.as_ref())
+                .and_then(|path| self.get(path))
+        }
     }
 
     // TODO(Jean): Once the event API uses `Lookup`, the allocation here can be removed.

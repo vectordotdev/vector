@@ -128,11 +128,23 @@ impl Transformer {
 
     fn apply_only_fields(&self, log: &mut LogEvent) {
         if let Some(only_fields) = self.only_fields.as_ref() {
-            let old_value = std::mem::replace(log.value_mut(), Value::Object(BTreeMap::new()));
+            let mut old_value = std::mem::replace(log.value_mut(), Value::Object(BTreeMap::new()));
 
             for field in only_fields {
-                if let Some(value) = old_value.get(field) {
-                    log.insert((PathPrefix::Event, field), value.clone());
+                if let Some(value) = old_value.remove(field, true) {
+                    log.insert((PathPrefix::Event, field), value);
+                }
+            }
+
+            // We may need the service field to apply tags to emitted metrics after the log message has been pruned. If there
+            // is a service meaning, we move this value to `dropped_fields` in the metadata.
+            // If the field is still in the new log message after pruning it will have been removed from `old_value` above.
+            let service_path = log.metadata().schema_definition().meaning_path("service");
+            if let Some(service_path) = service_path {
+                let mut new_log = LogEvent::from(old_value);
+                if let Some(service) = new_log.remove(service_path) {
+                    log.metadata_mut()
+                        .add_dropped_field("service".to_string(), service);
                 }
             }
         }
@@ -141,7 +153,20 @@ impl Transformer {
     fn apply_except_fields(&self, log: &mut LogEvent) {
         if let Some(except_fields) = self.except_fields.as_ref() {
             for field in except_fields {
-                log.remove(field.as_str());
+                let value = log.remove(field.as_str());
+
+                // If we are removing the service field we need to store this in a `dropped_fields` list as we may need to
+                // refer to this later when emitting metrics.
+                if let Some(v) = value {
+                    if let Some(path) = log.metadata().schema_definition().meaning_path("service") {
+                        use lookup::path::TargetPath;
+
+                        if &path.value_path().to_string() == field {
+                            log.metadata_mut()
+                                .add_dropped_field("service".to_string(), v);
+                        }
+                    }
+                }
             }
         }
     }
@@ -213,10 +238,15 @@ pub enum TimestampFormat {
 #[cfg(test)]
 mod tests {
     use indoc::indoc;
-    use vector_core::config::log_schema;
+    use lookup::path::parse_target_path;
+    use vector_common::btreemap;
+    use vector_core::config::{log_schema, LogNamespace};
+    use vrl::value::Kind;
+
+    use crate::config::schema;
 
     use super::*;
-    use std::collections::BTreeMap;
+    use std::{collections::BTreeMap, sync::Arc};
 
     #[test]
     fn serialize() {
@@ -373,5 +403,84 @@ mod tests {
             onlyfields = ["Doop"]
         "#});
         assert!(config.is_err())
+    }
+
+    #[test]
+    fn only_fields_with_service() {
+        let transformer: Transformer = toml::from_str(r#"only_fields = ["message"]"#).unwrap();
+        let mut log = LogEvent::default();
+        {
+            log.insert("message", 1);
+            log.insert("thing.service", "carrot");
+        }
+
+        let schema = schema::Definition::new_with_default_metadata(
+            Kind::object(btreemap! {
+                "thing" => Kind::object(btreemap! {
+                    "service" => Kind::bytes(),
+                })
+            }),
+            [LogNamespace::Vector],
+        );
+
+        let schema = schema.with_meaning(parse_target_path("thing.service").unwrap(), "service");
+
+        let mut event = Event::from(log);
+
+        event
+            .metadata_mut()
+            .set_schema_definition(&Arc::new(schema));
+
+        transformer.transform(&mut event);
+        assert!(event.as_mut_log().contains("message"));
+
+        // Event no longer contains the service field.
+        assert!(!event.as_mut_log().contains("thing.service"));
+
+        // But we can still get the service by meaning.
+        assert_eq!(
+            &Value::from("carrot"),
+            event.as_log().get_by_meaning("service").unwrap()
+        );
+    }
+
+    #[test]
+    fn except_fields_with_service() {
+        let transformer: Transformer =
+            toml::from_str(r#"except_fields = ["thing.service"]"#).unwrap();
+        let mut log = LogEvent::default();
+        {
+            log.insert("message", 1);
+            log.insert("thing.service", "carrot");
+        }
+
+        let schema = schema::Definition::new_with_default_metadata(
+            Kind::object(btreemap! {
+                "thing" => Kind::object(btreemap! {
+                    "service" => Kind::bytes(),
+                })
+            }),
+            [LogNamespace::Vector],
+        );
+
+        let schema = schema.with_meaning(parse_target_path("thing.service").unwrap(), "service");
+
+        let mut event = Event::from(log);
+
+        event
+            .metadata_mut()
+            .set_schema_definition(&Arc::new(schema));
+
+        transformer.transform(&mut event);
+        assert!(event.as_mut_log().contains("message"));
+
+        // Event no longer contains the service field.
+        assert!(!event.as_mut_log().contains("thing.service"));
+
+        // But we can still get the service by meaning.
+        assert_eq!(
+            &Value::from("carrot"),
+            event.as_log().get_by_meaning("service").unwrap()
+        );
     }
 }

@@ -46,6 +46,12 @@ pub struct EventMetadata {
     /// TODO(Jean): must not skip serialization to track schemas across restarts.
     #[serde(default = "default_schema_definition", skip)]
     schema_definition: Arc<schema::Definition>,
+
+    /// A store of values that may be dropped during the encoding process but may be needed
+    /// later on. The map is indexed by meaning.
+    /// Currently this is just used for the `service`. If the service field is dropped by `only_fields`
+    /// we need to ensure it is still available later on for emitting metrics tagged by the service.
+    dropped_fields: BTreeMap<String, Value>,
 }
 
 fn default_metadata_value() -> Value {
@@ -123,6 +129,17 @@ impl EventMetadata {
     pub fn set_splunk_hec_token(&mut self, secret: Arc<str>) {
         self.secrets.insert(SPLUNK_HEC_TOKEN, secret);
     }
+
+    /// Adds the value to the dropped fields list, returning the
+    /// position the value will be found in the list.
+    pub fn add_dropped_field(&mut self, meaning: String, value: Value) {
+        self.dropped_fields.insert(meaning, value);
+    }
+
+    /// Fetches the dropped field by meaning.
+    pub fn dropped_field(&self, meaning: impl AsRef<str>) -> Option<&Value> {
+        self.dropped_fields.get(meaning.as_ref())
+    }
 }
 
 impl Default for EventMetadata {
@@ -134,6 +151,7 @@ impl Default for EventMetadata {
             schema_definition: default_schema_definition(),
             source_id: None,
             upstream_id: None,
+            dropped_fields: BTreeMap::new(),
         }
     }
 }
