@@ -23,7 +23,7 @@ const INTERNAL_LOGS_KEY: &str = "_telemetry_logs";
 const INTERNAL_METRICS_KEY: &str = "_telemetry_metrics";
 const VECTOR_SINK_KEY: &str = "_telemetry_out";
 
-const SHUTDOWN_TICKS: u8 = 2;
+const SHUTDOWN_TICKS: u8 = 3;
 
 // The metrics event to monitor for before shutting down a telemetry collector.
 const INTERNAL_METRICS_SHUTDOWN_EVENT: &str = "component_received_events_total";
@@ -115,7 +115,7 @@ impl Telemetry {
                         let mut events_seen = 0;
                         let current_time = chrono::Utc::now();
 
-                        let timeout = tokio::time::sleep(Duration::from_secs(10));
+                        let timeout = tokio::time::sleep(Duration::from_secs(5));
                         tokio::pin!(timeout);
 
                         loop {
