@@ -29,7 +29,7 @@ jobs:
         if: ${{ steps.checkVectorMember.outputs.isTeamMember == 'false' }}
         with:
           project-url: https://github.com/orgs/vectordotdev/projects/49
-          github-token: ${{ steps.generate_token.outputs.token }}
+          github-token: ${{ secrets.GH_PROJECT_PAT }}
   add-dependabot-to-project:
     name: Add dependabot PR to Gardener project board
     runs-on: ubuntu-latest
