@@ -47,13 +47,19 @@ jobs:
     runs-on: ubuntu-latest
     if: contains(github.event.comment.body, '/ci-run-integration') || contains(github.event.comment.body, '/ci-run-all')
     steps:
+      - name: Generate authentication token
+        id: generate_token
+        uses: tibdex/github-app-token@b62528385c34dbc9f38e5f4225ac829252d1ea92
+        with:
+          app_id: ${{ secrets.GH_APP_DATADOG_VECTOR_CI_APP_ID }}
+          private_key: ${{ secrets.GH_APP_DATADOG_VECTOR_CI_APP_PRIVATE_KEY }}
       - name: Get PR comment author
         id: comment
         uses: tspascoal/get-user-teams-membership@v2
         with:
           username: ${{ github.actor }}
           team: 'Vector'
-          GITHUB_TOKEN: ${{ secrets.GH_PAT_ORG }}
+          GITHUB_TOKEN: ${{ steps.generate_token.outputs.token }}
 
       - name: Validate author membership
         if: steps.comment.outputs.isTeamMember == 'false'
@@ -373,13 +379,19 @@ jobs:
     needs: integration-tests
     if: always() && (contains(github.event.comment.body, '/ci-run-integration') || contains(github.event.comment.body, '/ci-run-all'))
     steps:
+      - name: Generate authentication token
+        id: generate_token
+        uses: tibdex/github-app-token@b62528385c34dbc9f38e5f4225ac829252d1ea92
+        with:
+          app_id: ${{ secrets.GH_APP_DATADOG_VECTOR_CI_APP_ID }}
+          private_key: ${{ secrets.GH_APP_DATADOG_VECTOR_CI_APP_PRIVATE_KEY }}
       - name: Validate issue comment
         if: github.event_name == 'issue_comment'
         uses: tspascoal/get-user-teams-membership@v2
         with:
           username: ${{ github.actor }}
           team: 'Vector'
-          GITHUB_TOKEN: ${{ secrets.GH_PAT_ORG }}
+          GITHUB_TOKEN: ${{ steps.generate_token.outputs.token }}
 
       - name: (PR comment) Get PR branch
         uses: xt0rted/pull-request-comment-branch@v2

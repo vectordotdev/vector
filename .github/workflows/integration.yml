@@ -99,9 +99,9 @@ jobs:
       - name: Determine if secrets are defined (PR author is team member).
         if: github.event_name == 'pull_request'
         env:
-          GH_PAT_ORG: ${{ secrets.GH_PAT_ORG }}
+          GH_APP_DATADOG_VECTOR_CI_APP_ID: ${{ secrets.GH_APP_DATADOG_VECTOR_CI_APP_ID }}
         run: |
-          if [[ "$GH_PAT_ORG" != "" ]] ; then
+          if [[ "$GH_APP_DATADOG_VECTOR_CI_APP_ID" != "" ]] ; then
             echo "PR_HAS_ACCESS_TO_SECRETS=true" >> "$GITHUB_ENV"
           else
             echo "PR_HAS_ACCESS_TO_SECRETS=false" >> "$GITHUB_ENV"
