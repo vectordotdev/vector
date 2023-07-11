@@ -1,5 +1,6 @@
 //! `AMQP` source.
 //! Handles version AMQP 0.9.1 which is used by RabbitMQ.
+//! run integration tests
 use crate::{
     amqp::AmqpConfig,
     codecs::{Decoder, DecodingConfig},
