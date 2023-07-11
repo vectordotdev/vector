@@ -51,6 +51,8 @@ pub struct EventMetadata {
     /// later on. The map is indexed by meaning.
     /// Currently this is just used for the `service`. If the service field is dropped by `only_fields`
     /// we need to ensure it is still available later on for emitting metrics tagged by the service.
+    /// This field could almost be keyed by `&'static str`, but because it needs to be deserializable
+    /// we have to use `String`.
     dropped_fields: BTreeMap<String, Value>,
 }
 
