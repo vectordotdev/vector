@@ -584,7 +584,7 @@ mod tests {
         assert_eq!(literals_to_idents(&["T"]), idents);
 
         // We don't support parenthesized type parameters, like when using a function pointer type.
-        let parenthesized_type: Type = parse_quote! { Something<Fn(bool) -> String> };
+        let parenthesized_type: Type = parse_quote! { Something<fn(bool) -> String> };
         let idents = get_generic_type_param_idents(&parenthesized_type);
         assert_eq!(None, idents);
     }
