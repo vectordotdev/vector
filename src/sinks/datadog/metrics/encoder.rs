@@ -425,6 +425,8 @@ fn generate_series_metrics(
     let ts = encode_timestamp(metric.timestamp());
     let tags = Some(encode_tags(&tags));
 
+    info!("interval {:?}", metric.interval_ms());
+
     let results = match (metric.value(), metric.interval_ms()) {
         (MetricValue::Counter { value }, maybe_interval_ms) => {
             let (value, interval, metric_type) = match maybe_interval_ms {
