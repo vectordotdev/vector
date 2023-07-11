@@ -9549,7 +9549,7 @@ dependencies = [
  "quote 1.0.29",
  "serde",
  "serde_json",
- "syn 1.0.109",
+ "syn 2.0.23",
  "tracing 0.1.37",
 ]
 
@@ -9562,7 +9562,7 @@ dependencies = [
  "quote 1.0.29",
  "serde",
  "serde_derive_internals",
- "syn 1.0.109",
+ "syn 2.0.23",
  "vector-config",
  "vector-config-common",
 ]
