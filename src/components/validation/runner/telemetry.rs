@@ -23,6 +23,8 @@ const INTERNAL_LOGS_KEY: &str = "_telemetry_logs";
 const INTERNAL_METRICS_KEY: &str = "_telemetry_metrics";
 const VECTOR_SINK_KEY: &str = "_telemetry_out";
 
+const SHUTDOWN_TICKS: u8 = 2;
+
 // The metrics event to monitor for before shutting down a telemetry collector.
 const INTERNAL_METRICS_SHUTDOWN_EVENT: &str = "component_received_events_total";
 
@@ -113,28 +115,40 @@ impl Telemetry {
                         let mut events_seen = 0;
                         let current_time = chrono::Utc::now();
 
-                        loop {
-                            match &rx.recv().await {
-                                None => break 'outer,
-                                Some(telemetry_event) => {
-                                    telemetry_events.push(telemetry_event.clone());
-                                    if let Event::Metric(metric) = telemetry_event {
-                                        if let Some(tags) = metric.tags() {
-                                            if metric.name() == INTERNAL_METRICS_SHUTDOWN_EVENT &&
-                                            tags.get("component_name") == Some(INTERNAL_LOGS_KEY) &&
-                                            metric.data().timestamp().unwrap() > &current_time {
-                                                debug!("Telemetry: processed one component_received_events_total event.");
+                        let timeout = tokio::time::sleep(Duration::from_secs(10));
+                        tokio::pin!(timeout);
 
-                                                events_seen += 1;
-                                                if events_seen == 2 {
-                                                    break 'outer;
+                        loop {
+                            select! {
+                                d = rx.recv() => {
+                                    match d {
+                                        None => break,
+                                        Some(telemetry_event) => {
+                                            telemetry_events.push(telemetry_event.clone());
+                                            if let Event::Metric(metric) = telemetry_event {
+                                                if let Some(tags) = metric.tags() {
+                                                    if metric.name() == INTERNAL_METRICS_SHUTDOWN_EVENT &&
+                                                    tags.get("component_name") == Some(INTERNAL_LOGS_KEY) &&
+                                                    metric.data().timestamp().unwrap() > &current_time {
+                                                        debug!("Telemetry: processed one component_received_events_total event.");
+
+                                                        events_seen += 1;
+                                                        if events_seen == SHUTDOWN_TICKS {
+                                                            break;
+                                                        }
+                                                    }
                                                 }
                                             }
                                         }
                                     }
-                                }
+                                },
+                                _ = &mut timeout => break,
                             }
                         }
+                        if events_seen != SHUTDOWN_TICKS {
+                            panic!("did not receive {SHUTDOWN_TICKS} events while waiting for shutdown! found {events_seen}");
+                        }
+                        break 'outer;
                     },
                     maybe_telemetry_event = rx.recv() => match maybe_telemetry_event {
                         None => break,

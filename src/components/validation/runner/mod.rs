@@ -271,7 +271,7 @@ impl Runner {
             // like the aforementioned unit tests, switch to any improved mechanism we come up with
             // in the future to make these tests more deterministic and waste less time waiting
             // around if we can avoid it.
-            tokio::time::sleep(Duration::from_secs(1)).await;
+            tokio::time::sleep(Duration::from_secs(2)).await;
 
             let input_events = test_case.events.clone();
             let input_driver = tokio::spawn(async move {

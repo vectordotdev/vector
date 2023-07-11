@@ -410,7 +410,7 @@ pub fn encode_test_event(
         TestEvent::Passthrough(event) => {
             // Encode the event normally.
             encoder
-                .encode(event.into_event(), buf)
+                .encode(event, buf)
                 .expect("should not fail to encode input event");
         }
         TestEvent::Modified { event, .. } => {
@@ -431,7 +431,7 @@ pub fn encode_test_event(
             };
 
             alt_encoder
-                .encode(event.into_event(), buf)
+                .encode(event, buf)
                 .expect("should not fail to encode input event");
         }
     }
