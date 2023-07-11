@@ -147,7 +147,7 @@ fn validate_bytes_total(
     let mut errs: Vec<String> = Vec::new();
 
     let metrics =
-        filter_events_by_metric_and_component(telemetry_events, metric_type, TEST_SOURCE_NAME)?;
+        filter_events_by_metric_and_component(telemetry_events, metric_type, TEST_SOURCE_NAME);
 
     let metric_bytes = sum_counters(metric_type, &metrics)?;
 
@@ -197,7 +197,7 @@ fn validate_component_received_event_bytes_total(
                 Event::Metric(_) => todo!(),
                 Event::Trace(_) => todo!(),
             }
-            let size = vec![e.clone()].estimated_json_encoded_size_of();
+            let size = vec![e.clone()].estimated_json_encoded_size_of().get();
             return acc + size;
         }
 
@@ -267,7 +267,7 @@ fn validate_component_sent_event_bytes_total(
 ) -> Result<Vec<String>, Vec<String>> {
     let mut expected_bytes = 0;
     for e in outputs {
-        expected_bytes += vec![e].estimated_json_encoded_size_of();
+        expected_bytes += vec![e].estimated_json_encoded_size_of().get();
     }
 
     validate_bytes_total(

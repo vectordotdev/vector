@@ -128,9 +128,9 @@ fn validate_telemetry(
 
 fn filter_events_by_metric_and_component<'a>(
     telemetry_events: &'a [Event],
-    metric_type: &SourceMetricType,
+    metric: &SourceMetricType,
     component_name: &'a str,
-) -> Result<Vec<&'a Metric>, Vec<String>> {
+) -> Vec<&'a Metric> {
     let metrics: Vec<&Metric> = telemetry_events
         .iter()
         .flat_map(|e| {
@@ -141,7 +141,7 @@ fn filter_events_by_metric_and_component<'a>(
             }
         })
         .filter(|&m| {
-            if m.name() == metric_type.to_string() {
+            if m.name() == metric.to_string() {
                 if let Some(tags) = m.tags() {
                     if tags.get("component_name").unwrap_or("") == component_name {
                         return true;
@@ -153,15 +153,7 @@ fn filter_events_by_metric_and_component<'a>(
         })
         .collect();
 
-    debug!(
-        "{}: {} metrics found.",
-        metric_type.to_string(),
-        metrics.len(),
-    );
+    debug!("{}: {} metrics found.", metric.to_string(), metrics.len(),);
 
-    if metrics.is_empty() {
-        return Err(vec![format!("{}: no metrics were emitted.", metric_type)]);
-    }
-
-    Ok(metrics)
+    metrics
 }
