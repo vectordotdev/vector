@@ -127,7 +127,7 @@ jobs:
     name: Test Suite
     runs-on: ubuntu-20.04
     if: always()
-    needs: checks
+    needs: [changes, checks]
     env:
       FAILED: ${{ contains(needs.*.result, 'failure') }}
     steps:

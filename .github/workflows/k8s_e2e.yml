@@ -225,7 +225,11 @@ jobs:
   final-result:
     name: K8s E2E Suite
     runs-on: ubuntu-latest
-    needs: test-e2e-kubernetes
+    needs:
+      - changes
+      - build-x86_64-unknown-linux-gnu
+      - compute-k8s-test-plan
+      - test-e2e-kubernetes
     if: always()
     env:
       FAILED: ${{ contains(needs.*.result, 'failure') }}
