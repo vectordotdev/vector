@@ -3531,6 +3531,39 @@ dependencies = [
 ]
 
 [[package]]
+name = "greptime-proto"
+version = "0.1.0"
+source = "git+https://github.com/GreptimeTeam/greptime-proto.git?tag=0.2.1#4398d20c56d5f7939cc2960789cb1fa7dd18e6fe"
+dependencies = [
+ "prost",
+ "serde",
+ "serde_json",
+ "tonic",
+ "tonic-build",
+]
+
+[[package]]
+name = "greptimedb-client"
+version = "0.1.0"
+source = "git+https://github.com/GreptimeTeam/greptimedb-client-rust.git?rev=bc32362adf0df17a41a95bae4221d6d8f1775656#bc32362adf0df17a41a95bae4221d6d8f1775656"
+dependencies = [
+ "dashmap",
+ "enum_dispatch",
+ "futures 0.3.28",
+ "futures-util",
+ "greptime-proto",
+ "parking_lot",
+ "prost",
+ "rand 0.8.5",
+ "snafu",
+ "tokio",
+ "tokio-stream",
+ "tonic",
+ "tonic-build",
+ "tower",
+]
+
+[[package]]
 name = "grok"
 version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9252,6 +9285,7 @@ dependencies = [
  "glob",
  "goauth",
  "governor",
+ "greptimedb-client",
  "grok",
  "h2",
  "hash_hasher",

@@ -221,6 +221,14 @@ jobs:
           max_attempts: 3
           command: bash scripts/ci-integration-test.sh gcp
 
+      - name: greptimedb
+        if: ${{ contains(github.event.comment.body, '/ci-run-integration-greptimedb') || contains(github.event.comment.body, '/ci-run-all') }}
+        uses: nick-fields/retry@v2
+        with:
+          timeout_minutes: 30
+          max_attempts: 3
+          command: bash scripts/ci-integration-test.sh greptimedb
+
       - name: humio
         if: ${{ contains(github.event.comment.body, '/ci-run-integration-humio') || contains(github.event.comment.body, '/ci-run-all') }}
         uses: nick-fields/retry@v2

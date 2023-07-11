@@ -67,6 +67,7 @@ jobs:
             || needs.changes.outputs.eventstoredb == 'true'
             || needs.changes.outputs.fluent == 'true'
             || needs.changes.outputs.gcp == 'true'
+            || needs.changes.outputs.greptimedb == 'true'
             || needs.changes.outputs.humio == 'true'
             || needs.changes.outputs.http-client == 'true'
             || needs.changes.outputs.influxdb == 'true'
@@ -250,6 +251,14 @@ jobs:
           timeout_minutes: 30
           max_attempts: 3
           command: bash scripts/ci-integration-test.sh  gcp
+
+      - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.greptimedb == 'true' }}
+        name: greptimedb
+        uses: nick-fields/retry@v2
+        with:
+          timeout_minutes: 30
+          max_attempts: 3
+          command: bash scripts/ci-integration-test.sh  greptimedb
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.humio == 'true' }}
         name: humio

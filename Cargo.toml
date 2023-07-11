@@ -233,6 +233,9 @@ tui = { version = "0.19.0", optional = true, default-features = false, features 
 hex = { version = "0.4.3", default-features = false, optional = true }
 sha2 = { version = "0.10.7", default-features = false, optional = true }
 
+# GreptimeDB
+greptimedb-client = { git = "https://github.com/GreptimeTeam/greptimedb-client-rust.git", rev = "bc32362adf0df17a41a95bae4221d6d8f1775656", optional = true }
+
 # External libs
 arc-swap = { version = "1.6", default-features = false, optional = true }
 async-compression = { version = "0.4.1", default-features = false, features = ["tokio", "gzip", "zstd"], optional = true }
@@ -646,6 +649,7 @@ sinks-metrics = [
   "sinks-blackhole",
   "sinks-console",
   "sinks-datadog_metrics",
+  "sinks-greptimedb",
   "sinks-humio",
   "sinks-influxdb",
   "sinks-kafka",
@@ -679,6 +683,7 @@ sinks-datadog_traces = ["protobuf-build", "dep:rmpv", "dep:rmp-serde", "dep:serd
 sinks-elasticsearch = ["aws-core", "transforms-metric_to_log"]
 sinks-file = ["dep:async-compression"]
 sinks-gcp = ["dep:base64", "gcp"]
+sinks-greptimedb = ["dep:greptimedb-client"]
 sinks-honeycomb = []
 sinks-http = []
 sinks-humio = ["sinks-splunk_hec", "transforms-metric_to_log"]
@@ -739,6 +744,7 @@ all-integration-tests = [
   "gcp-cloud-storage-integration-tests",
   "gcp-integration-tests",
   "gcp-pubsub-integration-tests",
+  "greptimedb-integration-tests",
   "http-client-integration-tests",
   "humio-integration-tests",
   "influxdb-integration-tests",
@@ -800,6 +806,7 @@ fluent-integration-tests = ["docker", "sources-fluent"]
 gcp-cloud-storage-integration-tests = ["sinks-gcp"]
 gcp-integration-tests = ["sinks-gcp"]
 gcp-pubsub-integration-tests = ["sinks-gcp", "sources-gcp_pubsub"]
+greptimedb-integration-tests = ["sinks-greptimedb"]
 humio-integration-tests = ["sinks-humio"]
 http-client-integration-tests = ["sources-http_client"]
 influxdb-integration-tests = ["sinks-influxdb"]
