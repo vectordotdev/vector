@@ -6,7 +6,10 @@ use futures::{future::ready, stream};
 use lookup::lookup_v2::OptionalValuePath;
 use serde_json::Value as JsonValue;
 use tokio::time::{sleep, Duration};
-use vector_core::event::{BatchNotifier, BatchStatus, Event, LogEvent};
+use vector_core::{
+    config::{init_telemetry, Tags, Telemetry},
+    event::{BatchNotifier, BatchStatus, Event, LogEvent},
+};
 
 use crate::{
     codecs::EncodingConfig,
@@ -25,7 +28,10 @@ use crate::{
     },
     template::Template,
     test_util::{
-        components::{run_and_assert_sink_compliance, HTTP_SINK_TAGS},
+        components::{
+            run_and_assert_data_volume_sink_compliance, run_and_assert_sink_compliance,
+            DATA_VOLUME_SINK_TAGS, HTTP_SINK_TAGS,
+        },
         random_lines_with_stream, random_string,
     },
 };
@@ -145,6 +151,45 @@ async fn splunk_insert_message() {
     assert!(entry.get("message").is_none());
 }
 
+fn enable_telemetry() {
+    init_telemetry(
+        Telemetry {
+            tags: Tags {
+                emit_service: true,
+                emit_source: true,
+            },
+        },
+        true,
+    );
+}
+
+#[tokio::test]
+async fn splunk_insert_message_data_volume() {
+    enable_telemetry();
+
+    let cx = SinkContext::default();
+
+    let config = config(TextSerializerConfig::default().into(), vec![]).await;
+    let (sink, _) = config.build(cx).await.unwrap();
+
+    let message = random_string(100);
+    let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+    let event = LogEvent::from(message.clone()).with_batch_notifier(&batch);
+    drop(batch);
+    run_and_assert_data_volume_sink_compliance(
+        sink,
+        stream::once(ready(event)),
+        &DATA_VOLUME_SINK_TAGS,
+    )
+    .await;
+    assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+
+    let entry = find_entry(message.as_str()).await;
+
+    assert_eq!(message, entry["_raw"].as_str().unwrap());
+    assert!(entry.get("message").is_none());
+}
+
 #[tokio::test]
 async fn splunk_insert_raw_message() {
     let cx = SinkContext::default();
@@ -161,6 +206,38 @@ async fn splunk_insert_raw_message() {
     let event = LogEvent::from(message.clone()).with_batch_notifier(&batch);
     drop(batch);
     run_and_assert_sink_compliance(sink, stream::once(ready(event)), &HTTP_SINK_TAGS).await;
+    assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+
+    let entry = find_entry(message.as_str()).await;
+
+    assert_eq!(message, entry["_raw"].as_str().unwrap());
+    assert_eq!("zork", entry[SOURCE_FIELD].as_str().unwrap());
+    assert!(entry.get("message").is_none());
+}
+
+#[tokio::test]
+async fn splunk_insert_raw_message_data_volume() {
+    enable_telemetry();
+
+    let cx = SinkContext::default();
+
+    let config = HecLogsSinkConfig {
+        endpoint_target: EndpointTarget::Raw,
+        source: Some(Template::try_from("zork").unwrap()),
+        ..config(TextSerializerConfig::default().into(), vec![]).await
+    };
+    let (sink, _) = config.build(cx).await.unwrap();
+
+    let message = random_string(100);
+    let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+    let event = LogEvent::from(message.clone()).with_batch_notifier(&batch);
+    drop(batch);
+    run_and_assert_data_volume_sink_compliance(
+        sink,
+        stream::once(ready(event)),
+        &DATA_VOLUME_SINK_TAGS,
+    )
+    .await;
     assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
     let entry = find_entry(message.as_str()).await;
