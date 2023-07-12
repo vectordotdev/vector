@@ -161,7 +161,7 @@ async fn collected_trace_native_json() {
 
     let trace = events[0].as_trace();
     assert_eq!(
-        trace.as_map()[log_schema().source_type_key().unwrap().to_string()],
+        trace.as_map()[log_schema().source_type_key().unwrap().to_string().as_str()],
         HttpClientConfig::NAME.into()
     );
 }
