@@ -308,7 +308,7 @@ impl ExternalResource {
     /// Spawns this resource for use as an output for a sink.
     pub fn spawn_as_output(
         self,
-        output_tx: mpsc::Sender<Event>,
+        output_tx: mpsc::Sender<Vec<Event>>,
         task_coordinator: &TaskCoordinator<Configuring>,
     ) {
         match self.definition {

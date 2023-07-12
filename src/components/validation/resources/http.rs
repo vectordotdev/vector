@@ -60,7 +60,7 @@ impl HttpResourceConfig {
         self,
         direction: ResourceDirection,
         codec: ResourceCodec,
-        output_tx: mpsc::Sender<Event>,
+        output_tx: mpsc::Sender<Vec<Event>>,
         task_coordinator: &TaskCoordinator<Configuring>,
     ) {
         match direction {
@@ -223,7 +223,7 @@ fn spawn_input_http_client(
 fn spawn_output_http_server(
     config: HttpResourceConfig,
     codec: ResourceCodec,
-    output_tx: mpsc::Sender<Event>,
+    output_tx: mpsc::Sender<Vec<Event>>,
     task_coordinator: &TaskCoordinator<Configuring>,
 ) {
     // This HTTP server will wait for events to be sent by a sink, and collect them and send them on
@@ -245,12 +245,10 @@ fn spawn_output_http_server(
                         loop {
                             match decoder.decode_eof(&mut body) {
                                 Ok(Some((events, _byte_size))) => {
-                                    for event in events {
-                                        output_tx
-                                            .send(event)
-                                            .await
-                                            .expect("should not fail to send output event");
-                                    }
+                                    output_tx
+                                        .send(events.to_vec())
+                                        .await
+                                        .expect("should not fail to send output event");
                                 }
                                 Ok(None) => return StatusCode::OK.into_response(),
                                 Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
@@ -283,7 +281,7 @@ fn spawn_output_http_server(
 fn spawn_output_http_client(
     _config: HttpResourceConfig,
     _codec: ResourceCodec,
-    _output_tx: mpsc::Sender<Event>,
+    _output_tx: mpsc::Sender<Vec<Event>>,
     _task_coordinator: &TaskCoordinator<Configuring>,
 ) {
     // TODO: The `prometheus_exporter` sink is the only sink that exposes an HTTP server which must be

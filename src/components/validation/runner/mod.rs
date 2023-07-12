@@ -89,7 +89,7 @@ pub enum RunnerOutput {
     /// external resource pulls output events from the sink.
     ///
     /// Only sinks have external inputs.
-    External(mpsc::Receiver<Event>),
+    External(mpsc::Receiver<Vec<Event>>),
 
     /// The component uses a "controlled" edge for its output.
     ///
@@ -109,8 +109,8 @@ impl RunnerOutput {
     /// this function will panic, as one or the other must be provided.
     pub fn into_receiver(
         self,
-        controlled_edge: Option<mpsc::Receiver<Event>>,
-    ) -> mpsc::Receiver<Event> {
+        controlled_edge: Option<mpsc::Receiver<Vec<Event>>>,
+    ) -> mpsc::Receiver<Vec<Event>> {
         match (self, controlled_edge) {
             (Self::External(_), Some(_)) => panic!("Runner output declared as external resource, but controlled output edge was also specified."),
             (Self::Controlled, None) => panic!("Runner output declared as controlled, but no controlled output edge was specified."),
@@ -553,7 +553,7 @@ fn spawn_input_driver(
 }
 
 fn spawn_output_driver(
-    mut output_rx: Receiver<Event>,
+    mut output_rx: Receiver<Vec<Event>>,
     runner_metrics: &Arc<Mutex<RunnerMetrics>>,
     maybe_encoder: Option<Encoder<encoding::Framer>>,
 ) -> JoinHandle<Vec<Event>> {
@@ -561,26 +561,29 @@ fn spawn_output_driver(
 
     tokio::spawn(async move {
         let mut output_events = Vec::new();
-        while let Some(output_event) = output_rx.recv().await {
-            output_events.push(output_event.clone());
+        while let Some(events) = output_rx.recv().await {
+            output_events.extend(events.clone());
 
             // Update the runner metrics for the received event. This will later
             // be used in the Validators, as the "expected" case.
             let mut output_runner_metrics = output_runner_metrics.lock().unwrap();
 
-            output_runner_metrics.received_events_total += 1;
-            output_runner_metrics.received_event_bytes_total += vec![output_event.clone()]
-                .estimated_json_encoded_size_of()
-                .get() as u64;
+            for output_event in events {
+                output_runner_metrics.received_events_total += 1;
+                output_runner_metrics.received_event_bytes_total += vec![output_event.clone()]
+                    .estimated_json_encoded_size_of()
+                    .get()
+                    as u64;
 
-            if let Some(encoder) = maybe_encoder.as_ref() {
-                let mut buffer = BytesMut::new();
-                encoder
-                    .clone()
-                    .encode(output_event, &mut buffer)
-                    .expect("should not fail to encode output event");
+                if let Some(encoder) = maybe_encoder.as_ref() {
+                    let mut buffer = BytesMut::new();
+                    encoder
+                        .clone()
+                        .encode(output_event, &mut buffer)
+                        .expect("should not fail to encode output event");
 
-                output_runner_metrics.received_bytes_total += buffer.len() as u64;
+                    output_runner_metrics.received_bytes_total += buffer.len() as u64;
+                }
             }
         }
         output_events
