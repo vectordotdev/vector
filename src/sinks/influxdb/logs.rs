@@ -206,7 +206,9 @@ impl SinkConfig for InfluxDbLogsConfig {
         let source_type_key = self
             .source_type_key
             .clone()
-            .and_then(|k| k.path).or(log_schema().source_type_key().cloned()).unwrap();
+            .and_then(|k| k.path)
+            .or(log_schema().source_type_key().cloned())
+            .unwrap();
 
         let sink = InfluxDbLogsSink {
             uri,
@@ -281,7 +283,7 @@ impl HttpEventEncoder<BytesMut> for InfluxDbLogsEncoder {
             self.tags.replace(source_type_path);
         }
 
-        if let Some(source_type_key) =  log_schema().source_type_key() {
+        if let Some(source_type_key) = log_schema().source_type_key() {
             log.rename_key(
                 (PathPrefix::Event, source_type_key),
                 (PathPrefix::Event, &self.source_type_key),

@@ -604,7 +604,10 @@ impl ReceivedMessage {
                 }
                 LogNamespace::Legacy => {
                     if let Some(source_type_key) = log_schema().source_type_key() {
-                        log.insert((PathPrefix::Event, source_type_key), KafkaSourceConfig::NAME);
+                        log.insert(
+                            (PathPrefix::Event, source_type_key),
+                            KafkaSourceConfig::NAME,
+                        );
                     }
                 }
             }

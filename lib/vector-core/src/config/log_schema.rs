@@ -1,8 +1,8 @@
-use lookup::lookup_v2::{OptionalValuePath};
+use lookup::lookup_v2::OptionalValuePath;
 use lookup::{OwnedTargetPath, OwnedValuePath};
 use once_cell::sync::{Lazy, OnceCell};
-use vrl::path::parse_target_path;
 use vector_config::configurable_component;
+use vrl::path::parse_target_path;
 
 static LOG_SCHEMA: OnceCell<LogSchema> = OnceCell::new();
 static LOG_SCHEMA_DEFAULT: Lazy<LogSchema> = Lazy::new(LogSchema::default);

@@ -1,5 +1,5 @@
-use vrl::owned_value_path;
 use vector_config::configurable_component;
+use vrl::owned_value_path;
 
 use crate::lookup_v2::PathParseError;
 use crate::{OwnedTargetPath, OwnedValuePath};
@@ -59,7 +59,9 @@ impl OptionalValuePath {
     }
 
     pub fn new(path: &str) -> Self {
-        Self { path: Some(owned_value_path!(path)) }
+        Self {
+            path: Some(owned_value_path!(path)),
+        }
     }
 }
 

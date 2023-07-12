@@ -273,9 +273,9 @@ mod test {
 #[cfg(feature = "sinks-vector")]
 #[cfg(test)]
 mod tests {
-    use vrl::path::PathPrefix;
     use vector_common::assert_event_data_eq;
     use vector_core::config::log_schema;
+    use vrl::path::PathPrefix;
 
     use super::*;
     use crate::{

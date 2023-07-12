@@ -713,7 +713,10 @@ mod integration_test {
         trace!("{:?}", log);
         assert_eq!(log[log_schema().message_key()], "my message".into());
         assert_eq!(log["routing"], routing_key.into());
-        assert_eq!(log[log_schema().source_type_key().unwrap().to_string()], "amqp".into());
+        assert_eq!(
+            log[log_schema().source_type_key().unwrap().to_string()],
+            "amqp".into()
+        );
         let log_ts = log[log_schema().timestamp_key().unwrap().to_string()]
             .as_timestamp()
             .unwrap();

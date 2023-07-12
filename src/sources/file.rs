@@ -1037,7 +1037,10 @@ mod tests {
         assert_eq!(log["host"], "Some.Machine".into());
         assert_eq!(log["offset"], 0.into());
         assert_eq!(log[log_schema().message_key()], "hello world".into());
-        assert_eq!(log[log_schema().source_type_key().unwrap().to_string()], "file".into());
+        assert_eq!(
+            log[log_schema().source_type_key().unwrap().to_string()],
+            "file".into()
+        );
         assert!(log[log_schema().timestamp_key().unwrap().to_string()].is_timestamp());
     }
 
@@ -1059,7 +1062,10 @@ mod tests {
         assert_eq!(log["hostname"], "Some.Machine".into());
         assert_eq!(log["off"], 0.into());
         assert_eq!(log[log_schema().message_key()], "hello world".into());
-        assert_eq!(log[log_schema().source_type_key().unwrap().to_string()], "file".into());
+        assert_eq!(
+            log[log_schema().source_type_key().unwrap().to_string()],
+            "file".into()
+        );
         assert!(log[log_schema().timestamp_key().unwrap().to_string()].is_timestamp());
     }
 

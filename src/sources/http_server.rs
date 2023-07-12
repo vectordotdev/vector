@@ -959,11 +959,13 @@ mod tests {
             ))
             .is_some());
 
-        let source_type_key_value = log.get((lookup::PathPrefix::Event, log_schema().source_type_key().unwrap())).unwrap();
-        assert_eq!(
-            source_type_key_value.to_string(),
-            SimpleHttpConfig::NAME
-        );
+        let source_type_key_value = log
+            .get((
+                lookup::PathPrefix::Event,
+                log_schema().source_type_key().unwrap(),
+            ))
+            .unwrap();
+        assert_eq!(source_type_key_value.to_string(), SimpleHttpConfig::NAME);
         assert_eq!(log["http_path"], "/".into());
     }
 
