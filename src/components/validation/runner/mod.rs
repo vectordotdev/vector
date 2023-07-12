@@ -575,7 +575,6 @@ fn spawn_output_driver(
 
             if let Some(encoder) = maybe_encoder.as_ref() {
                 let mut buffer = BytesMut::new();
-                //encode_test_event(&mut encoder, &mut buffer, output_event);
                 encoder
                     .clone()
                     .encode(output_event, &mut buffer)

@@ -146,7 +146,7 @@ impl Telemetry {
                             }
                         }
                         if events_seen != SHUTDOWN_TICKS {
-                            panic!("did not receive {SHUTDOWN_TICKS} events while waiting for shutdown! Only found {events_seen}!");
+                            panic!("Did not receive {SHUTDOWN_TICKS} events while waiting for shutdown! Only received {events_seen}!");
                         }
                         break 'outer;
                     },
