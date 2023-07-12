@@ -1,8 +1,16 @@
+use bytes::BytesMut;
 use serde::Deserialize;
 use snafu::Snafu;
+use tokio_util::codec::Encoder as _;
+
+use crate::codecs::Encoder;
+use codecs::{
+    encoding, JsonSerializer, LengthDelimitedEncoder, LogfmtSerializer, MetricTagValues,
+    NewlineDelimitedEncoder,
+};
 use vector_core::event::{Event, LogEvent};
 
-/// An raw test case event for deserialization from yaml file.
+/// An test case event for deserialization from yaml file.
 /// This is an intermediary step to TestEvent.
 #[derive(Clone, Debug, Deserialize)]
 #[serde(untagged)]
@@ -20,6 +28,22 @@ pub enum RawTestEvent {
     /// For transforms and sinks, generally, the only way to cause an error is if the event itself
     /// is malformed in some way, which can be achieved without this test event variant.
     Modified { modified: bool, event: EventData },
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(untagged)]
+pub enum EventData {
+    /// A log event.
+    Log(String),
+}
+
+impl EventData {
+    /// Converts this event data into an `Event`.
+    pub fn into_event(self) -> Event {
+        match self {
+            Self::Log(message) => Event::Log(LogEvent::from_bytes_legacy(&message.into())),
+        }
+    }
 }
 
 /// An event used in a test case.
@@ -42,15 +66,6 @@ pub enum TestEvent {
     Modified { modified: bool, event: Event },
 }
 
-// impl TestEvent {
-//     pub fn into_event(self) -> Event {
-//         match self {
-//             Self::Passthrough(event) => event.into_event(),
-//             Self::Modified { event, .. } => event.into_event(),
-//         }
-//     }
-// }
-
 #[derive(Clone, Debug, Eq, PartialEq, Snafu)]
 pub enum RawTestEventParseError {}
 
@@ -70,18 +85,38 @@ impl TryFrom<RawTestEvent> for TestEvent {
     }
 }
 
-#[derive(Clone, Debug, Deserialize)]
-#[serde(untagged)]
-pub enum EventData {
-    /// A log event.
-    Log(String),
-}
+pub fn encode_test_event(
+    encoder: &mut Encoder<encoding::Framer>,
+    buf: &mut BytesMut,
+    event: TestEvent,
+) {
+    match event {
+        TestEvent::Passthrough(event) => {
+            // Encode the event normally.
+            encoder
+                .encode(event, buf)
+                .expect("should not fail to encode input event");
+        }
+        TestEvent::Modified { event, .. } => {
+            // This is a little fragile, but we check what serializer this encoder uses, and based
+            // on `Serializer::supports_json`, we choose an opposing codec. For example, if the
+            // encoder supports JSON, we'll use a serializer that doesn't support JSON, and vise
+            // versa.
+            let mut alt_encoder = if encoder.serializer().supports_json() {
+                Encoder::<encoding::Framer>::new(
+                    LengthDelimitedEncoder::new().into(),
+                    LogfmtSerializer::new().into(),
+                )
+            } else {
+                Encoder::<encoding::Framer>::new(
+                    NewlineDelimitedEncoder::new().into(),
+                    JsonSerializer::new(MetricTagValues::default()).into(),
+                )
+            };
 
-impl EventData {
-    /// Converts this event data into an `Event`.
-    pub fn into_event(self) -> Event {
-        match self {
-            Self::Log(message) => Event::Log(LogEvent::from_bytes_legacy(&message.into())),
+            alt_encoder
+                .encode(event, buf)
+                .expect("should not fail to encode input event");
         }
     }
 }

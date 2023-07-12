@@ -2,9 +2,7 @@ mod sources;
 
 use vector_core::event::{Event, Metric};
 
-use crate::components::validation::{
-    ComponentType, TestCaseExpectation, TestEvent, ValidationConfiguration,
-};
+use crate::components::validation::{ComponentType, RunnerMetrics, TestCaseExpectation, TestEvent};
 
 use super::Validator;
 
@@ -28,12 +26,12 @@ impl Validator for ComponentSpecValidator {
 
     fn check_validation(
         &self,
-        configuration: ValidationConfiguration,
         component_type: ComponentType,
         expectation: TestCaseExpectation,
         inputs: &[TestEvent],
         outputs: &[Event],
         telemetry_events: &[Event],
+        runner_metrics: &RunnerMetrics,
     ) -> Result<Vec<String>, Vec<String>> {
         for input in inputs {
             debug!("Validator observed input event: {:?}", input);
@@ -84,13 +82,7 @@ impl Validator for ComponentSpecValidator {
             format!("received {} telemetry events", telemetry_events.len()),
         ];
 
-        let out = validate_telemetry(
-            configuration,
-            component_type,
-            inputs,
-            outputs,
-            telemetry_events,
-        )?;
+        let out = validate_telemetry(component_type, telemetry_events, runner_metrics)?;
         run_out.extend(out);
 
         Ok(run_out)
@@ -98,18 +90,16 @@ impl Validator for ComponentSpecValidator {
 }
 
 fn validate_telemetry(
-    configuration: ValidationConfiguration,
     component_type: ComponentType,
-    inputs: &[TestEvent],
-    outputs: &[Event],
     telemetry_events: &[Event],
+    runner_metrics: &RunnerMetrics,
 ) -> Result<Vec<String>, Vec<String>> {
     let mut out: Vec<String> = Vec::new();
     let mut errs: Vec<String> = Vec::new();
 
     match component_type {
         ComponentType::Source => {
-            let result = validate_sources(&configuration, inputs, outputs, telemetry_events);
+            let result = validate_sources(telemetry_events, runner_metrics);
             match result {
                 Ok(o) => out.extend(o),
                 Err(e) => errs.extend(e),

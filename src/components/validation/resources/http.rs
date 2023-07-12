@@ -1,5 +1,6 @@
 use std::{
     collections::VecDeque,
+    future::Future,
     net::{IpAddr, SocketAddr},
     str::FromStr,
     sync::Arc,
@@ -11,26 +12,18 @@ use axum::{
     Router,
 };
 use bytes::BytesMut;
-use codecs::{
-    encoding, JsonSerializer, LengthDelimitedEncoder, LogfmtSerializer, MetricTagValues,
-    NewlineDelimitedEncoder,
-};
 use http::{Method, Request, StatusCode, Uri};
 use hyper::{Body, Client, Server};
-use std::future::Future;
 use tokio::{
     select,
     sync::{mpsc, oneshot, Mutex, Notify},
 };
-use tokio_util::codec::{Decoder, Encoder as _};
+use tokio_util::codec::Decoder;
+
+use crate::components::validation::sync::{Configuring, TaskCoordinator};
 use vector_core::event::Event;
 
-use crate::{
-    codecs::Encoder,
-    components::validation::sync::{Configuring, TaskCoordinator},
-};
-
-use super::{ResourceCodec, ResourceDirection, TestEvent};
+use super::{encode_test_event, ResourceCodec, ResourceDirection, TestEvent};
 
 /// An HTTP resource.
 #[derive(Clone)]
@@ -399,40 +392,4 @@ fn socketaddr_from_uri(uri: &Uri) -> SocketAddr {
         .expect("HTTP URI not valid");
 
     SocketAddr::from((uri_host, uri_port))
-}
-
-pub fn encode_test_event(
-    encoder: &mut Encoder<encoding::Framer>,
-    buf: &mut BytesMut,
-    event: TestEvent,
-) {
-    match event {
-        TestEvent::Passthrough(event) => {
-            // Encode the event normally.
-            encoder
-                .encode(event, buf)
-                .expect("should not fail to encode input event");
-        }
-        TestEvent::Modified { event, .. } => {
-            // This is a little fragile, but we check what serializer this encoder uses, and based
-            // on `Serializer::supports_json`, we choose an opposing codec. For example, if the
-            // encoder supports JSON, we'll use a serializer that doesn't support JSON, and vise
-            // versa.
-            let mut alt_encoder = if encoder.serializer().supports_json() {
-                Encoder::<encoding::Framer>::new(
-                    LengthDelimitedEncoder::new().into(),
-                    LogfmtSerializer::new().into(),
-                )
-            } else {
-                Encoder::<encoding::Framer>::new(
-                    NewlineDelimitedEncoder::new().into(),
-                    JsonSerializer::new(MetricTagValues::default()).into(),
-                )
-            };
-
-            alt_encoder
-                .encode(event, buf)
-                .expect("should not fail to encode input event");
-        }
-    }
 }
