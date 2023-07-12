@@ -964,7 +964,9 @@ mod tests {
                 lookup::PathPrefix::Event,
                 log_schema().source_type_key().unwrap(),
             ))
-            .unwrap().as_str().unwrap();
+            .unwrap()
+            .as_str()
+            .unwrap();
         assert_eq!(source_type_key_value, SimpleHttpConfig::NAME);
         assert_eq!(log["http_path"], "/".into());
     }

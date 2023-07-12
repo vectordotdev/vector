@@ -280,12 +280,9 @@ impl HttpEventEncoder<BytesMut> for InfluxDbLogsEncoder {
         }
 
         if let Some(source_type_path) = log.source_type_path() {
-            self.tags.replace(source_type_path);
-        }
-
-        if let Some(source_type_key) = log_schema().source_type_key() {
+            self.tags.replace(source_type_path.clone());
             log.rename_key(
-                (PathPrefix::Event, source_type_key),
+                (PathPrefix::Event, source_type_path.as_str()),
                 (PathPrefix::Event, &self.source_type_key),
             );
         }
