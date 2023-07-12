@@ -1,17 +1,17 @@
-///! Constants for commonly used meanings.
+//! Constants for commonly used meanings.
 
 /// The service typically represents the application that generated the event.
-pub const SERVICE: &'static str = "service";
+pub const SERVICE: &str = "service";
 
 /// The main text message of the event.
-pub const MESSAGE: &'static str = "message";
+pub const MESSAGE: &str = "message";
 
 /// The main timestamp of the event.
-pub const TIMESTAMP: &'static str = "timestamp";
+pub const TIMESTAMP: &str = "timestamp";
 
 /// The hostname of the machine where the event was generated.
-pub const HOST: &'static str = "host";
+pub const HOST: &str = "host";
 
-pub const SOURCE: &'static str = "source";
-pub const SEVERITY: &'static str = "severity";
-pub const TRACE_ID: &'static str = "trace_id";
+pub const SOURCE: &str = "source";
+pub const SEVERITY: &str = "severity";
+pub const TRACE_ID: &str = "trace_id";
