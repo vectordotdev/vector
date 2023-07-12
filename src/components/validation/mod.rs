@@ -180,7 +180,7 @@ pub struct RunnerMetrics {
     pub received_bytes_total: u64,
     pub sent_bytes_total: u64, // a reciprocal for received_bytes_total
     pub sent_event_bytes_total: u64,
-    pub sent_event_total: u64,
+    pub sent_events_total: u64,
 }
 
 #[cfg(all(test, feature = "component-validation-tests"))]

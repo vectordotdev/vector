@@ -543,7 +543,7 @@ fn spawn_input_driver(
 
             // account for failure case
             if !modified {
-                input_runner_metrics.sent_event_total += 1;
+                input_runner_metrics.sent_events_total += 1;
 
                 input_runner_metrics.sent_event_bytes_total +=
                     vec![event].estimated_json_encoded_size_of().get() as u64;

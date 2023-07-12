@@ -158,7 +158,7 @@ fn validate_component_received_events_total(
 ) -> Result<Vec<String>, Vec<String>> {
     // The reciprocal metric for events received is events sent,
     // so the expected value is what the input runner sent.
-    let expected_events = runner_metrics.sent_event_total;
+    let expected_events = runner_metrics.sent_events_total;
 
     validate_events_total(
         telemetry_events,
