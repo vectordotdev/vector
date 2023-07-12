@@ -1,8 +1,11 @@
 use std::sync::Arc;
 
+use crate::internal_events::ApiStarted;
 #[cfg(feature = "enterprise")]
 use futures_util::future::BoxFuture;
 use futures_util::FutureExt as _;
+use tokio::runtime::Handle;
+
 use tokio::sync::{Mutex, MutexGuard};
 
 #[cfg(feature = "api")]
@@ -14,6 +17,8 @@ use crate::config::enterprise::{
 use crate::internal_events::{
     VectorConfigLoadError, VectorRecoveryError, VectorReloadError, VectorReloaded,
 };
+
+use crate::topology::ReloadOutcome::FatalError;
 use crate::{config, topology::RunningTopology};
 
 #[derive(Clone, Debug)]
@@ -90,6 +95,41 @@ impl TopologyController {
                     emit!(VectorReloadError);
                     return ReloadOutcome::MissingApiKey;
                 }
+            }
+        }
+
+        /*
+        Without this block
+        the first config loaded determines whether the api is
+        always on or always off
+        */
+        #[cfg(feature = "api")]
+        if new_config.api.enabled && self.api_server.is_none() {
+            use std::sync::atomic::AtomicBool;
+            debug!("Starting api server.");
+            self.api_server = match api::Server::start(
+                self.topology.config(),
+                self.topology.watch(),
+                Arc::<AtomicBool>::clone(&self.topology.running),
+                &Handle::current(),
+            ) {
+                Ok(api_server) => {
+                    emit!(ApiStarted {
+                        addr: new_config.api.address.unwrap(),
+                        playground: new_config.api.playground
+                    });
+
+                    Some(api_server)
+                }
+                Err(e) => {
+                    error!("An error occurred that Vector couldn't handle: {}.", e);
+                    return FatalError;
+                }
+            }
+        } else if !new_config.api.enabled {
+            if let Some(server) = self.api_server.take() {
+                debug!("Dropping api server.");
+                drop(server)
             }
         }
 
