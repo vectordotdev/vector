@@ -99,12 +99,8 @@ impl InputEdge {
             started.mark_as_done();
 
             while let Some(test_event) = rx.recv().await {
-                let event = match test_event {
-                    TestEvent::Passthrough(e) => e,
-                    TestEvent::Modified { modified: _, event } => event,
-                };
                 let request = PushEventsRequest {
-                    events: vec![event.into()],
+                    events: vec![test_event.into_event().into()],
                 };
 
                 if let Err(e) = client.push_events(request).await {

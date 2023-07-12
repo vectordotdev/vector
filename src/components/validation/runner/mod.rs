@@ -233,7 +233,7 @@ impl Runner {
             debug!("Component topology configuration built and telemetry collector spawned.");
 
             // Create the data structure that the input and output runners will use to store
-            // their receivent/sent metrics. This is then shared with the Validator for comparison
+            // their received/sent metrics. This is then shared with the Validator for comparison
             // against the actual metrics output by the component under test.
             let runner_metrics = Arc::new(Mutex::new(RunnerMetrics::default()));
 

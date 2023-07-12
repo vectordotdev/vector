@@ -66,7 +66,7 @@ pub fn validate_sources(
 fn sum_counters(
     metric_name: &SourceMetricType,
     metrics: &[&vector_core::event::Metric],
-) -> Result<f64, Vec<String>> {
+) -> Result<u64, Vec<String>> {
     let mut sum: f64 = 0.0;
     let mut errs = Vec::new();
 
@@ -84,7 +84,7 @@ fn sum_counters(
     }
 
     if errs.is_empty() {
-        Ok(sum)
+        Ok(sum as u64)
     } else {
         Err(errs)
     }
@@ -100,7 +100,7 @@ fn validate_events_total(
     let metrics =
         filter_events_by_metric_and_component(telemetry_events, metric_type, TEST_SOURCE_NAME);
 
-    let actual_events: u64 = sum_counters(metric_type, &metrics)? as u64;
+    let actual_events = sum_counters(metric_type, &metrics)?;
 
     debug!(
         "{}: {} events, {} expected events.",
@@ -131,7 +131,7 @@ fn validate_bytes_total(
     let metrics =
         filter_events_by_metric_and_component(telemetry_events, metric_type, TEST_SOURCE_NAME);
 
-    let actual_bytes: u64 = sum_counters(metric_type, &metrics)? as u64;
+    let actual_bytes = sum_counters(metric_type, &metrics)?;
 
     debug!(
         "{}: {} bytes, {} expected bytes.",

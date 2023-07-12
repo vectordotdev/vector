@@ -10,7 +10,7 @@ use codecs::{
 };
 use vector_core::event::{Event, LogEvent};
 
-/// An test case event for deserialization from yaml file.
+/// A test case event for deserialization from yaml file.
 /// This is an intermediary step to TestEvent.
 #[derive(Clone, Debug, Deserialize)]
 #[serde(untagged)]
@@ -47,6 +47,11 @@ impl EventData {
 }
 
 /// An event used in a test case.
+/// It is important to have created the event with all fields, immediately after deserializing from the
+/// test case definition yaml file. This ensures that the event data we are using in the expected/actual
+/// metrics collection is based on the same event. Namely, one issue that can arise from creating the event
+/// from the event data twice (once for the expected and once for actual), it can result in a timestamp in
+/// the event which may or may not have the same millisecond precision as it's counterpart.
 #[derive(Clone, Debug, Deserialize)]
 #[serde(try_from = "RawTestEvent")]
 #[serde(untagged)]
@@ -64,6 +69,15 @@ pub enum TestEvent {
     /// For transforms and sinks, generally, the only way to cause an error is if the event itself
     /// is malformed in some way, which can be achieved without this test event variant.
     Modified { modified: bool, event: Event },
+}
+
+impl TestEvent {
+    pub fn into_event(self) -> Event {
+        match self {
+            Self::Passthrough(event) => event,
+            Self::Modified { event, .. } => event,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Snafu)]
