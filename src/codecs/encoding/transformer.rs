@@ -12,6 +12,7 @@ use lookup::{
 use serde::{Deserialize, Deserializer};
 use vector_config::configurable_component;
 use vector_core::event::{LogEvent, MaybeAsLogMut};
+use vector_core::schema::meanings;
 use vrl::value::Value;
 
 use crate::{event::Event, serde::skip_serializing_if_default};
@@ -139,32 +140,39 @@ impl Transformer {
             // We may need the service field to apply tags to emitted metrics after the log message has been pruned. If there
             // is a service meaning, we move this value to `dropped_fields` in the metadata.
             // If the field is still in the new log message after pruning it will have been removed from `old_value` above.
-            let service_path = log.metadata().schema_definition().meaning_path("service");
+            let service_path = log
+                .metadata()
+                .schema_definition()
+                .meaning_path(meanings::SERVICE);
             if let Some(service_path) = service_path {
                 let mut new_log = LogEvent::from(old_value);
                 if let Some(service) = new_log.remove(service_path) {
                     log.metadata_mut()
-                        .add_dropped_field("service".to_string(), service);
+                        .add_dropped_field(meanings::SERVICE.to_string(), service);
                 }
             }
         }
     }
 
     fn apply_except_fields(&self, log: &mut LogEvent) {
+        use lookup::path::TargetPath;
+
         if let Some(except_fields) = self.except_fields.as_ref() {
+            let service_path = log
+                .metadata()
+                .schema_definition()
+                .meaning_path(meanings::SERVICE)
+                .map(|path| path.value_path().to_string());
+
             for field in except_fields {
                 let value = log.remove(field.as_str());
 
                 // If we are removing the service field we need to store this in a `dropped_fields` list as we may need to
                 // refer to this later when emitting metrics.
                 if let Some(v) = value {
-                    if let Some(path) = log.metadata().schema_definition().meaning_path("service") {
-                        use lookup::path::TargetPath;
-
-                        if &path.value_path().to_string() == field {
-                            log.metadata_mut()
-                                .add_dropped_field("service".to_string(), v);
-                        }
+                    if matches!(service_path.as_ref(), Some(path) if path == field) {
+                        log.metadata_mut()
+                            .add_dropped_field(meanings::SERVICE.to_string(), v);
                     }
                 }
             }

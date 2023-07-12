@@ -6,8 +6,10 @@ use futures::stream::{BoxStream, StreamExt};
 use tower::Service;
 use vector_common::request_metadata::RequestMetadata;
 use vector_core::{
+    config::telemetry,
     event::{EventFinalizers, Finalizable},
     stream::{BatcherSettings, DriverResponse},
+    EstimatedJsonEncodedSizeOf,
 };
 
 use super::{
@@ -95,8 +97,11 @@ impl RequestBuilder<Vec<Event>> for NewRelicRequestBuilder {
         &self,
         mut input: Vec<Event>,
     ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
+        let mut byte_size = telemetry().create_request_count_byte_size();
+
         for event in input.iter_mut() {
             self.transformer.transform(event);
+            byte_size.add_event(event, event.estimated_json_encoded_size_of());
         }
 
         let builder = RequestMetadataBuilder::from_events(&input);

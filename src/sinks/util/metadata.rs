@@ -94,7 +94,7 @@ impl RequestMetadataBuilder {
     }
 
     /// Builds the [`RequestMetadata`] from the results of encoding.
-    /// `EncodeResult` provides is with the byte size before and after compression
+    /// `EncodeResult` provides us with the byte size before and after compression
     /// and the json size of the events after transforming (dropping unwanted fields) but
     /// before encoding.
     pub fn build<T>(&self, result: &EncodeResult<T>) -> RequestMetadata {

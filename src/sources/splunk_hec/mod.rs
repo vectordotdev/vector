@@ -21,6 +21,7 @@ use vector_config::configurable_component;
 use vector_core::{
     config::{LegacyKey, LogNamespace},
     event::BatchNotifier,
+    schema::meanings,
     EstimatedJsonEncodedSizeOf,
 };
 use vrl::value::{kind::Collection, Kind};
@@ -183,7 +184,7 @@ impl SourceConfig for SplunkConfig {
                 .with_event_field(
                     &owned_value_path!(log_schema().message_key()),
                     Kind::bytes().or_undefined(),
-                    Some("message"),
+                    Some(meanings::MESSAGE),
                 )
                 .with_event_field(
                     &owned_value_path!("line"),
@@ -205,7 +206,7 @@ impl SourceConfig for SplunkConfig {
             ))),
             &owned_value_path!("host"),
             Kind::bytes(),
-            Some("host"),
+            Some(meanings::HOST),
         )
         .with_source_metadata(
             SplunkConfig::NAME,
@@ -226,7 +227,7 @@ impl SourceConfig for SplunkConfig {
             Some(LegacyKey::Overwrite(owned_value_path!(SOURCE))),
             &owned_value_path!("source"),
             Kind::bytes(),
-            Some("service"),
+            Some(meanings::SERVICE),
         )
         // Not to be confused with `source_type`.
         .with_source_metadata(

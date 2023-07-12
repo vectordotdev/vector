@@ -132,8 +132,7 @@ impl EventMetadata {
         self.secrets.insert(SPLUNK_HEC_TOKEN, secret);
     }
 
-    /// Adds the value to the dropped fields list, returning the
-    /// position the value will be found in the list.
+    /// Adds the value to the dropped fields list.
     pub fn add_dropped_field(&mut self, meaning: String, value: Value) {
         self.dropped_fields.insert(meaning, value);
     }
