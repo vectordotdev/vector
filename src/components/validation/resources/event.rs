@@ -72,6 +72,7 @@ pub enum TestEvent {
 }
 
 impl TestEvent {
+    #[allow(clippy::missing_const_for_fn)] // const cannot run destructor
     pub fn into_event(self) -> Event {
         match self {
             Self::Passthrough(event) => event,

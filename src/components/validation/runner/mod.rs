@@ -298,13 +298,13 @@ impl Runner {
                 test_case.events.clone(),
                 input_tx,
                 &runner_metrics,
-                maybe_runner_encoder.as_ref().map(|encoder| encoder.clone()),
+                maybe_runner_encoder.as_ref().cloned(),
             );
 
             let output_driver = spawn_output_driver(
                 output_rx,
                 &runner_metrics,
-                maybe_runner_encoder.as_ref().map(|encoder| encoder.clone()),
+                maybe_runner_encoder.as_ref().cloned(),
             );
 
             // At this point, the component topology is running, and all input/output/telemetry
@@ -516,7 +516,7 @@ fn spawn_input_driver(
     runner_metrics: &Arc<Mutex<RunnerMetrics>>,
     mut maybe_encoder: Option<Encoder<encoding::Framer>>,
 ) -> JoinHandle<()> {
-    let input_runner_metrics = Arc::clone(&runner_metrics);
+    let input_runner_metrics = Arc::clone(runner_metrics);
 
     tokio::spawn(async move {
         for input_event in input_events {
@@ -529,9 +529,9 @@ fn spawn_input_driver(
             // be used in the Validators, as the "expected" case.
             let mut input_runner_metrics = input_runner_metrics.lock().unwrap();
 
-            if let Some(mut encoder) = maybe_encoder.as_mut() {
+            if let Some(encoder) = maybe_encoder.as_mut() {
                 let mut buffer = BytesMut::new();
-                encode_test_event(&mut encoder, &mut buffer, input_event.clone());
+                encode_test_event(encoder, &mut buffer, input_event.clone());
 
                 input_runner_metrics.sent_bytes_total += buffer.len() as u64;
             }
@@ -557,7 +557,7 @@ fn spawn_output_driver(
     runner_metrics: &Arc<Mutex<RunnerMetrics>>,
     maybe_encoder: Option<Encoder<encoding::Framer>>,
 ) -> JoinHandle<Vec<Event>> {
-    let output_runner_metrics = Arc::clone(&runner_metrics);
+    let output_runner_metrics = Arc::clone(runner_metrics);
 
     tokio::spawn(async move {
         let mut output_events = Vec::new();
