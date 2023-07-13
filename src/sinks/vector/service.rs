@@ -119,6 +119,9 @@ impl Service<VectorRequest> for VectorService {
                         protocol: &service.protocol,
                         endpoint: &service.endpoint,
                     });
+
+                    dbg!(&events_byte_size);
+
                     VectorResponse { events_byte_size }
                 })
                 .map_err(|source| VectorSinkError::Request { source }.into())
