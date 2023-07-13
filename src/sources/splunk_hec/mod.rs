@@ -10,7 +10,7 @@ use chrono::{DateTime, TimeZone, Utc};
 use flate2::read::MultiGzDecoder;
 use futures::FutureExt;
 use http::StatusCode;
-use lookup::owned_value_path;
+use lookup::{event_path, owned_value_path};
 use serde::Serialize;
 use serde_json::{de::Read as JsonRead, Deserializer, Value as JsonValue};
 use snafu::Snafu;
@@ -818,7 +818,7 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
                     }
 
                     for (key, value) in object {
-                        log.insert(key.as_str(), value);
+                        log.insert(event_path!(key.as_str()), value);
                     }
                 }
                 _ => return Err(ApiError::InvalidDataFormat { event: self.events }.into()),
@@ -1569,6 +1569,28 @@ mod tests {
             .is_some());
         assert_eq!(event[log_schema().source_type_key()], "splunk_hec".into());
         assert!(event.metadata().splunk_hec_token().is_none());
+    }
+
+    #[tokio::test]
+    async fn json_invalid_path_event() {
+        let (sink, source) = start(
+            JsonSerializerConfig::default().into(),
+            Compression::gzip_default(),
+            None,
+        )
+        .await;
+
+        let mut log = LogEvent::default();
+        // Test with a field that would be considered an invalid path if it were to
+        // be treated as a path and not a simple field name.
+        log.insert(event_path!("(greeting | thing"), "hello");
+        sink.run_events(vec![log.into()]).await.unwrap();
+
+        let event = collect_n(source, 1).await.remove(0).into_log();
+        assert_eq!(
+            event.get(event_path!("(greeting | thing")),
+            Some(&Value::from("hello"))
+        );
     }
 
     #[tokio::test]
