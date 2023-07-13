@@ -142,7 +142,7 @@ fn handle_dd_trace_payload_v1(
                     .set_datadog_api_key(Arc::clone(k));
             }
             trace_event.insert(
-                source.log_schema_source_type_key,
+                source.log_schema_source_type_key.as_str(),
                 Bytes::from("datadog_agent"),
             );
             trace_event.insert("payload_version", "v2".to_string());
@@ -255,7 +255,7 @@ fn handle_dd_trace_payload_v0(
                 trace_event.insert("language_name", lang.clone());
             }
             trace_event.insert(
-                source.log_schema_source_type_key,
+                source.log_schema_source_type_key.as_str(),
                 Bytes::from("datadog_agent"),
             );
             trace_event.insert("payload_version", "v1".to_string());
