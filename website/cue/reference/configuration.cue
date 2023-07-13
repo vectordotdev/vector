@@ -254,7 +254,7 @@ configuration: {
 		schema: {
 			common: false
 			description: """
-				Configures options for how Vector handles schema.
+				Configures options for how Vector handles event schema.
 				"""
 			required: false
 			type: object: {
