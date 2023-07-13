@@ -530,6 +530,7 @@ jobs:
 
           ${{ runner.temp }}/bin/smp --team-id ${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }} job status \
             --use-curta \
+            --use-consignor \
             --wait \
             --wait-delay-seconds 60 \
             --wait-timeout-minutes 90 \
