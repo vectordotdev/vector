@@ -811,7 +811,10 @@ mod test {
                     .single()
                     .expect("invalid timestamp"),
             );
-            expected.insert(log_schema().source_type_key(), "syslog");
+            expected.insert(
+                (PathPrefix::Event, log_schema().source_type_key().unwrap()),
+                "syslog",
+            );
             expected.insert("host", "74794bfb6795");
             expected.insert("hostname", "74794bfb6795");
 
@@ -863,7 +866,10 @@ mod test {
             );
             expected.insert(log_schema().host_key(), "74794bfb6795");
             expected.insert("hostname", "74794bfb6795");
-            expected.insert(log_schema().source_type_key(), "syslog");
+            expected.insert(
+                (PathPrefix::Event, log_schema().source_type_key().unwrap()),
+                "syslog",
+            );
             expected.insert("severity", "notice");
             expected.insert("facility", "user");
             expected.insert("version", 1);
@@ -1003,7 +1009,10 @@ mod test {
                 expected_date,
             );
             expected.insert(log_schema().host_key(), "74794bfb6795");
-            expected.insert(log_schema().source_type_key(), "syslog");
+            expected.insert(
+                (PathPrefix::Event, log_schema().source_type_key().unwrap()),
+                "syslog",
+            );
             expected.insert("hostname", "74794bfb6795");
             expected.insert("severity", "notice");
             expected.insert("facility", "user");
@@ -1048,7 +1057,10 @@ mod test {
                 ),
                 expected_date,
             );
-            expected.insert(log_schema().source_type_key(), "syslog");
+            expected.insert(
+                (PathPrefix::Event, log_schema().source_type_key().unwrap()),
+                "syslog",
+            );
             expected.insert("host", "74794bfb6795");
             expected.insert("hostname", "74794bfb6795");
             expected.insert("severity", "info");
@@ -1085,7 +1097,10 @@ mod test {
                     .and_then(|t| t.with_nanosecond(605_850 * 1000))
                     .expect("invalid timestamp"),
             );
-            expected.insert(log_schema().source_type_key(), "syslog");
+            expected.insert(
+                (PathPrefix::Event, log_schema().source_type_key().unwrap()),
+                "syslog",
+            );
             expected.insert("host", "74794bfb6795");
             expected.insert("hostname", "74794bfb6795");
             expected.insert("severity", "info");

@@ -212,7 +212,7 @@ pub struct DnstapFrameHandler {
     socket_send_buffer_size: Option<usize>,
     host_key: Option<OwnedValuePath>,
     timestamp_key: Option<OwnedValuePath>,
-    source_type_key: String,
+    source_type_key: Option<OwnedValuePath>,
     bytes_received: Registered<BytesReceived>,
     log_namespace: LogNamespace,
 }
@@ -242,7 +242,7 @@ impl DnstapFrameHandler {
             socket_send_buffer_size: config.socket_send_buffer_size,
             host_key,
             timestamp_key: timestamp_key.cloned(),
-            source_type_key: source_type_key.to_string(),
+            source_type_key: source_type_key.cloned(),
             bytes_received: register!(BytesReceived::from(Protocol::from("protobuf"))),
             log_namespace,
         }
@@ -307,7 +307,7 @@ impl FrameHandler for DnstapFrameHandler {
 
         self.log_namespace.insert_vector_metadata(
             &mut log_event,
-            Some(self.source_type_key()),
+            self.source_type_key(),
             path!("source_type"),
             DnstapConfig::NAME,
         );
@@ -343,8 +343,8 @@ impl FrameHandler for DnstapFrameHandler {
         &self.host_key
     }
 
-    fn source_type_key(&self) -> &str {
-        self.source_type_key.as_str()
+    fn source_type_key(&self) -> Option<&OwnedValuePath> {
+        self.source_type_key.as_ref()
     }
 
     fn timestamp_key(&self) -> Option<&OwnedValuePath> {

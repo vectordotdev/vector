@@ -497,7 +497,7 @@ mod test {
 
             let event = rx.next().await.unwrap();
             assert_eq!(
-                event.as_log()[log_schema().source_type_key()],
+                event.as_log()[log_schema().source_type_key().unwrap().to_string()],
                 "socket".into()
             );
         })
@@ -1121,7 +1121,7 @@ mod test {
             let events = collect_n(rx, 1).await;
 
             assert_eq!(
-                events[0].as_log()[log_schema().source_type_key()],
+                events[0].as_log()[log_schema().source_type_key().unwrap().to_string()],
                 "socket".into()
             );
         })
@@ -1327,7 +1327,7 @@ mod test {
                 "test".into()
             );
             assert_eq!(
-                events[0].as_log()[log_schema().source_type_key()],
+                events[0].as_log()[log_schema().source_type_key().unwrap().to_string()],
                 "socket".into()
             );
             assert_eq!(events[0].as_log()["host"], UNNAMED_SOCKET_HOST.into());
@@ -1419,7 +1419,7 @@ mod test {
                 "foo\nbar".into()
             );
             assert_eq!(
-                events[0].as_log()[log_schema().source_type_key()],
+                events[0].as_log()[log_schema().source_type_key().unwrap().to_string()],
                 "socket".into()
             );
         })
@@ -1506,7 +1506,7 @@ mod test {
                 "test".into()
             );
             assert_eq!(
-                events[0].as_log()[log_schema().source_type_key()],
+                events[0].as_log()[log_schema().source_type_key().unwrap().to_string()],
                 "socket".into()
             );
         })
@@ -1546,12 +1546,12 @@ mod test {
             assert_eq!(events.len(), 2);
             assert_eq!(events[0].as_log()[log_schema().message_key()], "foo".into());
             assert_eq!(
-                events[0].as_log()[log_schema().source_type_key()],
+                events[0].as_log()[log_schema().source_type_key().unwrap().to_string()],
                 "socket".into()
             );
             assert_eq!(events[1].as_log()[log_schema().message_key()], "bar".into());
             assert_eq!(
-                events[1].as_log()[log_schema().source_type_key()],
+                events[1].as_log()[log_schema().source_type_key().unwrap().to_string()],
                 "socket".into()
             );
         })

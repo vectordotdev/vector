@@ -910,7 +910,7 @@ fn create_event(
 
     log_namespace.insert_vector_metadata(
         &mut log,
-        Some(log_schema().source_type_key()),
+        log_schema().source_type_key(),
         path!("source_type"),
         Bytes::from(Config::NAME),
     );

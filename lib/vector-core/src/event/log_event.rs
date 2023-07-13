@@ -466,10 +466,10 @@ impl LogEvent {
     /// or from the `source_type` key set on the "Global Log Schema" (Legacy namespace).
     // TODO: This can eventually return a `&TargetOwnedPath` once Semantic meaning and the
     //   "Global Log Schema" are updated to the new path lookup code
-    pub fn source_type_path(&self) -> &'static str {
+    pub fn source_type_path(&self) -> Option<String> {
         match self.namespace() {
-            LogNamespace::Vector => "%vector.source_type",
-            LogNamespace::Legacy => log_schema().source_type_key(),
+            LogNamespace::Vector => Some("%vector.source_type".to_string()),
+            LogNamespace::Legacy => log_schema().source_type_key().map(ToString::to_string),
         }
     }
 
@@ -514,7 +514,9 @@ impl LogEvent {
     pub fn get_source_type(&self) -> Option<&Value> {
         match self.namespace() {
             LogNamespace::Vector => self.get(metadata_path!("vector", "source_type")),
-            LogNamespace::Legacy => self.get((PathPrefix::Event, log_schema().source_type_key())),
+            LogNamespace::Legacy => log_schema()
+                .source_type_key()
+                .and_then(|key| self.get((PathPrefix::Event, key))),
         }
     }
 }

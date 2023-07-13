@@ -751,7 +751,7 @@ fn create_event(
 
     log_namespace.insert_vector_metadata(
         &mut event,
-        Some(log_schema().source_type_key()),
+        log_schema().source_type_key(),
         path!("source_type"),
         Bytes::from_static(FileConfig::NAME.as_bytes()),
     );
@@ -1037,7 +1037,10 @@ mod tests {
         assert_eq!(log["host"], "Some.Machine".into());
         assert_eq!(log["offset"], 0.into());
         assert_eq!(log[log_schema().message_key()], "hello world".into());
-        assert_eq!(log[log_schema().source_type_key()], "file".into());
+        assert_eq!(
+            log[log_schema().source_type_key().unwrap().to_string()],
+            "file".into()
+        );
         assert!(log[log_schema().timestamp_key().unwrap().to_string()].is_timestamp());
     }
 
@@ -1059,7 +1062,10 @@ mod tests {
         assert_eq!(log["hostname"], "Some.Machine".into());
         assert_eq!(log["off"], 0.into());
         assert_eq!(log[log_schema().message_key()], "hello world".into());
-        assert_eq!(log[log_schema().source_type_key()], "file".into());
+        assert_eq!(
+            log[log_schema().source_type_key().unwrap().to_string()],
+            "file".into()
+        );
         assert!(log[log_schema().timestamp_key().unwrap().to_string()].is_timestamp());
     }
 
@@ -1466,7 +1472,7 @@ mod tests {
                     log_schema().host_key().to_string(),
                     log_schema().message_key().to_string(),
                     log_schema().timestamp_key().unwrap().to_string(),
-                    log_schema().source_type_key().to_string()
+                    log_schema().source_type_key().unwrap().to_string()
                 ]
                 .into_iter()
                 .collect::<HashSet<_>>()

@@ -761,7 +761,10 @@ mod tests {
         assert_eq!(log[PID_KEY], (8888_i64).into());
         assert_eq!(log[COMMAND_KEY], config.command.into());
         assert_eq!(log[log_schema().message_key()], "hello world".into());
-        assert_eq!(log[log_schema().source_type_key()], "exec".into());
+        assert_eq!(
+            log[log_schema().source_type_key().unwrap().to_string()],
+            "exec".into()
+        );
         assert!(log
             .get((
                 lookup::PathPrefix::Event,
@@ -842,7 +845,10 @@ mod tests {
         assert_eq!(log[PID_KEY], (8888_i64).into());
         assert_eq!(log[COMMAND_KEY], config.command.into());
         assert_eq!(log[log_schema().message_key()], "hello world".into());
-        assert_eq!(log[log_schema().source_type_key()], "exec".into());
+        assert_eq!(
+            log[log_schema().source_type_key().unwrap().to_string()],
+            "exec".into()
+        );
         assert!(log
             .get((
                 lookup::PathPrefix::Event,
@@ -1041,7 +1047,10 @@ mod tests {
             let log = event.as_log();
             assert_eq!(log[COMMAND_KEY], config.command.clone().into());
             assert_eq!(log[STREAM_KEY], STDOUT.into());
-            assert_eq!(log[log_schema().source_type_key()], "exec".into());
+            assert_eq!(
+                log[log_schema().source_type_key().unwrap().to_string()],
+                "exec".into()
+            );
             assert_eq!(log[log_schema().message_key()], "Hello World!".into());
             assert_eq!(log[log_schema().host_key()], "Some.Machine".into());
             assert!(log.get(PID_KEY).is_some());

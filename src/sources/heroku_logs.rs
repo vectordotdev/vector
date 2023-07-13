@@ -531,7 +531,7 @@ mod tests {
                     .into()
             );
             assert_eq!(log[&log_schema().host_key()], "host".into());
-            assert_eq!(log[log_schema().source_type_key()], "heroku_logs".into());
+            assert_eq!(log[log_schema().source_type_key().unwrap().to_string()], "heroku_logs".into());
             assert_eq!(log["appname"], "lumberjack-store".into());
             assert_eq!(log["absent"], Value::Null);
         }).await;
@@ -614,7 +614,10 @@ mod tests {
                 .into()
         );
         assert_eq!(log[log_schema().host_key()], "host".into());
-        assert_eq!(log[log_schema().source_type_key()], "heroku_logs".into());
+        assert_eq!(
+            log[log_schema().source_type_key().unwrap().to_string()],
+            "heroku_logs".into()
+        );
     }
 
     #[test]
@@ -634,7 +637,10 @@ mod tests {
                 log_schema().timestamp_key().unwrap()
             ))
             .is_some());
-        assert_eq!(log[log_schema().source_type_key()], "heroku_logs".into());
+        assert_eq!(
+            log[log_schema().source_type_key().unwrap().to_string()],
+            "heroku_logs".into()
+        );
     }
 
     #[test]
@@ -653,7 +659,10 @@ mod tests {
                 .into()
         );
         assert_eq!(log[log_schema().host_key()], "host".into());
-        assert_eq!(log[log_schema().source_type_key()], "heroku_logs".into());
+        assert_eq!(
+            log[log_schema().source_type_key().unwrap().to_string()],
+            "heroku_logs".into()
+        );
     }
 
     #[test]
