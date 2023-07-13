@@ -36,6 +36,7 @@ Celkon
 Ceph
 Chromecast
 Citrix
+Cloudflare
 Cloudfone
 Cmx
 Coby
@@ -245,6 +246,7 @@ compiletime
 coredns
 corejs
 coreutils
+curta
 daemonset
 databend
 datacenter
@@ -296,6 +298,9 @@ gpg
 gql
 grafana
 graphiql
+greptime
+greptimecloud
+greptimedb
 gvisor
 gws
 hadoop

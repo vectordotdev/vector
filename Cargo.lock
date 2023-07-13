@@ -3531,6 +3531,39 @@ dependencies = [
 ]
 
 [[package]]
+name = "greptime-proto"
+version = "0.1.0"
+source = "git+https://github.com/GreptimeTeam/greptime-proto.git?tag=0.2.1#4398d20c56d5f7939cc2960789cb1fa7dd18e6fe"
+dependencies = [
+ "prost",
+ "serde",
+ "serde_json",
+ "tonic",
+ "tonic-build",
+]
+
+[[package]]
+name = "greptimedb-client"
+version = "0.1.0"
+source = "git+https://github.com/GreptimeTeam/greptimedb-client-rust.git?rev=bc32362adf0df17a41a95bae4221d6d8f1775656#bc32362adf0df17a41a95bae4221d6d8f1775656"
+dependencies = [
+ "dashmap",
+ "enum_dispatch",
+ "futures 0.3.28",
+ "futures-util",
+ "greptime-proto",
+ "parking_lot",
+ "prost",
+ "rand 0.8.5",
+ "snafu",
+ "tokio",
+ "tokio-stream",
+ "tonic",
+ "tonic-build",
+ "tower",
+]
+
+[[package]]
 name = "grok"
 version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7337,9 +7370,9 @@ checksum = "388a1df253eca08550bef6c72392cfe7c30914bf41df5269b68cbd6ff8f570a3"
 
 [[package]]
 name = "serde"
-version = "1.0.167"
+version = "1.0.168"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7daf513456463b42aa1d94cff7e0c24d682b429f020b9afa4f5ba5c40a22b237"
+checksum = "d614f89548720367ded108b3c843be93f3a341e22d5674ca0dd5cd57f34926af"
 dependencies = [
  "serde_derive",
 ]
@@ -7397,9 +7430,9 @@ dependencies = [
 
 [[package]]
 name = "serde_derive"
-version = "1.0.167"
+version = "1.0.168"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b69b106b68bc8054f0e974e70d19984040f8a5cf9215ca82626ea4853f82c4b9"
+checksum = "d4fe589678c688e44177da4f27152ee2d190757271dc7f1d5b6b9f68d869d641"
 dependencies = [
  "proc-macro2 1.0.64",
  "quote 1.0.29",
@@ -9252,6 +9285,7 @@ dependencies = [
  "glob",
  "goauth",
  "governor",
+ "greptimedb-client",
  "grok",
  "h2",
  "hash_hasher",
