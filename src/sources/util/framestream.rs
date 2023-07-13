@@ -604,7 +604,6 @@ mod test {
     };
     use tokio_util::codec::{length_delimited, Framed};
     use vector_core::config::{LegacyKey, LogNamespace};
-    use vrl::path::PathPrefix;
 
     use super::{
         build_framestream_unix_source, spawn_event_handling_tasks, ControlField, ControlHeader,
@@ -667,7 +666,7 @@ mod test {
             let mut log_event = LogEvent::from(frame);
 
             log_event.insert(
-                (PathPrefix::Event, log_schema().source_type_key().unwrap()),
+                log_schema().source_type_key().unwrap().to_string().as_str(),
                 "framestream",
             );
             if let Some(host) = received_from {
