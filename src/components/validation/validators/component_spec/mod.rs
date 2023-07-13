@@ -1,12 +1,14 @@
+mod sinks;
 mod sources;
 
-use vector_core::event::{Event, Metric};
+use vector_core::event::{Event, Metric, MetricKind};
 
 use crate::components::validation::{ComponentType, RunnerMetrics, TestCaseExpectation, TestEvent};
 
-use super::Validator;
+use super::{ComponentMetricType, Validator};
 
-use self::sources::{validate_sources, SourceMetricType};
+use self::sinks::validate_sinks;
+use self::sources::validate_sources;
 
 /// Validates that the component meets the requirements of the [Component Specification][component_spec].
 ///
@@ -105,7 +107,13 @@ fn validate_telemetry(
                 Err(e) => errs.extend(e),
             }
         }
-        ComponentType::Sink => {}
+        ComponentType::Sink => {
+            let result = validate_sinks(telemetry_events, runner_metrics);
+            match result {
+                Ok(o) => out.extend(o),
+                Err(e) => errs.extend(e),
+            }
+        }
         ComponentType::Transform => {}
     }
 
@@ -118,7 +126,7 @@ fn validate_telemetry(
 
 fn filter_events_by_metric_and_component<'a>(
     telemetry_events: &'a [Event],
-    metric: &SourceMetricType,
+    metric: &ComponentMetricType,
     component_name: &'a str,
 ) -> Vec<&'a Metric> {
     let metrics: Vec<&Metric> = telemetry_events
@@ -146,4 +154,95 @@ fn filter_events_by_metric_and_component<'a>(
     debug!("{}: {} metrics found.", metric.to_string(), metrics.len(),);
 
     metrics
+}
+
+fn sum_counters(
+    metric_name: &ComponentMetricType,
+    metrics: &[&vector_core::event::Metric],
+) -> Result<u64, Vec<String>> {
+    let mut sum: f64 = 0.0;
+    let mut errs = Vec::new();
+
+    for m in metrics {
+        match m.value() {
+            vector_core::event::MetricValue::Counter { value } => {
+                if let MetricKind::Absolute = m.data().kind {
+                    sum = *value;
+                } else {
+                    sum += *value;
+                }
+            }
+            _ => errs.push(format!("{}: metric value is not a counter", metric_name,)),
+        }
+    }
+
+    if errs.is_empty() {
+        Ok(sum as u64)
+    } else {
+        Err(errs)
+    }
+}
+
+fn validate_events_total(
+    telemetry_events: &[Event],
+    metric_type: &ComponentMetricType,
+    component_name: &str,
+    expected_events: u64,
+) -> Result<Vec<String>, Vec<String>> {
+    let mut errs: Vec<String> = Vec::new();
+
+    let metrics =
+        filter_events_by_metric_and_component(telemetry_events, metric_type, component_name);
+
+    let actual_events = sum_counters(metric_type, &metrics)?;
+
+    debug!(
+        "{}: {} events, {} expected events.",
+        metric_type, actual_events, expected_events,
+    );
+
+    if actual_events != expected_events {
+        errs.push(format!(
+            "{}: expected {} events, but received {}",
+            metric_type, expected_events, actual_events
+        ));
+    }
+
+    if !errs.is_empty() {
+        return Err(errs);
+    }
+
+    Ok(vec![format!("{}: {}", metric_type, actual_events)])
+}
+
+fn validate_bytes_total(
+    telemetry_events: &[Event],
+    metric_type: &ComponentMetricType,
+    component_name: &str,
+    expected_bytes: u64,
+) -> Result<Vec<String>, Vec<String>> {
+    let mut errs: Vec<String> = Vec::new();
+
+    let metrics =
+        filter_events_by_metric_and_component(telemetry_events, metric_type, component_name);
+
+    let actual_bytes = sum_counters(metric_type, &metrics)?;
+
+    debug!(
+        "{}: {} bytes, {} expected bytes.",
+        metric_type, actual_bytes, expected_bytes,
+    );
+
+    if actual_bytes != expected_bytes {
+        errs.push(format!(
+            "{}: expected {} bytes, but received {}",
+            metric_type, expected_bytes, actual_bytes
+        ));
+    }
+
+    if !errs.is_empty() {
+        return Err(errs);
+    }
+
+    Ok(vec![format!("{}: {}", metric_type, actual_bytes)])
 }

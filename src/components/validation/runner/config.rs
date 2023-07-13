@@ -1,5 +1,6 @@
 use crate::{
     components::validation::{
+        component_names::*,
         sync::{Configuring, TaskCoordinator},
         util::GrpcAddress,
         ComponentConfiguration, ComponentType, ValidationConfiguration,
@@ -20,12 +21,6 @@ pub struct TopologyBuilder {
     input_edge: Option<InputEdge>,
     output_edge: Option<OutputEdge>,
 }
-
-pub const TEST_SOURCE_NAME: &str = "test_source";
-pub const TEST_SINK_NAME: &str = "test_sink";
-pub const TEST_TRANSFORM_NAME: &str = "test_transform";
-pub const TEST_INPUT_SOURCE_NAME: &str = "input_source";
-pub const TEST_OUTPUT_SINK_NAME: &str = "output_sink";
 
 impl TopologyBuilder {
     /// Creates a component topology for the given component configuration.

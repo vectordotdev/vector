@@ -2,6 +2,8 @@ mod component_spec;
 
 pub use self::component_spec::ComponentSpecValidator;
 
+use std::fmt::{Display, Formatter};
+
 use vector_core::event::Event;
 
 use super::{ComponentType, RunnerMetrics, TestCaseExpectation, TestEvent};
@@ -47,5 +49,33 @@ impl From<StandardValidators> for Box<dyn Validator> {
         match sv {
             StandardValidators::ComponentSpec => Box::<ComponentSpecValidator>::default(),
         }
+    }
+}
+
+pub enum ComponentMetricType {
+    EventsReceived,
+    EventsReceivedBytes,
+    ReceivedBytesTotal,
+    SentEventsTotal,
+    SentEventBytesTotal,
+    EventsDropped,
+}
+
+impl ComponentMetricType {
+    const fn name(&self) -> &'static str {
+        match self {
+            ComponentMetricType::EventsReceived => "component_received_events_total",
+            ComponentMetricType::EventsReceivedBytes => "component_received_event_bytes_total",
+            ComponentMetricType::ReceivedBytesTotal => "component_received_bytes_total",
+            ComponentMetricType::SentEventsTotal => "component_sent_events_total",
+            ComponentMetricType::SentEventBytesTotal => "component_sent_event_bytes_total",
+            ComponentMetricType::EventsDropped => "component_discarded_events_total",
+        }
+    }
+}
+
+impl Display for ComponentMetricType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.name())
     }
 }

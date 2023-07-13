@@ -1,38 +1,8 @@
-use std::fmt::{Display, Formatter};
+use vector_core::event::Event;
 
-use vector_core::event::{Event, MetricKind};
+use crate::components::validation::{component_names::TEST_SOURCE_NAME, RunnerMetrics};
 
-use crate::components::validation::RunnerMetrics;
-
-use super::filter_events_by_metric_and_component;
-
-const TEST_SOURCE_NAME: &str = "test_source";
-
-pub enum SourceMetricType {
-    EventsReceived,
-    EventsReceivedBytes,
-    ReceivedBytesTotal,
-    SentEventsTotal,
-    SentEventBytesTotal,
-}
-
-impl SourceMetricType {
-    const fn name(&self) -> &'static str {
-        match self {
-            SourceMetricType::EventsReceived => "component_received_events_total",
-            SourceMetricType::EventsReceivedBytes => "component_received_event_bytes_total",
-            SourceMetricType::ReceivedBytesTotal => "component_received_bytes_total",
-            SourceMetricType::SentEventsTotal => "component_sent_events_total",
-            SourceMetricType::SentEventBytesTotal => "component_sent_event_bytes_total",
-        }
-    }
-}
-
-impl Display for SourceMetricType {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.name())
-    }
-}
+use super::{validate_bytes_total, validate_events_total, ComponentMetricType};
 
 pub fn validate_sources(
     telemetry_events: &[Event],
@@ -63,95 +33,6 @@ pub fn validate_sources(
     }
 }
 
-fn sum_counters(
-    metric_name: &SourceMetricType,
-    metrics: &[&vector_core::event::Metric],
-) -> Result<u64, Vec<String>> {
-    let mut sum: f64 = 0.0;
-    let mut errs = Vec::new();
-
-    for m in metrics {
-        match m.value() {
-            vector_core::event::MetricValue::Counter { value } => {
-                if let MetricKind::Absolute = m.data().kind {
-                    sum = *value;
-                } else {
-                    sum += *value;
-                }
-            }
-            _ => errs.push(format!("{}: metric value is not a counter", metric_name,)),
-        }
-    }
-
-    if errs.is_empty() {
-        Ok(sum as u64)
-    } else {
-        Err(errs)
-    }
-}
-
-fn validate_events_total(
-    telemetry_events: &[Event],
-    metric_type: &SourceMetricType,
-    expected_events: u64,
-) -> Result<Vec<String>, Vec<String>> {
-    let mut errs: Vec<String> = Vec::new();
-
-    let metrics =
-        filter_events_by_metric_and_component(telemetry_events, metric_type, TEST_SOURCE_NAME);
-
-    let actual_events = sum_counters(metric_type, &metrics)?;
-
-    debug!(
-        "{}: {} events, {} expected events.",
-        metric_type, actual_events, expected_events,
-    );
-
-    if actual_events != expected_events {
-        errs.push(format!(
-            "{}: expected {} events, but received {}",
-            metric_type, expected_events, actual_events
-        ));
-    }
-
-    if !errs.is_empty() {
-        return Err(errs);
-    }
-
-    Ok(vec![format!("{}: {}", metric_type, actual_events)])
-}
-
-fn validate_bytes_total(
-    telemetry_events: &[Event],
-    metric_type: &SourceMetricType,
-    expected_bytes: u64,
-) -> Result<Vec<String>, Vec<String>> {
-    let mut errs: Vec<String> = Vec::new();
-
-    let metrics =
-        filter_events_by_metric_and_component(telemetry_events, metric_type, TEST_SOURCE_NAME);
-
-    let actual_bytes = sum_counters(metric_type, &metrics)?;
-
-    debug!(
-        "{}: {} bytes, {} expected bytes.",
-        metric_type, actual_bytes, expected_bytes,
-    );
-
-    if actual_bytes != expected_bytes {
-        errs.push(format!(
-            "{}: expected {} bytes, but received {}",
-            metric_type, expected_bytes, actual_bytes
-        ));
-    }
-
-    if !errs.is_empty() {
-        return Err(errs);
-    }
-
-    Ok(vec![format!("{}: {}", metric_type, actual_bytes)])
-}
-
 fn validate_component_received_events_total(
     telemetry_events: &[Event],
     runner_metrics: &RunnerMetrics,
@@ -162,7 +43,8 @@ fn validate_component_received_events_total(
 
     validate_events_total(
         telemetry_events,
-        &SourceMetricType::EventsReceived,
+        &ComponentMetricType::EventsReceived,
+        TEST_SOURCE_NAME,
         expected_events,
     )
 }
@@ -177,7 +59,8 @@ fn validate_component_received_event_bytes_total(
 
     validate_bytes_total(
         telemetry_events,
-        &SourceMetricType::EventsReceivedBytes,
+        &ComponentMetricType::EventsReceivedBytes,
+        TEST_SOURCE_NAME,
         expected_bytes,
     )
 }
@@ -192,7 +75,8 @@ fn validate_component_received_bytes_total(
 
     validate_bytes_total(
         telemetry_events,
-        &SourceMetricType::ReceivedBytesTotal,
+        &ComponentMetricType::ReceivedBytesTotal,
+        TEST_SOURCE_NAME,
         expected_bytes,
     )
 }
@@ -207,7 +91,8 @@ fn validate_component_sent_events_total(
 
     validate_events_total(
         telemetry_events,
-        &SourceMetricType::SentEventsTotal,
+        &ComponentMetricType::SentEventsTotal,
+        TEST_SOURCE_NAME,
         expected_events,
     )
 }
@@ -222,7 +107,8 @@ fn validate_component_sent_event_bytes_total(
 
     validate_bytes_total(
         telemetry_events,
-        &SourceMetricType::SentEventBytesTotal,
+        &ComponentMetricType::SentEventBytesTotal,
+        TEST_SOURCE_NAME,
         expected_bytes,
     )
 }
