@@ -530,7 +530,6 @@ jobs:
 
           ${{ runner.temp }}/bin/smp --team-id ${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }} job status \
             --use-curta \
-            --use-consignor \
             --wait \
             --wait-delay-seconds 60 \
             --wait-timeout-minutes 90 \
@@ -625,7 +624,6 @@ jobs:
 
           ${{ runner.temp }}/bin/smp --team-id ${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }} job result \
             --use-curta \
-            --use-consignor \
             --submission-metadata ${{ runner.temp }}/submission-metadata
 
       - name: Check status, cancelled
@@ -718,7 +716,6 @@ jobs:
 
           ${{ runner.temp }}/bin/smp --team-id ${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }} job sync \
             --use-curta \
-            --use-consignor \
             --submission-metadata ${{ runner.temp }}/submission-metadata \
             --output-path "${{ runner.temp }}/outputs"
 
