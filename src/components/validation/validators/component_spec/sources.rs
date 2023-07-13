@@ -14,6 +14,7 @@ pub enum SourceMetricType {
     ReceivedBytesTotal,
     SentEventsTotal,
     SentEventBytesTotal,
+    ErrorsTotal,
 }
 
 impl SourceMetricType {
@@ -24,6 +25,7 @@ impl SourceMetricType {
             SourceMetricType::ReceivedBytesTotal => "component_received_bytes_total",
             SourceMetricType::SentEventsTotal => "component_sent_events_total",
             SourceMetricType::SentEventBytesTotal => "component_sent_event_bytes_total",
+            SourceMetricType::ErrorsTotal => "component_errors_total",
         }
     }
 }
@@ -47,6 +49,7 @@ pub fn validate_sources(
         validate_component_received_bytes_total,
         validate_component_sent_events_total,
         validate_component_sent_event_bytes_total,
+        validate_component_errors_total,
     ];
 
     for v in validations.iter() {
@@ -224,5 +227,16 @@ fn validate_component_sent_event_bytes_total(
         telemetry_events,
         &SourceMetricType::SentEventBytesTotal,
         expected_bytes,
+    )
+}
+
+fn validate_component_errors_total(
+    telemetry_events: &[Event],
+    runner_metrics: &RunnerMetrics,
+) -> Result<Vec<String>, Vec<String>> {
+    validate_events_total(
+        telemetry_events,
+        &SourceMetricType::ErrorsTotal,
+        runner_metrics.errors_total,
     )
 }
