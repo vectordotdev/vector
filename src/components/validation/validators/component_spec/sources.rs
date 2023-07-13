@@ -14,6 +14,7 @@ pub enum SourceMetricType {
     ReceivedBytesTotal,
     SentEventsTotal,
     SentEventBytesTotal,
+    EventsDropped,
 }
 
 impl SourceMetricType {
@@ -24,6 +25,7 @@ impl SourceMetricType {
             SourceMetricType::ReceivedBytesTotal => "component_received_bytes_total",
             SourceMetricType::SentEventsTotal => "component_sent_events_total",
             SourceMetricType::SentEventBytesTotal => "component_sent_event_bytes_total",
+            SourceMetricType::EventsDropped => "component_discarded_events_total",
         }
     }
 }
@@ -47,6 +49,7 @@ pub fn validate_sources(
         validate_component_received_bytes_total,
         validate_component_sent_events_total,
         validate_component_sent_event_bytes_total,
+        validate_component_discarded_events_total,
     ];
 
     for v in validations.iter() {
@@ -224,5 +227,20 @@ fn validate_component_sent_event_bytes_total(
         telemetry_events,
         &SourceMetricType::SentEventBytesTotal,
         expected_bytes,
+    )
+}
+
+fn validate_component_discarded_events_total(
+    telemetry_events: &[Event],
+    runner_metrics: &RunnerMetrics,
+) -> Result<Vec<String>, Vec<String>> {
+    // The reciprocal metric for sent_event_bytes is received_event_bytes,
+    // so the expected value is what the output runner received.
+    let expected_dropped = runner_metrics.discarded_events_total;
+
+    validate_bytes_total(
+        telemetry_events,
+        &SourceMetricType::EventsDropped,
+        expected_dropped,
     )
 }
