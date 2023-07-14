@@ -1,12 +1,7 @@
 use std::num::NonZeroUsize;
 
+use vector_common::request_metadata::{GetEventCountTags, GroupedCountByteSize, RequestMetadata};
 use vector_core::{config, ByteSizeOf, EstimatedJsonEncodedSizeOf};
-
-use vector_common::{
-    internal_event::CountByteSize,
-    json_size::JsonSize,
-    request_metadata::{GetEventCountTags, GroupedCountByteSize, RequestMetadata},
-};
 
 use super::request_builder::EncodeResult;
 
@@ -14,7 +9,7 @@ use super::request_builder::EncodeResult;
 pub struct RequestMetadataBuilder {
     event_count: usize,
     events_byte_size: usize,
-    events_estimated_json_encoded_byte_size: GroupedCountByteSize,
+    grouped_events_byte_size: GroupedCountByteSize,
 }
 
 impl RequestMetadataBuilder {
@@ -34,7 +29,7 @@ impl RequestMetadataBuilder {
         Self {
             event_count: events.len(),
             events_byte_size,
-            events_estimated_json_encoded_byte_size: size,
+            grouped_events_byte_size: size,
         }
     }
 
@@ -48,27 +43,11 @@ impl RequestMetadataBuilder {
         Self {
             event_count: 1,
             events_byte_size: event.size_of(),
-            events_estimated_json_encoded_byte_size: size,
+            grouped_events_byte_size: size,
         }
     }
 
-    pub fn new(
-        event_count: usize,
-        events_byte_size: usize,
-        events_estimated_json_encoded_byte_size: JsonSize,
-    ) -> Self {
-        Self {
-            event_count,
-            events_byte_size,
-            events_estimated_json_encoded_byte_size: CountByteSize(
-                event_count,
-                events_estimated_json_encoded_byte_size,
-            )
-            .into(),
-        }
-    }
-
-    pub const fn new_proper(
+    pub const fn new(
         event_count: usize,
         events_byte_size: usize,
         grouped_events_byte_size: GroupedCountByteSize,
@@ -76,7 +55,7 @@ impl RequestMetadataBuilder {
         Self {
             event_count,
             events_byte_size,
-            events_estimated_json_encoded_byte_size: grouped_events_byte_size,
+            grouped_events_byte_size,
         }
     }
 
@@ -87,8 +66,7 @@ impl RequestMetadataBuilder {
         self.event_count += 1;
         self.events_byte_size += event.size_of();
         let json_size = event.estimated_json_encoded_size_of();
-        self.events_estimated_json_encoded_byte_size
-            .add_event(&event, json_size);
+        self.grouped_events_byte_size.add_event(&event, json_size);
     }
 
     pub fn with_request_size(&self, size: NonZeroUsize) -> RequestMetadata {
@@ -99,7 +77,7 @@ impl RequestMetadataBuilder {
             self.events_byte_size,
             size,
             size,
-            self.events_estimated_json_encoded_byte_size.clone(),
+            self.grouped_events_byte_size.clone(),
         )
     }
 
@@ -111,7 +89,7 @@ impl RequestMetadataBuilder {
             result
                 .compressed_byte_size
                 .unwrap_or(result.uncompressed_byte_size),
-            self.events_estimated_json_encoded_byte_size.clone(),
+            self.grouped_events_byte_size.clone(),
         )
     }
 }

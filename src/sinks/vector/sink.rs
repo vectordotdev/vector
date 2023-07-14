@@ -81,7 +81,7 @@ where
                 },
             ))
             .map(|event_collection| {
-                let builder = RequestMetadataBuilder::new_proper(
+                let builder = RequestMetadataBuilder::new(
                     event_collection.events.len(),
                     event_collection.events_byte_size,
                     event_collection.events_json_byte_size,
