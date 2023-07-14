@@ -1,6 +1,8 @@
 mod event;
 mod http;
 
+use std::sync::Arc;
+
 use codecs::{
     decoding::{self, DeserializerConfig},
     encoding::{
@@ -8,7 +10,7 @@ use codecs::{
     },
     BytesEncoder,
 };
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, Mutex};
 use vector_core::{config::DataType, event::Event};
 
 use crate::codecs::{Decoder, DecodingConfig, Encoder, EncodingConfig, EncodingConfigWithFraming};
@@ -16,7 +18,10 @@ use crate::codecs::{Decoder, DecodingConfig, Encoder, EncodingConfig, EncodingCo
 pub use self::event::{encode_test_event, TestEvent};
 pub use self::http::HttpResourceConfig;
 
-use super::sync::{Configuring, TaskCoordinator};
+use super::{
+    sync::{Configuring, TaskCoordinator},
+    RunnerMetrics,
+};
 
 /// The codec used by the external resource.
 ///
@@ -273,7 +278,7 @@ impl From<HttpResourceConfig> for ResourceDefinition {
 /// the external resource must pull the data from the sink.
 #[derive(Clone)]
 pub struct ExternalResource {
-    direction: ResourceDirection,
+    pub direction: ResourceDirection,
     definition: ResourceDefinition,
     pub codec: ResourceCodec,
 }
@@ -297,11 +302,16 @@ impl ExternalResource {
         self,
         input_rx: mpsc::Receiver<TestEvent>,
         task_coordinator: &TaskCoordinator<Configuring>,
+        runner_metrics: &Arc<Mutex<RunnerMetrics>>,
     ) {
         match self.definition {
-            ResourceDefinition::Http(http_config) => {
-                http_config.spawn_as_input(self.direction, self.codec, input_rx, task_coordinator)
-            }
+            ResourceDefinition::Http(http_config) => http_config.spawn_as_input(
+                self.direction,
+                self.codec,
+                input_rx,
+                task_coordinator,
+                runner_metrics,
+            ),
         }
     }
 
@@ -310,11 +320,16 @@ impl ExternalResource {
         self,
         output_tx: mpsc::Sender<Vec<Event>>,
         task_coordinator: &TaskCoordinator<Configuring>,
+        runner_metrics: &Arc<Mutex<RunnerMetrics>>,
     ) {
         match self.definition {
-            ResourceDefinition::Http(http_config) => {
-                http_config.spawn_as_output(self.direction, self.codec, output_tx, task_coordinator)
-            }
+            ResourceDefinition::Http(http_config) => http_config.spawn_as_output(
+                self.direction,
+                self.codec,
+                output_tx,
+                task_coordinator,
+                runner_metrics,
+            ),
         }
     }
 }

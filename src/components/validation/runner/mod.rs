@@ -2,18 +2,16 @@ pub mod config;
 mod io;
 mod telemetry;
 
-use std::{
-    collections::HashMap,
-    path::PathBuf,
-    sync::{Arc, Mutex},
-    time::Duration,
-};
+use std::{collections::HashMap, path::PathBuf, sync::Arc, time::Duration};
 
 use bytes::BytesMut;
 use tokio::{
     runtime::Builder,
     select,
-    sync::mpsc::{self, Receiver, Sender},
+    sync::{
+        mpsc::{self, Receiver, Sender},
+        Mutex,
+    },
     task::JoinHandle,
 };
 use tokio_util::codec::Encoder as _;
@@ -251,6 +249,7 @@ impl Runner {
                 &self.configuration,
                 &input_task_coordinator,
                 &output_task_coordinator,
+                &runner_metrics,
             );
             let input_tx = runner_input.into_sender(controlled_edges.input);
             let output_rx = runner_output.into_receiver(controlled_edges.output);
@@ -294,17 +293,25 @@ impl Runner {
             // around if we can avoid it.
             tokio::time::sleep(Duration::from_secs(2)).await;
 
+            let skip_input_driver_metrics =
+                self.configuration.component_type == ComponentType::Source;
+
             let input_driver = spawn_input_driver(
                 test_case.events.clone(),
                 input_tx,
                 &runner_metrics,
                 maybe_runner_encoder.as_ref().cloned(),
+                skip_input_driver_metrics,
             );
+
+            let skip_output_driver_metrics =
+                self.configuration.component_type == ComponentType::Sink;
 
             let output_driver = spawn_output_driver(
                 output_rx,
                 &runner_metrics,
                 maybe_runner_encoder.as_ref().cloned(),
+                skip_output_driver_metrics,
             );
 
             // At this point, the component topology is running, and all input/output/telemetry
@@ -350,6 +357,8 @@ impl Runner {
             } = test_case;
             let telemetry_events = telemetry_collector.collect().await;
 
+            let final_runner_metrics = runner_metrics.lock().await;
+
             let validator_results = self
                 .validators
                 .values()
@@ -360,7 +369,7 @@ impl Runner {
                         &input_events,
                         &output_events,
                         &telemetry_events,
-                        &runner_metrics.lock().unwrap(),
+                        &final_runner_metrics,
                     )
                 })
                 .collect();
@@ -418,6 +427,7 @@ fn build_external_resource(
     configuration: &ValidationConfiguration,
     input_task_coordinator: &TaskCoordinator<Configuring>,
     output_task_coordinator: &TaskCoordinator<Configuring>,
+    runner_metrics: &Arc<Mutex<RunnerMetrics>>,
 ) -> (RunnerInput, RunnerOutput, Option<Encoder<encoding::Framer>>) {
     let component_type = configuration.component_type();
     let maybe_external_resource = configuration.external_resource();
@@ -433,7 +443,7 @@ fn build_external_resource(
             let (tx, rx) = mpsc::channel(1024);
             let resource =
                 maybe_external_resource.expect("a source must always have an external resource");
-            resource.spawn_as_input(rx, input_task_coordinator);
+            resource.spawn_as_input(rx, input_task_coordinator, runner_metrics);
 
             (
                 RunnerInput::External(tx),
@@ -453,7 +463,7 @@ fn build_external_resource(
             let (tx, rx) = mpsc::channel(1024);
             let resource =
                 maybe_external_resource.expect("a sink must always have an external resource");
-            resource.spawn_as_output(tx, output_task_coordinator);
+            resource.spawn_as_output(tx, output_task_coordinator, runner_metrics);
 
             (
                 RunnerInput::Controlled,
@@ -520,6 +530,7 @@ fn spawn_input_driver(
     input_tx: Sender<TestEvent>,
     runner_metrics: &Arc<Mutex<RunnerMetrics>>,
     mut maybe_encoder: Option<Encoder<encoding::Framer>>,
+    _skip_input_driver_metrics: bool,
 ) -> JoinHandle<()> {
     let input_runner_metrics = Arc::clone(runner_metrics);
 
@@ -532,7 +543,7 @@ fn spawn_input_driver(
 
             // Update the runner metrics for the sent event. This will later
             // be used in the Validators, as the "expected" case.
-            let mut input_runner_metrics = input_runner_metrics.lock().unwrap();
+            let mut input_runner_metrics = input_runner_metrics.lock().await;
 
             if let Some(encoder) = maybe_encoder.as_mut() {
                 let mut buffer = BytesMut::new();
@@ -561,6 +572,7 @@ fn spawn_output_driver(
     mut output_rx: Receiver<Vec<Event>>,
     runner_metrics: &Arc<Mutex<RunnerMetrics>>,
     maybe_encoder: Option<Encoder<encoding::Framer>>,
+    skip_output_driver_metrics: bool,
 ) -> JoinHandle<Vec<Event>> {
     let output_runner_metrics = Arc::clone(runner_metrics);
 
@@ -571,23 +583,25 @@ fn spawn_output_driver(
 
             // Update the runner metrics for the received event. This will later
             // be used in the Validators, as the "expected" case.
-            let mut output_runner_metrics = output_runner_metrics.lock().unwrap();
+            let mut output_runner_metrics = output_runner_metrics.lock().await;
 
             for output_event in events {
-                output_runner_metrics.received_events_total += 1;
                 output_runner_metrics.received_event_bytes_total += vec![output_event.clone()]
                     .estimated_json_encoded_size_of()
                     .get()
                     as u64;
 
-                if let Some(encoder) = maybe_encoder.as_ref() {
-                    let mut buffer = BytesMut::new();
-                    encoder
-                        .clone()
-                        .encode(output_event, &mut buffer)
-                        .expect("should not fail to encode output event");
+                if !skip_output_driver_metrics {
+                    if let Some(encoder) = maybe_encoder.as_ref() {
+                        let mut buffer = BytesMut::new();
+                        encoder
+                            .clone()
+                            .encode(output_event, &mut buffer)
+                            .expect("should not fail to encode output event");
 
-                    output_runner_metrics.received_bytes_total += buffer.len() as u64;
+                        output_runner_metrics.received_events_total += 1;
+                        output_runner_metrics.received_bytes_total += buffer.len() as u64;
+                    }
                 }
             }
         }

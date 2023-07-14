@@ -61,7 +61,7 @@ impl ComponentMetricValidator for SinkComponentMetricValidator {
             ComponentMetricType::SentBytesTotal => {
                 // Since the runner is on the same "side" of the topology as a sink is,
                 // the expected value is what the input runner sent.
-                let expected_bytes = runner_metrics.sent_bytes_total;
+                let expected_bytes = runner_metrics.received_bytes_total;
 
                 Self::validate_bytes_total(
                     telemetry_events,
@@ -73,7 +73,9 @@ impl ComponentMetricValidator for SinkComponentMetricValidator {
             ComponentMetricType::SentEventBytesTotal => {
                 // Since the runner is on the same "side" of the topology as a sink is,
                 // the expected value is what the input runner sent.
-                let expected_bytes = runner_metrics.received_bytes_total;
+                let expected_bytes = 0;
+
+                // TODO: see TODO in resources/http.rs for idea on how to get this value
 
                 Self::validate_bytes_total(
                     telemetry_events,
