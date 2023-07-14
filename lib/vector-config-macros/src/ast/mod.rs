@@ -1,4 +1,4 @@
-use darling::{error::Accumulator, util::path_to_string, FromMeta};
+use darling::{ast::NestedMeta, error::Accumulator, util::path_to_string, FromMeta};
 use quote::ToTokens;
 use serde_derive_internals::{ast as serde_ast, attr as serde_attr};
 
@@ -9,7 +9,7 @@ mod variant;
 
 pub use container::Container;
 pub use field::Field;
-use syn::{Expr, NestedMeta};
+use syn::Expr;
 pub use variant::Variant;
 use vector_config_common::constants;
 
@@ -196,36 +196,46 @@ impl FromMeta for Metadata {
                         errors.push(darling::Error::unexpected_type("list").with_span(nmeta));
                         None
                     }
-                    syn::Meta::NameValue(nv) => match &nv.lit {
-                        // When dealing with a string literal, we check if it ends in `()`. If so,
-                        // we emit that as-is, leading to doing a function call and using the return
-                        // value of that function as the value for this key/value pair.
-                        //
-                        // Otherwise, we just treat the string literal normally.
-                        syn::Lit::Str(s) => {
-                            if s.value().ends_with("()") {
-                                if let Ok(expr) = s.parse::<Expr>() {
-                                    Some(LazyCustomAttribute::KeyValue {
-                                        key: path_to_string(&nv.path),
-                                        value: expr.to_token_stream(),
-                                    })
-                                } else {
-                                    errors.push(
-                                        darling::Error::custom(INVALID_VALUE_EXPR).with_span(nmeta),
-                                    );
-                                    None
+                    syn::Meta::NameValue(nv) => match &nv.value {
+                        Expr::Lit(expr) => {
+                            match &expr.lit {
+                                // When dealing with a string literal, we check if it ends in `()`. If so,
+                                // we emit that as-is, leading to doing a function call and using the return
+                                // value of that function as the value for this key/value pair.
+                                //
+                                // Otherwise, we just treat the string literal normally.
+                                syn::Lit::Str(s) => {
+                                    if s.value().ends_with("()") {
+                                        if let Ok(expr) = s.parse::<Expr>() {
+                                            Some(LazyCustomAttribute::KeyValue {
+                                                key: path_to_string(&nv.path),
+                                                value: expr.to_token_stream(),
+                                            })
+                                        } else {
+                                            errors.push(
+                                                darling::Error::custom(INVALID_VALUE_EXPR)
+                                                    .with_span(nmeta),
+                                            );
+                                            None
+                                        }
+                                    } else {
+                                        Some(LazyCustomAttribute::KeyValue {
+                                            key: path_to_string(&nv.path),
+                                            value: s.value().to_token_stream(),
+                                        })
+                                    }
                                 }
-                            } else {
-                                Some(LazyCustomAttribute::KeyValue {
+                                lit => Some(LazyCustomAttribute::KeyValue {
                                     key: path_to_string(&nv.path),
-                                    value: s.value().to_token_stream(),
-                                })
+                                    value: lit.to_token_stream(),
+                                }),
                             }
                         }
-                        lit => Some(LazyCustomAttribute::KeyValue {
-                            key: path_to_string(&nv.path),
-                            value: lit.to_token_stream(),
-                        }),
+                        expr => {
+                            errors
+                                .push(darling::Error::unexpected_expr_type(expr).with_span(nmeta));
+                            None
+                        }
                     },
                 },
                 NestedMeta::Lit(_) => {
