@@ -1,5 +1,5 @@
 mod definition;
-pub mod meanings;
+pub mod meaning;
 mod requirement;
 
 pub use definition::Definition;

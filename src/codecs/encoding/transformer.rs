@@ -12,7 +12,7 @@ use lookup::{
 use serde::{Deserialize, Deserializer};
 use vector_config::configurable_component;
 use vector_core::event::{LogEvent, MaybeAsLogMut};
-use vector_core::schema::meanings;
+use vector_core::schema::meaning;
 use vrl::value::Value;
 
 use crate::{event::Event, serde::skip_serializing_if_default};
@@ -143,12 +143,12 @@ impl Transformer {
             let service_path = log
                 .metadata()
                 .schema_definition()
-                .meaning_path(meanings::SERVICE);
+                .meaning_path(meaning::SERVICE);
             if let Some(service_path) = service_path {
                 let mut new_log = LogEvent::from(old_value);
                 if let Some(service) = new_log.remove(service_path) {
                     log.metadata_mut()
-                        .add_dropped_field(meanings::SERVICE.to_string(), service);
+                        .add_dropped_field(meaning::SERVICE.to_string(), service);
                 }
             }
         }
@@ -161,7 +161,7 @@ impl Transformer {
             let service_path = log
                 .metadata()
                 .schema_definition()
-                .meaning_path(meanings::SERVICE)
+                .meaning_path(meaning::SERVICE)
                 .map(|path| path.value_path().to_string());
 
             for field in except_fields {
@@ -172,7 +172,7 @@ impl Transformer {
                 if let Some(v) = value {
                     if matches!(service_path.as_ref(), Some(path) if path == field) {
                         log.metadata_mut()
-                            .add_dropped_field(meanings::SERVICE.to_string(), v);
+                            .add_dropped_field(meaning::SERVICE.to_string(), v);
                     }
                 }
             }
