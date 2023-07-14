@@ -521,7 +521,7 @@ mod tests {
             let log = event.as_log();
 
             assert_eq!(
-                log[log_schema().message_key()],
+                log[log_schema().message_key().unwrap().to_string()],
                 r#"at=info method=GET path="/cart_link" host=lumberjack-store.timber.io request_id=05726858-c44e-4f94-9a20-37df73be9006 fwd="73.75.38.87" dyno=web.1 connect=1ms service=22ms status=304 bytes=656 protocol=http"#.into()
             );
             assert_eq!(
@@ -606,7 +606,10 @@ mod tests {
         let events = super::line_to_events(Default::default(), log_namespace, body.into());
         let log = events[0].as_log();
 
-        assert_eq!(log[log_schema().message_key()], "foo bar baz".into());
+        assert_eq!(
+            log[log_schema().message_key().unwrap().to_string()],
+            "foo bar baz".into()
+        );
         assert_eq!(
             log[log_schema().timestamp_key().unwrap().to_string()],
             "2020-01-08T22:33:57.353034+00:00"
@@ -632,7 +635,7 @@ mod tests {
         let log = events[0].as_log();
 
         assert_eq!(
-            log[log_schema().message_key()],
+            log[log_schema().message_key().unwrap().to_string()],
             "what am i doing here".into()
         );
         assert!(log
@@ -654,7 +657,10 @@ mod tests {
         let events = super::line_to_events(Default::default(), log_namespace, body.into());
         let log = events[0].as_log();
 
-        assert_eq!(log[log_schema().message_key()], "i'm not that long".into());
+        assert_eq!(
+            log[log_schema().message_key().unwrap().to_string()],
+            "i'm not that long".into()
+        );
         assert_eq!(
             log[log_schema().timestamp_key().unwrap().to_string()],
             "2020-01-08T22:33:57.353034+00:00"

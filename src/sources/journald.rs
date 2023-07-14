@@ -784,7 +784,9 @@ fn create_log_event_from_record(
             let mut log = LogEvent::from_iter(record).with_batch_notifier_option(batch);
 
             if let Some(message) = log.remove(MESSAGE) {
-                log.insert(log_schema().message_key(), message);
+                if let Some(message_key) = log_schema().message_key() {
+                    log.insert((PathPrefix::Event, message_key), message);
+                }
             }
 
             log
@@ -1487,7 +1489,7 @@ mod tests {
     }
 
     fn message(event: &Event) -> Value {
-        event.as_log()[log_schema().message_key()].clone()
+        event.as_log()[log_schema().message_key().unwrap().to_string()].clone()
     }
 
     fn timestamp(event: &Event) -> Value {

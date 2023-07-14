@@ -12,6 +12,7 @@ use vector_core::{
     schema,
     transform::{FunctionTransform, OutputBuffer, Transform},
 };
+use vrl::path::PathPrefix;
 use vrl::value::Value;
 
 use crate::config::{OutputId, TransformConfig, TransformContext};
@@ -75,13 +76,12 @@ impl FunctionTransform for BasicTransform {
     fn transform(&mut self, output: &mut OutputBuffer, mut event: Event) {
         match &mut event {
             Event::Log(log) => {
-                let mut v = log
-                    .get(crate::config::log_schema().message_key())
-                    .unwrap()
-                    .to_string_lossy()
-                    .into_owned();
-                v.push_str(&self.suffix);
-                log.insert(crate::config::log_schema().message_key(), Value::from(v));
+                if let Some(message_key) = crate::config::log_schema().message_key() {
+                    let target_path = (PathPrefix::Event, message_key);
+                    let mut v = log.get(target_path).unwrap().to_string_lossy().into_owned();
+                    v.push_str(&self.suffix);
+                    log.insert(target_path, Value::from(v));
+                }
             }
             Event::Metric(metric) => {
                 let increment = match metric.value() {
@@ -118,13 +118,15 @@ impl FunctionTransform for BasicTransform {
                 }
             }
             Event::Trace(trace) => {
-                let mut v = trace
-                    .get(crate::config::log_schema().message_key())
-                    .unwrap()
-                    .to_string_lossy()
-                    .into_owned();
-                v.push_str(&self.suffix);
-                trace.insert(crate::config::log_schema().message_key(), Value::from(v));
+                if let Some(message_key) = crate::config::log_schema().message_key() {
+                    let mut v = trace
+                        .get((PathPrefix::Event, message_key))
+                        .unwrap()
+                        .to_string_lossy()
+                        .into_owned();
+                    v.push_str(&self.suffix);
+                    trace.insert(message_key.to_string().as_str(), Value::from(v));
+                }
             }
         };
         output.push(event);

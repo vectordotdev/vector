@@ -521,10 +521,13 @@ mod tests {
 
         let output = receiver.await;
         assert_eq!(lines.len(), output.len());
-        let message_key = crate::config::log_schema().message_key();
+        let message_key = crate::config::log_schema()
+            .message_key()
+            .expect("global log_schema.message_key to be valid path")
+            .to_string();
         for (source, received) in lines.iter().zip(output) {
             let json = serde_json::from_str::<JsonValue>(&received).expect("Invalid JSON");
-            let received = json.get(message_key).unwrap().as_str().unwrap();
+            let received = json.get(message_key.as_str()).unwrap().as_str().unwrap();
             assert_eq!(source, received);
         }
     }

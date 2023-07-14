@@ -222,6 +222,7 @@ mod tests {
     use crate::codecs::DecodingConfig;
     use chrono::SecondsFormat;
     use lookup::path;
+    use vrl::path::PathPrefix;
 
     use super::*;
     use crate::config::{log_schema, SourceConfig};
@@ -312,7 +313,7 @@ mod tests {
             events[0]
                 .clone()
                 .as_log()
-                .get(log_schema().message_key())
+                .get((PathPrefix::Event, log_schema().message_key().unwrap()))
                 .unwrap()
                 .to_string_lossy(),
             message

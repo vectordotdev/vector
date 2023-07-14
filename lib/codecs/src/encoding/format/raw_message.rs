@@ -6,6 +6,7 @@ use vector_core::{
     event::Event,
     schema,
 };
+use vrl::path::PathPrefix;
 use vrl::value::Kind;
 
 /// Config used to build a `RawMessageSerializer`.
@@ -30,7 +31,11 @@ impl RawMessageSerializerConfig {
 
     /// The schema required by the serializer.
     pub fn schema_requirement(&self) -> schema::Requirement {
-        schema::Requirement::empty().required_meaning(log_schema().message_key(), Kind::any())
+        if let Some(message_key) = log_schema().message_key() {
+            schema::Requirement::empty().required_meaning(message_key.to_string(), Kind::any())
+        } else {
+            schema::Requirement::empty()
+        }
     }
 }
 
@@ -49,16 +54,16 @@ impl Encoder<Event> for RawMessageSerializer {
     type Error = vector_common::Error;
 
     fn encode(&mut self, event: Event, buffer: &mut BytesMut) -> Result<(), Self::Error> {
-        let message_key = log_schema().message_key();
+        if let Some(message_key) = log_schema().message_key() {
+            let log = event.as_log();
 
-        let log = event.as_log();
-
-        if let Some(bytes) = log
-            .get_by_meaning(message_key)
-            .or_else(|| log.get(message_key))
-            .map(|value| value.coerce_to_bytes())
-        {
-            buffer.put(bytes);
+            if let Some(bytes) = log
+                .get_by_meaning(message_key.to_string().as_str())
+                .or_else(|| log.get((PathPrefix::Event, message_key)))
+                .map(|value| value.coerce_to_bytes())
+            {
+                buffer.put(bytes);
+            }
         }
 
         Ok(())

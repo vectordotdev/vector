@@ -1059,7 +1059,7 @@ impl ContainerLogInfo {
         };
 
         // Build the log.
-        let deserializer = BytesDeserializer::new();
+        let deserializer = BytesDeserializer {};
         let mut log = deserializer.parse_single(bytes_message, log_namespace);
 
         // Container ID
@@ -1166,7 +1166,7 @@ impl ContainerLogInfo {
                         LogNamespace::Legacy => {
                             partial_event_merge_state.merge_in_next_event(
                                 log,
-                                &[log_schema().message_key().to_string()],
+                                &[log_schema().message_key().unwrap().to_string()],
                             );
                         }
                     }
@@ -1187,8 +1187,10 @@ impl ContainerLogInfo {
                     LogNamespace::Vector => {
                         partial_event_merge_state.merge_in_final_event(log, &["."])
                     }
-                    LogNamespace::Legacy => partial_event_merge_state
-                        .merge_in_final_event(log, &[log_schema().message_key().to_string()]),
+                    LogNamespace::Legacy => partial_event_merge_state.merge_in_final_event(
+                        log,
+                        &[log_schema().message_key().unwrap().to_string()],
+                    ),
                 },
                 None => log,
             }
@@ -1264,7 +1266,12 @@ fn line_agg_adapter(
         let message_value = match log_namespace {
             LogNamespace::Vector => log.remove(".").expect("`.` must exist in the event"),
             LogNamespace::Legacy => log
-                .remove(log_schema().message_key())
+                .remove((
+                    PathPrefix::Event,
+                    log_schema()
+                        .message_key()
+                        .expect("global log_schema.message_key to be valid path"),
+                ))
                 .expect("`message` must exist in the event"),
         };
         let stream_value = match log_namespace {
@@ -1282,7 +1289,15 @@ fn line_agg_adapter(
     line_agg_out.map(move |(_, message, mut log)| {
         match log_namespace {
             LogNamespace::Vector => log.insert(".", message),
-            LogNamespace::Legacy => log.insert(log_schema().message_key(), message),
+            LogNamespace::Legacy => log.insert(
+                (
+                    PathPrefix::Event,
+                    log_schema()
+                        .message_key()
+                        .expect("global log_schema.message_key to be valid path"),
+                ),
+                message,
+            ),
         };
         log
     })

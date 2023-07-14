@@ -150,7 +150,10 @@ impl LogEvent {
     /// valid for `LogNamespace::Legacy`
     pub fn from_str_legacy(msg: impl Into<String>) -> Self {
         let mut log = LogEvent::default();
-        log.insert(log_schema().message_key(), msg.into());
+        if let Some(message_key) = log_schema().message_key() {
+            log.insert((PathPrefix::Event, message_key), msg.into());
+        }
+
         if let Some(timestamp_key) = log_schema().timestamp_key() {
             log.insert((PathPrefix::Event, timestamp_key), Utc::now());
         }
@@ -444,7 +447,7 @@ impl LogEvent {
     pub fn message_path(&self) -> Option<String> {
         match self.namespace() {
             LogNamespace::Vector => self.find_key_by_meaning("message"),
-            LogNamespace::Legacy => Some(log_schema().message_key().to_owned()),
+            LogNamespace::Legacy => log_schema().message_key().map(ToString::to_string),
         }
     }
 
@@ -486,7 +489,9 @@ impl LogEvent {
     pub fn get_message(&self) -> Option<&Value> {
         match self.namespace() {
             LogNamespace::Vector => self.get_by_meaning("message"),
-            LogNamespace::Legacy => self.get((PathPrefix::Event, log_schema().message_key())),
+            LogNamespace::Legacy => log_schema()
+                .message_key()
+                .and_then(|key| self.get((PathPrefix::Event, key))),
         }
     }
 
@@ -556,8 +561,10 @@ mod test_utils {
     impl From<Bytes> for LogEvent {
         fn from(message: Bytes) -> Self {
             let mut log = LogEvent::default();
+            if let Some(message_key) = log_schema().message_key() {
+                log.insert((PathPrefix::Event, message_key), message);
+            }
 
-            log.insert(log_schema().message_key(), message);
             if let Some(timestamp_key) = log_schema().timestamp_key() {
                 log.insert((PathPrefix::Event, timestamp_key), Utc::now());
             }

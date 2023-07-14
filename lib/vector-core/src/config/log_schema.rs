@@ -2,7 +2,6 @@ use lookup::lookup_v2::OptionalValuePath;
 use lookup::{OwnedTargetPath, OwnedValuePath};
 use once_cell::sync::{Lazy, OnceCell};
 use vector_config::configurable_component;
-use vrl::path::parse_target_path;
 
 static LOG_SCHEMA: OnceCell<LogSchema> = OnceCell::new();
 static LOG_SCHEMA_DEFAULT: Lazy<LogSchema> = Lazy::new(LogSchema::default);
@@ -44,7 +43,7 @@ pub struct LogSchema {
     ///
     /// This would be the field that holds the raw message, such as a raw log line.
     #[serde(default = "LogSchema::default_message_key")]
-    message_key: String,
+    message_key: OptionalValuePath,
 
     /// The name of the event field to treat as the event timestamp.
     #[serde(default = "LogSchema::default_timestamp_key")]
@@ -84,8 +83,8 @@ impl Default for LogSchema {
 }
 
 impl LogSchema {
-    fn default_message_key() -> String {
-        String::from("message")
+    fn default_message_key() -> OptionalValuePath {
+        OptionalValuePath::new("message")
     }
 
     fn default_timestamp_key() -> OptionalValuePath {
@@ -104,8 +103,8 @@ impl LogSchema {
         String::from("metadata")
     }
 
-    pub fn message_key(&self) -> &str {
-        &self.message_key
+    pub fn message_key(&self) -> Option<&OwnedValuePath> {
+        self.message_key.path.as_ref()
     }
 
     /// Returns an `OwnedTargetPath` of the message key.
@@ -113,8 +112,8 @@ impl LogSchema {
     ///
     /// This should only be used where the result will either be cached,
     /// or performance isn't critical, since this requires parsing / memory allocation.
-    pub fn owned_message_path(&self) -> OwnedTargetPath {
-        parse_target_path(self.message_key()).expect("valid message key")
+    pub fn owned_legacy_message_path(&self) -> OwnedTargetPath {
+        OwnedTargetPath::event(self.message_key.clone().path.expect("valid message key"))
     }
 
     pub fn timestamp_key(&self) -> Option<&OwnedValuePath> {
@@ -133,8 +132,8 @@ impl LogSchema {
         &self.metadata_key
     }
 
-    pub fn set_message_key(&mut self, v: String) {
-        self.message_key = v;
+    pub fn set_message_key(&mut self, path: Option<OwnedValuePath>) {
+        self.message_key = OptionalValuePath { path };
     }
 
     pub fn set_timestamp_key(&mut self, v: Option<OwnedValuePath>) {
@@ -176,7 +175,7 @@ impl LogSchema {
             {
                 errors.push("conflicting values for 'log_schema.message_key' found".to_owned());
             } else {
-                self.set_message_key(other.message_key().to_string());
+                self.set_message_key(other.message_key().cloned());
             }
             if self.timestamp_key() != LOG_SCHEMA_DEFAULT.timestamp_key()
                 && self.timestamp_key() != other.timestamp_key()

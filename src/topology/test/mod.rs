@@ -29,6 +29,7 @@ use tokio::{
 use vector_buffers::{BufferConfig, BufferType, WhenFull};
 use vector_common::config::ComponentKey;
 use vector_core::config::OutputId;
+use vrl::path::PathPrefix;
 
 mod backpressure;
 mod compliance;
@@ -67,9 +68,10 @@ fn basic_config_with_sink_failing_healthcheck() -> Config {
 }
 
 fn into_message(event: Event) -> String {
+    let message_key = crate::config::log_schema().message_key().unwrap();
     event
         .as_log()
-        .get(crate::config::log_schema().message_key())
+        .get((PathPrefix::Event, message_key))
         .unwrap()
         .to_string_lossy()
         .into_owned()
@@ -120,7 +122,10 @@ async fn topology_shutdown_while_active() {
         .flat_map(EventArray::into_events)
     {
         assert_eq!(
-            event.as_log()[&crate::config::log_schema().message_key()],
+            event.as_log()[&crate::config::log_schema()
+                .message_key()
+                .unwrap()
+                .to_string()],
             "test transformed".to_owned().into()
         );
     }

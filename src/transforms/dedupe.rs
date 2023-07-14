@@ -103,7 +103,10 @@ fn default_cache_config() -> CacheConfig {
 //   structure can vary significantly. This should probably either become a required field
 //   in the future, or maybe the "semantic meaning" can be utilized here.
 fn default_match_fields() -> Vec<String> {
-    let mut fields = vec![log_schema().message_key().into()];
+    let mut fields = vec![];
+    if let Some(message_key) = log_schema().message_key() {
+        fields.push(message_key.to_string());
+    }
     if let Some(host_key) = log_schema().host_key() {
         fields.push(host_key.to_string());
     }
