@@ -234,8 +234,6 @@ fn validate_component_discarded_events_total(
     telemetry_events: &[Event],
     runner_metrics: &RunnerMetrics,
 ) -> Result<Vec<String>, Vec<String>> {
-    // The reciprocal metric for sent_event_bytes is received_event_bytes,
-    // so the expected value is what the output runner received.
     let expected_dropped = runner_metrics.discarded_events_total;
 
     validate_bytes_total(
