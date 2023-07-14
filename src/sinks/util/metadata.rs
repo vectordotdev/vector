@@ -68,6 +68,18 @@ impl RequestMetadataBuilder {
         }
     }
 
+    pub const fn new_proper(
+        event_count: usize,
+        events_byte_size: usize,
+        grouped_events_byte_size: GroupedCountByteSize,
+    ) -> Self {
+        Self {
+            event_count,
+            events_byte_size,
+            events_estimated_json_encoded_byte_size: grouped_events_byte_size,
+        }
+    }
+
     pub fn track_event<E>(&mut self, event: E)
     where
         E: ByteSizeOf + GetEventCountTags + EstimatedJsonEncodedSizeOf,

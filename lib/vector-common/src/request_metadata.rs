@@ -1,4 +1,4 @@
-use std::ops::Add;
+use std::ops::{Add, AddAssign};
 use std::{collections::HashMap, sync::Arc};
 
 use crate::{
@@ -145,11 +145,85 @@ impl GroupedCountByteSize {
             }
         }
     }
+
+    /// Returns `true` if we are the `Tagged` variant - keeping track of the byte sizes
+    /// grouped by their relevant tags.
+    #[must_use]
+    pub fn is_tagged(&self) -> bool {
+        match self {
+            GroupedCountByteSize::Tagged { .. } => true,
+            GroupedCountByteSize::Untagged { .. } => false,
+        }
+    }
+
+    /// Returns `true` if we are the `Untagged` variant - keeping a single count for all events.
+    #[must_use]
+    pub fn is_untagged(&self) -> bool {
+        match self {
+            GroupedCountByteSize::Tagged { .. } => false,
+            GroupedCountByteSize::Untagged { .. } => true,
+        }
+    }
 }
 
 impl From<CountByteSize> for GroupedCountByteSize {
     fn from(value: CountByteSize) -> Self {
         Self::Untagged { size: value }
+    }
+}
+
+impl AddAssign for GroupedCountByteSize {
+    fn add_assign(&mut self, mut rhs: Self) {
+        if self.is_untagged() && rhs.is_tagged() {
+            // First handle the case where we are untagged and assigning to a tagged value.
+            // We need to change `self` and so need to ensure our match doesn't take ownership of the object.
+            *self = match (&self, &mut rhs) {
+                (Self::Untagged { size }, Self::Tagged { sizes }) => {
+                    let mut sizes = std::mem::take(sizes);
+                    match sizes.get_mut(&EventCountTags::new_empty()) {
+                        Some(empty_size) => *empty_size += *size,
+                        None => {
+                            sizes.insert(EventCountTags::new_empty(), *size);
+                        }
+                    }
+
+                    Self::Tagged { sizes }
+                }
+                _ => {
+                    unreachable!()
+                }
+            };
+
+            return;
+        }
+
+        // For these cases, we know we won't have to change `self` so the match can take ownership.
+        match (self, rhs) {
+            (Self::Tagged { sizes: ref mut us }, Self::Tagged { sizes: them }) => {
+                for (key, value) in them {
+                    match us.get_mut(&key) {
+                        Some(size) => *size += value,
+                        None => {
+                            us.insert(key.clone(), value);
+                        }
+                    }
+                }
+            }
+
+            (Self::Untagged { size: us }, Self::Untagged { size: them }) => {
+                *us = *us + them;
+            }
+
+            (Self::Tagged { ref mut sizes }, Self::Untagged { size }) => {
+                match sizes.get_mut(&EventCountTags::new_empty()) {
+                    Some(empty_size) => *empty_size += size,
+                    None => {
+                        sizes.insert(EventCountTags::new_empty(), size);
+                    }
+                }
+            }
+            (Self::Untagged { .. }, Self::Tagged { .. }) => unreachable!(),
+        };
     }
 }
 
