@@ -52,6 +52,14 @@ pub struct TargetIter<T> {
     _marker: PhantomData<T>,
 }
 
+fn create_log_event(metadata: EventMetadata, value: Value) -> LogEvent {
+    let mut log = LogEvent::new_with_metadata(metadata);
+    if let Some(message_key) = log_schema().message_key() {
+        log.insert((PathPrefix::Event, message_key), value);
+    }
+    log
+}
+
 impl Iterator for TargetIter<LogEvent> {
     type Item = Event;
 
@@ -59,11 +67,7 @@ impl Iterator for TargetIter<LogEvent> {
         self.iter.next().map(|v| {
             match v {
                 value @ Value::Object(_) => LogEvent::from_parts(value, self.metadata.clone()),
-                value => {
-                    let mut log = LogEvent::new_with_metadata(self.metadata.clone());
-                    log.insert(log_schema().message_key(), value);
-                    log
-                }
+                value => create_log_event(self.metadata.clone(), value),
             }
             .into()
         })
@@ -79,11 +83,7 @@ impl Iterator for TargetIter<TraceEvent> {
                 value @ Value::Object(_) => {
                     TraceEvent::from(LogEvent::from_parts(value, self.metadata.clone()))
                 }
-                value => {
-                    let mut log = LogEvent::new_with_metadata(self.metadata.clone());
-                    log.insert(log_schema().message_key(), value);
-                    TraceEvent::from(log)
-                }
+                value => TraceEvent::from(create_log_event(self.metadata.clone(), value)),
             }
             .into()
         })
@@ -150,11 +150,7 @@ impl VrlTarget {
                     LogNamespace::Vector => {
                         TargetEvents::One(LogEvent::from_parts(v, metadata).into())
                     }
-                    LogNamespace::Legacy => {
-                        let mut log = LogEvent::new_with_metadata(metadata);
-                        log.insert(log_schema().message_key(), v);
-                        TargetEvents::One(log.into())
-                    }
+                    LogNamespace::Legacy => TargetEvents::One(create_log_event(metadata, v).into()),
                 },
             },
             VrlTarget::Trace(value, metadata) => match value {
@@ -169,11 +165,7 @@ impl VrlTarget {
                     _marker: PhantomData,
                 }),
 
-                v => {
-                    let mut log = LogEvent::new_with_metadata(metadata);
-                    log.insert(log_schema().message_key(), v);
-                    TargetEvents::One(log.into())
-                }
+                v => TargetEvents::One(create_log_event(metadata, v).into()),
             },
             VrlTarget::Metric { metric, .. } => TargetEvents::One(Event::Metric(metric)),
         }
@@ -202,22 +194,24 @@ fn move_field_definitions_into_message(mut definition: Definition) -> Definition
     message.remove_array();
 
     if !message.is_never() {
-        // We need to add the given message type to a field called `message`
-        // in the event.
-        let message = Kind::object(Collection::from(BTreeMap::from([(
-            log_schema().message_key().into(),
-            message,
-        )])));
+        if let Some(message_key) = log_schema().message_key() {
+            // We need to add the given message type to a field called `message`
+            // in the event.
+            let message = Kind::object(Collection::from(BTreeMap::from([(
+                message_key.to_string().into(),
+                message,
+            )])));
 
-        definition.event_kind_mut().remove_bytes();
-        definition.event_kind_mut().remove_integer();
-        definition.event_kind_mut().remove_float();
-        definition.event_kind_mut().remove_boolean();
-        definition.event_kind_mut().remove_timestamp();
-        definition.event_kind_mut().remove_regex();
-        definition.event_kind_mut().remove_null();
+            definition.event_kind_mut().remove_bytes();
+            definition.event_kind_mut().remove_integer();
+            definition.event_kind_mut().remove_float();
+            definition.event_kind_mut().remove_boolean();
+            definition.event_kind_mut().remove_timestamp();
+            definition.event_kind_mut().remove_regex();
+            definition.event_kind_mut().remove_null();
 
-        *definition.event_kind_mut() = definition.event_kind().union(message);
+            *definition.event_kind_mut() = definition.event_kind().union(message);
+        }
     }
 
     definition

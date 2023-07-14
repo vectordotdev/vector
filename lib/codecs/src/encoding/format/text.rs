@@ -5,6 +5,7 @@ use vector_core::{
     event::Event,
     schema,
 };
+use vrl::path::PathPrefix;
 use vrl::value::Kind;
 
 use crate::MetricTagValues;
@@ -42,7 +43,11 @@ impl TextSerializerConfig {
 
     /// The schema required by the serializer.
     pub fn schema_requirement(&self) -> schema::Requirement {
-        schema::Requirement::empty().required_meaning(log_schema().message_key(), Kind::any())
+        if let Some(message_key) = log_schema().message_key() {
+            schema::Requirement::empty().required_meaning(message_key.to_string(), Kind::any())
+        } else {
+            schema::Requirement::empty()
+        }
     }
 }
 
@@ -67,16 +72,16 @@ impl Encoder<Event> for TextSerializer {
     type Error = vector_common::Error;
 
     fn encode(&mut self, event: Event, buffer: &mut BytesMut) -> Result<(), Self::Error> {
-        let message_key = log_schema().message_key();
-
         match event {
             Event::Log(log) => {
-                if let Some(bytes) = log
-                    .get_by_meaning(message_key)
-                    .or_else(|| log.get(message_key))
-                    .map(|value| value.coerce_to_bytes())
-                {
-                    buffer.put(bytes);
+                if let Some(message_key) = log_schema().message_key() {
+                    if let Some(bytes) = log
+                        .get_by_meaning(message_key.to_string().as_str())
+                        .or(log.get((PathPrefix::Event, message_key)))
+                        .map(|value| value.coerce_to_bytes())
+                    {
+                        buffer.put(bytes);
+                    }
                 }
             }
             Event::Metric(mut metric) => {

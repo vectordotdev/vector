@@ -354,9 +354,18 @@ mod integration_test {
 
         let events = run_and_assert_source_compliance_n(config, 3, &SOURCE_TAGS).await;
 
-        assert_eq!(events[0].as_log()[log_schema().message_key()], "3".into());
-        assert_eq!(events[1].as_log()[log_schema().message_key()], "2".into());
-        assert_eq!(events[2].as_log()[log_schema().message_key()], "1".into());
+        assert_eq!(
+            events[0].as_log()[log_schema().message_key().unwrap().to_string()],
+            "3".into()
+        );
+        assert_eq!(
+            events[1].as_log()[log_schema().message_key().unwrap().to_string()],
+            "2".into()
+        );
+        assert_eq!(
+            events[2].as_log()[log_schema().message_key().unwrap().to_string()],
+            "1".into()
+        );
     }
 
     #[tokio::test]
@@ -427,9 +436,18 @@ mod integration_test {
 
         let events = run_and_assert_source_compliance_n(config, 3, &SOURCE_TAGS).await;
 
-        assert_eq!(events[0].as_log()[log_schema().message_key()], "1".into());
-        assert_eq!(events[1].as_log()[log_schema().message_key()], "2".into());
-        assert_eq!(events[2].as_log()[log_schema().message_key()], "3".into());
+        assert_eq!(
+            events[0].as_log()[log_schema().message_key().unwrap().to_string()],
+            "1".into()
+        );
+        assert_eq!(
+            events[1].as_log()[log_schema().message_key().unwrap().to_string()],
+            "2".into()
+        );
+        assert_eq!(
+            events[2].as_log()[log_schema().message_key().unwrap().to_string()],
+            "3".into()
+        );
     }
 
     #[tokio::test]
@@ -480,7 +498,10 @@ mod integration_test {
         assert_eq!(events.len(), 10000);
 
         for event in events {
-            assert_eq!(event.as_log()[log_schema().message_key()], text.into());
+            assert_eq!(
+                event.as_log()[log_schema().message_key().unwrap().to_string()],
+                text.into()
+            );
             assert_eq!(
                 event.as_log()[log_schema().source_type_key().unwrap().to_string()],
                 RedisSourceConfig::NAME.into()

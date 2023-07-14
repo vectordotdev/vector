@@ -12,6 +12,7 @@ use vector_core::{
     event::Value,
     schema,
 };
+use vrl::path::PathPrefix;
 
 /// On GELF encoding behavior:
 ///   Graylog has a relaxed parsing. They are much more lenient than the spec would
@@ -138,13 +139,15 @@ fn coerce_required_fields(mut log: LogEvent) -> vector_common::Result<LogEvent> 
         err_missing_field(HOST)?;
     }
 
-    let message_key = log_schema().message_key();
     if !log.contains(SHORT_MESSAGE) {
-        // rename the log_schema().message_key() to SHORT_MESSAGE
-        if log.contains(message_key) {
-            log.rename_key(message_key, SHORT_MESSAGE);
-        } else {
-            err_missing_field(SHORT_MESSAGE)?;
+        if let Some(message_key) = log_schema().message_key() {
+            // rename the log_schema().message_key() to SHORT_MESSAGE
+            let target_path = (PathPrefix::Event, message_key);
+            if log.contains(target_path) {
+                log.rename_key(target_path, SHORT_MESSAGE);
+            } else {
+                err_missing_field(SHORT_MESSAGE)?;
+            }
         }
     }
     Ok(log)
@@ -329,7 +332,7 @@ mod tests {
             let event_fields = btreemap! {
                 VERSION => "1.1",
                 HOST => "example.org",
-                log_schema().message_key() => "Some message",
+                log_schema().message_key().unwrap().to_string() => "Some message",
             };
 
             let jsn = do_serialize(true, event_fields).unwrap();

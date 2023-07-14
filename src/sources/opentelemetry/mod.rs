@@ -251,7 +251,7 @@ impl SourceConfig for OpentelemetryConfig {
                 schema_definition.with_meaning(OwnedTargetPath::event_root(), "message")
             }
             LogNamespace::Legacy => {
-                schema_definition.with_meaning(log_schema().owned_message_path(), "message")
+                schema_definition.with_meaning(log_schema().owned_legacy_message_path(), "message")
             }
         };
 

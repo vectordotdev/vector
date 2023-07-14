@@ -19,7 +19,10 @@ pub fn build(enabled: bool, log_namespace: LogNamespace) -> PartialEventsMerger 
     let reducer = if enabled {
         let key = match log_namespace {
             LogNamespace::Vector => ".".to_string(),
-            LogNamespace::Legacy => log_schema().message_key().to_string(),
+            LogNamespace::Legacy => log_schema()
+                .message_key()
+                .expect("global log_schema.message_key to be valid path")
+                .to_string(),
         };
 
         // Merge the message field of each event by concatenating it, with a space delimiter.

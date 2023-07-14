@@ -127,14 +127,15 @@ impl DnstapConfig {
                 let schema = vector_core::schema::Definition::empty_legacy_namespace();
 
                 if self.raw_data_only.unwrap_or(false) {
-                    schema.with_event_field(
-                        &owned_value_path!(log_schema().message_key()),
-                        Kind::bytes(),
-                        Some("message"),
-                    )
-                } else {
-                    event_schema.schema_definition(schema)
+                    if let Some(message_key) = log_schema().message_key() {
+                        return schema.with_event_field(
+                            message_key,
+                            Kind::bytes(),
+                            Some("message"),
+                        );
+                    }
                 }
+                event_schema.schema_definition(schema)
             }
             LogNamespace::Vector => {
                 let schema = vector_core::schema::Definition::new_with_default_metadata(
