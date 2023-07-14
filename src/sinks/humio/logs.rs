@@ -231,6 +231,7 @@ mod integration_tests {
     use serde::Deserialize;
     use serde_json::{json, Value as JsonValue};
     use tokio::time::Duration;
+    use vrl::path::PathPrefix;
 
     use super::*;
     use crate::{
@@ -262,14 +263,14 @@ mod integration_tests {
         let message = random_string(100);
         let host = "192.168.1.1".to_string();
         let mut event = LogEvent::from(message.clone());
-        event.insert(log_schema().host_key(), host.clone());
+        event.insert(
+            (PathPrefix::Event, log_schema().host_key().unwrap()),
+            host.clone(),
+        );
 
         let ts = Utc.timestamp_nanos(Utc::now().timestamp_millis() * 1_000_000 + 132_456);
         event.insert(
-            (
-                lookup::PathPrefix::Event,
-                log_schema().timestamp_key().unwrap(),
-            ),
+            (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
             ts,
         );
 
@@ -387,7 +388,7 @@ mod integration_tests {
             source: None,
             encoding: JsonSerializerConfig::default().into(),
             event_type: None,
-            host_key: log_schema().host_key().to_string(),
+            host_key: log_schema().host_key().unwrap().to_string(),
             indexed_fields: vec![],
             index: None,
             compression: Compression::None,

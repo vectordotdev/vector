@@ -385,7 +385,9 @@ fn sketch_to_proto_message(
     let name = get_namespaced_name(metric, default_namespace);
     let ts = encode_timestamp(metric.timestamp());
     let mut tags = metric.tags().cloned().unwrap_or_default();
-    let host = tags.remove(log_schema.host_key()).unwrap_or_default();
+    let host = tags
+        .remove(log_schema.host_key().unwrap().to_string().as_str())
+        .unwrap_or_default();
     let tags = encode_tags(&tags);
 
     let cnt = ddsketch.count() as i64;
@@ -497,7 +499,10 @@ fn generate_series_metrics(
     let name = get_namespaced_name(metric, default_namespace);
 
     let mut tags = metric.tags().cloned().unwrap_or_default();
-    let host = tags.remove(log_schema.host_key());
+    let host = log_schema
+        .host_key()
+        .map(|key| tags.remove(key.to_string().as_str()).unwrap_or_default());
+
     let source_type_name = tags.remove("source_type_name");
     let device = tags.remove("device");
     let ts = encode_timestamp(metric.timestamp());

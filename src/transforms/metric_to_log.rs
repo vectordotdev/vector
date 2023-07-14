@@ -1,6 +1,5 @@
 use chrono::Utc;
 use codecs::MetricTagValues;
-use lookup::lookup_v2::parse_value_path;
 use lookup::{event_path, owned_value_path, path, PathPrefix};
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
@@ -242,7 +241,7 @@ fn schema_definition(log_namespace: LogNamespace) -> Definition {
             }
 
             schema_definition = schema_definition.with_event_field(
-                &parse_value_path(log_schema().host_key()).expect("valid host key"),
+                log_schema().host_key().unwrap(),
                 Kind::bytes().or_undefined(),
                 None,
             );
@@ -269,7 +268,13 @@ impl MetricToLog {
         Self {
             host_tag: format!(
                 "tags.{}",
-                host_tag.unwrap_or_else(|| log_schema().host_key())
+                host_tag.unwrap_or(
+                    log_schema()
+                        .host_key()
+                        .map(ToString::to_string)
+                        .unwrap_or_default()
+                        .as_str()
+                )
             ),
             timezone,
             log_namespace,
@@ -311,7 +316,9 @@ impl MetricToLog {
                         }
 
                         if let Some(host) = log.remove_prune(self.host_tag.as_str(), true) {
-                            log.insert(log_schema().host_key(), host);
+                            if let Some(host_key) = log_schema().host_key() {
+                                log.insert((PathPrefix::Event, host_key), host);
+                            }
                         }
                     }
                     if self.log_namespace == LogNamespace::Vector {
