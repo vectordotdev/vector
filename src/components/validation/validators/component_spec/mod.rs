@@ -7,8 +7,7 @@ use crate::components::validation::{ComponentType, RunnerMetrics, TestCaseExpect
 
 use super::{ComponentMetricType, Validator};
 
-use self::sinks::validate_sinks;
-use self::sources::validate_sources;
+use self::{sinks::SinkComponentMetricValidator, sources::SourceComponentMetricValidator};
 
 /// Validates that the component meets the requirements of the [Component Specification][component_spec].
 ///
@@ -101,14 +100,20 @@ fn validate_telemetry(
 
     match component_type {
         ComponentType::Source => {
-            let result = validate_sources(telemetry_events, runner_metrics);
+            let result = validate_component::<SourceComponentMetricValidator>(
+                telemetry_events,
+                runner_metrics,
+            );
             match result {
                 Ok(o) => out.extend(o),
                 Err(e) => errs.extend(e),
             }
         }
         ComponentType::Sink => {
-            let result = validate_sinks(telemetry_events, runner_metrics);
+            let result = validate_component::<SinkComponentMetricValidator>(
+                telemetry_events,
+                runner_metrics,
+            );
             match result {
                 Ok(o) => out.extend(o),
                 Err(e) => errs.extend(e),
@@ -124,125 +129,171 @@ fn validate_telemetry(
     }
 }
 
-fn filter_events_by_metric_and_component<'a>(
-    telemetry_events: &'a [Event],
-    metric: &ComponentMetricType,
-    component_name: &'a str,
-) -> Vec<&'a Metric> {
-    let metrics: Vec<&Metric> = telemetry_events
-        .iter()
-        .flat_map(|e| {
-            if let vector_core::event::Event::Metric(m) = e {
-                Some(m)
-            } else {
-                None
-            }
-        })
-        .filter(|&m| {
-            if m.name() == metric.to_string() {
-                if let Some(tags) = m.tags() {
-                    if tags.get("component_name").unwrap_or("") == component_name {
-                        return true;
+pub trait ComponentMetricValidator {
+    fn validate_metric(
+        telemetry_events: &[Event],
+        runner_metrics: &RunnerMetrics,
+        metric_type: &ComponentMetricType,
+    ) -> Result<Vec<String>, Vec<String>>
+    where
+        Self: Sized;
+    fn filter_events_by_metric_and_component<'a>(
+        telemetry_events: &'a [Event],
+        metric: &ComponentMetricType,
+        component_name: &'a str,
+    ) -> Vec<&'a Metric> {
+        let metrics: Vec<&Metric> = telemetry_events
+            .iter()
+            .flat_map(|e| {
+                if let vector_core::event::Event::Metric(m) = e {
+                    Some(m)
+                } else {
+                    None
+                }
+            })
+            .filter(|&m| {
+                if m.name() == metric.to_string() {
+                    if let Some(tags) = m.tags() {
+                        if tags.get("component_name").unwrap_or("") == component_name {
+                            return true;
+                        }
                     }
                 }
-            }
 
-            false
-        })
-        .collect();
+                false
+            })
+            .collect();
 
-    debug!("{}: {} metrics found.", metric.to_string(), metrics.len(),);
+        debug!("{}: {} metrics found.", metric.to_string(), metrics.len(),);
 
-    metrics
-}
+        metrics
+    }
 
-fn sum_counters(
-    metric_name: &ComponentMetricType,
-    metrics: &[&vector_core::event::Metric],
-) -> Result<u64, Vec<String>> {
-    let mut sum: f64 = 0.0;
-    let mut errs = Vec::new();
+    fn sum_counters(
+        metric_name: &ComponentMetricType,
+        metrics: &[&vector_core::event::Metric],
+    ) -> Result<u64, Vec<String>> {
+        let mut sum: f64 = 0.0;
+        let mut errs = Vec::new();
 
-    for m in metrics {
-        match m.value() {
-            vector_core::event::MetricValue::Counter { value } => {
-                if let MetricKind::Absolute = m.data().kind {
-                    sum = *value;
-                } else {
-                    sum += *value;
+        for m in metrics {
+            match m.value() {
+                vector_core::event::MetricValue::Counter { value } => {
+                    if let MetricKind::Absolute = m.data().kind {
+                        sum = *value;
+                    } else {
+                        sum += *value;
+                    }
                 }
+                _ => errs.push(format!("{}: metric value is not a counter", metric_name,)),
             }
-            _ => errs.push(format!("{}: metric value is not a counter", metric_name,)),
+        }
+
+        if errs.is_empty() {
+            Ok(sum as u64)
+        } else {
+            Err(errs)
         }
     }
 
+    fn validate_events_total(
+        telemetry_events: &[Event],
+        metric_type: &ComponentMetricType,
+        component_name: &str,
+        expected_events: u64,
+    ) -> Result<Vec<String>, Vec<String>> {
+        let mut errs: Vec<String> = Vec::new();
+
+        let metrics = Self::filter_events_by_metric_and_component(
+            telemetry_events,
+            metric_type,
+            component_name,
+        );
+
+        let actual_events = Self::sum_counters(metric_type, &metrics)?;
+
+        debug!(
+            "{}: {} events, {} expected events.",
+            metric_type, actual_events, expected_events,
+        );
+
+        if actual_events != expected_events {
+            errs.push(format!(
+                "{}: expected {} events, but received {}",
+                metric_type, expected_events, actual_events
+            ));
+        }
+
+        if !errs.is_empty() {
+            return Err(errs);
+        }
+
+        Ok(vec![format!("{}: {}", metric_type, actual_events)])
+    }
+
+    fn validate_bytes_total(
+        telemetry_events: &[Event],
+        metric_type: &ComponentMetricType,
+        component_name: &str,
+        expected_bytes: u64,
+    ) -> Result<Vec<String>, Vec<String>> {
+        let mut errs: Vec<String> = Vec::new();
+
+        let metrics = Self::filter_events_by_metric_and_component(
+            telemetry_events,
+            metric_type,
+            component_name,
+        );
+
+        let actual_bytes = Self::sum_counters(metric_type, &metrics)?;
+
+        debug!(
+            "{}: {} bytes, {} expected bytes.",
+            metric_type, actual_bytes, expected_bytes,
+        );
+
+        if actual_bytes != expected_bytes {
+            errs.push(format!(
+                "{}: expected {} bytes, but received {}",
+                metric_type, expected_bytes, actual_bytes
+            ));
+        }
+
+        if !errs.is_empty() {
+            return Err(errs);
+        }
+
+        Ok(vec![format!("{}: {}", metric_type, actual_bytes)])
+    }
+}
+
+pub fn validate_component<V: ComponentMetricValidator>(
+    telemetry_events: &[Event],
+    runner_metrics: &RunnerMetrics,
+) -> Result<Vec<String>, Vec<String>> {
+    let mut out: Vec<String> = Vec::new();
+    let mut errs: Vec<String> = Vec::new();
+
+    let metric_types = [
+        ComponentMetricType::EventsReceived,
+        ComponentMetricType::EventsReceivedBytes,
+        ComponentMetricType::ReceivedBytesTotal,
+        ComponentMetricType::SentEventsTotal,
+        ComponentMetricType::SentEventBytesTotal,
+        ComponentMetricType::SentBytesTotal,
+        ComponentMetricType::EventsDropped,
+    ];
+
+    metric_types.iter().for_each(|metric_type| {
+        match V::validate_metric(telemetry_events, runner_metrics, metric_type) {
+            Err(e) => errs.extend(e),
+            Ok(m) => out.extend(m),
+        }
+    });
+
     if errs.is_empty() {
-        Ok(sum as u64)
+        Ok(out)
     } else {
         Err(errs)
     }
-}
-
-fn validate_events_total(
-    telemetry_events: &[Event],
-    metric_type: &ComponentMetricType,
-    component_name: &str,
-    expected_events: u64,
-) -> Result<Vec<String>, Vec<String>> {
-    let mut errs: Vec<String> = Vec::new();
-
-    let metrics =
-        filter_events_by_metric_and_component(telemetry_events, metric_type, component_name);
-
-    let actual_events = sum_counters(metric_type, &metrics)?;
-
-    debug!(
-        "{}: {} events, {} expected events.",
-        metric_type, actual_events, expected_events,
-    );
-
-    if actual_events != expected_events {
-        errs.push(format!(
-            "{}: expected {} events, but received {}",
-            metric_type, expected_events, actual_events
-        ));
-    }
-
-    if !errs.is_empty() {
-        return Err(errs);
-    }
-
-    Ok(vec![format!("{}: {}", metric_type, actual_events)])
-}
-
-fn validate_bytes_total(
-    telemetry_events: &[Event],
-    metric_type: &ComponentMetricType,
-    component_name: &str,
-    expected_bytes: u64,
-) -> Result<Vec<String>, Vec<String>> {
-    let mut errs: Vec<String> = Vec::new();
-
-    let metrics =
-        filter_events_by_metric_and_component(telemetry_events, metric_type, component_name);
-
-    let actual_bytes = sum_counters(metric_type, &metrics)?;
-
-    debug!(
-        "{}: {} bytes, {} expected bytes.",
-        metric_type, actual_bytes, expected_bytes,
-    );
-
-    if actual_bytes != expected_bytes {
-        errs.push(format!(
-            "{}: expected {} bytes, but received {}",
-            metric_type, expected_bytes, actual_bytes
-        ));
-    }
-
-    if !errs.is_empty() {
-        return Err(errs);
-    }
-
-    Ok(vec![format!("{}: {}", metric_type, actual_bytes)])
 }

@@ -1,127 +1,91 @@
 use vector_core::event::Event;
 
-// use crate::components::validation::{component_names::TEST_SINK_NAME, RunnerMetrics};
-use crate::components::validation::RunnerMetrics;
+use crate::components::validation::{component_names::TEST_SINK_NAME, RunnerMetrics};
 
-// use super::{filter_events_by_metric_and_component, ComponentMetricType};
+use super::{ComponentMetricType, ComponentMetricValidator};
 
-pub fn validate_sinks(
-    _telemetry_events: &[Event],
-    _runner_metrics: &RunnerMetrics,
-) -> Result<Vec<String>, Vec<String>> {
-    let out: Vec<String> = Vec::new();
-    let errs: Vec<String> = Vec::new();
+pub struct SinkComponentMetricValidator;
 
-    // let validations = [
-    //     // validate_component_received_events_total,
-    //     // validate_component_received_event_bytes_total,
-    //     // validate_component_received_bytes_total,
-    //     // validate_component_sent_events_total,
-    //     // validate_component_sent_event_bytes_total,
-    //     // validate_component_discarded_events_total,
-    // ];
+impl ComponentMetricValidator for SinkComponentMetricValidator {
+    fn validate_metric(
+        telemetry_events: &[Event],
+        runner_metrics: &RunnerMetrics,
+        metric_type: &ComponentMetricType,
+    ) -> Result<Vec<String>, Vec<String>> {
+        match metric_type {
+            ComponentMetricType::EventsReceived => {
+                // Since the runner is on the same "side" of the topology as a sink is,
+                // the expected value is what the input runner received.
+                // let expected_events = runner_metrics.received_events_total;
+                let expected_events = runner_metrics.sent_events_total;
 
-    // for v in validations.iter() {
-    //     match v(telemetry_events, runner_metrics) {
-    //         Err(e) => errs.extend(e),
-    //         Ok(m) => out.extend(m),
-    //     }
-    // }
+                Self::validate_events_total(
+                    telemetry_events,
+                    &ComponentMetricType::EventsReceived,
+                    TEST_SINK_NAME,
+                    expected_events,
+                )
+            }
+            ComponentMetricType::EventsReceivedBytes => {
+                // Since the runner is on the same "side" of the topology as a sink is,
+                // the expected value is what the input runner received.
+                let expected_bytes = runner_metrics.received_event_bytes_total;
 
-    if errs.is_empty() {
-        Ok(out)
-    } else {
-        Err(errs)
+                Self::validate_bytes_total(
+                    telemetry_events,
+                    &ComponentMetricType::EventsReceivedBytes,
+                    TEST_SINK_NAME,
+                    expected_bytes,
+                )
+            }
+            ComponentMetricType::ReceivedBytesTotal => {
+                Self::validate_bytes_total(
+                    telemetry_events,
+                    &ComponentMetricType::ReceivedBytesTotal,
+                    TEST_SINK_NAME,
+                    0, // sinks should not emit this metric
+                )
+            }
+            ComponentMetricType::SentEventsTotal => {
+                // Since the runner is on the same "side" of the topology as a sink is,
+                // the expected value is what the input runner sent.
+                let expected_events = runner_metrics.received_events_total;
+
+                Self::validate_events_total(
+                    telemetry_events,
+                    &ComponentMetricType::SentEventsTotal,
+                    TEST_SINK_NAME,
+                    expected_events,
+                )
+            }
+            ComponentMetricType::SentBytesTotal => {
+                // Since the runner is on the same "side" of the topology as a sink is,
+                // the expected value is what the input runner sent.
+                let expected_bytes = runner_metrics.sent_bytes_total;
+
+                Self::validate_bytes_total(
+                    telemetry_events,
+                    &ComponentMetricType::SentBytesTotal,
+                    TEST_SINK_NAME,
+                    expected_bytes,
+                )
+            }
+            ComponentMetricType::SentEventBytesTotal => {
+                // Since the runner is on the same "side" of the topology as a sink is,
+                // the expected value is what the input runner sent.
+                let expected_bytes = runner_metrics.received_bytes_total;
+
+                Self::validate_bytes_total(
+                    telemetry_events,
+                    &ComponentMetricType::SentEventBytesTotal,
+                    TEST_SINK_NAME,
+                    expected_bytes,
+                )
+            }
+            ComponentMetricType::EventsDropped => {
+                // TODO
+                Ok(vec![])
+            }
+        }
     }
 }
-
-// fn validate_component_received_events_total(
-//     telemetry_events: &[Event],
-//     runner_metrics: &RunnerMetrics,
-// ) -> Result<Vec<String>, Vec<String>> {
-//     // The reciprocal metric for events received is events sent,
-//     // so the expected value is what the input runner sent.
-//     let expected_events = runner_metrics.sent_events_total;
-
-//     validate_events_total(
-//         telemetry_events,
-//         &SourceMetricType::EventsReceived,
-//         expected_events,
-//         TEST_SINK_NAME,
-//     )
-// }
-
-// fn validate_component_received_event_bytes_total(
-//     telemetry_events: &[Event],
-//     runner_metrics: &RunnerMetrics,
-// ) -> Result<Vec<String>, Vec<String>> {
-//     // The reciprocal metric for received_event_bytes is sent_event_bytes,
-//     // so the expected value is what the input runner sent.
-//     let expected_bytes = runner_metrics.sent_event_bytes_total;
-
-//     validate_bytes_total(
-//         telemetry_events,
-//         &SourceMetricType::EventsReceivedBytes,
-//         expected_bytes,
-//     )
-// }
-
-// fn validate_component_received_bytes_total(
-//     telemetry_events: &[Event],
-//     runner_metrics: &RunnerMetrics,
-// ) -> Result<Vec<String>, Vec<String>> {
-//     // The reciprocal metric for received_bytes is sent_bytes,
-//     // so the expected value is what the input runner sent.
-//     let expected_bytes = runner_metrics.sent_bytes_total;
-
-//     validate_bytes_total(
-//         telemetry_events,
-//         &SourceMetricType::ReceivedBytesTotal,
-//         expected_bytes,
-//     )
-// }
-
-// fn validate_component_sent_events_total(
-//     telemetry_events: &[Event],
-//     runner_metrics: &RunnerMetrics,
-// ) -> Result<Vec<String>, Vec<String>> {
-//     // The reciprocal metric for events sent is events received,
-//     // so the expected value is what the output runner received.
-//     let expected_events = runner_metrics.received_events_total;
-
-//     validate_events_total(
-//         telemetry_events,
-//         &SourceMetricType::SentEventsTotal,
-//         expected_events,
-//     )
-// }
-
-// fn validate_component_sent_event_bytes_total(
-//     telemetry_events: &[Event],
-//     runner_metrics: &RunnerMetrics,
-// ) -> Result<Vec<String>, Vec<String>> {
-//     // The reciprocal metric for sent_event_bytes is received_event_bytes,
-//     // so the expected value is what the output runner received.
-//     let expected_bytes = runner_metrics.received_event_bytes_total;
-
-//     validate_bytes_total(
-//         telemetry_events,
-//         &SourceMetricType::SentEventBytesTotal,
-//         expected_bytes,
-//     )
-// }
-
-// fn validate_component_discarded_events_total(
-//     telemetry_events: &[Event],
-//     runner_metrics: &RunnerMetrics,
-// ) -> Result<Vec<String>, Vec<String>> {
-//     // The reciprocal metric for sent_event_bytes is received_event_bytes,
-//     // so the expected value is what the output runner received.
-//     let expected_dropped = runner_metrics.discarded_events_total;
-
-//     validate_bytes_total(
-//         telemetry_events,
-//         &SourceMetricType::EventsDropped,
-//         expected_dropped,
-//     )
-// }

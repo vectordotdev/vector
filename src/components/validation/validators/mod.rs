@@ -57,6 +57,7 @@ pub enum ComponentMetricType {
     EventsReceivedBytes,
     ReceivedBytesTotal,
     SentEventsTotal,
+    SentBytesTotal,
     SentEventBytesTotal,
     EventsDropped,
 }
@@ -68,6 +69,7 @@ impl ComponentMetricType {
             ComponentMetricType::EventsReceivedBytes => "component_received_event_bytes_total",
             ComponentMetricType::ReceivedBytesTotal => "component_received_bytes_total",
             ComponentMetricType::SentEventsTotal => "component_sent_events_total",
+            ComponentMetricType::SentBytesTotal => "component_sent_bytes_total",
             ComponentMetricType::SentEventBytesTotal => "component_sent_event_bytes_total",
             ComponentMetricType::EventsDropped => "component_discarded_events_total",
         }

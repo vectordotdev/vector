@@ -232,8 +232,19 @@ fn spawn_output_http_server(
     // First, we'll build and spawn our HTTP server.
     let decoder = codec.into_decoder();
 
-    let (_, http_server_shutdown_tx) =
-        spawn_http_server(task_coordinator, &config, move |request| {
+    let (_, http_server_shutdown_tx) = spawn_http_server(
+        task_coordinator,
+        &config,
+        move |request| {
+            if request.headers().contains_key("Content-Length") {
+                let bytes = request
+                    .headers()
+                    .get("Content-Length")
+                    .unwrap()
+                    .to_str()
+                    .unwrap();
+                debug!("HTTP server external output resource received {bytes} bytes.");
+            }
             let output_tx = output_tx.clone();
             let mut decoder = decoder.clone();
 
@@ -244,7 +255,8 @@ fn spawn_output_http_server(
                         let mut body = BytesMut::from(&body[..]);
                         loop {
                             match decoder.decode_eof(&mut body) {
-                                Ok(Some((events, _byte_size))) => {
+                                Ok(Some((events, byte_size))) => {
+                                    debug!("HTTP server external output resource decoded {byte_size} bytes.");
                                     output_tx
                                         .send(events.to_vec())
                                         .await
@@ -257,7 +269,8 @@ fn spawn_output_http_server(
                     }
                 }
             }
-        });
+        },
+    );
 
     // Now we'll create and spawn the resource's core logic loop which simply waits for the runner
     // to instruct us to shutdown, and when that happens, cascades to shutting down the HTTP server.

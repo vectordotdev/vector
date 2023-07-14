@@ -323,6 +323,9 @@ impl Runner {
             input_task_coordinator.shutdown().await;
             debug!("Input task(s) have been shutdown.");
 
+            // Without this, not all internal metric events are received for sink components under test.
+            tokio::time::sleep(Duration::from_secs(1)).await;
+
             telemetry_task_coordinator.shutdown().await;
             debug!("Telemetry task(s) have been shutdown.");
 
@@ -335,6 +338,8 @@ impl Runner {
             let output_events = output_driver
                 .await
                 .expect("input driver task should not have panicked");
+
+            debug!("Collected runner metrics: {:?}", runner_metrics);
 
             // Run the relevant data -- inputs, outputs, telemetry, etc -- through each validator to
             // get the validation results for this test.
