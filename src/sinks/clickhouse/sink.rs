@@ -1,15 +1,24 @@
 use bytes::Bytes;
 use codecs::{encoding::Framer, JsonSerializerConfig, NewlineDelimitedEncoderConfig};
+use futures_util::stream;
 
 use super::service::{ClickhouseRequest, ClickhouseRetryLogic, ClickhouseService};
+use crate::sinks::util::IncrementalRequestBuilder;
 use crate::{internal_events::SinkRequestBuildError, sinks::prelude::*};
+use vector_core::event::{EventFinalizers, Event, LogEvent, TraceEvent, Metric};
 
 pub struct ClickhouseSink {
     batch_settings: BatcherSettings,
-    compression: Compression,
-    encoding: (Transformer, Encoder<Framer>),
+    // encoding: (Transformer, Encoder<Framer>),
     service: Svc<ClickhouseService, ClickhouseRetryLogic>,
     protocol: &'static str,
+    request_builder: ClickhouseRequestBuilder,
+}
+
+struct ClickhouseRequestBuilder {
+    compression: Compression,
+    transformer: Transformer,
+    encoder: Encoder<Framer>,
 }
 
 impl ClickhouseSink {
@@ -22,29 +31,25 @@ impl ClickhouseSink {
     ) -> Self {
         Self {
             batch_settings,
-            compression,
-            encoding: (
-                transformer,
-                Encoder::<Framer>::new(
+            service,
+            protocol,
+            request_builder: ClickhouseRequestBuilder {
+                compression: compression,
+                transformer: transformer,
+                encoder: Encoder::<Framer>::new(
                     NewlineDelimitedEncoderConfig::default().build().into(),
                     JsonSerializerConfig::default().build().into(),
                 ),
-            ),
-            service,
-            protocol,
+            },
         }
     }
 
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         input
+            //.normalized_with_default::<ClickHouseNormalizer>()
             .batched(self.batch_settings.into_byte_size_config())
-            .request_builder(
-                None,
-                ClickhouseRequestBuilder {
-                    compression: self.compression,
-                    encoding: self.encoding,
-                },
-            )
+            .incremental_request_builder(self.request_builder)
+            .flat_map(stream::iter)
             .filter_map(|request| async {
                 match request {
                     Err(error) => {
@@ -71,47 +76,53 @@ impl StreamSink<Event> for ClickhouseSink {
     }
 }
 
-struct ClickhouseRequestBuilder {
-    compression: Compression,
-    encoding: (Transformer, Encoder<Framer>),
-}
-
-impl RequestBuilder<Vec<Event>> for ClickhouseRequestBuilder {
-    type Metadata = EventFinalizers;
-    type Events = Vec<Event>;
-    type Encoder = (Transformer, Encoder<Framer>);
+impl IncrementalRequestBuilder<Vec<Event>> for ClickhouseRequestBuilder {
+    type Metadata = (EventFinalizers, RequestMetadata);
     type Payload = Bytes;
     type Request = ClickhouseRequest;
     type Error = std::io::Error;
 
-    fn compression(&self) -> Compression {
-        self.compression
+    fn encode_events_incremental(&mut self, mut input: Vec<Event>,
+    ) -> Vec<Result<(Self::Metadata, Self::Payload), Self::Error>> {
+        let mut results = Vec::with_capacity(input.len());
+        let mut metrics: Vec<Metric> = Vec::new();
+        let mut traces: Vec<TraceEvent> = Vec::new();
+        let mut logs: Vec<LogEvent> = Vec::new();
+
+        let mut request_metadata_builder = RequestMetadataBuilder::default();
+
+        for event in input.drain(..) {
+            transformer.transform(&mut event);
+            match event {
+                Event::Log(log) => logs.push(log),
+                Event::Metric(metric) => metrics.push(metric),
+                Event::Trace(trace) => traces.push(trace),
+            };
+        }
+
+        {
+            let mut request_buf = Vec::new();
+            let mut finalizers = EventFinalizers::default();
+            for log in logs {
+                encoder.encode(&log, &mut request_buf);
+                finalizers.merge(log.take_finalizers());
+                request_metadata_builder.track_event(log);
+            }
+            let encode_result = EncodeResult::uncompressed(request_buf);
+            let request_metadata = request_metadata_builder.build(&encode_result);
+            results.push(Ok((finalizers,request_metadata), request_buf));
+        }
+
+        results
     }
 
-    fn encoder(&self) -> &Self::Encoder {
-        &self.encoding
-    }
-
-    fn split_input(
-        &self,
-        mut events: Vec<Event>,
-    ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
-        let finalizers = events.take_finalizers();
-        let builder = RequestMetadataBuilder::from_events(&events);
-        (finalizers, builder, events)
-    }
-
-    fn build_request(
-        &self,
-        metadata: Self::Metadata,
-        request_metadata: RequestMetadata,
-        payload: EncodeResult<Self::Payload>,
-    ) -> Self::Request {
+    fn build_request( &mut self, finalizers_and_metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {
+        let (finalizers, metadata) = finalizers_and_metadata;
         ClickhouseRequest {
-            body: payload.into_payload(),
+            body: payload,
             compression: self.compression,
-            finalizers: metadata,
-            metadata: request_metadata,
+            finalizers: finalizers,
+            metadata: metadata,
         }
     }
 }
