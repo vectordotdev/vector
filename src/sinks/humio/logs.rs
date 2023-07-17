@@ -388,7 +388,9 @@ mod integration_tests {
             source: None,
             encoding: JsonSerializerConfig::default().into(),
             event_type: None,
-            host_key: log_schema().host_key().unwrap().to_string(),
+            host_key: OptionalValuePath {
+                path: log_schema().host_key().cloned(),
+            },
             indexed_fields: vec![],
             index: None,
             compression: Compression::None,
