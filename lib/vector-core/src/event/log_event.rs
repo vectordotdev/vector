@@ -292,6 +292,10 @@ impl LogEvent {
         }
     }
 
+    /// Retrieves the value of a field based on it's meaning.
+    /// This will first check if the value has previously been dropped. It is worth being
+    /// aware that if the field has been dropped and then some how readded, we still fetch
+    /// the dropped value here.
     pub fn get_by_meaning(&self, meaning: impl AsRef<str>) -> Option<&Value> {
         if let Some(dropped) = self.metadata().dropped_field(&meaning) {
             Some(dropped)

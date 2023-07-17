@@ -133,6 +133,9 @@ impl EventMetadata {
     }
 
     /// Adds the value to the dropped fields list.
+    /// There is currently no way to remove a field from this list, so if a field is dropped
+    /// and then the field is re-added with a new value - the dropped value will still be
+    /// retrieved.
     pub fn add_dropped_field(&mut self, meaning: String, value: Value) {
         self.dropped_fields.insert(meaning, value);
     }
