@@ -133,7 +133,7 @@ pub fn build_uri(
 }
 
 pub fn host_key() -> String {
-    crate::config::log_schema().host_key().unwrap().to_string()
+    crate::config::log_schema().host_key().unwrap_or_default().to_string()
 }
 
 pub fn config_timestamp_key() -> OptionalValuePath {
