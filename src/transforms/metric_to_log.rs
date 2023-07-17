@@ -242,7 +242,7 @@ fn schema_definition(log_namespace: LogNamespace) -> Definition {
             }
 
             schema_definition = schema_definition.with_event_field(
-                log_schema().host_key().unwrap(),
+                log_schema().host_key().expect("valid host key"),
                 Kind::bytes().or_undefined(),
                 None,
             );
