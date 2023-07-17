@@ -191,7 +191,7 @@ impl SinkConfig for InfluxDbLogsConfig {
             .clone()
             .and_then(|k| k.path)
             .or(log_schema().host_key().cloned())
-            .unwrap();
+            .expect("global log_schema.host_key to be valid path");
 
         let message_key = self
             .message_key
