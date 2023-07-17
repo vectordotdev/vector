@@ -64,9 +64,6 @@ remap: functions: parse_nginx_log: {
 				user:        "alice"
 				timestamp:   "2021-04-01T12:02:31Z"
 				request:     "POST /not-found HTTP/1.1"
-				method:      "POST"
-				path:        "/not-found"
-				protocol:    "HTTP/1.1"
 				status:      404
 				size:        153
 				referer:     "http://localhost/somewhere"

@@ -115,7 +115,7 @@ members = [
 ]
 
 [workspace.dependencies]
-vrl = { version = "0.5.0", features = ["cli", "test", "test_framework", "arbitrary"] }
+vrl = { version = "0.6.0", features = ["cli", "test", "test_framework", "arbitrary"] }
 
 [dependencies]
 vrl.workspace = true
