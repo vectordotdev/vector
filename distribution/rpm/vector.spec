@@ -52,6 +52,7 @@ mkdir -p %{buildroot}%{_bindir}
 mkdir -p %{buildroot}%{_sysconfdir}/%{_name}
 mkdir -p %{buildroot}%{_sysconfdir}/default
 mkdir -p %{buildroot}%{_sharedstatedir}/%{_name}
+mkdir -p %{buildroot}%{_datadir}/%{_name}
 mkdir -p %{buildroot}%{_unitdir}
 
 cp -a %{_builddir}/bin/vector %{buildroot}%{_bindir}
