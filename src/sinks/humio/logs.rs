@@ -3,7 +3,7 @@ use lookup::lookup_v2::OptionalValuePath;
 use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 
-use super::host_key;
+use super::config_host_key;
 use crate::sinks::splunk_hec::common::config_timestamp_key;
 use crate::{
     codecs::EncodingConfig,
@@ -74,7 +74,7 @@ pub struct HumioLogsConfig {
     /// By default, the [global `log_schema.host_key` option][global_host_key] is used.
     ///
     /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
-    #[serde(default = "host_key")]
+    #[serde(default = "config_host_key")]
     pub(super) host_key: OptionalValuePath,
 
     /// Event fields to be added to Humio’s extra fields.
@@ -154,7 +154,7 @@ impl GenerateConfig for HumioLogsConfig {
             event_type: None,
             indexed_fields: vec![],
             index: None,
-            host_key: host_key(),
+            host_key: config_host_key(),
             compression: Compression::default(),
             request: TowerRequestConfig::default(),
             batch: BatchConfig::default(),
