@@ -59,6 +59,9 @@ cp -a %{_builddir}/config/vector.toml %{buildroot}%{_sysconfdir}/%{_name}/vector
 cp -a %{_builddir}/config/examples/. %{buildroot}%{_sysconfdir}/%{_name}/examples
 cp -a %{_builddir}/systemd/vector.service %{buildroot}%{_unitdir}/vector.service
 cp -a %{_builddir}/systemd/vector.default %{buildroot}%{_sysconfdir}/default/vector
+cp -a %{_builddir}/licenses/. %{buildroot}%{_datadir}/%{_name}/licenses
+cp -a %{_builddir}/NOTICE. %{buildroot}%{_datadir}/%{_name}/NOTICE
+cp -a %{_builddir}/LICENSE-3rdparty.csv %{buildroot}%{_datadir}/%{_name}/LICENSE-3rdparty.csv
 
 %post
 getent passwd %{_username} > /dev/null || \
