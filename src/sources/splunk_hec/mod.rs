@@ -1211,7 +1211,7 @@ mod tests {
     use vrl::path::PathPrefix;
 
     use super::*;
-    use crate::sinks::splunk_hec::common::config_timestamp_key;
+    use crate::sinks::splunk_hec::common::{config_host_key, config_timestamp_key};
     use crate::{
         codecs::EncodingConfig,
         config::{log_schema, SinkConfig, SinkContext, SourceConfig, SourceContext},
@@ -1287,7 +1287,7 @@ mod tests {
         HecLogsSinkConfig {
             default_token: TOKEN.to_owned().into(),
             endpoint: format!("http://{}", address),
-            host_key: "host".to_owned(),
+            host_key: config_host_key(),
             indexed_fields: vec![],
             index: None,
             sourcetype: None,

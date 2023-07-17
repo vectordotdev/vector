@@ -75,7 +75,7 @@ pub struct HumioLogsConfig {
     ///
     /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
     #[serde(default = "host_key")]
-    pub(super) host_key: String,
+    pub(super) host_key: OptionalValuePath,
 
     /// Event fields to be added to Humio’s extra fields.
     ///

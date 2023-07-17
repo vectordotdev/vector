@@ -244,7 +244,9 @@ pub(crate) fn decode_ddseries_v2(
                 // As per https://github.com/DataDog/datadog-agent/blob/a62ac9fb13e1e5060b89e731b8355b2b20a07c5b/pkg/serializer/internal/metrics/iterable_series.go#L180-L189
                 // the hostname can be found in MetricSeries::resources and that is the only value stored there.
                 if r.r#type.eq("host") {
-                    tags.replace(log_schema().host_key().unwrap().to_string(), r.name);
+                    log_schema()
+                        .host_key()
+                        .and_then(|key| tags.replace(key.to_string(), r.name));
                 } else {
                     // But to avoid losing information if this situation changes, any other resource type/name will be saved in the tags map
                     tags.replace(format!("resource.{}", r.r#type), r.name);
@@ -501,10 +503,10 @@ pub(crate) fn decode_ddsketch(
         .flat_map(|sketch_series| {
             // sketch_series.distributions is also always empty from payload coming from dd agents
             let mut tags = into_metric_tags(sketch_series.tags);
-            tags.replace(
-                log_schema().host_key().unwrap().to_string(),
-                sketch_series.host.clone(),
-            );
+            log_schema()
+                .host_key()
+                .and_then(|key| tags.replace(key.to_string(), sketch_series.host.clone()));
+
             sketch_series.dogsketches.into_iter().map(move |sketch| {
                 let k: Vec<i16> = sketch.k.iter().map(|k| *k as i16).collect();
                 let n: Vec<u16> = sketch.n.iter().map(|n| *n as u16).collect();
