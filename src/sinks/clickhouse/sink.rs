@@ -1,11 +1,15 @@
-use bytes::Bytes;
-use codecs::{encoding::Framer, JsonSerializerConfig, NewlineDelimitedEncoderConfig};
-use futures_util::stream;
+use vector_core::event::{EventFinalizers, Event};
+
+use crate::sinks::util::IncrementalRequestBuilder;
+use crate::sinks::util::buffer::metrics::MetricNormalizer;
+use crate::{internal_events::SinkRequestBuildError, sinks::prelude::*};
 
 use super::service::{ClickhouseRequest, ClickhouseRetryLogic, ClickhouseService};
-use crate::sinks::util::IncrementalRequestBuilder;
-use crate::{internal_events::SinkRequestBuildError, sinks::prelude::*};
-use vector_core::event::{EventFinalizers, Event, LogEvent, TraceEvent, Metric};
+use super::normalizer::ClickHouseMetricsNormalizer;
+
+use bytes::{Bytes, BytesMut};
+use codecs::{encoding::Framer, JsonSerializerConfig, NewlineDelimitedEncoderConfig};
+use futures_util::stream;
 
 pub struct ClickhouseSink {
     batch_settings: BatcherSettings,
@@ -19,6 +23,7 @@ struct ClickhouseRequestBuilder {
     compression: Compression,
     transformer: Transformer,
     encoder: Encoder<Framer>,
+    normalizer: MetricNormalizer<ClickHouseMetricsNormalizer>,
 }
 
 impl ClickhouseSink {
@@ -40,13 +45,13 @@ impl ClickhouseSink {
                     NewlineDelimitedEncoderConfig::default().build().into(),
                     JsonSerializerConfig::default().build().into(),
                 ),
+                normalizer: MetricNormalizer::from(ClickHouseMetricsNormalizer::default()),
             },
         }
     }
 
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         input
-            //.normalized_with_default::<ClickHouseNormalizer>()
             .batched(self.batch_settings.into_byte_size_config())
             .incremental_request_builder(self.request_builder)
             .flat_map(stream::iter)
@@ -84,35 +89,52 @@ impl IncrementalRequestBuilder<Vec<Event>> for ClickhouseRequestBuilder {
 
     fn encode_events_incremental(&mut self, mut input: Vec<Event>,
     ) -> Vec<Result<(Self::Metadata, Self::Payload), Self::Error>> {
-        let mut results = Vec::with_capacity(input.len());
-        let mut metrics: Vec<Metric> = Vec::new();
-        let mut traces: Vec<TraceEvent> = Vec::new();
-        let mut logs: Vec<LogEvent> = Vec::new();
+        let mut results = Vec::with_capacity(3);
 
-        let mut request_metadata_builder = RequestMetadataBuilder::default();
+        let mut metrics_buf = BytesMut::new();
+        let mut traces_buf = BytesMut::new();
+        let mut logs_buf = BytesMut::new();
+        let mut metrics_finalizers = EventFinalizers::default();
+        let mut traces_finalizers = EventFinalizers::default();
+        let mut logs_finalizers = EventFinalizers::default();
 
-        for event in input.drain(..) {
-            transformer.transform(&mut event);
+        let request_metadata_builder = RequestMetadataBuilder::default();
+
+        for mut event in input.drain(..) {
+            self.transformer.transform(&mut event);
             match event {
-                Event::Log(log) => logs.push(log),
-                Event::Metric(metric) => metrics.push(metric),
-                Event::Trace(trace) => traces.push(trace),
+                Event::Log(mut log) => {
+                    logs_finalizers.merge(log.take_finalizers());
+                    self.encoder.serialize(Event::Log(log), &mut logs_buf).expect("encoding is infallible");
+                },
+                Event::Trace(mut trace) => {
+                    traces_finalizers.merge(trace.take_finalizers());
+                    self.encoder.serialize(Event::Trace(trace), &mut traces_buf).expect("encoding is infallible");
+                },
+                Event::Metric(mut metric) => {
+                    metrics_finalizers.merge(metric.take_finalizers());
+                    if let Some(normalized) = self.normalizer.normalize(metric) {
+                        self.encoder.serialize(Event::Metric(normalized), &mut metrics_buf).expect("encoding is infallible");
+                    }
+                },
             };
         }
 
-        {
-            let mut request_buf = Vec::new();
-            let mut finalizers = EventFinalizers::default();
-            for log in logs {
-                encoder.encode(&log, &mut request_buf);
-                finalizers.merge(log.take_finalizers());
-                request_metadata_builder.track_event(log);
-            }
-            let encode_result = EncodeResult::uncompressed(request_buf);
-            let request_metadata = request_metadata_builder.build(&encode_result);
-            results.push(Ok((finalizers,request_metadata), request_buf));
+        if metrics_buf.len() > 0 {
+            let metrics_encoded = EncodeResult::uncompressed(metrics_buf);
+            let metrics_metadata = request_metadata_builder.build(&metrics_encoded);
+            results.push(Ok(((metrics_finalizers, metrics_metadata), metrics_encoded.into_payload().freeze())))
         }
-
+        if traces_buf.len() > 0 {
+            let traces_encoded = EncodeResult::uncompressed(traces_buf);
+            let traces_metadata = request_metadata_builder.build(&traces_encoded);
+            results.push(Ok(((traces_finalizers, traces_metadata), traces_encoded.into_payload().freeze())))
+        }
+        if logs_buf.len() > 0 {
+            let logs_encoded = EncodeResult::uncompressed(logs_buf);
+            let logs_metadata = request_metadata_builder.build(&logs_encoded);
+            results.push(Ok(((logs_finalizers, logs_metadata), logs_encoded.into_payload().freeze())))
+        }
         results
     }
 
