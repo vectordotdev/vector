@@ -98,13 +98,14 @@ impl TopologyController {
             }
         }
 
-        /*
-        Without this block
-        the first config loaded determines whether the api is
-        always on or always off
-        */
+        // Start the api server or disable it, if necessary
         #[cfg(feature = "api")]
-        if new_config.api.enabled && self.api_server.is_none() {
+        if !new_config.api.enabled {
+            if let Some(server) = self.api_server.take() {
+                debug!("Dropping api server.");
+                drop(server)
+            }
+        } else if self.api_server.is_none() {
             use std::sync::atomic::AtomicBool;
             debug!("Starting api server.");
             self.api_server = match api::Server::start(
@@ -125,11 +126,6 @@ impl TopologyController {
                     error!("An error occurred that Vector couldn't handle: {}.", e);
                     return FatalError;
                 }
-            }
-        } else if !new_config.api.enabled {
-            if let Some(server) = self.api_server.take() {
-                debug!("Dropping api server.");
-                drop(server)
             }
         }
 
