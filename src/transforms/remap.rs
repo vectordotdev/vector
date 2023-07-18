@@ -7,7 +7,7 @@ use std::{
 };
 
 use codecs::MetricTagValues;
-use lookup::lookup_v2::{parse_value_path, ValuePath};
+use lookup::lookup_v2::ValuePath;
 use lookup::{metadata_path, owned_value_path, path, PathPrefix};
 use snafu::{ResultExt, Snafu};
 use vector_common::TimeZone;
@@ -288,7 +288,7 @@ impl TransformConfig for RemapConfig {
             let dropped_definition = Definition::combine_log_namespaces(
                 input_definition.log_namespaces(),
                 input_definition.clone().with_event_field(
-                    &parse_value_path(log_schema().metadata_key()).expect("valid metadata key"),
+                    log_schema().metadata_key().expect("valid metadata key"),
                     Kind::object(BTreeMap::from([
                         ("reason".into(), Kind::bytes()),
                         ("message".into(), Kind::bytes()),
@@ -451,13 +451,12 @@ where
         match event {
             Event::Log(ref mut log) => match log.namespace() {
                 LogNamespace::Legacy => {
-                    log.insert(
-                        (
-                            PathPrefix::Event,
-                            log_schema().metadata_key().concat(path!("dropped")),
-                        ),
-                        self.dropped_data(reason, error),
-                    );
+                    if let Some(metadata_key) = log_schema().metadata_key() {
+                        log.insert(
+                            (PathPrefix::Event, metadata_key.concat(path!("dropped"))),
+                            self.dropped_data(reason, error),
+                        );
+                    }
                 }
                 LogNamespace::Vector => {
                     log.insert(
@@ -467,23 +466,29 @@ where
                 }
             },
             Event::Metric(ref mut metric) => {
-                let m = log_schema().metadata_key();
-                metric.replace_tag(format!("{}.dropped.reason", m), reason.into());
-                metric.replace_tag(
-                    format!("{}.dropped.component_id", m),
-                    self.component_key
-                        .as_ref()
-                        .map(ToString::to_string)
-                        .unwrap_or_else(String::new),
-                );
-                metric.replace_tag(format!("{}.dropped.component_type", m), "remap".into());
-                metric.replace_tag(format!("{}.dropped.component_kind", m), "transform".into());
+                if let Some(metadata_key) = log_schema().metadata_key() {
+                    metric.replace_tag(format!("{}.dropped.reason", metadata_key), reason.into());
+                    metric.replace_tag(
+                        format!("{}.dropped.component_id", metadata_key),
+                        self.component_key
+                            .as_ref()
+                            .map(ToString::to_string)
+                            .unwrap_or_else(String::new),
+                    );
+                    metric.replace_tag(
+                        format!("{}.dropped.component_type", metadata_key),
+                        "remap".into(),
+                    );
+                    metric.replace_tag(
+                        format!("{}.dropped.component_kind", metadata_key),
+                        "transform".into(),
+                    );
+                }
             }
             Event::Trace(ref mut trace) => {
-                trace.insert(
-                    log_schema().metadata_key(),
-                    self.dropped_data(reason, error),
-                );
+                if let Some(metadata_key) = log_schema().metadata_key() {
+                    trace.insert(metadata_key.to_string(), self.dropped_data(reason, error));
+                }
             }
         }
     }

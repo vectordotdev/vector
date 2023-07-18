@@ -73,7 +73,7 @@ pub struct LogSchema {
     /// Generally, this field will be set by Vector to hold event-specific metadata, such as
     /// annotations by the `remap` transform when an error or abort is encountered.
     #[serde(default = "LogSchema::default_metadata_key")]
-    metadata_key: String,
+    metadata_key: OptionalValuePath,
 }
 
 impl Default for LogSchema {
@@ -105,8 +105,8 @@ impl LogSchema {
         OptionalValuePath::new(SOURCE_TYPE)
     }
 
-    fn default_metadata_key() -> String {
-        String::from(METADATA)
+    fn default_metadata_key() -> OptionalValuePath {
+        OptionalValuePath::new(METADATA)
     }
 
     pub fn message_key(&self) -> Option<&OwnedValuePath> {
@@ -134,8 +134,8 @@ impl LogSchema {
         self.source_type_key.path.as_ref()
     }
 
-    pub fn metadata_key(&self) -> &str {
-        &self.metadata_key
+    pub fn metadata_key(&self) -> Option<&OwnedValuePath> {
+        self.metadata_key.path.as_ref()
     }
 
     pub fn set_message_key(&mut self, path: Option<OwnedValuePath>) {
@@ -154,8 +154,8 @@ impl LogSchema {
         self.source_type_key = OptionalValuePath { path };
     }
 
-    pub fn set_metadata_key(&mut self, v: String) {
-        self.metadata_key = v;
+    pub fn set_metadata_key(&mut self, path: Option<OwnedValuePath>) {
+        self.metadata_key = OptionalValuePath { path };
     }
 
     /// Merge two `LogSchema` instances together.
@@ -202,7 +202,7 @@ impl LogSchema {
             {
                 errors.push("conflicting values for 'log_schema.metadata_key' found".to_owned());
             } else {
-                self.set_metadata_key(other.metadata_key().to_string());
+                self.set_metadata_key(other.metadata_key().cloned());
             }
         }
 
