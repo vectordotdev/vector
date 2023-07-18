@@ -1,10 +1,8 @@
 use std::sync::Arc;
 
-use crate::internal_events::ApiStarted;
 #[cfg(feature = "enterprise")]
 use futures_util::future::BoxFuture;
 use futures_util::FutureExt as _;
-use tokio::runtime::Handle;
 
 use tokio::sync::{Mutex, MutexGuard};
 
@@ -18,7 +16,6 @@ use crate::internal_events::{
     VectorConfigLoadError, VectorRecoveryError, VectorReloadError, VectorReloaded,
 };
 
-use crate::topology::ReloadOutcome::FatalError;
 use crate::{config, topology::RunningTopology};
 
 #[derive(Clone, Debug)]
@@ -106,8 +103,13 @@ impl TopologyController {
                 drop(server)
             }
         } else if self.api_server.is_none() {
+            use crate::internal_events::ApiStarted;
+            use crate::topology::ReloadOutcome::FatalError;
             use std::sync::atomic::AtomicBool;
+            use tokio::runtime::Handle;
+
             debug!("Starting api server.");
+
             self.api_server = match api::Server::start(
                 self.topology.config(),
                 self.topology.watch(),
