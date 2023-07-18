@@ -142,6 +142,8 @@ fn deserializer_config_to_serializer(config: &DeserializerConfig) -> encoding::S
         // `message` field... but it's close enough for now.
         DeserializerConfig::Bytes => SerializerConfig::Text(TextSerializerConfig::default()),
         DeserializerConfig::Json { .. } => SerializerConfig::Json(JsonSerializerConfig::default()),
+        // TODO: how to handle this?
+        DeserializerConfig::Protobuf(_) => todo!(),
         // TODO: We need to create an Avro serializer because, certainly, for any source decoding
         // the data as Avro, we can't possibly send anything else without the source just
         // immediately barfing.
