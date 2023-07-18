@@ -32,14 +32,14 @@ use crate::{
     tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
 
-// The Datadog API has a hard limit of 3.2MB for uncompressed payloads.
+// The Datadog API has a hard limit of 25MB for uncompressed payloads.
 // Beyond this limit the payload will be ignored, enforcing a slight lower
 // limit as a safety margin.
-pub const BATCH_GOAL_BYTES: usize = 3_000_000;
+pub const BATCH_GOAL_BYTES: usize = 25_000_000;
 pub const BATCH_MAX_EVENTS: usize = 1_000;
 pub const BATCH_DEFAULT_TIMEOUT_SECS: f64 = 10.0;
 
-pub const PAYLOAD_LIMIT: usize = 3_200_000;
+pub const PAYLOAD_LIMIT: usize = 26_214_400;
 
 const DEFAULT_REQUEST_RETRY_ATTEMPTS: usize = 5;
 const DEFAULT_REQUEST_RETRY_MAX_DURATION_SECS: u64 = 300;
