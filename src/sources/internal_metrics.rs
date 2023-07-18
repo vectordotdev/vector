@@ -27,7 +27,7 @@ use crate::{
 #[serde(deny_unknown_fields, default)]
 pub struct InternalMetricsConfig {
     /// The interval between metric gathering, in seconds.
-    #[serde_as(as = "serde_with::DurationSeconds<f64>")]
+    #[serde_as(as = "serde_with::DurationSecondsWithFrac<f64>")]
     #[serde(default = "default_scrape_interval")]
     #[configurable(metadata(docs::human_name = "Scrape Interval"))]
     pub scrape_interval_secs: Duration,
