@@ -7585,9 +7585,9 @@ dependencies = [
 
 [[package]]
 name = "serde_with"
-version = "3.0.0"
+version = "3.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9f02d8aa6e3c385bf084924f660ce2a3a6bd333ba55b35e8590b321f35d88513"
+checksum = "21e47d95bc83ed33b2ecf84f4187ad1ab9685d18ff28db000c99deac8ce180e3"
 dependencies = [
  "base64 0.21.2",
  "chrono",
@@ -7595,7 +7595,7 @@ dependencies = [
  "indexmap 1.9.3",
  "serde",
  "serde_json",
- "serde_with_macros 3.0.0",
+ "serde_with_macros 3.1.0",
  "time",
 ]
 
@@ -7613,9 +7613,9 @@ dependencies = [
 
 [[package]]
 name = "serde_with_macros"
-version = "3.0.0"
+version = "3.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "edc7d5d3932fb12ce722ee5e64dd38c504efba37567f0c402f6ca728c3b8b070"
+checksum = "ea3cee93715c2e266b9338b7544da68a9f24e227722ba482bd1c024367c77c65"
 dependencies = [
  "darling 0.20.3",
  "proc-macro2 1.0.66",
@@ -9410,7 +9410,7 @@ dependencies = [
  "serde-toml-merge",
  "serde_bytes",
  "serde_json",
- "serde_with 3.0.0",
+ "serde_with 3.1.0",
  "serde_yaml 0.9.22",
  "sha2 0.10.7",
  "similar-asserts",
@@ -9578,7 +9578,7 @@ dependencies = [
  "once_cell",
  "serde",
  "serde_json",
- "serde_with 3.0.0",
+ "serde_with 3.1.0",
  "snafu",
  "toml 0.7.6",
  "tracing 0.1.37",
@@ -9670,7 +9670,7 @@ dependencies = [
  "security-framework",
  "serde",
  "serde_json",
- "serde_with 3.0.0",
+ "serde_with 3.1.0",
  "similar-asserts",
  "smallvec",
  "snafu",
