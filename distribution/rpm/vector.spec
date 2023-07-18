@@ -84,6 +84,9 @@ rm -rf %{buildroot}
 %config %{_sysconfdir}/%{_name}/examples/*
 %dir %{_sharedstatedir}/%{_name}
 %doc README.md
+%doc %{_datadir}/%{_name}/NOTICE
+%doc %{_datadir}/%{_name}/licenses/*
+%doc %{_datadir}/%{_name}/LICENSE-3rdparty.csv
 %license LICENSE
 
 %changelog
