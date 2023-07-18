@@ -1,0 +1,7 @@
+---
+registries:
+  - name: local
+    type: local
+    path: registry.yaml
+packages:
+  - registry: local
