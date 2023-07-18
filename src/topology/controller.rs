@@ -3,6 +3,7 @@ use std::sync::Arc;
 #[cfg(feature = "enterprise")]
 use futures_util::future::BoxFuture;
 use futures_util::FutureExt as _;
+
 use tokio::sync::{Mutex, MutexGuard};
 
 #[cfg(feature = "api")]
@@ -14,6 +15,7 @@ use crate::config::enterprise::{
 use crate::internal_events::{
     VectorConfigLoadError, VectorRecoveryError, VectorReloadError, VectorReloaded,
 };
+
 use crate::{config, topology::RunningTopology};
 
 #[derive(Clone, Debug)]
@@ -89,6 +91,42 @@ impl TopologyController {
                 if let EnterpriseError::MissingApiKey = err {
                     emit!(VectorReloadError);
                     return ReloadOutcome::MissingApiKey;
+                }
+            }
+        }
+
+        // Start the api server or disable it, if necessary
+        #[cfg(feature = "api")]
+        if !new_config.api.enabled {
+            if let Some(server) = self.api_server.take() {
+                debug!("Dropping api server.");
+                drop(server)
+            }
+        } else if self.api_server.is_none() {
+            use crate::internal_events::ApiStarted;
+            use crate::topology::ReloadOutcome::FatalError;
+            use std::sync::atomic::AtomicBool;
+            use tokio::runtime::Handle;
+
+            debug!("Starting api server.");
+
+            self.api_server = match api::Server::start(
+                self.topology.config(),
+                self.topology.watch(),
+                Arc::<AtomicBool>::clone(&self.topology.running),
+                &Handle::current(),
+            ) {
+                Ok(api_server) => {
+                    emit!(ApiStarted {
+                        addr: new_config.api.address.unwrap(),
+                        playground: new_config.api.playground
+                    });
+
+                    Some(api_server)
+                }
+                Err(e) => {
+                    error!("An error occurred that Vector couldn't handle: {}.", e);
+                    return FatalError;
                 }
             }
         }
