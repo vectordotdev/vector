@@ -22,7 +22,7 @@ pub use parser::{parse_dnstap_data, DnstapParser};
 
 pub mod schema;
 use dnsmsg_parser::{dns_message, dns_message_parser};
-use lookup::lookup_v2::{parse_value_path, OptionalValuePath};
+use lookup::lookup_v2::OptionalValuePath;
 pub use schema::DnstapEventSchema;
 use vector_core::{
     config::{LegacyKey, LogNamespace},
@@ -224,10 +224,10 @@ impl DnstapFrameHandler {
 
         let schema = DnstapConfig::event_schema(timestamp_key);
 
-        let host_key = config.host_key.clone().map_or_else(
-            || parse_value_path(log_schema().host_key()).ok(),
-            |k| k.path,
-        );
+        let host_key = config
+            .host_key
+            .clone()
+            .map_or(log_schema().host_key().cloned(), |k| k.path);
 
         Self {
             max_frame_length: config.max_frame_length,

@@ -12,7 +12,7 @@ use bytes::Bytes;
 use chrono::{TimeZone, Utc};
 use codecs::{decoding::BoxedFramingError, CharacterDelimitedDecoder};
 use futures::{poll, stream::BoxStream, task::Poll, StreamExt};
-use lookup::{lookup_v2::parse_value_path, metadata_path, owned_value_path, path, PathPrefix};
+use lookup::{metadata_path, owned_value_path, path, PathPrefix};
 use nix::{
     sys::signal::{kill, Signal},
     unistd::Pid,
@@ -270,9 +270,7 @@ impl JournaldConfig {
             )
             .with_source_metadata(
                 JournaldConfig::NAME,
-                parse_value_path(log_schema().host_key())
-                    .ok()
-                    .map(LegacyKey::Overwrite),
+                log_schema().host_key().cloned().map(LegacyKey::Overwrite),
                 &owned_value_path!("host"),
                 Kind::bytes().or_undefined(),
                 Some("host"),
@@ -709,10 +707,7 @@ fn enrich_log_event(log: &mut LogEvent, log_namespace: LogNamespace) {
         log_namespace.insert_source_metadata(
             JournaldConfig::NAME,
             log,
-            parse_value_path(log_schema().host_key())
-                .ok()
-                .as_ref()
-                .map(LegacyKey::Overwrite),
+            log_schema().host_key().map(LegacyKey::Overwrite),
             path!("host"),
             host,
         );

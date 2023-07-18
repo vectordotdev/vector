@@ -283,7 +283,7 @@ pub struct ApiKeyQueryParams {
 #[derive(Clone)]
 pub(crate) struct DatadogAgentSource {
     pub(crate) api_key_extractor: ApiKeyExtractor,
-    pub(crate) log_schema_host_key: &'static str,
+    pub(crate) log_schema_host_key: String,
     pub(crate) log_schema_source_type_key: String,
     pub(crate) log_namespace: LogNamespace,
     pub(crate) decoder: Decoder,
@@ -333,7 +333,9 @@ impl DatadogAgentSource {
                 matcher: Regex::new(r"^/v1/input/(?P<api_key>[[:alnum:]]{32})/??")
                     .expect("static regex always compiles"),
             },
-            log_schema_host_key: log_schema().host_key(),
+            log_schema_host_key: log_schema()
+                .host_key()
+                .map_or("".to_string(), |key| key.to_string()),
             log_schema_source_type_key: log_schema()
                 .source_type_key()
                 .map_or("".to_string(), |key| key.to_string()),

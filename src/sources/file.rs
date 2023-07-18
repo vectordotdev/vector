@@ -253,7 +253,7 @@ fn default_file_key() -> OptionalValuePath {
 }
 
 fn default_host_key() -> OptionalValuePath {
-    OptionalValuePath::from(owned_value_path!(log_schema().host_key()))
+    log_schema().host_key().cloned().into()
 }
 
 const fn default_read_from() -> ReadFromConfig {
@@ -1469,7 +1469,7 @@ mod tests {
                         .path
                         .expect("file key to exist")
                         .to_string(),
-                    log_schema().host_key().to_string(),
+                    log_schema().host_key().unwrap().to_string(),
                     log_schema().message_key().to_string(),
                     log_schema().timestamp_key().unwrap().to_string(),
                     log_schema().source_type_key().unwrap().to_string()

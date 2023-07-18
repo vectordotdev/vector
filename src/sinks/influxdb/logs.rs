@@ -4,12 +4,13 @@ use bytes::{Bytes, BytesMut};
 use futures::SinkExt;
 use http::{Request, Uri};
 use indoc::indoc;
+use vrl::value::Kind;
+
 use lookup::lookup_v2::{parse_value_path, OptionalValuePath};
 use lookup::{OwnedValuePath, PathPrefix};
 use vector_config::configurable_component;
 use vector_core::config::log_schema;
 use vector_core::schema;
-use vrl::value::Kind;
 
 use crate::{
     codecs::Transformer,
@@ -189,10 +190,8 @@ impl SinkConfig for InfluxDbLogsConfig {
             .host_key
             .clone()
             .and_then(|k| k.path)
-            .unwrap_or_else(|| {
-                parse_value_path(log_schema().host_key())
-                    .expect("global log_schema.host_key to be valid path")
-            });
+            .or(log_schema().host_key().cloned())
+            .expect("global log_schema.host_key to be valid path");
 
         let message_key = self
             .message_key
@@ -409,10 +408,10 @@ mod tests {
     use futures::{channel::mpsc, stream, StreamExt};
     use http::{request::Parts, StatusCode};
     use indoc::indoc;
+
     use lookup::owned_value_path;
     use vector_core::event::{BatchNotifier, BatchStatus, Event, LogEvent};
 
-    use super::*;
     use crate::{
         sinks::{
             influxdb::test_util::{assert_fields, split_line_protocol, ts},
@@ -426,6 +425,8 @@ mod tests {
             next_addr,
         },
     };
+
+    use super::*;
 
     type Receiver = mpsc::Receiver<(Parts, bytes::Bytes)>;
 
@@ -880,16 +881,17 @@ mod tests {
 #[cfg(feature = "influxdb-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
-    use chrono::Utc;
-    use codecs::BytesDeserializerConfig;
-    use futures::stream;
-    use lookup::{owned_value_path, path};
     use std::sync::Arc;
-    use vector_core::config::{LegacyKey, LogNamespace};
-    use vector_core::event::{BatchNotifier, BatchStatus, Event, LogEvent};
+
+    use chrono::Utc;
+    use futures::stream;
     use vrl::value;
 
-    use super::*;
+    use codecs::BytesDeserializerConfig;
+    use lookup::{owned_value_path, path};
+    use vector_core::config::{LegacyKey, LogNamespace};
+    use vector_core::event::{BatchNotifier, BatchStatus, Event, LogEvent};
+
     use crate::{
         config::SinkContext,
         sinks::influxdb::{
@@ -899,6 +901,8 @@ mod integration_tests {
         },
         test_util::components::{run_and_assert_sink_compliance, HTTP_SINK_TAGS},
     };
+
+    use super::*;
 
     #[tokio::test]
     async fn influxdb2_logs_put_data() {

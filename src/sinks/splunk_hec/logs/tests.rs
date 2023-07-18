@@ -10,6 +10,7 @@ use vector_core::{
     config::log_schema,
     event::{Event, LogEvent, Value},
 };
+use vrl::owned_value_path;
 
 use super::sink::HecProcessedEvent;
 use crate::sinks::splunk_hec::common::config_timestamp_key;
@@ -89,7 +90,7 @@ fn get_processed_event_timestamp(
             sourcetype: sourcetype.as_ref(),
             source: source.as_ref(),
             index: index.as_ref(),
-            host_key: "host_key",
+            host_key: Some(owned_value_path!("host_key")),
             indexed_fields: indexed_fields.as_slice(),
             timestamp_nanos_key: timestamp_nanos_key.as_ref(),
             timestamp_key,
@@ -200,7 +201,9 @@ async fn splunk_passthrough_token() {
     let config = HecLogsSinkConfig {
         default_token: "token".to_string().into(),
         endpoint: format!("http://{}", addr),
-        host_key: "host".into(),
+        host_key: OptionalValuePath {
+            path: log_schema().host_key().cloned(),
+        },
         indexed_fields: Vec::new(),
         index: None,
         sourcetype: None,

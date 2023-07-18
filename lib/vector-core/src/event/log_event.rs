@@ -458,7 +458,7 @@ impl LogEvent {
     pub fn host_path(&self) -> Option<String> {
         match self.namespace() {
             LogNamespace::Vector => self.find_key_by_meaning("host"),
-            LogNamespace::Legacy => Some(log_schema().host_key().to_owned()),
+            LogNamespace::Legacy => log_schema().host_key().map(ToString::to_string),
         }
     }
 
@@ -505,7 +505,9 @@ impl LogEvent {
     pub fn get_host(&self) -> Option<&Value> {
         match self.namespace() {
             LogNamespace::Vector => self.get_by_meaning("host"),
-            LogNamespace::Legacy => self.get((PathPrefix::Event, log_schema().host_key())),
+            LogNamespace::Legacy => log_schema()
+                .host_key()
+                .and_then(|key| self.get((PathPrefix::Event, key))),
         }
     }
 

@@ -55,7 +55,7 @@ pub struct LogSchema {
     /// This field will generally represent a real host, or container, that generated the message,
     /// but is somewhat source-dependent.
     #[serde(default = "LogSchema::default_host_key")]
-    host_key: String,
+    host_key: OptionalValuePath,
 
     /// The name of the event field to set the source identifier in.
     ///
@@ -92,8 +92,8 @@ impl LogSchema {
         OptionalValuePath::new("timestamp")
     }
 
-    fn default_host_key() -> String {
-        String::from("host")
+    fn default_host_key() -> OptionalValuePath {
+        OptionalValuePath::new("host")
     }
 
     fn default_source_type_key() -> OptionalValuePath {
@@ -121,8 +121,8 @@ impl LogSchema {
         self.timestamp_key.path.as_ref()
     }
 
-    pub fn host_key(&self) -> &str {
-        &self.host_key
+    pub fn host_key(&self) -> Option<&OwnedValuePath> {
+        self.host_key.path.as_ref()
     }
 
     pub fn source_type_key(&self) -> Option<&OwnedValuePath> {
@@ -141,8 +141,8 @@ impl LogSchema {
         self.timestamp_key = OptionalValuePath { path: v };
     }
 
-    pub fn set_host_key(&mut self, v: String) {
-        self.host_key = v;
+    pub fn set_host_key(&mut self, path: Option<OwnedValuePath>) {
+        self.host_key = OptionalValuePath { path };
     }
 
     pub fn set_source_type_key(&mut self, path: Option<OwnedValuePath>) {
@@ -169,7 +169,7 @@ impl LogSchema {
             {
                 errors.push("conflicting values for 'log_schema.host_key' found".to_owned());
             } else {
-                self.set_host_key(other.host_key().to_string());
+                self.set_host_key(other.host_key().cloned());
             }
             if self.message_key() != LOG_SCHEMA_DEFAULT.message_key()
                 && self.message_key() != other.message_key()

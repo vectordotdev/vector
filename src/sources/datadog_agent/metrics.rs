@@ -5,9 +5,10 @@ use chrono::{TimeZone, Utc};
 use http::StatusCode;
 use prost::Message;
 use serde::{Deserialize, Serialize};
+use warp::{filters::BoxedFilter, path, path::FullPath, reply::Response, Filter};
+
 use vector_common::internal_event::{CountByteSize, InternalEventHandle as _, Registered};
 use vector_core::{metrics::AgentDDSketch, EstimatedJsonEncodedSizeOf};
-use warp::{filters::BoxedFilter, path, path::FullPath, reply::Response, Filter};
 
 use crate::{
     common::datadog::{DatadogMetricType, DatadogSeriesMetric},
@@ -243,7 +244,9 @@ pub(crate) fn decode_ddseries_v2(
                 // As per https://github.com/DataDog/datadog-agent/blob/a62ac9fb13e1e5060b89e731b8355b2b20a07c5b/pkg/serializer/internal/metrics/iterable_series.go#L180-L189
                 // the hostname can be found in MetricSeries::resources and that is the only value stored there.
                 if r.r#type.eq("host") {
-                    tags.replace(log_schema().host_key().to_string(), r.name);
+                    log_schema()
+                        .host_key()
+                        .and_then(|key| tags.replace(key.to_string(), r.name));
                 } else {
                     // But to avoid losing information if this situation changes, any other resource type/name will be saved in the tags map
                     tags.replace(format!("resource.{}", r.r#type), r.name);
@@ -385,9 +388,12 @@ fn into_vector_metric(
 ) -> Vec<Event> {
     let mut tags = into_metric_tags(dd_metric.tags.unwrap_or_default());
 
-    dd_metric
-        .host
-        .and_then(|host| tags.replace(log_schema().host_key().to_owned(), host));
+    if let Some(key) = log_schema().host_key() {
+        dd_metric
+            .host
+            .and_then(|host| tags.replace(key.to_string(), host));
+    }
+
     dd_metric
         .source_type_name
         .and_then(|source| tags.replace("source_type_name".into(), source));
@@ -497,10 +503,10 @@ pub(crate) fn decode_ddsketch(
         .flat_map(|sketch_series| {
             // sketch_series.distributions is also always empty from payload coming from dd agents
             let mut tags = into_metric_tags(sketch_series.tags);
-            tags.replace(
-                log_schema().host_key().to_string(),
-                sketch_series.host.clone(),
-            );
+            log_schema()
+                .host_key()
+                .and_then(|key| tags.replace(key.to_string(), sketch_series.host.clone()));
+
             sketch_series.dogsketches.into_iter().map(move |sketch| {
                 let k: Vec<i16> = sketch.k.iter().map(|k| *k as i16).collect();
                 let n: Vec<u16> = sketch.n.iter().map(|n| *n as u16).collect();
