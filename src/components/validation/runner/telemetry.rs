@@ -23,7 +23,7 @@ const INTERNAL_LOGS_KEY: &str = "_telemetry_logs";
 const INTERNAL_METRICS_KEY: &str = "_telemetry_metrics";
 const VECTOR_SINK_KEY: &str = "_telemetry_out";
 
-const SHUTDOWN_TICKS: u8 = 5;
+const SHUTDOWN_TICKS: u8 = 3;
 
 /// Telemetry collector for a component under validation.
 pub struct Telemetry {
