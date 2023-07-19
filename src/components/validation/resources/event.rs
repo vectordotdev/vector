@@ -53,7 +53,7 @@ impl EventData {
 /// from the event data twice (once for the expected and once for actual), it can result in a timestamp in
 /// the event which may or may not have the same millisecond precision as it's counterpart.
 #[derive(Clone, Debug, Deserialize)]
-#[serde(try_from = "RawTestEvent")]
+#[serde(from = "RawTestEvent")]
 #[serde(untagged)]
 pub enum TestEvent {
     /// The event is used, as-is, without modification.
@@ -84,11 +84,9 @@ impl TestEvent {
 #[derive(Clone, Debug, Eq, PartialEq, Snafu)]
 pub enum RawTestEventParseError {}
 
-impl TryFrom<RawTestEvent> for TestEvent {
-    type Error = RawTestEventParseError;
-
-    fn try_from(other: RawTestEvent) -> Result<Self, Self::Error> {
-        Ok(match other {
+impl From<RawTestEvent> for TestEvent {
+    fn from(other: RawTestEvent) -> Self {
+        match other {
             RawTestEvent::Passthrough(event_data) => {
                 TestEvent::Passthrough(event_data.into_event())
             }
@@ -96,7 +94,7 @@ impl TryFrom<RawTestEvent> for TestEvent {
                 modified,
                 event: event.into_event(),
             },
-        })
+        }
     }
 }
 
