@@ -1,3 +1,4 @@
+use crate::encoding::format::common::get_serializer_schema_requirement;
 use bytes::{BufMut, BytesMut};
 use tokio_util::codec::Encoder;
 use vector_core::{
@@ -43,11 +44,7 @@ impl TextSerializerConfig {
 
     /// The schema required by the serializer.
     pub fn schema_requirement(&self) -> schema::Requirement {
-        if let Some(message_key) = log_schema().message_key() {
-            schema::Requirement::empty().required_meaning(message_key.to_string(), Kind::any())
-        } else {
-            schema::Requirement::empty()
-        }
+        get_serializer_schema_requirement()
     }
 }
 
