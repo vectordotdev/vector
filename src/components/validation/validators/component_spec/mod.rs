@@ -50,7 +50,7 @@ impl Validator for ComponentSpecValidator {
             TestCaseExpectation::Success => {
                 if inputs.len() != outputs.len() {
                     return Err(vec![format!(
-                        "Sent {} inputs but only received {} outputs.",
+                        "Sent {} inputs but received {} outputs.",
                         inputs.len(),
                         outputs.len()
                     )]);
