@@ -4,9 +4,9 @@ use lookup::{path, OwnedTargetPath};
 use serde_json::Value as JsonValue;
 use snafu::{OptionExt, ResultExt, Snafu};
 use vector_core::config::{LegacyKey, LogNamespace};
-use vrl::owned_value_path;
 use vrl::path::PathPrefix;
 
+use crate::sources::kubernetes_logs::transform_utils::get_message_field;
 use crate::{
     config::log_schema,
     event::{self, Event, LogEvent, Value},
@@ -53,14 +53,7 @@ impl FunctionTransform for Docker {
 
 /// Parses `message` as json object and removes it.
 fn parse_json(log: &mut LogEvent, log_namespace: LogNamespace) -> Result<(), ParsingError> {
-    let message_field = match log_namespace {
-        LogNamespace::Vector => ".".to_string(),
-        LogNamespace::Legacy => log_schema()
-            .message_key()
-            .expect("global log_schema.message_key to be valid path")
-            .clone()
-            .to_string(),
-    };
+    let message_field = get_message_field(log_namespace);
     let target_path = (PathPrefix::Event, message_field.as_str());
 
     let value = log
@@ -140,14 +133,8 @@ fn normalize_event(
     }
 
     // Parse message, remove trailing newline and detect if it's partial.
-    let message_key = match log_namespace {
-        LogNamespace::Vector => owned_value_path!("."),
-        LogNamespace::Legacy => log_schema()
-            .message_key()
-            .expect("global log_schema.message_key to be valid path")
-            .clone(),
-    };
-    let target_path = (PathPrefix::Event, &message_key);
+    let message_field = get_message_field(log_namespace);
+    let target_path = (PathPrefix::Event, message_field.as_str());
     let message = log.remove(target_path).context(LogFieldMissingSnafu)?;
     let mut message = match message {
         Value::Bytes(val) => val,

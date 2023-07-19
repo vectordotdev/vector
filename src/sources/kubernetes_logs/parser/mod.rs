@@ -5,8 +5,8 @@ mod test_util;
 use vector_core::config::LogNamespace;
 use vrl::path::PathPrefix;
 
+use crate::sources::kubernetes_logs::transform_utils::get_message_field;
 use crate::{
-    config::log_schema,
     event::{Event, Value},
     internal_events::KubernetesLogsFormatPickerEdgeCase,
     transforms::{FunctionTransform, OutputBuffer},
@@ -43,15 +43,7 @@ impl FunctionTransform for Parser {
     fn transform(&mut self, output: &mut OutputBuffer, event: Event) {
         match &mut self.state {
             ParserState::Uninitialized => {
-                let message_field = match self.log_namespace {
-                    LogNamespace::Vector => ".".to_string(),
-                    LogNamespace::Legacy => log_schema()
-                        .message_key()
-                        .expect("global log_schema.message_key to be valid path")
-                        .clone()
-                        .to_string(),
-                };
-
+                let message_field = get_message_field(self.log_namespace);
                 let message = match event
                     .as_log()
                     .get((PathPrefix::Event, message_field.as_str()))

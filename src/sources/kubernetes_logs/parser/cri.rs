@@ -5,6 +5,7 @@ use vector_common::conversion;
 use vector_core::config::{log_schema, LegacyKey, LogNamespace};
 use vrl::path::PathPrefix;
 
+use crate::sources::kubernetes_logs::transform_utils::get_message_field;
 use crate::{
     event::{self, Event, Value},
     internal_events::{
@@ -41,14 +42,7 @@ impl Cri {
 
 impl FunctionTransform for Cri {
     fn transform(&mut self, output: &mut OutputBuffer, mut event: Event) {
-        let message_field = match self.log_namespace {
-            LogNamespace::Vector => ".".to_string(),
-            LogNamespace::Legacy => log_schema()
-                .message_key()
-                .expect("global log_schema.message_key to be valid path")
-                .clone()
-                .to_string(),
-        };
+        let message_field = get_message_field(self.log_namespace);
         let target_path = (PathPrefix::Event, message_field.as_str());
 
         // Get the log field with the message, if it exists, and coerce it to bytes.
