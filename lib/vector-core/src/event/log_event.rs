@@ -20,6 +20,7 @@ use vector_common::{
     request_metadata::{EventCountTags, GetEventCountTags},
     EventDataEq,
 };
+use vrl::path::OwnedValuePath;
 
 use super::{
     estimated_json_encoded_size_of::EstimatedJsonEncodedSizeOf,
@@ -150,9 +151,7 @@ impl LogEvent {
     /// valid for `LogNamespace::Legacy`
     pub fn from_str_legacy(msg: impl Into<String>) -> Self {
         let mut log = LogEvent::default();
-        if let Some(message_key) = log_schema().message_key() {
-            log.insert((PathPrefix::Event, message_key), msg.into());
-        }
+        log.maybe_insert(PathPrefix::Event, log_schema().message_key(), msg.into());
 
         if let Some(timestamp_key) = log_schema().timestamp_key() {
             log.insert((PathPrefix::Event, timestamp_key), Utc::now());
@@ -346,6 +345,17 @@ impl LogEvent {
                 .metadata
                 .value_mut()
                 .insert(path.value_path(), value.into()),
+        }
+    }
+
+    pub fn maybe_insert(
+        &mut self,
+        prefix: PathPrefix,
+        path: Option<&OwnedValuePath>,
+        value: impl Into<Value>,
+    ) {
+        if let Some(path) = path {
+            self.insert((prefix, path), value);
         }
     }
 
@@ -561,10 +571,7 @@ mod test_utils {
     impl From<Bytes> for LogEvent {
         fn from(message: Bytes) -> Self {
             let mut log = LogEvent::default();
-            if let Some(message_key) = log_schema().message_key() {
-                log.insert((PathPrefix::Event, message_key), message);
-            }
-
+            log.maybe_insert(PathPrefix::Event, log_schema().message_key(), message);
             if let Some(timestamp_key) = log_schema().timestamp_key() {
                 log.insert((PathPrefix::Event, timestamp_key), Utc::now());
             }

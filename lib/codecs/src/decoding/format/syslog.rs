@@ -428,9 +428,7 @@ fn insert_fields_from_syslog(
 ) {
     match log_namespace {
         LogNamespace::Legacy => {
-            if let Some(message_key) = log_schema().message_key() {
-                log.insert((PathPrefix::Event, message_key), parsed.msg);
-            }
+            log.maybe_insert(PathPrefix::Event, log_schema().message_key(), parsed.msg);
         }
         LogNamespace::Vector => {
             log.insert(event_path!("message"), parsed.msg);

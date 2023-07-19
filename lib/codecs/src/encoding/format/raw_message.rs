@@ -8,7 +8,6 @@ use vector_core::{
     schema,
 };
 use vrl::path::PathPrefix;
-use vrl::value::Kind;
 
 /// Config used to build a `RawMessageSerializer`.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]

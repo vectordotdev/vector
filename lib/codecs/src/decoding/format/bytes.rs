@@ -63,9 +63,7 @@ impl BytesDeserializer {
             LogNamespace::Vector => log_namespace.new_log_from_data(bytes),
             LogNamespace::Legacy => {
                 let mut log = LogEvent::default();
-                if let Some(message_key) = log_schema().message_key() {
-                    log.insert((PathPrefix::Event, message_key), bytes);
-                }
+                log.maybe_insert(PathPrefix::Event, log_schema().message_key(), bytes);
                 log
             }
         }

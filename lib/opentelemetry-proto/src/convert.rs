@@ -95,9 +95,7 @@ impl ResourceLog {
             LogNamespace::Legacy => {
                 let mut log = LogEvent::default();
                 if let Some(v) = self.log_record.body.and_then(|av| av.value) {
-                    if let Some(message_key) = log_schema().message_key() {
-                        log.insert((PathPrefix::Event, message_key), v);
-                    }
+                    log.maybe_insert(PathPrefix::Event, log_schema().message_key(), v);
                 }
                 log
             }

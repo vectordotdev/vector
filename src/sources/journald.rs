@@ -784,9 +784,7 @@ fn create_log_event_from_record(
             let mut log = LogEvent::from_iter(record).with_batch_notifier_option(batch);
 
             if let Some(message) = log.remove(MESSAGE) {
-                if let Some(message_key) = log_schema().message_key() {
-                    log.insert((PathPrefix::Event, message_key), message);
-                }
+                log.maybe_insert(PathPrefix::Event, log_schema().message_key(), message);
             }
 
             log

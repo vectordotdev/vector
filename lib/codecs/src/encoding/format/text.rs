@@ -7,7 +7,6 @@ use vector_core::{
     schema,
 };
 use vrl::path::PathPrefix;
-use vrl::value::Kind;
 
 use crate::MetricTagValues;
 
