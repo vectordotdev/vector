@@ -1,6 +1,3 @@
-mod sinks;
-mod sources;
-
 use vector_core::event::{Event, Metric, MetricKind};
 
 use crate::components::validation::{
@@ -313,67 +310,3 @@ fn compare_actual_to_expected(
 
     Ok(vec![format!("{}: {}", metric_type, actual)])
 }
-
-// fn validate_events_total(
-//     telemetry_events: &[Event],
-//     metric_type: &ComponentMetricType,
-//     component_name: &str,
-//     expected_events: u64,
-// ) -> Result<Vec<String>, Vec<String>> {
-//     let mut errs: Vec<String> = Vec::new();
-
-//     let metrics =
-//         filter_events_by_metric_and_component(telemetry_events, metric_type, component_name);
-
-//     let actual_events = sum_counters(metric_type, &metrics)?;
-
-//     debug!(
-//         "{}: {} events, {} expected events.",
-//         metric_type, actual_events, expected_events,
-//     );
-
-//     if actual_events != expected_events {
-//         errs.push(format!(
-//             "{}: expected {} events, but received {}",
-//             metric_type, expected_events, actual_events
-//         ));
-//     }
-
-//     if !errs.is_empty() {
-//         return Err(errs);
-//     }
-
-//     Ok(vec![format!("{}: {}", metric_type, actual_events)])
-// }
-
-// fn validate_bytes_total(
-//     telemetry_events: &[Event],
-//     metric_type: &ComponentMetricType,
-//     component_name: &str,
-//     expected_bytes: u64,
-// ) -> Result<Vec<String>, Vec<String>> {
-//     let mut errs: Vec<String> = Vec::new();
-
-//     let metrics =
-//         filter_events_by_metric_and_component(telemetry_events, metric_type, component_name);
-
-//     let actual_bytes = sum_counters(metric_type, &metrics)?;
-
-//     debug!(
-//         "{}: {} bytes, {} expected bytes.",
-//         metric_type, actual_bytes, expected_bytes,
-//     );
-
-//     if actual_bytes != expected_bytes {
-//         errs.push(format!(
-//             "{}: expected {} bytes, but received {}",
-//             metric_type, expected_bytes, actual_bytes
-//         ));
-//     }
-
-//     if !errs.is_empty() {
-//         return Err(errs);
-//     }
-
-//     Ok(vec![format!("{}: {}", metric_type, actual_bytes)])
-// }
