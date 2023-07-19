@@ -132,8 +132,10 @@ pub fn build_uri(
     uri.parse::<Uri>()
 }
 
-pub fn host_key() -> String {
-    crate::config::log_schema().host_key().to_string()
+pub fn config_host_key() -> OptionalValuePath {
+    OptionalValuePath {
+        path: crate::config::log_schema().host_key().cloned(),
+    }
 }
 
 pub fn config_timestamp_key() -> OptionalValuePath {

@@ -328,16 +328,20 @@ impl http_client::HttpClientContext for HttpClientContext {
                     );
                 }
                 Event::Metric(ref mut metric) => {
-                    metric.replace_tag(
-                        log_schema().source_type_key().to_string(),
-                        HttpClientConfig::NAME.to_string(),
-                    );
+                    if let Some(source_type_key) = log_schema().source_type_key() {
+                        metric.replace_tag(
+                            source_type_key.to_string(),
+                            HttpClientConfig::NAME.to_string(),
+                        );
+                    }
                 }
                 Event::Trace(ref mut trace) => {
-                    trace.insert(
-                        log_schema().source_type_key(),
-                        Bytes::from(HttpClientConfig::NAME),
-                    );
+                    if let Some(source_type_key) = log_schema().source_type_key() {
+                        trace.insert(
+                            source_type_key.to_string(),
+                            Bytes::from(HttpClientConfig::NAME),
+                        );
+                    }
                 }
             }
         }

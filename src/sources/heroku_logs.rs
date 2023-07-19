@@ -95,9 +95,10 @@ impl LogplexConfig {
             )
             .with_source_metadata(
                 LogplexConfig::NAME,
-                Some(LegacyKey::InsertIfEmpty(owned_value_path!(
-                    log_schema().host_key()
-                ))),
+                log_schema()
+                    .host_key()
+                    .cloned()
+                    .map(LegacyKey::InsertIfEmpty),
                 &owned_value_path!("host"),
                 Kind::bytes(),
                 Some("host"),
@@ -324,7 +325,7 @@ fn line_to_events(
         let mut buffer = BytesMut::new();
         buffer.put(message.as_bytes());
 
-        let legacy_host_key = parse_value_path(log_schema().host_key()).ok();
+        let legacy_host_key = log_schema().host_key().cloned();
         let legacy_app_key = parse_value_path("app_name").ok();
         let legacy_proc_key = parse_value_path("proc_id").ok();
 
@@ -530,8 +531,8 @@ mod tests {
                     .unwrap()
                     .into()
             );
-            assert_eq!(log[&log_schema().host_key()], "host".into());
-            assert_eq!(log[log_schema().source_type_key()], "heroku_logs".into());
+            assert_eq!(log[log_schema().host_key().unwrap().to_string()], "host".into());
+            assert_eq!(log[log_schema().source_type_key().unwrap().to_string()], "heroku_logs".into());
             assert_eq!(log["appname"], "lumberjack-store".into());
             assert_eq!(log["absent"], Value::Null);
         }).await;
@@ -613,8 +614,14 @@ mod tests {
                 .unwrap()
                 .into()
         );
-        assert_eq!(log[log_schema().host_key()], "host".into());
-        assert_eq!(log[log_schema().source_type_key()], "heroku_logs".into());
+        assert_eq!(
+            log[log_schema().host_key().unwrap().to_string().as_str()],
+            "host".into()
+        );
+        assert_eq!(
+            log[log_schema().source_type_key().unwrap().to_string()],
+            "heroku_logs".into()
+        );
     }
 
     #[test]
@@ -634,7 +641,10 @@ mod tests {
                 log_schema().timestamp_key().unwrap()
             ))
             .is_some());
-        assert_eq!(log[log_schema().source_type_key()], "heroku_logs".into());
+        assert_eq!(
+            log[log_schema().source_type_key().unwrap().to_string()],
+            "heroku_logs".into()
+        );
     }
 
     #[test]
@@ -652,8 +662,14 @@ mod tests {
                 .unwrap()
                 .into()
         );
-        assert_eq!(log[log_schema().host_key()], "host".into());
-        assert_eq!(log[log_schema().source_type_key()], "heroku_logs".into());
+        assert_eq!(
+            log[log_schema().host_key().unwrap().to_string().as_str()],
+            "host".into()
+        );
+        assert_eq!(
+            log[log_schema().source_type_key().unwrap().to_string()],
+            "heroku_logs".into()
+        );
     }
 
     #[test]

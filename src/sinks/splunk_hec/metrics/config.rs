@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use futures_util::FutureExt;
+use lookup::lookup_v2::OptionalValuePath;
 use tower::ServiceBuilder;
 use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
@@ -13,7 +14,7 @@ use crate::{
     sinks::{
         splunk_hec::common::{
             acknowledgements::HecClientAcknowledgementsConfig,
-            build_healthcheck, build_http_batch_service, create_client, host_key,
+            build_healthcheck, build_http_batch_service, config_host_key, create_client,
             service::{HecService, HttpRequestBuilder},
             EndpointTarget, SplunkHecDefaultBatchSettings,
         },
@@ -71,8 +72,8 @@ pub struct HecMetricsSinkConfig {
     ///
     /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
     #[configurable(metadata(docs::advanced))]
-    #[serde(default = "host_key")]
-    pub host_key: String,
+    #[serde(default = "config_host_key")]
+    pub host_key: OptionalValuePath,
 
     /// The name of the index where to send the events to.
     ///
@@ -126,7 +127,7 @@ impl GenerateConfig for HecMetricsSinkConfig {
             default_namespace: None,
             default_token: "${VECTOR_SPLUNK_HEC_TOKEN}".to_owned().into(),
             endpoint: "http://localhost:8088".to_owned(),
-            host_key: host_key(),
+            host_key: config_host_key(),
             index: None,
             sourcetype: None,
             source: None,
@@ -213,7 +214,7 @@ impl HecMetricsSinkConfig {
             sourcetype: self.sourcetype.clone(),
             source: self.source.clone(),
             index: self.index.clone(),
-            host: self.host_key.clone(),
+            host_key: self.host_key.path.clone(),
             default_namespace: self.default_namespace.clone(),
         };
 

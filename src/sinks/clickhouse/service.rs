@@ -19,6 +19,8 @@ use crate::{
 
 #[derive(Debug, Clone)]
 pub struct ClickhouseRequest {
+    pub database: String,
+    pub table: String,
     pub body: Bytes,
     pub compression: Compression,
     pub finalizers: EventFinalizers,
@@ -107,31 +109,28 @@ impl RetryLogic for ClickhouseRetryLogic {
 #[derive(Debug, Clone)]
 pub struct ClickhouseService {
     client: HttpClient,
-    uri: Uri,
     auth: Option<Auth>,
+    endpoint: Uri,
+    skip_unknown_fields: bool,
+    date_time_best_effort: bool,
 }
 
 impl ClickhouseService {
     /// Creates a new `ClickhouseService`.
-    pub fn new(
+    pub const fn new(
         client: HttpClient,
         auth: Option<Auth>,
-        endpoint: &Uri,
-        database: Option<&str>,
-        table: &str,
+        endpoint: Uri,
         skip_unknown_fields: bool,
         date_time_best_effort: bool,
-    ) -> crate::Result<Self> {
-        // Set the URI query once during initialization, as it won't change throughout the lifecycle
-        // of the service.
-        let uri = set_uri_query(
+    ) -> Self {
+        Self {
+            client,
+            auth,
             endpoint,
-            database.unwrap_or("default"),
-            table,
             skip_unknown_fields,
             date_time_best_effort,
-        )?;
-        Ok(Self { client, auth, uri })
+        }
     }
 }
 
@@ -148,22 +147,32 @@ impl Service<ClickhouseRequest> for ClickhouseService {
     // Emission of Error internal event is handled upstream by the caller.
     fn call(&mut self, request: ClickhouseRequest) -> Self::Future {
         let mut client = self.client.clone();
+        let auth = self.auth.clone();
 
-        let mut builder = Request::post(&self.uri)
-            .header(CONTENT_TYPE, "application/x-ndjson")
-            .header(CONTENT_LENGTH, request.body.len());
-        if let Some(ce) = request.compression.content_encoding() {
-            builder = builder.header(CONTENT_ENCODING, ce);
-        }
-        if let Some(auth) = &self.auth {
-            builder = auth.apply_builder(builder);
-        }
-
-        let http_request = builder
-            .body(Body::from(request.body))
-            .expect("building HTTP request failed unexpectedly");
+        // Build the URI outside of the boxed future to avoid unnecessary clones.
+        let uri = set_uri_query(
+            &self.endpoint,
+            &request.database,
+            &request.table,
+            self.skip_unknown_fields,
+            self.date_time_best_effort,
+        );
 
         Box::pin(async move {
+            let mut builder = Request::post(&uri?)
+                .header(CONTENT_TYPE, "application/x-ndjson")
+                .header(CONTENT_LENGTH, request.body.len());
+            if let Some(ce) = request.compression.content_encoding() {
+                builder = builder.header(CONTENT_ENCODING, ce);
+            }
+            if let Some(auth) = auth {
+                builder = auth.apply_builder(builder);
+            }
+
+            let http_request = builder
+                .body(Body::from(request.body))
+                .expect("building HTTP request failed unexpectedly");
+
             let response = client.call(http_request).in_current_span().await?;
             let (parts, body) = response.into_parts();
             let body = body::to_bytes(body).await?;
