@@ -1166,7 +1166,10 @@ impl ContainerLogInfo {
                         LogNamespace::Legacy => {
                             partial_event_merge_state.merge_in_next_event(
                                 log,
-                                &[log_schema().message_key().unwrap().to_string()],
+                                &[log_schema()
+                                    .message_key()
+                                    .expect("global log_schema.message_key to be valid path")
+                                    .to_string()],
                             );
                         }
                     }
@@ -1189,7 +1192,10 @@ impl ContainerLogInfo {
                     }
                     LogNamespace::Legacy => partial_event_merge_state.merge_in_final_event(
                         log,
-                        &[log_schema().message_key().unwrap().to_string()],
+                        &[log_schema()
+                            .message_key()
+                            .expect("global log_schema.message_key to be valid path")
+                            .to_string()],
                     ),
                 },
                 None => log,
