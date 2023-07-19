@@ -13,8 +13,8 @@ use vector_core::{config::DataType, event::Event};
 
 use crate::codecs::{Decoder, DecodingConfig, Encoder, EncodingConfig, EncodingConfigWithFraming};
 
-pub use self::event::{EventData, TestEvent};
-pub use self::http::{encode_test_event, HttpResourceConfig};
+pub use self::event::{encode_test_event, TestEvent};
+pub use self::http::HttpResourceConfig;
 
 use super::sync::{Configuring, TaskCoordinator};
 
@@ -308,7 +308,7 @@ impl ExternalResource {
     /// Spawns this resource for use as an output for a sink.
     pub fn spawn_as_output(
         self,
-        output_tx: mpsc::Sender<Event>,
+        output_tx: mpsc::Sender<Vec<Event>>,
         task_coordinator: &TaskCoordinator<Configuring>,
     ) {
         match self.definition {
