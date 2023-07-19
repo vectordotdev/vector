@@ -36,6 +36,8 @@ pub(crate) struct GenericHttpClientInputs {
     pub urls: Vec<Uri>,
     /// Interval between calls.
     pub interval: Duration,
+    /// Timeout for the HTTP request.
+    pub target_timeout: Duration,
     /// Map of Header+Value to apply to HTTP request.
     pub headers: HashMap<String, Vec<String>>,
     /// Content type of the HTTP request, determined by the source.
@@ -52,7 +54,9 @@ pub(crate) const fn default_interval() -> Duration {
 }
 
 /// The default timeout for the HTTP request if none is configured.
-const DEFAULT_TARGET_TIMEOUT: Duration = Duration::from_secs(5);
+pub(crate) const fn default_target_timeout() -> Duration {
+    Duration::from_secs(5)
+}
 
 /// Builds the context, allowing the source-specific implementation to leverage data from the
 /// config and the current HTTP request.
@@ -160,7 +164,7 @@ pub(crate) async fn call<
             }
 
             let start = Instant::now();
-            let timeout = std::cmp::min(DEFAULT_TARGET_TIMEOUT, inputs.interval);
+            let timeout = std::cmp::min(inputs.target_timeout, inputs.interval);
             tokio::time::timeout(timeout, client.send(request))
                 .then(move |result| async move {
                     match result {

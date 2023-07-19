@@ -11,6 +11,7 @@ use vector_core::{config::LogNamespace, event::Event};
 
 use super::parser;
 use crate::sources::util::http::HttpMethod;
+use crate::sources::util::http_client::default_target_timeout;
 use crate::{
     config::{GenerateConfig, SourceConfig, SourceContext, SourceOutput},
     http::Auth,
@@ -59,6 +60,13 @@ pub struct PrometheusScrapeConfig {
     #[serde(rename = "scrape_interval_secs")]
     #[configurable(metadata(docs::human_name = "Scrape Interval"))]
     interval: Duration,
+
+    /// The timeout for each scrape request, in seconds.
+    #[serde(default = "default_target_timeout")]
+    #[serde_as(as = "serde_with::DurationSeconds<u64>")]
+    #[serde(rename = "scrape_target_timeout_secs")]
+    #[configurable(metadata(docs::human_name = "Scrape Target Timeout"))]
+    target_timeout: Duration,
 
     /// The tag name added to each event representing the scraped instance's `host:port`.
     ///
@@ -114,6 +122,7 @@ impl GenerateConfig for PrometheusScrapeConfig {
         toml::Value::try_from(Self {
             endpoints: vec!["http://localhost:9090/metrics".to_string()],
             interval: default_interval(),
+            target_timeout: default_target_timeout(),
             instance_tag: Some("instance".to_string()),
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: false,
@@ -146,6 +155,7 @@ impl SourceConfig for PrometheusScrapeConfig {
         let inputs = GenericHttpClientInputs {
             urls,
             interval: self.interval,
+            target_timeout: self.target_timeout,
             headers: HashMap::new(),
             content_type: "text/plain".to_string(),
             auth: self.auth.clone(),
@@ -351,6 +361,7 @@ mod test {
         let config = PrometheusScrapeConfig {
             endpoints: vec![format!("http://{}/metrics", in_addr)],
             interval: Duration::from_secs(1),
+            target_timeout: default_target_timeout(),
             instance_tag: Some("instance".to_string()),
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: true,
@@ -384,6 +395,7 @@ mod test {
         let config = PrometheusScrapeConfig {
             endpoints: vec![format!("http://{}/metrics", in_addr)],
             interval: Duration::from_secs(1),
+            target_timeout: default_target_timeout(),
             instance_tag: Some("instance".to_string()),
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: true,
@@ -435,6 +447,7 @@ mod test {
         let config = PrometheusScrapeConfig {
             endpoints: vec![format!("http://{}/metrics", in_addr)],
             interval: Duration::from_secs(1),
+            target_timeout: default_target_timeout(),
             instance_tag: Some("instance".to_string()),
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: false,
@@ -500,6 +513,7 @@ mod test {
         let config = PrometheusScrapeConfig {
             endpoints: vec![format!("http://{}/metrics", in_addr)],
             interval: Duration::from_secs(1),
+            target_timeout: default_target_timeout(),
             instance_tag: Some("instance".to_string()),
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: true,
@@ -555,6 +569,7 @@ mod test {
         let config = PrometheusScrapeConfig {
             endpoints: vec![format!("http://{}/metrics?key1=val1", in_addr)],
             interval: Duration::from_secs(1),
+            target_timeout: default_target_timeout(),
             instance_tag: Some("instance".to_string()),
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: false,
@@ -668,6 +683,7 @@ mod test {
                 honor_labels: false,
                 query: HashMap::new(),
                 interval: Duration::from_secs(1),
+                target_timeout: default_target_timeout(),
                 tls: None,
                 auth: None,
             },
