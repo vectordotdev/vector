@@ -179,7 +179,10 @@ impl Compose {
                 // Inject the networks block
                 config.networks.insert(
                     "default".to_string(),
-                    BTreeMap::from_iter([("name".to_string(), network.clone())]),
+                    BTreeMap::from_iter([
+                        ("name".to_string(), network.clone()),
+                        ("external".to_string(), "true".to_string()),
+                    ]),
                 );
 
                 // Create a named tempfile, there may be resource leakage here in case of SIGINT

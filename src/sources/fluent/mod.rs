@@ -135,8 +135,9 @@ impl FluentConfig {
     /// Builds the `schema::Definition` for this source using the provided `LogNamespace`.
     fn schema_definition(&self, log_namespace: LogNamespace) -> Definition {
         // `host_key` is only inserted if not present already.
-        let host_key = parse_value_path(log_schema().host_key())
-            .ok()
+        let host_key = log_schema()
+            .host_key()
+            .cloned()
             .map(LegacyKey::InsertIfEmpty);
 
         let tag_key = parse_value_path("tag").ok().map(LegacyKey::Overwrite);
@@ -209,7 +210,7 @@ impl FluentSource {
     fn new(log_namespace: LogNamespace) -> Self {
         Self {
             log_namespace,
-            legacy_host_key_path: parse_value_path(log_schema().host_key()).ok(),
+            legacy_host_key_path: log_schema().host_key().cloned(),
         }
     }
 }
@@ -587,7 +588,7 @@ impl From<FluentEvent<'_>> for LogEvent {
 
         log_namespace.insert_vector_metadata(
             &mut log,
-            Some(log_schema().source_type_key()),
+            log_schema().source_type_key(),
             path!("source_type"),
             Bytes::from_static(FluentConfig::NAME.as_bytes()),
         );
@@ -665,7 +666,7 @@ mod tests {
         Event::Log(LogEvent::from(BTreeMap::from([
             (String::from("message"), Value::from(name)),
             (
-                String::from(log_schema().source_type_key()),
+                log_schema().source_type_key().unwrap().to_string(),
                 Value::from(FluentConfig::NAME),
             ),
             (String::from("tag"), Value::from("tag.name")),

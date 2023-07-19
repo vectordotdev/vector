@@ -25,11 +25,11 @@ pub struct ClickhouseConfig {
 
     /// The table that data is inserted into.
     #[configurable(metadata(docs::examples = "mytable"))]
-    pub table: String,
+    pub table: Template,
 
     /// The database that contains the table that data is inserted into.
     #[configurable(metadata(docs::examples = "mydatabase"))]
-    pub database: Option<String>,
+    pub database: Option<Template>,
 
     /// Sets `input_format_skip_unknown_fields`, allowing ClickHouse to discard fields not present in the table schema.
     #[serde(default)]
@@ -90,12 +90,10 @@ impl SinkConfig for ClickhouseConfig {
         let service = ClickhouseService::new(
             client.clone(),
             auth.clone(),
-            &endpoint,
-            self.database.as_deref(),
-            self.table.as_str(),
+            endpoint.clone(),
             self.skip_unknown_fields,
             self.date_time_best_effort,
-        )?;
+        );
 
         let request_limits = self.request.unwrap_with(&Default::default());
         let service = ServiceBuilder::new()
@@ -103,12 +101,19 @@ impl SinkConfig for ClickhouseConfig {
             .service(service);
 
         let batch_settings = self.batch.into_batcher_settings()?;
+        let database = self.database.clone().unwrap_or_else(|| {
+            "default"
+                .try_into()
+                .expect("'default' should be a valid template")
+        });
         let sink = ClickhouseSink::new(
             batch_settings,
             self.compression,
             self.encoding.clone(),
             service,
             protocol,
+            database,
+            self.table.clone(),
         );
 
         let healthcheck = Box::pin(healthcheck(client, endpoint, auth));
@@ -126,7 +131,6 @@ impl SinkConfig for ClickhouseConfig {
 }
 
 async fn healthcheck(client: HttpClient, endpoint: Uri, auth: Option<Auth>) -> crate::Result<()> {
-    // TODO: check if table exists?
     let uri = format!("{}/?query=SELECT%201", endpoint);
     let mut request = Request::get(uri).body(Body::empty()).unwrap();
 

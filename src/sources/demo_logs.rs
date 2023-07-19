@@ -48,7 +48,7 @@ pub struct DemoLogsConfig {
     #[derivative(Default(value = "default_interval()"))]
     #[serde(default = "default_interval")]
     #[configurable(metadata(docs::examples = 1.0, docs::examples = 0.1, docs::examples = 0.01,))]
-    #[serde_as(as = "serde_with::DurationSeconds<f64>")]
+    #[serde_as(as = "serde_with::DurationSecondsWithFrac<f64>")]
     pub interval: Duration,
 
     /// The total number of lines to output.

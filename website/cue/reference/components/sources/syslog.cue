@@ -103,7 +103,7 @@ components: sources: syslog: {
 				}
 			}
 			source_ip: {
-				description: "The upstream hostname. In the case where `mode` = `\"unix\"` the socket path will be used. (`host` is also this value if `hostname` does not exist in the log.)"
+				description: "The IP address of the client. In the case where `mode` = `\"unix\"` the socket path will be used."
 				required:    true
 				type: string: {
 					examples: ["127.0.0.1"]

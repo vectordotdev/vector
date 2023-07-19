@@ -142,11 +142,11 @@ fn handle_dd_trace_payload_v1(
                     .set_datadog_api_key(Arc::clone(k));
             }
             trace_event.insert(
-                source.log_schema_source_type_key,
+                source.log_schema_source_type_key.as_str(),
                 Bytes::from("datadog_agent"),
             );
             trace_event.insert("payload_version", "v2".to_string());
-            trace_event.insert(source.log_schema_host_key, hostname.clone());
+            trace_event.insert(source.log_schema_host_key.as_str(), hostname.clone());
             trace_event.insert("env", env.clone());
             trace_event.insert("agent_version", agent_version.clone());
             trace_event.insert("target_tps", target_tps);
@@ -255,11 +255,11 @@ fn handle_dd_trace_payload_v0(
                 trace_event.insert("language_name", lang.clone());
             }
             trace_event.insert(
-                source.log_schema_source_type_key,
+                source.log_schema_source_type_key.as_str(),
                 Bytes::from("datadog_agent"),
             );
             trace_event.insert("payload_version", "v1".to_string());
-            trace_event.insert(source.log_schema_host_key, hostname.clone());
+            trace_event.insert(source.log_schema_host_key.as_str(), hostname.clone());
             trace_event.insert("env", env.clone());
             Event::Trace(trace_event)
         })
