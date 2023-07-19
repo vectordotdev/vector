@@ -25,7 +25,7 @@ impl BytesDeserializerConfig {
 
     /// Build the `BytesDeserializer` from this configuration.
     pub fn build(&self) -> BytesDeserializer {
-        BytesDeserializer {}
+        BytesDeserializer
     }
 
     /// Return the type of event build by this deserializer.
@@ -54,7 +54,7 @@ impl BytesDeserializerConfig {
 /// This deserializer can be considered as the no-op action for input where no
 /// further decoding has been specified.
 #[derive(Debug, Clone)]
-pub struct BytesDeserializer {}
+pub struct BytesDeserializer;
 
 impl BytesDeserializer {
     /// Deserializes the given bytes, which will always produce a single `LogEvent`.
@@ -93,7 +93,7 @@ mod tests {
     #[test]
     fn deserialize_bytes_legacy_namespace() {
         let input = Bytes::from("foo");
-        let deserializer = BytesDeserializer {};
+        let deserializer = BytesDeserializer;
 
         let events = deserializer.parse(input, LogNamespace::Legacy).unwrap();
         let mut events = events.into_iter();
@@ -113,7 +113,7 @@ mod tests {
     #[test]
     fn deserialize_bytes_vector_namespace() {
         let input = Bytes::from("foo");
-        let deserializer = BytesDeserializer {};
+        let deserializer = BytesDeserializer;
 
         let events = deserializer.parse(input, LogNamespace::Vector).unwrap();
         assert_eq!(events.len(), 1);

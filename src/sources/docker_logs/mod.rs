@@ -1059,7 +1059,7 @@ impl ContainerLogInfo {
         };
 
         // Build the log.
-        let deserializer = BytesDeserializer {};
+        let deserializer = BytesDeserializer;
         let mut log = deserializer.parse_single(bytes_message, log_namespace);
 
         // Container ID

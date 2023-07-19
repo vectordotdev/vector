@@ -897,7 +897,7 @@ fn create_event(
     ingestion_timestamp_field: Option<&OwnedTargetPath>,
     log_namespace: LogNamespace,
 ) -> Event {
-    let deserializer = BytesDeserializer {};
+    let deserializer = BytesDeserializer;
     let mut log = deserializer.parse_single(line, log_namespace);
 
     log_namespace.insert_source_metadata(

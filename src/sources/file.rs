@@ -746,7 +746,7 @@ fn create_event(
     meta: &EventMetadata,
     log_namespace: LogNamespace,
 ) -> LogEvent {
-    let deserializer = BytesDeserializer {};
+    let deserializer = BytesDeserializer;
     let mut event = deserializer.parse_single(line, log_namespace);
 
     log_namespace.insert_vector_metadata(

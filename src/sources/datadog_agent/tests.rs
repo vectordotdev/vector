@@ -85,7 +85,7 @@ fn test_decode_log_body() {
         let api_key = None;
         let decoder = crate::codecs::Decoder::new(
             Framer::Bytes(BytesDecoder::new()),
-            Deserializer::Bytes(BytesDeserializer {}),
+            Deserializer::Bytes(BytesDeserializer),
         );
 
         let source = DatadogAgentSource::new(
