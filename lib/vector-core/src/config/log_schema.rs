@@ -6,6 +6,12 @@ use vector_config::configurable_component;
 static LOG_SCHEMA: OnceCell<LogSchema> = OnceCell::new();
 static LOG_SCHEMA_DEFAULT: Lazy<LogSchema> = Lazy::new(LogSchema::default);
 
+const MESSAGE: &str = "message";
+const TIMESTAMP: &str = "timestamp";
+const HOST: &str = "host";
+const SOURCE_TYPE: &str = "source_type";
+const METADATA: &str = "metadata";
+
 /// Loads Log Schema from configurations and sets global schema. Once this is
 /// done, configurations can be correctly loaded using configured log schema
 /// defaults.
@@ -84,23 +90,23 @@ impl Default for LogSchema {
 
 impl LogSchema {
     fn default_message_key() -> OptionalValuePath {
-        OptionalValuePath::new("message")
+        OptionalValuePath::new(MESSAGE)
     }
 
     fn default_timestamp_key() -> OptionalValuePath {
-        OptionalValuePath::new("timestamp")
+        OptionalValuePath::new(TIMESTAMP)
     }
 
     fn default_host_key() -> OptionalValuePath {
-        OptionalValuePath::new("host")
+        OptionalValuePath::new(HOST)
     }
 
     fn default_source_type_key() -> OptionalValuePath {
-        OptionalValuePath::new("source_type")
+        OptionalValuePath::new(SOURCE_TYPE)
     }
 
     fn default_metadata_key() -> String {
-        String::from("metadata")
+        String::from(METADATA)
     }
 
     pub fn message_key(&self) -> Option<&OwnedValuePath> {
