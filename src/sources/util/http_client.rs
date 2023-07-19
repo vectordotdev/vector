@@ -25,7 +25,7 @@ use crate::{
     },
     sources::util::http::HttpMethod,
     tls::TlsSettings,
-    Error, SourceSender,
+    SourceSender,
 };
 use vector_common::shutdown::ShutdownSignal;
 use vector_core::{config::proxy::ProxyConfig, event::Event, EstimatedJsonEncodedSizeOf};
@@ -50,6 +50,9 @@ pub(crate) struct GenericHttpClientInputs {
 pub(crate) const fn default_interval() -> Duration {
     Duration::from_secs(15)
 }
+
+/// The default timeout for the HTTP request if none is configured.
+const DEFAULT_TARGET_TIMEOUT: Duration = Duration::from_secs(5);
 
 /// Builds the context, allowing the source-specific implementation to leverage data from the
 /// config and the current HTTP request.
@@ -157,9 +160,19 @@ pub(crate) async fn call<
             }
 
             let start = Instant::now();
-            client
-                .send(request)
-                .map_err(Error::from)
+            let timeout = std::cmp::min(DEFAULT_TARGET_TIMEOUT, inputs.interval);
+            tokio::time::timeout(timeout, client.send(request))
+                .then(move |result| async move {
+                    match result {
+                        Ok(Ok(response)) => Ok(response),
+                        Ok(Err(error)) => Err(error.into()),
+                        Err(_) => Err(format!(
+                            "Timeout error: request exceeded {}s",
+                            timeout.as_secs_f32()
+                        )
+                        .into()),
+                    }
+                })
                 .and_then(|response| async move {
                     let (header, body) = response.into_parts();
                     let body = hyper::body::to_bytes(body).await?;
@@ -224,8 +237,9 @@ pub(crate) async fn call<
                     })
                 })
                 .flatten()
+                .boxed()
         })
-        .flatten()
+        .flatten_unordered(None)
         .boxed();
 
     match out.send_event_stream(&mut stream).await {
