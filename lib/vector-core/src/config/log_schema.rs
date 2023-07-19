@@ -1,7 +1,8 @@
-use lookup::lookup_v2::{parse_target_path, OptionalValuePath};
-use lookup::{owned_value_path, OwnedTargetPath, OwnedValuePath};
+use lookup::lookup_v2::OptionalValuePath;
+use lookup::{OwnedTargetPath, OwnedValuePath};
 use once_cell::sync::{Lazy, OnceCell};
 use vector_config::configurable_component;
+use vrl::path::parse_target_path;
 
 static LOG_SCHEMA: OnceCell<LogSchema> = OnceCell::new();
 static LOG_SCHEMA_DEFAULT: Lazy<LogSchema> = Lazy::new(LogSchema::default);
@@ -54,13 +55,13 @@ pub struct LogSchema {
     /// This field will generally represent a real host, or container, that generated the message,
     /// but is somewhat source-dependent.
     #[serde(default = "LogSchema::default_host_key")]
-    host_key: String,
+    host_key: OptionalValuePath,
 
     /// The name of the event field to set the source identifier in.
     ///
     /// This field will be set by the Vector source that the event was created in.
     #[serde(default = "LogSchema::default_source_type_key")]
-    source_type_key: String,
+    source_type_key: OptionalValuePath,
 
     /// The name of the event field to set the event metadata in.
     ///
@@ -88,17 +89,15 @@ impl LogSchema {
     }
 
     fn default_timestamp_key() -> OptionalValuePath {
-        OptionalValuePath {
-            path: Some(owned_value_path!("timestamp")),
-        }
+        OptionalValuePath::new("timestamp")
     }
 
-    fn default_host_key() -> String {
-        String::from("host")
+    fn default_host_key() -> OptionalValuePath {
+        OptionalValuePath::new("host")
     }
 
-    fn default_source_type_key() -> String {
-        String::from("source_type")
+    fn default_source_type_key() -> OptionalValuePath {
+        OptionalValuePath::new("source_type")
     }
 
     fn default_metadata_key() -> String {
@@ -122,12 +121,12 @@ impl LogSchema {
         self.timestamp_key.path.as_ref()
     }
 
-    pub fn host_key(&self) -> &str {
-        &self.host_key
+    pub fn host_key(&self) -> Option<&OwnedValuePath> {
+        self.host_key.path.as_ref()
     }
 
-    pub fn source_type_key(&self) -> &str {
-        &self.source_type_key
+    pub fn source_type_key(&self) -> Option<&OwnedValuePath> {
+        self.source_type_key.path.as_ref()
     }
 
     pub fn metadata_key(&self) -> &str {
@@ -142,12 +141,12 @@ impl LogSchema {
         self.timestamp_key = OptionalValuePath { path: v };
     }
 
-    pub fn set_host_key(&mut self, v: String) {
-        self.host_key = v;
+    pub fn set_host_key(&mut self, path: Option<OwnedValuePath>) {
+        self.host_key = OptionalValuePath { path };
     }
 
-    pub fn set_source_type_key(&mut self, v: String) {
-        self.source_type_key = v;
+    pub fn set_source_type_key(&mut self, path: Option<OwnedValuePath>) {
+        self.source_type_key = OptionalValuePath { path };
     }
 
     pub fn set_metadata_key(&mut self, v: String) {
@@ -170,7 +169,7 @@ impl LogSchema {
             {
                 errors.push("conflicting values for 'log_schema.host_key' found".to_owned());
             } else {
-                self.set_host_key(other.host_key().to_string());
+                self.set_host_key(other.host_key().cloned());
             }
             if self.message_key() != LOG_SCHEMA_DEFAULT.message_key()
                 && self.message_key() != other.message_key()
@@ -191,7 +190,7 @@ impl LogSchema {
             {
                 errors.push("conflicting values for 'log_schema.source_type_key' found".to_owned());
             } else {
-                self.set_source_type_key(other.source_type_key().to_string());
+                self.set_source_type_key(other.source_type_key().cloned());
             }
             if self.metadata_key() != LOG_SCHEMA_DEFAULT.metadata_key()
                 && self.metadata_key() != other.metadata_key()

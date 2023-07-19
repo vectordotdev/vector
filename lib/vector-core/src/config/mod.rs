@@ -476,7 +476,7 @@ impl LogNamespace {
     ) {
         self.insert_vector_metadata(
             log,
-            Some(log_schema().source_type_key()),
+            log_schema().source_type_key(),
             path!("source_type"),
             Bytes::from_static(source_name.as_bytes()),
         );
@@ -551,14 +551,15 @@ mod test {
     use chrono::Utc;
     use lookup::{event_path, owned_value_path, OwnedTargetPath};
     use vector_common::btreemap;
+    use vrl::path::OwnedValuePath;
     use vrl::value::Kind;
 
     #[test]
     fn test_insert_standard_vector_source_metadata() {
-        let nested_path = "a.b.c.d";
+        let nested_path = "a.b.c.d".to_string();
 
         let mut schema = LogSchema::default();
-        schema.set_source_type_key(nested_path.to_owned());
+        schema.set_source_type_key(Some(OwnedValuePath::try_from(nested_path).unwrap()));
         init_log_schema(schema, false);
 
         let namespace = LogNamespace::Legacy;

@@ -75,7 +75,9 @@ async fn ensure_required_fields(event: Event) -> Option<Event> {
     }
 
     if !log.contains("source_type_name") {
-        log.rename_key(log.source_type_path(), "source_type_name")
+        if let Some(source_type_path) = log.source_type_path() {
+            log.rename_key(source_type_path.as_str(), "source_type_name")
+        }
     }
 
     Some(Event::from(log))

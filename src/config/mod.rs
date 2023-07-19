@@ -843,7 +843,10 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!("host", config.global.log_schema.host_key().to_string());
+        assert_eq!(
+            "host",
+            config.global.log_schema.host_key().unwrap().to_string()
+        );
         assert_eq!(
             "message",
             config.global.log_schema.message_key().to_string()
@@ -879,7 +882,10 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!("this", config.global.log_schema.host_key().to_string());
+        assert_eq!(
+            "this",
+            config.global.log_schema.host_key().unwrap().to_string()
+        );
         assert_eq!("that", config.global.log_schema.message_key().to_string());
         assert_eq!(
             "then",

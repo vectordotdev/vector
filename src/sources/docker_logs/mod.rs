@@ -14,8 +14,7 @@ use chrono::{DateTime, FixedOffset, Local, ParseError, Utc};
 use codecs::{BytesDeserializer, BytesDeserializerConfig};
 use futures::{Stream, StreamExt};
 use lookup::{
-    lookup_v2::{parse_value_path, OptionalValuePath},
-    metadata_path, owned_value_path, path, OwnedValuePath, PathPrefix,
+    lookup_v2::OptionalValuePath, metadata_path, owned_value_path, path, OwnedValuePath, PathPrefix,
 };
 use once_cell::sync::Lazy;
 use serde_with::serde_as;
@@ -189,7 +188,7 @@ impl Default for DockerLogsConfig {
 }
 
 fn default_host_key() -> OptionalValuePath {
-    OptionalValuePath::from(owned_value_path!(log_schema().host_key()))
+    log_schema().host_key().cloned().into()
 }
 
 fn default_partial_event_marker_field() -> Option<String> {
@@ -338,9 +337,7 @@ impl SourceConfig for DockerLogsConfig {
                 Some("timestamp"),
             )
             .with_vector_metadata(
-                parse_value_path(log_schema().source_type_key())
-                    .ok()
-                    .as_ref(),
+                log_schema().source_type_key(),
                 &owned_value_path!("source_type"),
                 Kind::bytes(),
                 None,
@@ -1119,7 +1116,7 @@ impl ContainerLogInfo {
 
         log_namespace.insert_vector_metadata(
             &mut log,
-            Some(log_schema().source_type_key()),
+            log_schema().source_type_key(),
             path!("source_type"),
             Bytes::from_static(DockerLogsConfig::NAME.as_bytes()),
         );

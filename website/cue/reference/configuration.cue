@@ -251,16 +251,28 @@ configuration: {
 				}
 			}
 		}
-		log_namespacing: {
-			common:      false
+		schema: {
+			common: false
 			description: """
-				Globally enables / disables log namespacing. See [Log Namespacing](\(urls.log_namespacing_blog))
-				for more details. If you want to enable individual sources, there is a config
-				option in the source configuration.
+				Configures options for how Vector handles event schema.
 				"""
-			required:    false
-			warnings: []
-			type: bool: default: false
+			required: false
+			type: object: {
+				examples: []
+				options: {
+					log_namespacing: {
+						common:      false
+						description: """
+							Globally enables / disables log namespacing. See [Log Namespacing](\(urls.log_namespacing_blog))
+							for more details. If you want to enable individual sources, there is a config
+							option in the source configuration.
+							"""
+						required:    false
+						warnings: []
+						type: bool: default: false
+					}
+				}
+			}
 		}
 
 		telemetry: {
@@ -277,7 +289,7 @@ configuration: {
 						description: """
 							Controls which tags should be included with the `vector_component_sent_events_total` and
 							`vector_component_sent_event_bytes_total` metrics.
-						"""
+							"""
 						type: object: {
 							examples: []
 							options: {
