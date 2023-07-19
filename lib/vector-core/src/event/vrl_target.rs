@@ -52,7 +52,7 @@ pub struct TargetIter<T> {
     _marker: PhantomData<T>,
 }
 
-fn create_log_event(metadata: EventMetadata, value: Value) -> LogEvent {
+fn create_log_event(value: Value, metadata: EventMetadata) -> LogEvent {
     let mut log = LogEvent::new_with_metadata(metadata);
     if let Some(message_key) = log_schema().message_key() {
         log.insert((PathPrefix::Event, message_key), value);
@@ -67,7 +67,7 @@ impl Iterator for TargetIter<LogEvent> {
         self.iter.next().map(|v| {
             match v {
                 value @ Value::Object(_) => LogEvent::from_parts(value, self.metadata.clone()),
-                value => create_log_event(self.metadata.clone(), value),
+                value => create_log_event(value, self.metadata.clone()),
             }
             .into()
         })
@@ -83,7 +83,7 @@ impl Iterator for TargetIter<TraceEvent> {
                 value @ Value::Object(_) => {
                     TraceEvent::from(LogEvent::from_parts(value, self.metadata.clone()))
                 }
-                value => TraceEvent::from(create_log_event(self.metadata.clone(), value)),
+                value => TraceEvent::from(create_log_event(value, self.metadata.clone())),
             }
             .into()
         })
@@ -150,7 +150,7 @@ impl VrlTarget {
                     LogNamespace::Vector => {
                         TargetEvents::One(LogEvent::from_parts(v, metadata).into())
                     }
-                    LogNamespace::Legacy => TargetEvents::One(create_log_event(metadata, v).into()),
+                    LogNamespace::Legacy => TargetEvents::One(create_log_event(v, metadata).into()),
                 },
             },
             VrlTarget::Trace(value, metadata) => match value {
@@ -165,7 +165,7 @@ impl VrlTarget {
                     _marker: PhantomData,
                 }),
 
-                v => TargetEvents::One(create_log_event(metadata, v).into()),
+                v => TargetEvents::One(create_log_event(v, metadata).into()),
             },
             VrlTarget::Metric { metric, .. } => TargetEvents::One(Event::Metric(metric)),
         }

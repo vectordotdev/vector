@@ -112,7 +112,7 @@ impl LogSchema {
     ///
     /// This should only be used where the result will either be cached,
     /// or performance isn't critical, since this requires parsing / memory allocation.
-    pub fn owned_legacy_message_path(&self) -> OwnedTargetPath {
+    pub fn owned_message_path(&self) -> OwnedTargetPath {
         OwnedTargetPath::event(self.message_key.clone().path.expect("valid message key"))
     }
 
