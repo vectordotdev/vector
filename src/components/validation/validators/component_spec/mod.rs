@@ -102,7 +102,7 @@ fn validate_telemetry(
         ComponentMetricType::SentEventsTotal,
         ComponentMetricType::SentEventBytesTotal,
         ComponentMetricType::SentBytesTotal,
-        ComponentMetricType::EventsDropped,
+        ComponentMetricType::DiscardedEventsTotal,
     ];
 
     metric_types.iter().for_each(|metric_type| {
@@ -144,7 +144,7 @@ fn validate_metric(
 
             compare_actual_to_expected(
                 telemetry_events,
-                &ComponentMetricType::EventsReceived,
+                metric_type,
                 component_name,
                 expected_events,
             )
@@ -156,7 +156,7 @@ fn validate_metric(
 
             compare_actual_to_expected(
                 telemetry_events,
-                &ComponentMetricType::EventsReceivedBytes,
+                metric_type,
                 component_name,
                 expected_bytes,
             )
@@ -171,7 +171,7 @@ fn validate_metric(
             };
             compare_actual_to_expected(
                 telemetry_events,
-                &ComponentMetricType::ReceivedBytesTotal,
+                metric_type,
                 component_name,
                 expected_bytes,
             )
@@ -183,7 +183,7 @@ fn validate_metric(
 
             compare_actual_to_expected(
                 telemetry_events,
-                &ComponentMetricType::SentEventsTotal,
+                metric_type,
                 component_name,
                 expected_events,
             )
@@ -199,7 +199,7 @@ fn validate_metric(
 
             compare_actual_to_expected(
                 telemetry_events,
-                &ComponentMetricType::SentBytesTotal,
+                metric_type,
                 component_name,
                 expected_bytes,
             )
@@ -211,14 +211,20 @@ fn validate_metric(
 
             compare_actual_to_expected(
                 telemetry_events,
-                &ComponentMetricType::SentEventBytesTotal,
+                metric_type,
                 component_name,
                 expected_bytes,
             )
         }
-        ComponentMetricType::EventsDropped => {
-            // TODO
-            Ok(vec![])
+        ComponentMetricType::DiscardedEventsTotal => {
+            let expected_events = runner_metrics.discarded_events_total;
+
+            compare_actual_to_expected(
+                telemetry_events,
+                metric_type,
+                component_name,
+                expected_events,
+            )
         }
     }
 }
