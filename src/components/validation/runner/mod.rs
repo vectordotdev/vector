@@ -5,6 +5,7 @@ mod telemetry;
 use std::{collections::HashMap, path::PathBuf, sync::Arc, time::Duration};
 
 use bytes::BytesMut;
+use chrono::Utc;
 use tokio::{
     runtime::Builder,
     select,
@@ -17,7 +18,7 @@ use tokio::{
 use tokio_util::codec::Encoder as _;
 
 use codecs::encoding;
-use vector_core::{event::Event, EstimatedJsonEncodedSizeOf};
+use vector_core::{config::LogNamespace, event::Event, EstimatedJsonEncodedSizeOf};
 
 use crate::{
     codecs::Encoder,
@@ -296,12 +297,16 @@ impl Runner {
             let skip_input_driver_metrics =
                 self.configuration.component_type == ComponentType::Source;
 
+            let source_is_controlled_edge =
+                self.configuration.component_type != ComponentType::Source;
+
             let input_driver = spawn_input_driver(
                 test_case.events.clone(),
                 input_tx,
                 &runner_metrics,
                 maybe_runner_encoder.as_ref().cloned(),
                 skip_input_driver_metrics,
+                source_is_controlled_edge,
             );
 
             let skip_output_driver_metrics =
@@ -531,8 +536,12 @@ fn spawn_input_driver(
     runner_metrics: &Arc<Mutex<RunnerMetrics>>,
     mut maybe_encoder: Option<Encoder<encoding::Framer>>,
     _skip_input_driver_metrics: bool,
+    source_is_controlled_edge: bool,
 ) -> JoinHandle<()> {
     let input_runner_metrics = Arc::clone(runner_metrics);
+
+    let log_namespace = LogNamespace::Legacy;
+    let now = Utc::now();
 
     tokio::spawn(async move {
         for input_event in input_events {
@@ -545,17 +554,40 @@ fn spawn_input_driver(
             // be used in the Validators, as the "expected" case.
             let mut input_runner_metrics = input_runner_metrics.lock().await;
 
+            let (modified, mut event) = match input_event.clone() {
+                TestEvent::Passthrough(event) => (false, event),
+                TestEvent::Modified { modified, event } => (modified, event),
+            };
+
+            event
+                .as_log()
+                .get_timestamp()
+                .unwrap()
+                .as_timestamp_unwrap();
+
+            // the controlled edge (vector source) adds metadata to the event when it is received.
+            // thus we need to add it here so the expected values for the comparisons on transforms
+            // and sinks are accurate.
+            if source_is_controlled_edge {
+                if let Event::Log(ref mut log) = event {
+                    log_namespace.insert_standard_vector_source_metadata(log, "vector", now);
+                }
+            }
+
+            let input_event = match &input_event {
+                TestEvent::Passthrough(_) => TestEvent::Passthrough(event.clone()),
+                TestEvent::Modified { modified, event: _ } => TestEvent::Modified {
+                    modified: *modified,
+                    event: event.clone(),
+                },
+            };
+
             if let Some(encoder) = maybe_encoder.as_mut() {
                 let mut buffer = BytesMut::new();
                 encode_test_event(encoder, &mut buffer, input_event.clone());
 
                 input_runner_metrics.sent_bytes_total += buffer.len() as u64;
             }
-
-            let (modified, event) = match input_event {
-                TestEvent::Passthrough(event) => (false, event),
-                TestEvent::Modified { modified, event } => (modified, event),
-            };
 
             // account for failure case
             if !modified {
@@ -586,12 +618,12 @@ fn spawn_output_driver(
             let mut output_runner_metrics = output_runner_metrics.lock().await;
 
             for output_event in events {
-                output_runner_metrics.received_event_bytes_total += vec![output_event.clone()]
-                    .estimated_json_encoded_size_of()
-                    .get()
-                    as u64;
-
                 if !skip_output_driver_metrics {
+                    output_runner_metrics.received_event_bytes_total += vec![output_event.clone()]
+                        .estimated_json_encoded_size_of()
+                        .get()
+                        as u64;
+
                     if let Some(encoder) = maybe_encoder.as_ref() {
                         let mut buffer = BytesMut::new();
                         encoder

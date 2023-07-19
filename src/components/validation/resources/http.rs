@@ -24,7 +24,7 @@ use crate::components::validation::{
     sync::{Configuring, TaskCoordinator},
     RunnerMetrics,
 };
-use vector_core::event::Event;
+use vector_core::{event::Event, EstimatedJsonEncodedSizeOf};
 
 use super::{encode_test_event, ResourceCodec, ResourceDirection, TestEvent};
 
@@ -248,15 +248,6 @@ fn spawn_output_http_server(
         &config,
         runner_metrics,
         move |request, output_runner_metrics| {
-            if request.headers().contains_key("Content-Length") {
-                let bytes = request
-                    .headers()
-                    .get("Content-Length")
-                    .unwrap()
-                    .to_str()
-                    .unwrap();
-                debug!("HTTP server external output resource received {bytes} bytes.");
-            }
             let output_tx = output_tx.clone();
             let mut decoder = decoder.clone();
 
@@ -274,16 +265,15 @@ fn spawn_output_http_server(
                                     // Update the runner metrics for the received events. This will later
                                     // be used in the Validators, as the "expected" case.
                                     output_runner_metrics.received_bytes_total += byte_size as u64;
+
                                     output_runner_metrics.received_events_total +=
                                         events.len() as u64;
 
-                                    // TODO: I think we will need to encode the events received and get the value
-                                    //       of the buffer length, to get the expected value for `component_sent_event_bytes_total`
-                                    //       Unfortunately that means we'll have to pass the encoder down to here as well.
-
-                                    // output_runner_metrics.received_event_bytes_total +=
-                                    //     events.to_vec().estimated_json_encoded_size_of().get()
-                                    //         as u64;
+                                    events.iter().for_each(|event| {
+                                        output_runner_metrics.received_event_bytes_total +=
+                                            event.clone().estimated_json_encoded_size_of().get()
+                                                as u64;
+                                    });
 
                                     output_tx
                                         .send(events.to_vec())
