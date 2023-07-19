@@ -18,13 +18,8 @@ impl S3KeyPartitioner {
     ) -> Self {
         Self(key_prefix_template, ssekms_key_id_template)
     }
-}
 
-impl Partitioner for S3KeyPartitioner {
-    type Item = Event;
-    type Key = Option<S3PartitionKey>;
-
-    fn partition(&self, item: &Self::Item) -> Self::Key {
+    pub fn partition(&self, item: &Event) -> Option<S3PartitionKey> {
         let key_prefix = self
             .0
             .render_string(item)
@@ -54,5 +49,14 @@ impl Partitioner for S3KeyPartitioner {
             key_prefix,
             ssekms_key_id,
         })
+    }
+}
+
+impl Partitioner for S3KeyPartitioner {
+    type Item = Event;
+    type Key = Option<S3PartitionKey>;
+
+    fn partition(&self, item: &Self::Item) -> Self::Key {
+        self.partition(item)
     }
 }
