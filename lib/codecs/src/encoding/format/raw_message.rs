@@ -2,12 +2,7 @@ use crate::encoding::format::common::get_serializer_schema_requirement;
 use bytes::{BufMut, BytesMut};
 use serde::{Deserialize, Serialize};
 use tokio_util::codec::Encoder;
-use vector_core::{
-    config::{log_schema, DataType},
-    event::Event,
-    schema,
-};
-use vrl::path::PathPrefix;
+use vector_core::{config::DataType, event::Event, schema};
 
 /// Config used to build a `RawMessageSerializer`.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
@@ -50,18 +45,10 @@ impl Encoder<Event> for RawMessageSerializer {
     type Error = vector_common::Error;
 
     fn encode(&mut self, event: Event, buffer: &mut BytesMut) -> Result<(), Self::Error> {
-        if let Some(message_key) = log_schema().message_key() {
-            let log = event.as_log();
-
-            if let Some(bytes) = log
-                .get_by_meaning(message_key.to_string().as_str())
-                .or_else(|| log.get((PathPrefix::Event, message_key)))
-                .map(|value| value.coerce_to_bytes())
-            {
-                buffer.put(bytes);
-            }
+        let log = event.as_log();
+        if let Some(bytes) = log.get_message().map(|value| value.coerce_to_bytes()) {
+            buffer.put(bytes);
         }
-
         Ok(())
     }
 }

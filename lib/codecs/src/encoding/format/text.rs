@@ -1,12 +1,7 @@
 use crate::encoding::format::common::get_serializer_schema_requirement;
 use bytes::{BufMut, BytesMut};
 use tokio_util::codec::Encoder;
-use vector_core::{
-    config::{log_schema, DataType},
-    event::Event,
-    schema,
-};
-use vrl::path::PathPrefix;
+use vector_core::{config::DataType, event::Event, schema};
 
 use crate::MetricTagValues;
 
@@ -70,14 +65,8 @@ impl Encoder<Event> for TextSerializer {
     fn encode(&mut self, event: Event, buffer: &mut BytesMut) -> Result<(), Self::Error> {
         match event {
             Event::Log(log) => {
-                if let Some(message_key) = log_schema().message_key() {
-                    if let Some(bytes) = log
-                        .get_by_meaning(message_key.to_string().as_str())
-                        .or(log.get((PathPrefix::Event, message_key)))
-                        .map(|value| value.coerce_to_bytes())
-                    {
-                        buffer.put(bytes);
-                    }
+                if let Some(bytes) = log.get_message().map(|value| value.coerce_to_bytes()) {
+                    buffer.put(bytes);
                 }
             }
             Event::Metric(mut metric) => {
