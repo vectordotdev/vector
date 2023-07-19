@@ -20,3 +20,5 @@ packages:
     registry: local
   - name: crates.io/cargo-msrv@0.15.1
     registry: local
+  - name: crates.io/dd-rust-license-tool@1.0.1
+    registry: local

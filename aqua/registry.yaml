@@ -17,3 +17,6 @@ packages:
   - name: crates.io/cargo-msrv
     type: cargo
     crate: cargo-msrv
+  - name: crates.io/dd-rust-license-tool
+    type: cargo
+    crate: dd-rust-license-tool
