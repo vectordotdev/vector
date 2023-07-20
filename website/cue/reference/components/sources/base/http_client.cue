@@ -316,7 +316,7 @@ base: components: sources: http_client: configuration: {
 			unit:    "seconds"
 		}
 	}
-	scrape_timeout: {
+	scrape_timeout_secs: {
 		description: "The timeout for each scrape request."
 		required:    false
 		type: float: {

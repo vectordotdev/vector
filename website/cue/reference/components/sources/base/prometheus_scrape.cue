@@ -111,7 +111,7 @@ base: components: sources: prometheus_scrape: configuration: {
 			unit:    "seconds"
 		}
 	}
-	scrape_timeout: {
+	scrape_timeout_secs: {
 		description: "The timeout for each scrape request."
 		required:    false
 		type: float: {

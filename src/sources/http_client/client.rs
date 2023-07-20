@@ -62,7 +62,7 @@ pub struct HttpClientConfig {
     /// The timeout for each scrape request.
     #[serde(default = "default_target_timeout")]
     #[serde_as(as = "serde_with:: DurationSecondsWithFrac<f64>")]
-    #[serde(rename = "scrape_timeout")]
+    #[serde(rename = "scrape_timeout_secs")]
     #[configurable(metadata(docs::human_name = "Scrape Timeout"))]
     pub target_timeout: Duration,
 
