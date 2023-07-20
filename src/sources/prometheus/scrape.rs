@@ -63,7 +63,7 @@ pub struct PrometheusScrapeConfig {
 
     /// The timeout for each scrape request, in seconds.
     #[serde(default = "default_target_timeout")]
-    #[serde_as(as = "serde_with::DurationSeconds<u64>")]
+    #[serde_as(as = "serde_with:: DurationSecondsWithFrac<f64>")]
     #[serde(rename = "scrape_target_timeout_secs")]
     #[configurable(metadata(docs::human_name = "Scrape Target Timeout"))]
     target_timeout: Duration,
