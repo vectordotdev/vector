@@ -309,10 +309,18 @@ base: components: sources: http_client: configuration: {
 		}
 	}
 	scrape_interval_secs: {
-		description: "The interval between calls."
+		description: "The interval between scrapes. Requests run concurrently."
 		required:    false
 		type: uint: {
 			default: 15
+			unit:    "seconds"
+		}
+	}
+	scrape_timeout: {
+		description: "The timeout for each scrape request."
+		required:    false
+		type: float: {
+			default: 5.0
 			unit:    "seconds"
 		}
 	}

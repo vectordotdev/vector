@@ -104,10 +104,18 @@ base: components: sources: prometheus_scrape: configuration: {
 		}
 	}
 	scrape_interval_secs: {
-		description: "The interval between scrapes, in seconds."
+		description: "The interval between scrapes. Requests run concurrently."
 		required:    false
 		type: uint: {
 			default: 15
+			unit:    "seconds"
+		}
+	}
+	scrape_timeout: {
+		description: "The timeout for each scrape request."
+		required:    false
+		type: float: {
+			default: 5.0
 			unit:    "seconds"
 		}
 	}
