@@ -344,19 +344,6 @@ dependencies = [
 
 [[package]]
 name = "async-compression"
-version = "0.3.15"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "942c7cd7ae39e91bde4820d74132e9862e62c2f386c3aa90ccf55949f5bad63a"
-dependencies = [
- "flate2",
- "futures-core",
- "memchr",
- "pin-project-lite",
- "tokio",
-]
-
-[[package]]
-name = "async-compression"
 version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "62b74f44609f0f91493e3082d3734d98497e094777144380ea4db9f9905dd5b6"
@@ -8663,12 +8650,12 @@ dependencies = [
 
 [[package]]
 name = "tower-http"
-version = "0.4.1"
+version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a8bd22a874a2d0b70452d5597b12c537331d49060824a95f49f108994f94aa4c"
+checksum = "7ac8060a61f8758a61562f6fb53ba3cbe1ca906f001df2e53cccddcdbee91e7c"
 dependencies = [
- "async-compression 0.3.15",
- "base64 0.20.0",
+ "async-compression",
+ "base64 0.21.2",
  "bitflags 2.3.2",
  "bytes 1.4.0",
  "futures-core",
@@ -9278,7 +9265,7 @@ dependencies = [
  "arc-swap",
  "arr_macro",
  "assert_cmd",
- "async-compression 0.4.1",
+ "async-compression",
  "async-graphql",
  "async-graphql-warp",
  "async-stream",
