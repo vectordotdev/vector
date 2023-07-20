@@ -366,7 +366,7 @@ dependencies = [
  "memchr",
  "pin-project-lite",
  "tokio",
- "zstd 0.12.3+zstd.1.5.2",
+ "zstd 0.12.4",
  "zstd-safe 6.0.3+zstd.1.5.2",
 ]
 
@@ -9462,7 +9462,7 @@ dependencies = [
  "warp",
  "windows-service",
  "wiremock",
- "zstd 0.12.3+zstd.1.5.2",
+ "zstd 0.12.4",
 ]
 
 [[package]]
@@ -9848,7 +9848,7 @@ dependencies = [
  "uuid",
  "webbrowser",
  "woothee",
- "zstd 0.12.3+zstd.1.5.2",
+ "zstd 0.12.4",
 ]
 
 [[package]]
@@ -10451,9 +10451,9 @@ dependencies = [
 
 [[package]]
 name = "zstd"
-version = "0.12.3+zstd.1.5.2"
+version = "0.12.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "76eea132fb024e0e13fd9c2f5d5d595d8a967aa72382ac2f9d39fcc95afd0806"
+checksum = "1a27595e173641171fc74a1232b7b1c7a7cb6e18222c11e9dfb9888fa424c53c"
 dependencies = [
  "zstd-safe 6.0.3+zstd.1.5.2",
 ]
