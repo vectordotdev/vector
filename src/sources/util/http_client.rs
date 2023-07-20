@@ -121,15 +121,16 @@ pub(crate) async fn call<
     mut out: SourceSender,
     http_method: HttpMethod,
 ) -> Result<(), ()> {
+    // Building the HttpClient should not fail as it is just setting up the client with the
+    // proxy and tls settings.
+    let client =
+        HttpClient::new(inputs.tls.clone(), &inputs.proxy).expect("Building HTTP client failed");
     let mut stream = IntervalStream::new(tokio::time::interval(inputs.interval))
         .take_until(inputs.shutdown)
         .map(move |_| stream::iter(inputs.urls.clone()))
         .flatten()
         .map(move |url| {
-            // Building the HttpClient should not fail as it is just setting up the client with the
-            // proxy and tls settings.
-            let client = HttpClient::new(inputs.tls.clone(), &inputs.proxy)
-                .expect("Building HTTP client failed");
+            let client = client.clone();
             let endpoint = url.to_string();
 
             let context_builder = context_builder.clone();
