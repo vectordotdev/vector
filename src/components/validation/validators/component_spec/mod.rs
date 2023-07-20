@@ -48,7 +48,7 @@ impl Validator for ComponentSpecValidator {
             TestCaseExpectation::Success => {
                 if inputs.len() != outputs.len() {
                     return Err(vec![format!(
-                        "Sent {} inputs but only received {} outputs.",
+                        "Sent {} inputs but received {} outputs.",
                         inputs.len(),
                         outputs.len()
                     )]);
@@ -102,6 +102,7 @@ fn validate_telemetry(
         ComponentMetricType::SentEventsTotal,
         ComponentMetricType::SentEventBytesTotal,
         ComponentMetricType::SentBytesTotal,
+        ComponentMetricType::ErrorsTotal,
         ComponentMetricType::DiscardedEventsTotal,
     ];
 
@@ -136,97 +137,50 @@ fn validate_metric(
         ComponentType::Sink => TEST_SINK_NAME,
     };
 
-    match metric_type {
+    let expected = match metric_type {
         ComponentMetricType::EventsReceived => {
             // The reciprocal metric for events received is events sent,
             // so the expected value is what the input runner sent.
-            let expected_events = runner_metrics.sent_events_total;
-
-            compare_actual_to_expected(
-                telemetry_events,
-                metric_type,
-                component_name,
-                expected_events,
-            )
+            runner_metrics.sent_events_total
         }
         ComponentMetricType::EventsReceivedBytes => {
             // The reciprocal metric for received_event_bytes is sent_event_bytes,
             // so the expected value is what the input runner sent.
-            let expected_bytes = runner_metrics.sent_event_bytes_total;
-
-            compare_actual_to_expected(
-                telemetry_events,
-                metric_type,
-                component_name,
-                expected_bytes,
-            )
+            runner_metrics.sent_event_bytes_total
         }
         ComponentMetricType::ReceivedBytesTotal => {
             // The reciprocal metric for received_bytes is sent_bytes,
             // so the expected value is what the input runner sent.
-            let expected_bytes = if component_type == ComponentType::Sink {
+            if component_type == ComponentType::Sink {
                 0 // sinks should not emit this metric
             } else {
                 runner_metrics.sent_bytes_total
-            };
-            compare_actual_to_expected(
-                telemetry_events,
-                metric_type,
-                component_name,
-                expected_bytes,
-            )
+            }
         }
         ComponentMetricType::SentEventsTotal => {
             // The reciprocal metric for events sent is events received,
             // so the expected value is what the output runner received.
-            let expected_events = runner_metrics.received_events_total;
-
-            compare_actual_to_expected(
-                telemetry_events,
-                metric_type,
-                component_name,
-                expected_events,
-            )
+            runner_metrics.received_events_total
         }
         ComponentMetricType::SentBytesTotal => {
             // The reciprocal metric for sent_bytes is received_bytes,
             // so the expected value is what the output runner received.
-            let expected_bytes = if component_type == ComponentType::Source {
+            if component_type == ComponentType::Source {
                 0 // sources should not emit this metric
             } else {
                 runner_metrics.received_bytes_total
-            };
-
-            compare_actual_to_expected(
-                telemetry_events,
-                metric_type,
-                component_name,
-                expected_bytes,
-            )
+            }
         }
         ComponentMetricType::SentEventBytesTotal => {
             // The reciprocal metric for sent_event_bytes is received_event_bytes,
             // so the expected value is what the output runner received.
-            let expected_bytes = runner_metrics.received_event_bytes_total;
-
-            compare_actual_to_expected(
-                telemetry_events,
-                metric_type,
-                component_name,
-                expected_bytes,
-            )
+            runner_metrics.received_event_bytes_total
         }
-        ComponentMetricType::DiscardedEventsTotal => {
-            let expected_events = runner_metrics.discarded_events_total;
+        ComponentMetricType::ErrorsTotal => runner_metrics.errors_total,
+        ComponentMetricType::DiscardedEventsTotal => runner_metrics.discarded_events_total,
+    };
 
-            compare_actual_to_expected(
-                telemetry_events,
-                metric_type,
-                component_name,
-                expected_events,
-            )
-        }
-    }
+    compare_actual_to_expected(telemetry_events, metric_type, component_name, expected)
 }
 
 fn filter_events_by_metric_and_component<'a>(

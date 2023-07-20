@@ -282,7 +282,7 @@ impl Runner {
             // send all inputs until we have no more, when we can't send more because we need to
             // drive output collection to allow forward progress to be made, etc.)
 
-            // We sleep for one second here because while we do wait for the component topology to
+            // We sleep for two seconds here because while we do wait for the component topology to
             // mark itself as started, starting the topology does not necessarily mean that all
             // component tasks are actually ready for input, etc.
             //
@@ -590,7 +590,9 @@ fn spawn_input_driver(
             }
 
             // account for failure case
-            if !modified {
+            if modified {
+                input_runner_metrics.errors_total += 1;
+            } else {
                 input_runner_metrics.sent_events_total += 1;
 
                 input_runner_metrics.sent_event_bytes_total +=
