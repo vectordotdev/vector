@@ -159,10 +159,7 @@ impl GroupedCountByteSize {
     /// Returns `true` if we are the `Untagged` variant - keeping a single count for all events.
     #[must_use]
     pub fn is_untagged(&self) -> bool {
-        match self {
-            GroupedCountByteSize::Tagged { .. } => false,
-            GroupedCountByteSize::Untagged { .. } => true,
-        }
+        !self.is_tagged()
     }
 }
 
@@ -199,19 +196,19 @@ impl AddAssign for GroupedCountByteSize {
 
         // For these cases, we know we won't have to change `self` so the match can take ownership.
         match (self, rhs) {
-            (Self::Tagged { sizes: ref mut us }, Self::Tagged { sizes: them }) => {
-                for (key, value) in them {
-                    match us.get_mut(&key) {
+            (Self::Tagged { sizes: ref mut lhs }, Self::Tagged { sizes: rhs }) => {
+                for (key, value) in rhs {
+                    match lhs.get_mut(&key) {
                         Some(size) => *size += value,
                         None => {
-                            us.insert(key.clone(), value);
+                            lhs.insert(key.clone(), value);
                         }
                     }
                 }
             }
 
-            (Self::Untagged { size: us }, Self::Untagged { size: them }) => {
-                *us = *us + them;
+            (Self::Untagged { size: lhs }, Self::Untagged { size: rhs }) => {
+                *lhs = *lhs + rhs;
             }
 
             (Self::Tagged { ref mut sizes }, Self::Untagged { size }) => {
@@ -232,21 +229,21 @@ impl<'a> Add<&'a GroupedCountByteSize> for GroupedCountByteSize {
 
     fn add(self, other: &'a Self::Output) -> Self::Output {
         match (self, other) {
-            (Self::Tagged { sizes: mut us }, Self::Tagged { sizes: them }) => {
-                for (key, value) in them {
-                    match us.get_mut(key) {
+            (Self::Tagged { sizes: mut lhs }, Self::Tagged { sizes: rhs }) => {
+                for (key, value) in rhs {
+                    match lhs.get_mut(key) {
                         Some(size) => *size += *value,
                         None => {
-                            us.insert(key.clone(), *value);
+                            lhs.insert(key.clone(), *value);
                         }
                     }
                 }
 
-                Self::Tagged { sizes: us }
+                Self::Tagged { sizes: lhs }
             }
 
-            (Self::Untagged { size: us }, Self::Untagged { size: them }) => {
-                Self::Untagged { size: us + *them }
+            (Self::Untagged { size: lhs }, Self::Untagged { size: rhs }) => {
+                Self::Untagged { size: lhs + *rhs }
             }
 
             // The following two scenarios shouldn't really occur in practice, but are provided for completeness.

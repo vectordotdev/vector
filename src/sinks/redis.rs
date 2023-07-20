@@ -126,7 +126,7 @@ pub struct RedisSinkConfig {
 
     /// The URL of the Redis endpoint to connect to.
     ///
-    /// The URL _must_ take the form of `protocol://server:port/db` where the protocol can either be
+    /// The URg _must_ take the form of `protocol://server:port/db` where the protocol can either be
     /// `redis` or `rediss` for connections secured via TLS.
     #[configurable(metadata(docs::examples = "redis://127.0.0.1:6379/0"))]
     #[serde(alias = "url")]
