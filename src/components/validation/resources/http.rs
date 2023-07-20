@@ -129,6 +129,7 @@ fn spawn_input_http_server(
     // events and working with the HTTP server as they're consumed.
     let resource_started = task_coordinator.track_started();
     let resource_completed = task_coordinator.track_completed();
+
     tokio::spawn(async move {
         resource_started.mark_as_done();
         debug!("HTTP server external input resource started.");
@@ -147,7 +148,10 @@ fn spawn_input_http_server(
                         let mut outstanding_events = outstanding_events.lock().await;
                         outstanding_events.push_back(event);
                     },
-                    None => input_finished = true,
+                    None => {
+                        trace!("HTTP server external input resource input is finished.");
+                        input_finished = true;
+                    },
                 },
 
                 _ = resource_notifier.notified() => {
@@ -166,10 +170,15 @@ fn spawn_input_http_server(
                 },
             }
         }
-
         // Mark ourselves as completed now that we've sent all inputs to the source, and
         // additionally signal the HTTP server to also gracefully shutdown.
         _ = http_server_shutdown_tx.send(());
+
+        // TODO - currently we are getting lucky in the testing of `http_client` source... if the source tries to query
+        // this server but we have already shut down the thread, then it will generate an error which can throw off our error
+        // validation.
+        // I think the solution involves adding synchronization to wait here for the runner to tell us to shutdown.
+
         resource_completed.mark_as_done();
 
         debug!("HTTP server external input resource completed.");
@@ -297,6 +306,7 @@ fn spawn_output_http_server(
     let resource_started = task_coordinator.track_started();
     let resource_completed = task_coordinator.track_completed();
     let mut resource_shutdown_rx = task_coordinator.register_for_shutdown();
+
     tokio::spawn(async move {
         resource_started.mark_as_done();
         debug!("HTTP server external output resource started.");
