@@ -165,15 +165,14 @@ pub(crate) async fn call<
             }
 
             let start = Instant::now();
-            let timeout = std::cmp::min(inputs.target_timeout, inputs.interval);
-            tokio::time::timeout(timeout, client.send(request))
+            tokio::time::timeout(inputs.target_timeout, client.send(request))
                 .then(move |result| async move {
                     match result {
                         Ok(Ok(response)) => Ok(response),
                         Ok(Err(error)) => Err(error.into()),
                         Err(_) => Err(format!(
                             "Timeout error: request exceeded {}s",
-                            timeout.as_secs_f32()
+                            inputs.target_timeout.as_secs_f64()
                         )
                         .into()),
                     }
