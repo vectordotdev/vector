@@ -20,8 +20,8 @@ use crate::{
     sources::util::{
         http::HttpMethod,
         http_client::{
-            build_url, call, default_interval, default_target_timeout, GenericHttpClientInputs,
-            HttpClientBuilder,
+            build_url, call, default_interval, default_target_timeout, warn_if_interval_too_low,
+            GenericHttpClientInputs, HttpClientBuilder,
         },
     },
     tls::{TlsConfig, TlsSettings},
@@ -202,13 +202,7 @@ impl SourceConfig for HttpClientConfig {
             log_namespace,
         };
 
-        if self.target_timeout > self.interval {
-            warn!(
-                interval_secs = %self.interval.as_secs_f64(),
-                target_timeout_secs = %self.target_timeout.as_secs_f64(),
-                message = "Having a scrape timeout that exceeds the scrape interval can lead to excessive resource consumption.",
-            );
-        }
+        warn_if_interval_too_low(self.target_timeout, self.interval);
 
         let inputs = GenericHttpClientInputs {
             urls,

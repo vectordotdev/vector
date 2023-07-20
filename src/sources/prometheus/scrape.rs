@@ -11,7 +11,7 @@ use vector_core::{config::LogNamespace, event::Event};
 
 use super::parser;
 use crate::sources::util::http::HttpMethod;
-use crate::sources::util::http_client::default_target_timeout;
+use crate::sources::util::http_client::{default_target_timeout, warn_if_interval_too_low};
 use crate::{
     config::{GenerateConfig, SourceConfig, SourceContext, SourceOutput},
     http::Auth,
@@ -152,13 +152,7 @@ impl SourceConfig for PrometheusScrapeConfig {
             endpoint_tag: self.endpoint_tag.clone(),
         };
 
-        if self.target_timeout > self.interval {
-            warn!(
-                interval_secs = %self.interval.as_secs_f64(),
-                target_timeout_secs = %self.target_timeout.as_secs_f64(),
-                message = "Having a scrape timeout that exceeds the scrape interval can lead to excessive resource consumption.",
-            );
-        }
+        warn_if_interval_too_low(self.target_timeout, self.interval);
 
         let inputs = GenericHttpClientInputs {
             urls,

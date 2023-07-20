@@ -108,6 +108,17 @@ pub(crate) fn build_url(uri: &Uri, query: &HashMap<String, Vec<String>>) -> Uri 
         .expect("Failed to build URI from parsed arguments")
 }
 
+/// Warns if the scrape timeout is greater than the scrape interval.
+pub(crate) fn warn_if_interval_too_low(timeout: Duration, interval: Duration) {
+    if timeout > interval {
+        warn!(
+            interval_secs = %interval.as_secs_f64(),
+            timeout_secs = %timeout.as_secs_f64(),
+            message = "Having a scrape timeout that exceeds the scrape interval can lead to excessive resource consumption.",
+        );
+    }
+}
+
 /// Calls one or more urls at an interval.
 ///   - The HTTP request is built per the options in provided generic inputs.
 ///   - The HTTP response is decoded/parsed into events by the specific context.
