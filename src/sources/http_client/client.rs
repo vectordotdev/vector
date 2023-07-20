@@ -20,7 +20,7 @@ use crate::{
     sources::util::{
         http::HttpMethod,
         http_client::{
-            build_url, call, default_interval, default_target_timeout, warn_if_interval_too_low,
+            build_url, call, default_interval, default_timeout, warn_if_interval_too_low,
             GenericHttpClientInputs, HttpClientBuilder,
         },
     },
@@ -60,11 +60,11 @@ pub struct HttpClientConfig {
     pub interval: Duration,
 
     /// The timeout for each scrape request.
-    #[serde(default = "default_target_timeout")]
+    #[serde(default = "default_timeout")]
     #[serde_as(as = "serde_with:: DurationSecondsWithFrac<f64>")]
     #[serde(rename = "scrape_timeout_secs")]
     #[configurable(metadata(docs::human_name = "Scrape Timeout"))]
-    pub target_timeout: Duration,
+    pub timeout: Duration,
 
     /// Custom parameters for the HTTP request query string.
     ///
@@ -161,7 +161,7 @@ impl Default for HttpClientConfig {
             endpoint: "http://localhost:9898/logs".to_string(),
             query: HashMap::new(),
             interval: default_interval(),
-            target_timeout: default_target_timeout(),
+            timeout: default_timeout(),
             decoding: default_decoding(),
             framing: default_framing_message_based(),
             headers: HashMap::new(),
@@ -202,12 +202,12 @@ impl SourceConfig for HttpClientConfig {
             log_namespace,
         };
 
-        warn_if_interval_too_low(self.target_timeout, self.interval);
+        warn_if_interval_too_low(self.timeout, self.interval);
 
         let inputs = GenericHttpClientInputs {
             urls,
             interval: self.interval,
-            target_timeout: self.target_timeout,
+            timeout: self.timeout,
             headers: self.headers.clone(),
             content_type,
             auth: self.auth.clone(),

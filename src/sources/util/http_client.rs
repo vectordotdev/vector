@@ -37,7 +37,7 @@ pub(crate) struct GenericHttpClientInputs {
     /// Interval between calls.
     pub interval: Duration,
     /// Timeout for the HTTP request.
-    pub target_timeout: Duration,
+    pub timeout: Duration,
     /// Map of Header+Value to apply to HTTP request.
     pub headers: HashMap<String, Vec<String>>,
     /// Content type of the HTTP request, determined by the source.
@@ -54,7 +54,7 @@ pub(crate) const fn default_interval() -> Duration {
 }
 
 /// The default timeout for the HTTP request if none is configured.
-pub(crate) const fn default_target_timeout() -> Duration {
+pub(crate) const fn default_timeout() -> Duration {
     Duration::from_secs(5)
 }
 
@@ -176,14 +176,14 @@ pub(crate) async fn call<
             }
 
             let start = Instant::now();
-            tokio::time::timeout(inputs.target_timeout, client.send(request))
+            tokio::time::timeout(inputs.timeout, client.send(request))
                 .then(move |result| async move {
                     match result {
                         Ok(Ok(response)) => Ok(response),
                         Ok(Err(error)) => Err(error.into()),
                         Err(_) => Err(format!(
                             "Timeout error: request exceeded {}s",
-                            inputs.target_timeout.as_secs_f64()
+                            inputs.timeout.as_secs_f64()
                         )
                         .into()),
                     }
