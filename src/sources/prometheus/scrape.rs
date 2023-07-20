@@ -152,6 +152,14 @@ impl SourceConfig for PrometheusScrapeConfig {
             endpoint_tag: self.endpoint_tag.clone(),
         };
 
+        if self.target_timeout > self.interval {
+            warn!(
+                interval_secs = %self.interval.as_secs_f64(),
+                target_timeout_secs = %self.target_timeout.as_secs_f64(),
+                message = "Having a scrape timeout that exceeds the scrape interval can lead to excessive resource consumption.",
+            );
+        }
+
         let inputs = GenericHttpClientInputs {
             urls,
             interval: self.interval,
