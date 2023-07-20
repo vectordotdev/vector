@@ -54,18 +54,18 @@ pub struct PrometheusScrapeConfig {
     #[serde(alias = "hosts")]
     endpoints: Vec<String>,
 
-    /// The interval between scrapes, in seconds.
+    /// The interval between scrapes. Requests run concurrently.
     #[serde(default = "default_interval")]
     #[serde_as(as = "serde_with::DurationSeconds<u64>")]
     #[serde(rename = "scrape_interval_secs")]
     #[configurable(metadata(docs::human_name = "Scrape Interval"))]
     interval: Duration,
 
-    /// The timeout for each scrape request, in seconds.
+    /// The timeout for each scrape request.
     #[serde(default = "default_target_timeout")]
     #[serde_as(as = "serde_with:: DurationSecondsWithFrac<f64>")]
-    #[serde(rename = "scrape_target_timeout_secs")]
-    #[configurable(metadata(docs::human_name = "Scrape Target Timeout"))]
+    #[serde(rename = "scrape_timeout")]
+    #[configurable(metadata(docs::human_name = "Scrape Timeout"))]
     target_timeout: Duration,
 
     /// The tag name added to each event representing the scraped instance's `host:port`.

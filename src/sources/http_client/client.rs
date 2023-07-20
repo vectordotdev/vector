@@ -52,18 +52,18 @@ pub struct HttpClientConfig {
     #[configurable(metadata(docs::examples = "http://127.0.0.1:9898/logs"))]
     pub endpoint: String,
 
-    /// The interval between calls.
+    /// The interval between scrapes. Requests run concurrently.
     #[serde(default = "default_interval")]
     #[serde_as(as = "serde_with::DurationSeconds<u64>")]
     #[serde(rename = "scrape_interval_secs")]
     #[configurable(metadata(docs::human_name = "Scrape Interval"))]
     pub interval: Duration,
 
-    /// The timeout for each scrape request, in seconds.
+    /// The timeout for each scrape request.
     #[serde(default = "default_target_timeout")]
-    #[serde_as(as = "serde_with::DurationSecondsWithFrac<f64>")]
-    #[serde(rename = "scrape_target_timeout_secs")]
-    #[configurable(metadata(docs::human_name = "Scrape Target Timeout"))]
+    #[serde_as(as = "serde_with:: DurationSecondsWithFrac<f64>")]
+    #[serde(rename = "scrape_timeout")]
+    #[configurable(metadata(docs::human_name = "Scrape Timeout"))]
     pub target_timeout: Duration,
 
     /// Custom parameters for the HTTP request query string.
