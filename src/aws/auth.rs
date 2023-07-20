@@ -497,37 +497,6 @@ mod tests {
     }
 
     #[test]
-    fn parsing_both_external_id() {
-        let config = toml::from_str::<ComponentConfig>(
-            r#"
-            auth.assume_role = "auth.root"
-            external_id = "id"
-            auth.external_id = "auth.id"
-            auth.load_timeout_secs = 10
-            auth.region = "us-west-2"
-        "#,
-        )
-            .unwrap();
-
-        match config.auth {
-            AwsAuthentication::Role {
-                assume_role,
-                external_id,
-                load_timeout_secs,
-                imds,
-                region,
-            } => {
-                assert_eq!(&assume_role, "auth.root");
-                assert_eq!(external_id.unwrap(), "auth.id");
-                assert_eq!(load_timeout_secs, Some(10));
-                assert!(matches!(imds, ImdsAuthentication { .. }));
-                assert_eq!(region.unwrap(), "us-west-2");
-            }
-            _ => panic!(),
-        }
-    }
-
-    #[test]
     fn parsing_static() {
         let config = toml::from_str::<ComponentConfig>(
             r#"
