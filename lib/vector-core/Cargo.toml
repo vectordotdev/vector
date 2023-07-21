@@ -68,7 +68,7 @@ vector-config-macros = { path = "../vector-config-macros" }
 vrl.workspace = true
 
 [target.'cfg(target_os = "macos")'.dependencies]
-security-framework = "2.9.1"
+security-framework = "2.9.2"
 
 [target.'cfg(windows)'.dependencies]
 schannel = "0.1.22"
