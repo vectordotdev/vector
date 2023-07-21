@@ -424,7 +424,7 @@ mod tests {
             auth.load_timeout_secs = 10
         "#,
         )
-            .unwrap();
+        .unwrap();
 
         assert!(matches!(config.auth, AwsAuthentication::Role { .. }));
     }
@@ -548,7 +548,7 @@ mod tests {
             auth.external_id = "id"
         "#,
         )
-            .unwrap();
+        .unwrap();
 
         match config.auth {
             AwsAuthentication::AccessKey {
