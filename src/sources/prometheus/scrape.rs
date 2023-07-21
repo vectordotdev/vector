@@ -54,7 +54,9 @@ pub struct PrometheusScrapeConfig {
     #[serde(alias = "hosts")]
     endpoints: Vec<String>,
 
-    /// The interval between scrapes. Requests run concurrently.
+    /// The interval between scrapes. Requests are run concurrently so if a scrape takes longer
+    /// than the interval a new scrape will be started. This can take extra resources, set the timeout
+    /// to a value lower than the scrape interval to prevent this from happening.
     #[serde(default = "default_interval")]
     #[serde_as(as = "serde_with::DurationSeconds<u64>")]
     #[serde(rename = "scrape_interval_secs")]
