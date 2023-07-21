@@ -104,8 +104,12 @@ base: components: sources: prometheus_scrape: configuration: {
 		}
 	}
 	scrape_interval_secs: {
-		description: "The interval between scrapes. Requests run concurrently."
-		required:    false
+		description: """
+			The interval between scrapes. Requests are run concurrently so if a scrape takes longer
+			than the interval a new scrape will be started. This can take extra resources, set the timeout
+			to a value lower than the scrape interval to prevent this from happening.
+			"""
+		required: false
 		type: uint: {
 			default: 15
 			unit:    "seconds"
