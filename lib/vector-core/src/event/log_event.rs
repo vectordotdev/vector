@@ -15,9 +15,9 @@ use lookup::lookup_v2::TargetPath;
 use lookup::PathPrefix;
 use serde::{Deserialize, Serialize, Serializer};
 use vector_common::{
-    internal_event::OptionalTag,
+    internal_event::{OptionalTag, TaggedEventsSent},
     json_size::{JsonSize, NonZeroJsonSize},
-    request_metadata::{EventCountTags, GetEventCountTags},
+    request_metadata::GetEventCountTags,
     EventDataEq,
 };
 
@@ -215,7 +215,7 @@ impl EstimatedJsonEncodedSizeOf for LogEvent {
 }
 
 impl GetEventCountTags for LogEvent {
-    fn get_tags(&self) -> EventCountTags {
+    fn get_tags(&self) -> TaggedEventsSent {
         let source = if telemetry().tags().emit_source {
             self.metadata().source_id().cloned().into()
         } else {
@@ -230,7 +230,7 @@ impl GetEventCountTags for LogEvent {
             OptionalTag::Ignored
         };
 
-        EventCountTags { source, service }
+        TaggedEventsSent { source, service }
     }
 }
 

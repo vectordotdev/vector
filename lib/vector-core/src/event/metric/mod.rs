@@ -12,9 +12,9 @@ use std::{
 
 use chrono::{DateTime, Utc};
 use vector_common::{
-    internal_event::OptionalTag,
+    internal_event::{OptionalTag, TaggedEventsSent},
     json_size::JsonSize,
-    request_metadata::{EventCountTags, GetEventCountTags},
+    request_metadata::GetEventCountTags,
     EventDataEq,
 };
 use vector_config::configurable_component;
@@ -483,7 +483,7 @@ impl Finalizable for Metric {
 }
 
 impl GetEventCountTags for Metric {
-    fn get_tags(&self) -> EventCountTags {
+    fn get_tags(&self) -> TaggedEventsSent {
         let source = if telemetry().tags().emit_source {
             self.metadata().source_id().cloned().into()
         } else {
@@ -500,7 +500,7 @@ impl GetEventCountTags for Metric {
             OptionalTag::Ignored
         };
 
-        EventCountTags { source, service }
+        TaggedEventsSent { source, service }
     }
 }
 
