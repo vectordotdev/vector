@@ -53,6 +53,16 @@ base: components: sinks: prometheus_remote_write: configuration: {
 				required:      true
 				type: string: examples: ["/my/aws/credentials"]
 			}
+			external_id: {
+				description: """
+					The optional unique external ID in conjunction with role to assume.
+
+					[external_id]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_create_for-user_externalid.html
+					"""
+				relevant_when: "strategy = \"aws\""
+				required:      false
+				type: string: examples: ["randomEXAMPLEidString"]
+			}
 			imds: {
 				description:   "Configuration for authenticating with AWS through IMDS."
 				relevant_when: "strategy = \"aws\""
