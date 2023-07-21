@@ -301,7 +301,7 @@ impl WebSocketSink {
                         Ok(()) => {
                             finalizers.update_status(EventStatus::Delivered);
 
-                            let message = Message::text(String::from_utf8_lossy(&bytes));
+                            let message = Message::binary(bytes);
                             let message_len = message.len();
 
                             ws_sink.send(message).await.map(|_| {
