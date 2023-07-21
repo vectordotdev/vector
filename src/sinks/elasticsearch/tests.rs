@@ -49,7 +49,7 @@ async fn sets_create_action_when_configured() {
     log.insert("action", "crea");
 
     let mut encoded = vec![];
-    let encoded_size = es
+    let (encoded_size, _json_size) = es
         .request_builder
         .encoder
         .encode_input(
@@ -103,7 +103,7 @@ async fn encode_datastream_mode() {
     log.insert("data_stream", data_stream_body());
 
     let mut encoded = vec![];
-    let encoded_size = es
+    let (encoded_size, _json_size) = es
         .request_builder
         .encoder
         .encode_input(
@@ -154,7 +154,7 @@ async fn encode_datastream_mode_no_routing() {
             .expect("invalid timestamp"),
     );
     let mut encoded = vec![];
-    let encoded_size = es
+    let (encoded_size, _json_size) = es
         .request_builder
         .encoder
         .encode_input(
@@ -299,7 +299,7 @@ async fn encode_datastream_mode_no_sync() {
     );
 
     let mut encoded = vec![];
-    let encoded_size = es
+    let (encoded_size, _json_size) = es
         .request_builder
         .encoder
         .encode_input(
@@ -339,7 +339,7 @@ async fn allows_using_except_fields() {
     log.insert("idx", "purple");
 
     let mut encoded = vec![];
-    let encoded_size = es
+    let (encoded_size, _json_size) = es
         .request_builder
         .encoder
         .encode_input(
@@ -374,7 +374,7 @@ async fn allows_using_only_fields() {
     log.insert("idx", "purple");
 
     let mut encoded = vec![];
-    let encoded_size = es
+    let (encoded_size, _json_size) = es
         .request_builder
         .encoder
         .encode_input(

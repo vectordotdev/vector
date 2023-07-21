@@ -2,7 +2,7 @@ pub mod v1;
 pub mod v2;
 
 use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
+use vector_core::config::{ComponentKey, LogNamespace};
 
 use crate::{
     config::{GenerateConfig, Input, OutputId, TransformConfig, TransformContext, TransformOutput},
@@ -89,10 +89,14 @@ impl GenerateConfig for LuaConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "lua")]
 impl TransformConfig for LuaConfig {
-    async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
+    async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
+        let key = context
+            .key
+            .as_ref()
+            .map_or_else(|| ComponentKey::from("lua"), Clone::clone);
         match self {
             LuaConfig::V1(v1) => v1.config.build(),
-            LuaConfig::V2(v2) => v2.config.build(),
+            LuaConfig::V2(v2) => v2.config.build(key),
         }
     }
 

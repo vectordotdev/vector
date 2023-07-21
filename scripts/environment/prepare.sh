@@ -17,8 +17,8 @@ fi
 if ! cargo deny --version >& /dev/null ; then
   rustup run stable cargo install cargo-deny --force --locked
 fi
-if ! rust-license-tool --help >& /dev/null ; then
-  cargo install --git https://github.com/DataDog/rust-license-tool
+if ! dd-rust-license-tool --help >& /dev/null ; then
+  rustup run stable cargo install dd-rust-license-tool --version 1.0.1 --force --locked
 fi
 
 # Currently fixing this to version 0.30 since version 0.31 has introduced

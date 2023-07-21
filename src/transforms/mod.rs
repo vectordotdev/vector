@@ -90,6 +90,7 @@ mod test {
 
         let (tx, rx) = mpsc::channel(1);
 
+        // TODO: Use non-hard-coded names to improve tests.
         builder.add_source("in", UnitTestStreamSourceConfig::new(events));
         builder.add_transform("transform", &["in"], transform_config);
         builder.add_sink(

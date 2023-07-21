@@ -598,7 +598,6 @@ async fn topology_swap_sink() {
     assert_eq!(vec![event1], res2);
 }
 
-#[ignore] // TODO: issue #2186
 #[tokio::test]
 async fn topology_swap_transform_is_atomic() {
     trace_init();

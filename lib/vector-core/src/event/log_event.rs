@@ -292,11 +292,19 @@ impl LogEvent {
         }
     }
 
+    /// Retrieves the value of a field based on it's meaning.
+    /// This will first check if the value has previously been dropped. It is worth being
+    /// aware that if the field has been dropped and then some how readded, we still fetch
+    /// the dropped value here.
     pub fn get_by_meaning(&self, meaning: impl AsRef<str>) -> Option<&Value> {
-        self.metadata()
-            .schema_definition()
-            .meaning_path(meaning.as_ref())
-            .and_then(|path| self.get(path))
+        if let Some(dropped) = self.metadata().dropped_field(&meaning) {
+            Some(dropped)
+        } else {
+            self.metadata()
+                .schema_definition()
+                .meaning_path(meaning.as_ref())
+                .and_then(|path| self.get(path))
+        }
     }
 
     // TODO(Jean): Once the event API uses `Lookup`, the allocation here can be removed.
@@ -458,7 +466,7 @@ impl LogEvent {
     pub fn host_path(&self) -> Option<String> {
         match self.namespace() {
             LogNamespace::Vector => self.find_key_by_meaning("host"),
-            LogNamespace::Legacy => Some(log_schema().host_key().to_owned()),
+            LogNamespace::Legacy => log_schema().host_key().map(ToString::to_string),
         }
     }
 
@@ -466,10 +474,10 @@ impl LogEvent {
     /// or from the `source_type` key set on the "Global Log Schema" (Legacy namespace).
     // TODO: This can eventually return a `&TargetOwnedPath` once Semantic meaning and the
     //   "Global Log Schema" are updated to the new path lookup code
-    pub fn source_type_path(&self) -> &'static str {
+    pub fn source_type_path(&self) -> Option<String> {
         match self.namespace() {
-            LogNamespace::Vector => "%vector.source_type",
-            LogNamespace::Legacy => log_schema().source_type_key(),
+            LogNamespace::Vector => Some("%vector.source_type".to_string()),
+            LogNamespace::Legacy => log_schema().source_type_key().map(ToString::to_string),
         }
     }
 
@@ -505,7 +513,9 @@ impl LogEvent {
     pub fn get_host(&self) -> Option<&Value> {
         match self.namespace() {
             LogNamespace::Vector => self.get_by_meaning("host"),
-            LogNamespace::Legacy => self.get((PathPrefix::Event, log_schema().host_key())),
+            LogNamespace::Legacy => log_schema()
+                .host_key()
+                .and_then(|key| self.get((PathPrefix::Event, key))),
         }
     }
 
@@ -514,7 +524,9 @@ impl LogEvent {
     pub fn get_source_type(&self) -> Option<&Value> {
         match self.namespace() {
             LogNamespace::Vector => self.get(metadata_path!("vector", "source_type")),
-            LogNamespace::Legacy => self.get((PathPrefix::Event, log_schema().source_type_key())),
+            LogNamespace::Legacy => log_schema()
+                .source_type_key()
+                .and_then(|key| self.get((PathPrefix::Event, key))),
         }
     }
 }

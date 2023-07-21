@@ -121,9 +121,10 @@ To build Vector on your own host will require a fairly complete development envi
 Loosely, you'll need the following:
 
 - **To build Vector:** Have working Rustup, Protobuf tools, C++/C build tools (LLVM, GCC, or MSVC), Python, and Perl, `make` (the GNU one preferably), `bash`, `cmake`, `GNU coreutils`, and `autotools`.
+- **To run `make test`:** Install [`cargo-nextest`](https://nexte.st/)
 - **To run integration tests:** Have `docker` available, or a real live version of that service. (Use `AUTOSPAWN=false`)
 - **To run `make check-component-features`:** Have `remarshal` installed.
-- **To run `make check-licenses` or `cargo vdev build licenses`:** Have `rust-license-tool` [installed](https://github.com/DataDog/rust-license-tool).
+- **To run `make check-licenses` or `cargo vdev build licenses`:** Have `dd-rust-license-tool` [installed](https://github.com/DataDog/rust-license-tool).
 - **To run `cargo vdev build component-docs`:** Have `cue` [installed](https://cuelang.org/docs/install/).
 
 If you find yourself needing to run something inside the Docker environment described above, that's totally fine, they won't collide or hurt each other. In this case, you'd just run `make environment-generate`.
@@ -141,19 +142,19 @@ cargo build
 make build-dev
 # Validate your test pass
 cargo test sources::example
-make test scope="sources::example"
+make test SCOPE="sources::example"
 # Validate tests (that do not require other services) pass
 cargo test
 make test
 # Validate your tests pass (starting required services in Docker)
-make test-integration scope="sources::example"
+make test-integration SCOPE="sources::example"
 # Validate your tests pass against a live service.
-make test-integration scope="sources::example" autospawn=false
+make test-integration SCOPE="sources::example" autospawn=false
 cargo test --features docker sources::example
 # Validate all tests pass (starting required services in Docker)
 make test-integration
 # Run your benchmarks
-make bench scope="transforms::example"
+make bench SCOPE="transforms::example"
 cargo bench transforms::example
 # Format your code before pushing!
 make fmt

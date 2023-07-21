@@ -79,6 +79,8 @@ impl RequestMetadataBuilder {
             .add_event(&event, json_size);
     }
 
+    /// Builds the [`RequestMetadata`] with the given size.
+    /// This is used when there is no encoder in the process to provide an `EncodeResult`
     pub fn with_request_size(&self, size: NonZeroUsize) -> RequestMetadata {
         let size = size.get();
 
@@ -91,6 +93,10 @@ impl RequestMetadataBuilder {
         )
     }
 
+    /// Builds the [`RequestMetadata`] from the results of encoding.
+    /// `EncodeResult` provides us with the byte size before and after compression
+    /// and the json size of the events after transforming (dropping unwanted fields) but
+    /// before encoding.
     pub fn build<T>(&self, result: &EncodeResult<T>) -> RequestMetadata {
         RequestMetadata::new(
             self.event_count,
@@ -99,7 +105,9 @@ impl RequestMetadataBuilder {
             result
                 .compressed_byte_size
                 .unwrap_or(result.uncompressed_byte_size),
-            self.events_estimated_json_encoded_byte_size.clone(),
+            // Building from an encoded result, we take the json size from the encoded since that has the size
+            // after transforming the event.
+            result.transformed_json_size.clone(),
         )
     }
 }

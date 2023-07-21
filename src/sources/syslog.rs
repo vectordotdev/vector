@@ -10,10 +10,7 @@ use codecs::{
 };
 use futures::StreamExt;
 use listenfd::ListenFd;
-use lookup::{
-    lookup_v2::{parse_value_path, OptionalValuePath},
-    path, OwnedValuePath, PathPrefix,
-};
+use lookup::{lookup_v2::OptionalValuePath, path, OwnedValuePath, PathPrefix};
 use smallvec::SmallVec;
 use tokio_util::udp::UdpFramed;
 use vector_config::configurable_component;
@@ -163,10 +160,11 @@ impl GenerateConfig for SyslogConfig {
 impl SourceConfig for SyslogConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let log_namespace = cx.log_namespace(self.log_namespace);
-        let host_key = self.host_key.clone().map_or_else(
-            || parse_value_path(log_schema().host_key()).ok(),
-            |k| k.path,
-        );
+        let host_key = self
+            .host_key
+            .clone()
+            .and_then(|k| k.path)
+            .or(log_schema().host_key().cloned());
 
         match self.mode.clone() {
             Mode::Tcp {
@@ -811,7 +809,10 @@ mod test {
                     .single()
                     .expect("invalid timestamp"),
             );
-            expected.insert(log_schema().source_type_key(), "syslog");
+            expected.insert(
+                (PathPrefix::Event, log_schema().source_type_key().unwrap()),
+                "syslog",
+            );
             expected.insert("host", "74794bfb6795");
             expected.insert("hostname", "74794bfb6795");
 
@@ -861,9 +862,15 @@ mod test {
                     .single()
                     .expect("invalid timestamp"),
             );
-            expected.insert(log_schema().host_key(), "74794bfb6795");
+            expected.insert(
+                log_schema().host_key().unwrap().to_string().as_str(),
+                "74794bfb6795",
+            );
             expected.insert("hostname", "74794bfb6795");
-            expected.insert(log_schema().source_type_key(), "syslog");
+            expected.insert(
+                (PathPrefix::Event, log_schema().source_type_key().unwrap()),
+                "syslog",
+            );
             expected.insert("severity", "notice");
             expected.insert("facility", "user");
             expected.insert("version", 1);
@@ -1002,8 +1009,14 @@ mod test {
                 ),
                 expected_date,
             );
-            expected.insert(log_schema().host_key(), "74794bfb6795");
-            expected.insert(log_schema().source_type_key(), "syslog");
+            expected.insert(
+                log_schema().host_key().unwrap().to_string().as_str(),
+                "74794bfb6795",
+            );
+            expected.insert(
+                (PathPrefix::Event, log_schema().source_type_key().unwrap()),
+                "syslog",
+            );
             expected.insert("hostname", "74794bfb6795");
             expected.insert("severity", "notice");
             expected.insert("facility", "user");
@@ -1048,7 +1061,10 @@ mod test {
                 ),
                 expected_date,
             );
-            expected.insert(log_schema().source_type_key(), "syslog");
+            expected.insert(
+                (PathPrefix::Event, log_schema().source_type_key().unwrap()),
+                "syslog",
+            );
             expected.insert("host", "74794bfb6795");
             expected.insert("hostname", "74794bfb6795");
             expected.insert("severity", "info");
@@ -1085,7 +1101,10 @@ mod test {
                     .and_then(|t| t.with_nanosecond(605_850 * 1000))
                     .expect("invalid timestamp"),
             );
-            expected.insert(log_schema().source_type_key(), "syslog");
+            expected.insert(
+                (PathPrefix::Event, log_schema().source_type_key().unwrap()),
+                "syslog",
+            );
             expected.insert("host", "74794bfb6795");
             expected.insert("hostname", "74794bfb6795");
             expected.insert("severity", "info");

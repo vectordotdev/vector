@@ -9,7 +9,6 @@ use std::{
 use bytes::{Buf, Bytes, BytesMut};
 use codecs::{BytesDeserializerConfig, StreamDecodingError};
 use flate2::read::ZlibDecoder;
-use lookup::lookup_v2::parse_value_path;
 use lookup::{event_path, metadata_path, owned_value_path, path, OwnedValuePath, PathPrefix};
 use smallvec::{smallvec, SmallVec};
 use snafu::{ResultExt, Snafu};
@@ -74,8 +73,9 @@ impl LogstashConfig {
     /// Builds the `schema::Definition` for this source using the provided `LogNamespace`.
     fn schema_definition(&self, log_namespace: LogNamespace) -> Definition {
         // `host_key` is only inserted if not present already.
-        let host_key = parse_value_path(log_schema().host_key())
-            .ok()
+        let host_key = log_schema()
+            .host_key()
+            .cloned()
             .map(LegacyKey::InsertIfEmpty);
 
         let tls_client_metadata_path = self
@@ -139,7 +139,7 @@ impl SourceConfig for LogstashConfig {
         let log_namespace = cx.log_namespace(self.log_namespace);
         let source = LogstashSource {
             timestamp_converter: types::Conversion::Timestamp(cx.globals.timezone()),
-            legacy_host_key_path: parse_value_path(log_schema().host_key()).ok(),
+            legacy_host_key_path: log_schema().host_key().cloned(),
             log_namespace,
         };
         let shutdown_secs = Duration::from_secs(30);
@@ -209,7 +209,7 @@ impl TcpSource for LogstashSource {
 
             self.log_namespace.insert_vector_metadata(
                 log,
-                Some(log_schema().source_type_key()),
+                log_schema().source_type_key(),
                 path!("source_type"),
                 Bytes::from_static(LogstashConfig::NAME.as_bytes()),
             );
