@@ -10,6 +10,7 @@ use vector_core::{
     config::LogNamespace,
     event::{BatchNotifier, BatchStatus, Event, LogEvent},
 };
+use vrl::path::PathPrefix;
 use vrl::value::{kind::Collection, Kind};
 
 use super::config::{LokiConfig, OutOfOrderAction};
@@ -327,7 +328,7 @@ async fn many_streams() {
         let index = (i % 5) * 2;
         let message = lines[index]
             .as_log()
-            .get(log_schema().message_key())
+            .get((PathPrefix::Event, log_schema().message_key().unwrap()))
             .unwrap()
             .to_string_lossy();
         assert_eq!(output, &message);
@@ -337,7 +338,7 @@ async fn many_streams() {
         let index = ((i % 5) * 2) + 1;
         let message = lines[index]
             .as_log()
-            .get(log_schema().message_key())
+            .get((PathPrefix::Event, log_schema().message_key().unwrap()))
             .unwrap()
             .to_string_lossy();
         assert_eq!(output, &message);
@@ -384,7 +385,7 @@ async fn interpolate_stream_key() {
     for (i, output) in outputs.iter().enumerate() {
         let message = lines[i]
             .as_log()
-            .get(log_schema().message_key())
+            .get((PathPrefix::Event, log_schema().message_key().unwrap()))
             .unwrap()
             .to_string_lossy();
         assert_eq!(output, &message);
@@ -637,7 +638,7 @@ async fn test_out_of_order_events(
         assert_eq!(
             &expected[i]
                 .as_log()
-                .get(log_schema().message_key())
+                .get((PathPrefix::Event, log_schema().message_key().unwrap()))
                 .unwrap()
                 .to_string_lossy(),
             output,

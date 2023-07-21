@@ -5,9 +5,9 @@ use indexmap::IndexMap;
 use vector_core::config::LogNamespace;
 
 use super::{transform_utils::optional::Optional, FILE_KEY};
+use crate::sources::kubernetes_logs::transform_utils::get_message_field;
 use crate::{
     conditions::AnyCondition,
-    config::log_schema,
     event,
     transforms::reduce::{MergeStrategy, Reduce, ReduceConfig},
 };
@@ -17,10 +17,7 @@ pub type PartialEventsMerger = Optional<Reduce>;
 
 pub fn build(enabled: bool, log_namespace: LogNamespace) -> PartialEventsMerger {
     let reducer = if enabled {
-        let key = match log_namespace {
-            LogNamespace::Vector => ".".to_string(),
-            LogNamespace::Legacy => log_schema().message_key().to_string(),
-        };
+        let key = get_message_field(log_namespace);
 
         // Merge the message field of each event by concatenating it, with a space delimiter.
         let mut merge_strategies = IndexMap::new();

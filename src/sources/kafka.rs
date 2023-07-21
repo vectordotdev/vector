@@ -1052,7 +1052,7 @@ mod integration_test {
         for (i, event) in events.into_iter().enumerate() {
             if let LogNamespace::Legacy = log_namespace {
                 assert_eq!(
-                    event.as_log()[log_schema().message_key()],
+                    event.as_log()[log_schema().message_key().unwrap().to_string()],
                     format!("{} {:03}", TEXT, i).into()
                 );
                 assert_eq!(

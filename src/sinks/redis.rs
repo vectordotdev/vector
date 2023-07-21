@@ -429,7 +429,7 @@ mod tests {
         .item
         .value;
         let map: HashMap<String, String> = serde_json::from_slice(&result[..]).unwrap();
-        assert_eq!(msg, map[&log_schema().message_key().to_string()]);
+        assert_eq!(msg, map[&log_schema().message_key().unwrap().to_string()]);
     }
 
     #[test]
