@@ -486,9 +486,9 @@ where
                 }
             }
             Event::Trace(ref mut trace) => {
-                if let Some(metadata_key) = log_schema().metadata_key() {
-                    trace.insert(metadata_key.to_string(), self.dropped_data(reason, error));
-                }
+                trace.maybe_insert(PathPrefix::Event, log_schema().metadata_key(), || {
+                    self.dropped_data(reason, error).into()
+                });
             }
         }
     }

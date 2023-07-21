@@ -7,6 +7,7 @@ use vector_common::{
     internal_event::TaggedEventsSent, json_size::JsonSize, request_metadata::GetEventCountTags,
     EventDataEq,
 };
+use vrl::path::{PathPrefix, ValuePath};
 
 use super::{
     BatchNotifier, EstimatedJsonEncodedSizeOf, EventFinalizer, EventFinalizers, EventMetadata,
@@ -84,12 +85,28 @@ impl TraceEvent {
         self.0.contains(key.as_ref())
     }
 
+    // TODO This should eventually use TargetPath for the `key` parameter.
+    // https://github.com/vectordotdev/vector/issues/7070
     pub fn insert(
         &mut self,
         key: impl AsRef<str>,
         value: impl Into<Value> + Debug,
     ) -> Option<Value> {
         self.0.insert(key.as_ref(), value.into())
+    }
+
+    // TODO Audit code and use this if possible.
+    // https://github.com/vectordotdev/vector/issues/7070
+    pub fn maybe_insert<'a, F: FnOnce() -> Value>(
+        &mut self,
+        prefix: PathPrefix,
+        path: Option<impl ValuePath<'a>>,
+        value_callback: F,
+    ) -> Option<Value> {
+        if let Some(path) = path {
+            return self.0.insert((prefix, path), value_callback());
+        }
+        None
     }
 }
 
