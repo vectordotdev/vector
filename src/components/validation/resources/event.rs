@@ -30,7 +30,11 @@ pub enum RawTestEvent {
     /// is malformed in some way, which can be achieved without this test event variant.
     Modified { modified: bool, event: EventData },
 
-    /// TODO
+    /// The event is created, and the specified field is added to it.
+    ///
+    /// This allows the ability to hit code paths where some codecs require specific fields to be of specific
+    /// types, thus allowing us to encode into the input runner without error, but encoding in the component
+    /// under test can be set up to fail.
     WithField {
         event: EventData,
         name: String,

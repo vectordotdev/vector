@@ -273,7 +273,12 @@ impl ValidatableComponent for SimpleHttpConfig {
 
         ValidationConfiguration::from_source(
             Self::NAME,
-            vec![(config, None, Some(external_resource), None)],
+            vec![ComponentTestCaseConfig::from_source(
+                config,
+                None,
+                Some(external_resource),
+                None,
+            )],
         )
     }
 }

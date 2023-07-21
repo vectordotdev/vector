@@ -345,8 +345,14 @@ impl ValidatableComponent for HttpSinkConfig {
         ValidationConfiguration::from_sink(
             Self::NAME,
             vec![
-                (happy_config, None, Some(happy_external_resource), None),
-                (
+                ComponentTestCaseConfig::from_sink(
+                    happy_config,
+                    None,
+                    Some(happy_external_resource),
+                    None,
+                ),
+                // this config only runs with the test case "encoding_error" in the yaml file.
+                ComponentTestCaseConfig::from_sink(
                     sad_config,
                     Some("encoding_error".to_owned()),
                     Some(sad_external_resource),
