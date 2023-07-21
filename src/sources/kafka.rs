@@ -23,6 +23,7 @@ use rdkafka::{
 use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
+use vrl::path::PathPrefix;
 
 use vector_common::finalizer::OrderedFinalizer;
 use vector_config::configurable_component;
@@ -602,7 +603,12 @@ impl ReceivedMessage {
                     );
                 }
                 LogNamespace::Legacy => {
-                    log.insert(log_schema().source_type_key(), KafkaSourceConfig::NAME);
+                    if let Some(source_type_key) = log_schema().source_type_key() {
+                        log.insert(
+                            (PathPrefix::Event, source_type_key),
+                            KafkaSourceConfig::NAME,
+                        );
+                    }
                 }
             }
 
@@ -1054,7 +1060,7 @@ mod integration_test {
                     format!("{} {}", KEY, i).into()
                 );
                 assert_eq!(
-                    event.as_log()[log_schema().source_type_key()],
+                    event.as_log()[log_schema().source_type_key().unwrap().to_string()],
                     "kafka".into()
                 );
                 assert_eq!(

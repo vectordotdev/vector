@@ -113,7 +113,7 @@ async fn config(encoding: EncodingConfig, indexed_fields: Vec<String>) -> HecLog
     HecLogsSinkConfig {
         default_token: get_token().await.into(),
         endpoint: splunk_hec_address(),
-        host_key: "host".into(),
+        host_key: OptionalValuePath::new("host"),
         indexed_fields,
         index: None,
         sourcetype: None,
@@ -404,7 +404,7 @@ async fn splunk_configure_hostname() {
     let cx = SinkContext::default();
 
     let config = HecLogsSinkConfig {
-        host_key: "roast".into(),
+        host_key: OptionalValuePath::new("roast"),
         ..config(
             JsonSerializerConfig::default().into(),
             vec!["asdf".to_string()],

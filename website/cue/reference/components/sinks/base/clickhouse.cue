@@ -138,7 +138,10 @@ base: components: sinks: clickhouse: configuration: {
 	database: {
 		description: "The database that contains the table that data is inserted into."
 		required:    false
-		type: string: examples: ["mydatabase"]
+		type: string: {
+			examples: ["mydatabase"]
+			syntax: "template"
+		}
 	}
 	date_time_best_effort: {
 		description: "Sets `date_time_input_format` to `best_effort`, allowing ClickHouse to properly parse RFC3339/ISO 8601."
@@ -325,7 +328,10 @@ base: components: sinks: clickhouse: configuration: {
 	table: {
 		description: "The table that data is inserted into."
 		required:    true
-		type: string: examples: ["mytable"]
+		type: string: {
+			examples: ["mytable"]
+			syntax: "template"
+		}
 	}
 	tls: {
 		description: "TLS configuration."

@@ -9,6 +9,6 @@ pub struct Cli {}
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
-        app::exec("rust-license-tool", ["write"], true)
+        app::exec("dd-rust-license-tool", ["write"], true)
     }
 }

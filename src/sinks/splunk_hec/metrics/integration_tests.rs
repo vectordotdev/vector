@@ -1,6 +1,7 @@
 use std::convert::TryFrom;
 
 use futures::{future::ready, stream};
+use lookup::lookup_v2::OptionalValuePath;
 use serde_json::Value as JsonValue;
 use vector_core::{
     config::{init_telemetry, Tags, Telemetry},
@@ -36,7 +37,7 @@ async fn config() -> HecMetricsSinkConfig {
         default_namespace: None,
         default_token: get_token().await.into(),
         endpoint: splunk_hec_address(),
-        host_key: "host".into(),
+        host_key: OptionalValuePath::new("host"),
         index: None,
         sourcetype: None,
         source: None,

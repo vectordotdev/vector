@@ -9,7 +9,7 @@ use vector_config::configurable_component;
 use vector_core::sink::StreamSink;
 
 use super::{
-    host_key,
+    config_host_key,
     logs::{HumioLogsConfig, HOST},
 };
 use crate::{
@@ -86,8 +86,8 @@ pub struct HumioMetricsConfig {
     /// By default, the [global `log_schema.host_key` option][global_host_key] is used.
     ///
     /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
-    #[serde(default = "host_key")]
-    host_key: String,
+    #[serde(default = "config_host_key")]
+    host_key: OptionalValuePath,
 
     /// Event fields to be added to Humio’s extra fields.
     ///

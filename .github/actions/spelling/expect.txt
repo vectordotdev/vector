@@ -1,9 +1,7 @@
 abcd
 abcdefghijklm
 abcdefghijklmnopqrstuvwxyzand
-abced
 abortable
-acb
 ack'ing
 acking
 Acq
@@ -37,7 +35,6 @@ ARNOTAREALIDD
 arshiyasolei
 asdf
 asdfasdf
-ASMS
 assertverify
 Asterix
 asynk
@@ -140,7 +137,6 @@ casttype
 castvalue
 cbe
 CBOR
-cbs
 cddl
 cdeab
 cdylib
@@ -304,7 +300,6 @@ ebfcee
 edenhill
 edns
 eeyun
-efg
 efgh
 Elhage
 emca
@@ -325,7 +320,6 @@ ENVARS
 envsubst
 EOIG
 EOL'ed
-Erfxl
 Err'ing
 errorf
 Errorsfor
@@ -469,7 +463,6 @@ hannes
 Hashbang
 hashbrown
 hashindex
-hashlink
 hashring
 hashset
 hashsum
@@ -778,6 +771,7 @@ NQTP
 nresamples
 nullishness
 numbackends
+oahd
 oap
 OKD
 omfwd
@@ -821,6 +815,7 @@ pathgen
 peekable
 PEMS
 pgmajfault
+pgrep
 PII
 Pitbull
 pkc
@@ -1053,7 +1048,6 @@ supertrait
 suser
 sustainability
 svalue
-Sya
 sysfs
 sysinit
 syslogng
@@ -1114,7 +1108,6 @@ Tomola
 tonydanza
 toolbars
 toolchains
-TOOLSDIRECTORY
 toolset
 toor
 topdir

@@ -91,7 +91,7 @@ crate::registered_event!(
         self.event_bytes.increment(byte_size.get() as u64);
     }
 
-    fn register(tags: EventCountTags) {
+    fn register(_fixed: (), tags: EventCountTags) {
         super::register(TaggedEventsSent::new(
             tags,
         ))

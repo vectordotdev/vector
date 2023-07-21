@@ -691,7 +691,7 @@ fn handle_single_log(
 
     log_namespace.insert_vector_metadata(
         log,
-        Some(log_schema().source_type_key()),
+        log_schema().source_type_key(),
         path!("source_type"),
         Bytes::from_static(AwsS3Config::NAME.as_bytes()),
     );

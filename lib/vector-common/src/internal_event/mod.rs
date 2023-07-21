@@ -1,6 +1,6 @@
 mod bytes_received;
 mod bytes_sent;
-mod cached_event;
+pub mod cached_event;
 pub mod component_events_dropped;
 mod events_received;
 mod events_sent;
@@ -219,7 +219,7 @@ macro_rules! registered_event {
         fn emit(&$slf:ident, $data_name:ident: $data:ident)
             $emit_body:block
 
-        $(fn register($tags_name:ident: $tags:ty)
+        $(fn register($fixed_name:ident: $fixed_tags:ty, $tags_name:ident: $tags:ty)
             $register_body:block)?
     ) => {
         paste::paste!{
@@ -251,10 +251,12 @@ macro_rules! registered_event {
 
             $(impl $crate::internal_event::cached_event::RegisterTaggedInternalEvent for $event {
                 type Tags = $tags;
+                type Fixed = $fixed_tags;
 
                 fn register(
+                    $fixed_name: $fixed_tags,
                     $tags_name: $tags,
-                ) -> <TaggedEventsSent as super::RegisterInternalEvent>::Handle {
+                ) -> <Self as $crate::internal_event::RegisterInternalEvent>::Handle {
                     $register_body
                 }
             })?

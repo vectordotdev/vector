@@ -99,7 +99,7 @@ where
         pin!(batched_input);
 
         let bytes_sent = protocol.map(|protocol| register(BytesSent { protocol }));
-        let events_sent = RegisteredEventCache::default();
+        let events_sent = RegisteredEventCache::new(());
 
         loop {
             // Core behavior of the loop:
@@ -203,7 +203,7 @@ where
         finalizers: EventFinalizers,
         event_count: usize,
         bytes_sent: &Option<Registered<BytesSent>>,
-        events_sent: &RegisteredEventCache<TaggedEventsSent>,
+        events_sent: &RegisteredEventCache<(), TaggedEventsSent>,
     ) {
         match result {
             Err(error) => {

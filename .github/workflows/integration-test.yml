@@ -1,22 +1,12 @@
-# This workflow is used to run an integration test.
-# The most common use case is that it is triggered by another workflow,
-# such as the Master Merge Queue Suite, or the Integration Comment.
+# Integration Test
 #
-# It can also be triggered on manual dispatch in CI however.
-# In that use case, an input for the test name needs to be provided.
+# This workflow is used to run an integration test on demand.
+# An input for the test name needs to be provided.
 # TODO: check if the input is "all" , and run all, without a timeout?
 
 name: Integration Test
 
 on:
-  workflow_call:
-    inputs:
-      if:
-         required: false
-         type: boolean
-      test_name:
-        required: true
-        type: string
   workflow_dispatch:
     inputs:
       test_name:

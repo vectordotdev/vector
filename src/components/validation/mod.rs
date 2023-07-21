@@ -170,6 +170,20 @@ macro_rules! register_validatable_component {
     };
 }
 
+/// Input and Output runners populate this structure as they send and receive events.
+/// The structure is passed into the validator to use as the expected values for the
+/// metrics that the components under test actually output.
+#[derive(Default)]
+pub struct RunnerMetrics {
+    pub received_events_total: u64,
+    pub received_event_bytes_total: u64,
+    pub received_bytes_total: u64,
+    pub sent_bytes_total: u64, // a reciprocal for received_bytes_total
+    pub sent_event_bytes_total: u64,
+    pub sent_events_total: u64,
+    pub errors_total: u64,
+}
+
 #[cfg(all(test, feature = "component-validation-tests"))]
 mod tests {
     use std::{
