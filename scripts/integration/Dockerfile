@@ -1,5 +1,5 @@
 ARG RUST_VERSION
-FROM docker.io/rust:${RUST_VERSION}-slim-bullseye
+FROM docker.io/rust:${RUST_VERSION}-slim-bookworm
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
