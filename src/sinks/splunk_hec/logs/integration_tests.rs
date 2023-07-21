@@ -131,6 +131,18 @@ async fn config(encoding: EncodingConfig, indexed_fields: Vec<String>) -> HecLog
     }
 }
 
+fn enable_telemetry() {
+    init_telemetry(
+        Telemetry {
+            tags: Tags {
+                emit_service: true,
+                emit_source: true,
+            },
+        },
+        true,
+    );
+}
+
 #[tokio::test]
 async fn splunk_insert_message() {
     let cx = SinkContext::default();
@@ -149,18 +161,6 @@ async fn splunk_insert_message() {
 
     assert_eq!(message, entry["_raw"].as_str().unwrap());
     assert!(entry.get("message").is_none());
-}
-
-fn enable_telemetry() {
-    init_telemetry(
-        Telemetry {
-            tags: Tags {
-                emit_service: true,
-                emit_source: true,
-            },
-        },
-        true,
-    );
 }
 
 #[tokio::test]
