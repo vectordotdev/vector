@@ -6,6 +6,10 @@ use vector_config::configurable_component;
 static LOG_SCHEMA: OnceCell<LogSchema> = OnceCell::new();
 static LOG_SCHEMA_DEFAULT: Lazy<LogSchema> = Lazy::new(LogSchema::default);
 
+const MESSAGE: &str = "message";
+const TIMESTAMP: &str = "timestamp";
+const HOST: &str = "host";
+const SOURCE_TYPE: &str = "source_type";
 const METADATA: &str = "metadata";
 
 /// Loads Log Schema from configurations and sets global schema. Once this is

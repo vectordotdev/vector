@@ -7,8 +7,7 @@ use std::{
 };
 
 use codecs::MetricTagValues;
-use lookup::lookup_v2::ValuePath;
-use lookup::{metadata_path, owned_value_path, path, PathPrefix};
+use lookup::{metadata_path, owned_value_path, PathPrefix};
 use snafu::{ResultExt, Snafu};
 use vector_common::TimeZone;
 use vector_config::configurable_component;
@@ -451,12 +450,11 @@ where
         match event {
             Event::Log(ref mut log) => match log.namespace() {
                 LogNamespace::Legacy => {
-                    if let Some(metadata_key) = log_schema().metadata_key() {
-                        log.insert(
-                            (PathPrefix::Event, metadata_key.concat(path!("dropped"))),
-                            self.dropped_data(reason, error),
-                        );
-                    }
+                    log.maybe_insert(
+                        PathPrefix::Event,
+                        log_schema().metadata_key(),
+                        self.dropped_data(reason, error),
+                    );
                 }
                 LogNamespace::Vector => {
                     log.insert(

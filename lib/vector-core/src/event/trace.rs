@@ -86,7 +86,7 @@ impl TraceEvent {
     }
 
     // TODO This should eventually use TargetPath for the `key` parameter.
-    // https://github.com/vectordotdev/vector/issues/7070
+    // https://github.com/vectordotdev/vector/issues/18059
     pub fn insert(
         &mut self,
         key: impl AsRef<str>,
@@ -96,7 +96,7 @@ impl TraceEvent {
     }
 
     // TODO Audit code and use this if possible.
-    // https://github.com/vectordotdev/vector/issues/7070
+    // https://github.com/vectordotdev/vector/issues/18059
     pub fn maybe_insert<'a, F: FnOnce() -> Value>(
         &mut self,
         prefix: PathPrefix,

@@ -348,6 +348,8 @@ impl LogEvent {
         }
     }
 
+    // TODO Refactor: change the `value` argument to function to avoid unnecessary value instantiations.
+    // https://github.com/vectordotdev/vector/issues/18059
     pub fn maybe_insert(
         &mut self,
         prefix: PathPrefix,
