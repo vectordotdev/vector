@@ -19,6 +19,8 @@ use vrl::compiler::runtime::{Runtime, Terminate};
 use vrl::compiler::state::ExternalEnv;
 use vrl::compiler::{CompileConfig, ExpressionError, Function, Program, TypeState, VrlRuntime};
 use vrl::diagnostic::{DiagnosticMessage, Formatter, Note};
+use vrl::path;
+use vrl::path::ValuePath;
 use vrl::value::{Kind, Value};
 
 use crate::config::OutputId;
@@ -450,11 +452,12 @@ where
         match event {
             Event::Log(ref mut log) => match log.namespace() {
                 LogNamespace::Legacy => {
-                    log.maybe_insert(
-                        PathPrefix::Event,
-                        log_schema().metadata_key(),
-                        self.dropped_data(reason, error),
-                    );
+                    if let Some(metadata_key) = log_schema().metadata_key() {
+                        log.insert(
+                            (PathPrefix::Event, metadata_key.concat(path!("dropped"))),
+                            self.dropped_data(reason, error),
+                        );
+                    }
                 }
                 LogNamespace::Vector => {
                     log.insert(
