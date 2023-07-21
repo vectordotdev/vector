@@ -224,7 +224,7 @@ Integration tests are not run by default when running
 
 ### Deprecations
 
-When deprecating functionality in Vector, see [DEPRECATION.md](DEPRECATION.md).
+When deprecating functionality in Vector, see [DEPRECATION.md](docs/DEPRECATION.md).
 
 ### Dependencies
 
@@ -238,9 +238,9 @@ inventory of third-party licenses maintained in `LICENSE-3rdparty.csv`. This fil
 As discussed in the [`README`](README.md), you should continue to the following
 documents:
 
-1. **[DEVELOPING.md](DEVELOPING.md)** - Everything necessary to develop
-2. **[DOCUMENTING.md](DOCUMENTING.md)** - Preparing your change for Vector users
-3. **[DEPRECATION.md](DEPRECATION.md)** - Deprecating functionality in Vector
+1. **[DEVELOPING.md](docs/DEVELOPING.md)** - Everything necessary to develop
+2. **[DOCUMENTING.md](docs/DOCUMENTING.md)** - Preparing your change for Vector users
+3. **[DEPRECATION.md](docs/DEPRECATION.md)** - Deprecating functionality in Vector
 
 ## Legal
 
