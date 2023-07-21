@@ -32,14 +32,14 @@ use crate::{
     },
 };
 
-struct NewS3Sink<Svc> {
-    service: Svc,
-    partitioner: S3KeyPartitioner,
-    transformer: Transformer,
-    framer: Framer,
-    serializer: codecs::encoding::Serializer,
-    batcher_settings: BatcherSettings,
-    options: S3RequestOptions,
+pub struct NewS3Sink<Svc> {
+    pub service: Svc,
+    pub partitioner: S3KeyPartitioner,
+    pub transformer: Transformer,
+    pub framer: Framer,
+    pub serializer: codecs::encoding::Serializer,
+    pub batcher_settings: BatcherSettings,
+    pub options: S3RequestOptions,
 }
 
 struct EncodedEvent {
