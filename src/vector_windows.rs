@@ -217,7 +217,7 @@ pub mod service_control {
             name: service_def.name.clone(),
             display_name: service_def.display_name.clone(),
             service_type: SERVICE_TYPE,
-            start_type: ServiceStartType::OnDemand,
+            start_type: ServiceStartType::AutoStart,
             error_control: ServiceErrorControl::Normal,
             executable_path: service_def.executable_path.clone(),
             launch_arguments: service_def.launch_arguments.clone(),
