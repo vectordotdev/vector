@@ -4,6 +4,7 @@ use std::{collections::HashMap, fmt};
 use chrono::Utc;
 use futures::{Stream, StreamExt};
 use metrics::{register_histogram, Histogram};
+use tracing::Instrument;
 use value::Value;
 use vector_buffers::topology::channel::{self, LimitedReceiver, LimitedSender};
 #[cfg(test)]
@@ -285,6 +286,7 @@ impl Inner {
         Ok(())
     }
 
+    #[instrument(skip_all, level = "trace")]
     async fn send_batch<I, E>(&mut self, events: I) -> Result<(), ClosedError>
     where
         E: Into<Event> + ByteSizeOf,
@@ -297,7 +299,12 @@ impl Inner {
                 .iter_events()
                 .for_each(|event| self.emit_lag_time(event, reference));
             let cbs = CountByteSize(events.len(), events.estimated_json_encoded_size_of());
-            match self.inner.send(events).await {
+            match self
+                .inner
+                .send(events)
+                .instrument(trace_span!("inner.send"))
+                .await
+            {
                 Ok(()) => {
                     self.events_sent.emit(cbs);
                 }

@@ -62,6 +62,7 @@ pub(crate) fn build_warp_filter(
         .boxed()
 }
 
+#[instrument(skip_all, level = "trace")]
 pub(crate) fn decode_log_body(
     body: Bytes,
     api_key: Option<Arc<str>>,

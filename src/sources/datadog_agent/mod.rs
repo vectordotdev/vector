@@ -29,7 +29,7 @@ use lookup::owned_value_path;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
-use tracing::Span;
+use tracing::{Instrument, Span};
 use value::Kind;
 use vector_common::internal_event::{EventsReceived, Registered};
 use vector_config::configurable_component;
@@ -385,6 +385,7 @@ impl DatadogAgentSource {
         filters.ok_or_else(|| "At least one of the supported data type shall be enabled".into())
     }
 
+    #[instrument(skip_all, level = "trace")]
     pub(crate) fn decode(
         &self,
         header: &Option<String>,
@@ -427,6 +428,7 @@ impl DatadogAgentSource {
     }
 }
 
+#[instrument(skip_all, level = "trace")]
 pub(crate) async fn handle_request(
     events: Result<Vec<Event>, ErrorMessage>,
     acknowledgements: bool,
@@ -449,7 +451,7 @@ pub(crate) async fn handle_request(
             })?;
             match receiver {
                 None => Ok(warp::reply().into_response()),
-                Some(receiver) => match receiver.await {
+                Some(receiver) => match receiver.instrument(trace_span!("receiver")).await {
                     BatchStatus::Delivered => Ok(warp::reply().into_response()),
                     BatchStatus::Errored => Err(warp::reject::custom(ErrorMessage::new(
                         StatusCode::INTERNAL_SERVER_ERROR,

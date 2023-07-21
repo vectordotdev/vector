@@ -11,6 +11,7 @@ use async_stream::stream;
 use crossbeam_queue::ArrayQueue;
 use futures::Stream;
 use tokio::sync::{Notify, OwnedSemaphorePermit, Semaphore, TryAcquireError};
+use tracing::Instrument;
 
 use crate::Bufferable;
 
@@ -107,14 +108,17 @@ impl<T: Bufferable> LimitedSender<T> {
             .limiter
             .clone()
             .acquire_many_owned(permits_required)
+            .instrument(trace_span!("inner.limiter.acquire_many_owned", permits_required))
             .await else {
             return Err(SendError(item))
         };
 
-        self.inner
-            .data
-            .push((permits, item))
-            .expect("acquired permits but channel reported being full");
+        trace_span!("inner.data.push").in_scope(|| {
+            self.inner
+                .data
+                .push((permits, item))
+                .expect("acquired permits but channel reported being full")
+        });
         self.inner.read_waker.notify_one();
 
         trace!("Sent item.");
