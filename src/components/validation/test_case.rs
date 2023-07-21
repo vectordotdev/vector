@@ -26,6 +26,7 @@ pub enum TestCaseExpectation {
 #[derive(Deserialize)]
 pub struct TestCase {
     pub name: String,
+    pub config_name: Option<String>,
     pub expectation: TestCaseExpectation,
     pub events: Vec<TestEvent>,
 }

@@ -271,7 +271,10 @@ impl ValidatableComponent for SimpleHttpConfig {
                 .expect("should not fail to get decoding config"),
         );
 
-        ValidationConfiguration::from_source(Self::NAME, config, Some(external_resource))
+        ValidationConfiguration::from_source(
+            Self::NAME,
+            vec![(config, None, Some(external_resource), None)],
+        )
     }
 }
 

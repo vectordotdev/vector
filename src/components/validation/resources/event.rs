@@ -1,5 +1,6 @@
 use bytes::BytesMut;
 use serde::Deserialize;
+use serde_json::Value;
 use snafu::Snafu;
 use tokio_util::codec::Encoder as _;
 
@@ -28,6 +29,14 @@ pub enum RawTestEvent {
     /// For transforms and sinks, generally, the only way to cause an error is if the event itself
     /// is malformed in some way, which can be achieved without this test event variant.
     Modified { modified: bool, event: EventData },
+
+    /// TODO
+    WithField {
+        event: EventData,
+        name: String,
+        value: Value,
+        fail: Option<bool>,
+    },
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -59,6 +68,9 @@ pub enum TestEvent {
     /// The event is used, as-is, without modification.
     Passthrough(Event),
 
+    /// The event is used, as-is, without modification by the framework, but we expect it to fail.
+    PassthroughFail(Event),
+
     /// The event is potentially modified by the external resource.
     ///
     /// The modification made is dependent on the external resource, but this mode is made available
@@ -76,6 +88,7 @@ impl TestEvent {
     pub fn into_event(self) -> Event {
         match self {
             Self::Passthrough(event) => event,
+            Self::PassthroughFail(event) => event,
             Self::Modified { event, .. } => event,
         }
     }
@@ -94,6 +107,22 @@ impl From<RawTestEvent> for TestEvent {
                 modified,
                 event: event.into_event(),
             },
+            RawTestEvent::WithField {
+                event,
+                name,
+                value,
+                fail,
+            } => {
+                let mut event = event.into_event();
+                let log_event = event.as_mut_log();
+                log_event.insert(name.as_str(), value);
+
+                if fail.unwrap_or_default() {
+                    TestEvent::PassthroughFail(event)
+                } else {
+                    TestEvent::Passthrough(event)
+                }
+            }
         }
     }
 }
@@ -104,7 +133,7 @@ pub fn encode_test_event(
     event: TestEvent,
 ) {
     match event {
-        TestEvent::Passthrough(event) => {
+        TestEvent::Passthrough(event) | TestEvent::PassthroughFail(event) => {
             // Encode the event normally.
             encoder
                 .encode(event, buf)

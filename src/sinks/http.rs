@@ -1,7 +1,10 @@
 use std::io::Write;
 
 use bytes::{BufMut, Bytes, BytesMut};
-use codecs::encoding::{CharacterDelimitedEncoder, Framer, Serializer};
+use codecs::{
+    encoding::{CharacterDelimitedEncoder, Framer, Serializer},
+    GelfSerializerConfig,
+};
 use futures::{future, FutureExt, SinkExt};
 use http::{
     header::{HeaderName, HeaderValue, AUTHORIZATION},
@@ -272,7 +275,7 @@ impl ValidatableComponent for HttpSinkConfig {
         use codecs::{JsonSerializerConfig, MetricTagValues};
         use std::str::FromStr;
 
-        let config = Self {
+        let happy_config = Self {
             uri: UriSerde::from_str("http://127.0.0.1:9000/endpoint")
                 .expect("should never fail to parse"),
             method: HttpMethod::Post,
@@ -292,13 +295,65 @@ impl ValidatableComponent for HttpSinkConfig {
             payload_suffix: String::new(),
         };
 
-        let external_resource = ExternalResource::new(
+        let happy_external_resource = ExternalResource::new(
             ResourceDirection::Push,
-            HttpResourceConfig::from_parts(config.uri.uri.clone(), Some(config.method.into())),
-            config.encoding.clone(),
+            HttpResourceConfig::from_parts(
+                happy_config.uri.uri.clone(),
+                Some(happy_config.method.into()),
+            ),
+            happy_config.encoding.clone(),
         );
 
-        ValidationConfiguration::from_sink(Self::NAME, config, Some(external_resource))
+        // this config uses the Gelf serializer, which requires the "level" field to
+        // be an integer
+        let sad_config = Self {
+            uri: UriSerde::from_str("http://127.0.0.1:9000/endpoint")
+                .expect("should never fail to parse"),
+            method: HttpMethod::Post,
+            encoding: EncodingConfigWithFraming::new(
+                None,
+                GelfSerializerConfig::new().into(),
+                Transformer::default(),
+            ),
+            auth: None,
+            headers: None,
+            compression: Compression::default(),
+            batch: BatchConfig::default(),
+            request: RequestConfig::default(),
+            tls: None,
+            acknowledgements: AcknowledgementsConfig::default(),
+            payload_prefix: String::new(),
+            payload_suffix: String::new(),
+        };
+
+        let sad_external_resource = ExternalResource::new(
+            ResourceDirection::Push,
+            HttpResourceConfig::from_parts(
+                sad_config.uri.uri.clone(),
+                Some(sad_config.method.into()),
+            ),
+            sad_config.encoding.clone(),
+        );
+
+        // this encoder is used to ingest the input event to the input driver (which we need to succeed)
+        let sad_encoder = EncodingConfigWithFraming::new(
+            None,
+            JsonSerializerConfig::new(MetricTagValues::Full).into(),
+            Transformer::default(),
+        );
+
+        ValidationConfiguration::from_sink(
+            Self::NAME,
+            vec![
+                (happy_config, None, Some(happy_external_resource), None),
+                (
+                    sad_config,
+                    Some("encoding_error".to_owned()),
+                    Some(sad_external_resource),
+                    Some(sad_encoder.into()),
+                ),
+            ],
+        )
     }
 }
 

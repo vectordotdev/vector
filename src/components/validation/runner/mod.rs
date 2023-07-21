@@ -220,7 +220,10 @@ impl Runner {
             // We then finalize the topology builder to get our actual `ConfigBuilder`, as well as
             // any controlled edges (channel sender/receiver to the aforementioned filler
             // components) and a telemetry client for collecting internal telemetry.
-            let topology_builder = TopologyBuilder::from_configuration(&self.configuration);
+            let topology_builder = TopologyBuilder::from_configuration(
+                &self.configuration,
+                test_case.config_name.as_ref(),
+            )?;
             let (config_builder, controlled_edges, telemetry_collector) = topology_builder
                 .finalize(
                     &input_task_coordinator,
@@ -247,6 +250,7 @@ impl Runner {
             // controlled output edge, which means we then need a server task listening for the
             // events sent by that sink.
             let (runner_input, runner_output, maybe_runner_encoder) = build_external_resource(
+                test_case.config_name.as_ref(),
                 &self.configuration,
                 &input_task_coordinator,
                 &output_task_coordinator,
@@ -294,29 +298,19 @@ impl Runner {
             // around if we can avoid it.
             tokio::time::sleep(Duration::from_secs(2)).await;
 
-            let skip_input_driver_metrics =
-                self.configuration.component_type == ComponentType::Source;
-
-            let source_is_controlled_edge =
-                self.configuration.component_type != ComponentType::Source;
-
             let input_driver = spawn_input_driver(
                 test_case.events.clone(),
                 input_tx,
                 &runner_metrics,
                 maybe_runner_encoder.as_ref().cloned(),
-                skip_input_driver_metrics,
-                source_is_controlled_edge,
+                self.configuration.component_type,
             );
-
-            let skip_output_driver_metrics =
-                self.configuration.component_type == ComponentType::Sink;
 
             let output_driver = spawn_output_driver(
                 output_rx,
                 &runner_metrics,
                 maybe_runner_encoder.as_ref().cloned(),
-                skip_output_driver_metrics,
+                self.configuration.component_type,
             );
 
             // At this point, the component topology is running, and all input/output/telemetry
@@ -364,6 +358,7 @@ impl Runner {
                 name: test_name,
                 expectation,
                 events: input_events,
+                ..
             } = test_case;
             let telemetry_events = telemetry_collector.collect().await;
 
@@ -434,16 +429,26 @@ fn load_component_test_cases(test_case_data_path: PathBuf) -> Result<Vec<TestCas
 }
 
 fn build_external_resource(
+    test_case: Option<&String>,
     configuration: &ValidationConfiguration,
     input_task_coordinator: &TaskCoordinator<Configuring>,
     output_task_coordinator: &TaskCoordinator<Configuring>,
     runner_metrics: &Arc<Mutex<RunnerMetrics>>,
 ) -> (RunnerInput, RunnerOutput, Option<Encoder<encoding::Framer>>) {
     let component_type = configuration.component_type();
-    let maybe_external_resource = configuration.external_resource();
-    let maybe_encoder = maybe_external_resource
-        .as_ref()
-        .map(|resource| resource.codec.into_encoder());
+    let maybe_external_resource = configuration.external_resource(test_case);
+
+    // use the provided input codec if specified, this generally occurs if we are testing error paths that
+    // necessitate being able to encode the input event for the input driver without error, but error on
+    // the encoding in the component under test.
+    let resource_codec = configuration.input_codec(test_case).or_else(|| {
+        maybe_external_resource
+            .as_ref()
+            .map(|resource| resource.codec.clone())
+    });
+
+    let maybe_encoder = resource_codec.as_ref().map(|codec| codec.into_encoder());
+
     match component_type {
         ComponentType::Source => {
             // As an external resource for a source, we create a channel that the validation runner
@@ -540,8 +545,7 @@ fn spawn_input_driver(
     input_tx: Sender<TestEvent>,
     runner_metrics: &Arc<Mutex<RunnerMetrics>>,
     mut maybe_encoder: Option<Encoder<encoding::Framer>>,
-    _skip_input_driver_metrics: bool,
-    source_is_controlled_edge: bool,
+    component_type: ComponentType,
 ) -> JoinHandle<()> {
     let input_runner_metrics = Arc::clone(runner_metrics);
 
@@ -559,8 +563,9 @@ fn spawn_input_driver(
             // be used in the Validators, as the "expected" case.
             let mut input_runner_metrics = input_runner_metrics.lock().await;
 
-            let (modified, mut event) = match input_event.clone() {
+            let (failure_case, mut event) = match input_event.clone() {
                 TestEvent::Passthrough(event) => (false, event),
+                TestEvent::PassthroughFail(event) => (true, event),
                 TestEvent::Modified { modified, event } => (modified, event),
             };
 
@@ -573,7 +578,7 @@ fn spawn_input_driver(
             // the controlled edge (vector source) adds metadata to the event when it is received.
             // thus we need to add it here so the expected values for the comparisons on transforms
             // and sinks are accurate.
-            if source_is_controlled_edge {
+            if component_type != ComponentType::Source {
                 if let Event::Log(ref mut log) = event {
                     log_namespace.insert_standard_vector_source_metadata(log, "vector", now);
                 }
@@ -581,6 +586,7 @@ fn spawn_input_driver(
 
             let input_event = match &input_event {
                 TestEvent::Passthrough(_) => TestEvent::Passthrough(event.clone()),
+                TestEvent::PassthroughFail(_) => TestEvent::PassthroughFail(event.clone()),
                 TestEvent::Modified { modified, event: _ } => TestEvent::Modified {
                     modified: *modified,
                     event: event.clone(),
@@ -595,9 +601,15 @@ fn spawn_input_driver(
             }
 
             // account for failure case
-            if modified {
+            if failure_case {
                 input_runner_metrics.errors_total += 1;
-            } else {
+                // TODO: this assumption may need to be made configurable at some point
+                if component_type == ComponentType::Sink {
+                    input_runner_metrics.discarded_events_total += 1;
+                }
+            }
+
+            if !failure_case || component_type == ComponentType::Sink {
                 input_runner_metrics.sent_events_total += 1;
 
                 input_runner_metrics.sent_event_bytes_total +=
@@ -612,7 +624,7 @@ fn spawn_output_driver(
     mut output_rx: Receiver<Vec<Event>>,
     runner_metrics: &Arc<Mutex<RunnerMetrics>>,
     maybe_encoder: Option<Encoder<encoding::Framer>>,
-    skip_output_driver_metrics: bool,
+    component_type: ComponentType,
 ) -> JoinHandle<Vec<Event>> {
     let output_runner_metrics = Arc::clone(runner_metrics);
 
@@ -626,7 +638,7 @@ fn spawn_output_driver(
             let mut output_runner_metrics = output_runner_metrics.lock().await;
 
             for output_event in events {
-                if !skip_output_driver_metrics {
+                if component_type != ComponentType::Sink {
                     output_runner_metrics.received_event_bytes_total += vec![output_event.clone()]
                         .estimated_json_encoded_size_of()
                         .get()

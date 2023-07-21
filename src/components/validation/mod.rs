@@ -57,6 +57,14 @@ pub enum ComponentConfiguration {
     Sink(BoxedSink),
 }
 
+#[derive(Clone)]
+pub struct ComponentTestCaseConfig {
+    config: ComponentConfiguration,
+    test_case: Option<String>,
+    external_resource: Option<ExternalResource>,
+    input_codec: Option<ResourceCodec>,
+}
+
 /// Configuration for validating a component.
 ///
 /// This type encompasses all of the required information for configuring and validating a
@@ -66,46 +74,82 @@ pub enum ComponentConfiguration {
 pub struct ValidationConfiguration {
     component_name: &'static str,
     component_type: ComponentType,
-    component_configuration: ComponentConfiguration,
-    external_resource: Option<ExternalResource>,
+    component_configurations: Vec<ComponentTestCaseConfig>,
 }
 
 impl ValidationConfiguration {
     /// Creates a new `ValidationConfiguration` for a source.
     pub fn from_source<C: Into<BoxedSource>>(
         component_name: &'static str,
-        config: C,
-        external_resource: Option<ExternalResource>,
+        component_configurations: Vec<(
+            C,
+            Option<String>,
+            Option<ExternalResource>,
+            Option<ResourceCodec>,
+        )>,
     ) -> Self {
         Self {
             component_name,
             component_type: ComponentType::Source,
-            component_configuration: ComponentConfiguration::Source(config.into()),
-            external_resource,
+            component_configurations: component_configurations
+                .into_iter()
+                .map(|c| ComponentTestCaseConfig {
+                    config: ComponentConfiguration::Source(c.0.into()),
+                    test_case: c.1,
+                    external_resource: c.2,
+                    input_codec: c.3,
+                })
+                .collect(),
         }
     }
 
     /// Creates a new `ValidationConfiguration` for a transform.
-    pub fn from_transform(component_name: &'static str, config: impl Into<BoxedTransform>) -> Self {
+    pub fn from_transform(
+        component_name: &'static str,
+        component_configurations: Vec<(
+            impl Into<BoxedTransform>,
+            Option<String>,
+            Option<ExternalResource>,
+            Option<ResourceCodec>,
+        )>,
+    ) -> Self {
         Self {
             component_name,
             component_type: ComponentType::Transform,
-            component_configuration: ComponentConfiguration::Transform(config.into()),
-            external_resource: None,
+            component_configurations: component_configurations
+                .into_iter()
+                .map(|c| ComponentTestCaseConfig {
+                    config: ComponentConfiguration::Transform(c.0.into()),
+                    test_case: c.1,
+                    external_resource: c.2,
+                    input_codec: c.3,
+                })
+                .collect(),
         }
     }
 
     /// Creates a new `ValidationConfiguration` for a sink.
     pub fn from_sink<C: Into<BoxedSink>>(
         component_name: &'static str,
-        config: C,
-        external_resource: Option<ExternalResource>,
+        component_configurations: Vec<(
+            C,
+            Option<String>,
+            Option<ExternalResource>,
+            Option<ResourceCodec>,
+        )>,
     ) -> Self {
         Self {
             component_name,
             component_type: ComponentType::Sink,
-            component_configuration: ComponentConfiguration::Sink(config.into()),
-            external_resource,
+            component_configurations: component_configurations
+                .into_iter()
+                .map(|c| ComponentTestCaseConfig {
+                    config: ComponentConfiguration::Sink(c.0.into()),
+                    test_case: c.1,
+                    external_resource: c.2,
+                    input_codec: c.3,
+                })
+                .collect(),
         }
     }
 
@@ -120,13 +164,39 @@ impl ValidationConfiguration {
     }
 
     /// Gets the configuration of the component.
-    pub fn component_configuration(&self) -> ComponentConfiguration {
-        self.component_configuration.clone()
+    pub fn component_configurations(&self) -> Vec<ComponentTestCaseConfig> {
+        self.component_configurations.clone()
+    }
+
+    fn get_comp_test_case(&self, test_case: Option<&String>) -> Option<ComponentTestCaseConfig> {
+        let empty = String::from("");
+        let test_case = test_case.unwrap_or(&empty);
+        self.component_configurations
+            .clone()
+            .into_iter()
+            .find(|c| c.test_case.as_ref().unwrap_or(&String::from("")) == test_case)
+    }
+
+    /// Gets the configuration of the component.
+    pub fn component_configuration_for_test_case(
+        &self,
+        test_case: Option<&String>,
+    ) -> Option<ComponentConfiguration> {
+        self.get_comp_test_case(test_case).map(|c| c.config)
     }
 
     /// Gets the external resource definition for validating the component, if any.
-    pub fn external_resource(&self) -> Option<ExternalResource> {
-        self.external_resource.clone()
+    pub fn external_resource(&self, test_case: Option<&String>) -> Option<ExternalResource> {
+        self.get_comp_test_case(test_case)
+            .map(|c| c.external_resource)
+            .flatten()
+    }
+
+    /// Gets the input codec for validating the component, if any.
+    pub fn input_codec(&self, test_case: Option<&String>) -> Option<ResourceCodec> {
+        self.get_comp_test_case(test_case)
+            .map(|c| c.input_codec)
+            .flatten()
     }
 }
 
