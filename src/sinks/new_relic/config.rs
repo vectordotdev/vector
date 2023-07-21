@@ -1,25 +1,15 @@
 use std::{fmt::Debug, sync::Arc};
 
-use futures::FutureExt;
 use http::Uri;
 use tower::ServiceBuilder;
 use vector_common::sensitive_string::SensitiveString;
-use vector_config::configurable_component;
 
 use super::{
     healthcheck, NewRelicApiResponse, NewRelicApiService, NewRelicEncoder, NewRelicSink,
     NewRelicSinkError,
 };
-use crate::{
-    codecs::Transformer,
-    config::{AcknowledgementsConfig, DataType, Input, SinkConfig, SinkContext},
-    http::HttpClient,
-    sinks::util::{
-        retries::RetryLogic, service::ServiceBuilderExt, BatchConfig, Compression,
-        SinkBatchSettings, TowerRequestConfig,
-    },
-    tls::TlsSettings,
-};
+
+use crate::{http::HttpClient, sinks::prelude::*};
 
 /// New Relic region.
 #[configurable_component]
@@ -164,8 +154,10 @@ impl SinkConfig for NewRelicConfig {
 
         let sink = NewRelicSink {
             service,
-            transformer: self.encoding.clone(),
-            encoder: NewRelicEncoder,
+            encoder: NewRelicEncoder {
+                transformer: self.encoding.clone(),
+                credentials: Arc::clone(&credentials),
+            },
             credentials,
             compression: self.compression,
             batcher_settings,

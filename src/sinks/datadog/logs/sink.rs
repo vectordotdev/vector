@@ -7,7 +7,7 @@ use futures::stream::{BoxStream, StreamExt};
 use lookup::event_path;
 use snafu::Snafu;
 use tower::Service;
-use vector_common::request_metadata::RequestMetadata;
+use vector_common::request_metadata::{GroupedCountByteSize, RequestMetadata};
 use vector_core::{
     event::{Event, EventFinalizers, Finalizable, Value},
     partition::Partitioner,
@@ -125,7 +125,11 @@ impl JsonEncoding {
 }
 
 impl crate::sinks::util::encoding::Encoder<Vec<Event>> for JsonEncoding {
-    fn encode_input(&self, mut input: Vec<Event>, writer: &mut dyn io::Write) -> io::Result<usize> {
+    fn encode_input(
+        &self,
+        mut input: Vec<Event>,
+        writer: &mut dyn io::Write,
+    ) -> io::Result<(usize, GroupedCountByteSize)> {
         for event in input.iter_mut() {
             let log = event.as_mut_log();
             let message_path = log
@@ -219,7 +223,7 @@ impl RequestBuilder<(Option<Arc<str>>, Vec<Event>)> for LogRequestBuilder {
         // to (un)compressed size limitations.
         let mut buf = Vec::new();
         let n_events = events.len();
-        let uncompressed_size = self.encoder().encode_input(events, &mut buf)?;
+        let (uncompressed_size, byte_size) = self.encoder().encode_input(events, &mut buf)?;
         if uncompressed_size > MAX_PAYLOAD_BYTES {
             return Err(RequestBuildError::PayloadTooBig);
         }
@@ -230,9 +234,13 @@ impl RequestBuilder<(Option<Arc<str>>, Vec<Event>)> for LogRequestBuilder {
         let bytes = compressor.into_inner().freeze();
 
         if self.compression.is_compressed() {
-            Ok(EncodeResult::compressed(bytes, uncompressed_size))
+            Ok(EncodeResult::compressed(
+                bytes,
+                uncompressed_size,
+                byte_size,
+            ))
         } else {
-            Ok(EncodeResult::uncompressed(bytes))
+            Ok(EncodeResult::uncompressed(bytes, byte_size))
         }
     }
 
