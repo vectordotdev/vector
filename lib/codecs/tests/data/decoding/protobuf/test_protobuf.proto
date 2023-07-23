@@ -1,6 +1,6 @@
-syntax = "proto3";
+syntax = "proto2";
 
-package test_protobuf3;
+package test_protobuf;
 
 message Person {
   optional string name = 1;
@@ -15,11 +15,10 @@ message Person {
 
   message PhoneNumber {
     optional string number = 1;
-    optional PhoneType type = 2;
+    optional PhoneType type = 2 [default = HOME];
   }
 
-  map<string, PhoneType> data = 4;
-  repeated PhoneNumber phones = 5;
+  repeated PhoneNumber phones = 4;
 }
 
 message AddressBook {

@@ -50,7 +50,7 @@ impl ProtobufDeserializerConfig {
                 if let Some(timestamp_key) = log_schema().timestamp_key() {
                     definition = definition.try_with_field(
                         timestamp_key,
-                        // The PROTOBUF decoder will try to insert a new `timestamp`-type value into the
+                        // The protobuf decoder will try to insert a new `timestamp`-type value into the
                         // "timestamp_key" field, but only if that field doesn't already exist.
                         Kind::json().or_timestamp(), // TODO: create kind::protobuf?
                         Some("timestamp"),
@@ -73,7 +73,7 @@ impl ProtobufDeserializerConfig {
     }
 }
 
-/// Deserializer that builds `Event`s from a byte frame containing PROTOBUF.
+/// Deserializer that builds `Event`s from a byte frame containing protobuf.
 #[derive(Debug, Clone)]
 pub struct ProtobufDeserializer {
     message_descriptor: MessageDescriptor,
@@ -101,12 +101,8 @@ impl Deserializer for ProtobufDeserializer {
         bytes: Bytes,
         log_namespace: LogNamespace,
     ) -> vector_common::Result<SmallVec<[Event; 1]>> {
-        if bytes.is_empty() {
-            return Ok(smallvec![]);
-        }
-
         let dynamic_message = DynamicMessage::decode(self.message_descriptor.clone(), bytes)
-            .map_err(|error| format!("Error parsing PROTOBUF: {:?}", error))?;
+            .map_err(|error| format!("Error parsing protobuf: {:?}", error))?;
 
         let proto_vrl = to_vrl(
             prost_reflect::Value::Message(dynamic_message),
@@ -143,7 +139,7 @@ fn to_vrl(
     prost_reflect_value: prost_reflect::Value,
     kind: &prost_reflect::Kind,
 ) -> vector_common::Result<vrl::value::Value> {
-    let v = match prost_reflect_value {
+    let vrl_value = match prost_reflect_value {
         prost_reflect::Value::Bool(v) => vrl::value::Value::from(v),
         prost_reflect::Value::I32(v) => vrl::value::Value::from(v),
         prost_reflect::Value::I64(v) => vrl::value::Value::from(v),
@@ -158,11 +154,11 @@ fn to_vrl(
         prost_reflect::Value::String(v) => vrl::value::Value::from(v),
         prost_reflect::Value::Bytes(v) => vrl::value::Value::from(v),
         prost_reflect::Value::EnumNumber(v) => {
-            let enum_desc = kind.as_enum().unwrap();
+            let enum_desc = kind.as_enum().ok_or_else(|| format!("Internal error while parsing protobuf enum"))?;
             vrl::value::Value::from(
                 enum_desc
                     .get_value(v)
-                    .ok_or_else(|| format!("The number {} cannot be in {}", v, enum_desc.name()))?
+                    .ok_or_else(|| format!("The number {} cannot be in '{}'", v, enum_desc.name()))?
                     .name(),
             )
         }
@@ -185,80 +181,43 @@ fn to_vrl(
             vrl::value::Value::from(vec)
         }
         prost_reflect::Value::Map(v) => {
-            let message_desc = kind.as_message().unwrap();
+            let message_desc = kind.as_message().ok_or_else(|| format!("Internal error while parsing protobuf message"))?;
             vrl::value::Value::from(
                 v.into_iter()
-                    // TODO: handle unwrap
                     .map(|kv| {
-                        (
-                            kv.0.as_str().unwrap().to_string(),
-                            to_vrl(kv.1, &message_desc.map_entry_value_field().kind()).unwrap(),
-                        )
+                        Ok((
+                            kv.0.as_str().ok_or_else(|| format!("Internal error while parsing protobuf map"))?.to_string(),
+                            to_vrl(kv.1, &message_desc.map_entry_value_field().kind())?,
+                        ))
                     })
-                    .collect::<BTreeMap<String, _>>(),
+                    .collect::<vector_common::Result<BTreeMap<String, _>>>()?,
             )
         }
     };
-    Ok(v)
+    Ok(vrl_value)
 }
 
 #[cfg(test)]
 mod tests {
     // TODO: add test for bad file path & invalid message_type
 
-    use std::fs;
+    use std::{env, fs};
+    use std::path::PathBuf;
     use vector_core::config::log_schema;
 
     use super::*;
 
-    #[test]
-    fn deserialize_protobuf() {
-        let protobuf_bin_message_path = "tests/data/protobuf_decoding/person_someone.pb";
-        let protobuf_desc_path = "tests/data/protobuf_decoding/test_protobuf.desc";
-        let message_type = "test_protobuf.Person";
-        let validate_log = |log: &LogEvent| {
-            assert_eq!(log["name"], "someone".into());
-        };
-
-        parse_and_validate(
-            protobuf_bin_message_path,
-            protobuf_desc_path,
-            message_type,
-            validate_log,
-        );
-    }
-
-    #[test]
-    fn deserialize_protobuf3() {
-        let protobuf_bin_message_path = "tests/data/protobuf_decoding/person_someone3.pb";
-        let protobuf_desc_path = "tests/data/protobuf_decoding/test_protobuf3.desc";
-        let message_type = "test_protobuf3.Person";
-        let validate_log = |log: &LogEvent| {
-            assert_eq!(log["name"], "someone".into());
-            assert_eq!(
-                log["data"].as_object().unwrap()["data_phone"],
-                "HOME".into()
-            );
-        };
-
-        parse_and_validate(
-            protobuf_bin_message_path,
-            protobuf_desc_path,
-            message_type,
-            validate_log,
-        );
-    }
+    fn test_data_dir() -> PathBuf { PathBuf::from(env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("tests/data/decoding/protobuf") }
 
     fn parse_and_validate(
-        protobuf_bin_message_path: &str,
-        protobuf_desc_path: &str,
+        protobuf_bin_message: String,
+        protobuf_desc_path: PathBuf,
         message_type: &str,
         validate_log: fn(&LogEvent),
     ) {
-        let protobuf_message = fs::read_to_string(protobuf_bin_message_path).unwrap();
-        let input = Bytes::from(protobuf_message);
+        let input = Bytes::from(protobuf_bin_message);
         let deserializer =
-            ProtobufDeserializer::new(protobuf_desc_path.to_string(), message_type.to_string());
+            ProtobufDeserializer::new(protobuf_desc_path.to_str().unwrap().to_string(), message_type.to_string());
 
         for namespace in [LogNamespace::Legacy, LogNamespace::Vector] {
             let events = deserializer.parse(input.clone(), namespace).unwrap();
@@ -270,10 +229,10 @@ mod tests {
                 validate_log(log);
                 assert_eq!(
                     log.get((
-                        lookup::PathPrefix::Event,
+                        PathPrefix::Event,
                         log_schema().timestamp_key().unwrap()
                     ))
-                    .is_some(),
+                        .is_some(),
                     namespace == LogNamespace::Legacy
                 );
             }
@@ -283,24 +242,65 @@ mod tests {
     }
 
     #[test]
-    fn deserialize_skip_empty() {
-        let input = Bytes::from("");
-        let deserializer = ProtobufDeserializer::new(
-            "tests/data/protobuf_decoding/test_protobuf.desc".to_string(),
-            "test_protobuf.Person".to_string(),
-        );
+    fn deserialize_protobuf() {
+        let protobuf_bin_message_path = test_data_dir().join("person_someone.pb");
+        let protobuf_desc_path = test_data_dir().join("test_protobuf.desc");
+        let message_type = "test_protobuf.Person";
+        let validate_log = |log: &LogEvent| {
+            assert_eq!(log["name"], "someone".into());
+        };
 
-        for namespace in [LogNamespace::Legacy, LogNamespace::Vector] {
-            let events = deserializer.parse(input.clone(), namespace).unwrap();
-            assert!(events.is_empty());
-        }
+        parse_and_validate(
+            fs::read_to_string(protobuf_bin_message_path).unwrap(),
+            protobuf_desc_path,
+            message_type,
+            validate_log,
+        );
+    }
+
+    #[test]
+    fn deserialize_protobuf3() {
+        let protobuf_bin_message_path = test_data_dir().join("person_someone3.pb");
+        let protobuf_desc_path = test_data_dir().join("test_protobuf3.desc");
+        let message_type = "test_protobuf3.Person";
+        let validate_log = |log: &LogEvent| {
+            assert_eq!(log["name"], "someone".into());
+            assert_eq!(
+                log["data"].as_object().unwrap()["data_phone"],
+                "HOME".into()
+            );
+        };
+
+        parse_and_validate(
+            fs::read_to_string(protobuf_bin_message_path).unwrap(),
+            protobuf_desc_path,
+            message_type,
+            validate_log,
+        );
+    }
+
+    #[test]
+    fn deserialize_empty_buffer() {
+        let protobuf_bin_message = "".to_string();
+        let protobuf_desc_path = test_data_dir().join("test_protobuf.desc");
+        let message_type = "test_protobuf.Person";
+        let validate_log = |log: &LogEvent| {
+            assert_eq!(log["name"], "".into());
+        };
+
+        parse_and_validate(
+            protobuf_bin_message,
+            protobuf_desc_path,
+            message_type,
+            validate_log,
+        );
     }
 
     #[test]
     fn deserialize_error_invalid_protobuf() {
         let input = Bytes::from("{ foo");
         let deserializer = ProtobufDeserializer::new(
-            "tests/data/protobuf_decoding/test_protobuf.desc".to_string(),
+            test_data_dir().join("test_protobuf.desc").to_str().unwrap().to_string(),
             "test_protobuf.Person".to_string(),
         );
 
