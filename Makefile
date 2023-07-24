@@ -270,6 +270,9 @@ target/%/vector.tar.gz: target/%/vector CARGO_HANDLES_FRESHNESS
 	cp -R -f -v \
 		README.md \
 		LICENSE \
+		licenses \
+		NOTICE \
+		LICENSE-3rdparty.csv \
 		config \
 		target/scratch/vector-${TRIPLE}/
 	cp -R -f -v \
