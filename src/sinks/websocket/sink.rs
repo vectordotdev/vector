@@ -132,10 +132,7 @@ impl WebSocketConnector {
 
         let maybe_tls = self.tls_connect().await?;
 
-        let ws_config = WebSocketConfig {
-            max_send_queue: None, // don't buffer messages
-            ..Default::default()
-        };
+        let ws_config = WebSocketConfig::default();
 
         let (ws_stream, _response) = client_async_with_config(request, maybe_tls, Some(ws_config))
             .await
