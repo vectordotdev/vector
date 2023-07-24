@@ -65,10 +65,15 @@ pub(crate) fn build_warp_filter(
                     });
 
                 let output = multiple_outputs.then_some(super::LOGS);
-                let res = handle_request(events, acknowledgements, out.clone(), output);
-                request_time.record(reference.elapsed().as_secs_f64());
-                active_request_count.decrement(1.);
-                res
+                handle_request(
+                    events,
+                    acknowledgements,
+                    out.clone(),
+                    output,
+                    Some(reference),
+                    Some(request_time.clone()),
+                    Some(active_request_count.clone()),
+                )
             },
         )
         .boxed()

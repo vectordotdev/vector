@@ -84,7 +84,15 @@ fn sketches_service(
                             &source.events_received,
                         )
                     });
-                handle_request(events, acknowledgements, out.clone(), output)
+                handle_request(
+                    events,
+                    acknowledgements,
+                    out.clone(),
+                    output,
+                    None,
+                    None,
+                    None,
+                )
             },
         )
         .boxed()
@@ -125,7 +133,15 @@ fn series_v1_service(
                             &source.events_received,
                         )
                     });
-                handle_request(events, acknowledgements, out.clone(), output)
+                handle_request(
+                    events,
+                    acknowledgements,
+                    out.clone(),
+                    output,
+                    None,
+                    None,
+                    None,
+                )
             },
         )
         .boxed()
@@ -163,7 +179,15 @@ fn series_v2_service(
                             &source.events_received,
                         )
                     });
-                handle_request(events, acknowledgements, out.clone(), output)
+                handle_request(
+                    events,
+                    acknowledgements,
+                    out.clone(),
+                    output,
+                    None,
+                    None,
+                    None,
+                )
             },
         )
         .boxed()

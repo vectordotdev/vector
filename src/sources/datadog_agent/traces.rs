@@ -75,7 +75,15 @@ fn build_trace_filter(
                         })
                     });
                 let output = multiple_outputs.then_some(super::TRACES);
-                handle_request(events, acknowledgements, out.clone(), output)
+                handle_request(
+                    events,
+                    acknowledgements,
+                    out.clone(),
+                    output,
+                    None,
+                    None,
+                    None,
+                )
             },
         )
         .boxed()

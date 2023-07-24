@@ -19,6 +19,7 @@ pub(crate) mod ddtrace_proto {
 
 use std::{fmt::Debug, io::Read, net::SocketAddr, sync::Arc};
 
+use ::metrics::{Gauge, Histogram};
 use bytes::{Buf, Bytes};
 use chrono::{serde::ts_milliseconds, DateTime, Utc};
 use codecs::decoding::{DeserializerConfig, FramingConfig};
@@ -29,6 +30,7 @@ use lookup::owned_value_path;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
+use tokio::time::Instant;
 use tracing::{Instrument, Span};
 use value::Kind;
 use vector_common::internal_event::{EventsReceived, Registered};
@@ -434,8 +436,11 @@ pub(crate) async fn handle_request(
     acknowledgements: bool,
     mut out: SourceSender,
     output: Option<&str>,
+    reference: Option<Instant>,
+    request_time: Option<Histogram>,
+    active_request_count: Option<Gauge>,
 ) -> Result<Response, Rejection> {
-    match events {
+    let res = match events {
         Ok(mut events) => {
             let receiver = BatchNotifier::maybe_apply_to(acknowledgements, &mut events);
             let count = events.len();
@@ -465,7 +470,12 @@ pub(crate) async fn handle_request(
             }
         }
         Err(err) => Err(warp::reject::custom(err)),
+    };
+    if let Some(reference) = reference {
+        request_time.map(|request_time| request_time.record(reference.elapsed().as_secs_f64()));
+        active_request_count.map(|active_request_count| active_request_count.decrement(1.));
     }
+    res
 }
 
 fn handle_decode_error(encoding: &str, error: impl std::error::Error) -> ErrorMessage {
