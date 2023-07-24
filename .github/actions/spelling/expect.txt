@@ -220,6 +220,7 @@ cwl
 Dailywarehousing
 daschl
 dashmap
+datadir
 dataflows
 datafuselabs
 datasources
@@ -1194,6 +1195,7 @@ watchexec
 watchlogs
 wayfor
 webgraphviz
+webpki
 webservers
 websites
 weee

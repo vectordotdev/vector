@@ -12,6 +12,7 @@ FROM docker.io/debian:bullseye-slim
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates tzdata systemd && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /usr/bin/vector /usr/bin/vector
+COPY --from=builder /usr/share/vector /usr/share/vector
 COPY --from=builder /usr/share/doc/vector /usr/share/doc/vector
 COPY --from=builder /etc/vector /etc/vector
 COPY --from=builder /var/lib/vector /var/lib/vector
