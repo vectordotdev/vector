@@ -22,7 +22,7 @@ pub use parser::{parse_dnstap_data, DnstapParser};
 
 pub mod schema;
 use dnsmsg_parser::{dns_message, dns_message_parser};
-use lookup::lookup_v2::{parse_value_path, OptionalValuePath};
+use lookup::lookup_v2::OptionalValuePath;
 pub use schema::DnstapEventSchema;
 use vector_core::{
     config::{LegacyKey, LogNamespace},
@@ -127,14 +127,15 @@ impl DnstapConfig {
                 let schema = vector_core::schema::Definition::empty_legacy_namespace();
 
                 if self.raw_data_only.unwrap_or(false) {
-                    schema.with_event_field(
-                        &owned_value_path!(log_schema().message_key()),
-                        Kind::bytes(),
-                        Some("message"),
-                    )
-                } else {
-                    event_schema.schema_definition(schema)
+                    if let Some(message_key) = log_schema().message_key() {
+                        return schema.with_event_field(
+                            message_key,
+                            Kind::bytes(),
+                            Some("message"),
+                        );
+                    }
                 }
+                event_schema.schema_definition(schema)
             }
             LogNamespace::Vector => {
                 let schema = vector_core::schema::Definition::new_with_default_metadata(
@@ -224,10 +225,10 @@ impl DnstapFrameHandler {
 
         let schema = DnstapConfig::event_schema(timestamp_key);
 
-        let host_key = config.host_key.clone().map_or_else(
-            || parse_value_path(log_schema().host_key()).ok(),
-            |k| k.path,
-        );
+        let host_key = config
+            .host_key
+            .clone()
+            .map_or(log_schema().host_key().cloned(), |k| k.path);
 
         Self {
             max_frame_length: config.max_frame_length,

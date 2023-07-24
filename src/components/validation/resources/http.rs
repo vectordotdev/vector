@@ -1,5 +1,6 @@
 use std::{
     collections::VecDeque,
+    future::Future,
     net::{IpAddr, SocketAddr},
     str::FromStr,
     sync::Arc,
@@ -11,26 +12,18 @@ use axum::{
     Router,
 };
 use bytes::BytesMut;
-use codecs::{
-    encoding, JsonSerializer, LengthDelimitedEncoder, LogfmtSerializer, MetricTagValues,
-    NewlineDelimitedEncoder,
-};
 use http::{Method, Request, StatusCode, Uri};
 use hyper::{Body, Client, Server};
-use std::future::Future;
 use tokio::{
     select,
     sync::{mpsc, oneshot, Mutex, Notify},
 };
-use tokio_util::codec::{Decoder, Encoder as _};
+use tokio_util::codec::Decoder;
+
+use crate::components::validation::sync::{Configuring, TaskCoordinator};
 use vector_core::event::Event;
 
-use crate::{
-    codecs::Encoder,
-    components::validation::sync::{Configuring, TaskCoordinator},
-};
-
-use super::{ResourceCodec, ResourceDirection, TestEvent};
+use super::{encode_test_event, ResourceCodec, ResourceDirection, TestEvent};
 
 /// An HTTP resource.
 #[derive(Clone)]
@@ -67,7 +60,7 @@ impl HttpResourceConfig {
         self,
         direction: ResourceDirection,
         codec: ResourceCodec,
-        output_tx: mpsc::Sender<Event>,
+        output_tx: mpsc::Sender<Vec<Event>>,
         task_coordinator: &TaskCoordinator<Configuring>,
     ) {
         match direction {
@@ -114,8 +107,10 @@ fn spawn_input_http_server(
 
                     buffer.into_response()
                 } else {
-                    // No outstanding events to send, so just provide an empty response.
-                    StatusCode::NO_CONTENT.into_response()
+                    // We'll send an empty 200 in the response since some
+                    // sources throw errors for anything other than a valid
+                    // response.
+                    StatusCode::OK.into_response()
                 }
             }
         });
@@ -230,7 +225,7 @@ fn spawn_input_http_client(
 fn spawn_output_http_server(
     config: HttpResourceConfig,
     codec: ResourceCodec,
-    output_tx: mpsc::Sender<Event>,
+    output_tx: mpsc::Sender<Vec<Event>>,
     task_coordinator: &TaskCoordinator<Configuring>,
 ) {
     // This HTTP server will wait for events to be sent by a sink, and collect them and send them on
@@ -252,12 +247,10 @@ fn spawn_output_http_server(
                         loop {
                             match decoder.decode_eof(&mut body) {
                                 Ok(Some((events, _byte_size))) => {
-                                    for event in events {
-                                        output_tx
-                                            .send(event)
-                                            .await
-                                            .expect("should not fail to send output event");
-                                    }
+                                    output_tx
+                                        .send(events.to_vec())
+                                        .await
+                                        .expect("should not fail to send output event");
                                 }
                                 Ok(None) => return StatusCode::OK.into_response(),
                                 Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
@@ -290,7 +283,7 @@ fn spawn_output_http_server(
 fn spawn_output_http_client(
     _config: HttpResourceConfig,
     _codec: ResourceCodec,
-    _output_tx: mpsc::Sender<Event>,
+    _output_tx: mpsc::Sender<Vec<Event>>,
     _task_coordinator: &TaskCoordinator<Configuring>,
 ) {
     // TODO: The `prometheus_exporter` sink is the only sink that exposes an HTTP server which must be
@@ -399,40 +392,4 @@ fn socketaddr_from_uri(uri: &Uri) -> SocketAddr {
         .expect("HTTP URI not valid");
 
     SocketAddr::from((uri_host, uri_port))
-}
-
-pub fn encode_test_event(
-    encoder: &mut Encoder<encoding::Framer>,
-    buf: &mut BytesMut,
-    event: TestEvent,
-) {
-    match event {
-        TestEvent::Passthrough(event) => {
-            // Encode the event normally.
-            encoder
-                .encode(event.into_event(), buf)
-                .expect("should not fail to encode input event");
-        }
-        TestEvent::Modified { event, .. } => {
-            // This is a little fragile, but we check what serializer this encoder uses, and based
-            // on `Serializer::supports_json`, we choose an opposing codec. For example, if the
-            // encoder supports JSON, we'll use a serializer that doesn't support JSON, and vise
-            // versa.
-            let mut alt_encoder = if encoder.serializer().supports_json() {
-                Encoder::<encoding::Framer>::new(
-                    LengthDelimitedEncoder::new().into(),
-                    LogfmtSerializer::new().into(),
-                )
-            } else {
-                Encoder::<encoding::Framer>::new(
-                    NewlineDelimitedEncoder::new().into(),
-                    JsonSerializer::new(MetricTagValues::default()).into(),
-                )
-            };
-
-            alt_encoder
-                .encode(event.into_event(), buf)
-                .expect("should not fail to encode input event");
-        }
-    }
 }

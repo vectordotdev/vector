@@ -772,6 +772,7 @@ NQTP
 nresamples
 nullishness
 numbackends
+oahd
 oap
 OKD
 omfwd
@@ -815,6 +816,7 @@ pathgen
 peekable
 PEMS
 pgmajfault
+pgrep
 PII
 Pitbull
 pkc

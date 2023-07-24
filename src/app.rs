@@ -38,6 +38,7 @@ use crate::{
 use std::os::unix::process::ExitStatusExt;
 #[cfg(windows)]
 use std::os::windows::process::ExitStatusExt;
+use tokio::runtime::Handle;
 
 pub static WORKER_THREADS: OnceNonZeroUsize = OnceNonZeroUsize::new();
 
@@ -122,13 +123,13 @@ impl ApplicationConfig {
 
     /// Configure the API server, if applicable
     #[cfg(feature = "api")]
-    pub fn setup_api(&self, runtime: &Runtime) -> Option<api::Server> {
+    pub fn setup_api(&self, handle: &Handle) -> Option<api::Server> {
         if self.api.enabled {
             match api::Server::start(
                 self.topology.config(),
                 self.topology.watch(),
                 std::sync::Arc::clone(&self.topology.running),
-                runtime,
+                handle,
             ) {
                 Ok(api_server) => {
                     emit!(ApiStarted {
@@ -159,7 +160,8 @@ impl Application {
     }
 
     pub fn prepare_start() -> Result<(Runtime, StartedApplication), ExitCode> {
-        Self::prepare().and_then(|(runtime, app)| app.start(&runtime).map(|app| (runtime, app)))
+        Self::prepare()
+            .and_then(|(runtime, app)| app.start(runtime.handle()).map(|app| (runtime, app)))
     }
 
     pub fn prepare() -> Result<(Runtime, Self), ExitCode> {
@@ -208,13 +210,13 @@ impl Application {
         ))
     }
 
-    pub fn start(self, runtime: &Runtime) -> Result<StartedApplication, ExitCode> {
+    pub fn start(self, handle: &Handle) -> Result<StartedApplication, ExitCode> {
         // Any internal_logs sources will have grabbed a copy of the
         // early buffer by this point and set up a subscriber.
         crate::trace::stop_early_buffering();
 
         emit!(VectorStarted);
-        runtime.spawn(heartbeat::heartbeat());
+        handle.spawn(heartbeat::heartbeat());
 
         let Self {
             require_healthy,
@@ -224,7 +226,7 @@ impl Application {
 
         let topology_controller = SharedTopologyController::new(TopologyController {
             #[cfg(feature = "api")]
-            api_server: config.setup_api(runtime),
+            api_server: config.setup_api(handle),
             topology: config.topology,
             config_paths: config.config_paths.clone(),
             require_healthy,

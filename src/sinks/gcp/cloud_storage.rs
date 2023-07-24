@@ -410,7 +410,9 @@ mod tests {
     use codecs::encoding::FramingConfig;
     use codecs::{JsonSerializerConfig, NewlineDelimitedEncoderConfig, TextSerializerConfig};
     use futures_util::{future::ready, stream};
+    use vector_common::request_metadata::GroupedCountByteSize;
     use vector_core::partition::Partitioner;
+    use vector_core::EstimatedJsonEncodedSizeOf;
 
     use crate::event::LogEvent;
     use crate::test_util::{
@@ -491,10 +493,14 @@ mod tests {
             .unwrap()
             .partition(&log)
             .expect("key wasn't provided");
+
+        let mut byte_size = GroupedCountByteSize::new_untagged();
+        byte_size.add_event(&log, log.estimated_json_encoded_size_of());
+
         let request_settings = request_settings(&sink_config);
         let (metadata, metadata_request_builder, _events) =
             request_settings.split_input((key, vec![log]));
-        let payload = EncodeResult::uncompressed(Bytes::new());
+        let payload = EncodeResult::uncompressed(Bytes::new(), byte_size);
         let request_metadata = metadata_request_builder.build(&payload);
 
         request_settings.build_request(metadata, request_metadata, payload)

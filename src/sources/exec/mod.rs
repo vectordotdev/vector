@@ -23,6 +23,7 @@ use tokio_util::codec::FramedRead;
 use vector_common::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
 use vector_config::configurable_component;
 use vector_core::{config::LegacyKey, EstimatedJsonEncodedSizeOf};
+use vrl::path::OwnedValuePath;
 use vrl::value::Kind;
 
 use crate::{
@@ -276,9 +277,11 @@ impl SourceConfig for ExecConfig {
             .with_standard_vector_source_metadata()
             .with_source_metadata(
                 Self::NAME,
-                Some(LegacyKey::InsertIfEmpty(owned_value_path!(
-                    log_schema().host_key()
-                ))),
+                Some(LegacyKey::InsertIfEmpty(
+                    log_schema()
+                        .host_key()
+                        .map_or(OwnedValuePath::root(), |key| key.clone()),
+                )),
                 &owned_value_path!("host"),
                 Kind::bytes().or_undefined(),
                 Some("host"),
@@ -666,7 +669,7 @@ fn handle_event(
             log_namespace.insert_source_metadata(
                 ExecConfig::NAME,
                 log,
-                Some(LegacyKey::InsertIfEmpty(path!(log_schema().host_key()))),
+                log_schema().host_key().map(LegacyKey::InsertIfEmpty),
                 path!("host"),
                 hostname.clone(),
             );
@@ -756,11 +759,17 @@ mod tests {
         );
         let log = event.as_log();
 
-        assert_eq!(log[log_schema().host_key()], "Some.Machine".into());
+        assert_eq!(
+            log[log_schema().host_key().unwrap().to_string().as_str()],
+            "Some.Machine".into()
+        );
         assert_eq!(log[STREAM_KEY], STDOUT.into());
         assert_eq!(log[PID_KEY], (8888_i64).into());
         assert_eq!(log[COMMAND_KEY], config.command.into());
-        assert_eq!(log[log_schema().message_key()], "hello world".into());
+        assert_eq!(
+            log[log_schema().message_key().unwrap().to_string()],
+            "hello world".into()
+        );
         assert_eq!(
             log[log_schema().source_type_key().unwrap().to_string()],
             "exec".into()
@@ -840,11 +849,17 @@ mod tests {
         );
         let log = event.as_log();
 
-        assert_eq!(log[log_schema().host_key()], "Some.Machine".into());
+        assert_eq!(
+            log[log_schema().host_key().unwrap().to_string().as_str()],
+            "Some.Machine".into()
+        );
         assert_eq!(log[STREAM_KEY], STDOUT.into());
         assert_eq!(log[PID_KEY], (8888_i64).into());
         assert_eq!(log[COMMAND_KEY], config.command.into());
-        assert_eq!(log[log_schema().message_key()], "hello world".into());
+        assert_eq!(
+            log[log_schema().message_key().unwrap().to_string()],
+            "hello world".into()
+        );
         assert_eq!(
             log[log_schema().source_type_key().unwrap().to_string()],
             "exec".into()
@@ -955,7 +970,7 @@ mod tests {
             assert_eq!(events.len(), 1);
             let log = events[0].as_log();
             assert_eq!(
-                log[log_schema().message_key()],
+                log[log_schema().message_key().unwrap().to_string()],
                 Bytes::from("hello world").into()
             );
             assert_eq!(origin, STDOUT);
@@ -967,7 +982,7 @@ mod tests {
             assert_eq!(events.len(), 1);
             let log = events[0].as_log();
             assert_eq!(
-                log[log_schema().message_key()],
+                log[log_schema().message_key().unwrap().to_string()],
                 Bytes::from("hello rocket 🚀").into()
             );
             assert_eq!(origin, STDOUT);
@@ -1051,8 +1066,14 @@ mod tests {
                 log[log_schema().source_type_key().unwrap().to_string()],
                 "exec".into()
             );
-            assert_eq!(log[log_schema().message_key()], "Hello World!".into());
-            assert_eq!(log[log_schema().host_key()], "Some.Machine".into());
+            assert_eq!(
+                log[log_schema().message_key().unwrap().to_string()],
+                "Hello World!".into()
+            );
+            assert_eq!(
+                log[log_schema().host_key().unwrap().to_string().as_str()],
+                "Some.Machine".into()
+            );
             assert!(log.get(PID_KEY).is_some());
             assert!(log
                 .get((
@@ -1110,14 +1131,20 @@ mod tests {
 
         if let Poll::Ready(Some(event)) = futures::poll!(rx.next()) {
             let log = event.as_log();
-            assert_eq!(log[log_schema().message_key()], "signal received".into());
+            assert_eq!(
+                log[log_schema().message_key().unwrap().to_string()],
+                "signal received".into()
+            );
         } else {
             panic!("Expected to receive event");
         }
 
         if let Poll::Ready(Some(event)) = futures::poll!(rx.next()) {
             let log = event.as_log();
-            assert_eq!(log[log_schema().message_key()], "slept".into());
+            assert_eq!(
+                log[log_schema().message_key().unwrap().to_string()],
+                "slept".into()
+            );
         } else {
             panic!("Expected to receive event");
         }

@@ -654,7 +654,10 @@ mod tests {
         {
             let event = events.remove(0);
             let log = event.as_log();
-            assert_eq!(log[log_schema().message_key()], "test body".into());
+            assert_eq!(
+                log[log_schema().message_key().unwrap().to_string()],
+                "test body".into()
+            );
             assert!(log
                 .get((
                     lookup::PathPrefix::Event,
@@ -671,7 +674,10 @@ mod tests {
         {
             let event = events.remove(0);
             let log = event.as_log();
-            assert_eq!(log[log_schema().message_key()], "test body 2".into());
+            assert_eq!(
+                log[log_schema().message_key().unwrap().to_string()],
+                "test body 2".into()
+            );
             assert_event_metadata(log).await;
         }
     }
@@ -703,13 +709,19 @@ mod tests {
         {
             let event = events.remove(0);
             let log = event.as_log();
-            assert_eq!(log[log_schema().message_key()], "test body".into());
+            assert_eq!(
+                log[log_schema().message_key().unwrap().to_string()],
+                "test body".into()
+            );
             assert_event_metadata(log).await;
         }
         {
             let event = events.remove(0);
             let log = event.as_log();
-            assert_eq!(log[log_schema().message_key()], "test body 2".into());
+            assert_eq!(
+                log[log_schema().message_key().unwrap().to_string()],
+                "test body 2".into()
+            );
             assert_event_metadata(log).await;
         }
     }
@@ -742,7 +754,10 @@ mod tests {
         {
             let event = events.remove(0);
             let log = event.as_log();
-            assert_eq!(log[log_schema().message_key()], "foo\nbar".into());
+            assert_eq!(
+                log[log_schema().message_key().unwrap().to_string()],
+                "foo\nbar".into()
+            );
             assert_event_metadata(log).await;
         }
     }
@@ -1094,7 +1109,10 @@ mod tests {
         {
             let event = events.remove(0);
             let log = event.as_log();
-            assert_eq!(log[log_schema().message_key()], "test body".into());
+            assert_eq!(
+                log[log_schema().message_key().unwrap().to_string()],
+                "test body".into()
+            );
             assert_event_metadata(log).await;
         }
     }

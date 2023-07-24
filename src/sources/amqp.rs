@@ -711,7 +711,10 @@ mod integration_test {
 
         let log = events[0].as_log();
         trace!("{:?}", log);
-        assert_eq!(log[log_schema().message_key()], "my message".into());
+        assert_eq!(
+            log[log_schema().message_key().unwrap().to_string()],
+            "my message".into()
+        );
         assert_eq!(log["routing"], routing_key.into());
         assert_eq!(
             log[log_schema().source_type_key().unwrap().to_string()],

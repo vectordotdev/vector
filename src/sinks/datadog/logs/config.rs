@@ -3,7 +3,7 @@ use std::{convert::TryFrom, sync::Arc};
 use indoc::indoc;
 use tower::ServiceBuilder;
 use vector_config::configurable_component;
-use vector_core::config::proxy::ProxyConfig;
+use vector_core::{config::proxy::ProxyConfig, schema::meaning};
 use vrl::value::Kind;
 
 use super::{service::LogApiRetry, sink::LogSinkBuilder};
@@ -176,13 +176,13 @@ impl SinkConfig for DatadogLogsConfig {
 
     fn input(&self) -> Input {
         let requirement = schema::Requirement::empty()
-            .required_meaning("message", Kind::bytes())
-            .required_meaning("timestamp", Kind::timestamp())
-            .optional_meaning("host", Kind::bytes())
-            .optional_meaning("source", Kind::bytes())
-            .optional_meaning("severity", Kind::bytes())
-            .optional_meaning("service", Kind::bytes())
-            .optional_meaning("trace_id", Kind::bytes());
+            .required_meaning(meaning::MESSAGE, Kind::bytes())
+            .required_meaning(meaning::TIMESTAMP, Kind::timestamp())
+            .optional_meaning(meaning::HOST, Kind::bytes())
+            .optional_meaning(meaning::SOURCE, Kind::bytes())
+            .optional_meaning(meaning::SEVERITY, Kind::bytes())
+            .optional_meaning(meaning::SERVICE, Kind::bytes())
+            .optional_meaning(meaning::TRACE_ID, Kind::bytes());
 
         Input::log().with_schema_requirement(requirement)
     }

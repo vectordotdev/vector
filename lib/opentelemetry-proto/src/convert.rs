@@ -7,6 +7,7 @@ use vector_core::{
     config::{log_schema, LegacyKey, LogNamespace},
     event::{Event, LogEvent},
 };
+use vrl::path::PathPrefix;
 use vrl::value::Value;
 
 use super::proto::{
@@ -94,7 +95,7 @@ impl ResourceLog {
             LogNamespace::Legacy => {
                 let mut log = LogEvent::default();
                 if let Some(v) = self.log_record.body.and_then(|av| av.value) {
-                    log.insert(log_schema().message_key(), v);
+                    log.maybe_insert(PathPrefix::Event, log_schema().message_key(), v);
                 }
                 log
             }

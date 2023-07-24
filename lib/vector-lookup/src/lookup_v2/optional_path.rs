@@ -91,3 +91,11 @@ impl From<OwnedValuePath> for OptionalValuePath {
         Self { path: Some(path) }
     }
 }
+
+impl From<Option<OwnedValuePath>> for OptionalValuePath {
+    fn from(value: Option<OwnedValuePath>) -> Self {
+        value.map_or(OptionalValuePath::none(), |path| {
+            OptionalValuePath::from(path)
+        })
+    }
+}
