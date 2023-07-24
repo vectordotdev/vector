@@ -196,7 +196,6 @@ pub struct WebSocketSink {
     connector: WebSocketConnector,
     ping_interval: Option<NonZeroU64>,
     ping_timeout: Option<NonZeroU64>,
-    encode_as_binary: bool,
 }
 
 impl WebSocketSink {
@@ -204,10 +203,6 @@ impl WebSocketSink {
         let transformer = config.encoding.transformer();
         let serializer = config.encoding.build()?;
         let encoder = Encoder::<()>::new(serializer);
-        let encode_as_binary = match config.encoding.config() {
-            codecs::encoding::SerializerConfig::RawMessage => true,
-            _ => false,
-        };
 
         Ok(Self {
             transformer,
@@ -215,7 +210,6 @@ impl WebSocketSink {
             connector,
             ping_interval: config.ping_interval,
             ping_timeout: config.ping_timeout,
-            encode_as_binary: encode_as_binary,
         })
     }
 
@@ -267,6 +261,11 @@ impl WebSocketSink {
 
         let bytes_sent = register!(BytesSent::from(Protocol("websocket".into())));
         let events_sent = register!(EventsSent::from(Output(None)));
+        let encode_as_binary = match self.encoder.serializer() {
+            codecs::encoding::Serializer::RawMessage(_) => true,
+            _ => false,
+        };
+
 
         loop {
             let result = tokio::select! {
@@ -307,9 +306,11 @@ impl WebSocketSink {
                         Ok(()) => {
                             finalizers.update_status(EventStatus::Delivered);
 
-                            let message = match self.encode_as_binary {
-                                true => Message::binary(bytes),
-                                false => Message::text(String::from_utf8_lossy(&bytes)),
+                            let message = if encode_as_binary {
+                                Message::binary(bytes)
+                            }
+                            else {
+                                Message::text(String::from_utf8_lossy(&bytes))
                             };
                             let message_len = message.len();
 
