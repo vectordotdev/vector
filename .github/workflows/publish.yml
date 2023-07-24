@@ -294,6 +294,7 @@ jobs:
           - ubuntu:23.04
           - debian:10
           - debian:11
+          - debian:12
     container:
       image: ${{ matrix.container }}
     steps:
