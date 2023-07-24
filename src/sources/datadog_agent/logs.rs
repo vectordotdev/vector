@@ -5,6 +5,8 @@ use chrono::Utc;
 use codecs::StreamDecodingError;
 use http::StatusCode;
 use lookup::path;
+use metrics::{register_gauge, register_histogram};
+use tokio::time::Instant;
 use tokio_util::codec::Decoder;
 use vector_common::internal_event::{CountByteSize, InternalEventHandle as _};
 use vector_core::{config::LegacyKey, EstimatedJsonEncodedSizeOf};
@@ -21,12 +23,17 @@ use crate::{
     SourceSender,
 };
 
+const ACTIVE_REQUEST_COUNT_NAME: &str = "datadog_agent_active_request_count";
+const REQUEST_TIME_NAME: &str = "datadog_agent_request_time_seconds";
+
 pub(crate) fn build_warp_filter(
     acknowledgements: bool,
     multiple_outputs: bool,
     out: SourceSender,
     source: DatadogAgentSource,
 ) -> BoxedFilter<(Response,)> {
+    let active_request_count = register_gauge!(ACTIVE_REQUEST_COUNT_NAME);
+    let request_time = register_histogram!(REQUEST_TIME_NAME);
     warp::post()
         .and(warp_path!("v1" / "input" / ..).or(warp_path!("api" / "v2" / "logs" / ..)))
         .and(warp::path::full())
@@ -41,6 +48,8 @@ pub(crate) fn build_warp_filter(
                   api_token: Option<String>,
                   query_params: ApiKeyQueryParams,
                   body: Bytes| {
+                active_request_count.increment(1.);
+                let reference = Instant::now();
                 let events = source
                     .decode(&encoding_header, body, path.as_str())
                     .and_then(|body| {
@@ -56,7 +65,10 @@ pub(crate) fn build_warp_filter(
                     });
 
                 let output = multiple_outputs.then_some(super::LOGS);
-                handle_request(events, acknowledgements, out.clone(), output)
+                let res = handle_request(events, acknowledgements, out.clone(), output);
+                request_time.record(reference.elapsed().as_secs_f64());
+                active_request_count.decrement(1.);
+                res
             },
         )
         .boxed()

@@ -4,6 +4,7 @@ use std::{collections::HashMap, fmt};
 use chrono::Utc;
 use futures::{Stream, StreamExt};
 use metrics::{register_histogram, Histogram};
+use tokio::time::Instant;
 use tracing::Instrument;
 use value::Value;
 use vector_buffers::topology::channel::{self, LimitedReceiver, LimitedSender};
@@ -29,12 +30,14 @@ pub(crate) const CHUNK_SIZE: usize = 1000;
 const TEST_BUFFER_SIZE: usize = 100;
 
 const LAG_TIME_NAME: &str = "source_lag_time_seconds";
+const SEND_TIME_NAME: &str = "source_send_time_seconds";
 
 pub struct Builder {
     buf_size: usize,
     inner: Option<Inner>,
     named_inners: HashMap<String, Inner>,
     lag_time: Option<Histogram>,
+    send_time: Option<Histogram>,
 }
 
 impl Builder {
@@ -46,20 +49,27 @@ impl Builder {
             inner: self.inner,
             named_inners: self.named_inners,
             lag_time: self.lag_time,
+            send_time: self.send_time,
         }
     }
 
     pub fn add_source_output(&mut self, output: SourceOutput) -> LimitedReceiver<EventArray> {
         let lag_time = self.lag_time.clone();
+        let send_time = self.send_time.clone();
         match output.port {
             None => {
-                let (inner, rx) =
-                    Inner::new_with_buffer(self.buf_size, DEFAULT_OUTPUT.to_owned(), lag_time);
+                let (inner, rx) = Inner::new_with_buffer(
+                    self.buf_size,
+                    DEFAULT_OUTPUT.to_owned(),
+                    lag_time,
+                    send_time,
+                );
                 self.inner = Some(inner);
                 rx
             }
             Some(name) => {
-                let (inner, rx) = Inner::new_with_buffer(self.buf_size, name.clone(), lag_time);
+                let (inner, rx) =
+                    Inner::new_with_buffer(self.buf_size, name.clone(), lag_time, send_time);
                 self.named_inners.insert(name, inner);
                 rx
             }
@@ -89,12 +99,14 @@ impl SourceSender {
             inner: None,
             named_inners: Default::default(),
             lag_time: Some(register_histogram!(LAG_TIME_NAME)),
+            send_time: Some(register_histogram!(SEND_TIME_NAME)),
         }
     }
 
     pub fn new_with_buffer(n: usize) -> (Self, LimitedReceiver<EventArray>) {
         let lag_time = Some(register_histogram!(LAG_TIME_NAME));
-        let (inner, rx) = Inner::new_with_buffer(n, DEFAULT_OUTPUT.to_owned(), lag_time);
+        let send_time = Some(register_histogram!(SEND_TIME_NAME));
+        let (inner, rx) = Inner::new_with_buffer(n, DEFAULT_OUTPUT.to_owned(), lag_time, send_time);
         (
             Self {
                 inner: Some(inner),
@@ -162,7 +174,7 @@ impl SourceSender {
     ) -> impl Stream<Item = EventArray> + Unpin {
         // The lag_time parameter here will need to be filled in if this function is ever used for
         // non-test situations.
-        let (inner, recv) = Inner::new_with_buffer(100, name.clone(), None);
+        let (inner, recv) = Inner::new_with_buffer(100, name.clone(), None, None);
         let recv = recv.into_stream().map(move |mut events| {
             events.iter_events_mut().for_each(|mut event| {
                 let metadata = event.metadata_mut();
@@ -225,6 +237,7 @@ struct Inner {
     inner: LimitedSender<EventArray>,
     output: String,
     lag_time: Option<Histogram>,
+    send_time: Option<Histogram>,
     events_sent: Registered<EventsSent>,
 }
 
@@ -243,6 +256,7 @@ impl Inner {
         n: usize,
         output: String,
         lag_time: Option<Histogram>,
+        send_time: Option<Histogram>,
     ) -> (Self, LimitedReceiver<EventArray>) {
         let (tx, rx) = channel::limited(n);
         (
@@ -250,6 +264,7 @@ impl Inner {
                 inner: tx,
                 output: output.clone(),
                 lag_time,
+                send_time,
                 events_sent: register!(EventsSent::from(internal_event::Output(Some(
                     output.into()
                 )))),
@@ -265,7 +280,13 @@ impl Inner {
             .for_each(|event| self.emit_lag_time(event, reference));
         let byte_size = events.estimated_json_encoded_size_of();
         let count = events.len();
+
+        let reference = Instant::now();
         self.inner.send(events).await.map_err(|_| ClosedError)?;
+        self.send_time
+            .as_ref()
+            .map(|send_time| send_time.record(reference.elapsed().as_secs_f64()));
+
         self.events_sent.emit(CountByteSize(count, byte_size));
         Ok(())
     }
@@ -299,12 +320,17 @@ impl Inner {
                 .iter_events()
                 .for_each(|event| self.emit_lag_time(event, reference));
             let cbs = CountByteSize(events.len(), events.estimated_json_encoded_size_of());
-            match self
+
+            let reference = Instant::now();
+            let res = self
                 .inner
                 .send(events)
                 .instrument(trace_span!("inner.send"))
-                .await
-            {
+                .await;
+            self.send_time
+                .as_ref()
+                .map(|send_time| send_time.record(reference.elapsed().as_secs_f64()));
+            match res {
                 Ok(()) => {
                     self.events_sent.emit(cbs);
                 }
