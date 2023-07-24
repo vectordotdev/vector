@@ -6,7 +6,7 @@ use http::{Request, Uri};
 use indoc::indoc;
 use vrl::value::Kind;
 
-use lookup::lookup_v2::{parse_value_path, OptionalValuePath};
+use lookup::lookup_v2::OptionalValuePath;
 use lookup::{OwnedValuePath, PathPrefix};
 use vector_config::configurable_component;
 use vector_core::config::log_schema;
@@ -198,7 +198,9 @@ impl SinkConfig for InfluxDbLogsConfig {
             .clone()
             .and_then(|k| k.path)
             .unwrap_or_else(|| {
-                parse_value_path(log_schema().message_key())
+                log_schema()
+                    .message_key()
+                    .cloned()
                     .expect("global log_schema.message_key to be valid path")
             });
 

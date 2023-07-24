@@ -152,7 +152,9 @@ fn splunk_encode_log_event_json() {
     assert_eq!(event.get("key").unwrap(), &serde_json::Value::from("value"));
     assert_eq!(event.get("int_val").unwrap(), &serde_json::Value::from(123));
     assert_eq!(
-        event.get(&log_schema().message_key().to_string()).unwrap(),
+        event
+            .get(&log_schema().message_key().unwrap().to_string())
+            .unwrap(),
         &serde_json::Value::from("hello world")
     );
     assert!(event

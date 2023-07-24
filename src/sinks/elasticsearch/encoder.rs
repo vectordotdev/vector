@@ -3,8 +3,9 @@ use std::{io, io::Write};
 use serde::Serialize;
 use vector_buffers::EventCount;
 use vector_common::{
+    internal_event::TaggedEventsSent,
     json_size::JsonSize,
-    request_metadata::{EventCountTags, GetEventCountTags, GroupedCountByteSize},
+    request_metadata::{GetEventCountTags, GroupedCountByteSize},
 };
 use vector_core::{config::telemetry, event::Event, ByteSizeOf, EstimatedJsonEncodedSizeOf};
 
@@ -51,7 +52,7 @@ impl EventCount for ProcessedEvent {
 }
 
 impl GetEventCountTags for ProcessedEvent {
-    fn get_tags(&self) -> EventCountTags {
+    fn get_tags(&self) -> TaggedEventsSent {
         self.log.get_tags()
     }
 }

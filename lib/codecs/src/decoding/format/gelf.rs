@@ -293,7 +293,7 @@ mod tests {
             Some(&Value::Bytes(Bytes::from_static(b"example.org")))
         );
         assert_eq!(
-            log.get(log_schema().message_key()),
+            log.get((PathPrefix::Event, log_schema().message_key().unwrap())),
             Some(&Value::Bytes(Bytes::from_static(
                 b"A short message that helps you identify what is going on"
             )))
@@ -348,7 +348,7 @@ mod tests {
             let events = deserialize_gelf_input(&input).unwrap();
             assert_eq!(events.len(), 1);
             let log = events[0].as_log();
-            assert!(log.contains(log_schema().message_key()));
+            assert!(log.contains((PathPrefix::Event, log_schema().message_key().unwrap())));
         }
 
         // filter out id

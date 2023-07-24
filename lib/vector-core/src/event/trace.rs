@@ -4,8 +4,7 @@ use lookup::lookup_v2::TargetPath;
 use serde::{Deserialize, Serialize};
 use vector_buffers::EventCount;
 use vector_common::{
-    json_size::JsonSize,
-    request_metadata::{EventCountTags, GetEventCountTags},
+    internal_event::TaggedEventsSent, json_size::JsonSize, request_metadata::GetEventCountTags,
     EventDataEq,
 };
 
@@ -149,7 +148,7 @@ impl AsMut<LogEvent> for TraceEvent {
 }
 
 impl GetEventCountTags for TraceEvent {
-    fn get_tags(&self) -> EventCountTags {
+    fn get_tags(&self) -> TaggedEventsSent {
         self.0.get_tags()
     }
 }

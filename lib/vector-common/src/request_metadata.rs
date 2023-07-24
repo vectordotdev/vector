@@ -1,44 +1,20 @@
-use std::ops::{Add, AddAssign};
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::HashMap,
+    ops::{Add, AddAssign},
+};
 
 use crate::{
-    config::ComponentKey,
     internal_event::{
-        CountByteSize, InternalEventHandle, OptionalTag, RegisterTaggedInternalEvent,
-        RegisteredEventCache,
+        CountByteSize, InternalEventHandle, RegisterTaggedInternalEvent, RegisteredEventCache,
+        TaggedEventsSent,
     },
     json_size::JsonSize,
 };
 
-/// Tags that are used to group the events within a batch for emitting telemetry.
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct EventCountTags {
-    pub source: OptionalTag<Arc<ComponentKey>>,
-    pub service: OptionalTag<String>,
-}
-
-impl EventCountTags {
-    #[must_use]
-    pub fn new_empty() -> Self {
-        Self {
-            source: OptionalTag::Specified(None),
-            service: OptionalTag::Specified(None),
-        }
-    }
-
-    #[must_use]
-    pub fn new_unspecified() -> Self {
-        Self {
-            source: OptionalTag::Ignored,
-            service: OptionalTag::Ignored,
-        }
-    }
-}
-
 /// Must be implemented by events to get the tags that will be attached to
 /// the `component_sent_event_*` emitted metrics.
 pub trait GetEventCountTags {
-    fn get_tags(&self) -> EventCountTags;
+    fn get_tags(&self) -> TaggedEventsSent;
 }
 
 /// Keeps track of the estimated json size of a given batch of events by
@@ -48,7 +24,7 @@ pub enum GroupedCountByteSize {
     /// When we need to keep track of the events by certain tags we use this
     /// variant.
     Tagged {
-        sizes: HashMap<EventCountTags, CountByteSize>,
+        sizes: HashMap<TaggedEventsSent, CountByteSize>,
     },
     /// If we don't need to track the events by certain tags we can use
     /// this variant to avoid allocating a `HashMap`,
@@ -86,7 +62,7 @@ impl GroupedCountByteSize {
     /// Returns `None` if we are not tracking by tags.
     #[must_use]
     #[cfg(test)]
-    pub fn sizes(&self) -> Option<&HashMap<EventCountTags, CountByteSize>> {
+    pub fn sizes(&self) -> Option<&HashMap<TaggedEventsSent, CountByteSize>> {
         match self {
             Self::Tagged { sizes } => Some(sizes),
             Self::Untagged { .. } => None,
@@ -131,7 +107,7 @@ impl GroupedCountByteSize {
     /// Emits our counts to a `RegisteredEvent` cached event.
     pub fn emit_event<T, H>(&self, event_cache: &RegisteredEventCache<(), T>)
     where
-        T: RegisterTaggedInternalEvent<Tags = EventCountTags, Fixed = (), Handle = H>,
+        T: RegisterTaggedInternalEvent<Tags = TaggedEventsSent, Fixed = (), Handle = H>,
         H: InternalEventHandle<Data = CountByteSize>,
     {
         match self {
@@ -141,7 +117,7 @@ impl GroupedCountByteSize {
                 }
             }
             GroupedCountByteSize::Untagged { size } => {
-                event_cache.emit(&EventCountTags::new_unspecified(), *size);
+                event_cache.emit(&TaggedEventsSent::new_unspecified(), *size);
             }
         }
     }
@@ -177,10 +153,10 @@ impl AddAssign for GroupedCountByteSize {
             *self = match (&self, &mut rhs) {
                 (Self::Untagged { size }, Self::Tagged { sizes }) => {
                     let mut sizes = std::mem::take(sizes);
-                    match sizes.get_mut(&EventCountTags::new_empty()) {
+                    match sizes.get_mut(&TaggedEventsSent::new_empty()) {
                         Some(empty_size) => *empty_size += *size,
                         None => {
-                            sizes.insert(EventCountTags::new_empty(), *size);
+                            sizes.insert(TaggedEventsSent::new_empty(), *size);
                         }
                     }
 
@@ -212,10 +188,10 @@ impl AddAssign for GroupedCountByteSize {
             }
 
             (Self::Tagged { ref mut sizes }, Self::Untagged { size }) => {
-                match sizes.get_mut(&EventCountTags::new_empty()) {
+                match sizes.get_mut(&TaggedEventsSent::new_empty()) {
                     Some(empty_size) => *empty_size += size,
                     None => {
-                        sizes.insert(EventCountTags::new_empty(), size);
+                        sizes.insert(TaggedEventsSent::new_empty(), size);
                     }
                 }
             }
@@ -248,10 +224,10 @@ impl<'a> Add<&'a GroupedCountByteSize> for GroupedCountByteSize {
 
             // The following two scenarios shouldn't really occur in practice, but are provided for completeness.
             (Self::Tagged { mut sizes }, Self::Untagged { size }) => {
-                match sizes.get_mut(&EventCountTags::new_empty()) {
+                match sizes.get_mut(&TaggedEventsSent::new_empty()) {
                     Some(empty_size) => *empty_size += *size,
                     None => {
-                        sizes.insert(EventCountTags::new_empty(), *size);
+                        sizes.insert(TaggedEventsSent::new_empty(), *size);
                     }
                 }
 
@@ -259,10 +235,10 @@ impl<'a> Add<&'a GroupedCountByteSize> for GroupedCountByteSize {
             }
             (Self::Untagged { size }, Self::Tagged { sizes }) => {
                 let mut sizes = sizes.clone();
-                match sizes.get_mut(&EventCountTags::new_empty()) {
+                match sizes.get_mut(&TaggedEventsSent::new_empty()) {
                     Some(empty_size) => *empty_size += size,
                     None => {
-                        sizes.insert(EventCountTags::new_empty(), size);
+                        sizes.insert(TaggedEventsSent::new_empty(), size);
                     }
                 }
 
@@ -378,6 +354,10 @@ pub trait MetaDescriptive {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
+    use crate::{config::ComponentKey, internal_event::OptionalTag};
+
     use super::*;
 
     struct DummyEvent {
@@ -386,8 +366,8 @@ mod tests {
     }
 
     impl GetEventCountTags for DummyEvent {
-        fn get_tags(&self) -> EventCountTags {
-            EventCountTags {
+        fn get_tags(&self) -> TaggedEventsSent {
+            TaggedEventsSent {
                 source: self.source.clone(),
                 service: self.service.clone(),
             }
@@ -451,14 +431,14 @@ mod tests {
         assert_eq!(
             vec![
                 (
-                    EventCountTags {
+                    TaggedEventsSent {
                         source: OptionalTag::Ignored,
                         service: Some("cabbage".to_string()).into()
                     },
                     CountByteSize(2, JsonSize::new(78))
                 ),
                 (
-                    EventCountTags {
+                    TaggedEventsSent {
                         source: OptionalTag::Ignored,
                         service: Some("tomato".to_string()).into()
                     },

@@ -399,7 +399,7 @@ mod tests {
 
     #[tokio::test]
     async fn shuffle_demo_logs_copies_lines() {
-        let message_key = log_schema().message_key();
+        let message_key = log_schema().message_key().unwrap().to_string();
         let mut rx = runit(
             r#"format = "shuffle"
                lines = ["one", "two", "three", "four"]
@@ -439,7 +439,7 @@ mod tests {
 
     #[tokio::test]
     async fn shuffle_demo_logs_adds_sequence() {
-        let message_key = log_schema().message_key();
+        let message_key = log_schema().message_key().unwrap().to_string();
         let mut rx = runit(
             r#"format = "shuffle"
                lines = ["one", "two"]
@@ -539,7 +539,7 @@ mod tests {
 
     #[tokio::test]
     async fn json_format_generates_output() {
-        let message_key = log_schema().message_key();
+        let message_key = log_schema().message_key().unwrap().to_string();
         let mut rx = runit(
             r#"format = "json"
             count = 5"#,

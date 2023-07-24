@@ -1,7 +1,6 @@
 use bytes::Bytes;
 use chrono::{DateTime, Datelike, Utc};
 use derivative::Derivative;
-use lookup::lookup_v2::parse_value_path;
 use lookup::{event_path, owned_value_path, OwnedTargetPath, OwnedValuePath, PathPrefix};
 use smallvec::{smallvec, SmallVec};
 use std::borrow::Cow;
@@ -71,7 +70,7 @@ impl SyslogDeserializerConfig {
                     // The `message` field is always defined. If parsing fails, the entire body becomes the
                     // message.
                     .with_event_field(
-                        &parse_value_path(log_schema().message_key()).expect("valid message key"),
+                        log_schema().message_key().expect("valid message key"),
                         Kind::bytes(),
                         Some("message"),
                     );
@@ -429,7 +428,7 @@ fn insert_fields_from_syslog(
 ) {
     match log_namespace {
         LogNamespace::Legacy => {
-            log.insert(event_path!(log_schema().message_key()), parsed.msg);
+            log.maybe_insert(PathPrefix::Event, log_schema().message_key(), parsed.msg);
         }
         LogNamespace::Vector => {
             log.insert(event_path!("message"), parsed.msg);
@@ -500,7 +499,10 @@ mod tests {
 
         let events = deserializer.parse(input, LogNamespace::Legacy).unwrap();
         assert_eq!(events.len(), 1);
-        assert_eq!(events[0].as_log()[log_schema().message_key()], "MSG".into());
+        assert_eq!(
+            events[0].as_log()[log_schema().message_key().unwrap().to_string()],
+            "MSG".into()
+        );
         assert!(
             events[0].as_log()[log_schema().timestamp_key().unwrap().to_string()].is_timestamp()
         );
@@ -522,8 +524,8 @@ mod tests {
 
     fn init() {
         let mut schema = LogSchema::default();
-        schema.set_message_key("legacy_message".to_string());
-        schema.set_message_key("legacy_timestamp".to_string());
+        schema.set_message_key(Some(owned_value_path!("legacy_message")));
+        schema.set_message_key(Some(owned_value_path!("legacy_timestamp")));
         init_log_schema(schema, false);
     }
 }
