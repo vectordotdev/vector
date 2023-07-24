@@ -6,10 +6,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     cmake \
     curl \
     g++ \
-    libclang1-14 \
+    libclang1 \
     libsasl2-dev \
     libssl-dev \
-    llvm-14 \
+    llvm \
     pkg-config \
     zlib1g-dev \
     unzip \
