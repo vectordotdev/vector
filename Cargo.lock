@@ -4210,9 +4210,9 @@ dependencies = [
 
 [[package]]
 name = "inventory"
-version = "0.3.10"
+version = "0.3.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "59c01ab27b36b668b4719ad000ced6ba3c3338f6793486449f2bd7ea96457f35"
+checksum = "a53088c87cf71c9d4f3372a2cb9eea1e7b8a0b1bf8b7f7d23fe5b76dbb07e63b"
 
 [[package]]
 name = "io-lifetimes"
