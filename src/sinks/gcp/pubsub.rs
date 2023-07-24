@@ -144,7 +144,7 @@ impl SinkConfig for PubsubConfig {
     }
 
     fn input(&self) -> Input {
-        Input::new(self.encoding.config().input_type() & DataType::Log)
+        Input::new(self.encoding.config().input_type() )
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
