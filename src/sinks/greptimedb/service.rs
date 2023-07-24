@@ -39,7 +39,7 @@ impl GreptimeDBRequest {
         let mut finalizers = EventFinalizers::default();
         let mut request_metadata_builder = RequestMetadataBuilder::default();
 
-        let sizer = GreptimeDBBatchSizer::default();
+        let sizer = GreptimeDBBatchSizer;
         let mut estimated_request_size = 0;
         for mut metric in metrics.into_iter() {
             finalizers.merge(metric.take_finalizers());

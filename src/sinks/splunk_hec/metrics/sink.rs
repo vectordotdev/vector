@@ -65,7 +65,7 @@ where
                     default_namespace,
                 ))
             })
-            .batched_partitioned(EventPartitioner::default(), self.batch_settings)
+            .batched_partitioned(EventPartitioner, self.batch_settings)
             .request_builder(builder_limit, self.request_builder)
             .filter_map(|request| async move {
                 match request {
