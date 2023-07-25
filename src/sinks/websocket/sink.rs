@@ -265,7 +265,12 @@ impl WebSocketSink {
             codecs::encoding::Serializer::RawMessage(_)
             | codecs::encoding::Serializer::Avro(_)
             | codecs::encoding::Serializer:: Native(_) => true,
-            _ => false,
+            codecs::encoding::Serializer::Csv(_)
+            | codecs::encoding::Serializer::Logfmt(_)
+            | codecs::encoding::Serializer::Gelf(_)
+            | codecs::encoding::Serializer::Json(_)
+            | codecs::encoding::Serializer::Text(_)
+            | codecs::encoding::Serializer:: NativeJson(_) => false,
         };
 
 
