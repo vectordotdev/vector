@@ -18,6 +18,10 @@ pub struct PrometheusPushgatewayConfig {
     #[configurable(derived)]
     #[configurable(metadata(docs::advanced))]
     auth: Option<HttpSourceAuthConfig>,
+
+    #[configurable(derived)]
+    #[serde(default, deserialize_with = "bool_or_struct")]
+    acknowledgements: SourceAcknowledgementsConfig,
 }
 
 impl GenerateConfig for PrometheusPushgatewayConfig {
@@ -26,6 +30,7 @@ impl GenerateConfig for PrometheusPushgatewayConfig {
             address: "127.0.0.1:9091".parse().unwrap(),
             tls: None,
             auth: None,
+            acknowledgements: SourceAcknowledgementsConfig::default(),
         })
         .unwrap()
     }
