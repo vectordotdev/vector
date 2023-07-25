@@ -376,7 +376,7 @@ zstd = { version = "0.12.4", default-features = false }
 # https://github.com/chronotope/chrono/pull/578
 chrono = { git = "https://github.com/vectordotdev/chrono.git", tag = "v0.4.26-no-default-time-1" }
 # The upgrade for `tokio-util` >= 0.6.9 is blocked on https://github.com/vectordotdev/vector/issues/11257.
-tokio-util = { git = "https://github.com/vectordotdev/tokio", branch = "tokio-util-0.7.4-framed-read-continue-on-error" }
+tokio-util = { git = "https://github.com/vectordotdev/tokio", branch = "tokio-util-0.7.8-framed-read-continue-on-error" }
 nix = { git = "https://github.com/vectordotdev/nix.git", branch = "memfd/gnu/musl" }
 # The `heim` crates depend on `ntapi` 0.3.7 on Windows, but that version has an
 # unaligned access bug fixed in the following revision.
