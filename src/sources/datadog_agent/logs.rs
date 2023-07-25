@@ -5,7 +5,7 @@ use chrono::Utc;
 use codecs::StreamDecodingError;
 use http::StatusCode;
 use lookup::path;
-use metrics::{register_gauge, register_histogram};
+use metrics::{register_counter, register_gauge, register_histogram};
 use tokio::time::Instant;
 use tokio_util::codec::Decoder;
 use vector_common::internal_event::{CountByteSize, InternalEventHandle as _};
@@ -23,6 +23,7 @@ use crate::{
     SourceSender,
 };
 
+const REQUEST_TOTAL_NAME: &str = "datadog_agent_request_total";
 const ACTIVE_REQUEST_COUNT_NAME: &str = "datadog_agent_active_request_count";
 const REQUEST_TIME_NAME: &str = "datadog_agent_request_time_seconds";
 
@@ -32,6 +33,7 @@ pub(crate) fn build_warp_filter(
     out: SourceSender,
     source: DatadogAgentSource,
 ) -> BoxedFilter<(Response,)> {
+    let request_count = register_counter!(REQUEST_TOTAL_NAME);
     let active_request_count = register_gauge!(ACTIVE_REQUEST_COUNT_NAME);
     let request_time = register_histogram!(REQUEST_TIME_NAME);
     warp::post()
@@ -48,6 +50,7 @@ pub(crate) fn build_warp_filter(
                   api_token: Option<String>,
                   query_params: ApiKeyQueryParams,
                   body: Bytes| {
+                request_count.increment(1);
                 active_request_count.increment(1.);
                 let reference = Instant::now();
                 let events = source
