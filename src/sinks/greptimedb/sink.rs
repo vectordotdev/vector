@@ -37,7 +37,7 @@ impl GreptimeDBSink {
             .normalized_with_default::<GreptimeDBMetricNormalize>()
             .batched(
                 self.batch_settings
-                    .into_item_size_config(GreptimeDBBatchSizer::default()),
+                    .into_item_size_config(GreptimeDBBatchSizer),
             )
             .map(GreptimeDBRequest::from_metrics)
             .into_driver(self.service)

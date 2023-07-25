@@ -62,7 +62,7 @@ where
             Self {
                 sender: Some(todo_tx),
                 flush: flush1,
-                _phantom: PhantomData::default(),
+                _phantom: PhantomData,
             },
             finalizer_stream(shutdown, todo_rx, S::default(), flush2).boxed(),
         )
@@ -199,7 +199,7 @@ pub struct EmptyStream<T>(PhantomData<T>);
 
 impl<T> Default for EmptyStream<T> {
     fn default() -> Self {
-        Self(PhantomData::default())
+        Self(PhantomData)
     }
 }
 

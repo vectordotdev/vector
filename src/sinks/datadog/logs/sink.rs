@@ -274,7 +274,7 @@ where
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let default_api_key = Arc::clone(&self.default_api_key);
 
-        let partitioner = EventPartitioner::default();
+        let partitioner = EventPartitioner;
 
         let builder_limit = NonZeroUsize::new(64);
         let input = input.batched_partitioned(partitioner, self.batch_settings);
