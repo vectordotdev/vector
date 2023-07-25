@@ -237,8 +237,9 @@ impl WebSocketSink {
     }
 
     const fn should_encode_as_binary(&self) -> bool {
-        use codecs::encoding::Serializer::{RawMessage, Avro, Native, Csv,
-            Logfmt, Gelf, Json, Text, NativeJson};
+        use codecs::encoding::Serializer::{
+            Avro, Csv, Gelf, Json, Logfmt, Native, NativeJson, RawMessage, Text,
+        };
 
         match self.encoder.serializer() {
             RawMessage(_) | Avro(_) | Native(_) => true,
