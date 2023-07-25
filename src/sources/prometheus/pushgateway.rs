@@ -20,7 +20,7 @@ pub struct PrometheusPushgatewayConfig {
     auth: Option<HttpSourceAuthConfig>,
 }
 
-impl GenerateConfig for PrometheusRemoteWriteConfig {
+impl GenerateConfig for PrometheusPushgatewayConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
             address: "127.0.0.1:9091".parse().unwrap(),
