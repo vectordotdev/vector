@@ -45,6 +45,9 @@ use crate::{
     tls::{MaybeTlsSettings, MaybeTlsStream, TlsError},
 };
 
+use codecs::encoding::Serializer::{RawMessage, Avro, Native, Csv, Logfmt, Gelf, Json, Text, NativeJson};
+
+
 #[derive(Debug, Snafu)]
 #[snafu(visibility(pub))]
 pub enum WebSocketError {
@@ -262,15 +265,8 @@ impl WebSocketSink {
         let bytes_sent = register!(BytesSent::from(Protocol("websocket".into())));
         let events_sent = register!(EventsSent::from(Output(None)));
         let encode_as_binary = match self.encoder.serializer() {
-            codecs::encoding::Serializer::RawMessage(_)
-            | codecs::encoding::Serializer::Avro(_)
-            | codecs::encoding::Serializer:: Native(_) => true,
-            codecs::encoding::Serializer::Csv(_)
-            | codecs::encoding::Serializer::Logfmt(_)
-            | codecs::encoding::Serializer::Gelf(_)
-            | codecs::encoding::Serializer::Json(_)
-            | codecs::encoding::Serializer::Text(_)
-            | codecs::encoding::Serializer:: NativeJson(_) => false,
+            RawMessage(_) | Avro(_) | Native(_) => true,
+            Csv(_) | Logfmt(_) | Gelf(_) | Json(_) | Text(_) | NativeJson(_) => false,
         };
 
 
