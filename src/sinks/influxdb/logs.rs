@@ -4,10 +4,11 @@ use bytes::{Bytes, BytesMut};
 use futures::SinkExt;
 use http::{Request, Uri};
 use indoc::indoc;
+use vrl::path::OwnedValuePath;
 use vrl::value::Kind;
 
 use lookup::lookup_v2::OptionalValuePath;
-use lookup::{OwnedValuePath, PathPrefix};
+use lookup::PathPrefix;
 use vector_config::configurable_component;
 use vector_core::config::log_schema;
 use vector_core::schema;
@@ -188,28 +189,24 @@ impl SinkConfig for InfluxDbLogsConfig {
 
         let host_key = self
             .host_key
-            .clone()
-            .and_then(|k| k.path)
-            .or(log_schema().host_key().cloned())
+            .as_ref()
+            .and_then(|k| k.path.clone())
+            .or_else(|| log_schema().host_key().cloned())
             .expect("global log_schema.host_key to be valid path");
 
         let message_key = self
             .message_key
-            .clone()
-            .and_then(|k| k.path)
-            .unwrap_or_else(|| {
-                log_schema()
-                    .message_key()
-                    .cloned()
-                    .expect("global log_schema.message_key to be valid path")
-            });
+            .as_ref()
+            .and_then(|k| k.path.clone())
+            .or_else(|| log_schema().message_key().cloned())
+            .expect("global log_schema.message_key to be valid path");
 
         let source_type_key = self
             .source_type_key
-            .clone()
-            .and_then(|k| k.path)
-            .or(log_schema().source_type_key().cloned())
-            .unwrap();
+            .as_ref()
+            .and_then(|k| k.path.clone())
+            .or_else(|| log_schema().source_type_key().cloned())
+            .expect("global log_schema.source_type_key to be valid path");
 
         let sink = InfluxDbLogsSink {
             uri,
@@ -267,25 +264,19 @@ impl HttpEventEncoder<BytesMut> for InfluxDbLogsEncoder {
         // the original value that was assigned to the root. To avoid this we intentionally rename
         // the path that points to "message" such that it has a dedicated key.
         // TODO: add a `TargetPath::is_event_root()` to conditionally rename?
-        if let Some(message_path) = log.message_path() {
-            log.rename_key(
-                message_path.as_str(),
-                (PathPrefix::Event, &self.message_key),
-            )
+        if let Some(message_path) = log.message_path().cloned().as_ref() {
+            log.rename_key(message_path, (PathPrefix::Event, &self.message_key));
         }
         // Add the `host` and `source_type` to the HashSet of tags to include
         // Ensure those paths are on the event to be encoded, rather than metadata
-        if let Some(host_path) = log.host_path() {
-            self.tags.replace(host_path.clone());
-            log.rename_key(host_path.as_str(), (PathPrefix::Event, &self.host_key));
+        if let Some(host_path) = log.host_path().cloned().as_ref() {
+            self.tags.replace(host_path.path.to_string());
+            log.rename_key(host_path, (PathPrefix::Event, &self.host_key));
         }
 
-        if let Some(source_type_path) = log.source_type_path() {
-            self.tags.replace(source_type_path.clone());
-            log.rename_key(
-                source_type_path.as_str(),
-                (PathPrefix::Event, &self.source_type_key),
-            );
+        if let Some(source_type_path) = log.source_type_path().cloned().as_ref() {
+            self.tags.replace(source_type_path.path.to_string());
+            log.rename_key(source_type_path, (PathPrefix::Event, &self.source_type_key));
         }
 
         self.tags.replace("metric_type".to_string());

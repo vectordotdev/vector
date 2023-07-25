@@ -134,19 +134,21 @@ impl crate::sinks::util::encoding::Encoder<Vec<Event>> for JsonEncoding {
             let log = event.as_mut_log();
             let message_path = log
                 .message_path()
-                .expect("message is required (make sure the \"message\" semantic meaning is set)");
-            log.rename_key(message_path.as_str(), event_path!("message"));
+                .expect("message is required (make sure the \"message\" semantic meaning is set)")
+                .clone();
+            log.rename_key(&message_path, event_path!("message"));
 
-            if let Some(host_path) = log.host_path() {
-                log.rename_key(host_path.as_str(), event_path!("hostname"));
+            if let Some(host_path) = log.host_path().cloned().as_ref() {
+                log.rename_key(host_path, event_path!("hostname"));
             }
 
-            if let Some(Value::Timestamp(ts)) = log.remove(
-                log
+            let message_path = log
                 .timestamp_path()
-                .expect("timestamp is required (make sure the \"timestamp\" semantic meaning is set)")
-                .as_str()
-            ) {
+                .expect(
+                    "timestamp is required (make sure the \"timestamp\" semantic meaning is set)",
+                )
+                .clone();
+            if let Some(Value::Timestamp(ts)) = log.remove(&message_path) {
                 log.insert(
                     event_path!("timestamp"),
                     Value::Integer(ts.timestamp_millis()),
