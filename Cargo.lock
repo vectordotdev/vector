@@ -8527,8 +8527,8 @@ dependencies = [
 
 [[package]]
 name = "tokio-util"
-version = "0.7.4"
-source = "git+https://github.com/vectordotdev/tokio?branch=tokio-util-0.7.4-framed-read-continue-on-error#53a17f257b599a9d18bd75249de98d0b6fc28cfa"
+version = "0.7.8"
+source = "git+https://github.com/vectordotdev/tokio?branch=tokio-util-0.7.8-framed-read-continue-on-error#3747655f8f0443e13fe20da3f613ea65c23347c2"
 dependencies = [
  "bytes 1.4.0",
  "futures-core",
