@@ -45,9 +45,6 @@ use crate::{
     tls::{MaybeTlsSettings, MaybeTlsStream, TlsError},
 };
 
-use codecs::encoding::Serializer::{RawMessage, Avro, Native, Csv, Logfmt, Gelf, Json, Text, NativeJson};
-
-
 #[derive(Debug, Snafu)]
 #[snafu(visibility(pub))]
 pub enum WebSocketError {
@@ -239,6 +236,16 @@ impl WebSocketSink {
         Ok(())
     }
 
+    fn should_encode_as_binary(&self) -> bool {
+        use codecs::encoding::Serializer::{RawMessage, Avro, Native, Csv,
+            Logfmt, Gelf, Json, Text, NativeJson};
+
+        match self.encoder.serializer() {
+            RawMessage(_) | Avro(_) | Native(_) => true,
+            Csv(_) | Logfmt(_) | Gelf(_) | Json(_) | Text(_) | NativeJson(_) => false,
+        }
+    }
+
     async fn handle_events<I, WS, O>(
         &mut self,
         input: &mut I,
@@ -264,11 +271,7 @@ impl WebSocketSink {
 
         let bytes_sent = register!(BytesSent::from(Protocol("websocket".into())));
         let events_sent = register!(EventsSent::from(Output(None)));
-        let encode_as_binary = match self.encoder.serializer() {
-            RawMessage(_) | Avro(_) | Native(_) => true,
-            Csv(_) | Logfmt(_) | Gelf(_) | Json(_) | Text(_) | NativeJson(_) => false,
-        };
-
+        let encode_as_binary = self.should_encode_as_binary();
 
         loop {
             let result = tokio::select! {
