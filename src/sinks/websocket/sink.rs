@@ -262,7 +262,9 @@ impl WebSocketSink {
         let bytes_sent = register!(BytesSent::from(Protocol("websocket".into())));
         let events_sent = register!(EventsSent::from(Output(None)));
         let encode_as_binary = match self.encoder.serializer() {
-            codecs::encoding::Serializer::RawMessage(_) => true,
+            codecs::encoding::Serializer::RawMessage(_)
+            | codecs::encoding::Serializer::Avro(_)
+            | codecs::encoding::Serializer:: Native(_) => true,
             _ => false,
         };
 
