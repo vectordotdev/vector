@@ -107,10 +107,7 @@ impl Deserializer for ProtobufDeserializer {
         let dynamic_message = DynamicMessage::decode(self.message_descriptor.clone(), bytes)
             .map_err(|error| format!("Error parsing protobuf: {:?}", error))?;
 
-        let proto_vrl = to_vrl(
-            prost_reflect::Value::Message(dynamic_message),
-            &prost_reflect::Kind::Message(self.message_descriptor.clone()),
-        )?;
+        let proto_vrl = to_vrl(&prost_reflect::Value::Message(dynamic_message), None)?;
         let mut event = Event::Log(LogEvent::from(proto_vrl));
         let event = match log_namespace {
             LogNamespace::Vector => event,
@@ -144,41 +141,47 @@ impl From<&ProtobufDeserializerConfig> for ProtobufDeserializer {
 }
 
 fn to_vrl(
-    prost_reflect_value: prost_reflect::Value,
-    kind: &prost_reflect::Kind,
+    prost_reflect_value: &prost_reflect::Value,
+    field_descriptor: Option<&prost_reflect::FieldDescriptor>,
 ) -> vector_common::Result<vrl::value::Value> {
     let vrl_value = match prost_reflect_value {
-        prost_reflect::Value::Bool(v) => vrl::value::Value::from(v),
-        prost_reflect::Value::I32(v) => vrl::value::Value::from(v),
-        prost_reflect::Value::I64(v) => vrl::value::Value::from(v),
-        prost_reflect::Value::U32(v) => vrl::value::Value::from(v),
-        prost_reflect::Value::U64(v) => vrl::value::Value::from(v),
+        prost_reflect::Value::Bool(v) => vrl::value::Value::from(v.clone()),
+        prost_reflect::Value::I32(v) => vrl::value::Value::from(v.clone()),
+        prost_reflect::Value::I64(v) => vrl::value::Value::from(v.clone()),
+        prost_reflect::Value::U32(v) => vrl::value::Value::from(v.clone()),
+        prost_reflect::Value::U64(v) => vrl::value::Value::from(v.clone()),
         prost_reflect::Value::F32(v) => vrl::value::Value::Float(
-            NotNan::new(f64::from(v)).map_err(|_e| format!("Float number cannot be Nan"))?,
+            NotNan::new(f64::from(v.clone()))
+                .map_err(|_e| format!("Float number cannot be Nan"))?,
         ),
         prost_reflect::Value::F64(v) => vrl::value::Value::Float(
-            NotNan::new(v).map_err(|_e| format!("F64 number cannot be Nan"))?,
+            NotNan::new(v.clone()).map_err(|_e| format!("F64 number cannot be Nan"))?,
         ),
-        prost_reflect::Value::String(v) => vrl::value::Value::from(v),
-        prost_reflect::Value::Bytes(v) => vrl::value::Value::from(v),
+        prost_reflect::Value::String(v) => vrl::value::Value::from(v.as_str()),
+        prost_reflect::Value::Bytes(v) => vrl::value::Value::from(v.clone()),
         prost_reflect::Value::EnumNumber(v) => {
-            let enum_desc = kind
-                .as_enum()
-                .ok_or_else(|| format!("Internal error while parsing protobuf enum"))?;
-            vrl::value::Value::from(
-                enum_desc
-                    .get_value(v)
-                    .ok_or_else(|| format!("The number {} cannot be in '{}'", v, enum_desc.name()))?
-                    .name(),
-            )
+            if let Some(field_descriptor) = field_descriptor {
+                let kind = field_descriptor.kind();
+                let enum_desc = kind
+                    .as_enum()
+                    .ok_or_else(|| format!("Internal error while parsing protobuf enum"))?;
+                vrl::value::Value::from(
+                    enum_desc
+                        .get_value(v.clone())
+                        .ok_or_else(|| {
+                            format!("The number {} cannot be in '{}'", v, enum_desc.name())
+                        })?
+                        .name(),
+                )
+            } else {
+                Err("Expected valid field descriptor")?
+            }
         }
-        prost_reflect::Value::Message(mut v) => {
+        prost_reflect::Value::Message(v) => {
             let mut obj_map = BTreeMap::new();
             for field_desc in v.descriptor().fields() {
-                let field = v.get_field_mut(&field_desc);
-                let mut taken_value = prost_reflect::Value::Bool(false);
-                std::mem::swap(&mut taken_value, field);
-                let out = to_vrl(taken_value, &field_desc.kind())?;
+                let field_value = v.get_field(&field_desc);
+                let out = to_vrl(field_value.as_ref(), Some(&field_desc))?;
                 obj_map.insert(field_desc.name().to_string(), out);
             }
             vrl::value::Value::from(obj_map)
@@ -186,28 +189,33 @@ fn to_vrl(
         prost_reflect::Value::List(v) => {
             let vec = v
                 .into_iter()
-                .map(|o| to_vrl(o, &kind))
+                .map(|o| to_vrl(o, field_descriptor))
                 .collect::<Result<Vec<_>, vector_common::Error>>()?;
             vrl::value::Value::from(vec)
         }
         prost_reflect::Value::Map(v) => {
-            let message_desc = kind
-                .as_message()
-                .ok_or_else(|| format!("Internal error while parsing protobuf message"))?;
-            vrl::value::Value::from(
-                v.into_iter()
-                    .map(|kv| {
-                        Ok((
-                            kv.0.as_str()
-                                .ok_or_else(|| {
-                                    format!("Internal error while parsing protobuf map")
-                                })?
-                                .to_string(),
-                            to_vrl(kv.1, &message_desc.map_entry_value_field().kind())?,
-                        ))
-                    })
-                    .collect::<vector_common::Result<BTreeMap<String, _>>>()?,
-            )
+            if let Some(field_descriptor) = field_descriptor {
+                let kind = field_descriptor.kind();
+                let message_desc = kind
+                    .as_message()
+                    .ok_or_else(|| format!("Internal error while parsing protobuf message"))?;
+                vrl::value::Value::from(
+                    v.into_iter()
+                        .map(|kv| {
+                            Ok((
+                                kv.0.as_str()
+                                    .ok_or_else(|| {
+                                        format!("Internal error while parsing protobuf map")
+                                    })?
+                                    .to_string(),
+                                to_vrl(kv.1, Some(&message_desc.map_entry_value_field()))?,
+                            ))
+                        })
+                        .collect::<vector_common::Result<BTreeMap<String, _>>>()?,
+                )
+            } else {
+                Err("Expected valid field descriptor")?
+            }
         }
     };
     Ok(vrl_value)
