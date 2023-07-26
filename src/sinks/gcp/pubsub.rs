@@ -469,5 +469,4 @@ mod integration_tests {
         timestamp: String,
         message: String,
     }
-
 }
