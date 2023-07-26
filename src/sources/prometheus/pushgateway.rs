@@ -1,7 +1,10 @@
-use std::net::SocketAddr;
-use vector_config::configurable_component;
+use std::{collections::HashMap, net::SocketAddr};
 
+use bytes::Bytes;
+use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
+use vector_core::event::{Metric, MetricKind, MetricValue};
+use warp::http::{HeaderMap, StatusCode};
 
 use crate::{
     config::{
@@ -84,3 +87,34 @@ impl SourceConfig for PrometheusPushgatewayConfig {
 
 #[derive(Clone)]
 struct PushgatewaySource;
+
+impl PushgatewaySource {
+    fn decode_body(&self, body: Bytes) -> Result<Vec<Event>, ErrorMessage> {
+        let mut result = Vec::new();
+
+        let counter = Metric::new(
+            "foo",
+            MetricKind::Absolute,
+            MetricValue::Counter {
+                value: 49.0,
+            },
+        );
+
+        result.push(counter.into());
+
+        Ok(result)
+    }
+}
+
+impl HttpSource for PushgatewaySource {
+    fn build_events(
+        &self,
+        mut body: Bytes,
+        header_map: &HeaderMap,
+        _query_parameters: &HashMap<String, String>,
+        _full_path: &str,
+    ) -> Result<Vec<Event>, ErrorMessage> {
+        let events = self.decode_body(body)?;
+        Ok(events)
+    }
+}
