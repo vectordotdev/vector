@@ -4,18 +4,17 @@ use bytes::Bytes;
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
 use vector_core::event::{Metric, MetricKind, MetricValue};
-use warp::http::{HeaderMap, StatusCode};
+use warp::http::HeaderMap;
 
 use crate::{
     config::{
         GenerateConfig, SourceAcknowledgementsConfig, SourceConfig, SourceContext, SourceOutput,
     },
     event::Event,
-    internal_events::PrometheusRemoteWriteParseError,
     serde::bool_or_struct,
     sources::{
         self,
-        util::{decode, http::HttpMethod, ErrorMessage, HttpSource, HttpSourceAuthConfig},
+        util::{http::HttpMethod, ErrorMessage, HttpSource, HttpSourceAuthConfig},
     },
     tls::TlsEnableableConfig,
 };
