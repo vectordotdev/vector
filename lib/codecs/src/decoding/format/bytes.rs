@@ -36,11 +36,17 @@ impl BytesDeserializerConfig {
     /// The schema produced by the deserializer.
     pub fn schema_definition(&self, log_namespace: LogNamespace) -> schema::Definition {
         match log_namespace {
-            LogNamespace::Legacy => schema::Definition::empty_legacy_namespace().with_event_field(
-                log_schema().message_key().expect("valid message key"),
-                Kind::bytes(),
-                Some("message"),
-            ),
+            LogNamespace::Legacy => {
+                let definition = schema::Definition::empty_legacy_namespace();
+                if let Some(message_key) = log_schema().message_key() {
+                    return definition.with_event_field(
+                        message_key,
+                        Kind::bytes(),
+                        Some("message"),
+                    );
+                }
+                definition
+            }
             LogNamespace::Vector => {
                 schema::Definition::new_with_default_metadata(Kind::bytes(), [log_namespace])
                     .with_meaning(OwnedTargetPath::event_root(), "message")
