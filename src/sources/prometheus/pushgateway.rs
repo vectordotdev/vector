@@ -118,6 +118,8 @@ impl HttpSource for PushgatewaySource {
     ) -> Result<Vec<Event>, ErrorMessage> {
         let body = String::from_utf8_lossy(&body);
 
+        // TODO: Add grouping key to these
+        // TODO: Add an option to toggle between incremental and absolute, default to absolute
         match parser::parse_text(&body) {
             Ok(events) => Ok(events),
             Err(_error) => {
