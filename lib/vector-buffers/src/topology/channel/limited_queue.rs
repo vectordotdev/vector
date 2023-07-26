@@ -10,7 +10,11 @@ use std::{
 use async_stream::stream;
 use crossbeam_queue::ArrayQueue;
 use futures::Stream;
-use tokio::sync::{Notify, OwnedSemaphorePermit, Semaphore, TryAcquireError};
+use metrics::histogram;
+use tokio::{
+    sync::{Notify, OwnedSemaphorePermit, Semaphore, TryAcquireError},
+    time::Instant,
+};
 use tracing::Instrument;
 
 use crate::Bufferable;
@@ -102,6 +106,7 @@ impl<T: Bufferable> LimitedSender<T> {
     /// with the given `item`.
     pub async fn send(&mut self, item: T) -> Result<(), SendError<T>> {
         // Calculate how many permits we need, and wait until we can acquire all of them.
+        let reference = Instant::now();
         let permits_required = self.get_required_permits_for_item(&item);
         let Ok(permits) = self
             .inner
@@ -112,7 +117,12 @@ impl<T: Bufferable> LimitedSender<T> {
             .await else {
             return Err(SendError(item))
         };
+        histogram!(
+            "limited_sender_semaphore_acquire_permits_time_seconds",
+            reference.elapsed().as_secs_f64()
+        );
 
+        let reference = Instant::now();
         trace_span!("inner.data.push").in_scope(|| {
             self.inner
                 .data
@@ -120,6 +130,10 @@ impl<T: Bufferable> LimitedSender<T> {
                 .expect("acquired permits but channel reported being full")
         });
         self.inner.read_waker.notify_one();
+        histogram!(
+            "limited_sender_data_push_time_seconds",
+            reference.elapsed().as_secs_f64()
+        );
 
         trace!("Sent item.");
 

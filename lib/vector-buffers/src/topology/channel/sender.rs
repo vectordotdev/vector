@@ -1,7 +1,8 @@
 use std::sync::Arc;
 
 use async_recursion::async_recursion;
-use tokio::sync::Mutex;
+use metrics::histogram;
+use tokio::{sync::Mutex, time::Instant};
 
 use super::limited_queue::LimitedSender;
 use crate::{
@@ -38,11 +39,20 @@ where
 {
     pub(crate) async fn send(&mut self, item: T) -> crate::Result<()> {
         match self {
-            Self::InMemory(tx) => tx.send(item).await.map_err(Into::into),
+            Self::InMemory(tx) => {
+                let reference = Instant::now();
+                let res = tx.send(item).await.map_err(Into::into);
+                histogram!(
+                    "memory_buffer_send_time_seconds",
+                    reference.elapsed().as_secs_f64()
+                );
+                res
+            }
             Self::DiskV2(writer) => {
+                let reference = Instant::now();
                 let mut writer = writer.lock().await;
 
-                writer.write_record(item).await.map(|_| ()).map_err(|e| {
+                let res = writer.write_record(item).await.map(|_| ()).map_err(|e| {
                     // TODO: Could some errors be handled and not be unrecoverable? Right now,
                     // encoding should theoretically be recoverable -- encoded value was too big, or
                     // error during encoding -- but the traits don't allow for recovering the
@@ -51,7 +61,12 @@ where
                     error!("Disk buffer writer has encountered an unrecoverable error.");
 
                     e.into()
-                })
+                });
+                histogram!(
+                    "disk_buffer_write_time_seconds",
+                    reference.elapsed().as_secs_f64()
+                );
+                res
             }
         }
     }
