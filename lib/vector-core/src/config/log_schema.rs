@@ -118,7 +118,7 @@ impl LogSchema {
     /// This parses the path and will panic if it is invalid.
     ///
     /// This should only be used where the result will either be cached,
-    /// or performance isn't critical, since this requires parsing / memory allocation.
+    /// or performance isn't critical, since this requires memory allocation.
     pub fn owned_message_path(&self) -> OwnedTargetPath {
         self.message_key
             .path
