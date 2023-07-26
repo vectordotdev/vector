@@ -3,9 +3,10 @@ use std::{collections::HashMap, net::SocketAddr};
 use bytes::Bytes;
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
-use vector_core::event::{Metric, MetricKind, MetricValue};
+// use vector_core::event::{Metric, MetricKind, MetricValue};
 use warp::http::HeaderMap;
 
+use super::parser;
 use crate::{
     config::{
         GenerateConfig, SourceAcknowledgementsConfig, SourceConfig, SourceContext, SourceOutput,
@@ -43,6 +44,8 @@ pub struct PrometheusPushgatewayConfig {
     #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
+
+    // TODO: Add toggle for whether to aggregate counters and histograms
 }
 
 impl GenerateConfig for PrometheusPushgatewayConfig {
@@ -67,8 +70,7 @@ impl SourceConfig for PrometheusPushgatewayConfig {
             // TODO: Support configuring path so we can run multiple of these
             "",
             HttpMethod::Post,
-            // TODO: We probably want non-strict paths so we can parse grouping keys
-            true,
+            false,
             &self.tls,
             &self.auth,
             cx,
@@ -88,23 +90,23 @@ impl SourceConfig for PrometheusPushgatewayConfig {
 #[derive(Clone)]
 struct PushgatewaySource;
 
-impl PushgatewaySource {
-    fn decode_body(&self, _body: Bytes) -> Result<Vec<Event>, ErrorMessage> {
-        let mut result = Vec::new();
-
-        let counter = Metric::new(
-            "foo",
-            MetricKind::Absolute,
-            MetricValue::Counter {
-                value: 49.0,
-            },
-        );
-
-        result.push(counter.into());
-
-        Ok(result)
-    }
-}
+// impl PushgatewaySource {
+//     fn decode_body(&self, _body: Bytes) -> Result<Vec<Event>, ErrorMessage> {
+//         let mut result = Vec::new();
+//
+//         let counter = Metric::new(
+//             "foo",
+//             MetricKind::Absolute,
+//             MetricValue::Counter {
+//                 value: 49.0,
+//             },
+//         );
+//
+//         result.push(counter.into());
+//
+//         Ok(result)
+//     }
+// }
 
 impl HttpSource for PushgatewaySource {
     fn build_events(
@@ -114,7 +116,13 @@ impl HttpSource for PushgatewaySource {
         _query_parameters: &HashMap<String, String>,
         _full_path: &str,
     ) -> Result<Vec<Event>, ErrorMessage> {
-        let events = self.decode_body(body)?;
-        Ok(events)
+        let body = String::from_utf8_lossy(&body);
+
+        match parser::parse_text(&body) {
+            Ok(events) => Ok(events),
+            Err(_error) => {
+                Ok(vec![])
+            }
+        }
     }
 }
