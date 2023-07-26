@@ -3,6 +3,7 @@ use lookup::OwnedTargetPath;
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use vector_core::config::LogNamespace;
+use vector_core::schema::meaning;
 use vector_core::{
     config::{log_schema, DataType},
     event::{Event, LogEvent},
@@ -42,7 +43,7 @@ impl BytesDeserializerConfig {
                     return definition.with_event_field(
                         message_key,
                         Kind::bytes(),
-                        Some("message"),
+                        Some(meaning::MESSAGE),
                     );
                 }
                 definition
