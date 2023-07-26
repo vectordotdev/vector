@@ -1,4 +1,22 @@
+use std::net::SocketAddr;
 use vector_config::configurable_component;
+
+use vector_core::config::LogNamespace;
+
+use crate::{
+    config::{
+        GenerateConfig, SourceAcknowledgementsConfig, SourceConfig, SourceContext, SourceOutput,
+    },
+    event::Event,
+    internal_events::PrometheusRemoteWriteParseError,
+    serde::bool_or_struct,
+    sources::{
+        self,
+        util::{decode, http::HttpMethod, ErrorMessage, HttpSource, HttpSourceAuthConfig},
+    },
+    tls::TlsEnableableConfig,
+};
+
 
 #[configurable_component(source(
     "prometheus_pushgateway",
@@ -35,3 +53,34 @@ impl GenerateConfig for PrometheusPushgatewayConfig {
         .unwrap()
     }
 }
+
+#[async_trait::async_trait]
+#[typetag::serde(name = "prometheus_remote_write")]
+impl SourceConfig for PrometheusPushgatewayConfig {
+    async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
+        let source = PushgatewaySource;
+        source.run(
+            self.address,
+            // TODO: Support configuring path so we can run multiple of these
+            "",
+            HttpMethod::Post,
+            // TODO: We probably want non-strict paths so we can parse grouping keys
+            true,
+            &self.tls,
+            &self.auth,
+            cx,
+            self.acknowledgements,
+        )
+    }
+
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
+        vec![SourceOutput::new_metrics()]
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        true
+    }
+}
+
+#[derive(Clone)]
+struct PushgatewaySource;
