@@ -36,6 +36,7 @@ use tokio_stream::wrappers::UnixListenerStream;
 use tokio_util::codec::{Encoder, FramedRead, FramedWrite, LinesCodec};
 use vector_buffers::topology::channel::LimitedReceiver;
 use vector_core::event::{BatchNotifier, Event, EventArray, LogEvent};
+
 #[cfg(test)]
 use zstd::Decoder as ZstdDecoder;
 
@@ -43,7 +44,10 @@ use crate::{
     config::{Config, ConfigDiff, GenerateConfig},
     topology::{self, RunningTopology},
     trace,
+    event::metric::{Metric, MetricKind, MetricValue},
 };
+use vector_core::metric_tags;
+use chrono::{Utc};
 
 const WAIT_FOR_SECS: u64 = 5; // The default time to wait in `wait_for`
 const WAIT_FOR_MIN_MILLIS: u64 = 5; // The minimum time to pause before retrying
@@ -287,6 +291,34 @@ pub fn random_events_with_stream(
         batch,
     );
     (events, stream)
+}
+
+pub fn metrics_with_stream(
+    count: i32,
+    batch: Option<BatchNotifier>,
+) -> (Vec<Event>, impl Stream<Item = EventArray>) {
+    let events: Vec<_> = (0..count).map(create_event).collect();
+    let stream = map_batch_stream(
+        stream::iter(events.clone()).map(|event| event.into_log()),
+        batch,
+    );
+    (events, stream)
+}
+
+fn create_event(i: i32) -> Event {
+    Event::Metric(
+        Metric::new(
+            format!("counter-{}", i),
+            MetricKind::Incremental,
+            MetricValue::Counter { value: i as f64 },
+        )
+        .with_namespace(Some("ns"))
+        .with_tags(Some(metric_tags!(
+            "region" => "us-west-1",
+            "production" => "true",
+        )))
+        .with_timestamp(Some(Utc::now())),
+    )
 }
 
 pub fn random_updated_events_with_stream<F>(

@@ -11,7 +11,7 @@ use vector_config::configurable_component;
 
 use crate::{
     codecs::{Encoder, EncodingConfig, Transformer},
-    config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
+    config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     event::Event,
     gcp::{GcpAuthConfig, GcpAuthenticator, Scope, PUBSUB_URL},
     http::HttpClient,
@@ -279,7 +279,7 @@ mod integration_tests {
     use crate::test_util::components::{run_and_assert_sink_error, COMPONENT_ERROR_TAGS};
     use crate::test_util::{
         components::{run_and_assert_sink_compliance, HTTP_SINK_TAGS},
-        random_events_with_stream, random_string, trace_init,
+        random_events_with_stream, metrics_with_stream, random_string, trace_init,
     };
 
     const PROJECT: &str = "testproject";
@@ -306,6 +306,34 @@ mod integration_tests {
         config(topic).build(cx).await.expect("Building sink failed")
     }
 
+    #[tokio::test]
+    async fn publish_metrics() {
+        trace_init();
+
+        let (topic, subscription) = create_topic_subscription().await;
+        let (sink, healthcheck) = config_build(&topic).await;
+
+        healthcheck.await.expect("Health check failed");
+
+        let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+        let (input, events) = metrics_with_stream(100, Some(batch));
+        run_and_assert_sink_compliance(sink, events, &HTTP_SINK_TAGS).await;
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+
+        let response = pull_messages(&subscription, 1000).await;
+        let messages = response
+            .receivedMessages
+            .as_ref()
+            .expect("Response is missing messages");
+        assert_eq!(input.len(), messages.len());
+        for i in 0..input.len() {
+            let data = messages[i].message.decode_data();
+            let data = serde_json::to_value(data).unwrap();
+            //let expected = serde_json::to_value(input[i].as_metric());
+            let expected = serde_json::to_value(input[i].as_log().all_fields().unwrap()).unwrap();
+            assert_eq!(data, expected);
+        }
+    }
     #[tokio::test]
     async fn publish_events() {
         trace_init();
@@ -441,4 +469,5 @@ mod integration_tests {
         timestamp: String,
         message: String,
     }
+
 }
