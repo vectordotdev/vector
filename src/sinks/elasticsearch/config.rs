@@ -355,12 +355,12 @@ impl DataStreamConfig {
 
     /// If there is a `timestamp` field, rename it to the expected `@timestamp` for Elastic Common Schema.
     pub fn remap_timestamp(&self, log: &mut LogEvent) {
-        if let Some(timestamp_key) = log.timestamp_path().cloned() {
+        if let Some(timestamp_key) = log.timestamp_path().cloned().as_ref() {
             if timestamp_key.to_string() == DATA_STREAM_TIMESTAMP_KEY {
                 return;
             }
 
-            log.rename_key(&timestamp_key, event_path!(DATA_STREAM_TIMESTAMP_KEY));
+            log.rename_key(timestamp_key, event_path!(DATA_STREAM_TIMESTAMP_KEY));
         }
     }
 

@@ -85,18 +85,14 @@ impl TraceEvent {
         self.0.contains(key.as_ref())
     }
 
-    // TODO This should eventually use TargetPath for the `key` parameter.
-    // https://github.com/vectordotdev/vector/issues/18059
-    pub fn insert(
+    pub fn insert<'a>(
         &mut self,
-        key: impl AsRef<str>,
+        key: impl TargetPath<'a>,
         value: impl Into<Value> + Debug,
     ) -> Option<Value> {
-        self.0.insert(key.as_ref(), value.into())
+        self.0.insert(key, value.into())
     }
 
-    // TODO Audit code and use this if possible.
-    // https://github.com/vectordotdev/vector/issues/18059
     pub fn maybe_insert<'a, F: FnOnce() -> Value>(
         &mut self,
         prefix: PathPrefix,
