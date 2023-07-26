@@ -58,7 +58,7 @@ impl GenerateConfig for PrometheusPushgatewayConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "prometheus_remote_write")]
+#[typetag::serde(name = "prometheus_pushgateway")]
 impl SourceConfig for PrometheusPushgatewayConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
         let source = PushgatewaySource;
