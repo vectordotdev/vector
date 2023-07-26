@@ -1,7 +1,8 @@
-use lookup::lookup_v2::OptionalValuePath;
+use lookup::lookup_v2::{OptionalTargetPath, OptionalValuePath};
 use lookup::{OwnedTargetPath, OwnedValuePath};
 use once_cell::sync::{Lazy, OnceCell};
 use vector_config::configurable_component;
+use vrl::path::PathPrefix;
 
 static LOG_SCHEMA: OnceCell<LogSchema> = OnceCell::new();
 static LOG_SCHEMA_DEFAULT: Lazy<LogSchema> = Lazy::new(LogSchema::default);
@@ -49,24 +50,24 @@ pub struct LogSchema {
     ///
     /// This would be the field that holds the raw message, such as a raw log line.
     #[serde(default = "LogSchema::default_message_key")]
-    message_key: OptionalValuePath,
+    message_key: OptionalTargetPath,
 
     /// The name of the event field to treat as the event timestamp.
     #[serde(default = "LogSchema::default_timestamp_key")]
-    timestamp_key: OptionalValuePath,
+    timestamp_key: OptionalTargetPath,
 
     /// The name of the event field to treat as the host which sent the message.
     ///
     /// This field will generally represent a real host, or container, that generated the message,
     /// but is somewhat source-dependent.
     #[serde(default = "LogSchema::default_host_key")]
-    host_key: OptionalValuePath,
+    host_key: OptionalTargetPath,
 
     /// The name of the event field to set the source identifier in.
     ///
     /// This field will be set by the Vector source that the event was created in.
     #[serde(default = "LogSchema::default_source_type_key")]
-    source_type_key: OptionalValuePath,
+    source_type_key: OptionalTargetPath,
 
     /// The name of the event field to set the event metadata in.
     ///
@@ -89,20 +90,20 @@ impl Default for LogSchema {
 }
 
 impl LogSchema {
-    fn default_message_key() -> OptionalValuePath {
-        OptionalValuePath::new(MESSAGE)
+    fn default_message_key() -> OptionalTargetPath {
+        OptionalTargetPath::event(MESSAGE)
     }
 
-    fn default_timestamp_key() -> OptionalValuePath {
-        OptionalValuePath::new(TIMESTAMP)
+    fn default_timestamp_key() -> OptionalTargetPath {
+        OptionalTargetPath::event(TIMESTAMP)
     }
 
-    fn default_host_key() -> OptionalValuePath {
-        OptionalValuePath::new(HOST)
+    fn default_host_key() -> OptionalTargetPath {
+        OptionalTargetPath::event(HOST)
     }
 
-    fn default_source_type_key() -> OptionalValuePath {
-        OptionalValuePath::new(SOURCE_TYPE)
+    fn default_source_type_key() -> OptionalTargetPath {
+        OptionalTargetPath::event(SOURCE_TYPE)
     }
 
     fn default_metadata_key() -> OptionalValuePath {
@@ -110,48 +111,68 @@ impl LogSchema {
     }
 
     pub fn message_key(&self) -> Option<&OwnedValuePath> {
-        self.message_key.path.as_ref()
+        self.message_key.path.as_ref().map(|key| &key.path)
     }
 
     /// Returns an `OwnedTargetPath` of the message key.
     /// This parses the path and will panic if it is invalid.
     ///
     /// This should only be used where the result will either be cached,
-    /// or performance isn't critical, since this requires parsing / memory allocation.
+    /// or performance isn't critical, since this requires memory allocation.
     pub fn owned_message_path(&self) -> OwnedTargetPath {
-        OwnedTargetPath::event(self.message_key.clone().path.expect("valid message key"))
+        self.message_key
+            .path
+            .as_ref()
+            .expect("valid message key")
+            .clone()
     }
 
     pub fn timestamp_key(&self) -> Option<&OwnedValuePath> {
-        self.timestamp_key.path.as_ref()
+        self.timestamp_key.as_ref().map(|key| &key.path)
     }
 
     pub fn host_key(&self) -> Option<&OwnedValuePath> {
-        self.host_key.path.as_ref()
+        self.host_key.as_ref().map(|key| &key.path)
     }
 
     pub fn source_type_key(&self) -> Option<&OwnedValuePath> {
-        self.source_type_key.path.as_ref()
+        self.source_type_key.as_ref().map(|key| &key.path)
     }
 
     pub fn metadata_key(&self) -> Option<&OwnedValuePath> {
         self.metadata_key.path.as_ref()
     }
 
-    pub fn set_message_key(&mut self, path: Option<OwnedValuePath>) {
-        self.message_key = OptionalValuePath { path };
+    pub fn message_key_target_path(&self) -> Option<&OwnedTargetPath> {
+        self.message_key.as_ref()
     }
 
-    pub fn set_timestamp_key(&mut self, v: Option<OwnedValuePath>) {
-        self.timestamp_key = OptionalValuePath { path: v };
+    pub fn timestamp_key_target_path(&self) -> Option<&OwnedTargetPath> {
+        self.timestamp_key.as_ref()
+    }
+
+    pub fn host_key_target_path(&self) -> Option<&OwnedTargetPath> {
+        self.host_key.as_ref()
+    }
+
+    pub fn source_type_key_target_path(&self) -> Option<&OwnedTargetPath> {
+        self.source_type_key.as_ref()
+    }
+
+    pub fn set_message_key(&mut self, path: Option<OwnedValuePath>) {
+        self.message_key = OptionalTargetPath::from(PathPrefix::Event, path);
+    }
+
+    pub fn set_timestamp_key(&mut self, path: Option<OwnedValuePath>) {
+        self.timestamp_key = OptionalTargetPath::from(PathPrefix::Event, path);
     }
 
     pub fn set_host_key(&mut self, path: Option<OwnedValuePath>) {
-        self.host_key = OptionalValuePath { path };
+        self.host_key = OptionalTargetPath::from(PathPrefix::Event, path);
     }
 
     pub fn set_source_type_key(&mut self, path: Option<OwnedValuePath>) {
-        self.source_type_key = OptionalValuePath { path };
+        self.source_type_key = OptionalTargetPath::from(PathPrefix::Event, path);
     }
 
     pub fn set_metadata_key(&mut self, path: Option<OwnedValuePath>) {

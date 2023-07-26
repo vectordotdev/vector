@@ -20,7 +20,7 @@ use vector_common::{
     request_metadata::GetEventCountTags,
     EventDataEq,
 };
-use vrl::path::OwnedValuePath;
+use vrl::path::{OwnedTargetPath, OwnedValuePath};
 
 use super::{
     estimated_json_encoded_size_of::EstimatedJsonEncodedSizeOf,
@@ -32,6 +32,15 @@ use crate::config::LogNamespace;
 use crate::config::{log_schema, telemetry};
 use crate::{event::MaybeAsLogMut, ByteSizeOf};
 use lookup::{metadata_path, path};
+use once_cell::sync::Lazy;
+use vrl::owned_value_path;
+
+static VECTOR_SOURCE_TYPE_PATH: Lazy<Option<OwnedTargetPath>> = Lazy::new(|| {
+    Some(OwnedTargetPath::metadata(owned_value_path!(
+        "vector",
+        "source_type"
+    )))
+});
 
 #[derive(Debug, Deserialize)]
 struct Inner {
@@ -296,7 +305,7 @@ impl LogEvent {
 
     /// Retrieves the value of a field based on it's meaning.
     /// This will first check if the value has previously been dropped. It is worth being
-    /// aware that if the field has been dropped and then some how readded, we still fetch
+    /// aware that if the field has been dropped and then somehow re-added, we still fetch
     /// the dropped value here.
     pub fn get_by_meaning(&self, meaning: impl AsRef<str>) -> Option<&Value> {
         if let Some(dropped) = self.metadata().dropped_field(&meaning) {
@@ -309,12 +318,11 @@ impl LogEvent {
         }
     }
 
-    // TODO(Jean): Once the event API uses `Lookup`, the allocation here can be removed.
-    pub fn find_key_by_meaning(&self, meaning: impl AsRef<str>) -> Option<String> {
+    /// Retrieves the target path of a field based on the specified `meaning`.
+    fn find_key_by_meaning(&self, meaning: impl AsRef<str>) -> Option<&OwnedTargetPath> {
         self.metadata()
             .schema_definition()
             .meaning_path(meaning.as_ref())
-            .map(std::string::ToString::to_string)
     }
 
     #[allow(clippy::needless_pass_by_value)] // TargetPath is always a reference
@@ -452,45 +460,37 @@ impl LogEvent {
 impl LogEvent {
     /// Fetches the "message" path of the event. This is either from the "message" semantic meaning (Vector namespace)
     /// or from the message key set on the "Global Log Schema" (Legacy namespace).
-    // TODO: This can eventually return a `&TargetOwnedPath` once Semantic meaning and the
-    //   "Global Log Schema" are updated to the new path lookup code
-    pub fn message_path(&self) -> Option<String> {
+    pub fn message_path(&self) -> Option<&OwnedTargetPath> {
         match self.namespace() {
             LogNamespace::Vector => self.find_key_by_meaning("message"),
-            LogNamespace::Legacy => log_schema().message_key().map(ToString::to_string),
+            LogNamespace::Legacy => log_schema().message_key_target_path(),
         }
     }
 
     /// Fetches the "timestamp" path of the event. This is either from the "timestamp" semantic meaning (Vector namespace)
     /// or from the timestamp key set on the "Global Log Schema" (Legacy namespace).
-    // TODO: This can eventually return a `&TargetOwnedPath` once Semantic meaning and the
-    //   "Global Log Schema" are updated to the new path lookup code
-    pub fn timestamp_path(&self) -> Option<String> {
+    pub fn timestamp_path(&self) -> Option<&OwnedTargetPath> {
         match self.namespace() {
             LogNamespace::Vector => self.find_key_by_meaning("timestamp"),
-            LogNamespace::Legacy => log_schema().timestamp_key().map(ToString::to_string),
+            LogNamespace::Legacy => log_schema().timestamp_key_target_path(),
         }
     }
 
     /// Fetches the `host` path of the event. This is either from the "host" semantic meaning (Vector namespace)
     /// or from the host key set on the "Global Log Schema" (Legacy namespace).
-    // TODO: This can eventually return a `&TargetOwnedPath` once Semantic meaning and the
-    //   "Global Log Schema" are updated to the new path lookup code
-    pub fn host_path(&self) -> Option<String> {
+    pub fn host_path(&self) -> Option<&OwnedTargetPath> {
         match self.namespace() {
             LogNamespace::Vector => self.find_key_by_meaning("host"),
-            LogNamespace::Legacy => log_schema().host_key().map(ToString::to_string),
+            LogNamespace::Legacy => log_schema().host_key_target_path(),
         }
     }
 
     /// Fetches the `source_type` path of the event. This is either from the `source_type` Vector metadata field (Vector namespace)
     /// or from the `source_type` key set on the "Global Log Schema" (Legacy namespace).
-    // TODO: This can eventually return a `&TargetOwnedPath` once Semantic meaning and the
-    //   "Global Log Schema" are updated to the new path lookup code
-    pub fn source_type_path(&self) -> Option<String> {
+    pub fn source_type_path(&self) -> Option<&OwnedTargetPath> {
         match self.namespace() {
-            LogNamespace::Vector => Some("%vector.source_type".to_string()),
-            LogNamespace::Legacy => log_schema().source_type_key().map(ToString::to_string),
+            LogNamespace::Vector => VECTOR_SOURCE_TYPE_PATH.as_ref(),
+            LogNamespace::Legacy => log_schema().source_type_key_target_path(),
         }
     }
 
@@ -520,7 +520,8 @@ impl LogEvent {
     /// or from the timestamp key set on the "Global Log Schema" (Legacy namespace).
     pub fn remove_timestamp(&mut self) -> Option<Value> {
         self.timestamp_path()
-            .and_then(|key| self.remove(key.as_str()))
+            .cloned()
+            .and_then(|key| self.remove(&key))
     }
 
     /// Fetches the `host` of the event. This is either from the "host" semantic meaning (Vector namespace)
