@@ -20,6 +20,7 @@ use crate::{
 };
 
 
+/// Configuration for the `prometheus_pushgateway` source.
 #[configurable_component(source(
     "prometheus_pushgateway",
     "Receive metrics via the Prometheus Pushgateway protocol."
@@ -88,7 +89,7 @@ impl SourceConfig for PrometheusPushgatewayConfig {
 struct PushgatewaySource;
 
 impl PushgatewaySource {
-    fn decode_body(&self, body: Bytes) -> Result<Vec<Event>, ErrorMessage> {
+    fn decode_body(&self, _body: Bytes) -> Result<Vec<Event>, ErrorMessage> {
         let mut result = Vec::new();
 
         let counter = Metric::new(
@@ -108,8 +109,8 @@ impl PushgatewaySource {
 impl HttpSource for PushgatewaySource {
     fn build_events(
         &self,
-        mut body: Bytes,
-        header_map: &HeaderMap,
+        body: Bytes,
+        _header_map: &HeaderMap,
         _query_parameters: &HashMap<String, String>,
         _full_path: &str,
     ) -> Result<Vec<Event>, ErrorMessage> {
