@@ -9,7 +9,7 @@ use chrono::Utc;
 use codecs::{BytesDeserializerConfig, StreamDecodingError};
 use flate2::read::MultiGzDecoder;
 use lookup::lookup_v2::parse_value_path;
-use lookup::{metadata_path, owned_value_path, path, OwnedValuePath, PathPrefix};
+use lookup::{metadata_path, owned_value_path, path, OwnedValuePath};
 use rmp_serde::{decode, Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
@@ -599,9 +599,7 @@ impl From<FluentEvent<'_>> for LogEvent {
                 log.insert(metadata_path!("vector", "ingest_timestamp"), Utc::now());
             }
             LogNamespace::Legacy => {
-                if let Some(timestamp_key) = log_schema().timestamp_key() {
-                    log.insert((PathPrefix::Event, timestamp_key), timestamp);
-                }
+                log.maybe_insert(log_schema().timestamp_key_target_path(), timestamp);
             }
         }
 

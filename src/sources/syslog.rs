@@ -10,7 +10,7 @@ use codecs::{
 };
 use futures::StreamExt;
 use listenfd::ListenFd;
-use lookup::{lookup_v2::OptionalValuePath, path, OwnedValuePath, PathPrefix};
+use lookup::{lookup_v2::OptionalValuePath, path, OwnedValuePath};
 use smallvec::SmallVec;
 use tokio_util::udp::UdpFramed;
 use vector_config::configurable_component;
@@ -423,8 +423,8 @@ fn enrich_syslog_event(
             .get("timestamp")
             .and_then(|timestamp| timestamp.as_timestamp().cloned())
             .unwrap_or_else(Utc::now);
-        if let Some(timestamp_key) = log_schema().timestamp_key() {
-            log.insert((PathPrefix::Event, timestamp_key), timestamp);
+        if let Some(timestamp_key) = log_schema().timestamp_key_target_path() {
+            log.insert(timestamp_key, timestamp);
         }
     }
 
@@ -810,7 +810,7 @@ mod test {
                     .expect("invalid timestamp"),
             );
             expected.insert(
-                (PathPrefix::Event, log_schema().source_type_key().unwrap()),
+                log_schema().source_type_key_target_path().unwrap(),
                 "syslog",
             );
             expected.insert("host", "74794bfb6795");
@@ -868,7 +868,7 @@ mod test {
             );
             expected.insert("hostname", "74794bfb6795");
             expected.insert(
-                (PathPrefix::Event, log_schema().source_type_key().unwrap()),
+                log_schema().source_type_key_target_path().unwrap(),
                 "syslog",
             );
             expected.insert("severity", "notice");
@@ -1014,7 +1014,7 @@ mod test {
                 "74794bfb6795",
             );
             expected.insert(
-                (PathPrefix::Event, log_schema().source_type_key().unwrap()),
+                log_schema().source_type_key_target_path().unwrap(),
                 "syslog",
             );
             expected.insert("hostname", "74794bfb6795");
@@ -1062,7 +1062,7 @@ mod test {
                 expected_date,
             );
             expected.insert(
-                (PathPrefix::Event, log_schema().source_type_key().unwrap()),
+                log_schema().source_type_key_target_path().unwrap(),
                 "syslog",
             );
             expected.insert("host", "74794bfb6795");
@@ -1102,7 +1102,7 @@ mod test {
                     .expect("invalid timestamp"),
             );
             expected.insert(
-                (PathPrefix::Event, log_schema().source_type_key().unwrap()),
+                log_schema().source_type_key_target_path().unwrap(),
                 "syslog",
             );
             expected.insert("host", "74794bfb6795");

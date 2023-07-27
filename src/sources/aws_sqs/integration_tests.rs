@@ -110,7 +110,7 @@ pub(crate) async fn test() {
         for event in events {
             let message = event
                 .as_log()
-                .get((PathPrefix::Event, log_schema().message_key().unwrap()))
+                .get(log_schema().message_key_target_path().unwrap())
                 .unwrap()
                 .to_string_lossy();
             if !expected_messages.remove(message.as_ref()) {

@@ -309,17 +309,15 @@ impl MetricToLog {
                             })
                             .unwrap_or_else(|| event::Value::Timestamp(Utc::now()));
 
-                        if let Some(timestamp_key) = log_schema().timestamp_key() {
-                            log.insert((PathPrefix::Event, timestamp_key), timestamp);
+                        if let Some(timestamp_key) = log_schema().timestamp_key_target_path() {
+                            log.insert(timestamp_key, timestamp);
                         }
 
                         if let Some(host_tag) = &self.host_tag {
                             if let Some(host_value) =
                                 log.remove_prune(host_tag.to_string().as_str(), true)
                             {
-                                if let Some(host_key) = log_schema().host_key() {
-                                    log.insert((PathPrefix::Event, host_key), host_value);
-                                }
+                                log.maybe_insert(log_schema().host_key_target_path(), host_value);
                             }
                         }
                     }

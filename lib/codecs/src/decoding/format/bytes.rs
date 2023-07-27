@@ -8,7 +8,6 @@ use vector_core::{
     event::{Event, LogEvent},
     schema,
 };
-use vrl::path::PathPrefix;
 use vrl::value::Kind;
 
 use super::Deserializer;
@@ -63,7 +62,7 @@ impl BytesDeserializer {
             LogNamespace::Vector => log_namespace.new_log_from_data(bytes),
             LogNamespace::Legacy => {
                 let mut log = LogEvent::default();
-                log.maybe_insert(PathPrefix::Event, log_schema().message_key(), bytes);
+                log.maybe_insert(log_schema().message_key_target_path(), bytes);
                 log
             }
         }

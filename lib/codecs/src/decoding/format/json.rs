@@ -3,7 +3,6 @@ use std::convert::TryInto;
 use bytes::Bytes;
 use chrono::Utc;
 use derivative::Derivative;
-use lookup::PathPrefix;
 use smallvec::{smallvec, SmallVec};
 use vector_config::configurable_component;
 use vector_core::{
@@ -133,11 +132,11 @@ impl Deserializer for JsonDeserializer {
             LogNamespace::Legacy => {
                 let timestamp = Utc::now();
 
-                if let Some(timestamp_key) = log_schema().timestamp_key() {
+                if let Some(timestamp_key) = log_schema().timestamp_key_target_path() {
                     for event in &mut events {
                         let log = event.as_mut_log();
-                        if !log.contains((PathPrefix::Event, timestamp_key)) {
-                            log.insert((PathPrefix::Event, timestamp_key), timestamp);
+                        if !log.contains(timestamp_key) {
+                            log.insert(timestamp_key, timestamp);
                         }
                     }
                 }
@@ -218,7 +217,7 @@ mod tests {
                 let log = event.as_log();
                 assert_eq!(log["bar"], 456.into());
                 assert_eq!(
-                    log.get((PathPrefix::Event, log_schema().timestamp_key().unwrap()))
+                    log.get(log_schema().timestamp_key_target_path().unwrap())
                         .is_some(),
                     namespace == LogNamespace::Legacy
                 );
