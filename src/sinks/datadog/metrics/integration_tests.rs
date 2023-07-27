@@ -4,7 +4,10 @@ use futures::{channel::mpsc::Receiver, stream, StreamExt};
 use hyper::StatusCode;
 use indoc::indoc;
 use rand::{thread_rng, Rng};
-use vector_core::event::{BatchNotifier, BatchStatus, Event, Metric, MetricKind, MetricValue};
+use vector_core::{
+    config::{init_telemetry, Tags, Telemetry},
+    event::{BatchNotifier, BatchStatus, Event, Metric, MetricKind, MetricValue},
+};
 
 use super::DatadogMetricsConfig;
 use crate::{
@@ -207,5 +210,15 @@ async fn real_endpoint() {
 
 #[tokio::test]
 async fn data_volume_tags() {
+    init_telemetry(
+        Telemetry {
+            tags: Tags {
+                emit_service: true,
+                emit_source: true,
+            },
+        },
+        true,
+    );
+
     assert_data_volume_sink_compliance(&DATA_VOLUME_SINK_TAGS, async { run_sink().await }).await;
 }
