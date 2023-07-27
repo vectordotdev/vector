@@ -334,6 +334,7 @@ mod integration_tests {
             assert_eq!(data, expected);
         }
     }
+    
     #[tokio::test]
     async fn publish_events() {
         trace_init();
