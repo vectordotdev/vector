@@ -556,7 +556,9 @@ mod test {
     #[test]
     fn test_insert_standard_vector_source_metadata() {
         let mut schema = LogSchema::default();
-        schema.set_source_type_key(Some(OwnedTargetPath::event(owned_value_path!("a.b.c.d"))));
+        schema.set_source_type_key(Some(OwnedTargetPath::event(owned_value_path!(
+            "a", "b", "c", "d"
+        ))));
         init_log_schema(schema, false);
 
         let namespace = LogNamespace::Legacy;
