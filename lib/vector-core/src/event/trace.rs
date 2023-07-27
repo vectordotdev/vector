@@ -7,7 +7,6 @@ use vector_common::{
     internal_event::TaggedEventsSent, json_size::JsonSize, request_metadata::GetEventCountTags,
     EventDataEq,
 };
-use vrl::path::{PathPrefix, ValuePath};
 
 use super::{
     BatchNotifier, EstimatedJsonEncodedSizeOf, EventFinalizer, EventFinalizers, EventMetadata,
@@ -95,12 +94,11 @@ impl TraceEvent {
 
     pub fn maybe_insert<'a, F: FnOnce() -> Value>(
         &mut self,
-        prefix: PathPrefix,
-        path: Option<impl ValuePath<'a>>,
+        path: Option<impl TargetPath<'a>>,
         value_callback: F,
     ) -> Option<Value> {
         if let Some(path) = path {
-            return self.0.insert((prefix, path), value_callback());
+            return self.0.insert(path, value_callback());
         }
         None
     }
