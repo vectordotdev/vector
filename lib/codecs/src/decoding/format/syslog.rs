@@ -483,9 +483,8 @@ fn insert_fields_from_syslog(
 
 #[cfg(test)]
 mod tests {
-    use vector_core::config::{init_log_schema, log_schema, LogSchema};
-
     use super::*;
+    use vector_core::config::{init_log_schema, log_schema, LogSchema};
 
     #[test]
     fn deserialize_syslog_legacy_namespace() {
@@ -522,8 +521,12 @@ mod tests {
 
     fn init() {
         let mut schema = LogSchema::default();
-        schema.set_message_key(Some(owned_value_path!("legacy_message")));
-        schema.set_message_key(Some(owned_value_path!("legacy_timestamp")));
+        schema.set_message_key(Some(OwnedTargetPath::event(owned_value_path!(
+            "legacy_message"
+        ))));
+        schema.set_message_key(Some(OwnedTargetPath::event(owned_value_path!(
+            "legacy_timestamp"
+        ))));
         init_log_schema(schema, false);
     }
 }

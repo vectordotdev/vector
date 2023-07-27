@@ -1,8 +1,7 @@
-use lookup::lookup_v2::{OptionalTargetPath, OptionalValuePath};
+use lookup::lookup_v2::OptionalTargetPath;
 use lookup::{OwnedTargetPath, OwnedValuePath};
 use once_cell::sync::{Lazy, OnceCell};
 use vector_config::configurable_component;
-use vrl::path::PathPrefix;
 
 static LOG_SCHEMA: OnceCell<LogSchema> = OnceCell::new();
 static LOG_SCHEMA_DEFAULT: Lazy<LogSchema> = Lazy::new(LogSchema::default);
@@ -74,7 +73,7 @@ pub struct LogSchema {
     /// Generally, this field will be set by Vector to hold event-specific metadata, such as
     /// annotations by the `remap` transform when an error or abort is encountered.
     #[serde(default = "LogSchema::default_metadata_key")]
-    metadata_key: OptionalValuePath,
+    metadata_key: OptionalTargetPath,
 }
 
 impl Default for LogSchema {
@@ -106,8 +105,8 @@ impl LogSchema {
         OptionalTargetPath::event(SOURCE_TYPE)
     }
 
-    fn default_metadata_key() -> OptionalValuePath {
-        OptionalValuePath::new(METADATA)
+    fn default_metadata_key() -> OptionalTargetPath {
+        OptionalTargetPath::event(METADATA)
     }
 
     pub fn message_key(&self) -> Option<&OwnedValuePath> {
@@ -140,7 +139,7 @@ impl LogSchema {
     }
 
     pub fn metadata_key(&self) -> Option<&OwnedValuePath> {
-        self.metadata_key.path.as_ref()
+        self.metadata_key.as_ref().map(|key| &key.path)
     }
 
     pub fn message_key_target_path(&self) -> Option<&OwnedTargetPath> {
@@ -159,24 +158,28 @@ impl LogSchema {
         self.source_type_key.as_ref()
     }
 
-    pub fn set_message_key(&mut self, path: Option<OwnedValuePath>) {
-        self.message_key = OptionalTargetPath::from(PathPrefix::Event, path);
+    pub fn metadata_key_target_path(&self) -> Option<&OwnedTargetPath> {
+        self.metadata_key.as_ref()
     }
 
-    pub fn set_timestamp_key(&mut self, path: Option<OwnedValuePath>) {
-        self.timestamp_key = OptionalTargetPath::from(PathPrefix::Event, path);
+    pub fn set_message_key(&mut self, path: Option<OwnedTargetPath>) {
+        self.message_key = OptionalTargetPath { path };
     }
 
-    pub fn set_host_key(&mut self, path: Option<OwnedValuePath>) {
-        self.host_key = OptionalTargetPath::from(PathPrefix::Event, path);
+    pub fn set_timestamp_key(&mut self, path: Option<OwnedTargetPath>) {
+        self.timestamp_key = OptionalTargetPath { path };
     }
 
-    pub fn set_source_type_key(&mut self, path: Option<OwnedValuePath>) {
-        self.source_type_key = OptionalTargetPath::from(PathPrefix::Event, path);
+    pub fn set_host_key(&mut self, path: Option<OwnedTargetPath>) {
+        self.host_key = OptionalTargetPath { path };
     }
 
-    pub fn set_metadata_key(&mut self, path: Option<OwnedValuePath>) {
-        self.metadata_key = OptionalValuePath { path };
+    pub fn set_source_type_key(&mut self, path: Option<OwnedTargetPath>) {
+        self.source_type_key = OptionalTargetPath { path };
+    }
+
+    pub fn set_metadata_key(&mut self, path: Option<OwnedTargetPath>) {
+        self.metadata_key = OptionalTargetPath { path };
     }
 
     /// Merge two `LogSchema` instances together.
@@ -195,35 +198,35 @@ impl LogSchema {
             {
                 errors.push("conflicting values for 'log_schema.host_key' found".to_owned());
             } else {
-                self.set_host_key(other.host_key().cloned());
+                self.set_host_key(other.host_key_target_path().cloned());
             }
             if self.message_key() != LOG_SCHEMA_DEFAULT.message_key()
                 && self.message_key() != other.message_key()
             {
                 errors.push("conflicting values for 'log_schema.message_key' found".to_owned());
             } else {
-                self.set_message_key(other.message_key().cloned());
+                self.set_message_key(other.message_key_target_path().cloned());
             }
             if self.timestamp_key() != LOG_SCHEMA_DEFAULT.timestamp_key()
                 && self.timestamp_key() != other.timestamp_key()
             {
                 errors.push("conflicting values for 'log_schema.timestamp_key' found".to_owned());
             } else {
-                self.set_timestamp_key(other.timestamp_key().cloned());
+                self.set_timestamp_key(other.timestamp_key_target_path().cloned());
             }
             if self.source_type_key() != LOG_SCHEMA_DEFAULT.source_type_key()
                 && self.source_type_key() != other.source_type_key()
             {
                 errors.push("conflicting values for 'log_schema.source_type_key' found".to_owned());
             } else {
-                self.set_source_type_key(other.source_type_key().cloned());
+                self.set_source_type_key(other.source_type_key_target_path().cloned());
             }
             if self.metadata_key() != LOG_SCHEMA_DEFAULT.metadata_key()
                 && self.metadata_key() != other.metadata_key()
             {
                 errors.push("conflicting values for 'log_schema.metadata_key' found".to_owned());
             } else {
-                self.set_metadata_key(other.metadata_key().cloned());
+                self.set_metadata_key(other.metadata_key_target_path().cloned());
             }
         }
 
