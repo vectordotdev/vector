@@ -330,7 +330,7 @@ mod integration_tests {
             let data = messages[i].message.decode_data();
             let data = serde_json::to_value(data).unwrap();
             //let expected = serde_json::to_value(input[i].as_metric());
-            let expected = serde_json::to_value(input[i].as_log().all_fields().unwrap()).unwrap();
+            let expected = serde_json::to_value(input[i].as_metric()).unwrap();
             assert_eq!(data, expected);
         }
     }
