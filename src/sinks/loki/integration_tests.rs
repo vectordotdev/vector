@@ -10,7 +10,6 @@ use vector_core::{
     config::LogNamespace,
     event::{BatchNotifier, BatchStatus, Event, LogEvent},
 };
-use vrl::path::PathPrefix;
 use vrl::value::{kind::Collection, Kind};
 
 use super::config::{LokiConfig, OutOfOrderAction};

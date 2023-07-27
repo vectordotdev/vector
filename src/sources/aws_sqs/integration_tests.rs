@@ -7,7 +7,6 @@ use aws_sdk_sqs::output::CreateQueueOutput;
 use aws_types::region::Region;
 use futures::StreamExt;
 use tokio::time::timeout;
-use vrl::path::PathPrefix;
 
 use crate::{
     aws::{auth::AwsAuthentication, region::RegionOrEndpoint},
