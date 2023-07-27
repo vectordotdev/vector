@@ -5296,9 +5296,9 @@ dependencies = [
 
 [[package]]
 name = "no-proxy"
-version = "0.3.2"
+version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b24b826bdb92c7a2c6f22ed4cf649001bd237f936587ee0b76cd9dea86003d01"
+checksum = "5cc5956cc74e3574924e108ad12e14340a64183e1cd1d69a7e41e9680c109e67"
 dependencies = [
  "cidr-utils",
  "serde",
