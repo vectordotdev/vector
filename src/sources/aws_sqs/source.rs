@@ -219,14 +219,12 @@ async fn delete_messages(client: SqsClient, receipts: Vec<String>, queue_url: St
 
 #[cfg(test)]
 mod tests {
-    use crate::codecs::DecodingConfig;
-    use chrono::SecondsFormat;
-    use lookup::path;
-    use vrl::path::PathPrefix;
-
     use super::*;
+    use crate::codecs::DecodingConfig;
     use crate::config::{log_schema, SourceConfig};
     use crate::sources::aws_sqs::AwsSqsConfig;
+    use chrono::SecondsFormat;
+    use lookup::path;
 
     #[tokio::test]
     async fn test_decode_vector_namespace() {
@@ -313,7 +311,7 @@ mod tests {
             events[0]
                 .clone()
                 .as_log()
-                .get((PathPrefix::Event, log_schema().message_key().unwrap()))
+                .get(log_schema().message_key_target_path().unwrap())
                 .unwrap()
                 .to_string_lossy(),
             message

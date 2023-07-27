@@ -12,7 +12,7 @@ use bytes::Bytes;
 use chrono::{TimeZone, Utc};
 use codecs::{decoding::BoxedFramingError, CharacterDelimitedDecoder};
 use futures::{poll, stream::BoxStream, task::Poll, StreamExt};
-use lookup::{metadata_path, owned_value_path, path, PathPrefix};
+use lookup::{metadata_path, owned_value_path, path};
 use nix::{
     sys::signal::{kill, Signal},
     unistd::Pid,
@@ -741,9 +741,7 @@ fn enrich_log_event(log: &mut LogEvent, log_namespace: LogNamespace) {
         }
         LogNamespace::Legacy => {
             if let Some(ts) = timestamp {
-                if let Some(timestamp_key) = log_schema().timestamp_key() {
-                    log.insert((PathPrefix::Event, timestamp_key), ts);
-                }
+                log.maybe_insert(log_schema().timestamp_key_target_path(), ts);
             }
         }
     }
@@ -784,7 +782,7 @@ fn create_log_event_from_record(
             let mut log = LogEvent::from_iter(record).with_batch_notifier_option(batch);
 
             if let Some(message) = log.remove(MESSAGE) {
-                log.maybe_insert(PathPrefix::Event, log_schema().message_key(), message);
+                log.maybe_insert(log_schema().message_key_target_path(), message);
             }
 
             log

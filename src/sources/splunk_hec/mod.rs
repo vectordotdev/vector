@@ -25,7 +25,6 @@ use vector_core::{
     schema::meaning,
     EstimatedJsonEncodedSizeOf,
 };
-use vrl::path::PathPrefix;
 use vrl::value::{kind::Collection, Kind};
 use warp::{filters::BoxedFilter, path, reject::Rejection, reply::Response, Filter, Reply};
 
@@ -812,7 +811,7 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
                     if string.is_empty() {
                         return Err(ApiError::EmptyEventField { event: self.events }.into());
                     }
-                    log.maybe_insert(PathPrefix::Event, log_schema().message_key(), string);
+                    log.maybe_insert(log_schema().message_key_target_path(), string);
                 }
                 JsonValue::Object(mut object) => {
                     if object.is_empty() {
@@ -827,11 +826,7 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
                                 log.insert("line", line);
                             }
                             _ => {
-                                log.maybe_insert(
-                                    PathPrefix::Event,
-                                    log_schema().message_key(),
-                                    line,
-                                );
+                                log.maybe_insert(log_schema().message_key_target_path(), line);
                             }
                         }
                     }
@@ -1005,7 +1000,7 @@ fn raw_event(
         LogNamespace::Vector => LogEvent::from(message),
         LogNamespace::Legacy => {
             let mut log = LogEvent::default();
-            log.maybe_insert(PathPrefix::Event, log_schema().message_key(), message);
+            log.maybe_insert(log_schema().message_key_target_path(), message);
             log
         }
     };

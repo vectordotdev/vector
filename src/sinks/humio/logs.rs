@@ -269,10 +269,7 @@ mod integration_tests {
         );
 
         let ts = Utc.timestamp_nanos(Utc::now().timestamp_millis() * 1_000_000 + 132_456);
-        event.insert(
-            (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
-            ts,
-        );
+        event.insert(log_schema().timestamp_key_target_path().unwrap(), ts);
 
         run_and_assert_sink_compliance(sink, stream::once(ready(event)), &HTTP_SINK_TAGS).await;
 

@@ -54,7 +54,7 @@ pub struct TargetIter<T> {
 
 fn create_log_event(value: Value, metadata: EventMetadata) -> LogEvent {
     let mut log = LogEvent::new_with_metadata(metadata);
-    log.maybe_insert(PathPrefix::Event, log_schema().message_key(), value);
+    log.maybe_insert(log_schema().message_key_target_path(), value);
     log
 }
 
