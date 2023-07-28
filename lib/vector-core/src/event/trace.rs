@@ -91,8 +91,8 @@ impl TraceEvent {
         self.0.get_mut(key)
     }
 
-    pub fn contains(&self, key: impl AsRef<str>) -> bool {
-        self.0.contains(key.as_ref())
+    pub fn contains<'a>(&self, key: impl TargetPath<'a>) -> bool {
+        self.0.contains(key)
     }
 
     pub fn insert<'a>(

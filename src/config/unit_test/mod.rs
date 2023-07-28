@@ -15,6 +15,7 @@ use tokio::sync::{
     Mutex,
 };
 use uuid::Uuid;
+use vrl::event_path;
 
 pub use self::unit_test_components::{
     UnitTestSinkCheck, UnitTestSinkConfig, UnitTestSinkResult, UnitTestSourceConfig,
@@ -572,7 +573,7 @@ fn build_input_event(input: &TestInput) -> Result<Event, String> {
                             NotNan::new(*f).map_err(|_| "NaN value not supported".to_string())?,
                         ),
                     };
-                    event.insert(path.as_str(), value);
+                    event.insert(event_path!(path.as_str()), value);
                 }
                 Ok(event.into())
             } else {

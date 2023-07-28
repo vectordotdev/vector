@@ -503,13 +503,9 @@ mod tests {
             .expect("invalid timestamp");
 
         let mut event = Event::Log(LogEvent::from("hello world"));
-        event.as_mut_log().insert(
-            (
-                lookup::PathPrefix::Event,
-                log_schema().timestamp_key().unwrap(),
-            ),
-            ts,
-        );
+        event
+            .as_mut_log()
+            .insert(log_schema().timestamp_key_target_path().unwrap(), ts);
 
         let template = Template::try_from("abcd-%F").unwrap();
 
@@ -524,13 +520,9 @@ mod tests {
             .expect("invalid timestamp");
 
         let mut event = Event::Log(LogEvent::from("hello world"));
-        event.as_mut_log().insert(
-            (
-                lookup::PathPrefix::Event,
-                log_schema().timestamp_key().unwrap(),
-            ),
-            ts,
-        );
+        event
+            .as_mut_log()
+            .insert(log_schema().timestamp_key_target_path().unwrap(), ts);
 
         let template = Template::try_from("abcd-%F_%T").unwrap();
 
