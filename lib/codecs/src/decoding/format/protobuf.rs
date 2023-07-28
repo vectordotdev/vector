@@ -259,7 +259,7 @@ mod tests {
                 let log = event.as_log();
                 validate_log(log);
                 assert_eq!(
-                    log.get((PathPrefix::Event, log_schema().timestamp_key().unwrap()))
+                    log.get(log_schema().timestamp_key_target_path().unwrap())
                         .is_some(),
                     namespace == LogNamespace::Legacy
                 );
