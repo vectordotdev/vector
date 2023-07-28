@@ -114,9 +114,12 @@ impl HttpSource for PushgatewaySource {
         body: Bytes,
         _header_map: &HeaderMap,
         _query_parameters: &HashMap<String, String>,
-        _full_path: &str,
+        full_path: &str,
     ) -> Result<Vec<Event>, ErrorMessage> {
         let body = String::from_utf8_lossy(&body);
+
+        println!("Full path was: {}", full_path);
+        parse_path_labels(full_path);
 
         // TODO: Add grouping key to these
         // TODO: Add an option to toggle between incremental and absolute, default to absolute
@@ -127,4 +130,13 @@ impl HttpSource for PushgatewaySource {
             }
         }
     }
+}
+
+fn parse_path_labels(path: &str) -> Vec<(String,String)> {
+    let labels = Vec::new();
+    let segments = path.split("/");
+    let asdf : Vec<&str> = segments.collect();
+    println!("{:?}", asdf);
+
+    labels
 }
