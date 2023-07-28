@@ -11,7 +11,8 @@ pub use format::{
     BoxedDeserializer, BytesDeserializer, BytesDeserializerConfig, GelfDeserializer,
     GelfDeserializerConfig, GelfDeserializerOptions, JsonDeserializer, JsonDeserializerConfig,
     JsonDeserializerOptions, NativeDeserializer, NativeDeserializerConfig, NativeJsonDeserializer,
-    NativeJsonDeserializerConfig, NativeJsonDeserializerOptions,
+    NativeJsonDeserializerConfig, NativeJsonDeserializerOptions, ProtobufDeserializer,
+    ProtobufDeserializerConfig,
 };
 #[cfg(feature = "syslog")]
 pub use format::{SyslogDeserializer, SyslogDeserializerConfig, SyslogDeserializerOptions};
@@ -200,6 +201,11 @@ pub enum DeserializerConfig {
     /// [json]: https://www.json.org/
     Json(JsonDeserializerConfig),
 
+    /// Decodes the raw bytes as [protobuf][protobuf].
+    ///
+    /// [protobuf]: https://protobuf.dev/
+    Protobuf(ProtobufDeserializerConfig),
+
     #[cfg(feature = "syslog")]
     /// Decodes the raw bytes as a Syslog message.
     ///
@@ -275,6 +281,7 @@ impl DeserializerConfig {
         match self {
             DeserializerConfig::Bytes => Deserializer::Bytes(BytesDeserializerConfig.build()),
             DeserializerConfig::Json(config) => Deserializer::Json(config.build()),
+            DeserializerConfig::Protobuf(config) => Deserializer::Protobuf(config.build()),
             #[cfg(feature = "syslog")]
             DeserializerConfig::Syslog(config) => Deserializer::Syslog(config.build()),
             DeserializerConfig::Native => Deserializer::Native(NativeDeserializerConfig.build()),
@@ -293,6 +300,7 @@ impl DeserializerConfig {
             | DeserializerConfig::NativeJson(_) => {
                 FramingConfig::NewlineDelimited(Default::default())
             }
+            DeserializerConfig::Protobuf(_) => FramingConfig::Bytes,
             #[cfg(feature = "syslog")]
             DeserializerConfig::Syslog(_) => FramingConfig::NewlineDelimited(Default::default()),
         }
@@ -303,6 +311,7 @@ impl DeserializerConfig {
         match self {
             DeserializerConfig::Bytes => BytesDeserializerConfig.output_type(),
             DeserializerConfig::Json(config) => config.output_type(),
+            DeserializerConfig::Protobuf(config) => config.output_type(),
             #[cfg(feature = "syslog")]
             DeserializerConfig::Syslog(config) => config.output_type(),
             DeserializerConfig::Native => NativeDeserializerConfig.output_type(),
@@ -316,6 +325,7 @@ impl DeserializerConfig {
         match self {
             DeserializerConfig::Bytes => BytesDeserializerConfig.schema_definition(log_namespace),
             DeserializerConfig::Json(config) => config.schema_definition(log_namespace),
+            DeserializerConfig::Protobuf(config) => config.schema_definition(log_namespace),
             #[cfg(feature = "syslog")]
             DeserializerConfig::Syslog(config) => config.schema_definition(log_namespace),
             DeserializerConfig::Native => NativeDeserializerConfig.schema_definition(log_namespace),
@@ -344,6 +354,7 @@ impl DeserializerConfig {
                 }),
             ) => "application/json",
             (DeserializerConfig::Native, _) => "application/octet-stream",
+            (DeserializerConfig::Protobuf(_), _) => "application/octet-stream",
             (
                 DeserializerConfig::Json(_)
                 | DeserializerConfig::NativeJson(_)
@@ -364,6 +375,8 @@ pub enum Deserializer {
     Bytes(BytesDeserializer),
     /// Uses a `JsonDeserializer` for deserialization.
     Json(JsonDeserializer),
+    /// Uses a `ProtobufDeserializer` for deserialization.
+    Protobuf(ProtobufDeserializer),
     #[cfg(feature = "syslog")]
     /// Uses a `SyslogDeserializer` for deserialization.
     Syslog(SyslogDeserializer),
@@ -386,6 +399,7 @@ impl format::Deserializer for Deserializer {
         match self {
             Deserializer::Bytes(deserializer) => deserializer.parse(bytes, log_namespace),
             Deserializer::Json(deserializer) => deserializer.parse(bytes, log_namespace),
+            Deserializer::Protobuf(deserializer) => deserializer.parse(bytes, log_namespace),
             #[cfg(feature = "syslog")]
             Deserializer::Syslog(deserializer) => deserializer.parse(bytes, log_namespace),
             Deserializer::Native(deserializer) => deserializer.parse(bytes, log_namespace),
