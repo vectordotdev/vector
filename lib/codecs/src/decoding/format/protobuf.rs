@@ -1,9 +1,9 @@
 use std::collections::BTreeMap;
 use std::fs;
+use std::path::PathBuf;
 
 use bytes::Bytes;
 use chrono::Utc;
-use lookup::PathPrefix;
 use ordered_float::NotNan;
 use prost_reflect::{DescriptorPool, DynamicMessage, MessageDescriptor, ReflectMessage};
 use smallvec::{smallvec, SmallVec};
@@ -23,7 +23,7 @@ use super::Deserializer;
 #[derive(Debug, Clone, Default)]
 pub struct ProtobufDeserializerConfig {
     /// Path to desc file
-    desc_file: String,
+    desc_file: PathBuf,
 
     /// message type. e.g package.message
     message_type: String,
@@ -32,6 +32,7 @@ pub struct ProtobufDeserializerConfig {
 impl ProtobufDeserializerConfig {
     /// Build the `ProtobufDeserializer` from this configuration.
     pub fn build(&self) -> ProtobufDeserializer {
+        // TODO return a Result instead.
         ProtobufDeserializer::try_from(self).unwrap()
     }
 
@@ -65,13 +66,6 @@ impl ProtobufDeserializerConfig {
     }
 }
 
-impl ProtobufDeserializerConfig {
-    /// Creates a new `ProtobufDeserializerConfig`.
-    pub fn new() -> Self {
-        Default::default()
-    }
-}
-
 /// Deserializer that builds `Event`s from a byte frame containing protobuf.
 #[derive(Debug, Clone)]
 pub struct ProtobufDeserializer {
@@ -85,15 +79,15 @@ impl ProtobufDeserializer {
     }
 
     fn get_message_descriptor(
-        desc_file: String,
+        desc_file: &PathBuf,
         message_type: String,
     ) -> vector_common::Result<MessageDescriptor> {
-        let b = fs::read(desc_file.clone())
-            .map_err(|e| format!("Failed to open protobuf desc file '{desc_file}': {e}"))?;
+        let b = fs::read(desc_file)
+            .map_err(|e| format!("Failed to open protobuf desc file '{desc_file:?}': {e}",))?;
         let pool = DescriptorPool::decode(b.as_slice())
-            .map_err(|e| format!("Failed to parse protobuf desc file '{desc_file}': {e}"))?;
+            .map_err(|e| format!("Failed to parse protobuf desc file '{desc_file:?}': {e}"))?;
         Ok(pool.get_message_by_name(&message_type).unwrap_or_else(|| {
-            panic!("The message type '{message_type}' could not be found in '{desc_file}'")
+            panic!("The message type '{message_type}' could not be found in '{desc_file:?}'")
         }))
     }
 }
@@ -113,14 +107,12 @@ impl Deserializer for ProtobufDeserializer {
             LogNamespace::Vector => event,
             LogNamespace::Legacy => {
                 let timestamp = Utc::now();
-
-                if let Some(timestamp_key) = log_schema().timestamp_key() {
+                if let Some(timestamp_key) = log_schema().timestamp_key_target_path() {
                     let log = event.as_mut_log();
-                    if !log.contains((PathPrefix::Event, timestamp_key)) {
-                        log.insert((PathPrefix::Event, timestamp_key), timestamp);
+                    if !log.contains(timestamp_key) {
+                        log.insert(timestamp_key, timestamp);
                     }
                 }
-
                 event
             }
         };
@@ -133,7 +125,7 @@ impl TryFrom<&ProtobufDeserializerConfig> for ProtobufDeserializer {
     type Error = vector_common::Error;
     fn try_from(config: &ProtobufDeserializerConfig) -> vector_common::Result<Self> {
         let message_descriptor = ProtobufDeserializer::get_message_descriptor(
-            config.desc_file.clone(),
+            &config.desc_file,
             config.message_type.clone(),
         )?;
         Ok(Self::new(message_descriptor))
@@ -252,7 +244,7 @@ mod tests {
     ) {
         let input = Bytes::from(protobuf_bin_message);
         let message_descriptor = ProtobufDeserializer::get_message_descriptor(
-            protobuf_desc_path.to_str().unwrap().to_string(),
+            &protobuf_desc_path,
             message_type.to_string(),
         )
         .unwrap();
@@ -348,11 +340,7 @@ mod tests {
     fn deserialize_error_invalid_protobuf() {
         let input = Bytes::from("{ foo");
         let message_descriptor = ProtobufDeserializer::get_message_descriptor(
-            test_data_dir()
-                .join("test_protobuf.desc")
-                .to_str()
-                .unwrap()
-                .to_string(),
+            &test_data_dir().join("test_protobuf.desc"),
             "test_protobuf.Person".to_string(),
         )
         .unwrap();
