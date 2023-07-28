@@ -7,7 +7,7 @@ use futures::stream;
 use lookup::owned_value_path;
 use vector_common::encode_logfmt;
 use vector_core::{
-    config::LogNamespace,
+    config::{init_telemetry, LogNamespace, Tags, Telemetry},
     event::{BatchNotifier, BatchStatus, Event, LogEvent},
 };
 use vrl::value::{kind::Collection, Kind};
@@ -20,7 +20,10 @@ use crate::{
     sinks::{util::test::load_sink, VectorSink},
     template::Template,
     test_util::{
-        components::{run_and_assert_sink_compliance, SINK_TAGS},
+        components::{
+            run_and_assert_data_volume_sink_compliance, run_and_assert_sink_compliance,
+            DATA_VOLUME_SINK_TAGS, SINK_TAGS,
+        },
         generate_events_with_stream, generate_lines_with_stream, random_lines,
     },
 };
@@ -140,6 +143,34 @@ async fn text() {
     let (batch, mut receiver) = BatchNotifier::new_with_receiver();
     let (lines, events) = generate_lines_with_stream(line_generator, 10, Some(batch));
     run_and_assert_sink_compliance(sink, events, &SINK_TAGS).await;
+    assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+
+    tokio::time::sleep(tokio::time::Duration::new(1, 0)).await;
+
+    let (_, outputs) = fetch_stream(stream.to_string(), "default").await;
+    assert_eq!(lines.len(), outputs.len());
+    for (i, output) in outputs.iter().enumerate() {
+        assert_eq!(output, &lines[i]);
+    }
+}
+
+#[tokio::test]
+async fn data_volume_tags() {
+    init_telemetry(
+        Telemetry {
+            tags: Tags {
+                emit_service: true,
+                emit_source: true,
+            },
+        },
+        true,
+    );
+
+    let (stream, sink) = build_sink("text", false).await;
+
+    let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+    let (lines, events) = generate_lines_with_stream(line_generator, 10, Some(batch));
+    run_and_assert_data_volume_sink_compliance(sink, events, &DATA_VOLUME_SINK_TAGS).await;
     assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
     tokio::time::sleep(tokio::time::Duration::new(1, 0)).await;
