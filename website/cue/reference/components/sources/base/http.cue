@@ -82,6 +82,11 @@ base: components: sources: http: configuration: {
 						[vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
 						[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
 						"""
+					protobuf: """
+						Decodes the raw bytes as [protobuf][protobuf].
+
+						[protobuf]: https://protobuf.dev/
+						"""
 					syslog: """
 						Decodes the raw bytes as a Syslog message.
 
@@ -92,6 +97,12 @@ base: components: sources: http: configuration: {
 						[rfc5424]: https://www.ietf.org/rfc/rfc5424.txt
 						"""
 				}
+			}
+			desc_file: {
+				description:   "Path to desc file"
+				relevant_when: "codec = \"protobuf\""
+				required:      true
+				type: string: {}
 			}
 			gelf: {
 				description:   "GELF-specific decoding options."
@@ -124,6 +135,12 @@ base: components: sources: http: configuration: {
 					required: false
 					type: bool: default: true
 				}
+			}
+			message_type: {
+				description:   "message type. e.g package.message"
+				relevant_when: "codec = \"protobuf\""
+				required:      true
+				type: string: {}
 			}
 			native_json: {
 				description:   "Vector's native JSON-specific decoding options."
