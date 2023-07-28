@@ -86,7 +86,7 @@ override that process.
 
 #### `listen`
 
-When a component listens for incoming connections, it SHOULD expose a `listen` option that takes
+When a component listens for incoming connections, it SHOULD expose a `listen` configuration option that takes
 a `string` representing an address with `<protocol>:<address>`.
 
 Options for `protocol` are:
