@@ -54,7 +54,7 @@ export AWS_ACCESS_KEY_ID ?= "dummy"
 export AWS_SECRET_ACCESS_KEY ?= "dummy"
 
 # Set version
-export VERSION ?= $(shell cargo vdev version)
+export VERSION ?= $(shell command -v cargo >/dev/null && cargo vdev version || echo unknown)
 
 # Set if you are on the CI and actually want the things to happen. (Non-CI users should never set this.)
 export CI ?= false
