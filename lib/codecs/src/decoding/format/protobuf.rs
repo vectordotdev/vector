@@ -4,6 +4,7 @@ use std::path::PathBuf;
 
 use bytes::Bytes;
 use chrono::Utc;
+use derivative::Derivative;
 use ordered_float::NotNan;
 use prost_reflect::{DescriptorPool, DynamicMessage, MessageDescriptor, ReflectMessage};
 use smallvec::{smallvec, SmallVec};
@@ -22,11 +23,12 @@ use super::Deserializer;
 #[configurable_component]
 #[derive(Debug, Clone, Default)]
 pub struct ProtobufDeserializerConfig {
-    /// Path to desc file
-    desc_file: PathBuf,
-
-    /// message type. e.g package.message
-    message_type: String,
+    /// Protobuf-specific decoding options.
+    #[serde(
+        default,
+        skip_serializing_if = "vector_core::serde::skip_serializing_if_default"
+    )]
+    pub protobuf: ProtobufDeserializerOptions,
 }
 
 impl ProtobufDeserializerConfig {
@@ -64,6 +66,18 @@ impl ProtobufDeserializerConfig {
             }
         }
     }
+}
+
+/// Protobuf-specific decoding options.
+#[configurable_component]
+#[derive(Debug, Clone, PartialEq, Eq, Derivative)]
+#[derivative(Default)]
+pub struct ProtobufDeserializerOptions {
+    /// Path to desc file
+    desc_file: PathBuf,
+
+    /// message type. e.g package.message
+    message_type: String,
 }
 
 /// Deserializer that builds `Event`s from a byte frame containing protobuf.
@@ -125,8 +139,8 @@ impl TryFrom<&ProtobufDeserializerConfig> for ProtobufDeserializer {
     type Error = vector_common::Error;
     fn try_from(config: &ProtobufDeserializerConfig) -> vector_common::Result<Self> {
         let message_descriptor = ProtobufDeserializer::get_message_descriptor(
-            &config.desc_file,
-            config.message_type.clone(),
+            &config.protobuf.desc_file,
+            config.protobuf.message_type.clone(),
         )?;
         Ok(Self::new(message_descriptor))
     }
