@@ -350,12 +350,9 @@ impl http_client::HttpClientContext for HttpClientContext {
                     }
                 }
                 Event::Trace(ref mut trace) => {
-                    if let Some(source_type_key) = log_schema().source_type_key() {
-                        trace.insert(
-                            source_type_key.to_string(),
-                            Bytes::from(HttpClientConfig::NAME),
-                        );
-                    }
+                    trace.maybe_insert(log_schema().source_type_key_target_path(), || {
+                        Bytes::from(HttpClientConfig::NAME).into()
+                    });
                 }
             }
         }

@@ -333,6 +333,8 @@ impl DatadogMetricsEncoder {
         self.state.written += n;
 
         let raw_bytes_written = self.state.written;
+        let byte_size = self.state.byte_size.clone();
+
         // Consume the encoder state so we can do our final checks and return the necessary data.
         let state = self.reset_state();
         let payload = state
@@ -357,7 +359,7 @@ impl DatadogMetricsEncoder {
         if recommended_splits == 1 {
             // "One" split means no splits needed: our payload didn't exceed either of the limits.
             Ok((
-                EncodeResult::compressed(payload, raw_bytes_written, self.state.byte_size.clone()),
+                EncodeResult::compressed(payload, raw_bytes_written, byte_size),
                 processed,
             ))
         } else {

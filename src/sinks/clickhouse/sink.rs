@@ -30,7 +30,7 @@ impl ClickhouseSink {
             encoding: (
                 transformer,
                 Encoder::<Framer>::new(
-                    NewlineDelimitedEncoderConfig::default().build().into(),
+                    NewlineDelimitedEncoderConfig.build().into(),
                     JsonSerializerConfig::default().build().into(),
                 ),
             ),

@@ -253,12 +253,15 @@ impl HttpEventEncoder<PartitionInnerBuffer<serde_json::Value, PartitionKey>> for
 
         let line = log
             .message_path()
-            .and_then(|path| log.remove(path.as_str()))
+            .cloned()
+            .as_ref()
+            .and_then(|path| log.remove(path))
             .unwrap_or_else(|| String::from("").into());
 
         let timestamp: Value = log
             .timestamp_path()
-            .and_then(|path| log.remove(path.as_str()))
+            .cloned()
+            .and_then(|path| log.remove(&path))
             .unwrap_or_else(|| chrono::Utc::now().into());
 
         let mut map = serde_json::map::Map::new();

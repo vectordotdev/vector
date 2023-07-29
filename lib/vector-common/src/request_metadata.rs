@@ -1,5 +1,7 @@
-use std::collections::HashMap;
-use std::ops::Add;
+use std::{
+    collections::HashMap,
+    ops::{Add, AddAssign},
+};
 
 use crate::{
     internal_event::{
@@ -119,6 +121,22 @@ impl GroupedCountByteSize {
             }
         }
     }
+
+    /// Returns `true` if we are the `Tagged` variant - keeping track of the byte sizes
+    /// grouped by their relevant tags.
+    #[must_use]
+    pub fn is_tagged(&self) -> bool {
+        match self {
+            GroupedCountByteSize::Tagged { .. } => true,
+            GroupedCountByteSize::Untagged { .. } => false,
+        }
+    }
+
+    /// Returns `true` if we are the `Untagged` variant - keeping a single count for all events.
+    #[must_use]
+    pub fn is_untagged(&self) -> bool {
+        !self.is_tagged()
+    }
 }
 
 impl From<CountByteSize> for GroupedCountByteSize {
@@ -127,26 +145,81 @@ impl From<CountByteSize> for GroupedCountByteSize {
     }
 }
 
+impl AddAssign for GroupedCountByteSize {
+    fn add_assign(&mut self, mut rhs: Self) {
+        if self.is_untagged() && rhs.is_tagged() {
+            // First handle the case where we are untagged and assigning to a tagged value.
+            // We need to change `self` and so need to ensure our match doesn't take ownership of the object.
+            *self = match (&self, &mut rhs) {
+                (Self::Untagged { size }, Self::Tagged { sizes }) => {
+                    let mut sizes = std::mem::take(sizes);
+                    match sizes.get_mut(&TaggedEventsSent::new_empty()) {
+                        Some(empty_size) => *empty_size += *size,
+                        None => {
+                            sizes.insert(TaggedEventsSent::new_empty(), *size);
+                        }
+                    }
+
+                    Self::Tagged { sizes }
+                }
+                _ => {
+                    unreachable!()
+                }
+            };
+
+            return;
+        }
+
+        // For these cases, we know we won't have to change `self` so the match can take ownership.
+        match (self, rhs) {
+            (Self::Tagged { sizes: ref mut lhs }, Self::Tagged { sizes: rhs }) => {
+                for (key, value) in rhs {
+                    match lhs.get_mut(&key) {
+                        Some(size) => *size += value,
+                        None => {
+                            lhs.insert(key.clone(), value);
+                        }
+                    }
+                }
+            }
+
+            (Self::Untagged { size: lhs }, Self::Untagged { size: rhs }) => {
+                *lhs = *lhs + rhs;
+            }
+
+            (Self::Tagged { ref mut sizes }, Self::Untagged { size }) => {
+                match sizes.get_mut(&TaggedEventsSent::new_empty()) {
+                    Some(empty_size) => *empty_size += size,
+                    None => {
+                        sizes.insert(TaggedEventsSent::new_empty(), size);
+                    }
+                }
+            }
+            (Self::Untagged { .. }, Self::Tagged { .. }) => unreachable!(),
+        };
+    }
+}
+
 impl<'a> Add<&'a GroupedCountByteSize> for GroupedCountByteSize {
     type Output = GroupedCountByteSize;
 
     fn add(self, other: &'a Self::Output) -> Self::Output {
         match (self, other) {
-            (Self::Tagged { sizes: mut us }, Self::Tagged { sizes: them }) => {
-                for (key, value) in them {
-                    match us.get_mut(key) {
+            (Self::Tagged { sizes: mut lhs }, Self::Tagged { sizes: rhs }) => {
+                for (key, value) in rhs {
+                    match lhs.get_mut(key) {
                         Some(size) => *size += *value,
                         None => {
-                            us.insert(key.clone(), *value);
+                            lhs.insert(key.clone(), *value);
                         }
                     }
                 }
 
-                Self::Tagged { sizes: us }
+                Self::Tagged { sizes: lhs }
             }
 
-            (Self::Untagged { size: us }, Self::Untagged { size: them }) => {
-                Self::Untagged { size: us + *them }
+            (Self::Untagged { size: lhs }, Self::Untagged { size: rhs }) => {
+                Self::Untagged { size: lhs + *rhs }
             }
 
             // The following two scenarios shouldn't really occur in practice, but are provided for completeness.

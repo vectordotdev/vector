@@ -34,6 +34,7 @@ use vector_common::internal_event::{EventsReceived, Registered};
 use vector_config::configurable_component;
 use vector_core::config::{LegacyKey, LogNamespace};
 use vector_core::event::{BatchNotifier, BatchStatus};
+use vrl::path::OwnedTargetPath;
 use vrl::value::Kind;
 use warp::{filters::BoxedFilter, reject::Rejection, reply::Response, Filter, Reply};
 
@@ -283,8 +284,8 @@ pub struct ApiKeyQueryParams {
 #[derive(Clone)]
 pub(crate) struct DatadogAgentSource {
     pub(crate) api_key_extractor: ApiKeyExtractor,
-    pub(crate) log_schema_host_key: String,
-    pub(crate) log_schema_source_type_key: String,
+    pub(crate) log_schema_host_key: OwnedTargetPath,
+    pub(crate) log_schema_source_type_key: OwnedTargetPath,
     pub(crate) log_namespace: LogNamespace,
     pub(crate) decoder: Decoder,
     protocol: &'static str,
@@ -334,11 +335,13 @@ impl DatadogAgentSource {
                     .expect("static regex always compiles"),
             },
             log_schema_host_key: log_schema()
-                .host_key()
-                .map_or("".to_string(), |key| key.to_string()),
+                .host_key_target_path()
+                .expect("global log_schema.host_key to be valid path")
+                .clone(),
             log_schema_source_type_key: log_schema()
-                .source_type_key()
-                .map_or("".to_string(), |key| key.to_string()),
+                .source_type_key_target_path()
+                .expect("global log_schema.source_type_key to be valid path")
+                .clone(),
             decoder,
             protocol,
             logs_schema_definition: Arc::new(logs_schema_definition),

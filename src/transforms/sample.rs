@@ -1,5 +1,6 @@
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
+use vrl::event_path;
 
 use crate::{
     conditions::{AnyCondition, Condition},
@@ -145,8 +146,12 @@ impl FunctionTransform for Sample {
 
         if num % self.rate == 0 {
             match event {
-                Event::Log(ref mut event) => event.insert("sample_rate", self.rate.to_string()),
-                Event::Trace(ref mut event) => event.insert("sample_rate", self.rate.to_string()),
+                Event::Log(ref mut event) => {
+                    event.insert(event_path!("sample_rate"), self.rate.to_string())
+                }
+                Event::Trace(ref mut event) => {
+                    event.insert(event_path!("sample_rate"), self.rate.to_string())
+                }
                 Event::Metric(_) => panic!("component can never receive metric events"),
             };
             output.push(event);

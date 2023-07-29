@@ -3,12 +3,12 @@ use lookup::OwnedTargetPath;
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use vector_core::config::LogNamespace;
+use vector_core::schema::meaning;
 use vector_core::{
     config::{log_schema, DataType},
     event::{Event, LogEvent},
     schema,
 };
-use vrl::path::PathPrefix;
 use vrl::value::Kind;
 
 use super::Deserializer;
@@ -36,11 +36,17 @@ impl BytesDeserializerConfig {
     /// The schema produced by the deserializer.
     pub fn schema_definition(&self, log_namespace: LogNamespace) -> schema::Definition {
         match log_namespace {
-            LogNamespace::Legacy => schema::Definition::empty_legacy_namespace().with_event_field(
-                log_schema().message_key().expect("valid message key"),
-                Kind::bytes(),
-                Some("message"),
-            ),
+            LogNamespace::Legacy => {
+                let definition = schema::Definition::empty_legacy_namespace();
+                if let Some(message_key) = log_schema().message_key() {
+                    return definition.with_event_field(
+                        message_key,
+                        Kind::bytes(),
+                        Some(meaning::MESSAGE),
+                    );
+                }
+                definition
+            }
             LogNamespace::Vector => {
                 schema::Definition::new_with_default_metadata(Kind::bytes(), [log_namespace])
                     .with_meaning(OwnedTargetPath::event_root(), "message")
@@ -63,7 +69,7 @@ impl BytesDeserializer {
             LogNamespace::Vector => log_namespace.new_log_from_data(bytes),
             LogNamespace::Legacy => {
                 let mut log = LogEvent::default();
-                log.maybe_insert(PathPrefix::Event, log_schema().message_key(), bytes);
+                log.maybe_insert(log_schema().message_key_target_path(), bytes);
                 log
             }
         }

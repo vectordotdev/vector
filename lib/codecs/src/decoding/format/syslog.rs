@@ -1,7 +1,7 @@
 use bytes::Bytes;
 use chrono::{DateTime, Datelike, Utc};
 use derivative::Derivative;
-use lookup::{event_path, owned_value_path, OwnedTargetPath, OwnedValuePath, PathPrefix};
+use lookup::{event_path, owned_value_path, OwnedTargetPath, OwnedValuePath};
 use smallvec::{smallvec, SmallVec};
 use std::borrow::Cow;
 use std::collections::BTreeMap;
@@ -428,7 +428,7 @@ fn insert_fields_from_syslog(
 ) {
     match log_namespace {
         LogNamespace::Legacy => {
-            log.maybe_insert(PathPrefix::Event, log_schema().message_key(), parsed.msg);
+            log.maybe_insert(log_schema().message_key_target_path(), parsed.msg);
         }
         LogNamespace::Vector => {
             log.insert(event_path!("message"), parsed.msg);
@@ -439,9 +439,7 @@ fn insert_fields_from_syslog(
         let timestamp = DateTime::<Utc>::from(timestamp);
         match log_namespace {
             LogNamespace::Legacy => {
-                if let Some(timestamp_key) = log_schema().timestamp_key() {
-                    log.insert((PathPrefix::Event, timestamp_key), timestamp);
-                }
+                log.maybe_insert(log_schema().timestamp_key_target_path(), timestamp);
             }
             LogNamespace::Vector => {
                 log.insert(event_path!("timestamp"), timestamp);
@@ -485,9 +483,8 @@ fn insert_fields_from_syslog(
 
 #[cfg(test)]
 mod tests {
-    use vector_core::config::{init_log_schema, log_schema, LogSchema};
-
     use super::*;
+    use vector_core::config::{init_log_schema, log_schema, LogSchema};
 
     #[test]
     fn deserialize_syslog_legacy_namespace() {
@@ -524,8 +521,12 @@ mod tests {
 
     fn init() {
         let mut schema = LogSchema::default();
-        schema.set_message_key(Some(owned_value_path!("legacy_message")));
-        schema.set_message_key(Some(owned_value_path!("legacy_timestamp")));
+        schema.set_message_key(Some(OwnedTargetPath::event(owned_value_path!(
+            "legacy_message"
+        ))));
+        schema.set_message_key(Some(OwnedTargetPath::event(owned_value_path!(
+            "legacy_timestamp"
+        ))));
         init_log_schema(schema, false);
     }
 }

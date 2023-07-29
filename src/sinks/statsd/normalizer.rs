@@ -145,7 +145,7 @@ mod tests {
 
     fn run_comparisons(inputs: Vec<Metric>, expected_outputs: Vec<Option<Metric>>) {
         let mut metric_set = MetricSet::default();
-        let mut normalizer = StatsdNormalizer::default();
+        let mut normalizer = StatsdNormalizer;
 
         for (input, expected) in inputs.into_iter().zip(expected_outputs) {
             let result = normalizer.normalize(&mut metric_set, input);

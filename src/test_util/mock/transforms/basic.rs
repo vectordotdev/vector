@@ -118,14 +118,14 @@ impl FunctionTransform for BasicTransform {
                 }
             }
             Event::Trace(trace) => {
-                if let Some(message_key) = crate::config::log_schema().message_key() {
+                if let Some(message_key) = crate::config::log_schema().message_key_target_path() {
                     let mut v = trace
-                        .get((PathPrefix::Event, message_key))
+                        .get(message_key)
                         .unwrap()
                         .to_string_lossy()
                         .into_owned();
                     v.push_str(&self.suffix);
-                    trace.insert(message_key.to_string().as_str(), Value::from(v));
+                    trace.insert(message_key, Value::from(v));
                 }
             }
         };

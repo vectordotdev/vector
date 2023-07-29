@@ -970,7 +970,7 @@ mod integration_tests {
 
                     event
                         .into_log()
-                        .remove((PathPrefix::Event, log_schema().message_key().unwrap()))
+                        .remove(log_schema().message_key_target_path().unwrap())
                         .unwrap()
                         .to_string_lossy()
                         .into_owned()

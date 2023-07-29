@@ -391,6 +391,7 @@ mod tests {
     use chrono::{DateTime, Duration};
     use rand::{thread_rng, Rng};
     use vector_core::event::{LogEvent, Metric, MetricKind, MetricValue, TraceEvent};
+    use vrl::event_path;
 
     use super::*;
     use crate::metrics::{self, Controller};
@@ -424,7 +425,7 @@ mod tests {
     async fn emits_lag_time_for_trace() {
         emit_and_test(|timestamp| {
             let mut trace = TraceEvent::default();
-            trace.insert("timestamp", timestamp);
+            trace.insert(event_path!("timestamp"), timestamp);
             Event::Trace(trace)
         })
         .await;
