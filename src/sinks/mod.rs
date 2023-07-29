@@ -87,6 +87,8 @@ pub mod redis;
 pub mod s3_common;
 #[cfg(feature = "sinks-sematext")]
 pub mod sematext;
+#[cfg(feature = "sinks-sftp")]
+pub mod sftp;
 #[cfg(feature = "sinks-socket")]
 pub mod socket;
 #[cfg(feature = "sinks-splunk_hec")]
@@ -99,8 +101,6 @@ pub mod vector;
 pub mod webhdfs;
 #[cfg(feature = "sinks-websocket")]
 pub mod websocket;
-#[cfg(feature = "sinks-sftp")]
-pub mod sftp;
 
 pub use vector_core::{config::Input, sink::VectorSink};
 

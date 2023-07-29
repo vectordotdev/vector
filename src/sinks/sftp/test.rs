@@ -22,7 +22,7 @@ fn default_config(encoding: EncodingConfigWithFraming) -> SftpConfig {
         prefix: "%F/".to_string(),
         endpoint: "127.0.0.1:22".to_string(),
         user: "ubuntu".to_string(),
-        key: "/home/ubuntu/.ssh/is_rsa".to_string(),
+        key: "/home/ubuntu/.ssh/id_rsa".to_string(),
         known_hosts_strategy: "strict".to_string(),
         encoding,
         compression: Compression::gzip_default(),

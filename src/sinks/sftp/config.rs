@@ -1,6 +1,5 @@
 use codecs::{encoding::Framer, JsonSerializerConfig, NewlineDelimitedEncoderConfig};
-use opendal::{layers::LoggingLayer, services::Webhdfs, Operator};
-use opendal::Scheme::Sftp;
+use opendal::{layers::LoggingLayer, services::Sftp, Operator};
 use tower::ServiceBuilder;
 use vector_config::configurable_component;
 use vector_core::{
@@ -84,9 +83,9 @@ pub struct SftpConfig {
 
     #[configurable(derived)]
     #[serde(
-    default,
-    deserialize_with = "crate::serde::bool_or_struct",
-    skip_serializing_if = "crate::serde::skip_serializing_if_default"
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     pub acknowledgements: AcknowledgementsConfig,
 }
@@ -99,7 +98,7 @@ impl GenerateConfig for SftpConfig {
             endpoint: "127.0.0.1:22".to_string(),
 
             user: "ubuntu".to_string(),
-            key: "/home/ubuntu/.ssh/is_rsa".to_string(),
+            key: "/home/ubuntu/.ssh/id_rsa".to_string(),
             known_hosts_strategy: "strict".to_string(),
             encoding: (
                 Some(NewlineDelimitedEncoderConfig::new()),
@@ -111,7 +110,7 @@ impl GenerateConfig for SftpConfig {
 
             acknowledgements: Default::default(),
         })
-            .unwrap()
+        .unwrap()
     }
 }
 
