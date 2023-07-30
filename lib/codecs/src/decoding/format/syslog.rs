@@ -282,7 +282,8 @@ impl Deserializer for SyslogDeserializer {
             false => Cow::from(std::str::from_utf8(&bytes)?),
         };
         let line = line.trim();
-        let parsed = syslog_loose::parse_message_with_year_exact(line, resolve_year, Variant::Either)?;
+        let parsed =
+            syslog_loose::parse_message_with_year_exact(line, resolve_year, Variant::Either)?;
 
         let log = match (self.source, log_namespace) {
             (Some(source), LogNamespace::Vector) => {
