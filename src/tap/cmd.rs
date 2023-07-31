@@ -18,11 +18,11 @@ use crate::{
 };
 
 /// Delay (in milliseconds) before attempting to reconnect to the Vector API
-pub const RECONNECT_DELAY: u64 = 5000;
+const RECONNECT_DELAY: u64 = 5000;
 
 /// CLI command func for issuing 'tap' queries, and communicating with a local/remote
 /// Vector API server via HTTP/WebSockets.
-pub(crate) async fn cmd(opts: &super::Opts, mut signal_rx: SignalRx) -> exitcode::ExitCode {
+pub(crate) async fn cmd(opts: &super::Opts, signal_rx: SignalRx) -> exitcode::ExitCode {
     // Use the provided URL as the Vector GraphQL API server, or default to the local port
     // provided by the API config. This will work despite `api` and `api-client` being distinct
     // features; the config is available even if `api` is disabled.
@@ -57,15 +57,20 @@ pub(crate) async fn cmd(opts: &super::Opts, mut signal_rx: SignalRx) -> exitcode
     })
     .expect("Couldn't build WebSocket URL. Please report.");
 
-    let outputs_patterns = opts.outputs_patterns();
+    tap(opts, url, signal_rx).await;
 
+    exitcode::OK
+}
+
+pub async fn tap(opts: &super::Opts, subscription_url: Url, mut signal_rx: SignalRx) {
     let formatter = EventFormatter::new(opts.meta, opts.format);
+    let outputs_patterns = opts.outputs_patterns();
 
     loop {
         tokio::select! {
             biased;
             Ok(SignalTo::Shutdown | SignalTo::Quit) = signal_rx.recv() => break,
-            status = run(url.clone(), opts, outputs_patterns.clone(), formatter.clone()) => {
+            status = run(subscription_url.clone(), opts, outputs_patterns.clone(), formatter.clone()) => {
                 if status == exitcode::UNAVAILABLE || status == exitcode::TEMPFAIL && !opts.no_reconnect {
                     #[allow(clippy::print_stderr)]
                     {
@@ -78,11 +83,9 @@ pub(crate) async fn cmd(opts: &super::Opts, mut signal_rx: SignalRx) -> exitcode
             }
         }
     }
-
-    exitcode::OK
 }
 
-pub async fn run(
+async fn run(
     url: Url,
     opts: &super::Opts,
     outputs_patterns: Vec<String>,
@@ -142,7 +145,7 @@ pub async fn run(
 }
 
 #[derive(Clone)]
-pub struct EventFormatter {
+struct EventFormatter {
     meta: bool,
     format: TapEncodingFormat,
     component_id_label: ColoredString,
