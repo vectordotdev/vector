@@ -12,7 +12,7 @@ pub struct Opts {
     #[arg(default_value = "500", short = 'i', long)]
     interval: u32,
 
-    /// Vector GraphQL API server endpoint
+    /// GraphQL API server endpoint
     #[arg(short, long)]
     url: Option<Url>,
 
@@ -44,7 +44,7 @@ pub struct Opts {
     #[arg(short, long)]
     meta: bool,
 
-    /// Whether to reconnect if the underlying Vector API connection drops. By default, tap will attempt to reconnect if the connection drops.
+    /// Whether to reconnect if the underlying API connection drops. By default, tap will attempt to reconnect if the connection drops.
     #[arg(short, long)]
     no_reconnect: bool,
 }
