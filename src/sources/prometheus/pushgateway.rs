@@ -1,6 +1,6 @@
 use std::{collections::HashMap, net::SocketAddr};
-// use base64::Engine;
-// use base64::prelude::BASE64_URL_SAFE;
+use base64::Engine;
+use base64::prelude::BASE64_URL_SAFE;
 
 use bytes::Bytes;
 use itertools::Itertools;
@@ -135,7 +135,7 @@ impl HttpSource for PushgatewaySource {
     }
 }
 
-fn parse_path_labels(path: &str) -> Result<Vec<(&str,&str)>,ErrorMessage> {
+fn parse_path_labels(path: &str) -> Result<Vec<(String,String)>,ErrorMessage> {
     let pairs = path.split('/')
         // Skip the first two segments as they're the empty string and
         // "metrics", which is always there as a path prefix
@@ -157,10 +157,27 @@ fn parse_path_labels(path: &str) -> Result<Vec<(&str,&str)>,ErrorMessage> {
         .map(|res|
             res.and_then(|(k,v)|
                 if k.ends_with("@base64") {
-                    // let decoded = BASE64_URL_SAFE.decode(v);
-                    Ok((k, v))
+                    let decoded_bytes = BASE64_URL_SAFE.decode(v);
+                    match decoded_bytes {
+                        Ok(decoded_bytes) => {
+                            let decoded = String::from_utf8(decoded_bytes);
+                            match decoded {
+                                Ok(decoded) => Ok((k.to_string(), decoded)),
+                                Err(_) => {
+                                    Err(ErrorMessage::new(
+                                        http::StatusCode::BAD_REQUEST,
+                                        format!("Invalid UTF-8 in base64 value for key {}", k)))
+                                }
+                            }
+                        },
+                        Err(_) => {
+                                Err(ErrorMessage::new(
+                                    http::StatusCode::BAD_REQUEST,
+                                    format!("Invalid base64 value for key {}", k)))
+                        }
+                    }
                 } else {
-                    Ok((k, v))
+                    Ok((k.to_string(), v.to_string()))
                 }
             )
         )
