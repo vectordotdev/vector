@@ -5,7 +5,7 @@ use lookup::{event_path, owned_value_path, OwnedTargetPath, OwnedValuePath};
 use smallvec::{smallvec, SmallVec};
 use std::borrow::Cow;
 use std::collections::BTreeMap;
-use syslog_loose::{IncompleteDate, Message, ProcId, Protocol};
+use syslog_loose::{IncompleteDate, Message, ProcId, Protocol, Variant};
 use vector_config::configurable_component;
 use vector_core::config::{LegacyKey, LogNamespace};
 use vector_core::{
@@ -282,7 +282,8 @@ impl Deserializer for SyslogDeserializer {
             false => Cow::from(std::str::from_utf8(&bytes)?),
         };
         let line = line.trim();
-        let parsed = syslog_loose::parse_message_with_year_exact(line, resolve_year)?;
+        let parsed =
+            syslog_loose::parse_message_with_year_exact(line, resolve_year, Variant::Either)?;
 
         let log = match (self.source, log_namespace) {
             (Some(source), LogNamespace::Vector) => {
