@@ -57,19 +57,7 @@ pub(crate) async fn cmd(opts: &super::Opts, mut signal_rx: SignalRx) -> exitcode
     })
     .expect("Couldn't build WebSocket URL. Please report.");
 
-    // If no patterns are provided, tap all components' outputs
-    let outputs_patterns = if opts.component_id_patterns.is_empty()
-        && opts.outputs_of.is_empty()
-        && opts.inputs_of.is_empty()
-    {
-        vec!["*".to_string()]
-    } else {
-        opts.outputs_of
-            .iter()
-            .cloned()
-            .chain(opts.component_id_patterns.iter().cloned())
-            .collect()
-    };
+    let outputs_patterns = opts.outputs_patterns();
 
     let formatter = EventFormatter::new(opts.meta, opts.format);
 

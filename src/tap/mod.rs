@@ -48,3 +48,23 @@ pub struct Opts {
     #[arg(short, long)]
     no_reconnect: bool,
 }
+
+impl Opts {
+    /// Component ID patterns to tap
+    ///
+    /// If no patterns are provided, tap all components' outputs
+    pub fn outputs_patterns(&self) -> Vec<String> {
+        if self.component_id_patterns.is_empty()
+            && self.outputs_of.is_empty()
+            && self.inputs_of.is_empty()
+        {
+            vec!["*".to_string()]
+        } else {
+            self.outputs_of
+                .iter()
+                .cloned()
+                .chain(self.component_id_patterns.iter().cloned())
+                .collect()
+        }
+    }
+}
