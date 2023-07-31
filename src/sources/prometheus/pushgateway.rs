@@ -135,7 +135,7 @@ impl HttpSource for PushgatewaySource {
 
 fn parse_path_labels(path: &str) -> Result<Vec<(&str,&str)>,ErrorMessage> {
     let pairs = path.split('/')
-        // Split the first two segments as they're the empty string and
+        // Skip the first two segments as they're the empty string and
         // "metrics", which is always there as a path prefix
         .skip(2)
         .chunks(2)
