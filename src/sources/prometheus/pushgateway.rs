@@ -1,4 +1,6 @@
 use std::{collections::HashMap, net::SocketAddr};
+// use base64::Engine;
+// use base64::prelude::BASE64_URL_SAFE;
 
 use bytes::Bytes;
 use itertools::Itertools;
@@ -143,10 +145,23 @@ fn parse_path_labels(path: &str) -> Result<Vec<(&str,&str)>,ErrorMessage> {
         // If we get a chunk that only has 1 item, return an error
         // The path has to be made up of key-value pairs to be valid
         .map(|mut c|
-            c.next().zip(c.next()).ok_or_else(
+            c.next().zip(c.next()).ok_or_else(|| {
                 ErrorMessage::new(
                     http::StatusCode::BAD_REQUEST,
                     "Request path must have an even number of segments to form grouping key".to_string())
+            })
+        )
+        // Decode any values that have been base64 encoded per the Pushgateway spec
+        //
+        // See: https://github.com/prometheus/pushgateway#url
+        .map(|res|
+            res.and_then(|(k,v)|
+                if k.ends_with("@base64") {
+                    // let decoded = BASE64_URL_SAFE.decode(v);
+                    Ok((k, v))
+                } else {
+                    Ok((k, v))
+                }
             )
         )
         .collect();
