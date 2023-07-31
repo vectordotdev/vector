@@ -403,6 +403,7 @@ rpmbuild
 rpms
 rsyslog
 rsyslogd
+samplerate
 servlet
 snyk
 socketaddr
