@@ -31,9 +31,8 @@ pub struct ProtobufDeserializerConfig {
 
 impl ProtobufDeserializerConfig {
     /// Build the `ProtobufDeserializer` from this configuration.
-    pub fn build(&self) -> ProtobufDeserializer {
-        // TODO return a Result instead.
-        ProtobufDeserializer::try_from(self).unwrap()
+    pub fn build(&self) -> vector_common::Result<ProtobufDeserializer> {
+        ProtobufDeserializer::try_from(self)
     }
 
     /// Return the type of event build by this deserializer.

@@ -127,7 +127,7 @@ fn default_offset_key() -> OptionalValuePath {
 impl_generate_config_from_default!(AmqpSourceConfig);
 
 impl AmqpSourceConfig {
-    fn decoder(&self, log_namespace: LogNamespace) -> Decoder {
+    fn decoder(&self, log_namespace: LogNamespace) -> vector_common::Result<Decoder> {
         DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace).build()
     }
 }
@@ -317,7 +317,8 @@ async fn receive_event(
     msg: Delivery,
 ) -> Result<(), ()> {
     let payload = Cursor::new(Bytes::copy_from_slice(&msg.data));
-    let mut stream = FramedRead::new(payload, config.decoder(log_namespace));
+    let decoder = config.decoder(log_namespace).map_err(|_e| ())?;
+    let mut stream = FramedRead::new(payload, decoder);
 
     // Extract timestamp from AMQP message
     let timestamp = msg
