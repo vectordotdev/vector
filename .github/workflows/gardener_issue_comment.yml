@@ -89,7 +89,7 @@ jobs:
             echo "Found issue on Gardener board. Current issue status is: '${current_status}'"
           fi
 
-          if [ "$current_status" = "Blocked / Waiting" ] ; then
+          if [ "$current_status" = "\"Blocked / Waiting\"" ] ; then
             echo "Moving issue from 'Blocked / Waiting' to 'Triage'"
             gh api graphql -f query='
               mutation($project_id: ID!, $item_id: ID!, $field_id: ID!, $option_id: String) {
