@@ -36,9 +36,18 @@ fn benchmark_remap(c: &mut Criterion) {
         let result = outputs.take_primary();
         let output_1 = result.first().unwrap().as_log();
 
-        debug_assert_eq!(output_1.get(event_path!("foo")).unwrap().to_string_lossy(), "bar");
-        debug_assert_eq!(output_1.get(event_path!("bar")).unwrap().to_string_lossy(), "baz");
-        debug_assert_eq!(output_1.get(event_path!("copy")).unwrap().to_string_lossy(), "buz");
+        debug_assert_eq!(
+            output_1.get(event_path!("foo")).unwrap().to_string_lossy(),
+            "bar"
+        );
+        debug_assert_eq!(
+            output_1.get(event_path!("bar")).unwrap().to_string_lossy(),
+            "baz"
+        );
+        debug_assert_eq!(
+            output_1.get(event_path!("copy")).unwrap().to_string_lossy(),
+            "buz"
+        );
 
         result
     };
@@ -144,8 +153,14 @@ fn benchmark_remap(c: &mut Criterion) {
             let result = outputs.take_primary();
             let output_1 = result.first().unwrap().as_log();
 
-            debug_assert_eq!(output_1.get(event_path!("number")).unwrap(), &Value::Integer(1234));
-            debug_assert_eq!(output_1.get(event_path!("bool")).unwrap(), &Value::Boolean(true));
+            debug_assert_eq!(
+                output_1.get(event_path!("number")).unwrap(),
+                &Value::Integer(1234)
+            );
+            debug_assert_eq!(
+                output_1.get(event_path!("bool")).unwrap(),
+                &Value::Boolean(true)
+            );
             debug_assert_eq!(
                 output_1.get(event_path!("timestamp")).unwrap(),
                 &Value::Timestamp(timestamp),
