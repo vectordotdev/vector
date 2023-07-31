@@ -82,7 +82,7 @@ pub(crate) async fn cmd(opts: &super::Opts, mut signal_rx: SignalRx) -> exitcode
     exitcode::OK
 }
 
-async fn run(
+pub async fn run(
     url: Url,
     opts: &super::Opts,
     outputs_patterns: Vec<String>,
@@ -93,7 +93,7 @@ async fn run(
         Err(e) => {
             #[allow(clippy::print_stderr)]
             {
-                eprintln!("[tap] Couldn't connect to Vector API via WebSockets: {}", e);
+                eprintln!("[tap] Couldn't connect to API via WebSockets: {}", e);
             }
             return exitcode::UNAVAILABLE;
         }
@@ -142,7 +142,7 @@ async fn run(
 }
 
 #[derive(Clone)]
-struct EventFormatter {
+pub struct EventFormatter {
     meta: bool,
     format: TapEncodingFormat,
     component_id_label: ColoredString,
