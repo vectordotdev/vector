@@ -12,10 +12,7 @@ use vector_api_client::{
     Client,
 };
 
-use crate::{
-    config,
-    signal::{SignalRx, SignalTo},
-};
+use crate::signal::{SignalRx, SignalTo};
 
 /// Delay (in milliseconds) before attempting to reconnect to the Vector API
 const RECONNECT_DELAY: u64 = 5000;
@@ -23,13 +20,7 @@ const RECONNECT_DELAY: u64 = 5000;
 /// CLI command func for issuing 'tap' queries, and communicating with a local/remote
 /// Vector API server via HTTP/WebSockets.
 pub(crate) async fn cmd(opts: &super::Opts, signal_rx: SignalRx) -> exitcode::ExitCode {
-    // Use the provided URL as the Vector GraphQL API server, or default to the local port
-    // provided by the API config. This will work despite `api` and `api-client` being distinct
-    // features; the config is available even if `api` is disabled.
-    let mut url = opts
-        .url
-        .clone()
-        .unwrap_or_else(config::api::default_graphql_url);
+    let mut url = opts.url();
 
     // Return early with instructions for enabling the API if the endpoint isn't reachable
     // via a healthcheck.

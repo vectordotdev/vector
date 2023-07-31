@@ -5,6 +5,8 @@ pub(crate) use cmd::cmd;
 use url::Url;
 use vector_api_client::gql::TapEncodingFormat;
 
+use crate::config::api::default_graphql_url;
+
 #[derive(Parser, Debug, Clone)]
 #[command(rename_all = "kebab-case")]
 pub struct Opts {
@@ -66,5 +68,11 @@ impl Opts {
                 .chain(self.component_id_patterns.iter().cloned())
                 .collect()
         }
+    }
+
+    /// Use the provided URL as the Vector GraphQL API server, or default to the local port
+    /// provided by the API config.
+    pub fn url(&self) -> Url {
+        self.url.clone().unwrap_or_else(default_graphql_url)
     }
 }
