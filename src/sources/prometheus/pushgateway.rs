@@ -119,7 +119,7 @@ impl HttpSource for PushgatewaySource {
         let body = String::from_utf8_lossy(&body);
 
         println!("Full path was: {}", full_path);
-        parse_path_labels(full_path);
+        let _ = parse_path_labels(full_path);
 
         // TODO: Add grouping key to these
         // TODO: Add an option to toggle between incremental and absolute, default to absolute
@@ -132,11 +132,21 @@ impl HttpSource for PushgatewaySource {
     }
 }
 
-fn parse_path_labels(path: &str) -> Vec<(String,String)> {
-    let labels = Vec::new();
-    let segments = path.split("/");
-    let asdf : Vec<&str> = segments.collect();
-    println!("{:?}", asdf);
+fn parse_path_labels(path: &str) -> Result<Vec<(&str,&str)>,ErrorMessage> {
+    // Skip first two elements as they are the base part of the path
+    // rather than something we want to parse
+    let segments: Vec<_> = path.split("/").skip(2).collect();
 
-    labels
+    let pairs: Result<Vec<_>, ErrorMessage> = segments.chunks(2).map( |pair|
+        match pair.len() {
+            2 => Ok((pair[0], pair[1])),
+            _ => Err(ErrorMessage::new(
+                http::StatusCode::BAD_REQUEST,
+                "Request path must have an even number of segments to form grouping key".to_string()))
+        }
+    ).collect();
+
+    println!("{:?}", pairs);
+
+    pairs
 }
