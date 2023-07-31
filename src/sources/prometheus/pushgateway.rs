@@ -135,11 +135,15 @@ impl HttpSource for PushgatewaySource {
 
 fn parse_path_labels(path: &str) -> Result<Vec<(&str,&str)>,ErrorMessage> {
     let pairs = path.split('/')
+        // Split the first two segments as they're the empty string and
+        // "metrics", which is always there as a path prefix
         .skip(2)
         .chunks(2)
         .into_iter()
+        // If we get a chunk that only has 1 item, return an error
+        // The path has to be made up of key-value pairs to be valid
         .map(|mut c|
-            c.next().zip(c.next()).ok_or(
+            c.next().zip(c.next()).ok_or_else(
                 ErrorMessage::new(
                     http::StatusCode::BAD_REQUEST,
                     "Request path must have an even number of segments to form grouping key".to_string())
