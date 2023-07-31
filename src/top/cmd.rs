@@ -3,7 +3,6 @@ use std::time::Duration;
 use chrono::Local;
 use futures_util::future::join_all;
 use tokio::sync::oneshot;
-use url::Url;
 use vector_api_client::{connect_subscription_client, Client};
 
 use super::{
@@ -31,17 +30,28 @@ pub async fn cmd(opts: &super::Opts) -> exitcode::ExitCode {
     // Use the provided URL as the Vector GraphQL API server, or default to the local port
     // provided by the API config. This will work despite `api` and `api-client` being distinct
     // features; the config is available even if `api` is disabled
-    let url = opts.url.clone().unwrap_or_else(|| {
-        let addr = config::api::default_address().unwrap();
-        Url::parse(&format!("http://{}/graphql", addr))
-            .expect("Couldn't parse default API URL. Please report this.")
-    });
+    let url = opts
+        .url
+        .clone()
+        .unwrap_or_else(config::api::default_graphql_url);
 
     // Create a new API client for connecting to the local/remote Vector instance.
-    let client = match Client::new_with_healthcheck(url.clone()).await {
-        Some(client) => client,
-        None => return exitcode::UNAVAILABLE,
-    };
+    let client = Client::new(url.clone());
+    if client.healthcheck().await.is_err() {
+        eprintln!(
+            indoc::indoc! {"
+            Vector API server isn't reachable ({}).
+
+            Have you enabled the API?
+
+            To enable the API, add the following to your `vector.toml` config file:
+
+            [api]
+                enabled = true"},
+            url
+        );
+        return exitcode::UNAVAILABLE;
+    }
 
     // Create a channel for updating state via event messages
     let (tx, rx) = tokio::sync::mpsc::channel(20);

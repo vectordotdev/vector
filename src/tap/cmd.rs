@@ -33,7 +33,20 @@ pub(crate) async fn cmd(opts: &super::Opts, mut signal_rx: SignalRx) -> exitcode
 
     // Return early with instructions for enabling the API if the endpoint isn't reachable
     // via a healthcheck.
-    if Client::new_with_healthcheck(url.clone()).await.is_none() {
+    let client = Client::new(url.clone());
+    if client.healthcheck().await.is_err() {
+        eprintln!(
+            indoc::indoc! {"
+            Vector API server isn't reachable ({}).
+
+            Have you enabled the API?
+
+            To enable the API, add the following to your `vector.toml` config file:
+
+            [api]
+                enabled = true"},
+            url
+        );
         return exitcode::UNAVAILABLE;
     }
 
