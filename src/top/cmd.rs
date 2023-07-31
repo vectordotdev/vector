@@ -13,7 +13,7 @@ use super::{
 use crate::config;
 
 /// Delay (in milliseconds) before attempting to reconnect to the Vector API
-const RECONNECT_DELAY: u64 = 5000;
+pub const RECONNECT_DELAY: u64 = 5000;
 
 /// CLI command func for displaying Vector components, and communicating with a local/remote
 /// Vector API server via HTTP/WebSockets
