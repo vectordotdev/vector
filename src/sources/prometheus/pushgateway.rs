@@ -156,29 +156,7 @@ fn parse_path_labels(path: &str) -> Result<Vec<(String,String)>,ErrorMessage> {
         // See: https://github.com/prometheus/pushgateway#url
         .map(|res|
             res.and_then(|(k,v)|
-                if k.ends_with("@base64") {
-                    let decoded_bytes = BASE64_URL_SAFE.decode(v);
-                    match decoded_bytes {
-                        Ok(decoded_bytes) => {
-                            let decoded = String::from_utf8(decoded_bytes);
-                            match decoded {
-                                Ok(decoded) => Ok((k.to_string(), decoded)),
-                                Err(_) => {
-                                    Err(ErrorMessage::new(
-                                        http::StatusCode::BAD_REQUEST,
-                                        format!("Invalid UTF-8 in base64 value for key {}", k)))
-                                }
-                            }
-                        },
-                        Err(_) => {
-                                Err(ErrorMessage::new(
-                                    http::StatusCode::BAD_REQUEST,
-                                    format!("Invalid base64 value for key {}", k)))
-                        }
-                    }
-                } else {
-                    Ok((k.to_string(), v.to_string()))
-                }
+                decode_label_pair(k, v)
             )
         )
         .collect();
@@ -186,4 +164,24 @@ fn parse_path_labels(path: &str) -> Result<Vec<(String,String)>,ErrorMessage> {
     println!("{:?}", pairs);
 
     pairs
+}
+
+fn decode_label_pair(k: &str, v: &str) -> Result<(String, String), ErrorMessage> {
+    if !k.ends_with("@base64") {
+        return Ok((k.to_owned(), v.to_owned()))
+    }
+
+    let decoded_bytes = BASE64_URL_SAFE.decode(v).map_err( |_|
+        ErrorMessage::new(
+            http::StatusCode::BAD_REQUEST,
+            format!("Invalid base64 value for key {}", k))
+    )?;
+
+    let decoded = String::from_utf8(decoded_bytes).map_err( |_|
+        ErrorMessage::new(
+        http::StatusCode::BAD_REQUEST,
+        format!("Invalid UTF-8 in base64 value for key {}", k))
+    )?;
+
+    Ok((k.to_owned(), decoded))
 }
