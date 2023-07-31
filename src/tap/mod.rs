@@ -67,4 +67,12 @@ impl Opts {
                 .collect()
         }
     }
+
+    /// Use the provided URL as the Vector GraphQL API server, or default to the local port
+    /// provided by the API config.
+    pub fn url(&self) -> Url {
+        self.url
+            .clone()
+            .unwrap_or_else(config::api::default_graphql_url)
+    }
 }
