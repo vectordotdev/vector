@@ -374,7 +374,8 @@ mod integration_tests {
                 conf.decoding.clone(),
                 LogNamespace::Legacy,
             )
-            .build();
+            .build()
+            .unwrap();
             tokio::spawn(nats_source(
                 conf.clone(),
                 nc,

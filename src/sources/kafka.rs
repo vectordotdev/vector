@@ -1159,7 +1159,8 @@ mod integration_test {
             config.decoding.clone(),
             log_namespace,
         )
-        .build();
+        .build()
+        .unwrap();
 
         tokio::spawn(kafka_source(
             config,
