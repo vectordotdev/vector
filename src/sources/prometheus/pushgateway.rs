@@ -1,6 +1,7 @@
 use std::{collections::HashMap, net::SocketAddr};
 
 use bytes::Bytes;
+use itertools::Itertools;
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
 // use vector_core::event::{Metric, MetricKind, MetricValue};
@@ -133,18 +134,18 @@ impl HttpSource for PushgatewaySource {
 }
 
 fn parse_path_labels(path: &str) -> Result<Vec<(&str,&str)>,ErrorMessage> {
-    // Skip first two elements as they are the base part of the path
-    // rather than something we want to parse
-    let segments: Vec<_> = path.split("/").skip(2).collect();
-
-    let pairs: Result<Vec<_>, ErrorMessage> = segments.chunks(2).map( |pair|
-        match pair.len() {
-            2 => Ok((pair[0], pair[1])),
-            _ => Err(ErrorMessage::new(
-                http::StatusCode::BAD_REQUEST,
-                "Request path must have an even number of segments to form grouping key".to_string()))
-        }
-    ).collect();
+    let pairs = path.split('/')
+        .skip(2)
+        .chunks(2)
+        .into_iter()
+        .map(|mut c|
+            c.next().zip(c.next()).ok_or(
+                ErrorMessage::new(
+                    http::StatusCode::BAD_REQUEST,
+                    "Request path must have an even number of segments to form grouping key".to_string())
+            )
+        )
+        .collect();
 
     println!("{:?}", pairs);
 
