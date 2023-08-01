@@ -24,6 +24,7 @@ pub(crate) async fn cmd(opts: &super::Opts, signal_rx: SignalRx) -> exitcode::Ex
     // Return early with instructions for enabling the API if the endpoint isn't reachable
     // via a healthcheck.
     let client = Client::new(url.clone());
+    #[allow(clippy::print_stderr)]
     if client.healthcheck().await.is_err() {
         eprintln!(
             indoc::indoc! {"

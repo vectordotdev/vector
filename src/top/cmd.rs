@@ -29,6 +29,7 @@ pub async fn cmd(opts: &super::Opts) -> exitcode::ExitCode {
     let url = opts.url();
     // Create a new API client for connecting to the local/remote Vector instance.
     let client = Client::new(url.clone());
+    #[allow(clippy::print_stderr)]
     if client.healthcheck().await.is_err() {
         eprintln!(
             indoc::indoc! {"
@@ -45,7 +46,7 @@ pub async fn cmd(opts: &super::Opts) -> exitcode::ExitCode {
         return exitcode::UNAVAILABLE;
     }
 
-    top(&opts, client).await
+    top(opts, client).await
 }
 
 pub async fn top(opts: &super::Opts, client: Client) -> exitcode::ExitCode {
@@ -66,7 +67,7 @@ pub async fn top(opts: &super::Opts, client: Client) -> exitcode::ExitCode {
         Err(err) => {
             #[allow(clippy::print_stderr)]
             {
-                eprintln!("Encountered error: {}", err);
+                eprintln!("[top] Encountered shutdown error: {}", err);
             }
             connection.abort();
             exitcode::IOERR
