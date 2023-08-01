@@ -7,6 +7,7 @@ mod state;
 
 use clap::Parser;
 pub use cmd::cmd;
+pub use cmd::top;
 pub use dashboard::is_tty;
 use url::Url;
 
