@@ -85,12 +85,6 @@ base: components: sources: datadog_agent: configuration: {
 					}
 				}
 			}
-			desc_file: {
-				description:   "Path to desc file"
-				relevant_when: "codec = \"protobuf\""
-				required:      true
-				type: string: {}
-			}
 			gelf: {
 				description:   "GELF-specific decoding options."
 				relevant_when: "codec = \"gelf\""
@@ -123,12 +117,6 @@ base: components: sources: datadog_agent: configuration: {
 					type: bool: default: true
 				}
 			}
-			message_type: {
-				description:   "message type. e.g package.message"
-				relevant_when: "codec = \"protobuf\""
-				required:      true
-				type: string: {}
-			}
 			native_json: {
 				description:   "Vector's native JSON-specific decoding options."
 				relevant_when: "codec = \"native_json\""
@@ -143,6 +131,23 @@ base: components: sources: datadog_agent: configuration: {
 						"""
 					required: false
 					type: bool: default: true
+				}
+			}
+			protobuf: {
+				description:   "Protobuf-specific decoding options."
+				relevant_when: "codec = \"protobuf\""
+				required:      false
+				type: object: options: {
+					desc_file: {
+						description: "Path to desc file"
+						required:    false
+						type: string: default: ""
+					}
+					message_type: {
+						description: "message type. e.g package.message"
+						required:    false
+						type: string: default: ""
+					}
 				}
 			}
 			syslog: {
