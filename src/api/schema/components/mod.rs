@@ -25,8 +25,8 @@ use crate::{
 
 #[derive(Debug, Clone, Interface)]
 #[graphql(
-    field(name = "component_id", type = "String"),
-    field(name = "component_type", type = "String")
+    field(name = "component_id", ty = "String"),
+    field(name = "component_type", ty = "String")
 )]
 pub enum Component {
     Source(source::Source),
