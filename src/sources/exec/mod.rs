@@ -723,6 +723,8 @@ fn spawn_reader_thread<R: 'static + AsyncRead + Unpin + std::marker::Send>(
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use crate::{event::LogEvent, test_util::trace_init};
     use bytes::Bytes;
     use std::io::Cursor;
     use vector_core::event::EventMetadata;
@@ -730,11 +732,6 @@ mod tests {
 
     #[cfg(unix)]
     use futures::task::Poll;
-
-    use super::*;
-    use crate::config::log_schema;
-
-    use crate::{event::LogEvent, test_util::trace_init};
 
     #[test]
     fn test_generate_config() {
@@ -759,27 +756,13 @@ mod tests {
         );
         let log = event.as_log();
 
-        assert_eq!(
-            log[log_schema().host_key().unwrap().to_string().as_str()],
-            "Some.Machine".into()
-        );
+        assert_eq!(*log.get_host().unwrap(), "Some.Machine".into());
         assert_eq!(log[STREAM_KEY], STDOUT.into());
         assert_eq!(log[PID_KEY], (8888_i64).into());
         assert_eq!(log[COMMAND_KEY], config.command.into());
-        assert_eq!(
-            log[log_schema().message_key().unwrap().to_string()],
-            "hello world".into()
-        );
-        assert_eq!(
-            log[log_schema().source_type_key().unwrap().to_string()],
-            "exec".into()
-        );
-        assert!(log
-            .get((
-                lookup::PathPrefix::Event,
-                log_schema().timestamp_key().unwrap()
-            ))
-            .is_some());
+        assert_eq!(*log.get_message().unwrap(), "hello world".into());
+        assert_eq!(*log.get_source_type().unwrap(), "exec".into());
+        assert!(log.get_timestamp().is_some());
     }
 
     #[test]
@@ -849,27 +832,13 @@ mod tests {
         );
         let log = event.as_log();
 
-        assert_eq!(
-            log[log_schema().host_key().unwrap().to_string().as_str()],
-            "Some.Machine".into()
-        );
+        assert_eq!(*log.get_host().unwrap(), "Some.Machine".into());
         assert_eq!(log[STREAM_KEY], STDOUT.into());
         assert_eq!(log[PID_KEY], (8888_i64).into());
         assert_eq!(log[COMMAND_KEY], config.command.into());
-        assert_eq!(
-            log[log_schema().message_key().unwrap().to_string()],
-            "hello world".into()
-        );
-        assert_eq!(
-            log[log_schema().source_type_key().unwrap().to_string()],
-            "exec".into()
-        );
-        assert!(log
-            .get((
-                lookup::PathPrefix::Event,
-                log_schema().timestamp_key().unwrap()
-            ))
-            .is_some());
+        assert_eq!(*log.get_message().unwrap(), "hello world".into());
+        assert_eq!(*log.get_source_type().unwrap(), "exec".into());
+        assert!(log.get_timestamp().is_some());
     }
 
     #[test]
@@ -970,7 +939,7 @@ mod tests {
             assert_eq!(events.len(), 1);
             let log = events[0].as_log();
             assert_eq!(
-                log[log_schema().message_key().unwrap().to_string()],
+                *log.get_message().unwrap(),
                 Bytes::from("hello world").into()
             );
             assert_eq!(origin, STDOUT);
@@ -982,7 +951,7 @@ mod tests {
             assert_eq!(events.len(), 1);
             let log = events[0].as_log();
             assert_eq!(
-                log[log_schema().message_key().unwrap().to_string()],
+                *log.get_message().unwrap(),
                 Bytes::from("hello rocket 🚀").into()
             );
             assert_eq!(origin, STDOUT);
@@ -1062,25 +1031,11 @@ mod tests {
             let log = event.as_log();
             assert_eq!(log[COMMAND_KEY], config.command.clone().into());
             assert_eq!(log[STREAM_KEY], STDOUT.into());
-            assert_eq!(
-                log[log_schema().source_type_key().unwrap().to_string()],
-                "exec".into()
-            );
-            assert_eq!(
-                log[log_schema().message_key().unwrap().to_string()],
-                "Hello World!".into()
-            );
-            assert_eq!(
-                log[log_schema().host_key().unwrap().to_string().as_str()],
-                "Some.Machine".into()
-            );
+            assert_eq!(*log.get_source_type().unwrap(), "exec".into());
+            assert_eq!(*log.get_message().unwrap(), "Hello World!".into());
+            assert_eq!(*log.get_host().unwrap(), "Some.Machine".into());
             assert!(log.get(PID_KEY).is_some());
-            assert!(log
-                .get((
-                    lookup::PathPrefix::Event,
-                    log_schema().timestamp_key().unwrap()
-                ))
-                .is_some());
+            assert!(log.get_timestamp().is_some());
 
             assert_eq!(8, log.all_fields().unwrap().count());
         } else {
@@ -1131,20 +1086,14 @@ mod tests {
 
         if let Poll::Ready(Some(event)) = futures::poll!(rx.next()) {
             let log = event.as_log();
-            assert_eq!(
-                log[log_schema().message_key().unwrap().to_string()],
-                "signal received".into()
-            );
+            assert_eq!(*log.get_message().unwrap(), "signal received".into());
         } else {
             panic!("Expected to receive event");
         }
 
         if let Poll::Ready(Some(event)) = futures::poll!(rx.next()) {
             let log = event.as_log();
-            assert_eq!(
-                log[log_schema().message_key().unwrap().to_string()],
-                "slept".into()
-            );
+            assert_eq!(*log.get_message().unwrap(), "slept".into());
         } else {
             panic!("Expected to receive event");
         }

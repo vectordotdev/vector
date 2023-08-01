@@ -1036,14 +1036,8 @@ mod tests {
         assert_eq!(log["file"], "some_file.rs".into());
         assert_eq!(log["host"], "Some.Machine".into());
         assert_eq!(log["offset"], 0.into());
-        assert_eq!(
-            log[log_schema().message_key().unwrap().to_string()],
-            "hello world".into()
-        );
-        assert_eq!(
-            log[log_schema().source_type_key().unwrap().to_string()],
-            "file".into()
-        );
+        assert_eq!(*log.get_message().unwrap(), "hello world".into());
+        assert_eq!(*log.get_source_type().unwrap(), "file".into());
         assert!(log[log_schema().timestamp_key().unwrap().to_string()].is_timestamp());
     }
 
@@ -1064,14 +1058,8 @@ mod tests {
         assert_eq!(log["file_path"], "some_file.rs".into());
         assert_eq!(log["hostname"], "Some.Machine".into());
         assert_eq!(log["off"], 0.into());
-        assert_eq!(
-            log[log_schema().message_key().unwrap().to_string()],
-            "hello world".into()
-        );
-        assert_eq!(
-            log[log_schema().source_type_key().unwrap().to_string()],
-            "file".into()
-        );
+        assert_eq!(*log.get_message().unwrap(), "hello world".into());
+        assert_eq!(*log.get_source_type().unwrap(), "file".into());
         assert!(log[log_schema().timestamp_key().unwrap().to_string()].is_timestamp());
     }
 
@@ -2336,11 +2324,7 @@ mod tests {
         received
             .into_iter()
             .map(Event::into_log)
-            .map(|log| {
-                log[log_schema().message_key().unwrap().to_string()]
-                    .to_string_lossy()
-                    .into_owned()
-            })
+            .map(|log| log.get_message().unwrap().to_string_lossy().into_owned())
             .collect()
     }
 
@@ -2348,7 +2332,7 @@ mod tests {
         received
             .into_iter()
             .map(Event::into_log)
-            .map(|log| log[log_schema().message_key().unwrap().to_string()].clone())
+            .map(|log| log.get_message().unwrap().clone())
             .collect()
     }
 }

@@ -711,15 +711,9 @@ mod integration_test {
 
         let log = events[0].as_log();
         trace!("{:?}", log);
-        assert_eq!(
-            log[log_schema().message_key().unwrap().to_string()],
-            "my message".into()
-        );
+        assert_eq!(*log.get_message().unwrap(), "my message".into());
         assert_eq!(log["routing"], routing_key.into());
-        assert_eq!(
-            log[log_schema().source_type_key().unwrap().to_string()],
-            "amqp".into()
-        );
+        assert_eq!(*log.get_source_type().unwrap(), "amqp".into());
         let log_ts = log[log_schema().timestamp_key().unwrap().to_string()]
             .as_timestamp()
             .unwrap();

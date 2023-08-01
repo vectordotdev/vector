@@ -178,10 +178,7 @@ async fn insert_events_unix_timestamps() {
         format!(
             "{}",
             exp_event
-                .get((
-                    lookup::PathPrefix::Event,
-                    log_schema().timestamp_key().unwrap()
-                ))
+                .get_timestamp()
                 .unwrap()
                 .as_timestamp()
                 .unwrap()
@@ -242,10 +239,7 @@ timestamp_format = "unix""#,
         format!(
             "{}",
             exp_event
-                .get((
-                    lookup::PathPrefix::Event,
-                    log_schema().timestamp_key().unwrap()
-                ))
+                .get_timestamp()
                 .unwrap()
                 .as_timestamp()
                 .unwrap()

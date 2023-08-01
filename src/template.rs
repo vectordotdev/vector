@@ -7,7 +7,6 @@ use chrono::{
     Utc,
 };
 use lookup::lookup_v2::parse_target_path;
-use lookup::PathPrefix;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use snafu::Snafu;
@@ -343,18 +342,24 @@ fn render_metric_field<'a>(key: &str, metric: &'a Metric) -> Option<&'a str> {
 
 fn render_timestamp(items: &ParsedStrftime, event: EventRef<'_>) -> String {
     match event {
-        EventRef::Log(log) => log_schema().timestamp_key().and_then(|timestamp_key| {
-            log.get((PathPrefix::Event, timestamp_key))
-                .and_then(Value::as_timestamp)
-                .copied()
-        }),
+        EventRef::Log(log) => log_schema()
+            .timestamp_key_target_path()
+            .and_then(|timestamp_key| {
+                log.get(timestamp_key)
+                    .and_then(Value::as_timestamp)
+                    .copied()
+            }),
         EventRef::Metric(metric) => metric.timestamp(),
-        EventRef::Trace(trace) => log_schema().timestamp_key().and_then(|timestamp_key| {
-            trace
-                .get((PathPrefix::Event, timestamp_key))
-                .and_then(Value::as_timestamp)
-                .copied()
-        }),
+        EventRef::Trace(trace) => {
+            log_schema()
+                .timestamp_key_target_path()
+                .and_then(|timestamp_key| {
+                    trace
+                        .get(timestamp_key)
+                        .and_then(Value::as_timestamp)
+                        .copied()
+                })
+        }
     }
     .unwrap_or_else(Utc::now)
     .format_with_items(items.as_items())

@@ -23,7 +23,6 @@ mod errors;
 use crate::config::{ComponentKey, OutputId};
 use crate::schema::Definition;
 pub use errors::{ClosedError, StreamSendError};
-use lookup::PathPrefix;
 
 pub(crate) const CHUNK_SIZE: usize = 1000;
 
@@ -356,18 +355,23 @@ impl Inner {
     fn emit_lag_time(&self, event: EventRef<'_>, reference: i64) {
         if let Some(lag_time_metric) = &self.lag_time {
             let timestamp = match event {
-                EventRef::Log(log) => log_schema().timestamp_key().and_then(|timestamp_key| {
-                    log.get((PathPrefix::Event, timestamp_key))
-                        .and_then(get_timestamp_millis)
-                }),
+                EventRef::Log(log) => {
+                    log_schema()
+                        .timestamp_key_target_path()
+                        .and_then(|timestamp_key| {
+                            log.get(timestamp_key).and_then(get_timestamp_millis)
+                        })
+                }
                 EventRef::Metric(metric) => metric
                     .timestamp()
                     .map(|timestamp| timestamp.timestamp_millis()),
-                EventRef::Trace(trace) => log_schema().timestamp_key().and_then(|timestamp_key| {
-                    trace
-                        .get((PathPrefix::Event, timestamp_key))
-                        .and_then(get_timestamp_millis)
-                }),
+                EventRef::Trace(trace) => {
+                    log_schema()
+                        .timestamp_key_target_path()
+                        .and_then(|timestamp_key| {
+                            trace.get(timestamp_key).and_then(get_timestamp_millis)
+                        })
+                }
             };
             if let Some(timestamp) = timestamp {
                 // This will truncate precision for values larger than 2**52, but at that point the user
