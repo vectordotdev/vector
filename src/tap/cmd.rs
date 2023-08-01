@@ -44,6 +44,7 @@ pub(crate) async fn cmd(opts: &super::Opts, signal_rx: SignalRx) -> exitcode::Ex
     tap(opts, signal_rx).await
 }
 
+/// Observe event flow from specified components
 pub async fn tap(opts: &super::Opts, mut signal_rx: SignalRx) -> exitcode::ExitCode {
     let subscription_url = opts.web_socket_url();
     let formatter = EventFormatter::new(opts.meta, opts.format);
