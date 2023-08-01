@@ -46,11 +46,11 @@ pub async fn cmd(opts: &super::Opts) -> exitcode::ExitCode {
         return exitcode::UNAVAILABLE;
     }
 
-    top(opts, client).await
+    top(opts, client, "Vector").await
 }
 
 /// General monitoring
-pub async fn top(opts: &super::Opts, client: Client) -> exitcode::ExitCode {
+pub async fn top(opts: &super::Opts, client: Client, dashboard_title: &str) -> exitcode::ExitCode {
     // Channel for updating state via event messages
     let (tx, rx) = tokio::sync::mpsc::channel(20);
     let state_rx = state::updater(rx).await;
@@ -60,7 +60,15 @@ pub async fn top(opts: &super::Opts, client: Client) -> exitcode::ExitCode {
     let connection = tokio::spawn(subscription(opts.clone(), client, tx, shutdown_tx));
 
     // Initialize the dashboard
-    match init_dashboard(opts.url().as_str(), opts, state_rx, shutdown_rx).await {
+    match init_dashboard(
+        dashboard_title,
+        opts.url().as_str(),
+        opts,
+        state_rx,
+        shutdown_rx,
+    )
+    .await
+    {
         Ok(_) => {
             connection.abort();
             exitcode::OK
