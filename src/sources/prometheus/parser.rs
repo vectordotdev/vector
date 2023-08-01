@@ -18,14 +18,21 @@ fn utc_timestamp(timestamp: Option<i64>, default: DateTime<Utc>) -> DateTime<Utc
 }
 
 pub(super) fn parse_text(packet: &str) -> Result<Vec<Event>, ParserError> {
-    prometheus_parser::parse_text(packet).map(reparse_groups)
+    prometheus_parser::parse_text(packet)
+        .map(|group| reparse_groups(group, MetricTags::default()))
+}
+
+pub(super) fn parse_text_with_overrides(packet: &str, tag_overrides: MetricTags) -> Result<Vec<Event>, ParserError> {
+    prometheus_parser::parse_text(packet)
+        .map(|group| reparse_groups(group, tag_overrides))
 }
 
 pub(super) fn parse_request(request: proto::WriteRequest) -> Result<Vec<Event>, ParserError> {
-    prometheus_parser::parse_request(request).map(reparse_groups)
+    prometheus_parser::parse_request(request)
+        .map(|group| reparse_groups(group, MetricTags::default()))
 }
 
-fn reparse_groups(groups: Vec<MetricGroup>) -> Vec<Event> {
+fn reparse_groups(groups: Vec<MetricGroup>, tag_overrides: MetricTags) -> Vec<Event> {
     let mut result = Vec::new();
     let start = Utc::now();
 
@@ -41,7 +48,9 @@ fn reparse_groups(groups: Vec<MetricGroup>) -> Vec<Event> {
                         },
                     )
                     .with_timestamp(Some(utc_timestamp(key.timestamp, start)))
-                    .with_tags(MetricTags::from(key.labels).as_option());
+                    .with_tags(MetricTags::from(key.labels).as_option())
+                    // TODO: don't overwrite all tags, just the ones that are passed in
+                    .with_tags(tag_overrides.clone().as_option());
 
                     result.push(counter.into());
                 }

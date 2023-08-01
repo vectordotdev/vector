@@ -8,6 +8,7 @@ use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
 // use vector_core::event::{Metric, MetricKind, MetricValue};
 use warp::http::HeaderMap;
+use vector_core::event::MetricTags;
 
 use super::parser;
 use crate::{
@@ -122,12 +123,15 @@ impl HttpSource for PushgatewaySource {
         let body = String::from_utf8_lossy(&body);
 
         println!("Full path was: {}", full_path);
-        let _ = parse_path_labels(full_path);
+        // TODO: handle error properly
+        let path_labels: MetricTags = parse_path_labels(full_path)?.into_iter().collect();
 
         // TODO: Add grouping key to these
         // TODO: Add an option to toggle between incremental and absolute, default to absolute
-        match parser::parse_text(&body) {
-            Ok(events) => Ok(events),
+        match parser::parse_text_with_overrides(&body, path_labels) {
+            Ok(events) => {
+                Ok(events)
+            },
             Err(_error) => {
                 Ok(vec![])
             }
