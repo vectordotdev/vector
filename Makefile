@@ -34,7 +34,13 @@ export VERBOSE ?= false
 # Override the container tool. Tries docker first and then tries podman.
 export CONTAINER_TOOL ?= auto
 ifeq ($(CONTAINER_TOOL),auto)
-	override CONTAINER_TOOL = $(shell docker version >/dev/null 2>&1 && echo docker || echo podman)
+	ifeq ($(shell docker version >/dev/null 2>&1 && echo docker), docker)
+		override CONTAINER_TOOL = docker
+	else ifeq ($(shell podman version >/dev/null 2>&1 && echo podman), podman)
+		override CONTAINER_TOOL = podman
+	else
+		override CONTAINER_TOOL = unknown
+	endif
 endif
 # If we're using podman create pods else if we're using docker create networks.
 export CURRENT_DIR = $(shell pwd)
@@ -54,7 +60,7 @@ export AWS_ACCESS_KEY_ID ?= "dummy"
 export AWS_SECRET_ACCESS_KEY ?= "dummy"
 
 # Set version
-export VERSION ?= $(shell cargo vdev version)
+export VERSION ?= $(shell command -v cargo >/dev/null && cargo vdev version || echo unknown)
 
 # Set if you are on the CI and actually want the things to happen. (Non-CI users should never set this.)
 export CI ?= false
@@ -128,6 +134,7 @@ define ENVIRONMENT_EXEC
 endef
 
 
+ifneq ($(CONTAINER_TOOL), unknown)
 ifeq ($(ENVIRONMENT_AUTOBUILD), true)
 define ENVIRONMENT_PREPARE
 	@echo "Building the environment. (ENVIRONMENT_AUTOBUILD=true) This may take a few minutes..."
@@ -140,6 +147,11 @@ endef
 else
 define ENVIRONMENT_PREPARE
 	$(CONTAINER_TOOL) pull $(ENVIRONMENT_UPSTREAM)
+endef
+endif
+else
+define ENVIRONMENT_PREPARE
+$(error "Please install a container tool such as Docker or Podman")
 endef
 endif
 
@@ -208,8 +220,10 @@ build-graphql-schema: ## Generate the `schema.json` for Vector's GraphQL API
 
 .PHONY: check-build-tools
 check-build-tools:
-ifeq (, $(shell which cargo))
+ifneq ($(ENVIRONMENT), true)
+ifeq (, $(shell command -v cargo))
 	$(error "Please install Rust: https://www.rust-lang.org/tools/install")
+endif
 endif
 
 ##@ Cross Compiling
