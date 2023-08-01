@@ -1,3 +1,4 @@
+//! Top subcommand
 mod cmd;
 mod dashboard;
 mod events;
@@ -6,10 +7,12 @@ mod state;
 
 use clap::Parser;
 pub use cmd::cmd;
+pub use dashboard::is_tty;
 use url::Url;
 
 use crate::config::api::default_graphql_url;
 
+/// Top options
 #[derive(Parser, Debug, Clone)]
 #[command(rename_all = "kebab-case")]
 pub struct Opts {

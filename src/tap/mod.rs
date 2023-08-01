@@ -1,3 +1,4 @@
+//! Tap subcommand
 mod cmd;
 
 use clap::Parser;
@@ -7,6 +8,7 @@ use vector_api_client::gql::TapEncodingFormat;
 
 use crate::config::api::default_graphql_url;
 
+/// Tap options
 #[derive(Parser, Debug, Clone)]
 #[command(rename_all = "kebab-case")]
 pub struct Opts {
