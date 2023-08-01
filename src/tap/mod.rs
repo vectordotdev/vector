@@ -75,4 +75,16 @@ impl Opts {
     pub fn url(&self) -> Url {
         self.url.clone().unwrap_or_else(default_graphql_url)
     }
+
+    /// URL with scheme set to WebSockets
+    pub fn web_socket_url(&self) -> Url {
+        let mut url = self.url();
+        url.set_scheme(match url.scheme() {
+            "https" => "wss",
+            _ => "ws",
+        })
+        .expect("Couldn't build WebSocket URL. Please report.");
+
+        url
+    }
 }

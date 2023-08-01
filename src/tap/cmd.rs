@@ -20,8 +20,7 @@ const RECONNECT_DELAY: u64 = 5000;
 /// CLI command func for issuing 'tap' queries, and communicating with a local/remote
 /// Vector API server via HTTP/WebSockets.
 pub(crate) async fn cmd(opts: &super::Opts, signal_rx: SignalRx) -> exitcode::ExitCode {
-    let mut url = opts.url();
-
+    let url = opts.url();
     // Return early with instructions for enabling the API if the endpoint isn't reachable
     // via a healthcheck.
     let client = Client::new(url.clone());
@@ -41,19 +40,11 @@ pub(crate) async fn cmd(opts: &super::Opts, signal_rx: SignalRx) -> exitcode::Ex
         return exitcode::UNAVAILABLE;
     }
 
-    // Change the HTTP schema to WebSockets.
-    url.set_scheme(match url.scheme() {
-        "https" => "wss",
-        _ => "ws",
-    })
-    .expect("Couldn't build WebSocket URL. Please report.");
-
-    tap(opts, url, signal_rx).await;
-
-    exitcode::OK
+    tap(opts, signal_rx).await
 }
 
-pub async fn tap(opts: &super::Opts, subscription_url: Url, mut signal_rx: SignalRx) {
+pub async fn tap(opts: &super::Opts, mut signal_rx: SignalRx) -> exitcode::ExitCode {
+    let subscription_url = opts.web_socket_url();
     let formatter = EventFormatter::new(opts.meta, opts.format);
     let outputs_patterns = opts.outputs_patterns();
 
@@ -74,6 +65,8 @@ pub async fn tap(opts: &super::Opts, subscription_url: Url, mut signal_rx: Signa
             }
         }
     }
+
+    exitcode::OK
 }
 
 async fn run(

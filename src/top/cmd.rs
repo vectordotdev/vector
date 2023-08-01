@@ -3,7 +3,6 @@ use std::time::Duration;
 use chrono::Local;
 use futures_util::future::join_all;
 use tokio::sync::{mpsc, oneshot};
-use url::Url;
 use vector_api_client::{connect_subscription_client, Client};
 
 use super::{
@@ -28,7 +27,6 @@ pub async fn cmd(opts: &super::Opts) -> exitcode::ExitCode {
     }
 
     let url = opts.url();
-
     // Create a new API client for connecting to the local/remote Vector instance.
     let client = Client::new(url.clone());
     if client.healthcheck().await.is_err() {
@@ -47,16 +45,33 @@ pub async fn cmd(opts: &super::Opts) -> exitcode::ExitCode {
         return exitcode::UNAVAILABLE;
     }
 
-    // Change the HTTP schema to WebSockets
-    let mut ws_url = url.clone();
-    ws_url
-        .set_scheme(match url.scheme() {
-            "https" => "wss",
-            _ => "ws",
-        })
-        .expect("Couldn't build WebSocket URL. Please report.");
+    top(&opts, client).await
+}
 
-    top(&opts, client, ws_url).await
+pub async fn top(opts: &super::Opts, client: Client) -> exitcode::ExitCode {
+    // Channel for updating state via event messages
+    let (tx, rx) = tokio::sync::mpsc::channel(20);
+    let state_rx = state::updater(rx).await;
+    // Channel for shutdown signal
+    let (shutdown_tx, shutdown_rx) = oneshot::channel::<()>();
+
+    let connection = tokio::spawn(subscription(opts.clone(), client, tx, shutdown_tx));
+
+    // Initialize the dashboard
+    match init_dashboard(opts.url().as_str(), opts, state_rx, shutdown_rx).await {
+        Ok(_) => {
+            connection.abort();
+            exitcode::OK
+        }
+        Err(err) => {
+            #[allow(clippy::print_stderr)]
+            {
+                eprintln!("Encountered error: {}", err);
+            }
+            connection.abort();
+            exitcode::IOERR
+        }
+    }
 }
 
 // This task handles reconnecting the subscription client and all
@@ -64,10 +79,11 @@ pub async fn cmd(opts: &super::Opts) -> exitcode::ExitCode {
 async fn subscription(
     opts: super::Opts,
     client: Client,
-    ws_url: Url,
     tx: mpsc::Sender<EventType>,
     shutdown_tx: oneshot::Sender<()>,
 ) {
+    let ws_url = opts.web_socket_url();
+
     loop {
         // Initialize state. On future reconnects, we re-initialize state in
         // order to accurately capture added, removed, and edited
@@ -110,32 +126,6 @@ async fn subscription(
         if opts.no_reconnect {
             _ = shutdown_tx.send(());
             break;
-        }
-    }
-}
-
-pub async fn top(opts: &super::Opts, client: Client, ws_url: Url) -> exitcode::ExitCode {
-    // Channel for updating state via event messages
-    let (tx, rx) = tokio::sync::mpsc::channel(20);
-    let state_rx = state::updater(rx).await;
-    // Channel for shutdown signal
-    let (shutdown_tx, shutdown_rx) = oneshot::channel::<()>();
-
-    let connection = tokio::spawn(subscription(opts.clone(), client, ws_url, tx, shutdown_tx));
-
-    // Initialize the dashboard
-    match init_dashboard(opts.url().as_str(), opts, state_rx, shutdown_rx).await {
-        Ok(_) => {
-            connection.abort();
-            exitcode::OK
-        }
-        Err(err) => {
-            #[allow(clippy::print_stderr)]
-            {
-                eprintln!("Encountered error: {}", err);
-            }
-            connection.abort();
-            exitcode::IOERR
         }
     }
 }
