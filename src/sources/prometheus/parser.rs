@@ -43,8 +43,6 @@ fn reparse_groups(groups: Vec<MetricGroup>, tag_overrides: impl IntoIterator<Ite
         MetricKind::Absolute
     };
 
-    println!("Metric kind is: {:?}", metric_kind);
-
     for group in groups {
         match group.metrics {
             GroupKind::Counter(metrics) => {

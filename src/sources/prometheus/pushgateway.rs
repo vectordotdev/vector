@@ -115,7 +115,6 @@ impl HttpSource for PushgatewaySource {
     ) -> Result<Vec<Event>, ErrorMessage> {
         let body = String::from_utf8_lossy(&body);
 
-        println!("Full path was: {}", full_path);
         let path_labels: Vec<(String, String)> = parse_path_labels(full_path)?.into_iter().collect();
 
         parser::parse_text_with_overrides(&body, path_labels, self.aggregation_enabled())
@@ -152,8 +151,6 @@ fn parse_path_labels(path: &str) -> Result<Vec<(String,String)>,ErrorMessage> {
             )
         )
         .collect();
-
-    println!("{:?}", pairs);
 
     pairs
 }
