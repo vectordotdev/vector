@@ -22,6 +22,12 @@ pub(super) fn parse_text(packet: &str) -> Result<Vec<Event>, ParserError> {
         .map(|group| reparse_groups(group, MetricTags::default()))
 }
 
+// TODO: Revisit this type signature
+// Not sure if MetricTags is the right thing to accept here and in reparse_groups
+//
+// Feels a bit pointless to make the caller convert to that when we're just iterating over them
+// to merge them into the tags from the metrics body, but also I'm not sure what would be an
+// appropriate type (Vec feels a bit specific - maybe an iterator of (String,String)?).
 pub(super) fn parse_text_with_overrides(packet: &str, tag_overrides: MetricTags) -> Result<Vec<Event>, ParserError> {
     prometheus_parser::parse_text(packet)
         .map(|group| reparse_groups(group, tag_overrides))
@@ -40,6 +46,11 @@ fn reparse_groups(groups: Vec<MetricGroup>, tag_overrides: MetricTags) -> Vec<Ev
         match group.metrics {
             GroupKind::Counter(metrics) => {
                 for (key, metric) in metrics {
+                    let mut tags = MetricTags::from(key.labels);
+                    for (k,v) in tag_overrides.iter_single() {
+                        tags.replace(k.to_owned(),v.to_owned());
+                    }
+
                     let counter = Metric::new(
                         group.name.clone(),
                         MetricKind::Absolute,
@@ -48,9 +59,7 @@ fn reparse_groups(groups: Vec<MetricGroup>, tag_overrides: MetricTags) -> Vec<Ev
                         },
                     )
                     .with_timestamp(Some(utc_timestamp(key.timestamp, start)))
-                    .with_tags(MetricTags::from(key.labels).as_option())
-                    // TODO: don't overwrite all tags, just the ones that are passed in
-                    .with_tags(tag_overrides.clone().as_option());
+                    .with_tags(tags.as_option());
 
                     result.push(counter.into());
                 }
