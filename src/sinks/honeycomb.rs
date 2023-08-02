@@ -76,10 +76,11 @@ fn default_endpoint() -> String {
 /// that event for Honeycomb to inflate query results. If the sample rate source is disabled, no fields will
 /// be removed and no sample rate will be sent to Honeycomb.
 #[configurable_component]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub enum SampleRateSource {
     /// Use the sample rate that is added to the event by the `Sample` transform.
     #[configurable(metadata(derived))]
+    #[default]
     SampleTransformField,
     /// Use the value of the specified field as the sample rate.
     #[configurable(metadata(derived))]
@@ -95,11 +96,6 @@ impl SampleRateSource {
             SampleRateSource::Field(field) => Some(field.as_str()),
             SampleRateSource::Disabled => None,
         }
-    }
-}
-impl Default for SampleRateSource {
-    fn default() -> Self {
-        SampleRateSource::SampleTransformField
     }
 }
 
@@ -316,11 +312,7 @@ mod test {
 
         let mut log = LogEvent::from("simple message");
         log.insert(SAMPLE_RATE_FIELD, Value::Integer(40));
-        let timestamp = log
-            .get_timestamp()
-            .and_then(|t| t.as_timestamp())
-            .unwrap()
-            .clone();
+        let timestamp = *log.get_timestamp().and_then(|t| t.as_timestamp()).unwrap();
         let event = Event::Log(log);
 
         let encoded = encoder.encode_event(event);
@@ -346,11 +338,7 @@ mod test {
 
         let mut log = LogEvent::from("simple message");
         log.insert(SAMPLE_RATE_FIELD, Value::Integer(40));
-        let timestamp = log
-            .get_timestamp()
-            .and_then(|t| t.as_timestamp())
-            .unwrap()
-            .clone();
+        let timestamp = *log.get_timestamp().and_then(|t| t.as_timestamp()).unwrap();
         let event = Event::Log(log);
 
         let encoded = encoder.encode_event(event);
@@ -375,11 +363,7 @@ mod test {
         };
 
         let log = LogEvent::from("simple message");
-        let timestamp = log
-            .get_timestamp()
-            .and_then(|t| t.as_timestamp())
-            .unwrap()
-            .clone();
+        let timestamp = *log.get_timestamp().and_then(|t| t.as_timestamp()).unwrap();
         let event = Event::Log(log);
 
         let encoded = encoder.encode_event(event);
@@ -404,11 +388,7 @@ mod test {
 
         let mut log = LogEvent::from("simple message");
         log.insert("custom_sample_rate", Value::Integer(40));
-        let timestamp = log
-            .get_timestamp()
-            .and_then(|t| t.as_timestamp())
-            .unwrap()
-            .clone();
+        let timestamp = *log.get_timestamp().and_then(|t| t.as_timestamp()).unwrap();
         let event = Event::Log(log);
 
         let encoded = encoder.encode_event(event);
