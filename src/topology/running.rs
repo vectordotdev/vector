@@ -859,7 +859,7 @@ impl RunningTopology {
         let task = {
             let key = key.clone();
             handle_errors(task, self.abort_tx.clone(), |error| {
-                ShutdownError::SinkAborted(key, error)
+                ShutdownError::SinkAborted { key, error }
             })
         }
         .instrument(task_span);
@@ -902,7 +902,7 @@ impl RunningTopology {
         let task = {
             let key = key.clone();
             handle_errors(task, self.abort_tx.clone(), |error| {
-                ShutdownError::TransformAborted(key, error)
+                ShutdownError::TransformAborted { key, error }
             })
         }
         .instrument(task_span);
@@ -946,7 +946,7 @@ impl RunningTopology {
         let task = {
             let key = key.clone();
             handle_errors(task, self.abort_tx.clone(), |error| {
-                ShutdownError::SourceAborted(key, error)
+                ShutdownError::SourceAborted { key, error }
             })
         }
         .instrument(task_span.clone());
@@ -963,7 +963,7 @@ impl RunningTopology {
         let source_task = {
             let key = key.clone();
             handle_errors(source_task, self.abort_tx.clone(), |error| {
-                ShutdownError::SourceAborted(key, error)
+                ShutdownError::SourceAborted { key, error }
             })
         }
         .instrument(task_span);

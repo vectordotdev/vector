@@ -1,5 +1,6 @@
 #![allow(missing_docs)]
 
+use snafu::Snafu;
 use tokio::{runtime::Runtime, sync::broadcast};
 use tokio_stream::{Stream, StreamExt};
 
@@ -23,20 +24,20 @@ pub enum SignalTo {
     Quit,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Snafu)]
 pub enum ShutdownError {
-    /// The API failed to start
     // For future work: It would be nice if we could keep the actual errors in here, but
     // `crate::Error` doesn't implement `Clone`, and adding `DynClone` for errors is tricky.
-    ApiFailed(String),
-    /// Reload failed, and then failed to restore the previous config
+    #[snafu(display("The API failed to start: {error}"))]
+    ApiFailed { error: String },
+    #[snafu(display("Reload failed, and then failed to restore the previous config"))]
     ReloadFailedToRestore,
-    /// Source task died during execution
-    SourceAborted(ComponentKey, String),
-    /// Transform task died during execution
-    TransformAborted(ComponentKey, String),
-    /// Sink task died during execution
-    SinkAborted(ComponentKey, String),
+    #[snafu(display(r#"The task for source "{key}" died during execution: {error}"#))]
+    SourceAborted { key: ComponentKey, error: String },
+    #[snafu(display(r#"The task for transform "{key}" died during execution: {error}"#))]
+    TransformAborted { key: ComponentKey, error: String },
+    #[snafu(display(r#"The task for sink "{key}" died during execution: {error}"#))]
+    SinkAborted { key: ComponentKey, error: String },
 }
 
 /// Convenience struct for app setup handling.

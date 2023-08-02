@@ -124,9 +124,10 @@ impl TopologyController {
 
                     Some(api_server)
                 }
-                Err(e) => {
-                    error!("An error occurred that Vector couldn't handle: {}.", e);
-                    return ReloadOutcome::FatalError(ShutdownError::ApiFailed(e.to_string()));
+                Err(error) => {
+                    let error = error.to_string();
+                    error!("An error occurred that Vector couldn't handle: {}.", error);
+                    return ReloadOutcome::FatalError(ShutdownError::ApiFailed { error });
                 }
             }
         }

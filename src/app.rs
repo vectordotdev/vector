@@ -139,11 +139,12 @@ impl ApplicationConfig {
 
                     Some(api_server)
                 }
-                Err(e) => {
-                    error!("An error occurred that Vector couldn't handle: {}.", e);
+                Err(error) => {
+                    let error = error.to_string();
+                    error!("An error occurred that Vector couldn't handle: {}.", error);
                     _ = self
                         .graceful_crash_sender
-                        .send(ShutdownError::ApiFailed(e.to_string()));
+                        .send(ShutdownError::ApiFailed { error });
                     None
                 }
             }
