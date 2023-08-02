@@ -154,7 +154,7 @@ fn reparse_groups(groups: Vec<MetricGroup>, tag_overrides: impl IntoIterator<Ite
 fn combine_tags(base_tags: BTreeMap<String,String>, tag_overrides: impl IntoIterator<Item = (String, String)>) -> MetricTags {
     let mut tags = MetricTags::from(base_tags);
     for (k,v) in tag_overrides.into_iter() {
-        tags.replace(k.to_owned(),v.to_owned());
+        tags.replace(k, v);
     }
 
     tags
