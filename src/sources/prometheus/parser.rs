@@ -1,5 +1,4 @@
 use std::cmp::Ordering;
-use std::collections::BTreeMap;
 
 use chrono::{DateTime, TimeZone, Utc};
 use prometheus_parser::{proto, GroupKind, MetricGroup, ParserError};
@@ -152,7 +151,7 @@ fn reparse_groups(groups: Vec<MetricGroup>, tag_overrides: impl IntoIterator<Ite
 }
 
 fn combine_tags(base_tags: impl Into<MetricTags>, tag_overrides: impl IntoIterator<Item = (String, String)>) -> MetricTags {
-    let mut tags = MetricTags::from(base_tags);
+    let mut tags = base_tags.into();
     for (k,v) in tag_overrides.into_iter() {
         tags.replace(k, v);
     }
