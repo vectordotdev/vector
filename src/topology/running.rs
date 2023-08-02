@@ -20,6 +20,7 @@ use crate::{
     config::{ComponentKey, Config, ConfigDiff, HealthcheckOptions, Inputs, OutputId, Resource},
     event::EventArray,
     shutdown::SourceShutdownCoordinator,
+    signal::ShutdownError,
     spawn_named,
     topology::{
         build_or_log_errors, builder,
@@ -42,14 +43,14 @@ pub struct RunningTopology {
     shutdown_coordinator: SourceShutdownCoordinator,
     detach_triggers: HashMap<ComponentKey, DisabledTrigger>,
     pub(crate) config: Config,
-    abort_tx: mpsc::UnboundedSender<()>,
+    abort_tx: mpsc::UnboundedSender<ShutdownError>,
     watch: (WatchTx, WatchRx),
     pub(crate) running: Arc<AtomicBool>,
     graceful_shutdown_duration: Option<Duration>,
 }
 
 impl RunningTopology {
-    pub fn new(config: Config, abort_tx: mpsc::UnboundedSender<()>) -> Self {
+    pub fn new(config: Config, abort_tx: mpsc::UnboundedSender<ShutdownError>) -> Self {
         Self {
             inputs: HashMap::new(),
             inputs_tap_metadata: HashMap::new(),

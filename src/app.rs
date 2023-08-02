@@ -27,7 +27,7 @@ use crate::{
     cli::{handle_config_errors, LogFormat, Opts, RootOpts},
     config::{self, Config, ConfigPath},
     heartbeat,
-    signal::{SignalHandler, SignalPair, SignalRx, SignalTo},
+    signal::{ShutdownError, SignalHandler, SignalPair, SignalRx, SignalTo},
     topology::{
         self, ReloadOutcome, RunningTopology, SharedTopologyController, TopologyController,
     },
@@ -49,8 +49,8 @@ use tokio::sync::broadcast::error::RecvError;
 pub struct ApplicationConfig {
     pub config_paths: Vec<config::ConfigPath>,
     pub topology: RunningTopology,
-    pub graceful_crash_sender: mpsc::UnboundedSender<()>,
-    pub graceful_crash_receiver: mpsc::UnboundedReceiver<()>,
+    pub graceful_crash_sender: mpsc::UnboundedSender<ShutdownError>,
+    pub graceful_crash_receiver: mpsc::UnboundedReceiver<ShutdownError>,
     #[cfg(feature = "api")]
     pub api: config::api::Options,
     #[cfg(feature = "enterprise")]
@@ -141,7 +141,7 @@ impl ApplicationConfig {
                 }
                 Err(e) => {
                     error!("An error occurred that Vector couldn't handle: {}.", e);
-                    _ = self.graceful_crash_sender.send(());
+                    _ = self.graceful_crash_sender.send(ShutdownError::ApiFailed);
                     None
                 }
             }
@@ -245,7 +245,7 @@ impl Application {
 
 pub struct StartedApplication {
     pub config_paths: Vec<ConfigPath>,
-    pub graceful_crash_receiver: mpsc::UnboundedReceiver<()>,
+    pub graceful_crash_receiver: mpsc::UnboundedReceiver<ShutdownError>,
     pub signals: SignalPair,
     pub topology_controller: SharedTopologyController,
 }
@@ -279,10 +279,10 @@ impl StartedApplication {
                     break signal;
                 },
                 // Trigger graceful shutdown if a component crashed, or all sources have ended.
-                _ = graceful_crash.next() => break SignalTo::Shutdown,
+                error = graceful_crash.next() => break SignalTo::Shutdown(error),
                 _ = TopologyController::sources_finished(topology_controller.clone()) => {
                     info!("All sources have finished.");
-                    break SignalTo::Shutdown
+                    break SignalTo::Shutdown(None)
                 } ,
                 else => unreachable!("Signal streams never end"),
             }
@@ -307,7 +307,7 @@ async fn handle_signal(
             let mut topology_controller = topology_controller.lock().await;
             let new_config = config_builder.build().map_err(handle_config_errors).ok();
             match topology_controller.reload(new_config).await {
-                ReloadOutcome::FatalError => Some(SignalTo::Shutdown),
+                ReloadOutcome::FatalError(error) => Some(SignalTo::Shutdown(Some(error))),
                 _ => None,
             }
         }
@@ -329,7 +329,7 @@ async fn handle_signal(
             .ok();
 
             match topology_controller.reload(new_config).await {
-                ReloadOutcome::FatalError => Some(SignalTo::Shutdown),
+                ReloadOutcome::FatalError(error) => Some(SignalTo::Shutdown(Some(error))),
                 _ => None,
             }
         }
@@ -337,11 +337,12 @@ async fn handle_signal(
             warn!("Overflow, dropped {} signals.", amt);
             None
         }
-        Err(RecvError::Closed) => Some(SignalTo::Shutdown),
+        Err(RecvError::Closed) => Some(SignalTo::Shutdown(None)),
         Ok(signal) => Some(signal),
     }
 }
 
+#[derive(Debug)]
 pub struct FinishedApplication {
     pub signal: SignalTo,
     pub signal_rx: SignalRx,
@@ -364,7 +365,7 @@ impl FinishedApplication {
             .into_inner();
 
         match signal {
-            SignalTo::Shutdown => Self::stop(topology_controller, signal_rx).await,
+            SignalTo::Shutdown(_) => Self::stop(topology_controller, signal_rx).await,
             SignalTo::Quit => Self::quit(),
             _ => unreachable!(),
         }

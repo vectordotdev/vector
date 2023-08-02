@@ -18,9 +18,19 @@ pub enum SignalTo {
     /// Signal to reload config from the filesystem.
     ReloadFromDisk,
     /// Signal to shutdown process.
-    Shutdown,
+    Shutdown(Option<ShutdownError>),
     /// Shutdown process immediately.
     Quit,
+}
+
+#[derive(Clone, Debug)]
+pub enum ShutdownError {
+    /// The API failed to start
+    ApiFailed, // TODO: Hand off the failure error here
+    /// Reload failed, and then failed to restore the previous config
+    ReloadFailedToRestore,
+    /// FIXME
+    HandledError,
 }
 
 /// Convenience struct for app setup handling.
@@ -153,11 +163,11 @@ fn os_signals(runtime: &Runtime) -> impl Stream<Item = SignalTo> {
                 let signal = tokio::select! {
                     _ = sigint.recv() => {
                         info!(message = "Signal received.", signal = "SIGINT");
-                        SignalTo::Shutdown
+                        SignalTo::Shutdown(None)
                     },
                     _ = sigterm.recv() => {
                         info!(message = "Signal received.", signal = "SIGTERM");
-                        SignalTo::Shutdown
+                        SignalTo::Shutdown(None)
                     } ,
                     _ = sigquit.recv() => {
                         info!(message = "Signal received.", signal = "SIGQUIT");
