@@ -64,6 +64,8 @@ fn reparse_groups(groups: Vec<MetricGroup>, tag_overrides: MetricTags) -> Vec<Ev
             }
             GroupKind::Gauge(metrics) | GroupKind::Untyped(metrics) => {
                 for (key, metric) in metrics {
+                    let tags = combine_tags(key.labels, tag_overrides.clone());
+
                     let gauge = Metric::new(
                         group.name.clone(),
                         MetricKind::Absolute,
@@ -72,13 +74,15 @@ fn reparse_groups(groups: Vec<MetricGroup>, tag_overrides: MetricTags) -> Vec<Ev
                         },
                     )
                     .with_timestamp(Some(utc_timestamp(key.timestamp, start)))
-                    .with_tags(MetricTags::from(key.labels).as_option());
+                    .with_tags(MetricTags::from(tags).as_option());
 
                     result.push(gauge.into());
                 }
             }
             GroupKind::Histogram(metrics) => {
                 for (key, metric) in metrics {
+                    let tags = combine_tags(key.labels, tag_overrides.clone());
+
                     let mut buckets = metric.buckets;
                     buckets.sort_unstable_by(|a, b| a.partial_cmp(b).unwrap_or(Ordering::Equal));
                     for i in (1..buckets.len()).rev() {
@@ -108,13 +112,15 @@ fn reparse_groups(groups: Vec<MetricGroup>, tag_overrides: MetricTags) -> Vec<Ev
                             },
                         )
                         .with_timestamp(Some(utc_timestamp(key.timestamp, start)))
-                        .with_tags(MetricTags::from(key.labels).as_option())
+                        .with_tags(MetricTags::from(tags).as_option())
                         .into(),
                     );
                 }
             }
             GroupKind::Summary(metrics) => {
                 for (key, metric) in metrics {
+                    let tags = combine_tags(key.labels, tag_overrides.clone());
+
                     result.push(
                         Metric::new(
                             group.name.clone(),
@@ -133,7 +139,7 @@ fn reparse_groups(groups: Vec<MetricGroup>, tag_overrides: MetricTags) -> Vec<Ev
                             },
                         )
                         .with_timestamp(Some(utc_timestamp(key.timestamp, start)))
-                        .with_tags(MetricTags::from(key.labels).as_option())
+                        .with_tags(MetricTags::from(tags).as_option())
                         .into(),
                     );
                 }
