@@ -23,12 +23,6 @@ pub(super) fn parse_text(packet: &str) -> Result<Vec<Event>, ParserError> {
         .map(|group| reparse_groups(group, vec![], false))
 }
 
-// TODO: Revisit this type signature
-// Not sure if MetricTags is the right thing to accept here and in reparse_groups
-//
-// Feels a bit pointless to make the caller convert to that when we're just iterating over them
-// to merge them into the tags from the metrics body, but also I'm not sure what would be an
-// appropriate type (Vec feels a bit specific - maybe an iterator of (String,String)?).
 pub(super) fn parse_text_with_overrides(packet: &str, tag_overrides: impl IntoIterator<Item = (String, String)> + Clone, aggregate_metrics: bool) -> Result<Vec<Event>, ParserError> {
     prometheus_parser::parse_text(packet)
         .map(|group| reparse_groups(group, tag_overrides, aggregate_metrics))
