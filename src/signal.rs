@@ -26,7 +26,9 @@ pub enum SignalTo {
 #[derive(Clone, Debug)]
 pub enum ShutdownError {
     /// The API failed to start
-    ApiFailed, // TODO: Hand off the failure error here
+    // For future work: It would be nice if we could keep the actual errors in here, but
+    // `crate::Error` doesn't implement `Clone`, and adding `DynClone` for errors is tricky.
+    ApiFailed(String),
     /// Reload failed, and then failed to restore the previous config
     ReloadFailedToRestore,
     /// Source task died during execution

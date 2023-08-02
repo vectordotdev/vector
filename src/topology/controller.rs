@@ -126,7 +126,7 @@ impl TopologyController {
                 }
                 Err(e) => {
                     error!("An error occurred that Vector couldn't handle: {}.", e);
-                    return ReloadOutcome::FatalError(ShutdownError::ApiFailed);
+                    return ReloadOutcome::FatalError(ShutdownError::ApiFailed(e.to_string()));
                 }
             }
         }
