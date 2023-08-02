@@ -191,7 +191,7 @@ impl Runner {
         }
     }
 
-    pub async fn run_validation(self) -> Result<Vec<RunnerResults>, String> {
+    pub async fn run_validation(self) -> Result<Vec<RunnerResults>, vector_common::Error> {
         // Initialize our test environment.
         initialize_test_environment();
 
@@ -413,7 +413,7 @@ fn build_external_resource(
     configuration: &ValidationConfiguration,
     input_task_coordinator: &TaskCoordinator<Configuring>,
     output_task_coordinator: &TaskCoordinator<Configuring>,
-) -> Result<(RunnerInput, RunnerOutput, Option<Encoder<encoding::Framer>>), String> {
+) -> Result<(RunnerInput, RunnerOutput, Option<Encoder<encoding::Framer>>), vector_common::Error> {
     let component_type = configuration.component_type();
     let maybe_external_resource = configuration.external_resource();
     let maybe_encoder = maybe_external_resource
@@ -448,9 +448,7 @@ fn build_external_resource(
             let (tx, rx) = mpsc::channel(1024);
             let resource =
                 maybe_external_resource.expect("a sink must always have an external resource");
-            resource
-                .spawn_as_output(tx, output_task_coordinator)
-                .map_err(|e| e.to_string())?;
+            resource.spawn_as_output(tx, output_task_coordinator)?;
 
             Ok((
                 RunnerInput::Controlled,
