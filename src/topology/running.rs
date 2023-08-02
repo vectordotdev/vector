@@ -856,8 +856,12 @@ impl RunningTopology {
         }
 
         let task_name = format!(">> {} ({})", task.typetag(), task.id());
-        let task = handle_errors(task, self.abort_tx.clone(), ShutdownError::SinkAborted)
-            .instrument(task_span);
+        let task = handle_errors(
+            task,
+            self.abort_tx.clone(),
+            ShutdownError::SinkAborted(key.clone()),
+        )
+        .instrument(task_span);
         let spawned = spawn_named(task, task_name.as_ref());
         if let Some(previous) = self.tasks.insert(key.clone(), spawned) {
             drop(previous); // detach and forget
@@ -894,8 +898,12 @@ impl RunningTopology {
         }
 
         let task_name = format!(">> {} ({}) >>", task.typetag(), task.id());
-        let task = handle_errors(task, self.abort_tx.clone(), ShutdownError::TransformAborted)
-            .instrument(task_span);
+        let task = handle_errors(
+            task,
+            self.abort_tx.clone(),
+            ShutdownError::TransformAborted(key.clone()),
+        )
+        .instrument(task_span);
         let spawned = spawn_named(task, task_name.as_ref());
         if let Some(previous) = self.tasks.insert(key.clone(), spawned) {
             drop(previous); // detach and forget
@@ -933,8 +941,12 @@ impl RunningTopology {
         }
 
         let task_name = format!("{} ({}) >>", task.typetag(), task.id());
-        let task = handle_errors(task, self.abort_tx.clone(), ShutdownError::SourceAborted)
-            .instrument(task_span.clone());
+        let task = handle_errors(
+            task,
+            self.abort_tx.clone(),
+            ShutdownError::SourceAborted(key.clone()),
+        )
+        .instrument(task_span.clone());
         let spawned = spawn_named(task, task_name.as_ref());
         if let Some(previous) = self.tasks.insert(key.clone(), spawned) {
             drop(previous); // detach and forget
@@ -948,7 +960,7 @@ impl RunningTopology {
         let source_task = handle_errors(
             source_task,
             self.abort_tx.clone(),
-            ShutdownError::SourceAborted,
+            ShutdownError::SourceAborted(key.clone()),
         )
         .instrument(task_span);
         self.source_tasks

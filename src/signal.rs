@@ -3,7 +3,7 @@
 use tokio::{runtime::Runtime, sync::broadcast};
 use tokio_stream::{Stream, StreamExt};
 
-use super::config::ConfigBuilder;
+use super::config::{ComponentKey, ConfigBuilder};
 
 pub type ShutdownTx = broadcast::Sender<()>;
 pub type SignalTx = broadcast::Sender<SignalTo>;
@@ -30,11 +30,11 @@ pub enum ShutdownError {
     /// Reload failed, and then failed to restore the previous config
     ReloadFailedToRestore,
     /// Source task died during execution
-    SourceAborted,
+    SourceAborted(ComponentKey),
     /// Transform task died during execution
-    TransformAborted,
+    TransformAborted(ComponentKey),
     /// Sink task died during execution
-    SinkAborted,
+    SinkAborted(ComponentKey),
 }
 
 /// Convenience struct for app setup handling.
