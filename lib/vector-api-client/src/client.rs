@@ -22,10 +22,7 @@ impl Client {
 
     /// Send a health query
     pub async fn healthcheck(&self) -> Result<(), ()> {
-        match self.health_query().await {
-            Ok(_) => Ok(()),
-            Err(_) => Err(()),
-        }
+        self.health_query().await.map(|_| ()).map_err(|_| ())
     }
 
     /// Issue a GraphQL query using Reqwest, serializing the response to the associated
