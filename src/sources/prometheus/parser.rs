@@ -80,7 +80,7 @@ fn reparse_groups(
                         },
                     )
                     .with_timestamp(Some(utc_timestamp(key.timestamp, start)))
-                    .with_tags(MetricTags::from(tags).as_option());
+                    .with_tags(tags.as_option());
 
                     result.push(gauge.into());
                 }
@@ -118,7 +118,7 @@ fn reparse_groups(
                             },
                         )
                         .with_timestamp(Some(utc_timestamp(key.timestamp, start)))
-                        .with_tags(MetricTags::from(tags).as_option())
+                        .with_tags(tags.as_option())
                         .into(),
                     );
                 }
@@ -145,7 +145,7 @@ fn reparse_groups(
                             },
                         )
                         .with_timestamp(Some(utc_timestamp(key.timestamp, start)))
-                        .with_tags(MetricTags::from(tags).as_option())
+                        .with_tags(tags.as_option())
                         .into(),
                     );
                 }

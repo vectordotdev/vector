@@ -101,6 +101,8 @@ struct PushgatewaySource {
 }
 
 impl PushgatewaySource {
+    // False positive - this is not const
+    #[allow(clippy::missing_const_for_fn)]
     fn aggregation_enabled(&self) -> bool {
         self.aggregate_metrics
     }
@@ -122,7 +124,7 @@ impl HttpSource for PushgatewaySource {
             |error| {
                 ErrorMessage::new(
                     http::StatusCode::UNPROCESSABLE_ENTITY,
-                    format!("Failed to parse metrics body: {}", error.to_string()),
+                    format!("Failed to parse metrics body: {}", error),
                 )
             },
         )
