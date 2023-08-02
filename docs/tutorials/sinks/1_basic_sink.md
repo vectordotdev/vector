@@ -284,7 +284,7 @@ Add the following after emitting `BytesSent`:
 +         count: 1,
 +         byte_size: event_byte_size,
 +         output: None,
-+     })
++     });
 ```
 
 More details about instrumenting Vector can be found
