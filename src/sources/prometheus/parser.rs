@@ -18,21 +18,27 @@ fn utc_timestamp(timestamp: Option<i64>, default: DateTime<Utc>) -> DateTime<Utc
 }
 
 pub(super) fn parse_text(packet: &str) -> Result<Vec<Event>, ParserError> {
-    prometheus_parser::parse_text(packet)
-        .map(|group| reparse_groups(group, vec![], false))
+    prometheus_parser::parse_text(packet).map(|group| reparse_groups(group, vec![], false))
 }
 
-pub(super) fn parse_text_with_overrides(packet: &str, tag_overrides: impl IntoIterator<Item = (String, String)> + Clone, aggregate_metrics: bool) -> Result<Vec<Event>, ParserError> {
+pub(super) fn parse_text_with_overrides(
+    packet: &str,
+    tag_overrides: impl IntoIterator<Item = (String, String)> + Clone,
+    aggregate_metrics: bool,
+) -> Result<Vec<Event>, ParserError> {
     prometheus_parser::parse_text(packet)
         .map(|group| reparse_groups(group, tag_overrides, aggregate_metrics))
 }
 
 pub(super) fn parse_request(request: proto::WriteRequest) -> Result<Vec<Event>, ParserError> {
-    prometheus_parser::parse_request(request)
-        .map(|group| reparse_groups(group, vec![], false))
+    prometheus_parser::parse_request(request).map(|group| reparse_groups(group, vec![], false))
 }
 
-fn reparse_groups(groups: Vec<MetricGroup>, tag_overrides: impl IntoIterator<Item = (String, String)> + Clone, aggregate_metrics: bool) -> Vec<Event> {
+fn reparse_groups(
+    groups: Vec<MetricGroup>,
+    tag_overrides: impl IntoIterator<Item = (String, String)> + Clone,
+    aggregate_metrics: bool,
+) -> Vec<Event> {
     let mut result = Vec::new();
     let start = Utc::now();
 
@@ -150,9 +156,12 @@ fn reparse_groups(groups: Vec<MetricGroup>, tag_overrides: impl IntoIterator<Ite
     result
 }
 
-fn combine_tags(base_tags: impl Into<MetricTags>, tag_overrides: impl IntoIterator<Item = (String, String)>) -> MetricTags {
+fn combine_tags(
+    base_tags: impl Into<MetricTags>,
+    tag_overrides: impl IntoIterator<Item = (String, String)>,
+) -> MetricTags {
     let mut tags = base_tags.into();
-    for (k,v) in tag_overrides.into_iter() {
+    for (k, v) in tag_overrides.into_iter() {
         tags.replace(k, v);
     }
 
