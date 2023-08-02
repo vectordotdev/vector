@@ -654,18 +654,10 @@ mod tests {
         {
             let event = events.remove(0);
             let log = event.as_log();
+            assert_eq!(*log.get_message().unwrap(), "test body".into());
+            assert!(log.get_timestamp().is_some());
             assert_eq!(
-                log[log_schema().message_key().unwrap().to_string()],
-                "test body".into()
-            );
-            assert!(log
-                .get((
-                    lookup::PathPrefix::Event,
-                    log_schema().timestamp_key().unwrap()
-                ))
-                .is_some());
-            assert_eq!(
-                log[log_schema().source_type_key().unwrap().to_string()],
+                *log.get_source_type().unwrap(),
                 SimpleHttpConfig::NAME.into()
             );
             assert_eq!(log["http_path"], "/".into());
@@ -674,10 +666,7 @@ mod tests {
         {
             let event = events.remove(0);
             let log = event.as_log();
-            assert_eq!(
-                log[log_schema().message_key().unwrap().to_string()],
-                "test body 2".into()
-            );
+            assert_eq!(*log.get_message().unwrap(), "test body 2".into());
             assert_event_metadata(log).await;
         }
     }
@@ -709,19 +698,13 @@ mod tests {
         {
             let event = events.remove(0);
             let log = event.as_log();
-            assert_eq!(
-                log[log_schema().message_key().unwrap().to_string()],
-                "test body".into()
-            );
+            assert_eq!(*log.get_message().unwrap(), "test body".into());
             assert_event_metadata(log).await;
         }
         {
             let event = events.remove(0);
             let log = event.as_log();
-            assert_eq!(
-                log[log_schema().message_key().unwrap().to_string()],
-                "test body 2".into()
-            );
+            assert_eq!(*log.get_message().unwrap(), "test body 2".into());
             assert_event_metadata(log).await;
         }
     }
@@ -754,10 +737,7 @@ mod tests {
         {
             let event = events.remove(0);
             let log = event.as_log();
-            assert_eq!(
-                log[log_schema().message_key().unwrap().to_string()],
-                "foo\nbar".into()
-            );
+            assert_eq!(*log.get_message().unwrap(), "foo\nbar".into());
             assert_event_metadata(log).await;
         }
     }
@@ -794,22 +774,8 @@ mod tests {
         })
         .await;
 
-        assert!(events
-            .remove(1)
-            .as_log()
-            .get((
-                lookup::PathPrefix::Event,
-                log_schema().timestamp_key().unwrap()
-            ))
-            .is_some());
-        assert!(events
-            .remove(0)
-            .as_log()
-            .get((
-                lookup::PathPrefix::Event,
-                log_schema().timestamp_key().unwrap()
-            ))
-            .is_some());
+        assert!(events.remove(1).as_log().get_timestamp().is_some());
+        assert!(events.remove(0).as_log().get_timestamp().is_some());
     }
 
     #[tokio::test]
@@ -967,12 +933,7 @@ mod tests {
     }
 
     async fn assert_event_metadata(log: &LogEvent) {
-        assert!(log
-            .get((
-                lookup::PathPrefix::Event,
-                log_schema().timestamp_key().unwrap()
-            ))
-            .is_some());
+        assert!(log.get_timestamp().is_some());
 
         let source_type_key_value = log
             .get((
@@ -1109,10 +1070,7 @@ mod tests {
         {
             let event = events.remove(0);
             let log = event.as_log();
-            assert_eq!(
-                log[log_schema().message_key().unwrap().to_string()],
-                "test body".into()
-            );
+            assert_eq!(*log.get_message().unwrap(), "test body".into());
             assert_event_metadata(log).await;
         }
     }
@@ -1148,14 +1106,9 @@ mod tests {
             let log = event.as_log();
             assert_eq!(log["key1"], "value1".into());
             assert_eq!(log["vector_http_path"], "/event/path".into());
-            assert!(log
-                .get((
-                    lookup::PathPrefix::Event,
-                    log_schema().timestamp_key().unwrap()
-                ))
-                .is_some());
+            assert!(log.get_timestamp().is_some());
             assert_eq!(
-                log[log_schema().source_type_key().unwrap().to_string()],
+                *log.get_source_type().unwrap(),
                 SimpleHttpConfig::NAME.into()
             );
         }
@@ -1201,14 +1154,9 @@ mod tests {
             let log = event.as_log();
             assert_eq!(log["key1"], "value1".into());
             assert_eq!(log["vector_http_path"], "/event/path1".into());
-            assert!(log
-                .get((
-                    lookup::PathPrefix::Event,
-                    log_schema().timestamp_key().unwrap()
-                ))
-                .is_some());
+            assert!(log.get_timestamp().is_some());
             assert_eq!(
-                log[log_schema().source_type_key().unwrap().to_string()],
+                *log.get_source_type().unwrap(),
                 SimpleHttpConfig::NAME.into()
             );
         }
@@ -1217,14 +1165,9 @@ mod tests {
             let log = event.as_log();
             assert_eq!(log["key2"], "value2".into());
             assert_eq!(log["vector_http_path"], "/event/path2".into());
-            assert!(log
-                .get((
-                    lookup::PathPrefix::Event,
-                    log_schema().timestamp_key().unwrap()
-                ))
-                .is_some());
+            assert!(log.get_timestamp().is_some());
             assert_eq!(
-                log[log_schema().source_type_key().unwrap().to_string()],
+                *log.get_source_type().unwrap(),
                 SimpleHttpConfig::NAME.into()
             );
         }

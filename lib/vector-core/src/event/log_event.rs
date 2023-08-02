@@ -162,8 +162,8 @@ impl LogEvent {
         let mut log = LogEvent::default();
         log.maybe_insert(log_schema().message_key_target_path(), msg.into());
 
-        if let Some(timestamp_key) = log_schema().timestamp_key() {
-            log.insert((PathPrefix::Event, timestamp_key), Utc::now());
+        if let Some(timestamp_key) = log_schema().timestamp_key_target_path() {
+            log.insert(timestamp_key, Utc::now());
         }
 
         log
@@ -495,8 +495,8 @@ impl LogEvent {
         match self.namespace() {
             LogNamespace::Vector => self.get_by_meaning("message"),
             LogNamespace::Legacy => log_schema()
-                .message_key()
-                .and_then(|key| self.get((PathPrefix::Event, key))),
+                .message_key_target_path()
+                .and_then(|key| self.get(key)),
         }
     }
 
@@ -506,8 +506,8 @@ impl LogEvent {
         match self.namespace() {
             LogNamespace::Vector => self.get_by_meaning("timestamp"),
             LogNamespace::Legacy => log_schema()
-                .timestamp_key()
-                .and_then(|key| self.get((PathPrefix::Event, key))),
+                .timestamp_key_target_path()
+                .and_then(|key| self.get(key)),
         }
     }
 
@@ -525,8 +525,8 @@ impl LogEvent {
         match self.namespace() {
             LogNamespace::Vector => self.get_by_meaning("host"),
             LogNamespace::Legacy => log_schema()
-                .host_key()
-                .and_then(|key| self.get((PathPrefix::Event, key))),
+                .host_key_target_path()
+                .and_then(|key| self.get(key)),
         }
     }
 
@@ -536,8 +536,8 @@ impl LogEvent {
         match self.namespace() {
             LogNamespace::Vector => self.get(metadata_path!("vector", "source_type")),
             LogNamespace::Legacy => log_schema()
-                .source_type_key()
-                .and_then(|key| self.get((PathPrefix::Event, key))),
+                .source_type_key_target_path()
+                .and_then(|key| self.get(key)),
         }
     }
 }
@@ -568,8 +568,8 @@ mod test_utils {
         fn from(message: Bytes) -> Self {
             let mut log = LogEvent::default();
             log.maybe_insert(log_schema().message_key_target_path(), message);
-            if let Some(timestamp_key) = log_schema().timestamp_key() {
-                log.insert((PathPrefix::Event, timestamp_key), Utc::now());
+            if let Some(timestamp_key) = log_schema().timestamp_key_target_path() {
+                log.insert(timestamp_key, Utc::now());
             }
             log
         }
