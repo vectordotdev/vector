@@ -29,8 +29,12 @@ pub enum ShutdownError {
     ApiFailed, // TODO: Hand off the failure error here
     /// Reload failed, and then failed to restore the previous config
     ReloadFailedToRestore,
-    /// FIXME
-    HandledError,
+    /// Source task died during execution
+    SourceAborted,
+    /// Transform task died during execution
+    TransformAborted,
+    /// Sink task died during execution
+    SinkAborted,
 }
 
 /// Convenience struct for app setup handling.
