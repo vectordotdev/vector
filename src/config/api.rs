@@ -1,5 +1,6 @@
 use std::net::{Ipv4Addr, SocketAddr};
 
+use url::Url;
 use vector_config::configurable_component;
 
 /// API options.
@@ -39,6 +40,13 @@ const fn default_enabled() -> bool {
 /// override is provided.
 pub fn default_address() -> Option<SocketAddr> {
     Some(SocketAddr::new(Ipv4Addr::new(127, 0, 0, 1).into(), 8686))
+}
+
+/// Default GraphQL API address
+pub fn default_graphql_url() -> Url {
+    let addr = default_address().unwrap();
+    Url::parse(&format!("http://{}/graphql", addr))
+        .expect("Couldn't parse default API URL. Please report this.")
 }
 
 const fn default_playground() -> bool {
