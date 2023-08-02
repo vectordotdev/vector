@@ -314,7 +314,7 @@ fn remove_duplicates(mut list: Vec<String>, list_name: &str) -> Vec<String> {
 #[typetag::serde(name = "http_server")]
 impl SourceConfig for SimpleHttpConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
-        let decoder = self.get_decoding_config()?.build();
+        let decoder = self.get_decoding_config()?.build()?;
         let log_namespace = cx.log_namespace(self.log_namespace);
 
         let source = SimpleHttpSource {

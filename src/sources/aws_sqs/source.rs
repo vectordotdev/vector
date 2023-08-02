@@ -245,7 +245,8 @@ mod tests {
                 config.decoding,
                 LogNamespace::Vector,
             )
-            .build(),
+            .build()
+            .unwrap(),
             "aws_sqs",
             b"test",
             Some(now),
@@ -297,7 +298,8 @@ mod tests {
                 config.decoding,
                 LogNamespace::Legacy,
             )
-            .build(),
+            .build()
+            .unwrap(),
             "aws_sqs",
             b"test",
             Some(now),

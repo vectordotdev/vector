@@ -122,7 +122,8 @@ impl SourceConfig for NatsSourceConfig {
         let log_namespace = cx.log_namespace(self.log_namespace);
         let (connection, subscription) = create_subscription(self).await?;
         let decoder =
-            DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace).build();
+            DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace)
+                .build()?;
 
         Ok(Box::pin(nats_source(
             self.clone(),
@@ -373,7 +374,8 @@ mod integration_tests {
                 conf.decoding.clone(),
                 LogNamespace::Legacy,
             )
-            .build();
+            .build()
+            .unwrap();
             tokio::spawn(nats_source(
                 conf.clone(),
                 nc,

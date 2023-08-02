@@ -234,7 +234,7 @@ impl SourceConfig for ExecConfig {
             .clone()
             .unwrap_or_else(|| self.decoding.default_stream_framing());
         let decoder =
-            DecodingConfig::new(framing, self.decoding.clone(), LogNamespace::Legacy).build();
+            DecodingConfig::new(framing, self.decoding.clone(), LogNamespace::Legacy).build()?;
 
         match &self.mode {
             Mode::Scheduled => {

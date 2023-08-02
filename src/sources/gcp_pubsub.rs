@@ -314,7 +314,7 @@ impl SourceConfig for PubsubConfig {
                 self.decoding.clone(),
                 log_namespace,
             )
-            .build(),
+            .build()?,
             acknowledgements: cx.do_acknowledgements(self.acknowledgements),
             shutdown: cx.shutdown,
             out: cx.out,

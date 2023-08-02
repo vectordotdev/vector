@@ -296,7 +296,8 @@ impl SourceConfig for KafkaSourceConfig {
 
         let consumer = create_consumer(self)?;
         let decoder =
-            DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace).build();
+            DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace)
+                .build()?;
         let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
 
         Ok(Box::pin(kafka_source(
@@ -1158,7 +1159,8 @@ mod integration_test {
             config.decoding.clone(),
             log_namespace,
         )
-        .build();
+        .build()
+        .unwrap();
 
         tokio::spawn(kafka_source(
             config,

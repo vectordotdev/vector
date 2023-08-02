@@ -124,7 +124,7 @@ impl SourceConfig for SocketConfig {
                     decoding,
                     log_namespace,
                 )
-                .build();
+                .build()?;
 
                 let tcp = tcp::RawTcpSource::new(config.clone(), decoder, log_namespace);
                 let tls_config = config.tls().as_ref().map(|tls| tls.tls_config.clone());
@@ -156,7 +156,7 @@ impl SourceConfig for SocketConfig {
                     config.decoding().clone(),
                     log_namespace,
                 )
-                .build();
+                .build()?;
                 Ok(udp::udp(
                     config,
                     decoder,
@@ -176,7 +176,7 @@ impl SourceConfig for SocketConfig {
                     config.decoding.clone(),
                     log_namespace,
                 )
-                .build();
+                .build()?;
 
                 unix::unix_datagram(config, decoder, cx.shutdown, cx.out, log_namespace)
             }
@@ -193,7 +193,7 @@ impl SourceConfig for SocketConfig {
                     decoding,
                     log_namespace,
                 )
-                .build();
+                .build()?;
 
                 unix::unix_stream(config, decoder, cx.shutdown, cx.out, log_namespace)
             }

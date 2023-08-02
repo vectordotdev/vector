@@ -163,7 +163,8 @@ impl SourceConfig for LogplexConfig {
         let log_namespace = cx.log_namespace(self.log_namespace);
 
         let decoder =
-            DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace).build();
+            DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace)
+                .build()?;
 
         let source = LogplexSource {
             query_parameters: self.query_parameters.clone(),
