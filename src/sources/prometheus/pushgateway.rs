@@ -101,9 +101,7 @@ struct PushgatewaySource {
 }
 
 impl PushgatewaySource {
-    // False positive - this is not const
-    #[allow(clippy::missing_const_for_fn)]
-    fn aggregation_enabled(&self) -> bool {
+    const fn aggregation_enabled(&self) -> bool {
         self.aggregate_metrics
     }
 }
