@@ -469,7 +469,7 @@ BODY:
 {"log":{"host":"computer","message":"zork","source_type":"stdin","timestamp":"2023-01-23T10:21:57.215019942Z"}}
 ```
 
-[tutorial_1]: https://github.com/vectordotdev/vector/tree/master/docs/tutorials/sinsk/1_basic_sink.md
+[tutorial_1]: https://github.com/vectordotdev/vector/tree/master/docs/tutorials/sinks/1_basic_sink.md
 [tower]: https://docs.rs/tower/latest/tower/
 [tower_service]: https://docs.rs/tower/latest/tower/trait.Service.html
 [hyper_docs]: https://docs.rs/hyper/latest/hyper/
