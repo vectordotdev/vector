@@ -236,4 +236,21 @@ base: components: sinks: honeycomb: configuration: {
 			}
 		}
 	}
+	sample_rate_source: {
+		description: "The source of the sample rate for each event."
+		required:    false
+		type: {
+			object: options: Field: {
+				required: true
+				type: string: {}
+			}
+			string: {
+				default: "SampleTransformField"
+				enum: {
+					Disabled:             "Do not include a sample rate."
+					SampleTransformField: "Use the sample rate that is added to the event by the `Sample` transform."
+				}
+			}
+		}
+	}
 }
