@@ -44,8 +44,8 @@ fn benchmark_event_iterate(c: &mut Criterion) {
         b.iter_batched_ref(
             || {
                 let mut log = LogEvent::default();
-                log.insert(event_path!("key1", "nested1", "0"), Bytes::from("value1"));
-                log.insert(event_path!("key1", "nested1", "1"), Bytes::from("value2"));
+                log.insert(event_path!("key1", "nested1", 0), Bytes::from("value1"));
+                log.insert(event_path!("key1", "nested1", 1), Bytes::from("value2"));
                 log
             },
             |e| e.all_fields().unwrap().count(),
