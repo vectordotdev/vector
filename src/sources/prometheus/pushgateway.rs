@@ -118,15 +118,12 @@ impl HttpSource for PushgatewaySource {
         println!("Full path was: {}", full_path);
         let path_labels: Vec<(String, String)> = parse_path_labels(full_path)?.into_iter().collect();
 
-        match parser::parse_text_with_overrides(&body, path_labels, self.aggregation_enabled()) {
-            Ok(events) => {
-                Ok(events)
-            },
-            // TODO: error handling
-            Err(_error) => {
-                Ok(vec![])
-            }
-        }
+        parser::parse_text_with_overrides(&body, path_labels, self.aggregation_enabled())
+            .map_err(|error|
+                ErrorMessage::new(
+                    http::StatusCode::UNPROCESSABLE_ENTITY,
+                    format!("Failed to parse metrics body: {}", error.to_string()))
+            )
     }
 }
 
