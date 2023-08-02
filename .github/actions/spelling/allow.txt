@@ -393,6 +393,7 @@ podman
 postgresql
 proxyuser
 pseudocode
+pushgateway
 qwerty
 rabbitmq
 rclone
