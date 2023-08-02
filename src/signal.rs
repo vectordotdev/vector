@@ -30,11 +30,11 @@ pub enum ShutdownError {
     /// Reload failed, and then failed to restore the previous config
     ReloadFailedToRestore,
     /// Source task died during execution
-    SourceAborted(ComponentKey),
+    SourceAborted(ComponentKey, String),
     /// Transform task died during execution
-    TransformAborted(ComponentKey),
+    TransformAborted(ComponentKey, String),
     /// Sink task died during execution
-    SinkAborted(ComponentKey),
+    SinkAborted(ComponentKey, String),
 }
 
 /// Convenience struct for app setup handling.

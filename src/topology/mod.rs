@@ -156,7 +156,7 @@ pub(super) fn take_healthchecks(
 async fn handle_errors(
     task: impl Future<Output = TaskResult>,
     abort_tx: mpsc::UnboundedSender<ShutdownError>,
-    error: ShutdownError,
+    error: impl FnOnce(String) -> ShutdownError,
 ) -> TaskResult {
     AssertUnwindSafe(task)
         .catch_unwind()
@@ -165,7 +165,7 @@ async fn handle_errors(
         .and_then(|res| res)
         .map_err(|e| {
             error!("An error occurred that Vector couldn't handle: {}.", e);
-            _ = abort_tx.send(error);
+            _ = abort_tx.send(error(e.to_string()));
             e
         })
 }

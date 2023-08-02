@@ -856,11 +856,12 @@ impl RunningTopology {
         }
 
         let task_name = format!(">> {} ({})", task.typetag(), task.id());
-        let task = handle_errors(
-            task,
-            self.abort_tx.clone(),
-            ShutdownError::SinkAborted(key.clone()),
-        )
+        let task = {
+            let key = key.clone();
+            handle_errors(task, self.abort_tx.clone(), |error| {
+                ShutdownError::SinkAborted(key, error)
+            })
+        }
         .instrument(task_span);
         let spawned = spawn_named(task, task_name.as_ref());
         if let Some(previous) = self.tasks.insert(key.clone(), spawned) {
@@ -898,11 +899,12 @@ impl RunningTopology {
         }
 
         let task_name = format!(">> {} ({}) >>", task.typetag(), task.id());
-        let task = handle_errors(
-            task,
-            self.abort_tx.clone(),
-            ShutdownError::TransformAborted(key.clone()),
-        )
+        let task = {
+            let key = key.clone();
+            handle_errors(task, self.abort_tx.clone(), |error| {
+                ShutdownError::TransformAborted(key, error)
+            })
+        }
         .instrument(task_span);
         let spawned = spawn_named(task, task_name.as_ref());
         if let Some(previous) = self.tasks.insert(key.clone(), spawned) {
@@ -941,11 +943,12 @@ impl RunningTopology {
         }
 
         let task_name = format!("{} ({}) >>", task.typetag(), task.id());
-        let task = handle_errors(
-            task,
-            self.abort_tx.clone(),
-            ShutdownError::SourceAborted(key.clone()),
-        )
+        let task = {
+            let key = key.clone();
+            handle_errors(task, self.abort_tx.clone(), |error| {
+                ShutdownError::SourceAborted(key, error)
+            })
+        }
         .instrument(task_span.clone());
         let spawned = spawn_named(task, task_name.as_ref());
         if let Some(previous) = self.tasks.insert(key.clone(), spawned) {
@@ -957,11 +960,12 @@ impl RunningTopology {
 
         // Now spawn the actual source task.
         let source_task = new_pieces.source_tasks.remove(key).unwrap();
-        let source_task = handle_errors(
-            source_task,
-            self.abort_tx.clone(),
-            ShutdownError::SourceAborted(key.clone()),
-        )
+        let source_task = {
+            let key = key.clone();
+            handle_errors(source_task, self.abort_tx.clone(), |error| {
+                ShutdownError::SourceAborted(key, error)
+            })
+        }
         .instrument(task_span);
         self.source_tasks
             .insert(key.clone(), spawn_named(source_task, task_name.as_ref()));
