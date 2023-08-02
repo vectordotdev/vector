@@ -20,7 +20,7 @@ fn utc_timestamp(timestamp: Option<i64>, default: DateTime<Utc>) -> DateTime<Utc
 
 pub(super) fn parse_text(packet: &str) -> Result<Vec<Event>, ParserError> {
     prometheus_parser::parse_text(packet)
-        .map(|group| reparse_groups(group, MetricTags::default()))
+        .map(|group| reparse_groups(group, MetricTags::default(), false))
 }
 
 // TODO: Revisit this type signature
@@ -29,19 +29,27 @@ pub(super) fn parse_text(packet: &str) -> Result<Vec<Event>, ParserError> {
 // Feels a bit pointless to make the caller convert to that when we're just iterating over them
 // to merge them into the tags from the metrics body, but also I'm not sure what would be an
 // appropriate type (Vec feels a bit specific - maybe an iterator of (String,String)?).
-pub(super) fn parse_text_with_overrides(packet: &str, tag_overrides: MetricTags) -> Result<Vec<Event>, ParserError> {
+pub(super) fn parse_text_with_overrides(packet: &str, tag_overrides: MetricTags, aggregate_metrics: bool) -> Result<Vec<Event>, ParserError> {
     prometheus_parser::parse_text(packet)
-        .map(|group| reparse_groups(group, tag_overrides))
+        .map(|group| reparse_groups(group, tag_overrides, aggregate_metrics))
 }
 
 pub(super) fn parse_request(request: proto::WriteRequest) -> Result<Vec<Event>, ParserError> {
     prometheus_parser::parse_request(request)
-        .map(|group| reparse_groups(group, MetricTags::default()))
+        .map(|group| reparse_groups(group, MetricTags::default(), false))
 }
 
-fn reparse_groups(groups: Vec<MetricGroup>, tag_overrides: MetricTags) -> Vec<Event> {
+fn reparse_groups(groups: Vec<MetricGroup>, tag_overrides: MetricTags, aggregate_metrics: bool) -> Vec<Event> {
     let mut result = Vec::new();
     let start = Utc::now();
+
+    let metric_kind = if aggregate_metrics {
+        MetricKind::Incremental
+    } else {
+        MetricKind::Absolute
+    };
+
+    println!("Metric kind is: {:?}", metric_kind);
 
     for group in groups {
         match group.metrics {
@@ -51,7 +59,7 @@ fn reparse_groups(groups: Vec<MetricGroup>, tag_overrides: MetricTags) -> Vec<Ev
 
                     let counter = Metric::new(
                         group.name.clone(),
-                        MetricKind::Absolute,
+                        metric_kind,
                         MetricValue::Counter {
                             value: metric.value,
                         },
@@ -68,6 +76,7 @@ fn reparse_groups(groups: Vec<MetricGroup>, tag_overrides: MetricTags) -> Vec<Ev
 
                     let gauge = Metric::new(
                         group.name.clone(),
+                        // Gauges are always absolute: aggregating them makes no sense
                         MetricKind::Absolute,
                         MetricValue::Gauge {
                             value: metric.value,
@@ -98,7 +107,7 @@ fn reparse_groups(groups: Vec<MetricGroup>, tag_overrides: MetricTags) -> Vec<Ev
                     result.push(
                         Metric::new(
                             group.name.clone(),
-                            MetricKind::Absolute,
+                            metric_kind,
                             MetricValue::AggregatedHistogram {
                                 buckets: buckets
                                     .into_iter()
@@ -124,7 +133,7 @@ fn reparse_groups(groups: Vec<MetricGroup>, tag_overrides: MetricTags) -> Vec<Ev
                     result.push(
                         Metric::new(
                             group.name.clone(),
-                            MetricKind::Absolute,
+                            metric_kind,
                             MetricValue::AggregatedSummary {
                                 quantiles: metric
                                     .quantiles

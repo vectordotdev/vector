@@ -47,7 +47,12 @@ pub struct PrometheusPushgatewayConfig {
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
 
-    // TODO: Add toggle for whether to aggregate counters and histograms
+    /// Whether to aggregate values across pushes.
+    ///
+    /// Applies to all Prometheus metric types except gauges (i.e. counters, histograms, and distributions)
+    #[configurable(metadata(docs::examples = true))]
+    #[serde(default = "crate::serde::default_false")]
+    aggregate_metrics: bool,
 }
 
 impl GenerateConfig for PrometheusPushgatewayConfig {
@@ -57,6 +62,7 @@ impl GenerateConfig for PrometheusPushgatewayConfig {
             tls: None,
             auth: None,
             acknowledgements: SourceAcknowledgementsConfig::default(),
+            aggregate_metrics: false,
         })
         .unwrap()
     }
@@ -66,7 +72,7 @@ impl GenerateConfig for PrometheusPushgatewayConfig {
 #[typetag::serde(name = "prometheus_pushgateway")]
 impl SourceConfig for PrometheusPushgatewayConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
-        let source = PushgatewaySource;
+        let source = PushgatewaySource{ aggregate_metrics: self.aggregate_metrics };
         source.run(
             self.address,
             "",
@@ -89,25 +95,15 @@ impl SourceConfig for PrometheusPushgatewayConfig {
 }
 
 #[derive(Clone)]
-struct PushgatewaySource;
+struct PushgatewaySource {
+    aggregate_metrics: bool,
+}
 
-// impl PushgatewaySource {
-//     fn decode_body(&self, _body: Bytes) -> Result<Vec<Event>, ErrorMessage> {
-//         let mut result = Vec::new();
-//
-//         let counter = Metric::new(
-//             "foo",
-//             MetricKind::Absolute,
-//             MetricValue::Counter {
-//                 value: 49.0,
-//             },
-//         );
-//
-//         result.push(counter.into());
-//
-//         Ok(result)
-//     }
-// }
+impl PushgatewaySource {
+    fn aggregation_enabled(&self) -> bool {
+        self.aggregate_metrics
+    }
+}
 
 impl HttpSource for PushgatewaySource {
     fn build_events(
@@ -123,7 +119,7 @@ impl HttpSource for PushgatewaySource {
         let path_labels = parse_path_labels(full_path)?.into_iter().collect();
 
         // TODO: Add an option to toggle between incremental and absolute, default to absolute
-        match parser::parse_text_with_overrides(&body, path_labels) {
+        match parser::parse_text_with_overrides(&body, path_labels, self.aggregation_enabled()) {
             Ok(events) => {
                 Ok(events)
             },
