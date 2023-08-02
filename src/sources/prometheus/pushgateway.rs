@@ -116,7 +116,7 @@ impl HttpSource for PushgatewaySource {
         let body = String::from_utf8_lossy(&body);
 
         println!("Full path was: {}", full_path);
-        let path_labels = parse_path_labels(full_path)?.into_iter().collect();
+        let path_labels: Vec<(String, String)> = parse_path_labels(full_path)?.into_iter().collect();
 
         // TODO: Add an option to toggle between incremental and absolute, default to absolute
         match parser::parse_text_with_overrides(&body, path_labels, self.aggregation_enabled()) {
