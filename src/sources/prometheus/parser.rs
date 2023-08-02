@@ -1,4 +1,5 @@
 use std::cmp::Ordering;
+use std::collections::BTreeMap;
 
 use chrono::{DateTime, TimeZone, Utc};
 use prometheus_parser::{proto, GroupKind, MetricGroup, ParserError};
@@ -46,10 +47,7 @@ fn reparse_groups(groups: Vec<MetricGroup>, tag_overrides: MetricTags) -> Vec<Ev
         match group.metrics {
             GroupKind::Counter(metrics) => {
                 for (key, metric) in metrics {
-                    let mut tags = MetricTags::from(key.labels);
-                    for (k,v) in tag_overrides.iter_single() {
-                        tags.replace(k.to_owned(),v.to_owned());
-                    }
+                    let tags = combine_tags(key.labels, tag_overrides.clone());
 
                     let counter = Metric::new(
                         group.name.clone(),
@@ -144,6 +142,15 @@ fn reparse_groups(groups: Vec<MetricGroup>, tag_overrides: MetricTags) -> Vec<Ev
     }
 
     result
+}
+
+fn combine_tags(base_tags: BTreeMap<String,String>, tag_overrides: MetricTags) -> MetricTags {
+    let mut tags = MetricTags::from(base_tags);
+    for (k,v) in tag_overrides.iter_single() {
+        tags.replace(k.to_owned(),v.to_owned());
+    }
+
+    tags
 }
 
 #[cfg(test)]
