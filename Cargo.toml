@@ -197,7 +197,7 @@ opendal = {version = "0.38", default-features = false, features = ["native-tls",
 tower = { version = "0.4.13", default-features = false, features = ["buffer", "limit", "retry", "timeout", "util", "balance", "discover"] }
 tower-http = { version = "0.4.3", default-features = false, features = ["decompression-gzip"]}
 # Serde
-serde = { version = "1.0.175", default-features = false, features = ["derive"] }
+serde = { version = "1.0.180", default-features = false, features = ["derive"] }
 serde-toml-merge = { version = "0.3.0", default-features = false }
 serde_bytes = { version = "0.11.12", default-features = false, features = ["std"], optional = true }
 serde_json = { version = "1.0.104", default-features = false, features = ["raw_value"] }
@@ -221,8 +221,8 @@ smpl_jwt = { version = "0.7.1", default-features = false, optional = true }
 lapin = { version = "2.3.1", default-features = false, features = ["native-tls"], optional = true }
 
 # API
-async-graphql = { version = "5.0.10", default-features = false, optional = true, features = ["chrono"] }
-async-graphql-warp = { version = "5.0.10", default-features = false, optional = true }
+async-graphql = { version = "6.0.0", default-features = false, optional = true, features = ["chrono", "playground"] }
+async-graphql-warp = { version = "6.0.0", default-features = false, optional = true }
 itertools = { version = "0.11.0", default-features = false, optional = true }
 
 # API client
@@ -303,7 +303,7 @@ pulsar = { version = "6.0.1", default-features = false, features = ["tokio-runti
 rand = { version = "0.8.5", default-features = false, features = ["small_rng"] }
 rand_distr = { version = "0.4.3", default-features = false }
 rdkafka = { version = "0.33.2", default-features = false, features = ["tokio", "libz", "ssl", "zstd"], optional = true }
-redis = { version = "0.23.0", default-features = false, features = ["connection-manager", "tokio-comp", "tokio-native-tls-comp"], optional = true }
+redis = { version = "0.23.1", default-features = false, features = ["connection-manager", "tokio-comp", "tokio-native-tls-comp"], optional = true }
 regex = { version = "1.9.1", default-features = false, features = ["std", "perf"] }
 roaring = { version = "0.10.2", default-features = false, optional = true }
 seahash = { version = "4.1.0", default-features = false }
@@ -315,7 +315,7 @@ socket2 = { version = "0.5.3", default-features = false }
 stream-cancel = { version = "0.8.1", default-features = false }
 strip-ansi-escapes = { version = "0.1.1", default-features = false }
 syslog = { version = "6.1.0", default-features = false, optional = true }
-tikv-jemallocator = { version = "0.5.0", default-features = false, optional = true }
+tikv-jemallocator = { version = "0.5.4", default-features = false, optional = true }
 tokio-postgres = { version = "0.7.7", default-features = false, features = ["runtime", "with-chrono-0_4"], optional = true }
 tokio-tungstenite = {version = "0.20.0", default-features = false, features = ["connect"], optional = true}
 toml = { version = "0.7.6", default-features = false, features = ["parse", "display"] }
