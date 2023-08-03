@@ -48,6 +48,7 @@
 \.otf$
 \.p12$
 \.pattern$
+\.pb$
 \.pdf$
 \.pem$
 \.png$
