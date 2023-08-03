@@ -99,13 +99,13 @@ sending batches of events, or they may send a completely different type if each
 event is processed in some way prior to encoding.
 
 [`encode_input`][encoder_encode_input] serializes the event to a String and
-writes these bytes. The function also creates a
-[`GroupedCountByteSize`][grouped_count_byte_size] object. This object tracks the
-size of the event that is sent by the sink. This object can also track the size
-by the source and service that originated the event if Vector has been configured
-to do so. It is necessary to calculate the sizes in this function since the encode
-function sometimes drops fields from the event prior to encoding. We need the size
-to be calculated after these fields have been dropped.
+writes these bytes. The function also creates a [`GroupedCountByteSize`]
+[grouped_count_byte_size] object. This object tracks the size of the event
+that is sent by the sink, optionally grouped by the source and  service that
+originated the event if Vector has been configured to do so. It is necessary to
+calculate the sizes in this function since the encode function sometimes drops
+fields from the event prior to encoding. We need the size to be calculated after
+these fields have been dropped.
 
 ```rust
     fn encode_input(
