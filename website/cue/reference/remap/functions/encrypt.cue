@@ -35,8 +35,8 @@ remap: functions: encrypt: {
 		* AES-192-CBC-ISO10126 (key = 24 bytes, iv = 16 bytes)
 		* AES-128-CBC-ISO10126 (key = 16 bytes, iv = 16 bytes)
 		* CHACHA20-POLY1305 (key = 32 bytes, iv = 12 bytes)
-    * XCHACHA20-POLY1305 (key = 32 bytes, iv = 24 bytes)
-    * XSALSA20-POLY1305 (key = 32 bytes, iv = 24 bytes)
+		* XCHACHA20-POLY1305 (key = 32 bytes, iv = 24 bytes)
+		* XSALSA20-POLY1305 (key = 32 bytes, iv = 24 bytes)
 		"""
 
 	arguments: [
