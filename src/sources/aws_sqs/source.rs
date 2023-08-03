@@ -9,6 +9,7 @@ use futures::{FutureExt, StreamExt};
 use tokio::{pin, select};
 use tracing_futures::Instrument;
 use vector_common::finalizer::UnorderedFinalizer;
+use vector_common::internal_event::{EventsReceived, Registered};
 use vector_core::config::LogNamespace;
 
 use crate::{
@@ -37,13 +38,14 @@ pub struct SqsSource {
     pub delete_message: bool,
     pub concurrency: usize,
     pub(super) acknowledgements: bool,
+    pub(super) log_namespace: LogNamespace,
 }
 
 impl SqsSource {
     pub async fn run(self, out: SourceSender, shutdown: ShutdownSignal) -> Result<(), ()> {
         let mut task_handles = vec![];
         let finalizer = self.acknowledgements.then(|| {
-            let (finalizer, mut ack_stream) = Finalizer::new(shutdown.clone());
+            let (finalizer, mut ack_stream) = Finalizer::new(Some(shutdown.clone()));
             let client = self.client.clone();
             let queue_url = self.queue_url.clone();
             tokio::spawn(
@@ -58,12 +60,14 @@ impl SqsSource {
             );
             Arc::new(finalizer)
         });
+        let events_received = register!(EventsReceived);
 
         for _ in 0..self.concurrency {
             let source = self.clone();
             let shutdown = shutdown.clone().fuse();
             let mut out = out.clone();
             let finalizer = finalizer.clone();
+            let events_received = events_received.clone();
             task_handles.push(tokio::spawn(
                 async move {
                     let finalizer = finalizer.as_ref();
@@ -71,7 +75,7 @@ impl SqsSource {
                     loop {
                         select! {
                             _ = &mut shutdown => break,
-                            _ = source.run_once(&mut out, finalizer) => {},
+                            _ = source.run_once(&mut out, finalizer, events_received.clone()) => {},
                         }
                     }
                 }
@@ -91,7 +95,12 @@ impl SqsSource {
         Ok(())
     }
 
-    async fn run_once(&self, out: &mut SourceSender, finalizer: Option<&Arc<Finalizer>>) {
+    async fn run_once(
+        &self,
+        out: &mut SourceSender,
+        finalizer: Option<&Arc<Finalizer>>,
+        events_received: Registered<EventsReceived>,
+    ) {
         let result = self
             .client
             .receive_message()
@@ -101,7 +110,7 @@ impl SqsSource {
             .visibility_timeout(self.visibility_timeout_secs as i32)
             // I think this should be a known attribute
             // https://github.com/awslabs/aws-sdk-rust/issues/411
-            .attribute_names(QueueAttributeName::Unknown(String::from("SentTimestamp")))
+            .attribute_names(QueueAttributeName::from("SentTimestamp"))
             .send()
             .await;
 
@@ -144,8 +153,8 @@ impl SqsSource {
                         body.as_bytes(),
                         timestamp,
                         &batch,
-                        // TODO: Update this when updating the source to use log_namespaces.
-                        LogNamespace::Legacy,
+                        self.log_namespace,
+                        &events_received,
                     );
                     events.extend(decoded);
                 }
@@ -171,7 +180,7 @@ impl SqsSource {
                         }
                     }
                 }
-                Err(error) => emit!(StreamClosedError { error, count }),
+                Err(_) => emit!(StreamClosedError { count }),
             }
         }
     }
@@ -182,7 +191,11 @@ fn get_timestamp(
 ) -> Option<DateTime<Utc>> {
     attributes.as_ref().and_then(|attributes| {
         let sent_time_str = attributes.get(&MessageSystemAttributeName::SentTimestamp)?;
-        Some(Utc.timestamp_millis(i64::from_str(sent_time_str).ok()?))
+        Some(
+            Utc.timestamp_millis_opt(i64::from_str(sent_time_str).ok()?)
+                .single()
+                .expect("invalid timestamp"),
+        )
     })
 }
 
@@ -206,22 +219,40 @@ async fn delete_messages(client: SqsClient, receipts: Vec<String>, queue_url: St
 
 #[cfg(test)]
 mod tests {
-    use chrono::SecondsFormat;
-
     use super::*;
-    use crate::config::log_schema;
+    use crate::codecs::DecodingConfig;
+    use crate::config::{log_schema, SourceConfig};
+    use crate::sources::aws_sqs::AwsSqsConfig;
+    use chrono::SecondsFormat;
+    use lookup::path;
 
     #[tokio::test]
-    async fn test_decode() {
+    async fn test_decode_vector_namespace() {
+        let config = AwsSqsConfig {
+            log_namespace: Some(true),
+            ..Default::default()
+        };
+        let definitions = config
+            .outputs(LogNamespace::Vector)
+            .remove(0)
+            .schema_definition(true);
+
         let message = "test";
         let now = Utc::now();
         let events: Vec<_> = util::decode_message(
-            Decoder::default(),
+            DecodingConfig::new(
+                config.framing.clone(),
+                config.decoding,
+                LogNamespace::Vector,
+            )
+            .build()
+            .unwrap(),
             "aws_sqs",
             b"test",
             Some(now),
             &None,
-            LogNamespace::Legacy,
+            LogNamespace::Vector,
+            &register!(EventsReceived),
         )
         .collect();
         assert_eq!(events.len(), 1);
@@ -229,7 +260,7 @@ mod tests {
             events[0]
                 .clone()
                 .as_log()
-                .get(log_schema().message_key())
+                .get(".")
                 .unwrap()
                 .to_string_lossy(),
             message
@@ -238,11 +269,65 @@ mod tests {
             events[0]
                 .clone()
                 .as_log()
-                .get(log_schema().timestamp_key())
+                .metadata()
+                .value()
+                .get(path!(AwsSqsConfig::NAME, "timestamp"))
                 .unwrap()
                 .to_string_lossy(),
             now.to_rfc3339_opts(SecondsFormat::AutoSi, true)
         );
+        definitions.unwrap().assert_valid_for_event(&events[0]);
+    }
+
+    #[tokio::test]
+    async fn test_decode_legacy_namespace() {
+        let config = AwsSqsConfig {
+            log_namespace: None,
+            ..Default::default()
+        };
+        let definitions = config
+            .outputs(LogNamespace::Legacy)
+            .remove(0)
+            .schema_definition(true);
+
+        let message = "test";
+        let now = Utc::now();
+        let events: Vec<_> = util::decode_message(
+            DecodingConfig::new(
+                config.framing.clone(),
+                config.decoding,
+                LogNamespace::Legacy,
+            )
+            .build()
+            .unwrap(),
+            "aws_sqs",
+            b"test",
+            Some(now),
+            &None,
+            LogNamespace::Legacy,
+            &register!(EventsReceived),
+        )
+        .collect();
+        assert_eq!(events.len(), 1);
+        assert_eq!(
+            events[0]
+                .clone()
+                .as_log()
+                .get(log_schema().message_key_target_path().unwrap())
+                .unwrap()
+                .to_string_lossy(),
+            message
+        );
+        assert_eq!(
+            events[0]
+                .clone()
+                .as_log()
+                .get_timestamp()
+                .unwrap()
+                .to_string_lossy(),
+            now.to_rfc3339_opts(SecondsFormat::AutoSi, true)
+        );
+        definitions.unwrap().assert_valid_for_event(&events[0]);
     }
 
     #[test]
@@ -254,7 +339,11 @@ mod tests {
 
         assert_eq!(
             get_timestamp(&Some(attributes)),
-            Some(Utc.timestamp_millis(1636408546018))
+            Some(
+                Utc.timestamp_millis_opt(1636408546018)
+                    .single()
+                    .expect("invalid timestamp")
+            )
         );
     }
 }

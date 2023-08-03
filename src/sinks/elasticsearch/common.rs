@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use aws_types::credentials::SharedCredentialsProvider;
+use aws_credential_types::provider::SharedCredentialsProvider;
 use aws_types::region::Region;
 use bytes::{Buf, Bytes};
 use http::{Response, StatusCode, Uri};
@@ -118,9 +118,10 @@ impl ElasticsearchCommon {
 
         let metric_config = config.metrics.clone().unwrap_or_default();
         let metric_to_log = MetricToLog::new(
-            metric_config.host_tag,
+            metric_config.host_tag.as_deref(),
             metric_config.timezone.unwrap_or_default(),
             LogNamespace::Legacy,
+            metric_config.metric_tag_values,
         );
 
         let region = config.aws.as_ref().and_then(|config| config.region());
@@ -144,16 +145,28 @@ impl ElasticsearchCommon {
                     )
                     .await
                     {
-                        Ok(version) => version,
+                        Ok(version) => {
+                            debug!(message = "Auto-detected Elasticsearch API version.", %version);
+                            version
+                        }
                         // This error should be fatal, but for now we only emit it as a warning
                         // to make the transition smoother.
                         Err(error) => {
                             // For now, estimate version.
-                            let assumed_version = match config.suppress_type_name {
-                                Some(true) => 8,
-                                _ => 6,
-                            };
-                            warn!(message = "Failed to determine Elasticsearch version from `/_cluster/state/version`. Please fix the reported error or set an API version explicitly via `api_version`.",%assumed_version, %error);
+                            // The `suppress_type_name` option is only valid up to V6, so if a user
+                            // specified that is true, then we will assume they need API V6.
+                            // Otherwise, assume the latest version (V8).
+                            // This is by no means a perfect assumption but it's the best we can
+                            // make with the data we have.
+                            let assumed_version = if config.suppress_type_name { 6 } else { 8 };
+                            debug!(message = "Assumed Elasticsearch API version based on config setting suppress_type_name.",
+                                   %assumed_version,
+                                   %config.suppress_type_name
+                            );
+                            warn!(message = "Failed to determine Elasticsearch API version. Please fix the reported error or set an API version explicitly via `api_version`.",
+                                  %assumed_version,
+                                  %error
+                            );
                             assumed_version
                         }
                     }
@@ -163,10 +176,10 @@ impl ElasticsearchCommon {
             ver
         };
 
-        let doc_type = config.doc_type.clone().unwrap_or_else(|| "_doc".into());
-        let suppress_type_name = if let Some(suppress_type_name) = config.suppress_type_name {
+        let doc_type = config.doc_type.clone();
+        let suppress_type_name = if config.suppress_type_name {
             warn!(message = "DEPRECATION, use of deprecated option `suppress_type_name`. Please use `api_version` option instead.");
-            suppress_type_name
+            config.suppress_type_name
         } else {
             version >= 7
         };
@@ -225,7 +238,7 @@ impl ElasticsearchCommon {
     #[cfg(test)]
     pub async fn parse_single(config: &ElasticsearchConfig) -> crate::Result<Self> {
         let mut commons =
-            Self::parse_many(config, crate::config::SinkContext::new_test().proxy()).await?;
+            Self::parse_many(config, crate::config::SinkContext::default().proxy()).await?;
         assert_eq!(commons.len(), 1);
         Ok(commons.remove(0))
     }
@@ -267,28 +280,34 @@ async fn get_version(
     proxy_config: &ProxyConfig,
 ) -> crate::Result<usize> {
     #[derive(Deserialize)]
-    struct ClusterState {
-        version: Option<usize>,
+    struct Version {
+        number: Option<String>,
+    }
+    #[derive(Deserialize)]
+    struct ResponsePayload {
+        version: Option<Version>,
     }
 
     let client = HttpClient::new(tls_settings.clone(), proxy_config)?;
-    let response = get(
-        base_url,
-        http_auth,
-        aws_auth,
-        region,
-        request,
-        client,
-        "/_cluster/state/version",
-    )
-    .await
-    .map_err(|error| format!("Failed to get Elasticsearch API version: {}", error))?;
+    let response = get(base_url, http_auth, aws_auth, region, request, client, "/")
+        .await
+        .map_err(|error| format!("Failed to get Elasticsearch API version: {}", error))?;
 
     let (_, body) = response.into_parts();
     let mut body = body::aggregate(body).await?;
     let body = body.copy_to_bytes(body.remaining());
-    let ClusterState { version } = serde_json::from_slice(&body)?;
-    version.ok_or_else(||"Unexpected response from Elasticsearch endpoint `/_cluster/state/version`. Missing `version`. Consider setting `api_version` option.".into())
+    let ResponsePayload { version } = serde_json::from_slice(&body)?;
+    if let Some(version) = version {
+        if let Some(number) = version.number {
+            let v: Vec<&str> = number.split('.').collect();
+            if !v.is_empty() {
+                if let Ok(major_version) = v[0].parse::<usize>() {
+                    return Ok(major_version);
+                }
+            }
+        }
+    }
+    Err("Unexpected response from Elasticsearch endpoint `/`. Consider setting `api_version` option.".into())
 }
 
 async fn get(

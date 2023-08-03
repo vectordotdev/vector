@@ -81,7 +81,7 @@ impl DnsMessageParser {
             answer_section: self.parse_dns_message_section(msg.answers())?,
             authority_section: self.parse_dns_message_section(msg.name_servers())?,
             additional_section: self.parse_dns_message_section(msg.additionals())?,
-            opt_pserdo_section: edns_section,
+            opt_pseudo_section: edns_section,
         })
     }
 

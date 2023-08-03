@@ -3,23 +3,23 @@ pub mod udp;
 #[cfg(unix)]
 mod unix;
 
-use codecs::{decoding::DeserializerConfig, NewlineDelimitedDecoderConfig};
-use lookup::{lookup_v2::parse_value_path, owned_value_path};
-use value::Kind;
-use vector_config::{configurable_component, NamedComponent};
-use vector_core::config::{LegacyKey, LogNamespace};
+use codecs::decoding::DeserializerConfig;
+use lookup::{lookup_v2::OptionalValuePath, owned_value_path};
+use vector_config::configurable_component;
+use vector_core::config::{log_schema, LegacyKey, LogNamespace};
+use vrl::value::{kind::Collection, Kind};
 
 #[cfg(unix)]
 use crate::serde::default_framing_message_based;
 use crate::{
     codecs::DecodingConfig,
-    config::{GenerateConfig, Output, Resource, SourceConfig, SourceContext},
+    config::{GenerateConfig, Resource, SourceConfig, SourceContext, SourceOutput},
     sources::util::net::TcpSource,
     tls::MaybeTlsSettings,
 };
 
 /// Configuration for the `socket` source.
-#[configurable_component(source("socket"))]
+#[configurable_component(source("socket", "Collect logs over a socket."))]
 #[derive(Clone, Debug)]
 pub struct SocketConfig {
     #[serde(flatten)]
@@ -30,22 +30,23 @@ pub struct SocketConfig {
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(tag = "mode", rename_all = "snake_case")]
+#[configurable(metadata(docs::enum_tag_description = "The type of socket to use."))]
 #[allow(clippy::large_enum_variant)] // just used for configuration
 pub enum Mode {
     /// Listen on TCP.
-    Tcp(#[configurable(derived)] tcp::TcpConfig),
+    Tcp(tcp::TcpConfig),
 
     /// Listen on UDP.
-    Udp(#[configurable(derived)] udp::UdpConfig),
+    Udp(udp::UdpConfig),
 
-    /// Listen on UDS, in datagram mode. (Unix domain socket)
+    /// Listen on a Unix domain socket (UDS), in datagram mode.
     #[cfg(unix)]
-    UnixDatagram(#[configurable(derived)] unix::UnixConfig),
+    UnixDatagram(unix::UnixConfig),
 
-    /// Listen on UDS, in stream mode. (Unix domain socket)
+    /// Listen on a Unix domain socket (UDS), in stream mode.
     #[cfg(unix)]
     #[serde(alias = "unix")]
-    UnixStream(#[configurable(derived)] unix::UnixConfig),
+    UnixStream(unix::UnixConfig),
 }
 
 impl SocketConfig {
@@ -107,41 +108,31 @@ impl GenerateConfig for SocketConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "socket")]
 impl SourceConfig for SocketConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         match self.mode.clone() {
             Mode::Tcp(config) => {
-                let (framing, decoding) = match (config.framing(), config.max_length()) {
-                    (Some(_), Some(_)) => {
-                        return Err("Using `max_length` is deprecated and does not have any effect when framing is provided. Configure `max_length` on the framing config instead.".into());
-                    }
-                    (Some(framing), None) => {
-                        let decoding = config.decoding().clone();
-                        let framing = framing.clone();
-                        (framing, decoding)
-                    }
-                    (None, Some(max_length)) => {
-                        let decoding = config.decoding().clone();
-                        let framing =
-                            NewlineDelimitedDecoderConfig::new_with_max_length(max_length).into();
-                        (framing, decoding)
-                    }
-                    (None, None) => {
-                        let decoding = config.decoding().clone();
-                        let framing = decoding.default_stream_framing();
-                        (framing, decoding)
-                    }
-                };
-
-                let decoder = DecodingConfig::new(framing, decoding, LogNamespace::Legacy).build();
                 let log_namespace = cx.log_namespace(config.log_namespace);
+
+                let decoding = config.decoding().clone();
+                let decoder = DecodingConfig::new(
+                    config
+                        .framing
+                        .clone()
+                        .unwrap_or_else(|| decoding.default_stream_framing()),
+                    decoding,
+                    log_namespace,
+                )
+                .build()?;
 
                 let tcp = tcp::RawTcpSource::new(config.clone(), decoder, log_namespace);
                 let tls_config = config.tls().as_ref().map(|tls| tls.tls_config.clone());
                 let tls_client_metadata_key = config
                     .tls()
                     .as_ref()
-                    .and_then(|tls| tls.client_metadata_key.clone());
+                    .and_then(|tls| tls.client_metadata_key.clone())
+                    .and_then(|k| k.path);
                 let tls = MaybeTlsSettings::from_config(&tls_config, true)?;
                 tcp.run(
                     config.address(),
@@ -150,9 +141,12 @@ impl SourceConfig for SocketConfig {
                     tls,
                     tls_client_metadata_key,
                     config.receive_buffer_bytes(),
+                    config.max_connection_duration_secs(),
                     cx,
                     false.into(),
                     config.connection_limit,
+                    SocketConfig::NAME,
+                    log_namespace,
                 )
             }
             Mode::Udp(config) => {
@@ -160,9 +154,9 @@ impl SourceConfig for SocketConfig {
                 let decoder = DecodingConfig::new(
                     config.framing().clone(),
                     config.decoding().clone(),
-                    LogNamespace::Legacy,
+                    log_namespace,
                 )
-                .build();
+                .build()?;
                 Ok(udp::udp(
                     config,
                     decoder,
@@ -173,53 +167,40 @@ impl SourceConfig for SocketConfig {
             }
             #[cfg(unix)]
             Mode::UnixDatagram(config) => {
+                let log_namespace = cx.log_namespace(config.log_namespace);
                 let decoder = DecodingConfig::new(
                     config
                         .framing
                         .clone()
                         .unwrap_or_else(default_framing_message_based),
                     config.decoding.clone(),
-                    LogNamespace::Legacy,
+                    log_namespace,
                 )
-                .build();
-
-                let log_namespace = cx.log_namespace(config.log_namespace);
+                .build()?;
 
                 unix::unix_datagram(config, decoder, cx.shutdown, cx.out, log_namespace)
             }
             #[cfg(unix)]
             Mode::UnixStream(config) => {
-                let (framing, decoding) = match (config.framing.clone(), config.max_length) {
-                    (Some(_), Some(_)) => {
-                        return Err("Using `max_length` is deprecated and does not have any effect when framing is provided. Configure `max_length` on the framing config instead.".into());
-                    }
-                    (Some(framing), None) => {
-                        let decoding = config.decoding.clone();
-                        (framing, decoding)
-                    }
-                    (None, Some(max_length)) => {
-                        let decoding = config.decoding.clone();
-                        let framing =
-                            NewlineDelimitedDecoderConfig::new_with_max_length(max_length).into();
-                        (framing, decoding)
-                    }
-                    (None, None) => {
-                        let decoding = config.decoding.clone();
-                        let framing = decoding.default_stream_framing();
-                        (framing, decoding)
-                    }
-                };
-
-                let decoder = DecodingConfig::new(framing, decoding, LogNamespace::Legacy).build();
-
                 let log_namespace = cx.log_namespace(config.log_namespace);
+
+                let decoding = config.decoding().clone();
+                let decoder = DecodingConfig::new(
+                    config
+                        .framing
+                        .clone()
+                        .unwrap_or_else(|| decoding.default_stream_framing()),
+                    decoding,
+                    log_namespace,
+                )
+                .build()?;
 
                 unix::unix_stream(config, decoder, cx.shutdown, cx.out, log_namespace)
             }
         }
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         let log_namespace = global_log_namespace.merge(Some(self.log_namespace()));
 
         let schema_definition = self
@@ -229,70 +210,57 @@ impl SourceConfig for SocketConfig {
 
         let schema_definition = match &self.mode {
             Mode::Tcp(config) => {
-                let host_key_path = config
-                    .host_key()
-                    .as_ref()
-                    .and_then(|x| parse_value_path(x).ok())
-                    .map_or_else(
-                        || LegacyKey::InsertIfEmpty(owned_value_path!("host")),
-                        LegacyKey::InsertIfEmpty,
-                    );
+                let legacy_host_key = config.host_key().clone().path.map(LegacyKey::InsertIfEmpty);
 
-                let port_key_path = config
-                    .port_key()
+                let legacy_port_key = config.port_key().clone().path.map(LegacyKey::InsertIfEmpty);
+
+                let tls_client_metadata_path = config
+                    .tls()
                     .as_ref()
-                    .and_then(|x| parse_value_path(x).ok())
-                    .map_or_else(
-                        || LegacyKey::InsertIfEmpty(owned_value_path!("port")),
-                        LegacyKey::InsertIfEmpty,
-                    );
+                    .and_then(|tls| tls.client_metadata_key.as_ref())
+                    .and_then(|k| k.path.clone())
+                    .map(LegacyKey::Overwrite);
 
                 schema_definition
                     .with_source_metadata(
                         Self::NAME,
-                        Some(host_key_path),
+                        legacy_host_key,
                         &owned_value_path!("host"),
                         Kind::bytes(),
-                        None,
+                        Some("host"),
                     )
                     .with_source_metadata(
                         Self::NAME,
-                        Some(port_key_path),
+                        legacy_port_key,
                         &owned_value_path!("port"),
                         Kind::bytes(),
                         None,
                     )
+                    .with_source_metadata(
+                        Self::NAME,
+                        tls_client_metadata_path,
+                        &owned_value_path!("tls_client_metadata"),
+                        Kind::object(Collection::empty().with_unknown(Kind::bytes()))
+                            .or_undefined(),
+                        None,
+                    )
             }
             Mode::Udp(config) => {
-                let host_key_path = config
-                    .host_key()
-                    .as_ref()
-                    .and_then(|x| parse_value_path(x).ok())
-                    .map_or_else(
-                        || LegacyKey::InsertIfEmpty(owned_value_path!("host")),
-                        LegacyKey::InsertIfEmpty,
-                    );
+                let legacy_host_key = config.host_key().clone().path.map(LegacyKey::InsertIfEmpty);
 
-                let port_key_path = config
-                    .port_key()
-                    .as_ref()
-                    .and_then(|x| parse_value_path(x).ok())
-                    .map_or_else(
-                        || LegacyKey::InsertIfEmpty(owned_value_path!("port")),
-                        LegacyKey::InsertIfEmpty,
-                    );
+                let legacy_port_key = config.port_key().clone().path.map(LegacyKey::InsertIfEmpty);
 
                 schema_definition
                     .with_source_metadata(
                         Self::NAME,
-                        Some(host_key_path),
+                        legacy_host_key,
                         &owned_value_path!("host"),
                         Kind::bytes(),
                         None,
                     )
                     .with_source_metadata(
                         Self::NAME,
-                        Some(port_key_path),
+                        legacy_port_key,
                         &owned_value_path!("port"),
                         Kind::bytes(),
                         None,
@@ -300,18 +268,11 @@ impl SourceConfig for SocketConfig {
             }
             #[cfg(unix)]
             Mode::UnixDatagram(config) => {
-                let host_key_path = config
-                    .host_key()
-                    .as_ref()
-                    .and_then(|x| parse_value_path(x).ok())
-                    .map_or_else(
-                        || LegacyKey::InsertIfEmpty(owned_value_path!("host")),
-                        LegacyKey::InsertIfEmpty,
-                    );
+                let legacy_host_key = config.host_key().clone().path.map(LegacyKey::InsertIfEmpty);
 
                 schema_definition.with_source_metadata(
                     Self::NAME,
-                    Some(host_key_path),
+                    legacy_host_key,
                     &owned_value_path!("host"),
                     Kind::bytes(),
                     None,
@@ -319,18 +280,11 @@ impl SourceConfig for SocketConfig {
             }
             #[cfg(unix)]
             Mode::UnixStream(config) => {
-                let host_key_path = config
-                    .host_key()
-                    .as_ref()
-                    .and_then(|x| parse_value_path(x).ok())
-                    .map_or_else(
-                        || LegacyKey::InsertIfEmpty(owned_value_path!("host")),
-                        LegacyKey::InsertIfEmpty,
-                    );
+                let legacy_host_key = config.host_key().clone().path.map(LegacyKey::InsertIfEmpty);
 
                 schema_definition.with_source_metadata(
                     Self::NAME,
-                    Some(host_key_path),
+                    legacy_host_key,
                     &owned_value_path!("host"),
                     Kind::bytes(),
                     None,
@@ -338,8 +292,10 @@ impl SourceConfig for SocketConfig {
             }
         };
 
-        vec![Output::default(self.decoding().output_type())
-            .with_schema_definition(schema_definition)]
+        vec![SourceOutput::new_logs(
+            self.decoding().output_type(),
+            schema_definition,
+        )]
     }
 
     fn resources(&self) -> Vec<Resource> {
@@ -358,8 +314,13 @@ impl SourceConfig for SocketConfig {
     }
 }
 
+pub(crate) fn default_host_key() -> OptionalValuePath {
+    log_schema().host_key().cloned().into()
+}
+
 #[cfg(test)]
 mod test {
+    use approx::assert_relative_eq;
     use std::{
         collections::{BTreeMap, HashMap},
         net::{SocketAddr, UdpSocket},
@@ -375,14 +336,18 @@ mod test {
     #[cfg(unix)]
     use codecs::{decoding::CharacterDelimitedDecoderOptions, CharacterDelimitedDecoderConfig};
     use futures::{stream, StreamExt};
-    use lookup::path;
+    use lookup::{lookup_v2::OptionalValuePath, owned_value_path, path};
+    use tokio::io::AsyncReadExt;
+    use tokio::net::TcpStream;
     use tokio::{
         task::JoinHandle,
         time::{timeout, Duration, Instant},
     };
-    use vector_common::btreemap;
-    use vector_config::NamedComponent;
     use vector_core::event::EventContainer;
+    use vrl::btreemap;
+    use vrl::value;
+    use vrl::value::Value;
+
     #[cfg(unix)]
     use {
         super::{unix::UnixConfig, Mode},
@@ -440,6 +405,7 @@ mod test {
                 .unwrap();
 
             let event = rx.next().await.unwrap();
+
             assert_eq!(event.as_log()["host"], addr.ip().to_string().into());
             assert_eq!(event.as_log()["port"], addr.port().into());
         })
@@ -466,19 +432,21 @@ mod test {
                 .unwrap();
 
             let event = rx.next().await.unwrap();
-            let event_meta = event.as_log().metadata().value();
+            let log = event.as_log();
+            let event_meta = log.metadata().value();
 
+            assert_eq!(log.value(), &"test".into());
             assert_eq!(
                 event_meta.get(path!("vector", "source_type")).unwrap(),
-                &vrl::value!(SocketConfig::NAME)
+                &value!(SocketConfig::NAME)
             );
             assert_eq!(
                 event_meta.get(path!(SocketConfig::NAME, "host")).unwrap(),
-                &vrl::value!(addr.ip().to_string())
+                &value!(addr.ip().to_string())
             );
             assert_eq!(
                 event_meta.get(path!(SocketConfig::NAME, "port")).unwrap(),
-                &vrl::value!(addr.port())
+                &value!(addr.port())
             );
         })
         .await;
@@ -504,8 +472,14 @@ mod test {
             let events = collect_n(rx, 2).await;
 
             assert_eq!(events.len(), 2);
-            assert_eq!(events[0].as_log()[log_schema().message_key()], "foo".into());
-            assert_eq!(events[1].as_log()[log_schema().message_key()], "bar".into());
+            assert_eq!(
+                events[0].as_log()[log_schema().message_key().unwrap().to_string()],
+                "foo".into()
+            );
+            assert_eq!(
+                events[1].as_log()[log_schema().message_key().unwrap().to_string()],
+                "bar".into()
+            );
         })
         .await;
     }
@@ -529,7 +503,7 @@ mod test {
 
             let event = rx.next().await.unwrap();
             assert_eq!(
-                event.as_log()[log_schema().source_type_key()],
+                event.as_log()[log_schema().source_type_key().unwrap().to_string()],
                 "socket".into()
             );
         })
@@ -543,7 +517,6 @@ mod test {
             let addr = next_addr();
 
             let mut config = TcpConfig::from_address(addr.into());
-            config.set_max_length(None);
             config.set_framing(Some(
                 NewlineDelimitedDecoderConfig::new_with_max_length(10).into(),
             ));
@@ -564,11 +537,14 @@ mod test {
             send_lines(addr, lines.into_iter()).await.unwrap();
 
             let event = rx.next().await.unwrap();
-            assert_eq!(event.as_log()[log_schema().message_key()], "short".into());
+            assert_eq!(
+                event.as_log()[log_schema().message_key().unwrap().to_string()],
+                "short".into()
+            );
 
             let event = rx.next().await.unwrap();
             assert_eq!(
-                event.as_log()[log_schema().message_key()],
+                event.as_log()[log_schema().message_key().unwrap().to_string()],
                 "more short".into()
             );
         })
@@ -593,7 +569,7 @@ mod test {
                         ..Default::default()
                     },
                 },
-                client_metadata_key: Some("tls_peer".into()),
+                client_metadata_key: Some(OptionalValuePath::from(owned_value_path!("tls_peer"))),
             }));
 
             let server = SocketConfig::from(config)
@@ -618,11 +594,11 @@ mod test {
 
             let event = rx.next().await.unwrap();
             assert_eq!(
-                event.as_log()[log_schema().message_key()],
+                event.as_log()[log_schema().message_key().unwrap().to_string()],
                 "one line".into()
             );
 
-            let tls_meta: BTreeMap<String, value::Value> = btreemap!(
+            let tls_meta: BTreeMap<String, Value> = btreemap!(
                 "subject" => "CN=localhost,OU=Vector,O=Datadog,L=New York,ST=New York,C=US"
             );
 
@@ -630,11 +606,86 @@ mod test {
 
             let event = rx.next().await.unwrap();
             assert_eq!(
-                event.as_log()[log_schema().message_key()],
+                event.as_log()[log_schema().message_key().unwrap().to_string()],
                 "another line".into()
             );
 
             assert_eq!(event.as_log()["tls_peer"], tls_meta.clone().into(),);
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn tcp_with_tls_vector_namespace() {
+        assert_source_compliance(&SOCKET_HIGH_CARDINALITY_PUSH_SOURCE_TAGS, async {
+            let (tx, mut rx) = SourceSender::new_test();
+            let addr = next_addr();
+
+            let mut config = TcpConfig::from_address(addr.into());
+            config.set_tls(Some(TlsSourceConfig {
+                tls_config: TlsEnableableConfig {
+                    enabled: Some(true),
+                    options: TlsConfig {
+                        verify_certificate: Some(true),
+                        crt_file: Some(tls::TEST_PEM_CRT_PATH.into()),
+                        key_file: Some(tls::TEST_PEM_KEY_PATH.into()),
+                        ca_file: Some(tls::TEST_PEM_CA_PATH.into()),
+                        ..Default::default()
+                    },
+                },
+                client_metadata_key: None,
+            }));
+            config.log_namespace = Some(true);
+
+            let server = SocketConfig::from(config)
+                .build(SourceContext::new_test(tx, None))
+                .await
+                .unwrap();
+            tokio::spawn(server);
+
+            let lines = vec!["one line".to_owned(), "another line".to_owned()];
+
+            wait_for_tcp(addr).await;
+            send_lines_tls(
+                addr,
+                "localhost".into(),
+                lines.into_iter(),
+                std::path::Path::new(tls::TEST_PEM_CA_PATH),
+                std::path::Path::new(tls::TEST_PEM_CLIENT_CRT_PATH),
+                std::path::Path::new(tls::TEST_PEM_CLIENT_KEY_PATH),
+            )
+            .await
+            .unwrap();
+
+            let event = rx.next().await.unwrap();
+            let log = event.as_log();
+            let event_meta = log.metadata().value();
+
+            assert_eq!(log.value(), &"one line".into());
+
+            let tls_meta: BTreeMap<String, Value> = btreemap!(
+                "subject" => "CN=localhost,OU=Vector,O=Datadog,L=New York,ST=New York,C=US"
+            );
+
+            assert_eq!(
+                event_meta
+                    .get(path!(SocketConfig::NAME, "tls_client_metadata"))
+                    .unwrap(),
+                &value!(tls_meta.clone())
+            );
+
+            let event = rx.next().await.unwrap();
+            let log = event.as_log();
+            let event_meta = log.metadata().value();
+
+            assert_eq!(log.value(), &"another line".into());
+
+            assert_eq!(
+                event_meta
+                    .get(path!(SocketConfig::NAME, "tls_client_metadata"))
+                    .unwrap(),
+                &value!(tls_meta.clone())
+            );
         })
         .await;
     }
@@ -661,7 +712,10 @@ mod test {
                 .unwrap();
 
             let event = rx.next().await.unwrap();
-            assert_eq!(event.as_log()[log_schema().message_key()], "test".into());
+            assert_eq!(
+                event.as_log()[log_schema().message_key().unwrap().to_string()],
+                "test".into()
+            );
 
             // Now signal to the Source to shut down.
             let deadline = Instant::now() + Duration::from_secs(10);
@@ -670,7 +724,7 @@ mod test {
             assert!(shutdown_success);
 
             // Ensure source actually shut down successfully.
-            let _ = source_handle.await.unwrap();
+            _ = source_handle.await.unwrap();
         })
         .await;
     }
@@ -685,7 +739,7 @@ mod test {
         // shutdown.
         let addr = next_addr();
 
-        let (source_tx, source_rx) = SourceSender::new_with_buffer(10_000);
+        let (source_tx, source_rx) = SourceSender::new_test_sender_with_buffer(10_000);
         let source_key = ComponentKey::from("tcp_shutdown_infinite_stream");
         let (source_cx, mut shutdown) = SourceContext::new_shutdown(&source_key, source_tx);
 
@@ -739,10 +793,10 @@ mod test {
             .collect::<Vec<_>>();
         assert_eq!(100, events.len());
 
-        let message_key = log_schema().message_key();
+        let message_key = log_schema().message_key().unwrap().to_string();
         let expected_message = message.clone().into();
         for event in events.into_iter().flat_map(EventContainer::into_events) {
-            assert_eq!(event.as_log()[message_key], expected_message);
+            assert_eq!(event.as_log()[message_key.as_str()], expected_message);
         }
 
         // Now trigger shutdown on the source and ensure that it shuts down before or at the
@@ -756,6 +810,45 @@ mod test {
 
         let source_result = source_handle.await.expect("source task should not panic");
         assert_eq!(source_result, Ok(()));
+    }
+
+    #[tokio::test]
+    async fn tcp_connection_close_after_max_duration() {
+        let (tx, _) = SourceSender::new_test();
+        let addr = next_addr();
+
+        let mut source_config = TcpConfig::from_address(addr.into());
+        source_config.set_max_connection_duration_secs(Some(1));
+        let source_task = SocketConfig::from(source_config)
+            .build(SourceContext::new_test(tx, None))
+            .await
+            .unwrap();
+
+        // Spawn the source task and wait until we're sure it's listening:
+        drop(tokio::spawn(source_task));
+        wait_for_tcp(addr).await;
+
+        let mut stream: TcpStream = TcpStream::connect(addr)
+            .await
+            .expect("stream should be able to connect");
+        let start = Instant::now();
+
+        let timeout = tokio::time::sleep(Duration::from_millis(1200));
+        let mut buffer = [0u8; 10];
+
+        tokio::select! {
+             _ = timeout => {
+                 panic!("timed out waiting for stream to close")
+             },
+             read_result = stream.read(&mut buffer) => {
+                 match read_result {
+                    // read resulting with 0 bytes -> the connection was closed
+                    Ok(0) => assert_relative_eq!(start.elapsed().as_secs_f64(), 1.0, epsilon = 0.3),
+                    Ok(_) => panic!("unexpectedly read data from stream"),
+                    Err(e) => panic!("{:}", e)
+                 }
+             }
+        }
     }
 
     //////// UDP TESTS ////////
@@ -791,7 +884,7 @@ mod test {
         source_id: &ComponentKey,
         shutdown: &mut SourceShutdownCoordinator,
     ) -> (SocketAddr, JoinHandle<Result<(), ()>>) {
-        let (shutdown_signal, _) = shutdown.register_source(source_id);
+        let (shutdown_signal, _) = shutdown.register_source(source_id, false);
         init_udp_inner(sender, source_id, shutdown_signal, None, false).await
     }
 
@@ -875,7 +968,7 @@ mod test {
             let events = collect_n(rx, 1).await;
 
             assert_eq!(
-                events[0].as_log()[log_schema().message_key()],
+                events[0].as_log()[log_schema().message_key().unwrap().to_string()],
                 "test".into()
             );
         })
@@ -892,7 +985,7 @@ mod test {
             let events = collect_n(rx, 1).await;
 
             assert_eq!(
-                events[0].as_log()[log_schema().message_key()],
+                events[0].as_log()[log_schema().message_key().unwrap().to_string()],
                 "foo\nbar".into()
             );
         })
@@ -909,11 +1002,11 @@ mod test {
             let events = collect_n(rx, 2).await;
 
             assert_eq!(
-                events[0].as_log()[log_schema().message_key()],
+                events[0].as_log()[log_schema().message_key().unwrap().to_string()],
                 "test".into()
             );
             assert_eq!(
-                events[1].as_log()[log_schema().message_key()],
+                events[1].as_log()[log_schema().message_key().unwrap().to_string()],
                 "test2".into()
             );
         })
@@ -940,11 +1033,11 @@ mod test {
 
             let events = collect_n(rx, 2).await;
             assert_eq!(
-                events[0].as_log()[log_schema().message_key()],
+                events[0].as_log()[log_schema().message_key().unwrap().to_string()],
                 "short line".into()
             );
             assert_eq!(
-                events[1].as_log()[log_schema().message_key()],
+                events[1].as_log()[log_schema().message_key().unwrap().to_string()],
                 "a short un".into()
             );
         })
@@ -976,11 +1069,11 @@ mod test {
 
             let events = collect_n(rx, 2).await;
             assert_eq!(
-                events[0].as_log()[log_schema().message_key()],
+                events[0].as_log()[log_schema().message_key().unwrap().to_string()],
                 "test with".into()
             );
             assert_eq!(
-                events[1].as_log()[log_schema().message_key()],
+                events[1].as_log()[log_schema().message_key().unwrap().to_string()],
                 "short one".into()
             );
         })
@@ -1010,20 +1103,21 @@ mod test {
 
             let from = send_lines_udp(address, vec!["test".to_string()]);
             let events = collect_n(rx, 1).await;
+            let log = events[0].as_log();
+            let event_meta = log.metadata().value();
 
-            let event_meta = events[0].as_log().metadata().value();
-
+            assert_eq!(log.value(), &"test".into());
             assert_eq!(
                 event_meta.get(path!("vector", "source_type")).unwrap(),
-                &vrl::value!(SocketConfig::NAME)
+                &value!(SocketConfig::NAME)
             );
             assert_eq!(
                 event_meta.get(path!(SocketConfig::NAME, "host")).unwrap(),
-                &vrl::value!(from.ip().to_string())
+                &value!(from.ip().to_string())
             );
             assert_eq!(
                 event_meta.get(path!(SocketConfig::NAME, "port")).unwrap(),
-                &vrl::value!(from.port())
+                &value!(from.port())
             );
         })
         .await;
@@ -1035,11 +1129,11 @@ mod test {
             let (tx, rx) = SourceSender::new_test();
             let address = init_udp(tx, false).await;
 
-            let _ = send_lines_udp(address, vec!["test".to_string()]);
+            _ = send_lines_udp(address, vec!["test".to_string()]);
             let events = collect_n(rx, 1).await;
 
             assert_eq!(
-                events[0].as_log()[log_schema().source_type_key()],
+                events[0].as_log()[log_schema().source_type_key().unwrap().to_string()],
                 "socket".into()
             );
         })
@@ -1060,7 +1154,7 @@ mod test {
             let events = collect_n(rx, 1).await;
 
             assert_eq!(
-                events[0].as_log()[log_schema().message_key()],
+                events[0].as_log()[log_schema().message_key().unwrap().to_string()],
                 "test".into()
             );
 
@@ -1071,7 +1165,7 @@ mod test {
             assert!(shutdown_success);
 
             // Ensure source actually shut down successfully.
-            let _ = source_handle.await.unwrap();
+            _ = source_handle.await.unwrap();
         })
         .await;
     }
@@ -1101,7 +1195,10 @@ mod test {
             let events = collect_n(rx, 100).await;
             assert_eq!(100, events.len());
             for event in events {
-                assert_eq!(event.as_log()[log_schema().message_key()], "test".into());
+                assert_eq!(
+                    event.as_log()[log_schema().message_key().unwrap().to_string()],
+                    "test".into()
+                );
             }
 
             let deadline = Instant::now() + Duration::from_secs(10);
@@ -1110,7 +1207,7 @@ mod test {
             assert!(shutdown_success);
 
             // Ensure that the source has actually shut down.
-            let _ = source_handle.await.unwrap();
+            _ = source_handle.await.unwrap();
 
             // Stop the pump from sending lines forever.
             run_pump_atomic_sender.store(false, Ordering::Relaxed);
@@ -1186,11 +1283,11 @@ mod test {
 
         assert_eq!(2, events.len());
         assert_eq!(
-            events[0].as_log()[log_schema().message_key()],
+            events[0].as_log()[log_schema().message_key().unwrap().to_string()],
             "test".into()
         );
         assert_eq!(
-            events[1].as_log()[log_schema().message_key()],
+            events[1].as_log()[log_schema().message_key().unwrap().to_string()],
             "test2".into()
         );
     }
@@ -1241,11 +1338,11 @@ mod test {
 
             assert_eq!(events.len(), 1);
             assert_eq!(
-                events[0].as_log()[log_schema().message_key()],
+                events[0].as_log()[log_schema().message_key().unwrap().to_string()],
                 "test".into()
             );
             assert_eq!(
-                events[0].as_log()[log_schema().source_type_key()],
+                events[0].as_log()[log_schema().source_type_key().unwrap().to_string()],
                 "socket".into()
             );
             assert_eq!(events[0].as_log()["host"], UNNAMED_SOCKET_HOST.into());
@@ -1305,19 +1402,20 @@ mod test {
         assert_source_compliance(&SOCKET_HIGH_CARDINALITY_PUSH_SOURCE_TAGS, async {
             let (_, rx) = unix_message("test", false, true).await;
             let events = collect_n(rx, 1).await;
-            let event_meta = events[0].as_log().metadata().value();
+            let log = events[0].as_log();
+            let event_meta = log.metadata().value();
 
+            assert_eq!(log.value(), &"test".into());
             assert_eq!(events.len(), 1);
 
             assert_eq!(
                 event_meta.get(path!("vector", "source_type")).unwrap(),
-                &vrl::value!(SocketConfig::NAME)
+                &value!(SocketConfig::NAME)
             );
 
-            assert_eq!(events[0].as_log()["message"], "test".into());
             assert_eq!(
                 event_meta.get(path!(SocketConfig::NAME, "host")).unwrap(),
-                &vrl::value!(UNNAMED_SOCKET_HOST)
+                &value!(UNNAMED_SOCKET_HOST)
             );
         })
         .await;
@@ -1332,11 +1430,11 @@ mod test {
 
             assert_eq!(events.len(), 1);
             assert_eq!(
-                events[0].as_log()[log_schema().message_key()],
+                events[0].as_log()[log_schema().message_key().unwrap().to_string()],
                 "foo\nbar".into()
             );
             assert_eq!(
-                events[0].as_log()[log_schema().source_type_key()],
+                events[0].as_log()[log_schema().source_type_key().unwrap().to_string()],
                 "socket".into()
             );
         })
@@ -1419,11 +1517,11 @@ mod test {
 
             assert_eq!(1, events.len());
             assert_eq!(
-                events[0].as_log()[log_schema().message_key()],
+                events[0].as_log()[log_schema().message_key().unwrap().to_string()],
                 "test".into()
             );
             assert_eq!(
-                events[0].as_log()[log_schema().source_type_key()],
+                events[0].as_log()[log_schema().source_type_key().unwrap().to_string()],
                 "socket".into()
             );
         })
@@ -1436,17 +1534,18 @@ mod test {
         assert_source_compliance(&SOCKET_HIGH_CARDINALITY_PUSH_SOURCE_TAGS, async {
             let (_, rx) = unix_message("test", true, true).await;
             let events = collect_n(rx, 1).await;
-            let event_meta = events[0].as_log().metadata().value();
+            let log = events[0].as_log();
+            let event_meta = log.metadata().value();
 
+            assert_eq!(log.value(), &"test".into());
             assert_eq!(1, events.len());
             assert_eq!(
                 event_meta.get(path!("vector", "source_type")).unwrap(),
-                &vrl::value!(SocketConfig::NAME)
+                &value!(SocketConfig::NAME)
             );
-            assert_eq!(events[0].as_log()["message"], "test".into());
             assert_eq!(
                 event_meta.get(path!(SocketConfig::NAME, "host")).unwrap(),
-                &vrl::value!(UNNAMED_SOCKET_HOST)
+                &value!(UNNAMED_SOCKET_HOST)
             );
         })
         .await;
@@ -1460,14 +1559,20 @@ mod test {
             let events = collect_n(rx, 2).await;
 
             assert_eq!(events.len(), 2);
-            assert_eq!(events[0].as_log()[log_schema().message_key()], "foo".into());
             assert_eq!(
-                events[0].as_log()[log_schema().source_type_key()],
+                events[0].as_log()[log_schema().message_key().unwrap().to_string()],
+                "foo".into()
+            );
+            assert_eq!(
+                events[0].as_log()[log_schema().source_type_key().unwrap().to_string()],
                 "socket".into()
             );
-            assert_eq!(events[1].as_log()[log_schema().message_key()], "bar".into());
             assert_eq!(
-                events[1].as_log()[log_schema().source_type_key()],
+                events[1].as_log()[log_schema().message_key().unwrap().to_string()],
+                "bar".into()
+            );
+            assert_eq!(
+                events[1].as_log()[log_schema().source_type_key().unwrap().to_string()],
                 "socket".into()
             );
         })

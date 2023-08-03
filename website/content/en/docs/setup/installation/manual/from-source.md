@@ -210,7 +210,6 @@ under "[features]" [here](https://github.com/vectordotdev/vector/blob/master/Car
 [jemalloc]: https://github.com/jemalloc/jemalloc
 [kafka_sink]: /docs/reference/configuration/sinks/kafka
 [kafka_source]: /docs/reference/configuration/sources/kafka
-[leveldb]: https://github.com/google/leveldb
 [librdkafka]: https://github.com/edenhill/librdkafka
 [openssl]: https://www.openssl.org
 [perl]: https://www.perl.org/get.html#win32

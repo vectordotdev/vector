@@ -4,9 +4,11 @@ use async_trait::async_trait;
 use futures::{stream::BoxStream, StreamExt};
 use prost::Message;
 use tower::Service;
+use vector_common::request_metadata::GroupedCountByteSize;
 use vector_core::{
+    config::telemetry,
     stream::{BatcherSettings, DriverResponse},
-    ByteSizeOf,
+    ByteSizeOf, EstimatedJsonEncodedSizeOf,
 };
 
 use super::service::VectorRequest;
@@ -19,16 +21,29 @@ use crate::{
 /// Data for a single event.
 struct EventData {
     byte_size: usize,
+    json_byte_size: GroupedCountByteSize,
     finalizers: EventFinalizers,
     wrapper: EventWrapper,
 }
 
 /// Temporary struct to collect events during batching.
-#[derive(Clone, Default)]
+#[derive(Clone)]
 struct EventCollection {
     pub finalizers: EventFinalizers,
     pub events: Vec<EventWrapper>,
     pub events_byte_size: usize,
+    pub events_json_byte_size: GroupedCountByteSize,
+}
+
+impl Default for EventCollection {
+    fn default() -> Self {
+        Self {
+            finalizers: Default::default(),
+            events: Default::default(),
+            events_byte_size: Default::default(),
+            events_json_byte_size: telemetry().create_request_count_byte_size(),
+        }
+    }
 }
 
 pub struct VectorSink<S> {
@@ -45,10 +60,16 @@ where
 {
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         input
-            .map(|mut event| EventData {
-                byte_size: event.size_of(),
-                finalizers: event.take_finalizers(),
-                wrapper: EventWrapper::from(event),
+            .map(|mut event| {
+                let mut byte_size = telemetry().create_request_count_byte_size();
+                byte_size.add_event(&event, event.estimated_json_encoded_size_of());
+
+                EventData {
+                    byte_size: event.size_of(),
+                    json_byte_size: byte_size,
+                    finalizers: event.take_finalizers(),
+                    wrapper: EventWrapper::from(event),
+                }
             })
             .batched(self.batch_settings.into_reducer_config(
                 |data: &EventData| data.wrapper.encoded_len(),
@@ -56,13 +77,14 @@ where
                     event_collection.finalizers.merge(item.finalizers);
                     event_collection.events.push(item.wrapper);
                     event_collection.events_byte_size += item.byte_size;
+                    event_collection.events_json_byte_size += item.json_byte_size;
                 },
             ))
             .map(|event_collection| {
                 let builder = RequestMetadataBuilder::new(
                     event_collection.events.len(),
                     event_collection.events_byte_size,
-                    event_collection.events_byte_size, // this is fine as it isn't being used
+                    event_collection.events_json_byte_size,
                 );
 
                 let encoded_events = proto_vector::PushEventsRequest {

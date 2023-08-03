@@ -12,27 +12,36 @@ use crate::{
     sinks::{console::sink::WriterSink, Healthcheck, VectorSink},
 };
 
-/// Output target.
+/// The [standard stream][standard_streams] to write to.
+///
+/// [standard_streams]: https://en.wikipedia.org/wiki/Standard_streams
 #[configurable_component]
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(rename_all = "lowercase")]
 pub enum Target {
-    /// Standard output.
+    /// Write output to [STDOUT][stdout].
+    ///
+    /// [stdout]: https://en.wikipedia.org/wiki/Standard_streams#Standard_output_(stdout)
     #[derivative(Default)]
     Stdout,
 
-    /// Standard error.
+    /// Write output to [STDERR][stderr].
+    ///
+    /// [stderr]: https://en.wikipedia.org/wiki/Standard_streams#Standard_error_(stderr)
     Stderr,
 }
 
 /// Configuration for the `console` sink.
-#[configurable_component(sink("console"))]
+#[configurable_component(sink(
+    "console",
+    "Display observability events in the console, which can be useful for debugging purposes."
+))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct ConsoleSinkConfig {
     #[configurable(derived)]
-    #[serde(default)]
+    #[serde(default = "default_target")]
     pub target: Target,
 
     #[serde(flatten)]
@@ -47,11 +56,15 @@ pub struct ConsoleSinkConfig {
     pub acknowledgements: AcknowledgementsConfig,
 }
 
+const fn default_target() -> Target {
+    Target::Stdout
+}
+
 impl GenerateConfig for ConsoleSinkConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
             target: Target::Stdout,
-            encoding: (None::<FramingConfig>, JsonSerializerConfig::new()).into(),
+            encoding: (None::<FramingConfig>, JsonSerializerConfig::default()).into(),
             acknowledgements: Default::default(),
         })
         .unwrap()
@@ -59,6 +72,7 @@ impl GenerateConfig for ConsoleSinkConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "console")]
 impl SinkConfig for ConsoleSinkConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let transformer = self.encoding.transformer();

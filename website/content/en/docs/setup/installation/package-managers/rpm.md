@@ -15,7 +15,7 @@ sudo rpm -i https://packages.timber.io/vector/{{< version >}}/vector-{{< version
 Make sure to replace `{arch}` with one of the following:
 
 * `x86_64`
-* `arm64`
+* `aarch64`
 * `armv7`
 
 ## Other actions

@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 use std::{collections::HashMap, fmt, fs::remove_dir_all, path::PathBuf};
 
 use clap::Parser;
@@ -219,6 +220,7 @@ async fn validate_healthchecks(
             fmt.error(error);
         };
 
+        trace!("Healthcheck for {id} starting.");
         match tokio::spawn(healthcheck).await {
             Ok(Ok(_)) => {
                 if config
@@ -239,6 +241,7 @@ async fn validate_healthchecks(
             }
             Err(_) => failed(format!("Health check for \"{}\" panicked", id)),
         }
+        trace!("Healthcheck for {id} done.");
     }
 
     validated

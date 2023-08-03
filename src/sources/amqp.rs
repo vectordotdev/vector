@@ -3,7 +3,7 @@
 use crate::{
     amqp::AmqpConfig,
     codecs::{Decoder, DecodingConfig},
-    config::{Output, SourceConfig, SourceContext},
+    config::{SourceConfig, SourceContext, SourceOutput},
     event::{BatchNotifier, BatchStatus},
     internal_events::{
         source::{AmqpAckError, AmqpBytesReceived, AmqpEventError, AmqpRejectError},
@@ -20,18 +20,21 @@ use codecs::decoding::{DeserializerConfig, FramingConfig};
 use futures::{FutureExt, StreamExt};
 use futures_util::Stream;
 use lapin::{acker::Acker, message::Delivery, Channel};
-use lookup::{metadata_path, owned_value_path, path, PathPrefix};
+use lookup::{lookup_v2::OptionalValuePath, metadata_path, owned_value_path, path, PathPrefix};
 use snafu::Snafu;
 use std::{io::Cursor, pin::Pin};
 use tokio_util::codec::FramedRead;
-use value::Kind;
-use vector_common::{finalizer::UnorderedFinalizer, internal_event::EventsReceived};
-use vector_config::{configurable_component, NamedComponent};
+use vector_common::{
+    finalizer::UnorderedFinalizer,
+    internal_event::{CountByteSize, EventsReceived, InternalEventHandle as _},
+};
+use vector_config::configurable_component;
 use vector_core::{
     config::{log_schema, LegacyKey, LogNamespace, SourceAcknowledgementsConfig},
     event::Event,
     EstimatedJsonEncodedSizeOf,
 };
+use vrl::value::Kind;
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -46,7 +49,10 @@ enum BuildError {
 /// Configuration for the `amqp` source.
 ///
 /// Supports AMQP version 0.9.1
-#[configurable_component(source("amqp"))]
+#[configurable_component(source(
+    "amqp",
+    "Collect events from AMQP 0.9.1 compatible brokers like RabbitMQ."
+))]
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(deny_unknown_fields)]
@@ -57,22 +63,26 @@ pub struct AmqpSourceConfig {
 
     /// The identifier for the consumer.
     #[serde(default = "default_consumer")]
+    #[configurable(metadata(docs::examples = "consumer-group-name"))]
     pub(crate) consumer: String,
 
-    /// Connection options for `AMQP` source.
+    #[serde(flatten)]
     pub(crate) connection: AmqpConfig,
 
     /// The `AMQP` routing key.
     #[serde(default = "default_routing_key_field")]
-    pub(crate) routing_key_field: String,
+    #[derivative(Default(value = "default_routing_key_field()"))]
+    pub(crate) routing_key_field: OptionalValuePath,
 
     /// The `AMQP` exchange key.
     #[serde(default = "default_exchange_key")]
-    pub(crate) exchange_key: String,
+    #[derivative(Default(value = "default_exchange_key()"))]
+    pub(crate) exchange_key: OptionalValuePath,
 
     /// The `AMQP` offset key.
     #[serde(default = "default_offset_key")]
-    pub(crate) offset_key: String,
+    #[derivative(Default(value = "default_offset_key()"))]
+    pub(crate) offset_key: OptionalValuePath,
 
     /// The namespace to use for logs. This overrides the global setting.
     #[configurable(metadata(docs::hidden))]
@@ -102,27 +112,28 @@ fn default_consumer() -> String {
     "vector".into()
 }
 
-fn default_routing_key_field() -> String {
-    "routing".into()
+fn default_routing_key_field() -> OptionalValuePath {
+    OptionalValuePath::from(owned_value_path!("routing"))
 }
 
-fn default_exchange_key() -> String {
-    "exchange".into()
+fn default_exchange_key() -> OptionalValuePath {
+    OptionalValuePath::from(owned_value_path!("exchange"))
 }
 
-fn default_offset_key() -> String {
-    "offset".into()
+fn default_offset_key() -> OptionalValuePath {
+    OptionalValuePath::from(owned_value_path!("offset"))
 }
 
 impl_generate_config_from_default!(AmqpSourceConfig);
 
 impl AmqpSourceConfig {
-    fn decoder(&self, log_namespace: LogNamespace) -> Decoder {
+    fn decoder(&self, log_namespace: LogNamespace) -> vector_common::Result<Decoder> {
         DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace).build()
     }
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "amqp")]
 impl SourceConfig for AmqpSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let log_namespace = cx.log_namespace(self.log_namespace);
@@ -131,7 +142,7 @@ impl SourceConfig for AmqpSourceConfig {
         amqp_source(self, cx.shutdown, cx.out, log_namespace, acknowledgements).await
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
         let schema_definition = self
             .decoding
@@ -146,29 +157,33 @@ impl SourceConfig for AmqpSourceConfig {
             )
             .with_source_metadata(
                 AmqpSourceConfig::NAME,
-                Some(LegacyKey::Overwrite(owned_value_path!(
-                    &self.routing_key_field
-                ))),
+                self.routing_key_field
+                    .path
+                    .clone()
+                    .map(LegacyKey::InsertIfEmpty),
                 &owned_value_path!("routing"),
                 Kind::bytes(),
                 None,
             )
             .with_source_metadata(
                 AmqpSourceConfig::NAME,
-                Some(LegacyKey::Overwrite(owned_value_path!(&self.exchange_key))),
+                self.exchange_key.path.clone().map(LegacyKey::InsertIfEmpty),
                 &owned_value_path!("exchange"),
                 Kind::bytes(),
                 None,
             )
             .with_source_metadata(
                 AmqpSourceConfig::NAME,
-                Some(LegacyKey::Overwrite(owned_value_path!(&self.offset_key))),
+                self.offset_key.path.clone().map(LegacyKey::InsertIfEmpty),
                 &owned_value_path!("offset"),
                 Kind::integer(),
                 None,
             );
 
-        vec![Output::default(self.decoding.output_type()).with_schema_definition(schema_definition)]
+        vec![SourceOutput::new_logs(
+            self.decoding.output_type(),
+            schema_definition,
+        )]
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -214,11 +229,11 @@ pub(crate) async fn amqp_source(
 }
 
 struct Keys<'a> {
-    routing_key_field: &'a str,
+    routing_key_field: &'a OptionalValuePath,
     routing: &'a str,
-    exchange_key: &'a str,
+    exchange_key: &'a OptionalValuePath,
     exchange: &'a str,
-    offset_key: &'a str,
+    offset_key: &'a OptionalValuePath,
     delivery_tag: i64,
 }
 
@@ -234,7 +249,10 @@ fn populate_event(
     log_namespace.insert_source_metadata(
         AmqpSourceConfig::NAME,
         log,
-        Some(LegacyKey::InsertIfEmpty(keys.routing_key_field)),
+        keys.routing_key_field
+            .path
+            .as_ref()
+            .map(LegacyKey::InsertIfEmpty),
         "routing",
         keys.routing.to_string(),
     );
@@ -242,7 +260,10 @@ fn populate_event(
     log_namespace.insert_source_metadata(
         AmqpSourceConfig::NAME,
         log,
-        Some(LegacyKey::InsertIfEmpty(keys.exchange_key)),
+        keys.exchange_key
+            .path
+            .as_ref()
+            .map(LegacyKey::InsertIfEmpty),
         "exchange",
         keys.exchange.to_string(),
     );
@@ -250,14 +271,14 @@ fn populate_event(
     log_namespace.insert_source_metadata(
         AmqpSourceConfig::NAME,
         log,
-        Some(LegacyKey::InsertIfEmpty(keys.offset_key)),
+        keys.offset_key.path.as_ref().map(LegacyKey::InsertIfEmpty),
         "offset",
         keys.delivery_tag,
     );
 
     log_namespace.insert_vector_metadata(
         log,
-        path!(log_schema().source_type_key()),
+        log_schema().source_type_key(),
         path!("source_type"),
         Bytes::from_static(AmqpSourceConfig::NAME.as_bytes()),
     );
@@ -277,10 +298,12 @@ fn populate_event(
             log.insert(metadata_path!("vector", "ingest_timestamp"), Utc::now());
         }
         LogNamespace::Legacy => {
-            log.try_insert(
-                (PathPrefix::Event, log_schema().timestamp_key()),
-                timestamp.unwrap_or_else(Utc::now),
-            );
+            if let Some(timestamp_key) = log_schema().timestamp_key() {
+                log.try_insert(
+                    (PathPrefix::Event, timestamp_key),
+                    timestamp.unwrap_or_else(Utc::now),
+                );
+            }
         }
     };
 }
@@ -294,7 +317,8 @@ async fn receive_event(
     msg: Delivery,
 ) -> Result<(), ()> {
     let payload = Cursor::new(Bytes::copy_from_slice(&msg.data));
-    let mut stream = FramedRead::new(payload, config.decoder(log_namespace));
+    let decoder = config.decoder(log_namespace).map_err(|_e| ())?;
+    let mut stream = FramedRead::new(payload, decoder);
 
     // Extract timestamp from AMQP message
     let timestamp = msg
@@ -305,13 +329,14 @@ async fn receive_event(
     let routing = msg.routing_key.to_string();
     let exchange = msg.exchange.to_string();
     let keys = Keys {
-        routing_key_field: config.routing_key_field.as_str(),
-        exchange_key: config.exchange_key.as_str(),
-        offset_key: config.offset_key.as_str(),
+        routing_key_field: &config.routing_key_field,
+        exchange_key: &config.exchange_key,
+        offset_key: &config.offset_key,
         routing: &routing,
         exchange: &exchange,
         delivery_tag: msg.delivery_tag as i64,
     };
+    let events_received = register!(EventsReceived);
 
     let stream = stream! {
         while let Some(result) = stream.next().await {
@@ -322,10 +347,10 @@ async fn receive_event(
                         protocol: "amqp_0_9_1",
                     });
 
-                    emit!(EventsReceived {
-                        byte_size: events.estimated_json_encoded_size_of(),
-                        count: events.len(),
-                    });
+                    events_received.emit(CountByteSize(
+                        events.len(),
+                        events.estimated_json_encoded_size_of(),
+                    ));
 
                     for mut event in events {
                         populate_event(&mut event,
@@ -368,8 +393,8 @@ async fn finalize_event_stream(
             let mut stream = stream.map(|event| event.with_batch_notifier(&batch));
 
             match out.send_event_stream(&mut stream).await {
-                Err(error) => {
-                    emit!(StreamClosedError { error, count: 1 });
+                Err(_) => {
+                    emit!(StreamClosedError { count: 1 });
                 }
                 Ok(_) => {
                     finalizer.add(msg.into(), receiver);
@@ -377,8 +402,8 @@ async fn finalize_event_stream(
             }
         }
         None => match out.send_event_stream(&mut stream).await {
-            Err(error) => {
-                emit!(StreamClosedError { error, count: 1 });
+            Err(_) => {
+                emit!(StreamClosedError { count: 1 });
             }
             Ok(_) => {
                 let ack_options = lapin::options::BasicAckOptions::default();
@@ -400,7 +425,7 @@ async fn run_amqp_source(
     acknowledgements: bool,
 ) -> Result<(), ()> {
     let (finalizer, mut ack_stream) =
-        UnorderedFinalizer::<FinalizerEntry>::maybe_new(acknowledgements, shutdown.clone());
+        UnorderedFinalizer::<FinalizerEntry>::maybe_new(acknowledgements, Some(shutdown.clone()));
 
     debug!("Starting amqp source, listening to queue {}.", config.queue);
     let mut consumer = channel
@@ -470,9 +495,9 @@ async fn handle_ack(status: BatchStatus, entry: FinalizerEntry) {
 
 #[cfg(test)]
 pub mod test {
-    use lookup::LookupBuf;
-    use value::kind::Collection;
+    use lookup::OwnedTargetPath;
     use vector_core::schema::Definition;
+    use vrl::value::kind::Collection;
 
     use super::*;
 
@@ -501,40 +526,44 @@ pub mod test {
             ..Default::default()
         };
 
-        let definition = config.outputs(LogNamespace::Vector)[0]
-            .clone()
-            .log_schema_definition
-            .unwrap();
+        let definition = config
+            .outputs(LogNamespace::Vector)
+            .remove(0)
+            .schema_definition(true);
 
         let expected_definition =
             Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
-                .with_meaning(LookupBuf::root(), "message")
-                .with_metadata_field(&owned_value_path!("vector", "source_type"), Kind::bytes())
+                .with_meaning(OwnedTargetPath::event_root(), "message")
+                .with_metadata_field(
+                    &owned_value_path!("vector", "source_type"),
+                    Kind::bytes(),
+                    None,
+                )
                 .with_metadata_field(
                     &owned_value_path!("vector", "ingest_timestamp"),
                     Kind::timestamp(),
+                    None,
                 )
-                .with_metadata_field(&owned_value_path!("amqp", "timestamp"), Kind::timestamp())
-                .with_metadata_field(&owned_value_path!("amqp", "routing"), Kind::bytes())
-                .with_metadata_field(&owned_value_path!("amqp", "exchange"), Kind::bytes())
-                .with_metadata_field(&owned_value_path!("amqp", "offset"), Kind::integer());
+                .with_metadata_field(
+                    &owned_value_path!("amqp", "timestamp"),
+                    Kind::timestamp(),
+                    Some("timestamp"),
+                )
+                .with_metadata_field(&owned_value_path!("amqp", "routing"), Kind::bytes(), None)
+                .with_metadata_field(&owned_value_path!("amqp", "exchange"), Kind::bytes(), None)
+                .with_metadata_field(&owned_value_path!("amqp", "offset"), Kind::integer(), None);
 
-        assert_eq!(definition, expected_definition);
+        assert_eq!(definition, Some(expected_definition));
     }
 
     #[test]
     fn output_schema_definition_legacy_namespace() {
-        let config = AmqpSourceConfig {
-            routing_key_field: "routing".to_string(),
-            exchange_key: "exchange".to_string(),
-            offset_key: "offset".to_string(),
-            ..Default::default()
-        };
+        let config = AmqpSourceConfig::default();
 
-        let definition = config.outputs(LogNamespace::Legacy)[0]
-            .clone()
-            .log_schema_definition
-            .unwrap();
+        let definition = config
+            .outputs(LogNamespace::Legacy)
+            .remove(0)
+            .schema_definition(true);
 
         let expected_definition = Definition::new_with_default_metadata(
             Kind::object(Collection::empty()),
@@ -551,7 +580,7 @@ pub mod test {
         .with_event_field(&owned_value_path!("exchange"), Kind::bytes(), None)
         .with_event_field(&owned_value_path!("offset"), Kind::integer(), None);
 
-        assert_eq!(definition, expected_definition);
+        assert_eq!(definition, Some(expected_definition));
     }
 }
 
@@ -625,8 +654,6 @@ mod integration_test {
         let mut config = make_config();
         config.consumer = consumer;
         config.queue = queue;
-        config.routing_key_field = "message_key".to_string();
-        config.exchange_key = "exchange".to_string();
         let (_conn, channel) = config.connection.connect().await.unwrap();
         let exchange_opts = lapin::options::ExchangeDeclareOptions {
             auto_delete: true,
@@ -685,10 +712,12 @@ mod integration_test {
 
         let log = events[0].as_log();
         trace!("{:?}", log);
-        assert_eq!(log[log_schema().message_key()], "my message".into());
-        assert_eq!(log["message_key"], routing_key.into());
-        assert_eq!(log[log_schema().source_type_key()], "amqp".into());
-        let log_ts = log[log_schema().timestamp_key()].as_timestamp().unwrap();
+        assert_eq!(*log.get_message().unwrap(), "my message".into());
+        assert_eq!(log["routing"], routing_key.into());
+        assert_eq!(*log.get_source_type().unwrap(), "amqp".into());
+        let log_ts = log[log_schema().timestamp_key().unwrap().to_string()]
+            .as_timestamp()
+            .unwrap();
         assert!(log_ts.signed_duration_since(now) < chrono::Duration::seconds(1));
         assert_eq!(log["exchange"], exchange.into());
     }

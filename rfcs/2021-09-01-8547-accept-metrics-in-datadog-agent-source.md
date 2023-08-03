@@ -80,7 +80,7 @@ The current `dd_url` endpoint configuration has a [conditional
 behavior](https://github.com/DataDog/datadog-agent/blob/main/pkg/config/config.go#L1199-L1201) (also
 [here](https://github.com/DataDog/datadog-agent/blob/main/pkg/forwarder/forwarder_health.go#L131-L143)). I.e. if
 `dd_url` contains a known pattern (i.e. it has a suffix that matches a Datadog site) some extra hostname manipulation
-happens. But overal, the following paths are expected to be supported on the host behind `dd_url`:
+happens. But overall, the following paths are expected to be supported on the host behind `dd_url`:
 
 * `/api/v1/validate` for API key validation
 * `/api/v1/check_run` for check submission
@@ -104,7 +104,7 @@ A few details about the Datadog Agents & [Datadog metrics](https://docs.datadogh
     [here](https://github.com/DataDog/datadog-agent/blob/main/pkg/aggregator/sender.go#L227-L252)
   * Dogstatsd metrics are converted to the `MetricSample` structure
     [here](https://github.com/DataDog/datadog-agent/blob/main/pkg/dogstatsd/enrich.go#L87-L137) However Datadog Agents
-    metrics are transformed before being sent, ultimately metrics accounts for two differents kind of payload:
+    metrics are transformed before being sent, ultimately metrics accounts for two different kind of payload:
 * The count, gauge and rate series kind of payload, sent to `/api/v1/series` using the [JSON schema officially
   documented](https://docs.datadoghq.com/api/latest/metrics) with few undocumented [additional
   fields](https://github.com/DataDog/datadog-agent/blob/main/pkg/metrics/series.go#L45-L57), but this align very well
@@ -144,8 +144,8 @@ The implementation would then consist in:
      without loss of information: `(Agent Sketch) -> (Vector) -> (Datadog intake)`. This RFC focus on ingesting sketch
      and not the rest of the flow.
 
-**Regarding the tagging issue:** A -possibly temporary- work-around would be to store incoming tags with the complete
-"key:value" string as the key and an empty value to store those in the extisting map Vector uses to store
+**Regarding the tagging issue:** A -possibly temporary- workaround would be to store incoming tags with the complete
+"key:value" string as the key and an empty value to store those in the existing map Vector uses to store
 [tags](https://github.com/vectordotdev/vector/blob/master/lib/vector-core/src/event/metric.rs#L60) and slightly rework the
 `datadog_metrics` sink not to append `:` if a tag key has the empty string as the corresponding value. However Datadog
 best practices can be followed with the current Vector data model, so unless something unforeseen or unexpected demand
@@ -204,7 +204,7 @@ Instead of being done in the Agent, the request routing could be implemented eit
 
 1. In Vector, that would receive both metric and non-metric payload, simply proxying non-metric payload directly to
    Datadog without further processing.
-2. Or in a third party middle layer (e.g. haproxy or similare). It could leverage the [documented
+2. Or in a third party middle layer (e.g. haproxy or similar). It could leverage the [documented
    haproxy](https://docs.datadoghq.com/agent/proxy/?tab=agentv6v7#haproxy) setup for Agent to divert selected routes to
    Vector, but it would have the advantage of resolving any migrations, not-yet-supported-metric-route in Vector and
    alleviate the need of modifying the Agent.

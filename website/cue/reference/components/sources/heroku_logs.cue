@@ -15,12 +15,13 @@ components: sources: heroku_logs: {
 		commonly_used: false
 		delivery:      "at_least_once"
 		deployment_roles: ["aggregator"]
-		development:   "beta"
+		development:   "stable"
 		egress_method: "batch"
 		stateful:      false
 	}
 
 	features: {
+		auto_generated:   true
 		acknowledgements: true
 		multiline: enabled: false
 		codecs: {
@@ -61,12 +62,7 @@ components: sources: heroku_logs: {
 		platform_name: null
 	}
 
-	configuration: {
-		acknowledgements: configuration._source_acknowledgements
-		address:          sources.http_server.configuration.address
-		auth:             sources.http_server.configuration.auth
-		query_parameters: sources.http_server.configuration.query_parameters
-	}
+	configuration: base.components.sources.heroku_logs.configuration
 
 	output: logs: line: {
 		description: "An individual event from a batch of events received through an HTTP POST request."
@@ -105,13 +101,7 @@ components: sources: heroku_logs: {
 	}
 
 	telemetry: metrics: {
-		component_errors_total:               components.sources.internal_metrics.output.metrics.component_errors_total
-		component_received_bytes_total:       components.sources.internal_metrics.output.metrics.component_received_bytes_total
-		component_received_events_total:      components.sources.internal_metrics.output.metrics.component_received_events_total
-		component_received_event_bytes_total: components.sources.internal_metrics.output.metrics.component_received_event_bytes_total
-		events_in_total:                      components.sources.internal_metrics.output.metrics.events_in_total
-		processed_bytes_total:                components.sources.internal_metrics.output.metrics.processed_bytes_total
-		request_read_errors_total:            components.sources.internal_metrics.output.metrics.request_read_errors_total
-		requests_received_total:              components.sources.internal_metrics.output.metrics.requests_received_total
+		request_read_errors_total: components.sources.internal_metrics.output.metrics.request_read_errors_total
+		requests_received_total:   components.sources.internal_metrics.output.metrics.requests_received_total
 	}
 }

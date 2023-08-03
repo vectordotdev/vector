@@ -13,6 +13,7 @@ components: sinks: console: {
 	}
 
 	features: {
+		auto_generated:   true
 		acknowledgements: true
 		healthcheck: enabled: false
 		send: {
@@ -40,20 +41,7 @@ components: sinks: console: {
 		notices: []
 	}
 
-	configuration: {
-		target: {
-			common:      true
-			description: "The [standard stream](\(urls.standard_streams)) to write to."
-			required:    false
-			type: string: {
-				default: "stdout"
-				enum: {
-					stdout: "Output will be written to [STDOUT](\(urls.stdout))"
-					stderr: "Output will be written to [STDERR](\(urls.stderr))"
-				}
-			}
-		}
-	}
+	configuration: base.components.sinks.console.configuration
 
 	input: {
 		logs: true
@@ -66,11 +54,5 @@ components: sinks: console: {
 			summary:      true
 		}
 		traces: true
-	}
-
-	telemetry: metrics: {
-		processed_bytes_total:   components.sources.internal_metrics.output.metrics.processed_bytes_total
-		processed_events_total:  components.sources.internal_metrics.output.metrics.processed_events_total
-		processing_errors_total: components.sources.internal_metrics.output.metrics.processing_errors_total
 	}
 }

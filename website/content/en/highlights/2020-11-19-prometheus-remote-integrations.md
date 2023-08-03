@@ -29,7 +29,7 @@ with a variety of Prometheus use cases:
 Using the new [`prometheus_remote_write` source][prometheus_remote_write_source],
 Prometheus operators can route a stream of Prometheus data to the archiving
 solution of their choice. For this use case we recommend object stores for their
-cheap and durable qualtiies:
+cheap and durable qualities:
 
 ```toml title="vector.toml"
 [sources.prometheus]

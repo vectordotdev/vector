@@ -143,8 +143,13 @@ weight = 5
 
 [[languages.en.menus.navbar]]
 name = "Support"
-url = "https://www.datadoghq.com/product/observability-pipelines"
+url = "/community"
 weight = 6
+
+[[languages.en.menus.navbar]]
+name = "Enterprise"
+url = "https://www.datadoghq.com/product/observability-pipelines"
+weight = 7
 
 # Footer menu
 [[languages.en.menus.footer]]
@@ -253,6 +258,18 @@ name = "Chat"
 url = "https://chat.vector.dev"
 parent = "community"
 weight = 3
+
+[[languages.en.menus.footer]]
+name = "Download"
+url = "/download"
+identifier = "download"
+weight = 5
+
+[[languages.en.menus.footer]]
+name = "Releases"
+url = "/releases"
+weight = 1
+parent = "download"
 
 # Extra links under the "Meta" section in the docs
 [[languages.en.menus.meta]]

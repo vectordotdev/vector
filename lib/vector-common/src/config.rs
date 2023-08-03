@@ -33,7 +33,7 @@ impl ComponentKey {
     }
 
     pub fn port<D: fmt::Display>(&self, name: D) -> String {
-        format!("{}.{}", self.id, name)
+        format!("{}.{name}", self.id)
     }
 
     #[must_use]

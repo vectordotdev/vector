@@ -7,6 +7,6 @@ use crate::Configurable;
 ///
 /// If this trait is implemented for a type that is not string-like, things will probably break.
 /// Don't implement this for things that are not string-like.
-pub trait ConfigurableString: Configurable {}
+pub trait ConfigurableString: Configurable + ToString {}
 
 impl ConfigurableString for String {}

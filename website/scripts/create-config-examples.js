@@ -83,7 +83,10 @@ Object.makeExampleParams = (params, filter, deepFilter) => {
     .keys(params)
     .filter(k => filter(params[k]))
     .forEach(k => {
-      obj[k] = getExampleValue(params[k], deepFilter);
+      let value = getExampleValue(params[k], deepFilter);
+      if (value) {
+        obj[k] = value;
+      }
     });
 
   return obj;

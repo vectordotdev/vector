@@ -1,0 +1,20 @@
+features:
+- datadog-logs-integration-tests
+
+test_filter: '::datadog::logs::'
+
+runner:
+  env:
+    TEST_DATADOG_API_KEY:
+
+matrix:
+  version: [latest]
+
+# changes to these files/paths will invoke the integration test in CI
+# expressions are evaluated using https://github.com/micromatch/picomatch
+paths:
+- "src/common/datadog.rs"
+- "src/internal_events/datadog_*"
+- "src/sinks/datadog/logs/**"
+- "src/sinks/util/**"
+- "scripts/integration/datadog-logs/**"

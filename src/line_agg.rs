@@ -26,7 +26,7 @@ pub enum Mode {
     ///
     /// The first line (the line that matched the start pattern) does not need to match the `ContinueThrough` pattern.
     ///
-    /// This is useful in cases such as a Java stack trace, where some indicator in the line (such as leading
+    /// This is useful in cases such as a Java stack trace, where some indicator in the line (such as a leading
     /// whitespace) indicates that it is an extension of the proceeding line.
     ContinueThrough,
 
@@ -712,7 +712,7 @@ mod tests {
         // Tests if multiline aggregation updates
         // it's timeout every time it get's a new line.
         // To test this we are emitting a single large
-        // multiline but drip feeding it into the aggreagator
+        // multiline but drip feeding it into the aggregator
         // with 1ms delay.
 
         let n: usize = 1000;

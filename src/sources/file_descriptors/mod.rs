@@ -8,18 +8,22 @@ use codecs::{
     StreamDecodingError,
 };
 use futures::{channel::mpsc, executor, SinkExt, StreamExt};
-use lookup::{owned_value_path, path};
+use lookup::{lookup_v2::OptionalValuePath, owned_value_path, path, OwnedValuePath};
 use tokio_util::{codec::FramedRead, io::StreamReader};
-use value::Kind;
-use vector_common::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
+use vector_common::internal_event::{
+    ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol,
+};
 use vector_config::NamedComponent;
-use vector_core::config::{LegacyKey, LogNamespace, Output};
-use vector_core::event::Event;
-use vector_core::EstimatedJsonEncodedSizeOf;
+use vector_core::{
+    config::{LegacyKey, LogNamespace},
+    event::Event,
+    EstimatedJsonEncodedSizeOf,
+};
+use vrl::value::Kind;
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
-    config::log_schema,
+    config::{log_schema, SourceOutput},
     internal_events::{EventsReceived, FileDescriptorReadError, StreamClosedError},
     shutdown::ShutdownSignal,
     SourceSender,
@@ -31,7 +35,7 @@ pub mod file_descriptor;
 pub mod stdin;
 
 pub trait FileDescriptorConfig: NamedComponent {
-    fn host_key(&self) -> Option<String>;
+    fn host_key(&self) -> Option<OptionalValuePath>;
     fn framing(&self) -> Option<FramingConfig>;
     fn decoding(&self) -> DeserializerConfig;
     fn description(&self) -> String;
@@ -48,7 +52,8 @@ pub trait FileDescriptorConfig: NamedComponent {
     {
         let host_key = self
             .host_key()
-            .unwrap_or_else(|| log_schema().host_key().to_string());
+            .and_then(|k| k.path)
+            .or(log_schema().host_key().cloned());
         let hostname = crate::get_hostname().ok();
 
         let description = self.description();
@@ -57,7 +62,7 @@ pub trait FileDescriptorConfig: NamedComponent {
         let framing = self
             .framing()
             .unwrap_or_else(|| decoding.default_stream_framing());
-        let decoder = DecodingConfig::new(framing, decoding, log_namespace).build();
+        let decoder = DecodingConfig::new(framing, decoding, log_namespace).build()?;
 
         let (sender, receiver) = mpsc::channel(1024);
 
@@ -77,14 +82,14 @@ pub trait FileDescriptorConfig: NamedComponent {
             out,
             shutdown,
             host_key,
-            Self::NAME,
+            self.get_component_name(),
             hostname,
             log_namespace,
         )))
     }
 }
 
-type Sender = mpsc::Sender<std::result::Result<bytes::Bytes, std::io::Error>>;
+type Sender = mpsc::Sender<Result<Bytes, io::Error>>;
 
 fn read_from_fd<R>(mut reader: R, mut sender: Sender)
 where
@@ -94,7 +99,7 @@ where
         let (buffer, len) = match reader.fill_buf() {
             Ok(buffer) if buffer.is_empty() => break, // EOF.
             Ok(buffer) => (Ok(Bytes::copy_from_slice(buffer)), buffer.len()),
-            Err(error) if error.kind() == std::io::ErrorKind::Interrupted => continue,
+            Err(error) if error.kind() == io::ErrorKind::Interrupted => continue,
             Err(error) => (Err(error), 0),
         };
 
@@ -107,7 +112,7 @@ where
     }
 }
 
-type Receiver = mpsc::Receiver<std::result::Result<bytes::Bytes, std::io::Error>>;
+type Receiver = mpsc::Receiver<Result<Bytes, io::Error>>;
 
 #[allow(clippy::too_many_arguments)]
 async fn process_stream(
@@ -115,12 +120,13 @@ async fn process_stream(
     decoder: Decoder,
     mut out: SourceSender,
     shutdown: ShutdownSignal,
-    host_key: String,
+    host_key: Option<OwnedValuePath>,
     source_type: &'static str,
     hostname: Option<String>,
     log_namespace: LogNamespace,
 ) -> Result<(), ()> {
     let bytes_received = register!(BytesReceived::from(Protocol::NONE));
+    let events_received = register!(EventsReceived);
     let stream = receiver.inspect(|result| {
         if let Err(error) = result {
             emit!(FileDescriptorReadError { error: &error });
@@ -133,10 +139,10 @@ async fn process_stream(
             match result {
                 Ok((events, byte_size)) => {
                     bytes_received.emit(ByteSize(byte_size));
-                    emit!(EventsReceived {
-                        byte_size: events.estimated_json_encoded_size_of(),
-                        count: events.len()
-                    });
+                    events_received.emit(CountByteSize(
+                         events.len(),
+                         events.estimated_json_encoded_size_of(),
+                    ));
 
                     let now = Utc::now();
 
@@ -155,7 +161,7 @@ async fn process_stream(
                                     log_namespace.insert_source_metadata(
                                         source_type,
                                         log,
-                                        Some(LegacyKey::InsertIfEmpty(host_key.as_str())),
+                                        host_key.as_ref().map(LegacyKey::InsertIfEmpty),
                                         path!("host"),
                                         hostname.clone()
                                     );
@@ -186,9 +192,9 @@ async fn process_stream(
             debug!("Finished sending.");
             Ok(())
         }
-        Err(error) => {
+        Err(_) => {
             let (count, _) = stream.size_hint();
-            emit!(StreamClosedError { error, count });
+            emit!(StreamClosedError { count });
             Err(())
         }
     }
@@ -198,25 +204,26 @@ async fn process_stream(
 /// file_descriptor sources.
 fn outputs(
     log_namespace: LogNamespace,
-    host_key: &Option<String>,
+    host_key: &Option<OptionalValuePath>,
     decoding: &DeserializerConfig,
     source_name: &'static str,
-) -> Vec<Output> {
-    let host_key_path = host_key.as_ref().map_or_else(
-        || owned_value_path!(log_schema().host_key()),
-        |x| owned_value_path!(x),
-    );
-
+) -> Vec<SourceOutput> {
     let schema_definition = decoding
         .schema_definition(log_namespace)
         .with_source_metadata(
             source_name,
-            Some(LegacyKey::InsertIfEmpty(host_key_path)),
+            host_key
+                .clone()
+                .map_or(log_schema().host_key().cloned(), |key| key.path)
+                .map(LegacyKey::Overwrite),
             &owned_value_path!("host"),
             Kind::bytes(),
-            None,
+            Some("host"),
         )
         .with_standard_vector_source_metadata();
 
-    vec![Output::default(decoding.output_type()).with_schema_definition(schema_definition)]
+    vec![SourceOutput::new_logs(
+        decoding.output_type(),
+        schema_definition,
+    )]
 }

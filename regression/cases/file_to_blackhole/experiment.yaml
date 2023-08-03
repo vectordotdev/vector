@@ -1,0 +1,2 @@
+optimization_goal: egress_throughput
+erratic: true

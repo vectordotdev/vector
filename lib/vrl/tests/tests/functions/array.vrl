@@ -1,5 +1,0 @@
-# object: { "foo": [ "apples", "bananas" ] }
-# result: { "foo": [ "apples", "bananas", "coffee" ] }
-
-.foo = append(array!(.foo), [ "coffee" ])
-.

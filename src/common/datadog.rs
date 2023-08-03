@@ -5,6 +5,9 @@
 use serde::{Deserialize, Serialize};
 use vector_config::configurable_component;
 
+pub const DD_US_SITE: &str = "datadoghq.com";
+pub const DD_EU_SITE: &str = "datadoghq.eu";
+
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub(crate) struct DatadogSeriesMetric {
     pub(crate) metric: String,
@@ -45,26 +48,28 @@ pub enum Region {
 
 /// Gets the base domain to use for any calls to Datadog.
 ///
-/// If `site` is not specified, we fallback to `region`, and if that is not specified, we
-/// fallback to the Datadog US domain.
-pub(crate) fn get_base_domain(site: Option<&String>, region: Option<Region>) -> &str {
-    site.map(|s| s.as_str()).unwrap_or_else(|| match region {
-        Some(Region::Eu) => "datadoghq.eu",
-        None | Some(Region::Us) => "datadoghq.com",
-    })
+/// This is a helper function for Datadog component configs using the deprecated `region` field.
+///
+/// If `region` is not specified, we fallback to `site`.
+///
+/// TODO: This should be deleted when the deprecated `region` config option is fully removed,
+///       and the callers will replace the result of this function call with just `site`.
+pub(crate) const fn get_base_domain_region<'a>(site: &'a str, region: Option<&Region>) -> &'a str {
+    if let Some(region) = region {
+        match region {
+            Region::Eu => DD_EU_SITE,
+            Region::Us => DD_US_SITE,
+        }
+    } else {
+        site
+    }
 }
 
 /// Gets the base API endpoint to use for any calls to Datadog.
 ///
-/// If `site` is not specified, we fallback to `region`, and if that is not specified, we fallback
-/// to the Datadog US domain.
-pub(crate) fn get_api_base_endpoint(
-    endpoint: Option<&String>,
-    site: Option<&String>,
-    region: Option<Region>,
-) -> String {
-    endpoint.cloned().unwrap_or_else(|| {
-        let base = get_base_domain(site, region);
-        format!("https://api.{}", base)
-    })
+/// If `endpoint` is not specified, we fallback to `site`.
+pub(crate) fn get_api_base_endpoint(endpoint: Option<&String>, site: &str) -> String {
+    endpoint
+        .cloned()
+        .unwrap_or_else(|| format!("https://api.{}", site))
 }

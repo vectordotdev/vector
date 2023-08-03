@@ -1,6 +1,6 @@
 #[cfg(feature = "enterprise")]
 use std::collections::BTreeMap;
-use std::path::Path;
+use std::{path::Path, time::Duration};
 
 use indexmap::IndexMap;
 #[cfg(feature = "enterprise")]
@@ -8,18 +8,16 @@ use serde_json::Value;
 use vector_config::configurable_component;
 use vector_core::config::GlobalOptions;
 
-use crate::{
-    enrichment_tables::EnrichmentTables, providers::Providers, secrets::SecretBackends,
-    sinks::Sinks, sources::Sources, transforms::Transforms,
-};
+use crate::{enrichment_tables::EnrichmentTables, providers::Providers, secrets::SecretBackends};
 
 #[cfg(feature = "api")]
 use super::api;
 #[cfg(feature = "enterprise")]
 use super::enterprise;
 use super::{
-    compiler, schema, ComponentKey, Config, EnrichmentTableOuter, HealthcheckOptions, SinkOuter,
-    SourceOuter, TestDefinition, TransformOuter,
+    compiler, schema, BoxedSink, BoxedSource, BoxedTransform, ComponentKey, Config,
+    EnrichmentTableOuter, HealthcheckOptions, SinkOuter, SourceOuter, TestDefinition,
+    TransformOuter,
 };
 
 /// A complete Vector configuration.
@@ -78,6 +76,13 @@ pub struct ConfigBuilder {
     /// All configured secrets backends.
     #[serde(default)]
     pub secret: IndexMap<ComponentKey, SecretBackends>,
+
+    /// The duration in seconds to wait for graceful shutdown after SIGINT or SIGTERM are received.
+    /// After the duration has passed, Vector will force shutdown. Default value is 60 seconds. This
+    /// value can be set using a [cli arg](crate::cli::RootOpts::graceful_shutdown_limit_secs).
+    #[serde(default, skip)]
+    #[doc(hidden)]
+    pub graceful_shutdown_duration: Option<Duration>,
 }
 
 #[cfg(feature = "enterprise")]
@@ -195,8 +200,8 @@ impl From<Config> for ConfigBuilder {
             transforms,
             tests,
             secret,
+            graceful_shutdown_duration,
             hash: _,
-            expansions: _,
         } = config;
 
         let transforms = transforms
@@ -226,6 +231,7 @@ impl From<Config> for ConfigBuilder {
             provider: None,
             tests,
             secret,
+            graceful_shutdown_duration,
         }
     }
 }
@@ -256,12 +262,17 @@ impl ConfigBuilder {
         );
     }
 
-    pub fn add_source<K: Into<String>, S: Into<Sources>>(&mut self, key: K, source: S) {
+    pub fn add_source<K: Into<String>, S: Into<BoxedSource>>(&mut self, key: K, source: S) {
         self.sources
             .insert(ComponentKey::from(key.into()), SourceOuter::new(source));
     }
 
-    pub fn add_sink<K: Into<String>, S: Into<Sinks>>(&mut self, key: K, inputs: &[&str], sink: S) {
+    pub fn add_sink<K: Into<String>, S: Into<BoxedSink>>(
+        &mut self,
+        key: K,
+        inputs: &[&str],
+        sink: S,
+    ) {
         let inputs = inputs
             .iter()
             .map(|value| value.to_string())
@@ -276,11 +287,11 @@ impl ConfigBuilder {
 
     // For some feature sets, no transforms are compiled, which leads to no callers using this
     // method, and in turn, annoying errors about unused variables.
-    pub fn add_transform<K: Into<String>, T: Into<Transforms>>(
+    pub fn add_transform(
         &mut self,
-        key: K,
+        key: impl Into<String>,
         inputs: &[&str],
-        transform: T,
+        transform: impl Into<BoxedTransform>,
     ) {
         let inputs = inputs
             .iter()

@@ -13,8 +13,5 @@ base: components: transforms: configuration: inputs: {
 		[configuration]: https://vector.dev/docs/reference/configuration/
 		"""
 	required: true
-	type: array: items: type: string: {
-		examples: ["my-source-or-transform-id", "prefix-*"]
-		syntax: "literal"
-	}
+	type: array: items: type: string: examples: ["my-source-or-transform-id", "prefix-*"]
 }

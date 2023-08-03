@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 use std::{
     fmt,
     task::{Context, Poll},
@@ -52,10 +53,12 @@ impl HttpError {
 }
 
 pub type HttpClientFuture = <HttpClient as Service<http::Request<Body>>>::Future;
+type HttpProxyConnector = ProxyConnector<HttpsConnector<HttpConnector>>;
 
 pub struct HttpClient<B = Body> {
-    client: Client<ProxyConnector<HttpsConnector<HttpConnector>>, B>,
+    client: Client<HttpProxyConnector, B>,
     user_agent: HeaderValue,
+    proxy_connector: HttpProxyConnector,
 }
 
 impl<B> HttpClient<B>
@@ -76,14 +79,18 @@ where
         proxy_config: &ProxyConfig,
         client_builder: &mut client::Builder,
     ) -> Result<HttpClient<B>, HttpError> {
-        let proxy = build_proxy_connector(tls_settings.into(), proxy_config)?;
-        let client = client_builder.build(proxy);
+        let proxy_connector = build_proxy_connector(tls_settings.into(), proxy_config)?;
+        let client = client_builder.build(proxy_connector.clone());
 
         let version = crate::get_version();
         let user_agent = HeaderValue::from_str(&format!("Vector/{}", version))
             .expect("Invalid header value for version!");
 
-        Ok(HttpClient { client, user_agent })
+        Ok(HttpClient {
+            client,
+            user_agent,
+            proxy_connector,
+        })
     }
 
     pub fn send(
@@ -94,6 +101,7 @@ where
         let _enter = span.enter();
 
         default_request_headers(&mut request, &self.user_agent);
+        self.maybe_add_proxy_headers(&mut request);
 
         emit!(http_client::AboutToSendHttpRequest { request: &request });
 
@@ -133,6 +141,17 @@ where
         .instrument(span.clone().or_current());
 
         Box::pin(fut)
+    }
+
+    fn maybe_add_proxy_headers(&self, request: &mut Request<B>) {
+        if let Some(proxy_headers) = self.proxy_connector.http_headers(request.uri()) {
+            for (k, v) in proxy_headers {
+                let request_headers = request.headers_mut();
+                if !request_headers.contains_key(k) {
+                    request_headers.insert(k, v.into());
+                }
+            }
+        }
     }
 }
 
@@ -215,6 +234,7 @@ impl<B> Clone for HttpClient<B> {
         Self {
             client: self.client.clone(),
             user_agent: self.user_agent.clone(),
+            proxy_connector: self.proxy_connector.clone(),
         }
     }
 }
@@ -230,28 +250,35 @@ impl<B> fmt::Debug for HttpClient<B> {
 
 /// Configuration of the authentication strategy for HTTP requests.
 ///
-/// HTTP authentication should almost always be used with HTTPS only, as the authentication credentials are passed as an
+/// HTTP authentication should be used with HTTPS only, as the authentication credentials are passed as an
 /// HTTP header without any additional encryption beyond what is provided by the transport itself.
 #[configurable_component]
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[serde(deny_unknown_fields, rename_all = "snake_case", tag = "strategy")]
+#[configurable(metadata(docs::enum_tag_description = "The authentication strategy to use."))]
 pub enum Auth {
     /// Basic authentication.
     ///
-    /// The username and password are concatenated and encoded via base64.
+    /// The username and password are concatenated and encoded via [base64][base64].
+    ///
+    /// [base64]: https://en.wikipedia.org/wiki/Base64
     Basic {
-        /// The username to send.
+        /// The basic authentication username.
+        #[configurable(metadata(docs::examples = "${USERNAME}"))]
+        #[configurable(metadata(docs::examples = "username"))]
         user: String,
 
-        /// The password to send.
+        /// The basic authentication password.
+        #[configurable(metadata(docs::examples = "${PASSWORD}"))]
+        #[configurable(metadata(docs::examples = "password"))]
         password: SensitiveString,
     },
 
     /// Bearer authentication.
     ///
-    /// A bearer token (OAuth2, JWT, etc) is passed as-is.
+    /// The bearer token value (OAuth2, JWT, etc.) is passed as-is.
     Bearer {
-        /// The bearer token to send.
+        /// The bearer authentication token.
         token: SensitiveString,
     },
 }

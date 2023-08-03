@@ -4,6 +4,7 @@ components: sources: gcp_pubsub: {
 	title: "GCP Pub/Sub"
 
 	features: {
+		auto_generated:   true
 		acknowledgements: true
 		collect: {
 			tls: {
@@ -57,118 +58,7 @@ components: sources: gcp_pubsub: {
 		platform_name: null
 	}
 
-	configuration: {
-		acknowledgements: configuration._source_acknowledgements
-		ack_deadline_seconds: {
-			common:      false
-			description: "The acknowledgement deadline to use for this stream. Messages that are not acknowledged when this deadline expires may be retransmitted. This setting is deprecated and will be removed in a future version."
-			required:    false
-			type: uint: {
-				default: 600
-				examples: [10, 600]
-				unit: "seconds"
-			}
-		}
-		ack_deadline_secs: {
-			common:      false
-			description: "The acknowledgement deadline to use for this stream. Messages that are not acknowledged when this deadline expires may be retransmitted."
-			required:    false
-			type: uint: {
-				default: 600
-				examples: [10, 600]
-				unit: "seconds"
-			}
-		}
-		api_key:          configuration._gcp_api_key
-		credentials_path: configuration._gcp_credentials_path
-		endpoint: {
-			common:      false
-			description: "The endpoint from which to pull data."
-			required:    false
-			type: string: {
-				default: "https://pubsub.googleapis.com"
-				examples: ["https://us-central1-pubsub.googleapis.com"]
-			}
-		}
-		full_response_size: {
-			common: false
-			description: """
-					The number of messages in a response to mark a stream as "busy".
-					This is used to determine if more streams should be started.
-					The GCP Pub/Sub servers send responses with 100 or more messages when
-					the subscription is busy.
-				"""
-			required: false
-			type: uint: {
-				default: 100
-				examples: [100, 128]
-				unit: null
-			}
-		}
-		keepalive_secs: {
-			common:      false
-			description: "The amount of time, in seconds, with no received activity before sending a keepalive request. If this is set larger than `60`, you may see periodic errors sent from the server."
-			required:    false
-			type: float: {
-				default: 60.0
-				examples: [10.0]
-			}
-		}
-		max_concurrency: {
-			common:      false
-			description: "The maximum number of concurrent stream connections to open at once."
-			required:    false
-			type: uint: {
-				default: 5
-				examples: [1, 9]
-				unit: "concurrency"
-			}
-		}
-		poll_time_seconds: {
-			common:      false
-			description: "How often to poll the currently active streams to see if they are all busy and so open a new stream."
-			required:    false
-			type: float: {
-				default: 2.0
-				examples: [1.0, 5.0]
-				unit: "seconds"
-			}
-		}
-		project: {
-			description: "The project name from which to pull logs."
-			required:    true
-			type: string: {
-				examples: ["vector-123456"]
-			}
-		}
-		retry_delay_seconds: {
-			common:      false
-			description: "The amount of time to wait between retry attempts after an error. This setting is deprecated and will be removed in a future version."
-			required:    false
-			type: float: {
-				default: 1.0
-				examples: [0.5]
-				unit: "seconds"
-			}
-		}
-		retry_delay_secs: {
-			common:      false
-			description: "The amount of time to wait between retry attempts after an error."
-			required:    false
-			type: float: {
-				default: 1.0
-				examples: [0.5]
-				unit: "seconds"
-			}
-		}
-		subscription: {
-			description: "The subscription within the project which is configured to receive logs."
-			required:    true
-			type: string: {
-				examples: ["vector-123456"]
-			}
-		}
-	}
+	configuration: base.components.sources.gcp_pubsub.configuration
 
 	output: logs: record: {
 		description: "An individual Pub/Sub record"
@@ -207,12 +97,6 @@ components: sources: gcp_pubsub: {
 				description: "The time this message was published in the topic."
 			}
 		}
-	}
-
-	telemetry: metrics: {
-		component_received_event_bytes_total: components.sources.internal_metrics.output.metrics.component_received_event_bytes_total
-		component_received_events_total:      components.sources.internal_metrics.output.metrics.component_received_events_total
-		component_received_bytes_total:       components.sources.internal_metrics.output.metrics.component_received_bytes_total
 	}
 
 	how_it_works: {

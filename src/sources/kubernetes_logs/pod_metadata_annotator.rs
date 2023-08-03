@@ -11,7 +11,7 @@ use lookup::{
     lookup_v2::{OptionalTargetPath, ValuePath},
     owned_value_path, path, OwnedTargetPath,
 };
-use vector_config::{configurable_component, NamedComponent};
+use vector_config::configurable_component;
 use vector_core::config::{LegacyKey, LogNamespace};
 
 use super::{
@@ -20,46 +20,114 @@ use super::{
 };
 use crate::event::{Event, LogEvent};
 
-/// Configuration for how the events are annotated with `Pod` metadata.
+/// Configuration for how the events are enriched with Pod metadata.
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields, default)]
 pub struct FieldsSpec {
-    /// Event field for Pod name.
+    /// Event field for the Pod's name.
+    ///
+    /// Set to `""` to suppress this key.
+    #[configurable(metadata(docs::examples = ".k8s.pod_name"))]
+    #[configurable(metadata(docs::examples = "k8s.pod_name"))]
+    #[configurable(metadata(docs::examples = ""))]
     pub pod_name: OptionalTargetPath,
 
-    /// Event field for Pod namespace.
+    /// Event field for the Pod's namespace.
+    ///
+    /// Set to `""` to suppress this key.
+    #[configurable(metadata(docs::examples = ".k8s.pod_ns"))]
+    #[configurable(metadata(docs::examples = "k8s.pod_ns"))]
+    #[configurable(metadata(docs::examples = ""))]
     pub pod_namespace: OptionalTargetPath,
 
-    /// Event field for Pod uid.
+    /// Event field for the Pod's UID.
+    ///
+    /// Set to `""` to suppress this key.
+    #[configurable(metadata(docs::examples = ".k8s.pod_uid"))]
+    #[configurable(metadata(docs::examples = "k8s.pod_uid"))]
+    #[configurable(metadata(docs::examples = ""))]
     pub pod_uid: OptionalTargetPath,
 
-    /// Event field for Pod IPv4 address.
+    /// Event field for the Pod's IPv4 address.
+    ///
+    /// Set to `""` to suppress this key.
+    #[configurable(metadata(docs::examples = ".k8s.pod_ip"))]
+    #[configurable(metadata(docs::examples = "k8s.pod_ip"))]
+    #[configurable(metadata(docs::examples = ""))]
     pub pod_ip: OptionalTargetPath,
 
-    /// Event field for Pod IPv4 and IPv6 addresses.
+    /// Event field for the Pod's IPv4 and IPv6 addresses.
+    ///
+    /// Set to `""` to suppress this key.
+    #[configurable(metadata(docs::examples = ".k8s.pod_ips"))]
+    #[configurable(metadata(docs::examples = "k8s.pod_ips"))]
+    #[configurable(metadata(docs::examples = ""))]
     pub pod_ips: OptionalTargetPath,
 
-    /// Event field for Pod labels.
+    /// Event field for the `Pod`'s labels.
+    ///
+    /// Set to `""` to suppress this key.
+    #[configurable(metadata(docs::examples = ".k8s.pod_labels"))]
+    #[configurable(metadata(docs::examples = "k8s.pod_labels"))]
+    #[configurable(metadata(docs::examples = ""))]
     pub pod_labels: OptionalTargetPath,
 
-    /// Event field for Pod annotations.
+    /// Event field for the Pod's annotations.
+    ///
+    /// Set to `""` to suppress this key.
+    #[configurable(metadata(docs::examples = ".k8s.pod_annotations"))]
+    #[configurable(metadata(docs::examples = "k8s.pod_annotations"))]
+    #[configurable(metadata(docs::examples = ""))]
     pub pod_annotations: OptionalTargetPath,
 
-    /// Event field for Pod node_name.
+    /// Event field for the Pod's node_name.
+    ///
+    /// Set to `""` to suppress this key.
+    #[configurable(metadata(docs::examples = ".k8s.pod_host"))]
+    #[configurable(metadata(docs::examples = "k8s.pod_host"))]
+    #[configurable(metadata(docs::examples = ""))]
     pub pod_node_name: OptionalTargetPath,
 
-    /// Event field for Pod owner reference.
+    /// Event field for the Pod's owner reference.
+    ///
+    /// Set to `""` to suppress this key.
+    #[configurable(metadata(docs::examples = ".k8s.pod_owner"))]
+    #[configurable(metadata(docs::examples = "k8s.pod_owner"))]
+    #[configurable(metadata(docs::examples = ""))]
     pub pod_owner: OptionalTargetPath,
 
-    /// Event field for container name.
+    /// Event field for the Container's name.
+    ///
+    /// Set to `""` to suppress this key.
+    #[configurable(metadata(docs::examples = ".k8s.container_name"))]
+    #[configurable(metadata(docs::examples = "k8s.container_name"))]
+    #[configurable(metadata(docs::examples = ""))]
     pub container_name: OptionalTargetPath,
 
-    /// Event field for container ID.
+    /// Event field for the Container's ID.
+    ///
+    /// Set to `""` to suppress this key.
+    #[configurable(metadata(docs::examples = ".k8s.container_id"))]
+    #[configurable(metadata(docs::examples = "k8s.container_id"))]
+    #[configurable(metadata(docs::examples = ""))]
     pub container_id: OptionalTargetPath,
 
-    /// Event field for container image.
+    /// Event field for the Container's image.
+    ///
+    /// Set to `""` to suppress this key.
+    #[configurable(metadata(docs::examples = ".k8s.container_image"))]
+    #[configurable(metadata(docs::examples = "k8s.container_image"))]
+    #[configurable(metadata(docs::examples = ""))]
     pub container_image: OptionalTargetPath,
+
+    /// Event field for the Container's image ID.
+    ///
+    /// Set to `""` to suppress this key.
+    #[configurable(metadata(docs::examples = ".k8s.container_image_id"))]
+    #[configurable(metadata(docs::examples = "k8s.container_image_id"))]
+    #[configurable(metadata(docs::examples = ""))]
+    pub container_image_id: OptionalTargetPath,
 }
 
 impl Default for FieldsSpec {
@@ -93,6 +161,11 @@ impl Default for FieldsSpec {
                 "container_image"
             ))
             .into(),
+            container_image_id: OwnedTargetPath::event(owned_value_path!(
+                "kubernetes",
+                "container_image_id"
+            ))
+            .into(),
         }
     }
 }
@@ -121,8 +194,6 @@ impl PodMetadataAnnotator {
 
 impl PodMetadataAnnotator {
     /// Annotates an event with the information from the [`Pod::metadata`].
-    /// The event has to be obtained from kubernetes log file, and have a
-    /// [`FILE_KEY`] field set with a file that the line came from.
     pub fn annotate<'a>(&self, event: &mut Event, file: &'a str) -> Option<LogFileInfo<'a>> {
         let log = event.as_mut_log();
         let file_info = parse_log_file_path(file)?;
@@ -364,6 +435,21 @@ fn annotate_from_container_status(
             value.to_owned(),
         )
     }
+
+    let legacy_key = fields_spec
+        .container_image_id
+        .path
+        .as_ref()
+        .map(|k| &k.path)
+        .map(LegacyKey::Overwrite);
+
+    log_namespace.insert_source_metadata(
+        Config::NAME,
+        log,
+        legacy_key,
+        path!("container_image_id"),
+        container_status.image_id.to_owned(),
+    )
 }
 
 fn annotate_from_container(
@@ -861,7 +947,11 @@ mod tests {
             (
                 FieldsSpec::default(),
                 ContainerStatus::default(),
-                LogEvent::default(),
+                {
+                    let mut log = LogEvent::default();
+                    log.insert(event_path!("kubernetes", "container_image_id"), "");
+                    log
+                },
                 LogNamespace::Legacy,
             ),
             (
@@ -870,6 +960,7 @@ mod tests {
                 },
                 ContainerStatus {
                     container_id: Some("container_id_foo".to_owned()),
+                    image_id: "test_image_id".to_owned(),
                     ..ContainerStatus::default()
                 },
                 {
@@ -877,6 +968,10 @@ mod tests {
                     log.insert(
                         event_path!("kubernetes", "container_id"),
                         "container_id_foo",
+                    );
+                    log.insert(
+                        event_path!("kubernetes", "container_image_id"),
+                        "test_image_id",
                     );
                     log
                 },

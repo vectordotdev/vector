@@ -6,8 +6,9 @@ use futures::{stream::BoxStream, SinkExt, StreamExt};
 use snafu::{ResultExt, Snafu};
 use tokio::{net::UnixStream, time::sleep};
 use tokio_util::codec::Encoder;
+use vector_common::json_size::JsonSize;
 use vector_config::configurable_component;
-use vector_core::ByteSizeOf;
+use vector_core::{ByteSizeOf, EstimatedJsonEncodedSizeOf};
 
 use crate::{
     codecs::Transformer,
@@ -43,6 +44,7 @@ pub struct UnixSinkConfig {
     /// The Unix socket path.
     ///
     /// This should be an absolute path.
+    #[configurable(metadata(docs::examples = "/path/to/socket"))]
     pub path: PathBuf,
 }
 
@@ -150,6 +152,7 @@ where
         let mut input = input
             .map(|mut event| {
                 let byte_size = event.size_of();
+                let json_byte_size = event.estimated_json_encoded_size_of();
 
                 transformer.transform(&mut event);
 
@@ -163,9 +166,10 @@ where
                         item,
                         finalizers,
                         byte_size,
+                        json_byte_size,
                     }
                 } else {
-                    EncodedEvent::new(Bytes::new(), 0)
+                    EncodedEvent::new(Bytes::new(), 0, JsonSize::zero())
                 }
             })
             .peekable();
@@ -193,7 +197,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use codecs::{encoding::Framer, NewlineDelimitedEncoder, TextSerializer};
+    use codecs::{encoding::Framer, NewlineDelimitedEncoder, TextSerializerConfig};
     use tokio::net::UnixListener;
 
     use super::*;
@@ -216,7 +220,7 @@ mod tests {
         assert!(UnixSinkConfig::new(good_path)
             .build(
                 Default::default(),
-                Encoder::<()>::new(TextSerializer::new().into())
+                Encoder::<()>::new(TextSerializerConfig::default().build().into())
             )
             .unwrap()
             .1
@@ -227,7 +231,7 @@ mod tests {
         assert!(UnixSinkConfig::new(bad_path)
             .build(
                 Default::default(),
-                Encoder::<()>::new(TextSerializer::new().into())
+                Encoder::<()>::new(TextSerializerConfig::default().build().into())
             )
             .unwrap()
             .1
@@ -250,7 +254,7 @@ mod tests {
                 Default::default(),
                 Encoder::<Framer>::new(
                     NewlineDelimitedEncoder::new().into(),
-                    TextSerializer::new().into(),
+                    TextSerializerConfig::default().build().into(),
                 ),
             )
             .unwrap();

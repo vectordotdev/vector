@@ -31,6 +31,9 @@ pub fn decode(header: &Option<String>, mut body: Bytes) -> Result<Bytes, ErrorMe
                     .decompress_vec(&body)
                     .map_err(|error| handle_decode_error(encoding, error))?
                     .into(),
+                "zstd" => zstd::decode_all(body.reader())
+                    .map_err(|error| handle_decode_error(encoding, error))?
+                    .into(),
                 encoding => {
                     return Err(ErrorMessage::new(
                         StatusCode::UNSUPPORTED_MEDIA_TYPE,

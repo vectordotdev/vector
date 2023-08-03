@@ -14,7 +14,7 @@ use futures::StreamExt;
 use rkyv::{with::Atomic, Archive, Serialize};
 use snafu::{ResultExt, Snafu};
 use tokio::{fs, io::AsyncWriteExt, sync::Notify};
-use vector_common::{finalizer::OrderedFinalizer, shutdown::ShutdownSignal};
+use vector_common::finalizer::OrderedFinalizer;
 
 use super::{
     backed_archive::BackedArchive,
@@ -74,7 +74,7 @@ pub enum LedgerLoadCreateError {
 
 /// Ledger state.
 ///
-/// Stores the relevant information related to both the reader and writer.  Gets serailized and
+/// Stores the relevant information related to both the reader and writer.  Gets serialized and
 /// stored on disk, and is managed via a memory-mapped file.
 ///
 /// # Warning
@@ -352,7 +352,7 @@ where
     pub fn get_data_file_path(&self, file_id: u16) -> PathBuf {
         self.config
             .data_dir
-            .join(format!("buffer-data-{}.dat", file_id))
+            .join(format!("buffer-data-{file_id}.dat"))
     }
 
     /// Waits for a signal from the reader that progress has been made.
@@ -705,7 +705,7 @@ where
 
     #[must_use]
     pub(super) fn spawn_finalizer(self: Arc<Self>) -> OrderedFinalizer<u64> {
-        let (finalizer, mut stream) = OrderedFinalizer::new(ShutdownSignal::noop());
+        let (finalizer, mut stream) = OrderedFinalizer::new(None);
         tokio::spawn(async move {
             while let Some((_status, amount)) = stream.next().await {
                 self.increment_pending_acks(amount);

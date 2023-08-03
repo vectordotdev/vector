@@ -4,9 +4,8 @@ use aws_sdk_sqs::{error::SendMessageError, types::SdkError, Client as SqsClient}
 use futures::{future::BoxFuture, TryFutureExt};
 use tower::Service;
 use tracing::Instrument;
-use vector_core::{
-    event::EventStatus, internal_event::CountByteSize, stream::DriverResponse, ByteSizeOf,
-};
+use vector_common::request_metadata::GroupedCountByteSize;
+use vector_core::{event::EventStatus, stream::DriverResponse, ByteSizeOf};
 
 use super::request_builder::SendMessageEntry;
 
@@ -44,7 +43,13 @@ impl Service<SendMessageEntry> for SqsService {
                 .set_message_deduplication_id(entry.message_deduplication_id)
                 .queue_url(entry.queue_url)
                 .send()
-                .map_ok(|_| SendMessageResponse { byte_size })
+                .map_ok(|_| SendMessageResponse {
+                    byte_size,
+                    json_byte_size: entry
+                        .metadata
+                        .events_estimated_json_encoded_byte_size()
+                        .clone(),
+                })
                 .instrument(info_span!("request").or_current())
                 .await
         })
@@ -53,6 +58,7 @@ impl Service<SendMessageEntry> for SqsService {
 
 pub(crate) struct SendMessageResponse {
     byte_size: usize,
+    json_byte_size: GroupedCountByteSize,
 }
 
 impl DriverResponse for SendMessageResponse {
@@ -60,7 +66,11 @@ impl DriverResponse for SendMessageResponse {
         EventStatus::Delivered
     }
 
-    fn events_sent(&self) -> CountByteSize {
-        CountByteSize(1, self.byte_size)
+    fn events_sent(&self) -> &GroupedCountByteSize {
+        &self.json_byte_size
+    }
+
+    fn bytes_sent(&self) -> Option<usize> {
+        Some(self.byte_size)
     }
 }

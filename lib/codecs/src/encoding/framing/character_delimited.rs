@@ -1,12 +1,12 @@
 use bytes::{BufMut, BytesMut};
-use serde::{Deserialize, Serialize};
 use tokio_util::codec::Encoder;
 use vector_config::configurable_component;
 
 use super::BoxedFramingError;
 
 /// Config used to build a `CharacterDelimitedEncoder`.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[configurable_component]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct CharacterDelimitedEncoderConfig {
     /// Options for the character delimited encoder.
     pub character_delimited: CharacterDelimitedEncoderOptions,

@@ -1,5 +1,5 @@
 ARG RUST_VERSION
-ARG DEBIAN_RELEASE=bullseye
+ARG DEBIAN_RELEASE=bookworm
 # Features required for both Agent and Aggregator Helm chart configurations
 ARG FEATURES=api,api-client,sources-datadog_agent,sources-fluent,sources-host_metrics,sources-internal_metrics,sources-kubernetes_logs,sources-logstash,sources-splunk_hec,sources-statsd,sources-syslog,sources-vector,sinks-console,sinks-prometheus,sinks-vector
 

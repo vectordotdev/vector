@@ -1,5 +1,5 @@
 ---
-title: Statsd
+title: StatsD
 description: Deliver metric data to a [StatsD](https://github.com/statsd/statsd) aggregator
 kind: sink
 layout: component

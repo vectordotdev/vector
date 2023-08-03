@@ -2,7 +2,8 @@ use std::{error, fmt, path::PathBuf};
 
 use bytes::{Buf, BufMut};
 use metrics_tracing_context::{MetricsLayer, TracingContextLayer};
-use metrics_util::{debugging::DebuggingRecorder, layers::Layer};
+use metrics_util::debugging::DebuggingRecorder;
+use metrics_util::layers::Layer;
 use tracing::Span;
 use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
 use vector_buffers::{
@@ -102,7 +103,7 @@ impl<const N: usize> FixedEncodable for Message<N> {
         let id = buffer.get_u64();
         for _ in 0..N {
             // this covers self._padding
-            let _ = buffer.get_u64();
+            _ = buffer.get_u64();
         }
         Ok(Message::new(id))
     }
@@ -177,6 +178,6 @@ pub async fn war_measurement<const N: usize>(
 ) {
     for msg in messages.into_iter() {
         sender.send(msg).await.unwrap();
-        let _ = receiver.next().await.unwrap();
+        _ = receiver.next().await.unwrap();
     }
 }

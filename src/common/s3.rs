@@ -12,6 +12,10 @@ impl ClientBuilder for S3ClientBuilder {
     }
 
     fn build(client: aws_smithy_client::Client, config: &aws_types::SdkConfig) -> Self::Client {
-        aws_sdk_s3::client::Client::with_config(client, config.into())
+        let config = aws_sdk_s3::config::Builder::from(config)
+            .force_path_style(true)
+            .build();
+
+        aws_sdk_s3::client::Client::with_config(client, config)
     }
 }

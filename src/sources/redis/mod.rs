@@ -5,24 +5,25 @@ use codecs::{
     StreamDecodingError,
 };
 use futures::StreamExt;
-use lookup::{lookup_v2::BorrowedSegment, owned_value_path, path};
+use lookup::{lookup_v2::OptionalValuePath, owned_value_path, path, OwnedValuePath};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
-use value::Kind;
 use vector_common::internal_event::{
-    ByteSize, BytesReceived, InternalEventHandle as _, Protocol, Registered,
+    ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol, Registered,
 };
-use vector_config::{configurable_component, NamedComponent};
-use vector_core::config::{LegacyKey, LogNamespace};
-use vector_core::EstimatedJsonEncodedSizeOf;
+use vector_config::configurable_component;
+use vector_core::{
+    config::{LegacyKey, LogNamespace},
+    EstimatedJsonEncodedSizeOf,
+};
+use vrl::value::Kind;
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
-    config::{log_schema, GenerateConfig, Output, SourceConfig, SourceContext},
+    config::{log_schema, GenerateConfig, SourceConfig, SourceContext, SourceOutput},
     event::Event,
     internal_events::{EventsReceived, StreamClosedError},
     serde::{default_decoding, default_framing_message_based},
-    SourceSender,
 };
 
 mod channel;
@@ -93,7 +94,7 @@ impl From<&redis::ConnectionInfo> for ConnectionInfo {
 }
 
 /// Configuration for the `redis` source.
-#[configurable_component(source("redis"))]
+#[configurable_component(source("redis", "Collect observability data from Redis."))]
 #[derive(Clone, Debug, Derivative)]
 #[serde(deny_unknown_fields)]
 pub struct RedisSourceConfig {
@@ -106,18 +107,21 @@ pub struct RedisSourceConfig {
 
     /// The Redis URL to connect to.
     ///
-    /// The URL must take the form of `protocol://server:port/db` where the `protocol` can either be `redis` or `rediss` for connections secured via TLS.
+    /// The URL must take the form of `protocol://server:port/db` where the `protocol` can either be `redis` or `rediss` for connections secured using TLS.
+    #[configurable(metadata(docs::examples = "redis://127.0.0.1:6379/0"))]
     url: String,
 
     /// The Redis key to read messages from.
+    #[configurable(metadata(docs::examples = "vector"))]
     key: String,
 
     /// Sets the name of the log field to use to add the key to each event.
     ///
-    /// The value will be the Redis key that the event was read from.
+    /// The value is the Redis key that the event was read from.
     ///
-    /// By default, this is not set and the field will not be automatically added.
-    redis_key: Option<String>,
+    /// By default, this is not set and the field is not automatically added.
+    #[configurable(metadata(docs::examples = "redis_key"))]
+    redis_key: Option<OptionalValuePath>,
 
     #[configurable(derived)]
     #[serde(default = "default_framing_message_based")]
@@ -151,6 +155,7 @@ impl GenerateConfig for RedisSourceConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "redis")]
 impl SourceConfig for RedisSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let log_namespace = cx.log_namespace(self.log_namespace);
@@ -159,54 +164,45 @@ impl SourceConfig for RedisSourceConfig {
         if self.key.is_empty() {
             return Err("`key` cannot be empty.".into());
         }
+        let redis_key = self.redis_key.clone().and_then(|k| k.path);
 
         let client = redis::Client::open(self.url.as_str()).context(ClientSnafu {})?;
         let connection_info = ConnectionInfo::from(client.get_connection_info());
         let decoder =
-            DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace).build();
+            DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace)
+                .build()?;
 
         let bytes_received = register!(BytesReceived::from(Protocol::from(
             connection_info.protocol
         )));
+        let events_received = register!(EventsReceived);
+        let handler = InputHandler {
+            client,
+            bytes_received: bytes_received.clone(),
+            events_received: events_received.clone(),
+            key: self.key.clone(),
+            redis_key,
+            decoder,
+            cx,
+            log_namespace,
+        };
 
         match self.data_type {
             DataTypeConfig::List => {
-                let list = self.list.unwrap_or_default();
-                list::watch(list::WatchInputs {
-                    client,
-                    bytes_received: bytes_received.clone(),
-                    key: self.key.clone(),
-                    redis_key: self.redis_key.clone(),
-                    method: list.method,
-                    decoder,
-                    cx,
-                    log_namespace,
-                })
-                .await
+                let method = self.list.unwrap_or_default().method;
+                handler.watch(method).await
             }
-            DataTypeConfig::Channel => {
-                channel::subscribe(channel::SubscribeInputs {
-                    client,
-                    connection_info,
-                    bytes_received: bytes_received.clone(),
-                    key: self.key.clone(),
-                    redis_key: self.redis_key.clone(),
-                    decoder,
-                    cx,
-                    log_namespace,
-                })
-                .await
-            }
+            DataTypeConfig::Channel => handler.subscribe(connection_info).await,
         }
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
 
         let redis_key_path = self
             .redis_key
-            .as_ref()
-            .map(|x| owned_value_path!(x))
+            .clone()
+            .and_then(|k| k.path)
             .map(LegacyKey::InsertIfEmpty);
 
         let schema_definition = self
@@ -221,7 +217,10 @@ impl SourceConfig for RedisSourceConfig {
             )
             .with_standard_vector_source_metadata();
 
-        vec![Output::default(self.decoding.output_type()).with_schema_definition(schema_definition)]
+        vec![SourceOutput::new_logs(
+            self.decoding.output_type(),
+            schema_definition,
+        )]
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -229,73 +228,74 @@ impl SourceConfig for RedisSourceConfig {
     }
 }
 
-async fn handle_line(
-    line: String,
-    key: &str,
-    redis_key: Option<&str>,
-    decoder: Decoder,
-    bytes_received: &Registered<BytesReceived>,
-    out: &mut SourceSender,
-    log_namespace: LogNamespace,
-) -> Result<(), ()> {
-    let now = Utc::now();
+pub(self) struct InputHandler {
+    pub client: redis::Client,
+    pub bytes_received: Registered<BytesReceived>,
+    pub events_received: Registered<EventsReceived>,
+    pub key: String,
+    pub redis_key: Option<OwnedValuePath>,
+    pub decoder: Decoder,
+    pub log_namespace: LogNamespace,
+    pub cx: SourceContext,
+}
 
-    bytes_received.emit(ByteSize(line.len()));
+impl InputHandler {
+    async fn handle_line(&mut self, line: String) -> Result<(), ()> {
+        let now = Utc::now();
 
-    let mut stream = FramedRead::new(line.as_ref(), decoder.clone());
-    while let Some(next) = stream.next().await {
-        match next {
-            Ok((events, _byte_size)) => {
-                let count = events.len();
-                emit!(EventsReceived {
-                    byte_size: events.estimated_json_encoded_size_of(),
-                    count,
-                });
+        self.bytes_received.emit(ByteSize(line.len()));
 
-                let events = events.into_iter().map(|mut event| {
-                    if let Event::Log(ref mut log) = event {
-                        log_namespace.insert_vector_metadata(
-                            log,
-                            path!(log_schema().source_type_key()),
-                            path!("source_type"),
-                            Bytes::from(RedisSourceConfig::NAME),
-                        );
-                        log_namespace.insert_vector_metadata(
-                            log,
-                            path!(log_schema().timestamp_key()),
-                            path!("ingest_timestamp"),
-                            now,
-                        );
+        let mut stream = FramedRead::new(line.as_ref(), self.decoder.clone());
+        while let Some(next) = stream.next().await {
+            match next {
+                Ok((events, _byte_size)) => {
+                    let count = events.len();
+                    let byte_size = events.estimated_json_encoded_size_of();
+                    self.events_received.emit(CountByteSize(count, byte_size));
 
-                        let redis_key_path = redis_key.map(|x| [BorrowedSegment::from(x)]);
+                    let events = events.into_iter().map(|mut event| {
+                        if let Event::Log(ref mut log) = event {
+                            self.log_namespace.insert_vector_metadata(
+                                log,
+                                log_schema().source_type_key(),
+                                path!("source_type"),
+                                Bytes::from(RedisSourceConfig::NAME),
+                            );
+                            self.log_namespace.insert_vector_metadata(
+                                log,
+                                log_schema().timestamp_key(),
+                                path!("ingest_timestamp"),
+                                now,
+                            );
 
-                        log_namespace.insert_source_metadata(
-                            RedisSourceConfig::NAME,
-                            log,
-                            redis_key_path.as_ref().map(LegacyKey::InsertIfEmpty),
-                            path!("key"),
-                            key,
-                        );
-                    };
+                            self.log_namespace.insert_source_metadata(
+                                RedisSourceConfig::NAME,
+                                log,
+                                self.redis_key.as_ref().map(LegacyKey::InsertIfEmpty),
+                                path!("key"),
+                                self.key.as_str(),
+                            );
+                        };
 
-                    event
-                });
+                        event
+                    });
 
-                if let Err(error) = out.send_batch(events).await {
-                    emit!(StreamClosedError { error, count });
-                    return Err(());
+                    if (self.cx.out.send_batch(events).await).is_err() {
+                        emit!(StreamClosedError { count });
+                        return Err(());
+                    }
                 }
-            }
-            Err(error) => {
-                // Error is logged by `crate::codecs::Decoder`, no further
-                // handling is needed here.
-                if !error.can_continue() {
-                    break;
+                Err(error) => {
+                    // Error is logged by `crate::codecs::Decoder`, no further
+                    // handling is needed here.
+                    if !error.can_continue() {
+                        break;
+                    }
                 }
             }
         }
+        Ok(())
     }
-    Ok(())
 }
 
 #[cfg(test)]
@@ -313,12 +313,16 @@ mod integration_test {
     use redis::AsyncCommands;
 
     use super::*;
-    use crate::config::log_schema;
-    use crate::test_util::components::{run_and_assert_source_compliance_n, SOURCE_TAGS};
     use crate::{
-        test_util::{collect_n, random_string},
+        config::log_schema,
+        test_util::{
+            collect_n,
+            components::{run_and_assert_source_compliance_n, SOURCE_TAGS},
+            random_string,
+        },
         SourceSender,
     };
+    use vrl::value;
 
     const REDIS_SERVER: &str = "redis://redis:6379/0";
 
@@ -351,9 +355,18 @@ mod integration_test {
 
         let events = run_and_assert_source_compliance_n(config, 3, &SOURCE_TAGS).await;
 
-        assert_eq!(events[0].as_log()[log_schema().message_key()], "3".into());
-        assert_eq!(events[1].as_log()[log_schema().message_key()], "2".into());
-        assert_eq!(events[2].as_log()[log_schema().message_key()], "1".into());
+        assert_eq!(
+            events[0].as_log()[log_schema().message_key().unwrap().to_string()],
+            "3".into()
+        );
+        assert_eq!(
+            events[1].as_log()[log_schema().message_key().unwrap().to_string()],
+            "2".into()
+        );
+        assert_eq!(
+            events[2].as_log()[log_schema().message_key().unwrap().to_string()],
+            "1".into()
+        );
     }
 
     #[tokio::test]
@@ -375,7 +388,7 @@ mod integration_test {
             }),
             url: REDIS_SERVER.to_owned(),
             key: key.clone(),
-            redis_key: Some("remapped_key".into()),
+            redis_key: Some(OptionalValuePath::from(owned_value_path!("remapped_key"))),
             framing: default_framing_message_based(),
             decoding: default_decoding(),
             log_namespace: Some(true),
@@ -391,7 +404,7 @@ mod integration_test {
             meta.value()
                 .get(path!(RedisSourceConfig::NAME, "key"))
                 .unwrap(),
-            &vrl::value!(key)
+            &value!(key)
         );
     }
 
@@ -424,9 +437,18 @@ mod integration_test {
 
         let events = run_and_assert_source_compliance_n(config, 3, &SOURCE_TAGS).await;
 
-        assert_eq!(events[0].as_log()[log_schema().message_key()], "1".into());
-        assert_eq!(events[1].as_log()[log_schema().message_key()], "2".into());
-        assert_eq!(events[2].as_log()[log_schema().message_key()], "3".into());
+        assert_eq!(
+            events[0].as_log()[log_schema().message_key().unwrap().to_string()],
+            "1".into()
+        );
+        assert_eq!(
+            events[1].as_log()[log_schema().message_key().unwrap().to_string()],
+            "2".into()
+        );
+        assert_eq!(
+            events[2].as_log()[log_schema().message_key().unwrap().to_string()],
+            "3".into()
+        );
     }
 
     #[tokio::test]
@@ -458,7 +480,7 @@ mod integration_test {
         // Briefly wait to ensure the source is subscribed.
         //
         // TODO: This is a prime example of where being able to check if the shutdown signal had been polled at least
-        // once would serve as the most precise indicator of "is the source ready and waiting to receieve?".
+        // once would serve as the most precise indicator of "is the source ready and waiting to receive?".
         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
 
         // Now create a normal Redis client and use it to publish a bunch of message, which we'll ensure the source consumes.
@@ -477,9 +499,12 @@ mod integration_test {
         assert_eq!(events.len(), 10000);
 
         for event in events {
-            assert_eq!(event.as_log()[log_schema().message_key()], text.into());
             assert_eq!(
-                event.as_log()[log_schema().source_type_key()],
+                event.as_log()[log_schema().message_key().unwrap().to_string()],
+                text.into()
+            );
+            assert_eq!(
+                event.as_log()[log_schema().source_type_key().unwrap().to_string()],
                 RedisSourceConfig::NAME.into()
             );
         }

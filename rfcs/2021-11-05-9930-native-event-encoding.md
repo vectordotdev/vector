@@ -33,7 +33,7 @@ codecs to allow just that.
 
 ### Out of scope
 
-- Implementing it for a specific specific source/sink pair.
+- Implementing it for a specific source/sink pair.
 - Forward/backwards compatibility guarantees for anything except for Protocol Buffers.
 - Handling arbitrary native formats in differing sources/sinks i.e. letting a statsd source parse the
   Prometheus exposition format, or having the Kafka sink spit out metrics in the Influx line

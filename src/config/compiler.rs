@@ -1,26 +1,9 @@
-use std::collections::HashSet;
-
-use indexmap::{IndexMap, IndexSet};
+use indexmap::IndexSet;
 
 use super::{
-    builder::ConfigBuilder, graph::Graph, id::Inputs, schema, validation, ComponentKey, Config,
-    OutputId, SourceConfig, TransformConfig,
+    builder::ConfigBuilder, graph::Graph, id::Inputs, transform::get_transform_output_ids,
+    validation, Config, OutputId,
 };
-
-/// to handle the expansions when building the graph we need to be able to get the list of inputs
-/// that will replace a single input, as a String.
-pub(crate) fn to_string_expansions(
-    input: &IndexMap<ComponentKey, Vec<ComponentKey>>,
-) -> IndexMap<String, Vec<String>> {
-    input
-        .iter()
-        .map(|(key, values)| {
-            let key: String = key.id().to_string();
-            let values: Vec<String> = values.iter().map(|value| value.id().to_string()).collect();
-            (key, values)
-        })
-        .collect::<IndexMap<_, _>>()
-}
 
 pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<String>> {
     let mut errors = Vec::new();
@@ -37,8 +20,6 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
     ) {
         errors.extend(name_errors);
     }
-
-    let expansions = expand_macros(&mut builder)?;
 
     expand_globs(&mut builder);
 
@@ -75,10 +56,10 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
         tests,
         provider: _,
         secret,
+        graceful_shutdown_duration,
     } = builder;
 
-    let str_expansions = to_string_expansions(&expansions);
-    let graph = match Graph::new(&sources, &transforms, &sinks, &str_expansions, schema) {
+    let graph = match Graph::new(&sources, &transforms, &sinks, schema) {
         Ok(graph) => graph,
         Err(graph_errors) => {
             errors.extend(graph_errors);
@@ -112,7 +93,7 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
         .collect();
     let tests = tests
         .into_iter()
-        .map(|test| test.resolve_outputs(&graph, &str_expansions))
+        .map(|test| test.resolve_outputs(&graph))
         .collect::<Result<Vec<_>, Vec<_>>>()?;
 
     if errors.is_empty() {
@@ -130,8 +111,8 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
             sinks,
             transforms,
             tests,
-            expansions,
             secret,
+            graceful_shutdown_duration,
         };
 
         config.propagate_acknowledgements()?;
@@ -141,35 +122,6 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
         Ok((config, warnings))
     } else {
         Err(errors)
-    }
-}
-
-/// Some component configs can act like macros and expand themselves into multiple replacement
-/// configs. Performs those expansions and records the relevant metadata.
-pub(super) fn expand_macros(
-    config: &mut ConfigBuilder,
-) -> Result<IndexMap<ComponentKey, Vec<ComponentKey>>, Vec<String>> {
-    let mut expanded_transforms = IndexMap::new();
-    let mut expansions = IndexMap::new();
-    let mut errors = Vec::new();
-    let parent_types = HashSet::new();
-
-    while let Some((key, transform)) = config.transforms.pop() {
-        if let Err(error) = transform.expand(
-            key,
-            &parent_types,
-            &mut expanded_transforms,
-            &mut expansions,
-        ) {
-            errors.push(error);
-        }
-    }
-    config.transforms = expanded_transforms;
-
-    if !errors.is_empty() {
-        Err(errors)
-    } else {
-        Ok(expansions)
     }
 }
 
@@ -188,13 +140,7 @@ pub(crate) fn expand_globs(config: &mut ConfigBuilder) {
                 })
         })
         .chain(config.transforms.iter().flat_map(|(key, t)| {
-            t.inner
-                .outputs(&schema::Definition::any(), config.schema.log_namespace())
-                .into_iter()
-                .map(|output| OutputId {
-                    component: key.clone(),
-                    port: output.port,
-                })
+            get_transform_output_ids(t.inner.as_ref(), key.clone(), config.schema.log_namespace())
         }))
         .map(|output_id| output_id.to_string())
         .collect::<IndexSet<String>>();
@@ -241,7 +187,7 @@ fn expand_globs_inner(inputs: &mut Inputs<String>, id: &str, candidates: &IndexS
             }
         }
         // If it didn't work as a glob pattern, leave it in the inputs as-is. This lets us give
-        // more accurate error messages about non-existent inputs.
+        // more accurate error messages about nonexistent inputs.
         if !matched {
             inputs.extend(Some(raw_input))
         }
@@ -252,6 +198,7 @@ fn expand_globs_inner(inputs: &mut Inputs<String>, id: &str, candidates: &IndexS
 mod test {
     use super::*;
     use crate::test_util::mock::{basic_sink, basic_source, basic_transform};
+    use vector_core::config::ComponentKey;
 
     #[test]
     fn glob_expansion() {

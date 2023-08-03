@@ -1,0 +1,13 @@
+- name: happy path
+  expectation: success
+  events:
+    - simple message 1
+    - simple message 2
+    - simple message 3
+- name: sad path
+  expectation: partial_success
+  events:
+    - simple message 1
+    - simple message 2
+    - modified: true
+      event: simple message with the wrong encoding

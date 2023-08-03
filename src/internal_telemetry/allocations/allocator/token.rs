@@ -80,11 +80,11 @@ pub struct AllocationGroupToken {
 
 impl AllocationGroupToken {
     pub fn enter(&self) {
-        let _ = LOCAL_ALLOCATION_GROUP_STACK.try_with(|stack| stack.borrow_mut().push(self.id));
+        _ = LOCAL_ALLOCATION_GROUP_STACK.try_with(|stack| stack.borrow_mut().push(self.id));
     }
 
     pub fn exit(&self) {
-        let _ = LOCAL_ALLOCATION_GROUP_STACK.try_with(|stack| stack.borrow_mut().pop());
+        _ = LOCAL_ALLOCATION_GROUP_STACK.try_with(|stack| stack.borrow_mut().pop());
     }
 }
 
@@ -119,7 +119,7 @@ where
 
 /// Calls `f` after suspending the active allocation group.
 ///
-/// In constrast to `try_with_suspended_allocation_group`, this method will always call `f` after attempting to suspend
+/// In contrast to `try_with_suspended_allocation_group`, this method will always call `f` after attempting to suspend
 /// the active allocation group, even if it was already suspended.
 ///
 /// In practice, this method is primarily useful for "run this function and don't trace any (de)allocations at all" while

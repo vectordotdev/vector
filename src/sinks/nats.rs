@@ -7,7 +7,7 @@ use futures::{stream::BoxStream, FutureExt, StreamExt, TryFutureExt};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::Encoder as _;
 use vector_common::internal_event::{
-    ByteSize, BytesSent, EventsSent, InternalEventHandle, Protocol,
+    ByteSize, BytesSent, CountByteSize, EventsSent, InternalEventHandle, Output, Protocol,
 };
 use vector_config::configurable_component;
 
@@ -41,7 +41,10 @@ enum BuildError {
  */
 
 /// Configuration for the `nats` sink.
-#[configurable_component(sink("nats"))]
+#[configurable_component(sink(
+    "nats",
+    "Publish observability data to subjects on the NATS messaging system."
+))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct NatsSinkConfig {
@@ -56,17 +59,35 @@ pub struct NatsSinkConfig {
     )]
     pub acknowledgements: AcknowledgementsConfig,
 
-    /// A name assigned to the NATS connection.
+    /// A NATS [name][nats_connection_name] assigned to the NATS connection.
+    ///
+    /// [nats_connection_name]: https://docs.nats.io/using-nats/developer/connecting/name
     #[serde(default = "default_name", alias = "name")]
+    #[configurable(metadata(docs::examples = "foo"))]
     connection_name: String,
 
-    /// The NATS subject to publish messages to.
+    /// The NATS [subject][nats_subject] to publish messages to.
+    ///
+    /// [nats_subject]: https://docs.nats.io/nats-concepts/subjects
     #[configurable(metadata(docs::templateable))]
+    #[configurable(metadata(
+        docs::examples = "{{ host }}",
+        docs::examples = "foo",
+        docs::examples = "time.us.east",
+        docs::examples = "time.*.east",
+        docs::examples = "time.>",
+        docs::examples = ">"
+    ))]
     subject: String,
 
-    /// The NATS URL to connect to.
+    /// The NATS [URL][nats_url] to connect to.
     ///
     /// The URL must take the form of `nats://server:port`.
+    /// If the port is not specified it defaults to 4222.
+    ///
+    /// [nats_url]: https://docs.nats.io/using-nats/developer/connecting#nats-url
+    #[configurable(metadata(docs::examples = "nats://demo.nats.io"))]
+    #[configurable(metadata(docs::examples = "nats://127.0.0.1:4242"))]
     url: String,
 
     #[configurable(derived)]
@@ -86,7 +107,7 @@ impl GenerateConfig for NatsSinkConfig {
             acknowledgements: Default::default(),
             auth: None,
             connection_name: "vector".into(),
-            encoding: JsonSerializerConfig::new().into(),
+            encoding: JsonSerializerConfig::default().into(),
             subject: "from.vector".into(),
             tls: None,
             url: "nats://127.0.0.1:4222".into(),
@@ -96,6 +117,7 @@ impl GenerateConfig for NatsSinkConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "nats")]
 impl SinkConfig for NatsSinkConfig {
     async fn build(
         &self,
@@ -162,6 +184,7 @@ impl NatsSink {
 impl StreamSink<Event> for NatsSink {
     async fn run(mut self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
         let bytes_sent = register!(BytesSent::from(Protocol::TCP));
+        let events_sent = register!(EventsSent::from(Output(None)));
 
         while let Some(mut event) = input.next().await {
             let finalizers = event.take_finalizers();
@@ -199,11 +222,7 @@ impl StreamSink<Event> for NatsSink {
                 Ok(_) => {
                     finalizers.update_status(EventStatus::Delivered);
 
-                    emit!(EventsSent {
-                        byte_size: event_byte_size,
-                        count: 1,
-                        output: None
-                    });
+                    events_sent.emit(CountByteSize(1, event_byte_size));
                     bytes_sent.emit(ByteSize(bytes.len()));
                 }
             }
@@ -291,7 +310,7 @@ mod integration_tests {
 
         let conf = NatsSinkConfig {
             acknowledgements: Default::default(),
-            encoding: TextSerializerConfig::new().into(),
+            encoding: TextSerializerConfig::default().into(),
             connection_name: "".to_owned(),
             subject: subject.clone(),
             url,
@@ -317,7 +336,7 @@ mod integration_tests {
 
         let conf = NatsSinkConfig {
             acknowledgements: Default::default(),
-            encoding: TextSerializerConfig::new().into(),
+            encoding: TextSerializerConfig::default().into(),
             connection_name: "".to_owned(),
             subject: subject.clone(),
             url,
@@ -345,7 +364,7 @@ mod integration_tests {
 
         let conf = NatsSinkConfig {
             acknowledgements: Default::default(),
-            encoding: TextSerializerConfig::new().into(),
+            encoding: TextSerializerConfig::default().into(),
             connection_name: "".to_owned(),
             subject: subject.clone(),
             url,
@@ -376,7 +395,7 @@ mod integration_tests {
 
         let conf = NatsSinkConfig {
             acknowledgements: Default::default(),
-            encoding: TextSerializerConfig::new().into(),
+            encoding: TextSerializerConfig::default().into(),
             connection_name: "".to_owned(),
             subject: subject.clone(),
             url,
@@ -406,7 +425,7 @@ mod integration_tests {
 
         let conf = NatsSinkConfig {
             acknowledgements: Default::default(),
-            encoding: TextSerializerConfig::new().into(),
+            encoding: TextSerializerConfig::default().into(),
             connection_name: "".to_owned(),
             subject: subject.clone(),
             url,
@@ -436,7 +455,7 @@ mod integration_tests {
 
         let conf = NatsSinkConfig {
             acknowledgements: Default::default(),
-            encoding: TextSerializerConfig::new().into(),
+            encoding: TextSerializerConfig::default().into(),
             connection_name: "".to_owned(),
             subject: subject.clone(),
             url,
@@ -467,7 +486,7 @@ mod integration_tests {
 
         let conf = NatsSinkConfig {
             acknowledgements: Default::default(),
-            encoding: TextSerializerConfig::new().into(),
+            encoding: TextSerializerConfig::default().into(),
             connection_name: "".to_owned(),
             subject: subject.clone(),
             url,
@@ -498,7 +517,7 @@ mod integration_tests {
 
         let conf = NatsSinkConfig {
             acknowledgements: Default::default(),
-            encoding: TextSerializerConfig::new().into(),
+            encoding: TextSerializerConfig::default().into(),
             connection_name: "".to_owned(),
             subject: subject.clone(),
             url,
@@ -530,7 +549,7 @@ mod integration_tests {
 
         let conf = NatsSinkConfig {
             acknowledgements: Default::default(),
-            encoding: TextSerializerConfig::new().into(),
+            encoding: TextSerializerConfig::default().into(),
             connection_name: "".to_owned(),
             subject: subject.clone(),
             url,
@@ -556,7 +575,7 @@ mod integration_tests {
 
         let conf = NatsSinkConfig {
             acknowledgements: Default::default(),
-            encoding: TextSerializerConfig::new().into(),
+            encoding: TextSerializerConfig::default().into(),
             connection_name: "".to_owned(),
             subject: subject.clone(),
             url,
@@ -590,7 +609,7 @@ mod integration_tests {
 
         let conf = NatsSinkConfig {
             acknowledgements: Default::default(),
-            encoding: TextSerializerConfig::new().into(),
+            encoding: TextSerializerConfig::default().into(),
             connection_name: "".to_owned(),
             subject: subject.clone(),
             url,
@@ -622,7 +641,7 @@ mod integration_tests {
 
         let conf = NatsSinkConfig {
             acknowledgements: Default::default(),
-            encoding: TextSerializerConfig::new().into(),
+            encoding: TextSerializerConfig::default().into(),
             connection_name: "".to_owned(),
             subject: subject.clone(),
             url,
@@ -658,7 +677,7 @@ mod integration_tests {
 
         let conf = NatsSinkConfig {
             acknowledgements: Default::default(),
-            encoding: TextSerializerConfig::new().into(),
+            encoding: TextSerializerConfig::default().into(),
             connection_name: "".to_owned(),
             subject: subject.clone(),
             url,

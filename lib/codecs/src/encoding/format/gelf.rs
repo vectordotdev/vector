@@ -1,6 +1,7 @@
 use crate::{gelf_fields::*, VALID_FIELD_REGEX};
 use bytes::{BufMut, BytesMut};
 use lookup::event_path;
+use ordered_float::NotNan;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use tokio_util::codec::Encoder;
@@ -8,8 +9,10 @@ use vector_core::{
     config::{log_schema, DataType},
     event::Event,
     event::LogEvent,
+    event::Value,
     schema,
 };
+use vrl::path::PathPrefix;
 
 /// On GELF encoding behavior:
 ///   Graylog has a relaxed parsing. They are much more lenient than the spec would
@@ -68,7 +71,7 @@ impl GelfSerializerConfig {
 }
 
 /// Serializer that converts an `Event` to bytes using the GELF format.
-/// Spec: https://docs.graylog.org/docs/gelf
+/// Spec: <https://docs.graylog.org/docs/gelf>
 #[derive(Debug, Clone)]
 pub struct GelfSerializer;
 
@@ -136,13 +139,15 @@ fn coerce_required_fields(mut log: LogEvent) -> vector_common::Result<LogEvent> 
         err_missing_field(HOST)?;
     }
 
-    let message_key = log_schema().message_key();
     if !log.contains(SHORT_MESSAGE) {
-        // rename the log_schema().message_key() to SHORT_MESSAGE
-        if log.contains(message_key) {
-            log.rename_key(message_key, SHORT_MESSAGE);
-        } else {
-            err_missing_field(SHORT_MESSAGE)?;
+        if let Some(message_key) = log_schema().message_key() {
+            // rename the log_schema().message_key() to SHORT_MESSAGE
+            let target_path = (PathPrefix::Event, message_key);
+            if log.contains(target_path) {
+                log.rename_key(target_path, SHORT_MESSAGE);
+            } else {
+                err_missing_field(SHORT_MESSAGE)?;
+            }
         }
     }
     Ok(log)
@@ -164,6 +169,18 @@ fn coerce_field_names_and_values(
                 TIMESTAMP => {
                     if !(value.is_timestamp() || value.is_integer()) {
                         err_invalid_type(field, "timestamp or integer", value.kind_str())?;
+                    }
+
+                    // convert a `Value::Timestamp` to a GELF specified timestamp where milliseconds are represented by the fractional part of a float.
+                    if let Value::Timestamp(ts) = value {
+                        let ts_millis = ts.timestamp_millis();
+                        if ts_millis % 1000 != 0 {
+                            *value = Value::Float(NotNan::new(ts_millis as f64 / 1000.0).unwrap());
+                        } else {
+                            // keep full range of representable time if no milliseconds are set
+                            // but still convert to numeric according to GELF protocol
+                            *value = Value::Integer(ts.timestamp())
+                        }
                     }
                 }
                 LEVEL => {
@@ -225,9 +242,10 @@ mod tests {
     use crate::encoding::SerializerConfig;
 
     use super::*;
-    use value::Value;
-    use vector_common::btreemap;
+    use chrono::{DateTime, NaiveDateTime, Utc};
     use vector_core::event::{Event, EventMetadata};
+    use vrl::btreemap;
+    use vrl::value::Value;
 
     fn do_serialize(
         expect_success: bool,
@@ -314,11 +332,50 @@ mod tests {
             let event_fields = btreemap! {
                 VERSION => "1.1",
                 HOST => "example.org",
-                log_schema().message_key() => "Some message",
+                log_schema().message_key().unwrap().to_string() => "Some message",
             };
 
             let jsn = do_serialize(true, event_fields).unwrap();
             assert_eq!(jsn.get(SHORT_MESSAGE).unwrap(), "Some message");
+        }
+    }
+
+    #[test]
+    fn gelf_serializing_timestamp() {
+        // floating point in case of sub second timestamp
+        {
+            let naive_dt =
+                NaiveDateTime::parse_from_str("1970-01-01 00:00:00.1", "%Y-%m-%d %H:%M:%S%.f");
+            let dt = DateTime::<Utc>::from_utc(naive_dt.unwrap(), Utc);
+
+            let event_fields = btreemap! {
+                VERSION => "1.1",
+                SHORT_MESSAGE => "Some message",
+                HOST => "example.org",
+                TIMESTAMP => dt,
+            };
+
+            let jsn = do_serialize(true, event_fields).unwrap();
+            assert!(jsn.get(TIMESTAMP).unwrap().is_f64());
+            assert_eq!(jsn.get(TIMESTAMP).unwrap().as_f64().unwrap(), 0.1,);
+        }
+
+        // integer in case of no sub second timestamp
+        {
+            let naive_dt =
+                NaiveDateTime::parse_from_str("1970-01-01 00:00:00.0", "%Y-%m-%d %H:%M:%S%.f");
+            let dt = DateTime::<Utc>::from_utc(naive_dt.unwrap(), Utc);
+
+            let event_fields = btreemap! {
+                VERSION => "1.1",
+                SHORT_MESSAGE => "Some message",
+                HOST => "example.org",
+                TIMESTAMP => dt,
+            };
+
+            let jsn = do_serialize(true, event_fields).unwrap();
+            assert!(jsn.get(TIMESTAMP).unwrap().is_i64());
+            assert_eq!(jsn.get(TIMESTAMP).unwrap().as_i64().unwrap(), 0);
         }
     }
 

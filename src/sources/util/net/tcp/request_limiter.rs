@@ -57,6 +57,7 @@ impl RequestLimiterData {
 
     pub fn target_requests_in_flight(&self) -> usize {
         let target = (self.event_limit_target as f64) / self.average_request_size.average();
+        #[allow(clippy::manual_clamp)]
         (target as usize)
             .max(MINIMUM_PERMITS)
             .min(self.max_requests)

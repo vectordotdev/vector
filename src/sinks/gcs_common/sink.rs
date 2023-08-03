@@ -22,6 +22,7 @@ pub struct GcsSink<Svc, RB> {
     request_builder: RB,
     partitioner: KeyPartitioner,
     batcher_settings: BatcherSettings,
+    protocol: &'static str,
 }
 
 impl<Svc, RB> GcsSink<Svc, RB> {
@@ -30,12 +31,14 @@ impl<Svc, RB> GcsSink<Svc, RB> {
         request_builder: RB,
         partitioner: KeyPartitioner,
         batcher_settings: BatcherSettings,
+        protocol: &'static str,
     ) -> Self {
         Self {
             service,
             request_builder,
             partitioner,
             batcher_settings,
+            protocol,
         }
     }
 }
@@ -57,7 +60,7 @@ where
         let builder_limit = NonZeroUsize::new(64);
         let request_builder = self.request_builder;
 
-        let sink = input
+        input
             .batched_partitioned(partitioner, settings)
             .filter_map(|(key, batch)| async move {
                 // A `TemplateRenderingError` will have been emitted by `KeyPartitioner` if the key here is `None`,
@@ -74,9 +77,10 @@ where
                     Ok(req) => Some(req),
                 }
             })
-            .into_driver(self.service);
-
-        sink.run().await
+            .into_driver(self.service)
+            .protocol(self.protocol)
+            .run()
+            .await
     }
 }
 

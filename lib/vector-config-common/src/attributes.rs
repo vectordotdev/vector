@@ -1,5 +1,7 @@
 use std::fmt;
 
+use serde::Serialize;
+
 /// A custom attribute on a container, variant, or field.
 ///
 /// Applied by using the `#[configurable(metadata(...))]` helper. Two forms are supported:
@@ -21,7 +23,10 @@ pub enum CustomAttribute {
     ///
     /// Used for most metadata, where a given key could have many different possible values i.e. the status of a
     /// component (alpha, beta, stable, deprecated, etc).
-    KeyValue { key: String, value: String },
+    KeyValue {
+        key: String,
+        value: serde_json::Value,
+    },
 }
 
 impl CustomAttribute {
@@ -35,11 +40,19 @@ impl CustomAttribute {
     pub fn kv<K, V>(key: K, value: V) -> Self
     where
         K: fmt::Display,
-        V: fmt::Display,
+        V: Serialize,
     {
         Self::KeyValue {
             key: key.to_string(),
-            value: value.to_string(),
+            value: serde_json::to_value(value).expect("should not fail to serialize value to JSON"),
         }
+    }
+
+    pub const fn is_flag(&self) -> bool {
+        matches!(self, Self::Flag(_))
+    }
+
+    pub const fn is_kv(&self) -> bool {
+        matches!(self, Self::KeyValue { .. })
     }
 }

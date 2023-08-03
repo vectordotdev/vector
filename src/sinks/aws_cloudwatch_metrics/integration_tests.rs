@@ -1,7 +1,4 @@
-#![cfg(feature = "aws-cloudwatch-metrics-integration-tests")]
-#![cfg(test)]
-
-use chrono::{offset::TimeZone, Utc};
+use chrono::{offset::TimeZone, Timelike, Utc};
 use rand::seq::SliceRandom;
 use vector_core::metric_tags;
 
@@ -38,7 +35,7 @@ async fn cloudwatch_metrics_healthcheck() {
 
 #[tokio::test]
 async fn cloudwatch_metrics_put_data() {
-    let cx = SinkContext::new_test();
+    let cx = SinkContext::default();
     let config = config();
     let client = config.create_client(&cx.globals.proxy).await.unwrap();
     let sink = CloudWatchMetricsSvc::new(config, client).unwrap();
@@ -83,7 +80,10 @@ async fn cloudwatch_metrics_put_data() {
                 },
             )
             .with_timestamp(Some(
-                Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 123456789),
+                Utc.with_ymd_and_hms(2018, 11, 14, 8, 9, 10)
+                    .single()
+                    .and_then(|t| t.with_nanosecond(123456789))
+                    .expect("invalid timestamp"),
             )),
         );
         events.push(event);
@@ -94,7 +94,7 @@ async fn cloudwatch_metrics_put_data() {
 
 #[tokio::test]
 async fn cloudwatch_metrics_namespace_partitioning() {
-    let cx = SinkContext::new_test();
+    let cx = SinkContext::default();
     let config = config();
     let client = config.create_client(&cx.globals.proxy).await.unwrap();
     let sink = CloudWatchMetricsSvc::new(config, client).unwrap();

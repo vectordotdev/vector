@@ -1,9 +1,0 @@
-# object: { "foo": false, "bar": false, "baz": false }
-# result: { "foo": false, "bar": false, "baz": false }
-
-# The rhs condition should never trigger in these cases.
-true || (.foo = true)
-false && (.bar = true)
-foo = 1
-5 / foo ?? (.baz = true)
-.

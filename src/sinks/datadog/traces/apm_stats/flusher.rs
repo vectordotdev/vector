@@ -65,7 +65,7 @@ pub async fn flush_apm_stats_thread(
                 sender.flush_apm_stats(true).await;
 
                 // signal the sink (who tripped the tripwire), that we are done flushing
-                let _ = sink_shutdown_ack_sender.send(());
+                _ = sink_shutdown_ack_sender.send(());
                 break;
             }
             Err(_) => {

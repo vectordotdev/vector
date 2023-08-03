@@ -235,7 +235,7 @@ fn generate_record_cache(min: usize, max: usize) -> Vec<VariableMessage> {
     let mut records = Vec::new();
     for i in 1..=200_000 {
         let payload_size = rng.gen_range(min..max);
-        let payload = (0..payload_size).map(|_| rng.gen()).collect();
+        let payload = (0..payload_size).map(|_| rng.gen::<u8>()).collect();
         let message = VariableMessage::new(i, payload);
         records.push(message);
     }
@@ -262,16 +262,6 @@ where
             );
             BufferType::Memory {
                 max_events: max_size_events,
-                when_full,
-            }
-        }
-        "disk-v1" => {
-            info!(
-                "[buffer-perf] creating disk v1 buffer with max_size={}, in blocking mode",
-                max_size_bytes
-            );
-            BufferType::DiskV1 {
-                max_size: max_size_bytes,
                 when_full,
             }
         }
