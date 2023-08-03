@@ -425,6 +425,8 @@ userguide
 webhdfs
 winapi
 workarounds
+XCHACHA
+XSALSA
 yandex
 zeek
 zookeeper
