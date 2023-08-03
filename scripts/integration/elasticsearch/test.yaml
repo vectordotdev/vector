@@ -1,0 +1,21 @@
+features:
+- es-integration-tests
+
+test_filter: '::elasticsearch::integration_tests::'
+
+env:
+  AWS_ACCESS_KEY_ID: dummy
+  AWS_SECRET_ACCESS_KEY: dummy
+  ELASTICSEARCH_AWS_ADDRESS: http://localstack:4571
+  ELASTICSEARCH_HTTPS_ADDRESS: https://elasticsearch-secure:9200
+  ELASTICSEARCH_HTTP_ADDRESS: http://elasticsearch:9200
+
+matrix:
+  version: [7.13.1]
+
+# changes to these files/paths will invoke the integration test in CI
+# expressions are evaluated using https://github.com/micromatch/picomatch
+paths:
+- "src/sinks/elasticsearch/**"
+- "src/sinks/util/**"
+- "scripts/integration/elasticsearch/**"

@@ -13,7 +13,6 @@ impl InternalEvent for FluentMessageReceived {
     fn emit(self) {
         trace!(message = "Received fluent message.", byte_size = %self.byte_size);
         counter!("component_received_events_total", 1);
-        counter!("events_in_total", 1);
     }
 }
 

@@ -26,7 +26,7 @@ impl NoProxyInterceptor {
                 let matches = host.map_or(false, |host| {
                     self.0.matches(host)
                         || port.map_or(false, |port| {
-                            let url = format!("{}:{}", host, port);
+                            let url = format!("{host}:{port}");
                             self.0.matches(&url)
                         })
                 });
@@ -39,10 +39,13 @@ impl NoProxyInterceptor {
 
 /// Proxy configuration.
 ///
-/// Vector can be configured to proxy traffic through an HTTP(S) proxy when making external requests. Similar to common
-/// proxy configuration convention, users can set different proxies to use based on the type of traffic being proxied,
-/// as well as set specific hosts that should not be proxied.
+/// Configure to proxy traffic through an HTTP(S) proxy when making external requests.
+///
+/// Similar to common proxy configuration convention, you can set different proxies
+/// to use based on the type of traffic being proxied, as well as set specific hosts that
+/// should not be proxied.
 #[configurable_component]
+#[configurable(metadata(docs::advanced))]
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct ProxyConfig {
@@ -75,17 +78,20 @@ pub struct ProxyConfig {
     ///
     /// | Pattern             | Example match                                                               |
     /// | ------------------- | --------------------------------------------------------------------------- |
-    /// | Domain names        | `**example.com**` matches requests to `**example.com**`                     |
-    /// | Wildcard domains    | `**.example.com**` matches requests to `**example.com**` and its subdomains |
-    /// | IP addresses        | `**127.0.0.1**` matches requests to `**127.0.0.1**`                         |
-    /// | [CIDR][cidr] blocks | `**192.168.0.0/16**` matches requests to any IP addresses in this range     |
-    /// | Splat               | `__*__` matches all hosts                                                   |
+    /// | Domain names        | `example.com` matches requests to `example.com`                     |
+    /// | Wildcard domains    | `.example.com` matches requests to `example.com` and its subdomains |
+    /// | IP addresses        | `127.0.0.1` matches requests to `127.0.0.1`                         |
+    /// | [CIDR][cidr] blocks | `192.168.0.0/16` matches requests to any IP addresses in this range     |
+    /// | Splat               | `*` matches all hosts                                                   |
     ///
     /// [cidr]: https://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing
     #[serde(
         default,
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
+    #[configurable(metadata(docs::examples = "localhost"))]
+    #[configurable(metadata(docs::examples = ".foo.bar"))]
+    #[configurable(metadata(docs::examples = "*"))]
     pub no_proxy: NoProxy,
 }
 
@@ -193,9 +199,14 @@ impl ProxyConfig {
 
 #[cfg(test)]
 mod tests {
-    use base64::encode;
+    use base64::prelude::{Engine as _, BASE64_STANDARD};
     use env_test_util::TempEnvVar;
-    use http::{HeaderValue, Uri};
+    use http::{
+        header::{AUTHORIZATION, PROXY_AUTHORIZATION},
+        HeaderName, HeaderValue, Uri,
+    };
+
+    const PROXY_HEADERS: [HeaderName; 2] = [AUTHORIZATION, PROXY_AUTHORIZATION];
 
     use super::*;
 
@@ -328,26 +339,43 @@ mod tests {
             .https_proxy()
             .expect("should not be an error")
             .expect("should not be None");
-        let encoded_header = format!("Basic {}", encode("user:pass"));
+        let encoded_header = format!("Basic {}", BASE64_STANDARD.encode("user:pass"));
         let expected_header_value = HeaderValue::from_str(encoded_header.as_str());
 
         assert_eq!(
             Some(first.uri()),
             Uri::try_from("http://user:pass@1.2.3.4:5678").as_ref().ok()
         );
-        assert_eq!(
-            first.headers().get("authorization"),
-            expected_header_value.as_ref().ok()
-        );
+        for h in &PROXY_HEADERS {
+            assert_eq!(first.headers().get(h), expected_header_value.as_ref().ok());
+        }
         assert_eq!(
             Some(second.uri()),
             Uri::try_from("https://user:pass@2.3.4.5:9876")
                 .as_ref()
                 .ok()
         );
-        assert_eq!(
-            second.headers().get("authorization"),
-            expected_header_value.as_ref().ok()
-        );
+        for h in &PROXY_HEADERS {
+            assert_eq!(second.headers().get(h), expected_header_value.as_ref().ok());
+        }
+    }
+
+    #[ignore]
+    #[test]
+    fn build_proxy_with_special_chars_url_encoded() {
+        let config = ProxyConfig {
+            http: Some("http://user:P%40ssw0rd@1.2.3.4:5678".into()),
+            https: Some("https://user:P%40ssw0rd@2.3.4.5:9876".into()),
+            ..Default::default()
+        };
+        let first = config
+            .http_proxy()
+            .expect("should not be an error")
+            .expect("should not be None");
+        let encoded_header = format!("Basic {}", BASE64_STANDARD.encode("user:P@ssw0rd"));
+        let expected_header_value = HeaderValue::from_str(encoded_header.as_str());
+        for h in &PROXY_HEADERS {
+            assert_eq!(first.headers().get(h), expected_header_value.as_ref().ok());
+        }
     }
 }

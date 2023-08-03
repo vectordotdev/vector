@@ -11,7 +11,8 @@ use std::collections::BTreeMap;
 
 use dyn_clone::DynClone;
 pub use tables::{TableRegistry, TableSearch};
-use value::Value;
+use vrl::compiler::Function;
+use vrl::value::Value;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct IndexHandle(pub usize);
@@ -77,7 +78,7 @@ pub trait Table: DynClone {
 
 dyn_clone::clone_trait_object!(Table);
 
-pub fn vrl_functions() -> Vec<Box<dyn vrl::Function>> {
+pub fn vrl_functions() -> Vec<Box<dyn Function>> {
     vec![
         Box::new(get_enrichment_table_record::GetEnrichmentTableRecord) as _,
         Box::new(find_enrichment_table_records::FindEnrichmentTableRecords) as _,

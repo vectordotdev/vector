@@ -62,8 +62,8 @@ impl<R: Clone, T: Clone> Clone for MaybeTls<R, T> {
 impl<R: fmt::Debug, T: fmt::Debug> fmt::Debug for MaybeTls<R, T> {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Raw(raw) => write!(fmt, "MaybeTls::Raw({:?})", raw),
-            Self::Tls(tls) => write!(fmt, "MaybeTls::Tls({:?})", tls),
+            Self::Raw(raw) => write!(fmt, "MaybeTls::Raw({raw:?})"),
+            Self::Tls(tls) => write!(fmt, "MaybeTls::Tls({tls:?})"),
         }
     }
 }

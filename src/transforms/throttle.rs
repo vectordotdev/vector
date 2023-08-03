@@ -6,10 +6,11 @@ use governor::{clock, Quota, RateLimiter};
 use serde_with::serde_as;
 use snafu::Snafu;
 use vector_config::configurable_component;
+use vector_core::config::{clone_input_definitions, LogNamespace};
 
 use crate::{
     conditions::{AnyCondition, Condition},
-    config::{DataType, Input, Output, TransformConfig, TransformContext},
+    config::{DataType, Input, OutputId, TransformConfig, TransformContext, TransformOutput},
     event::Event,
     internal_events::{TemplateRenderingError, ThrottleEventDiscarded},
     schema,
@@ -19,24 +20,23 @@ use crate::{
 
 /// Configuration for the `throttle` transform.
 #[serde_as]
-#[configurable_component(transform("throttle"))]
+#[configurable_component(transform("throttle", "Rate limit logs passing through a topology."))]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct ThrottleConfig {
     /// The number of events allowed for a given bucket per configured `window_secs`.
     ///
-    /// Each unique key will have its own `threshold`.
+    /// Each unique key has its own `threshold`.
     threshold: u32,
 
     /// The time window in which the configured `threshold` is applied, in seconds.
-    #[serde_as(as = "serde_with::DurationSeconds<f64>")]
+    #[serde_as(as = "serde_with::DurationSecondsWithFrac<f64>")]
+    #[configurable(metadata(docs::human_name = "Time Window"))]
     window_secs: Duration,
 
-    /// The name of the log field whose value will be hashed to determine if the event should be
-    /// rate limited.
+    /// The value to group events into separate buckets to be rate limited independently.
     ///
-    /// Each unique key will create a bucket of related events to be rate limited separately. If
-    /// left unspecified, or if the event doesn’t have `key_field`, the event be will not be rate
+    /// If left unspecified, or if the event doesn't have `key_field`, then the event is not rate
     /// limited separately.
     #[configurable(metadata(docs::examples = "{{ message }}", docs::examples = "{{ hostname }}",))]
     key_field: Option<Template>,
@@ -48,6 +48,7 @@ pub struct ThrottleConfig {
 impl_generate_config_from_default!(ThrottleConfig);
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "throttle")]
 impl TransformConfig for ThrottleConfig {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
         Throttle::new(self, context, clock::MonotonicClock).map(Transform::event_task)
@@ -57,9 +58,17 @@ impl TransformConfig for ThrottleConfig {
         Input::log()
     }
 
-    fn outputs(&self, merged_definition: &schema::Definition) -> Vec<Output> {
+    fn outputs(
+        &self,
+        _: enrichment::TableRegistry,
+        input_definitions: &[(OutputId, schema::Definition)],
+        _: LogNamespace,
+    ) -> Vec<TransformOutput> {
         // The event is not modified, so the definition is passed through as-is
-        vec![Output::default(DataType::Log).with_schema_definition(merged_definition.clone())]
+        vec![TransformOutput::new(
+            DataType::Log,
+            clone_input_definitions(input_definitions),
+        )]
     }
 }
 

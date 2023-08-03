@@ -3,6 +3,8 @@ use std::io;
 use bytes::BytesMut;
 use codecs::encoding::Framer;
 use tokio_util::codec::Encoder as _;
+use vector_common::request_metadata::GroupedCountByteSize;
+use vector_core::{config::telemetry, EstimatedJsonEncodedSizeOf};
 
 use crate::{codecs::Transformer, event::Event, internal_events::EncoderWriteError};
 
@@ -12,7 +14,11 @@ pub trait Encoder<T> {
     /// # Errors
     ///
     /// If an I/O error is encountered while encoding the input, an error variant will be returned.
-    fn encode_input(&self, input: T, writer: &mut dyn io::Write) -> io::Result<usize>;
+    fn encode_input(
+        &self,
+        input: T,
+        writer: &mut dyn io::Write,
+    ) -> io::Result<(usize, GroupedCountByteSize)>;
 }
 
 impl Encoder<Vec<Event>> for (Transformer, crate::codecs::Encoder<Framer>) {
@@ -20,13 +26,16 @@ impl Encoder<Vec<Event>> for (Transformer, crate::codecs::Encoder<Framer>) {
         &self,
         mut events: Vec<Event>,
         writer: &mut dyn io::Write,
-    ) -> io::Result<usize> {
+    ) -> io::Result<(usize, GroupedCountByteSize)> {
         let mut encoder = self.1.clone();
         let mut bytes_written = 0;
         let mut n_events_pending = events.len();
         let batch_prefix = encoder.batch_prefix();
         write_all(writer, n_events_pending, batch_prefix)?;
         bytes_written += batch_prefix.len();
+
+        let mut byte_size = telemetry().create_request_count_byte_size();
+
         if let Some(last) = events.pop() {
             for mut event in events {
                 self.0.transform(&mut event);
@@ -40,6 +49,11 @@ impl Encoder<Vec<Event>> for (Transformer, crate::codecs::Encoder<Framer>) {
             }
             let mut event = last;
             self.0.transform(&mut event);
+
+            // Ensure the json size is calculated after any fields have been removed
+            // by the transformer.
+            byte_size.add_event(&event, event.estimated_json_encoded_size_of());
+
             let mut bytes = BytesMut::new();
             encoder
                 .serialize(event, &mut bytes)
@@ -53,20 +67,28 @@ impl Encoder<Vec<Event>> for (Transformer, crate::codecs::Encoder<Framer>) {
         write_all(writer, 0, batch_suffix)?;
         bytes_written += batch_suffix.len();
 
-        Ok(bytes_written)
+        Ok((bytes_written, byte_size))
     }
 }
 
 impl Encoder<Event> for (Transformer, crate::codecs::Encoder<()>) {
-    fn encode_input(&self, mut event: Event, writer: &mut dyn io::Write) -> io::Result<usize> {
+    fn encode_input(
+        &self,
+        mut event: Event,
+        writer: &mut dyn io::Write,
+    ) -> io::Result<(usize, GroupedCountByteSize)> {
         let mut encoder = self.1.clone();
         self.0.transform(&mut event);
+
+        let mut byte_size = telemetry().create_request_count_byte_size();
+        byte_size.add_event(&event, event.estimated_json_encoded_size_of());
+
         let mut bytes = BytesMut::new();
         encoder
             .serialize(event, &mut bytes)
             .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
         write_all(writer, 1, &bytes)?;
-        Ok(bytes.len())
+        Ok((bytes.len(), byte_size))
     }
 }
 
@@ -78,7 +100,7 @@ impl Encoder<Event> for (Transformer, crate::codecs::Encoder<()>) {
 /// * `writer`           - The object implementing io::Write to write data to.
 /// * `n_events_pending` - The number of events that are dropped if this write fails.
 /// * `buf`              - The buffer to write.
-pub(crate) fn write_all(
+pub fn write_all(
     writer: &mut dyn io::Write,
     n_events_pending: usize,
     buf: &[u8],
@@ -125,10 +147,11 @@ mod tests {
     use std::collections::BTreeMap;
 
     use codecs::{
-        CharacterDelimitedEncoder, JsonSerializer, NewlineDelimitedEncoder, TextSerializer,
+        CharacterDelimitedEncoder, JsonSerializerConfig, NewlineDelimitedEncoder,
+        TextSerializerConfig,
     };
-    use value::Value;
     use vector_core::event::LogEvent;
+    use vrl::value::Value;
 
     use super::*;
 
@@ -138,12 +161,12 @@ mod tests {
             Transformer::default(),
             crate::codecs::Encoder::<Framer>::new(
                 CharacterDelimitedEncoder::new(b',').into(),
-                JsonSerializer::new().into(),
+                JsonSerializerConfig::default().build().into(),
             ),
         );
 
         let mut writer = Vec::new();
-        let written = encoding.encode_input(vec![], &mut writer).unwrap();
+        let (written, _json_size) = encoding.encode_input(vec![], &mut writer).unwrap();
         assert_eq!(written, 2);
 
         assert_eq!(String::from_utf8(writer).unwrap(), "[]");
@@ -155,12 +178,12 @@ mod tests {
             Transformer::default(),
             crate::codecs::Encoder::<Framer>::new(
                 CharacterDelimitedEncoder::new(b',').into(),
-                JsonSerializer::new().into(),
+                JsonSerializerConfig::default().build().into(),
             ),
         );
 
         let mut writer = Vec::new();
-        let written = encoding
+        let (written, _json_size) = encoding
             .encode_input(
                 vec![Event::Log(LogEvent::from(BTreeMap::from([(
                     String::from("key"),
@@ -180,12 +203,12 @@ mod tests {
             Transformer::default(),
             crate::codecs::Encoder::<Framer>::new(
                 CharacterDelimitedEncoder::new(b',').into(),
-                JsonSerializer::new().into(),
+                JsonSerializerConfig::default().build().into(),
             ),
         );
 
         let mut writer = Vec::new();
-        let written = encoding
+        let (written, _json_size) = encoding
             .encode_input(
                 vec![
                     Event::Log(LogEvent::from(BTreeMap::from([(
@@ -218,12 +241,12 @@ mod tests {
             Transformer::default(),
             crate::codecs::Encoder::<Framer>::new(
                 NewlineDelimitedEncoder::new().into(),
-                JsonSerializer::new().into(),
+                JsonSerializerConfig::default().build().into(),
             ),
         );
 
         let mut writer = Vec::new();
-        let written = encoding.encode_input(vec![], &mut writer).unwrap();
+        let (written, _json_size) = encoding.encode_input(vec![], &mut writer).unwrap();
         assert_eq!(written, 0);
 
         assert_eq!(String::from_utf8(writer).unwrap(), "");
@@ -235,12 +258,12 @@ mod tests {
             Transformer::default(),
             crate::codecs::Encoder::<Framer>::new(
                 NewlineDelimitedEncoder::new().into(),
-                JsonSerializer::new().into(),
+                JsonSerializerConfig::default().build().into(),
             ),
         );
 
         let mut writer = Vec::new();
-        let written = encoding
+        let (written, _json_size) = encoding
             .encode_input(
                 vec![Event::Log(LogEvent::from(BTreeMap::from([(
                     String::from("key"),
@@ -260,12 +283,12 @@ mod tests {
             Transformer::default(),
             crate::codecs::Encoder::<Framer>::new(
                 NewlineDelimitedEncoder::new().into(),
-                JsonSerializer::new().into(),
+                JsonSerializerConfig::default().build().into(),
             ),
         );
 
         let mut writer = Vec::new();
-        let written = encoding
+        let (written, _json_size) = encoding
             .encode_input(
                 vec![
                     Event::Log(LogEvent::from(BTreeMap::from([(
@@ -296,11 +319,11 @@ mod tests {
     fn test_encode_event_json() {
         let encoding = (
             Transformer::default(),
-            crate::codecs::Encoder::<()>::new(JsonSerializer::new().into()),
+            crate::codecs::Encoder::<()>::new(JsonSerializerConfig::default().build().into()),
         );
 
         let mut writer = Vec::new();
-        let written = encoding
+        let (written, _json_size) = encoding
             .encode_input(
                 Event::Log(LogEvent::from(BTreeMap::from([(
                     String::from("key"),
@@ -318,11 +341,11 @@ mod tests {
     fn test_encode_event_text() {
         let encoding = (
             Transformer::default(),
-            crate::codecs::Encoder::<()>::new(TextSerializer::new().into()),
+            crate::codecs::Encoder::<()>::new(TextSerializerConfig::default().build().into()),
         );
 
         let mut writer = Vec::new();
-        let written = encoding
+        let (written, _json_size) = encoding
             .encode_input(
                 Event::Log(LogEvent::from(BTreeMap::from([(
                     String::from("message"),

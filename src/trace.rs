@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 use std::{
     collections::HashMap,
     marker::PhantomData,
@@ -27,7 +28,7 @@ use tracing_subscriber::{
     Layer,
 };
 pub use tracing_tower::{InstrumentableService, InstrumentedService};
-use value::Value;
+use vrl::value::Value;
 
 use crate::event::LogEvent;
 
@@ -99,7 +100,7 @@ pub fn init(color: bool, json: bool, levels: &str, internal_log_rate_limit: u64)
             RateLimitedLayer::new(formatter).with_default_limit(internal_log_rate_limit);
         let subscriber = subscriber.with(rate_limited.with_filter(fmt_filter));
 
-        let _ = subscriber.try_init();
+        _ = subscriber.try_init();
     } else {
         let formatter = tracing_subscriber::fmt::layer()
             .with_ansi(color)
@@ -112,7 +113,7 @@ pub fn init(color: bool, json: bool, levels: &str, internal_log_rate_limit: u64)
             RateLimitedLayer::new(formatter).with_default_limit(internal_log_rate_limit);
         let subscriber = subscriber.with(rate_limited.with_filter(fmt_filter));
 
-        let _ = subscriber.try_init();
+        _ = subscriber.try_init();
     }
 }
 
@@ -153,7 +154,7 @@ fn try_buffer_event(log: &LogEvent) -> bool {
 /// If no subscribers are connected, this does nothing.
 fn try_broadcast_event(log: LogEvent) {
     if let Some(sender) = maybe_get_trace_sender() {
-        let _ = sender.send(log);
+        _ = sender.send(log);
     }
 }
 
@@ -161,7 +162,7 @@ fn try_broadcast_event(log: LogEvent) {
 ///
 /// # Panics
 ///
-/// If the early buffered events have already been consumes, this function will panic.
+/// If the early buffered events have already been consumed, this function will panic.
 fn consume_early_buffer() -> Vec<LogEvent> {
     get_early_buffer()
         .take()
@@ -218,17 +219,26 @@ fn try_register_for_early_events() -> Option<oneshot::Receiver<Vec<LogEvent>>> {
 /// This flushes any buffered log events to waiting subscribers and redirects log events from the buffer to the
 /// broadcast stream.
 pub fn stop_early_buffering() {
-    // First, consume any waiting subscribers. This causes new subscriptions to simply receive from
-    // the broadcast channel, and not bother trying to receive the early buffered events.
-    let subscribers = get_trace_subscriber_list().take();
+    // Try and disable early buffering.
+    //
+    // If it was already disabled, or we lost the race to disable it, just return.
+    if SHOULD_BUFFER
+        .compare_exchange(true, false, Ordering::SeqCst, Ordering::SeqCst)
+        .is_err()
+    {
+        return;
+    }
 
-    // Now that we have any waiting subscribers, actually disable early buffering and consume any
-    // buffered log events. Once we have the buffered events, send them to each subscriber.
-    SHOULD_BUFFER.store(false, Ordering::Release);
-    let buffered_events = consume_early_buffer();
-    for subscriber_tx in subscribers.into_iter().flatten() {
-        // Ignore any errors sending since the caller may have dropped or something else.
-        let _ = subscriber_tx.send(buffered_events.clone());
+    // We won the right to capture all buffered events and forward them to any waiting subscribers,
+    // so let's grab the subscriber list and see if there's actually anyone waiting.
+    let subscribers = get_trace_subscriber_list().take();
+    if let Some(subscribers_tx) = subscribers {
+        // Consume the early buffer, and send a copy of it to every waiting subscriber.
+        let buffered_events = consume_early_buffer();
+        for subscriber_tx in subscribers_tx {
+            // Ignore any errors sending since the caller may have dropped or something else.
+            _ = subscriber_tx.send(buffered_events.clone());
+        }
     }
 }
 
@@ -271,7 +281,7 @@ impl TraceSubscription {
     /// Converts this subscription into a raw stream of log events.
     pub fn into_stream(self) -> impl Stream<Item = LogEvent> + Unpin {
         // We ignore errors because the only error we get is when the broadcast receiver lags, and there's nothing we
-        // can actully do about that so there's no reason to force callers to even deal with it.
+        // can actually do about that so there's no reason to force callers to even deal with it.
         BroadcastStream::new(self.trace_rx).filter_map(|event| ready(event.ok()))
     }
 }

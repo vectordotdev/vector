@@ -1,22 +1,14 @@
 use std::task::{Context, Poll};
 
 use bytes::Bytes;
-use futures::future::BoxFuture;
 use http::StatusCode;
 use snafu::Snafu;
-use tower::Service;
 use tracing::Instrument;
-use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
-use vector_core::{
-    event::{EventFinalizers, EventStatus, Finalizable},
-    internal_event::CountByteSize,
-    stream::DriverResponse,
-};
 
 use crate::sinks::loki::config::{CompressionConfigAdapter, ExtendedCompression};
 use crate::{
-    http::{get_http_scheme_from_uri, Auth, HttpClient},
-    sinks::util::{retries::RetryLogic, UriSerde},
+    http::{Auth, HttpClient},
+    sinks::{prelude::*, util::UriSerde},
 };
 
 #[derive(Clone)]
@@ -49,7 +41,6 @@ pub enum LokiError {
 
 #[derive(Debug, Snafu)]
 pub struct LokiResponse {
-    protocol: &'static str,
     metadata: RequestMetadata,
 }
 
@@ -58,15 +49,12 @@ impl DriverResponse for LokiResponse {
         EventStatus::Delivered
     }
 
-    fn events_sent(&self) -> CountByteSize {
-        CountByteSize(
-            self.metadata.event_count(),
-            self.metadata.events_estimated_json_encoded_byte_size(),
-        )
+    fn events_sent(&self) -> &GroupedCountByteSize {
+        self.metadata.events_estimated_json_encoded_byte_size()
     }
 
-    fn bytes_sent(&self) -> Option<(usize, &str)> {
-        Some((self.metadata.request_encoded_size(), self.protocol))
+    fn bytes_sent(&self) -> Option<usize> {
+        Some(self.metadata.request_encoded_size())
     }
 }
 
@@ -86,8 +74,12 @@ impl Finalizable for LokiRequest {
 }
 
 impl MetaDescriptive for LokiRequest {
-    fn get_metadata(&self) -> RequestMetadata {
-        self.metadata
+    fn get_metadata(&self) -> &RequestMetadata {
+        &self.metadata
+    }
+
+    fn metadata_mut(&mut self) -> &mut RequestMetadata {
+        &mut self.metadata
     }
 }
 
@@ -98,8 +90,13 @@ pub struct LokiService {
 }
 
 impl LokiService {
-    pub fn new(client: HttpClient, endpoint: UriSerde, auth: Option<Auth>) -> crate::Result<Self> {
-        let endpoint = endpoint.append_path("loki/api/v1/push")?.with_auth(auth);
+    pub fn new(
+        client: HttpClient,
+        endpoint: UriSerde,
+        path: String,
+        auth: Option<Auth>,
+    ) -> crate::Result<Self> {
+        let endpoint = endpoint.append_path(&path)?.with_auth(auth);
 
         Ok(Self { client, endpoint })
     }
@@ -122,9 +119,8 @@ impl Service<LokiRequest> for LokiService {
             }
         };
         let mut req = http::Request::post(&self.endpoint.uri).header("Content-Type", content_type);
-        let protocol = get_http_scheme_from_uri(&self.endpoint.uri);
 
-        let metadata = request.get_metadata();
+        let metadata = request.get_metadata().clone();
 
         if let Some(tenant_id) = request.tenant_id {
             req = req.header("X-Scope-OrgID", tenant_id);
@@ -149,7 +145,7 @@ impl Service<LokiRequest> for LokiService {
                     let status = response.status();
 
                     if status.is_success() {
-                        Ok(LokiResponse { protocol, metadata })
+                        Ok(LokiResponse { metadata })
                     } else {
                         Err(LokiError::ServerError { code: status })
                     }

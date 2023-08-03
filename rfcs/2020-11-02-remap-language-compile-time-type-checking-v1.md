@@ -372,7 +372,7 @@ A program could be allowed to convert the final expression as it sees fit
 (through some kind of function that takes an `Expression` and returns a
 `Value`).
 
-It could then match on whatver `Value` the final expression resolved to, and do
+It could then match on whatever `Value` the final expression resolved to, and do
 whatever it needs to, to convert that to the acceptable value kind (such as a
 boolean) before returning the final value of the program.
 

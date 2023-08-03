@@ -7,7 +7,10 @@ use std::{
 use once_cell::sync::Lazy;
 use regex::Regex;
 
-use crate::event::metric::{Metric, MetricKind, MetricTags, MetricValue, StatisticKind};
+use crate::{
+    event::metric::{Metric, MetricKind, MetricTags, MetricValue, StatisticKind},
+    sources::util::extract_tag_key_and_value,
+};
 
 static WHITESPACE: Lazy<Regex> = Lazy::new(|| Regex::new(r"\s+").unwrap());
 static NONALPHANUM: Lazy<Regex> = Lazy::new(|| Regex::new(r"[^a-zA-Z_\-0-9\.]").unwrap());
@@ -123,6 +126,7 @@ fn parse_sampling(input: &str) -> Result<f64, ParseError> {
     }
 }
 
+/// Statsd (and dogstatsd) support bare, single and multi-value tags.
 fn parse_tags(input: &&str) -> Result<MetricTags, ParseError> {
     if !input.starts_with('#') || input.len() < 2 {
         return Err(ParseError::Malformed(
@@ -132,15 +136,7 @@ fn parse_tags(input: &&str) -> Result<MetricTags, ParseError> {
 
     Ok(input[1..]
         .split(',')
-        .map(|chunk| {
-            let pair: Vec<_> = chunk.split(':').collect();
-            let key = &pair[0];
-            // same as in telegraf plugin:
-            // if tag value is not provided, use "true"
-            // https://github.com/influxdata/telegraf/blob/master/plugins/inputs/statsd/datadog.go#L152
-            let value = pair.get(1).unwrap_or(&"true");
-            ((*key).to_owned(), (*value).to_owned())
-        })
+        .map(extract_tag_key_and_value)
         .collect())
 }
 
@@ -220,7 +216,7 @@ impl From<ParseFloatError> for ParseError {
 #[cfg(test)]
 mod test {
     use vector_common::assert_event_data_eq;
-    use vector_core::metric_tags;
+    use vector_core::{event::metric::TagValue, metric_tags};
 
     use super::{parse, sanitize_key, sanitize_sampling};
     use crate::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
@@ -247,8 +243,28 @@ mod test {
                 MetricValue::Counter { value: 1.0 },
             )
             .with_tags(Some(metric_tags!(
-                "tag1" => "true",
+                "tag1" => TagValue::Bare,
                 "tag2" => "value",
+            )))),
+        );
+    }
+
+    #[test]
+    fn enhanced_tags() {
+        assert_event_data_eq!(
+            parse("foo:1|c|#tag1,tag2:valueA,tag2:valueB,tag3:value,tag3,tag4:"),
+            Ok(Metric::new(
+                "foo",
+                MetricKind::Incremental,
+                MetricValue::Counter { value: 1.0 },
+            )
+            .with_tags(Some(metric_tags!(
+                "tag1" => TagValue::Bare,
+                "tag2" => "valueA",
+                "tag2" => "valueB",
+                "tag3" => "value",
+                "tag3" => TagValue::Bare,
+                "tag4" => "",
             )))),
         );
     }
@@ -306,7 +322,7 @@ mod test {
             )
             .with_tags(Some(metric_tags!(
                 "region" => "us-west1",
-                "production" => "true",
+                "production" => TagValue::Bare,
                 "e" => "",
             )))),
         );
@@ -326,7 +342,7 @@ mod test {
             )
             .with_tags(Some(metric_tags!(
                 "region" => "us-west1",
-                "production" => "true",
+                "production" => TagValue::Bare,
                 "e" => "",
             )))),
         );

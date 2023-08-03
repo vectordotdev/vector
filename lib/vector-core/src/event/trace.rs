@@ -1,11 +1,16 @@
 use std::{collections::BTreeMap, fmt::Debug};
 
+use lookup::lookup_v2::TargetPath;
 use serde::{Deserialize, Serialize};
 use vector_buffers::EventCount;
-use vector_common::EventDataEq;
+use vector_common::{
+    internal_event::TaggedEventsSent, json_size::JsonSize, request_metadata::GetEventCountTags,
+    EventDataEq,
+};
 
 use super::{
-    BatchNotifier, EventFinalizer, EventFinalizers, EventMetadata, Finalizable, LogEvent, Value,
+    BatchNotifier, EstimatedJsonEncodedSizeOf, EventFinalizer, EventFinalizers, EventMetadata,
+    Finalizable, LogEvent, Value,
 };
 use crate::ByteSizeOf;
 
@@ -66,8 +71,9 @@ impl TraceEvent {
         self.0.as_map().expect("inner value must be a map")
     }
 
-    pub fn get(&self, key: impl AsRef<str>) -> Option<&Value> {
-        self.0.get(key.as_ref())
+    #[allow(clippy::needless_pass_by_value)] // TargetPath is always a reference
+    pub fn get<'a>(&self, key: impl TargetPath<'a>) -> Option<&Value> {
+        self.0.get(key)
     }
 
     pub fn get_mut(&mut self, key: impl AsRef<str>) -> Option<&mut Value> {
@@ -78,16 +84,23 @@ impl TraceEvent {
         self.0.contains(key.as_ref())
     }
 
-    pub fn insert(
+    pub fn insert<'a>(
         &mut self,
-        key: impl AsRef<str>,
+        key: impl TargetPath<'a>,
         value: impl Into<Value> + Debug,
     ) -> Option<Value> {
-        self.0.insert(key.as_ref(), value.into())
+        self.0.insert(key, value.into())
     }
 
-    pub fn estimated_json_encoded_size_of(&self) -> usize {
-        self.0.estimated_json_encoded_size_of()
+    pub fn maybe_insert<'a, F: FnOnce() -> Value>(
+        &mut self,
+        path: Option<impl TargetPath<'a>>,
+        value_callback: F,
+    ) -> Option<Value> {
+        if let Some(path) = path {
+            return self.0.insert(path, value_callback());
+        }
+        None
     }
 }
 
@@ -106,6 +119,12 @@ impl From<BTreeMap<String, Value>> for TraceEvent {
 impl ByteSizeOf for TraceEvent {
     fn allocated_bytes(&self) -> usize {
         self.0.allocated_bytes()
+    }
+}
+
+impl EstimatedJsonEncodedSizeOf for TraceEvent {
+    fn estimated_json_encoded_size_of(&self) -> JsonSize {
+        self.0.estimated_json_encoded_size_of()
     }
 }
 
@@ -136,5 +155,11 @@ impl AsRef<LogEvent> for TraceEvent {
 impl AsMut<LogEvent> for TraceEvent {
     fn as_mut(&mut self) -> &mut LogEvent {
         &mut self.0
+    }
+}
+
+impl GetEventCountTags for TraceEvent {
+    fn get_tags(&self) -> TaggedEventsSent {
+        self.0.get_tags()
     }
 }

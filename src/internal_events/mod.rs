@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 pub mod prelude;
 
 mod adaptive_concurrency;
@@ -16,10 +17,13 @@ mod aws_cloudwatch_logs;
 mod aws_ec2_metadata;
 #[cfg(feature = "sources-aws_ecs_metrics")]
 mod aws_ecs_metrics;
+#[cfg(any(
+    feature = "sinks-aws_kinesis_streams",
+    feature = "sinks-aws_kinesis_firehose"
+))]
+mod aws_kinesis;
 #[cfg(feature = "sources-aws_kinesis_firehose")]
 mod aws_kinesis_firehose;
-#[cfg(feature = "sinks-aws_kinesis_streams")]
-mod aws_kinesis_streams;
 #[cfg(any(feature = "sources-aws_s3", feature = "sources-aws_sqs",))]
 mod aws_sqs;
 mod batch;
@@ -51,8 +55,6 @@ mod filter;
 mod fluent;
 #[cfg(feature = "sources-gcp_pubsub")]
 mod gcp_pubsub;
-#[cfg(feature = "transforms-geoip")]
-mod geoip;
 #[cfg(any(feature = "sources-vector", feature = "sources-opentelemetry"))]
 mod grpc;
 mod heartbeat;
@@ -148,10 +150,13 @@ pub(crate) use self::aws_cloudwatch_logs::*;
 pub(crate) use self::aws_ec2_metadata::*;
 #[cfg(feature = "sources-aws_ecs_metrics")]
 pub(crate) use self::aws_ecs_metrics::*;
+#[cfg(any(
+    feature = "sinks-aws_kinesis_streams",
+    feature = "sinks-aws_kinesis_firehose"
+))]
+pub(crate) use self::aws_kinesis::*;
 #[cfg(feature = "sources-aws_kinesis_firehose")]
 pub(crate) use self::aws_kinesis_firehose::*;
-#[cfg(feature = "sinks-aws_kinesis_streams")]
-pub(crate) use self::aws_kinesis_streams::*;
 #[cfg(any(feature = "sources-aws_s3", feature = "sources-aws_sqs",))]
 pub(crate) use self::aws_sqs::*;
 pub(crate) use self::codecs::*;
@@ -185,8 +190,6 @@ pub(crate) use self::filter::*;
 pub(crate) use self::fluent::*;
 #[cfg(feature = "sources-gcp_pubsub")]
 pub(crate) use self::gcp_pubsub::*;
-#[cfg(feature = "transforms-geoip")]
-pub(crate) use self::geoip::*;
 #[cfg(any(feature = "sources-vector", feature = "sources-opentelemetry"))]
 pub(crate) use self::grpc::*;
 #[cfg(feature = "sources-host_metrics")]
@@ -250,24 +253,13 @@ pub(crate) use self::statsd_sink::*;
 pub(crate) use self::tag_cardinality_limit::*;
 #[cfg(feature = "transforms-throttle")]
 pub(crate) use self::throttle::*;
-#[cfg(all(
-    any(
-        feature = "sinks-socket",
-        feature = "sinks-statsd",
-        feature = "sources-dnstap",
-        feature = "sources-metrics",
-        feature = "sources-statsd",
-        feature = "sources-syslog",
-        feature = "sources-socket"
-    ),
-    unix
-))]
+#[cfg(unix)]
 pub(crate) use self::unix::*;
 #[cfg(feature = "sinks-websocket")]
 pub(crate) use self::websocket::*;
 #[cfg(windows)]
 pub(crate) use self::windows::*;
-pub(crate) use self::{
+pub use self::{
     adaptive_concurrency::*, batch::*, common::*, conditions::*, encoding_transcode::*,
     heartbeat::*, open::*, process::*, socket::*, tcp::*, template::*, udp::*,
 };

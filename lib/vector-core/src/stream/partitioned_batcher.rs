@@ -236,7 +236,7 @@ impl BatcherSettings {
     }
 
     /// A batcher config using the `ByteSizeOf` trait to determine batch sizes.
-    /// The output is a Vec<T>
+    /// The output is a  `Vec<T>`.
     pub fn into_byte_size_config<T: ByteSizeOf>(
         self,
     ) -> BatchConfigParts<SizeLimit<ByteSizeOfItemSize>, Vec<T>> {
@@ -244,7 +244,7 @@ impl BatcherSettings {
     }
 
     /// A batcher config using the `ItemBatchSize` trait to determine batch sizes.
-    /// The output is a Vec<T>
+    /// The output is a `Vec<T>`.
     pub fn into_item_size_config<T, I>(self, item_size: I) -> BatchConfigParts<SizeLimit<I>, Vec<T>>
     where
         I: ItemBatchSize<T>,
@@ -436,7 +436,7 @@ where
                         // We have no batch yet for this partition key, so
                         // create one and create the expiration entries as well.
                         // This allows the batch to expire before filling up,
-                        // and vise versa.
+                        // and vice versa.
                         let batch = Batch::new(item_limit, alloc_limit).with(item);
                         this.batches.insert(item_key.clone(), batch);
                         this.timer.insert(item_key);

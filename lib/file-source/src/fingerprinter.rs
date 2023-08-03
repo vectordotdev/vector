@@ -96,8 +96,8 @@ impl Fingerprinter {
                 buffer.resize(self.max_line_length, 0u8);
                 let mut fp = fs::File::open(path)?;
                 fp.seek(SeekFrom::Start(ignored_header_bytes as u64))?;
-                fingerprinter_read_until(fp, b'\n', lines, buffer)?;
-                let fingerprint = FINGERPRINT_CRC.checksum(&buffer[..]);
+                let bytes_read = fingerprinter_read_until(fp, b'\n', lines, buffer)?;
+                let fingerprint = FINGERPRINT_CRC.checksum(&buffer[..bytes_read]);
                 Ok(FirstLinesChecksum(fingerprint))
             }
         }
@@ -180,8 +180,35 @@ impl Fingerprinter {
                 buffer.resize(self.max_line_length, 0u8);
                 let mut fp = fs::File::open(path)?;
                 fp.seek(SeekFrom::Start(ignored_header_bytes as u64))?;
-                fingerprinter_read_until(fp, b'\n', lines, buffer)?;
+                fingerprinter_read_until_and_zerofill_buf(fp, b'\n', lines, buffer)?;
                 let fingerprint = LEGACY_FINGERPRINT_CRC.checksum(&buffer[..]);
+                Ok(Some(FileFingerprint::FirstLinesChecksum(fingerprint)))
+            }
+            _ => Ok(None),
+        }
+    }
+    /// For upgrades from legacy strategy version
+    /// <https://github.com/vectordotdev/vector/issues/15700>
+    pub fn get_legacy_first_lines_checksum(
+        &self,
+        path: &Path,
+        buffer: &mut Vec<u8>,
+    ) -> Result<Option<FileFingerprint>, io::Error> {
+        match self.strategy {
+            FingerprintStrategy::Checksum {
+                ignored_header_bytes,
+                bytes: _,
+                lines,
+            }
+            | FingerprintStrategy::FirstLinesChecksum {
+                ignored_header_bytes,
+                lines,
+            } => {
+                buffer.resize(self.max_line_length, 0u8);
+                let mut fp = fs::File::open(path)?;
+                fp.seek(SeekFrom::Start(ignored_header_bytes as u64))?;
+                fingerprinter_read_until_and_zerofill_buf(fp, b'\n', lines, buffer)?;
+                let fingerprint = FINGERPRINT_CRC.checksum(&buffer[..]);
                 Ok(Some(FileFingerprint::FirstLinesChecksum(fingerprint)))
             }
             _ => Ok(None),
@@ -189,7 +216,8 @@ impl Fingerprinter {
     }
 }
 
-fn fingerprinter_read_until(
+/// Saved for backwards compatibility.
+fn fingerprinter_read_until_and_zerofill_buf(
     mut r: impl Read,
     delim: u8,
     mut count: usize,
@@ -215,10 +243,40 @@ fn fingerprinter_read_until(
                 }
             }
         }
-
         buf = &mut buf[read..];
     }
     Ok(())
+}
+
+fn fingerprinter_read_until(
+    mut r: impl Read,
+    delim: u8,
+    mut count: usize,
+    mut buf: &mut [u8],
+) -> io::Result<usize> {
+    let mut total_read = 0;
+    'main: while !buf.is_empty() {
+        let read = match r.read(buf) {
+            Ok(0) => return Err(io::Error::new(io::ErrorKind::UnexpectedEof, "EOF reached")),
+            Ok(n) => n,
+            Err(ref e) if e.kind() == io::ErrorKind::Interrupted => continue,
+            Err(e) => return Err(e),
+        };
+
+        for (pos, &c) in buf[..read].iter().enumerate() {
+            if c == delim {
+                if count <= 1 {
+                    total_read += pos + 1;
+                    break 'main;
+                } else {
+                    count -= 1;
+                }
+            }
+        }
+        total_read += read;
+        buf = &mut buf[read..];
+    }
+    Ok(total_read)
 }
 
 #[cfg(test)]
@@ -249,10 +307,10 @@ mod test {
         let full_line_path = target_dir.path().join("full_line.log");
         let duplicate_path = target_dir.path().join("duplicate.log");
         let not_full_line_path = target_dir.path().join("not_full_line.log");
-        fs::write(&empty_path, &[]).unwrap();
+        fs::write(&empty_path, []).unwrap();
         fs::write(&full_line_path, &full_line_data).unwrap();
         fs::write(&duplicate_path, &full_line_data).unwrap();
-        fs::write(&not_full_line_path, &not_full_line_data).unwrap();
+        fs::write(&not_full_line_path, not_full_line_data).unwrap();
 
         let mut buf = Vec::new();
         assert!(fingerprinter
@@ -307,7 +365,7 @@ mod test {
         };
 
         let empty = prepare_test("empty.log", b"");
-        let incomlete_line = prepare_test("incomlete_line.log", b"missing newline char");
+        let incomplete_line = prepare_test("incomplete_line.log", b"missing newline char");
         let one_line = prepare_test("one_line.log", b"hello world\n");
         let one_line_duplicate = prepare_test("one_line_duplicate.log", b"hello world\n");
         let one_line_continued =
@@ -327,7 +385,7 @@ mod test {
         let mut run = move |path| fingerprinter.get_fingerprint_of_file(path, &mut buf);
 
         assert!(run(&empty).is_err());
-        assert!(run(&incomlete_line).is_err());
+        assert!(run(&incomplete_line).is_err());
         assert!(run(&incomplete_under_max_line_length_by_one).is_err());
 
         assert!(run(&one_line).is_ok());
@@ -367,8 +425,8 @@ mod test {
             path
         };
 
-        let incomlete_lines = prepare_test(
-            "incomlete_lines.log",
+        let incomplete_lines = prepare_test(
+            "incomplete_lines.log",
             b"missing newline char\non second line",
         );
         let two_lines = prepare_test("two_lines.log", b"hello world\nfrom vector\n");
@@ -386,7 +444,7 @@ mod test {
         let mut buf = Vec::new();
         let mut run = move |path| fingerprinter.get_fingerprint_of_file(path, &mut buf);
 
-        assert!(run(&incomlete_lines).is_err());
+        assert!(run(&incomplete_lines).is_err());
 
         assert!(run(&two_lines).is_ok());
         assert!(run(&two_lines_duplicate).is_ok());
@@ -417,8 +475,8 @@ mod test {
         let small_path = target_dir.path().join("small.log");
         let medium_path = target_dir.path().join("medium.log");
         let duplicate_path = target_dir.path().join("duplicate.log");
-        fs::write(&empty_path, &[]).unwrap();
-        fs::write(&small_path, &small_data).unwrap();
+        fs::write(&empty_path, []).unwrap();
+        fs::write(&small_path, small_data).unwrap();
         fs::write(&medium_path, &medium_data).unwrap();
         fs::write(&duplicate_path, &medium_data).unwrap();
 

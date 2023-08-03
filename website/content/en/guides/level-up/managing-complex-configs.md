@@ -85,9 +85,11 @@ the grok parser:
   address = "0.0.0.0:9000"
 
 [transforms.foo]
-  type = "grok_parser"
   inputs = ["over_tcp"]
-  pattern = "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"
+  type = "remap"
+  source = '''
+  . = parse_grok!(.message, s'%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}')
+'''
 ```
 
 A common way to test this transform might be to temporarily change the source

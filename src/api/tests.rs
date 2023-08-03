@@ -84,8 +84,8 @@ async fn sink_events() {
         MetricValue::Counter { value: 1.0 },
     ));
 
-    let _ = fanout.send(metric_event).await.unwrap();
-    let _ = fanout.send(log_event).await.unwrap();
+    _ = fanout.send(metric_event).await.unwrap();
+    _ = fanout.send(log_event).await.unwrap();
 
     // 3rd payload should be the metric event
     assert!(matches!(

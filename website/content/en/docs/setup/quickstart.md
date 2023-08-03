@@ -158,7 +158,7 @@ We can see that Vector has parsed the Syslog message and created a structured ev
 
 ## What's next?
 
-We're just scatching the surface in this post. To get your hands dirty with Vector check out:
+We're just scratching the surface in this post. To get your hands dirty with Vector check out:
 
 * All of Vector's [sources][sources], [transforms][transforms], and [sinks][sinks].
 * The [Vector Remap Language][vrl], the heart of data processing in Vector.

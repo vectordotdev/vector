@@ -40,7 +40,7 @@ use vector_common::{byte_size_of::ByteSizeOf, finalization::AddBatchNotifier};
 
 /// Event handling behavior when a buffer is full.
 #[configurable_component]
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum WhenFull {
     /// Wait for free space in the buffer.
@@ -48,6 +48,7 @@ pub enum WhenFull {
     /// This applies backpressure up the topology, signalling that sources should slow down
     /// the acceptance/consumption of events. This means that while no data is lost, data will pile
     /// up at the edge.
+    #[default]
     Block,
 
     /// Drops the event instead of waiting for free space in buffer.
@@ -67,12 +68,6 @@ pub enum WhenFull {
     /// This mode can only be used when two or more buffer stages are configured.
     #[configurable(metadata(docs::hidden))]
     Overflow,
-}
-
-impl Default for WhenFull {
-    fn default() -> Self {
-        WhenFull::Block
-    }
 }
 
 #[cfg(test)]

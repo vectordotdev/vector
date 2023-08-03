@@ -93,7 +93,7 @@ pub struct PrometheusNormalizationError;
 
 impl InternalEvent for PrometheusNormalizationError {
     fn emit(self) {
-        let normalization_reason = "Prometheuse metric normalization failed.";
+        let normalization_reason = "Prometheus metric normalization failed.";
         error!(
             message = normalization_reason,
             error_type = error_type::CONVERSION_FAILED,

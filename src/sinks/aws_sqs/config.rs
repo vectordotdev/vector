@@ -32,12 +32,18 @@ pub(super) enum BuildError {
 }
 
 /// Configuration for the `aws_sqs` sink.
-#[configurable_component(sink("aws_sqs"))]
+#[configurable_component(sink(
+    "aws_sqs",
+    "Publish observability events to AWS Simple Queue Service topics."
+))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct SqsSinkConfig {
     /// The URL of the Amazon SQS queue to which messages are sent.
     #[configurable(validation(format = "uri"))]
+    #[configurable(metadata(
+        docs::examples = "https://sqs.us-east-2.amazonaws.com/123456789012/MyQueue"
+    ))]
     pub queue_url: String,
 
     #[serde(flatten)]
@@ -49,6 +55,8 @@ pub struct SqsSinkConfig {
     /// The tag that specifies that a message belongs to a specific message group.
     ///
     /// Can be applied only to FIFO queues.
+    #[configurable(metadata(docs::examples = "vector"))]
+    #[configurable(metadata(docs::examples = "vector-%Y-%m-%d"))]
     pub message_group_id: Option<String>,
 
     /// The message deduplication ID value to allow AWS to identify duplicate messages.
@@ -57,6 +65,7 @@ pub struct SqsSinkConfig {
     /// documentation][deduplication_id_docs] for more about how AWS does message deduplication.
     ///
     /// [deduplication_id_docs]: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/using-messagededuplicationid-property.html
+    #[configurable(metadata(docs::examples = "{{ transaction_id }}"))]
     pub message_deduplication_id: Option<String>,
 
     #[configurable(derived)]
@@ -70,6 +79,7 @@ pub struct SqsSinkConfig {
     ///
     /// [iam_role]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles.html
     #[configurable(deprecated)]
+    #[configurable(metadata(docs::hidden))]
     pub assume_role: Option<String>,
 
     #[configurable(derived)]
@@ -104,6 +114,7 @@ impl GenerateConfig for SqsSinkConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "aws_sqs")]
 impl SinkConfig for SqsSinkConfig {
     async fn build(
         &self,
@@ -142,7 +153,7 @@ impl SqsSinkConfig {
         create_client::<SqsClientBuilder>(
             &self.auth,
             self.region.region(),
-            self.region.endpoint()?,
+            self.region.endpoint(),
             proxy,
             &self.tls,
             true,

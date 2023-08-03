@@ -35,7 +35,7 @@ This is ideal for users who want it to "Just work" and just want to start contri
 export CONTAINER_TOOL="podman"
 ```
 
-By default, `make environment` style tasks will do a `docker pull` from Github's container repository, you can **optionally** build your own environment while you make your morning coffee ☕:
+By default, `make environment` style tasks will do a `docker pull` from GitHub's container repository, you can **optionally** build your own environment while you make your morning coffee ☕:
 
 ```bash
 # Optional: Only if you want to go make a coffee

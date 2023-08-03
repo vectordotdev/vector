@@ -1,12 +1,13 @@
 package metadata
 
 components: sinks: statsd: {
-	title: "Statsd"
+	title: "StatsD"
 
 	classes: sinks.socket.classes
 
 	features: {
 		acknowledgements: sinks.socket.features.acknowledgements
+		auto_generated:   true
 		healthcheck:      sinks.socket.features.healthcheck
 		send: {
 			compression: sinks.socket.features.send.compression
@@ -46,51 +47,5 @@ components: sinks: statsd: {
 		traces: false
 	}
 
-	configuration: {
-		address: {
-			description:   "The address to connect to. The address _must_ include a port."
-			relevant_when: "mode = `tcp` or `udp`"
-			required:      true
-			type: string: {
-				examples: ["92.12.333.224:5000"]
-			}
-		}
-		mode: {
-			description: "The type of socket to use."
-			required:    true
-			type: string: {
-				enum: {
-					tcp:  "TCP socket"
-					udp:  "UDP socket"
-					unix: "Unix domain socket"
-				}
-			}
-		}
-		path: {
-			description:   "The unix socket path. This should be the absolute path."
-			relevant_when: "mode = `unix`"
-			required:      true
-			type: string: {
-				examples: ["/path/to/socket"]
-			}
-		}
-		default_namespace: {
-			common: true
-			description: """
-				Used as a namespace for metrics that don't have it.
-				A namespace will be prefixed to a metric's name.
-				"""
-			required: false
-			type: string: {
-				default: null
-				examples: ["service"]
-			}
-		}
-	}
-
-	telemetry: metrics: {
-		component_sent_events_total:      components.sources.internal_metrics.output.metrics.component_sent_events_total
-		component_sent_event_bytes_total: components.sources.internal_metrics.output.metrics.component_sent_event_bytes_total
-		processing_errors_total:          components.sources.internal_metrics.output.metrics.processing_errors_total
-	}
+	configuration: base.components.sinks.statsd.configuration
 }

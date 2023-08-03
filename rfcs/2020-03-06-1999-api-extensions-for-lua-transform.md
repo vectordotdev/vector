@@ -106,7 +106,7 @@ The following example illustrates fields manipulations with the new approach.
       }
       -- add new field (nested, to already existing map)
       event.nested.another_field = "example value"
-      -- add new field (nestd, without assumptions about presence of the parent map)
+      -- add new field (nested, without assumptions about presence of the parent map)
       if event.possibly_existing == nil then
         event.possibly_existing = {}
       end

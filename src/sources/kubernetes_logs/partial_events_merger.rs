@@ -2,8 +2,10 @@
 
 use enrichment::TableRegistry;
 use indexmap::IndexMap;
+use vector_core::config::LogNamespace;
 
 use super::{transform_utils::optional::Optional, FILE_KEY};
+use crate::sources::kubernetes_logs::transform_utils::get_message_field;
 use crate::{
     conditions::AnyCondition,
     event,
@@ -13,14 +15,13 @@ use crate::{
 /// Partial event merger.
 pub type PartialEventsMerger = Optional<Reduce>;
 
-pub fn build(enabled: bool) -> PartialEventsMerger {
+pub fn build(enabled: bool, log_namespace: LogNamespace) -> PartialEventsMerger {
     let reducer = if enabled {
+        let key = get_message_field(log_namespace);
+
         // Merge the message field of each event by concatenating it, with a space delimiter.
         let mut merge_strategies = IndexMap::new();
-        merge_strategies.insert(
-            crate::config::log_schema().message_key().to_string(),
-            MergeStrategy::ConcatRaw,
-        );
+        merge_strategies.insert(key, MergeStrategy::ConcatRaw);
 
         // Group events by their file.
         let group_by = vec![FILE_KEY.to_string()];

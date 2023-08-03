@@ -13,6 +13,7 @@ components: sinks: kafka: {
 	}
 
 	features: {
+		auto_generated:   true
 		acknowledgements: true
 		healthcheck: enabled: true
 		send: {
@@ -50,90 +51,7 @@ components: sinks: kafka: {
 
 	support: components._kafka.support
 
-	configuration: {
-		bootstrap_servers: components._kafka.configuration.bootstrap_servers
-		key_field: {
-			common:      true
-			description: "The log field name or tags key to use for the topic key. If the field does not exist in the log or in tags, a blank value will be used. If unspecified, the key is not sent. Kafka uses a hash of the key to choose the partition or uses round-robin if the record has no key."
-			required:    false
-			type: string: {
-				default: null
-				examples: ["user_id"]
-			}
-		}
-		librdkafka_options: components._kafka.configuration.librdkafka_options
-		message_timeout_ms: {
-			common:      false
-			description: "Local message timeout."
-			required:    false
-			type: uint: {
-				default: 300000
-				examples: [150000, 450000]
-				unit: null
-			}
-		}
-		sasl: {
-			common:      false
-			description: "Options for SASL/SCRAM authentication support."
-			required:    false
-			type: object: {
-				examples: []
-				options: {
-					enabled: {
-						common:      true
-						description: "Enable SASL/SCRAM authentication to the remote. (Not supported on Windows at this time.)"
-						required:    false
-						type: bool: default: null
-					}
-					mechanism: {
-						common:      true
-						description: "The Kafka SASL/SCRAM mechanisms."
-						required:    false
-						type: string: {
-							default: null
-							examples: ["SCRAM-SHA-256", "SCRAM-SHA-512"]
-						}
-					}
-					password: {
-						common:      true
-						description: "The Kafka SASL/SCRAM authentication password."
-						required:    false
-						type: string: {
-							default: null
-							examples: ["password"]
-						}
-					}
-					username: {
-						common:      true
-						description: "The Kafka SASL/SCRAM authentication username."
-						required:    false
-						type: string: {
-							default: null
-							examples: ["username"]
-						}
-					}
-				}
-			}
-		}
-		socket_timeout_ms: components._kafka.configuration.socket_timeout_ms
-		topic: {
-			description: "The Kafka topic name to write events to."
-			required:    true
-			type: string: {
-				examples: ["topic-1234", "logs-{{unit}}-%Y-%m-%d"]
-				syntax: "template"
-			}
-		}
-		headers_key: {
-			common:      false
-			description: "The log field name to use for the Kafka headers. If omitted, no headers will be written."
-			required:    false
-			type: string: {
-				default: null
-				examples: ["headers"]
-			}
-		}
-	}
+	configuration: base.components.sinks.kafka.configuration
 
 	input: {
 		logs: true
@@ -151,11 +69,6 @@ components: sinks: kafka: {
 	how_it_works: components._kafka.how_it_works
 
 	telemetry: metrics: {
-		component_sent_events_total:         components.sources.internal_metrics.output.metrics.component_sent_events_total
-		component_sent_event_bytes_total:    components.sources.internal_metrics.output.metrics.component_sent_event_bytes_total
-		component_sent_bytes_total:          components.sources.internal_metrics.output.metrics.component_sent_bytes_total
-		events_discarded_total:              components.sources.internal_metrics.output.metrics.events_discarded_total
-		processing_errors_total:             components.sources.internal_metrics.output.metrics.processing_errors_total
 		kafka_queue_messages:                components.sources.internal_metrics.output.metrics.kafka_queue_messages
 		kafka_queue_messages_bytes:          components.sources.internal_metrics.output.metrics.kafka_queue_messages_bytes
 		kafka_requests_total:                components.sources.internal_metrics.output.metrics.kafka_requests_total

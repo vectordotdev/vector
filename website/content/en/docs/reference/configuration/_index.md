@@ -44,15 +44,15 @@ source = '''
 # Sample the data to save on cost
 [transforms.apache_sampler]
 inputs = ["apache_parser"]
-type   = "sampler"
-rate   = 50                   # only keep 50%
+type   = "sample"
+rate   = 2                    # only keep 50% (1/`rate`)
 
 # Send structured data to a short-term storage
 [sinks.es_cluster]
-inputs = ["apache_sampler"]             # only take sampled data
-type   = "elasticsearch"
-host   = "http://79.12.221.222:9200"    # local or external host
-index  = "vector-%Y-%m-%d"              # daily indices
+inputs     = ["apache_sampler"]             # only take sampled data
+type       = "elasticsearch"
+endpoints  = ["http://79.12.221.222:9200"]  # local or external host
+bulk.index = "vector-%Y-%m-%d"              # daily indices
 
 # Send structured data to a cost-effective long-term storage
 [sinks.s3_archives]
@@ -79,7 +79,7 @@ sources:
       - /var/log/apache2/*.log
     ignore_older: 86400
 transforms:
-  remap:
+  apache_parser:
     inputs:
       - apache_logs
     type: remap
@@ -88,15 +88,16 @@ transforms:
   apache_sampler:
     inputs:
       - apache_parser
-    type: sampler
+    type: sample
     rate: 50
 sinks:
   es_cluster:
     inputs:
       - apache_sampler
     type: elasticsearch
-    host: 'http://79.12.221.222:9200'
-    index: vector-%Y-%m-%d
+    endpoints: ['http://79.12.221.222:9200']
+    bulk:
+      index: vector-%Y-%m-%d
   s3_archives:
     inputs:
       - apache_parser
@@ -129,7 +130,7 @@ sinks:
     }
   },
   "transforms": {
-    "remap": {
+    "apache_parser": {
       "inputs": [
         "apache_logs"
       ],
@@ -140,7 +141,7 @@ sinks:
       "inputs": [
         "apache_parser"
       ],
-      "type": "sampler",
+      "type": "sample",
       "rate": 50
     }
   },
@@ -150,8 +151,10 @@ sinks:
         "apache_sampler"
       ],
       "type": "elasticsearch",
-      "host": "http://79.12.221.222:9200",
-      "index": "vector-%Y-%m-%d"
+      "endpoints": ["http://79.12.221.222:9200"],
+      "bulk": {
+        "index": "vector-%Y-%m-%d"
+      }
     },
     "s3_archives": {
       "inputs": [
@@ -307,8 +310,6 @@ data_dir = "/var/lib/vector"
 [api]
 enabled = false
 # address = "127.0.0.1:8686"
-
-'''
 ```
 
 {{< /tab >}}
@@ -339,8 +340,7 @@ source = '''
 # Sample the data to save on cost
 inputs = ["apache_parser"]
 type   = "sample"
-rate   = 50                   # only keep 50%
-. = parse_apache_log(.message)
+rate   = 2                    # only keep 50% (1/`rate`)
 ```
 
 {{< /tab >}}
@@ -348,10 +348,10 @@ rate   = 50                   # only keep 50%
 
 ```toml
 # Send structured data to a short-term storage
-inputs = ["apache_sampler"]             # only take sampled data
-type   = "elasticsearch"
-host   = "http://79.12.221.222:9200"    # local or external host
-index  = "vector-%Y-%m-%d"              # daily indices
+inputs     = ["apache_sampler"]             # only take sampled data
+type       = "elasticsearch"
+endpoints  = ["http://79.12.221.222:9200"]  # local or external host
+bulk.index = "vector-%Y-%m-%d"              # daily indices
 ```
 
 {{< /tab >}}

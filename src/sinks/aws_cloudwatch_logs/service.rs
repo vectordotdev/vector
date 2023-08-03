@@ -22,21 +22,18 @@ use tower::{
     timeout::Timeout,
     Service, ServiceBuilder, ServiceExt,
 };
-use vector_common::request_metadata::MetaDescriptive;
-use vector_core::{internal_event::CountByteSize, stream::DriverResponse};
-use vrl::prelude::fmt::Debug;
+use vector_common::{
+    finalization::EventStatus,
+    request_metadata::{GroupedCountByteSize, MetaDescriptive},
+};
+use vector_core::stream::DriverResponse;
 
-use crate::{
-    event::EventStatus,
-    sinks::{
-        aws_cloudwatch_logs::{
-            config::CloudwatchLogsSinkConfig, request, retry::CloudwatchRetryLogic,
-            sink::BatchCloudwatchRequest, CloudwatchKey,
-        },
-        util::{
-            retries::FixedRetryPolicy, EncodedLength, TowerRequestConfig, TowerRequestSettings,
-        },
+use crate::sinks::{
+    aws_cloudwatch_logs::{
+        config::CloudwatchLogsSinkConfig, request, retry::CloudwatchRetryLogic,
+        sink::BatchCloudwatchRequest, CloudwatchKey,
     },
+    util::{retries::FixedRetryPolicy, EncodedLength, TowerRequestConfig, TowerRequestSettings},
 };
 
 type Svc = Buffer<
@@ -99,8 +96,7 @@ impl From<SdkError<DescribeLogStreamsError>> for CloudwatchError {
 
 #[derive(Debug)]
 pub struct CloudwatchResponse {
-    events_count: usize,
-    events_byte_size: usize,
+    events_byte_size: GroupedCountByteSize,
 }
 
 impl crate::sinks::util::sink::Response for CloudwatchResponse {
@@ -118,8 +114,8 @@ impl DriverResponse for CloudwatchResponse {
         EventStatus::Delivered
     }
 
-    fn events_sent(&self) -> CountByteSize {
-        CountByteSize(self.events_count, self.events_byte_size)
+    fn events_sent(&self) -> &GroupedCountByteSize {
+        &self.events_byte_size
     }
 }
 
@@ -157,9 +153,9 @@ impl Service<BatchCloudwatchRequest> for CloudwatchLogsPartitionSvc {
         Poll::Ready(Ok(()))
     }
 
-    fn call(&mut self, req: BatchCloudwatchRequest) -> Self::Future {
-        let events_count = req.get_metadata().event_count();
-        let events_byte_size = req.get_metadata().events_byte_size();
+    fn call(&mut self, mut req: BatchCloudwatchRequest) -> Self::Future {
+        let metadata = std::mem::take(req.metadata_mut());
+        let events_byte_size = metadata.into_events_estimated_json_encoded_byte_size();
 
         let key = req.key;
         let events = req
@@ -201,10 +197,7 @@ impl Service<BatchCloudwatchRequest> for CloudwatchLogsPartitionSvc {
         };
 
         svc.oneshot(events)
-            .map_ok(move |_x| CloudwatchResponse {
-                events_count,
-                events_byte_size,
-            })
+            .map_ok(move |_x| CloudwatchResponse { events_byte_size })
             .map_err(Into::into)
             .boxed()
     }
@@ -220,8 +213,8 @@ impl CloudwatchLogsSvc {
         let group_name = key.group.clone();
         let stream_name = key.stream.clone();
 
-        let create_missing_group = config.create_missing_group.unwrap_or(true);
-        let create_missing_stream = config.create_missing_stream.unwrap_or(true);
+        let create_missing_group = config.create_missing_group;
+        let create_missing_stream = config.create_missing_stream;
 
         CloudwatchLogsSvc {
             headers: config.request.headers,

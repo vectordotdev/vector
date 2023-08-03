@@ -6,13 +6,14 @@ components: sinks: loki: {
 	classes: {
 		commonly_used: true
 		delivery:      "at_least_once"
-		development:   "beta"
+		development:   "stable"
 		egress_method: "batch"
 		service_providers: ["Grafana"]
 		stateful: false
 	}
 
 	features: {
+		auto_generated:   true
 		acknowledgements: true
 		healthcheck: enabled: true
 		send: {
@@ -68,100 +69,7 @@ components: sinks: loki: {
 		notices: []
 	}
 
-	configuration: {
-		endpoint: {
-			description: "The base URL of the Loki instance. Vector will append `/loki/api/v1/push` to this."
-			required:    true
-			type: string: {
-				examples: ["http://localhost:3100"]
-			}
-		}
-		auth: configuration._http_auth & {_args: {
-			password_example: "${LOKI_PASSWORD}"
-			username_example: "${LOKI_USERNAME}"
-		}}
-		labels: {
-			description: """
-				A set of labels that are attached to each batch of events. Both keys and values are templatable, which
-				enables you to attach dynamic labels to events. Labels can be suffixed with a "*" to allow the expansion
-				of objects into multiple labels, see "How it works" for more information.
-
-				Note: If the set of labels has high cardinality, this can cause drastic performance issues with Loki.
-				To prevent this from happening, reduce the number of unique label keys and values.
-				"""
-			required: true
-			type: object: {
-				examples: [
-					{
-						"forwarder":             "vector"
-						"event":                 "{{ event_field }}"
-						"key":                   "value"
-						"\"{{ event_field }}\"": "{{ another_event_field }}"
-						"pod_labels_*":          "{{ kubernetes.pod_labels }}"
-					},
-				]
-				options: {
-					"*": {
-						common:      false
-						description: "Any Loki label, templatable"
-						required:    false
-						type: string: {
-							default: null
-							examples: ["vector", "{{ event_field }}", "{{ kubernetes.pod_labels }}"]
-							syntax: "template"
-						}
-					}
-				}
-			}
-		}
-		out_of_order_action: {
-			common: false
-			description: """
-				Some sources may generate events with timestamps that aren't in strictly chronological order. The Loki
-				service can't accept a stream of such events prior version 2.4.0. Vector sorts events before sending
-				them to Loki, however some late events might arrive after a batch has been sent. This option specifies
-				what Vector should do with those events. If you are using Loki 2.4.0 and newer, you should set this
-				option to "accept"
-				"""
-			required: false
-			type: string: {
-				default: "drop"
-				enum: {
-					"drop":              "Drop the event."
-					"rewrite_timestamp": "Rewrite timestamp of the event to the latest timestamp that was pushed."
-					"accept":            "Don't do anything, send events into Loki normally (needs Loki 2.4.0 and newer)"
-				}
-			}
-		}
-		remove_label_fields: {
-			common:      false
-			description: "If this is set to `true` then when labels are collected from events those fields will also get removed from the event."
-			required:    false
-			type: bool: default: false
-		}
-
-		remove_timestamp: {
-			common:      false
-			description: "If this is set to `true` then the timestamp will be removed from the event payload. Note the event timestamp will still be sent as metadata to Loki for indexing."
-			required:    false
-			type: bool: default: true
-		}
-		tenant_id: {
-			common:      false
-			description: """
-				The tenant id that's sent with every request, by default this is not required since a proxy should set
-				this header. When running Loki locally a tenant id is not required either.
-
-				You can read more about tenant id's [here](\(urls.loki_multi_tenancy)).
-				"""
-			required:    false
-			type: string: {
-				default: null
-				examples: ["some_tenant_id", "{{ event_field }}"]
-				syntax: "template"
-			}
-		}
-	}
+	configuration: base.components.sinks.loki.configuration
 
 	input: {
 		logs:    true
@@ -197,26 +105,43 @@ components: sinks: loki: {
 		label_expansion: {
 			title: "Label Expansion"
 			body: """
-				The `labels` option can be passed keys suffixed with "*" to
-				allow for setting multiple keys based on the contents of an
-				object. For example, with an object:
+				The `labels` option can be passed keys with `*` or prefixes ending with `*` to
+				allow for setting multiple keys based on the contents of an object. Static keys
+				override dynamically defined keys. For example, with an object:
 
 				```json
-				{"kubernetes":{"pod_labels":{"app":"web-server","name":"unicorn"}}}
+				{
+					"kubernetes": {
+						"pod_labels": {
+							"app": "web-server",
+							"name": "unicorn"
+						}
+					},
+					"metadata": {
+						"cluster_name": "operations",
+						"cluster_environment": "development",
+						"cluster_version": "1.2.3"
+					}
+				}
 				```
 
 				and a configuration:
 
 				```toml
 				[sinks.my_sink_id.labels]
-				pod_labels_*: "{{ kubernetes.pod_labels }}"
+				\"pod_labels_*\" = "{{ kubernetes.pod_labels }}"
+				\"*\" = "{{ metadata }}"
+				cluster_name = "static_cluster_name"
 				```
 
-				This would expand into two labels:
+				this would expand into the following labels:
 
-				```toml
+				```yaml
 				pod_labels_app: web-server
 				pod_labels_name: unicorn
+				cluster_name: static_cluster_name
+				cluster_environment: development
+				cluster_version: 1.2.3
 				"""
 		}
 
@@ -234,13 +159,6 @@ components: sinks: loki: {
 	}
 
 	telemetry: metrics: {
-		component_sent_bytes_total:       components.sources.internal_metrics.output.metrics.component_sent_bytes_total
-		component_sent_events_total:      components.sources.internal_metrics.output.metrics.component_sent_events_total
-		component_sent_event_bytes_total: components.sources.internal_metrics.output.metrics.component_sent_event_bytes_total
-		events_discarded_total:           components.sources.internal_metrics.output.metrics.events_discarded_total
-		events_out_total:                 components.sources.internal_metrics.output.metrics.events_out_total
-		processed_bytes_total:            components.sources.internal_metrics.output.metrics.processed_bytes_total
-		processing_errors_total:          components.sources.internal_metrics.output.metrics.processing_errors_total
-		streams_total:                    components.sources.internal_metrics.output.metrics.streams_total
+		streams_total: components.sources.internal_metrics.output.metrics.streams_total
 	}
 }

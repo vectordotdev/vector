@@ -46,7 +46,7 @@ mod test {
             let result: bool = lua
                 .load(assertion)
                 .eval()
-                .unwrap_or_else(|_| panic!("Failed to verify assertion {:?}", assertion));
+                .unwrap_or_else(|_| panic!("Failed to verify assertion {assertion:?}"));
             assert!(result, "{}", assertion);
         }
     }

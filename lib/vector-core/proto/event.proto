@@ -72,7 +72,8 @@ message Value {
 message Metric {
   string name = 1;
   google.protobuf.Timestamp timestamp = 2;
-  map<string, string> tags = 3;
+  map<string, string> tags_v1 = 3;
+  map<string, TagValues> tags_v2 = 20;
   enum Kind {
     Incremental = 0;
     Absolute = 1;
@@ -95,6 +96,14 @@ message Metric {
   string namespace = 11;
   uint32 interval_ms = 18;
   Value metadata = 19;
+}
+
+message TagValues {
+  repeated TagValue values = 1;
+}
+
+message TagValue {
+  optional string value = 1;
 }
 
 message Counter {

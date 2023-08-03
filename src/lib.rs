@@ -5,6 +5,8 @@
 #![deny(unused_assignments)]
 #![deny(unused_comparisons)]
 #![deny(warnings)]
+#![deny(missing_docs)]
+#![cfg_attr(docsrs, feature(doc_cfg), deny(rustdoc::broken_intra_doc_links))]
 #![allow(clippy::approx_constant)]
 #![allow(clippy::float_cmp)]
 #![allow(clippy::match_wild_err_arm)]
@@ -14,26 +16,20 @@
 #![deny(clippy::clone_on_ref_ptr)]
 #![deny(clippy::trivially_copy_pass_by_ref)]
 #![deny(clippy::disallowed_methods)] // [nursery] mark some functions as verboten
-#![deny(clippy::missing_const_for_fn)] // [nursery] valuable to the optimizer,
-                                       // but may produce false positives
+#![deny(clippy::missing_const_for_fn)] // [nursery] valuable to the optimizer, but may produce false positives
+
+//! The main library to support building Vector.
 
 #[macro_use]
 extern crate tracing;
 #[macro_use]
 extern crate derivative;
 
-#[cfg(any(
-    all(feature = "tikv-jemallocator", target_os = "macos"),
-    all(feature = "tikv-jemallocator", not(feature = "allocation-tracing"))
-))]
+#[cfg(all(feature = "tikv-jemallocator", not(feature = "allocation-tracing")))]
 #[global_allocator]
 static ALLOC: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
-#[cfg(all(
-    feature = "tikv-jemallocator",
-    feature = "allocation-tracing",
-    not(target_os = "macos")
-))]
+#[cfg(all(feature = "tikv-jemallocator", feature = "allocation-tracing"))]
 #[global_allocator]
 static ALLOC: self::internal_telemetry::allocations::Allocator<tikv_jemallocator::Jemalloc> =
     self::internal_telemetry::allocations::get_grouped_tracing_allocator(
@@ -47,6 +43,8 @@ pub mod internal_telemetry;
 #[allow(unreachable_pub)]
 pub mod config;
 pub mod cli;
+#[allow(unreachable_pub)]
+pub mod components;
 pub mod conditions;
 pub mod dns;
 #[cfg(feature = "docker")]
@@ -85,6 +83,7 @@ pub mod line_agg;
 pub mod list;
 #[cfg(any(feature = "sources-nats", feature = "sinks-nats"))]
 pub(crate) mod nats;
+pub mod net;
 #[allow(unreachable_pub)]
 pub(crate) mod proto;
 pub mod providers;
@@ -102,19 +101,18 @@ pub mod sources;
 pub mod stats;
 #[cfg(feature = "api-client")]
 #[allow(unreachable_pub)]
-mod tap;
+pub mod tap;
 pub mod template;
 pub mod test_util;
 #[cfg(feature = "api-client")]
 #[allow(unreachable_pub)]
-pub(crate) mod top;
+pub mod top;
 #[allow(unreachable_pub)]
 pub mod topology;
 pub mod trace;
 #[allow(unreachable_pub)]
 pub mod transforms;
 pub mod types;
-pub mod udp;
 pub mod unit_test;
 pub(crate) mod utilization;
 pub mod validate;
@@ -125,16 +123,29 @@ pub use source_sender::SourceSender;
 pub use vector_common::{shutdown, Error, Result};
 pub use vector_core::{event, metrics, schema, tcp, tls};
 
+/// The current version of Vector in simplified format.
+/// `<version-number>-nightly`.
 pub fn vector_version() -> impl std::fmt::Display {
     #[cfg(feature = "nightly")]
     let pkg_version = format!("{}-nightly", built_info::PKG_VERSION);
 
     #[cfg(not(feature = "nightly"))]
-    let pkg_version = built_info::PKG_VERSION;
+    let pkg_version = match built_info::DEBUG {
+        // If any debug info is included, consider it a non-release build.
+        "1" | "2" | "true" => {
+            format!(
+                "{}-custom-{}",
+                built_info::PKG_VERSION,
+                built_info::GIT_SHORT_HASH
+            )
+        }
+        _ => built_info::PKG_VERSION.to_string(),
+    };
 
     pkg_version
 }
 
+/// Returns a string containing full version information of the current build.
 pub fn get_version() -> String {
     let pkg_version = vector_version();
     let build_desc = built_info::VECTOR_BUILD_DESC;
@@ -155,15 +166,21 @@ pub fn get_version() -> String {
     format!("{} ({})", pkg_version, build_string)
 }
 
+/// Includes information about the current build.
 #[allow(warnings)]
 pub mod built_info {
     include!(concat!(env!("OUT_DIR"), "/built.rs"));
 }
 
+/// Returns the host name of the current system.
 pub fn get_hostname() -> std::io::Result<String> {
     Ok(hostname::get()?.to_string_lossy().into())
 }
 
+/// Spawn a task with the given name. The name is only used if
+/// built with [`tokio_unstable`][tokio_unstable].
+///
+/// [tokio_unstable]: https://docs.rs/tokio/latest/tokio/#unstable-features
 #[track_caller]
 pub(crate) fn spawn_named<T>(
     task: impl std::future::Future<Output = T> + Send + 'static,
@@ -179,6 +196,7 @@ where
     tokio::spawn(task)
 }
 
+/// Returns an estimate of the number of recommended threads that Vector should spawn.
 pub fn num_threads() -> usize {
     let count = match std::thread::available_parallelism() {
         Ok(count) => count,

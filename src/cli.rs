@@ -1,4 +1,5 @@
-use std::path::PathBuf;
+#![allow(missing_docs)]
+use std::{num::NonZeroU64, path::PathBuf};
 
 use clap::{ArgAction, CommandFactory, FromArgMatches, Parser};
 
@@ -9,6 +10,7 @@ use crate::tap;
 #[cfg(feature = "api-client")]
 use crate::top;
 use crate::{config, generate, get_version, graph, list, unit_test, validate};
+use crate::{generate_schema, signal};
 
 #[derive(Parser, Debug)]
 #[command(rename_all = "kebab-case")]
@@ -156,6 +158,42 @@ pub struct RootOpts {
         default_value = "10"
     )]
     pub internal_log_rate_limit: u64,
+
+    /// Set the duration in seconds to wait for graceful shutdown after SIGINT or SIGTERM are
+    /// received. After the duration has passed, Vector will force shutdown. To never force
+    /// shutdown, use `--no-graceful-shutdown-limit`.
+    #[arg(
+        long,
+        default_value = "60",
+        env = "VECTOR_GRACEFUL_SHUTDOWN_LIMIT_SECS",
+        group = "graceful-shutdown-limit"
+    )]
+    pub graceful_shutdown_limit_secs: NonZeroU64,
+
+    /// Never time out while waiting for graceful shutdown after SIGINT or SIGTERM received.
+    /// This is useful when you would like for Vector to attempt to send data until terminated
+    /// by a SIGKILL. Overrides/cannot be set with `--graceful-shutdown-limit-secs`.
+    #[arg(
+        long,
+        default_value = "false",
+        env = "VECTOR_NO_GRACEFUL_SHUTDOWN_LIMIT",
+        group = "graceful-shutdown-limit"
+    )]
+    pub no_graceful_shutdown_limit: bool,
+
+    /// Set runtime allocation tracing
+    #[cfg(feature = "allocation-tracing")]
+    #[arg(long, env = "ALLOCATION_TRACING", default_value = "false")]
+    pub allocation_tracing: bool,
+
+    /// Set allocation tracing reporting rate in milliseconds.
+    #[cfg(feature = "allocation-tracing")]
+    #[arg(
+        long,
+        env = "ALLOCATION_TRACING_REPORTING_INTERVAL_MS",
+        default_value = "5000"
+    )]
+    pub allocation_tracing_reporting_interval_ms: u64,
 }
 
 impl RootOpts {
@@ -191,7 +229,7 @@ pub enum SubCommand {
     /// A JSON Schema document will be written to stdout that represents the valid schema for a
     /// Vector configuration. This schema is based on the "full" configuration, such that for usages
     /// where a configuration is split into multiple files, the schema would apply to those files
-    /// only when concatentated together.
+    /// only when concatenated together.
     GenerateSchema,
 
     /// Output a provided Vector configuration file/dir as a single JSON object, useful for checking in to version control.
@@ -221,18 +259,59 @@ pub enum SubCommand {
     Service(service::Opts),
 
     /// Vector Remap Language CLI
-    #[cfg(feature = "vrl-cli")]
-    Vrl(vrl_cli::Opts),
+    Vrl(vrl::cli::Opts),
 }
 
-#[derive(clap::ValueEnum, Debug, Clone, PartialEq, Eq)]
+impl SubCommand {
+    pub async fn execute(
+        &self,
+        mut signals: signal::SignalPair,
+        color: bool,
+    ) -> exitcode::ExitCode {
+        match self {
+            Self::Config(c) => config::cmd(c),
+            Self::Generate(g) => generate::cmd(g),
+            Self::GenerateSchema => generate_schema::cmd(),
+            Self::Graph(g) => graph::cmd(g),
+            Self::List(l) => list::cmd(l),
+            #[cfg(windows)]
+            Self::Service(s) => service::cmd(s),
+            #[cfg(feature = "api-client")]
+            Self::Tap(t) => tap::cmd(t, signals.receiver).await,
+            Self::Test(t) => unit_test::cmd(t, &mut signals.handler).await,
+            #[cfg(feature = "api-client")]
+            Self::Top(t) => top::cmd(t).await,
+            Self::Validate(v) => validate::validate(v, color).await,
+            Self::Vrl(s) => {
+                let mut functions = vrl::stdlib::all();
+                functions.extend(vector_vrl_functions::all());
+                vrl::cli::cmd::cmd(s, functions)
+            }
+        }
+    }
+}
+
+#[derive(clap::ValueEnum, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Color {
     Auto,
     Always,
     Never,
 }
 
-#[derive(clap::ValueEnum, Debug, Clone, PartialEq, Eq)]
+impl Color {
+    pub fn use_color(&self) -> bool {
+        match self {
+            #[cfg(unix)]
+            Color::Auto => atty::is(atty::Stream::Stdout),
+            #[cfg(windows)]
+            Color::Auto => false, // ANSI colors are not supported by cmd.exe
+            Color::Always => true,
+            Color::Never => false,
+        }
+    }
+}
+
+#[derive(clap::ValueEnum, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LogFormat {
     Text,
     Json,

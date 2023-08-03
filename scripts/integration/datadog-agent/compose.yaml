@@ -1,0 +1,28 @@
+version: '3'
+
+services:
+  datadog-agent:
+    image: docker.io/datadog/agent:${CONFIG_VERSION}
+    environment:
+    - DD_API_KEY=${TEST_DATADOG_API_KEY:?TEST_DATADOG_API_KEY required}
+    - DD_APM_ENABLED=false
+    - DD_LOGS_ENABLED=true
+    - DD_LOGS_CONFIG_LOGS_DD_URL=runner:8080
+    - DD_LOGS_CONFIG_LOGS_NO_SSL=true
+    - DD_LOGS_CONFIG_USE_HTTP=true
+    - DD_HEALTH_PORT=8182
+    - DD_CMD_PORT=5001
+    - DD_USE_DOGSTATSD=false
+    - DD_HOSTNAME=datadog-agent
+    volumes:
+    - ../../../tests/data/datadog-agent/conf.yaml:/etc/datadog-agent/conf.d/test.d/conf.yaml
+  datadog-trace-agent:
+    image: docker.io/datadog/agent:7.31.0
+    environment:
+    - DD_API_KEY=${TEST_DATADOG_API_KEY:?TEST_DATADOG_API_KEY required}
+    - DD_APM_ENABLED=true
+    - DD_APM_DD_URL=http://runner:8081
+    - DD_HEALTH_PORT=8183
+    - DD_CMD_PORT=5002
+    - DD_USE_DOGSTATSD=false
+    - DD_HOSTNAME=datadog-trace-agent

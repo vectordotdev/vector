@@ -20,7 +20,7 @@ base: components: transforms: log_to_metric: configuration: metrics: {
 				Metric kind.
 
 				Metrics can be either absolute of incremental. Absolute metrics represent a sort of "last write wins" scenario,
-				where the latest absolute value seen is meant to be the actual metric value.  In constrast, and perhaps intuitively,
+				where the latest absolute value seen is meant to be the actual metric value.  In contrast, and perhaps intuitively,
 				incremental metrics are meant to be additive, such that we don't know what total value of the metric is, but we know
 				that we'll be adding or subtracting the given value from it.
 
@@ -55,13 +55,14 @@ base: components: transforms: log_to_metric: configuration: metrics: {
 			description: "Tags to apply to the metric."
 			required:    false
 			type: object: options: "*": {
-				description: "Tags to apply to the metric."
+				description: "A metric tag."
 				required:    true
 				type: string: syntax: "template"
 			}
 		}
 		type: {
-			required: true
+			description: "The type of metric to create."
+			required:    true
 			type: string: enum: {
 				counter:   "A counter."
 				gauge:     "A gauge."

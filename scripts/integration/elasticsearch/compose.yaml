@@ -1,0 +1,27 @@
+version: '3'
+
+services:
+  localstack:
+    image: docker.io/localstack/localstack@sha256:f21f1fc770ee4bfd5012afdc902154c56b7fb18c14cf672de151b65569c8251e
+    environment:
+    - SERVICES=elasticsearch:4571
+  elasticsearch:
+    image: docker.io/elasticsearch:${CONFIG_VERSION}
+    environment:
+    - discovery.type=single-node
+    - ES_JAVA_OPTS=-Xms400m -Xmx400m
+  elasticsearch-secure:
+    image: docker.io/elasticsearch:${CONFIG_VERSION}
+    environment:
+    - discovery.type=single-node
+    - xpack.security.enabled=true
+    - xpack.security.http.ssl.enabled=true
+    - xpack.security.http.ssl.certificate=certs/intermediate_server/certs/elasticsearch-secure-chain.cert.pem
+    - xpack.security.http.ssl.key=certs/intermediate_server/private/elasticsearch-secure.key.pem
+    - xpack.security.transport.ssl.enabled=true
+    - xpack.security.transport.ssl.certificate=certs/intermediate_server/certs/elasticsearch-secure-chain.cert.pem
+    - xpack.security.transport.ssl.key=certs/intermediate_server/private/elasticsearch-secure.key.pem
+    - ELASTIC_PASSWORD=vector
+    - ES_JAVA_OPTS=-Xms400m -Xmx400m
+    volumes:
+    - ../../../tests/data/ca:/usr/share/elasticsearch/config/certs:ro

@@ -93,7 +93,7 @@ impl RequestBuilder<Event> for SqsRequestBuilder {
             None => None,
         };
 
-        let builder = RequestMetadataBuilder::from_events(&event);
+        let builder = RequestMetadataBuilder::from_event(&event);
 
         let sqs_metadata = SqsMetadata {
             finalizers: event.take_finalizers(),
@@ -130,7 +130,7 @@ pub(crate) struct SendMessageEntry {
     pub message_deduplication_id: Option<String>,
     pub queue_url: String,
     finalizers: EventFinalizers,
-    metadata: RequestMetadata,
+    pub metadata: RequestMetadata,
 }
 
 impl ByteSizeOf for SendMessageEntry {
@@ -154,7 +154,11 @@ impl Finalizable for SendMessageEntry {
 }
 
 impl MetaDescriptive for SendMessageEntry {
-    fn get_metadata(&self) -> RequestMetadata {
-        self.metadata
+    fn get_metadata(&self) -> &RequestMetadata {
+        &self.metadata
+    }
+
+    fn metadata_mut(&mut self) -> &mut RequestMetadata {
+        &mut self.metadata
     }
 }

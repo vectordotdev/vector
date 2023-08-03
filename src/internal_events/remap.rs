@@ -3,13 +3,13 @@ use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
 use vector_common::internal_event::{
-    error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL,
+    error_stage, error_type, ComponentEventsDropped, INTENTIONAL, UNINTENTIONAL,
 };
 
 #[derive(Debug)]
 pub struct RemapMappingError {
     /// If set to true, the remap transform has dropped the event after a failed
-    /// mapping. This internal event will reflect that in its messaging.
+    /// mapping. This internal event reflects that in its messaging.
     pub event_dropped: bool,
     pub error: String,
 }
@@ -34,15 +34,13 @@ impl InternalEvent for RemapMappingError {
                 reason: "Mapping failed with event.",
             });
         }
-        // deprecated
-        counter!("processing_errors_total", 1);
     }
 }
 
 #[derive(Debug)]
 pub struct RemapMappingAbort {
     /// If set to true, the remap transform has dropped the event after an abort
-    /// during mapping. This internal event will reflect that in its messaging.
+    /// during mapping. This internal event reflects that in its messaging.
     pub event_dropped: bool,
 }
 
@@ -54,7 +52,7 @@ impl InternalEvent for RemapMappingAbort {
         );
 
         if self.event_dropped {
-            emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+            emit!(ComponentEventsDropped::<INTENTIONAL> {
                 count: 1,
                 reason: "Event mapping aborted.",
             });

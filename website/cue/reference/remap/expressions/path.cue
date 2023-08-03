@@ -5,6 +5,8 @@ remap: expressions: path: {
 	description: """
 		A _path_ expression is a sequence of period-delimited segments that represent the location of a value
 		within an object.
+		A leading "." means the path points to the event.
+		A leading "%" means the path points to the event _metadata_.
 		"""
 	return: """
 		Returns the value of the path location.
@@ -17,8 +19,12 @@ remap: expressions: path: {
 		definitions: {
 			"\".\"": {
 				description: """
-					The `"."` character represents the root of the event. Therefore, _all_ paths must begin with the `.`
-					character, and `.` alone is a valid path.
+					The `.` character represents the root of the event. All paths must begin with `.` or `%`
+					"""
+			}
+			"\"%\"": {
+				description: """
+					The `%` character represents the root of the event metadata.
 					"""
 			}
 			path_segments: {
@@ -98,12 +104,20 @@ remap: expressions: path: {
 
 	examples: [
 		{
-			title: "Root path"
+			title: "Root event path"
 			input: log: message: "Hello, World!"
 			source: #"""
 				.
 				"""#
 			return: input.log
+		},
+		{
+			title: "Root metadata path"
+			input: log: message: "Hello, World!"
+			source: #"""
+				%
+				"""#
+			return: {}
 		},
 		{
 			title: "Top-level path"

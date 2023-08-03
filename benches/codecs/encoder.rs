@@ -77,7 +77,7 @@ fn encoder(c: &mut Criterion) {
     group.throughput(Throughput::Bytes(input.size_of() as u64));
     group.bench_with_input("codecs::JsonSerializer::encode", &(), |b, ()| {
         b.iter_batched(
-            || JsonSerializer::new(),
+            || JsonSerializerConfig::default().build(),
             |mut encoder| {
                 let mut bytes = BytesMut::new();
                 encoder.encode(input.clone(), &mut bytes).unwrap();
@@ -93,7 +93,7 @@ fn encoder(c: &mut Criterion) {
             || {
                 vector::codecs::Encoder::<Framer>::new(
                     NewlineDelimitedEncoder::new().into(),
-                    JsonSerializer::new().into(),
+                    JsonSerializerConfig::default().build().into(),
                 )
             },
             |mut encoder| {

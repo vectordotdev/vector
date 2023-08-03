@@ -1,7 +1,8 @@
+use std::io::Read;
 use std::sync::Arc;
 use std::task;
 
-use aws_types::credentials::SharedCredentialsProvider;
+use aws_credential_types::provider::SharedCredentialsProvider;
 use aws_types::region::Region;
 use bytes::{Bytes, BytesMut};
 use futures::{future::BoxFuture, stream, FutureExt, SinkExt};
@@ -10,7 +11,7 @@ use prost::Message;
 use snafu::{ResultExt, Snafu};
 use tower::Service;
 use vector_config::configurable_component;
-use vector_core::ByteSizeOf;
+use vector_core::{ByteSizeOf, EstimatedJsonEncodedSizeOf};
 
 use super::collector::{self, MetricCollector as _};
 use crate::{
@@ -52,11 +53,17 @@ enum Errors {
 }
 
 /// Configuration for the `prometheus_remote_write` sink.
-#[configurable_component(sink("prometheus_remote_write"))]
+#[configurable_component(sink(
+    "prometheus_remote_write",
+    "Deliver metric data to a Prometheus remote write endpoint."
+))]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct RemoteWriteConfig {
     /// The endpoint to send data to.
+    ///
+    /// The endpoint should include the scheme and the path to write to.
+    #[configurable(metadata(docs::examples = "https://localhost:8087/api/v1/write"))]
     pub endpoint: String,
 
     /// The default namespace for any metrics sent.
@@ -67,18 +74,22 @@ pub struct RemoteWriteConfig {
     /// It should follow the Prometheus [naming conventions][prom_naming_docs].
     ///
     /// [prom_naming_docs]: https://prometheus.io/docs/practices/naming/#metric-names
+    #[configurable(metadata(docs::examples = "service"))]
+    #[configurable(metadata(docs::advanced))]
     pub default_namespace: Option<String>,
 
     /// Default buckets to use for aggregating [distribution][dist_metric_docs] metrics into histograms.
     ///
     /// [dist_metric_docs]: https://vector.dev/docs/about/under-the-hood/architecture/data-model/metric/#distribution
     #[serde(default = "super::default_histogram_buckets")]
+    #[configurable(metadata(docs::advanced))]
     pub buckets: Vec<f64>,
 
     /// Quantiles to use for aggregating [distribution][dist_metric_docs] metrics into a summary.
     ///
     /// [dist_metric_docs]: https://vector.dev/docs/about/under-the-hood/architecture/data-model/metric/#distribution
     #[serde(default = "super::default_summary_quantiles")]
+    #[configurable(metadata(docs::advanced))]
     pub quantiles: Vec<f64>,
 
     #[configurable(derived)]
@@ -91,10 +102,12 @@ pub struct RemoteWriteConfig {
 
     /// The tenant ID to send.
     ///
-    /// If set, a header named `X-Scope-OrgID` will be added to outgoing requests with the value of this setting.
+    /// If set, a header named `X-Scope-OrgID` is added to outgoing requests with the value of this setting.
     ///
     /// This may be used by Cortex or other remote services to identify the tenant making the request.
     #[serde(default)]
+    #[configurable(metadata(docs::examples = "my-domain"))]
+    #[configurable(metadata(docs::advanced))]
     pub tenant_id: Option<Template>,
 
     #[configurable(derived)]
@@ -104,6 +117,7 @@ pub struct RemoteWriteConfig {
     pub auth: Option<PrometheusRemoteWriteAuth>,
 
     #[configurable(derived)]
+    #[configurable(metadata(docs::advanced))]
     pub aws: Option<RegionOrEndpoint>,
 
     #[configurable(derived)]
@@ -113,11 +127,42 @@ pub struct RemoteWriteConfig {
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     pub acknowledgements: AcknowledgementsConfig,
+
+    #[configurable(derived)]
+    #[configurable(metadata(docs::advanced))]
+    #[serde(default)]
+    pub compression: Compression,
 }
 
 impl_generate_config_from_default!(RemoteWriteConfig);
 
+/// Supported compression types for Prometheus Remote Write.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Derivative)]
+#[derivative(Default)]
+#[serde(rename_all = "lowercase")]
+pub enum Compression {
+    /// Snappy.
+    #[derivative(Default)]
+    Snappy,
+
+    /// Gzip.
+    Gzip,
+
+    /// Zstandard.
+    Zstd,
+}
+
+const fn convert_compression_to_content_encoding(compression: Compression) -> &'static str {
+    match compression {
+        Compression::Snappy => "snappy",
+        Compression::Gzip => "gzip",
+        Compression::Zstd => "zstd",
+    }
+}
+
 #[async_trait::async_trait]
+#[typetag::serde(name = "prometheus_remote_write")]
 impl SinkConfig for RemoteWriteConfig {
     async fn build(
         &self,
@@ -138,6 +183,13 @@ impl SinkConfig for RemoteWriteConfig {
                 Some(Auth::Basic {
                     user: user.clone(),
                     password: password.clone().into(),
+                }),
+                None,
+                None,
+            ),
+            Some(PrometheusRemoteWriteAuth::Bearer { token }) => (
+                Some(Auth::Bearer {
+                    token: token.clone(),
                 }),
                 None,
                 None,
@@ -164,6 +216,7 @@ impl SinkConfig for RemoteWriteConfig {
             aws_region,
             credentials_provider,
             http_auth,
+            compression: self.compression,
         });
 
         let healthcheck = healthcheck(client.clone(), Arc::clone(&http_request_builder)).boxed();
@@ -173,6 +226,7 @@ impl SinkConfig for RemoteWriteConfig {
             buckets,
             quantiles,
             http_request_builder,
+            compression: self.compression,
         };
 
         let sink = {
@@ -183,6 +237,8 @@ impl SinkConfig for RemoteWriteConfig {
                 .partition_sink(HttpRetryLogic, service, buffer, batch.timeout)
                 .with_flat_map(move |event: Event| {
                     let byte_size = event.size_of();
+                    let json_size = event.estimated_json_encoded_size_of();
+
                     stream::iter(normalizer.normalize(event.into_metric()).map(|event| {
                         let tenant_id = tenant_id.as_ref().and_then(|template| {
                             template
@@ -200,6 +256,7 @@ impl SinkConfig for RemoteWriteConfig {
                         Ok(EncodedEvent::new(
                             PartitionInnerBuffer::new(event, key),
                             byte_size,
+                            json_size,
                         ))
                     }))
                 })
@@ -208,6 +265,7 @@ impl SinkConfig for RemoteWriteConfig {
                 )
         };
 
+        #[allow(deprecated)]
         Ok((sinks::VectorSink::from_event_sink(sink), healthcheck))
     }
 
@@ -257,6 +315,7 @@ struct RemoteWriteService {
     buckets: Vec<f64>,
     quantiles: Vec<f64>,
     http_request_builder: Arc<HttpRequestBuilder>,
+    compression: Compression,
 }
 
 impl RemoteWriteService {
@@ -292,7 +351,7 @@ impl Service<PartitionInnerBuffer<Vec<Metric>, PartitionKey>> for RemoteWriteSer
     fn call(&mut self, buffer: PartitionInnerBuffer<Vec<Metric>, PartitionKey>) -> Self::Future {
         let (events, key) = buffer.into_parts();
         let body = self.encode_events(events);
-        let body = snap_block(body);
+        let body = compress_block(self.compression, body);
 
         let client = self.client.clone();
         let request_builder = Arc::clone(&self.http_request_builder);
@@ -324,6 +383,7 @@ pub struct HttpRequestBuilder {
     pub aws_region: Option<Region>,
     pub http_auth: Option<Auth>,
     pub credentials_provider: Option<SharedCredentialsProvider>,
+    pub compression: Compression,
 }
 
 impl HttpRequestBuilder {
@@ -333,11 +393,13 @@ impl HttpRequestBuilder {
         body: Vec<u8>,
         tenant_id: Option<String>,
     ) -> Result<Request<hyper::Body>, crate::Error> {
+        let content_encoding = convert_compression_to_content_encoding(self.compression);
+
         let mut builder = http::Request::builder()
             .method(method)
             .uri(self.endpoint.clone())
             .header("X-Prometheus-Remote-Write-Version", "0.1.0")
-            .header("Content-Encoding", "snappy")
+            .header("Content-Encoding", content_encoding)
             .header("Content-Type", "application/x-protobuf");
 
         if let Some(tenant_id) = &tenant_id {
@@ -360,10 +422,22 @@ impl HttpRequestBuilder {
     }
 }
 
-fn snap_block(data: Bytes) -> Vec<u8> {
-    snap::raw::Encoder::new()
-        .compress_vec(&data)
-        .expect("Out of memory")
+fn compress_block(compression: Compression, data: Bytes) -> Vec<u8> {
+    match compression {
+        Compression::Snappy => snap::raw::Encoder::new()
+            .compress_vec(&data)
+            .expect("snap compression failed, please report"),
+        Compression::Gzip => {
+            let mut buf = Vec::new();
+            flate2::read::GzEncoder::new(data.as_ref(), flate2::Compression::default())
+                .read_to_end(&mut buf)
+                .expect("gzip compression failed, please report");
+            buf
+        }
+        Compression::Zstd => {
+            zstd::encode_all(data.as_ref(), 0).expect("zstd compression failed, please report")
+        }
+    }
 }
 
 async fn sign_request(
@@ -550,7 +624,7 @@ mod tests {
 
             let config = format!("endpoint = \"http://{}/write\"\n{}", addr, config);
             let config: RemoteWriteConfig = toml::from_str(&config).unwrap();
-            let cx = SinkContext::new_test();
+            let cx = SinkContext::default();
 
             let (sink, _) = config.build(cx).await.unwrap();
             sink.run_events(events).await.unwrap();
@@ -618,8 +692,8 @@ mod integration_tests {
         tls::{self, TlsConfig},
     };
 
-    const HTTP_URL: &str = "http://localhost:8086";
-    const HTTPS_URL: &str = "https://localhost:8087";
+    const HTTP_URL: &str = "http://influxdb-v1:8086";
+    const HTTPS_URL: &str = "https://influxdb-v1-tls:8087";
 
     #[tokio::test]
     async fn insert_metrics_over_http() {
@@ -635,7 +709,7 @@ mod integration_tests {
         assert_sink_compliance(&HTTP_SINK_TAGS, async {
             let database = onboarding_v1(url).await;
 
-            let cx = SinkContext::new_test();
+            let cx = SinkContext::default();
 
             let config = RemoteWriteConfig {
                 endpoint: format!("{}/api/v1/prom/write?db={}", url, database),
@@ -673,7 +747,7 @@ mod integration_tests {
                     }
                     _ => panic!("Unhandled metric value, fix the test"),
                 }
-                for (tag, value) in metric.tags().unwrap() {
+                for (tag, value) in metric.tags().unwrap().iter_single() {
                     assert_eq!(output[tag], Value::String(value.to_string()));
                 }
                 let timestamp =

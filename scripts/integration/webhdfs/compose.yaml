@@ -1,0 +1,32 @@
+version: '3'
+
+services:
+  namenode:
+    image: docker.io/bde2020/hadoop-namenode:${CONFIG_HADOOP}
+    hostname: namenode.local
+    ports:
+      - "9870:9870"
+      - "9000:9000"
+    environment:
+      - CLUSTER_NAME=test
+    env_file:
+      - ../../../tests/data/webhdfs/hadoop.env
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9870"]
+      interval: 5s
+      timeout: 5s
+      retries: 3
+  datanode:
+    image: docker.io/bde2020/hadoop-datanode:${CONFIG_HADOOP}
+    hostname: datanode.local
+    ports:
+      - "9864:9864"
+    environment:
+      - SERVICE_PRECONDITION=namenode.local:9870
+    env_file:
+      - ../../../tests/data/webhdfs/hadoop.env
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9864"]
+      interval: 5s
+      timeout: 5s
+      retries: 3

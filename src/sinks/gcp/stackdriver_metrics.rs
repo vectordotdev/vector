@@ -36,7 +36,10 @@ impl SinkBatchSettings for StackdriverMetricsDefaultBatchSettings {
 }
 
 /// Configuration for the `gcp_stackdriver_metrics` sink.
-#[configurable_component(sink("gcp_stackdriver_metrics"))]
+#[configurable_component(sink(
+    "gcp_stackdriver_metrics",
+    "Deliver metrics to GCP's Cloud Monitoring system."
+))]
 #[derive(Clone, Debug, Default)]
 pub struct StackdriverConfig {
     #[serde(skip, default = "default_endpoint")]
@@ -93,21 +96,23 @@ fn default_endpoint() -> String {
 impl_generate_config_from_default!(StackdriverConfig);
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "gcp_stackdriver_metrics")]
 impl SinkConfig for StackdriverConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let auth = self.auth.build(Scope::MonitoringWrite).await?;
 
         let healthcheck = healthcheck().boxed();
         let started = chrono::Utc::now();
-        let request = self.request.unwrap_with(&TowerRequestConfig {
-            rate_limit_num: Some(1000),
-            rate_limit_duration_secs: Some(1),
-            ..Default::default()
-        });
+        let request = self.request.unwrap_with(
+            &TowerRequestConfig::default()
+                .rate_limit_duration_secs(1)
+                .rate_limit_num(1000),
+        );
         let tls_settings = TlsSettings::from_options(&self.tls)?;
         let client = HttpClient::new(tls_settings, cx.proxy())?;
         let batch_settings = self.batch.into_batch_settings()?;
 
+        auth.spawn_regenerate_token();
         let sink = HttpEventSink {
             config: self.clone(),
             started,
@@ -125,6 +130,7 @@ impl SinkConfig for StackdriverConfig {
             |error| error!(message = "Fatal gcp_stackdriver_metrics sink error.", %error),
         );
 
+        #[allow(deprecated)]
         Ok((VectorSink::from_event_sink(sink), healthcheck))
     }
 
@@ -210,16 +216,16 @@ impl HttpSink for HttpEventSink {
         let metric_labels = series
             .tags
             .unwrap_or_default()
-            .into_iter()
+            .into_iter_single()
             .collect::<std::collections::HashMap<_, _>>();
 
         let series = gcp::GcpSeries {
             time_series: &[gcp::GcpSerie {
-                metric: gcp::GcpTypedResource {
+                metric: gcp::GcpMetric {
                     r#type: metric_type,
                     labels: metric_labels,
                 },
-                resource: gcp::GcpTypedResource {
+                resource: gcp::GcpResource {
                     r#type: self.config.resource.r#type.clone(),
                     labels: self.config.resource.labels.clone(),
                 },
@@ -258,6 +264,7 @@ async fn healthcheck() -> crate::Result<()> {
 #[cfg(test)]
 mod tests {
     use futures::{future::ready, stream};
+    use serde::Deserialize;
     use vector_core::event::{MetricKind, MetricValue};
 
     use super::*;
@@ -279,8 +286,8 @@ mod tests {
         let mock_endpoint = spawn_blackhole_http_server(always_200_response).await;
 
         let config = StackdriverConfig::generate_config().to_string();
-        let mut config =
-            toml::from_str::<StackdriverConfig>(&config).expect("config should be valid");
+        let mut config = StackdriverConfig::deserialize(toml::de::ValueDeserializer::new(&config))
+            .expect("config should be valid");
 
         // If we don't override the credentials path/API key, it tries to directly call out to the Google Instance
         // Metadata API, which we clearly don't have in unit tests. :)
@@ -288,7 +295,7 @@ mod tests {
         config.auth.api_key = Some("fake".to_string().into());
         config.endpoint = mock_endpoint.to_string();
 
-        let context = SinkContext::new_test();
+        let context = SinkContext::default();
         let (sink, _healthcheck) = config.build(context).await.unwrap();
 
         let event = Event::Metric(Metric::new(

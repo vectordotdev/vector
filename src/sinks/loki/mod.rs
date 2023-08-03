@@ -1,7 +1,7 @@
 //! Loki sink
 //!
 //! This sink provides downstream support for `Loki` via
-//! the `/loki/api/v1/push` endpoint.
+//! the (configurable) `/loki/api/v1/push` endpoint.
 //!
 //! <https://grafana.com/docs/loki/v2.6.x/api/>
 //!

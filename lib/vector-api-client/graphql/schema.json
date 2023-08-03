@@ -10,6 +10,45 @@
       },
       "types": [
         {
+          "kind": "OBJECT",
+          "name": "AllocatedBytes",
+          "description": null,
+          "fields": [
+            {
+              "name": "timestamp",
+              "description": "Metric timestamp",
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "DateTime",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "allocatedBytes",
+              "description": "Allocated bytes",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Float",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
           "kind": "SCALAR",
           "name": "Boolean",
           "description": "The `Boolean` scalar type represents `true` or `false`.",
@@ -80,6 +119,49 @@
         },
         {
           "kind": "OBJECT",
+          "name": "ComponentAllocatedBytes",
+          "description": null,
+          "fields": [
+            {
+              "name": "componentId",
+              "description": "Component id",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "metric",
+              "description": "Allocated bytes metric",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "AllocatedBytes",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "OBJECT",
           "name": "ComponentConnection",
           "description": null,
           "fields": [
@@ -104,12 +186,44 @@
               "description": "A list of edges.",
               "args": [],
               "type": {
-                "kind": "LIST",
+                "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
-                  "kind": "OBJECT",
-                  "name": "ComponentEdge",
-                  "ofType": null
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "OBJECT",
+                      "name": "ComponentEdge",
+                      "ofType": null
+                    }
+                  }
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "nodes",
+              "description": "A list of nodes.",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "INTERFACE",
+                      "name": "Component",
+                      "ofType": null
+                    }
+                  }
                 }
               },
               "isDeprecated": false,
@@ -143,22 +257,6 @@
           "description": "An edge in a connection.",
           "fields": [
             {
-              "name": "node",
-              "description": "The item at the end of the edge",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INTERFACE",
-                  "name": "Component",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
               "name": "cursor",
               "description": "A cursor for use in pagination",
               "args": [],
@@ -168,6 +266,22 @@
                 "ofType": {
                   "kind": "SCALAR",
                   "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "node",
+              "description": "The item at the end of the edge",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "INTERFACE",
+                  "name": "Component",
                   "ofType": null
                 }
               },
@@ -285,12 +399,12 @@
         },
         {
           "kind": "OBJECT",
-          "name": "ComponentProcessedBytesThroughput",
+          "name": "ComponentReceivedBytesThroughput",
           "description": null,
           "fields": [
             {
               "name": "componentId",
-              "description": "Component id",
+              "description": "Component ID.",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -306,7 +420,7 @@
             },
             {
               "name": "throughput",
-              "description": "Bytes processed throughput",
+              "description": "Throughput of bytes sent.",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -328,12 +442,12 @@
         },
         {
           "kind": "OBJECT",
-          "name": "ComponentProcessedBytesTotal",
+          "name": "ComponentReceivedBytesTotal",
           "description": null,
           "fields": [
             {
               "name": "componentId",
-              "description": "Component id",
+              "description": "Component ID.",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -349,100 +463,14 @@
             },
             {
               "name": "metric",
-              "description": "Bytes processed total metric",
+              "description": "Metric for total bytes received.",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
                   "kind": "OBJECT",
-                  "name": "ProcessedBytesTotal",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": null,
-          "interfaces": [],
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "OBJECT",
-          "name": "ComponentProcessedEventsThroughput",
-          "description": null,
-          "fields": [
-            {
-              "name": "componentId",
-              "description": "Component id",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "String",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "throughput",
-              "description": "Events processed throughput",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Int",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": null,
-          "interfaces": [],
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "OBJECT",
-          "name": "ComponentProcessedEventsTotal",
-          "description": null,
-          "fields": [
-            {
-              "name": "componentId",
-              "description": "Component id",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "String",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "metric",
-              "description": "Events processed total metric",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "OBJECT",
-                  "name": "ProcessedEventsTotal",
+                  "name": "ReceivedBytesTotal",
                   "ofType": null
                 }
               },
@@ -529,6 +557,92 @@
                 "ofType": {
                   "kind": "OBJECT",
                   "name": "ReceivedEventsTotal",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "OBJECT",
+          "name": "ComponentSentBytesThroughput",
+          "description": null,
+          "fields": [
+            {
+              "name": "componentId",
+              "description": "Component ID.",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "throughput",
+              "description": "Throughput of bytes sent.",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Int",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "OBJECT",
+          "name": "ComponentSentBytesTotal",
+          "description": null,
+          "fields": [
+            {
+              "name": "componentId",
+              "description": "Component ID.",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "metric",
+              "description": "Metric for total bytes sent.",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "SentBytesTotal",
                   "ofType": null
                 }
               },
@@ -1050,84 +1164,6 @@
         },
         {
           "kind": "OBJECT",
-          "name": "EventsInTotal",
-          "description": null,
-          "fields": [
-            {
-              "name": "timestamp",
-              "description": "Metric timestamp",
-              "args": [],
-              "type": {
-                "kind": "SCALAR",
-                "name": "DateTime",
-                "ofType": null
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "eventsInTotal",
-              "description": "Total incoming events",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Float",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": null,
-          "interfaces": [],
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "OBJECT",
-          "name": "EventsOutTotal",
-          "description": null,
-          "fields": [
-            {
-              "name": "timestamp",
-              "description": "Metric timestamp",
-              "args": [],
-              "type": {
-                "kind": "SCALAR",
-                "name": "DateTime",
-                "ofType": null
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "eventsOutTotal",
-              "description": "Total outgoing events",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Float",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": null,
-          "interfaces": [],
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "OBJECT",
           "name": "FileSourceMetricFile",
           "description": null,
           "fields": [
@@ -1148,36 +1184,12 @@
               "deprecationReason": null
             },
             {
-              "name": "processedEventsTotal",
-              "description": "Metric indicating events processed for the current file",
+              "name": "receivedBytesTotal",
+              "description": "Metric indicating bytes received for the current file",
               "args": [],
               "type": {
                 "kind": "OBJECT",
-                "name": "ProcessedEventsTotal",
-                "ofType": null
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "processedBytesTotal",
-              "description": "Metric indicating bytes processed for the current file",
-              "args": [],
-              "type": {
-                "kind": "OBJECT",
-                "name": "ProcessedBytesTotal",
-                "ofType": null
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "eventsInTotal",
-              "description": "Metric indicating incoming events for the current file",
-              "args": [],
-              "type": {
-                "kind": "OBJECT",
-                "name": "EventsInTotal",
+                "name": "ReceivedBytesTotal",
                 "ofType": null
               },
               "isDeprecated": false,
@@ -1190,18 +1202,6 @@
               "type": {
                 "kind": "OBJECT",
                 "name": "ReceivedEventsTotal",
-                "ofType": null
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "eventsOutTotal",
-              "description": "Metric indicating outgoing events for the current file",
-              "args": [],
-              "type": {
-                "kind": "OBJECT",
-                "name": "EventsOutTotal",
                 "ofType": null
               },
               "isDeprecated": false,
@@ -1251,12 +1251,44 @@
               "description": "A list of edges.",
               "args": [],
               "type": {
-                "kind": "LIST",
+                "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
-                  "kind": "OBJECT",
-                  "name": "FileSourceMetricFileEdge",
-                  "ofType": null
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "OBJECT",
+                      "name": "FileSourceMetricFileEdge",
+                      "ofType": null
+                    }
+                  }
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "nodes",
+              "description": "A list of nodes.",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "OBJECT",
+                      "name": "FileSourceMetricFile",
+                      "ofType": null
+                    }
+                  }
                 }
               },
               "isDeprecated": false,
@@ -1290,22 +1322,6 @@
           "description": "An edge in a connection.",
           "fields": [
             {
-              "name": "node",
-              "description": "The item at the end of the edge",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "OBJECT",
-                  "name": "FileSourceMetricFile",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
               "name": "cursor",
               "description": "A cursor for use in pagination",
               "args": [],
@@ -1315,6 +1331,22 @@
                 "ofType": {
                   "kind": "SCALAR",
                   "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "node",
+              "description": "The item at the end of the edge",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "FileSourceMetricFile",
                   "ofType": null
                 }
               },
@@ -1381,13 +1413,7 @@
               "deprecationReason": null
             },
             {
-              "name": "PROCESSED_BYTES_TOTAL",
-              "description": null,
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "PROCESSED_EVENTS_TOTAL",
+              "name": "RECEIVED_BYTES_TOTAL",
               "description": null,
               "isDeprecated": false,
               "deprecationReason": null
@@ -1399,19 +1425,7 @@
               "deprecationReason": null
             },
             {
-              "name": "EVENTS_IN_TOTAL",
-              "description": null,
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
               "name": "SENT_EVENTS_TOTAL",
-              "description": null,
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "EVENTS_OUT_TOTAL",
               "description": null,
               "isDeprecated": false,
               "deprecationReason": null
@@ -1510,36 +1524,12 @@
               "deprecationReason": null
             },
             {
-              "name": "processedEventsTotal",
-              "description": "Events processed for the current file source",
+              "name": "receivedBytesTotal",
+              "description": "Total received bytes for the current file source",
               "args": [],
               "type": {
                 "kind": "OBJECT",
-                "name": "ProcessedEventsTotal",
-                "ofType": null
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "processedBytesTotal",
-              "description": "Bytes processed for the current file source",
-              "args": [],
-              "type": {
-                "kind": "OBJECT",
-                "name": "ProcessedBytesTotal",
-                "ofType": null
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "eventsInTotal",
-              "description": "Total incoming events for the current file source",
-              "args": [],
-              "type": {
-                "kind": "OBJECT",
-                "name": "EventsInTotal",
+                "name": "ReceivedBytesTotal",
                 "ofType": null
               },
               "isDeprecated": false,
@@ -1558,20 +1548,8 @@
               "deprecationReason": null
             },
             {
-              "name": "eventsOutTotal",
-              "description": "Total outgoing events for the current file source",
-              "args": [],
-              "type": {
-                "kind": "OBJECT",
-                "name": "EventsOutTotal",
-                "ofType": null
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
               "name": "sentEventsTotal",
-              "description": "Total outgoing events for the current file source",
+              "description": "Total sent events for the current file source",
               "args": [],
               "type": {
                 "kind": "OBJECT",
@@ -1715,42 +1693,6 @@
           "description": null,
           "fields": [
             {
-              "name": "processedEventsTotal",
-              "description": "Events processed for the current sink",
-              "args": [],
-              "type": {
-                "kind": "OBJECT",
-                "name": "ProcessedEventsTotal",
-                "ofType": null
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "processedBytesTotal",
-              "description": "Bytes processed for the current sink",
-              "args": [],
-              "type": {
-                "kind": "OBJECT",
-                "name": "ProcessedBytesTotal",
-                "ofType": null
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "eventsInTotal",
-              "description": "Total incoming events for the current sink",
-              "args": [],
-              "type": {
-                "kind": "OBJECT",
-                "name": "EventsInTotal",
-                "ofType": null
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
               "name": "receivedEventsTotal",
               "description": "Total received events for the current sink",
               "args": [],
@@ -1763,12 +1705,12 @@
               "deprecationReason": null
             },
             {
-              "name": "eventsOutTotal",
-              "description": "Total outgoing events for the current sink",
+              "name": "sentBytesTotal",
+              "description": "Total sent bytes for the current sink",
               "args": [],
               "type": {
                 "kind": "OBJECT",
-                "name": "EventsOutTotal",
+                "name": "SentBytesTotal",
                 "ofType": null
               },
               "isDeprecated": false,
@@ -1776,7 +1718,7 @@
             },
             {
               "name": "sentEventsTotal",
-              "description": "Total outgoing events for the current sink",
+              "description": "Total sent events for the current sink",
               "args": [],
               "type": {
                 "kind": "OBJECT",
@@ -1804,36 +1746,12 @@
           "description": null,
           "fields": [
             {
-              "name": "processedEventsTotal",
-              "description": "Events processed for the current source",
+              "name": "receivedBytesTotal",
+              "description": "Total received bytes for the current source",
               "args": [],
               "type": {
                 "kind": "OBJECT",
-                "name": "ProcessedEventsTotal",
-                "ofType": null
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "processedBytesTotal",
-              "description": "Bytes processed for the current source",
-              "args": [],
-              "type": {
-                "kind": "OBJECT",
-                "name": "ProcessedBytesTotal",
-                "ofType": null
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "eventsInTotal",
-              "description": "Total incoming events for the current source",
-              "args": [],
-              "type": {
-                "kind": "OBJECT",
-                "name": "EventsInTotal",
+                "name": "ReceivedBytesTotal",
                 "ofType": null
               },
               "isDeprecated": false,
@@ -1852,20 +1770,8 @@
               "deprecationReason": null
             },
             {
-              "name": "eventsOutTotal",
-              "description": "Total outgoing events for the current source",
-              "args": [],
-              "type": {
-                "kind": "OBJECT",
-                "name": "EventsOutTotal",
-                "ofType": null
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
               "name": "sentEventsTotal",
-              "description": "Total outgoing events for the current source",
+              "description": "Total sent events for the current source",
               "args": [],
               "type": {
                 "kind": "OBJECT",
@@ -1893,42 +1799,6 @@
           "description": null,
           "fields": [
             {
-              "name": "processedEventsTotal",
-              "description": "Events processed for the current transform",
-              "args": [],
-              "type": {
-                "kind": "OBJECT",
-                "name": "ProcessedEventsTotal",
-                "ofType": null
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "processedBytesTotal",
-              "description": "Bytes processed for the current transform",
-              "args": [],
-              "type": {
-                "kind": "OBJECT",
-                "name": "ProcessedBytesTotal",
-                "ofType": null
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "eventsInTotal",
-              "description": "Total incoming events for the current transform",
-              "args": [],
-              "type": {
-                "kind": "OBJECT",
-                "name": "EventsInTotal",
-                "ofType": null
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
               "name": "receivedEventsTotal",
               "description": "Total received events for the current transform",
               "args": [],
@@ -1941,20 +1811,8 @@
               "deprecationReason": null
             },
             {
-              "name": "eventsOutTotal",
-              "description": "Total outgoing events for the current transform",
-              "args": [],
-              "type": {
-                "kind": "OBJECT",
-                "name": "EventsOutTotal",
-                "ofType": null
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
               "name": "sentEventsTotal",
-              "description": "Total outgoing events for the current transform",
+              "description": "Total sent events for the current transform",
               "args": [],
               "type": {
                 "kind": "OBJECT",
@@ -2194,16 +2052,6 @@
           "possibleTypes": null
         },
         {
-          "kind": "SCALAR",
-          "name": "Json",
-          "description": "Raw JSON data`",
-          "fields": null,
-          "inputFields": null,
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
           "kind": "OBJECT",
           "name": "LoadAverageMetrics",
           "description": null,
@@ -2391,7 +2239,7 @@
               ],
               "type": {
                 "kind": "SCALAR",
-                "name": "Json",
+                "name": "String",
                 "ofType": null
               },
               "isDeprecated": false,
@@ -2902,16 +2750,6 @@
               "kind": "OBJECT",
               "name": "Uptime",
               "ofType": null
-            },
-            {
-              "kind": "OBJECT",
-              "name": "ProcessedEventsTotal",
-              "ofType": null
-            },
-            {
-              "kind": "OBJECT",
-              "name": "ProcessedBytesTotal",
-              "ofType": null
             }
           ]
         },
@@ -3260,96 +3098,6 @@
           ],
           "inputFields": null,
           "interfaces": [],
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "OBJECT",
-          "name": "ProcessedBytesTotal",
-          "description": null,
-          "fields": [
-            {
-              "name": "timestamp",
-              "description": "Metric timestamp",
-              "args": [],
-              "type": {
-                "kind": "SCALAR",
-                "name": "DateTime",
-                "ofType": null
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "processedBytesTotal",
-              "description": "Total number of bytes processed",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Float",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": null,
-          "interfaces": [
-            {
-              "kind": "INTERFACE",
-              "name": "MetricType",
-              "ofType": null
-            }
-          ],
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "OBJECT",
-          "name": "ProcessedEventsTotal",
-          "description": null,
-          "fields": [
-            {
-              "name": "timestamp",
-              "description": "Metric timestamp",
-              "args": [],
-              "type": {
-                "kind": "SCALAR",
-                "name": "DateTime",
-                "ofType": null
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "processedEventsTotal",
-              "description": "Total number of events processed",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Float",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": null,
-          "interfaces": [
-            {
-              "kind": "INTERFACE",
-              "name": "MetricType",
-              "ofType": null
-            }
-          ],
           "enumValues": null,
           "possibleTypes": null
         },
@@ -3781,6 +3529,45 @@
         },
         {
           "kind": "OBJECT",
+          "name": "ReceivedBytesTotal",
+          "description": null,
+          "fields": [
+            {
+              "name": "timestamp",
+              "description": "Metric timestamp.",
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "DateTime",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "receivedBytesTotal",
+              "description": "Total number of bytes received.",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Float",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "OBJECT",
           "name": "ReceivedEventsTotal",
           "description": null,
           "fields": [
@@ -3799,6 +3586,45 @@
             {
               "name": "receivedEventsTotal",
               "description": "Total incoming events",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Float",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "OBJECT",
+          "name": "SentBytesTotal",
+          "description": null,
+          "fields": [
+            {
+              "name": "timestamp",
+              "description": "Metric timestamp.",
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "DateTime",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "sentBytesTotal",
+              "description": "Total number of bytes sent.",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -3996,12 +3822,44 @@
               "description": "A list of edges.",
               "args": [],
               "type": {
-                "kind": "LIST",
+                "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
-                  "kind": "OBJECT",
-                  "name": "SinkEdge",
-                  "ofType": null
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "OBJECT",
+                      "name": "SinkEdge",
+                      "ofType": null
+                    }
+                  }
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "nodes",
+              "description": "A list of nodes.",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "OBJECT",
+                      "name": "Sink",
+                      "ofType": null
+                    }
+                  }
                 }
               },
               "isDeprecated": false,
@@ -4035,22 +3893,6 @@
           "description": "An edge in a connection.",
           "fields": [
             {
-              "name": "node",
-              "description": "The item at the end of the edge",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "OBJECT",
-                  "name": "Sink",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
               "name": "cursor",
               "description": "A cursor for use in pagination",
               "args": [],
@@ -4060,6 +3902,22 @@
                 "ofType": {
                   "kind": "SCALAR",
                   "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "node",
+              "description": "The item at the end of the edge",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "Sink",
                   "ofType": null
                 }
               },
@@ -4078,30 +3936,6 @@
           "description": null,
           "fields": [
             {
-              "name": "processedEventsTotal",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "OBJECT",
-                "name": "ProcessedEventsTotal",
-                "ofType": null
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "processedBytesTotal",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "OBJECT",
-                "name": "ProcessedBytesTotal",
-                "ofType": null
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
               "name": "receivedEventsTotal",
               "description": null,
               "args": [],
@@ -4114,16 +3948,16 @@
               "deprecationReason": null
             },
             {
-              "name": "eventsInTotal",
+              "name": "sentBytesTotal",
               "description": null,
               "args": [],
               "type": {
                 "kind": "OBJECT",
-                "name": "EventsInTotal",
+                "name": "SentBytesTotal",
                 "ofType": null
               },
-              "isDeprecated": true,
-              "deprecationReason": "Use received_events_total instead"
+              "isDeprecated": false,
+              "deprecationReason": null
             },
             {
               "name": "sentEventsTotal",
@@ -4136,18 +3970,6 @@
               },
               "isDeprecated": false,
               "deprecationReason": null
-            },
-            {
-              "name": "eventsOutTotal",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "OBJECT",
-                "name": "EventsOutTotal",
-                "ofType": null
-              },
-              "isDeprecated": true,
-              "deprecationReason": "Use sent_events_total instead"
             }
           ],
           "inputFields": null,
@@ -4475,12 +4297,44 @@
               "description": "A list of edges.",
               "args": [],
               "type": {
-                "kind": "LIST",
+                "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
-                  "kind": "OBJECT",
-                  "name": "SourceEdge",
-                  "ofType": null
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "OBJECT",
+                      "name": "SourceEdge",
+                      "ofType": null
+                    }
+                  }
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "nodes",
+              "description": "A list of nodes.",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "OBJECT",
+                      "name": "Source",
+                      "ofType": null
+                    }
+                  }
                 }
               },
               "isDeprecated": false,
@@ -4514,22 +4368,6 @@
           "description": "An edge in a connection.",
           "fields": [
             {
-              "name": "node",
-              "description": "The item at the end of the edge",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "OBJECT",
-                  "name": "Source",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
               "name": "cursor",
               "description": "A cursor for use in pagination",
               "args": [],
@@ -4539,6 +4377,22 @@
                 "ofType": {
                   "kind": "SCALAR",
                   "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "node",
+              "description": "The item at the end of the edge",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "Source",
                   "ofType": null
                 }
               },
@@ -4557,24 +4411,12 @@
           "description": null,
           "fields": [
             {
-              "name": "processedEventsTotal",
+              "name": "receivedBytesTotal",
               "description": null,
               "args": [],
               "type": {
                 "kind": "OBJECT",
-                "name": "ProcessedEventsTotal",
-                "ofType": null
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "processedBytesTotal",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "OBJECT",
-                "name": "ProcessedBytesTotal",
+                "name": "ReceivedBytesTotal",
                 "ofType": null
               },
               "isDeprecated": false,
@@ -4593,18 +4435,6 @@
               "deprecationReason": null
             },
             {
-              "name": "eventsInTotal",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "OBJECT",
-                "name": "EventsInTotal",
-                "ofType": null
-              },
-              "isDeprecated": true,
-              "deprecationReason": "Use received_events_total instead"
-            },
-            {
               "name": "sentEventsTotal",
               "description": null,
               "args": [],
@@ -4615,18 +4445,6 @@
               },
               "isDeprecated": false,
               "deprecationReason": null
-            },
-            {
-              "name": "eventsOutTotal",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "OBJECT",
-                "name": "EventsOutTotal",
-                "ofType": null
-              },
-              "isDeprecated": true,
-              "deprecationReason": "Use sent_events_total instead"
             }
           ],
           "inputFields": null,
@@ -4895,7 +4713,7 @@
         {
           "kind": "SCALAR",
           "name": "String",
-          "description": "The `String` scalar type represents textual data, represented as UTF-8 character sequences. The String type is most often used by GraphQL to represent free-form human-readable text.",
+          "description": "The `String` scalar type represents textual data, represented as UTF-8\ncharacter sequences. The String type is most often used by GraphQL to\nrepresent free-form human-readable text.",
           "fields": null,
           "inputFields": null,
           "interfaces": null,
@@ -5035,146 +4853,6 @@
                   "kind": "OBJECT",
                   "name": "Uptime",
                   "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "processedEventsTotal",
-              "description": "Event processing metrics.",
-              "args": [
-                {
-                  "name": "interval",
-                  "description": null,
-                  "type": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "SCALAR",
-                      "name": "Int",
-                      "ofType": null
-                    }
-                  },
-                  "defaultValue": "1000"
-                }
-              ],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "OBJECT",
-                  "name": "ProcessedEventsTotal",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "processedEventsThroughput",
-              "description": "Event processing throughput sampled over the provided millisecond `interval`.",
-              "args": [
-                {
-                  "name": "interval",
-                  "description": null,
-                  "type": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "SCALAR",
-                      "name": "Int",
-                      "ofType": null
-                    }
-                  },
-                  "defaultValue": "1000"
-                }
-              ],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Int",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "componentProcessedEventsThroughputs",
-              "description": "Component event processing throughput metrics over `interval`.",
-              "args": [
-                {
-                  "name": "interval",
-                  "description": null,
-                  "type": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "SCALAR",
-                      "name": "Int",
-                      "ofType": null
-                    }
-                  },
-                  "defaultValue": "1000"
-                }
-              ],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "LIST",
-                  "name": null,
-                  "ofType": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "OBJECT",
-                      "name": "ComponentProcessedEventsThroughput",
-                      "ofType": null
-                    }
-                  }
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "componentProcessedEventsTotals",
-              "description": "Component event processing metrics over `interval`.",
-              "args": [
-                {
-                  "name": "interval",
-                  "description": null,
-                  "type": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "SCALAR",
-                      "name": "Int",
-                      "ofType": null
-                    }
-                  },
-                  "defaultValue": "1000"
-                }
-              ],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "LIST",
-                  "name": null,
-                  "ofType": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "OBJECT",
-                      "name": "ComponentProcessedEventsTotal",
-                      "ofType": null
-                    }
-                  }
                 }
               },
               "isDeprecated": false,
@@ -5461,70 +5139,8 @@
               "deprecationReason": null
             },
             {
-              "name": "processedBytesTotal",
-              "description": "Byte processing metrics.",
-              "args": [
-                {
-                  "name": "interval",
-                  "description": null,
-                  "type": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "SCALAR",
-                      "name": "Int",
-                      "ofType": null
-                    }
-                  },
-                  "defaultValue": "1000"
-                }
-              ],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "OBJECT",
-                  "name": "ProcessedBytesTotal",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "processedBytesThroughput",
-              "description": "Byte processing throughput sampled over a provided millisecond `interval`.",
-              "args": [
-                {
-                  "name": "interval",
-                  "description": null,
-                  "type": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "SCALAR",
-                      "name": "Int",
-                      "ofType": null
-                    }
-                  },
-                  "defaultValue": "1000"
-                }
-              ],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Int",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "componentProcessedBytesTotals",
-              "description": "Component byte processing metrics over `interval`.",
+              "name": "componentReceivedBytesTotals",
+              "description": "Component bytes received metrics over `interval`.",
               "args": [
                 {
                   "name": "interval",
@@ -5552,7 +5168,7 @@
                     "name": null,
                     "ofType": {
                       "kind": "OBJECT",
-                      "name": "ComponentProcessedBytesTotal",
+                      "name": "ComponentReceivedBytesTotal",
                       "ofType": null
                     }
                   }
@@ -5562,8 +5178,8 @@
               "deprecationReason": null
             },
             {
-              "name": "componentProcessedBytesThroughputs",
-              "description": "Component byte processing throughput over `interval`",
+              "name": "componentReceivedBytesThroughputs",
+              "description": "Component bytes received throughput over `interval`",
               "args": [
                 {
                   "name": "interval",
@@ -5591,7 +5207,85 @@
                     "name": null,
                     "ofType": {
                       "kind": "OBJECT",
-                      "name": "ComponentProcessedBytesThroughput",
+                      "name": "ComponentReceivedBytesThroughput",
+                      "ofType": null
+                    }
+                  }
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "componentSentBytesTotals",
+              "description": "Component bytes sent metrics over `interval`.",
+              "args": [
+                {
+                  "name": "interval",
+                  "description": null,
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "Int",
+                      "ofType": null
+                    }
+                  },
+                  "defaultValue": "1000"
+                }
+              ],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "OBJECT",
+                      "name": "ComponentSentBytesTotal",
+                      "ofType": null
+                    }
+                  }
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "componentSentBytesThroughputs",
+              "description": "Component bytes sent throughput over `interval`",
+              "args": [
+                {
+                  "name": "interval",
+                  "description": null,
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "Int",
+                      "ofType": null
+                    }
+                  },
+                  "defaultValue": "1000"
+                }
+              ],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "OBJECT",
+                      "name": "ComponentSentBytesThroughput",
                       "ofType": null
                     }
                   }
@@ -5626,6 +5320,76 @@
                   "kind": "OBJECT",
                   "name": "ErrorsTotal",
                   "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "allocatedBytes",
+              "description": "Allocated bytes metrics.",
+              "args": [
+                {
+                  "name": "interval",
+                  "description": null,
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "Int",
+                      "ofType": null
+                    }
+                  },
+                  "defaultValue": "1000"
+                }
+              ],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "AllocatedBytes",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "componentAllocatedBytes",
+              "description": "Component allocation metrics",
+              "args": [
+                {
+                  "name": "interval",
+                  "description": null,
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "Int",
+                      "ofType": null
+                    }
+                  },
+                  "defaultValue": "1000"
+                }
+              ],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "OBJECT",
+                      "name": "ComponentAllocatedBytes",
+                      "ofType": null
+                    }
+                  }
                 }
               },
               "isDeprecated": false,
@@ -6020,7 +5784,7 @@
               ],
               "type": {
                 "kind": "SCALAR",
-                "name": "Json",
+                "name": "String",
                 "ofType": null
               },
               "isDeprecated": false,
@@ -6219,12 +5983,44 @@
               "description": "A list of edges.",
               "args": [],
               "type": {
-                "kind": "LIST",
+                "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
-                  "kind": "OBJECT",
-                  "name": "TransformEdge",
-                  "ofType": null
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "OBJECT",
+                      "name": "TransformEdge",
+                      "ofType": null
+                    }
+                  }
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "nodes",
+              "description": "A list of nodes.",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "OBJECT",
+                      "name": "Transform",
+                      "ofType": null
+                    }
+                  }
                 }
               },
               "isDeprecated": false,
@@ -6258,22 +6054,6 @@
           "description": "An edge in a connection.",
           "fields": [
             {
-              "name": "node",
-              "description": "The item at the end of the edge",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "OBJECT",
-                  "name": "Transform",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
               "name": "cursor",
               "description": "A cursor for use in pagination",
               "args": [],
@@ -6283,6 +6063,22 @@
                 "ofType": {
                   "kind": "SCALAR",
                   "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "node",
+              "description": "The item at the end of the edge",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "Transform",
                   "ofType": null
                 }
               },
@@ -6301,30 +6097,6 @@
           "description": null,
           "fields": [
             {
-              "name": "processedEventsTotal",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "OBJECT",
-                "name": "ProcessedEventsTotal",
-                "ofType": null
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "processedBytesTotal",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "OBJECT",
-                "name": "ProcessedBytesTotal",
-                "ofType": null
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
               "name": "receivedEventsTotal",
               "description": null,
               "args": [],
@@ -6337,18 +6109,6 @@
               "deprecationReason": null
             },
             {
-              "name": "eventsInTotal",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "OBJECT",
-                "name": "EventsInTotal",
-                "ofType": null
-              },
-              "isDeprecated": true,
-              "deprecationReason": "Use received_events_total instead"
-            },
-            {
               "name": "sentEventsTotal",
               "description": null,
               "args": [],
@@ -6359,18 +6119,6 @@
               },
               "isDeprecated": false,
               "deprecationReason": null
-            },
-            {
-              "name": "eventsOutTotal",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "OBJECT",
-                "name": "EventsOutTotal",
-                "ofType": null
-              },
-              "isDeprecated": true,
-              "deprecationReason": "Use sent_events_total instead"
             }
           ],
           "inputFields": null,
@@ -6559,7 +6307,7 @@
         {
           "kind": "OBJECT",
           "name": "__Directive",
-          "description": "A Directive provides a way to describe alternate runtime execution and type validation behavior in a GraphQL document.\n\nIn some cases, you need to provide options to alter GraphQL's execution behavior in ways field arguments will not suffice, such as conditionally including or skipping a field. Directives provide this by describing additional information to the executor.",
+          "description": "A Directive provides a way to describe alternate runtime execution and type\nvalidation behavior in a GraphQL document.\n\nIn some cases, you need to provide options to alter GraphQL's execution\nbehavior in ways field arguments will not suffice, such as conditionally\nincluding or skipping a field. Directives provide this by describing\nadditional information to the executor.",
           "fields": [
             {
               "name": "name",
@@ -6662,7 +6410,7 @@
         {
           "kind": "ENUM",
           "name": "__DirectiveLocation",
-          "description": "A Directive can be adjacent to many parts of the GraphQL language, a __DirectiveLocation describes one such possible adjacencies.",
+          "description": "A Directive can be adjacent to many parts of the GraphQL language, a\n__DirectiveLocation describes one such possible adjacencies.",
           "fields": null,
           "inputFields": null,
           "interfaces": null,
@@ -6787,7 +6535,7 @@
         {
           "kind": "OBJECT",
           "name": "__EnumValue",
-          "description": "One possible value for a given Enum. Enum values are unique values, not a placeholder for a string or numeric value. However an Enum value is returned in a JSON response as a string.",
+          "description": "One possible value for a given Enum. Enum values are unique values, not a\nplaceholder for a string or numeric value. However an Enum value is returned\nin a JSON response as a string.",
           "fields": [
             {
               "name": "name",
@@ -6854,7 +6602,7 @@
         {
           "kind": "OBJECT",
           "name": "__Field",
-          "description": "Object and Interface types are described by a list of Fields, each of which has a name, potentially a list of arguments, and a return type.",
+          "description": "Object and Interface types are described by a list of Fields, each of which\nhas a name, potentially a list of arguments, and a return type.",
           "fields": [
             {
               "name": "name",
@@ -6961,7 +6709,7 @@
         {
           "kind": "OBJECT",
           "name": "__InputValue",
-          "description": "Arguments provided to Fields or Directives and the input fields of an InputObject are represented as Input Values which describe their type and optionally a default value.",
+          "description": "Arguments provided to Fields or Directives and the input fields of an\nInputObject are represented as Input Values which describe their type and\noptionally a default value.",
           "fields": [
             {
               "name": "name",
@@ -7028,7 +6776,7 @@
         {
           "kind": "OBJECT",
           "name": "__Schema",
-          "description": "A GraphQL Schema defines the capabilities of a GraphQL server. It exposes all available types and directives on the server, as well as the entry points for query, mutation, and subscription operations.",
+          "description": "A GraphQL Schema defines the capabilities of a GraphQL server. It exposes\nall available types and directives on the server, as well as the entry\npoints for query, mutation, and subscription operations.",
           "fields": [
             {
               "name": "types",
@@ -7072,7 +6820,7 @@
             },
             {
               "name": "mutationType",
-              "description": "If this server supports mutation, the type that mutation operations will be rooted at.",
+              "description": "If this server supports mutation, the type that mutation operations will\nbe rooted at.",
               "args": [],
               "type": {
                 "kind": "OBJECT",
@@ -7084,7 +6832,7 @@
             },
             {
               "name": "subscriptionType",
-              "description": "If this server support subscription, the type that subscription operations will be rooted at.",
+              "description": "If this server support subscription, the type that subscription\noperations will be rooted at.",
               "args": [],
               "type": {
                 "kind": "OBJECT",
@@ -7127,7 +6875,7 @@
         {
           "kind": "OBJECT",
           "name": "__Type",
-          "description": "The fundamental unit of any GraphQL Schema is the type. There are many kinds of types in GraphQL as represented by the `__TypeKind` enum.\n\nDepending on the kind of a type, certain fields describe information about that type. Scalar types provide no information beyond a name and description, while Enum types provide their values. Object and Interface types provide the fields they describe. Abstract types, Union and Interface, provide the Object types possible at runtime. List and NonNull types compose other types.",
+          "description": "The fundamental unit of any GraphQL Schema is the type. There are many kinds\nof types in GraphQL as represented by the `__TypeKind` enum.\n\nDepending on the kind of a type, certain fields describe information about\nthat type. Scalar types provide no information beyond a name and\ndescription, while Enum types provide their values. Object and Interface\ntypes provide the fields they describe. Abstract types, Union and Interface,\nprovide the Object types possible at runtime. List and NonNull types compose\nother types.",
           "fields": [
             {
               "name": "kind",
@@ -7322,6 +7070,18 @@
               },
               "isDeprecated": false,
               "deprecationReason": null
+            },
+            {
+              "name": "isOneOf",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "Boolean",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
             }
           ],
           "inputFields": null,
@@ -7345,13 +7105,13 @@
             },
             {
               "name": "OBJECT",
-              "description": "Indicates this type is an object. `fields` and `interfaces` are valid fields.",
+              "description": "Indicates this type is an object. `fields` and `interfaces` are valid\nfields.",
               "isDeprecated": false,
               "deprecationReason": null
             },
             {
               "name": "INTERFACE",
-              "description": "Indicates this type is an interface. `fields` and `possibleTypes` are valid fields.",
+              "description": "Indicates this type is an interface. `fields` and `possibleTypes` are\nvalid fields.",
               "isDeprecated": false,
               "deprecationReason": null
             },
