@@ -1,0 +1,11 @@
+features:
+- cnosdb-integration-tests
+
+test_filter: '::cnosdb::'
+
+runner:
+  env:
+    HTTP_LISTEN_PORT: 8902
+
+matrix:
+    version: ['latest']

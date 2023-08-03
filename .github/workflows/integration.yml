@@ -59,6 +59,7 @@ jobs:
             || needs.changes.outputs.axiom == 'true'
             || needs.changes.outputs.azure == 'true'
             || needs.changes.outputs.clickhouse == 'true'
+            || needs.changes.outputs.cnosdb == 'true'
             || needs.changes.outputs.databend == 'true'
             || needs.changes.outputs.datadog == 'true'
             || needs.changes.outputs.dnstap == 'true'
@@ -156,6 +157,14 @@ jobs:
           timeout_minutes: 30
           max_attempts: 3
           command: bash scripts/ci-integration-test.sh  clickhouse
+
+      - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.cnosdb == 'true' }}
+        name: cnosdb
+        uses: nick-fields/retry@v2
+        with:
+          timeout_minutes: 30
+          max_attempts: 3
+          command: bash scripts/ci-integration-test.sh  cnosdb
 
       - if: (github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.databend == 'true') &&
           (github.event_name != 'pull_request' || env.PR_HAS_ACCESS_TO_SECRETS == 'true')

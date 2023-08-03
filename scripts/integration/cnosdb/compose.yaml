@@ -1,0 +1,14 @@
+version: '3'
+
+services:
+  cnosdb:
+    image: cnosdb/cnosdb:community-latest
+    container_name: cnosdb
+    ports:
+      - "8901:8901"
+      - "8902:8902"
+    command:
+      - /bin/bash
+      - -c
+      - |
+        cnosdb run --config /etc/cnosdb/cnosdb.conf -M singleton

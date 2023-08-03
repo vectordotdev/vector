@@ -54,6 +54,8 @@ on:
         value: ${{ jobs.int_tests.outputs.azure }}
       clickhouse:
         value: ${{ jobs.int_tests.outputs.clickhouse }}
+      cnosdb:
+        value: ${{ jobs.int_tests.outputs.cnosdb }}
       databend:
         value: ${{ jobs.int_tests.outputs.databend }}
       datadog:
@@ -188,6 +190,7 @@ jobs:
       axiom: ${{ steps.filter.outputs.axiom }}
       azure: ${{ steps.filter.outputs.azure }}
       clickhouse: ${{ steps.filter.outputs.clickhouse }}
+      cnosdb: ${{ steps.filter.outputs.cnosdb }}
       databend: ${{ steps.filter.outputs.databend }}
       datadog: ${{ steps.filter.outputs.datadog }}
       dnstap: ${{ steps.filter.outputs.dnstap }}

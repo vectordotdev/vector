@@ -137,6 +137,14 @@ jobs:
           max_attempts: 3
           command: bash scripts/ci-integration-test.sh clickhouse
 
+      - name: cnosdb
+        if: ${{ contains(github.event.comment.body, '/ci-run-integration-cnosdb') || contains(github.event.comment.body, '/ci-run-all') }}
+        uses: nick-fields/retry@v2
+        with:
+          timeout_minutes: 30
+          max_attempts: 3
+          command: bash scripts/ci-integration-test.sh cnosdb
+
       - name: databend
         if: ${{ contains(github.event.comment.body, '/ci-run-integration-databend') || contains(github.event.comment.body, '/ci-run-all') }}
         uses: nick-fields/retry@v2

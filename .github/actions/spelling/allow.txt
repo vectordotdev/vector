@@ -239,6 +239,8 @@ buildroot
 bytestream
 callsites
 cncf
+cnos
+cnosdb
 codepath
 codepaths
 commandline
