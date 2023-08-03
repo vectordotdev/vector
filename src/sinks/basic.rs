@@ -1,32 +1,9 @@
 use std::task::Poll;
 
-use crate::{
-    config::{GenerateConfig, SinkConfig, SinkContext},
-    http::HttpClient,
-    internal_events::SinkRequestBuildError,
-    sinks::util::{
-        encoding::{write_all, Encoder},
-        metadata::RequestMetadataBuilder,
-        request_builder::EncodeResult,
-        Compression, RequestBuilder, SinkBuilderExt,
-    },
-    sinks::Healthcheck,
-};
+use crate::{http::HttpClient, sinks::prelude::*};
 use bytes::Bytes;
 use futures::{future::BoxFuture, stream::BoxStream, StreamExt};
-use vector_common::{
-    finalization::{EventFinalizers, EventStatus, Finalizable},
-    internal_event::CountByteSize,
-    request_metadata::{MetaDescriptive, RequestMetadata},
-};
-use vector_config::configurable_component;
-use vector_core::{
-    config::{AcknowledgementsConfig, Input},
-    event::Event,
-    sink::{StreamSink, VectorSink},
-    stream::DriverResponse,
-    tls::TlsSettings,
-};
+use vector_core::config::telemetry;
 
 #[configurable_component(sink("basic"))]
 #[derive(Clone, Debug)]
@@ -55,6 +32,7 @@ impl GenerateConfig for BasicConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "basic")]
 impl SinkConfig for BasicConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let healthcheck = Box::pin(async move { Ok(()) });
@@ -74,6 +52,7 @@ impl SinkConfig for BasicConfig {
 
 struct BasicResponse {
     byte_size: usize,
+    json_size: GroupedCountByteSize,
 }
 
 impl DriverResponse for BasicResponse {
@@ -81,9 +60,12 @@ impl DriverResponse for BasicResponse {
         EventStatus::Delivered
     }
 
-    fn events_sent(&self) -> CountByteSize {
-        // (events count, byte size)
-        CountByteSize(1, self.byte_size)
+    fn events_sent(&self) -> &GroupedCountByteSize {
+        &self.json_size
+    }
+
+    fn bytes_sent(&self) -> Option<usize> {
+        Some(self.byte_size)
     }
 }
 
@@ -120,7 +102,12 @@ impl tower::Service<BasicRequest> for BasicService {
             match client.call(req).await {
                 Ok(response) => {
                     if response.status().is_success() {
-                        Ok(BasicResponse { byte_size })
+                        Ok(BasicResponse {
+                            byte_size,
+                            json_size: request
+                                .metadata
+                                .into_events_estimated_json_encoded_byte_size(),
+                        })
                     } else {
                         Err("received error response")
                     }
@@ -134,14 +121,17 @@ impl tower::Service<BasicRequest> for BasicService {
 #[derive(Clone)]
 struct BasicEncoder;
 
-impl Encoder<Event> for BasicEncoder {
+impl encoding::Encoder<Event> for BasicEncoder {
     fn encode_input(
         &self,
         input: Event,
         writer: &mut dyn std::io::Write,
-    ) -> std::io::Result<usize> {
+    ) -> std::io::Result<(usize, GroupedCountByteSize)> {
+        let mut byte_size = telemetry().create_request_count_byte_size();
+        byte_size.add_event(&input, input.estimated_json_encoded_size_of());
+
         let event = serde_json::to_string(&input).unwrap();
-        write_all(writer, 1, event.as_bytes()).map(|()| event.len())
+        write_all(writer, 1, event.as_bytes()).map(|()| (event.len(), byte_size))
     }
 }
 
@@ -172,8 +162,12 @@ struct BasicRequest {
 }
 
 impl MetaDescriptive for BasicRequest {
-    fn get_metadata(&self) -> RequestMetadata {
-        self.metadata
+    fn get_metadata(&self) -> &RequestMetadata {
+        &self.metadata
+    }
+
+    fn metadata_mut(&mut self) -> &mut RequestMetadata {
+        &mut self.metadata
     }
 }
 
@@ -204,7 +198,7 @@ impl RequestBuilder<Event> for BasicRequestBuilder {
         mut input: Event,
     ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
         let finalizers = input.take_finalizers();
-        let metadata_builder = RequestMetadataBuilder::from_events(&input);
+        let metadata_builder = RequestMetadataBuilder::from_event(&input);
         (finalizers, metadata_builder, input)
     }
 
