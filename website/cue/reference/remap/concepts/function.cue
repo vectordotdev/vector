@@ -18,8 +18,8 @@ remap: concepts: function: {
 				This feature of VRL programs, which we call [fail safety](\(urls.vrl_fail_safety)),
 				is a defining characteristic of VRL and a primary source of its safety guarantees.
 				"""
-		},
-	  deprecation: {
+		}
+		deprecation: {
 			title: "Deprecation"
 			description: """
 				VRL functions can be marked as "deprecated". When a function

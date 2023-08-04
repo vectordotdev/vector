@@ -133,7 +133,7 @@ remap: expressions: function_call: {
 				worry about missing any potential runtime
 				failures.
 				"""
-		},
+		}
 		deprecation: {
 			title: "Deprecation"
 			description: """
