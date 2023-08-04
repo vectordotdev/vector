@@ -43,17 +43,30 @@ impl TryFrom<Vec<Event>> for MetricsApiModel {
             if let Event::Metric(metric) = buf_event {
                 // Generate Value::Object() from BTreeMap<String, String>
                 let (series, data, _) = metric.into_parts();
-                let attr = series.tags.map(|tags| {
-                    Value::from(
-                        tags.iter_single()
-                            .map(|(key, value)| (key.to_string(), Value::from(value)))
-                            .collect::<BTreeMap<_, _>>(),
-                    )
-                });
 
                 // We only handle gauge and counter metrics
                 if let MetricValue::Gauge { value } | MetricValue::Counter { value } = data.value {
                     let mut metric_data = KeyValData::new();
+
+                    // Set type and type related attributes
+                    if let (MetricValue::Counter { .. }, MetricKind::Incremental) =
+                        (&data.value, &data.kind)
+                    {
+                        if let Some(interval_ms) = data.time.interval_ms {
+                            metric_data.insert(
+                                "interval.ms".to_owned(),
+                                Value::from(interval_ms.get() as i64),
+                            );
+                        } else {
+                            // Incremental counter without an interval is worthless, skip this metric
+                            continue;
+                        }
+                        metric_data.insert("type".to_owned(), Value::from("count"));
+                    } else {
+                        // Anything that's not an incremental counter is considered a gauge, that is gauge and absolute counters metrics.
+                        metric_data.insert("type".to_owned(), Value::from("gauge"));
+                    }
+
                     // Set name, value, and timestamp
                     metric_data.insert("name".to_owned(), Value::from(series.name.name));
                     metric_data.insert(
@@ -72,9 +85,18 @@ impl TryFrom<Vec<Event>> for MetricsApiModel {
                                 .timestamp(),
                         ),
                     );
-                    if let Some(attr) = attr {
-                        metric_data.insert("attributes".to_owned(), attr);
+
+                    if let Some(tags) = series.tags {
+                        metric_data.insert(
+                            "attributes".to_owned(),
+                            Value::from(
+                                tags.iter_single()
+                                    .map(|(key, value)| (key.to_string(), Value::from(value)))
+                                    .collect::<BTreeMap<_, _>>(),
+                            ),
+                        );
                     }
+
                     // Set type and type related attributes
                     if let (MetricValue::Counter { .. }, MetricKind::Incremental) =
                         (data.value, data.kind)
