@@ -80,18 +80,17 @@ remap: functions: parse_nginx_log: {
 				)
 				"""#
 			return: {
-				cid:       1
-				client:    "172.17.0.1"
-				host:      "localhost:8081"
-				message:   "open() \"/usr/share/nginx/html/not-found\" failed (2: No such file or directory)"
-				pid:       31
-				request:   "POST /not-found HTTP/1.1"
-				server:    "localhost"
+				timestamp: "2021-04-01T13:02:31Z"
 				severity:  "error"
+				pid:       31
 				tid:       31
-				timestamp: '2021-04-01T17:02:31Z'
+				cid:       1
+				message:   "open() \"/usr/share/nginx/html/not-found\" failed (2: No such file or directory)"
+				client:    "172.17.0.1"
+				server:    "localhost"
+				request:   "POST /not-found HTTP/1.1"
+				host:      "localhost:8081"
 			}
-
 		},
 	]
 }
