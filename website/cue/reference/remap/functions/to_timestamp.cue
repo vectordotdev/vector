@@ -51,7 +51,7 @@ remap: functions: to_timestamp: {
 			source: """
 				to_timestamp!("2020-10-21T16:00:00Z")
 				"""
-			return: "2020-10-21T16:00:00Z"
+			return:    "2020-10-21T16:00:00Z"
 			skip_test: true
 		},
 		{
@@ -59,7 +59,7 @@ remap: functions: to_timestamp: {
 			source: """
 				to_timestamp!(1675968923)
 				"""
-			return: "2023-02-09T18:55:23Z"
+			return:    "2023-02-09T18:55:23Z"
 			skip_test: true
 		},
 		{
@@ -67,7 +67,7 @@ remap: functions: to_timestamp: {
 			source: """
 				to_timestamp!(1675968923.567)
 				"""
-			return: "2023-02-09T18:55:23.566999912Z"
+			return:    "2023-02-09T18:55:23.566999912Z"
 			skip_test: true
 		},
 		{
@@ -75,7 +75,7 @@ remap: functions: to_timestamp: {
 			source: """
 				to_timestamp!(1676478566639, unit: "milliseconds")
 				"""
-			return: "2023-02-15T16:29:26.639Z"
+			return:    "2023-02-15T16:29:26.639Z"
 			skip_test: true
 		},
 		{
@@ -83,7 +83,7 @@ remap: functions: to_timestamp: {
 			source: """
 				to_timestamp!(1675968923012312311, unit: "nanoseconds")
 				"""
-			return: "2023-02-09T18:55:23.012312311Z"
+			return:    "2023-02-09T18:55:23.012312311Z"
 			skip_test: true
 		},
 	]
