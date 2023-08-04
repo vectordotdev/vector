@@ -3,6 +3,8 @@ package metadata
 remap: functions: to_timestamp: {
 	category: "Coerce"
 	description: """
+		This function is deprecated.
+		For integer values, use `from_unix_timestamp`, otherwise use `parse_timestamp`.
 		Coerces the `value` into a timestamp.
 		"""
 	notices: ["There is the possibility of precision loss due to float arithmetic when coercing floats."]
@@ -12,7 +14,7 @@ remap: functions: to_timestamp: {
 	arguments: [
 		{
 			name:        "value"
-			description: "This function is deprecated. For integer values, use `from_unix_timestamp`, otherwise use `parse_timestamp`. The value that is to be converted to a timestamp. If a string, must be a valid representation of a `timestamp` otherwise an `ArgumentError` will be raised."
+			description: "The value that is to be converted to a timestamp. If a string, must be a valid representation of a `timestamp` otherwise an `ArgumentError` will be raised."
 			required:    true
 			type: ["string", "float", "integer", "timestamp"]
 		},

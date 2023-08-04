@@ -133,8 +133,8 @@ remap: expressions: function_call: {
 				worry about missing any potential runtime
 				failures.
 				"""
-		}
-		fallibility: {
+		},
+		deprecation: {
 			title: "Deprecation"
 			description: """
 				VRL functions can be marked as "deprecated". When a function
