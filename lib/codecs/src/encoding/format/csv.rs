@@ -71,7 +71,7 @@ pub struct CsvSerializerOptions {
     /// In some variants of CSV, quotes are escaped using a special escape character
     /// like \ (instead of escaping quotes by doubling them).
     ///
-    /// To use this `double_uotes` needs to be disabled as well
+    /// To use this `double_quotes` needs to be disabled as well otherwise it is ignored
     pub escape: u8,
 
     /// Configures the fields that will be encoded, as well as the order in which they
@@ -98,21 +98,13 @@ impl Default for CsvSerializerOptions {
 /// Serializer that converts an `Event` to bytes using the CSV format.
 #[derive(Debug, Clone)]
 pub struct CsvSerializer {
-    delimiter: u8,
-    double_quote: bool,
-    escape: u8,
-    fields: Vec<ConfigTargetPath>,
+    config: CsvSerializerConfig
 }
 
 impl CsvSerializer {
     /// Creates a new `CsvSerializer`.
-    pub fn new(conf: CsvSerializerConfig) -> Self {
-        Self {
-            delimiter: conf.csv.delimiter,
-            double_quote: conf.csv.double_quote,
-            escape: conf.csv.escape,
-            fields: conf.csv.fields,
-        }
+    pub const fn new(config: CsvSerializerConfig) -> Self {
+        Self { config }
     }
 }
 
@@ -122,13 +114,13 @@ impl Encoder<Event> for CsvSerializer {
     fn encode(&mut self, event: Event, buffer: &mut BytesMut) -> Result<(), Self::Error> {
         let log = event.into_log();
         let mut wtr = csv::WriterBuilder::new()
-            .delimiter(self.delimiter)
-            .double_quote(self.double_quote)
-            .escape(self.escape)
-            .terminator(csv::Terminator::Any(b'\0')) // TODO: this needs proper 'nothig' value
+            .delimiter(self.config.csv.delimiter)
+            .double_quote(self.config.csv.double_quote)
+            .escape(self.config.csv.escape)
+            .terminator(csv::Terminator::Any(b'\0')) // TODO: this needs proper 'nothing' value
             .from_writer(buffer.writer());
 
-        for field in &self.fields {
+        for field in &self.config.csv.fields {
             match log.get(field) {
                 Some(Value::Bytes(bytes)) => {
                     wtr.write_field(String::from_utf8_lossy(bytes).to_string())?
@@ -289,16 +281,15 @@ mod tests {
     #[test]
     fn custom_escape_char() {
         let event = Event::Log(LogEvent::from(btreemap! {
-            "field1" => Value::from("hallo world"),
+            "field1" => Value::from("hallo \" world"),
         }));
         let fields = vec![
             ConfigTargetPath::try_from("field1".to_string()).unwrap(),
         ];
         let mut opts = CsvSerializerOptions::default();
         opts.fields = fields;
-        opts.delimiter = b' ';
-        opts.double_quote = true;
-        //opts.escape = b'\'';
+        opts.double_quote = false;
+        opts.escape = b'\\';
 
         let config = CsvSerializerConfig::new(opts);
         let mut serializer = config.build().unwrap();
@@ -306,7 +297,7 @@ mod tests {
         serializer.encode(event, &mut bytes).unwrap();
 
         assert_eq!(
-            &bytes.freeze()[..],
+            bytes.freeze(),
             b"\"hallo\\\"world\"".as_slice()
         );
     }
