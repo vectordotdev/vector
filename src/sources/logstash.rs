@@ -9,24 +9,23 @@ use std::{
 use bytes::{Buf, Bytes, BytesMut};
 use codecs::{BytesDeserializerConfig, StreamDecodingError};
 use flate2::read::ZlibDecoder;
-use lookup::lookup_v2::parse_value_path;
 use lookup::{event_path, metadata_path, owned_value_path, path, OwnedValuePath, PathPrefix};
 use smallvec::{smallvec, SmallVec};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::Decoder;
-use value::kind::Collection;
-use value::Kind;
 use vector_config::configurable_component;
 use vector_core::{
     config::{LegacyKey, LogNamespace},
     schema::Definition,
 };
+use vrl::value::kind::Collection;
+use vrl::value::Kind;
 
 use super::util::net::{SocketListenAddr, TcpSource, TcpSourceAck, TcpSourceAcker};
 use crate::{
     config::{
-        log_schema, DataType, GenerateConfig, Output, Resource, SourceAcknowledgementsConfig,
-        SourceConfig, SourceContext,
+        log_schema, DataType, GenerateConfig, Resource, SourceAcknowledgementsConfig, SourceConfig,
+        SourceContext, SourceOutput,
     },
     event::{Event, LogEvent, Value},
     serde::bool_or_struct,
@@ -36,7 +35,7 @@ use crate::{
 };
 
 /// Configuration for the `logstash` source.
-#[configurable_component(source("logstash"))]
+#[configurable_component(source("logstash", "Collect logs from a Logstash agent."))]
 #[derive(Clone, Debug)]
 pub struct LogstashConfig {
     #[configurable(derived)]
@@ -50,14 +49,12 @@ pub struct LogstashConfig {
     tls: Option<TlsSourceConfig>,
 
     /// The size of the receive buffer used for each connection.
-    ///
-    /// This generally should not need to be changed.
     #[configurable(metadata(docs::type_unit = "bytes"))]
     #[configurable(metadata(docs::examples = 65536))]
     #[configurable(metadata(docs::advanced))]
     receive_buffer_bytes: Option<usize>,
 
-    /// The maximum number of TCP connections that will be allowed at any given time.
+    /// The maximum number of TCP connections that are allowed at any given time.
     #[configurable(metadata(docs::type_unit = "connections"))]
     #[configurable(metadata(docs::advanced))]
     connection_limit: Option<u32>,
@@ -76,8 +73,9 @@ impl LogstashConfig {
     /// Builds the `schema::Definition` for this source using the provided `LogNamespace`.
     fn schema_definition(&self, log_namespace: LogNamespace) -> Definition {
         // `host_key` is only inserted if not present already.
-        let host_key = parse_value_path(log_schema().host_key())
-            .ok()
+        let host_key = log_schema()
+            .host_key()
+            .cloned()
             .map(LegacyKey::InsertIfEmpty);
 
         let tls_client_metadata_path = self
@@ -135,12 +133,13 @@ impl GenerateConfig for LogstashConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "logstash")]
 impl SourceConfig for LogstashConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let log_namespace = cx.log_namespace(self.log_namespace);
         let source = LogstashSource {
             timestamp_converter: types::Conversion::Timestamp(cx.globals.timezone()),
-            legacy_host_key_path: parse_value_path(log_schema().host_key()).ok(),
+            legacy_host_key_path: log_schema().host_key().cloned(),
             log_namespace,
         };
         let shutdown_secs = Duration::from_secs(30);
@@ -168,10 +167,11 @@ impl SourceConfig for LogstashConfig {
         )
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         // There is a global and per-source `log_namespace` config.
         // The source config overrides the global setting and is merged here.
-        vec![Output::default(DataType::Log).with_schema_definition(
+        vec![SourceOutput::new_logs(
+            DataType::Log,
             self.schema_definition(global_log_namespace.merge(self.log_namespace)),
         )]
     }
@@ -232,10 +232,12 @@ impl TcpSource for LogstashSource {
                     log.insert(metadata_path!("vector", "ingest_timestamp"), now);
                 }
                 LogNamespace::Legacy => {
-                    log.insert(
-                        (PathPrefix::Event, log_schema().timestamp_key()),
-                        log_timestamp.unwrap_or_else(|| Value::from(now)),
-                    );
+                    if let Some(timestamp_key) = log_schema().timestamp_key() {
+                        log.insert(
+                            (PathPrefix::Event, timestamp_key),
+                            log_timestamp.unwrap_or_else(|| Value::from(now)),
+                        );
+                    }
                 }
             }
 
@@ -680,7 +682,7 @@ mod test {
     use lookup::OwnedTargetPath;
     use rand::{thread_rng, Rng};
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
-    use value::kind::Collection;
+    use vrl::value::kind::Collection;
 
     use super::*;
     use crate::{
@@ -789,10 +791,10 @@ mod test {
             ..Default::default()
         };
 
-        let definition = config.outputs(LogNamespace::Vector)[0]
-            .clone()
-            .log_schema_definition
-            .unwrap();
+        let definitions = config
+            .outputs(LogNamespace::Vector)
+            .remove(0)
+            .schema_definition(true);
 
         let expected_definition =
             Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
@@ -823,17 +825,17 @@ mod test {
                     None,
                 );
 
-        assert_eq!(definition, expected_definition)
+        assert_eq!(definitions, Some(expected_definition))
     }
 
     #[test]
     fn output_schema_definition_legacy_namespace() {
         let config = LogstashConfig::default();
 
-        let definition = config.outputs(LogNamespace::Legacy)[0]
-            .clone()
-            .log_schema_definition
-            .unwrap();
+        let definitions = config
+            .outputs(LogNamespace::Legacy)
+            .remove(0)
+            .schema_definition(true);
 
         let expected_definition = Definition::new_with_default_metadata(
             Kind::object(Collection::empty()),
@@ -848,7 +850,7 @@ mod test {
         .with_event_field(&owned_value_path!("timestamp"), Kind::timestamp(), None)
         .with_event_field(&owned_value_path!("host"), Kind::bytes(), Some("host"));
 
-        assert_eq!(definition, expected_definition)
+        assert_eq!(definitions, Some(expected_definition))
     }
 }
 

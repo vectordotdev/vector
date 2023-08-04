@@ -2,8 +2,4 @@ version: '3'
 
 services:
   clickhouse:
-    image: docker.io/yandex/clickhouse-server:${CONFIG_VERSION}
-
-networks:
-  default:
-    name: ${VECTOR_NETWORK}
+    image: docker.io/clickhouse/clickhouse-server:${CONFIG_VERSION}

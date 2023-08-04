@@ -9,7 +9,7 @@ components: sinks: prometheus_remote_write: {
 		development:   "beta"
 		egress_method: "batch"
 		service_providers: ["AWS"]
-		stateful: false
+		stateful: true
 	}
 
 	features: {
@@ -100,11 +100,14 @@ components: sinks: prometheus_remote_write: {
 				values for each name, Vector will only send the last value specified.
 				"""
 		}
-	}
-
-	telemetry: metrics: {
-		component_sent_events_total:      components.sources.internal_metrics.output.metrics.component_sent_events_total
-		component_sent_event_bytes_total: components.sources.internal_metrics.output.metrics.component_sent_event_bytes_total
-		processing_errors_total:          components.sources.internal_metrics.output.metrics.processing_errors_total
+		compression_schemes: {
+			title: "Compression schemes"
+			body:  """
+				Officially according to the [Prometheus Remote-Write specification](\(urls.prometheus_remote_write_spec)),
+				the only supported compression scheme is [Snappy](\(urls.snappy)). However,
+				there are a number of other implementations that do support other schemes. Thus
+				Vector also supports using Gzip and Zstd.
+				"""
+		}
 	}
 }

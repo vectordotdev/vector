@@ -53,8 +53,12 @@ impl<R> MetaDescriptive for KinesisRequest<R>
 where
     R: Record,
 {
-    fn get_metadata(&self) -> RequestMetadata {
-        self.metadata
+    fn get_metadata(&self) -> &RequestMetadata {
+        &self.metadata
+    }
+
+    fn metadata_mut(&mut self) -> &mut RequestMetadata {
+        &mut self.metadata
     }
 }
 
@@ -102,7 +106,7 @@ where
             partition_key: processed_event.metadata.partition_key,
         };
         let event = Event::from(processed_event.event);
-        let builder = RequestMetadataBuilder::from_events(&event);
+        let builder = RequestMetadataBuilder::from_event(&event);
 
         (kinesis_metadata, builder, event)
     }

@@ -1,6 +1,5 @@
 use std::collections::BTreeMap;
 use std::{
-    cmp::min,
     collections::{hash_map, HashMap},
     num::NonZeroUsize,
     pin::Pin,
@@ -15,9 +14,10 @@ use lookup::PathPrefix;
 use serde_with::serde_as;
 use vector_config::configurable_component;
 
+use crate::config::OutputId;
 use crate::{
     conditions::{AnyCondition, Condition},
-    config::{DataType, Input, Output, TransformConfig, TransformContext},
+    config::{DataType, Input, TransformConfig, TransformContext, TransformOutput},
     event::{discriminant::Discriminant, Event, EventMetadata, LogEvent},
     internal_events::ReduceStaleEventFlushed,
     schema,
@@ -26,11 +26,12 @@ use crate::{
 
 mod merge_strategy;
 
+use crate::config::schema::Definition;
 use crate::event::Value;
 pub use merge_strategy::*;
-use value::kind::Collection;
-use value::Kind;
 use vector_core::config::LogNamespace;
+use vrl::value::kind::Collection;
+use vrl::value::Kind;
 
 /// Configuration for the `reduce` transform.
 #[serde_as]
@@ -47,12 +48,14 @@ pub struct ReduceConfig {
     #[serde(default = "default_expire_after_ms")]
     #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
     #[derivative(Default(value = "default_expire_after_ms()"))]
+    #[configurable(metadata(docs::human_name = "Expire After"))]
     pub expire_after_ms: Duration,
 
     /// The interval to check for and flush any expired events, in milliseconds.
     #[serde(default = "default_flush_period_ms")]
     #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
     #[derivative(Default(value = "default_flush_period_ms()"))]
+    #[configurable(metadata(docs::human_name = "Flush Period"))]
     pub flush_period_ms: Duration,
 
     /// The maximum number of events to group together.
@@ -62,10 +65,10 @@ pub struct ReduceConfig {
     ///
     /// Each group with matching values for the specified keys is reduced independently, allowing
     /// you to keep independent event streams separate. When no fields are specified, all events
-    /// will be combined in a single group.
+    /// are combined in a single group.
     ///
     /// For example, if `group_by = ["host", "region"]`, then all incoming events that have the same
-    /// host and region will be grouped together before being reduced.
+    /// host and region are grouped together before being reduced.
     #[serde(default)]
     #[configurable(metadata(
         docs::examples = "request_id",
@@ -76,12 +79,12 @@ pub struct ReduceConfig {
 
     /// A map of field names to custom merge strategies.
     ///
-    /// For each field specified, the given strategy will be used for combining events rather than
+    /// For each field specified, the given strategy is used for combining events rather than
     /// the default behavior.
     ///
     /// The default behavior is as follows:
     ///
-    /// - The first value of a string field is kept, subsequent values are discarded.
+    /// - The first value of a string field is kept and subsequent values are discarded.
     /// - For timestamp fields the first is kept and a new field `[field-name]_end` is added with
     ///   the last received timestamp value.
     /// - Numeric values are summed.
@@ -125,8 +128,21 @@ impl TransformConfig for ReduceConfig {
         Input::log()
     }
 
-    fn outputs(&self, input: &schema::Definition, _: LogNamespace) -> Vec<Output> {
-        let mut schema_definition = input.clone();
+    fn outputs(
+        &self,
+        _: enrichment::TableRegistry,
+        input_definitions: &[(OutputId, schema::Definition)],
+        _: LogNamespace,
+    ) -> Vec<TransformOutput> {
+        // Events may be combined, so there isn't a true single "source" for events.
+        // All of the definitions must be merged.
+        let merged_definition: Definition = input_definitions
+            .iter()
+            .map(|(_output, definition)| definition.clone())
+            .reduce(Definition::merge)
+            .unwrap_or_else(Definition::any);
+
+        let mut schema_definition = merged_definition;
 
         for (key, merge_strategy) in self.merge_strategies.iter() {
             let key = if let Ok(key) = parse_target_path(key) {
@@ -209,7 +225,13 @@ impl TransformConfig for ReduceConfig {
             schema_definition = schema_definition.with_field(&key, new_kind, None);
         }
 
-        vec![Output::default(DataType::Log).with_schema_definition(schema_definition)]
+        // the same schema definition is used for all inputs
+        let mut output_definitions = HashMap::new();
+        for (output, _input) in input_definitions {
+            output_definitions.insert(output.clone(), schema_definition.clone());
+        }
+
+        vec![TransformOutput::new(DataType::Log, output_definitions)]
     }
 }
 
@@ -218,7 +240,6 @@ struct ReduceState {
     events: usize,
     fields: HashMap<String, Box<dyn ReduceValueMerger>>,
     stale_since: Instant,
-    last_flushed_at: Instant,
     metadata: EventMetadata,
 }
 
@@ -230,7 +251,6 @@ impl ReduceState {
         Self {
             events: 0,
             stale_since: Instant::now(),
-            last_flushed_at: Instant::now(),
             fields,
             metadata,
         }
@@ -334,10 +354,9 @@ impl Reduce {
     fn flush_into(&mut self, output: &mut Vec<Event>) {
         let mut flush_discriminants = Vec::new();
         let now = Instant::now();
-        for (k, t) in &mut self.reduce_merge_states {
-            if now - min(t.stale_since, t.last_flushed_at) >= self.expire_after {
+        for (k, t) in &self.reduce_merge_states {
+            if (now - t.stale_since) >= self.expire_after {
                 flush_discriminants.push(k.clone());
-                t.last_flushed_at = Instant::now();
             }
         }
         for k in &flush_discriminants {
@@ -463,13 +482,15 @@ impl TaskTransform<Event> for Reduce {
 
 #[cfg(test)]
 mod test {
+    use enrichment::TableRegistry;
     use serde_json::json;
-    use tokio::sync::mpsc::{self, Sender};
-    use tokio::time::sleep;
+    use std::sync::Arc;
+    use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
-    use value::Kind;
+    use vrl::value::Kind;
 
     use super::*;
+    use crate::config::schema::Definition;
     use crate::event::{LogEvent, Value};
     use crate::test_util::components::assert_transform_compliance;
     use crate::transforms::test::create_topology;
@@ -507,13 +528,27 @@ group_by = [ "request_id" ]
                     Kind::bytes().or_undefined(),
                     None,
                 );
-            let schema_definition = reduce_config
-                .outputs(&input_definition, LogNamespace::Legacy)
+            let schema_definitions = reduce_config
+                .outputs(
+                    enrichment::TableRegistry::default(),
+                    &[("test".into(), input_definition)],
+                    LogNamespace::Legacy,
+                )
                 .first()
                 .unwrap()
-                .log_schema_definition
-                .clone()
-                .unwrap();
+                .schema_definitions(true)
+                .clone();
+
+            let new_schema_definition = reduce_config.outputs(
+                TableRegistry::default(),
+                &[(OutputId::from("in"), Definition::default_legacy_namespace())],
+                LogNamespace::Legacy,
+            )[0]
+            .clone()
+            .log_schema_definitions
+            .get(&OutputId::from("in"))
+            .unwrap()
+            .clone();
 
             let (tx, rx) = mpsc::channel(1);
             let (topology, mut out) = create_topology(ReceiverStream::new(rx), reduce_config).await;
@@ -521,12 +556,16 @@ group_by = [ "request_id" ]
             let mut e_1 = LogEvent::from("test message 1");
             e_1.insert("counter", 1);
             e_1.insert("request_id", "1");
-            let metadata_1 = e_1.metadata().clone();
+            let mut metadata_1 = e_1.metadata().clone();
+            metadata_1.set_upstream_id(Arc::new(OutputId::from("transform")));
+            metadata_1.set_schema_definition(&Arc::new(new_schema_definition.clone()));
 
             let mut e_2 = LogEvent::from("test message 2");
             e_2.insert("counter", 2);
             e_2.insert("request_id", "2");
-            let metadata_2 = e_2.metadata().clone();
+            let mut metadata_2 = e_2.metadata().clone();
+            metadata_2.set_upstream_id(Arc::new(OutputId::from("transform")));
+            metadata_2.set_schema_definition(&Arc::new(new_schema_definition.clone()));
 
             let mut e_3 = LogEvent::from("test message 3");
             e_3.insert("counter", 3);
@@ -551,14 +590,18 @@ group_by = [ "request_id" ]
             assert_eq!(output_1["message"], "test message 1".into());
             assert_eq!(output_1["counter"], Value::from(8));
             assert_eq!(output_1.metadata(), &metadata_1);
-            schema_definition.assert_valid_for_event(&output_1.into());
+            schema_definitions
+                .values()
+                .for_each(|definition| definition.assert_valid_for_event(&output_1.clone().into()));
 
             let output_2 = out.recv().await.unwrap().into_log();
             assert_eq!(output_2["message"], "test message 2".into());
             assert_eq!(output_2["extra_field"], "value1".into());
             assert_eq!(output_2["counter"], Value::from(7));
             assert_eq!(output_2.metadata(), &metadata_2);
-            schema_definition.assert_valid_for_event(&output_2.into());
+            schema_definitions
+                .values()
+                .for_each(|definition| definition.assert_valid_for_event(&output_2.clone().into()));
 
             drop(tx);
             topology.stop().await;
@@ -586,6 +629,18 @@ merge_strategies.baz = "max"
 
         assert_transform_compliance(async move {
             let (tx, rx) = mpsc::channel(1);
+
+            let new_schema_definition = reduce_config.outputs(
+                TableRegistry::default(),
+                &[(OutputId::from("in"), Definition::default_legacy_namespace())],
+                LogNamespace::Legacy,
+            )[0]
+            .clone()
+            .log_schema_definitions
+            .get(&OutputId::from("in"))
+            .unwrap()
+            .clone();
+
             let (topology, mut out) = create_topology(ReceiverStream::new(rx), reduce_config).await;
 
             let mut e_1 = LogEvent::from("test message 1");
@@ -593,7 +648,9 @@ merge_strategies.baz = "max"
             e_1.insert("bar", "first bar");
             e_1.insert("baz", 2);
             e_1.insert("request_id", "1");
-            let metadata = e_1.metadata().clone();
+            let mut metadata = e_1.metadata().clone();
+            metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
+            metadata.set_schema_definition(&Arc::new(new_schema_definition.clone()));
             tx.send(e_1.into()).await.unwrap();
 
             let mut e_2 = LogEvent::from("test message 2");
@@ -643,17 +700,32 @@ group_by = [ "request_id" ]
 
         assert_transform_compliance(async move {
             let (tx, rx) = mpsc::channel(1);
+            let new_schema_definition = reduce_config.outputs(
+                TableRegistry::default(),
+                &[(OutputId::from("in"), Definition::default_legacy_namespace())],
+                LogNamespace::Legacy,
+            )[0]
+            .clone()
+            .log_schema_definitions
+            .get(&OutputId::from("in"))
+            .unwrap()
+            .clone();
+
             let (topology, mut out) = create_topology(ReceiverStream::new(rx), reduce_config).await;
 
             let mut e_1 = LogEvent::from("test message 1");
             e_1.insert("counter", 1);
             e_1.insert("request_id", "1");
-            let metadata_1 = e_1.metadata().clone();
+            let mut metadata_1 = e_1.metadata().clone();
+            metadata_1.set_upstream_id(Arc::new(OutputId::from("transform")));
+            metadata_1.set_schema_definition(&Arc::new(new_schema_definition.clone()));
             tx.send(e_1.into()).await.unwrap();
 
             let mut e_2 = LogEvent::from("test message 2");
             e_2.insert("counter", 2);
-            let metadata_2 = e_2.metadata().clone();
+            let mut metadata_2 = e_2.metadata().clone();
+            metadata_2.set_upstream_id(Arc::new(OutputId::from("transform")));
+            metadata_2.set_schema_definition(&Arc::new(new_schema_definition));
             tx.send(e_2.into()).await.unwrap();
 
             let mut e_3 = LogEvent::from("test message 3");
@@ -835,20 +907,37 @@ merge_strategies.bar = "concat"
 
         assert_transform_compliance(async move {
             let (tx, rx) = mpsc::channel(1);
+
+            let new_schema_definition = reduce_config.outputs(
+                TableRegistry::default(),
+                &[(OutputId::from("in"), Definition::default_legacy_namespace())],
+                LogNamespace::Legacy,
+            )[0]
+            .clone()
+            .log_schema_definitions
+            .get(&OutputId::from("in"))
+            .unwrap()
+            .clone();
+
             let (topology, mut out) = create_topology(ReceiverStream::new(rx), reduce_config).await;
 
             let mut e_1 = LogEvent::from("test message 1");
             e_1.insert("foo", json!([1, 3]));
             e_1.insert("bar", json!([1, 3]));
             e_1.insert("request_id", "1");
-            let metadata_1 = e_1.metadata().clone();
+            let mut metadata_1 = e_1.metadata().clone();
+            metadata_1.set_upstream_id(Arc::new(OutputId::from("transform")));
+            metadata_1.set_schema_definition(&Arc::new(new_schema_definition.clone()));
+
             tx.send(e_1.into()).await.unwrap();
 
             let mut e_2 = LogEvent::from("test message 2");
             e_2.insert("foo", json!([2, 4]));
             e_2.insert("bar", json!([2, 4]));
             e_2.insert("request_id", "2");
-            let metadata_2 = e_2.metadata().clone();
+            let mut metadata_2 = e_2.metadata().clone();
+            metadata_2.set_upstream_id(Arc::new(OutputId::from("transform")));
+            metadata_2.set_schema_definition(&Arc::new(new_schema_definition));
             tx.send(e_2.into()).await.unwrap();
 
             let mut e_3 = LogEvent::from("test message 3");
@@ -890,49 +979,6 @@ merge_strategies.bar = "concat"
             drop(tx);
             topology.stop().await;
             assert_eq!(out.recv().await, None);
-        })
-        .await;
-    }
-
-    /// Tests the case where both starts_when and ends_when are not defined,
-    /// and aggregation continues on and on, without flushing as long as events
-    /// arrive in rate that is faster than the rate of expire_ms between events.
-    #[tokio::test]
-    async fn last_flush_at() {
-        let reduce_config = toml::from_str::<ReduceConfig>(
-            r#"
-group_by = [ "user_id" ]
-expire_after_ms = 200
-flush_period_ms = 250
-            "#,
-        )
-        .unwrap();
-
-        assert_transform_compliance(async move {
-            let (tx, rx) = mpsc::channel(1);
-            let (topology, mut out) = create_topology(ReceiverStream::new(rx), reduce_config).await;
-
-            async fn send_event(tx: &Sender<Event>, user_id: i32) {
-                let mut log_event = LogEvent::from("test message");
-                log_event.insert("user_id", user_id.to_string());
-                tx.send(log_event.into()).await.unwrap();
-            }
-
-            // send in a rate that is double than the rate of of expire_ms between events
-            for _ in 0..5 {
-                send_event(&tx, 1).await;
-                sleep(Duration::from_millis(50)).await;
-                send_event(&tx, 2).await;
-                sleep(Duration::from_millis(50)).await;
-            }
-
-            // verify messages arrive during this time
-            out.try_recv().expect("No message arrived");
-            sleep(Duration::from_millis(10)).await;
-            out.try_recv().expect("No message arrived");
-
-            drop(tx);
-            topology.stop().await;
         })
         .await;
     }

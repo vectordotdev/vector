@@ -23,28 +23,6 @@
 // our heuristic to detect unsigned integers failed, but we might be able to give a meaningful error
 // closer to the problem, which would be much better.
 //
-// TODO: If we want to deny unknown fields on structs, JSON Schema supports that by setting
-// `additionalProperties` to `false` on a schema, which turns it into a "closed" schema. However,
-// this is at odds with types used in enums, which is all of our component configuration types. This
-// is because applying `additionalProperties` to the configuration type's schema itself would
-// consider something like an internal enum tag (i.e. `"type": "aws_s3"`) as an additional property,
-// even if `type` was already accounted for in another subschema that was validated against.
-//
-// JSON Schema draft 2019-09 has a solution for this -- `unevaluatedProperties` -- which forces the
-// validator to track what properties have been "accounted" for, so far, during subschema validation
-// during things like validating against all subschemas in `allOf`.
-//
-// Essentially, we should force all structs to generate a schema that sets `additionalProperties` to
-// `false`, if it wasn't set already, but if it gets used in a way that will place it into `allOf`
-// (which is the case for internally tagged enum variants aka all component configuration types)
-// then we need to update the schema codegen to unset that field, and re-apply it as
-// `unevaluatedProperties` on the schema which is using `allOf`.
-//
-// Logically, this makes sense because we're only creating a new wrapper schema B around some schema
-// A such that we can use it as a tagged enum variant, so rules like "no additional properties"
-// should apply to the wrapper, since schema A and B should effectively represent the same exact
-// thing.
-//
 // TODO: We may want to simply switch from using `description` as the baseline descriptive field to
 // using `title`.  While, by itself, I think `description` makes a little more sense than `title`,
 // it makes it hard to do split-location documentation.
@@ -145,16 +123,11 @@ mod named;
 pub use self::named::NamedComponent;
 mod num;
 pub use self::num::ConfigurableNumber;
-mod schema_gen;
+pub mod schema;
 pub mod ser;
 mod stdlib;
 mod str;
 pub use self::str::ConfigurableString;
-
-pub mod schema {
-    pub use super::schema_gen::*;
-    pub use vector_config_common::schema::*;
-}
 
 // Re-export of the `#[configurable_component]` and `#[derive(Configurable)]` proc macros.
 pub use vector_config_macros::*;

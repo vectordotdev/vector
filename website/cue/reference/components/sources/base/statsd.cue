@@ -13,7 +13,7 @@ base: components: sources: statsd: configuration: {
 		type: string: examples: ["0.0.0.0:9000", "systemd", "systemd#3"]
 	}
 	connection_limit: {
-		description:   "The maximum number of TCP connections that will be allowed at any given time."
+		description:   "The maximum number of TCP connections that are allowed at any given time."
 		relevant_when: "mode = \"tcp\""
 		required:      false
 		type: uint: unit: "connections"
@@ -48,11 +48,7 @@ base: components: sources: statsd: configuration: {
 		type: string: examples: ["/path/to/socket"]
 	}
 	receive_buffer_bytes: {
-		description: """
-			The size of the receive buffer used for each connection.
-
-			Generally this should not need to be configured.
-			"""
+		description:   "The size of the receive buffer used for each connection."
 		relevant_when: "mode = \"tcp\" or mode = \"udp\""
 		required:      false
 		type: uint: unit: "bytes"
@@ -67,7 +63,7 @@ base: components: sources: statsd: configuration: {
 		}
 	}
 	tls: {
-		description:   "TlsEnableableConfig for `sources`, adding metadata from the client certificate"
+		description:   "TlsEnableableConfig for `sources`, adding metadata from the client certificate."
 		relevant_when: "mode = \"tcp\""
 		required:      false
 		type: object: options: {
@@ -75,8 +71,8 @@ base: components: sources: statsd: configuration: {
 				description: """
 					Sets the list of supported ALPN protocols.
 
-					Declare the supported ALPN protocols, which are used during negotiation with peer. Prioritized in the order
-					they are defined.
+					Declare the supported ALPN protocols, which are used during negotiation with peer. They are prioritized in the order
+					that they are defined.
 					"""
 				required: false
 				type: array: items: type: string: examples: ["h2"]
@@ -109,7 +105,7 @@ base: components: sources: statsd: configuration: {
 			}
 			enabled: {
 				description: """
-					Whether or not to require TLS for incoming/outgoing connections.
+					Whether or not to require TLS for incoming or outgoing connections.
 
 					When enabled and used for incoming connections, an identity certificate is also required. See `tls.crt_file` for
 					more information.
@@ -139,10 +135,10 @@ base: components: sources: statsd: configuration: {
 				description: """
 					Enables certificate verification.
 
-					If enabled, certificates must be valid in terms of not being expired, as well as being issued by a trusted
-					issuer. This verification operates in a hierarchical manner, checking that not only the leaf certificate (the
-					certificate presented by the client/server) is valid, but also that the issuer of that certificate is valid, and
-					so on until reaching a root certificate.
+					If enabled, certificates must not be expired and must be issued by a trusted
+					issuer. This verification operates in a hierarchical manner, checking that the leaf certificate (the
+					certificate presented by the client/server) is not only valid, but that the issuer of that certificate is also valid, and
+					so on until the verification process reaches a root certificate.
 
 					Relevant for both incoming and outgoing connections.
 

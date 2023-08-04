@@ -8,11 +8,9 @@ base: components: transforms: throttle: configuration: {
 	}
 	key_field: {
 		description: """
-			The name of the log field whose value will be hashed to determine if the event should be
-			rate limited.
+			The value to group events into separate buckets to be rate limited independently.
 
-			Each unique key will create a bucket of related events to be rate limited separately. If
-			left unspecified, or if the event doesn’t have `key_field`, the event be will not be rate
+			If left unspecified, or if the event doesn't have `key_field`, then the event is not rate
 			limited separately.
 			"""
 		required: false
@@ -25,7 +23,7 @@ base: components: transforms: throttle: configuration: {
 		description: """
 			The number of events allowed for a given bucket per configured `window_secs`.
 
-			Each unique key will have its own `threshold`.
+			Each unique key has its own `threshold`.
 			"""
 		required: true
 		type: uint: {}

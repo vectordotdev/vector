@@ -59,7 +59,6 @@ impl NodeMetadataAnnotator {
 
 impl NodeMetadataAnnotator {
     /// Annotates an event with the information from the [`Node::metadata`].
-    /// The event has to have a [`VECTOR_SELF_NODE_NAME`] field set.
     pub fn annotate(&self, event: &mut Event, node: &str) -> Option<()> {
         let log = event.as_mut_log();
         let obj = ObjectRef::<Node>::new(node);

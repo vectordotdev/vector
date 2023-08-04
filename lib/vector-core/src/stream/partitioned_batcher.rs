@@ -436,7 +436,7 @@ where
                         // We have no batch yet for this partition key, so
                         // create one and create the expiration entries as well.
                         // This allows the batch to expire before filling up,
-                        // and vise versa.
+                        // and vice versa.
                         let batch = Batch::new(item_limit, alloc_limit).with(item);
                         this.batches.insert(item_key.clone(), batch);
                         this.timer.insert(item_key);

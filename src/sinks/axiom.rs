@@ -16,7 +16,7 @@ use crate::{
 static CLOUD_URL: &str = "https://api.axiom.co";
 
 /// Configuration for the `axiom` sink.
-#[configurable_component(sink("axiom"))]
+#[configurable_component(sink("axiom", "Deliver log events to Axiom."))]
 #[derive(Clone, Debug, Default)]
 pub struct AxiomConfig {
     /// URI of the Axiom endpoint to send data to.
@@ -77,6 +77,7 @@ impl GenerateConfig for AxiomConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "axiom")]
 impl SinkConfig for AxiomConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let mut request = self.request.clone();
@@ -158,9 +159,10 @@ mod integration_tests {
         let client = reqwest::Client::new();
         let url = env::var("AXIOM_URL").unwrap();
         let token = env::var("AXIOM_TOKEN").expect("AXIOM_TOKEN environment variable to be set");
+        assert!(!token.is_empty(), "$AXIOM_TOKEN required");
         let dataset = env::var("AXIOM_DATASET").unwrap();
 
-        let cx = SinkContext::new_test();
+        let cx = SinkContext::default();
 
         let config = AxiomConfig {
             url: Some(url.clone()),

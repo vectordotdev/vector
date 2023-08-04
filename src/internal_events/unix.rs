@@ -91,6 +91,34 @@ impl<E: std::fmt::Display> InternalEvent for UnixSocketSendError<'_, E> {
 }
 
 #[derive(Debug)]
+pub struct UnixSendIncompleteError {
+    pub data_size: usize,
+    pub sent: usize,
+}
+
+impl InternalEvent for UnixSendIncompleteError {
+    fn emit(self) {
+        let reason = "Could not send all data in one Unix datagram.";
+        error!(
+            message = reason,
+            data_size = self.data_size,
+            sent = self.sent,
+            dropped = self.data_size - self.sent,
+            error_type = error_type::WRITER_FAILED,
+            stage = error_stage::SENDING,
+            internal_log_rate_limit = true,
+        );
+        counter!(
+            "component_errors_total", 1,
+            "error_type" => error_type::WRITER_FAILED,
+            "stage" => error_stage::SENDING,
+        );
+
+        emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
+    }
+}
+
+#[derive(Debug)]
 pub struct UnixSocketFileDeleteError<'a> {
     pub path: &'a Path,
     pub error: Error,

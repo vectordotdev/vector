@@ -1,4 +1,8 @@
-use crate::config::{DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext};
+use std::collections::HashMap;
+
+use crate::config::{
+    DataType, GenerateConfig, Input, OutputId, TransformConfig, TransformContext, TransformOutput,
+};
 use crate::schema;
 use crate::transforms::tag_cardinality_limit::TagCardinalityLimit;
 use crate::transforms::Transform;
@@ -14,7 +18,7 @@ use vector_core::config::LogNamespace;
 pub struct TagCardinalityLimitConfig {
     /// How many distinct values to accept for any given key.
     #[serde(default = "default_value_limit")]
-    pub value_limit: u32,
+    pub value_limit: usize,
 
     #[configurable(derived)]
     #[serde(default = "default_limit_exceeded_action")]
@@ -56,6 +60,7 @@ pub struct BloomFilterConfig {
     /// The larger the cache size, the less likely it is to have a false positive, or a case where
     /// we allow a new value for tag even after we have reached the configured limits.
     #[serde(default = "default_cache_size")]
+    #[configurable(metadata(docs::human_name = "Cache Size per Key"))]
     pub cache_size_per_key: usize,
 }
 
@@ -76,7 +81,7 @@ const fn default_limit_exceeded_action() -> LimitExceededAction {
     LimitExceededAction::DropTag
 }
 
-const fn default_value_limit() -> u32 {
+const fn default_value_limit() -> usize {
     500
 }
 
@@ -108,7 +113,12 @@ impl TransformConfig for TagCardinalityLimitConfig {
         Input::metric()
     }
 
-    fn outputs(&self, _: &schema::Definition, _: LogNamespace) -> Vec<Output> {
-        vec![Output::default(DataType::Metric)]
+    fn outputs(
+        &self,
+        _: enrichment::TableRegistry,
+        _: &[(OutputId, schema::Definition)],
+        _: LogNamespace,
+    ) -> Vec<TransformOutput> {
+        vec![TransformOutput::new(DataType::Metric, HashMap::new())]
     }
 }

@@ -18,13 +18,13 @@ use opentelemetry_proto::convert::{
 };
 
 use opentelemetry_proto::proto::collector::logs::v1::logs_service_server::LogsServiceServer;
-use value::{kind::Collection, Kind};
 use vector_common::internal_event::{BytesReceived, EventsReceived, Protocol};
 use vector_config::configurable_component;
 use vector_core::{
     config::{log_schema, LegacyKey, LogNamespace},
     schema::Definition,
 };
+use vrl::value::{kind::Collection, Kind};
 
 use self::{
     grpc::Service,
@@ -32,8 +32,8 @@ use self::{
 };
 use crate::{
     config::{
-        DataType, GenerateConfig, Output, Resource, SourceAcknowledgementsConfig, SourceConfig,
-        SourceContext,
+        DataType, GenerateConfig, Resource, SourceAcknowledgementsConfig, SourceConfig,
+        SourceContext, SourceOutput,
     },
     serde::bool_or_struct,
     sources::{util::grpc::run_grpc_server, Source},
@@ -43,7 +43,7 @@ use crate::{
 pub const LOGS: &str = "logs";
 
 /// Configuration for the `opentelemetry` source.
-#[configurable_component(source("opentelemetry"))]
+#[configurable_component(source("opentelemetry", "Receive OTLP data through gRPC or HTTP."))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct OpentelemetryConfig {
@@ -124,6 +124,7 @@ impl GenerateConfig for OpentelemetryConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "opentelemetry")]
 impl SourceConfig for OpentelemetryConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<Source> {
         let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
@@ -166,7 +167,7 @@ impl SourceConfig for OpentelemetryConfig {
 
     // TODO: appropriately handle "severity" meaning across both "severity_text" and "severity_number",
     // as both are optional and can be converted to/from.
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
         let schema_definition = Definition::new_with_default_metadata(Kind::any(), [log_namespace])
             .with_source_metadata(
@@ -254,9 +255,7 @@ impl SourceConfig for OpentelemetryConfig {
             }
         };
 
-        vec![Output::default(DataType::Log)
-            .with_port(LOGS)
-            .with_schema_definition(schema_definition)]
+        vec![SourceOutput::new_logs(DataType::Log, schema_definition).with_port(LOGS)]
     }
 
     fn resources(&self) -> Vec<Resource> {

@@ -75,6 +75,7 @@ components: sinks: aws_kinesis_firehose: components._aws & {
 
 	configuration: base.components.sinks.aws_kinesis_firehose.configuration & {
 		_aws_include: false
+		request_retry_partial: warnings: ["This can cause duplicate logs to be published."]
 	}
 
 	input: {
@@ -99,9 +100,4 @@ components: sinks: aws_kinesis_firehose: components._aws & {
 			]
 		},
 	]
-
-	telemetry: metrics: {
-		component_sent_events_total:      components.sources.internal_metrics.output.metrics.component_sent_events_total
-		component_sent_event_bytes_total: components.sources.internal_metrics.output.metrics.component_sent_event_bytes_total
-	}
 }

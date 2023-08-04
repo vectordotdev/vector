@@ -1,88 +1,16 @@
-use darling::{Error, FromMeta};
-use itertools::Itertools as _;
+use darling::{ast::NestedMeta, Error, FromMeta};
 use proc_macro::TokenStream;
 use proc_macro2::{Ident, Span};
 use quote::{quote, quote_spanned};
 use syn::{
     parse_macro_input, parse_quote, parse_quote_spanned, punctuated::Punctuated, spanned::Spanned,
-    token::Comma, AttributeArgs, DeriveInput, Lit, LitStr, Meta, MetaList, NestedMeta, Path,
+    token::Comma, DeriveInput, Lit, LitStr, Meta, MetaList, Path,
+};
+use vector_config_common::{
+    constants::ComponentType, human_friendly::generate_human_friendly_string,
 };
 
 use crate::attrs;
-
-#[derive(Clone, Debug)]
-enum ComponentType {
-    EnrichmentTable,
-    Provider,
-    Secrets,
-    Sink,
-    Source,
-    Transform,
-}
-
-impl ComponentType {
-    /// Gets the ident of the component type-specific helper attribute for the `NamedComponent` derive.
-    ///
-    /// When we emit code for a configurable item that has been marked as a typed component, we
-    /// optionally emit the code to generate an implementation of `NamedComponent` if that component
-    /// is supposed to be named.
-    ///
-    /// This function returns the appropriate ident for the helper attribute specific to the
-    /// component, as we must pass the component type being named -- source vs transform, etc --
-    /// down to the derive for `NamedComponent`. This allows it to emit error messages that _look_
-    /// like they're coming from `configurable_component`, even though they're coming from the
-    /// derive for `NamedComponent`.
-    fn get_named_component_helper_ident(&self) -> Ident {
-        let attr = match self {
-            ComponentType::EnrichmentTable => attrs::ENRICHMENT_TABLE_COMPONENT,
-            ComponentType::Provider => attrs::PROVIDER_COMPONENT,
-            ComponentType::Secrets => attrs::SECRETS_COMPONENT,
-            ComponentType::Sink => attrs::SINK_COMPONENT,
-            ComponentType::Source => attrs::SOURCE_COMPONENT,
-            ComponentType::Transform => attrs::TRANSFORM_COMPONENT,
-        };
-
-        attr.as_ident(Span::call_site())
-    }
-
-    fn is_valid_type(path: &Path) -> bool {
-        ComponentType::try_from(path).is_ok()
-    }
-
-    /// Gets the type of this component as a string.
-    fn as_str(&self) -> &'static str {
-        match self {
-            ComponentType::EnrichmentTable => "enrichment_table",
-            ComponentType::Provider => "provider",
-            ComponentType::Secrets => "secrets",
-            ComponentType::Sink => "sink",
-            ComponentType::Source => "source",
-            ComponentType::Transform => "transform",
-        }
-    }
-}
-
-impl<'a> TryFrom<&'a Path> for ComponentType {
-    type Error = ();
-
-    fn try_from(path: &'a Path) -> Result<Self, Self::Error> {
-        if path == attrs::ENRICHMENT_TABLE {
-            Ok(Self::EnrichmentTable)
-        } else if path == attrs::PROVIDER {
-            Ok(Self::Provider)
-        } else if path == attrs::SECRETS {
-            Ok(Self::Secrets)
-        } else if path == attrs::SINK {
-            Ok(Self::Sink)
-        } else if path == attrs::SOURCE {
-            Ok(Self::Source)
-        } else if path == attrs::TRANSFORM {
-            Ok(Self::Transform)
-        } else {
-            Err(())
-        }
-    }
-}
 
 #[derive(Clone, Debug)]
 struct TypedComponent {
@@ -113,16 +41,19 @@ impl TypedComponent {
     /// If the meta list does not have a path that matches a known component type, `None` is
     /// returned. Otherwise, `Some(...)` is returned with a valid `TypedComponent`.
     fn from_meta_list(ml: &MetaList) -> Option<Self> {
-        let mut items = ml.nested.iter();
+        let mut items = ml
+            .parse_args_with(Punctuated::<NestedMeta, Comma>::parse_terminated)
+            .unwrap_or_default()
+            .into_iter();
         ComponentType::try_from(&ml.path)
             .ok()
             .map(|component_type| {
                 let component_name = match items.next() {
-                    Some(NestedMeta::Lit(Lit::Str(component_name))) => Some(component_name.clone()),
+                    Some(NestedMeta::Lit(Lit::Str(component_name))) => Some(component_name),
                     _ => None,
                 };
                 let description = match items.next() {
-                    Some(NestedMeta::Lit(Lit::Str(description))) => Some(description.clone()),
+                    Some(NestedMeta::Lit(Lit::Str(description))) => Some(description),
                     _ => None,
                 };
                 Self {
@@ -168,8 +99,8 @@ impl TypedComponent {
                 }
             };
 
-            // Derive the label from the component name, but capitalized.
-            let label = capitalize_words(&component_name.value());
+            // Derive the human-friendly name from the component name.
+            let label = generate_human_friendly_string(&component_name.value());
 
             // Derive the logical name from the config type, with the trailing "Config" dropped.
             let logical_name = config_ty.to_string();
@@ -197,7 +128,7 @@ impl TypedComponent {
 
     /// Creates the component name registration code.
     fn get_component_name_registration(&self) -> proc_macro2::TokenStream {
-        let helper_attr = self.component_type.get_named_component_helper_ident();
+        let helper_attr = get_named_component_helper_ident(self.component_type);
         match self.component_name.as_ref() {
             None => quote_spanned! {self.span=>
                 #[derive(::vector_config_macros::NamedComponent)]
@@ -229,7 +160,7 @@ struct Options {
 }
 
 impl FromMeta for Options {
-    fn from_list(items: &[syn::NestedMeta]) -> darling::Result<Self> {
+    fn from_list(items: &[NestedMeta]) -> darling::Result<Self> {
         let mut typed_component = None;
         let mut no_ser = false;
         let mut no_deser = false;
@@ -327,7 +258,10 @@ impl Options {
 }
 
 pub fn configurable_component_impl(args: TokenStream, item: TokenStream) -> TokenStream {
-    let args = parse_macro_input!(args as AttributeArgs);
+    let args: Vec<NestedMeta> =
+        parse_macro_input!(args with Punctuated::<NestedMeta, Comma>::parse_terminated)
+            .into_iter()
+            .collect();
     let input = parse_macro_input!(item as DeriveInput);
 
     let options = match Options::from_list(&args) {
@@ -400,14 +334,26 @@ pub fn configurable_component_impl(args: TokenStream, item: TokenStream) -> Toke
     derived.into()
 }
 
-fn capitalize(s: &str) -> String {
-    let mut iter = s.chars();
-    match iter.next() {
-        None => String::new(),
-        Some(first) => first.to_uppercase().collect::<String>() + iter.as_str(),
-    }
-}
+/// Gets the ident of the component type-specific helper attribute for the `NamedComponent` derive.
+///
+/// When we emit code for a configurable item that has been marked as a typed component, we
+/// optionally emit the code to generate an implementation of `NamedComponent` if that component
+/// is supposed to be named.
+///
+/// This function returns the appropriate ident for the helper attribute specific to the
+/// component, as we must pass the component type being named -- source vs transform, etc --
+/// down to the derive for `NamedComponent`. This allows it to emit error messages that _look_
+/// like they're coming from `configurable_component`, even though they're coming from the
+/// derive for `NamedComponent`.
+fn get_named_component_helper_ident(component_type: ComponentType) -> Ident {
+    let attr = match component_type {
+        ComponentType::EnrichmentTable => attrs::ENRICHMENT_TABLE_COMPONENT,
+        ComponentType::Provider => attrs::PROVIDER_COMPONENT,
+        ComponentType::Secrets => attrs::SECRETS_COMPONENT,
+        ComponentType::Sink => attrs::SINK_COMPONENT,
+        ComponentType::Source => attrs::SOURCE_COMPONENT,
+        ComponentType::Transform => attrs::TRANSFORM_COMPONENT,
+    };
 
-fn capitalize_words(s: &str) -> String {
-    s.split('_').map(capitalize).join(" ")
+    attr.as_ident(Span::call_site())
 }

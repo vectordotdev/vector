@@ -5,7 +5,7 @@ base: components: sources: prometheus_scrape: configuration: {
 		description: """
 			Configuration of the authentication strategy for HTTP requests.
 
-			HTTP authentication should almost always be used with HTTPS only, as the authentication credentials are passed as an
+			HTTP authentication should be used with HTTPS only, as the authentication credentials are passed as an
 			HTTP header without any additional encryption beyond what is provided by the transport itself.
 			"""
 		required: false
@@ -30,7 +30,7 @@ base: components: sources: prometheus_scrape: configuration: {
 					bearer: """
 						Bearer authentication.
 
-						The bearer token value (OAuth2, JWT, etc) is passed as-is.
+						The bearer token value (OAuth2, JWT, etc.) is passed as-is.
 						"""
 				}
 			}
@@ -52,7 +52,7 @@ base: components: sources: prometheus_scrape: configuration: {
 		description: """
 			The tag name added to each event representing the scraped instance's endpoint.
 
-			The tag value will be the endpoint of the scraped instance.
+			The tag value is the endpoint of the scraped instance.
 			"""
 		required: false
 		type: string: {}
@@ -76,9 +76,9 @@ base: components: sources: prometheus_scrape: configuration: {
 	}
 	instance_tag: {
 		description: """
-			The tag name added to each event representing the scraped instance's host:port.
+			The tag name added to each event representing the scraped instance's `host:port`.
 
-			The tag value will be the host/port of the scraped instance.
+			The tag value is the host and port of the scraped instance.
 			"""
 		required: false
 		type: string: {}
@@ -104,10 +104,22 @@ base: components: sources: prometheus_scrape: configuration: {
 		}
 	}
 	scrape_interval_secs: {
-		description: "The interval between scrapes, in seconds."
-		required:    false
+		description: """
+			The interval between scrapes. Requests are run concurrently so if a scrape takes longer
+			than the interval a new scrape will be started. This can take extra resources, set the timeout
+			to a value lower than the scrape interval to prevent this from happening.
+			"""
+		required: false
 		type: uint: {
 			default: 15
+			unit:    "seconds"
+		}
+	}
+	scrape_timeout_secs: {
+		description: "The timeout for each scrape request."
+		required:    false
+		type: float: {
+			default: 5.0
 			unit:    "seconds"
 		}
 	}
@@ -119,8 +131,8 @@ base: components: sources: prometheus_scrape: configuration: {
 				description: """
 					Sets the list of supported ALPN protocols.
 
-					Declare the supported ALPN protocols, which are used during negotiation with peer. Prioritized in the order
-					they are defined.
+					Declare the supported ALPN protocols, which are used during negotiation with peer. They are prioritized in the order
+					that they are defined.
 					"""
 				required: false
 				type: array: items: type: string: examples: ["h2"]
@@ -168,10 +180,10 @@ base: components: sources: prometheus_scrape: configuration: {
 				description: """
 					Enables certificate verification.
 
-					If enabled, certificates must be valid in terms of not being expired, as well as being issued by a trusted
-					issuer. This verification operates in a hierarchical manner, checking that not only the leaf certificate (the
-					certificate presented by the client/server) is valid, but also that the issuer of that certificate is valid, and
-					so on until reaching a root certificate.
+					If enabled, certificates must not be expired and must be issued by a trusted
+					issuer. This verification operates in a hierarchical manner, checking that the leaf certificate (the
+					certificate presented by the client/server) is not only valid, but that the issuer of that certificate is also valid, and
+					so on until the verification process reaches a root certificate.
 
 					Relevant for both incoming and outgoing connections.
 

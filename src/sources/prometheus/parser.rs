@@ -112,7 +112,7 @@ fn reparse_groups(groups: Vec<MetricGroup>) -> Vec<Event> {
                                         value: q.value,
                                     })
                                     .collect(),
-                                count: u64::from(metric.count),
+                                count: metric.count,
                                 sum: metric.sum,
                             },
                         )
@@ -130,7 +130,7 @@ fn reparse_groups(groups: Vec<MetricGroup>) -> Vec<Event> {
 
 #[cfg(test)]
 mod test {
-    use chrono::{TimeZone, Utc};
+    use chrono::{TimeZone, Timelike, Utc};
     use once_cell::sync::Lazy;
     use similar_asserts::assert_eq;
     use vector_common::assert_event_data_eq;
@@ -139,8 +139,12 @@ mod test {
     use super::*;
     use crate::event::metric::{Metric, MetricKind, MetricValue};
 
-    static TIMESTAMP: Lazy<DateTime<Utc>> =
-        Lazy::new(|| Utc.ymd(2021, 2, 4).and_hms_milli(4, 5, 6, 789));
+    static TIMESTAMP: Lazy<DateTime<Utc>> = Lazy::new(|| {
+        Utc.with_ymd_and_hms(2021, 2, 4, 4, 5, 6)
+            .single()
+            .and_then(|t| t.with_nanosecond(789 * 1_000_000))
+            .expect("invalid timestamp")
+    });
 
     fn parse_text(text: &str) -> Result<Vec<Metric>, ParserError> {
         super::parse_text(text).map(|events| events.into_iter().map(Event::into_metric).collect())

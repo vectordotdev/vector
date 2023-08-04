@@ -48,7 +48,7 @@ where
         // use independent `tower` layers when the request body itself (the body type, not the actual bytes) must be
         // modified or wrapped.. so instead of a cleaner design, we're opting here to bake it all together until the
         // crates are sufficiently flexible for us to craft a better design.
-        .layer(DecompressionAndMetricsLayer::default())
+        .layer(DecompressionAndMetricsLayer)
         .add_service(service)
         .serve_with_incoming_shutdown(stream, shutdown.map(|token| tx.send(token).unwrap()))
         .in_current_span()

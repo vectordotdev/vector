@@ -2,12 +2,14 @@ use std::sync::Arc;
 
 use codecs::TextSerializerConfig;
 use futures_util::FutureExt;
+use lookup::lookup_v2::OptionalValuePath;
 use tower::ServiceBuilder;
 use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 use vector_core::sink::VectorSink;
 
 use super::{encoder::HecLogsEncoder, request_builder::HecLogsRequestBuilder, sink::HecLogsSink};
+use crate::sinks::splunk_hec::common::config_timestamp_key;
 use crate::{
     codecs::{Encoder, EncodingConfig},
     config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
@@ -15,9 +17,9 @@ use crate::{
     sinks::{
         splunk_hec::common::{
             acknowledgements::HecClientAcknowledgementsConfig,
-            build_healthcheck, build_http_batch_service, create_client, host_key,
+            build_healthcheck, build_http_batch_service, config_host_key, create_client,
             service::{HecService, HttpRequestBuilder},
-            timestamp_key, EndpointTarget, SplunkHecDefaultBatchSettings,
+            EndpointTarget, SplunkHecDefaultBatchSettings,
         },
         util::{
             http::HttpRetryLogic, BatchConfig, Compression, ServiceBuilderExt, TowerRequestConfig,
@@ -29,13 +31,16 @@ use crate::{
 };
 
 /// Configuration for the `splunk_hec_logs` sink.
-#[configurable_component(sink("splunk_hec_logs"))]
+#[configurable_component(sink(
+    "splunk_hec_logs",
+    "Deliver log data to Splunk's HTTP Event Collector."
+))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct HecLogsSinkConfig {
     /// Default Splunk HEC token.
     ///
-    /// If an event has a token set in its secrets (`splunk_hec_token`), it will prevail over the one set here.
+    /// If an event has a token set in its secrets (`splunk_hec_token`), it prevails over the one set here.
     #[serde(alias = "token")]
     pub default_token: SensitiveString,
 
@@ -53,14 +58,14 @@ pub struct HecLogsSinkConfig {
     #[configurable(validation(format = "uri"))]
     pub endpoint: String,
 
-    /// Overrides the name of the log field used to grab the hostname to send to Splunk HEC.
+    /// Overrides the name of the log field used to retrieve the hostname to send to Splunk HEC.
     ///
     /// By default, the [global `log_schema.host_key` option][global_host_key] is used.
     ///
     /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
     #[configurable(metadata(docs::advanced))]
-    #[serde(default = "host_key")]
-    pub host_key: String,
+    #[serde(default = "config_host_key")]
+    pub host_key: OptionalValuePath,
 
     /// Fields to be [added to Splunk index][splunk_field_index_docs].
     ///
@@ -78,7 +83,7 @@ pub struct HecLogsSinkConfig {
 
     /// The sourcetype of events sent to this sink.
     ///
-    /// If unset, Splunk will default to `httpevent`.
+    /// If unset, Splunk defaults to `httpevent`.
     #[configurable(metadata(docs::advanced))]
     #[configurable(metadata(docs::examples = "{{ sourcetype }}", docs::examples = "_json",))]
     pub sourcetype: Option<Template>,
@@ -87,7 +92,7 @@ pub struct HecLogsSinkConfig {
     ///
     /// This is typically the filename the logs originated from.
     ///
-    /// If unset, the Splunk collector will set it.
+    /// If unset, the Splunk collector sets it.
     #[configurable(metadata(docs::advanced))]
     #[configurable(metadata(
         docs::examples = "{{ file }}",
@@ -123,23 +128,23 @@ pub struct HecLogsSinkConfig {
     #[serde(skip)]
     pub timestamp_nanos_key: Option<String>,
 
-    /// Overrides the name of the log field used to grab the timestamp to send to Splunk HEC.
-    /// When set to `“”`, vector omits setting a timestamp in the events sent to Splunk HEC.
+    /// Overrides the name of the log field used to retrieve the timestamp to send to Splunk HEC.
+    /// When set to `“”`, a timestamp is not set in the events sent to Splunk HEC.
     ///
     /// By default, the [global `log_schema.timestamp_key` option][global_timestamp_key] is used.
     ///
     /// [global_timestamp_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.timestamp_key
     #[configurable(metadata(docs::advanced))]
-    #[serde(default = "crate::sinks::splunk_hec::common::timestamp_key")]
+    #[serde(default = "crate::sinks::splunk_hec::common::config_timestamp_key")]
     #[configurable(metadata(docs::examples = "timestamp", docs::examples = ""))]
-    pub timestamp_key: String,
+    pub timestamp_key: OptionalValuePath,
 
     /// Passes the `auto_extract_timestamp` option to Splunk.
     ///
     /// This option is only relevant to Splunk v8.x and above, and is only applied when
     /// `endpoint_target` is set to `event`.
     ///
-    /// Setting this to `true` will cause Splunk to extract the timestamp from the message text
+    /// Setting this to `true` causes Splunk to extract the timestamp from the message text
     /// rather than use the timestamp embedded in the event. The timestamp must be in the format
     /// `yyyy-mm-dd hh:mm:ss`.
     #[serde(default)]
@@ -160,7 +165,7 @@ impl GenerateConfig for HecLogsSinkConfig {
         toml::Value::try_from(Self {
             default_token: "${VECTOR_SPLUNK_HEC_TOKEN}".to_owned().into(),
             endpoint: "endpoint".to_owned(),
-            host_key: host_key(),
+            host_key: config_host_key(),
             indexed_fields: vec![],
             index: None,
             sourcetype: None,
@@ -172,7 +177,7 @@ impl GenerateConfig for HecLogsSinkConfig {
             tls: None,
             acknowledgements: Default::default(),
             timestamp_nanos_key: None,
-            timestamp_key: timestamp_key(),
+            timestamp_key: config_timestamp_key(),
             auto_extract_timestamp: None,
             endpoint_target: EndpointTarget::Event,
         })
@@ -181,6 +186,7 @@ impl GenerateConfig for HecLogsSinkConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "splunk_hec_logs")]
 impl SinkConfig for HecLogsSinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         if self.auto_extract_timestamp.is_some() && self.endpoint_target == EndpointTarget::Raw {
@@ -267,9 +273,9 @@ impl HecLogsSinkConfig {
             source: self.source.clone(),
             index: self.index.clone(),
             indexed_fields: self.indexed_fields.clone(),
-            host: self.host_key.clone(),
+            host_key: self.host_key.path.clone(),
             timestamp_nanos_key: self.timestamp_nanos_key.clone(),
-            timestamp_key: self.timestamp_key.clone(),
+            timestamp_key: self.timestamp_key.path.clone(),
             endpoint_target: self.endpoint_target,
         };
 

@@ -6,8 +6,8 @@ use http::{Request, Uri};
 use hyper::Body;
 use serde_json::{json, map};
 use snafu::Snafu;
-use value::Kind;
 use vector_config::configurable_component;
+use vrl::value::Kind;
 
 use crate::{
     codecs::Transformer,
@@ -36,7 +36,10 @@ enum HealthcheckError {
 }
 
 /// Configuration for the `gcp_stackdriver_logs` sink.
-#[configurable_component(sink("gcp_stackdriver_logs"))]
+#[configurable_component(sink(
+    "gcp_stackdriver_logs",
+    "Deliver logs to GCP's Cloud Operations suite."
+))]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct StackdriverConfig {
@@ -202,6 +205,7 @@ fn label_examples() -> HashMap<String, String> {
 impl_generate_config_from_default!(StackdriverConfig);
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "gcp_stackdriver_logs")]
 impl SinkConfig for StackdriverConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let auth = self.auth.build(Scope::LoggingWrite).await?;
@@ -237,6 +241,7 @@ impl SinkConfig for StackdriverConfig {
         )
         .sink_map_err(|error| error!(message = "Fatal gcp_stackdriver_logs sink error.", %error));
 
+        #[allow(deprecated)]
         Ok((VectorSink::from_event_sink(sink), healthcheck))
     }
 
@@ -446,7 +451,7 @@ mod tests {
         config.auth.api_key = Some("fake".to_string().into());
         config.endpoint = mock_endpoint.to_string();
 
-        let context = SinkContext::new_test();
+        let context = SinkContext::default();
         let (sink, _healthcheck) = config.build(context).await.unwrap();
 
         let event = Event::Log(LogEvent::from("simple message"));
@@ -521,8 +526,8 @@ mod tests {
         log.insert(
             "timestamp",
             Value::Timestamp(
-                Utc.ymd(2020, 1, 1)
-                    .and_hms_opt(12, 30, 0)
+                Utc.with_ymd_and_hms(2020, 1, 1, 12, 30, 0)
+                    .single()
                     .expect("invalid timestamp"),
             ),
         );
@@ -654,7 +659,7 @@ mod tests {
             resource.namespace = "office"
         "#})
         .unwrap();
-        if config.build(SinkContext::new_test()).await.is_ok() {
+        if config.build(SinkContext::default()).await.is_ok() {
             panic!("config.build failed to error");
         }
     }

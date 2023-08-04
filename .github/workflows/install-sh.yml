@@ -1,47 +1,71 @@
 name: Update install.sh Suite
 
 on:
-  push:
-    branches:
-      - master
-    paths:
-      - '.github/workflows/install-sh.yml'
-      - 'distribution/install.sh'
+  workflow_call:
   workflow_dispatch:
 
-
 jobs:
+
   sync-install:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@v3
-      - run: sudo apt-get install --yes python3-setuptools python3.6-dev
+      - name: (PR comment) Get PR branch
+        if: ${{ github.event_name == 'issue_comment' }}
+        uses: xt0rted/pull-request-comment-branch@v2
+        id: comment-branch
+
+      - name: (PR comment) Set latest commit status as pending
+        if: ${{ github.event_name == 'issue_comment' }}
+        uses: myrotvorets/set-commit-status-action@v1.1.7
+        with:
+          sha: ${{ steps.comment-branch.outputs.head_sha }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          context: Update install.sh Suite
+          status: pending
+
+      - name: (PR comment) Checkout PR branch
+        if: ${{ github.event_name == 'issue_comment' }}
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ steps.comment-branch.outputs.head_ref }}
+
+      - name: Checkout branch
+        if: ${{ github.event_name != 'issue_comment' }}
+        uses: actions/checkout@v3
+
       - run: pip3 install awscli --upgrade --user
       - env:
           AWS_ACCESS_KEY_ID: "${{ secrets.CI_AWS_ACCESS_KEY_ID }}"
           AWS_SECRET_ACCESS_KEY: "${{ secrets.CI_AWS_SECRET_ACCESS_KEY }}"
         run: make sync-install
 
+      - name: (PR comment) Set latest commit status as failed
+        uses: myrotvorets/set-commit-status-action@v1.1.7
+        if: failure() && github.event_name == 'issue_comment'
+        with:
+          sha: ${{ steps.comment-branch.outputs.head_sha }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          context: Update install.sh Suite
+          status: 'failure'
+
   test-install:
-    needs:
-      - sync-install
+    needs: sync-install
     runs-on: ubuntu-20.04
     steps:
       - run: sudo apt-get install --yes curl bc
       - run:  curl --proto '=https' --tlsv1.2 -sSf https://sh.vector.dev | bash -s -- -y
       - run: ~/.vector/bin/vector --version
 
-  install-shell-failure:
-    name: install-shell-failure
-    if: failure()
-    needs:
-      - sync-install
-      - test-install
-    runs-on: ubuntu-20.04
-    steps:
-    - name: Discord notification
-      env:
-        DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
-      uses: Ilshidur/action-discord@0.3.2
-      with:
-        args: "Update of sh.vector.dev failed: <https://github.com/${{github.repository}}/actions/runs/${{github.run_id}}>"
+      - name: (PR comment) Get PR branch
+        if: github.event_name == 'issue_comment'
+        uses: xt0rted/pull-request-comment-branch@v2
+        id: comment-branch
+
+      - name: (PR comment) Set latest commit status as ${{ job.status }}
+        if: github.event_name == 'issue_comment'
+        uses: myrotvorets/set-commit-status-action@v1.1.7
+        with:
+          sha: ${{ steps.comment-branch.outputs.head_sha }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          context: Update install.sh Suite
+          status: ${{ job.status }}

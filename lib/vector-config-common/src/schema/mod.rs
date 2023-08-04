@@ -6,7 +6,11 @@ mod gen;
 mod json_schema;
 pub mod visit;
 
-pub type Map<K, V> = indexmap::IndexMap<K, V>;
+pub(crate) const DEFINITIONS_PREFIX: &str = "#/definitions/";
+
+// We have chosen the `BTree*` types here instead of hash tables to provide for a consistent
+// ordering of the output elements between runs and changes to the configuration.
+pub type Map<K, V> = std::collections::BTreeMap<K, V>;
 pub type Set<V> = std::collections::BTreeSet<V>;
 
 pub use self::gen::{SchemaGenerator, SchemaSettings};

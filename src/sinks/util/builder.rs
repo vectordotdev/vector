@@ -1,6 +1,16 @@
-use std::{fmt, future::Future, hash::Hash, num::NonZeroUsize, pin::Pin, sync::Arc};
+use std::{
+    convert::Infallible,
+    fmt,
+    future::Future,
+    hash::Hash,
+    num::NonZeroUsize,
+    pin::Pin,
+    sync::Arc,
+    task::{Context, Poll},
+};
 
 use futures_util::{stream::Map, Stream, StreamExt};
+use pin_project::pin_project;
 use tower::Service;
 use vector_core::{
     event::{Finalizable, Metric},
@@ -20,6 +30,16 @@ use super::{
 impl<T: ?Sized> SinkBuilderExt for T where T: Stream {}
 
 pub trait SinkBuilderExt: Stream {
+    /// Converts a stream of infallible results by unwrapping them.
+    ///
+    /// For a stream of `Result<T, Infallible>` items, this turns it into a stream of `T` items.
+    fn unwrap_infallible<T>(self) -> UnwrapInfallible<Self>
+    where
+        Self: Stream<Item = Result<T, Infallible>> + Sized,
+    {
+        UnwrapInfallible { st: self }
+    }
+
     /// Batches the stream based on the given partitioner and batch settings.
     ///
     /// The stream will yield batches of events, with their partition key, when either a batch fills
@@ -208,5 +228,25 @@ pub trait SinkBuilderExt: Stream {
         Svc::Response: DriverResponse,
     {
         Driver::new(self, service)
+    }
+}
+
+#[pin_project]
+pub struct UnwrapInfallible<St> {
+    #[pin]
+    st: St,
+}
+
+impl<St, T> Stream for UnwrapInfallible<St>
+where
+    St: Stream<Item = Result<T, Infallible>>,
+{
+    type Item = T;
+
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let this = self.project();
+        this.st
+            .poll_next(cx)
+            .map(|maybe| maybe.map(|result| result.unwrap()))
     }
 }

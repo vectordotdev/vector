@@ -4,7 +4,6 @@ use futures::{pin_mut, stream, Stream, StreamExt};
 use lookup::{lookup_v2::OptionalValuePath, owned_value_path};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
-use value::Kind;
 use vector_common::internal_event::{
     ByteSize, BytesReceived, CountByteSize, EventsReceived, InternalEventHandle as _, Protocol,
 };
@@ -13,10 +12,11 @@ use vector_core::{
     config::{LegacyKey, LogNamespace},
     EstimatedJsonEncodedSizeOf,
 };
+use vrl::value::Kind;
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
-    config::{GenerateConfig, Output, SourceConfig, SourceContext},
+    config::{GenerateConfig, SourceConfig, SourceContext, SourceOutput},
     event::Event,
     internal_events::StreamClosedError,
     nats::{from_tls_auth_config, NatsAuthConfig, NatsConfigError},
@@ -37,7 +37,10 @@ enum BuildError {
 }
 
 /// Configuration for the `nats` source.
-#[configurable_component(source("nats"))]
+#[configurable_component(source(
+    "nats",
+    "Read observability data from subjects on the NATS messaging system."
+))]
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(deny_unknown_fields)]
@@ -67,7 +70,7 @@ pub struct NatsSourceConfig {
     #[configurable(metadata(docs::examples = ">"))]
     subject: String,
 
-    /// NATS Queue Group to join.
+    /// The NATS queue group to join.
     queue: Option<String>,
 
     /// The namespace to use for logs. This overrides the global setting.
@@ -113,12 +116,14 @@ impl GenerateConfig for NatsSourceConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "nats")]
 impl SourceConfig for NatsSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let log_namespace = cx.log_namespace(self.log_namespace);
         let (connection, subscription) = create_subscription(self).await?;
         let decoder =
-            DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace).build();
+            DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace)
+                .build()?;
 
         Ok(Box::pin(nats_source(
             self.clone(),
@@ -131,7 +136,7 @@ impl SourceConfig for NatsSourceConfig {
         )))
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
         let legacy_subject_key_field = self
             .subject_key_field
@@ -150,7 +155,10 @@ impl SourceConfig for NatsSourceConfig {
                 None,
             );
 
-        vec![Output::default(self.decoding.output_type()).with_schema_definition(schema_definition)]
+        vec![SourceOutput::new_logs(
+            self.decoding.output_type(),
+            schema_definition,
+        )]
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -231,8 +239,8 @@ async fn nats_source(
                         event
                     });
 
-                    out.send_batch(events).await.map_err(|error| {
-                        emit!(StreamClosedError { error, count });
+                    out.send_batch(events).await.map_err(|_| {
+                        emit!(StreamClosedError { count });
                     })?;
                 }
                 Err(error) => {
@@ -268,8 +276,8 @@ mod tests {
     #![allow(clippy::print_stdout)] //tests
 
     use lookup::{owned_value_path, OwnedTargetPath};
-    use value::{kind::Collection, Kind};
     use vector_core::schema::Definition;
+    use vrl::value::{kind::Collection, Kind};
 
     use super::*;
 
@@ -286,10 +294,10 @@ mod tests {
             ..Default::default()
         };
 
-        let definition = config.outputs(LogNamespace::Vector)[0]
-            .clone()
-            .log_schema_definition
-            .unwrap();
+        let definitions = config
+            .outputs(LogNamespace::Vector)
+            .remove(0)
+            .schema_definition(true);
 
         let expected_definition =
             Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
@@ -306,7 +314,7 @@ mod tests {
                 )
                 .with_metadata_field(&owned_value_path!("nats", "subject"), Kind::bytes(), None);
 
-        assert_eq!(definition, expected_definition);
+        assert_eq!(definitions, Some(expected_definition));
     }
 
     #[test]
@@ -315,10 +323,10 @@ mod tests {
             subject_key_field: default_subject_key_field(),
             ..Default::default()
         };
-        let definition = config.outputs(LogNamespace::Legacy)[0]
-            .clone()
-            .log_schema_definition
-            .unwrap();
+        let definitions = config
+            .outputs(LogNamespace::Legacy)
+            .remove(0)
+            .schema_definition(true);
 
         let expected_definition = Definition::new_with_default_metadata(
             Kind::object(Collection::empty()),
@@ -333,7 +341,7 @@ mod tests {
         .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None)
         .with_event_field(&owned_value_path!("subject"), Kind::bytes(), None);
 
-        assert_eq!(definition, expected_definition);
+        assert_eq!(definitions, Some(expected_definition));
     }
 }
 
@@ -366,7 +374,8 @@ mod integration_tests {
                 conf.decoding.clone(),
                 LogNamespace::Legacy,
             )
-            .build();
+            .build()
+            .unwrap();
             tokio::spawn(nats_source(
                 conf.clone(),
                 nc,
@@ -383,7 +392,10 @@ mod integration_tests {
         .await;
 
         println!("Received event  {:?}", events[0].as_log());
-        assert_eq!(events[0].as_log()[log_schema().message_key()], msg.into());
+        assert_eq!(
+            events[0].as_log()[log_schema().message_key().unwrap().to_string()],
+            msg.into()
+        );
         Ok(())
     }
 

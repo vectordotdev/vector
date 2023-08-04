@@ -46,8 +46,6 @@ pub mod cli;
 #[allow(unreachable_pub)]
 pub mod components;
 pub mod conditions;
-#[cfg(not(windows))]
-pub mod control_server;
 pub mod dns;
 #[cfg(feature = "docker")]
 pub mod docker;
@@ -85,6 +83,7 @@ pub mod line_agg;
 pub mod list;
 #[cfg(any(feature = "sources-nats", feature = "sinks-nats"))]
 pub(crate) mod nats;
+pub mod net;
 #[allow(unreachable_pub)]
 pub(crate) mod proto;
 pub mod providers;
@@ -102,19 +101,18 @@ pub mod sources;
 pub mod stats;
 #[cfg(feature = "api-client")]
 #[allow(unreachable_pub)]
-mod tap;
+pub mod tap;
 pub mod template;
 pub mod test_util;
 #[cfg(feature = "api-client")]
 #[allow(unreachable_pub)]
-pub(crate) mod top;
+pub mod top;
 #[allow(unreachable_pub)]
 pub mod topology;
 pub mod trace;
 #[allow(unreachable_pub)]
 pub mod transforms;
 pub mod types;
-pub mod udp;
 pub mod unit_test;
 pub(crate) mod utilization;
 pub mod validate;
@@ -126,13 +124,23 @@ pub use vector_common::{shutdown, Error, Result};
 pub use vector_core::{event, metrics, schema, tcp, tls};
 
 /// The current version of Vector in simplified format.
-/// <version-number>-nightly.
+/// `<version-number>-nightly`.
 pub fn vector_version() -> impl std::fmt::Display {
     #[cfg(feature = "nightly")]
     let pkg_version = format!("{}-nightly", built_info::PKG_VERSION);
 
     #[cfg(not(feature = "nightly"))]
-    let pkg_version = built_info::PKG_VERSION;
+    let pkg_version = match built_info::DEBUG {
+        // If any debug info is included, consider it a non-release build.
+        "1" | "2" | "true" => {
+            format!(
+                "{}-custom-{}",
+                built_info::PKG_VERSION,
+                built_info::GIT_SHORT_HASH
+            )
+        }
+        _ => built_info::PKG_VERSION.to_string(),
+    };
 
     pkg_version
 }

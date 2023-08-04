@@ -2,9 +2,9 @@ use bytes::Bytes;
 use futures::{FutureExt, SinkExt};
 use http::{Request, StatusCode, Uri};
 use serde_json::json;
-use value::Kind;
 use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
+use vrl::value::Kind;
 
 use crate::{
     codecs::Transformer,
@@ -19,14 +19,14 @@ use crate::{
 };
 
 /// Configuration for the `honeycomb` sink.
-#[configurable_component(sink("honeycomb"))]
+#[configurable_component(sink("honeycomb", "Deliver log events to Honeycomb."))]
 #[derive(Clone, Debug)]
 pub struct HoneycombConfig {
     // This endpoint is not user-configurable and only exists for testing purposes
     #[serde(skip, default = "default_endpoint")]
     endpoint: String,
 
-    /// The team key that will be used to authenticate against Honeycomb.
+    /// The API key that is used to authenticate against Honeycomb.
     #[configurable(metadata(docs::examples = "${HONEYCOMB_API_KEY}"))]
     #[configurable(metadata(docs::examples = "some-api-key"))]
     api_key: SensitiveString,
@@ -85,6 +85,7 @@ impl GenerateConfig for HoneycombConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "honeycomb")]
 impl SinkConfig for HoneycombConfig {
     async fn build(
         &self,
@@ -108,6 +109,7 @@ impl SinkConfig for HoneycombConfig {
 
         let healthcheck = healthcheck(self.clone(), client).boxed();
 
+        #[allow(deprecated)]
         Ok((super::VectorSink::from_event_sink(sink), healthcheck))
     }
 
@@ -243,7 +245,7 @@ mod test {
             .expect("config should be valid");
         config.endpoint = mock_endpoint.to_string();
 
-        let context = SinkContext::new_test();
+        let context = SinkContext::default();
         let (sink, _healthcheck) = config.build(context).await.unwrap();
 
         let event = Event::Log(LogEvent::from("simple message"));

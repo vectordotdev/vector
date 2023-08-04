@@ -349,7 +349,7 @@ impl ReaderModel {
                 // We have enough unconsumed event acknowledgements to fully acknowledge this
                 // record. Remove it, consume the event acknowledgements, add a record
                 // acknowledgement, and update the buffer size.
-                let _ = self.pending_record_acks.pop_front().unwrap();
+                _ = self.pending_record_acks.pop_front().unwrap();
                 self.unconsumed_event_acks -= 1;
                 self.unconsumed_record_acks += 1;
 
@@ -369,13 +369,12 @@ impl ReaderModel {
             if self.unconsumed_record_acks >= required_record_acks {
                 // We have enough unconsumed record acknowledgements to fully acknowledge this data
                 // file. Remove it, consume the record acknowledgements, and delete the data file.
-                let _ = self.pending_data_file_acks.pop_front().unwrap();
+                _ = self.pending_data_file_acks.pop_front().unwrap();
                 self.unconsumed_record_acks -= required_record_acks;
 
                 assert!(
                     self.filesystem.delete_file(file_id),
-                    "invariant violation: tried to delete file id {}, but file does not exist",
-                    file_id
+                    "invariant violation: tried to delete file id {file_id}, but file does not exist"
                 );
             } else {
                 // Not enough delete acks to proceed, so we can't do anything more.

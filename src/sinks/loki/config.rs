@@ -1,21 +1,12 @@
 use std::collections::HashMap;
 
-use futures::future::FutureExt;
-use value::Kind;
-use vector_config::configurable_component;
+use vrl::value::Kind;
 
 use super::{healthcheck::healthcheck, sink::LokiSink};
 use crate::{
-    codecs::EncodingConfig,
-    config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
     http::{Auth, HttpClient, MaybeAuth},
     schema,
-    sinks::{
-        util::{BatchConfig, Compression, SinkBatchSettings, TowerRequestConfig, UriSerde},
-        VectorSink,
-    },
-    template::Template,
-    tls::{TlsConfig, TlsSettings},
+    sinks::{prelude::*, util::UriSerde},
 };
 
 /// Loki-specific compression.
@@ -61,7 +52,7 @@ fn default_loki_path() -> String {
 }
 
 /// Configuration for the `loki` sink.
-#[configurable_component(sink("loki"))]
+#[configurable_component(sink("loki", "Deliver log event data to the Loki aggregation system."))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct LokiConfig {
@@ -111,7 +102,7 @@ pub struct LokiConfig {
 
     /// Whether or not to remove the timestamp from the event payload.
     ///
-    /// The timestamp will still be sent as event metadata for Loki to use for indexing.
+    /// The timestamp is still sent as event metadata for Loki to use for indexing.
     #[serde(default = "crate::serde::default_true")]
     pub remove_timestamp: bool,
 
@@ -172,9 +163,9 @@ impl SinkBatchSettings for LokiDefaultBatchSettings {
 
 /// Out-of-order event behavior.
 ///
-/// Some sources may generate events with timestamps that aren’t in chronological order. While the
-/// sink will sort events before sending them to Loki, there is the chance another event comes in
-/// that is out-of-order with respective the latest events sent to Loki. Prior to Loki 2.4.0, this
+/// Some sources may generate events with timestamps that aren't in chronological order. Even though the
+/// sink sorts the events before sending them to Loki, there is a chance that another event could come in
+/// that is out of order with the latest events sent to Loki. Prior to Loki 2.4.0, this
 /// was not supported and would result in an error during the push request.
 ///
 /// If you're using Loki 2.4.0 or newer, `Accept` is the preferred action, which lets Loki handle
@@ -220,6 +211,7 @@ impl LokiConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "loki")]
 impl SinkConfig for LokiConfig {
     async fn build(
         &self,

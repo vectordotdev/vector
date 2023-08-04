@@ -21,7 +21,7 @@ use crate::{
 };
 
 /// Configuration for the `sematext_logs` sink.
-#[configurable_component(sink("sematext_logs"))]
+#[configurable_component(sink("sematext_logs", "Publish log events to Sematext."))]
 #[derive(Clone, Debug)]
 pub struct SematextLogsConfig {
     #[serde(default = "super::default_region")]
@@ -36,7 +36,7 @@ pub struct SematextLogsConfig {
     #[configurable(metadata(docs::examples = "https://example.com"))]
     endpoint: Option<String>,
 
-    /// The token that will be used to write to Sematext.
+    /// The token that is used to write to Sematext.
     #[configurable(metadata(docs::examples = "${SEMATEXT_TOKEN}"))]
     #[configurable(metadata(docs::examples = "some-sematext-token"))]
     token: SensitiveString,
@@ -79,6 +79,7 @@ const US_ENDPOINT: &str = "https://logsene-receiver.sematext.com";
 const EU_ENDPOINT: &str = "https://logsene-receiver.eu.sematext.com";
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "sematext_logs")]
 impl SinkConfig for SematextLogsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let endpoint = match (&self.endpoint, &self.region) {
@@ -93,11 +94,11 @@ impl SinkConfig for SematextLogsConfig {
             doc_type: "\
                 logs"
                 .to_string(),
-            bulk: Some(BulkConfig {
+            bulk: BulkConfig {
                 index: Template::try_from(self.token.inner())
                     .expect("unable to parse token as Template"),
                 ..Default::default()
-            }),
+            },
             batch: self.batch,
             request: RequestConfig {
                 tower: self.request,
@@ -142,12 +143,12 @@ fn map_timestamp(mut events: EventArray) -> EventArray {
     match &mut events {
         EventArray::Logs(logs) => {
             for log in logs {
-                if let Some(path) = log.timestamp_path() {
-                    log.rename_key(path.as_str(), "@timestamp");
+                if let Some(path) = log.timestamp_path().cloned().as_ref() {
+                    log.rename_key(path, "@timestamp");
                 }
 
-                if let Some(path) = log.host_path() {
-                    log.rename_key(path.as_str(), "os.host");
+                if let Some(path) = log.host_path().cloned().as_ref() {
+                    log.rename_key(path, "os.host");
                 }
             }
         }
@@ -185,7 +186,7 @@ mod tests {
         .unwrap();
 
         // Make sure we can build the config
-        let _ = config.build(cx.clone()).await.unwrap();
+        _ = config.build(cx.clone()).await.unwrap();
 
         let addr = next_addr();
         // Swap out the host so we can force send it

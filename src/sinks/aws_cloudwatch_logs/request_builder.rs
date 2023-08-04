@@ -39,8 +39,12 @@ impl Finalizable for CloudwatchRequest {
 }
 
 impl MetaDescriptive for CloudwatchRequest {
-    fn get_metadata(&self) -> RequestMetadata {
-        self.metadata
+    fn get_metadata(&self) -> &RequestMetadata {
+        &self.metadata
+    }
+
+    fn metadata_mut(&mut self) -> &mut RequestMetadata {
+        &mut self.metadata
     }
 }
 
@@ -87,7 +91,7 @@ impl CloudwatchRequestBuilder {
         self.transformer.transform(&mut event);
         let mut message_bytes = BytesMut::new();
 
-        let builder = RequestMetadataBuilder::from_events(&event);
+        let builder = RequestMetadataBuilder::from_event(&event);
 
         if self.encoder.encode(event, &mut message_bytes).is_err() {
             // The encoder handles internal event emission for Error and EventsDropped.
@@ -120,7 +124,7 @@ impl CloudwatchRequestBuilder {
 /// ByteSizeOf is being abused to represent the encoded size of a request for the Partitioned Batcher
 ///
 /// The maximum batch size is 1,048,576 bytes. This size is calculated as the sum of all event messages in UTF-8, plus 26 bytes for each log event.
-/// source: https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_PutLogEvents.html
+/// source: <https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_PutLogEvents.html>
 impl ByteSizeOf for CloudwatchRequest {
     fn size_of(&self) -> usize {
         self.message.len() + 26
@@ -150,7 +154,13 @@ mod tests {
         let timestamp = Utc::now();
         let message = "event message";
         let mut event = LogEvent::from(message);
-        event.insert(log_schema().timestamp_key(), timestamp);
+        event.insert(
+            (
+                lookup::PathPrefix::Event,
+                log_schema().timestamp_key().unwrap(),
+            ),
+            timestamp,
+        );
 
         let request = request_builder.build(event.into()).unwrap();
         assert_eq!(request.timestamp, timestamp.timestamp_millis());

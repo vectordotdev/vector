@@ -14,7 +14,7 @@ use codecs::{
 use lookup::{lookup_v2::parse_value_path, owned_value_path, path};
 use smallvec::SmallVec;
 use tokio_util::codec::Decoder as _;
-use value::{kind::Collection, Kind};
+use vrl::value::{kind::Collection, Kind};
 use warp::http::{HeaderMap, StatusCode};
 
 use vector_config::configurable_component;
@@ -26,8 +26,8 @@ use vector_core::{
 use crate::{
     codecs::{Decoder, DecodingConfig},
     config::{
-        log_schema, GenerateConfig, Output, Resource, SourceAcknowledgementsConfig, SourceConfig,
-        SourceContext,
+        log_schema, GenerateConfig, Resource, SourceAcknowledgementsConfig, SourceConfig,
+        SourceContext, SourceOutput,
     },
     event::{Event, LogEvent},
     internal_events::{HerokuLogplexRequestReadError, HerokuLogplexRequestReceived},
@@ -40,7 +40,7 @@ use crate::{
 };
 
 /// Configuration for `heroku_logs` source.
-#[configurable_component(source("heroku_logs"))]
+#[configurable_component(source("heroku_logs", "Collect logs from Heroku's Logplex, the router responsible for receiving logs from your Heroku apps."))]
 #[derive(Clone, Debug)]
 pub struct LogplexConfig {
     /// The socket address to listen for connections on.
@@ -50,7 +50,7 @@ pub struct LogplexConfig {
 
     /// A list of URL query parameters to include in the log event.
     ///
-    /// These will override any values included in the body with conflicting names.
+    /// These override any values included in the body with conflicting names.
     #[serde(default)]
     #[configurable(metadata(docs::examples = "application", docs::examples = "source"))]
     query_parameters: Vec<String>,
@@ -95,9 +95,10 @@ impl LogplexConfig {
             )
             .with_source_metadata(
                 LogplexConfig::NAME,
-                Some(LegacyKey::InsertIfEmpty(owned_value_path!(
-                    log_schema().host_key()
-                ))),
+                log_schema()
+                    .host_key()
+                    .cloned()
+                    .map(LegacyKey::InsertIfEmpty),
                 &owned_value_path!("host"),
                 Kind::bytes(),
                 Some("host"),
@@ -107,7 +108,7 @@ impl LogplexConfig {
                 Some(LegacyKey::InsertIfEmpty(owned_value_path!("app_name"))),
                 &owned_value_path!("app_name"),
                 Kind::bytes(),
-                None,
+                Some("service"),
             )
             .with_source_metadata(
                 LogplexConfig::NAME,
@@ -156,12 +157,14 @@ impl GenerateConfig for LogplexConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "heroku_logs")]
 impl SourceConfig for LogplexConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let log_namespace = cx.log_namespace(self.log_namespace);
 
         let decoder =
-            DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace).build();
+            DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace)
+                .build()?;
 
         let source = LogplexSource {
             query_parameters: self.query_parameters.clone(),
@@ -181,11 +184,14 @@ impl SourceConfig for LogplexConfig {
         )
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         // There is a global and per-source `log_namespace` config.
         // The source config overrides the global setting and is merged here.
         let schema_def = self.schema_definition(global_log_namespace.merge(self.log_namespace));
-        vec![Output::default(self.decoding.output_type()).with_schema_definition(schema_def)]
+        vec![SourceOutput::new_logs(
+            self.decoding.output_type(),
+            schema_def,
+        )]
     }
 
     fn resources(&self) -> Vec<Resource> {
@@ -208,15 +214,15 @@ impl LogplexSource {
     fn decode_message(
         &self,
         body: Bytes,
-        header_map: HeaderMap,
+        header_map: &HeaderMap,
     ) -> Result<Vec<Event>, ErrorMessage> {
         // Deal with headers
-        let msg_count = match usize::from_str(get_header(&header_map, "Logplex-Msg-Count")?) {
+        let msg_count = match usize::from_str(get_header(header_map, "Logplex-Msg-Count")?) {
             Ok(v) => v,
             Err(e) => return Err(header_error_message("Logplex-Msg-Count", &e.to_string())),
         };
-        let frame_id = get_header(&header_map, "Logplex-Frame-Id")?;
-        let drain_token = get_header(&header_map, "Logplex-Drain-Token")?;
+        let frame_id = get_header(header_map, "Logplex-Frame-Id")?;
+        let drain_token = get_header(header_map, "Logplex-Drain-Token")?;
 
         emit!(HerokuLogplexRequestReceived {
             msg_count,
@@ -260,21 +266,27 @@ impl HttpSource for LogplexSource {
     fn build_events(
         &self,
         body: Bytes,
-        header_map: HeaderMap,
-        query_parameters: HashMap<String, String>,
+        header_map: &HeaderMap,
+        _query_parameters: &HashMap<String, String>,
         _full_path: &str,
     ) -> Result<Vec<Event>, ErrorMessage> {
-        let mut events = self.decode_message(body, header_map)?;
+        self.decode_message(body, header_map)
+    }
 
+    fn enrich_events(
+        &self,
+        events: &mut [Event],
+        _request_path: &str,
+        _headers_config: &HeaderMap,
+        query_parameters: &HashMap<String, String>,
+    ) {
         add_query_parameters(
-            &mut events,
+            events,
             &self.query_parameters,
             query_parameters,
             self.log_namespace,
             LogplexConfig::NAME,
         );
-
-        Ok(events)
     }
 }
 
@@ -314,7 +326,7 @@ fn line_to_events(
         let mut buffer = BytesMut::new();
         buffer.put(message.as_bytes());
 
-        let legacy_host_key = parse_value_path(log_schema().host_key()).ok();
+        let legacy_host_key = log_schema().host_key().cloned();
         let legacy_app_key = parse_value_path("app_name").ok();
         let legacy_proc_key = parse_value_path("proc_id").ok();
 
@@ -397,12 +409,12 @@ mod tests {
     use futures::Stream;
     use lookup::{owned_value_path, OwnedTargetPath};
     use similar_asserts::assert_eq;
-    use value::{kind::Collection, Kind};
     use vector_core::{
         config::LogNamespace,
         event::{Event, EventStatus, Value},
         schema::Definition,
     };
+    use vrl::value::{kind::Collection, Kind};
 
     use super::{HttpSourceAuthConfig, LogplexConfig};
     use crate::{
@@ -510,18 +522,18 @@ mod tests {
             let log = event.as_log();
 
             assert_eq!(
-                log[log_schema().message_key()],
+                *log.get_message().unwrap(),
                 r#"at=info method=GET path="/cart_link" host=lumberjack-store.timber.io request_id=05726858-c44e-4f94-9a20-37df73be9006 fwd="73.75.38.87" dyno=web.1 connect=1ms service=22ms status=304 bytes=656 protocol=http"#.into()
             );
             assert_eq!(
-                log[log_schema().timestamp_key()],
+                log[log_schema().timestamp_key().unwrap().to_string()],
                 "2020-01-08T22:33:57.353034+00:00"
                     .parse::<DateTime<Utc>>()
                     .unwrap()
                     .into()
             );
-            assert_eq!(log[&log_schema().host_key()], "host".into());
-            assert_eq!(log[log_schema().source_type_key()], "heroku_logs".into());
+            assert_eq!(*log.get_host().unwrap(), "host".into());
+            assert_eq!(*log.get_source_type().unwrap(), "heroku_logs".into());
             assert_eq!(log["appname"], "lumberjack-store".into());
             assert_eq!(log["absent"], Value::Null);
         }).await;
@@ -595,16 +607,16 @@ mod tests {
         let events = super::line_to_events(Default::default(), log_namespace, body.into());
         let log = events[0].as_log();
 
-        assert_eq!(log[log_schema().message_key()], "foo bar baz".into());
+        assert_eq!(*log.get_message().unwrap(), "foo bar baz".into());
         assert_eq!(
-            log[log_schema().timestamp_key()],
+            log[log_schema().timestamp_key().unwrap().to_string()],
             "2020-01-08T22:33:57.353034+00:00"
                 .parse::<DateTime<Utc>>()
                 .unwrap()
                 .into()
         );
-        assert_eq!(log[log_schema().host_key()], "host".into());
-        assert_eq!(log[log_schema().source_type_key()], "heroku_logs".into());
+        assert_eq!(*log.get_host().unwrap(), "host".into());
+        assert_eq!(*log.get_source_type().unwrap(), "heroku_logs".into());
     }
 
     #[test]
@@ -614,12 +626,9 @@ mod tests {
         let events = super::line_to_events(Default::default(), log_namespace, body.into());
         let log = events[0].as_log();
 
-        assert_eq!(
-            log[log_schema().message_key()],
-            "what am i doing here".into()
-        );
-        assert!(log.get(log_schema().timestamp_key()).is_some());
-        assert_eq!(log[log_schema().source_type_key()], "heroku_logs".into());
+        assert_eq!(*log.get_message().unwrap(), "what am i doing here".into());
+        assert!(log.get_timestamp().is_some());
+        assert_eq!(*log.get_source_type().unwrap(), "heroku_logs".into());
     }
 
     #[test]
@@ -629,16 +638,16 @@ mod tests {
         let events = super::line_to_events(Default::default(), log_namespace, body.into());
         let log = events[0].as_log();
 
-        assert_eq!(log[log_schema().message_key()], "i'm not that long".into());
+        assert_eq!(*log.get_message().unwrap(), "i'm not that long".into());
         assert_eq!(
-            log[log_schema().timestamp_key()],
+            log[log_schema().timestamp_key().unwrap().to_string()],
             "2020-01-08T22:33:57.353034+00:00"
                 .parse::<DateTime<Utc>>()
                 .unwrap()
                 .into()
         );
-        assert_eq!(log[log_schema().host_key()], "host".into());
-        assert_eq!(log[log_schema().source_type_key()], "heroku_logs".into());
+        assert_eq!(*log.get_host().unwrap(), "host".into());
+        assert_eq!(*log.get_source_type().unwrap(), "heroku_logs".into());
     }
 
     #[test]
@@ -648,10 +657,10 @@ mod tests {
             ..Default::default()
         };
 
-        let definition = config.outputs(LogNamespace::Vector)[0]
-            .clone()
-            .log_schema_definition
-            .unwrap();
+        let definitions = config
+            .outputs(LogNamespace::Vector)
+            .remove(0)
+            .schema_definition(true);
 
         let expected_definition =
             Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
@@ -679,7 +688,7 @@ mod tests {
                 .with_metadata_field(
                     &owned_value_path!(LogplexConfig::NAME, "app_name"),
                     Kind::bytes(),
-                    None,
+                    Some("service"),
                 )
                 .with_metadata_field(
                     &owned_value_path!(LogplexConfig::NAME, "proc_id"),
@@ -692,17 +701,17 @@ mod tests {
                     None,
                 );
 
-        assert_eq!(definition, expected_definition)
+        assert_eq!(definitions, Some(expected_definition))
     }
 
     #[test]
     fn output_schema_definition_legacy_namespace() {
         let config = LogplexConfig::default();
 
-        let definition = config.outputs(LogNamespace::Legacy)[0]
-            .clone()
-            .log_schema_definition
-            .unwrap();
+        let definitions = config
+            .outputs(LogNamespace::Legacy)
+            .remove(0)
+            .schema_definition(true);
 
         let expected_definition = Definition::new_with_default_metadata(
             Kind::object(Collection::empty()),
@@ -716,10 +725,14 @@ mod tests {
         .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None)
         .with_event_field(&owned_value_path!("timestamp"), Kind::timestamp(), None)
         .with_event_field(&owned_value_path!("host"), Kind::bytes(), Some("host"))
-        .with_event_field(&owned_value_path!("app_name"), Kind::bytes(), None)
+        .with_event_field(
+            &owned_value_path!("app_name"),
+            Kind::bytes(),
+            Some("service"),
+        )
         .with_event_field(&owned_value_path!("proc_id"), Kind::bytes(), None)
         .unknown_fields(Kind::bytes());
 
-        assert_eq!(definition, expected_definition)
+        assert_eq!(definitions, Some(expected_definition))
     }
 }

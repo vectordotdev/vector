@@ -1,6 +1,6 @@
 use lookup::{owned_value_path, OwnedTargetPath};
-use vrl_lib::state::TypeState;
-use vrl_lib::{diagnostic::DiagnosticList, CompilationResult, CompileConfig, Function};
+use vrl::compiler::{compile_with_state, CompilationResult, CompileConfig, Function, TypeState};
+use vrl::diagnostic::DiagnosticList;
 
 /// Compiles a VRL program
 /// Vector metadata is set to read-only to prevent it from being mutated
@@ -20,5 +20,5 @@ pub fn compile_vrl(
     // prevents users from potentially breaking behavior relying on it.
     config.set_read_only_path(OwnedTargetPath::metadata(owned_value_path!("vector")), true);
 
-    vrl_lib::compile_with_state(source, fns, state, config)
+    compile_with_state(source, fns, state, config)
 }

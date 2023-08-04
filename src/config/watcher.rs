@@ -51,7 +51,7 @@ pub fn spawn_thread<'a>(
                     debug!(message = "Configuration file change detected.", event = ?event);
 
                     // Consume events until delay amount of time has passed since the latest event.
-                    while let Ok(..) = receiver.recv_timeout(delay) {}
+                    while receiver.recv_timeout(delay).is_ok() {}
 
                     debug!(message = "Consumed file change events for delay.", delay = ?delay);
 
@@ -102,7 +102,7 @@ pub fn spawn_thread<'a>(
 #[cfg(unix)]
 fn raise_sighup() {
     use nix::sys::signal;
-    let _ = signal::raise(signal::Signal::SIGHUP).map_err(|error| {
+    _ = signal::raise(signal::Signal::SIGHUP).map_err(|error| {
         error!(message = "Unable to reload configuration file. Restart Vector to reload it.", cause = %error)
     });
 }

@@ -28,7 +28,7 @@ sinks:
 - influxdb_logs
 - influxdb_metrics
 - kafka
-- logdna
+- mezmo
 - loki
 - nats
 - new_relic_logs

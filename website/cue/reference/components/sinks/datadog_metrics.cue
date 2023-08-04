@@ -3,7 +3,9 @@ package metadata
 components: sinks: datadog_metrics: {
 	title: "Datadog Metrics"
 
-	classes: sinks._datadog.classes
+	classes: sinks._datadog.classes & {
+		stateful: true
+	}
 
 	features: {
 		acknowledgements: true
@@ -68,10 +70,5 @@ components: sinks: datadog_metrics: {
 			summary:      false
 		}
 		traces: false
-	}
-
-	telemetry: metrics: {
-		component_sent_events_total:      components.sources.internal_metrics.output.metrics.component_sent_events_total
-		component_sent_event_bytes_total: components.sources.internal_metrics.output.metrics.component_sent_event_bytes_total
 	}
 }

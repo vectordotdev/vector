@@ -59,11 +59,11 @@ pub enum ElasticsearchAuth {
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
 pub enum ElasticsearchMode {
-    /// Ingests documents in bulk, via the bulk API `index` action.
+    /// Ingests documents in bulk, using the bulk API `index` action.
     #[serde(alias = "normal")]
     Bulk,
 
-    /// Ingests documents in bulk, via the bulk API `create` action.
+    /// Ingests documents in bulk, using the bulk API `create` action.
     ///
     /// Elasticsearch Data Streams only support the `create` action.
     DataStream,
@@ -120,10 +120,7 @@ impl_generate_config_from_default!(ElasticsearchConfig);
 
 #[derive(Debug, Clone)]
 pub enum ElasticsearchCommonMode {
-    Bulk {
-        index: Template,
-        action: Option<Template>,
-    },
+    Bulk { index: Template, action: Template },
     DataStream(DataStreamConfig),
 }
 
@@ -147,22 +144,19 @@ impl ElasticsearchCommonMode {
     fn bulk_action<'a>(&self, event: impl Into<EventRef<'a>>) -> Option<BulkAction> {
         match self {
             ElasticsearchCommonMode::Bulk {
-                action: bulk_action,
+                action: bulk_action_template,
                 ..
-            } => match bulk_action {
-                Some(template) => template
-                    .render_string(event)
-                    .map_err(|error| {
-                        emit!(TemplateRenderingError {
-                            error,
-                            field: Some("bulk_action"),
-                            drop_event: true,
-                        });
-                    })
-                    .ok()
-                    .and_then(|value| BulkAction::try_from(value.as_str()).ok()),
-                None => Some(BulkAction::Index),
-            },
+            } => bulk_action_template
+                .render_string(event)
+                .map_err(|error| {
+                    emit!(TemplateRenderingError {
+                        error,
+                        field: Some("bulk_action"),
+                        drop_event: true,
+                    });
+                })
+                .ok()
+                .and_then(|value| BulkAction::try_from(value.as_str()).ok()),
             // avoid the interpolation
             ElasticsearchCommonMode::DataStream(_) => Some(BulkAction::Create),
         }
@@ -185,8 +179,8 @@ pub enum ElasticsearchApiVersion {
     ///
     /// If the [cluster state version endpoint][es_version] isn't reachable, a warning is logged to
     /// stdout, and the version is assumed to be V6 if the `suppress_type_name` option is set to
-    /// true. Otherwise, the version is assumed to be V8. In the future, the sink will instead
-    /// return an Error during configuration parsing, since a wronly assumed version could lead to
+    /// `true`. Otherwise, the version is assumed to be V8. In the future, the sink instead
+    /// returns an error during configuration parsing, since a wrongly assumed version could lead to
     /// incorrect API calls.
     ///
     /// [es_version]: https://www.elastic.co/guide/en/elasticsearch/reference/current/cluster-state.html#cluster-state-api-path-params

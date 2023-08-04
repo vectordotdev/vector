@@ -3,7 +3,10 @@ package metadata
 components: sinks: datadog_traces: {
 	title: "Datadog Traces"
 
-	classes: sinks._datadog.classes
+	classes: sinks._datadog.classes & {
+		stateful:    true
+		development: "beta"
+	}
 
 	features: {
 		acknowledgements: true
@@ -61,7 +64,18 @@ components: sinks: datadog_traces: {
 
 	support: {
 		requirements: []
-		warnings: ["APM stats are in Beta. Currently the sink does not support the Datadog Agent sampling feature. This must be disabled in the Agent in order for APM stats output from vector to be accurate."]
+		warnings: [
+			"""
+				Support for APM statistics is in beta.
+
+				Currently the sink does not support the Datadog Agent sampling feature. Sampling must be
+				disabled in the Agent in order for APM stats output from vector to be accurate.
+
+				Currently the sink does not calculate statistics aggregated across `peer.service`. Any
+				functionality in Datadog's APM product that depends on this aggregation will not
+				function correctly.
+				""",
+		]
 		notices: []
 	}
 
@@ -71,12 +85,5 @@ components: sinks: datadog_traces: {
 		logs:    false
 		metrics: null
 		traces:  true
-	}
-
-	telemetry: metrics: {
-		component_discarded_events_total: components.sources.internal_metrics.output.metrics.component_discarded_events_total
-		component_errors_total:           components.sources.internal_metrics.output.metrics.component_errors_total
-		component_sent_events_total:      components.sources.internal_metrics.output.metrics.component_sent_events_total
-		component_sent_event_bytes_total: components.sources.internal_metrics.output.metrics.component_sent_event_bytes_total
 	}
 }

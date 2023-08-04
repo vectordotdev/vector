@@ -20,7 +20,7 @@ use vector_core::config::LogNamespace;
 use vector_core::EstimatedJsonEncodedSizeOf;
 
 use crate::{
-    config::{DataType, Output, SourceConfig, SourceContext},
+    config::{SourceConfig, SourceContext, SourceOutput},
     event::metric::{Metric, MetricKind, MetricTags, MetricValue},
     internal_events::{EventsReceived, HostMetricsScrapeDetailError, StreamClosedError},
     shutdown::ShutdownSignal,
@@ -85,7 +85,7 @@ pub(self) struct FilterList {
 
 /// Configuration for the `host_metrics` source.
 #[serde_as]
-#[configurable_component(source("host_metrics"))]
+#[configurable_component(source("host_metrics", "Collect metric data from the local system."))]
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(deny_unknown_fields)]
@@ -93,6 +93,7 @@ pub struct HostMetricsConfig {
     /// The interval between metric gathering, in seconds.
     #[serde_as(as = "serde_with::DurationSeconds<u64>")]
     #[serde(default = "default_scrape_interval")]
+    #[configurable(metadata(docs::human_name = "Scrape Interval"))]
     pub scrape_interval_secs: Duration,
 
     /// The list of host metric collector services to use.
@@ -126,7 +127,7 @@ pub struct HostMetricsConfig {
     pub network: network::NetworkConfig,
 }
 
-/// Options for the “cgroups” (controller groups) metrics collector.
+/// Options for the cgroups (controller groups) metrics collector.
 ///
 /// This collector is only available on Linux systems, and only supports either version 2 or hybrid cgroups.
 #[configurable_component]
@@ -136,7 +137,7 @@ pub struct HostMetricsConfig {
 pub struct CGroupsConfig {
     /// The number of levels of the cgroups hierarchy for which to report metrics.
     ///
-    /// A value of `1` means just the root or named cgroup.
+    /// A value of `1` means the root or named cgroup.
     #[derivative(Default(value = "default_levels()"))]
     #[serde(default = "default_levels")]
     #[configurable(metadata(docs::examples = 1))]
@@ -157,6 +158,7 @@ pub struct CGroupsConfig {
     /// Base cgroup directory, for testing use only
     #[serde(skip_serializing)]
     #[configurable(metadata(docs::hidden))]
+    #[configurable(metadata(docs::human_name = "Base Directory"))]
     base_dir: Option<PathBuf>,
 }
 
@@ -249,6 +251,7 @@ fn default_cgroups_config() -> Option<CGroupsConfig> {
 impl_generate_config_from_default!(HostMetricsConfig);
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "host_metrics")]
 impl SourceConfig for HostMetricsConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         init_roots();
@@ -266,8 +269,8 @@ impl SourceConfig for HostMetricsConfig {
         Ok(Box::pin(config.run(cx.out, cx.shutdown)))
     }
 
-    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
-        vec![Output::default(DataType::Metric)]
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
+        vec![SourceOutput::new_metrics()]
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -293,8 +296,8 @@ impl HostMetricsConfig {
             bytes_received.emit(ByteSize(0));
             let metrics = generator.capture_metrics().await;
             let count = metrics.len();
-            if let Err(error) = out.send_batch(metrics).await {
-                emit!(StreamClosedError { count, error });
+            if (out.send_batch(metrics).await).is_err() {
+                emit!(StreamClosedError { count });
                 return Err(());
             }
         }

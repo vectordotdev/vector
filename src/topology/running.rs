@@ -17,10 +17,7 @@ use vector_common::trigger::DisabledTrigger;
 
 use super::{TapOutput, TapResource};
 use crate::{
-    config::{
-        ComponentKey, Config, ConfigDiff, HealthcheckOptions, Inputs, OutputId, Resource,
-        SourceConfig,
-    },
+    config::{ComponentKey, Config, ConfigDiff, HealthcheckOptions, Inputs, OutputId, Resource},
     event::EventArray,
     shutdown::SourceShutdownCoordinator,
     spawn_named,
@@ -48,6 +45,7 @@ pub struct RunningTopology {
     abort_tx: mpsc::UnboundedSender<()>,
     watch: (WatchTx, WatchRx),
     pub(crate) running: Arc<AtomicBool>,
+    graceful_shutdown_duration: Option<Duration>,
 }
 
 impl RunningTopology {
@@ -57,7 +55,6 @@ impl RunningTopology {
             inputs_tap_metadata: HashMap::new(),
             outputs: HashMap::new(),
             outputs_tap_metadata: HashMap::new(),
-            config,
             shutdown_coordinator: SourceShutdownCoordinator::default(),
             detach_triggers: HashMap::new(),
             source_tasks: HashMap::new(),
@@ -65,6 +62,8 @@ impl RunningTopology {
             abort_tx,
             watch: watch::channel(TapResource::default()),
             running: Arc::new(AtomicBool::new(true)),
+            graceful_shutdown_duration: config.graceful_shutdown_duration,
+            config,
         }
     }
 
@@ -123,30 +122,36 @@ impl RunningTopology {
             check_handles.entry(key).or_default().push(task);
         }
 
-        // If we reach this, we will forcefully shutdown the sources.
-        let deadline = Instant::now() + Duration::from_secs(60);
+        // If we reach this, we will forcefully shutdown the sources. If None, we will never force shutdown.
+        let deadline = self
+            .graceful_shutdown_duration
+            .map(|grace_period| Instant::now() + grace_period);
 
-        // If we reach the deadline, this future will print out which components
-        // won't gracefully shutdown since we will start to forcefully shutdown
-        // the sources.
-        let mut check_handles2 = check_handles.clone();
-        let timeout = async move {
-            sleep_until(deadline).await;
-            // Remove all tasks that have shutdown.
-            check_handles2.retain(|_key, handles| {
-                retain(handles, |handle| handle.peek().is_none());
-                !handles.is_empty()
-            });
-            let remaining_components = check_handles2
-                .keys()
-                .map(|item| item.to_string())
-                .collect::<Vec<_>>()
-                .join(", ");
+        let timeout = if let Some(deadline) = deadline {
+            // If we reach the deadline, this future will print out which components
+            // won't gracefully shutdown since we will start to forcefully shutdown
+            // the sources.
+            let mut check_handles2 = check_handles.clone();
+            Box::pin(async move {
+                sleep_until(deadline).await;
+                // Remove all tasks that have shutdown.
+                check_handles2.retain(|_key, handles| {
+                    retain(handles, |handle| handle.peek().is_none());
+                    !handles.is_empty()
+                });
+                let remaining_components = check_handles2
+                    .keys()
+                    .map(|item| item.to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ");
 
-            error!(
-                components = ?remaining_components,
-                "Failed to gracefully shut down in time. Killing components."
-            );
+                error!(
+                    components = ?remaining_components,
+                    "Failed to gracefully shut down in time. Killing components."
+                );
+            }) as future::BoxFuture<'static, ()>
+        } else {
+            Box::pin(future::pending()) as future::BoxFuture<'static, ()>
         };
 
         // Reports in intervals which components are still running.
@@ -166,10 +171,12 @@ impl RunningTopology {
                     .collect::<Vec<_>>()
                     .join(", ");
 
-                let time_remaining = match deadline.checked_duration_since(Instant::now()) {
-                    Some(remaining) => format!("{} seconds left", remaining.as_secs()),
-                    None => "overdue".to_string(),
-                };
+                let time_remaining = deadline
+                    .map(|d| match d.checked_duration_since(Instant::now()) {
+                        Some(remaining) => format!("{} seconds left", remaining.as_secs()),
+                        None => "overdue".to_string(),
+                    })
+                    .unwrap_or("no time limit".to_string());
 
                 info!(
                     remaining_components = ?remaining_components,
@@ -240,8 +247,8 @@ impl RunningTopology {
         // Try to build all of the new components coming from the new configuration.  If we can
         // successfully build them, we'll attempt to connect them up to the topology and spawn their
         // respective component tasks.
-        let new_bufs = buffers.clone();
-        if let Some(mut new_pieces) = build_or_log_errors(&new_config, &diff, new_bufs).await {
+        if let Some(mut new_pieces) = build_or_log_errors(&new_config, &diff, buffers.clone()).await
+        {
             // If healthchecks are configured for any of the changing/new components, try running
             // them before moving forward with connecting and spawning.  In some cases, healthchecks
             // failing may be configured as a non-blocking issue and so we'll still continue on.
@@ -688,7 +695,7 @@ impl RunningTopology {
                 // output for the first time, since there's nothing to actually replace at this point.
                 debug!(component = %key, fanout_id = %input, "Adding component input to fanout.");
 
-                let _ = output.send(ControlMessage::Add(key.clone(), tx.clone()));
+                _ = output.send(ControlMessage::Add(key.clone(), tx.clone()));
             } else {
                 // We know that if this component is connected to a given input, and neither
                 // components were changed, then the output must still exist, which means we paused
@@ -696,7 +703,7 @@ impl RunningTopology {
                 // now:
                 debug!(component = %key, fanout_id = %input, "Replacing component input in fanout.");
 
-                let _ = output.send(ControlMessage::Replace(key.clone(), tx.clone()));
+                _ = output.send(ControlMessage::Replace(key.clone(), tx.clone()));
             }
         }
 
@@ -740,14 +747,14 @@ impl RunningTopology {
                     // Case 3: This component is no longer connected to the input from new config.
                     debug!(component = %key, fanout_id = %input, "Removing component input from fanout.");
 
-                    let _ = output.send(ControlMessage::Remove(key.clone()));
+                    _ = output.send(ControlMessage::Remove(key.clone()));
                 } else {
                     // We know that if this component is connected to a given input, and it isn't being
                     // changed, then it will exist when we reconnect inputs, so we should pause it
                     // now to pause further sends through that component until we reconnect:
                     debug!(component = %key, fanout_id = %input, "Pausing component input in fanout.");
 
-                    let _ = output.send(ControlMessage::Pause(key.clone()));
+                    _ = output.send(ControlMessage::Pause(key.clone()));
                 }
             }
         }
@@ -765,7 +772,7 @@ impl RunningTopology {
 
                 let input = self.inputs.get(transform_key).cloned().unwrap();
                 let output = self.outputs.get_mut(&output_id).unwrap();
-                let _ = output.send(ControlMessage::Add(transform_key.clone(), input));
+                _ = output.send(ControlMessage::Add(transform_key.clone(), input));
             }
         }
 
@@ -780,7 +787,7 @@ impl RunningTopology {
 
                 let input = self.inputs.get(sink_key).cloned().unwrap();
                 let output = self.outputs.get_mut(&output_id).unwrap();
-                let _ = output.send(ControlMessage::Add(sink_key.clone(), input));
+                _ = output.send(ControlMessage::Add(sink_key.clone(), input));
             }
         }
     }

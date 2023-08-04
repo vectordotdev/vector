@@ -11,8 +11,9 @@ use vector_core::{config::LogNamespace, event::Event};
 
 use super::parser;
 use crate::sources::util::http::HttpMethod;
+use crate::sources::util::http_client::{default_timeout, warn_if_interval_too_low};
 use crate::{
-    config::{self, GenerateConfig, Output, SourceConfig, SourceContext},
+    config::{GenerateConfig, SourceConfig, SourceContext, SourceOutput},
     http::Auth,
     internal_events::PrometheusParseError,
     sources::{
@@ -42,7 +43,10 @@ enum ConfigError {
 
 /// Configuration for the `prometheus_scrape` source.
 #[serde_as]
-#[configurable_component(source("prometheus_scrape"))]
+#[configurable_component(source(
+    "prometheus_scrape",
+    "Collect metrics from Prometheus exporters."
+))]
 #[derive(Clone, Debug)]
 pub struct PrometheusScrapeConfig {
     /// Endpoints to scrape metrics from.
@@ -50,21 +54,31 @@ pub struct PrometheusScrapeConfig {
     #[serde(alias = "hosts")]
     endpoints: Vec<String>,
 
-    /// The interval between scrapes, in seconds.
+    /// The interval between scrapes. Requests are run concurrently so if a scrape takes longer
+    /// than the interval a new scrape will be started. This can take extra resources, set the timeout
+    /// to a value lower than the scrape interval to prevent this from happening.
     #[serde(default = "default_interval")]
     #[serde_as(as = "serde_with::DurationSeconds<u64>")]
     #[serde(rename = "scrape_interval_secs")]
+    #[configurable(metadata(docs::human_name = "Scrape Interval"))]
     interval: Duration,
 
-    /// The tag name added to each event representing the scraped instance's host:port.
+    /// The timeout for each scrape request.
+    #[serde(default = "default_timeout")]
+    #[serde_as(as = "serde_with:: DurationSecondsWithFrac<f64>")]
+    #[serde(rename = "scrape_timeout_secs")]
+    #[configurable(metadata(docs::human_name = "Scrape Timeout"))]
+    timeout: Duration,
+
+    /// The tag name added to each event representing the scraped instance's `host:port`.
     ///
-    /// The tag value will be the host/port of the scraped instance.
+    /// The tag value is the host and port of the scraped instance.
     #[configurable(metadata(docs::advanced))]
     instance_tag: Option<String>,
 
     /// The tag name added to each event representing the scraped instance's endpoint.
     ///
-    /// The tag value will be the endpoint of the scraped instance.
+    /// The tag value is the endpoint of the scraped instance.
     #[configurable(metadata(docs::advanced))]
     endpoint_tag: Option<String>,
 
@@ -110,6 +124,7 @@ impl GenerateConfig for PrometheusScrapeConfig {
         toml::Value::try_from(Self {
             endpoints: vec!["http://localhost:9090/metrics".to_string()],
             interval: default_interval(),
+            timeout: default_timeout(),
             instance_tag: Some("instance".to_string()),
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: false,
@@ -122,6 +137,7 @@ impl GenerateConfig for PrometheusScrapeConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "prometheus_scrape")]
 impl SourceConfig for PrometheusScrapeConfig {
     async fn build(&self, cx: SourceContext) -> Result<sources::Source> {
         let urls = self
@@ -138,9 +154,12 @@ impl SourceConfig for PrometheusScrapeConfig {
             endpoint_tag: self.endpoint_tag.clone(),
         };
 
+        warn_if_interval_too_low(self.timeout, self.interval);
+
         let inputs = GenericHttpClientInputs {
             urls,
             interval: self.interval,
+            timeout: self.timeout,
             headers: HashMap::new(),
             content_type: "text/plain".to_string(),
             auth: self.auth.clone(),
@@ -152,8 +171,8 @@ impl SourceConfig for PrometheusScrapeConfig {
         Ok(call(inputs, builder, cx.out, HttpMethod::Get).boxed())
     }
 
-    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
-        vec![Output::default(config::DataType::Metric)]
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
+        vec![SourceOutput::new_metrics()]
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -229,51 +248,52 @@ struct PrometheusScrapeContext {
 }
 
 impl HttpClientContext for PrometheusScrapeContext {
+    fn enrich_events(&mut self, events: &mut Vec<Event>) {
+        for event in events.iter_mut() {
+            let metric = event.as_mut_metric();
+            if let Some(InstanceInfo {
+                tag,
+                instance,
+                honor_label,
+            }) = &self.instance_info
+            {
+                match (honor_label, metric.tag_value(tag)) {
+                    (false, Some(old_instance)) => {
+                        metric.replace_tag(format!("exported_{}", tag), old_instance);
+                        metric.replace_tag(tag.clone(), instance.clone());
+                    }
+                    (true, Some(_)) => {}
+                    (_, None) => {
+                        metric.replace_tag(tag.clone(), instance.clone());
+                    }
+                }
+            }
+            if let Some(EndpointInfo {
+                tag,
+                endpoint,
+                honor_label,
+            }) = &self.endpoint_info
+            {
+                match (honor_label, metric.tag_value(tag)) {
+                    (false, Some(old_endpoint)) => {
+                        metric.replace_tag(format!("exported_{}", tag), old_endpoint);
+                        metric.replace_tag(tag.clone(), endpoint.clone());
+                    }
+                    (true, Some(_)) => {}
+                    (_, None) => {
+                        metric.replace_tag(tag.clone(), endpoint.clone());
+                    }
+                }
+            }
+        }
+    }
+
     /// Parses the Prometheus HTTP response into metric events
     fn on_response(&mut self, url: &Uri, _header: &Parts, body: &Bytes) -> Option<Vec<Event>> {
         let body = String::from_utf8_lossy(body);
 
         match parser::parse_text(&body) {
-            Ok(mut events) => {
-                for event in events.iter_mut() {
-                    let metric = event.as_mut_metric();
-                    if let Some(InstanceInfo {
-                        tag,
-                        instance,
-                        honor_label,
-                    }) = &self.instance_info
-                    {
-                        match (honor_label, metric.tag_value(tag)) {
-                            (false, Some(old_instance)) => {
-                                metric.replace_tag(format!("exported_{}", tag), old_instance);
-                                metric.replace_tag(tag.clone(), instance.clone());
-                            }
-                            (true, Some(_)) => {}
-                            (_, None) => {
-                                metric.replace_tag(tag.clone(), instance.clone());
-                            }
-                        }
-                    }
-                    if let Some(EndpointInfo {
-                        tag,
-                        endpoint,
-                        honor_label,
-                    }) = &self.endpoint_info
-                    {
-                        match (honor_label, metric.tag_value(tag)) {
-                            (false, Some(old_endpoint)) => {
-                                metric.replace_tag(format!("exported_{}", tag), old_endpoint);
-                                metric.replace_tag(tag.clone(), endpoint.clone());
-                            }
-                            (true, Some(_)) => {}
-                            (_, None) => {
-                                metric.replace_tag(tag.clone(), endpoint.clone());
-                            }
-                        }
-                    }
-                }
-                Some(events)
-            }
+            Ok(events) => Some(events),
             Err(error) => {
                 if url.path() == "/" {
                     // https://github.com/vectordotdev/vector/pull/3801#issuecomment-700723178
@@ -345,6 +365,7 @@ mod test {
         let config = PrometheusScrapeConfig {
             endpoints: vec![format!("http://{}/metrics", in_addr)],
             interval: Duration::from_secs(1),
+            timeout: default_timeout(),
             instance_tag: Some("instance".to_string()),
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: true,
@@ -378,6 +399,7 @@ mod test {
         let config = PrometheusScrapeConfig {
             endpoints: vec![format!("http://{}/metrics", in_addr)],
             interval: Duration::from_secs(1),
+            timeout: default_timeout(),
             instance_tag: Some("instance".to_string()),
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: true,
@@ -429,6 +451,7 @@ mod test {
         let config = PrometheusScrapeConfig {
             endpoints: vec![format!("http://{}/metrics", in_addr)],
             interval: Duration::from_secs(1),
+            timeout: default_timeout(),
             instance_tag: Some("instance".to_string()),
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: false,
@@ -494,6 +517,7 @@ mod test {
         let config = PrometheusScrapeConfig {
             endpoints: vec![format!("http://{}/metrics", in_addr)],
             interval: Duration::from_secs(1),
+            timeout: default_timeout(),
             instance_tag: Some("instance".to_string()),
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: true,
@@ -549,6 +573,7 @@ mod test {
         let config = PrometheusScrapeConfig {
             endpoints: vec![format!("http://{}/metrics?key1=val1", in_addr)],
             interval: Duration::from_secs(1),
+            timeout: default_timeout(),
             instance_tag: Some("instance".to_string()),
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: false,
@@ -662,6 +687,7 @@ mod test {
                 honor_labels: false,
                 query: HashMap::new(),
                 interval: Duration::from_secs(1),
+                timeout: default_timeout(),
                 tls: None,
                 auth: None,
             },
@@ -747,6 +773,7 @@ mod integration_tests {
         let config = PrometheusScrapeConfig {
             endpoints: vec!["http://prometheus:9090/metrics".into()],
             interval: Duration::from_secs(1),
+            timeout: Duration::from_secs(1),
             instance_tag: Some("instance".to_string()),
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: false,

@@ -58,24 +58,27 @@ async fn ensure_required_fields(event: Event) -> Option<Event> {
     if !log.contains("text") {
         let message_path = log
             .message_path()
-            .expect("message is required (make sure the \"message\" semantic meaning is set)");
-        log.rename_key(message_path.as_str(), event_path!("text"))
+            .expect("message is required (make sure the \"message\" semantic meaning is set)")
+            .clone();
+        log.rename_key(&message_path, event_path!("text"));
     }
 
     if !log.contains("host") {
-        if let Some(host_path) = log.host_path() {
-            log.rename_key(host_path.as_str(), event_path!("host"));
+        if let Some(host_path) = log.host_path().cloned().as_ref() {
+            log.rename_key(host_path, event_path!("host"));
         }
     }
 
     if !log.contains("date_happened") {
-        if let Some(timestamp_path) = log.timestamp_path() {
-            log.rename_key(timestamp_path.as_str(), "date_happened");
+        if let Some(timestamp_path) = log.timestamp_path().cloned().as_ref() {
+            log.rename_key(timestamp_path, "date_happened");
         }
     }
 
     if !log.contains("source_type_name") {
-        log.rename_key(log.source_type_path(), "source_type_name")
+        if let Some(source_type_path) = log.source_type_path().cloned().as_ref() {
+            log.rename_key(source_type_path, "source_type_name");
+        }
     }
 
     Some(Event::from(log))

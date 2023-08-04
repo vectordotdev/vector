@@ -2,10 +2,10 @@ use std::{
     collections::BTreeMap,
     convert::{TryFrom, TryInto},
     fmt::Debug,
+    sync::Arc,
 };
 
-use crate::ByteSizeOf;
-pub use ::value::Value;
+use crate::{config::OutputId, ByteSizeOf};
 pub use array::{into_event_stream, EventArray, EventContainer, LogArray, MetricArray, TraceArray};
 pub use estimated_json_encoded_size_of::EstimatedJsonEncodedSizeOf;
 pub use finalization::{
@@ -19,13 +19,16 @@ pub use r#ref::{EventMutRef, EventRef};
 use serde::{Deserialize, Serialize};
 pub use trace::TraceEvent;
 use vector_buffers::EventCount;
-use vector_common::{finalization, EventDataEq};
+use vector_common::{
+    config::ComponentKey, finalization, internal_event::TaggedEventsSent, json_size::JsonSize,
+    request_metadata::GetEventCountTags, EventDataEq,
+};
+pub use vrl::value::Value;
 #[cfg(feature = "vrl")]
 pub use vrl_target::{TargetEvents, VrlTarget};
 
 pub mod array;
 pub mod discriminant;
-pub mod error;
 mod estimated_json_encoded_size_of;
 mod log_event;
 #[cfg(feature = "lua")]
@@ -65,7 +68,7 @@ impl ByteSizeOf for Event {
 }
 
 impl EstimatedJsonEncodedSizeOf for Event {
-    fn estimated_json_encoded_size_of(&self) -> usize {
+    fn estimated_json_encoded_size_of(&self) -> JsonSize {
         match self {
             Event::Log(log_event) => log_event.estimated_json_encoded_size_of(),
             Event::Metric(metric_event) => metric_event.estimated_json_encoded_size_of(),
@@ -86,6 +89,16 @@ impl Finalizable for Event {
             Event::Log(log_event) => log_event.take_finalizers(),
             Event::Metric(metric) => metric.take_finalizers(),
             Event::Trace(trace_event) => trace_event.take_finalizers(),
+        }
+    }
+}
+
+impl GetEventCountTags for Event {
+    fn get_tags(&self) -> TaggedEventsSent {
+        match self {
+            Event::Log(log) => log.get_tags(),
+            Event::Metric(metric) => metric.get_tags(),
+            Event::Trace(trace) => trace.get_tags(),
         }
     }
 }
@@ -280,6 +293,36 @@ impl Event {
             Self::Metric(metric) => metric.with_batch_notifier_option(batch).into(),
             Self::Trace(trace) => trace.with_batch_notifier_option(batch).into(),
         }
+    }
+
+    /// Returns a reference to the event metadata source.
+    #[must_use]
+    pub fn source_id(&self) -> Option<&Arc<ComponentKey>> {
+        self.metadata().source_id()
+    }
+
+    /// Sets the `source_id` in the event metadata to the provided value.
+    pub fn set_source_id(&mut self, source_id: Arc<ComponentKey>) {
+        self.metadata_mut().set_source_id(source_id);
+    }
+
+    /// Sets the `upstream_id` in the event metadata to the provided value.
+    pub fn set_upstream_id(&mut self, upstream_id: Arc<OutputId>) {
+        self.metadata_mut().set_upstream_id(upstream_id);
+    }
+
+    /// Sets the `source_id` in the event metadata to the provided value.
+    #[must_use]
+    pub fn with_source_id(mut self, source_id: Arc<ComponentKey>) -> Self {
+        self.metadata_mut().set_source_id(source_id);
+        self
+    }
+
+    /// Sets the `upstream_id` in the event metadata to the provided value.
+    #[must_use]
+    pub fn with_upstream_id(mut self, upstream_id: Arc<OutputId>) -> Self {
+        self.metadata_mut().set_upstream_id(upstream_id);
+        self
     }
 }
 

@@ -10,8 +10,8 @@ use crate::MetricTagValues;
 pub struct JsonSerializerConfig {
     /// Controls how metric tag values are encoded.
     ///
-    /// When set to `single`, only the last non-bare value of tags will be displayed with the
-    /// metric.  When set to `full`, all metric tags will be exposed as separate assignments.
+    /// When set to `single`, only the last non-bare value of tags are displayed with the
+    /// metric.  When set to `full`, all metric tags are exposed as separate assignments.
     #[serde(
         default,
         skip_serializing_if = "vector_core::serde::skip_serializing_if_default"
@@ -88,10 +88,10 @@ impl Encoder<Event> for JsonSerializer {
 #[cfg(test)]
 mod tests {
     use bytes::{Bytes, BytesMut};
-    use chrono::{TimeZone, Utc};
-    use vector_common::btreemap;
+    use chrono::{TimeZone, Timelike, Utc};
     use vector_core::event::{LogEvent, Metric, MetricKind, MetricValue, StatisticKind, Value};
     use vector_core::metric_tags;
+    use vrl::btreemap;
 
     use super::*;
 
@@ -122,8 +122,9 @@ mod tests {
                 "Key3" => "Value3",
             )))
             .with_timestamp(Some(
-                Utc.ymd(2018, 11, 14)
-                    .and_hms_nano_opt(8, 9, 10, 11)
+                Utc.with_ymd_and_hms(2018, 11, 14, 8, 9, 10)
+                    .single()
+                    .and_then(|t| t.with_nanosecond(11))
                     .expect("invalid timestamp"),
             )),
         );

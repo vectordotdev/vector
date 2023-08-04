@@ -4,8 +4,8 @@ use std::{
 };
 
 use codecs::{encoding::FramingConfig, TextSerializerConfig};
-use futures::{stream, TryStreamExt};
-use opendal::ObjectMode;
+use futures::{stream, StreamExt};
+use opendal::{Entry, Metakey};
 use similar_asserts::assert_eq;
 use vector_core::event::{Event, LogEvent};
 
@@ -24,7 +24,7 @@ async fn hdfs_healthchecks_invalid_node_node() {
     // Point to an invalid endpoint
     let config = config("http://127.0.0.1:1", 10);
     let (_, health_check) = config
-        .build(SinkContext::new_test())
+        .build(SinkContext::default())
         .await
         .expect("config build must with success");
     let result = health_check.await;
@@ -36,7 +36,7 @@ async fn hdfs_healthchecks_invalid_node_node() {
 async fn hdfs_healthchecks_valid_node_node() {
     let config = config(&webhdfs_endpoint(), 10);
     let (_, health_check) = config
-        .build(SinkContext::new_test())
+        .build(SinkContext::default())
         .await
         .expect("config build must with success");
     let result = health_check.await;
@@ -74,24 +74,33 @@ async fn hdfs_rotate_files_after_the_buffer_size_is_reached() {
     // Hard-coded sleeps are bad, but we're waiting on localstack's state to converge.
     tokio::time::sleep(Duration::from_secs(1)).await;
 
-    let mut objects: Vec<_> = op
-        .object("/")
-        .scan()
+    // blocking_scan isn't supported
+    let objects: Vec<Entry> = op
+        .scan("/")
         .await
         .unwrap()
-        .try_collect::<Vec<_>>()
-        .await
-        .unwrap()
+        .map(|x| x.unwrap())
+        .collect()
+        .await;
+
+    let mut objects = objects
         .into_iter()
-        .filter(|o| o.blocking_mode().unwrap() == ObjectMode::FILE)
-        .collect();
+        .filter(|entry| {
+            op.blocking()
+                .metadata(entry, Metakey::Mode)
+                .unwrap()
+                .mode()
+                .is_file()
+        })
+        .collect::<Vec<_>>();
+
     // Sort file path in order, because we have the event id in path.
     objects.sort_by(|l, r| l.path().cmp(r.path()));
     assert_eq!(objects.len(), 3);
 
     let mut response_lines: Vec<Vec<String>> = Vec::new();
     for o in objects {
-        let bs = o.read().await.unwrap();
+        let bs = op.read(o.path()).await.unwrap();
         let buf_read = BufReader::new(Cursor::new(bs));
 
         response_lines.push(buf_read.lines().map(|l| l.unwrap()).collect());

@@ -17,7 +17,7 @@ use crate::{
     tls::TlsSourceConfig,
 };
 
-use super::{default_host_key, default_max_length, SocketConfig};
+use super::{default_host_key, SocketConfig};
 
 /// TCP configuration for the `socket` source.
 #[serde_as]
@@ -30,21 +30,10 @@ pub struct TcpConfig {
     #[configurable(derived)]
     keepalive: Option<TcpKeepaliveConfig>,
 
-    /// The maximum buffer size of incoming messages.
-    ///
-    /// Messages larger than this are truncated.
-    // TODO: this option is noted as deprecated in the source build function in mod.rs , but
-    // behaviorally there are inconsistencies when adapting the from_address() function to use framing
-    // instead of max_length. Merits further investigation.
-    #[configurable(
-        deprecated = "This option has been deprecated. Configure `max_length` on the framing config instead."
-    )]
-    #[configurable(metadata(docs::type_unit = "bytes"))]
-    max_length: Option<usize>,
-
     /// The timeout before a connection is forcefully closed during shutdown.
     #[serde(default = "default_shutdown_timeout_secs")]
     #[serde_as(as = "serde_with::DurationSeconds<u64>")]
+    #[configurable(metadata(docs::human_name = "Shutdown Timeout"))]
     shutdown_timeout_secs: Duration,
 
     /// Overrides the name of the log field used to add the peer host to each event.
@@ -73,8 +62,6 @@ pub struct TcpConfig {
     tls: Option<TlsSourceConfig>,
 
     /// The size of the receive buffer used for each connection.
-    ///
-    /// Generally this should not need to be configured.
     #[configurable(metadata(docs::type_unit = "bytes"))]
     receive_buffer_bytes: Option<usize>,
 
@@ -84,16 +71,16 @@ pub struct TcpConfig {
     #[configurable(metadata(docs::type_unit = "seconds"))]
     max_connection_duration_secs: Option<u64>,
 
-    /// The maximum number of TCP connections that will be allowed at any given time.
+    /// The maximum number of TCP connections that are allowed at any given time.
     #[configurable(metadata(docs::type_unit = "connections"))]
     pub connection_limit: Option<u32>,
 
     #[configurable(derived)]
-    framing: Option<FramingConfig>,
+    pub(super) framing: Option<FramingConfig>,
 
     #[configurable(derived)]
     #[serde(default = "default_decoding")]
-    decoding: DeserializerConfig,
+    pub(super) decoding: DeserializerConfig,
 
     /// The namespace to use for logs. This overrides the global setting.
     #[serde(default)]
@@ -114,7 +101,6 @@ impl TcpConfig {
         Self {
             address,
             keepalive: None,
-            max_length: default_max_length(),
             shutdown_timeout_secs: default_shutdown_timeout_secs(),
             host_key: default_host_key(),
             port_key: default_port_key(),
@@ -156,10 +142,6 @@ impl TcpConfig {
         self.keepalive
     }
 
-    pub const fn max_length(&self) -> Option<usize> {
-        self.max_length
-    }
-
     pub const fn shutdown_timeout_secs(&self) -> Duration {
         self.shutdown_timeout_secs
     }
@@ -174,11 +156,6 @@ impl TcpConfig {
 
     pub fn set_max_connection_duration_secs(&mut self, val: Option<u64>) -> &mut Self {
         self.max_connection_duration_secs = val;
-        self
-    }
-
-    pub fn set_max_length(&mut self, val: Option<usize>) -> &mut Self {
-        self.max_length = val;
         self
     }
 

@@ -24,7 +24,7 @@ pub enum Error {
 
 /// Configuration of TLS when connecting to the Docker daemon.
 ///
-/// Only relevant when connecting to Docker via an HTTPS URL.
+/// Only relevant when connecting to Docker with an HTTPS URL.
 ///
 /// If not configured, the environment variable `DOCKER_CERT_PATH` is used. If `DOCKER_CERT_PATH` is absent, then` DOCKER_CONFIG` is used. If both environment variables are absent, the certificates in `~/.docker/` are read.
 #[configurable_component]
@@ -53,7 +53,7 @@ pub fn docker(host: Option<String>, tls: Option<DockerTlsConfig>) -> crate::Resu
                 .and_then(|uri| uri.into_parts().scheme);
 
             match scheme.as_ref().map(|scheme| scheme.as_str()) {
-                Some("http") => {
+                Some("http") | Some("tcp") => {
                     let host = get_authority(&host)?;
                     Docker::connect_with_http(&host, DEFAULT_TIMEOUT, API_DEFAULT_VERSION)
                         .map_err(Into::into)
@@ -149,7 +149,7 @@ async fn pull_image(docker: &Docker, image: &str, tag: &str) {
 async fn remove_container(docker: &Docker, id: &str) {
     trace!("Stopping container.");
 
-    let _ = docker
+    _ = docker
         .stop_container(id, None)
         .await
         .map_err(|e| error!(%e));
@@ -157,7 +157,7 @@ async fn remove_container(docker: &Docker, id: &str) {
     trace!("Removing container.");
 
     // Don't panic, as this is unrelated to the test
-    let _ = docker
+    _ = docker
         .remove_container(id, None)
         .await
         .map_err(|e| error!(%e));

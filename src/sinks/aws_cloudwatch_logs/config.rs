@@ -3,9 +3,9 @@ use aws_smithy_types::retry::RetryConfig;
 use codecs::JsonSerializerConfig;
 use futures::FutureExt;
 use tower::ServiceBuilder;
-use value::Kind;
 use vector_config::configurable_component;
 use vector_core::schema;
+use vrl::value::Kind;
 
 use crate::{
     aws::{
@@ -49,7 +49,10 @@ impl ClientBuilder for CloudwatchLogsClientBuilder {
 }
 
 /// Configuration for the `aws_cloudwatch_logs` sink.
-#[configurable_component(sink("aws_cloudwatch_logs"))]
+#[configurable_component(sink(
+    "aws_cloudwatch_logs",
+    "Publish log events to AWS CloudWatch Logs."
+))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct CloudwatchLogsSinkConfig {
@@ -80,7 +83,7 @@ pub struct CloudwatchLogsSinkConfig {
 
     /// Dynamically create a [log group][log_group] if it does not already exist.
     ///
-    /// This will ignore `create_missing_stream` directly after creating the group and will create
+    /// This ignores `create_missing_stream` directly after creating the group and creates
     /// the first stream.
     ///
     /// [log_group]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html
@@ -136,7 +139,7 @@ impl CloudwatchLogsSinkConfig {
         create_client::<CloudwatchLogsClientBuilder>(
             &self.auth,
             self.region.region(),
-            self.region.endpoint()?,
+            self.region.endpoint(),
             proxy,
             &self.tls,
             true,
@@ -161,6 +164,7 @@ impl CloudwatchLogsSinkConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "aws_cloudwatch_logs")]
 impl SinkConfig for CloudwatchLogsSinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let batcher_settings = self.batch.into_batcher_settings()?;

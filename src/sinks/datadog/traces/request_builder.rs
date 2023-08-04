@@ -133,17 +133,14 @@ impl IncrementalRequestBuilder<(PartitionKey, Vec<Event>)> for DatadogTracesRequ
                         content_type: "application/x-protobuf".to_string(),
                     };
 
+                    // build RequestMetadata
+                    let builder = RequestMetadataBuilder::from_events(&processed);
+
                     let mut compressor = Compressor::from(self.compression);
                     match compressor.write_all(&payload) {
                         Ok(()) => {
                             let bytes = compressor.into_inner().freeze();
 
-                            // build RequestMetadata
-                            let builder = RequestMetadataBuilder::new(
-                                n,
-                                uncompressed_size,
-                                uncompressed_size,
-                            );
                             let bytes_len = NonZeroUsize::new(bytes.len())
                                 .expect("payload should never be zero length");
                             let request_metadata = builder.with_request_size(bytes_len);

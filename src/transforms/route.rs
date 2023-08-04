@@ -1,11 +1,14 @@
 use indexmap::IndexMap;
 use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
+use vector_core::config::{clone_input_definitions, LogNamespace};
 use vector_core::transform::SyncTransform;
 
 use crate::{
     conditions::{AnyCondition, Condition},
-    config::{DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext},
+    config::{
+        DataType, GenerateConfig, Input, OutputId, TransformConfig, TransformContext,
+        TransformOutput,
+    },
     event::Event,
     schema,
     transforms::Transform,
@@ -39,13 +42,13 @@ impl SyncTransform for Route {
         for (output_name, condition) in &self.conditions {
             let (result, event) = condition.check(event.clone());
             if result {
-                output.push_named(output_name, event);
+                output.push(Some(output_name), event);
             } else {
                 check_failed += 1;
             }
         }
         if check_failed == self.conditions.len() {
-            output.push_named(UNMATCHED_ROUTE, event);
+            output.push(Some(UNMATCHED_ROUTE), event);
         }
     }
 }
@@ -61,7 +64,7 @@ pub struct RouteConfig {
     /// A table of route identifiers to logical conditions representing the filter of the route.
     ///
     /// Each route can then be referenced as an input by other components with the name
-    /// `<transform_name>.<route_id>`. If an event doesn’t match any route, it will be sent to the
+    /// `<transform_name>.<route_id>`. If an event doesn’t match any route, it is sent to the
     /// `<transform_name>._unmatched` output.
     ///
     /// Both `_unmatched`, as well as `_default`, are reserved output names and thus cannot be used
@@ -101,19 +104,22 @@ impl TransformConfig for RouteConfig {
         }
     }
 
-    fn outputs(&self, merged_definition: &schema::Definition, _: LogNamespace) -> Vec<Output> {
-        let mut result: Vec<Output> = self
+    fn outputs(
+        &self,
+        _: enrichment::TableRegistry,
+        input_definitions: &[(OutputId, schema::Definition)],
+        _: LogNamespace,
+    ) -> Vec<TransformOutput> {
+        let mut result: Vec<TransformOutput> = self
             .route
             .keys()
             .map(|output_name| {
-                Output::default(DataType::all())
-                    .with_schema_definition(merged_definition.clone())
+                TransformOutput::new(DataType::all(), clone_input_definitions(input_definitions))
                     .with_port(output_name)
             })
             .collect();
         result.push(
-            Output::default(DataType::all())
-                .with_schema_definition(merged_definition.clone())
+            TransformOutput::new(DataType::all(), clone_input_definitions(input_definitions))
                 .with_port(UNMATCHED_ROUTE),
         );
         result
@@ -126,6 +132,8 @@ impl TransformConfig for RouteConfig {
 
 #[cfg(test)]
 mod test {
+    use std::collections::HashMap;
+
     use indoc::indoc;
     use vector_core::transform::TransformOutputsBuf;
 
@@ -184,7 +192,8 @@ mod test {
             output_names
                 .iter()
                 .map(|output_name| {
-                    Output::default(DataType::all()).with_port(output_name.to_owned())
+                    TransformOutput::new(DataType::all(), HashMap::new())
+                        .with_port(output_name.to_owned())
                 })
                 .collect(),
             1,
@@ -225,7 +234,8 @@ mod test {
             output_names
                 .iter()
                 .map(|output_name| {
-                    Output::default(DataType::all()).with_port(output_name.to_owned())
+                    TransformOutput::new(DataType::all(), HashMap::new())
+                        .with_port(output_name.to_owned())
                 })
                 .collect(),
             1,
@@ -265,7 +275,8 @@ mod test {
             output_names
                 .iter()
                 .map(|output_name| {
-                    Output::default(DataType::all()).with_port(output_name.to_owned())
+                    TransformOutput::new(DataType::all(), HashMap::new())
+                        .with_port(output_name.to_owned())
                 })
                 .collect(),
             1,

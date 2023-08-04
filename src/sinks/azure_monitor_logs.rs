@@ -6,17 +6,17 @@ use http::{
     Request, StatusCode, Uri,
 };
 use hyper::Body;
-use lookup::lookup_v2::{parse_value_path, OptionalValuePath};
+use lookup::lookup_v2::OptionalValuePath;
 use lookup::{OwnedValuePath, PathPrefix};
 use once_cell::sync::Lazy;
 use openssl::{base64, hash, pkey, sign};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
-use value::Kind;
 use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 use vector_core::schema;
+use vrl::value::Kind;
 
 use crate::{
     codecs::Transformer,
@@ -39,7 +39,10 @@ fn default_host() -> String {
 }
 
 /// Configuration for the `azure_monitor_logs` sink.
-#[configurable_component(sink("azure_monitor_logs"))]
+#[configurable_component(sink(
+    "azure_monitor_logs",
+    "Publish log events to the Azure Monitor Logs service."
+))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct AzureMonitorLogsConfig {
@@ -177,6 +180,7 @@ const SHARED_KEY: &str = "SharedKey";
 const API_VERSION: &str = "2016-04-01";
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "azure_monitor_logs")]
 impl SinkConfig for AzureMonitorLogsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let batch_settings = self
@@ -204,6 +208,7 @@ impl SinkConfig for AzureMonitorLogsConfig {
         )
         .sink_map_err(|error| error!(message = "Fatal azure_monitor_logs sink error.", %error));
 
+        #[allow(deprecated)]
         Ok((VectorSink::from_event_sink(sink), healthcheck))
     }
 
@@ -223,7 +228,7 @@ impl SinkConfig for AzureMonitorLogsConfig {
 struct AzureMonitorLogsSink {
     uri: Uri,
     customer_id: String,
-    time_generated_key: OwnedValuePath,
+    time_generated_key: Option<OwnedValuePath>,
     transformer: Transformer,
     shared_key: pkey::PKey<pkey::Private>,
     default_headers: HeaderMap,
@@ -231,7 +236,7 @@ struct AzureMonitorLogsSink {
 
 struct AzureMonitorLogsEventEncoder {
     transformer: Transformer,
-    time_generated_key: OwnedValuePath,
+    time_generated_key: Option<OwnedValuePath>,
 }
 
 impl HttpEventEncoder<serde_json::Value> for AzureMonitorLogsEventEncoder {
@@ -250,10 +255,12 @@ impl HttpEventEncoder<serde_json::Value> for AzureMonitorLogsEventEncoder {
             chrono::Utc::now()
         };
 
-        log.insert(
-            (PathPrefix::Event, &self.time_generated_key),
-            JsonValue::String(timestamp.to_rfc3339_opts(chrono::SecondsFormat::Millis, true)),
-        );
+        if let Some(timestamp_key) = &self.time_generated_key {
+            log.insert(
+                (PathPrefix::Event, timestamp_key),
+                JsonValue::String(timestamp.to_rfc3339_opts(chrono::SecondsFormat::Millis, true)),
+            );
+        }
 
         let entry = serde_json::json!(&log);
 
@@ -294,10 +301,8 @@ impl AzureMonitorLogsSink {
             return Err("shared_key can't be an empty string".into());
         }
 
-        let time_generated_key = time_generated_key.unwrap_or_else(|| {
-            parse_value_path(log_schema().timestamp_key())
-                .expect("global log_schema.timestamp_key to be valid path")
-        });
+        let time_generated_key =
+            time_generated_key.or_else(|| log_schema().timestamp_key().cloned());
 
         let shared_key_bytes = base64::decode_block(config.shared_key.inner())?;
         let shared_key = pkey::PKey::hmac(&shared_key_bytes)?;
@@ -313,10 +318,12 @@ impl AzureMonitorLogsSink {
         let log_type = HeaderValue::from_str(&config.log_type)?;
         default_headers.insert(LOG_TYPE_HEADER.clone(), log_type);
 
-        default_headers.insert(
-            TIME_GENERATED_FIELD_HEADER.clone(),
-            HeaderValue::try_from(time_generated_key.to_string())?,
-        );
+        if let Some(timestamp_key) = &time_generated_key {
+            default_headers.insert(
+                TIME_GENERATED_FIELD_HEADER.clone(),
+                HeaderValue::try_from(timestamp_key.to_string())?,
+            );
+        }
 
         if let Some(azure_resource_id) = &config.azure_resource_id {
             if azure_resource_id.is_empty() {
@@ -446,14 +453,13 @@ mod tests {
         let sink = AzureMonitorLogsSink {
             uri: mock_endpoint,
             customer_id: "weee".to_string(),
-            time_generated_key: parse_value_path(log_schema().timestamp_key())
-                .expect("log_schema.timestamp_key to be valid path"),
+            time_generated_key: log_schema().timestamp_key().cloned(),
             transformer: Default::default(),
             shared_key,
             default_headers: HeaderMap::new(),
         };
 
-        let context = SinkContext::new_test();
+        let context = SinkContext::default();
         let client =
             HttpClient::new(None, &context.proxy).expect("should not fail to create HTTP client");
 
@@ -470,6 +476,7 @@ mod tests {
         .sink_map_err(|error| error!(message = "Fatal azure_monitor_logs sink error.", %error));
 
         let event = Event::Log(LogEvent::from("simple message"));
+        #[allow(deprecated)]
         run_and_assert_sink_compliance(
             VectorSink::from_event_sink(sink),
             stream::once(ready(event)),
@@ -481,11 +488,11 @@ mod tests {
     fn insert_timestamp_kv(log: &mut LogEvent) -> (String, String) {
         let now = chrono::Utc::now();
 
-        let timestamp_key = log_schema().timestamp_key().to_string();
+        let timestamp_key = log_schema().timestamp_key().unwrap();
         let timestamp_value = now.to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
-        log.insert(timestamp_key.as_str(), now);
+        log.insert((PathPrefix::Event, timestamp_key), now);
 
-        (timestamp_key, timestamp_value)
+        (timestamp_key.to_string(), timestamp_value)
     }
 
     #[test]
@@ -582,7 +589,10 @@ mod tests {
 
         let time_generated_field = headers.get("time-generated-field").unwrap();
         let timestamp_key = log_schema().timestamp_key();
-        assert_eq!(time_generated_field.to_str().unwrap(), timestamp_key);
+        assert_eq!(
+            time_generated_field.to_str().unwrap(),
+            timestamp_key.unwrap().to_string().as_str()
+        );
 
         let azure_resource_id = headers.get("x-ms-azureresourceid").unwrap();
         assert_eq!(
@@ -607,7 +617,7 @@ mod tests {
         "#,
         )
         .unwrap();
-        if config.build(SinkContext::new_test()).await.is_ok() {
+        if config.build(SinkContext::default()).await.is_ok() {
             panic!("config.build failed to error");
         }
     }
@@ -647,7 +657,7 @@ mod tests {
         "#,
         )
         .unwrap();
-        if config.build(SinkContext::new_test()).await.is_ok() {
+        if config.build(SinkContext::default()).await.is_ok() {
             panic!("config.build failed to error");
         }
     }

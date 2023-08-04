@@ -484,9 +484,9 @@ fn setup_logs_reporting(
         dd_common: DatadogCommonConfig {
             endpoint: datadog.endpoint.clone(),
             site: datadog.site.clone(),
+            default_api_key: api_key.into(),
             ..Default::default()
         },
-        default_api_key: api_key.into(),
         region: datadog.region,
         request: RequestConfig {
             headers: IndexMap::from([(
@@ -592,9 +592,9 @@ fn setup_metrics_reporting(
         dd_common: DatadogCommonConfig {
             endpoint: datadog.endpoint.clone(),
             site: datadog.site.clone(),
+            default_api_key: api_key.into(),
             ..Default::default()
         },
-        default_api_key: api_key.into(),
         region: datadog.region,
         ..Default::default()
     };
@@ -832,11 +832,12 @@ mod test {
     use http::StatusCode;
     use indexmap::IndexMap;
     use tokio::time::sleep;
-    use value::Kind;
-    use vector_common::btreemap;
     use vector_core::config::proxy::ProxyConfig;
-    use vrl::prelude::Collection;
-    use vrl::CompileConfig;
+    use vrl::btreemap;
+    use vrl::compiler::state::ExternalEnv;
+    use vrl::compiler::{compile, compile_with_external, CompileConfig};
+    use vrl::value::kind::Collection;
+    use vrl::value::Kind;
     use wiremock::{matchers, Mock, MockServer, ResponseTemplate};
 
     use super::{
@@ -1003,15 +1004,15 @@ mod test {
         // We need to set up some state here to inform the VRL compiler that
         // .tags is an object and merge() is thus a safe operation (mimicking
         // the environment this code will actually run in).
-        let state = vrl::state::ExternalEnv::new_with_kind(
+        let state = ExternalEnv::new_with_kind(
             Kind::object(btreemap! {
                 "tags" => Kind::object(BTreeMap::new()),
             }),
             Kind::object(Collection::empty()),
         );
-        assert!(vrl::compile_with_external(
+        assert!(compile_with_external(
             vrl.as_str(),
-            vrl_stdlib::all().as_ref(),
+            vrl::stdlib::all().as_ref(),
             &state,
             CompileConfig::default()
         )
@@ -1031,6 +1032,6 @@ mod test {
             vrl,
             r#". = merge(., {"pull_request":"1234","replica":"abcd","variant":"baseline"}, deep: true)"#
         );
-        assert!(vrl::compile(vrl.as_str(), vrl_stdlib::all().as_ref()).is_ok());
+        assert!(compile(vrl.as_str(), vrl::stdlib::all().as_ref()).is_ok());
     }
 }
