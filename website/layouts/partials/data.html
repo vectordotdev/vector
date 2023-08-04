@@ -690,7 +690,7 @@
           {{ end }}
           {{/* Deprecation Badge */}}
           {{ if $func.deprecated }}
-          {{ partial "badge.html" (dict "word" "deprecated" "color" "gray" "inline" true "href" $href) }}
+          {{ partial "badge.html" (dict "word" "deprecated" "color" "red" "inline" true "href" $href) }}
           {{ end }}
         </span>
       </span>
