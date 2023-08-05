@@ -351,6 +351,19 @@ impl LogEvent {
         }
     }
 
+    /// Parse the specified `path` and if there are no parsing errors, attempt to insert the specified `value`.
+    ///
+    /// # Errors
+    /// Will return an error if path parsing failed.
+    pub fn parse_path_and_insert(
+        &mut self,
+        path: impl AsRef<str>,
+        value: impl Into<Value>,
+    ) -> Result<Option<Value>, PathParseError> {
+        let target_path = parse_target_path(path.as_ref())?;
+        Ok(self.insert(&target_path, value))
+    }
+
     #[allow(clippy::needless_pass_by_value)] // TargetPath is always a reference
     pub fn insert<'a>(
         &mut self,
@@ -743,28 +756,31 @@ impl From<&tracing::Event<'_>> for LogEvent {
 
 impl tracing::field::Visit for LogEvent {
     fn record_str(&mut self, field: &tracing::field::Field, value: &str) {
-        self.insert(event_path!(field.name()), value.to_string());
+        self.parse_path_and_insert(field.as_ref(), value.to_string())
+            .ok();
     }
 
     fn record_debug(&mut self, field: &tracing::field::Field, value: &dyn Debug) {
-        self.insert(event_path!(field.name()), format!("{value:?}"));
+        self.parse_path_and_insert(field.as_ref(), format!("{value:?}"))
+            .ok();
     }
 
     fn record_i64(&mut self, field: &tracing::field::Field, value: i64) {
-        self.insert(event_path!(field.name()), value);
+        self.parse_path_and_insert(field.as_ref(), value).ok();
     }
 
     fn record_u64(&mut self, field: &tracing::field::Field, value: u64) {
-        let field_path = event_path!(field.name());
         let converted: Result<i64, _> = value.try_into();
         match converted {
-            Ok(value) => self.insert(field_path, value),
-            Err(_) => self.insert(field_path, value.to_string()),
+            Ok(value) => self.parse_path_and_insert(field.as_ref(), value).ok(),
+            Err(_) => self
+                .parse_path_and_insert(field.as_ref(), value.to_string())
+                .ok(),
         };
     }
 
     fn record_bool(&mut self, field: &tracing::field::Field, value: bool) {
-        self.insert(event_path!(field.name()), value);
+        self.parse_path_and_insert(field.as_ref(), value).ok();
     }
 }
 
