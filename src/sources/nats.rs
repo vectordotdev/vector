@@ -31,9 +31,9 @@ enum BuildError {
     #[snafu(display("NATS Config Error: {}", source))]
     Config { source: NatsConfigError },
     #[snafu(display("NATS Connect Error: {}", source))]
-    Connect { source: std::io::Error },
+    Connect { source: async_nats::ConnectError },
     #[snafu(display("NATS Subscribe Error: {}", source))]
-    Subscribe { source: async_nats::Error },
+    Subscribe { source: async_nats::SubscribeError },
 }
 
 /// Configuration for the `nats` source.
