@@ -5,7 +5,7 @@ base: components: sinks: humio_metrics: configuration: {
 		description: """
 			Controls how acknowledgements are handled for this sink.
 
-			See [End-to-end Acknowledgements][e2e_acks] for more information on how Vector handles event acknowledgement.
+			See [End-to-end Acknowledgements][e2e_acks] for more information on how event acknowledgement is handled.
 
 			[e2e_acks]: https://vector.dev/docs/about/under-the-hood/architecture/end-to-end-acknowledgements/
 			"""
@@ -15,7 +15,7 @@ base: components: sinks: humio_metrics: configuration: {
 				Whether or not end-to-end acknowledgements are enabled.
 
 				When enabled for a sink, any source connected to that sink, where the source supports
-				end-to-end acknowledgements as well, will wait for events to be acknowledged by the sink
+				end-to-end acknowledgements as well, waits for events to be acknowledged by the sink
 				before acknowledging them at the source.
 
 				Enabling or disabling acknowledgements at the sink level takes precedence over any global
@@ -33,23 +33,29 @@ base: components: sinks: humio_metrics: configuration: {
 		type: object: options: {
 			max_bytes: {
 				description: """
-					The maximum size of a batch that will be processed by a sink.
+					The maximum size of a batch that is processed by a sink.
 
 					This is based on the uncompressed size of the batched events, before they are
-					serialized / compressed.
+					serialized/compressed.
 					"""
 				required: false
-				type: uint: {}
+				type: uint: {
+					default: 1000000
+					unit:    "bytes"
+				}
 			}
 			max_events: {
-				description: "The maximum size of a batch, in events, before it is flushed."
+				description: "The maximum size of a batch before it is flushed."
 				required:    false
-				type: uint: {}
+				type: uint: unit: "events"
 			}
 			timeout_secs: {
-				description: "The maximum age of a batch, in seconds, before it is flushed."
+				description: "The maximum age of a batch before it is flushed."
 				required:    false
-				type: float: {}
+				type: float: {
+					default: 1.0
+					unit:    "seconds"
+				}
 			}
 		}
 	}
@@ -70,41 +76,48 @@ base: components: sinks: humio_metrics: configuration: {
 					"""
 				none: "No compression."
 				zlib: """
-					[Zlib]][zlib] compression.
+					[Zlib][zlib] compression.
 
 					[zlib]: https://zlib.net/
+					"""
+				zstd: """
+					[Zstandard][zstd] compression.
+
+					[zstd]: https://facebook.github.io/zstd/
 					"""
 			}
 		}
 	}
 	endpoint: {
-		description: "The base URL of the Humio instance."
-		required:    false
-		type: string: {}
-	}
-	enhanced_tags: {
 		description: """
-			Controls if this transform should encode tags using the enhanced encoding of [the
-			`native_json` codec][vector_native_json]?
+			The base URL of the Humio instance.
 
-			If set to `false`, tags will always be encoded as single string values using the last value
-			assigned to the tag.
+			The scheme (`http` or `https`) must be specified. No path should be included since the paths defined
+			by the [`Splunk`][splunk] API are used.
+
+			[splunk]: https://docs.splunk.com/Documentation/Splunk/8.0.0/Data/HECRESTendpoints
 			"""
 		required: false
-		type: bool: default: false
+		type: string: {
+			default: "https://cloud.humio.com"
+			examples: ["http://127.0.0.1", "https://example.com"]
+		}
 	}
 	event_type: {
 		description: """
 			The type of events sent to this sink. Humio uses this as the name of the parser to use to ingest the data.
 
-			If unset, Humio will default it to none.
+			If unset, Humio defaults it to none.
 			"""
 		required: false
-		type: string: syntax: "template"
+		type: string: {
+			examples: ["json", "none", "{{ event_type }}"]
+			syntax: "template"
+		}
 	}
 	host_key: {
 		description: """
-			Overrides the name of the log field used to grab the hostname to send to Humio.
+			Overrides the name of the log field used to retrieve the hostname to send to Humio.
 
 			By default, the [global `log_schema.host_key` option][global_host_key] is used.
 
@@ -117,8 +130,8 @@ base: components: sinks: humio_metrics: configuration: {
 		description: """
 			Name of the tag in the metric to use for the source host.
 
-			If present, the value of the tag is set on the generated log event in the "host" field,
-			where the field key will use the [global `host_key` option][global_log_schema_host_key].
+			If present, the value of the tag is set on the generated log event in the `host` field,
+			where the field key uses the [global `host_key` option][global_log_schema_host_key].
 
 			[global_log_schema_host_key]: https://vector.dev/docs/reference/configuration//global-options#log_schema.host_key
 			"""
@@ -138,7 +151,10 @@ base: components: sinks: humio_metrics: configuration: {
 			[humio_data_format]: https://docs.humio.com/integrations/data-shippers/hec/#format-of-data
 			"""
 		required: false
-		type: string: syntax: "template"
+		type: string: {
+			examples: ["{{ host }}", "custom_index"]
+			syntax: "template"
+		}
 	}
 	indexed_fields: {
 		description: """
@@ -154,6 +170,29 @@ base: components: sinks: humio_metrics: configuration: {
 		type: array: {
 			default: []
 			items: type: string: {}
+		}
+	}
+	metric_tag_values: {
+		description: """
+			Controls how metric tag values are encoded.
+
+			When set to `single`, only the last non-bare value of tags are displayed with the
+			metric.  When set to `full`, all metric tags are exposed as separate assignments as
+			described by [the `native_json` codec][vector_native_json].
+
+			[vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
+			"""
+		required: false
+		type: string: {
+			default: "single"
+			enum: {
+				full: "All tags are exposed as arrays of either string or null values."
+				single: """
+					Tag values are exposed as single strings, the same as they were before this config
+					option. Tags with multiple values show the last assigned value, and null values
+					are ignored.
+					"""
+			}
 		}
 	}
 	request: {
@@ -237,14 +276,20 @@ base: components: sinks: humio_metrics: configuration: {
 				}
 			}
 			rate_limit_duration_secs: {
-				description: "The time window, in seconds, used for the `rate_limit_num` option."
+				description: "The time window used for the `rate_limit_num` option."
 				required:    false
-				type: uint: default: 1
+				type: uint: {
+					default: 1
+					unit:    "seconds"
+				}
 			}
 			rate_limit_num: {
 				description: "The maximum number of requests allowed within the `rate_limit_duration_secs` time window."
 				required:    false
-				type: uint: default: 9223372036854775807
+				type: uint: {
+					default: 9223372036854775807
+					unit:    "requests"
+				}
 			}
 			retry_attempts: {
 				description: """
@@ -253,31 +298,43 @@ base: components: sinks: humio_metrics: configuration: {
 					The default, for all intents and purposes, represents an infinite number of retries.
 					"""
 				required: false
-				type: uint: default: 9223372036854775807
+				type: uint: {
+					default: 9223372036854775807
+					unit:    "retries"
+				}
 			}
 			retry_initial_backoff_secs: {
 				description: """
 					The amount of time to wait before attempting the first retry for a failed request.
 
-					After the first retry has failed, the fibonacci sequence will be used to select future backoffs.
+					After the first retry has failed, the fibonacci sequence is used to select future backoffs.
 					"""
 				required: false
-				type: uint: default: 1
+				type: uint: {
+					default: 1
+					unit:    "seconds"
+				}
 			}
 			retry_max_duration_secs: {
-				description: "The maximum amount of time, in seconds, to wait between retries."
+				description: "The maximum amount of time to wait between retries."
 				required:    false
-				type: uint: default: 3600
+				type: uint: {
+					default: 3600
+					unit:    "seconds"
+				}
 			}
 			timeout_secs: {
 				description: """
-					The maximum time a request can take before being aborted.
+					The time a request can take before being aborted.
 
-					It is highly recommended that you do not lower this value below the service’s internal timeout, as this could
+					Datadog highly recommends that you do not lower this value below the service's internal timeout, as this could
 					create orphaned requests, pile on retries, and result in duplicate data downstream.
 					"""
 				required: false
-				type: uint: default: 60
+				type: uint: {
+					default: 60
+					unit:    "seconds"
+				}
 			}
 		}
 	}
@@ -292,11 +349,11 @@ base: components: sinks: humio_metrics: configuration: {
 	}
 	timezone: {
 		description: """
-			The name of the timezone to apply to timestamp conversions that do not contain an explicit
+			The name of the time zone to apply to timestamp conversions that do not contain an explicit
 			time zone.
 
 			This overrides the [global `timezone`][global_timezone] option. The time zone name may be
-			any name in the [TZ database][tz_database], or `local` to indicate system local time.
+			any name in the [TZ database][tz_database] or `local` to indicate system local time.
 
 			[global_timezone]: https://vector.dev/docs/reference/configuration//global-options#timezone
 			[tz_database]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
@@ -312,8 +369,8 @@ base: components: sinks: humio_metrics: configuration: {
 				description: """
 					Sets the list of supported ALPN protocols.
 
-					Declare the supported ALPN protocols, which are used during negotiation with peer. Prioritized in the order
-					they are defined.
+					Declare the supported ALPN protocols, which are used during negotiation with peer. They are prioritized in the order
+					that they are defined.
 					"""
 				required: false
 				type: array: items: type: string: examples: ["h2"]
@@ -361,10 +418,10 @@ base: components: sinks: humio_metrics: configuration: {
 				description: """
 					Enables certificate verification.
 
-					If enabled, certificates must be valid in terms of not being expired, as well as being issued by a trusted
-					issuer. This verification operates in a hierarchical manner, checking that not only the leaf certificate (the
-					certificate presented by the client/server) is valid, but also that the issuer of that certificate is valid, and
-					so on until reaching a root certificate.
+					If enabled, certificates must not be expired and must be issued by a trusted
+					issuer. This verification operates in a hierarchical manner, checking that the leaf certificate (the
+					certificate presented by the client/server) is not only valid, but that the issuer of that certificate is also valid, and
+					so on until the verification process reaches a root certificate.
 
 					Relevant for both incoming and outgoing connections.
 
@@ -392,6 +449,6 @@ base: components: sinks: humio_metrics: configuration: {
 	token: {
 		description: "The Humio ingestion token."
 		required:    true
-		type: string: {}
+		type: string: examples: ["${HUMIO_TOKEN}", "A94A8FE5CCB19BA61C4C08"]
 	}
 }

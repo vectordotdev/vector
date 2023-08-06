@@ -5,7 +5,7 @@ base: components: sinks: prometheus_remote_write: configuration: {
 		description: """
 			Controls how acknowledgements are handled for this sink.
 
-			See [End-to-end Acknowledgements][e2e_acks] for more information on how Vector handles event acknowledgement.
+			See [End-to-end Acknowledgements][e2e_acks] for more information on how event acknowledgement is handled.
 
 			[e2e_acks]: https://vector.dev/docs/about/under-the-hood/architecture/end-to-end-acknowledgements/
 			"""
@@ -15,7 +15,7 @@ base: components: sinks: prometheus_remote_write: configuration: {
 				Whether or not end-to-end acknowledgements are enabled.
 
 				When enabled for a sink, any source connected to that sink, where the source supports
-				end-to-end acknowledgements as well, will wait for events to be acknowledged by the sink
+				end-to-end acknowledgements as well, waits for events to be acknowledged by the sink
 				before acknowledging them at the source.
 
 				Enabling or disabling acknowledgements at the sink level takes precedence over any global
@@ -35,19 +35,33 @@ base: components: sinks: prometheus_remote_write: configuration: {
 				description:   "The AWS access key ID."
 				relevant_when: "strategy = \"aws\""
 				required:      true
-				type: string: {}
+				type: string: examples: ["AKIAIOSFODNN7EXAMPLE"]
 			}
 			assume_role: {
-				description:   "The ARN of the role to assume."
+				description: """
+					The ARN of an [IAM role][iam_role] to assume.
+
+					[iam_role]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles.html
+					"""
 				relevant_when: "strategy = \"aws\""
 				required:      true
-				type: string: {}
+				type: string: examples: ["arn:aws:iam::123456789098:role/my_role"]
 			}
 			credentials_file: {
 				description:   "Path to the credentials file."
 				relevant_when: "strategy = \"aws\""
 				required:      true
-				type: string: {}
+				type: string: examples: ["/my/aws/credentials"]
+			}
+			external_id: {
+				description: """
+					The optional unique external ID in conjunction with role to assume.
+
+					[external_id]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_create_for-user_externalid.html
+					"""
+				relevant_when: "strategy = \"aws\""
+				required:      false
+				type: string: examples: ["randomEXAMPLEidString"]
 			}
 			imds: {
 				description:   "Configuration for authenticating with AWS through IMDS."
@@ -78,10 +92,17 @@ base: components: sinks: prometheus_remote_write: configuration: {
 				}
 			}
 			load_timeout_secs: {
-				description:   "Timeout for successfully loading any credentials, in seconds."
+				description: """
+					Timeout for successfully loading any credentials, in seconds.
+
+					Relevant when the default credentials chain or `assume_role` is used.
+					"""
 				relevant_when: "strategy = \"aws\""
 				required:      false
-				type: uint: {}
+				type: uint: {
+					examples: [30]
+					unit: "seconds"
+				}
 			}
 			password: {
 				description:   "Basic authentication password."
@@ -90,30 +111,40 @@ base: components: sinks: prometheus_remote_write: configuration: {
 				type: string: {}
 			}
 			profile: {
-				description:   "The credentials profile to use."
-				relevant_when: "strategy = \"aws\""
-				required:      false
-				type: string: {}
-			}
-			region: {
 				description: """
-					The AWS region to send STS requests to.
+					The credentials profile to use.
 
-					If not set, this will default to the configured region
-					for the service itself.
+					Used to select AWS credentials from a provided credentials file.
 					"""
 				relevant_when: "strategy = \"aws\""
 				required:      false
-				type: string: {}
+				type: string: {
+					default: "default"
+					examples: ["develop"]
+				}
+			}
+			region: {
+				description: """
+					The [AWS region][aws_region] to send STS requests to.
+
+					If not set, this defaults to the configured region
+					for the service itself.
+
+					[aws_region]: https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints
+					"""
+				relevant_when: "strategy = \"aws\""
+				required:      false
+				type: string: examples: ["us-west-2"]
 			}
 			secret_access_key: {
 				description:   "The AWS secret access key."
 				relevant_when: "strategy = \"aws\""
 				required:      true
-				type: string: {}
+				type: string: examples: ["wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"]
 			}
 			strategy: {
-				required: true
+				description: "The authentication strategy to use."
+				required:    true
 				type: string: enum: {
 					aws:   "Amazon Prometheus Service-specific authentication."
 					basic: "HTTP Basic Authentication."
@@ -143,14 +174,18 @@ base: components: sinks: prometheus_remote_write: configuration: {
 		required:    false
 		type: object: options: {
 			endpoint: {
-				description: "The API endpoint of the service."
+				description: "Custom endpoint for use with AWS-compatible services."
 				required:    false
-				type: string: {}
+				type: string: examples: ["http://127.0.0.0:5000/path/to/service"]
 			}
 			region: {
-				description: "The AWS region to use."
-				required:    false
-				type: string: {}
+				description: """
+					The [AWS region][aws_region] of the target service.
+
+					[aws_region]: https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints
+					"""
+				required: false
+				type: string: examples: ["us-east-1"]
 			}
 		}
 	}
@@ -160,23 +195,29 @@ base: components: sinks: prometheus_remote_write: configuration: {
 		type: object: options: {
 			max_bytes: {
 				description: """
-					The maximum size of a batch that will be processed by a sink.
+					The maximum size of a batch that is processed by a sink.
 
 					This is based on the uncompressed size of the batched events, before they are
-					serialized / compressed.
+					serialized/compressed.
 					"""
 				required: false
-				type: uint: {}
+				type: uint: unit: "bytes"
 			}
 			max_events: {
-				description: "The maximum size of a batch, in events, before it is flushed."
+				description: "The maximum size of a batch before it is flushed."
 				required:    false
-				type: uint: {}
+				type: uint: {
+					default: 1000
+					unit:    "events"
+				}
 			}
 			timeout_secs: {
-				description: "The maximum age of a batch, in seconds, before it is flushed."
+				description: "The maximum age of a batch before it is flushed."
 				required:    false
-				type: float: {}
+				type: float: {
+					default: 1.0
+					unit:    "seconds"
+				}
 			}
 		}
 	}
@@ -189,7 +230,19 @@ base: components: sinks: prometheus_remote_write: configuration: {
 		required: false
 		type: array: {
 			default: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]
-			items: type: number: {}
+			items: type: float: {}
+		}
+	}
+	compression: {
+		description: "Supported compression types for Prometheus Remote Write."
+		required:    false
+		type: string: {
+			default: "snappy"
+			enum: {
+				gzip:   "Gzip."
+				snappy: "Snappy."
+				zstd:   "Zstandard."
+			}
 		}
 	}
 	default_namespace: {
@@ -204,12 +257,16 @@ base: components: sinks: prometheus_remote_write: configuration: {
 			[prom_naming_docs]: https://prometheus.io/docs/practices/naming/#metric-names
 			"""
 		required: false
-		type: string: {}
+		type: string: examples: ["service"]
 	}
 	endpoint: {
-		description: "The endpoint to send data to."
-		required:    true
-		type: string: {}
+		description: """
+			The endpoint to send data to.
+
+			The endpoint should include the scheme and the path to write to.
+			"""
+		required: true
+		type: string: examples: ["https://localhost:8087/api/v1/write"]
 	}
 	quantiles: {
 		description: """
@@ -220,7 +277,7 @@ base: components: sinks: prometheus_remote_write: configuration: {
 		required: false
 		type: array: {
 			default: [0.5, 0.75, 0.9, 0.95, 0.99]
-			items: type: number: {}
+			items: type: float: {}
 		}
 	}
 	request: {
@@ -304,14 +361,20 @@ base: components: sinks: prometheus_remote_write: configuration: {
 				}
 			}
 			rate_limit_duration_secs: {
-				description: "The time window, in seconds, used for the `rate_limit_num` option."
+				description: "The time window used for the `rate_limit_num` option."
 				required:    false
-				type: uint: default: 1
+				type: uint: {
+					default: 1
+					unit:    "seconds"
+				}
 			}
 			rate_limit_num: {
 				description: "The maximum number of requests allowed within the `rate_limit_duration_secs` time window."
 				required:    false
-				type: uint: default: 9223372036854775807
+				type: uint: {
+					default: 9223372036854775807
+					unit:    "requests"
+				}
 			}
 			retry_attempts: {
 				description: """
@@ -320,31 +383,43 @@ base: components: sinks: prometheus_remote_write: configuration: {
 					The default, for all intents and purposes, represents an infinite number of retries.
 					"""
 				required: false
-				type: uint: default: 9223372036854775807
+				type: uint: {
+					default: 9223372036854775807
+					unit:    "retries"
+				}
 			}
 			retry_initial_backoff_secs: {
 				description: """
 					The amount of time to wait before attempting the first retry for a failed request.
 
-					After the first retry has failed, the fibonacci sequence will be used to select future backoffs.
+					After the first retry has failed, the fibonacci sequence is used to select future backoffs.
 					"""
 				required: false
-				type: uint: default: 1
+				type: uint: {
+					default: 1
+					unit:    "seconds"
+				}
 			}
 			retry_max_duration_secs: {
-				description: "The maximum amount of time, in seconds, to wait between retries."
+				description: "The maximum amount of time to wait between retries."
 				required:    false
-				type: uint: default: 3600
+				type: uint: {
+					default: 3600
+					unit:    "seconds"
+				}
 			}
 			timeout_secs: {
 				description: """
-					The maximum time a request can take before being aborted.
+					The time a request can take before being aborted.
 
-					It is highly recommended that you do not lower this value below the service’s internal timeout, as this could
+					Datadog highly recommends that you do not lower this value below the service's internal timeout, as this could
 					create orphaned requests, pile on retries, and result in duplicate data downstream.
 					"""
 				required: false
-				type: uint: default: 60
+				type: uint: {
+					default: 60
+					unit:    "seconds"
+				}
 			}
 		}
 	}
@@ -352,12 +427,15 @@ base: components: sinks: prometheus_remote_write: configuration: {
 		description: """
 			The tenant ID to send.
 
-			If set, a header named `X-Scope-OrgID` will be added to outgoing requests with the value of this setting.
+			If set, a header named `X-Scope-OrgID` is added to outgoing requests with the value of this setting.
 
 			This may be used by Cortex or other remote services to identify the tenant making the request.
 			"""
 		required: false
-		type: string: syntax: "template"
+		type: string: {
+			examples: ["my-domain"]
+			syntax: "template"
+		}
 	}
 	tls: {
 		description: "TLS configuration."
@@ -367,8 +445,8 @@ base: components: sinks: prometheus_remote_write: configuration: {
 				description: """
 					Sets the list of supported ALPN protocols.
 
-					Declare the supported ALPN protocols, which are used during negotiation with peer. Prioritized in the order
-					they are defined.
+					Declare the supported ALPN protocols, which are used during negotiation with peer. They are prioritized in the order
+					that they are defined.
 					"""
 				required: false
 				type: array: items: type: string: examples: ["h2"]
@@ -416,10 +494,10 @@ base: components: sinks: prometheus_remote_write: configuration: {
 				description: """
 					Enables certificate verification.
 
-					If enabled, certificates must be valid in terms of not being expired, as well as being issued by a trusted
-					issuer. This verification operates in a hierarchical manner, checking that not only the leaf certificate (the
-					certificate presented by the client/server) is valid, but also that the issuer of that certificate is valid, and
-					so on until reaching a root certificate.
+					If enabled, certificates must not be expired and must be issued by a trusted
+					issuer. This verification operates in a hierarchical manner, checking that the leaf certificate (the
+					certificate presented by the client/server) is not only valid, but that the issuer of that certificate is also valid, and
+					so on until the verification process reaches a root certificate.
 
 					Relevant for both incoming and outgoing connections.
 

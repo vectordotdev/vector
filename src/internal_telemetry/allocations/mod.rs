@@ -93,7 +93,7 @@ impl Tracer for MainTracer {
     #[inline(always)]
     fn trace_allocation(&self, object_size: usize, group_id: AllocationGroupId) {
         // Handle the case when thread local destructor is ran.
-        let _ = GROUP_MEM_STATS.try_with(|t| {
+        _ = GROUP_MEM_STATS.try_with(|t| {
             t.stats.allocations[group_id.as_raw() as usize]
                 .fetch_add(object_size as u64, Ordering::Relaxed)
         });
@@ -102,7 +102,7 @@ impl Tracer for MainTracer {
     #[inline(always)]
     fn trace_deallocation(&self, object_size: usize, source_group_id: AllocationGroupId) {
         // Handle the case when thread local destructor is ran.
-        let _ = GROUP_MEM_STATS.try_with(|t| {
+        _ = GROUP_MEM_STATS.try_with(|t| {
             t.stats.deallocations[source_group_id.as_raw() as usize]
                 .fetch_add(object_size as u64, Ordering::Relaxed)
         });
@@ -191,22 +191,22 @@ pub fn acquire_allocation_group_id(
     component_type: String,
     component_kind: String,
 ) -> AllocationGroupId {
-    let group_id =
-        AllocationGroupId::register().expect("failed to register allocation group token");
-    let idx = group_id.as_raw();
-    match GROUP_INFO.get(idx as usize) {
-        Some(mutex) => {
-            let mut writer = mutex.lock().unwrap();
+    if let Some(group_id) = AllocationGroupId::register() {
+        if let Some(group_lock) = GROUP_INFO.get(group_id.as_raw() as usize) {
+            let mut writer = group_lock.lock().unwrap();
             *writer = GroupInfo {
                 component_id,
                 component_kind,
                 component_type,
             };
-            group_id
-        }
-        None => {
-            info!("Maximum number of registrable allocation group IDs reached ({}). Allocations for component '{}' will be attributed to the root allocation group.", NUM_GROUPS, component_id);
-            AllocationGroupId::ROOT
+
+            return group_id;
         }
     }
+
+    // TODO: Technically, `NUM_GROUPS` is lower (128) than the upper bound for the
+    // `AllocationGroupId::register` call itself (253), so we can hardcode `NUM_GROUPS` here knowing
+    // it's the lower of the two values and will trigger first.. but this may not always be true.
+    info!("Maximum number of registrable allocation group IDs reached ({}). Allocations for component '{}' will be attributed to the root allocation group.", NUM_GROUPS, component_id);
+    AllocationGroupId::ROOT
 }

@@ -1,9 +1,9 @@
 ---
 title: Kafka
-description: Collect logs from [Kafka](https://kafka.apache.org)
+description: Collect observability data from [Apache Kafka](https://kafka.apache.org) topics
 kind: source
 layout: component
-tags: ["kafka", "apache", "component", "source", "logs"]
+tags: ["kafka", "apache", "component", "source"]
 ---
 
 {{/*

@@ -22,6 +22,7 @@ pub mod udp;
 #[cfg(all(any(feature = "sinks-socket", feature = "sinks-statsd"), unix))]
 pub mod unix;
 pub mod uri;
+pub mod zstd;
 
 use std::borrow::Cow;
 
@@ -47,6 +48,7 @@ pub use service::{
 pub use sink::{BatchSink, PartitionBatchSink, StreamSink};
 use snafu::Snafu;
 pub use uri::UriSerde;
+use vector_common::json_size::JsonSize;
 
 use crate::event::EventFinalizers;
 
@@ -63,16 +65,18 @@ pub struct EncodedEvent<I> {
     pub item: I,
     pub finalizers: EventFinalizers,
     pub byte_size: usize,
+    pub json_byte_size: JsonSize,
 }
 
 impl<I> EncodedEvent<I> {
     /// Create a trivial input with no metadata. This method will be
     /// removed when all sinks are converted.
-    pub fn new(item: I, byte_size: usize) -> Self {
+    pub fn new(item: I, byte_size: usize, json_byte_size: JsonSize) -> Self {
         Self {
             item,
             finalizers: Default::default(),
             byte_size,
+            json_byte_size,
         }
     }
 
@@ -89,6 +93,7 @@ impl<I> EncodedEvent<I> {
             item: I::from(that.item),
             finalizers: that.finalizers,
             byte_size: that.byte_size,
+            json_byte_size: that.json_byte_size,
         }
     }
 
@@ -98,6 +103,7 @@ impl<I> EncodedEvent<I> {
             item: doit(self.item),
             finalizers: self.finalizers,
             byte_size: self.byte_size,
+            json_byte_size: self.json_byte_size,
         }
     }
 }

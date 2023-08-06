@@ -2,9 +2,10 @@ use chrono::{DateTime, Utc};
 use derivative::Derivative;
 use lookup::path;
 use vector_common::conversion;
-use vector_config::NamedComponent;
 use vector_core::config::{log_schema, LegacyKey, LogNamespace};
+use vrl::path::PathPrefix;
 
+use crate::sources::kubernetes_logs::transform_utils::get_message_field;
 use crate::{
     event::{self, Event, Value},
     internal_events::{
@@ -41,20 +42,18 @@ impl Cri {
 
 impl FunctionTransform for Cri {
     fn transform(&mut self, output: &mut OutputBuffer, mut event: Event) {
-        let message_field = match self.log_namespace {
-            LogNamespace::Vector => ".",
-            LogNamespace::Legacy => log_schema().message_key(),
-        };
+        let message_field = get_message_field(self.log_namespace);
+        let target_path = (PathPrefix::Event, message_field.as_str());
 
         // Get the log field with the message, if it exists, and coerce it to bytes.
         let log = event.as_mut_log();
-        let value = log.remove(message_field).map(|s| s.coerce_to_bytes());
+        let value = log.remove(target_path).map(|s| s.coerce_to_bytes());
         match value {
             None => {
                 // The message field was missing, inexplicably. If we can't find the message field, there's nothing for
                 // us to actually decode, so there's no event we could emit, and so we just emit the error and return.
                 emit!(ParserMissingFieldError::<DROP_EVENT> {
-                    field: message_field
+                    field: &message_field.to_string()
                 });
                 return;
             }
@@ -71,7 +70,7 @@ impl FunctionTransform for Cri {
                     // MESSAGE
                     // Insert either directly into `.` or `log_schema().message_key()`,
                     // overwriting the original "full" CRI log that included additional fields.
-                    drop(log.insert(message_field, Value::Bytes(s.slice_ref(parsed_log.message))));
+                    drop(log.insert(target_path, Value::Bytes(s.slice_ref(parsed_log.message))));
 
                     // MULTILINE_TAG
                     // If the MULTILINE_TAG is 'P' (partial), insert our generic `_partial` key.
@@ -97,7 +96,7 @@ impl FunctionTransform for Cri {
                             self.log_namespace.insert_source_metadata(
                                 Config::NAME,
                                 log,
-                                Some(LegacyKey::Overwrite(path!(log_schema().timestamp_key()))),
+                                log_schema().timestamp_key().map(LegacyKey::Overwrite),
                                 path!(TIMESTAMP_KEY),
                                 Value::Timestamp(dt.with_timezone(&Utc)),
                             )
@@ -189,7 +188,8 @@ pub mod tests {
     use bytes::Bytes;
 
     use super::{super::test_util, *};
-    use crate::{event::LogEvent, test_util::trace_init, transforms::Transform};
+    use crate::{event::LogEvent, test_util::trace_init};
+    use vrl::value;
 
     fn make_long_string(base: &str, len: usize) -> String {
         base.chars().cycle().take(len).collect()
@@ -203,7 +203,7 @@ pub mod tests {
                     "2016-10-06T00:17:09.669794202Z stdout F The content of the log entry 1",
                 ),
                 vec![test_util::make_log_event(
-                    vrl::value!("The content of the log entry 1"),
+                    value!("The content of the log entry 1"),
                     "2016-10-06T00:17:09.669794202Z",
                     "stdout",
                     false,
@@ -213,7 +213,7 @@ pub mod tests {
             (
                 Bytes::from("2016-10-06T00:17:09.669794202Z stdout P First line of log entry 2"),
                 vec![test_util::make_log_event(
-                    vrl::value!("First line of log entry 2"),
+                    value!("First line of log entry 2"),
                     "2016-10-06T00:17:09.669794202Z",
                     "stdout",
                     true,
@@ -225,7 +225,7 @@ pub mod tests {
                     "2016-10-06T00:17:09.669794202Z stdout P Second line of the log entry 2",
                 ),
                 vec![test_util::make_log_event(
-                    vrl::value!("Second line of the log entry 2"),
+                    value!("Second line of the log entry 2"),
                     "2016-10-06T00:17:09.669794202Z",
                     "stdout",
                     true,
@@ -235,7 +235,7 @@ pub mod tests {
             (
                 Bytes::from("2016-10-06T00:17:10.113242941Z stderr F Last line of the log entry 2"),
                 vec![test_util::make_log_event(
-                    vrl::value!("Last line of the log entry 2"),
+                    value!("Last line of the log entry 2"),
                     "2016-10-06T00:17:10.113242941Z",
                     "stderr",
                     false,
@@ -252,7 +252,7 @@ pub mod tests {
                     .join(""),
                 ),
                 vec![test_util::make_log_event(
-                    vrl::value!(make_long_string("very long message ", 16 * 1024)),
+                    value!(make_long_string("very long message ", 16 * 1024)),
                     "2016-10-06T00:17:10.113242941Z",
                     "stdout",
                     true,
@@ -269,7 +269,7 @@ pub mod tests {
                     128, 208, 184, 208, 178, 208, 181, 209, 130, 32, 208, 156, 208, 184, 209, 10,
                 ]),
                 vec![test_util::make_log_event(
-                    vrl::value!(Bytes::from(vec![
+                    value!(Bytes::from(vec![
                         72, 101, 108, 108, 111, 32, 87, 111, 114, 108, 100, 32, 208, 159, 209, 128,
                         208, 184, 208, 178, 208, 181, 209, 130, 32, 208, 156, 208, 184, 209,
                     ])),
@@ -286,8 +286,8 @@ pub mod tests {
     fn test_parsing_valid_vector_namespace() {
         trace_init();
         test_util::test_parser(
-            || Transform::function(Cri::new(LogNamespace::Vector)),
-            |bytes| Event::Log(LogEvent::from(vrl::value!(bytes))),
+            || Cri::new(LogNamespace::Vector),
+            |bytes| Event::Log(LogEvent::from(value!(bytes))),
             valid_cases(LogNamespace::Vector),
         );
     }
@@ -296,7 +296,7 @@ pub mod tests {
     fn test_parsing_valid_legacy_namespace() {
         trace_init();
         test_util::test_parser(
-            || Transform::function(Cri::new(LogNamespace::Legacy)),
+            || Cri::new(LogNamespace::Legacy),
             |bytes| Event::Log(LogEvent::from(bytes)),
             valid_cases(LogNamespace::Legacy),
         );

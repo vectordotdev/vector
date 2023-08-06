@@ -7,7 +7,7 @@ components: sources: mongodb_metrics: {
 		commonly_used: false
 		delivery:      "at_least_once"
 		deployment_roles: ["daemon", "sidecar"]
-		development:   "beta"
+		development:   "stable"
 		egress_method: "batch"
 		stateful:      false
 	}
@@ -51,34 +51,7 @@ components: sources: mongodb_metrics: {
 		platform_name: null
 	}
 
-	configuration: {
-		endpoints: {
-			description: "MongoDB [Connection String URI Format](\(urls.mongodb_connection_string_uri_format))"
-			required:    true
-			type: array: {
-				items: type: string: {
-					examples: ["mongodb://localhost:27017"]
-				}
-			}
-		}
-		scrape_interval_secs: {
-			description: "The interval between scrapes."
-			common:      true
-			required:    false
-			type: uint: {
-				default: 15
-				unit:    "seconds"
-			}
-		}
-		namespace: {
-			description: "The namespace of metrics. Disabled if empty."
-			common:      false
-			required:    false
-			type: string: {
-				default: "mongodb"
-			}
-		}
-	}
+	configuration: base.components.sources.mongodb_metrics.configuration
 
 	how_it_works: {
 		mod_status: {
@@ -749,17 +722,9 @@ components: sources: mongodb_metrics: {
 	}
 
 	telemetry: metrics: {
-		events_in_total:                  components.sources.internal_metrics.output.metrics.events_in_total
-		collect_completed_total:          components.sources.internal_metrics.output.metrics.collect_completed_total
-		collect_duration_seconds:         components.sources.internal_metrics.output.metrics.collect_duration_seconds
-		parse_errors_total:               components.sources.internal_metrics.output.metrics.parse_errors_total
-		request_errors_total:             components.sources.internal_metrics.output.metrics.request_errors_total
-		component_discarded_events_total: components.sources.internal_metrics.output.metrics.component_discarded_events_total
-		component_errors_total:           components.sources.internal_metrics.output.metrics.component_errors_total
-		component_received_bytes_total:   components.sources.internal_metrics.output.metrics.component_received_bytes_total & {
-			description: "The number of deserialized bytes from the returned BSON documents"
-		}
-		component_received_event_bytes_total: components.sources.internal_metrics.output.metrics.component_received_event_bytes_total
-		component_received_events_total:      components.sources.internal_metrics.output.metrics.component_received_events_total
+		collect_completed_total:  components.sources.internal_metrics.output.metrics.collect_completed_total
+		collect_duration_seconds: components.sources.internal_metrics.output.metrics.collect_duration_seconds
+		parse_errors_total:       components.sources.internal_metrics.output.metrics.parse_errors_total
+		request_errors_total:     components.sources.internal_metrics.output.metrics.request_errors_total
 	}
 }

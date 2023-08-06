@@ -1,0 +1,18 @@
+features:
+- humio-integration-tests
+
+test_filter: '::humio::'
+
+runner:
+  env:
+    HUMIO_ADDRESS: http://humio:8080
+
+matrix:
+  version: [1.13.1]
+
+# changes to these files/paths will invoke the integration test in CI
+# expressions are evaluated using https://github.com/micromatch/picomatch
+paths:
+- "src/sinks/humio/**"
+- "src/sinks/util/**"
+- "scripts/integration/humio/**"

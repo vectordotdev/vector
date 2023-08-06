@@ -12,7 +12,7 @@ base: components: sources: nats: configuration: {
 				type: object: options: path: {
 					description: "Path to credentials file."
 					required:    true
-					type: string: {}
+					type: string: examples: ["/etc/nats/nats.creds"]
 				}
 			}
 			nkey: {
@@ -41,24 +41,21 @@ base: components: sources: nats: configuration: {
 				}
 			}
 			strategy: {
+				description: """
+					The strategy used to authenticate with the NATS server.
+
+					More information on NATS authentication, and the various authentication strategies, can be found in the
+					NATS [documentation][nats_auth_docs]. For TLS client certificate authentication specifically, see the
+					`tls` settings.
+
+					[nats_auth_docs]: https://docs.nats.io/running-a-nats-service/configuration/securing_nats/auth_intro
+					"""
 				required: true
 				type: string: enum: {
-					credentials_file: """
-						Credentials file authentication.
-						([documentation](https://docs.nats.io/running-a-nats-service/configuration/securing_nats/auth_intro/jwt))
-						"""
-					nkey: """
-						NKey authentication.
-						([documentation](https://docs.nats.io/running-a-nats-service/configuration/securing_nats/auth_intro/nkey_auth))
-						"""
-					token: """
-						Token authentication.
-						([documentation](https://docs.nats.io/running-a-nats-service/configuration/securing_nats/auth_intro/tokens))
-						"""
-					user_password: """
-						Username and password authentication.
-						([documentation](https://docs.nats.io/running-a-nats-service/configuration/securing_nats/auth_intro/username_password))
-						"""
+					credentials_file: "Credentials file authentication. (JWT-based)"
+					nkey:             "NKey authentication."
+					token:            "Token authentication."
+					user_password:    "Username/password authentication."
 				}
 			}
 			token: {
@@ -91,55 +88,149 @@ base: components: sources: nats: configuration: {
 		}
 	}
 	connection_name: {
-		description: "A name assigned to the NATS connection."
-		required:    true
-		type: string: {}
+		description: """
+			A [name][nats_connection_name] assigned to the NATS connection.
+
+			[nats_connection_name]: https://docs.nats.io/using-nats/developer/connecting/name
+			"""
+		required: true
+		type: string: examples: [
+			"vector",
+		]
 	}
 	decoding: {
 		description: "Configures how events are decoded from raw bytes."
 		required:    false
-		type: object: options: codec: {
-			description: "The codec to use for decoding events."
-			required:    false
-			type: string: {
-				default: "bytes"
-				enum: {
-					bytes: "Uses the raw bytes as-is."
-					gelf: """
-						Decodes the raw bytes as a [GELF][gelf] message.
+		type: object: options: {
+			codec: {
+				description: "The codec to use for decoding events."
+				required:    false
+				type: string: {
+					default: "bytes"
+					enum: {
+						bytes: "Uses the raw bytes as-is."
+						gelf: """
+															Decodes the raw bytes as a [GELF][gelf] message.
 
-						[gelf]: https://docs.graylog.org/docs/gelf
+															[gelf]: https://docs.graylog.org/docs/gelf
+															"""
+						json: """
+															Decodes the raw bytes as [JSON][json].
+
+															[json]: https://www.json.org/
+															"""
+						native: """
+															Decodes the raw bytes as Vector’s [native Protocol Buffers format][vector_native_protobuf].
+
+															This codec is **[experimental][experimental]**.
+
+															[vector_native_protobuf]: https://github.com/vectordotdev/vector/blob/master/lib/vector-core/proto/event.proto
+															[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
+															"""
+						native_json: """
+															Decodes the raw bytes as Vector’s [native JSON format][vector_native_json].
+
+															This codec is **[experimental][experimental]**.
+
+															[vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
+															[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
+															"""
+						protobuf: """
+															Decodes the raw bytes as [protobuf][protobuf].
+
+															[protobuf]: https://protobuf.dev/
+															"""
+						syslog: """
+															Decodes the raw bytes as a Syslog message.
+
+															Decodes either as the [RFC 3164][rfc3164]-style format ("old" style) or the
+															[RFC 5424][rfc5424]-style format ("new" style, includes structured data).
+
+															[rfc3164]: https://www.ietf.org/rfc/rfc3164.txt
+															[rfc5424]: https://www.ietf.org/rfc/rfc5424.txt
+															"""
+					}
+				}
+			}
+			gelf: {
+				description:   "GELF-specific decoding options."
+				relevant_when: "codec = \"gelf\""
+				required:      false
+				type: object: options: lossy: {
+					description: """
+						Determines whether or not to replace invalid UTF-8 sequences instead of failing.
+
+						When true, invalid UTF-8 sequences are replaced with the [`U+FFFD REPLACEMENT CHARACTER`][U+FFFD].
+
+						[U+FFFD]: https://en.wikipedia.org/wiki/Specials_(Unicode_block)#Replacement_character
 						"""
-					json: """
-						Decodes the raw bytes as [JSON][json].
+					required: false
+					type: bool: default: true
+				}
+			}
+			json: {
+				description:   "JSON-specific decoding options."
+				relevant_when: "codec = \"json\""
+				required:      false
+				type: object: options: lossy: {
+					description: """
+						Determines whether or not to replace invalid UTF-8 sequences instead of failing.
 
-						[json]: https://www.json.org/
+						When true, invalid UTF-8 sequences are replaced with the [`U+FFFD REPLACEMENT CHARACTER`][U+FFFD].
+
+						[U+FFFD]: https://en.wikipedia.org/wiki/Specials_(Unicode_block)#Replacement_character
 						"""
-					native: """
-						Decodes the raw bytes as Vector’s [native Protocol Buffers format][vector_native_protobuf].
+					required: false
+					type: bool: default: true
+				}
+			}
+			native_json: {
+				description:   "Vector's native JSON-specific decoding options."
+				relevant_when: "codec = \"native_json\""
+				required:      false
+				type: object: options: lossy: {
+					description: """
+						Determines whether or not to replace invalid UTF-8 sequences instead of failing.
 
-						This codec is **[experimental][experimental]**.
+						When true, invalid UTF-8 sequences are replaced with the [`U+FFFD REPLACEMENT CHARACTER`][U+FFFD].
 
-						[vector_native_protobuf]: https://github.com/vectordotdev/vector/blob/master/lib/vector-core/proto/event.proto
-						[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
+						[U+FFFD]: https://en.wikipedia.org/wiki/Specials_(Unicode_block)#Replacement_character
 						"""
-					native_json: """
-						Decodes the raw bytes as Vector’s [native JSON format][vector_native_json].
+					required: false
+					type: bool: default: true
+				}
+			}
+			protobuf: {
+				description:   "Protobuf-specific decoding options."
+				relevant_when: "codec = \"protobuf\""
+				required:      false
+				type: object: options: {
+					desc_file: {
+						description: "Path to desc file"
+						required:    false
+						type: string: default: ""
+					}
+					message_type: {
+						description: "message type. e.g package.message"
+						required:    false
+						type: string: default: ""
+					}
+				}
+			}
+			syslog: {
+				description:   "Syslog-specific decoding options."
+				relevant_when: "codec = \"syslog\""
+				required:      false
+				type: object: options: lossy: {
+					description: """
+						Determines whether or not to replace invalid UTF-8 sequences instead of failing.
 
-						This codec is **[experimental][experimental]**.
+						When true, invalid UTF-8 sequences are replaced with the [`U+FFFD REPLACEMENT CHARACTER`][U+FFFD].
 
-						[vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
-						[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
+						[U+FFFD]: https://en.wikipedia.org/wiki/Specials_(Unicode_block)#Replacement_character
 						"""
-					syslog: """
-						Decodes the raw bytes as a Syslog message.
-
-						Will decode either as the [RFC 3164][rfc3164]-style format ("old" style) or the more modern
-						[RFC 5424][rfc5424]-style format ("new" style, includes structured data).
-
-						[rfc3164]: https://www.ietf.org/rfc/rfc3164.txt
-						[rfc5424]: https://www.ietf.org/rfc/rfc5424.txt
-						"""
+					required: false
+					type: bool: default: true
 				}
 			}
 		}
@@ -148,8 +239,8 @@ base: components: sources: nats: configuration: {
 		description: """
 			Framing configuration.
 
-			Framing deals with how events are separated when encoded in a raw byte form, where each event is
-			a "frame" that must be prefixed, or delimited, in a way that marks where an event begins and
+			Framing handles how events are separated when encoded in a raw byte form, where each event is
+			a frame that must be prefixed, or delimited, in a way that marks where an event begins and
 			ends within the byte stream.
 			"""
 		required: false
@@ -169,6 +260,14 @@ base: components: sources: nats: configuration: {
 																The maximum length of the byte buffer.
 
 																This length does *not* include the trailing delimiter.
+
+																By default, there is no maximum length enforced. If events are malformed, this can lead to
+																additional resource usage as events continue to be buffered in memory, and can potentially
+																lead to memory exhaustion in extreme cases.
+
+																If there is a risk of processing malformed data, such as logs with user-controlled input,
+																consider setting the maximum length to a reasonably large value as a safety net. This
+																ensures that processing is not actually unbounded.
 																"""
 						required: false
 						type: uint: {}
@@ -181,7 +280,7 @@ base: components: sources: nats: configuration: {
 				type: string: {
 					default: "bytes"
 					enum: {
-						bytes:               "Byte frames are passed through as-is according to the underlying I/O boundaries (e.g. split between messages or stream segments)."
+						bytes:               "Byte frames are passed through as-is according to the underlying I/O boundaries (for example, split between messages or stream segments)."
 						character_delimited: "Byte frames which are delimited by a chosen character."
 						length_delimited:    "Byte frames which are prefixed by an unsigned big-endian 32-bit integer indicating the length."
 						newline_delimited:   "Byte frames which are delimited by a newline character."
@@ -202,6 +301,14 @@ base: components: sources: nats: configuration: {
 						The maximum length of the byte buffer.
 
 						This length does *not* include the trailing delimiter.
+
+						By default, there is no maximum length enforced. If events are malformed, this can lead to
+						additional resource usage as events continue to be buffered in memory, and can potentially
+						lead to memory exhaustion in extreme cases.
+
+						If there is a risk of processing malformed data, such as logs with user-controlled input,
+						consider setting the maximum length to a reasonably large value as a safety net. This
+						ensures that processing is not actually unbounded.
 						"""
 					required: false
 					type: uint: {}
@@ -220,14 +327,18 @@ base: components: sources: nats: configuration: {
 		}
 	}
 	queue: {
-		description: "NATS Queue Group to join."
+		description: "The NATS queue group to join."
 		required:    false
 		type: string: {}
 	}
 	subject: {
-		description: "The NATS subject to publish messages to."
-		required:    true
-		type: string: syntax: "template"
+		description: """
+			The NATS [subject][nats_subject] to pull messages from.
+
+			[nats_subject]: https://docs.nats.io/nats-concepts/subjects
+			"""
+		required: true
+		type: string: examples: ["foo", "time.us.east", "time.*.east", "time.>", ">"]
 	}
 	subject_key_field: {
 		description: "The `NATS` subject key."
@@ -242,8 +353,8 @@ base: components: sources: nats: configuration: {
 				description: """
 					Sets the list of supported ALPN protocols.
 
-					Declare the supported ALPN protocols, which are used during negotiation with peer. Prioritized in the order
-					they are defined.
+					Declare the supported ALPN protocols, which are used during negotiation with peer. They are prioritized in the order
+					that they are defined.
 					"""
 				required: false
 				type: array: items: type: string: examples: ["h2"]
@@ -271,7 +382,7 @@ base: components: sources: nats: configuration: {
 			}
 			enabled: {
 				description: """
-					Whether or not to require TLS for incoming/outgoing connections.
+					Whether or not to require TLS for incoming or outgoing connections.
 
 					When enabled and used for incoming connections, an identity certificate is also required. See `tls.crt_file` for
 					more information.
@@ -301,10 +412,10 @@ base: components: sources: nats: configuration: {
 				description: """
 					Enables certificate verification.
 
-					If enabled, certificates must be valid in terms of not being expired, as well as being issued by a trusted
-					issuer. This verification operates in a hierarchical manner, checking that not only the leaf certificate (the
-					certificate presented by the client/server) is valid, but also that the issuer of that certificate is valid, and
-					so on until reaching a root certificate.
+					If enabled, certificates must not be expired and must be issued by a trusted
+					issuer. This verification operates in a hierarchical manner, checking that the leaf certificate (the
+					certificate presented by the client/server) is not only valid, but that the issuer of that certificate is also valid, and
+					so on until the verification process reaches a root certificate.
 
 					Relevant for both incoming and outgoing connections.
 
@@ -333,9 +444,10 @@ base: components: sources: nats: configuration: {
 		description: """
 			The NATS URL to connect to.
 
-			The URL must take the form of `nats://server:port`.
+			The URL takes the form of `nats://server:port`.
+			If the port is not specified it defaults to 4222.
 			"""
 		required: true
-		type: string: {}
+		type: string: examples: ["nats://demo.nats.io", "nats://127.0.0.1:4242"]
 	}
 }

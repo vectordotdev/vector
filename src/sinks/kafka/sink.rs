@@ -1,7 +1,4 @@
-use std::convert::TryFrom;
-
-use async_trait::async_trait;
-use futures::{future, stream::BoxStream, StreamExt};
+use futures::future;
 use rdkafka::{
     consumer::{BaseConsumer, Consumer},
     error::KafkaError,
@@ -11,24 +8,18 @@ use rdkafka::{
 use snafu::{ResultExt, Snafu};
 use tokio::time::Duration;
 use tower::limit::ConcurrencyLimit;
-use vector_core::config::log_schema;
 
 use super::config::{KafkaRole, KafkaSinkConfig};
 use crate::{
-    codecs::{Encoder, Transformer},
-    event::{Event, LogEvent},
     kafka::KafkaStatisticsContext,
-    sinks::{
-        kafka::{
-            config::QUEUED_MIN_MESSAGES, request_builder::KafkaRequestBuilder,
-            service::KafkaService,
-        },
-        util::{builder::SinkBuilderExt, StreamSink},
+    sinks::kafka::{
+        config::QUEUED_MIN_MESSAGES, request_builder::KafkaRequestBuilder, service::KafkaService,
     },
-    template::{Template, TemplateParseError},
+    sinks::prelude::*,
 };
 
 #[derive(Debug, Snafu)]
+#[snafu(visibility(pub(crate)))]
 pub(super) enum BuildError {
     #[snafu(display("creating kafka producer failed: {}", source))]
     KafkaCreateFailed { source: KafkaError },
@@ -49,7 +40,7 @@ pub(crate) fn create_producer(
     client_config: ClientConfig,
 ) -> crate::Result<FutureProducer<KafkaStatisticsContext>> {
     let producer = client_config
-        .create_with_context(KafkaStatisticsContext)
+        .create_with_context(KafkaStatisticsContext::default())
         .context(KafkaCreateFailedSnafu)?;
     Ok(producer)
 }
@@ -67,7 +58,7 @@ impl KafkaSink {
             transformer,
             encoder,
             service: KafkaService::new(producer),
-            topic: Template::try_from(config.topic).context(TopicTemplateSnafu)?,
+            topic: config.topic,
             key_field: config.key_field,
         })
     }
@@ -81,7 +72,6 @@ impl KafkaSink {
             topic_template: self.topic,
             transformer: self.transformer,
             encoder: self.encoder,
-            log_schema: log_schema(),
         };
 
         input
@@ -98,10 +88,7 @@ impl KafkaSink {
 pub(crate) async fn healthcheck(config: KafkaSinkConfig) -> crate::Result<()> {
     trace!("Healthcheck started.");
     let client = config.to_rdkafka(KafkaRole::Consumer).unwrap();
-    let topic = match Template::try_from(config.topic)
-        .context(TopicTemplateSnafu)?
-        .render_string(&LogEvent::from_str_legacy(""))
-    {
+    let topic = match config.topic.render_string(&LogEvent::from_str_legacy("")) {
         Ok(topic) => Some(topic),
         Err(error) => {
             warn!(

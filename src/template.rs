@@ -1,3 +1,4 @@
+//! Functionality for managing template fields used by Vector's sinks.
 use std::{borrow::Cow, convert::TryFrom, fmt, hash::Hash, path::PathBuf};
 
 use bytes::Bytes;
@@ -18,6 +19,8 @@ use crate::{
 
 static RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"\{\{(?P<key>[^\}]+)\}\}").unwrap());
 
+/// Errors raised whilst parsing a Template field.
+#[allow(missing_docs)]
 #[derive(Clone, Debug, Eq, PartialEq, Snafu)]
 pub enum TemplateParseError {
     #[snafu(display("Invalid strftime item"))]
@@ -26,6 +29,8 @@ pub enum TemplateParseError {
     InvalidPathSyntax { path: String },
 }
 
+/// Errors raised whilst rendering a Template.
+#[allow(missing_docs)]
 #[derive(Clone, Debug, Eq, PartialEq, Snafu)]
 pub enum TemplateRenderingError {
     #[snafu(display("Missing fields on event: {:?}", missing_keys))]
@@ -34,15 +39,15 @@ pub enum TemplateRenderingError {
 
 /// A templated field.
 ///
-/// In many cases, components can be configured in such a way where some portion of the component's functionality can be
-/// customized on a per-event basis. An example of this might be a sink that writes events to a file, where we want to
-/// provide the flexibility to specify which file an event should go to by using an event field itself as part of the
-/// input to the filename we use.
+/// In many cases, components can be configured so that part of the component's functionality can be
+/// customized on a per-event basis. For example, you have a sink that writes events to a file and you want to
+/// specify which file an event should go to by using an event field as part of the
+/// input to the filename used.
 ///
-/// By using `Template`, users can specify either fixed strings or "templated" strings, which use a common syntax to
-/// refer to fields in an event that will serve as the input data when rendering the template.  While a fixed string may
-/// look something like `my-file.log`, a template string could look something like `my-file-{{key}}.log`, and the `key`
-/// field of the event being processed would serve as the value when rendering the template into a string.
+/// By using `Template`, users can specify either fixed strings or templated strings. Templated strings use a common syntax to
+/// refer to fields in an event that is used as the input data when rendering the template. An example of a fixed string
+/// is `my-file.log`. An example of a template string is `my-file-{{key}}.log`, where `{{key}}`
+/// is the key's value when the template is rendered into a string.
 #[configurable_component]
 #[configurable(metadata(docs::templateable))]
 #[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
@@ -132,6 +137,7 @@ impl fmt::Display for Template {
 impl ConfigurableString for Template {}
 
 impl Template {
+    /// Renders the given template with data from the event.
     pub fn render<'a>(
         &self,
         event: impl Into<EventRef<'a>>,
@@ -139,6 +145,7 @@ impl Template {
         self.render_string(event.into()).map(Into::into)
     }
 
+    /// Renders the given template with data from the event.
     pub fn render_string<'a>(
         &self,
         event: impl Into<EventRef<'a>>,
@@ -164,7 +171,9 @@ impl Template {
                             EventRef::Metric(metric) => {
                                 render_metric_field(key, metric).map(Cow::Borrowed)
                             }
-                            EventRef::Trace(trace) => trace.get(&key).map(Value::to_string_lossy),
+                            EventRef::Trace(trace) => {
+                                trace.get(key.as_str()).map(Value::to_string_lossy)
+                            }
                         }
                         .unwrap_or_else(|| {
                             missing_keys.push(key.to_owned());
@@ -181,6 +190,7 @@ impl Template {
         }
     }
 
+    /// Returns the names of the fields that are rendered in this template.
     pub fn get_fields(&self) -> Option<Vec<String>> {
         let parts: Vec<_> = self
             .parts
@@ -196,6 +206,7 @@ impl Template {
         (!parts.is_empty()).then_some(parts)
     }
 
+    /// Returns a reference to the template string.
     pub fn get_ref(&self) -> &str {
         &self.src
     }
@@ -205,6 +216,7 @@ impl Template {
         self.src.is_empty()
     }
 
+    /// A dynamic template string contains sections that depend on the input event or time.
     pub const fn is_dynamic(&self) -> bool {
         !self.is_static
     }
@@ -330,15 +342,24 @@ fn render_metric_field<'a>(key: &str, metric: &'a Metric) -> Option<&'a str> {
 
 fn render_timestamp(items: &ParsedStrftime, event: EventRef<'_>) -> String {
     match event {
-        EventRef::Log(log) => log
-            .get(log_schema().timestamp_key())
-            .and_then(Value::as_timestamp)
-            .copied(),
+        EventRef::Log(log) => log_schema()
+            .timestamp_key_target_path()
+            .and_then(|timestamp_key| {
+                log.get(timestamp_key)
+                    .and_then(Value::as_timestamp)
+                    .copied()
+            }),
         EventRef::Metric(metric) => metric.timestamp(),
-        EventRef::Trace(trace) => trace
-            .get(log_schema().timestamp_key())
-            .and_then(Value::as_timestamp)
-            .copied(),
+        EventRef::Trace(trace) => {
+            log_schema()
+                .timestamp_key_target_path()
+                .and_then(|timestamp_key| {
+                    trace
+                        .get(timestamp_key)
+                        .and_then(Value::as_timestamp)
+                        .copied()
+                })
+        }
     }
     .unwrap_or_else(Utc::now)
     .format_with_items(items.as_items())
@@ -472,10 +493,19 @@ mod tests {
 
     #[test]
     fn render_log_timestamp_strftime_style() {
-        let ts = Utc.ymd(2001, 2, 3).and_hms(4, 5, 6);
+        let ts = Utc
+            .with_ymd_and_hms(2001, 2, 3, 4, 5, 6)
+            .single()
+            .expect("invalid timestamp");
 
         let mut event = Event::Log(LogEvent::from("hello world"));
-        event.as_mut_log().insert(log_schema().timestamp_key(), ts);
+        event.as_mut_log().insert(
+            (
+                lookup::PathPrefix::Event,
+                log_schema().timestamp_key().unwrap(),
+            ),
+            ts,
+        );
 
         let template = Template::try_from("abcd-%F").unwrap();
 
@@ -484,10 +514,19 @@ mod tests {
 
     #[test]
     fn render_log_timestamp_multiple_strftime_style() {
-        let ts = Utc.ymd(2001, 2, 3).and_hms(4, 5, 6);
+        let ts = Utc
+            .with_ymd_and_hms(2001, 2, 3, 4, 5, 6)
+            .single()
+            .expect("invalid timestamp");
 
         let mut event = Event::Log(LogEvent::from("hello world"));
-        event.as_mut_log().insert(log_schema().timestamp_key(), ts);
+        event.as_mut_log().insert(
+            (
+                lookup::PathPrefix::Event,
+                log_schema().timestamp_key().unwrap(),
+            ),
+            ts,
+        );
 
         let template = Template::try_from("abcd-%F_%T").unwrap();
 
@@ -499,11 +538,20 @@ mod tests {
 
     #[test]
     fn render_log_dynamic_with_strftime() {
-        let ts = Utc.ymd(2001, 2, 3).and_hms(4, 5, 6);
+        let ts = Utc
+            .with_ymd_and_hms(2001, 2, 3, 4, 5, 6)
+            .single()
+            .expect("invalid timestamp");
 
         let mut event = Event::Log(LogEvent::from("hello world"));
         event.as_mut_log().insert("foo", "butts");
-        event.as_mut_log().insert(log_schema().timestamp_key(), ts);
+        event.as_mut_log().insert(
+            (
+                lookup::PathPrefix::Event,
+                log_schema().timestamp_key().unwrap(),
+            ),
+            ts,
+        );
 
         let template = Template::try_from("{{ foo }}-%F_%T").unwrap();
 
@@ -515,11 +563,20 @@ mod tests {
 
     #[test]
     fn render_log_dynamic_with_nested_strftime() {
-        let ts = Utc.ymd(2001, 2, 3).and_hms(4, 5, 6);
+        let ts = Utc
+            .with_ymd_and_hms(2001, 2, 3, 4, 5, 6)
+            .single()
+            .expect("invalid timestamp");
 
         let mut event = Event::Log(LogEvent::from("hello world"));
         event.as_mut_log().insert("format", "%F");
-        event.as_mut_log().insert(log_schema().timestamp_key(), ts);
+        event.as_mut_log().insert(
+            (
+                lookup::PathPrefix::Event,
+                log_schema().timestamp_key().unwrap(),
+            ),
+            ts,
+        );
 
         let template = Template::try_from("nested {{ format }} %T").unwrap();
 
@@ -531,11 +588,20 @@ mod tests {
 
     #[test]
     fn render_log_dynamic_with_reverse_nested_strftime() {
-        let ts = Utc.ymd(2001, 2, 3).and_hms(4, 5, 6);
+        let ts = Utc
+            .with_ymd_and_hms(2001, 2, 3, 4, 5, 6)
+            .single()
+            .expect("invalid timestamp");
 
         let mut event = Event::Log(LogEvent::from("hello world"));
         event.as_mut_log().insert("\"%F\"", "foo");
-        event.as_mut_log().insert(log_schema().timestamp_key(), ts);
+        event.as_mut_log().insert(
+            (
+                lookup::PathPrefix::Event,
+                log_schema().timestamp_key().unwrap(),
+            ),
+            ts,
+        );
 
         let template = Template::try_from("nested {{ \"%F\" }} %T").unwrap();
 
@@ -607,7 +673,11 @@ mod tests {
             MetricKind::Absolute,
             MetricValue::Counter { value: 1.1 },
         )
-        .with_timestamp(Some(Utc.ymd(2002, 3, 4).and_hms(5, 6, 7)))
+        .with_timestamp(Some(
+            Utc.with_ymd_and_hms(2002, 3, 4, 5, 6, 7)
+                .single()
+                .expect("invalid timestamp"),
+        ))
     }
 
     #[test]

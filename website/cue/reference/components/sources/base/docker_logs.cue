@@ -12,10 +12,12 @@ base: components: sources: docker_logs: configuration: {
 
 			Use an HTTPS URL to enable TLS encryption.
 
-			If absent, the `DOCKER_HOST` environment variable is used. If `DOCKER_HOST` is also absent, the default Docker local socket (`/var/run/docker.sock` on Unix platforms, `//./pipe/docker_engine` on Windows) is used.
+			If absent, the `DOCKER_HOST` environment variable is used. If `DOCKER_HOST` is also absent,
+			the default Docker local socket (`/var/run/docker.sock` on Unix platforms,
+			`//./pipe/docker_engine` on Windows) is used.
 			"""
 		required: false
-		type: string: {}
+		type: string: examples: ["http://localhost:2375", "https://localhost:2376", "unix:///var/run/docker.sock", "npipe:////./pipe/docker_engine", "/var/run/docker.sock", "//./pipe/docker_engine"]
 	}
 	exclude_containers: {
 		description: """
@@ -24,15 +26,15 @@ base: components: sources: docker_logs: configuration: {
 			Matching is prefix first, so specifying a value of `foo` would match any container named `foo` as well as any
 			container whose name started with `foo`. This applies equally whether matching container IDs or names.
 
-			By default, the source will collect logs for all containers. If `exclude_containers` is configured, any
-			container that matches a configured exclusion will be excluded even if it is also included via
-			`include_containers`, so care should be taken when utilizing prefix matches as they cannot be overridden by a
-			corresponding entry in `include_containers` e.g. excluding `foo` by attempting to include `foo-specific-id`.
+			By default, the source collects logs for all containers. If `exclude_containers` is configured, any
+			container that matches a configured exclusion is excluded even if it is also included with
+			`include_containers`, so care should be taken when using prefix matches as they cannot be overridden by a
+			corresponding entry in `include_containers`, for example, excluding `foo` by attempting to include `foo-specific-id`.
 
 			This can be used in conjunction with `include_containers`.
 			"""
 		required: false
-		type: array: items: type: string: {}
+		type: array: items: type: string: examples: ["exclude_", "exclude_me_0", "ad08cc418cf9"]
 	}
 	host_key: {
 		description: """
@@ -52,22 +54,22 @@ base: components: sources: docker_logs: configuration: {
 			Matching is prefix first, so specifying a value of `foo` would match any container named `foo` as well as any
 			container whose name started with `foo`. This applies equally whether matching container IDs or names.
 
-			By default, the source will collect logs for all containers. If `include_containers` is configured, only
-			containers that match a configured inclusion and are also not excluded will be matched.
+			By default, the source collects logs for all containers. If `include_containers` is configured, only
+			containers that match a configured inclusion and are also not excluded get matched.
 
-			This can be used in conjunction with `include_containers`.
+			This can be used in conjunction with `exclude_containers`.
 			"""
 		required: false
-		type: array: items: type: string: {}
+		type: array: items: type: string: examples: ["include_", "include_me_0", "ad08cc418cf9"]
 	}
 	include_images: {
 		description: """
 			A list of image names to match against.
 
-			If not provided, all images will be included.
+			If not provided, all images are included.
 			"""
 		required: false
-		type: array: items: type: string: {}
+		type: array: items: type: string: examples: ["httpd", "redis"]
 	}
 	include_labels: {
 		description: """
@@ -76,7 +78,7 @@ base: components: sources: docker_logs: configuration: {
 			Labels should follow the syntax described in the [Docker object labels](https://docs.docker.com/config/labels-custom-metadata/) documentation.
 			"""
 		required: false
-		type: array: items: type: string: {}
+		type: array: items: type: string: examples: ["org.opencontainers.image.vendor=Vector", "com.mycorp.internal.animal=fish"]
 	}
 	multiline: {
 		description: """
@@ -93,7 +95,7 @@ base: components: sources: docker_logs: configuration: {
 					This setting must be configured in conjunction with `mode`.
 					"""
 				required: true
-				type: string: {}
+				type: string: examples: ["^[\\s]+", "\\\\$", "^(INFO|ERROR) ", ";$"]
 			}
 			mode: {
 				description: """
@@ -114,7 +116,7 @@ base: components: sources: docker_logs: configuration: {
 
 						The first line (the line that matched the start pattern) does not need to match the `ContinueThrough` pattern.
 
-						This is useful in cases such as a Java stack trace, where some indicator in the line (such as leading
+						This is useful in cases such as a Java stack trace, where some indicator in the line (such as a leading
 						whitespace) indicates that it is an extension of the proceeding line.
 						"""
 					halt_before: """
@@ -132,7 +134,7 @@ base: components: sources: docker_logs: configuration: {
 			start_pattern: {
 				description: "Regular expression pattern that is used to match the start of a new message."
 				required:    true
-				type: string: {}
+				type: string: examples: ["^[\\s]+", "\\\\$", "^(INFO|ERROR) ", ";$"]
 			}
 			timeout_ms: {
 				description: """
@@ -141,7 +143,10 @@ base: components: sources: docker_logs: configuration: {
 					Once this timeout is reached, the buffered message is guaranteed to be flushed, even if incomplete.
 					"""
 				required: true
-				type: uint: {}
+				type: uint: {
+					examples: [1000, 600000]
+					unit: "milliseconds"
+				}
 			}
 		}
 	}
@@ -149,26 +154,27 @@ base: components: sources: docker_logs: configuration: {
 		description: """
 			Overrides the name of the log field used to mark an event as partial.
 
-			If `auto_partial_merge` is disabled, partial events will be emitted with a log field, controlled by this
-			configuration value, is set, indicating that the event is not complete.
-
-			By default, `"_partial"` is used.
+			If `auto_partial_merge` is disabled, partial events are emitted with a log field, set by this
+			configuration value, indicating that the event is not complete.
 			"""
 		required: false
 		type: string: default: "_partial"
 	}
 	retry_backoff_secs: {
-		description: "The amount of time, in seconds, to wait before retrying after an error."
+		description: "The amount of time to wait before retrying after an error."
 		required:    false
-		type: uint: default: 2
+		type: uint: {
+			default: 2
+			unit:    "seconds"
+		}
 	}
 	tls: {
 		description: """
 			Configuration of TLS when connecting to the Docker daemon.
 
-			Only relevant when connecting to Docker via an HTTPS URL.
+			Only relevant when connecting to Docker with an HTTPS URL.
 
-			If not configured, Vector will try to use environment variable `DOCKER_CERT_PATH` and then` DOCKER_CONFIG`. If both environment variables are absent, Vector will try to read certificates in `~/.docker/`.
+			If not configured, the environment variable `DOCKER_CERT_PATH` is used. If `DOCKER_CERT_PATH` is absent, then` DOCKER_CONFIG` is used. If both environment variables are absent, the certificates in `~/.docker/` are read.
 			"""
 		required: false
 		type: object: options: {

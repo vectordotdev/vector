@@ -3,10 +3,7 @@ use std::{fmt, num::NonZeroUsize};
 use async_trait::async_trait;
 use futures::{future, stream::BoxStream, StreamExt};
 use tower::Service;
-use vector_core::{
-    stream::{BatcherSettings, DriverResponse},
-    ByteSizeOf,
-};
+use vector_core::stream::{BatcherSettings, DriverResponse};
 
 use crate::{
     codecs::Transformer,
@@ -28,17 +25,6 @@ use super::{ElasticsearchCommon, ElasticsearchConfig};
 pub struct PartitionKey {
     pub index: String,
     pub bulk_action: BulkAction,
-}
-
-pub struct BatchedEvents {
-    pub key: PartitionKey,
-    pub events: Vec<ProcessedEvent>,
-}
-
-impl ByteSizeOf for BatchedEvents {
-    fn allocated_bytes(&self) -> usize {
-        self.events.size_of()
-    }
 }
 
 pub struct ElasticsearchSink<S> {

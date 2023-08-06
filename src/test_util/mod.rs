@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 use std::{
     collections::HashMap,
     convert::Infallible,
@@ -91,9 +92,10 @@ pub fn test_generate_config<T>()
 where
     for<'de> T: GenerateConfig + serde::Deserialize<'de>,
 {
-    let cfg = T::generate_config().to_string();
+    let cfg = toml::to_string(&T::generate_config()).unwrap();
+
     toml::from_str::<T>(&cfg)
-        .unwrap_or_else(|_| panic!("Invalid config generated from string:\n'{}'\n", cfg));
+        .unwrap_or_else(|e| panic!("Invalid config generated from string:\n\n{}\n'{}'", e, cfg));
 }
 
 pub fn open_fixture(path: impl AsRef<Path>) -> crate::Result<serde_json::Value> {
@@ -591,7 +593,7 @@ impl<T> Future for CountReceiver<T> {
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.get_mut();
         if let Some(trigger) = this.trigger.take() {
-            let _ = trigger.send(());
+            _ = trigger.send(());
         }
 
         let result = ready!(this.handle.poll_unpin(cx));

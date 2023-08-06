@@ -1,12 +1,11 @@
 use darling::{error::Accumulator, util::Flag, FromAttributes};
-use proc_macro2::Ident;
+use proc_macro2::{Ident, TokenStream};
+use quote::ToTokens;
 use serde_derive_internals::ast as serde_ast;
-use syn::spanned::Spanned;
-use vector_config_common::attributes::CustomAttribute;
 
 use super::{
     util::{try_extract_doc_title_description, DarlingResultIterator},
-    Field, Metadata, Style, Tagging,
+    Field, LazyCustomAttribute, Metadata, Style, Tagging,
 };
 
 /// A variant in an enum.
@@ -29,6 +28,7 @@ impl<'a> Variant<'a> {
         let original = serde.original;
         let name = serde.attrs.name().deserialize_name();
         let style = serde.style.into();
+        let is_newtype_wrapper_field = style == Style::Newtype;
 
         let attrs = Attributes::from_attributes(&original.attrs)
             .and_then(|attrs| attrs.finalize(serde, &original.attrs))?;
@@ -37,7 +37,7 @@ impl<'a> Variant<'a> {
         let fields = serde
             .fields
             .iter()
-            .map(|field| Field::from_ast(field, is_virtual_newtype))
+            .map(|field| Field::from_ast(field, is_virtual_newtype, is_newtype_wrapper_field))
             .collect_darling_results(&mut accumulator);
 
         let variant = Variant {
@@ -140,7 +140,7 @@ impl<'a> Variant<'a> {
     /// standard `#[deprecated]` attribute, neither automatically applying it nor deriving the
     /// deprecation status of a variant when it is present.
     pub fn deprecated(&self) -> bool {
-        self.attrs.deprecated.is_some()
+        self.attrs.deprecated.is_present()
     }
 
     /// Whether or not this variant is visible during either serialization or deserialization.
@@ -157,7 +157,7 @@ impl<'a> Variant<'a> {
     /// Attributes can take the shape of flags (`#[configurable(metadata(im_a_teapot))]`) or
     /// key/value pairs (`#[configurable(metadata(status = "beta"))]`) to allow rich, semantic
     /// metadata to be attached directly to variants.
-    pub fn metadata(&self) -> impl Iterator<Item = CustomAttribute> {
+    pub fn metadata(&self) -> impl Iterator<Item = LazyCustomAttribute> {
         self.attrs
             .metadata
             .clone()
@@ -166,9 +166,9 @@ impl<'a> Variant<'a> {
     }
 }
 
-impl<'a> Spanned for Variant<'a> {
-    fn span(&self) -> proc_macro2::Span {
-        self.original.span()
+impl<'a> ToTokens for Variant<'a> {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        self.original.to_tokens(tokens)
     }
 }
 

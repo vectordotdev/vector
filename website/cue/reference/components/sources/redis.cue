@@ -4,6 +4,7 @@ components: sources: redis: {
 	title: "Redis"
 
 	features: {
+		auto_generated:   true
 		acknowledgements: false
 		collect: {
 			checkpoint: enabled: false
@@ -31,7 +32,7 @@ components: sources: redis: {
 		commonly_used: false
 		delivery:      "best_effort"
 		deployment_roles: ["aggregator"]
-		development:   "beta"
+		development:   "stable"
 		egress_method: "stream"
 		stateful:      false
 	}
@@ -57,75 +58,7 @@ components: sources: redis: {
 		platform_name: null
 	}
 
-	configuration: {
-		url: {
-			description: "The Redis URL to connect to. The url _must_ take the form of `protocol://server:port/db` where the protocol can either be `redis` or `rediss` for connections secured via TLS."
-			groups: ["tcp"]
-			required: true
-			warnings: []
-			type: string: {
-				examples: ["redis://127.0.0.1:6379/0"]
-				syntax: "literal"
-			}
-		}
-		key: {
-			description: "The Redis key to read messages from."
-			required:    true
-			warnings: []
-			type: string: {
-				examples: ["vector"]
-				syntax: "literal"
-			}
-		}
-		data_type: {
-			common:      false
-			description: "The Redis data type (`list` or `channel`) to use."
-			required:    false
-			type: string: {
-				default: "list"
-				enum: {
-					list:    "Use the Redis `list` data type."
-					channel: "Use the Redis `channel` data type."
-				}
-				syntax: "literal"
-			}
-		}
-		list: {
-			common:      false
-			description: "Options for the Redis `list` data type."
-			required:    false
-			warnings: []
-			type: object: {
-				examples: []
-				options: {
-					method: {
-						common:      false
-						description: "The method (`rpop` or `lpop`) to pop messages when `data_type` is list."
-						required:    false
-						type: string: {
-							default: "lpop"
-							enum: {
-								lpop: "Pop messages from the head of the list."
-								rpop: "Pop messages from the tail of the list."
-							}
-							syntax: "literal"
-						}
-					}
-				}
-			}
-		}
-		redis_key: {
-			common:      false
-			description: "The log field name to use for the redis key. If set to an empty string or null, the key is not added to the log event."
-			required:    false
-			warnings: []
-			type: string: {
-				default: null
-				examples: ["redis_key"]
-				syntax: "literal"
-			}
-		}
-	}
+	configuration: base.components.sources.redis.configuration
 
 	output: logs: record: {
 		description: "An individual Redis record"
@@ -161,13 +94,5 @@ components: sources: redis: {
 				API.
 				"""
 		}
-	}
-
-	telemetry: metrics: {
-		events_in_total:         components.sources.internal_metrics.output.metrics.events_in_total
-		events_out_total:        components.sources.internal_metrics.output.metrics.events_out_total
-		processed_bytes_total:   components.sources.internal_metrics.output.metrics.processed_bytes_total
-		processed_bytes_total:   components.sources.internal_metrics.output.metrics.processed_bytes_total
-		processing_errors_total: components.sources.internal_metrics.output.metrics.processing_errors_total
 	}
 }

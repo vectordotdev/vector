@@ -1,12 +1,12 @@
 package metadata
 
 components: sinks: clickhouse: {
-	title: "Clickhouse"
+	title: "ClickHouse"
 
 	classes: {
 		commonly_used: true
 		delivery:      "at_least_once"
-		development:   "beta"
+		development:   "stable"
 		egress_method: "batch"
 		service_providers: ["Yandex"]
 		stateful: false
@@ -51,7 +51,7 @@ components: sinks: clickhouse: {
 				interface: {
 					socket: {
 						api: {
-							title: "Clickhouse HTTP API"
+							title: "ClickHouse HTTP API"
 							url:   urls.clickhouse_http
 						}
 						direction: "outgoing"
@@ -66,7 +66,7 @@ components: sinks: clickhouse: {
 	support: {
 		requirements: [
 			"""
-				[Clickhouse](\(urls.clickhouse)) version `>= 1.1.54378` is required.
+				[ClickHouse](\(urls.clickhouse)) version `>= 1.1.54378` is required.
 				""",
 		]
 		warnings: []
@@ -79,12 +79,5 @@ components: sinks: clickhouse: {
 		logs:    true
 		metrics: null
 		traces:  false
-	}
-
-	telemetry: metrics: {
-		component_sent_bytes_total:       components.sources.internal_metrics.output.metrics.component_sent_bytes_total
-		component_sent_events_total:      components.sources.internal_metrics.output.metrics.component_sent_events_total
-		component_sent_event_bytes_total: components.sources.internal_metrics.output.metrics.component_sent_event_bytes_total
-		events_out_total:                 components.sources.internal_metrics.output.metrics.events_out_total
 	}
 }

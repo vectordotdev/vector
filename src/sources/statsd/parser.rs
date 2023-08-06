@@ -6,9 +6,11 @@ use std::{
 
 use once_cell::sync::Lazy;
 use regex::Regex;
-use vector_core::event::metric::TagValue;
 
-use crate::event::metric::{Metric, MetricKind, MetricTags, MetricValue, StatisticKind};
+use crate::{
+    event::metric::{Metric, MetricKind, MetricTags, MetricValue, StatisticKind},
+    sources::util::extract_tag_key_and_value,
+};
 
 static WHITESPACE: Lazy<Regex> = Lazy::new(|| Regex::new(r"\s+").unwrap());
 static NONALPHANUM: Lazy<Regex> = Lazy::new(|| Regex::new(r"[^a-zA-Z_\-0-9\.]").unwrap());
@@ -134,17 +136,7 @@ fn parse_tags(input: &&str) -> Result<MetricTags, ParseError> {
 
     Ok(input[1..]
         .split(',')
-        .map(|chunk| {
-            // note: the behavior of StatsD if more than one colon is found (which would presumably
-            // be part of the tag value), is to remove any additional colons from the tag value.
-            // Thus Vector expects only one colon character to be present per chunk, so the find()
-            // operation locating the first position is sufficient.
-            match chunk.split_once(':') {
-                // the notation `tag:` is valid for statsd, the effect is an empty string value.
-                Some((prefix, suffix)) => (prefix.to_string(), TagValue::Value(suffix.to_string())),
-                None => (chunk.to_string(), TagValue::Bare),
-            }
-        })
+        .map(extract_tag_key_and_value)
         .collect())
 }
 

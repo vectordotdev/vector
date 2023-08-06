@@ -324,7 +324,7 @@ impl<'a> FromLua<'a> for Metric {
                     return Err(LuaError::FromLuaConversionError {
                         from: value.type_name(),
                         to: "Metric",
-                        message: Some(format!("Invalid sketch type '{}' given", x)),
+                        message: Some(format!("Invalid sketch type '{x}' given")),
                     })
                 }
             }
@@ -346,7 +346,7 @@ impl<'a> FromLua<'a> for Metric {
 
 #[cfg(test)]
 mod test {
-    use chrono::{offset::TimeZone, Utc};
+    use chrono::{offset::TimeZone, Timelike, Utc};
     use vector_common::assert_event_data_eq;
 
     use super::*;
@@ -381,7 +381,12 @@ mod test {
         )
         .with_namespace(Some("namespace_example"))
         .with_tags(Some(crate::metric_tags!("example tag" => "example value")))
-        .with_timestamp(Some(Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 11)));
+        .with_timestamp(Some(
+            Utc.with_ymd_and_hms(2018, 11, 14, 8, 9, 10)
+                .single()
+                .and_then(|t| t.with_nanosecond(11))
+                .expect("invalid timestamp"),
+        ));
 
         assert_metric(
             metric.clone(),
@@ -643,7 +648,11 @@ mod test {
         )
         .with_namespace(Some("example_namespace"))
         .with_tags(Some(crate::metric_tags!("example tag" => "example value")))
-        .with_timestamp(Some(Utc.ymd(2018, 11, 14).and_hms(8, 9, 10)));
+        .with_timestamp(Some(
+            Utc.with_ymd_and_hms(2018, 11, 14, 8, 9, 10)
+                .single()
+                .expect("invalid timestamp"),
+        ));
         assert_event_data_eq!(Lua::new().load(value).eval::<Metric>().unwrap(), expected);
     }
 
@@ -681,7 +690,11 @@ mod test {
                 TagValue::from("b".to_string()),
             ]),
         )]))))
-        .with_timestamp(Some(Utc.ymd(2018, 11, 14).and_hms(8, 9, 10)));
+        .with_timestamp(Some(
+            Utc.with_ymd_and_hms(2018, 11, 14, 8, 9, 10)
+                .single()
+                .expect("invalid timestamp"),
+        ));
         assert_event_data_eq!(Lua::new().load(value).eval::<Metric>().unwrap(), expected);
     }
 

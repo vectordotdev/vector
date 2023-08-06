@@ -28,17 +28,18 @@ async fn check_batch_size() {
     let base = KinesisSinkBaseConfig {
         stream_name: String::from("test"),
         region: RegionOrEndpoint::with_both("local", "http://localhost:4566"),
-        encoding: JsonSerializerConfig::new().into(),
+        encoding: JsonSerializerConfig::default().into(),
         compression: Compression::None,
         request: Default::default(),
         tls: None,
         auth: Default::default(),
+        request_retry_partial: false,
         acknowledgements: Default::default(),
     };
 
     let config = KinesisFirehoseSinkConfig { batch, base };
 
-    let cx = SinkContext::new_test();
+    let cx = SinkContext::default();
     let res = config.build(cx).await;
 
     assert_eq!(
@@ -57,17 +58,18 @@ async fn check_batch_events() {
     let base = KinesisSinkBaseConfig {
         stream_name: String::from("test"),
         region: RegionOrEndpoint::with_both("local", "http://localhost:4566"),
-        encoding: JsonSerializerConfig::new().into(),
+        encoding: JsonSerializerConfig::default().into(),
         compression: Compression::None,
         request: Default::default(),
         tls: None,
         auth: Default::default(),
+        request_retry_partial: false,
         acknowledgements: Default::default(),
     };
 
     let config = KinesisFirehoseSinkConfig { batch, base };
 
-    let cx = SinkContext::new_test();
+    let cx = SinkContext::default();
     let res = config.build(cx).await;
 
     assert_eq!(

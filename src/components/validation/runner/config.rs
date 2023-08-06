@@ -2,13 +2,12 @@ use crate::{
     components::validation::{
         sync::{Configuring, TaskCoordinator},
         util::GrpcAddress,
-        ComponentConfiguration, ComponentType, ValidatableComponent,
+        ComponentConfiguration, ComponentType, ValidationConfiguration,
     },
-    config::ConfigBuilder,
-    sinks::{vector::VectorConfig as VectorSinkConfig, Sinks},
-    sources::{vector::VectorConfig as VectorSourceConfig, Sources},
+    config::{BoxedSink, BoxedSource, BoxedTransform, ConfigBuilder},
+    sinks::vector::VectorConfig as VectorSinkConfig,
+    sources::vector::VectorConfig as VectorSourceConfig,
     test_util::next_addr,
-    transforms::Transforms,
 };
 
 use super::{
@@ -22,33 +21,39 @@ pub struct TopologyBuilder {
     output_edge: Option<OutputEdge>,
 }
 
+pub const TEST_SOURCE_NAME: &str = "test_source";
+pub const TEST_SINK_NAME: &str = "test_sink";
+pub const TEST_TRANSFORM_NAME: &str = "test_transform";
+pub const TEST_INPUT_SOURCE_NAME: &str = "input_source";
+pub const TEST_OUTPUT_SINK_NAME: &str = "output_sink";
+
 impl TopologyBuilder {
     /// Creates a component topology for the given component configuration.
-    pub fn from_component<C: ValidatableComponent>(component: C) -> Self {
-        let component_configuration = component.component_configuration();
+    pub fn from_configuration(configuration: &ValidationConfiguration) -> Self {
+        let component_configuration = configuration.component_configuration();
         match component_configuration {
             ComponentConfiguration::Source(source) => {
-                debug_assert_eq!(component.component_type(), ComponentType::Source);
+                debug_assert_eq!(configuration.component_type(), ComponentType::Source);
                 Self::from_source(source)
             }
             ComponentConfiguration::Transform(transform) => {
-                debug_assert_eq!(component.component_type(), ComponentType::Transform);
+                debug_assert_eq!(configuration.component_type(), ComponentType::Transform);
                 Self::from_transform(transform)
             }
             ComponentConfiguration::Sink(sink) => {
-                debug_assert_eq!(component.component_type(), ComponentType::Sink);
+                debug_assert_eq!(configuration.component_type(), ComponentType::Sink);
                 Self::from_sink(sink)
             }
         }
     }
 
     /// Creates a component topology for validating a source.
-    fn from_source(source: Sources) -> Self {
+    fn from_source(source: BoxedSource) -> Self {
         let (output_edge, output_sink) = build_output_edge();
 
         let mut config_builder = ConfigBuilder::default();
-        config_builder.add_source("test_source", source);
-        config_builder.add_sink("output_sink", &["test_source"], output_sink);
+        config_builder.add_source(TEST_SOURCE_NAME, source);
+        config_builder.add_sink(TEST_OUTPUT_SINK_NAME, &[TEST_SOURCE_NAME], output_sink);
 
         Self {
             config_builder,
@@ -57,14 +62,14 @@ impl TopologyBuilder {
         }
     }
 
-    fn from_transform(transform: Transforms) -> Self {
+    fn from_transform(transform: BoxedTransform) -> Self {
         let (input_edge, input_source) = build_input_edge();
         let (output_edge, output_sink) = build_output_edge();
 
         let mut config_builder = ConfigBuilder::default();
-        config_builder.add_source("input_source", input_source);
-        config_builder.add_transform("test_transform", &["input_source"], transform);
-        config_builder.add_sink("output_sink", &["test_transform"], output_sink);
+        config_builder.add_source(TEST_INPUT_SOURCE_NAME, input_source);
+        config_builder.add_transform(TEST_TRANSFORM_NAME, &[TEST_INPUT_SOURCE_NAME], transform);
+        config_builder.add_sink(TEST_OUTPUT_SINK_NAME, &[TEST_TRANSFORM_NAME], output_sink);
 
         Self {
             config_builder,
@@ -73,12 +78,12 @@ impl TopologyBuilder {
         }
     }
 
-    fn from_sink(sink: Sinks) -> Self {
+    fn from_sink(sink: BoxedSink) -> Self {
         let (input_edge, input_source) = build_input_edge();
 
         let mut config_builder = ConfigBuilder::default();
-        config_builder.add_source("input_source", input_source);
-        config_builder.add_sink("test_sink", &["input_source"], sink);
+        config_builder.add_source(TEST_INPUT_SOURCE_NAME, input_source);
+        config_builder.add_sink(TEST_SINK_NAME, &[TEST_INPUT_SOURCE_NAME], sink);
 
         Self {
             config_builder,
@@ -93,10 +98,11 @@ impl TopologyBuilder {
     /// topology itself. All controlled edges are built and spawned, and a channel sender/receiver
     /// is provided for them. Additionally, the telemetry collector is also spawned and a channel
     /// receiver for telemetry events is provided.
-    pub fn finalize(
+    pub async fn finalize(
         mut self,
         input_task_coordinator: &TaskCoordinator<Configuring>,
         output_task_coordinator: &TaskCoordinator<Configuring>,
+        telemetry_task_coordinator: &TaskCoordinator<Configuring>,
     ) -> (ConfigBuilder, ControlledEdges, TelemetryCollector) {
         let controlled_edges = ControlledEdges {
             input: self
@@ -108,13 +114,13 @@ impl TopologyBuilder {
         };
 
         let telemetry = Telemetry::attach_to_config(&mut self.config_builder);
-        let telemetry_collector = telemetry.into_collector(output_task_coordinator);
+        let telemetry_collector = telemetry.into_collector(telemetry_task_coordinator).await;
 
         (self.config_builder, controlled_edges, telemetry_collector)
     }
 }
 
-fn build_input_edge() -> (InputEdge, impl Into<Sources>) {
+fn build_input_edge() -> (InputEdge, impl Into<BoxedSource>) {
     let input_listen_addr = GrpcAddress::from(next_addr());
     debug!(listen_addr = %input_listen_addr, "Creating controlled input edge.");
 
@@ -124,11 +130,19 @@ fn build_input_edge() -> (InputEdge, impl Into<Sources>) {
     (input_edge, input_source)
 }
 
-fn build_output_edge() -> (OutputEdge, impl Into<Sinks>) {
+fn build_output_edge() -> (OutputEdge, impl Into<BoxedSink>) {
     let output_listen_addr = GrpcAddress::from(next_addr());
     debug!(endpoint = %output_listen_addr, "Creating controlled output edge.");
 
-    let output_sink = VectorSinkConfig::from_address(output_listen_addr.as_uri());
+    let mut output_sink = VectorSinkConfig::from_address(output_listen_addr.as_uri());
+
+    // We want to ensure that the output sink is flushed as soon as possible, so
+    // we set the batch timeout to a very low value. We also disable retries, as
+    // we don't want to waste time performing retries, especially when the test
+    // harness is shutting down.
+    output_sink.batch.timeout_secs = Some(0.1);
+    output_sink.request.retry_attempts = Some(0);
+
     let output_edge = OutputEdge::from_address(output_listen_addr);
 
     (output_edge, output_sink)

@@ -1,9 +1,9 @@
 use std::sync::{
-    atomic::{AtomicU32, AtomicU64, Ordering},
+    atomic::{AtomicU32, Ordering},
     Arc,
 };
 
-use metrics::{GaugeFn, HistogramFn};
+use metrics::{atomics::AtomicU64, GaugeFn, HistogramFn};
 use metrics_util::registry::Storage;
 
 use crate::event::{metric::Bucket, MetricValue};

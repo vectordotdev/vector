@@ -5,7 +5,7 @@ base: components: sinks: clickhouse: configuration: {
 		description: """
 			Controls how acknowledgements are handled for this sink.
 
-			See [End-to-end Acknowledgements][e2e_acks] for more information on how Vector handles event acknowledgement.
+			See [End-to-end Acknowledgements][e2e_acks] for more information on how event acknowledgement is handled.
 
 			[e2e_acks]: https://vector.dev/docs/about/under-the-hood/architecture/end-to-end-acknowledgements/
 			"""
@@ -15,7 +15,7 @@ base: components: sinks: clickhouse: configuration: {
 				Whether or not end-to-end acknowledgements are enabled.
 
 				When enabled for a sink, any source connected to that sink, where the source supports
-				end-to-end acknowledgements as well, will wait for events to be acknowledged by the sink
+				end-to-end acknowledgements as well, waits for events to be acknowledged by the sink
 				before acknowledging them at the source.
 
 				Enabling or disabling acknowledgements at the sink level takes precedence over any global
@@ -31,16 +31,16 @@ base: components: sinks: clickhouse: configuration: {
 		description: """
 			Configuration of the authentication strategy for HTTP requests.
 
-			HTTP authentication should almost always be used with HTTPS only, as the authentication credentials are passed as an
+			HTTP authentication should be used with HTTPS only, as the authentication credentials are passed as an
 			HTTP header without any additional encryption beyond what is provided by the transport itself.
 			"""
 		required: false
 		type: object: options: {
 			password: {
-				description:   "The password to send."
+				description:   "The basic authentication password."
 				relevant_when: "strategy = \"basic\""
 				required:      true
-				type: string: {}
+				type: string: examples: ["${PASSWORD}", "password"]
 			}
 			strategy: {
 				description: "The authentication strategy to use."
@@ -56,21 +56,21 @@ base: components: sinks: clickhouse: configuration: {
 					bearer: """
 						Bearer authentication.
 
-						The bearer token value (OAuth2, JWT, etc) is passed as-is.
+						The bearer token value (OAuth2, JWT, etc.) is passed as-is.
 						"""
 				}
 			}
 			token: {
-				description:   "The bearer token to send."
+				description:   "The bearer authentication token."
 				relevant_when: "strategy = \"bearer\""
 				required:      true
 				type: string: {}
 			}
 			user: {
-				description:   "The username to send."
+				description:   "The basic authentication username."
 				relevant_when: "strategy = \"basic\""
 				required:      true
-				type: string: {}
+				type: string: examples: ["${USERNAME}", "username"]
 			}
 		}
 	}
@@ -80,23 +80,29 @@ base: components: sinks: clickhouse: configuration: {
 		type: object: options: {
 			max_bytes: {
 				description: """
-					The maximum size of a batch that will be processed by a sink.
+					The maximum size of a batch that is processed by a sink.
 
 					This is based on the uncompressed size of the batched events, before they are
-					serialized / compressed.
+					serialized/compressed.
 					"""
 				required: false
-				type: uint: {}
+				type: uint: {
+					default: 10000000
+					unit:    "bytes"
+				}
 			}
 			max_events: {
-				description: "The maximum size of a batch, in events, before it is flushed."
+				description: "The maximum size of a batch before it is flushed."
 				required:    false
-				type: uint: {}
+				type: uint: unit: "events"
 			}
 			timeout_secs: {
-				description: "The maximum age of a batch, in seconds, before it is flushed."
+				description: "The maximum age of a batch before it is flushed."
 				required:    false
-				type: float: {}
+				type: float: {
+					default: 1.0
+					unit:    "seconds"
+				}
 			}
 		}
 	}
@@ -117,29 +123,42 @@ base: components: sinks: clickhouse: configuration: {
 					"""
 				none: "No compression."
 				zlib: """
-					[Zlib]][zlib] compression.
+					[Zlib][zlib] compression.
 
 					[zlib]: https://zlib.net/
+					"""
+				zstd: """
+					[Zstandard][zstd] compression.
+
+					[zstd]: https://facebook.github.io/zstd/
 					"""
 			}
 		}
 	}
 	database: {
-		description: "The database that contains the table that data will be inserted into."
+		description: "The database that contains the table that data is inserted into."
 		required:    false
-		type: string: examples: ["mydatabase"]
+		type: string: {
+			examples: ["mydatabase"]
+			syntax: "template"
+		}
+	}
+	date_time_best_effort: {
+		description: "Sets `date_time_input_format` to `best_effort`, allowing ClickHouse to properly parse RFC3339/ISO 8601."
+		required:    false
+		type: bool: default: false
 	}
 	encoding: {
 		description: "Transformations to prepare an event for serialization."
 		required:    false
 		type: object: options: {
 			except_fields: {
-				description: "List of fields that will be excluded from the encoded event."
+				description: "List of fields that are excluded from the encoded event."
 				required:    false
 				type: array: items: type: string: {}
 			}
 			only_fields: {
-				description: "List of fields that will be included in the encoded event."
+				description: "List of fields that are included in the encoded event."
 				required:    false
 				type: array: items: type: string: {}
 			}
@@ -154,7 +173,7 @@ base: components: sinks: clickhouse: configuration: {
 		}
 	}
 	endpoint: {
-		description: "The endpoint of the Clickhouse server."
+		description: "The endpoint of the ClickHouse server."
 		required:    true
 		type: string: examples: ["http://localhost:8123"]
 	}
@@ -239,14 +258,20 @@ base: components: sinks: clickhouse: configuration: {
 				}
 			}
 			rate_limit_duration_secs: {
-				description: "The time window, in seconds, used for the `rate_limit_num` option."
+				description: "The time window used for the `rate_limit_num` option."
 				required:    false
-				type: uint: default: 1
+				type: uint: {
+					default: 1
+					unit:    "seconds"
+				}
 			}
 			rate_limit_num: {
 				description: "The maximum number of requests allowed within the `rate_limit_duration_secs` time window."
 				required:    false
-				type: uint: default: 9223372036854775807
+				type: uint: {
+					default: 9223372036854775807
+					unit:    "requests"
+				}
 			}
 			retry_attempts: {
 				description: """
@@ -255,43 +280,58 @@ base: components: sinks: clickhouse: configuration: {
 					The default, for all intents and purposes, represents an infinite number of retries.
 					"""
 				required: false
-				type: uint: default: 9223372036854775807
+				type: uint: {
+					default: 9223372036854775807
+					unit:    "retries"
+				}
 			}
 			retry_initial_backoff_secs: {
 				description: """
 					The amount of time to wait before attempting the first retry for a failed request.
 
-					After the first retry has failed, the fibonacci sequence will be used to select future backoffs.
+					After the first retry has failed, the fibonacci sequence is used to select future backoffs.
 					"""
 				required: false
-				type: uint: default: 1
+				type: uint: {
+					default: 1
+					unit:    "seconds"
+				}
 			}
 			retry_max_duration_secs: {
-				description: "The maximum amount of time, in seconds, to wait between retries."
+				description: "The maximum amount of time to wait between retries."
 				required:    false
-				type: uint: default: 3600
+				type: uint: {
+					default: 3600
+					unit:    "seconds"
+				}
 			}
 			timeout_secs: {
 				description: """
-					The maximum time a request can take before being aborted.
+					The time a request can take before being aborted.
 
-					It is highly recommended that you do not lower this value below the service’s internal timeout, as this could
+					Datadog highly recommends that you do not lower this value below the service's internal timeout, as this could
 					create orphaned requests, pile on retries, and result in duplicate data downstream.
 					"""
 				required: false
-				type: uint: default: 60
+				type: uint: {
+					default: 60
+					unit:    "seconds"
+				}
 			}
 		}
 	}
 	skip_unknown_fields: {
-		description: "Sets `input_format_skip_unknown_fields`, allowing Clickhouse to discard fields not present in the table schema."
+		description: "Sets `input_format_skip_unknown_fields`, allowing ClickHouse to discard fields not present in the table schema."
 		required:    false
 		type: bool: default: false
 	}
 	table: {
-		description: "The table that data will be inserted into."
+		description: "The table that data is inserted into."
 		required:    true
-		type: string: examples: ["mytable"]
+		type: string: {
+			examples: ["mytable"]
+			syntax: "template"
+		}
 	}
 	tls: {
 		description: "TLS configuration."
@@ -301,8 +341,8 @@ base: components: sinks: clickhouse: configuration: {
 				description: """
 					Sets the list of supported ALPN protocols.
 
-					Declare the supported ALPN protocols, which are used during negotiation with peer. Prioritized in the order
-					they are defined.
+					Declare the supported ALPN protocols, which are used during negotiation with peer. They are prioritized in the order
+					that they are defined.
 					"""
 				required: false
 				type: array: items: type: string: examples: ["h2"]
@@ -350,10 +390,10 @@ base: components: sinks: clickhouse: configuration: {
 				description: """
 					Enables certificate verification.
 
-					If enabled, certificates must be valid in terms of not being expired, as well as being issued by a trusted
-					issuer. This verification operates in a hierarchical manner, checking that not only the leaf certificate (the
-					certificate presented by the client/server) is valid, but also that the issuer of that certificate is valid, and
-					so on until reaching a root certificate.
+					If enabled, certificates must not be expired and must be issued by a trusted
+					issuer. This verification operates in a hierarchical manner, checking that the leaf certificate (the
+					certificate presented by the client/server) is not only valid, but that the issuer of that certificate is also valid, and
+					so on until the verification process reaches a root certificate.
 
 					Relevant for both incoming and outgoing connections.
 

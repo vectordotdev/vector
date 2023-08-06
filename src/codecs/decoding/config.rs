@@ -35,14 +35,19 @@ impl DecodingConfig {
         &self.decoding
     }
 
+    /// Get the framing configuration.
+    pub const fn framing(&self) -> &FramingConfig {
+        &self.framing
+    }
+
     /// Builds a `Decoder` from the provided configuration.
-    pub fn build(&self) -> Decoder {
+    pub fn build(&self) -> vector_common::Result<Decoder> {
         // Build the framer.
         let framer = self.framing.build();
 
         // Build the deserializer.
-        let deserializer = self.decoding.build();
+        let deserializer = self.decoding.build()?;
 
-        Decoder::new(framer, deserializer).with_log_namespace(self.log_namespace)
+        Ok(Decoder::new(framer, deserializer).with_log_namespace(self.log_namespace))
     }
 }

@@ -16,6 +16,7 @@ use crate::{
         AcknowledgementsConfig, GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext,
         SinkHealthcheckOptions,
     },
+    http::build_proxy_connector,
     proto::vector as proto,
     sinks::{
         util::{
@@ -24,27 +25,36 @@ use crate::{
         },
         Healthcheck, VectorSink as VectorSinkType,
     },
-    tls::{tls_connector_builder, MaybeTlsSettings, TlsEnableableConfig},
+    tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
 
 /// Configuration for the `vector` sink.
-#[configurable_component(sink("vector"))]
+#[configurable_component(sink("vector", "Relay observability data to a Vector instance."))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct VectorConfig {
     /// Version of the configuration.
+    // NOTE: this option is deprecated and has already been removed from the "old" docs.
+    // At some point in the future we will remove it entirely as a breaking change.
+    #[configurable(metadata(docs::hidden))]
     version: Option<super::VectorConfigVersion>,
 
     /// The downstream Vector address to which to connect.
     ///
+    /// Both IP address and hostname are accepted formats.
+    ///
     /// The address _must_ include a port.
+    #[configurable(validation(format = "uri"))]
+    #[configurable(metadata(docs::examples = "92.12.333.224:6000"))]
+    #[configurable(metadata(docs::examples = "https://somehost:6000"))]
     address: String,
 
     /// Whether or not to compress requests.
     ///
-    /// If set to `true`, requests will be compressed with [`gzip`][gzip_docs].
+    /// If set to `true`, requests are compressed with [`gzip`][gzip_docs].
     ///
     /// [gzip_docs]: https://www.gzip.org/
+    #[configurable(metadata(docs::advanced))]
     #[serde(default)]
     compression: bool,
 
@@ -96,6 +106,7 @@ fn default_config(address: &str) -> VectorConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "vector")]
 impl SinkConfig for VectorConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSinkType, Healthcheck)> {
         let tls = MaybeTlsSettings::from_config(&self.tls, false)?;
@@ -199,23 +210,7 @@ fn new_client(
     tls_settings: &MaybeTlsSettings,
     proxy_config: &ProxyConfig,
 ) -> crate::Result<hyper::Client<ProxyConnector<HttpsConnector<HttpConnector>>, BoxBody>> {
-    let mut http = HttpConnector::new();
-    http.enforce_http(false);
-
-    let tls = tls_connector_builder(tls_settings)?;
-    let mut https = HttpsConnector::with_connector(http, tls)?;
-
-    let settings = tls_settings.tls().cloned();
-    https.set_callback(move |c, _uri| {
-        if let Some(settings) = &settings {
-            settings.apply_connect_configuration(c);
-        }
-
-        Ok(())
-    });
-
-    let mut proxy = ProxyConnector::new(https).unwrap();
-    proxy_config.configure(&mut proxy)?;
+    let proxy = build_proxy_connector(tls_settings.clone(), proxy_config)?;
 
     Ok(hyper::Client::builder().http2_only(true).build(proxy))
 }
@@ -243,6 +238,7 @@ impl RetryLogic for VectorGrpcRetryLogic {
                     | OutOfRange
                     | Unimplemented
                     | Unauthenticated
+                    | DataLoss
             ),
             _ => true,
         }

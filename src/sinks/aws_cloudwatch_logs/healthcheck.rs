@@ -57,7 +57,7 @@ pub async fn healthcheck(
                 if config.group_name.is_dynamic() {
                     info!("Skipping healthcheck log group check: `group_name` is dynamic.");
                     Ok(())
-                } else if config.create_missing_group.unwrap_or(true) {
+                } else if config.create_missing_group {
                     info!("Skipping healthcheck log group check: `group_name` will be created if missing.");
                     Ok(())
                 } else {

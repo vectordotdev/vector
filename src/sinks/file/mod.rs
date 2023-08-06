@@ -1,3 +1,4 @@
+use std::convert::TryFrom;
 use std::time::{Duration, Instant};
 
 use async_compression::tokio::write::{GzipEncoder, ZstdEncoder};
@@ -12,6 +13,7 @@ use futures::{
     stream::{BoxStream, StreamExt},
     FutureExt,
 };
+use serde_with::serde_as;
 use tokio::{
     fs::{self, File},
     io::AsyncWriteExt,
@@ -33,22 +35,34 @@ use crate::{
     template::Template,
 };
 mod bytes_path;
-use std::convert::TryFrom;
 
 use bytes_path::BytesPath;
 
 /// Configuration for the `file` sink.
-#[configurable_component(sink("file"))]
+#[serde_as]
+#[configurable_component(sink("file", "Output observability events into files."))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct FileSinkConfig {
-    /// File name to write events to.
+    /// File path to write events to.
+    ///
+    /// Compression format extension must be explicit.
+    #[configurable(metadata(docs::examples = "/tmp/vector-%Y-%m-%d.log"))]
+    #[configurable(metadata(
+        docs::examples = "/tmp/application-{{ application_id }}-%Y-%m-%d.log"
+    ))]
+    #[configurable(metadata(docs::examples = "/tmp/vector-%Y-%m-%d.log.zst"))]
     pub path: Template,
 
-    /// The amount of time, in seconds, that a file can be idle and stay open.
+    /// The amount of time that a file can be idle and stay open.
     ///
-    /// After not receiving any events in this amount of time, the file will be flushed and closed.
-    pub idle_timeout_secs: Option<u64>,
+    /// After not receiving any events in this amount of time, the file is flushed and closed.
+    #[serde(default = "default_idle_timeout")]
+    #[serde_as(as = "serde_with::DurationSeconds<u64>")]
+    #[serde(rename = "idle_timeout_secs")]
+    #[configurable(metadata(docs::examples = 600))]
+    #[configurable(metadata(docs::human_name = "Idle Timeout"))]
+    pub idle_timeout: Duration,
 
     #[serde(flatten)]
     pub encoding: EncodingConfigWithFraming,
@@ -73,8 +87,8 @@ impl GenerateConfig for FileSinkConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
             path: Template::try_from("/tmp/vector-%Y-%m-%d.log").unwrap(),
-            idle_timeout_secs: None,
-            encoding: (None::<FramingConfig>, TextSerializerConfig::new()).into(),
+            idle_timeout: default_idle_timeout(),
+            encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             compression: Default::default(),
             acknowledgements: Default::default(),
         })
@@ -82,26 +96,30 @@ impl GenerateConfig for FileSinkConfig {
     }
 }
 
-/// Compression algorithm.
-// TODO: Why doesn't this already use `crate::sinks::util::Compression`? :thinkies:
+const fn default_idle_timeout() -> Duration {
+    Duration::from_secs(30)
+}
+
+/// Compression configuration.
+// TODO: Why doesn't this already use `crate::sinks::util::Compression`
+// `crate::sinks::util::Compression` doesn't support zstd yet
 #[configurable_component]
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum Compression {
-    /// Gzip compression.
+    /// [Gzip][gzip] compression.
+    ///
+    /// [gzip]: https://www.gzip.org/
     Gzip,
 
-    /// Zstandard compression.
+    /// [Zstandard][zstd] compression.
+    ///
+    /// [zstd]: https://facebook.github.io/zstd/
     Zstd,
 
     /// No compression.
+    #[default]
     None,
-}
-
-impl Default for Compression {
-    fn default() -> Self {
-        Compression::None
-    }
 }
 
 enum OutFile {
@@ -152,6 +170,7 @@ impl OutFile {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "file")]
 impl SinkConfig for FileSinkConfig {
     async fn build(
         &self,
@@ -193,7 +212,7 @@ impl FileSink {
             path: config.path.clone(),
             transformer,
             encoder,
-            idle_timeout: Duration::from_secs(config.idle_timeout_secs.unwrap_or(30)),
+            idle_timeout: config.idle_timeout,
             files: ExpiringHashMap::default(),
             compression: config.compression,
             events_sent: register!(EventsSent::from(Output(None))),
@@ -431,8 +450,8 @@ mod tests {
 
         let config = FileSinkConfig {
             path: template.clone().try_into().unwrap(),
-            idle_timeout_secs: None,
-            encoding: (None::<FramingConfig>, TextSerializerConfig::new()).into(),
+            idle_timeout: default_idle_timeout(),
+            encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             compression: Compression::None,
             acknowledgements: Default::default(),
         };
@@ -453,8 +472,8 @@ mod tests {
 
         let config = FileSinkConfig {
             path: template.clone().try_into().unwrap(),
-            idle_timeout_secs: None,
-            encoding: (None::<FramingConfig>, TextSerializerConfig::new()).into(),
+            idle_timeout: default_idle_timeout(),
+            encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             compression: Compression::Gzip,
             acknowledgements: Default::default(),
         };
@@ -475,8 +494,8 @@ mod tests {
 
         let config = FileSinkConfig {
             path: template.clone().try_into().unwrap(),
-            idle_timeout_secs: None,
-            encoding: (None::<FramingConfig>, TextSerializerConfig::new()).into(),
+            idle_timeout: default_idle_timeout(),
+            encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             compression: Compression::Zstd,
             acknowledgements: Default::default(),
         };
@@ -502,8 +521,8 @@ mod tests {
 
         let config = FileSinkConfig {
             path: template.try_into().unwrap(),
-            idle_timeout_secs: None,
-            encoding: (None::<FramingConfig>, TextSerializerConfig::new()).into(),
+            idle_timeout: default_idle_timeout(),
+            encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             compression: Compression::None,
             acknowledgements: Default::default(),
         };
@@ -529,44 +548,45 @@ mod tests {
         run_assert_sink(config, input.clone().into_iter()).await;
 
         let output = vec![
-            lines_from_file(&directory.join("warnings-2019-26-07.log")),
-            lines_from_file(&directory.join("errors-2019-26-07.log")),
-            lines_from_file(&directory.join("warnings-2019-27-07.log")),
-            lines_from_file(&directory.join("errors-2019-27-07.log")),
-            lines_from_file(&directory.join("warnings-2019-28-07.log")),
-            lines_from_file(&directory.join("errors-2019-29-07.log")),
+            lines_from_file(directory.join("warnings-2019-26-07.log")),
+            lines_from_file(directory.join("errors-2019-26-07.log")),
+            lines_from_file(directory.join("warnings-2019-27-07.log")),
+            lines_from_file(directory.join("errors-2019-27-07.log")),
+            lines_from_file(directory.join("warnings-2019-28-07.log")),
+            lines_from_file(directory.join("errors-2019-29-07.log")),
         ];
 
+        let message_key = log_schema().message_key().unwrap().to_string();
         assert_eq!(
-            input[0].as_log()[log_schema().message_key()],
+            input[0].as_log()[&message_key],
             From::<&str>::from(&output[0][0])
         );
         assert_eq!(
-            input[1].as_log()[log_schema().message_key()],
+            input[1].as_log()[&message_key],
             From::<&str>::from(&output[1][0])
         );
         assert_eq!(
-            input[2].as_log()[log_schema().message_key()],
+            input[2].as_log()[&message_key],
             From::<&str>::from(&output[0][1])
         );
         assert_eq!(
-            input[3].as_log()[log_schema().message_key()],
+            input[3].as_log()[&message_key],
             From::<&str>::from(&output[3][0])
         );
         assert_eq!(
-            input[4].as_log()[log_schema().message_key()],
+            input[4].as_log()[&message_key],
             From::<&str>::from(&output[2][0])
         );
         assert_eq!(
-            input[5].as_log()[log_schema().message_key()],
+            input[5].as_log()[&message_key],
             From::<&str>::from(&output[2][1])
         );
         assert_eq!(
-            input[6].as_log()[log_schema().message_key()],
+            input[6].as_log()[&message_key],
             From::<&str>::from(&output[4][0])
         );
         assert_eq!(
-            input[7].as_log()[log_schema().message_key()],
+            input[7].as_log()[message_key],
             From::<&str>::from(&output[5][0])
         );
     }
@@ -579,8 +599,8 @@ mod tests {
 
         let config = FileSinkConfig {
             path: template.clone().try_into().unwrap(),
-            idle_timeout_secs: Some(1),
-            encoding: (None::<FramingConfig>, TextSerializerConfig::new()).into(),
+            idle_timeout: Duration::from_secs(1),
+            encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             compression: Compression::None,
             acknowledgements: Default::default(),
         };

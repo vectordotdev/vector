@@ -4,6 +4,7 @@ use bytes::Bytes;
 use futures_util::future::BoxFuture;
 use http::{Request, StatusCode, Uri};
 use hyper::Body;
+use lookup::lookup_v2::OptionalValuePath;
 use snafu::{ResultExt, Snafu};
 use vector_core::{config::proxy::ProxyConfig, event::EventRef};
 
@@ -131,12 +132,16 @@ pub fn build_uri(
     uri.parse::<Uri>()
 }
 
-pub fn host_key() -> String {
-    crate::config::log_schema().host_key().to_string()
+pub fn config_host_key() -> OptionalValuePath {
+    OptionalValuePath {
+        path: crate::config::log_schema().host_key().cloned(),
+    }
 }
 
-pub fn timestamp_key() -> String {
-    crate::config::log_schema().timestamp_key().to_string()
+pub fn config_timestamp_key() -> OptionalValuePath {
+    OptionalValuePath {
+        path: crate::config::log_schema().timestamp_key().cloned(),
+    }
 }
 
 pub fn render_template_string<'a>(

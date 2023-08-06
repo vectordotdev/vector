@@ -1,6 +1,7 @@
 use std::{hash::Hash, marker::PhantomData, pin::Pin, sync::Arc, time::Duration};
 
 use futures_util::stream::{self, BoxStream};
+use serde_with::serde_as;
 use tower::{
     balance::p2c::Balance,
     buffer::{Buffer, BufferLayer},
@@ -34,6 +35,7 @@ use crate::{
 mod concurrency;
 mod health;
 mod map;
+pub mod net;
 
 pub type Svc<S, L> = RateLimit<AdaptiveConcurrencyLimit<Retry<FixedRetryPolicy<L>, Timeout<S>>, L>>;
 pub type TowerBatchedSink<S, B, RL> = BatchSink<Svc<S, RL>, B>;
@@ -84,37 +86,56 @@ impl<L> ServiceBuilderExt<L> for ServiceBuilder<L> {
 /// Middleware settings for outbound requests.
 ///
 /// Various settings can be configured, such as concurrency and rate limits, timeouts, etc.
+#[serde_as]
 #[configurable_component]
+#[configurable(metadata(docs::advanced))]
 #[derive(Clone, Copy, Debug)]
 pub struct TowerRequestConfig {
     #[configurable(derived)]
-    #[serde(default)]
+    #[serde(default = "default_concurrency")]
     #[serde(skip_serializing_if = "concurrency_is_none")]
     pub concurrency: Concurrency,
 
-    /// The maximum time a request can take before being aborted.
+    /// The time a request can take before being aborted.
     ///
-    /// It is highly recommended that you do not lower this value below the service’s internal timeout, as this could
+    /// Datadog highly recommends that you do not lower this value below the service's internal timeout, as this could
     /// create orphaned requests, pile on retries, and result in duplicate data downstream.
+    #[configurable(metadata(docs::type_unit = "seconds"))]
+    #[serde(default = "default_timeout_secs")]
+    #[configurable(metadata(docs::human_name = "Timeout"))]
     pub timeout_secs: Option<u64>,
 
-    /// The time window, in seconds, used for the `rate_limit_num` option.
+    /// The time window used for the `rate_limit_num` option.
+    #[configurable(metadata(docs::type_unit = "seconds"))]
+    #[serde(default = "default_rate_limit_duration_secs")]
+    #[configurable(metadata(docs::human_name = "Rate Limit Duration"))]
     pub rate_limit_duration_secs: Option<u64>,
 
     /// The maximum number of requests allowed within the `rate_limit_duration_secs` time window.
+    #[configurable(metadata(docs::type_unit = "requests"))]
+    #[serde(default = "default_rate_limit_num")]
+    #[configurable(metadata(docs::human_name = "Rate Limit Number"))]
     pub rate_limit_num: Option<u64>,
 
     /// The maximum number of retries to make for failed requests.
     ///
     /// The default, for all intents and purposes, represents an infinite number of retries.
+    #[configurable(metadata(docs::type_unit = "retries"))]
+    #[serde(default = "default_retry_attempts")]
     pub retry_attempts: Option<usize>,
 
-    /// The maximum amount of time, in seconds, to wait between retries.
+    /// The maximum amount of time to wait between retries.
+    #[configurable(metadata(docs::type_unit = "seconds"))]
+    #[serde(default = "default_retry_max_duration_secs")]
+    #[configurable(metadata(docs::human_name = "Max Retry Duration"))]
     pub retry_max_duration_secs: Option<u64>,
 
     /// The amount of time to wait before attempting the first retry for a failed request.
     ///
-    /// After the first retry has failed, the fibonacci sequence will be used to select future backoffs.
+    /// After the first retry has failed, the fibonacci sequence is used to select future backoffs.
+    #[configurable(metadata(docs::type_unit = "seconds"))]
+    #[serde(default = "default_retry_initial_backoff_secs")]
+    #[configurable(metadata(docs::human_name = "Retry Initial Backoff"))]
     pub retry_initial_backoff_secs: Option<u64>,
 
     #[configurable(derived)]
@@ -122,36 +143,57 @@ pub struct TowerRequestConfig {
     pub adaptive_concurrency: AdaptiveConcurrencySettings,
 }
 
-pub const CONCURRENCY_DEFAULT: Concurrency = Concurrency::None;
-pub const RATE_LIMIT_DURATION_SECONDS_DEFAULT: u64 = 1;
-pub const RATE_LIMIT_NUM_DEFAULT: u64 = i64::max_value() as u64; // i64 avoids TOML deserialize issue
-pub const RETRY_ATTEMPTS_DEFAULT: usize = isize::max_value() as usize; // isize avoids TOML deserialize issue
-pub const RETRY_MAX_DURATION_SECONDS_DEFAULT: u64 = 3_600;
-pub const RETRY_INITIAL_BACKOFF_SECONDS_DEFAULT: u64 = 1;
-pub const TIMEOUT_SECONDS_DEFAULT: u64 = 60;
+const fn default_concurrency() -> Concurrency {
+    Concurrency::None
+}
+
+const fn default_timeout_secs() -> Option<u64> {
+    Some(60)
+}
+
+const fn default_rate_limit_duration_secs() -> Option<u64> {
+    Some(1)
+}
+
+const fn default_rate_limit_num() -> Option<u64> {
+    // i64 avoids TOML deserialize issue
+    Some(i64::max_value() as u64)
+}
+
+const fn default_retry_attempts() -> Option<usize> {
+    // i64 avoids TOML deserialize issue
+    Some(isize::max_value() as usize)
+}
+
+const fn default_retry_max_duration_secs() -> Option<u64> {
+    Some(3_600)
+}
+
+const fn default_retry_initial_backoff_secs() -> Option<u64> {
+    Some(1)
+}
 
 impl Default for TowerRequestConfig {
     fn default() -> Self {
-        Self::new(CONCURRENCY_DEFAULT)
+        Self {
+            concurrency: default_concurrency(),
+            timeout_secs: default_timeout_secs(),
+            rate_limit_duration_secs: default_rate_limit_duration_secs(),
+            rate_limit_num: default_rate_limit_num(),
+            retry_attempts: default_retry_attempts(),
+            retry_max_duration_secs: default_retry_max_duration_secs(),
+            retry_initial_backoff_secs: default_retry_initial_backoff_secs(),
+            adaptive_concurrency: AdaptiveConcurrencySettings::default(),
+        }
     }
 }
 
 impl TowerRequestConfig {
-    pub const fn new(concurrency: Concurrency) -> Self {
+    pub fn new(concurrency: Concurrency) -> Self {
         Self {
             concurrency,
-            timeout_secs: Some(TIMEOUT_SECONDS_DEFAULT),
-            rate_limit_duration_secs: Some(RATE_LIMIT_DURATION_SECONDS_DEFAULT),
-            rate_limit_num: Some(RATE_LIMIT_NUM_DEFAULT),
-            retry_attempts: Some(RETRY_ATTEMPTS_DEFAULT),
-            retry_max_duration_secs: Some(RETRY_MAX_DURATION_SECONDS_DEFAULT),
-            retry_initial_backoff_secs: Some(RETRY_INITIAL_BACKOFF_SECONDS_DEFAULT),
-            adaptive_concurrency: AdaptiveConcurrencySettings::const_default(),
+            ..Default::default()
         }
-    }
-
-    pub const fn const_default() -> Self {
-        Self::new(CONCURRENCY_DEFAULT)
     }
 
     pub const fn timeout_secs(mut self, timeout_secs: u64) -> Self {
@@ -185,35 +227,42 @@ impl TowerRequestConfig {
     }
 
     pub fn unwrap_with(&self, defaults: &Self) -> TowerRequestSettings {
+        // the unwrap() calls below are safe because the final defaults are always Some<>
         TowerRequestSettings {
             concurrency: self.concurrency.parse_concurrency(defaults.concurrency),
             timeout: Duration::from_secs(
                 self.timeout_secs
                     .or(defaults.timeout_secs)
-                    .unwrap_or(TIMEOUT_SECONDS_DEFAULT),
+                    .or(default_timeout_secs())
+                    .unwrap(),
             ),
             rate_limit_duration: Duration::from_secs(
                 self.rate_limit_duration_secs
                     .or(defaults.rate_limit_duration_secs)
-                    .unwrap_or(RATE_LIMIT_DURATION_SECONDS_DEFAULT),
+                    .or(default_rate_limit_duration_secs())
+                    .unwrap(),
             ),
             rate_limit_num: self
                 .rate_limit_num
                 .or(defaults.rate_limit_num)
-                .unwrap_or(RATE_LIMIT_NUM_DEFAULT),
+                .or(default_rate_limit_num())
+                .unwrap(),
             retry_attempts: self
                 .retry_attempts
                 .or(defaults.retry_attempts)
-                .unwrap_or(RETRY_ATTEMPTS_DEFAULT),
+                .or(default_retry_attempts())
+                .unwrap(),
             retry_max_duration_secs: Duration::from_secs(
                 self.retry_max_duration_secs
                     .or(defaults.retry_max_duration_secs)
-                    .unwrap_or(RETRY_MAX_DURATION_SECONDS_DEFAULT),
+                    .or(default_retry_max_duration_secs())
+                    .unwrap(),
             ),
             retry_initial_backoff_secs: Duration::from_secs(
                 self.retry_initial_backoff_secs
                     .or(defaults.retry_initial_backoff_secs)
-                    .unwrap_or(RETRY_INITIAL_BACKOFF_SECONDS_DEFAULT),
+                    .or(default_retry_initial_backoff_secs())
+                    .unwrap(),
             ),
             adaptive_concurrency: self.adaptive_concurrency,
         }
@@ -308,7 +357,6 @@ impl TowerRequestSettings {
         S::Future: Send + 'static,
     {
         let policy = self.retry_policy(retry_logic.clone());
-        let settings = self.clone();
 
         // Build services
         let open = OpenGauge::new();
@@ -319,16 +367,14 @@ impl TowerRequestSettings {
                 // Build individual service
                 ServiceBuilder::new()
                     .layer(AdaptiveConcurrencyLimitLayer::new(
-                        settings.concurrency,
-                        settings.adaptive_concurrency,
+                        self.concurrency,
+                        self.adaptive_concurrency,
                         retry_logic.clone(),
                     ))
                     .service(
                         health_config.build(
                             health_logic.clone(),
-                            ServiceBuilder::new()
-                                .timeout(settings.timeout)
-                                .service(inner),
+                            ServiceBuilder::new().timeout(self.timeout).service(inner),
                             open.clone(),
                             endpoint,
                         ), // NOTE: there is a version conflict for crate `tracing` between `tracing_tower` crate
@@ -394,6 +440,7 @@ mod tests {
 
     use futures::{future, stream, FutureExt, SinkExt, StreamExt};
     use tokio::time::Duration;
+    use vector_common::json_size::JsonSize;
 
     use super::*;
     use crate::sinks::util::{
@@ -474,19 +521,19 @@ mod tests {
         );
         sink.ordered();
 
-        let input = (0..20).into_iter().map(|i| PartitionInnerBuffer::new(i, 0));
+        let input = (0..20).map(|i| PartitionInnerBuffer::new(i, 0));
         sink.sink_map_err(drop)
-            .send_all(&mut stream::iter(input).map(|item| Ok(EncodedEvent::new(item, 0))))
+            .send_all(
+                &mut stream::iter(input)
+                    .map(|item| Ok(EncodedEvent::new(item, 0, JsonSize::zero()))),
+            )
             .await
             .unwrap();
 
         let output = sent_requests.lock().unwrap();
         assert_eq!(
             &*output,
-            &vec![
-                (0..10).into_iter().collect::<Vec<_>>(),
-                (10..20).into_iter().collect::<Vec<_>>(),
-            ]
+            &vec![(0..10).collect::<Vec<_>>(), (10..20).collect::<Vec<_>>(),]
         );
     }
 

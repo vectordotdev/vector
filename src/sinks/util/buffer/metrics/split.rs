@@ -76,8 +76,8 @@ impl<S: MetricSplit> MetricSplitter<S> {
     }
 }
 
-impl<S: Default> MetricSplitter<S> {
-    pub fn default() -> Self {
+impl<S: Default> Default for MetricSplitter<S> {
+    fn default() -> Self {
         Self {
             splitter: S::default(),
         }
@@ -93,7 +93,7 @@ impl<S> From<S> for MetricSplitter<S> {
 /// A splitter that separates an aggregated summary into its various parts.
 ///
 /// Generally speaking, all metric types supported by Vector have way to be added to and removed from other instances of
-/// themselves, such as merging two counters by adding together their values, or merging two distributions simpky be
+/// themselves, such as merging two counters by adding together their values, or merging two distributions simply be
 /// adding all of their samples together.
 ///
 /// However, one particular metric type is not amenable to these operations: aggregated summaries. Hailing from

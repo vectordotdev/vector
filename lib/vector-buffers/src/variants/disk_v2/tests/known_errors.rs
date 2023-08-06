@@ -121,7 +121,7 @@ async fn reader_throws_error_when_finished_file_has_truncated_record_data() {
             let (mut writer, _, ledger) =
                 create_buffer_v2_with_max_data_file_size(data_dir.clone(), 172).await;
 
-            // Write two smaller records, such that the first one fits entirelyh, and the second one
+            // Write two smaller records, such that the first one fits entirely, and the second one
             // starts within the 128-byte zone but finishes over the limit, thus triggering data
             // file rollover.
             let first_record_size = 32;
@@ -391,7 +391,7 @@ async fn writer_detects_when_last_record_has_scrambled_archive_data() {
                 .expect("metadata should not fail");
             assert_eq!(expected_data_file_len, metadata.len());
 
-            let target_pos = expected_data_file_len as u64 - 8;
+            let target_pos = expected_data_file_len - 8;
             let pos = data_file
                 .seek(SeekFrom::Start(target_pos))
                 .await
@@ -791,11 +791,11 @@ async fn reader_throws_error_when_record_is_undecodable_via_metadata() {
             CAN_DECODE_VALUE.store(1, Ordering::Relaxed);
             let second_read_result = reader.next().await;
             assert!(matches!(second_read_result, Err(ReaderError::Incompatible { .. })));
-            let second_read_error_reason = if let ReaderError::Incompatible { reason } = second_read_result.unwrap_err() {
-                reason
-            } else {
+
+            let ReaderError::Incompatible { reason: second_read_error_reason } = second_read_result.unwrap_err() else {
                 panic!("error should be ReadError::Incompatible");
             };
+
             let expected_second_read_error_reason = format!("record metadata not supported (metadata: {:#036b})", 0_u32);
             assert_eq!(expected_second_read_error_reason, second_read_error_reason);
 
@@ -806,15 +806,13 @@ async fn reader_throws_error_when_record_is_undecodable_via_metadata() {
             // should cause an "incompatible" error:
             let third_read_result = reader.next().await;
             assert!(matches!(third_read_result, Err(ReaderError::Incompatible { .. })));
-            let third_read_error_reason = if let ReaderError::Incompatible { reason } = third_read_result.unwrap_err() {
-                reason
-            } else {
+            let ReaderError::Incompatible { reason: third_read_error_reason } = third_read_result.unwrap_err() else {
                 panic!("error should be ReadError::Incompatible");
             };
+
             let expected_third_read_error_reason_prefix = "invalid metadata for";
             assert!(third_read_error_reason.starts_with(expected_third_read_error_reason_prefix),
-                "error reason when metadata cannot be converted should start with 'metadata invalid for', got '{}' instead",
-                third_read_error_reason);
+                "error reason when metadata cannot be converted should start with 'metadata invalid for', got '{third_read_error_reason}' instead");
         }
     })
     .await;

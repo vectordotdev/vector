@@ -13,72 +13,178 @@ base: components: sources: demo_logs: configuration: {
 	decoding: {
 		description: "Configures how events are decoded from raw bytes."
 		required:    false
-		type: object: options: codec: {
-			description: "The codec to use for decoding events."
-			required:    false
-			type: string: {
-				default: "bytes"
-				enum: {
-					bytes: "Uses the raw bytes as-is."
-					gelf: """
-						Decodes the raw bytes as a [GELF][gelf] message.
+		type: object: options: {
+			codec: {
+				description: "The codec to use for decoding events."
+				required:    false
+				type: string: {
+					default: "bytes"
+					enum: {
+						bytes: "Uses the raw bytes as-is."
+						gelf: """
+															Decodes the raw bytes as a [GELF][gelf] message.
 
-						[gelf]: https://docs.graylog.org/docs/gelf
+															[gelf]: https://docs.graylog.org/docs/gelf
+															"""
+						json: """
+															Decodes the raw bytes as [JSON][json].
+
+															[json]: https://www.json.org/
+															"""
+						native: """
+															Decodes the raw bytes as Vector’s [native Protocol Buffers format][vector_native_protobuf].
+
+															This codec is **[experimental][experimental]**.
+
+															[vector_native_protobuf]: https://github.com/vectordotdev/vector/blob/master/lib/vector-core/proto/event.proto
+															[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
+															"""
+						native_json: """
+															Decodes the raw bytes as Vector’s [native JSON format][vector_native_json].
+
+															This codec is **[experimental][experimental]**.
+
+															[vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
+															[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
+															"""
+						protobuf: """
+															Decodes the raw bytes as [protobuf][protobuf].
+
+															[protobuf]: https://protobuf.dev/
+															"""
+						syslog: """
+															Decodes the raw bytes as a Syslog message.
+
+															Decodes either as the [RFC 3164][rfc3164]-style format ("old" style) or the
+															[RFC 5424][rfc5424]-style format ("new" style, includes structured data).
+
+															[rfc3164]: https://www.ietf.org/rfc/rfc3164.txt
+															[rfc5424]: https://www.ietf.org/rfc/rfc5424.txt
+															"""
+					}
+				}
+			}
+			gelf: {
+				description:   "GELF-specific decoding options."
+				relevant_when: "codec = \"gelf\""
+				required:      false
+				type: object: options: lossy: {
+					description: """
+						Determines whether or not to replace invalid UTF-8 sequences instead of failing.
+
+						When true, invalid UTF-8 sequences are replaced with the [`U+FFFD REPLACEMENT CHARACTER`][U+FFFD].
+
+						[U+FFFD]: https://en.wikipedia.org/wiki/Specials_(Unicode_block)#Replacement_character
 						"""
-					json: """
-						Decodes the raw bytes as [JSON][json].
+					required: false
+					type: bool: default: true
+				}
+			}
+			json: {
+				description:   "JSON-specific decoding options."
+				relevant_when: "codec = \"json\""
+				required:      false
+				type: object: options: lossy: {
+					description: """
+						Determines whether or not to replace invalid UTF-8 sequences instead of failing.
 
-						[json]: https://www.json.org/
+						When true, invalid UTF-8 sequences are replaced with the [`U+FFFD REPLACEMENT CHARACTER`][U+FFFD].
+
+						[U+FFFD]: https://en.wikipedia.org/wiki/Specials_(Unicode_block)#Replacement_character
 						"""
-					native: """
-						Decodes the raw bytes as Vector’s [native Protocol Buffers format][vector_native_protobuf].
+					required: false
+					type: bool: default: true
+				}
+			}
+			native_json: {
+				description:   "Vector's native JSON-specific decoding options."
+				relevant_when: "codec = \"native_json\""
+				required:      false
+				type: object: options: lossy: {
+					description: """
+						Determines whether or not to replace invalid UTF-8 sequences instead of failing.
 
-						This codec is **[experimental][experimental]**.
+						When true, invalid UTF-8 sequences are replaced with the [`U+FFFD REPLACEMENT CHARACTER`][U+FFFD].
 
-						[vector_native_protobuf]: https://github.com/vectordotdev/vector/blob/master/lib/vector-core/proto/event.proto
-						[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
+						[U+FFFD]: https://en.wikipedia.org/wiki/Specials_(Unicode_block)#Replacement_character
 						"""
-					native_json: """
-						Decodes the raw bytes as Vector’s [native JSON format][vector_native_json].
+					required: false
+					type: bool: default: true
+				}
+			}
+			protobuf: {
+				description:   "Protobuf-specific decoding options."
+				relevant_when: "codec = \"protobuf\""
+				required:      false
+				type: object: options: {
+					desc_file: {
+						description: "Path to desc file"
+						required:    false
+						type: string: default: ""
+					}
+					message_type: {
+						description: "message type. e.g package.message"
+						required:    false
+						type: string: default: ""
+					}
+				}
+			}
+			syslog: {
+				description:   "Syslog-specific decoding options."
+				relevant_when: "codec = \"syslog\""
+				required:      false
+				type: object: options: lossy: {
+					description: """
+						Determines whether or not to replace invalid UTF-8 sequences instead of failing.
 
-						This codec is **[experimental][experimental]**.
+						When true, invalid UTF-8 sequences are replaced with the [`U+FFFD REPLACEMENT CHARACTER`][U+FFFD].
 
-						[vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
-						[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
+						[U+FFFD]: https://en.wikipedia.org/wiki/Specials_(Unicode_block)#Replacement_character
 						"""
-					syslog: """
-						Decodes the raw bytes as a Syslog message.
-
-						Will decode either as the [RFC 3164][rfc3164]-style format ("old" style) or the more modern
-						[RFC 5424][rfc5424]-style format ("new" style, includes structured data).
-
-						[rfc3164]: https://www.ietf.org/rfc/rfc3164.txt
-						[rfc5424]: https://www.ietf.org/rfc/rfc5424.txt
-						"""
+					required: false
+					type: bool: default: true
 				}
 			}
 		}
 	}
 	format: {
-		required: false
-		type: string: {
-			default: "json"
-			enum: {
-				apache_common: "Randomly generated logs in [Apache common](\\(urls.apache_common)) format."
-				apache_error:  "Randomly generated logs in [Apache error](\\(urls.apache_error)) format."
-				bsd_syslog:    "Randomly generated logs in Syslog format ([RFC 3164](\\(urls.syslog_3164)))."
-				json:          "Randomly generated HTTP server logs in [JSON](\\(urls.json)) format."
-				shuffle:       "Lines are chosen at random from the list specified using `lines`."
-				syslog:        "Randomly generated logs in Syslog format ([RFC 5424](\\(urls.syslog_5424)))."
-			}
+		description: "The format of the randomly generated output."
+		required:    true
+		type: string: enum: {
+			apache_common: """
+				Randomly generated logs in [Apache common][apache_common] format.
+
+				[apache_common]: https://httpd.apache.org/docs/current/logs.html#common
+				"""
+			apache_error: """
+				Randomly generated logs in [Apache error][apache_error] format.
+
+				[apache_error]: https://httpd.apache.org/docs/current/logs.html#errorlog
+				"""
+			bsd_syslog: """
+				Randomly generated logs in Syslog format ([RFC 3164][syslog_3164]).
+
+				[syslog_3164]: https://tools.ietf.org/html/rfc3164
+				"""
+			json: """
+				Randomly generated HTTP server logs in [JSON][json] format.
+
+				[json]: https://en.wikipedia.org/wiki/JSON
+				"""
+			shuffle: "Lines are chosen at random from the list specified using `lines`."
+			syslog: """
+				Randomly generated logs in Syslog format ([RFC 5424][syslog_5424]).
+
+				[syslog_5424]: https://tools.ietf.org/html/rfc5424
+				"""
 		}
 	}
 	framing: {
 		description: """
 			Framing configuration.
 
-			Framing deals with how events are separated when encoded in a raw byte form, where each event is
-			a "frame" that must be prefixed, or delimited, in a way that marks where an event begins and
+			Framing handles how events are separated when encoded in a raw byte form, where each event is
+			a frame that must be prefixed, or delimited, in a way that marks where an event begins and
 			ends within the byte stream.
 			"""
 		required: false
@@ -98,6 +204,14 @@ base: components: sources: demo_logs: configuration: {
 																The maximum length of the byte buffer.
 
 																This length does *not* include the trailing delimiter.
+
+																By default, there is no maximum length enforced. If events are malformed, this can lead to
+																additional resource usage as events continue to be buffered in memory, and can potentially
+																lead to memory exhaustion in extreme cases.
+
+																If there is a risk of processing malformed data, such as logs with user-controlled input,
+																consider setting the maximum length to a reasonably large value as a safety net. This
+																ensures that processing is not actually unbounded.
 																"""
 						required: false
 						type: uint: {}
@@ -110,7 +224,7 @@ base: components: sources: demo_logs: configuration: {
 				type: string: {
 					default: "bytes"
 					enum: {
-						bytes:               "Byte frames are passed through as-is according to the underlying I/O boundaries (e.g. split between messages or stream segments)."
+						bytes:               "Byte frames are passed through as-is according to the underlying I/O boundaries (for example, split between messages or stream segments)."
 						character_delimited: "Byte frames which are delimited by a chosen character."
 						length_delimited:    "Byte frames which are prefixed by an unsigned big-endian 32-bit integer indicating the length."
 						newline_delimited:   "Byte frames which are delimited by a newline character."
@@ -131,6 +245,14 @@ base: components: sources: demo_logs: configuration: {
 						The maximum length of the byte buffer.
 
 						This length does *not* include the trailing delimiter.
+
+						By default, there is no maximum length enforced. If events are malformed, this can lead to
+						additional resource usage as events continue to be buffered in memory, and can potentially
+						lead to memory exhaustion in extreme cases.
+
+						If there is a risk of processing malformed data, such as logs with user-controlled input,
+						consider setting the maximum length to a reasonably large value as a safety net. This
+						ensures that processing is not actually unbounded.
 						"""
 					required: false
 					type: uint: {}
@@ -152,17 +274,21 @@ base: components: sources: demo_logs: configuration: {
 		description: """
 			The amount of time, in seconds, to pause between each batch of output lines.
 
-			The default is one batch per second. In order to remove the delay and output batches as quickly as possible, set
+			The default is one batch per second. To remove the delay and output batches as quickly as possible, set
 			`interval` to `0.0`.
 			"""
 		required: false
-		type: float: default: 1.0
+		type: float: {
+			default: 1.0
+			examples: [1.0, 0.1, 0.01]
+			unit: "seconds"
+		}
 	}
 	lines: {
 		description:   "The list of lines to output."
 		relevant_when: "format = \"shuffle\""
 		required:      true
-		type: array: items: type: string: {}
+		type: array: items: type: string: examples: ["line1", "line2"]
 	}
 	sequence: {
 		description:   "If `true`, each output line starts with an increasing sequence number, beginning with 0."

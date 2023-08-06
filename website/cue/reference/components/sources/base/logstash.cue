@@ -2,10 +2,13 @@ package metadata
 
 base: components: sources: logstash: configuration: {
 	acknowledgements: {
+		deprecated: true
 		description: """
 			Controls how acknowledgements are handled by this source.
 
-			This setting is **deprecated** in favor of enabling `acknowledgements` at the [global][global_acks] or sink level. Enabling or disabling acknowledgements at the source level has **no effect** on acknowledgement behavior.
+			This setting is **deprecated** in favor of enabling `acknowledgements` at the [global][global_acks] or sink level.
+
+			Enabling or disabling acknowledgements at the source level has **no effect** on acknowledgement behavior.
 
 			See [End-to-end Acknowledgements][e2e_acks] for more information on how event acknowledgement is handled.
 
@@ -20,46 +23,49 @@ base: components: sources: logstash: configuration: {
 		}
 	}
 	address: {
-		description: "The address to listen for connections on."
-		required:    true
-		type: {
-			number: {}
-			string: {}
-		}
+		description: """
+			The socket address to listen for connections on, or `systemd{#N}` to use the Nth socket passed by
+			systemd socket activation.
+
+			If a socket address is used, it _must_ include a port.
+			"""
+		required: true
+		type: string: examples: ["0.0.0.0:9000", "systemd", "systemd#3"]
 	}
 	connection_limit: {
-		description: "The maximum number of TCP connections that will be allowed at any given time."
+		description: "The maximum number of TCP connections that are allowed at any given time."
 		required:    false
-		type: uint: {}
+		type: uint: unit: "connections"
 	}
 	keepalive: {
 		description: "TCP keepalive settings for socket-based components."
 		required:    false
 		type: object: options: time_secs: {
-			description: "The time to wait, in seconds, before starting to send TCP keepalive probes on an idle connection."
+			description: "The time to wait before starting to send TCP keepalive probes on an idle connection."
 			required:    false
-			type: uint: {}
+			type: uint: unit: "seconds"
 		}
 	}
 	receive_buffer_bytes: {
-		description: """
-			The size, in bytes, of the receive buffer used for each connection.
-
-			This should not typically needed to be changed.
-			"""
-		required: false
-		type: uint: {}
+		description: "The size of the receive buffer used for each connection."
+		required:    false
+		type: uint: {
+			examples: [
+				65536,
+			]
+			unit: "bytes"
+		}
 	}
 	tls: {
-		description: "TlsEnableableConfig for `sources`, adding metadata from the client certificate"
+		description: "TlsEnableableConfig for `sources`, adding metadata from the client certificate."
 		required:    false
 		type: object: options: {
 			alpn_protocols: {
 				description: """
 					Sets the list of supported ALPN protocols.
 
-					Declare the supported ALPN protocols, which are used during negotiation with peer. Prioritized in the order
-					they are defined.
+					Declare the supported ALPN protocols, which are used during negotiation with peer. They are prioritized in the order
+					that they are defined.
 					"""
 				required: false
 				type: array: items: type: string: examples: ["h2"]
@@ -92,7 +98,7 @@ base: components: sources: logstash: configuration: {
 			}
 			enabled: {
 				description: """
-					Whether or not to require TLS for incoming/outgoing connections.
+					Whether or not to require TLS for incoming or outgoing connections.
 
 					When enabled and used for incoming connections, an identity certificate is also required. See `tls.crt_file` for
 					more information.
@@ -122,10 +128,10 @@ base: components: sources: logstash: configuration: {
 				description: """
 					Enables certificate verification.
 
-					If enabled, certificates must be valid in terms of not being expired, as well as being issued by a trusted
-					issuer. This verification operates in a hierarchical manner, checking that not only the leaf certificate (the
-					certificate presented by the client/server) is valid, but also that the issuer of that certificate is valid, and
-					so on until reaching a root certificate.
+					If enabled, certificates must not be expired and must be issued by a trusted
+					issuer. This verification operates in a hierarchical manner, checking that the leaf certificate (the
+					certificate presented by the client/server) is not only valid, but that the issuer of that certificate is also valid, and
+					so on until the verification process reaches a root certificate.
 
 					Relevant for both incoming and outgoing connections.
 

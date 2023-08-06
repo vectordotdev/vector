@@ -5,7 +5,7 @@ base: components: sinks: logdna: configuration: {
 		description: """
 			Controls how acknowledgements are handled for this sink.
 
-			See [End-to-end Acknowledgements][e2e_acks] for more information on how Vector handles event acknowledgement.
+			See [End-to-end Acknowledgements][e2e_acks] for more information on how event acknowledgement is handled.
 
 			[e2e_acks]: https://vector.dev/docs/about/under-the-hood/architecture/end-to-end-acknowledgements/
 			"""
@@ -15,7 +15,7 @@ base: components: sinks: logdna: configuration: {
 				Whether or not end-to-end acknowledgements are enabled.
 
 				When enabled for a sink, any source connected to that sink, where the source supports
-				end-to-end acknowledgements as well, will wait for events to be acknowledged by the sink
+				end-to-end acknowledgements as well, waits for events to be acknowledged by the sink
 				before acknowledging them at the source.
 
 				Enabling or disabling acknowledgements at the sink level takes precedence over any global
@@ -30,7 +30,7 @@ base: components: sinks: logdna: configuration: {
 	api_key: {
 		description: "The Ingestion API key."
 		required:    true
-		type: string: {}
+		type: string: examples: ["${LOGDNA_API_KEY}", "ef8d5de700e7989468166c40fc8a0ccd"]
 	}
 	batch: {
 		description: "Event batching behavior."
@@ -38,47 +38,61 @@ base: components: sinks: logdna: configuration: {
 		type: object: options: {
 			max_bytes: {
 				description: """
-					The maximum size of a batch that will be processed by a sink.
+					The maximum size of a batch that is processed by a sink.
 
 					This is based on the uncompressed size of the batched events, before they are
-					serialized / compressed.
+					serialized/compressed.
 					"""
 				required: false
-				type: uint: {}
+				type: uint: {
+					default: 10000000
+					unit:    "bytes"
+				}
 			}
 			max_events: {
-				description: "The maximum size of a batch, in events, before it is flushed."
+				description: "The maximum size of a batch before it is flushed."
 				required:    false
-				type: uint: {}
+				type: uint: unit: "events"
 			}
 			timeout_secs: {
-				description: "The maximum age of a batch, in seconds, before it is flushed."
+				description: "The maximum age of a batch before it is flushed."
 				required:    false
-				type: float: {}
+				type: float: {
+					default: 1.0
+					unit:    "seconds"
+				}
 			}
 		}
 	}
 	default_app: {
-		description: "The default app that will be set for events that do not contain a `file` or `app` field."
+		description: "The default app that is set for events that do not contain a `file` or `app` field."
 		required:    false
-		type: string: {}
+		type: string: {
+			default: "vector"
+			examples: [
+				"my-app",
+			]
+		}
 	}
 	default_env: {
-		description: "The default environment that will be set for events that do not contain an `env` field."
+		description: "The default environment that is set for events that do not contain an `env` field."
 		required:    false
-		type: string: {}
+		type: string: {
+			default: "production"
+			examples: ["staging"]
+		}
 	}
 	encoding: {
 		description: "Transformations to prepare an event for serialization."
 		required:    false
 		type: object: options: {
 			except_fields: {
-				description: "List of fields that will be excluded from the encoded event."
+				description: "List of fields that are excluded from the encoded event."
 				required:    false
 				type: array: items: type: string: {}
 			}
 			only_fields: {
-				description: "List of fields that will be included in the encoded event."
+				description: "List of fields that are included in the encoded event."
 				required:    false
 				type: array: items: type: string: {}
 			}
@@ -93,24 +107,34 @@ base: components: sinks: logdna: configuration: {
 		}
 	}
 	endpoint: {
-		description: "The endpoint to send logs to."
-		required:    false
-		type: string: {}
+		description: """
+			The HTTP endpoint to send logs to.
+
+			Both IP address and hostname are accepted formats.
+			"""
+		required: false
+		type: string: {
+			default: "https://logs.mezmo.com/"
+			examples: ["http://127.0.0.1", "http://example.com"]
+		}
 	}
 	hostname: {
-		description: "The hostname that will be attached to each batch of events."
+		description: "The hostname that is attached to each batch of events."
 		required:    true
-		type: string: syntax: "template"
+		type: string: {
+			examples: ["${HOSTNAME}", "my-local-machine"]
+			syntax: "template"
+		}
 	}
 	ip: {
-		description: "The IP address that will be attached to each batch of events."
+		description: "The IP address that is attached to each batch of events."
 		required:    false
-		type: string: {}
+		type: string: examples: ["0.0.0.0"]
 	}
 	mac: {
-		description: "The MAC address that will be attached to each batch of events."
+		description: "The MAC address that is attached to each batch of events."
 		required:    false
-		type: string: {}
+		type: string: examples: ["my-mac-address"]
 	}
 	request: {
 		description: """
@@ -193,14 +217,20 @@ base: components: sinks: logdna: configuration: {
 				}
 			}
 			rate_limit_duration_secs: {
-				description: "The time window, in seconds, used for the `rate_limit_num` option."
+				description: "The time window used for the `rate_limit_num` option."
 				required:    false
-				type: uint: default: 1
+				type: uint: {
+					default: 1
+					unit:    "seconds"
+				}
 			}
 			rate_limit_num: {
 				description: "The maximum number of requests allowed within the `rate_limit_duration_secs` time window."
 				required:    false
-				type: uint: default: 9223372036854775807
+				type: uint: {
+					default: 9223372036854775807
+					unit:    "requests"
+				}
 			}
 			retry_attempts: {
 				description: """
@@ -209,37 +239,52 @@ base: components: sinks: logdna: configuration: {
 					The default, for all intents and purposes, represents an infinite number of retries.
 					"""
 				required: false
-				type: uint: default: 9223372036854775807
+				type: uint: {
+					default: 9223372036854775807
+					unit:    "retries"
+				}
 			}
 			retry_initial_backoff_secs: {
 				description: """
 					The amount of time to wait before attempting the first retry for a failed request.
 
-					After the first retry has failed, the fibonacci sequence will be used to select future backoffs.
+					After the first retry has failed, the fibonacci sequence is used to select future backoffs.
 					"""
 				required: false
-				type: uint: default: 1
+				type: uint: {
+					default: 1
+					unit:    "seconds"
+				}
 			}
 			retry_max_duration_secs: {
-				description: "The maximum amount of time, in seconds, to wait between retries."
+				description: "The maximum amount of time to wait between retries."
 				required:    false
-				type: uint: default: 3600
+				type: uint: {
+					default: 3600
+					unit:    "seconds"
+				}
 			}
 			timeout_secs: {
 				description: """
-					The maximum time a request can take before being aborted.
+					The time a request can take before being aborted.
 
-					It is highly recommended that you do not lower this value below the service’s internal timeout, as this could
+					Datadog highly recommends that you do not lower this value below the service's internal timeout, as this could
 					create orphaned requests, pile on retries, and result in duplicate data downstream.
 					"""
 				required: false
-				type: uint: default: 60
+				type: uint: {
+					default: 60
+					unit:    "seconds"
+				}
 			}
 		}
 	}
 	tags: {
-		description: "The tags that will be attached to each batch of events."
+		description: "The tags that are attached to each batch of events."
 		required:    false
-		type: array: items: type: string: syntax: "template"
+		type: array: items: type: string: {
+			examples: ["tag1", "tag2"]
+			syntax: "template"
+		}
 	}
 }

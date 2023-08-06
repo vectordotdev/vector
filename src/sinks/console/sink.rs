@@ -65,7 +65,7 @@ where
 
 #[cfg(test)]
 mod test {
-    use codecs::{JsonSerializer, NewlineDelimitedEncoder};
+    use codecs::{JsonSerializerConfig, NewlineDelimitedEncoder};
     use futures::future::ready;
     use futures_util::stream;
     use vector_core::sink::VectorSink;
@@ -82,7 +82,7 @@ mod test {
 
         let encoder = Encoder::<Framer>::new(
             NewlineDelimitedEncoder::new().into(),
-            JsonSerializer::new().into(),
+            JsonSerializerConfig::default().build().into(),
         );
 
         let sink = WriterSink {

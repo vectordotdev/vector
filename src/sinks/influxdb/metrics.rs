@@ -7,7 +7,7 @@ use tower::Service;
 use vector_config::configurable_component;
 use vector_core::{
     event::metric::{MetricSketch, MetricTags, Quantile},
-    ByteSizeOf,
+    ByteSizeOf, EstimatedJsonEncodedSizeOf,
 };
 
 use crate::{
@@ -52,7 +52,7 @@ impl SinkBatchSettings for InfluxDbDefaultBatchSettings {
 }
 
 /// Configuration for the `influxdb_metrics` sink.
-#[configurable_component(sink("influxdb_metrics"))]
+#[configurable_component(sink("influxdb_metrics", "Deliver metric event data to InfluxDB."))]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct InfluxDbConfig {
@@ -61,9 +61,13 @@ pub struct InfluxDbConfig {
     /// This namespace is only used if a metric has no existing namespace. When a namespace is
     /// present, it is used as a prefix to the metric name, and separated with a period (`.`).
     #[serde(alias = "namespace")]
+    #[configurable(metadata(docs::examples = "service"))]
     pub default_namespace: Option<String>,
 
     /// The endpoint to send data to.
+    ///
+    /// This should be a full HTTP URI, including the scheme, host, and port.
+    #[configurable(metadata(docs::examples = "http://localhost:8086/"))]
     pub endpoint: String,
 
     #[serde(flatten)]
@@ -80,7 +84,9 @@ pub struct InfluxDbConfig {
     #[serde(default)]
     pub request: TowerRequestConfig,
 
-    /// A map of additional tags, in the form of key/value pairs, to add to each measurement.
+    /// A map of additional tags, in the key/value pair format, to add to each measurement.
+    #[configurable(metadata(docs::additional_props_description = "A tag key/value pair."))]
+    #[configurable(metadata(docs::examples = "example_tags()"))]
     pub tags: Option<HashMap<String, String>>,
 
     #[configurable(derived)]
@@ -103,6 +109,10 @@ pub fn default_summary_quantiles() -> Vec<f64> {
     vec![0.5, 0.75, 0.9, 0.95, 0.99]
 }
 
+pub fn example_tags() -> HashMap<String, String> {
+    HashMap::from([("region".to_string(), "us-west-1".to_string())])
+}
+
 // https://v2.docs.influxdata.com/v2.0/write-data/#influxdb-api
 #[derive(Debug, Clone, PartialEq, Serialize)]
 struct InfluxDbRequest {
@@ -112,6 +122,7 @@ struct InfluxDbRequest {
 impl_generate_config_from_default!(InfluxDbConfig);
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "influxdb_metrics")]
 impl SinkConfig for InfluxDbConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let tls_settings = TlsSettings::from_options(&self.tls)?;
@@ -174,13 +185,16 @@ impl InfluxDbSvc {
             .with_flat_map(move |event: Event| {
                 stream::iter({
                     let byte_size = event.size_of();
+                    let json_size = event.estimated_json_encoded_size_of();
+
                     normalizer
                         .normalize(event.into_metric())
-                        .map(|metric| Ok(EncodedEvent::new(metric, byte_size)))
+                        .map(|metric| Ok(EncodedEvent::new(metric, byte_size, json_size)))
                 })
             })
             .sink_map_err(|error| error!(message = "Fatal influxdb sink error.", %error));
 
+        #[allow(deprecated)]
         Ok(VectorSink::from_event_sink(sink))
     }
 }
@@ -981,7 +995,7 @@ mod integration_tests {
         crate::test_util::trace_init();
         let database = onboarding_v1(url).await;
 
-        let cx = SinkContext::new_test();
+        let cx = SinkContext::default();
 
         let config = InfluxDbConfig {
             endpoint: url.to_string(),
@@ -1076,7 +1090,7 @@ mod integration_tests {
         let endpoint = address_v2();
         onboarding_v2(&endpoint).await;
 
-        let cx = SinkContext::new_test();
+        let cx = SinkContext::default();
 
         let config = InfluxDbConfig {
             endpoint,

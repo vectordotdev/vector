@@ -53,7 +53,7 @@ pub fn build_unix_stream_source(
         info!(message = "Listening.", path = ?listen_path, r#type = "unix");
 
         change_socket_permissions(&listen_path, socket_file_mode)
-            .expect("Failed to set socket permssions");
+            .expect("Failed to set socket permissions");
 
         let bytes_received = register!(BytesReceived::from(Protocol::UNIX));
 
@@ -118,8 +118,8 @@ pub fn build_unix_stream_source(
                                 handle_events(&mut events, Some(received_from.clone()));
 
                                 let count = events.len();
-                                if let Err(error) = out.send_batch(events).await {
-                                    emit!(StreamClosedError { error, count });
+                                if (out.send_batch(events).await).is_err() {
+                                    emit!(StreamClosedError { count });
                                 }
                             }
                             Err(error) => {

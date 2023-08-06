@@ -53,7 +53,7 @@ fn decoding(c: &mut Criterion) {
                                 .map(|ml| NewlineDelimitedDecoder::new_with_max_length(ml))
                                 .unwrap_or(NewlineDelimitedDecoder::new()),
                         );
-                        let deserializer = Deserializer::Bytes(BytesDeserializer::new());
+                        let deserializer = Deserializer::Bytes(BytesDeserializer);
                         let decoder = vector::codecs::Decoder::new(framer, deserializer);
 
                         (Box::new(decoder), param.input.clone())

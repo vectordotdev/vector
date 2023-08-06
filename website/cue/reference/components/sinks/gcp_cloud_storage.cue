@@ -6,13 +6,14 @@ components: sinks: gcp_cloud_storage: {
 	classes: {
 		commonly_used: true
 		delivery:      "at_least_once"
-		development:   "beta"
+		development:   "stable"
 		egress_method: "batch"
 		service_providers: ["GCP"]
 		stateful: false
 	}
 
 	features: {
+		auto_generated:   true
 		acknowledgements: true
 		healthcheck: enabled: true
 		send: {
@@ -73,103 +74,7 @@ components: sinks: gcp_cloud_storage: {
 		notices: []
 	}
 
-	configuration: {
-		acl: {
-			category:    "ACL"
-			common:      false
-			description: "Predefined ACL to apply to the created objects. For more information, see [Predefined ACLs](\(urls.gcs_predefined_acl)). If this is not set, GCS will apply a default ACL when the object is created."
-			required:    false
-			type: string: {
-				default: null
-				enum: {
-					"authenticated-read":        "Gives the bucket or object owner OWNER permission, and gives all authenticated Google account holders READER permission."
-					"bucket-owner-full-control": "Gives the object and bucket owners OWNER permission."
-					"bucket-owner-read":         "Gives the object owner OWNER permission, and gives the bucket owner READER permission."
-					"private":                   "Gives the bucket or object owner OWNER permission for a bucket or object."
-					"project-private":           "Gives permission to the project team based on their roles. Anyone who is part of the team has READER permission. Project owners and project editors have OWNER permission. This the default."
-					"public-read":               "Gives the bucket or object owner OWNER permission, and gives all users, both authenticated and anonymous, READER permission. When you apply this to an object, anyone on the Internet can read the object without authenticating."
-				}
-			}
-		}
-		api_key: configuration._gcp_api_key
-		bucket: {
-			description: "The GCS bucket name."
-			required:    true
-			type: string: {
-				examples: ["my-bucket"]
-			}
-		}
-		credentials_path: {
-			category:    "Auth"
-			common:      true
-			description: "The filename for a Google Cloud service account credentials JSON file used to authenticate access to the Cloud Storage API. If this is unset, Vector checks the `GOOGLE_APPLICATION_CREDENTIALS` environment variable for a filename.\n\nIf no filename is named, Vector will attempt to fetch an instance service account for the compute instance the program is running on. If Vector is not running on a GCE instance, you must define a credentials file as above."
-			required:    false
-			type: string: {
-				default: null
-				examples: ["/path/to/credentials.json"]
-			}
-		}
-		filename_append_uuid: {
-			category:    "File Naming"
-			common:      false
-			description: "Whether or not to append a UUID v4 token to the end of the file. This ensures there are no name collisions high volume use cases."
-			required:    false
-			type: bool: default: true
-		}
-		filename_extension: {
-			category:    "File Naming"
-			common:      false
-			description: "The filename extension to use in the object name."
-			required:    false
-			type: string: {
-				default: "log"
-			}
-		}
-		filename_time_format: {
-			category:    "File Naming"
-			common:      false
-			description: "The format of the resulting object file name. [`strftime` specifiers](\(urls.strptime_specifiers)) are supported."
-			required:    false
-			type: string: {
-				default: "%s"
-			}
-		}
-		key_prefix: {
-			category:    "File Naming"
-			common:      true
-			description: "A prefix to apply to all object key names. This should be used to partition your objects, and it's important to end this value with a `/` if you want this to be the root GCS \"folder\"."
-			required:    false
-			type: string: {
-				default: "date=%F/"
-				examples: ["date=%F/", "date=%F/hour=%H/", "year=%Y/month=%m/day=%d/", "application_id={{ application_id }}/date=%F/"]
-				syntax: "template"
-			}
-		}
-		metadata: {
-			common:      false
-			description: "The set of metadata `key:value` pairs for the created objects. See the [GCS custom metadata](\(urls.gcs_custom_metadata)) documentation for more details."
-			required:    false
-			type: string: {
-				default: null
-				examples: []
-			}
-		}
-		storage_class: {
-			category:    "Storage"
-			common:      false
-			description: "The storage class for the created objects. See [the GCP storage classes](\(urls.gcs_storage_classes)) for more details."
-			required:    false
-			type: string: {
-				default: null
-				enum: {
-					STANDARD: "Standard Storage is best for data that is frequently accessed and/or stored for only brief periods of time. This is the default."
-					NEARLINE: "Nearline Storage is a low-cost, highly durable storage service for storing infrequently accessed data."
-					COLDLINE: "Coldline Storage is a very-low-cost, highly durable storage service for storing infrequently accessed data."
-					ARCHIVE:  "Archive Storage is the lowest-cost, highly durable storage service for data archiving, online backup, and disaster recovery."
-				}
-			}
-		}
-	}
+	configuration: base.components.sinks.gcp_cloud_storage.configuration
 
 	input: {
 		logs:    true
@@ -224,6 +129,15 @@ components: sinks: gcp_cloud_storage: {
 				You can control the resulting name via the [`key_prefix`](#key_prefix),
 				[`filename_time_format`](#filename_time_format),
 				and [`filename_append_uuid`](#filename_append_uuid) options.
+
+				For example, to store objects at the root GCS folder, without a timestamp or UUID use
+				these configuration options:
+
+				```text
+				key_prefix = "{{ my_file_name }}"
+				filename_time_format = ""
+				filename_append_uuid = false
+				```
 				"""
 		}
 
@@ -265,11 +179,4 @@ components: sinks: gcp_cloud_storage: {
 			]
 		},
 	]
-
-	telemetry: metrics: {
-		component_sent_events_total:      components.sources.internal_metrics.output.metrics.component_sent_events_total
-		component_sent_event_bytes_total: components.sources.internal_metrics.output.metrics.component_sent_event_bytes_total
-		events_discarded_total:           components.sources.internal_metrics.output.metrics.events_discarded_total
-		processing_errors_total:          components.sources.internal_metrics.output.metrics.processing_errors_total
-	}
 }

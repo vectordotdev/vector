@@ -9,10 +9,11 @@ components: sinks: influxdb_metrics: {
 		development:   "stable"
 		egress_method: "batch"
 		service_providers: ["InfluxData"]
-		stateful: false
+		stateful: true
 	}
 
 	features: {
+		auto_generated:   true
 		acknowledgements: true
 		healthcheck: enabled: true
 		send: {
@@ -42,29 +43,7 @@ components: sinks: influxdb_metrics: {
 		notices: []
 	}
 
-	configuration: sinks._influxdb.configuration & {
-		default_namespace: {
-			common: true
-			description: """
-				Used as a namespace for metrics that don't have it.
-				A namespace will be prefixed to a metric's name.
-				"""
-			required: false
-			type: string: {
-				default: null
-				examples: ["service"]
-			}
-		}
-		tags: {
-			required:    false
-			common:      false
-			description: "A map of additional key-value pairs that will be attached to each LineProtocol as tags."
-			groups: ["v1", "v2"]
-			type: object: {
-				examples: [{region: "us-west-1"}]
-			}
-		}
-	}
+	configuration: base.components.sinks.influxdb_metrics.configuration
 
 	input: {
 		logs: false
@@ -210,9 +189,4 @@ components: sinks: influxdb_metrics: {
 			output: "\(_name),metric_type=summary,host=\(_host) count=6i,quantile_0.01=1.5,quantile_0.5=2,quantile_0.99=3,sum=12.1 1542182950000000011"
 		},
 	]
-
-	telemetry: metrics: {
-		component_sent_events_total:      components.sources.internal_metrics.output.metrics.component_sent_events_total
-		component_sent_event_bytes_total: components.sources.internal_metrics.output.metrics.component_sent_event_bytes_total
-	}
 }

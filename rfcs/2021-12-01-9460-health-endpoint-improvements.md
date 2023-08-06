@@ -101,7 +101,7 @@ health information that can be used by operators/systems.
 
 - [ ] Integrate health endpoint with our shutdown sequence, having the API return
 a `503` and take the shutting down instance out of load balancing/service discovery
-- [ ] Verify the `/health` endpoint is unavaible until Vector's topology is build
+- [ ] Verify the `/health` endpoint is unavailable until Vector's topology is build
 and valid to run
 
 ## Future Improvements

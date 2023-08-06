@@ -12,7 +12,7 @@ components: sources: internal_metrics: {
 		commonly_used: true
 		delivery:      "at_least_once"
 		deployment_roles: ["aggregator", "daemon", "sidecar"]
-		development:   "beta"
+		development:   "stable"
 		egress_method: "batch"
 		stateful:      false
 	}
@@ -36,61 +36,7 @@ components: sources: internal_metrics: {
 		platform_name: null
 	}
 
-	configuration: {
-		namespace: {
-			description: "The namespace of the metric."
-			common:      false
-			required:    false
-			type: string: {
-				default: "vector"
-			}
-		}
-		scrape_interval_secs: {
-			description: "The interval between metric gathering, in seconds."
-			common:      true
-			required:    false
-			type: float: {
-				default: 1.0
-				unit:    "seconds"
-			}
-		}
-		tags: {
-			common:      false
-			description: "Metric tag options."
-			required:    false
-
-			type: object: {
-				examples: []
-				options: {
-					host_key: {
-						category:    "Context"
-						common:      false
-						description: """
-							The key name added to each event representing the current host. This can also be globally set via the
-							[global `host_key` option](\(urls.vector_configuration)/global-options#log_schema.host_key).
-
-							Set to "" to suppress this key.
-							"""
-						required:    false
-						type: string: {
-							default: "host"
-						}
-					}
-					pid_key: {
-						category: "Context"
-						common:   false
-						description: """
-							If set, will add a tag using the provided key name with a value of the current the current process ID.
-							"""
-						required: false
-						type: string: {
-							default: null
-						}
-					}
-				}
-			}
-		}
-	}
+	configuration: base.components.sources.internal_metrics.configuration
 
 	output: metrics: {
 		// Default internal metrics tags
@@ -428,44 +374,6 @@ components: sources: internal_metrics: {
 				reason: _reason
 			}
 		}
-		events_failed_total: {
-			description:       "The total number of failures to read a Kafka message."
-			type:              "counter"
-			default_namespace: "vector"
-			tags:              _component_tags
-		}
-		events_in_total: {
-			description:       """
-				The number of events accepted by this component either from tagged
-				origins like file and uri, or cumulatively from other origins.
-				This metric is deprecated and will be removed in a future version.
-				Use [`component_received_events_total`](\(urls.vector_sources)/internal_metrics/#component_received_events_total) instead.
-				"""
-			type:              "counter"
-			default_namespace: "vector"
-			tags:              component_received_events_total.tags
-		}
-		events_out_total: {
-			description:       """
-				The total number of events emitted by this component.
-				This metric is deprecated and will be removed in a future version.
-				Use [`component_sent_events_total`](\(urls.vector_sources)/internal_metrics/#component_sent_events_total) instead.
-				"""
-			type:              "counter"
-			default_namespace: "vector"
-			tags:              _component_tags & {output: _output}
-		}
-		processed_events_total: {
-			description:       """
-				The total number of events processed by this component.
-				This metric is deprecated in place of using
-				[`component_received_events_total`](\(urls.vector_sources)/internal_metrics/#component_received_events_total) and
-				[`component_sent_events_total`](\(urls.vector_sources)/internal_metrics/#component_sent_events_total) metrics.
-				"""
-			type:              "counter"
-			default_namespace: "vector"
-			tags:              _component_tags
-		}
 		buffer_byte_size: {
 			description:       "The number of bytes current in the buffer."
 			type:              "gauge"
@@ -729,6 +637,21 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
+		kafka_consumer_lag: {
+			description:       "The Kafka consumer lag."
+			type:              "gauge"
+			default_namespace: "vector"
+			tags:              _component_tags & {
+				topic_id: {
+					description: "The Kafka topic id."
+					required:    true
+				}
+				partition_id: {
+					description: "The Kafka partition id."
+					required:    true
+				}
+			}
+		}
 		file_delete_errors_total: {
 			description:       "The total number of failures to delete a file. This metric is deprecated in favor of `component_errors_total`."
 			type:              "counter"
@@ -889,46 +812,6 @@ components: sources: internal_metrics: {
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags
-		}
-		processed_bytes_total: {
-			description:       "The number of bytes processed by the component."
-			type:              "counter"
-			default_namespace: "vector"
-			tags:              _component_tags & {
-				file: {
-					description: "The file from which the bytes originate."
-					required:    false
-				}
-				uri: {
-					description: "The sanitized URI from which the bytes originate."
-					required:    false
-				}
-				container_name: {
-					description: "The name of the container from which the bytes originate."
-					required:    false
-				}
-				pod_name: {
-					description: "The name of the pod from which the bytes originate."
-					required:    false
-				}
-				peer_addr: {
-					description: "The IP from which the bytes originate."
-					required:    false
-				}
-				peer_path: {
-					description: "The pathname from which the bytes originate."
-					required:    false
-				}
-				mode: _mode
-			}
-		}
-		processing_errors_total: {
-			description:       "The total number of processing errors encountered by this component. This metric is deprecated in favor of `component_errors_total`."
-			type:              "counter"
-			default_namespace: "vector"
-			tags:              _component_tags & {
-				error_type: _error_type
-			}
 		}
 		protobuf_decode_errors_total: {
 			description:       "The total number of [Protocol Buffers](\(urls.protobuf)) errors thrown during communication between Vector instances."
@@ -1247,7 +1130,7 @@ components: sources: internal_metrics: {
 				"glob_failed":                 "The glob pattern match operation failed."
 				"http_error":                  "The HTTP request resulted in an error code."
 				"invalid_metric":              "The metric was invalid."
-				"kafka_offset_update":         "The comsumer offset update failed."
+				"kafka_offset_update":         "The consumer offset update failed."
 				"kafka_read":                  "The message from Kafka was invalid."
 				"mapping_failed":              "The mapping failed."
 				"match_failed":                "The match operation failed."
@@ -1327,12 +1210,5 @@ components: sources: internal_metrics: {
 				tag from the environment.
 				"""
 		}
-	}
-
-	telemetry: metrics: {
-		component_discarded_events_total:     components.sources.internal_metrics.output.metrics.component_discarded_events_total
-		component_errors_total:               components.sources.internal_metrics.output.metrics.component_errors_total
-		component_received_events_total:      components.sources.internal_metrics.output.metrics.component_received_events_total
-		component_received_event_bytes_total: components.sources.internal_metrics.output.metrics.component_received_event_bytes_total
 	}
 }

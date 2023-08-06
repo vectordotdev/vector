@@ -7,17 +7,17 @@
 #Metric: {
 	name:       string
 	namespace?: string
-	tags?: {[string]: string}
-	timestamp?: #Timestamp
-	kind:       "incremental" | "absolute"
+	tags?: {[string]: #TagValueSet}
+	timestamp?:   #Timestamp
+	interval_ms?: int
+	kind:         "incremental" | "absolute"
 	{counter: value: number} |
 	{gauge: value: number} |
 	{set: values: [...string]} |
 	{distribution: {
 		samples: [...{value: number, rate: int}]
 		statistic: "histogram" | "summary"
-	}
-	} |
+	}} |
 	{aggregated_histogram: {
 		buckets: [...{upper_limit: number, count: int}]
 		count: int
@@ -42,5 +42,9 @@
 		}
 }
 }
+
+#TagValueSet: {#TagValue | [...#TagValue]}
+
+#TagValue: {string | null}
 
 #Timestamp: =~"^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(.\\d+)?Z"

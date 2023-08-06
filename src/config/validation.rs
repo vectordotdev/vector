@@ -1,5 +1,4 @@
 use crate::config::schema;
-use crate::topology::schema::merged_definition;
 use futures_util::{stream, FutureExt, StreamExt, TryFutureExt, TryStreamExt};
 use heim::{disk::Partition, units::information::byte};
 use indexmap::IndexMap;
@@ -7,7 +6,8 @@ use std::{collections::HashMap, path::PathBuf};
 use vector_core::internal_event::DEFAULT_OUTPUT;
 
 use super::{
-    builder::ConfigBuilder, ComponentKey, Config, OutputId, Resource, SourceConfig, TransformConfig,
+    builder::ConfigBuilder, transform::get_transform_output_ids, ComponentKey, Config, OutputId,
+    Resource,
 };
 
 /// Check that provide + topology config aren't present in the same builder, which is an error.
@@ -172,12 +172,12 @@ pub fn check_outputs(config: &ConfigBuilder) -> Result<(), Vec<String>> {
             errors.extend(errs.into_iter().map(|msg| format!("Transform {key} {msg}")));
         }
 
-        if transform
-            .inner
-            .outputs(&definition, config.schema.log_namespace())
-            .iter()
-            .map(|output| output.port.as_deref().unwrap_or(""))
-            .any(|name| name == DEFAULT_OUTPUT)
+        if get_transform_output_ids(
+            transform.inner.as_ref(),
+            key.clone(),
+            config.schema.log_namespace(),
+        )
+        .any(|output| matches!(output.port, Some(output) if output == DEFAULT_OUTPUT))
         {
             errors.push(format!(
                 "Transform {key} cannot have a named output with reserved name: `{DEFAULT_OUTPUT}`"
@@ -325,7 +325,6 @@ async fn process_partitions(partitions: Vec<Partition>) -> heim::Result<IndexMap
 
 pub fn warnings(config: &Config) -> Vec<String> {
     let mut warnings = vec![];
-    let mut cache = HashMap::new();
 
     let source_ids = config.sources.iter().flat_map(|(key, source)| {
         source
@@ -342,21 +341,13 @@ pub fn warnings(config: &Config) -> Vec<String> {
             .collect::<Vec<_>>()
     });
     let transform_ids = config.transforms.iter().flat_map(|(key, transform)| {
-        transform
-            .inner
-            .outputs(
-                &merged_definition(&transform.inputs, config, &mut cache),
-                config.schema.log_namespace(),
-            )
-            .iter()
-            .map(|output| {
-                if let Some(port) = &output.port {
-                    ("transform", OutputId::from((key, port.clone())))
-                } else {
-                    ("transform", OutputId::from(key))
-                }
-            })
-            .collect::<Vec<_>>()
+        get_transform_output_ids(
+            transform.inner.as_ref(),
+            key.clone(),
+            config.schema.log_namespace(),
+        )
+        .map(|output| ("transform", output))
+        .collect::<Vec<_>>()
     });
 
     for (input_type, id) in transform_ids.chain(source_ids) {

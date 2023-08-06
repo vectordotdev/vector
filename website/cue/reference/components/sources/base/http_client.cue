@@ -6,10 +6,10 @@ base: components: sources: http_client: configuration: {
 		required:    false
 		type: object: options: {
 			password: {
-				description:   "The password to send."
+				description:   "The basic authentication password."
 				relevant_when: "strategy = \"basic\""
 				required:      true
-				type: string: {}
+				type: string: examples: ["${PASSWORD}", "password"]
 			}
 			strategy: {
 				description: "The authentication strategy to use."
@@ -25,80 +25,169 @@ base: components: sources: http_client: configuration: {
 					bearer: """
 						Bearer authentication.
 
-						The bearer token value (OAuth2, JWT, etc) is passed as-is.
+						The bearer token value (OAuth2, JWT, etc.) is passed as-is.
 						"""
 				}
 			}
 			token: {
-				description:   "The bearer token to send."
+				description:   "The bearer authentication token."
 				relevant_when: "strategy = \"bearer\""
 				required:      true
 				type: string: {}
 			}
 			user: {
-				description:   "The username to send."
+				description:   "The basic authentication username."
 				relevant_when: "strategy = \"basic\""
 				required:      true
-				type: string: {}
+				type: string: examples: ["${USERNAME}", "username"]
 			}
 		}
 	}
 	decoding: {
 		description: "Decoder to use on the HTTP responses."
 		required:    false
-		type: object: options: codec: {
-			description: "The codec to use for decoding events."
-			required:    false
-			type: string: {
-				default: "bytes"
-				enum: {
-					bytes: "Uses the raw bytes as-is."
-					gelf: """
-						Decodes the raw bytes as a [GELF][gelf] message.
+		type: object: options: {
+			codec: {
+				description: "The codec to use for decoding events."
+				required:    false
+				type: string: {
+					default: "bytes"
+					enum: {
+						bytes: "Uses the raw bytes as-is."
+						gelf: """
+															Decodes the raw bytes as a [GELF][gelf] message.
 
-						[gelf]: https://docs.graylog.org/docs/gelf
+															[gelf]: https://docs.graylog.org/docs/gelf
+															"""
+						json: """
+															Decodes the raw bytes as [JSON][json].
+
+															[json]: https://www.json.org/
+															"""
+						native: """
+															Decodes the raw bytes as Vector’s [native Protocol Buffers format][vector_native_protobuf].
+
+															This codec is **[experimental][experimental]**.
+
+															[vector_native_protobuf]: https://github.com/vectordotdev/vector/blob/master/lib/vector-core/proto/event.proto
+															[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
+															"""
+						native_json: """
+															Decodes the raw bytes as Vector’s [native JSON format][vector_native_json].
+
+															This codec is **[experimental][experimental]**.
+
+															[vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
+															[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
+															"""
+						protobuf: """
+															Decodes the raw bytes as [protobuf][protobuf].
+
+															[protobuf]: https://protobuf.dev/
+															"""
+						syslog: """
+															Decodes the raw bytes as a Syslog message.
+
+															Decodes either as the [RFC 3164][rfc3164]-style format ("old" style) or the
+															[RFC 5424][rfc5424]-style format ("new" style, includes structured data).
+
+															[rfc3164]: https://www.ietf.org/rfc/rfc3164.txt
+															[rfc5424]: https://www.ietf.org/rfc/rfc5424.txt
+															"""
+					}
+				}
+			}
+			gelf: {
+				description:   "GELF-specific decoding options."
+				relevant_when: "codec = \"gelf\""
+				required:      false
+				type: object: options: lossy: {
+					description: """
+						Determines whether or not to replace invalid UTF-8 sequences instead of failing.
+
+						When true, invalid UTF-8 sequences are replaced with the [`U+FFFD REPLACEMENT CHARACTER`][U+FFFD].
+
+						[U+FFFD]: https://en.wikipedia.org/wiki/Specials_(Unicode_block)#Replacement_character
 						"""
-					json: """
-						Decodes the raw bytes as [JSON][json].
+					required: false
+					type: bool: default: true
+				}
+			}
+			json: {
+				description:   "JSON-specific decoding options."
+				relevant_when: "codec = \"json\""
+				required:      false
+				type: object: options: lossy: {
+					description: """
+						Determines whether or not to replace invalid UTF-8 sequences instead of failing.
 
-						[json]: https://www.json.org/
+						When true, invalid UTF-8 sequences are replaced with the [`U+FFFD REPLACEMENT CHARACTER`][U+FFFD].
+
+						[U+FFFD]: https://en.wikipedia.org/wiki/Specials_(Unicode_block)#Replacement_character
 						"""
-					native: """
-						Decodes the raw bytes as Vector’s [native Protocol Buffers format][vector_native_protobuf].
+					required: false
+					type: bool: default: true
+				}
+			}
+			native_json: {
+				description:   "Vector's native JSON-specific decoding options."
+				relevant_when: "codec = \"native_json\""
+				required:      false
+				type: object: options: lossy: {
+					description: """
+						Determines whether or not to replace invalid UTF-8 sequences instead of failing.
 
-						This codec is **[experimental][experimental]**.
+						When true, invalid UTF-8 sequences are replaced with the [`U+FFFD REPLACEMENT CHARACTER`][U+FFFD].
 
-						[vector_native_protobuf]: https://github.com/vectordotdev/vector/blob/master/lib/vector-core/proto/event.proto
-						[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
+						[U+FFFD]: https://en.wikipedia.org/wiki/Specials_(Unicode_block)#Replacement_character
 						"""
-					native_json: """
-						Decodes the raw bytes as Vector’s [native JSON format][vector_native_json].
+					required: false
+					type: bool: default: true
+				}
+			}
+			protobuf: {
+				description:   "Protobuf-specific decoding options."
+				relevant_when: "codec = \"protobuf\""
+				required:      false
+				type: object: options: {
+					desc_file: {
+						description: "Path to desc file"
+						required:    false
+						type: string: default: ""
+					}
+					message_type: {
+						description: "message type. e.g package.message"
+						required:    false
+						type: string: default: ""
+					}
+				}
+			}
+			syslog: {
+				description:   "Syslog-specific decoding options."
+				relevant_when: "codec = \"syslog\""
+				required:      false
+				type: object: options: lossy: {
+					description: """
+						Determines whether or not to replace invalid UTF-8 sequences instead of failing.
 
-						This codec is **[experimental][experimental]**.
+						When true, invalid UTF-8 sequences are replaced with the [`U+FFFD REPLACEMENT CHARACTER`][U+FFFD].
 
-						[vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
-						[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
+						[U+FFFD]: https://en.wikipedia.org/wiki/Specials_(Unicode_block)#Replacement_character
 						"""
-					syslog: """
-						Decodes the raw bytes as a Syslog message.
-
-						Will decode either as the [RFC 3164][rfc3164]-style format ("old" style) or the more modern
-						[RFC 5424][rfc5424]-style format ("new" style, includes structured data).
-
-						[rfc3164]: https://www.ietf.org/rfc/rfc3164.txt
-						[rfc5424]: https://www.ietf.org/rfc/rfc5424.txt
-						"""
+					required: false
+					type: bool: default: true
 				}
 			}
 		}
 	}
 	endpoint: {
 		description: """
-			Endpoint to collect events from. The full path must be specified.
-			Example: "http://127.0.0.1:9898/logs"
+			The HTTP endpoint to collect events from.
+
+			The full path must be specified.
 			"""
 		required: true
-		type: string: {}
+		type: string: examples: ["http://127.0.0.1:9898/logs"]
 	}
 	framing: {
 		description: "Framing to use in the decoding."
@@ -119,6 +208,14 @@ base: components: sources: http_client: configuration: {
 																The maximum length of the byte buffer.
 
 																This length does *not* include the trailing delimiter.
+
+																By default, there is no maximum length enforced. If events are malformed, this can lead to
+																additional resource usage as events continue to be buffered in memory, and can potentially
+																lead to memory exhaustion in extreme cases.
+
+																If there is a risk of processing malformed data, such as logs with user-controlled input,
+																consider setting the maximum length to a reasonably large value as a safety net. This
+																ensures that processing is not actually unbounded.
 																"""
 						required: false
 						type: uint: {}
@@ -131,7 +228,7 @@ base: components: sources: http_client: configuration: {
 				type: string: {
 					default: "bytes"
 					enum: {
-						bytes:               "Byte frames are passed through as-is according to the underlying I/O boundaries (e.g. split between messages or stream segments)."
+						bytes:               "Byte frames are passed through as-is according to the underlying I/O boundaries (for example, split between messages or stream segments)."
 						character_delimited: "Byte frames which are delimited by a chosen character."
 						length_delimited:    "Byte frames which are prefixed by an unsigned big-endian 32-bit integer indicating the length."
 						newline_delimited:   "Byte frames which are delimited by a newline character."
@@ -152,6 +249,14 @@ base: components: sources: http_client: configuration: {
 						The maximum length of the byte buffer.
 
 						This length does *not* include the trailing delimiter.
+
+						By default, there is no maximum length enforced. If events are malformed, this can lead to
+						additional resource usage as events continue to be buffered in memory, and can potentially
+						lead to memory exhaustion in extreme cases.
+
+						If there is a risk of processing malformed data, such as logs with user-controlled input,
+						consider setting the maximum length to a reasonably large value as a safety net. This
+						ensures that processing is not actually unbounded.
 						"""
 					required: false
 					type: uint: {}
@@ -172,16 +277,24 @@ base: components: sources: http_client: configuration: {
 	headers: {
 		description: """
 			Headers to apply to the HTTP requests.
+
 			One or more values for the same header can be provided.
 			"""
 		required: false
-		type: object: options: "*": {
-			required: true
-			type: array: items: type: string: {}
+		type: object: {
+			examples: [{
+				Accept: ["text/plain", "text/html"]
+				"X-My-Custom-Header": ["a", "vector", "of", "values"]
+			}]
+			options: "*": {
+				description: "An HTTP request header and it's value(s)."
+				required:    true
+				type: array: items: type: string: {}
+			}
 		}
 	}
 	method: {
-		description: "Specifies the action of the HTTP request."
+		description: "Specifies the method of the HTTP request."
 		required:    false
 		type: string: {
 			default: "GET"
@@ -199,19 +312,43 @@ base: components: sources: http_client: configuration: {
 		description: """
 			Custom parameters for the HTTP request query string.
 
-			One or more values for the same parameter key can be provided. The parameters provided in this option are
-			appended to any parameters manually provided in the `endpoint` option.
+			One or more values for the same parameter key can be provided.
+
+			The parameters provided in this option are appended to any parameters
+			manually provided in the `endpoint` option.
 			"""
 		required: false
-		type: object: options: "*": {
-			required: true
-			type: array: items: type: string: {}
+		type: object: {
+			examples: [{
+				field: ["value"]
+				fruit: ["mango", "papaya", "kiwi"]
+			}]
+			options: "*": {
+				description: "A query string parameter and it's value(s)."
+				required:    true
+				type: array: items: type: string: {}
+			}
 		}
 	}
 	scrape_interval_secs: {
-		description: "The interval between calls, in seconds."
+		description: """
+			The interval between scrapes. Requests are run concurrently so if a scrape takes longer
+			than the interval a new scrape will be started. This can take extra resources, set the timeout
+			to a value lower than the scrape interval to prevent this from happening.
+			"""
+		required: false
+		type: uint: {
+			default: 15
+			unit:    "seconds"
+		}
+	}
+	scrape_timeout_secs: {
+		description: "The timeout for each scrape request."
 		required:    false
-		type: uint: default: 15
+		type: float: {
+			default: 5.0
+			unit:    "seconds"
+		}
 	}
 	tls: {
 		description: "TLS configuration."
@@ -221,8 +358,8 @@ base: components: sources: http_client: configuration: {
 				description: """
 					Sets the list of supported ALPN protocols.
 
-					Declare the supported ALPN protocols, which are used during negotiation with peer. Prioritized in the order
-					they are defined.
+					Declare the supported ALPN protocols, which are used during negotiation with peer. They are prioritized in the order
+					that they are defined.
 					"""
 				required: false
 				type: array: items: type: string: examples: ["h2"]
@@ -270,10 +407,10 @@ base: components: sources: http_client: configuration: {
 				description: """
 					Enables certificate verification.
 
-					If enabled, certificates must be valid in terms of not being expired, as well as being issued by a trusted
-					issuer. This verification operates in a hierarchical manner, checking that not only the leaf certificate (the
-					certificate presented by the client/server) is valid, but also that the issuer of that certificate is valid, and
-					so on until reaching a root certificate.
+					If enabled, certificates must not be expired and must be issued by a trusted
+					issuer. This verification operates in a hierarchical manner, checking that the leaf certificate (the
+					certificate presented by the client/server) is not only valid, but that the issuer of that certificate is also valid, and
+					so on until the verification process reaches a root certificate.
 
 					Relevant for both incoming and outgoing connections.
 

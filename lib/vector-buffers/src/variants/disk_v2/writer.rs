@@ -73,7 +73,7 @@ where
 
     /// A record reported that it contained more events than the number of bytes when encoded.
     ///
-    /// This is nonsensicial because we don't intend to ever support encoding zero-sized types
+    /// This is nonsensical because we don't intend to ever support encoding zero-sized types
     /// through the buffer, and the logic we use to count the number of actual events in the buffer
     /// transitively depends on not being able to represent more than one event per encoded byte.
     #[snafu(display(
@@ -89,7 +89,7 @@ where
     /// The encoder encountered an issue during encoding.
     ///
     /// For common encoders, failure to write all of the bytes of the input will be the most common
-    /// error, and in fact, some some encoders, it's the only possible error that can occur.
+    /// error, and in fact, some encoders, it's the only possible error that can occur.
     #[snafu(display("failed to encode record: {:?}", source))]
     FailedToEncode {
         source: <T as Encodable>::EncodeError,
@@ -187,7 +187,7 @@ where
     fn from(e: CompositeSerializerError<StdInfallible, AllocScratchError, StdInfallible>) -> Self {
         match e {
             CompositeSerializerError::ScratchSpaceError(sse) => WriterError::FailedToSerialize {
-                reason: format!("insufficient space to serialize encoded record: {}", sse),
+                reason: format!("insufficient space to serialize encoded record: {sse}"),
             },
             // Only our scratch space strategy is fallible, so we should never get here.
             _ => unreachable!(),
@@ -398,7 +398,7 @@ where
             "must always be able to fit at least one record into a data file"
         );
 
-        // We subtract the length of the record header from our allowe maximum record size, because we have to make sure
+        // We subtract the length of the record header from our allowed maximum record size, because we have to make sure
         // that when we go to actually wrap and serialize the encoded record, we're limiting the actual bytes we write
         // to disk to within `max_record_size`.
         //
@@ -975,7 +975,7 @@ where
         // waiting for the reader to delete it if it already exists and hasn't been fully read yet,
         // etc.
         //
-        // Essentially, we defer tthe actual skipping to avoid deadlocking here trying to open a
+        // Essentially, we defer the actual skipping to avoid deadlocking here trying to open a
         // data file we might not be able to open yet.
         if should_skip_to_next_file {
             self.reset();
@@ -1352,7 +1352,7 @@ where
 {
     /// Closes this [`Writer`], marking it as done.
     ///
-    /// Closing the writer signals to the reader that that no more records will be written until the
+    /// Closing the writer signals to the reader that no more records will be written until the
     /// buffer is reopened.  Writers and readers effectively share a "session", so until the writer
     /// and reader both close, the buffer cannot be reopened by another Vector instance.
     ///

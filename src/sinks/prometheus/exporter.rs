@@ -8,6 +8,7 @@ use std::{
 };
 
 use async_trait::async_trait;
+use base64::prelude::{Engine as _, BASE64_STANDARD};
 use futures::{future, stream::BoxStream, FutureExt, StreamExt};
 use hyper::{
     header::HeaderValue,
@@ -60,7 +61,10 @@ enum BuildError {
 
 /// Configuration for the `prometheus_exporter` sink.
 #[serde_as]
-#[configurable_component(sink("prometheus_exporter"))]
+#[configurable_component(sink(
+    "prometheus_exporter",
+    "Expose metric events on a Prometheus compatible endpoint."
+))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct PrometheusExporterConfig {
@@ -73,12 +77,14 @@ pub struct PrometheusExporterConfig {
     ///
     /// [prom_naming_docs]: https://prometheus.io/docs/practices/naming/#metric-names
     #[serde(alias = "namespace")]
+    #[configurable(metadata(docs::advanced))]
     pub default_namespace: Option<String>,
 
     /// The address to expose for scraping.
     ///
     /// The metrics are exposed at the typical Prometheus exporter path, `/metrics`.
     #[serde(default = "default_address")]
+    #[configurable(metadata(docs::examples = "192.160.0.10:9598"))]
     pub address: SocketAddr,
 
     #[configurable(derived)]
@@ -91,12 +97,14 @@ pub struct PrometheusExporterConfig {
     ///
     /// [dist_metric_docs]: https://vector.dev/docs/about/under-the-hood/architecture/data-model/metric/#distribution
     #[serde(default = "super::default_histogram_buckets")]
+    #[configurable(metadata(docs::advanced))]
     pub buckets: Vec<f64>,
 
     /// Quantiles to use for aggregating [distribution][dist_metric_docs] metrics into a summary.
     ///
     /// [dist_metric_docs]: https://vector.dev/docs/about/under-the-hood/architecture/data-model/metric/#distribution
     #[serde(default = "super::default_summary_quantiles")]
+    #[configurable(metadata(docs::advanced))]
     pub quantiles: Vec<f64>,
 
     /// Whether or not to render [distributions][dist_metric_docs] as an [aggregated histogram][prom_agg_hist_docs] or  [aggregated summary][prom_agg_summ_docs].
@@ -109,6 +117,7 @@ pub struct PrometheusExporterConfig {
     /// [prom_agg_hist_docs]: https://prometheus.io/docs/concepts/metric_types/#histogram
     /// [prom_agg_summ_docs]: https://prometheus.io/docs/concepts/metric_types/#summary
     #[serde(default = "default_distributions_as_summaries")]
+    #[configurable(metadata(docs::advanced))]
     pub distributions_as_summaries: bool,
 
     /// The interval, in seconds, on which metrics are flushed.
@@ -119,6 +128,8 @@ pub struct PrometheusExporterConfig {
     /// Be sure to configure this value higher than your client’s scrape interval.
     #[serde(default = "default_flush_period_secs")]
     #[serde_as(as = "serde_with::DurationSeconds<u64>")]
+    #[configurable(metadata(docs::advanced))]
+    #[configurable(metadata(docs::human_name = "Flush Interval"))]
     pub flush_period_secs: Duration,
 
     /// Suppresses timestamps on the Prometheus output.
@@ -127,6 +138,7 @@ pub struct PrometheusExporterConfig {
     /// far in the past for Prometheus to allow them, such as when aggregating metrics over long
     /// time periods, or when replaying old metrics from a disk buffer.
     #[serde(default)]
+    #[configurable(metadata(docs::advanced))]
     pub suppress_timestamp: bool,
 
     #[configurable(derived)]
@@ -175,11 +187,12 @@ const fn default_suppress_timestamp() -> bool {
 
 impl GenerateConfig for PrometheusExporterConfig {
     fn generate_config() -> toml::Value {
-        toml::Value::try_from(&Self::default()).unwrap()
+        toml::Value::try_from(Self::default()).unwrap()
     }
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "prometheus_exporter")]
 impl SinkConfig for PrometheusExporterConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         if self.flush_period_secs.as_secs() < MIN_FLUSH_PERIOD_SECS {
@@ -349,7 +362,7 @@ fn authorized(req: &Request<Body>, auth: &Option<Auth>) -> bool {
                 Auth::Basic { user, password } => HeaderValue::from_str(
                     format!(
                         "Basic {}",
-                        base64::encode(format!("{}:{}", user, password.inner()))
+                        BASE64_STANDARD.encode(format!("{}:{}", user, password.inner()))
                     )
                     .as_str(),
                 ),
@@ -881,7 +894,7 @@ mod tests {
         let mut receiver = BatchNotifier::apply_to(&mut events[..]);
         assert_eq!(receiver.try_recv(), Err(TryRecvError::Empty));
 
-        let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
+        let (sink, _) = config.build(SinkContext::default()).await.unwrap();
         let (_, delayed_event) = create_metric_gauge(Some("delayed".to_string()), 123.4);
         let sink_handle = tokio::spawn(run_and_assert_sink_compliance(
             sink,
@@ -945,7 +958,7 @@ mod tests {
         let mut receiver = BatchNotifier::apply_to(&mut events[..]);
         assert_eq!(receiver.try_recv(), Err(TryRecvError::Empty));
 
-        let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
+        let (sink, _) = config.build(SinkContext::default()).await.unwrap();
         let (_, delayed_event) = create_metric_gauge(Some("delayed".to_string()), 123.4);
         let sink_handle = tokio::spawn(run_and_assert_sink_compliance(
             sink,
@@ -1218,7 +1231,7 @@ mod tests {
         // that we check the internal metric data, which, when in this mode, will actually be a
         // sketch (so that we can merge without loss of accuracy).
         //
-        // The render code is actually what will end up rrendering those sketches as aggregated
+        // The render code is actually what will end up rendering those sketches as aggregated
         // summaries in the scrape output.
         let config = PrometheusExporterConfig {
             address: next_addr(), // Not actually bound, just needed to fill config
@@ -1409,7 +1422,7 @@ mod integration_tests {
             flush_period_secs: Duration::from_secs(2),
             ..Default::default()
         };
-        let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
+        let (sink, _) = config.build(SinkContext::default()).await.unwrap();
         let (name, event) = tests::create_metric_gauge(None, 123.4);
         let (_, delayed_event) = tests::create_metric_gauge(Some("delayed".to_string()), 123.4);
 
@@ -1447,7 +1460,7 @@ mod integration_tests {
             flush_period_secs: Duration::from_secs(3),
             ..Default::default()
         };
-        let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
+        let (sink, _) = config.build(SinkContext::default()).await.unwrap();
         let (tx, rx) = mpsc::unbounded_channel();
         let input_events = UnboundedReceiverStream::new(rx);
 
@@ -1504,7 +1517,7 @@ mod integration_tests {
             flush_period_secs: Duration::from_secs(3),
             ..Default::default()
         };
-        let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
+        let (sink, _) = config.build(SinkContext::default()).await.unwrap();
         let (tx, rx) = mpsc::unbounded_channel();
         let input_events = UnboundedReceiverStream::new(rx);
 

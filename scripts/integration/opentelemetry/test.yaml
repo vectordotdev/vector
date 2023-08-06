@@ -1,0 +1,19 @@
+features:
+- opentelemetry-integration-tests
+
+test_filter: '::opentelemetry::'
+
+runner:
+  env:
+    OTEL_HEALTH_URL: http://opentelemetry-collector:13133
+    OTEL_OTLPHTTP_URL: http://opentelemetry-collector:9876
+
+matrix:
+  version: [0.56.0]
+
+# changes to these files/paths will invoke the integration test in CI
+# expressions are evaluated using https://github.com/micromatch/picomatch
+paths:
+- "src/sources/opentelemetry/**"
+- "src/sources/util/**"
+- "scripts/integration/opentelemetry/**"

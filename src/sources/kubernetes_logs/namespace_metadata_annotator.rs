@@ -6,19 +6,24 @@ use k8s_openapi::{api::core::v1::Namespace, apimachinery::pkg::apis::meta::v1::O
 use kube::runtime::reflector::{store::Store, ObjectRef};
 use lookup::lookup_v2::OptionalTargetPath;
 use lookup::{lookup_v2::ValuePath, owned_value_path, path, OwnedTargetPath};
-use vector_config::{configurable_component, NamedComponent};
+use vector_config::configurable_component;
 use vector_core::config::{LegacyKey, LogNamespace};
 
 use crate::event::{Event, LogEvent};
 
 use super::Config;
 
-/// Configuration for how the events are annotated with Namespace metadata.
+/// Configuration for how the events are enriched with Namespace metadata.
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields, default)]
 pub struct FieldsSpec {
-    /// Event field for Namespace labels.
+    /// Event field for the Namespace's labels.
+    ///
+    /// Set to `""` to suppress this key.
+    #[configurable(metadata(docs::examples = ".k8s.ns_labels"))]
+    #[configurable(metadata(docs::examples = "k8s.ns_labels"))]
+    #[configurable(metadata(docs::examples = ""))]
     pub namespace_labels: OptionalTargetPath,
 }
 
@@ -58,7 +63,6 @@ impl NamespaceMetadataAnnotator {
 
 impl NamespaceMetadataAnnotator {
     /// Annotates an event with the information from the [`Namespace::metadata`].
-    /// The event has to have a [`POD_NAMESPACE`] field set.
     pub fn annotate(&self, event: &mut Event, pod_namespace: &str) -> Option<()> {
         let log = event.as_mut_log();
         let obj = ObjectRef::<Namespace>::new(pod_namespace);

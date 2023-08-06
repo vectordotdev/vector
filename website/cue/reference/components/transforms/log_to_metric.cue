@@ -24,11 +24,7 @@ components: transforms: log_to_metric: {
 		notices: []
 	}
 
-	// TODO: It'd be nice to have a way to define the description of the enum tag field on the Rust
-	// side and propagate it forward, since this is a common pattern that gets used.
-	configuration: base.components.transforms.log_to_metric.configuration & {
-		metrics: type: array: items: type: object: options: type: description: "The metric type."
-	}
+	configuration: base.components.transforms.log_to_metric.configuration
 
 	input: {
 		logs:    true
@@ -262,7 +258,7 @@ components: transforms: log_to_metric: {
 		{
 			title: "Set"
 			notes: """
-				In this example we'll demonstrate how to use sets. Sets are primarily a Statsd concept
+				In this example we'll demonstrate how to use sets. Sets are primarily a StatsD concept
 				that represent the number of unique values seen for a given metric.
 				The idea is that you pass the unique/high-cardinality value as the metric value
 				and the metric store will count the number of unique values seen.
@@ -329,9 +325,5 @@ components: transforms: log_to_metric: {
 				will not be emitted.
 				"""
 		}
-	}
-
-	telemetry: metrics: {
-		processing_errors_total: components.sources.internal_metrics.output.metrics.processing_errors_total
 	}
 }

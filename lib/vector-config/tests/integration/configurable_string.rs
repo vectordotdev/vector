@@ -6,9 +6,15 @@ use vector_config::{configurable_component, schema::generate_root_schema, Config
 /// A type that pretends to be `ConfigurableString` but has a non-string-like schema.
 #[configurable_component]
 #[derive(Clone, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct FakeString(#[configurable(transparent)] u64);
+pub struct FakeString(u64);
 
 impl ConfigurableString for FakeString {}
+
+impl ToString for FakeString {
+    fn to_string(&self) -> String {
+        self.0.to_string()
+    }
+}
 
 #[test]
 #[should_panic]

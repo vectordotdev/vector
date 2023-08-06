@@ -1,0 +1,27 @@
+features:
+- nats-integration-tests
+
+test_filter: '::nats::'
+
+env:
+  NATS_ADDRESS: nats://nats:4222
+  NATS_JWT_ADDRESS: nats://nats-jwt:4222
+  NATS_NKEY_ADDRESS: nats://nats-nkey:4222
+  NATS_TLS_ADDRESS: nats://nats-tls:4222
+  NATS_TLS_CLIENT_CERT_ADDRESS: nats://nats-tls-client-cert:4222
+  NATS_TOKEN_ADDRESS: nats://nats-token:4222
+  NATS_USERPASS_ADDRESS: nats://nats-userpass:4222
+
+matrix:
+  version: [latest]
+
+# changes to these files/paths will invoke the integration test in CI
+# expressions are evaluated using https://github.com/micromatch/picomatch
+paths:
+- "src/internal_events/nats.rs"
+- "src/sources/nats.rs"
+- "src/sources/util/**"
+- "src/sinks/nats.rs"
+- "src/sinks/util/**"
+- "src/nats.rs"
+- "scripts/integration/nats/**"

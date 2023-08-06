@@ -1,59 +1,36 @@
 //! The sink for the `AMQP` sink that wires together the main stream that takes the
 //! event and sends it to `AMQP`.
-use crate::{
-    codecs::Transformer, event::Event, internal_events::TemplateRenderingError,
-    sinks::util::builder::SinkBuilderExt, template::Template,
-};
-use async_trait::async_trait;
-use futures::StreamExt;
-use futures_util::stream::BoxStream;
-use lapin::options::ConfirmSelectOptions;
+use crate::sinks::prelude::*;
+use lapin::{options::ConfirmSelectOptions, BasicProperties};
 use serde::Serialize;
 use std::sync::Arc;
-use tower::ServiceBuilder;
-use vector_buffers::EventCount;
-use vector_core::{sink::StreamSink, ByteSizeOf, EstimatedJsonEncodedSizeOf};
 
 use super::{
-    config::AmqpSinkConfig, encoder::AmqpEncoder, request_builder::AmqpRequestBuilder,
-    service::AmqpService, BuildError,
+    config::{AmqpPropertiesConfig, AmqpSinkConfig},
+    encoder::AmqpEncoder,
+    request_builder::AmqpRequestBuilder,
+    service::AmqpService,
+    BuildError,
 };
 
 /// Stores the event together with the rendered exchange and routing_key values.
 /// This is passed into the `RequestBuilder` which then splits it out into the event
 /// and metadata containing the exchange and routing_key.
 /// This event needs to be created prior to building the request so we can filter out
-/// any events that error whilst redndering the templates.
+/// any events that error whilst rendering the templates.
 #[derive(Serialize)]
 pub(super) struct AmqpEvent {
     pub(super) event: Event,
     pub(super) exchange: String,
     pub(super) routing_key: String,
-}
-
-impl EventCount for AmqpEvent {
-    fn event_count(&self) -> usize {
-        // An AmqpEvent represents one event.
-        1
-    }
-}
-
-impl ByteSizeOf for AmqpEvent {
-    fn allocated_bytes(&self) -> usize {
-        self.event.size_of()
-    }
-}
-
-impl EstimatedJsonEncodedSizeOf for AmqpEvent {
-    fn estimated_json_encoded_size_of(&self) -> usize {
-        self.event.estimated_json_encoded_size_of()
-    }
+    pub(super) properties: BasicProperties,
 }
 
 pub(super) struct AmqpSink {
     pub(super) channel: Arc<lapin::Channel>,
     exchange: Template,
     routing_key: Option<Template>,
+    properties: Option<AmqpPropertiesConfig>,
     transformer: Transformer,
     encoder: crate::codecs::Encoder<()>,
 }
@@ -81,6 +58,7 @@ impl AmqpSink {
             channel: Arc::new(channel),
             exchange: config.exchange,
             routing_key: config.routing_key,
+            properties: config.properties,
             transformer,
             encoder,
         })
@@ -115,10 +93,16 @@ impl AmqpSink {
                 .ok()?,
         };
 
+        let properties = match &self.properties {
+            None => BasicProperties::default(),
+            Some(prop) => prop.build(),
+        };
+
         Some(AmqpEvent {
             event,
             exchange,
             routing_key,
+            properties,
         })
     }
 

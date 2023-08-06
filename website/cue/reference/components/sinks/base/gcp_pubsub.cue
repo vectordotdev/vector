@@ -5,7 +5,7 @@ base: components: sinks: gcp_pubsub: configuration: {
 		description: """
 			Controls how acknowledgements are handled for this sink.
 
-			See [End-to-end Acknowledgements][e2e_acks] for more information on how Vector handles event acknowledgement.
+			See [End-to-end Acknowledgements][e2e_acks] for more information on how event acknowledgement is handled.
 
 			[e2e_acks]: https://vector.dev/docs/about/under-the-hood/architecture/end-to-end-acknowledgements/
 			"""
@@ -15,7 +15,7 @@ base: components: sinks: gcp_pubsub: configuration: {
 				Whether or not end-to-end acknowledgements are enabled.
 
 				When enabled for a sink, any source connected to that sink, where the source supports
-				end-to-end acknowledgements as well, will wait for events to be acknowledged by the sink
+				end-to-end acknowledgements as well, waits for events to be acknowledged by the sink
 				before acknowledging them at the source.
 
 				Enabling or disabling acknowledgements at the sink level takes precedence over any global
@@ -29,14 +29,16 @@ base: components: sinks: gcp_pubsub: configuration: {
 	}
 	api_key: {
 		description: """
-			An API key. ([documentation](https://cloud.google.com/docs/authentication/api-keys))
+			An [API key][gcp_api_key].
 
-			Either an API key, or a path to a service account credentials JSON file can be specified.
+			Either an API key or a path to a service account credentials JSON file can be specified.
 
-			If both are unset, Vector checks the `GOOGLE_APPLICATION_CREDENTIALS` environment variable for a filename. If no
-			filename is named, Vector will attempt to fetch an instance service account for the compute instance the program is
-			running on. If Vector is not running on a GCE instance, then you must define eith an API key or service account
+			If both are unset, the `GOOGLE_APPLICATION_CREDENTIALS` environment variable is checked for a filename. If no
+			filename is named, an attempt is made to fetch an instance service account for the compute instance the program is
+			running on. If this is not on a GCE instance, then you must define it with an API key or service account
 			credentials JSON file.
+
+			[gcp_api_key]: https://cloud.google.com/docs/authentication/api-keys
 			"""
 		required: false
 		type: string: {}
@@ -47,36 +49,47 @@ base: components: sinks: gcp_pubsub: configuration: {
 		type: object: options: {
 			max_bytes: {
 				description: """
-					The maximum size of a batch that will be processed by a sink.
+					The maximum size of a batch that is processed by a sink.
 
 					This is based on the uncompressed size of the batched events, before they are
-					serialized / compressed.
+					serialized/compressed.
 					"""
 				required: false
-				type: uint: {}
+				type: uint: {
+					default: 10000000
+					unit:    "bytes"
+				}
 			}
 			max_events: {
-				description: "The maximum size of a batch, in events, before it is flushed."
+				description: "The maximum size of a batch before it is flushed."
 				required:    false
-				type: uint: {}
+				type: uint: {
+					default: 1000
+					unit:    "events"
+				}
 			}
 			timeout_secs: {
-				description: "The maximum age of a batch, in seconds, before it is flushed."
+				description: "The maximum age of a batch before it is flushed."
 				required:    false
-				type: float: {}
+				type: float: {
+					default: 1.0
+					unit:    "seconds"
+				}
 			}
 		}
 	}
 	credentials_path: {
 		description: """
-			Path to a service account credentials JSON file. ([documentation](https://cloud.google.com/docs/authentication/production#manually))
+			Path to a [service account][gcp_service_account_credentials] credentials JSON file.
 
-			Either an API key, or a path to a service account credentials JSON file can be specified.
+			Either an API key or a path to a service account credentials JSON file can be specified.
 
-			If both are unset, Vector checks the `GOOGLE_APPLICATION_CREDENTIALS` environment variable for a filename. If no
-			filename is named, Vector will attempt to fetch an instance service account for the compute instance the program is
-			running on. If Vector is not running on a GCE instance, then you must define eith an API key or service account
+			If both are unset, the `GOOGLE_APPLICATION_CREDENTIALS` environment variable is checked for a filename. If no
+			filename is named, an attempt is made to fetch an instance service account for the compute instance the program is
+			running on. If this is not on a GCE instance, then you must define it with an API key or service account
 			credentials JSON file.
+
+			[gcp_service_account_credentials]: https://cloud.google.com/docs/authentication/production#manually
 			"""
 		required: false
 		type: string: {}
@@ -104,6 +117,11 @@ base: components: sinks: gcp_pubsub: configuration: {
 
 						[apache_avro]: https://avro.apache.org/
 						"""
+					csv: """
+						Encodes an event as a CSV message.
+
+						This codec must be configured with fields to encode.
+						"""
 					gelf: """
 						Encodes an event as a [GELF][gelf] message.
 
@@ -120,7 +138,7 @@ base: components: sinks: gcp_pubsub: configuration: {
 						[logfmt]: https://brandur.org/logfmt
 						"""
 					native: """
-						Encodes an event in Vector’s [native Protocol Buffers format][vector_native_protobuf].
+						Encodes an event in the [native Protocol Buffers format][vector_native_protobuf].
 
 						This codec is **[experimental][experimental]**.
 
@@ -128,7 +146,7 @@ base: components: sinks: gcp_pubsub: configuration: {
 						[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
 						"""
 					native_json: """
-						Encodes an event in Vector’s [native JSON format][vector_native_json].
+						Encodes an event in the [native JSON format][vector_native_json].
 
 						This codec is **[experimental][experimental]**.
 
@@ -138,30 +156,70 @@ base: components: sinks: gcp_pubsub: configuration: {
 					raw_message: """
 						No encoding.
 
-						This "encoding" simply uses the `message` field of a log event.
+						This encoding uses the `message` field of a log event.
 
-						Users should take care if they're modifying their log events (such as by using a `remap`
-						transform, etc) and removing the message field while doing additional parsing on it, as this
+						Be careful if you are modifying your log events (for example, by using a `remap`
+						transform) and removing the message field while doing additional parsing on it, as this
 						could lead to the encoding emitting empty strings for the given event.
 						"""
 					text: """
-						Plaintext encoding.
+						Plain text encoding.
 
-						This "encoding" simply uses the `message` field of a log event.
+						This encoding uses the `message` field of a log event. For metrics, it uses an
+						encoding that resembles the Prometheus export format.
 
-						Users should take care if they're modifying their log events (such as by using a `remap`
-						transform, etc) and removing the message field while doing additional parsing on it, as this
+						Be careful if you are modifying your log events (for example, by using a `remap`
+						transform) and removing the message field while doing additional parsing on it, as this
 						could lead to the encoding emitting empty strings for the given event.
 						"""
 				}
 			}
+			csv: {
+				description:   "The CSV Serializer Options."
+				relevant_when: "codec = \"csv\""
+				required:      true
+				type: object: options: fields: {
+					description: """
+						Configures the fields that will be encoded, as well as the order in which they
+						appear in the output.
+
+						If a field is not present in the event, the output will be an empty string.
+
+						Values of type `Array`, `Object`, and `Regex` are not supported and the
+						output will be an empty string.
+						"""
+					required: true
+					type: array: items: type: string: {}
+				}
+			}
 			except_fields: {
-				description: "List of fields that will be excluded from the encoded event."
+				description: "List of fields that are excluded from the encoded event."
 				required:    false
 				type: array: items: type: string: {}
 			}
+			metric_tag_values: {
+				description: """
+					Controls how metric tag values are encoded.
+
+					When set to `single`, only the last non-bare value of tags are displayed with the
+					metric.  When set to `full`, all metric tags are exposed as separate assignments.
+					"""
+				relevant_when: "codec = \"json\" or codec = \"text\""
+				required:      false
+				type: string: {
+					default: "single"
+					enum: {
+						full: "All tags are exposed as arrays of either string or null values."
+						single: """
+															Tag values are exposed as single strings, the same as they were before this config
+															option. Tags with multiple values show the last assigned value, and null values
+															are ignored.
+															"""
+					}
+				}
+			}
 			only_fields: {
-				description: "List of fields that will be included in the encoded event."
+				description: "List of fields that are included in the encoded event."
 				required:    false
 				type: array: items: type: string: {}
 			}
@@ -176,14 +234,26 @@ base: components: sinks: gcp_pubsub: configuration: {
 		}
 	}
 	endpoint: {
-		description: "The endpoint to which to publish events."
-		required:    false
-		type: string: {}
+		description: """
+			The endpoint to which to publish events.
+
+			The scheme (`http` or `https`) must be specified. No path should be included since the paths defined
+			by the [`GCP Pub/Sub`][pubsub_api] API are used.
+
+			The trailing slash `/` must not be included.
+
+			[pubsub_api]: https://cloud.google.com/pubsub/docs/reference/rest
+			"""
+		required: false
+		type: string: {
+			default: "https://pubsub.googleapis.com"
+			examples: ["https://us-central1-pubsub.googleapis.com"]
+		}
 	}
 	project: {
 		description: "The project name to which to publish events."
 		required:    true
-		type: string: {}
+		type: string: examples: ["vector-123456"]
 	}
 	request: {
 		description: """
@@ -266,14 +336,20 @@ base: components: sinks: gcp_pubsub: configuration: {
 				}
 			}
 			rate_limit_duration_secs: {
-				description: "The time window, in seconds, used for the `rate_limit_num` option."
+				description: "The time window used for the `rate_limit_num` option."
 				required:    false
-				type: uint: default: 1
+				type: uint: {
+					default: 1
+					unit:    "seconds"
+				}
 			}
 			rate_limit_num: {
 				description: "The maximum number of requests allowed within the `rate_limit_duration_secs` time window."
 				required:    false
-				type: uint: default: 9223372036854775807
+				type: uint: {
+					default: 9223372036854775807
+					unit:    "requests"
+				}
 			}
 			retry_attempts: {
 				description: """
@@ -282,38 +358,45 @@ base: components: sinks: gcp_pubsub: configuration: {
 					The default, for all intents and purposes, represents an infinite number of retries.
 					"""
 				required: false
-				type: uint: default: 9223372036854775807
+				type: uint: {
+					default: 9223372036854775807
+					unit:    "retries"
+				}
 			}
 			retry_initial_backoff_secs: {
 				description: """
 					The amount of time to wait before attempting the first retry for a failed request.
 
-					After the first retry has failed, the fibonacci sequence will be used to select future backoffs.
+					After the first retry has failed, the fibonacci sequence is used to select future backoffs.
 					"""
 				required: false
-				type: uint: default: 1
+				type: uint: {
+					default: 1
+					unit:    "seconds"
+				}
 			}
 			retry_max_duration_secs: {
-				description: "The maximum amount of time, in seconds, to wait between retries."
+				description: "The maximum amount of time to wait between retries."
 				required:    false
-				type: uint: default: 3600
+				type: uint: {
+					default: 3600
+					unit:    "seconds"
+				}
 			}
 			timeout_secs: {
 				description: """
-					The maximum time a request can take before being aborted.
+					The time a request can take before being aborted.
 
-					It is highly recommended that you do not lower this value below the service’s internal timeout, as this could
+					Datadog highly recommends that you do not lower this value below the service's internal timeout, as this could
 					create orphaned requests, pile on retries, and result in duplicate data downstream.
 					"""
 				required: false
-				type: uint: default: 60
+				type: uint: {
+					default: 60
+					unit:    "seconds"
+				}
 			}
 		}
-	}
-	skip_authentication: {
-		description: "Skip all authentication handling. For use with integration tests only."
-		required:    false
-		type: bool: default: false
 	}
 	tls: {
 		description: "TLS configuration."
@@ -323,8 +406,8 @@ base: components: sinks: gcp_pubsub: configuration: {
 				description: """
 					Sets the list of supported ALPN protocols.
 
-					Declare the supported ALPN protocols, which are used during negotiation with peer. Prioritized in the order
-					they are defined.
+					Declare the supported ALPN protocols, which are used during negotiation with peer. They are prioritized in the order
+					that they are defined.
 					"""
 				required: false
 				type: array: items: type: string: examples: ["h2"]
@@ -372,10 +455,10 @@ base: components: sinks: gcp_pubsub: configuration: {
 				description: """
 					Enables certificate verification.
 
-					If enabled, certificates must be valid in terms of not being expired, as well as being issued by a trusted
-					issuer. This verification operates in a hierarchical manner, checking that not only the leaf certificate (the
-					certificate presented by the client/server) is valid, but also that the issuer of that certificate is valid, and
-					so on until reaching a root certificate.
+					If enabled, certificates must not be expired and must be issued by a trusted
+					issuer. This verification operates in a hierarchical manner, checking that the leaf certificate (the
+					certificate presented by the client/server) is not only valid, but that the issuer of that certificate is also valid, and
+					so on until the verification process reaches a root certificate.
 
 					Relevant for both incoming and outgoing connections.
 
@@ -403,6 +486,6 @@ base: components: sinks: gcp_pubsub: configuration: {
 	topic: {
 		description: "The topic within the project to which to publish events."
 		required:    true
-		type: string: {}
+		type: string: examples: ["this-is-a-topic"]
 	}
 }

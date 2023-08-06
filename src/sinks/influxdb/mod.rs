@@ -22,7 +22,7 @@ pub(in crate::sinks) enum Field {
     Float(f64),
     /// unsigned integer
     /// Influx can support 64 bit integers if compiled with a flag, see:
-    /// https://github.com/influxdata/influxdb/issues/7801#issuecomment-466801839
+    /// <https://github.com/influxdata/influxdb/issues/7801#issuecomment-466801839>
     UnsignedInt(u64),
     /// integer
     Int(i64),
@@ -58,26 +58,38 @@ pub struct InfluxDb1Settings {
     /// The name of the database to write into.
     ///
     /// Only relevant when using InfluxDB v0.x/v1.x.
+    #[configurable(metadata(docs::examples = "vector-database"))]
+    #[configurable(metadata(docs::examples = "iot-store"))]
     database: String,
 
     /// The consistency level to use for writes.
     ///
     /// Only relevant when using InfluxDB v0.x/v1.x.
+    #[configurable(metadata(docs::examples = "any"))]
+    #[configurable(metadata(docs::examples = "one"))]
+    #[configurable(metadata(docs::examples = "quorum"))]
+    #[configurable(metadata(docs::examples = "all"))]
     consistency: Option<String>,
 
     /// The target retention policy for writes.
     ///
     /// Only relevant when using InfluxDB v0.x/v1.x.
+    #[configurable(metadata(docs::examples = "autogen"))]
+    #[configurable(metadata(docs::examples = "one_day_only"))]
     retention_policy_name: Option<String>,
 
     /// The username to authenticate with.
     ///
     /// Only relevant when using InfluxDB v0.x/v1.x.
+    #[configurable(metadata(docs::examples = "todd"))]
+    #[configurable(metadata(docs::examples = "vector-source"))]
     username: Option<String>,
 
     /// The password to authenticate with.
     ///
     /// Only relevant when using InfluxDB v0.x/v1.x.
+    #[configurable(metadata(docs::examples = "${INFLUXDB_PASSWORD}"))]
+    #[configurable(metadata(docs::examples = "influxdb4ever"))]
     password: Option<SensitiveString>,
 }
 
@@ -88,11 +100,15 @@ pub struct InfluxDb2Settings {
     /// The name of the organization to write into.
     ///
     /// Only relevant when using InfluxDB v2.x and above.
+    #[configurable(metadata(docs::examples = "my-org"))]
+    #[configurable(metadata(docs::examples = "33f2cff0a28e5b63"))]
     org: String,
 
     /// The name of the bucket to write into.
     ///
     /// Only relevant when using InfluxDB v2.x and above.
+    #[configurable(metadata(docs::examples = "vector-bucket"))]
+    #[configurable(metadata(docs::examples = "4d2225e4d3d49f75"))]
     bucket: String,
 
     /// The [token][token_docs] to authenticate with.
@@ -100,6 +116,8 @@ pub struct InfluxDb2Settings {
     /// Only relevant when using InfluxDB v2.x and above.
     ///
     /// [token_docs]: https://v2.docs.influxdata.com/v2.0/security/tokens/
+    #[configurable(metadata(docs::examples = "${INFLUXDB_TOKEN}"))]
+    #[configurable(metadata(docs::examples = "ef8d5de700e7989468166c40fc8a0ccd"))]
     token: SensitiveString,
 }
 
@@ -209,7 +227,7 @@ fn healthcheck(
     .boxed())
 }
 
-// https://v2.docs.influxdata.com/v2.0/reference/syntax/line-protocol/
+// https://docs.influxdata.com/influxdb/latest/reference/syntax/line-protocol/
 pub(in crate::sinks) fn influx_line_protocol(
     protocol_version: ProtocolVersion,
     measurement: &str,
@@ -226,11 +244,13 @@ pub(in crate::sinks) fn influx_line_protocol(
     }
 
     encode_string(measurement, line_protocol);
-    line_protocol.put_u8(b',');
 
-    // Tags
+    // Tags are optional
     let unwrapped_tags = tags.unwrap_or_default();
-    encode_tags(unwrapped_tags, line_protocol);
+    if !unwrapped_tags.is_empty() {
+        line_protocol.put_u8(b',');
+        encode_tags(unwrapped_tags, line_protocol);
+    }
     line_protocol.put_u8(b' ');
 
     // Fields
@@ -359,7 +379,7 @@ pub(in crate::sinks) fn encode_uri(
 pub mod test_util {
     use std::{fs::File, io::Read};
 
-    use chrono::{offset::TimeZone, DateTime, SecondsFormat, Utc};
+    use chrono::{offset::TimeZone, DateTime, SecondsFormat, Timelike, Utc};
     use vector_core::metric_tags;
 
     use super::*;
@@ -374,7 +394,10 @@ pub mod test_util {
     }
 
     pub(crate) fn ts() -> DateTime<Utc> {
-        Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 11)
+        Utc.with_ymd_and_hms(2018, 11, 14, 8, 9, 10)
+            .single()
+            .and_then(|t| t.with_nanosecond(11))
+            .expect("invalid timestamp")
     }
 
     pub(crate) fn tags() -> MetricTags {
@@ -424,12 +447,12 @@ pub mod test_util {
     // 1542182950000000011
     //
     pub(crate) fn split_line_protocol(line_protocol: &str) -> (&str, &str, String, &str) {
-        let mut split = line_protocol.splitn(2, ',').collect::<Vec<&str>>();
-        let measurement = split[0];
+        let (name, fields) = line_protocol.split_once(' ').unwrap_or_default();
+        // tags and timestamp may not be present
+        let (measurement, tags) = name.split_once(',').unwrap_or((name, ""));
+        let (fields, ts) = fields.split_once(' ').unwrap_or((fields, ""));
 
-        split = split[1].splitn(3, ' ').collect::<Vec<&str>>();
-
-        (measurement, split[0], split[1].to_string(), split[2])
+        (measurement, tags, fields.to_string(), ts)
     }
 
     fn client() -> reqwest::Client {
@@ -590,7 +613,7 @@ mod tests {
         database = "my-database"
     "#;
         let config: InfluxDbTestConfig = toml::from_str(config).unwrap();
-        let _ = influxdb_settings(config.influxdb1_settings, config.influxdb2_settings).unwrap();
+        _ = influxdb_settings(config.influxdb1_settings, config.influxdb2_settings).unwrap();
     }
 
     #[test]
@@ -601,7 +624,7 @@ mod tests {
         token = "my-token"
     "#;
         let config: InfluxDbTestConfig = toml::from_str(config).unwrap();
-        let _ = influxdb_settings(config.influxdb1_settings, config.influxdb2_settings).unwrap();
+        _ = influxdb_settings(config.influxdb1_settings, config.influxdb2_settings).unwrap();
     }
 
     #[test]
@@ -851,7 +874,7 @@ mod tests {
             "http://localhost:9999",
             "api/v2/write",
             &[
-                ("org", Some("Orgazniation name".to_owned())),
+                ("org", Some("Organization name".to_owned())),
                 ("bucket", Some("Bucket=name".to_owned())),
                 ("none", None),
             ],
@@ -859,7 +882,7 @@ mod tests {
         .unwrap();
         assert_eq!(
             uri,
-            "http://localhost:9999/api/v2/write?org=Orgazniation+name&bucket=Bucket%3Dname"
+            "http://localhost:9999/api/v2/write?org=Organization+name&bucket=Bucket%3Dname"
         );
     }
 

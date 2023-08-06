@@ -7,17 +7,22 @@ use k8s_openapi::{api::core::v1::Node, apimachinery::pkg::apis::meta::v1::Object
 use kube::runtime::reflector::{store::Store, ObjectRef};
 use lookup::lookup_v2::OptionalTargetPath;
 use lookup::{lookup_v2::ValuePath, owned_value_path, path, OwnedTargetPath};
-use vector_config::{configurable_component, NamedComponent};
+use vector_config::configurable_component;
 use vector_core::config::{LegacyKey, LogNamespace};
 
 use super::Config;
 
-/// Configuration for how the events are annotated with Node metadata.
+/// Configuration for how the events are enriched with Node metadata.
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields, default)]
 pub struct FieldsSpec {
-    /// Event field for Node labels.
+    /// Event field for the Node's labels.
+    ///
+    /// Set to `""` to suppress this key.
+    #[configurable(metadata(docs::examples = ".k8s.node_labels"))]
+    #[configurable(metadata(docs::examples = "k8s.node_labels"))]
+    #[configurable(metadata(docs::examples = ""))]
     pub node_labels: OptionalTargetPath,
 }
 
@@ -54,7 +59,6 @@ impl NodeMetadataAnnotator {
 
 impl NodeMetadataAnnotator {
     /// Annotates an event with the information from the [`Node::metadata`].
-    /// The event has to have a [`VECTOR_SELF_NODE_NAME`] field set.
     pub fn annotate(&self, event: &mut Event, node: &str) -> Option<()> {
         let log = event.as_mut_log();
         let obj = ObjectRef::<Node>::new(node);

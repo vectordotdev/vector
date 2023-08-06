@@ -8,19 +8,19 @@ use futures::StreamExt;
 use lookup::{lookup_v2::OptionalValuePath, owned_value_path, path, OwnedValuePath};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
-use value::Kind;
 use vector_common::internal_event::{
     ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol, Registered,
 };
-use vector_config::{configurable_component, NamedComponent};
+use vector_config::configurable_component;
 use vector_core::{
     config::{LegacyKey, LogNamespace},
     EstimatedJsonEncodedSizeOf,
 };
+use vrl::value::Kind;
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
-    config::{log_schema, GenerateConfig, Output, SourceConfig, SourceContext},
+    config::{log_schema, GenerateConfig, SourceConfig, SourceContext, SourceOutput},
     event::Event,
     internal_events::{EventsReceived, StreamClosedError},
     serde::{default_decoding, default_framing_message_based},
@@ -94,7 +94,7 @@ impl From<&redis::ConnectionInfo> for ConnectionInfo {
 }
 
 /// Configuration for the `redis` source.
-#[configurable_component(source("redis"))]
+#[configurable_component(source("redis", "Collect observability data from Redis."))]
 #[derive(Clone, Debug, Derivative)]
 #[serde(deny_unknown_fields)]
 pub struct RedisSourceConfig {
@@ -107,17 +107,20 @@ pub struct RedisSourceConfig {
 
     /// The Redis URL to connect to.
     ///
-    /// The URL must take the form of `protocol://server:port/db` where the `protocol` can either be `redis` or `rediss` for connections secured via TLS.
+    /// The URL must take the form of `protocol://server:port/db` where the `protocol` can either be `redis` or `rediss` for connections secured using TLS.
+    #[configurable(metadata(docs::examples = "redis://127.0.0.1:6379/0"))]
     url: String,
 
     /// The Redis key to read messages from.
+    #[configurable(metadata(docs::examples = "vector"))]
     key: String,
 
     /// Sets the name of the log field to use to add the key to each event.
     ///
-    /// The value will be the Redis key that the event was read from.
+    /// The value is the Redis key that the event was read from.
     ///
-    /// By default, this is not set and the field will not be automatically added.
+    /// By default, this is not set and the field is not automatically added.
+    #[configurable(metadata(docs::examples = "redis_key"))]
     redis_key: Option<OptionalValuePath>,
 
     #[configurable(derived)]
@@ -152,6 +155,7 @@ impl GenerateConfig for RedisSourceConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "redis")]
 impl SourceConfig for RedisSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let log_namespace = cx.log_namespace(self.log_namespace);
@@ -165,7 +169,8 @@ impl SourceConfig for RedisSourceConfig {
         let client = redis::Client::open(self.url.as_str()).context(ClientSnafu {})?;
         let connection_info = ConnectionInfo::from(client.get_connection_info());
         let decoder =
-            DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace).build();
+            DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace)
+                .build()?;
 
         let bytes_received = register!(BytesReceived::from(Protocol::from(
             connection_info.protocol
@@ -191,7 +196,7 @@ impl SourceConfig for RedisSourceConfig {
         }
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
 
         let redis_key_path = self
@@ -212,7 +217,10 @@ impl SourceConfig for RedisSourceConfig {
             )
             .with_standard_vector_source_metadata();
 
-        vec![Output::default(self.decoding.output_type()).with_schema_definition(schema_definition)]
+        vec![SourceOutput::new_logs(
+            self.decoding.output_type(),
+            schema_definition,
+        )]
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -249,13 +257,13 @@ impl InputHandler {
                         if let Event::Log(ref mut log) = event {
                             self.log_namespace.insert_vector_metadata(
                                 log,
-                                path!(log_schema().source_type_key()),
+                                log_schema().source_type_key(),
                                 path!("source_type"),
                                 Bytes::from(RedisSourceConfig::NAME),
                             );
                             self.log_namespace.insert_vector_metadata(
                                 log,
-                                path!(log_schema().timestamp_key()),
+                                log_schema().timestamp_key(),
                                 path!("ingest_timestamp"),
                                 now,
                             );
@@ -272,8 +280,8 @@ impl InputHandler {
                         event
                     });
 
-                    if let Err(error) = self.cx.out.send_batch(events).await {
-                        emit!(StreamClosedError { error, count });
+                    if (self.cx.out.send_batch(events).await).is_err() {
+                        emit!(StreamClosedError { count });
                         return Err(());
                     }
                 }
@@ -314,6 +322,7 @@ mod integration_test {
         },
         SourceSender,
     };
+    use vrl::value;
 
     const REDIS_SERVER: &str = "redis://redis:6379/0";
 
@@ -346,9 +355,18 @@ mod integration_test {
 
         let events = run_and_assert_source_compliance_n(config, 3, &SOURCE_TAGS).await;
 
-        assert_eq!(events[0].as_log()[log_schema().message_key()], "3".into());
-        assert_eq!(events[1].as_log()[log_schema().message_key()], "2".into());
-        assert_eq!(events[2].as_log()[log_schema().message_key()], "1".into());
+        assert_eq!(
+            events[0].as_log()[log_schema().message_key().unwrap().to_string()],
+            "3".into()
+        );
+        assert_eq!(
+            events[1].as_log()[log_schema().message_key().unwrap().to_string()],
+            "2".into()
+        );
+        assert_eq!(
+            events[2].as_log()[log_schema().message_key().unwrap().to_string()],
+            "1".into()
+        );
     }
 
     #[tokio::test]
@@ -386,7 +404,7 @@ mod integration_test {
             meta.value()
                 .get(path!(RedisSourceConfig::NAME, "key"))
                 .unwrap(),
-            &vrl::value!(key)
+            &value!(key)
         );
     }
 
@@ -419,9 +437,18 @@ mod integration_test {
 
         let events = run_and_assert_source_compliance_n(config, 3, &SOURCE_TAGS).await;
 
-        assert_eq!(events[0].as_log()[log_schema().message_key()], "1".into());
-        assert_eq!(events[1].as_log()[log_schema().message_key()], "2".into());
-        assert_eq!(events[2].as_log()[log_schema().message_key()], "3".into());
+        assert_eq!(
+            events[0].as_log()[log_schema().message_key().unwrap().to_string()],
+            "1".into()
+        );
+        assert_eq!(
+            events[1].as_log()[log_schema().message_key().unwrap().to_string()],
+            "2".into()
+        );
+        assert_eq!(
+            events[2].as_log()[log_schema().message_key().unwrap().to_string()],
+            "3".into()
+        );
     }
 
     #[tokio::test]
@@ -453,7 +480,7 @@ mod integration_test {
         // Briefly wait to ensure the source is subscribed.
         //
         // TODO: This is a prime example of where being able to check if the shutdown signal had been polled at least
-        // once would serve as the most precise indicator of "is the source ready and waiting to receieve?".
+        // once would serve as the most precise indicator of "is the source ready and waiting to receive?".
         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
 
         // Now create a normal Redis client and use it to publish a bunch of message, which we'll ensure the source consumes.
@@ -472,9 +499,12 @@ mod integration_test {
         assert_eq!(events.len(), 10000);
 
         for event in events {
-            assert_eq!(event.as_log()[log_schema().message_key()], text.into());
             assert_eq!(
-                event.as_log()[log_schema().source_type_key()],
+                event.as_log()[log_schema().message_key().unwrap().to_string()],
+                text.into()
+            );
+            assert_eq!(
+                event.as_log()[log_schema().source_type_key().unwrap().to_string()],
                 RedisSourceConfig::NAME.into()
             );
         }

@@ -4,6 +4,7 @@ components: sources: nats: {
 	title: "NATS"
 
 	features: {
+		auto_generated:   true
 		acknowledgements: false
 		collect: {
 			checkpoint: enabled: false
@@ -27,7 +28,7 @@ components: sources: nats: {
 		commonly_used: true
 		deployment_roles: ["aggregator"]
 		delivery:      "best_effort"
-		development:   "beta"
+		development:   "stable"
 		egress_method: "stream"
 		stateful:      false
 	}
@@ -38,20 +39,10 @@ components: sources: nats: {
 		platform_name: null
 	}
 
-	configuration: components._nats.configuration & {
-		queue: {
-			common:      false
-			description: "NATS Queue Group to join"
-			required:    false
-			type: string: {
-				default: "vector"
-				examples: ["foo", "API Name Option Example"]
-			}
-		}
-	}
+	configuration: base.components.sources.nats.configuration
 
 	output: logs: record: {
-		description: "An individual NATS record"
+		description: "An individual NATS record."
 		fields: {
 			message: {
 				description: "The raw line from the NATS message."
@@ -75,17 +66,6 @@ components: sources: nats: {
 				}
 			}
 		}
-	}
-
-	telemetry: metrics: {
-		events_in_total:                      components.sources.internal_metrics.output.metrics.events_in_total
-		processed_bytes_total:                components.sources.internal_metrics.output.metrics.processed_bytes_total
-		processed_events_total:               components.sources.internal_metrics.output.metrics.processed_events_total
-		component_discarded_events_total:     components.sources.internal_metrics.output.metrics.component_discarded_events_total
-		component_errors_total:               components.sources.internal_metrics.output.metrics.component_errors_total
-		component_received_bytes_total:       components.sources.internal_metrics.output.metrics.component_received_bytes_total
-		component_received_events_total:      components.sources.internal_metrics.output.metrics.component_received_events_total
-		component_received_event_bytes_total: components.sources.internal_metrics.output.metrics.component_received_event_bytes_total
 	}
 
 	how_it_works: components._nats.how_it_works

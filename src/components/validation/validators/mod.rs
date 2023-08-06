@@ -1,9 +1,10 @@
 mod component_spec;
+
 pub use self::component_spec::ComponentSpecValidator;
 
 use vector_core::event::Event;
 
-use super::{ComponentType, TestCaseExpectation, TestEvent};
+use super::{ComponentType, RunnerMetrics, TestCaseExpectation, TestEvent};
 
 /// A component validator.
 ///
@@ -24,6 +25,7 @@ pub trait Validator {
         inputs: &[TestEvent],
         outputs: &[Event],
         telemetry_events: &[Event],
+        runner_metrics: &RunnerMetrics,
     ) -> Result<Vec<String>, Vec<String>>;
 }
 
@@ -43,7 +45,7 @@ pub enum StandardValidators {
 impl From<StandardValidators> for Box<dyn Validator> {
     fn from(sv: StandardValidators) -> Self {
         match sv {
-            StandardValidators::ComponentSpec => Box::new(ComponentSpecValidator::default()),
+            StandardValidators::ComponentSpec => Box::<ComponentSpecValidator>::default(),
         }
     }
 }

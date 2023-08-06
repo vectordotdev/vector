@@ -3,15 +3,17 @@
 use core::fmt::Debug;
 use std::collections::BTreeMap;
 
+use lookup::lookup_v2::ConfigValuePath;
 use lookup::{
     event_path,
     lookup_v2::{parse_value_path, OwnedValuePath},
     PathPrefix,
 };
 use serde::{Deserialize, Deserializer};
-use value::Value;
 use vector_config::configurable_component;
 use vector_core::event::{LogEvent, MaybeAsLogMut};
+use vector_core::schema::meaning;
+use vrl::value::Value;
 
 use crate::{event::Event, serde::skip_serializing_if_default};
 
@@ -19,11 +21,11 @@ use crate::{event::Event, serde::skip_serializing_if_default};
 #[configurable_component(no_deser)]
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Transformer {
-    /// List of fields that will be included in the encoded event.
+    /// List of fields that are included in the encoded event.
     #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
-    only_fields: Option<Vec<OwnedValuePath>>,
+    only_fields: Option<Vec<ConfigValuePath>>,
 
-    /// List of fields that will be excluded from the encoded event.
+    /// List of fields that are excluded from the encoded event.
     #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
     except_fields: Option<Vec<String>>,
 
@@ -70,6 +72,7 @@ impl Transformer {
     ) -> Result<Self, crate::Error> {
         Self::validate_fields(only_fields.as_ref(), except_fields.as_ref())?;
 
+        let only_fields = only_fields.map(|x| x.into_iter().map(ConfigValuePath).collect());
         Ok(Self {
             only_fields,
             except_fields,
@@ -78,7 +81,8 @@ impl Transformer {
     }
 
     /// Get the `Transformer`'s `only_fields`.
-    pub const fn only_fields(&self) -> &Option<Vec<OwnedValuePath>> {
+    #[cfg(test)]
+    pub const fn only_fields(&self) -> &Option<Vec<ConfigValuePath>> {
         &self.only_fields
     }
 
@@ -125,20 +129,52 @@ impl Transformer {
 
     fn apply_only_fields(&self, log: &mut LogEvent) {
         if let Some(only_fields) = self.only_fields.as_ref() {
-            let old_value = std::mem::replace(log.value_mut(), Value::Object(BTreeMap::new()));
+            let mut old_value = std::mem::replace(log.value_mut(), Value::Object(BTreeMap::new()));
 
             for field in only_fields {
-                if let Some(value) = old_value.get(field) {
-                    log.insert((PathPrefix::Event, field), value.clone());
+                if let Some(value) = old_value.remove(field, true) {
+                    log.insert((PathPrefix::Event, field), value);
+                }
+            }
+
+            // We may need the service field to apply tags to emitted metrics after the log message has been pruned. If there
+            // is a service meaning, we move this value to `dropped_fields` in the metadata.
+            // If the field is still in the new log message after pruning it will have been removed from `old_value` above.
+            let service_path = log
+                .metadata()
+                .schema_definition()
+                .meaning_path(meaning::SERVICE);
+            if let Some(service_path) = service_path {
+                let mut new_log = LogEvent::from(old_value);
+                if let Some(service) = new_log.remove(service_path) {
+                    log.metadata_mut()
+                        .add_dropped_field(meaning::SERVICE.to_string(), service);
                 }
             }
         }
     }
 
     fn apply_except_fields(&self, log: &mut LogEvent) {
+        use lookup::path::TargetPath;
+
         if let Some(except_fields) = self.except_fields.as_ref() {
+            let service_path = log
+                .metadata()
+                .schema_definition()
+                .meaning_path(meaning::SERVICE)
+                .map(|path| path.value_path().to_string());
+
             for field in except_fields {
-                log.remove(field.as_str());
+                let value = log.remove(field.as_str());
+
+                // If we are removing the service field we need to store this in a `dropped_fields` list as we may need to
+                // refer to this later when emitting metrics.
+                if let Some(v) = value {
+                    if matches!(service_path.as_ref(), Some(path) if path == field) {
+                        log.metadata_mut()
+                            .add_dropped_field(meaning::SERVICE.to_string(), v);
+                    }
+                }
             }
         }
     }
@@ -179,8 +215,15 @@ impl Transformer {
     ///
     /// Returns `Err` if the new `except_fields` fail validation, i.e. are not mutually exclusive
     /// with `only_fields`.
+    #[cfg(test)]
     pub fn set_except_fields(&mut self, except_fields: Option<Vec<String>>) -> crate::Result<()> {
-        Self::validate_fields(self.only_fields.as_ref(), except_fields.as_ref())?;
+        Self::validate_fields(
+            self.only_fields
+                .clone()
+                .map(|x| x.into_iter().map(|x| x.0).collect())
+                .as_ref(),
+            except_fields.as_ref(),
+        )?;
 
         self.except_fields = except_fields;
 
@@ -203,10 +246,15 @@ pub enum TimestampFormat {
 #[cfg(test)]
 mod tests {
     use indoc::indoc;
-    use vector_core::config::log_schema;
+    use lookup::path::parse_target_path;
+    use vector_common::btreemap;
+    use vector_core::config::{log_schema, LogNamespace};
+    use vrl::value::Kind;
+
+    use crate::config::schema;
 
     use super::*;
-    use std::collections::BTreeMap;
+    use std::{collections::BTreeMap, sync::Arc};
 
     #[test]
     fn serialize() {
@@ -308,7 +356,10 @@ mod tests {
         let mut event = Event::Log(LogEvent::from("Demo"));
         let timestamp = event
             .as_mut_log()
-            .get(log_schema().timestamp_key())
+            .get((
+                lookup::PathPrefix::Event,
+                log_schema().timestamp_key().unwrap(),
+            ))
             .unwrap()
             .clone();
         let timestamp = timestamp.as_timestamp().unwrap();
@@ -320,7 +371,10 @@ mod tests {
 
         match event
             .as_mut_log()
-            .get(log_schema().timestamp_key())
+            .get((
+                lookup::PathPrefix::Event,
+                log_schema().timestamp_key().unwrap(),
+            ))
             .unwrap()
         {
             Value::Integer(_) => {}
@@ -357,5 +411,84 @@ mod tests {
             onlyfields = ["Doop"]
         "#});
         assert!(config.is_err())
+    }
+
+    #[test]
+    fn only_fields_with_service() {
+        let transformer: Transformer = toml::from_str(r#"only_fields = ["message"]"#).unwrap();
+        let mut log = LogEvent::default();
+        {
+            log.insert("message", 1);
+            log.insert("thing.service", "carrot");
+        }
+
+        let schema = schema::Definition::new_with_default_metadata(
+            Kind::object(btreemap! {
+                "thing" => Kind::object(btreemap! {
+                    "service" => Kind::bytes(),
+                })
+            }),
+            [LogNamespace::Vector],
+        );
+
+        let schema = schema.with_meaning(parse_target_path("thing.service").unwrap(), "service");
+
+        let mut event = Event::from(log);
+
+        event
+            .metadata_mut()
+            .set_schema_definition(&Arc::new(schema));
+
+        transformer.transform(&mut event);
+        assert!(event.as_mut_log().contains("message"));
+
+        // Event no longer contains the service field.
+        assert!(!event.as_mut_log().contains("thing.service"));
+
+        // But we can still get the service by meaning.
+        assert_eq!(
+            &Value::from("carrot"),
+            event.as_log().get_by_meaning("service").unwrap()
+        );
+    }
+
+    #[test]
+    fn except_fields_with_service() {
+        let transformer: Transformer =
+            toml::from_str(r#"except_fields = ["thing.service"]"#).unwrap();
+        let mut log = LogEvent::default();
+        {
+            log.insert("message", 1);
+            log.insert("thing.service", "carrot");
+        }
+
+        let schema = schema::Definition::new_with_default_metadata(
+            Kind::object(btreemap! {
+                "thing" => Kind::object(btreemap! {
+                    "service" => Kind::bytes(),
+                })
+            }),
+            [LogNamespace::Vector],
+        );
+
+        let schema = schema.with_meaning(parse_target_path("thing.service").unwrap(), "service");
+
+        let mut event = Event::from(log);
+
+        event
+            .metadata_mut()
+            .set_schema_definition(&Arc::new(schema));
+
+        transformer.transform(&mut event);
+        assert!(event.as_mut_log().contains("message"));
+
+        // Event no longer contains the service field.
+        assert!(!event.as_mut_log().contains("thing.service"));
+
+        // But we can still get the service by meaning.
+        assert_eq!(
+            &Value::from("carrot"),
+            event.as_log().get_by_meaning("service").unwrap()
+        );
     }
 }

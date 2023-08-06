@@ -14,6 +14,7 @@ components: sinks: aws_cloudwatch_metrics: components._aws & {
 
 	features: {
 		acknowledgements: true
+		auto_generated:   true
 		healthcheck: enabled: true
 		send: {
 			batch: {
@@ -82,17 +83,8 @@ components: sinks: aws_cloudwatch_metrics: components._aws & {
 		]
 	}
 
-	configuration: {
-		default_namespace: {
-			description: """
-				A [namespace](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/cloudwatch_concepts.html#Namespace) that will isolate different metrics from each other.
-				Used as a namespace for metrics that don't have it.
-				"""
-			required: true
-			type: string: {
-				examples: ["service"]
-			}
-		}
+	configuration: base.components.sinks.aws_cloudwatch_metrics.configuration & {
+		_aws_include: false
 	}
 
 	input: {
@@ -122,9 +114,4 @@ components: sinks: aws_cloudwatch_metrics: components._aws & {
 			]
 		},
 	]
-
-	telemetry: metrics: {
-		component_sent_events_total:      components.sources.internal_metrics.output.metrics.component_sent_events_total
-		component_sent_event_bytes_total: components.sources.internal_metrics.output.metrics.component_sent_event_bytes_total
-	}
 }

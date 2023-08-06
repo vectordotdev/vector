@@ -1,6 +1,12 @@
+use std::sync::Arc;
+
+use vector_common::config::ComponentKey;
+use vector_core::config::OutputId;
 use vector_core::metric_tags;
 
 use super::*;
+use crate::config::schema::Definition;
+use crate::config::LogNamespace;
 use crate::event::metric::TagValue;
 use crate::event::{metric, Event, Metric, MetricTags};
 use crate::test_util::components::assert_transform_compliance;
@@ -10,6 +16,7 @@ use crate::transforms::tag_cardinality_limit::config::{
 use crate::transforms::test::create_topology;
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
+use vrl::compiler::prelude::Kind;
 
 #[test]
 fn generate_config() {
@@ -28,7 +35,7 @@ fn make_metric(tags: MetricTags) -> Event {
 }
 
 const fn make_transform_hashset(
-    value_limit: u32,
+    value_limit: usize,
     limit_exceeded_action: LimitExceededAction,
 ) -> TagCardinalityLimitConfig {
     TagCardinalityLimitConfig {
@@ -39,7 +46,7 @@ const fn make_transform_hashset(
 }
 
 const fn make_transform_bloom(
-    value_limit: u32,
+    value_limit: usize,
     limit_exceeded_action: LimitExceededAction,
 ) -> TagCardinalityLimitConfig {
     TagCardinalityLimitConfig {
@@ -63,8 +70,8 @@ async fn tag_cardinality_limit_drop_event_bloom() {
 
 async fn drop_event(config: TagCardinalityLimitConfig) {
     assert_transform_compliance(async move {
-        let event1 = make_metric(metric_tags!("tag1" => "val1"));
-        let event2 = make_metric(metric_tags!("tag1" => "val2"));
+        let mut event1 = make_metric(metric_tags!("tag1" => "val1"));
+        let mut event2 = make_metric(metric_tags!("tag1" => "val2"));
         let event3 = make_metric(metric_tags!("tag1" => "val3"));
 
         let (tx, rx) = mpsc::channel(1);
@@ -81,6 +88,19 @@ async fn drop_event(config: TagCardinalityLimitConfig) {
         topology.stop().await;
 
         let new_event3 = out.recv().await;
+
+        event1.set_source_id(Arc::new(ComponentKey::from("in")));
+        event2.set_source_id(Arc::new(ComponentKey::from("in")));
+
+        event1.set_upstream_id(Arc::new(OutputId::from("transform")));
+        event2.set_upstream_id(Arc::new(OutputId::from("transform")));
+
+        event1.metadata_mut().set_schema_definition(&Arc::new(
+            Definition::new_with_default_metadata(Kind::any_object(), [LogNamespace::Legacy]),
+        ));
+        event2.metadata_mut().set_schema_definition(&Arc::new(
+            Definition::new_with_default_metadata(Kind::any_object(), [LogNamespace::Legacy]),
+        ));
 
         assert_eq!(new_event1, Some(event1));
         assert_eq!(new_event2, Some(event2));
@@ -103,13 +123,13 @@ async fn tag_cardinality_limit_drop_tag_bloom() {
 async fn drop_tag(config: TagCardinalityLimitConfig) {
     assert_transform_compliance(async move {
         let tags1 = metric_tags!("tag1" => "val1", "tag2" => "val1");
-        let event1 = make_metric(tags1);
+        let mut event1 = make_metric(tags1);
 
         let tags2 = metric_tags!("tag1" => "val2", "tag2" => "val1");
-        let event2 = make_metric(tags2);
+        let mut event2 = make_metric(tags2);
 
         let tags3 = metric_tags!("tag1" => "val3", "tag2" => "val1");
-        let event3 = make_metric(tags3);
+        let mut event3 = make_metric(tags3);
 
         let (tx, rx) = mpsc::channel(1);
         let (topology, mut out) = create_topology(ReceiverStream::new(rx), config).await;
@@ -124,6 +144,24 @@ async fn drop_tag(config: TagCardinalityLimitConfig) {
 
         drop(tx);
         topology.stop().await;
+
+        event1.set_source_id(Arc::new(ComponentKey::from("in")));
+        event2.set_source_id(Arc::new(ComponentKey::from("in")));
+        event3.set_source_id(Arc::new(ComponentKey::from("in")));
+
+        event1.set_upstream_id(Arc::new(OutputId::from("transform")));
+        event2.set_upstream_id(Arc::new(OutputId::from("transform")));
+        event3.set_upstream_id(Arc::new(OutputId::from("transform")));
+
+        event1.metadata_mut().set_schema_definition(&Arc::new(
+            Definition::new_with_default_metadata(Kind::any_object(), [LogNamespace::Legacy]),
+        ));
+        event2.metadata_mut().set_schema_definition(&Arc::new(
+            Definition::new_with_default_metadata(Kind::any_object(), [LogNamespace::Legacy]),
+        ));
+        event3.metadata_mut().set_schema_definition(&Arc::new(
+            Definition::new_with_default_metadata(Kind::any_object(), [LogNamespace::Legacy]),
+        ));
 
         assert_eq!(new_event1, Some(event1));
         assert_eq!(new_event2, Some(event2));
@@ -160,7 +198,7 @@ async fn drop_tag_multi_value(config: TagCardinalityLimitConfig) {
                 TagValue::Value("val1.b".to_string()),
             ],
         );
-        let event1 = make_metric(tags1);
+        let mut event1 = make_metric(tags1);
 
         let mut tags2 = MetricTags::default();
         tags2.set_multi_value(
@@ -170,7 +208,7 @@ async fn drop_tag_multi_value(config: TagCardinalityLimitConfig) {
                 TagValue::Value("val1.c".to_string()),
             ],
         );
-        let event2 = make_metric(tags2);
+        let mut event2 = make_metric(tags2);
 
         let mut tags3 = MetricTags::default();
         tags3.set_multi_value(
@@ -180,7 +218,7 @@ async fn drop_tag_multi_value(config: TagCardinalityLimitConfig) {
                 TagValue::Value("val1.c".to_string()),
             ],
         );
-        let event3 = make_metric(tags3);
+        let mut event3 = make_metric(tags3);
 
         let (tx, rx) = mpsc::channel(1);
         let (topology, mut out) = create_topology(ReceiverStream::new(rx), config).await;
@@ -192,6 +230,25 @@ async fn drop_tag_multi_value(config: TagCardinalityLimitConfig) {
         let new_event1 = out.recv().await;
         let new_event2 = out.recv().await;
         let new_event3 = out.recv().await;
+
+        event1.set_source_id(Arc::new(ComponentKey::from("in")));
+        event2.set_source_id(Arc::new(ComponentKey::from("in")));
+        event3.set_source_id(Arc::new(ComponentKey::from("in")));
+
+        event1.set_upstream_id(Arc::new(OutputId::from("transform")));
+        event2.set_upstream_id(Arc::new(OutputId::from("transform")));
+        event3.set_upstream_id(Arc::new(OutputId::from("transform")));
+
+        // definitions aren't valid for metrics yet, it's just set to the default (anything).
+        event1.metadata_mut().set_schema_definition(&Arc::new(
+            Definition::new_with_default_metadata(Kind::any_object(), [LogNamespace::Legacy]),
+        ));
+        event2.metadata_mut().set_schema_definition(&Arc::new(
+            Definition::new_with_default_metadata(Kind::any_object(), [LogNamespace::Legacy]),
+        ));
+        event3.metadata_mut().set_schema_definition(&Arc::new(
+            Definition::new_with_default_metadata(Kind::any_object(), [LogNamespace::Legacy]),
+        ));
 
         drop(tx);
         topology.stop().await;
@@ -218,12 +275,12 @@ async fn tag_cardinality_limit_separate_value_limit_per_tag_bloom() {
 /// values for other tags.
 async fn separate_value_limit_per_tag(config: TagCardinalityLimitConfig) {
     assert_transform_compliance(async move {
-        let event1 = make_metric(metric_tags!("tag1" => "val1", "tag2" => "val1"));
+        let mut event1 = make_metric(metric_tags!("tag1" => "val1", "tag2" => "val1"));
 
-        let event2 = make_metric(metric_tags!("tag1" => "val2", "tag2" => "val1"));
+        let mut event2 = make_metric(metric_tags!("tag1" => "val2", "tag2" => "val1"));
 
         // Now value limit is reached for "tag1", but "tag2" still has values available.
-        let event3 = make_metric(metric_tags!("tag1" => "val1", "tag2" => "val2"));
+        let mut event3 = make_metric(metric_tags!("tag1" => "val1", "tag2" => "val2"));
 
         let (tx, rx) = mpsc::channel(1);
         let (topology, mut out) = create_topology(ReceiverStream::new(rx), config).await;
@@ -238,6 +295,25 @@ async fn separate_value_limit_per_tag(config: TagCardinalityLimitConfig) {
 
         drop(tx);
         topology.stop().await;
+
+        event1.set_source_id(Arc::new(ComponentKey::from("in")));
+        event2.set_source_id(Arc::new(ComponentKey::from("in")));
+        event3.set_source_id(Arc::new(ComponentKey::from("in")));
+
+        event1.set_upstream_id(Arc::new(OutputId::from("transform")));
+        event2.set_upstream_id(Arc::new(OutputId::from("transform")));
+        event3.set_upstream_id(Arc::new(OutputId::from("transform")));
+
+        // definitions aren't valid for metrics yet, it's just set to the default (anything).
+        event1.metadata_mut().set_schema_definition(&Arc::new(
+            Definition::new_with_default_metadata(Kind::any_object(), [LogNamespace::Legacy]),
+        ));
+        event2.metadata_mut().set_schema_definition(&Arc::new(
+            Definition::new_with_default_metadata(Kind::any_object(), [LogNamespace::Legacy]),
+        ));
+        event3.metadata_mut().set_schema_definition(&Arc::new(
+            Definition::new_with_default_metadata(Kind::any_object(), [LogNamespace::Legacy]),
+        ));
 
         assert_eq!(new_event1, Some(event1));
         assert_eq!(new_event2, Some(event2));

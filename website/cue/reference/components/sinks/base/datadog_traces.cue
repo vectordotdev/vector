@@ -5,7 +5,7 @@ base: components: sinks: datadog_traces: configuration: {
 		description: """
 			Controls how acknowledgements are handled for this sink.
 
-			See [End-to-end Acknowledgements][e2e_acks] for more information on how Vector handles event acknowledgement.
+			See [End-to-end Acknowledgements][e2e_acks] for more information on how event acknowledgement is handled.
 
 			[e2e_acks]: https://vector.dev/docs/about/under-the-hood/architecture/end-to-end-acknowledgements/
 			"""
@@ -15,7 +15,7 @@ base: components: sinks: datadog_traces: configuration: {
 				Whether or not end-to-end acknowledgements are enabled.
 
 				When enabled for a sink, any source connected to that sink, where the source supports
-				end-to-end acknowledgements as well, will wait for events to be acknowledged by the sink
+				end-to-end acknowledgements as well, waits for events to be acknowledged by the sink
 				before acknowledging them at the source.
 
 				Enabling or disabling acknowledgements at the sink level takes precedence over any global
@@ -33,23 +33,32 @@ base: components: sinks: datadog_traces: configuration: {
 		type: object: options: {
 			max_bytes: {
 				description: """
-					The maximum size of a batch that will be processed by a sink.
+					The maximum size of a batch that is processed by a sink.
 
 					This is based on the uncompressed size of the batched events, before they are
-					serialized / compressed.
+					serialized/compressed.
 					"""
 				required: false
-				type: uint: {}
+				type: uint: {
+					default: 3000000
+					unit:    "bytes"
+				}
 			}
 			max_events: {
-				description: "The maximum size of a batch, in events, before it is flushed."
+				description: "The maximum size of a batch before it is flushed."
 				required:    false
-				type: uint: {}
+				type: uint: {
+					default: 1000
+					unit:    "events"
+				}
 			}
 			timeout_secs: {
-				description: "The maximum age of a batch, in seconds, before it is flushed."
+				description: "The maximum age of a batch before it is flushed."
 				required:    false
-				type: float: {}
+				type: float: {
+					default: 10.0
+					unit:    "seconds"
+				}
 			}
 		}
 	}
@@ -68,28 +77,40 @@ base: components: sinks: datadog_traces: configuration: {
 				"""
 			none: "No compression."
 			zlib: """
-				[Zlib]][zlib] compression.
+				[Zlib][zlib] compression.
 
 				[zlib]: https://zlib.net/
+				"""
+			zstd: """
+				[Zstandard][zstd] compression.
+
+				[zstd]: https://facebook.github.io/zstd/
 				"""
 		}
 	}
 	default_api_key: {
 		description: """
-			The default Datadog [API key][api_key] to send traces with.
+			The default Datadog [API key][api_key] to use in authentication of HTTP requests.
 
-			If a trace has a Datadog [API key][api_key] set explicitly in its metadata, it will take
-			precedence over the default.
+			If an event has a Datadog [API key][api_key] set explicitly in its metadata, it takes
+			precedence over this setting.
 
 			[api_key]: https://docs.datadoghq.com/api/?lang=bash#authentication
 			"""
 		required: true
-		type: string: {}
+		type: string: examples: ["${DATADOG_API_KEY_ENV_VAR}", "ef8d5de700e7989468166c40fc8a0ccd"]
 	}
 	endpoint: {
-		description: "The endpoint to send traces to."
-		required:    false
-		type: string: {}
+		description: """
+			The endpoint to send observability data to.
+
+			The endpoint must contain an HTTP scheme, and may specify a
+			hostname or IP address and port.
+
+			If set, overrides the `site` option.
+			"""
+		required: false
+		type: string: examples: ["http://127.0.0.1:8080", "http://example.com:12345"]
 	}
 	request: {
 		description: """
@@ -172,14 +193,20 @@ base: components: sinks: datadog_traces: configuration: {
 				}
 			}
 			rate_limit_duration_secs: {
-				description: "The time window, in seconds, used for the `rate_limit_num` option."
+				description: "The time window used for the `rate_limit_num` option."
 				required:    false
-				type: uint: default: 1
+				type: uint: {
+					default: 1
+					unit:    "seconds"
+				}
 			}
 			rate_limit_num: {
 				description: "The maximum number of requests allowed within the `rate_limit_duration_secs` time window."
 				required:    false
-				type: uint: default: 9223372036854775807
+				type: uint: {
+					default: 9223372036854775807
+					unit:    "requests"
+				}
 			}
 			retry_attempts: {
 				description: """
@@ -188,42 +215,57 @@ base: components: sinks: datadog_traces: configuration: {
 					The default, for all intents and purposes, represents an infinite number of retries.
 					"""
 				required: false
-				type: uint: default: 9223372036854775807
+				type: uint: {
+					default: 9223372036854775807
+					unit:    "retries"
+				}
 			}
 			retry_initial_backoff_secs: {
 				description: """
 					The amount of time to wait before attempting the first retry for a failed request.
 
-					After the first retry has failed, the fibonacci sequence will be used to select future backoffs.
+					After the first retry has failed, the fibonacci sequence is used to select future backoffs.
 					"""
 				required: false
-				type: uint: default: 1
+				type: uint: {
+					default: 1
+					unit:    "seconds"
+				}
 			}
 			retry_max_duration_secs: {
-				description: "The maximum amount of time, in seconds, to wait between retries."
+				description: "The maximum amount of time to wait between retries."
 				required:    false
-				type: uint: default: 3600
+				type: uint: {
+					default: 3600
+					unit:    "seconds"
+				}
 			}
 			timeout_secs: {
 				description: """
-					The maximum time a request can take before being aborted.
+					The time a request can take before being aborted.
 
-					It is highly recommended that you do not lower this value below the service’s internal timeout, as this could
+					Datadog highly recommends that you do not lower this value below the service's internal timeout, as this could
 					create orphaned requests, pile on retries, and result in duplicate data downstream.
 					"""
 				required: false
-				type: uint: default: 60
+				type: uint: {
+					default: 60
+					unit:    "seconds"
+				}
 			}
 		}
 	}
 	site: {
 		description: """
-			The Datadog [site][dd_site] to send traces to.
+			The Datadog [site][dd_site] to send observability data to.
 
 			[dd_site]: https://docs.datadoghq.com/getting_started/site
 			"""
 		required: false
-		type: string: {}
+		type: string: {
+			default: "datadoghq.com"
+			examples: ["us3.datadoghq.com", "datadoghq.eu"]
+		}
 	}
 	tls: {
 		description: "Configures the TLS options for incoming/outgoing connections."
@@ -233,8 +275,8 @@ base: components: sinks: datadog_traces: configuration: {
 				description: """
 					Sets the list of supported ALPN protocols.
 
-					Declare the supported ALPN protocols, which are used during negotiation with peer. Prioritized in the order
-					they are defined.
+					Declare the supported ALPN protocols, which are used during negotiation with peer. They are prioritized in the order
+					that they are defined.
 					"""
 				required: false
 				type: array: items: type: string: examples: ["h2"]
@@ -262,7 +304,7 @@ base: components: sinks: datadog_traces: configuration: {
 			}
 			enabled: {
 				description: """
-					Whether or not to require TLS for incoming/outgoing connections.
+					Whether or not to require TLS for incoming or outgoing connections.
 
 					When enabled and used for incoming connections, an identity certificate is also required. See `tls.crt_file` for
 					more information.
@@ -292,10 +334,10 @@ base: components: sinks: datadog_traces: configuration: {
 				description: """
 					Enables certificate verification.
 
-					If enabled, certificates must be valid in terms of not being expired, as well as being issued by a trusted
-					issuer. This verification operates in a hierarchical manner, checking that not only the leaf certificate (the
-					certificate presented by the client/server) is valid, but also that the issuer of that certificate is valid, and
-					so on until reaching a root certificate.
+					If enabled, certificates must not be expired and must be issued by a trusted
+					issuer. This verification operates in a hierarchical manner, checking that the leaf certificate (the
+					certificate presented by the client/server) is not only valid, but that the issuer of that certificate is also valid, and
+					so on until the verification process reaches a root certificate.
 
 					Relevant for both incoming and outgoing connections.
 

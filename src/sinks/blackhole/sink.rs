@@ -53,8 +53,8 @@ impl StreamSink<EventArray> for BlackholeSink {
         let events_sent = register!(EventsSent::from(Output(None)));
         let bytes_sent = register!(BytesSent::from(Protocol("blackhole".into())));
 
-        if self.config.print_interval_secs > 0 {
-            let interval_dur = Duration::from_secs(self.config.print_interval_secs);
+        if self.config.print_interval_secs.as_secs() > 0 {
+            let interval_dur = self.config.print_interval_secs;
             tokio::spawn(async move {
                 let mut print_interval = interval(interval_dur);
                 loop {
@@ -89,17 +89,17 @@ impl StreamSink<EventArray> for BlackholeSink {
 
             let message_len = events.estimated_json_encoded_size_of();
 
-            let _ = self.total_events.fetch_add(events.len(), Ordering::AcqRel);
-            let _ = self
+            _ = self.total_events.fetch_add(events.len(), Ordering::AcqRel);
+            _ = self
                 .total_raw_bytes
-                .fetch_add(message_len, Ordering::AcqRel);
+                .fetch_add(message_len.get(), Ordering::AcqRel);
 
             events_sent.emit(CountByteSize(events.len(), message_len));
-            bytes_sent.emit(ByteSize(message_len));
+            bytes_sent.emit(ByteSize(message_len.get()));
         }
 
         // Notify the reporting task to shutdown.
-        let _ = shutdown.send(());
+        _ = shutdown.send(());
 
         Ok(())
     }

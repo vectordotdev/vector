@@ -1,24 +1,40 @@
-mod config;
+pub mod config;
 mod io;
 mod telemetry;
 
-use std::{collections::HashMap, time::Duration};
+use std::{
+    collections::HashMap,
+    path::PathBuf,
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 
-use tokio::{runtime::Builder, select, sync::mpsc};
-use vector_core::event::Event;
+use bytes::BytesMut;
+use tokio::{
+    runtime::Builder,
+    select,
+    sync::mpsc::{self, Receiver, Sender},
+    task::JoinHandle,
+};
+use tokio_util::codec::Encoder as _;
+
+use codecs::encoding;
+use vector_core::{event::Event, EstimatedJsonEncodedSizeOf};
 
 use crate::{
-    components::validation::TestCase,
+    codecs::Encoder,
+    components::validation::{RunnerMetrics, TestCase},
     config::{ConfigBuilder, ConfigDiff},
     topology,
 };
 
 use super::{
+    encode_test_event,
     sync::{Configuring, TaskCoordinator},
-    ComponentType, TestCaseExpectation, TestEvent, ValidatableComponent, Validator,
+    ComponentType, TestCaseExpectation, TestEvent, ValidationConfiguration, Validator,
 };
 
-use self::config::TopologyBuilder;
+pub use self::config::TopologyBuilder;
 
 /// Runner input mechanism.
 ///
@@ -73,7 +89,7 @@ pub enum RunnerOutput {
     /// external resource pulls output events from the sink.
     ///
     /// Only sinks have external inputs.
-    External(mpsc::Receiver<Event>),
+    External(mpsc::Receiver<Vec<Event>>),
 
     /// The component uses a "controlled" edge for its output.
     ///
@@ -93,8 +109,8 @@ impl RunnerOutput {
     /// this function will panic, as one or the other must be provided.
     pub fn into_receiver(
         self,
-        controlled_edge: Option<mpsc::Receiver<Event>>,
-    ) -> mpsc::Receiver<Event> {
+        controlled_edge: Option<mpsc::Receiver<Vec<Event>>>,
+    ) -> mpsc::Receiver<Vec<Event>> {
         match (self, controlled_edge) {
             (Self::External(_), Some(_)) => panic!("Runner output declared as external resource, but controlled output edge was also specified."),
             (Self::Controlled, None) => panic!("Runner output declared as controlled, but no controlled output edge was specified."),
@@ -134,15 +150,20 @@ impl RunnerResults {
     }
 }
 
-pub struct Runner<'comp, C: ?Sized> {
+pub struct Runner {
+    configuration: ValidationConfiguration,
+    test_case_data_path: PathBuf,
     validators: HashMap<String, Box<dyn Validator>>,
-    component: &'comp C,
 }
 
-impl<'comp, C: ValidatableComponent + ?Sized> Runner<'comp, C> {
-    pub fn from_component(component: &'comp C) -> Self {
+impl Runner {
+    pub fn from_configuration(
+        configuration: ValidationConfiguration,
+        test_case_data_path: PathBuf,
+    ) -> Self {
         Self {
-            component,
+            configuration,
+            test_case_data_path,
             validators: HashMap::new(),
         }
     }
@@ -170,13 +191,15 @@ impl<'comp, C: ValidatableComponent + ?Sized> Runner<'comp, C> {
         }
     }
 
-    pub async fn run_validation(self) -> Result<Vec<RunnerResults>, String> {
+    pub async fn run_validation(self) -> Result<Vec<RunnerResults>, vector_common::Error> {
         // Initialize our test environment.
         initialize_test_environment();
 
         let mut test_case_results = Vec::new();
 
-        let test_cases = load_component_test_cases(self.component)?;
+        let component_type = self.configuration.component_type();
+
+        let test_cases = load_component_test_cases(self.test_case_data_path)?;
         for test_case in test_cases {
             // Create a task coordinator for each relevant phase of the test.
             //
@@ -186,6 +209,7 @@ impl<'comp, C: ValidatableComponent + ?Sized> Runner<'comp, C> {
             let input_task_coordinator = TaskCoordinator::new();
             let output_task_coordinator = TaskCoordinator::new();
             let topology_task_coordinator = TaskCoordinator::new();
+            let telemetry_task_coordinator = TaskCoordinator::new();
 
             // First, we get a topology builder for the given component being validated.
             //
@@ -197,10 +221,21 @@ impl<'comp, C: ValidatableComponent + ?Sized> Runner<'comp, C> {
             // We then finalize the topology builder to get our actual `ConfigBuilder`, as well as
             // any controlled edges (channel sender/receiver to the aforementioned filler
             // components) and a telemetry client for collecting internal telemetry.
-            let topology_builder = TopologyBuilder::from_component(self.component);
-            let (config_builder, controlled_edges, telemetry_collector) =
-                topology_builder.finalize(&input_task_coordinator, &output_task_coordinator);
+            let topology_builder = TopologyBuilder::from_configuration(&self.configuration);
+            let (config_builder, controlled_edges, telemetry_collector) = topology_builder
+                .finalize(
+                    &input_task_coordinator,
+                    &output_task_coordinator,
+                    &telemetry_task_coordinator,
+                )
+                .await;
+
             debug!("Component topology configuration built and telemetry collector spawned.");
+
+            // Create the data structure that the input and output runners will use to store
+            // their received/sent metrics. This is then shared with the Validator for comparison
+            // against the actual metrics output by the component under test.
+            let runner_metrics = Arc::new(Mutex::new(RunnerMetrics::default()));
 
             // After that, we'll build the external resource necessary for this component, if any.
             // Once that's done, we build the input event/output event sender and receiver based on
@@ -212,13 +247,13 @@ impl<'comp, C: ValidatableComponent + ?Sized> Runner<'comp, C> {
             // For example, if we're validating a source, we would have added a filler sink for our
             // controlled output edge, which means we then need a server task listening for the
             // events sent by that sink.
-            let (runner_input, runner_output) = build_external_resource(
-                self.component,
+            let (runner_input, runner_output, maybe_runner_encoder) = build_external_resource(
+                &self.configuration,
                 &input_task_coordinator,
                 &output_task_coordinator,
-            );
+            )?;
             let input_tx = runner_input.into_sender(controlled_edges.input);
-            let mut output_rx = runner_output.into_receiver(controlled_edges.output);
+            let output_rx = runner_output.into_receiver(controlled_edges.output);
             debug!("External resource (if any) and controlled edges built and spawned.");
 
             // Now with any external resource spawned, as well as any tasks for handling controlled
@@ -226,6 +261,9 @@ impl<'comp, C: ValidatableComponent + ?Sized> Runner<'comp, C> {
             // listening, etc.
             let input_task_coordinator = input_task_coordinator.started().await;
             debug!("All input task(s) started.");
+
+            let telemetry_task_coordinator = telemetry_task_coordinator.started().await;
+            debug!("All telemetry task(s) started.");
 
             let output_task_coordinator = output_task_coordinator.started().await;
             debug!("All output task(s) started.");
@@ -244,8 +282,8 @@ impl<'comp, C: ValidatableComponent + ?Sized> Runner<'comp, C> {
             // send all inputs until we have no more, when we can't send more because we need to
             // drive output collection to allow forward progress to be made, etc.)
 
-            // We sleep for one second here because while we do wait for the component topology to
-            // mark itself as started, starting the topology does not necessaryily mean that all
+            // We sleep for two seconds here because while we do wait for the component topology to
+            // mark itself as started, starting the topology does not necessarily mean that all
             // component tasks are actually ready for input, etc.
             //
             // TODO: The above problem is bigger than just component validation, and affects a lot
@@ -254,25 +292,20 @@ impl<'comp, C: ValidatableComponent + ?Sized> Runner<'comp, C> {
             // like the aforementioned unit tests, switch to any improved mechanism we come up with
             // in the future to make these tests more deterministic and waste less time waiting
             // around if we can avoid it.
-            tokio::time::sleep(Duration::from_secs(1)).await;
+            tokio::time::sleep(Duration::from_secs(2)).await;
 
-            let input_events = test_case.events.clone();
-            let input_driver = tokio::spawn(async move {
-                for input_event in input_events {
-                    input_tx
-                        .send(input_event)
-                        .await
-                        .expect("input channel should not be closed");
-                }
-            });
+            let input_driver = spawn_input_driver(
+                test_case.events.clone(),
+                input_tx,
+                &runner_metrics,
+                maybe_runner_encoder.as_ref().cloned(),
+            );
 
-            let output_driver = tokio::spawn(async move {
-                let mut output_events = Vec::new();
-                while let Some(output_event) = output_rx.recv().await {
-                    output_events.push(output_event);
-                }
-                output_events
-            });
+            let output_driver = spawn_output_driver(
+                output_rx,
+                &runner_metrics,
+                maybe_runner_encoder.as_ref().cloned(),
+            );
 
             // At this point, the component topology is running, and all input/output/telemetry
             // tasks are running as well. Our input driver should be sending (or will have already
@@ -290,6 +323,9 @@ impl<'comp, C: ValidatableComponent + ?Sized> Runner<'comp, C> {
             input_task_coordinator.shutdown().await;
             debug!("Input task(s) have been shutdown.");
 
+            telemetry_task_coordinator.shutdown().await;
+            debug!("Telemetry task(s) have been shutdown.");
+
             topology_task_coordinator.shutdown().await;
             debug!("Component topology task has been shutdown.");
 
@@ -302,7 +338,6 @@ impl<'comp, C: ValidatableComponent + ?Sized> Runner<'comp, C> {
 
             // Run the relevant data -- inputs, outputs, telemetry, etc -- through each validator to
             // get the validation results for this test.
-            let component_type = self.component.component_type();
             let TestCase {
                 name: test_name,
                 expectation,
@@ -312,14 +347,15 @@ impl<'comp, C: ValidatableComponent + ?Sized> Runner<'comp, C> {
 
             let validator_results = self
                 .validators
-                .iter()
-                .map(|(_, validator)| {
+                .values()
+                .map(|validator| {
                     validator.check_validation(
                         component_type,
                         expectation,
                         &input_events,
                         &output_events,
                         &telemetry_events,
+                        &runner_metrics.lock().unwrap(),
                     )
                 })
                 .collect();
@@ -355,17 +391,8 @@ impl<'comp, C: ValidatableComponent + ?Sized> Runner<'comp, C> {
 /// during deserialization of the test case file, whether the error is I/O related in nature or due
 /// to invalid YAML, or not representing valid serialized test cases, then an error variant will be
 /// returned explaining the cause.
-fn load_component_test_cases<C: ValidatableComponent>(
-    component: C,
-) -> Result<Vec<TestCase>, String> {
-    let component_type = component.component_type().as_str();
-    let component_name = component.component_name();
-    let component_test_cases_path = format!(
-        "tests/validation/components/{}s/{}.yaml",
-        component_type, component_name
-    );
-
-    std::fs::File::open(&component_test_cases_path)
+fn load_component_test_cases(test_case_data_path: PathBuf) -> Result<Vec<TestCase>, String> {
+    std::fs::File::open(test_case_data_path)
         .map_err(|e| {
             format!(
                 "I/O error during open of component validation test cases file: {}",
@@ -382,13 +409,16 @@ fn load_component_test_cases<C: ValidatableComponent>(
         })
 }
 
-fn build_external_resource<C: ValidatableComponent>(
-    component: C,
+fn build_external_resource(
+    configuration: &ValidationConfiguration,
     input_task_coordinator: &TaskCoordinator<Configuring>,
     output_task_coordinator: &TaskCoordinator<Configuring>,
-) -> (RunnerInput, RunnerOutput) {
-    let component_type = component.component_type();
-    let maybe_external_resource = component.external_resource();
+) -> Result<(RunnerInput, RunnerOutput, Option<Encoder<encoding::Framer>>), vector_common::Error> {
+    let component_type = configuration.component_type();
+    let maybe_external_resource = configuration.external_resource();
+    let maybe_encoder = maybe_external_resource
+        .as_ref()
+        .map(|resource| resource.codec.into_encoder());
     match component_type {
         ComponentType::Source => {
             // As an external resource for a source, we create a channel that the validation runner
@@ -400,11 +430,15 @@ fn build_external_resource<C: ValidatableComponent>(
                 maybe_external_resource.expect("a source must always have an external resource");
             resource.spawn_as_input(rx, input_task_coordinator);
 
-            (RunnerInput::External(tx), RunnerOutput::Controlled)
+            Ok((
+                RunnerInput::External(tx),
+                RunnerOutput::Controlled,
+                maybe_encoder,
+            ))
         }
         ComponentType::Transform => {
             // Transforms have no external resources.
-            (RunnerInput::Controlled, RunnerOutput::Controlled)
+            Ok((RunnerInput::Controlled, RunnerOutput::Controlled, None))
         }
         ComponentType::Sink => {
             // As an external resource for a sink, we create a channel that the validation runner
@@ -414,9 +448,13 @@ fn build_external_resource<C: ValidatableComponent>(
             let (tx, rx) = mpsc::channel(1024);
             let resource =
                 maybe_external_resource.expect("a sink must always have an external resource");
-            resource.spawn_as_output(tx, output_task_coordinator);
+            resource.spawn_as_output(tx, output_task_coordinator)?;
 
-            (RunnerInput::Controlled, RunnerOutput::External(rx))
+            Ok((
+                RunnerInput::Controlled,
+                RunnerOutput::External(rx),
+                maybe_encoder,
+            ))
         }
     }
 }
@@ -435,7 +473,7 @@ fn spawn_component_topology(
     config.healthchecks.set_require_healthy(Some(true));
     let config_diff = ConfigDiff::initial(&config);
 
-    let _ = std::thread::spawn(move || {
+    _ = std::thread::spawn(move || {
         let test_runtime = Builder::new_current_thread()
             .enable_all()
             .build()
@@ -470,6 +508,88 @@ fn spawn_component_topology(
             topology_completed.mark_as_done();
         });
     });
+}
+
+fn spawn_input_driver(
+    input_events: Vec<TestEvent>,
+    input_tx: Sender<TestEvent>,
+    runner_metrics: &Arc<Mutex<RunnerMetrics>>,
+    mut maybe_encoder: Option<Encoder<encoding::Framer>>,
+) -> JoinHandle<()> {
+    let input_runner_metrics = Arc::clone(runner_metrics);
+
+    tokio::spawn(async move {
+        for input_event in input_events {
+            input_tx
+                .send(input_event.clone())
+                .await
+                .expect("input channel should not be closed");
+
+            // Update the runner metrics for the sent event. This will later
+            // be used in the Validators, as the "expected" case.
+            let mut input_runner_metrics = input_runner_metrics.lock().unwrap();
+
+            if let Some(encoder) = maybe_encoder.as_mut() {
+                let mut buffer = BytesMut::new();
+                encode_test_event(encoder, &mut buffer, input_event.clone());
+
+                input_runner_metrics.sent_bytes_total += buffer.len() as u64;
+            }
+
+            let (modified, event) = match input_event {
+                TestEvent::Passthrough(event) => (false, event),
+                TestEvent::Modified { modified, event } => (modified, event),
+            };
+
+            // account for failure case
+            if modified {
+                input_runner_metrics.errors_total += 1;
+            } else {
+                input_runner_metrics.sent_events_total += 1;
+
+                input_runner_metrics.sent_event_bytes_total +=
+                    vec![event].estimated_json_encoded_size_of().get() as u64;
+            }
+        }
+    })
+}
+
+fn spawn_output_driver(
+    mut output_rx: Receiver<Vec<Event>>,
+    runner_metrics: &Arc<Mutex<RunnerMetrics>>,
+    maybe_encoder: Option<Encoder<encoding::Framer>>,
+) -> JoinHandle<Vec<Event>> {
+    let output_runner_metrics = Arc::clone(runner_metrics);
+
+    tokio::spawn(async move {
+        let mut output_events = Vec::new();
+        while let Some(events) = output_rx.recv().await {
+            output_events.extend(events.clone());
+
+            // Update the runner metrics for the received event. This will later
+            // be used in the Validators, as the "expected" case.
+            let mut output_runner_metrics = output_runner_metrics.lock().unwrap();
+
+            for output_event in events {
+                output_runner_metrics.received_events_total += 1;
+                output_runner_metrics.received_event_bytes_total += vec![output_event.clone()]
+                    .estimated_json_encoded_size_of()
+                    .get()
+                    as u64;
+
+                if let Some(encoder) = maybe_encoder.as_ref() {
+                    let mut buffer = BytesMut::new();
+                    encoder
+                        .clone()
+                        .encode(output_event, &mut buffer)
+                        .expect("should not fail to encode output event");
+
+                    output_runner_metrics.received_bytes_total += buffer.len() as u64;
+                }
+            }
+        }
+        output_events
+    })
 }
 
 fn initialize_test_environment() {

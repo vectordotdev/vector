@@ -1,0 +1,21 @@
+features:
+- nginx-integration-tests
+
+test_filter: '::nginx_metrics::'
+
+runner:
+  env:
+    NGINX_ADDRESS: http://nginx:8000
+    NGINX_PROXY_ADDRESS: http://nginx-proxy:8000
+    SQUID_ADDRESS: http://squid:3128
+
+matrix:
+  version: [1.19.4]
+
+# changes to these files/paths will invoke the integration test in CI
+# expressions are evaluated using https://github.com/micromatch/picomatch
+paths:
+- "src/internal_events/nginx_metrics.rs"
+- "src/sources/nginx_metrics/**"
+- "src/sources/util/**"
+- "scripts/integration/nginx/**"

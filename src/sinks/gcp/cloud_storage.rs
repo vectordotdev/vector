@@ -49,11 +49,15 @@ pub enum GcsHealthcheckError {
 }
 
 /// Configuration for the `gcp_cloud_storage` sink.
-#[configurable_component(sink("gcp_cloud_storage"))]
+#[configurable_component(sink(
+    "gcp_cloud_storage",
+    "Store observability events in GCP Cloud Storage."
+))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct GcsSinkConfig {
     /// The GCS bucket name.
+    #[configurable(metadata(docs::examples = "my-bucket"))]
     bucket: String,
 
     /// The Predefined ACL to apply to created objects.
@@ -65,24 +69,33 @@ pub struct GcsSinkConfig {
 
     /// The storage class for created objects.
     ///
-    /// For more information, see [Storage classes][storage_classes].
+    /// For more information, see the [storage classes][storage_classes] documentation.
     ///
     /// [storage_classes]: https://cloud.google.com/storage/docs/storage-classes
     storage_class: Option<GcsStorageClass>,
 
     /// The set of metadata `key:value` pairs for the created objects.
     ///
-    /// For more information, see [Custom metadata][custom_metadata].
+    /// For more information, see the [custom metadata][custom_metadata] documentation.
     ///
     /// [custom_metadata]: https://cloud.google.com/storage/docs/metadata#custom-metadata
+    #[configurable(metadata(docs::additional_props_description = "A key/value pair."))]
+    #[configurable(metadata(docs::advanced))]
     metadata: Option<HashMap<String, String>>,
 
     /// A prefix to apply to all object keys.
     ///
     /// Prefixes are useful for partitioning objects, such as by creating an object key that
-    /// stores objects under a particular "directory". If using a prefix for this purpose, it must end
-    /// in `/` in order to act as a directory path: Vector will **not** add a trailing `/` automatically.
+    /// stores objects under a particular directory. If using a prefix for this purpose, it must end
+    /// in `/` in order to act as a directory path. A trailing `/` is **not** automatically added.
     #[configurable(metadata(docs::templateable))]
+    #[configurable(metadata(
+        docs::examples = "date=%F/",
+        docs::examples = "date=%F/hour=%H/",
+        docs::examples = "year=%Y/month=%m/day=%d/",
+        docs::examples = "application_id={{ application_id }}/date=%F/"
+    ))]
+    #[configurable(metadata(docs::advanced))]
     key_prefix: Option<String>,
 
     /// The timestamp format for the time component of the object key.
@@ -98,22 +111,29 @@ pub struct GcsSinkConfig {
     /// Supports the common [`strftime`][chrono_strftime_specifiers] specifiers found in most
     /// languages.
     ///
-    /// When set to an empty string, no timestamp will be appended to the key prefix.
+    /// When set to an empty string, no timestamp is appended to the key prefix.
     ///
     /// [chrono_strftime_specifiers]: https://docs.rs/chrono/latest/chrono/format/strftime/index.html#specifiers
-    filename_time_format: Option<String>,
+    #[serde(default = "default_time_format")]
+    #[configurable(metadata(docs::advanced))]
+    filename_time_format: String,
 
     /// Whether or not to append a UUID v4 token to the end of the object key.
     ///
     /// The UUID is appended to the timestamp portion of the object key, such that if the object key
-    /// being generated was `date=2022-07-18/1658176486`, setting this field to `true` would result
-    /// in an object key that looked like `date=2022-07-18/1658176486-30f6652c-71da-4f9f-800d-a1189c47c547`.
+    /// generated is `date=2022-07-18/1658176486`, setting this field to `true` results
+    /// in an object key that looks like `date=2022-07-18/1658176486-30f6652c-71da-4f9f-800d-a1189c47c547`.
     ///
     /// This ensures there are no name collisions, and can be useful in high-volume workloads where
     /// object keys must be unique.
-    filename_append_uuid: Option<bool>,
+    #[serde(default = "crate::serde::default_true")]
+    #[configurable(metadata(docs::advanced))]
+    filename_append_uuid: bool,
 
     /// The filename extension to use in the object key.
+    ///
+    /// If not specified, the extension is determined by the compression scheme used.
+    #[configurable(metadata(docs::advanced))]
     filename_extension: Option<String>,
 
     #[serde(flatten)]
@@ -146,6 +166,10 @@ pub struct GcsSinkConfig {
     acknowledgements: AcknowledgementsConfig,
 }
 
+fn default_time_format() -> String {
+    "%s".to_string()
+}
+
 #[cfg(test)]
 fn default_config(encoding: EncodingConfigWithFraming) -> GcsSinkConfig {
     GcsSinkConfig {
@@ -154,8 +178,8 @@ fn default_config(encoding: EncodingConfigWithFraming) -> GcsSinkConfig {
         storage_class: Default::default(),
         metadata: Default::default(),
         key_prefix: Default::default(),
-        filename_time_format: Default::default(),
-        filename_append_uuid: Default::default(),
+        filename_time_format: default_time_format(),
+        filename_append_uuid: true,
         filename_extension: Default::default(),
         encoding,
         compression: Compression::gzip_default(),
@@ -180,6 +204,7 @@ impl GenerateConfig for GcsSinkConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "gcp_cloud_storage")]
 impl SinkConfig for GcsSinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let auth = self.auth.build(Scope::DevStorageReadWrite).await?;
@@ -192,6 +217,7 @@ impl SinkConfig for GcsSinkConfig {
             base_url.clone(),
             auth.clone(),
         )?;
+        auth.spawn_regenerate_token();
         let sink = self.build_sink(client, base_url, auth)?;
 
         Ok((sink, healthcheck))
@@ -354,11 +380,8 @@ impl RequestSettings {
             .filename_extension
             .clone()
             .unwrap_or_else(|| config.compression.extension().into());
-        let time_format = config
-            .filename_time_format
-            .clone()
-            .unwrap_or_else(|| "%s".into());
-        let append_uuid = config.filename_append_uuid.unwrap_or(true);
+        let time_format = config.filename_time_format.clone();
+        let append_uuid = config.filename_append_uuid;
         Ok(Self {
             acl,
             content_type,
@@ -387,7 +410,9 @@ mod tests {
     use codecs::encoding::FramingConfig;
     use codecs::{JsonSerializerConfig, NewlineDelimitedEncoderConfig, TextSerializerConfig};
     use futures_util::{future::ready, stream};
+    use vector_common::request_metadata::GroupedCountByteSize;
     use vector_core::partition::Partitioner;
+    use vector_core::EstimatedJsonEncodedSizeOf;
 
     use crate::event::LogEvent;
     use crate::test_util::{
@@ -406,13 +431,14 @@ mod tests {
     async fn component_spec_compliance() {
         let mock_endpoint = spawn_blackhole_http_server(always_200_response).await;
 
-        let context = SinkContext::new_test();
+        let context = SinkContext::default();
 
         let tls = TlsSettings::default();
         let client =
             HttpClient::new(tls, context.proxy()).expect("should not fail to create HTTP client");
 
-        let config = default_config((None::<FramingConfig>, JsonSerializerConfig::new()).into());
+        let config =
+            default_config((None::<FramingConfig>, JsonSerializerConfig::default()).into());
         let sink = config
             .build_sink(client, mock_endpoint.to_string(), GcpAuthenticator::None)
             .expect("failed to build sink");
@@ -431,7 +457,7 @@ mod tests {
 
         let sink_config = GcsSinkConfig {
             key_prefix: Some("key: {{ key }}".into()),
-            ..default_config((None::<FramingConfig>, TextSerializerConfig::new()).into())
+            ..default_config((None::<FramingConfig>, TextSerializerConfig::default()).into())
         };
         let key = sink_config
             .key_partitioner()
@@ -449,14 +475,14 @@ mod tests {
     fn build_request(extension: Option<&str>, uuid: bool, compression: Compression) -> GcsRequest {
         let sink_config = GcsSinkConfig {
             key_prefix: Some("key/".into()),
-            filename_time_format: Some("date".into()),
+            filename_time_format: "date".into(),
             filename_extension: extension.map(Into::into),
-            filename_append_uuid: Some(uuid),
+            filename_append_uuid: uuid,
             compression,
             ..default_config(
                 (
                     Some(NewlineDelimitedEncoderConfig::new()),
-                    JsonSerializerConfig::new(),
+                    JsonSerializerConfig::default(),
                 )
                     .into(),
             )
@@ -467,10 +493,14 @@ mod tests {
             .unwrap()
             .partition(&log)
             .expect("key wasn't provided");
+
+        let mut byte_size = GroupedCountByteSize::new_untagged();
+        byte_size.add_event(&log, log.estimated_json_encoded_size_of());
+
         let request_settings = request_settings(&sink_config);
         let (metadata, metadata_request_builder, _events) =
             request_settings.split_input((key, vec![log]));
-        let payload = EncodeResult::uncompressed(Bytes::new());
+        let payload = EncodeResult::uncompressed(Bytes::new(), byte_size);
         let request_metadata = metadata_request_builder.build(&payload);
 
         request_settings.build_request(metadata, request_metadata, payload)

@@ -1,15 +1,10 @@
-#![cfg(feature = "aws-cloudwatch-logs-integration-tests")]
-#![cfg(test)]
-
 use std::convert::TryFrom;
-use std::str::FromStr;
 
 use aws_sdk_cloudwatchlogs::Client as CloudwatchLogsClient;
-use aws_sdk_cloudwatchlogs::{Endpoint, Region};
+use aws_sdk_cloudwatchlogs::Region;
 use chrono::Duration;
 use codecs::TextSerializerConfig;
 use futures::{stream, StreamExt};
-use http::Uri;
 use similar_asserts::assert_eq;
 
 use super::*;
@@ -44,9 +39,9 @@ async fn cloudwatch_insert_log_event() {
         stream_name: Template::try_from(stream_name.as_str()).unwrap(),
         group_name: Template::try_from(GROUP_NAME).unwrap(),
         region: RegionOrEndpoint::with_both("localstack", watchlogs_address().as_str()),
-        encoding: TextSerializerConfig::new().into(),
-        create_missing_group: None,
-        create_missing_stream: None,
+        encoding: TextSerializerConfig::default().into(),
+        create_missing_group: true,
+        create_missing_stream: true,
         compression: Default::default(),
         batch: Default::default(),
         request: Default::default(),
@@ -56,7 +51,7 @@ async fn cloudwatch_insert_log_event() {
         acknowledgements: Default::default(),
     };
 
-    let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
+    let (sink, _) = config.build(SinkContext::default()).await.unwrap();
 
     let timestamp = chrono::Utc::now();
 
@@ -94,9 +89,9 @@ async fn cloudwatch_insert_log_events_sorted() {
         stream_name: Template::try_from(stream_name.as_str()).unwrap(),
         group_name: Template::try_from(GROUP_NAME).unwrap(),
         region: RegionOrEndpoint::with_both("localstack", watchlogs_address().as_str()),
-        encoding: TextSerializerConfig::new().into(),
-        create_missing_group: None,
-        create_missing_stream: None,
+        encoding: TextSerializerConfig::default().into(),
+        create_missing_group: true,
+        create_missing_stream: true,
         compression: Default::default(),
         batch: Default::default(),
         request: Default::default(),
@@ -106,7 +101,7 @@ async fn cloudwatch_insert_log_events_sorted() {
         acknowledgements: Default::default(),
     };
 
-    let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
+    let (sink, _) = config.build(SinkContext::default()).await.unwrap();
 
     let timestamp = chrono::Utc::now() - Duration::days(1);
 
@@ -120,7 +115,13 @@ async fn cloudwatch_insert_log_events_sorted() {
             let timestamp = chrono::Utc::now() - Duration::days(1);
 
             events.iter_logs_mut().for_each(|log| {
-                log.insert(log_schema().timestamp_key(), Value::Timestamp(timestamp));
+                log.insert(
+                    (
+                        lookup::PathPrefix::Event,
+                        log_schema().timestamp_key().unwrap(),
+                    ),
+                    Value::Timestamp(timestamp),
+                );
             });
         }
         doit = true;
@@ -163,9 +164,9 @@ async fn cloudwatch_insert_out_of_range_timestamp() {
         stream_name: Template::try_from(stream_name.as_str()).unwrap(),
         group_name: Template::try_from(GROUP_NAME).unwrap(),
         region: RegionOrEndpoint::with_both("localstack", watchlogs_address().as_str()),
-        encoding: TextSerializerConfig::new().into(),
-        create_missing_group: None,
-        create_missing_stream: None,
+        encoding: TextSerializerConfig::default().into(),
+        create_missing_group: true,
+        create_missing_stream: true,
         compression: Default::default(),
         batch: Default::default(),
         request: Default::default(),
@@ -175,7 +176,7 @@ async fn cloudwatch_insert_out_of_range_timestamp() {
         acknowledgements: Default::default(),
     };
 
-    let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
+    let (sink, _) = config.build(SinkContext::default()).await.unwrap();
 
     let now = chrono::Utc::now();
 
@@ -186,7 +187,13 @@ async fn cloudwatch_insert_out_of_range_timestamp() {
     let mut add_event = |offset: Duration| {
         let line = input_lines.next().unwrap();
         let mut event = LogEvent::from(line.clone());
-        event.insert(log_schema().timestamp_key(), now + offset);
+        event.insert(
+            (
+                lookup::PathPrefix::Event,
+                log_schema().timestamp_key().unwrap(),
+            ),
+            now + offset,
+        );
         events.push(Event::Log(event));
         line
     };
@@ -236,9 +243,9 @@ async fn cloudwatch_dynamic_group_and_stream_creation() {
         stream_name: Template::try_from(stream_name.as_str()).unwrap(),
         group_name: Template::try_from(group_name.as_str()).unwrap(),
         region: RegionOrEndpoint::with_both("localstack", watchlogs_address().as_str()),
-        encoding: TextSerializerConfig::new().into(),
-        create_missing_group: None,
-        create_missing_stream: None,
+        encoding: TextSerializerConfig::default().into(),
+        create_missing_group: true,
+        create_missing_stream: true,
         compression: Default::default(),
         batch: Default::default(),
         request: Default::default(),
@@ -248,7 +255,7 @@ async fn cloudwatch_dynamic_group_and_stream_creation() {
         acknowledgements: Default::default(),
     };
 
-    let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
+    let (sink, _) = config.build(SinkContext::default()).await.unwrap();
 
     let timestamp = chrono::Utc::now();
 
@@ -291,9 +298,9 @@ async fn cloudwatch_insert_log_event_batched() {
         stream_name: Template::try_from(stream_name.as_str()).unwrap(),
         group_name: Template::try_from(group_name.as_str()).unwrap(),
         region: RegionOrEndpoint::with_both("localstack", watchlogs_address().as_str()),
-        encoding: TextSerializerConfig::new().into(),
-        create_missing_group: None,
-        create_missing_stream: None,
+        encoding: TextSerializerConfig::default().into(),
+        create_missing_group: true,
+        create_missing_stream: true,
         compression: Default::default(),
         batch,
         request: Default::default(),
@@ -303,7 +310,7 @@ async fn cloudwatch_insert_log_event_batched() {
         acknowledgements: Default::default(),
     };
 
-    let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
+    let (sink, _) = config.build(SinkContext::default()).await.unwrap();
 
     let timestamp = chrono::Utc::now();
 
@@ -341,9 +348,9 @@ async fn cloudwatch_insert_log_event_partitioned() {
         group_name: Template::try_from(GROUP_NAME).unwrap(),
         stream_name: Template::try_from(format!("{}-{{{{key}}}}", stream_name)).unwrap(),
         region: RegionOrEndpoint::with_both("localstack", watchlogs_address().as_str()),
-        encoding: TextSerializerConfig::new().into(),
-        create_missing_group: None,
-        create_missing_stream: None,
+        encoding: TextSerializerConfig::default().into(),
+        create_missing_group: true,
+        create_missing_stream: true,
         compression: Default::default(),
         batch: Default::default(),
         request: Default::default(),
@@ -353,7 +360,7 @@ async fn cloudwatch_insert_log_event_partitioned() {
         acknowledgements: Default::default(),
     };
 
-    let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
+    let (sink, _) = config.build(SinkContext::default()).await.unwrap();
 
     let timestamp = chrono::Utc::now();
 
@@ -433,9 +440,9 @@ async fn cloudwatch_healthcheck() {
         stream_name: Template::try_from("test-stream").unwrap(),
         group_name: Template::try_from(GROUP_NAME).unwrap(),
         region: RegionOrEndpoint::with_both("localstack", watchlogs_address().as_str()),
-        encoding: TextSerializerConfig::new().into(),
-        create_missing_group: None,
-        create_missing_stream: None,
+        encoding: TextSerializerConfig::default().into(),
+        create_missing_group: true,
+        create_missing_stream: true,
         compression: Default::default(),
         batch: Default::default(),
         request: Default::default(),
@@ -452,10 +459,7 @@ async fn cloudwatch_healthcheck() {
 async fn create_client_test() -> CloudwatchLogsClient {
     let auth = AwsAuthentication::test_auth();
     let region = Some(Region::new("localstack"));
-    let watchlogs_address = watchlogs_address();
-    let endpoint = Some(Endpoint::immutable(
-        Uri::from_str(&watchlogs_address).unwrap(),
-    ));
+    let endpoint = Some(watchlogs_address());
     let proxy = ProxyConfig::default();
 
     create_client::<CloudwatchLogsClientBuilder>(&auth, region, endpoint, &proxy, &None, true)
@@ -465,7 +469,7 @@ async fn create_client_test() -> CloudwatchLogsClient {
 
 async fn ensure_group() {
     let client = create_client_test().await;
-    let _ = client
+    _ = client
         .create_log_group()
         .log_group_name(GROUP_NAME)
         .send()

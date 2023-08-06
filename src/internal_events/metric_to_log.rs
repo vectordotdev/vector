@@ -27,8 +27,6 @@ impl InternalEvent for MetricToLogSerializeError {
             "error_type" => error_type::ENCODER_FAILED,
             "stage" => error_stage::PROCESSING,
         );
-        // deprecated
-        counter!("processing_errors_total", 1, "error_type" => "failed_serialize");
 
         emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason })
     }

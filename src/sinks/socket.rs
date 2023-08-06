@@ -13,7 +13,7 @@ use crate::{
 };
 
 /// Configuration for the `socket` sink.
-#[configurable_component(sink("socket"))]
+#[configurable_component(sink("socket", "Deliver logs to a remote socket endpoint."))]
 #[derive(Clone, Debug)]
 pub struct SocketSinkConfig {
     #[serde(flatten)]
@@ -32,16 +32,17 @@ pub struct SocketSinkConfig {
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(tag = "mode", rename_all = "snake_case")]
+#[configurable(metadata(docs::enum_tag_description = "The type of socket to use."))]
 pub enum Mode {
-    /// TCP.
-    Tcp(#[configurable(transparent)] TcpMode),
+    /// Send over TCP.
+    Tcp(TcpMode),
 
-    /// UDP.
-    Udp(#[configurable(transparent)] UdpMode),
+    /// Send over UDP.
+    Udp(UdpMode),
 
-    /// Unix Domain Socket.
+    /// Send over a Unix domain socket (UDS).
     #[cfg(unix)]
-    Unix(#[configurable(transparent)] UnixMode),
+    Unix(UnixMode),
 }
 
 /// TCP configuration.
@@ -104,7 +105,7 @@ impl SocketSinkConfig {
         Self::new(
             Mode::Tcp(TcpMode {
                 config: TcpSinkConfig::from_address(address),
-                encoding: (None::<FramingConfig>, TextSerializerConfig::new()).into(),
+                encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             }),
             acknowledgements,
         )
@@ -112,6 +113,7 @@ impl SocketSinkConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "socket")]
 impl SinkConfig for SocketSinkConfig {
     async fn build(
         &self,
@@ -194,12 +196,12 @@ mod test {
         let config = SocketSinkConfig {
             mode: Mode::Udp(UdpMode {
                 config: UdpSinkConfig::from_address(addr.to_string()),
-                encoding: JsonSerializerConfig::new().into(),
+                encoding: JsonSerializerConfig::default().into(),
             }),
             acknowledgements: Default::default(),
         };
 
-        let context = SinkContext::new_test();
+        let context = SinkContext::default();
         assert_sink_compliance(&SINK_TAGS, async move {
             let (sink, _healthcheck) = config.build(context).await.unwrap();
 
@@ -244,7 +246,7 @@ mod test {
         let config = SocketSinkConfig {
             mode: Mode::Tcp(TcpMode {
                 config: TcpSinkConfig::from_address(addr.to_string()),
-                encoding: (None::<FramingConfig>, JsonSerializerConfig::new()).into(),
+                encoding: (None::<FramingConfig>, JsonSerializerConfig::default()).into(),
             }),
             acknowledgements: Default::default(),
         };
@@ -254,7 +256,7 @@ mod test {
         let (lines, events) = random_lines_with_stream(10, 100, None);
 
         assert_sink_compliance(&SINK_TAGS, async move {
-            let context = SinkContext::new_test();
+            let context = SinkContext::default();
             let (sink, _healthcheck) = config.build(context).await.unwrap();
 
             sink.run(events).await
@@ -327,11 +329,11 @@ mod test {
                     }),
                     None,
                 ),
-                encoding: (None::<FramingConfig>, TextSerializerConfig::new()).into(),
+                encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             }),
             acknowledgements: Default::default(),
         };
-        let context = SinkContext::new_test();
+        let context = SinkContext::default();
         let (sink, _healthcheck) = config.build(context).await.unwrap();
         let (mut sender, receiver) = mpsc::channel::<Option<EventArray>>(0);
         let jh1 = tokio::spawn(async move {
@@ -446,12 +448,12 @@ mod test {
         let config = SocketSinkConfig {
             mode: Mode::Tcp(TcpMode {
                 config: TcpSinkConfig::from_address(addr.to_string()),
-                encoding: (None::<FramingConfig>, TextSerializerConfig::new()).into(),
+                encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             }),
             acknowledgements: Default::default(),
         };
 
-        let context = SinkContext::new_test();
+        let context = SinkContext::default();
         let (sink, _healthcheck) = config.build(context).await.unwrap();
 
         let (_, events) = random_lines_with_stream(1000, 10000, None);

@@ -55,7 +55,7 @@ fn tracing_context_layer_enabled() -> bool {
 }
 
 fn init(recorder: VectorRecorder) -> Result<()> {
-    // An escape hatch to allow disabing internal metrics core. May be used for
+    // An escape hatch to allow disabling internal metrics core. May be used for
     // performance reasons. This is a hidden and undocumented functionality.
     if !metrics_enabled() {
         metrics::set_boxed_recorder(Box::new(metrics::NoopRecorder))
@@ -160,28 +160,6 @@ impl Controller {
         let timestamp = Utc::now();
 
         let mut metrics = self.recorder.with_registry(Registry::visit_metrics);
-
-        // Add aliases for deprecated metrics
-        for i in 0..metrics.len() {
-            let metric = &metrics[i];
-            match metric.name() {
-                "component_sent_events_total" => {
-                    let alias = metric.clone().with_name("processed_events_total");
-                    metrics.push(alias);
-                }
-                "component_sent_bytes_total" if metric.tag_matches("component_kind", "sink") => {
-                    let alias = metric.clone().with_name("processed_bytes_total");
-                    metrics.push(alias);
-                }
-                "component_received_bytes_total"
-                    if metric.tag_matches("component_kind", "source") =>
-                {
-                    let alias = metric.clone().with_name("processed_bytes_total");
-                    metrics.push(alias);
-                }
-                _ => {}
-            }
-        }
 
         #[allow(clippy::cast_precision_loss)]
         let value = (metrics.len() + 2) as f64;
@@ -354,7 +332,7 @@ mod tests {
             .expect("Test metric is not present");
         match metric.value() {
             MetricValue::Counter { value } => assert_eq!(*value, 2.0),
-            value => panic!("Invalid metric value {:?}", value),
+            value => panic!("Invalid metric value {value:?}"),
         }
     }
 }

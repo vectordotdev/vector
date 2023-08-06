@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 use std::{
     collections::HashMap,
     marker::PhantomData,
@@ -27,7 +28,7 @@ use tracing_subscriber::{
     Layer,
 };
 pub use tracing_tower::{InstrumentableService, InstrumentedService};
-use value::Value;
+use vrl::value::Value;
 
 use crate::event::LogEvent;
 
@@ -99,7 +100,7 @@ pub fn init(color: bool, json: bool, levels: &str, internal_log_rate_limit: u64)
             RateLimitedLayer::new(formatter).with_default_limit(internal_log_rate_limit);
         let subscriber = subscriber.with(rate_limited.with_filter(fmt_filter));
 
-        let _ = subscriber.try_init();
+        _ = subscriber.try_init();
     } else {
         let formatter = tracing_subscriber::fmt::layer()
             .with_ansi(color)
@@ -112,7 +113,7 @@ pub fn init(color: bool, json: bool, levels: &str, internal_log_rate_limit: u64)
             RateLimitedLayer::new(formatter).with_default_limit(internal_log_rate_limit);
         let subscriber = subscriber.with(rate_limited.with_filter(fmt_filter));
 
-        let _ = subscriber.try_init();
+        _ = subscriber.try_init();
     }
 }
 
@@ -153,7 +154,7 @@ fn try_buffer_event(log: &LogEvent) -> bool {
 /// If no subscribers are connected, this does nothing.
 fn try_broadcast_event(log: LogEvent) {
     if let Some(sender) = maybe_get_trace_sender() {
-        let _ = sender.send(log);
+        _ = sender.send(log);
     }
 }
 
@@ -236,7 +237,7 @@ pub fn stop_early_buffering() {
         let buffered_events = consume_early_buffer();
         for subscriber_tx in subscribers_tx {
             // Ignore any errors sending since the caller may have dropped or something else.
-            let _ = subscriber_tx.send(buffered_events.clone());
+            _ = subscriber_tx.send(buffered_events.clone());
         }
     }
 }
@@ -280,7 +281,7 @@ impl TraceSubscription {
     /// Converts this subscription into a raw stream of log events.
     pub fn into_stream(self) -> impl Stream<Item = LogEvent> + Unpin {
         // We ignore errors because the only error we get is when the broadcast receiver lags, and there's nothing we
-        // can actully do about that so there's no reason to force callers to even deal with it.
+        // can actually do about that so there's no reason to force callers to even deal with it.
         BroadcastStream::new(self.trace_rx).filter_map(|event| ready(event.ok()))
     }
 }

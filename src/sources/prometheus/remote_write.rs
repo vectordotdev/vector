@@ -10,7 +10,7 @@ use warp::http::{HeaderMap, StatusCode};
 use super::parser;
 use crate::{
     config::{
-        self, GenerateConfig, Output, SourceAcknowledgementsConfig, SourceConfig, SourceContext,
+        GenerateConfig, SourceAcknowledgementsConfig, SourceConfig, SourceContext, SourceOutput,
     },
     event::Event,
     internal_events::PrometheusRemoteWriteParseError,
@@ -23,18 +23,23 @@ use crate::{
 };
 
 /// Configuration for the `prometheus_remote_write` source.
-#[configurable_component(source("prometheus_remote_write"))]
+#[configurable_component(source(
+    "prometheus_remote_write",
+    "Receive metric via the Prometheus Remote Write protocol."
+))]
 #[derive(Clone, Debug)]
 pub struct PrometheusRemoteWriteConfig {
-    /// The address to accept connections on.
+    /// The socket address to accept connections on.
     ///
     /// The address _must_ include a port.
+    #[configurable(metadata(docs::examples = "0.0.0.0:9090"))]
     address: SocketAddr,
 
     #[configurable(derived)]
     tls: Option<TlsEnableableConfig>,
 
     #[configurable(derived)]
+    #[configurable(metadata(docs::advanced))]
     auth: Option<HttpSourceAuthConfig>,
 
     #[configurable(derived)]
@@ -67,6 +72,7 @@ impl GenerateConfig for PrometheusRemoteWriteConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "prometheus_remote_write")]
 impl SourceConfig for PrometheusRemoteWriteConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
         let source = RemoteWriteSource;
@@ -82,8 +88,8 @@ impl SourceConfig for PrometheusRemoteWriteConfig {
         )
     }
 
-    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
-        vec![Output::default(config::DataType::Metric)]
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
+        vec![SourceOutput::new_metrics()]
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -118,8 +124,8 @@ impl HttpSource for RemoteWriteSource {
     fn build_events(
         &self,
         mut body: Bytes,
-        header_map: HeaderMap,
-        _query_parameters: HashMap<String, String>,
+        header_map: &HeaderMap,
+        _query_parameters: &HashMap<String, String>,
         _full_path: &str,
     ) -> Result<Vec<Event>, ErrorMessage> {
         // If `Content-Encoding` header isn't `snappy` HttpSource won't decode it for us
@@ -199,7 +205,7 @@ mod test {
                 ..Default::default()
             };
             let (sink, _) = sink
-                .build(SinkContext::new_test())
+                .build(SinkContext::default())
                 .await
                 .expect("Error building config.");
 
@@ -293,7 +299,7 @@ mod test {
                 ..Default::default()
             };
             let (sink, _) = sink
-                .build(SinkContext::new_test())
+                .build(SinkContext::default())
                 .await
                 .expect("Error building config.");
 
@@ -339,13 +345,22 @@ mod test {
 
 #[cfg(all(test, feature = "prometheus-integration-tests"))]
 mod integration_tests {
+    use std::net::{SocketAddr, ToSocketAddrs as _};
     use tokio::time::Duration;
 
     use super::*;
     use crate::test_util::components::{run_and_assert_source_compliance, HTTP_PUSH_SOURCE_TAGS};
 
-    fn source_receive_address() -> String {
-        std::env::var("SOURCE_RECEIVE_ADDRESS").unwrap_or_else(|_| "127.0.0.1:9102".into())
+    fn source_receive_address() -> SocketAddr {
+        let address = std::env::var("REMOTE_WRITE_SOURCE_RECEIVE_ADDRESS")
+            .unwrap_or_else(|_| "127.0.0.1:9102".into());
+        // TODO: This logic should maybe be moved up into the source, and possibly into other
+        // sources, wrapped in a new socket address type that does the lookup during config parsing.
+        address
+            .to_socket_addrs()
+            .unwrap()
+            .next()
+            .unwrap_or_else(|| panic!("Socket address {address:?} did not resolve"))
     }
 
     #[tokio::test]
@@ -358,7 +373,7 @@ mod integration_tests {
         // It could be nice to split up the Prometheus integration tests in the future, or
         // maybe there's a way to do a one-shot remote write from Prometheus? Not sure.
         let config = PrometheusRemoteWriteConfig {
-            address: source_receive_address().parse().unwrap(),
+            address: source_receive_address(),
             auth: None,
             tls: None,
             acknowledgements: SourceAcknowledgementsConfig::default(),

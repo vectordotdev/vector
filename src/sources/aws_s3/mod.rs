@@ -2,22 +2,27 @@ use std::{convert::TryInto, io::ErrorKind};
 
 use async_compression::tokio::bufread;
 use aws_sdk_s3::types::ByteStream;
-use codecs::BytesDeserializerConfig;
+use codecs::decoding::{DeserializerConfig, FramingConfig, NewlineDelimitedDecoderOptions};
+use codecs::{BytesDeserializerConfig, NewlineDelimitedDecoderConfig};
 use futures::{stream, stream::StreamExt, TryStreamExt};
 use lookup::owned_value_path;
 use snafu::Snafu;
 use tokio_util::io::StreamReader;
-use value::{kind::Collection, Kind};
-use vector_config::{configurable_component, NamedComponent};
-use vector_core::config::{DataType, LegacyKey, LogNamespace};
+use vector_config::configurable_component;
+use vector_core::config::{LegacyKey, LogNamespace};
+use vrl::value::{kind::Collection, Kind};
 
 use super::util::MultilineConfig;
+use crate::codecs::DecodingConfig;
+use crate::config::DataType;
 use crate::{
     aws::{auth::AwsAuthentication, create_client, RegionOrEndpoint},
     common::{s3::S3ClientBuilder, sqs::SqsClientBuilder},
-    config::{Output, ProxyConfig, SourceAcknowledgementsConfig, SourceConfig, SourceContext},
+    config::{
+        ProxyConfig, SourceAcknowledgementsConfig, SourceConfig, SourceContext, SourceOutput,
+    },
     line_agg,
-    serde::bool_or_struct,
+    serde::{bool_or_struct, default_decoding},
     tls::TlsConfig,
 };
 
@@ -25,6 +30,7 @@ pub mod sqs;
 
 /// Compression scheme for objects retrieved from S3.
 #[configurable_component]
+#[configurable(metadata(docs::advanced))]
 #[derive(Clone, Copy, Debug, Derivative, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 #[derivative(Default)]
@@ -34,18 +40,21 @@ pub enum Compression {
     /// The compression scheme of the object is determined from its `Content-Encoding` and
     /// `Content-Type` metadata, as well as the key suffix (for example, `.gz`).
     ///
-    /// It is set to 'none' if the compression scheme cannot be determined.
+    /// It is set to `none` if the compression scheme cannot be determined.
     #[derivative(Default)]
     Auto,
+
     /// Uncompressed.
     None,
+
     /// GZIP.
     Gzip,
+
     /// ZSTD.
     Zstd,
 }
 
-/// Strategies for consuming objects from S3.
+/// Strategies for consuming objects from AWS S3.
 #[configurable_component]
 #[derive(Clone, Copy, Debug, Derivative)]
 #[serde(rename_all = "lowercase")]
@@ -64,8 +73,9 @@ enum Strategy {
 // when there's required fields.
 //
 // Maybe showing defaults at all, when there are required properties, doesn't actually make sense? :thinkies:
-#[configurable_component(source("aws_s3"))]
-#[derive(Clone, Debug, Default)]
+#[configurable_component(source("aws_s3", "Collect logs from AWS S3."))]
+#[derive(Clone, Debug, Derivative)]
+#[derivative(Default)]
 #[serde(default, deny_unknown_fields)]
 pub struct AwsS3Config {
     #[serde(flatten)]
@@ -75,17 +85,17 @@ pub struct AwsS3Config {
     compression: Compression,
 
     /// The strategy to use to consume objects from S3.
+    #[configurable(metadata(docs::hidden))]
     strategy: Strategy,
 
     /// Configuration options for SQS.
-    ///
-    /// Only relevant when `strategy = "sqs"`.
     sqs: Option<sqs::Config>,
 
     /// The ARN of an [IAM role][iam_role] to assume at startup.
     ///
     /// [iam_role]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles.html
     #[configurable(deprecated)]
+    #[configurable(metadata(docs::hidden))]
     assume_role: Option<String>,
 
     #[configurable(derived)]
@@ -95,6 +105,7 @@ pub struct AwsS3Config {
     /// Multiline aggregation configuration.
     ///
     /// If not specified, multiline aggregation is disabled.
+    #[configurable(derived)]
     multiline: Option<MultilineConfig>,
 
     #[configurable(derived)]
@@ -108,11 +119,29 @@ pub struct AwsS3Config {
     #[configurable(metadata(docs::hidden))]
     #[serde(default)]
     log_namespace: Option<bool>,
+
+    #[configurable(derived)]
+    #[serde(default = "default_framing")]
+    #[derivative(Default(value = "default_framing()"))]
+    pub framing: FramingConfig,
+
+    #[configurable(derived)]
+    #[serde(default = "default_decoding")]
+    #[derivative(Default(value = "default_decoding()"))]
+    pub decoding: DeserializerConfig,
+}
+
+const fn default_framing() -> FramingConfig {
+    // This is used for backwards compatibility. It used to be the only (hardcoded) option.
+    FramingConfig::NewlineDelimited(NewlineDelimitedDecoderConfig {
+        newline_delimited: NewlineDelimitedDecoderOptions { max_length: None },
+    })
 }
 
 impl_generate_config_from_default!(AwsS3Config);
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "aws_s3")]
 impl SourceConfig for AwsS3Config {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let log_namespace = cx.log_namespace(self.log_namespace);
@@ -125,14 +154,14 @@ impl SourceConfig for AwsS3Config {
 
         match self.strategy {
             Strategy::Sqs => Ok(Box::pin(
-                self.create_sqs_ingestor(multiline_config, &cx.proxy)
+                self.create_sqs_ingestor(multiline_config, &cx.proxy, log_namespace)
                     .await?
                     .run(cx, self.acknowledgements, log_namespace),
             )),
         }
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
         let mut schema_definition = BytesDeserializerConfig
             .schema_definition(log_namespace)
@@ -179,7 +208,7 @@ impl SourceConfig for AwsS3Config {
             schema_definition = schema_definition.unknown_fields(Kind::bytes());
         }
 
-        vec![Output::default(DataType::Log).with_schema_definition(schema_definition)]
+        vec![SourceOutput::new_logs(DataType::Log, schema_definition)]
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -192,16 +221,14 @@ impl AwsS3Config {
         &self,
         multiline: Option<line_agg::Config>,
         proxy: &ProxyConfig,
+        log_namespace: LogNamespace,
     ) -> crate::Result<sqs::Ingestor> {
         let region = self
             .region
             .region()
             .ok_or(CreateSqsIngestorError::RegionMissing)?;
 
-        let endpoint = self
-            .region
-            .endpoint()
-            .map_err(|_| CreateSqsIngestorError::InvalidEndpoint)?;
+        let endpoint = self.region.endpoint();
 
         let s3_client = create_client::<S3ClientBuilder>(
             &self.auth,
@@ -212,6 +239,10 @@ impl AwsS3Config {
             false,
         )
         .await?;
+
+        let decoder =
+            DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace)
+                .build()?;
 
         match self.sqs {
             Some(ref sqs) => {
@@ -232,6 +263,7 @@ impl AwsS3Config {
                     sqs.clone(),
                     self.compression,
                     multiline,
+                    decoder,
                 )
                 .await?;
 
@@ -416,8 +448,7 @@ mod integration_tests {
     use aws_sdk_sqs::{model::QueueAttributeName, Client as SqsClient};
     use lookup::path;
     use similar_asserts::assert_eq;
-    use value::Value;
-    use vector_config::NamedComponent;
+    use vrl::value::Value;
 
     use super::{sqs, AwsS3Config, Compression, Strategy};
     use crate::{
@@ -624,7 +655,7 @@ mod integration_tests {
                 start_pattern: "abc".to_owned(),
                 mode: line_agg::Mode::HaltWith,
                 condition_pattern: "geh".to_owned(),
-                timeout_ms: 1000,
+                timeout_ms: Duration::from_millis(1000),
             }),
             logs.join("\n").into_bytes(),
             vec!["abc\ndef\ngeh".to_owned()],
@@ -634,6 +665,9 @@ mod integration_tests {
         .await;
     }
 
+    // TODO: re-enable this after figuring out why it is so flakey in CI
+    //       https://github.com/vectordotdev/vector/issues/17456
+    #[ignore]
     #[tokio::test]
     async fn handles_errored_status() {
         trace_init();
@@ -889,7 +923,7 @@ mod integration_tests {
         create_client::<S3ClientBuilder>(
             &auth,
             region_endpoint.region(),
-            region_endpoint.endpoint().unwrap(),
+            region_endpoint.endpoint(),
             &proxy_config,
             &None,
             false,
@@ -908,7 +942,7 @@ mod integration_tests {
         create_client::<SqsClientBuilder>(
             &auth,
             region_endpoint.region(),
-            region_endpoint.endpoint().unwrap(),
+            region_endpoint.endpoint(),
             &proxy_config,
             &None,
             false,

@@ -9,7 +9,7 @@ base: components: sources: splunk_hec: configuration: {
 				description: """
 					Whether or not to remove channels after idling for `max_idle_time` seconds.
 
-					A channel is idling if it is not used for sending data or querying ack statuses.
+					A channel is idling if it is not used for sending data or querying acknowledgement statuses.
 					"""
 				required: false
 				type: bool: default: false
@@ -41,7 +41,7 @@ base: components: sources: splunk_hec: configuration: {
 			}
 			max_pending_acks: {
 				description: """
-					The maximum number of ack statuses pending query across all channels.
+					The maximum number of acknowledgement statuses pending query across all channels.
 
 					Equivalent to the `max_number_of_acked_requests_pending_query` Splunk HEC setting.
 
@@ -52,7 +52,7 @@ base: components: sources: splunk_hec: configuration: {
 			}
 			max_pending_acks_per_channel: {
 				description: """
-					The maximum number of ack statuses pending query for a single channel.
+					The maximum number of acknowledgement statuses pending query for a single channel.
 
 					Equivalent to the `max_number_of_acked_requests_pending_query_per_ack_channel` Splunk HEC setting.
 
@@ -65,7 +65,7 @@ base: components: sources: splunk_hec: configuration: {
 	}
 	address: {
 		description: """
-			The address to listen for connections on.
+			The socket address to listen for connections on.
 
 			The address _must_ include a port.
 			"""
@@ -76,8 +76,8 @@ base: components: sources: splunk_hec: configuration: {
 		description: """
 			Whether or not to forward the Splunk HEC authentication token with events.
 
-			If set to `true`, when incoming requests contain a Splunk HEC token, the token used will kept in the
-			event metadata and be preferentially used if the event is sent to a Splunk HEC sink.
+			If set to `true`, when incoming requests contain a Splunk HEC token, the token used is kept in the
+			event metadata and preferentially used if the event is sent to a Splunk HEC sink.
 			"""
 		required: false
 		type: bool: default: false
@@ -90,8 +90,8 @@ base: components: sources: splunk_hec: configuration: {
 				description: """
 					Sets the list of supported ALPN protocols.
 
-					Declare the supported ALPN protocols, which are used during negotiation with peer. Prioritized in the order
-					they are defined.
+					Declare the supported ALPN protocols, which are used during negotiation with peer. They are prioritized in the order
+					that they are defined.
 					"""
 				required: false
 				type: array: items: type: string: examples: ["h2"]
@@ -119,7 +119,7 @@ base: components: sources: splunk_hec: configuration: {
 			}
 			enabled: {
 				description: """
-					Whether or not to require TLS for incoming/outgoing connections.
+					Whether or not to require TLS for incoming or outgoing connections.
 
 					When enabled and used for incoming connections, an identity certificate is also required. See `tls.crt_file` for
 					more information.
@@ -149,10 +149,10 @@ base: components: sources: splunk_hec: configuration: {
 				description: """
 					Enables certificate verification.
 
-					If enabled, certificates must be valid in terms of not being expired, as well as being issued by a trusted
-					issuer. This verification operates in a hierarchical manner, checking that not only the leaf certificate (the
-					certificate presented by the client/server) is valid, but also that the issuer of that certificate is valid, and
-					so on until reaching a root certificate.
+					If enabled, certificates must not be expired and must be issued by a trusted
+					issuer. This verification operates in a hierarchical manner, checking that the leaf certificate (the
+					certificate presented by the client/server) is not only valid, but that the issuer of that certificate is also valid, and
+					so on until the verification process reaches a root certificate.
 
 					Relevant for both incoming and outgoing connections.
 
@@ -178,27 +178,29 @@ base: components: sources: splunk_hec: configuration: {
 		}
 	}
 	token: {
+		deprecated:         true
+		deprecated_message: "This option has been deprecated, use `valid_tokens` instead."
 		description: """
 			Optional authorization token.
 
 			If supplied, incoming requests must supply this token in the `Authorization` header, just as a client would if
 			it was communicating with the Splunk HEC endpoint directly.
 
-			If _not_ supplied, the `Authorization` header will be ignored and requests will not be authenticated.
+			If _not_ supplied, the `Authorization` header is ignored and requests are not authenticated.
 			"""
 		required: false
 		type: string: {}
 	}
 	valid_tokens: {
 		description: """
-			Optional list of valid authorization tokens.
+			A list of valid authorization tokens.
 
 			If supplied, incoming requests must supply one of these tokens in the `Authorization` header, just as a client
 			would if it was communicating with the Splunk HEC endpoint directly.
 
-			If _not_ supplied, the `Authorization` header will be ignored and requests will not be authenticated.
+			If _not_ supplied, the `Authorization` header is ignored and requests are not authenticated.
 			"""
 		required: false
-		type: array: items: type: string: {}
+		type: array: items: type: string: examples: ["A94A8FE5CCB19BA61C4C08"]
 	}
 }

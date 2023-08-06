@@ -6,7 +6,7 @@ components: sinks: loki: {
 	classes: {
 		commonly_used: true
 		delivery:      "at_least_once"
-		development:   "beta"
+		development:   "stable"
 		egress_method: "batch"
 		service_providers: ["Grafana"]
 		stateful: false
@@ -105,26 +105,43 @@ components: sinks: loki: {
 		label_expansion: {
 			title: "Label Expansion"
 			body: """
-				The `labels` option can be passed keys suffixed with "*" to
-				allow for setting multiple keys based on the contents of an
-				object. For example, with an object:
+				The `labels` option can be passed keys with `*` or prefixes ending with `*` to
+				allow for setting multiple keys based on the contents of an object. Static keys
+				override dynamically defined keys. For example, with an object:
 
 				```json
-				{"kubernetes":{"pod_labels":{"app":"web-server","name":"unicorn"}}}
+				{
+					"kubernetes": {
+						"pod_labels": {
+							"app": "web-server",
+							"name": "unicorn"
+						}
+					},
+					"metadata": {
+						"cluster_name": "operations",
+						"cluster_environment": "development",
+						"cluster_version": "1.2.3"
+					}
+				}
 				```
 
 				and a configuration:
 
 				```toml
 				[sinks.my_sink_id.labels]
-				pod_labels_*: "{{ kubernetes.pod_labels }}"
+				\"pod_labels_*\" = "{{ kubernetes.pod_labels }}"
+				\"*\" = "{{ metadata }}"
+				cluster_name = "static_cluster_name"
 				```
 
-				This would expand into two labels:
+				this would expand into the following labels:
 
-				```toml
+				```yaml
 				pod_labels_app: web-server
 				pod_labels_name: unicorn
+				cluster_name: static_cluster_name
+				cluster_environment: development
+				cluster_version: 1.2.3
 				"""
 		}
 
@@ -142,13 +159,6 @@ components: sinks: loki: {
 	}
 
 	telemetry: metrics: {
-		component_sent_bytes_total:       components.sources.internal_metrics.output.metrics.component_sent_bytes_total
-		component_sent_events_total:      components.sources.internal_metrics.output.metrics.component_sent_events_total
-		component_sent_event_bytes_total: components.sources.internal_metrics.output.metrics.component_sent_event_bytes_total
-		events_discarded_total:           components.sources.internal_metrics.output.metrics.events_discarded_total
-		events_out_total:                 components.sources.internal_metrics.output.metrics.events_out_total
-		processed_bytes_total:            components.sources.internal_metrics.output.metrics.processed_bytes_total
-		processing_errors_total:          components.sources.internal_metrics.output.metrics.processing_errors_total
-		streams_total:                    components.sources.internal_metrics.output.metrics.streams_total
+		streams_total: components.sources.internal_metrics.output.metrics.streams_total
 	}
 }

@@ -9,7 +9,7 @@ components: sources: aws_kinesis_firehose: {
 		commonly_used: false
 		delivery:      "at_least_once"
 		deployment_roles: ["aggregator"]
-		development:   "beta"
+		development:   "stable"
 		egress_method: "batch"
 		stateful:      false
 	}
@@ -80,7 +80,7 @@ components: sources: aws_kinesis_firehose: {
 					}
 				}
 				source_arn: {
-					description: "The AWS Kinises Firehose delivery stream that issued the request, value of the `X-Amz-Firehose-Source-Arn` header."
+					description: "The AWS Kinesis Firehose delivery stream that issued the request, value of the `X-Amz-Firehose-Source-Arn` header."
 					required:    true
 					type: string: {
 						examples: ["arn:aws:firehose:us-east-1:111111111111:deliverystream/test"]
@@ -142,7 +142,7 @@ components: sources: aws_kinesis_firehose: {
 				   this source. You will likely also want to use the
 				   [`parse_aws_cloudwatch_log_subscription_message`](\(urls.vrl_functions)/#parse_aws_cloudwatch_log_subscription_message)
 				   function to extract the log events. Make sure to set
-				   the `access_key` to secure this endpoint. Your
+				   the `access_keys` to secure this endpoint. Your
 				   configuration might look something like:
 
 				   ```toml
@@ -150,7 +150,7 @@ components: sources: aws_kinesis_firehose: {
 					# General
 					type = "aws_kinesis_firehose"
 					address = "127.0.0.1:9000"
-					access_key = "secret"
+					access_keys = ["secret"]
 
 					[transforms.cloudwatch]
 					type = "remap"
@@ -160,10 +160,10 @@ components: sources: aws_kinesis_firehose: {
 					parsed = parse_aws_cloudwatch_log_subscription_message!(.message)
 					. = unnest(parsed.log_events)
 					. = map_values(.) -> |value| {
-						event = del(value.log_events)
-						value |= event
-						message = del(.message)
-						. |= object!(parse_json!(message))
+					  event = del(value.log_events)
+					  value |= event
+					  message = string!(del(.message))
+					  merge(value, object!(parse_json!(message)))
 					}
 					'''
 
@@ -178,7 +178,7 @@ components: sources: aws_kinesis_firehose: {
 				   ingest.
 				3. Set the stream to forward to your Vector instance via its
 				   HTTP Endpoint destination. Make sure to configure the
-				   same `access_key` you set earlier.
+				   same `access_keys` you set earlier.
 				4. Setup a [CloudWatch Logs
 				   subscription](\(urls.aws_cloudwatch_logs_subscriptions)) to
 				   forward the events to your delivery stream
@@ -187,15 +187,6 @@ components: sources: aws_kinesis_firehose: {
 	}
 
 	telemetry: metrics: {
-		component_errors_total:                components.sources.internal_metrics.output.metrics.component_errors_total
-		component_discarded_events_total:      components.sources.internal_metrics.output.metrics.component_discarded_events_total
-		component_sent_events_total:           components.sources.internal_metrics.output.metrics.component_sent_events_total
-		component_sent_event_bytes_total:      components.sources.internal_metrics.output.metrics.component_sent_event_bytes_total
-		component_received_bytes_total:        components.sources.internal_metrics.output.metrics.component_received_bytes_total
-		component_received_events_total:       components.sources.internal_metrics.output.metrics.component_received_events_total
-		component_received_event_bytes_total:  components.sources.internal_metrics.output.metrics.component_received_event_bytes_total
-		events_in_total:                       components.sources.internal_metrics.output.metrics.events_in_total
-		processed_bytes_total:                 components.sources.internal_metrics.output.metrics.processed_bytes_total
 		request_read_errors_total:             components.sources.internal_metrics.output.metrics.request_read_errors_total
 		requests_received_total:               components.sources.internal_metrics.output.metrics.requests_received_total
 		request_automatic_decode_errors_total: components.sources.internal_metrics.output.metrics.request_automatic_decode_errors_total

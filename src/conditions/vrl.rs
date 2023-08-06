@@ -1,9 +1,12 @@
-use value::Value;
 use vector_common::TimeZone;
 use vector_config::configurable_component;
 use vector_core::compile_vrl;
-use vrl::{diagnostic::Formatter, CompilationResult, CompileConfig, Program, Runtime, VrlRuntime};
+use vrl::compiler::runtime::{Runtime, RuntimeResult, Terminate};
+use vrl::compiler::{CompilationResult, CompileConfig, Program, TypeState, VrlRuntime};
+use vrl::diagnostic::Formatter;
+use vrl::value::Value;
 
+use crate::config::LogNamespace;
 use crate::event::TargetEvents;
 use crate::{
     conditions::{Condition, Conditional, ConditionalConfig},
@@ -19,7 +22,7 @@ pub struct VrlConfig {
     /// The VRL boolean expression.
     pub(crate) source: String,
 
-    #[configurable(derived)]
+    #[configurable(derived, metadata(docs::hidden))]
     #[serde(default)]
     pub(crate) runtime: VrlRuntime,
 }
@@ -38,13 +41,13 @@ impl ConditionalConfig for VrlConfig {
         //     },
         // };
 
-        let functions = vrl_stdlib::all()
+        let functions = vrl::stdlib::all()
             .into_iter()
             .chain(enrichment::vrl_functions().into_iter())
-            .chain(vector_vrl_functions::vrl_functions())
+            .chain(vector_vrl_functions::all())
             .collect::<Vec<_>>();
 
-        let state = vrl::state::TypeState::default();
+        let state = TypeState::default();
 
         let mut config = CompileConfig::default();
         config.set_custom(enrichment_tables.clone());
@@ -59,6 +62,10 @@ impl ConditionalConfig for VrlConfig {
                 .colored()
                 .to_string()
         })?;
+
+        if !program.final_type_info().result.is_boolean() {
+            return Err("VRL conditions must return a boolean.".into());
+        }
 
         if !warnings.is_empty() {
             let warnings = Formatter::new(&self.source, warnings).colored().to_string();
@@ -81,13 +88,17 @@ pub struct Vrl {
 }
 
 impl Vrl {
-    fn run(&self, event: Event) -> (Event, vrl::RuntimeResult) {
+    fn run(&self, event: Event) -> (Event, RuntimeResult) {
+        let log_namespace = event
+            .maybe_as_log()
+            .map(|log| log.namespace())
+            .unwrap_or(LogNamespace::Legacy);
         let mut target = VrlTarget::new(event, self.program.info(), false);
         // TODO: use timezone from remap config
         let timezone = TimeZone::default();
 
         let result = Runtime::default().resolve(&mut target, &self.program, &timezone);
-        let original_event = match target.into_events() {
+        let original_event = match target.into_events(log_namespace) {
             TargetEvents::One(event) => event,
             _ => panic!("Event was modified in a condition. This is an internal compiler error."),
         };
@@ -117,7 +128,7 @@ impl Conditional for Vrl {
         let (event, result) = self.run(event);
 
         let value_result = result.map_err(|err| match err {
-            vrl::Terminate::Abort(err) => {
+            Terminate::Abort(err) => {
                 let err = Formatter::new(
                     &self.source,
                     vrl::diagnostic::Diagnostic::from(
@@ -128,7 +139,7 @@ impl Conditional for Vrl {
                 .to_string();
                 format!("source execution aborted: {}", err)
             }
-            vrl::Terminate::Error(err) => {
+            Terminate::Error(err) => {
                 let err = Formatter::new(
                     &self.source,
                     vrl::diagnostic::Diagnostic::from(
@@ -224,6 +235,12 @@ mod test {
                 ),
                 r#".name == "zork" && .tags.host == "zoobub" && .kind == "incremental""#,
                 Ok(()),
+                Ok(()),
+            ),
+            (
+                log_event![],
+                r#""i_return_a_string""#,
+                Err("VRL conditions must return a boolean.".into()),
                 Ok(()),
             ),
         ];

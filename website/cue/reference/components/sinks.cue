@@ -24,6 +24,12 @@ components: sinks: [Name=string]: {
 			}
 		}
 
+		if features.send != _|_ && features.send.proxy != _|_ {
+			if features.send.proxy.enabled {
+				proxy: base.components.sinks.configuration.proxy
+			}
+		}
+
 		if !features.auto_generated {
 			if features.acknowledgements {
 				acknowledgements: {
@@ -570,28 +576,6 @@ components: sinks: [Name=string]: {
 
 		if features.send != _|_ {
 			if features.send.request.enabled {
-				partitioning: _ | *{
-					title: "Partitioning"
-					body: """
-						Vector supports dynamic configuration values through a simple
-						template syntax. If an option supports templating, it will be
-						noted with a badge and you can use event fields to create dynamic
-						values. For example:
-
-						```toml title="vector.toml"
-						[sinks.my-sink]
-						dynamic_option = "application={{ application_id }}"
-						```
-
-						In the above example, the `application_id` for each event will be
-						used to partition outgoing data.
-						"""
-				}
-			}
-		}
-
-		if features.send != _|_ {
-			if features.send.request.enabled {
 				rate_limits: {
 					title: "Rate limits & adaptive concurrency"
 					body:  null
@@ -668,17 +652,21 @@ components: sinks: [Name=string]: {
 	}
 
 	telemetry: metrics: {
-		component_received_events_count:      components.sources.internal_metrics.output.metrics.component_received_events_count
-		component_received_events_total:      components.sources.internal_metrics.output.metrics.component_received_events_total
-		component_received_event_bytes_total: components.sources.internal_metrics.output.metrics.component_received_event_bytes_total
-		events_in_total:                      components.sources.internal_metrics.output.metrics.events_in_total
-		utilization:                          components.sources.internal_metrics.output.metrics.utilization
 		buffer_byte_size:                     components.sources.internal_metrics.output.metrics.buffer_byte_size
+		buffer_discarded_events_total:        components.sources.internal_metrics.output.metrics.buffer_discarded_events_total
 		buffer_events:                        components.sources.internal_metrics.output.metrics.buffer_events
 		buffer_received_events_total:         components.sources.internal_metrics.output.metrics.buffer_received_events_total
 		buffer_received_event_bytes_total:    components.sources.internal_metrics.output.metrics.buffer_received_event_bytes_total
 		buffer_sent_events_total:             components.sources.internal_metrics.output.metrics.buffer_sent_events_total
 		buffer_sent_event_bytes_total:        components.sources.internal_metrics.output.metrics.buffer_sent_event_bytes_total
-		buffer_discarded_events_total:        components.sources.internal_metrics.output.metrics.buffer_discarded_events_total
+		component_discarded_events_total:     components.sources.internal_metrics.output.metrics.component_discarded_events_total
+		component_errors_total:               components.sources.internal_metrics.output.metrics.component_errors_total
+		component_received_events_count:      components.sources.internal_metrics.output.metrics.component_received_events_count
+		component_received_events_total:      components.sources.internal_metrics.output.metrics.component_received_events_total
+		component_received_event_bytes_total: components.sources.internal_metrics.output.metrics.component_received_event_bytes_total
+		component_sent_bytes_total:           components.sources.internal_metrics.output.metrics.component_sent_bytes_total
+		component_sent_events_total:          components.sources.internal_metrics.output.metrics.component_sent_events_total
+		component_sent_event_bytes_total:     components.sources.internal_metrics.output.metrics.component_sent_event_bytes_total
+		utilization:                          components.sources.internal_metrics.output.metrics.utilization
 	}
 }

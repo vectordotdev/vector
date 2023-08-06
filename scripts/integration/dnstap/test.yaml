@@ -1,0 +1,22 @@
+features:
+- dnstap-integration-tests
+
+test_filter: '::dnstap::'
+
+runner:
+  env:
+    BIND_SOCKET: /run/bind/socket
+  needs_docker_socket: true
+  volumes:
+    dnstap_dnstap-sockets: /run/bind/socket
+
+matrix:
+  version: ['latest']
+
+# changes to these files/paths will invoke the integration test in CI
+# expressions are evaluated using https://github.com/micromatch/picomatch
+paths:
+- "src/internal_events/dnstap.rs"
+- "src/sources/dnstap/**"
+- "src/sources/util/**"
+- "scripts/integration/dnstap/**"

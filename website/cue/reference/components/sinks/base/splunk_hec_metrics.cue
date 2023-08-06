@@ -10,7 +10,7 @@ base: components: sinks: splunk_hec_metrics: configuration: {
 					Whether or not end-to-end acknowledgements are enabled.
 
 					When enabled for a sink, any source connected to that sink, where the source supports
-					end-to-end acknowledgements as well, will wait for events to be acknowledged by the sink
+					end-to-end acknowledgements as well, waits for events to be acknowledged by the sink
 					before acknowledging them at the source.
 
 					Enabling or disabling acknowledgements at the sink level takes precedence over any global
@@ -23,7 +23,7 @@ base: components: sinks: splunk_hec_metrics: configuration: {
 			}
 			indexer_acknowledgements_enabled: {
 				description: """
-					Controls if the sink will integrate with [Splunk HEC indexer acknowledgements][splunk_indexer_ack_docs] for end-to-end acknowledgements.
+					Controls if the sink integrates with [Splunk HEC indexer acknowledgements][splunk_indexer_ack_docs] for end-to-end acknowledgements.
 
 					[splunk_indexer_ack_docs]: https://docs.splunk.com/Documentation/Splunk/8.2.3/Data/AboutHECIDXAck
 					"""
@@ -34,18 +34,21 @@ base: components: sinks: splunk_hec_metrics: configuration: {
 				description: """
 					The maximum number of pending acknowledgements from events sent to the Splunk HEC collector.
 
-					Once reached, the sink will begin applying backpressure.
+					Once reached, the sink begins applying backpressure.
 					"""
 				required: false
 				type: uint: default: 1000000
 			}
 			query_interval: {
-				description: "The amount of time, in seconds, to wait in between queries to the Splunk HEC indexer acknowledgement endpoint."
+				description: "The amount of time to wait between queries to the Splunk HEC indexer acknowledgement endpoint."
 				required:    false
-				type: uint: default: 10
+				type: uint: {
+					default: 10
+					unit:    "seconds"
+				}
 			}
 			retry_limit: {
-				description: "The maximum number of times an acknowledgement ID will be queried for its status."
+				description: "The maximum number of times an acknowledgement ID is queried for its status."
 				required:    false
 				type: uint: default: 30
 			}
@@ -57,23 +60,29 @@ base: components: sinks: splunk_hec_metrics: configuration: {
 		type: object: options: {
 			max_bytes: {
 				description: """
-					The maximum size of a batch that will be processed by a sink.
+					The maximum size of a batch that is processed by a sink.
 
 					This is based on the uncompressed size of the batched events, before they are
-					serialized / compressed.
+					serialized/compressed.
 					"""
 				required: false
-				type: uint: {}
+				type: uint: {
+					default: 1000000
+					unit:    "bytes"
+				}
 			}
 			max_events: {
-				description: "The maximum size of a batch, in events, before it is flushed."
+				description: "The maximum size of a batch before it is flushed."
 				required:    false
-				type: uint: {}
+				type: uint: unit: "events"
 			}
 			timeout_secs: {
-				description: "The maximum age of a batch, in seconds, before it is flushed."
+				description: "The maximum age of a batch before it is flushed."
 				required:    false
-				type: float: {}
+				type: float: {
+					default: 1.0
+					unit:    "seconds"
+				}
 			}
 		}
 	}
@@ -94,9 +103,14 @@ base: components: sinks: splunk_hec_metrics: configuration: {
 					"""
 				none: "No compression."
 				zlib: """
-					[Zlib]][zlib] compression.
+					[Zlib][zlib] compression.
 
 					[zlib]: https://zlib.net/
+					"""
+				zstd: """
+					[Zstandard][zstd] compression.
+
+					[zstd]: https://facebook.github.io/zstd/
 					"""
 			}
 		}
@@ -109,25 +123,32 @@ base: components: sinks: splunk_hec_metrics: configuration: {
 			present, it is used as a prefix to the metric name, and separated with a period (`.`).
 			"""
 		required: false
-		type: string: {}
+		type: string: examples: ["service"]
 	}
 	default_token: {
 		description: """
 			Default Splunk HEC token.
 
-			If an event has a token set in its metadata, it will prevail over the one set here.
+			If an event has a token set in its metadata, it prevails over the one set here.
 			"""
 		required: true
-		type: string: {}
+		type: string: examples: ["${SPLUNK_HEC_TOKEN}", "A94A8FE5CCB19BA61C4C08"]
 	}
 	endpoint: {
-		description: "The base URL of the Splunk instance."
-		required:    true
-		type: string: {}
+		description: """
+			The base URL of the Splunk instance.
+
+			The scheme (`http` or `https`) must be specified. No path should be included since the paths defined
+			by the [`Splunk`][splunk] API are used.
+
+			[splunk]: https://docs.splunk.com/Documentation/Splunk/8.0.0/Data/HECRESTendpoints
+			"""
+		required: true
+		type: string: examples: ["https://http-inputs-hec.splunkcloud.com", "https://hec.splunk.com:8088", "http://example.com"]
 	}
 	host_key: {
 		description: """
-			Overrides the name of the log field used to grab the hostname to send to Splunk HEC.
+			Overrides the name of the log field used to retrieve the hostname to send to Splunk HEC.
 
 			By default, the [global `log_schema.host_key` option][global_host_key] is used.
 
@@ -140,10 +161,13 @@ base: components: sinks: splunk_hec_metrics: configuration: {
 		description: """
 			The name of the index where to send the events to.
 
-			If not specified, the default index is used.
+			If not specified, the default index defined within Splunk is used.
 			"""
 		required: false
-		type: string: syntax: "template"
+		type: string: {
+			examples: ["{{ host }}", "custom_index"]
+			syntax: "template"
+		}
 	}
 	request: {
 		description: """
@@ -226,14 +250,20 @@ base: components: sinks: splunk_hec_metrics: configuration: {
 				}
 			}
 			rate_limit_duration_secs: {
-				description: "The time window, in seconds, used for the `rate_limit_num` option."
+				description: "The time window used for the `rate_limit_num` option."
 				required:    false
-				type: uint: default: 1
+				type: uint: {
+					default: 1
+					unit:    "seconds"
+				}
 			}
 			rate_limit_num: {
 				description: "The maximum number of requests allowed within the `rate_limit_duration_secs` time window."
 				required:    false
-				type: uint: default: 9223372036854775807
+				type: uint: {
+					default: 9223372036854775807
+					unit:    "requests"
+				}
 			}
 			retry_attempts: {
 				description: """
@@ -242,31 +272,43 @@ base: components: sinks: splunk_hec_metrics: configuration: {
 					The default, for all intents and purposes, represents an infinite number of retries.
 					"""
 				required: false
-				type: uint: default: 9223372036854775807
+				type: uint: {
+					default: 9223372036854775807
+					unit:    "retries"
+				}
 			}
 			retry_initial_backoff_secs: {
 				description: """
 					The amount of time to wait before attempting the first retry for a failed request.
 
-					After the first retry has failed, the fibonacci sequence will be used to select future backoffs.
+					After the first retry has failed, the fibonacci sequence is used to select future backoffs.
 					"""
 				required: false
-				type: uint: default: 1
+				type: uint: {
+					default: 1
+					unit:    "seconds"
+				}
 			}
 			retry_max_duration_secs: {
-				description: "The maximum amount of time, in seconds, to wait between retries."
+				description: "The maximum amount of time to wait between retries."
 				required:    false
-				type: uint: default: 3600
+				type: uint: {
+					default: 3600
+					unit:    "seconds"
+				}
 			}
 			timeout_secs: {
 				description: """
-					The maximum time a request can take before being aborted.
+					The time a request can take before being aborted.
 
-					It is highly recommended that you do not lower this value below the service’s internal timeout, as this could
+					Datadog highly recommends that you do not lower this value below the service's internal timeout, as this could
 					create orphaned requests, pile on retries, and result in duplicate data downstream.
 					"""
 				required: false
-				type: uint: default: 60
+				type: uint: {
+					default: 60
+					unit:    "seconds"
+				}
 			}
 		}
 	}
@@ -276,19 +318,25 @@ base: components: sinks: splunk_hec_metrics: configuration: {
 
 			This is typically the filename the logs originated from.
 
-			If unset, the Splunk collector will set it.
+			If unset, the Splunk collector sets it.
 			"""
 		required: false
-		type: string: syntax: "template"
+		type: string: {
+			examples: ["{{ file }}", "/var/log/syslog", "UDP:514"]
+			syntax: "template"
+		}
 	}
 	sourcetype: {
 		description: """
 			The sourcetype of events sent to this sink.
 
-			If unset, Splunk will default to `httpevent`.
+			If unset, Splunk defaults to `httpevent`.
 			"""
 		required: false
-		type: string: syntax: "template"
+		type: string: {
+			examples: ["{{ sourcetype }}", "_json"]
+			syntax: "template"
+		}
 	}
 	tls: {
 		description: "TLS configuration."
@@ -298,8 +346,8 @@ base: components: sinks: splunk_hec_metrics: configuration: {
 				description: """
 					Sets the list of supported ALPN protocols.
 
-					Declare the supported ALPN protocols, which are used during negotiation with peer. Prioritized in the order
-					they are defined.
+					Declare the supported ALPN protocols, which are used during negotiation with peer. They are prioritized in the order
+					that they are defined.
 					"""
 				required: false
 				type: array: items: type: string: examples: ["h2"]
@@ -347,10 +395,10 @@ base: components: sinks: splunk_hec_metrics: configuration: {
 				description: """
 					Enables certificate verification.
 
-					If enabled, certificates must be valid in terms of not being expired, as well as being issued by a trusted
-					issuer. This verification operates in a hierarchical manner, checking that not only the leaf certificate (the
-					certificate presented by the client/server) is valid, but also that the issuer of that certificate is valid, and
-					so on until reaching a root certificate.
+					If enabled, certificates must not be expired and must be issued by a trusted
+					issuer. This verification operates in a hierarchical manner, checking that the leaf certificate (the
+					certificate presented by the client/server) is not only valid, but that the issuer of that certificate is also valid, and
+					so on until the verification process reaches a root certificate.
 
 					Relevant for both incoming and outgoing connections.
 

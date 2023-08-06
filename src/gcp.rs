@@ -1,6 +1,10 @@
-use std::sync::{Arc, RwLock};
-use std::time::Duration;
+#![allow(missing_docs)]
+use std::{
+    sync::{Arc, RwLock},
+    time::Duration,
+};
 
+use base64::prelude::{Engine as _, BASE64_URL_SAFE};
 pub use goauth::scopes::Scope;
 use goauth::{
     auth::{JwtClaims, Token, TokenErr},
@@ -20,12 +24,6 @@ use crate::{config::ProxyConfig, http::HttpClient, http::HttpError};
 
 const SERVICE_ACCOUNT_TOKEN_URL: &str =
     "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token";
-
-const URL_SAFE_ENGINE_PAD: base64::engine::fast_portable::FastPortable =
-    base64::engine::fast_portable::FastPortable::from(
-        &base64::alphabet::URL_SAFE,
-        base64::engine::fast_portable::PAD,
-    );
 
 pub const PUBSUB_URL: &str = "https://pubsub.googleapis.com";
 
@@ -70,28 +68,33 @@ pub enum GcpError {
 #[configurable_component]
 #[derive(Clone, Debug, Default)]
 pub struct GcpAuthConfig {
-    /// An API key. ([documentation](https://cloud.google.com/docs/authentication/api-keys))
+    /// An [API key][gcp_api_key].
     ///
-    /// Either an API key, or a path to a service account credentials JSON file can be specified.
+    /// Either an API key or a path to a service account credentials JSON file can be specified.
     ///
-    /// If both are unset, Vector checks the `GOOGLE_APPLICATION_CREDENTIALS` environment variable for a filename. If no
-    /// filename is named, Vector will attempt to fetch an instance service account for the compute instance the program is
-    /// running on. If Vector is not running on a GCE instance, then you must define eith an API key or service account
+    /// If both are unset, the `GOOGLE_APPLICATION_CREDENTIALS` environment variable is checked for a filename. If no
+    /// filename is named, an attempt is made to fetch an instance service account for the compute instance the program is
+    /// running on. If this is not on a GCE instance, then you must define it with an API key or service account
     /// credentials JSON file.
+    ///
+    /// [gcp_api_key]: https://cloud.google.com/docs/authentication/api-keys
     pub api_key: Option<SensitiveString>,
 
-    /// Path to a service account credentials JSON file. ([documentation](https://cloud.google.com/docs/authentication/production#manually))
+    /// Path to a [service account][gcp_service_account_credentials] credentials JSON file.
     ///
-    /// Either an API key, or a path to a service account credentials JSON file can be specified.
+    /// Either an API key or a path to a service account credentials JSON file can be specified.
     ///
-    /// If both are unset, Vector checks the `GOOGLE_APPLICATION_CREDENTIALS` environment variable for a filename. If no
-    /// filename is named, Vector will attempt to fetch an instance service account for the compute instance the program is
-    /// running on. If Vector is not running on a GCE instance, then you must define eith an API key or service account
+    /// If both are unset, the `GOOGLE_APPLICATION_CREDENTIALS` environment variable is checked for a filename. If no
+    /// filename is named, an attempt is made to fetch an instance service account for the compute instance the program is
+    /// running on. If this is not on a GCE instance, then you must define it with an API key or service account
     /// credentials JSON file.
+    ///
+    /// [gcp_service_account_credentials]: https://cloud.google.com/docs/authentication/production#manually
     pub credentials_path: Option<String>,
 
     /// Skip all authentication handling. For use with integration tests only.
     #[serde(default, skip_serializing)]
+    #[configurable(metadata(docs::hidden))]
     pub skip_authentication: bool,
 }
 
@@ -139,7 +142,9 @@ impl GcpAuthenticator {
     }
 
     fn from_api_key(api_key: &str) -> crate::Result<Self> {
-        base64::decode_engine(api_key, &URL_SAFE_ENGINE_PAD).context(InvalidApiKeySnafu)?;
+        BASE64_URL_SAFE
+            .decode(api_key)
+            .context(InvalidApiKeySnafu)?;
         Ok(Self::ApiKey(api_key.into()))
     }
 
