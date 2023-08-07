@@ -1,5 +1,5 @@
-pub mod config;
-pub mod service;
-pub mod sink;
+mod config;
+mod service;
+mod sink;
 
 pub use config::AzureMonitorLogsConfig;
