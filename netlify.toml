@@ -97,7 +97,7 @@ force = true
 # to
 #
 # https://github.com/vectordotdev/vector/releases/download/v0.30.0/vector_0.30.0-1_armhf.deb
-from = "https://packages.timber.io/vector/:version/:file"
+from = "https://packages.vector.dev/vector/:version/:file"
 to = "https://github.com/vectordotdev/vector/releases/download/v:version/:file"
 force = true
 
