@@ -78,6 +78,17 @@ impl WebSocketSink {
         Ok(())
     }
 
+    const fn should_encode_as_binary(&self) -> bool {
+        use codecs::encoding::Serializer::{
+            Avro, Csv, Gelf, Json, Logfmt, Native, NativeJson, RawMessage, Text,
+        };
+
+        match self.encoder.serializer() {
+            RawMessage(_) | Avro(_) | Native(_) => true,
+            Csv(_) | Logfmt(_) | Gelf(_) | Json(_) | Text(_) | NativeJson(_) => false,
+        }
+    }
+
     async fn handle_events<I, WS, O>(
         &mut self,
         input: &mut I,
@@ -103,6 +114,7 @@ impl WebSocketSink {
 
         let bytes_sent = register!(BytesSent::from(Protocol("websocket".into())));
         let events_sent = register!(EventsSent::from(Output(None)));
+        let encode_as_binary = self.should_encode_as_binary();
 
         loop {
             let result = tokio::select! {
@@ -143,7 +155,12 @@ impl WebSocketSink {
                         Ok(()) => {
                             finalizers.update_status(EventStatus::Delivered);
 
-                            let message = Message::text(String::from_utf8_lossy(&bytes));
+                            let message = if encode_as_binary {
+                                Message::binary(bytes)
+                            }
+                            else {
+                                Message::text(String::from_utf8_lossy(&bytes))
+                            };
                             let message_len = message.len();
 
                             ws_sink.send(message).await.map(|_| {
@@ -357,10 +374,13 @@ mod tests {
 
         let output = receiver.await;
         assert_eq!(lines.len(), output.len());
-        let message_key = crate::config::log_schema().message_key();
+        let message_key = crate::config::log_schema()
+            .message_key()
+            .expect("global log_schema.message_key to be valid path")
+            .to_string();
         for (source, received) in lines.iter().zip(output) {
             let json = serde_json::from_str::<JsonValue>(&received).expect("Invalid JSON");
-            let received = json.get(message_key).unwrap().as_str().unwrap();
+            let received = json.get(message_key.as_str()).unwrap().as_str().unwrap();
             assert_eq!(source, received);
         }
     }

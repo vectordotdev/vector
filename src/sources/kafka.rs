@@ -23,6 +23,7 @@ use rdkafka::{
 use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
+use vrl::path::PathPrefix;
 
 use vector_common::finalizer::OrderedFinalizer;
 use vector_config::configurable_component;
@@ -295,7 +296,8 @@ impl SourceConfig for KafkaSourceConfig {
 
         let consumer = create_consumer(self)?;
         let decoder =
-            DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace).build();
+            DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace)
+                .build()?;
         let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
 
         Ok(Box::pin(kafka_source(
@@ -602,7 +604,12 @@ impl ReceivedMessage {
                     );
                 }
                 LogNamespace::Legacy => {
-                    log.insert(log_schema().source_type_key(), KafkaSourceConfig::NAME);
+                    if let Some(source_type_key) = log_schema().source_type_key() {
+                        log.insert(
+                            (PathPrefix::Event, source_type_key),
+                            KafkaSourceConfig::NAME,
+                        );
+                    }
                 }
             }
 
@@ -1046,7 +1053,7 @@ mod integration_test {
         for (i, event) in events.into_iter().enumerate() {
             if let LogNamespace::Legacy = log_namespace {
                 assert_eq!(
-                    event.as_log()[log_schema().message_key()],
+                    event.as_log()[log_schema().message_key().unwrap().to_string()],
                     format!("{} {:03}", TEXT, i).into()
                 );
                 assert_eq!(
@@ -1054,7 +1061,7 @@ mod integration_test {
                     format!("{} {}", KEY, i).into()
                 );
                 assert_eq!(
-                    event.as_log()[log_schema().source_type_key()],
+                    event.as_log()[log_schema().source_type_key().unwrap().to_string()],
                     "kafka".into()
                 );
                 assert_eq!(
@@ -1152,7 +1159,8 @@ mod integration_test {
             config.decoding.clone(),
             log_namespace,
         )
-        .build();
+        .build()
+        .unwrap();
 
         tokio::spawn(kafka_source(
             config,

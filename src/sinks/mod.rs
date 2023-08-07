@@ -51,8 +51,10 @@ pub mod elasticsearch;
 pub mod file;
 #[cfg(feature = "sinks-gcp")]
 pub mod gcp;
-#[cfg(any(feature = "sinks-gcp"))]
+#[cfg(feature = "sinks-gcp")]
 pub mod gcs_common;
+#[cfg(feature = "sinks-greptimedb")]
+pub mod greptimedb;
 #[cfg(feature = "sinks-honeycomb")]
 pub mod honeycomb;
 #[cfg(feature = "sinks-http")]

@@ -23,7 +23,6 @@ mod errors;
 use crate::config::{ComponentKey, OutputId};
 use crate::schema::Definition;
 pub use errors::{ClosedError, StreamSendError};
-use lookup::PathPrefix;
 
 pub(crate) const CHUNK_SIZE: usize = 1000;
 
@@ -356,18 +355,23 @@ impl Inner {
     fn emit_lag_time(&self, event: EventRef<'_>, reference: i64) {
         if let Some(lag_time_metric) = &self.lag_time {
             let timestamp = match event {
-                EventRef::Log(log) => log_schema().timestamp_key().and_then(|timestamp_key| {
-                    log.get((PathPrefix::Event, timestamp_key))
-                        .and_then(get_timestamp_millis)
-                }),
+                EventRef::Log(log) => {
+                    log_schema()
+                        .timestamp_key_target_path()
+                        .and_then(|timestamp_key| {
+                            log.get(timestamp_key).and_then(get_timestamp_millis)
+                        })
+                }
                 EventRef::Metric(metric) => metric
                     .timestamp()
                     .map(|timestamp| timestamp.timestamp_millis()),
-                EventRef::Trace(trace) => log_schema().timestamp_key().and_then(|timestamp_key| {
-                    trace
-                        .get((PathPrefix::Event, timestamp_key))
-                        .and_then(get_timestamp_millis)
-                }),
+                EventRef::Trace(trace) => {
+                    log_schema()
+                        .timestamp_key_target_path()
+                        .and_then(|timestamp_key| {
+                            trace.get(timestamp_key).and_then(get_timestamp_millis)
+                        })
+                }
             };
             if let Some(timestamp) = timestamp {
                 // This will truncate precision for values larger than 2**52, but at that point the user
@@ -391,6 +395,7 @@ mod tests {
     use chrono::{DateTime, Duration};
     use rand::{thread_rng, Rng};
     use vector_core::event::{LogEvent, Metric, MetricKind, MetricValue, TraceEvent};
+    use vrl::event_path;
 
     use super::*;
     use crate::metrics::{self, Controller};
@@ -424,7 +429,7 @@ mod tests {
     async fn emits_lag_time_for_trace() {
         emit_and_test(|timestamp| {
             let mut trace = TraceEvent::default();
-            trace.insert("timestamp", timestamp);
+            trace.insert(event_path!("timestamp"), timestamp);
             Event::Trace(trace)
         })
         .await;

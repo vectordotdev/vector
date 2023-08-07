@@ -8,7 +8,7 @@ use futures::{future::ready, stream};
 use http::{Request, StatusCode};
 use serde_json::{json, Value};
 use vector_core::{
-    config::log_schema,
+    config::{init_telemetry, log_schema, Tags, Telemetry},
     event::{BatchNotifier, BatchStatus, Event, LogEvent},
 };
 
@@ -23,8 +23,8 @@ use crate::{
     },
     test_util::{
         components::{
-            run_and_assert_sink_compliance, run_and_assert_sink_error, COMPONENT_ERROR_TAGS,
-            HTTP_SINK_TAGS,
+            run_and_assert_data_volume_sink_compliance, run_and_assert_sink_compliance,
+            run_and_assert_sink_error, COMPONENT_ERROR_TAGS, DATA_VOLUME_SINK_TAGS, HTTP_SINK_TAGS,
         },
         random_events_with_stream, random_string, trace_init,
     },
@@ -288,7 +288,25 @@ async fn insert_events_over_http() {
             batch: batch_settings(),
             ..Default::default()
         },
-        false,
+        TestType::Normal,
+        BatchStatus::Delivered,
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn insert_events_with_data_volume() {
+    trace_init();
+
+    run_insert_tests(
+        ElasticsearchConfig {
+            endpoints: vec![http_server()],
+            doc_type: "log_lines".into(),
+            compression: Compression::None,
+            batch: batch_settings(),
+            ..Default::default()
+        },
+        TestType::DataVolume,
         BatchStatus::Delivered,
     )
     .await;
@@ -306,7 +324,7 @@ async fn insert_events_over_http_with_gzip_compression() {
             batch: batch_settings(),
             ..Default::default()
         },
-        false,
+        TestType::Normal,
         BatchStatus::Delivered,
     )
     .await;
@@ -332,7 +350,7 @@ async fn insert_events_over_https() {
             batch: batch_settings(),
             ..Default::default()
         },
-        false,
+        TestType::Normal,
         BatchStatus::Delivered,
     )
     .await;
@@ -355,7 +373,7 @@ async fn insert_events_on_aws() {
             batch: batch_settings(),
             ..Default::default()
         },
-        false,
+        TestType::Normal,
         BatchStatus::Delivered,
     )
     .await;
@@ -379,7 +397,7 @@ async fn insert_events_on_aws_with_compression() {
             batch: batch_settings(),
             ..Default::default()
         },
-        false,
+        TestType::Normal,
         BatchStatus::Delivered,
     )
     .await;
@@ -397,7 +415,7 @@ async fn insert_events_with_failure() {
             batch: batch_settings(),
             ..Default::default()
         },
-        true,
+        TestType::Error,
         BatchStatus::Rejected,
     )
     .await;
@@ -415,7 +433,7 @@ async fn insert_events_with_failure_and_gzip_compression() {
             batch: batch_settings(),
             ..Default::default()
         },
-        true,
+        TestType::Error,
         BatchStatus::Rejected,
     )
     .await;
@@ -449,7 +467,7 @@ async fn insert_events_in_data_stream() {
         .await
         .expect("Data stream creation error");
 
-    run_insert_tests_with_config(&cfg, false, BatchStatus::Delivered).await;
+    run_insert_tests_with_config(&cfg, TestType::Normal, BatchStatus::Delivered).await;
 }
 
 #[tokio::test]
@@ -512,14 +530,26 @@ async fn distributed_insert_events_failover() {
 
 async fn run_insert_tests(
     mut config: ElasticsearchConfig,
-    break_events: bool,
+    test_type: TestType,
     status: BatchStatus,
 ) {
+    if test_type == TestType::DataVolume {
+        init_telemetry(
+            Telemetry {
+                tags: Tags {
+                    emit_service: true,
+                    emit_source: true,
+                },
+            },
+            true,
+        );
+    }
+
     config.bulk = BulkConfig {
         index: gen_index(),
         ..Default::default()
     };
-    run_insert_tests_with_config(&config, break_events, status).await;
+    run_insert_tests_with_config(&config, test_type, status).await;
 }
 
 fn create_http_client() -> reqwest::Client {
@@ -537,9 +567,16 @@ fn create_http_client() -> reqwest::Client {
         .expect("Could not build HTTP client")
 }
 
+#[derive(Eq, PartialEq)]
+enum TestType {
+    Error,
+    DataVolume,
+    Normal,
+}
+
 async fn run_insert_tests_with_config(
     config: &ElasticsearchConfig,
-    break_events: bool,
+    test_type: TestType,
     batch_status: BatchStatus,
 ) {
     let common = ElasticsearchCommon::parse_single(config)
@@ -565,22 +602,30 @@ async fn run_insert_tests_with_config(
 
     let (batch, mut receiver) = BatchNotifier::new_with_receiver();
     let (input, events) = random_events_with_stream(100, 100, Some(batch));
-    if break_events {
-        // Break all but the first event to simulate some kind of partial failure
-        let mut doit = false;
-        let events = events.map(move |mut events| {
-            if doit {
-                events.iter_logs_mut().for_each(|log| {
-                    log.insert("_type", 1);
-                });
-            }
-            doit = true;
-            events
-        });
+    match test_type {
+        TestType::Error => {
+            // Break all but the first event to simulate some kind of partial failure
+            let mut doit = false;
+            let events = events.map(move |mut events| {
+                if doit {
+                    events.iter_logs_mut().for_each(|log| {
+                        log.insert("_type", 1);
+                    });
+                }
+                doit = true;
+                events
+            });
 
-        run_and_assert_sink_error(sink, events, &COMPONENT_ERROR_TAGS).await;
-    } else {
-        run_and_assert_sink_compliance(sink, events, &HTTP_SINK_TAGS).await;
+            run_and_assert_sink_error(sink, events, &COMPONENT_ERROR_TAGS).await;
+        }
+
+        TestType::DataVolume => {
+            run_and_assert_data_volume_sink_compliance(sink, events, &DATA_VOLUME_SINK_TAGS).await;
+        }
+
+        TestType::Normal => {
+            run_and_assert_sink_compliance(sink, events, &HTTP_SINK_TAGS).await;
+        }
     }
 
     assert_eq!(receiver.try_recv(), Ok(batch_status));
@@ -607,7 +652,7 @@ async fn run_insert_tests_with_config(
         .or_else(|| response["hits"]["total"].as_u64())
         .expect("Elasticsearch response does not include hits->total nor hits->total->value");
 
-    if break_events {
+    if test_type == TestType::Error {
         assert_ne!(input.len() as u64, total);
     } else {
         assert_eq!(input.len() as u64, total);

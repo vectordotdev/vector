@@ -36,6 +36,7 @@ Celkon
 Ceph
 Chromecast
 Citrix
+Cloudflare
 Cloudfone
 Cmx
 Coby
@@ -165,6 +166,7 @@ Samsung
 Sega
 Segoe
 Shopify
+SIGINTs
 Simvalley
 Skype
 Skytex
@@ -244,6 +246,7 @@ compiletime
 coredns
 corejs
 coreutils
+curta
 daemonset
 databend
 datacenter
@@ -295,6 +298,9 @@ gpg
 gql
 grafana
 graphiql
+greptime
+greptimecloud
+greptimedb
 gvisor
 gws
 hadoop
@@ -313,6 +319,7 @@ https
 humungus
 icecream
 ifeq
+ifneq
 imobile
 influxd
 ionik
@@ -418,6 +425,8 @@ userguide
 webhdfs
 winapi
 workarounds
+XCHACHA
+XSALSA
 yandex
 zeek
 zookeeper

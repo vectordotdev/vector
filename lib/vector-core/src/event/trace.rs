@@ -4,8 +4,7 @@ use lookup::lookup_v2::TargetPath;
 use serde::{Deserialize, Serialize};
 use vector_buffers::EventCount;
 use vector_common::{
-    json_size::JsonSize,
-    request_metadata::{EventCountTags, GetEventCountTags},
+    internal_event::TaggedEventsSent, json_size::JsonSize, request_metadata::GetEventCountTags,
     EventDataEq,
 };
 
@@ -85,12 +84,23 @@ impl TraceEvent {
         self.0.contains(key.as_ref())
     }
 
-    pub fn insert(
+    pub fn insert<'a>(
         &mut self,
-        key: impl AsRef<str>,
+        key: impl TargetPath<'a>,
         value: impl Into<Value> + Debug,
     ) -> Option<Value> {
-        self.0.insert(key.as_ref(), value.into())
+        self.0.insert(key, value.into())
+    }
+
+    pub fn maybe_insert<'a, F: FnOnce() -> Value>(
+        &mut self,
+        path: Option<impl TargetPath<'a>>,
+        value_callback: F,
+    ) -> Option<Value> {
+        if let Some(path) = path {
+            return self.0.insert(path, value_callback());
+        }
+        None
     }
 }
 
@@ -149,7 +159,7 @@ impl AsMut<LogEvent> for TraceEvent {
 }
 
 impl GetEventCountTags for TraceEvent {
-    fn get_tags(&self) -> EventCountTags {
+    fn get_tags(&self) -> TaggedEventsSent {
         self.0.get_tags()
     }
 }

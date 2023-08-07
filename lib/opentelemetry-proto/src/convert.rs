@@ -94,7 +94,7 @@ impl ResourceLog {
             LogNamespace::Legacy => {
                 let mut log = LogEvent::default();
                 if let Some(v) = self.log_record.body.and_then(|av| av.value) {
-                    log.insert(log_schema().message_key(), v);
+                    log.maybe_insert(log_schema().message_key_target_path(), v);
                 }
                 log
             }
@@ -208,7 +208,7 @@ impl ResourceLog {
 
         log_namespace.insert_vector_metadata(
             &mut log,
-            Some(log_schema().source_type_key()),
+            log_schema().source_type_key(),
             path!("source_type"),
             Bytes::from_static(SOURCE_NAME.as_bytes()),
         );

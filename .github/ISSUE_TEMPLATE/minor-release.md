@@ -41,8 +41,8 @@ On the day of release:
 - [ ] Merge release preparation branch into the release branch
     - `git co v0.<new version number> && git merge --ff-only prepare-v0.<new version number>`
 - [ ] Tag new release
-  - [ ] `git tag v0.<minor>.0 -a -m v0.<minor>.0``
-  - [ ] `git push origin v0.<minor>.0
+  - [ ] `git tag v0.<minor>.0 -a -m v0.<minor>.0`
+  - [ ] `git push origin v0.<minor>.0`
 - [ ] Wait for release workflow to complete
   - Discoverable via [https://github.com/timberio/vector/actions/workflows/release.yml](https://github.com/timberio/vector/actions/workflows/release.yml)
 - [ ] Release updated Helm chart. See [releasing Helm chart](https://github.com/vectordotdev/helm-charts#releasing).

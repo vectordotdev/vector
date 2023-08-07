@@ -1,7 +1,7 @@
 use bytes::Bytes;
 use chrono::{DateTime, NaiveDateTime, Utc};
 use derivative::Derivative;
-use lookup::{event_path, owned_value_path, PathPrefix};
+use lookup::{event_path, owned_value_path};
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use std::collections::HashMap;
@@ -130,20 +130,17 @@ impl GelfDeserializer {
             log.insert(FULL_MESSAGE, full_message.to_string());
         }
 
-        if let Some(timestamp_key) = log_schema().timestamp_key() {
+        if let Some(timestamp_key) = log_schema().timestamp_key_target_path() {
             if let Some(timestamp) = parsed.timestamp {
                 let naive = NaiveDateTime::from_timestamp_opt(
                     f64::trunc(timestamp) as i64,
                     f64::fract(timestamp) as u32,
                 )
                 .expect("invalid timestamp");
-                log.insert(
-                    (PathPrefix::Event, timestamp_key),
-                    DateTime::<Utc>::from_utc(naive, Utc),
-                );
+                log.insert(timestamp_key, DateTime::<Utc>::from_utc(naive, Utc));
                 // per GELF spec- add timestamp if not provided
             } else {
-                log.insert((PathPrefix::Event, timestamp_key), Utc::now());
+                log.insert(timestamp_key, Utc::now());
             }
         }
 
@@ -293,7 +290,7 @@ mod tests {
             Some(&Value::Bytes(Bytes::from_static(b"example.org")))
         );
         assert_eq!(
-            log.get(log_schema().message_key()),
+            log.get(log_schema().message_key_target_path().unwrap()),
             Some(&Value::Bytes(Bytes::from_static(
                 b"A short message that helps you identify what is going on"
             )))
@@ -348,7 +345,7 @@ mod tests {
             let events = deserialize_gelf_input(&input).unwrap();
             assert_eq!(events.len(), 1);
             let log = events[0].as_log();
-            assert!(log.contains(log_schema().message_key()));
+            assert!(log.contains(log_schema().message_key_target_path().unwrap()));
         }
 
         // filter out id

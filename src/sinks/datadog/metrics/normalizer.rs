@@ -185,7 +185,7 @@ mod tests {
 
     fn run_comparisons(inputs: Vec<Metric>, expected_outputs: Vec<Option<Metric>>) {
         let mut metric_set = MetricSet::default();
-        let mut normalizer = DatadogMetricsNormalizer::default();
+        let mut normalizer = DatadogMetricsNormalizer;
 
         for (input, expected) in inputs.into_iter().zip(expected_outputs) {
             let result = normalizer.normalize(&mut metric_set, input);

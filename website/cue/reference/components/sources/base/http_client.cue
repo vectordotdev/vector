@@ -80,6 +80,11 @@ base: components: sources: http_client: configuration: {
 															[vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
 															[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
 															"""
+						protobuf: """
+															Decodes the raw bytes as [protobuf][protobuf].
+
+															[protobuf]: https://protobuf.dev/
+															"""
 						syslog: """
 															Decodes the raw bytes as a Syslog message.
 
@@ -138,6 +143,23 @@ base: components: sources: http_client: configuration: {
 						"""
 					required: false
 					type: bool: default: true
+				}
+			}
+			protobuf: {
+				description:   "Protobuf-specific decoding options."
+				relevant_when: "codec = \"protobuf\""
+				required:      false
+				type: object: options: {
+					desc_file: {
+						description: "Path to desc file"
+						required:    false
+						type: string: default: ""
+					}
+					message_type: {
+						description: "message type. e.g package.message"
+						required:    false
+						type: string: default: ""
+					}
 				}
 			}
 			syslog: {
@@ -309,10 +331,22 @@ base: components: sources: http_client: configuration: {
 		}
 	}
 	scrape_interval_secs: {
-		description: "The interval between calls."
-		required:    false
+		description: """
+			The interval between scrapes. Requests are run concurrently so if a scrape takes longer
+			than the interval a new scrape will be started. This can take extra resources, set the timeout
+			to a value lower than the scrape interval to prevent this from happening.
+			"""
+		required: false
 		type: uint: {
 			default: 15
+			unit:    "seconds"
+		}
+	}
+	scrape_timeout_secs: {
+		description: "The timeout for each scrape request."
+		required:    false
+		type: float: {
+			default: 5.0
 			unit:    "seconds"
 		}
 	}

@@ -40,7 +40,7 @@ impl Conditional for DatadogSearchRunner {
 impl ConditionalConfig for DatadogSearchConfig {
     fn build(&self, _enrichment_tables: &enrichment::TableRegistry) -> crate::Result<Condition> {
         let node = parse(&self.source)?;
-        let matcher = as_log(build_matcher(&node, &EventFilter::default()));
+        let matcher = as_log(build_matcher(&node, &EventFilter));
 
         Ok(Condition::DatadogSearch(DatadogSearchRunner { matcher }))
     }
@@ -1039,7 +1039,7 @@ mod test {
     #[test]
     /// Parse each Datadog Search Syntax query and check that it passes/fails.
     fn event_filter() {
-        test_filter(EventFilter::default(), |ev| ev.into_log())
+        test_filter(EventFilter, |ev| ev.into_log())
     }
 
     #[test]

@@ -3,13 +3,17 @@ use std::{collections::HashMap, convert::TryFrom, time::SystemTime};
 use chrono::{DateTime, Utc};
 use futures::{future::ready, stream};
 use serde::Deserialize;
+use vector_core::config::{init_telemetry, Tags, Telemetry};
 
 use super::*;
 use crate::{
     config::{GenerateConfig, SinkConfig, SinkContext},
     event::{Event, LogEvent, Metric, MetricKind, MetricValue, Value},
     test_util::{
-        components::{run_and_assert_sink_compliance, SINK_TAGS},
+        components::{
+            run_and_assert_data_volume_sink_compliance, run_and_assert_sink_compliance,
+            DATA_VOLUME_SINK_TAGS, SINK_TAGS,
+        },
         http::{always_200_response, spawn_blackhole_http_server},
     },
 };
@@ -19,8 +23,7 @@ fn generate_config() {
     crate::test_util::test_generate_config::<NewRelicConfig>();
 }
 
-#[tokio::test]
-async fn component_spec_compliance() {
+async fn sink() -> (VectorSink, Event) {
     let mock_endpoint = spawn_blackhole_http_server(always_200_response).await;
 
     let config = NewRelicConfig::generate_config().to_string();
@@ -32,7 +35,37 @@ async fn component_spec_compliance() {
     let (sink, _healthcheck) = config.build(context).await.unwrap();
 
     let event = Event::Log(LogEvent::from("simple message"));
+
+    (sink, event)
+}
+
+#[tokio::test]
+async fn component_spec_compliance() {
+    let (sink, event) = sink().await;
     run_and_assert_sink_compliance(sink, stream::once(ready(event)), &SINK_TAGS).await;
+}
+
+#[tokio::test]
+async fn component_spec_compliance_data_volume() {
+    // We need to configure Vector to emit the service and source tags.
+    // The default is to not emit these.
+    init_telemetry(
+        Telemetry {
+            tags: Tags {
+                emit_service: true,
+                emit_source: true,
+            },
+        },
+        true,
+    );
+
+    let (sink, event) = sink().await;
+    run_and_assert_data_volume_sink_compliance(
+        sink,
+        stream::once(ready(event)),
+        &DATA_VOLUME_SINK_TAGS,
+    )
+    .await;
 }
 
 #[test]

@@ -1,12 +1,12 @@
 use chrono::Utc;
 use codecs::MetricTagValues;
-use lookup::lookup_v2::parse_value_path;
 use lookup::{event_path, owned_value_path, path, PathPrefix};
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
 use vector_common::TimeZone;
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
+use vrl::path::OwnedValuePath;
 use vrl::value::kind::Collection;
 use vrl::value::Kind;
 
@@ -242,7 +242,7 @@ fn schema_definition(log_namespace: LogNamespace) -> Definition {
             }
 
             schema_definition = schema_definition.with_event_field(
-                &parse_value_path(log_schema().host_key()).expect("valid host key"),
+                log_schema().host_key().expect("valid host key"),
                 Kind::bytes().or_undefined(),
                 None,
             );
@@ -253,7 +253,7 @@ fn schema_definition(log_namespace: LogNamespace) -> Definition {
 
 #[derive(Clone, Debug)]
 pub struct MetricToLog {
-    host_tag: String,
+    host_tag: Option<OwnedValuePath>,
     timezone: TimeZone,
     log_namespace: LogNamespace,
     tag_values: MetricTagValues,
@@ -267,9 +267,12 @@ impl MetricToLog {
         tag_values: MetricTagValues,
     ) -> Self {
         Self {
-            host_tag: format!(
-                "tags.{}",
-                host_tag.unwrap_or_else(|| log_schema().host_key())
+            host_tag: host_tag.map_or(
+                log_schema().host_key().cloned().map(|mut key| {
+                    key.push_front_field("tags");
+                    key
+                }),
+                |host| Some(owned_value_path!("tags", host)),
             ),
             timezone,
             log_namespace,
@@ -306,12 +309,14 @@ impl MetricToLog {
                             })
                             .unwrap_or_else(|| event::Value::Timestamp(Utc::now()));
 
-                        if let Some(timestamp_key) = log_schema().timestamp_key() {
-                            log.insert((PathPrefix::Event, timestamp_key), timestamp);
-                        }
+                        log.maybe_insert(log_schema().timestamp_key_target_path(), timestamp);
 
-                        if let Some(host) = log.remove_prune(self.host_tag.as_str(), true) {
-                            log.insert(log_schema().host_key(), host);
+                        if let Some(host_tag) = &self.host_tag {
+                            if let Some(host_value) =
+                                log.remove_prune(host_tag.to_string().as_str(), true)
+                            {
+                                log.maybe_insert(log_schema().host_key_target_path(), host_value);
+                            }
                         }
                     }
                     if self.log_namespace == LogNamespace::Vector {

@@ -10,10 +10,12 @@ use chrono::{DateTime, Utc};
 use once_cell::sync::OnceCell;
 use prost::Message;
 use snafu::{ResultExt, Snafu};
+use vector_common::request_metadata::GroupedCountByteSize;
 use vector_core::{
-    config::{log_schema, LogSchema},
+    config::{log_schema, telemetry, LogSchema},
     event::{metric::MetricSketch, Metric, MetricTags, MetricValue},
     metrics::AgentDDSketch,
+    EstimatedJsonEncodedSizeOf,
 };
 
 use super::config::{
@@ -122,6 +124,7 @@ struct EncoderState {
     written: usize,
     buf: Vec<u8>,
     processed: Vec<Metric>,
+    byte_size: GroupedCountByteSize,
 }
 
 impl Default for EncoderState {
@@ -131,6 +134,7 @@ impl Default for EncoderState {
             written: 0,
             buf: Vec::with_capacity(1024),
             processed: Vec::new(),
+            byte_size: telemetry().create_request_count_byte_size(),
         }
     }
 }
@@ -201,6 +205,10 @@ impl DatadogMetricsEncoder {
 
         // Clear our temporary buffer before any encoding.
         self.state.buf.clear();
+
+        self.state
+            .byte_size
+            .add_event(&metric, metric.estimated_json_encoded_size_of());
 
         match self.endpoint {
             // Series metrics are encoded via JSON, in an incremental fashion.
@@ -325,6 +333,8 @@ impl DatadogMetricsEncoder {
         self.state.written += n;
 
         let raw_bytes_written = self.state.written;
+        let byte_size = self.state.byte_size.clone();
+
         // Consume the encoder state so we can do our final checks and return the necessary data.
         let state = self.reset_state();
         let payload = state
@@ -349,7 +359,7 @@ impl DatadogMetricsEncoder {
         if recommended_splits == 1 {
             // "One" split means no splits needed: our payload didn't exceed either of the limits.
             Ok((
-                EncodeResult::compressed(payload, raw_bytes_written),
+                EncodeResult::compressed(payload, raw_bytes_written, byte_size),
                 processed,
             ))
         } else {
@@ -385,7 +395,10 @@ fn sketch_to_proto_message(
     let name = get_namespaced_name(metric, default_namespace);
     let ts = encode_timestamp(metric.timestamp());
     let mut tags = metric.tags().cloned().unwrap_or_default();
-    let host = tags.remove(log_schema.host_key()).unwrap_or_default();
+    let host = log_schema
+        .host_key()
+        .map(|key| tags.remove(key.to_string().as_str()).unwrap_or_default())
+        .unwrap_or_default();
     let tags = encode_tags(&tags);
 
     let cnt = ddsketch.count() as i64;
@@ -497,7 +510,10 @@ fn generate_series_metrics(
     let name = get_namespaced_name(metric, default_namespace);
 
     let mut tags = metric.tags().cloned().unwrap_or_default();
-    let host = tags.remove(log_schema.host_key());
+    let host = log_schema
+        .host_key()
+        .map(|key| tags.remove(key.to_string().as_str()).unwrap_or_default());
+
     let source_type_name = tags.remove("source_type_name");
     let device = tags.remove("device");
     let ts = encode_timestamp(metric.timestamp());

@@ -8,7 +8,7 @@ metadata:
     app.kubernetes.io/name: vector
     app.kubernetes.io/instance: vector
     app.kubernetes.io/component: Agent
-    app.kubernetes.io/version: "0.30.0-distroless-libc"
+    app.kubernetes.io/version: "0.31.0-distroless-libc"
   annotations: {}
 spec:
   selector:
@@ -16,6 +16,7 @@ spec:
       app.kubernetes.io/name: vector
       app.kubernetes.io/instance: vector
       app.kubernetes.io/component: Agent
+  minReadySeconds: 0
   template:
     metadata:
       annotations: {}
@@ -29,7 +30,7 @@ spec:
       dnsPolicy: ClusterFirst
       containers:
         - name: vector
-          image: "timberio/vector:0.30.0-distroless-libc"
+          image: "timberio/vector:0.31.0-distroless-libc"
           imagePullPolicy: IfNotPresent
           args:
             - --config-dir
@@ -51,6 +52,8 @@ spec:
               value: "/host/proc"
             - name: SYSFS_ROOT
               value: "/host/sys"
+            - name: VECTOR_LOG
+              value: "info"
           ports:
             - name: prom-exporter
               containerPort: 9090
@@ -61,17 +64,17 @@ spec:
             - name: config
               mountPath: "/etc/vector/"
               readOnly: true
-            - name: var-log
-              mountPath: "/var/log/"
+            - mountPath: /var/log/
+              name: var-log
               readOnly: true
-            - name: var-lib
-              mountPath: "/var/lib"
+            - mountPath: /var/lib
+              name: var-lib
               readOnly: true
-            - name: procfs
-              mountPath: "/host/proc"
+            - mountPath: /host/proc
+              name: procfs
               readOnly: true
-            - name: sysfs
-              mountPath: "/host/sys"
+            - mountPath: /host/sys
+              name: sysfs
               readOnly: true
       terminationGracePeriodSeconds: 60
       volumes:
@@ -83,15 +86,15 @@ spec:
         - name: data
           hostPath:
             path: "/var/lib/vector"
-        - name: var-log
-          hostPath:
-            path: "/var/log/"
-        - name: var-lib
-          hostPath:
-            path: "/var/lib/"
-        - name: procfs
-          hostPath:
-            path: "/proc"
-        - name: sysfs
-          hostPath:
-            path: "/sys"
+        - hostPath:
+            path: /var/log/
+          name: var-log
+        - hostPath:
+            path: /var/lib/
+          name: var-lib
+        - hostPath:
+            path: /proc
+          name: procfs
+        - hostPath:
+            path: /sys
+          name: sysfs

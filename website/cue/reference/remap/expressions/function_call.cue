@@ -134,6 +134,15 @@ remap: expressions: function_call: {
 				failures.
 				"""
 		}
+		deprecation: {
+			title: "Deprecation"
+			description: """
+				VRL functions can be marked as "deprecated". When a function
+				is deprecated, a warning will be shown at runtime.
+
+				Suggestions on how to update the VRL program can usually be found in the actual warning and the function documentation.
+				"""
+		}
 	}
 
 	examples: [

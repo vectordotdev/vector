@@ -241,7 +241,8 @@ impl AwsS3Config {
         .await?;
 
         let decoder =
-            DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace).build();
+            DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace)
+                .build()?;
 
         match self.sqs {
             Some(ref sqs) => {

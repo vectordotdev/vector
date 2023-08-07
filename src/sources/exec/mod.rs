@@ -23,6 +23,7 @@ use tokio_util::codec::FramedRead;
 use vector_common::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
 use vector_config::configurable_component;
 use vector_core::{config::LegacyKey, EstimatedJsonEncodedSizeOf};
+use vrl::path::OwnedValuePath;
 use vrl::value::Kind;
 
 use crate::{
@@ -233,7 +234,7 @@ impl SourceConfig for ExecConfig {
             .clone()
             .unwrap_or_else(|| self.decoding.default_stream_framing());
         let decoder =
-            DecodingConfig::new(framing, self.decoding.clone(), LogNamespace::Legacy).build();
+            DecodingConfig::new(framing, self.decoding.clone(), LogNamespace::Legacy).build()?;
 
         match &self.mode {
             Mode::Scheduled => {
@@ -276,9 +277,11 @@ impl SourceConfig for ExecConfig {
             .with_standard_vector_source_metadata()
             .with_source_metadata(
                 Self::NAME,
-                Some(LegacyKey::InsertIfEmpty(owned_value_path!(
-                    log_schema().host_key()
-                ))),
+                Some(LegacyKey::InsertIfEmpty(
+                    log_schema()
+                        .host_key()
+                        .map_or(OwnedValuePath::root(), |key| key.clone()),
+                )),
                 &owned_value_path!("host"),
                 Kind::bytes().or_undefined(),
                 Some("host"),
@@ -666,7 +669,7 @@ fn handle_event(
             log_namespace.insert_source_metadata(
                 ExecConfig::NAME,
                 log,
-                Some(LegacyKey::InsertIfEmpty(path!(log_schema().host_key()))),
+                log_schema().host_key().map(LegacyKey::InsertIfEmpty),
                 path!("host"),
                 hostname.clone(),
             );
@@ -720,6 +723,8 @@ fn spawn_reader_thread<R: 'static + AsyncRead + Unpin + std::marker::Send>(
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use crate::{event::LogEvent, test_util::trace_init};
     use bytes::Bytes;
     use std::io::Cursor;
     use vector_core::event::EventMetadata;
@@ -727,11 +732,6 @@ mod tests {
 
     #[cfg(unix)]
     use futures::task::Poll;
-
-    use super::*;
-    use crate::config::log_schema;
-
-    use crate::{event::LogEvent, test_util::trace_init};
 
     #[test]
     fn test_generate_config() {
@@ -756,18 +756,13 @@ mod tests {
         );
         let log = event.as_log();
 
-        assert_eq!(log[log_schema().host_key()], "Some.Machine".into());
+        assert_eq!(*log.get_host().unwrap(), "Some.Machine".into());
         assert_eq!(log[STREAM_KEY], STDOUT.into());
         assert_eq!(log[PID_KEY], (8888_i64).into());
         assert_eq!(log[COMMAND_KEY], config.command.into());
-        assert_eq!(log[log_schema().message_key()], "hello world".into());
-        assert_eq!(log[log_schema().source_type_key()], "exec".into());
-        assert!(log
-            .get((
-                lookup::PathPrefix::Event,
-                log_schema().timestamp_key().unwrap()
-            ))
-            .is_some());
+        assert_eq!(*log.get_message().unwrap(), "hello world".into());
+        assert_eq!(*log.get_source_type().unwrap(), "exec".into());
+        assert!(log.get_timestamp().is_some());
     }
 
     #[test]
@@ -837,18 +832,13 @@ mod tests {
         );
         let log = event.as_log();
 
-        assert_eq!(log[log_schema().host_key()], "Some.Machine".into());
+        assert_eq!(*log.get_host().unwrap(), "Some.Machine".into());
         assert_eq!(log[STREAM_KEY], STDOUT.into());
         assert_eq!(log[PID_KEY], (8888_i64).into());
         assert_eq!(log[COMMAND_KEY], config.command.into());
-        assert_eq!(log[log_schema().message_key()], "hello world".into());
-        assert_eq!(log[log_schema().source_type_key()], "exec".into());
-        assert!(log
-            .get((
-                lookup::PathPrefix::Event,
-                log_schema().timestamp_key().unwrap()
-            ))
-            .is_some());
+        assert_eq!(*log.get_message().unwrap(), "hello world".into());
+        assert_eq!(*log.get_source_type().unwrap(), "exec".into());
+        assert!(log.get_timestamp().is_some());
     }
 
     #[test]
@@ -949,7 +939,7 @@ mod tests {
             assert_eq!(events.len(), 1);
             let log = events[0].as_log();
             assert_eq!(
-                log[log_schema().message_key()],
+                *log.get_message().unwrap(),
                 Bytes::from("hello world").into()
             );
             assert_eq!(origin, STDOUT);
@@ -961,7 +951,7 @@ mod tests {
             assert_eq!(events.len(), 1);
             let log = events[0].as_log();
             assert_eq!(
-                log[log_schema().message_key()],
+                *log.get_message().unwrap(),
                 Bytes::from("hello rocket 🚀").into()
             );
             assert_eq!(origin, STDOUT);
@@ -1041,16 +1031,11 @@ mod tests {
             let log = event.as_log();
             assert_eq!(log[COMMAND_KEY], config.command.clone().into());
             assert_eq!(log[STREAM_KEY], STDOUT.into());
-            assert_eq!(log[log_schema().source_type_key()], "exec".into());
-            assert_eq!(log[log_schema().message_key()], "Hello World!".into());
-            assert_eq!(log[log_schema().host_key()], "Some.Machine".into());
+            assert_eq!(*log.get_source_type().unwrap(), "exec".into());
+            assert_eq!(*log.get_message().unwrap(), "Hello World!".into());
+            assert_eq!(*log.get_host().unwrap(), "Some.Machine".into());
             assert!(log.get(PID_KEY).is_some());
-            assert!(log
-                .get((
-                    lookup::PathPrefix::Event,
-                    log_schema().timestamp_key().unwrap()
-                ))
-                .is_some());
+            assert!(log.get_timestamp().is_some());
 
             assert_eq!(8, log.all_fields().unwrap().count());
         } else {
@@ -1101,14 +1086,14 @@ mod tests {
 
         if let Poll::Ready(Some(event)) = futures::poll!(rx.next()) {
             let log = event.as_log();
-            assert_eq!(log[log_schema().message_key()], "signal received".into());
+            assert_eq!(*log.get_message().unwrap(), "signal received".into());
         } else {
             panic!("Expected to receive event");
         }
 
         if let Poll::Ready(Some(event)) = futures::poll!(rx.next()) {
             let log = event.as_log();
-            assert_eq!(log[log_schema().message_key()], "slept".into());
+            assert_eq!(*log.get_message().unwrap(), "slept".into());
         } else {
             panic!("Expected to receive event");
         }

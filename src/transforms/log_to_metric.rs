@@ -408,15 +408,6 @@ impl FunctionTransform for LogToMetric {
 
 #[cfg(test)]
 mod tests {
-    use chrono::{offset::TimeZone, DateTime, Timelike, Utc};
-    use lookup::PathPrefix;
-    use std::sync::Arc;
-    use std::time::Duration;
-    use tokio::sync::mpsc;
-    use tokio_stream::wrappers::ReceiverStream;
-    use vector_common::config::ComponentKey;
-    use vector_core::metric_tags;
-
     use super::*;
     use crate::test_util::components::assert_transform_compliance;
     use crate::transforms::test::create_topology;
@@ -427,6 +418,13 @@ mod tests {
             Event, LogEvent,
         },
     };
+    use chrono::{offset::TimeZone, DateTime, Timelike, Utc};
+    use std::sync::Arc;
+    use std::time::Duration;
+    use tokio::sync::mpsc;
+    use tokio_stream::wrappers::ReceiverStream;
+    use vector_common::config::ComponentKey;
+    use vector_core::metric_tags;
 
     #[test]
     fn generate_config() {
@@ -451,10 +449,8 @@ mod tests {
     fn create_event(key: &str, value: impl Into<Value> + std::fmt::Debug) -> Event {
         let mut log = Event::Log(LogEvent::from("i am a log"));
         log.as_mut_log().insert(key, value);
-        log.as_mut_log().insert(
-            (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
-            ts(),
-        );
+        log.as_mut_log()
+            .insert(log_schema().timestamp_key_target_path().unwrap(), ts());
         log
     }
 
@@ -837,10 +833,9 @@ mod tests {
         );
 
         let mut event = Event::Log(LogEvent::from("i am a log"));
-        event.as_mut_log().insert(
-            (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
-            ts(),
-        );
+        event
+            .as_mut_log()
+            .insert(log_schema().timestamp_key_target_path().unwrap(), ts());
         event.as_mut_log().insert("status", "42");
         event.as_mut_log().insert("backtrace", "message");
         let mut metadata = event.metadata().clone();
@@ -893,10 +888,9 @@ mod tests {
         );
 
         let mut event = Event::Log(LogEvent::from("i am a log"));
-        event.as_mut_log().insert(
-            (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
-            ts(),
-        );
+        event
+            .as_mut_log()
+            .insert(log_schema().timestamp_key_target_path().unwrap(), ts());
         event.as_mut_log().insert("status", "42");
         event.as_mut_log().insert("backtrace", "message");
         event.as_mut_log().insert("host", "local");
