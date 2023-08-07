@@ -29,6 +29,14 @@ pub(self) fn instant_now() -> std::time::Instant {
 #[derive(Clone, Copy, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct AdaptiveConcurrencySettings {
+    /// The initial concurrency limit to use. If not specified, the initial limit will be 1 (no concurrency).
+    ///
+    /// It is recommended to set this value to your service's average limit if you're seeing that it takes a
+    /// long time to ramp up adaptive concurrency after a restart. You can find this value by looking at the
+    /// `adaptive_concurrency_limit` metric.
+    #[configurable(derived)]
+    pub(super) initial_concurrency: Option<usize>,
+
     /// The fraction of the current value to set the new concurrency limit when decreasing the limit.
     ///
     /// Valid values are greater than `0` and less than `1`. Smaller values cause the algorithm to scale back rapidly
@@ -84,6 +92,7 @@ impl AdaptiveConcurrencySettings {
 impl Default for AdaptiveConcurrencySettings {
     fn default() -> Self {
         Self {
+            initial_concurrency: None,
             decrease_ratio: default_decrease_ratio(),
             ewma_alpha: default_ewma_alpha(),
             rtt_deviation_scale: default_rtt_deviation_scale(),
