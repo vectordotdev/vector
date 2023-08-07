@@ -88,6 +88,19 @@ from = "/docs/reference/configuration/field-path-notation/"
 to = "/docs/reference/vrl/expressions/#path"
 force = true
 
+# Packages redirects
+[[redirects]]
+# For example:
+#
+# https://packages.timber.io/vector/0.31.0/vector_0.31.0-1_armhf.deb
+#
+# to
+#
+# https://github.com/vectordotdev/vector/releases/download/v0.30.0/vector_0.30.0-1_armhf.deb
+from = "https://packages.timber.io/vector/:version/:file"
+to = "https://github.com/vectordotdev/vector/releases/download/v:version/:file"
+force = true
+
 # CORS headers for /index.json
 [[headers]]
 for = "/index.json"
