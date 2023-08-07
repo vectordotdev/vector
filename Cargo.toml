@@ -353,7 +353,7 @@ assert_cmd = { version = "2.0.12", default-features = false }
 azure_core = { version = "0.13", default-features = false, features = ["enable_reqwest", "azurite_workaround"] }
 azure_identity = { version = "0.13", default-features = false, features = ["enable_reqwest"] }
 azure_storage_blobs = { version = "0.13", default-features = false, features = ["azurite_workaround"] }
-azure_storage = { version = "0.13", default-features = false, features = ["azurite_workaround"] }
+azure_storage = { version = "0.13", default-features = false }
 base64 = "0.21.2"
 criterion = { version = "0.5.1", features = ["html_reports", "async_tokio"] }
 itertools = { version = "0.11.0", default-features = false, features = ["use_alloc"] }
