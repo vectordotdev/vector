@@ -93,20 +93,9 @@ impl RequestBuilder<(String, Vec<Event>)> for AzureBlobRequestOptions {
         AzureBlobRequest {
             blob_data,
             content_encoding: self.compression.content_encoding(),
-            content_type: self.compression.content_type(),
+            content_type: self.encoder.1.content_type(),
             metadata: azure_metadata,
             request_metadata,
-        }
-    }
-}
-
-impl Compression {
-    pub const fn content_type(self) -> &'static str {
-        match self {
-            Self::None => "text/plain",
-            Self::Gzip(_) => "application/gzip",
-            Self::Zlib(_) => "application/zlib",
-            Self::Zstd(_) => "application/zstd",
         }
     }
 }
