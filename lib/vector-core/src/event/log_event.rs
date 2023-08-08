@@ -754,33 +754,31 @@ impl From<&tracing::Event<'_>> for LogEvent {
     }
 }
 
+/// Note that `tracing::field::Field` containing dots and other special characters will be treated as a single segment.
 impl tracing::field::Visit for LogEvent {
     fn record_str(&mut self, field: &tracing::field::Field, value: &str) {
-        self.parse_path_and_insert(field.as_ref(), value.to_string())
-            .ok();
+        self.insert(event_path!(field.name()), value.to_string());
     }
 
     fn record_debug(&mut self, field: &tracing::field::Field, value: &dyn Debug) {
-        self.parse_path_and_insert(field.as_ref(), format!("{value:?}"))
-            .ok();
+        self.insert(event_path!(field.name()), format!("{value:?}"));
     }
 
     fn record_i64(&mut self, field: &tracing::field::Field, value: i64) {
-        self.parse_path_and_insert(field.as_ref(), value).ok();
+        self.insert(event_path!(field.name()), value);
     }
 
     fn record_u64(&mut self, field: &tracing::field::Field, value: u64) {
+        let field_path = event_path!(field.name());
         let converted: Result<i64, _> = value.try_into();
         match converted {
-            Ok(value) => self.parse_path_and_insert(field.as_ref(), value).ok(),
-            Err(_) => self
-                .parse_path_and_insert(field.as_ref(), value.to_string())
-                .ok(),
+            Ok(value) => self.insert(field_path, value),
+            Err(_) => self.insert(field_path, value.to_string()),
         };
     }
 
     fn record_bool(&mut self, field: &tracing::field::Field, value: bool) {
-        self.parse_path_and_insert(field.as_ref(), value).ok();
+        self.insert(event_path!(field.name()), value);
     }
 }
 
