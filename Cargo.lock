@@ -649,7 +649,8 @@ dependencies = [
 [[package]]
 name = "async-nats"
 version = "0.31.0"
-source = "git+https://github.com/nats-io/nats.rs.git?rev=a59b21eabceef45736f6f7ca987987e8c3edb805#a59b21eabceef45736f6f7ca987987e8c3edb805"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8257238e2a3629ee5618502a75d1b91f8017c24638c75349fc8d2d80cf1f7c4c"
 dependencies = [
  "base64 0.21.2",
  "bytes 1.4.0",
@@ -5520,11 +5521,11 @@ dependencies = [
 
 [[package]]
 name = "nuid"
-version = "0.4.1"
+version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0b61b1710432e483e6a67b20b6c60c6afe0e2fad67aabba3bdb912f3f70ff6ae"
+checksum = "20c1bb65186718d348306bf1afdeb20d9ab45b2ab80fb793c0fdcf59ffbb4f38"
 dependencies = [
- "once_cell",
+ "lazy_static",
  "rand 0.8.5",
 ]
 
