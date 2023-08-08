@@ -227,7 +227,7 @@ mod tests {
     use codecs::JsonSerializerConfig;
     use futures::{future, FutureExt, StreamExt};
     use serde_json::Value as JsonValue;
-    use tokio::time::timeout;
+    use tokio::{time, time::timeout};
     use tokio_tungstenite::{
         accept_async, accept_hdr_async,
         tungstenite::{

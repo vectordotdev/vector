@@ -107,7 +107,7 @@ impl SourceConfig for super::config::WebSocketConfig {
         let connector = WebSocketConnector::new(self.uri.clone(), tls, self.auth.clone())?;
 
         let log_namespace = cx.log_namespace(self.log_namespace);
-        let decoder = self.get_decoding_config(Some(log_namespace)).build();
+        let decoder = self.get_decoding_config(Some(log_namespace)).build()?;
 
         Ok(Box::pin(super::source::recv_from_websocket(
             cx,

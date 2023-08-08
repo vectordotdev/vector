@@ -102,7 +102,7 @@ impl InternalEvent for WsMessageReceived {
         );
         counter!(
             "component_received_events_total", 1,
-            "uri" => self.url.clone(),
+            "uri" => self.url,
         );
     }
 

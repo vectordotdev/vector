@@ -91,7 +91,7 @@ pub(crate) async fn recv_from_websocket(
     // using NonZeroU64 that is not something we need to account for.
     let mut ping = PingInterval::new(ping_interval.map(u64::from));
 
-    if let Some(_) = ping_interval {
+    if ping_interval.is_some() {
         if let Err(error) = ws_sink.send(Message::Ping(PING.to_vec())).await {
             emit!(WsConnectionError { error });
             return Err(());
@@ -145,7 +145,7 @@ pub(crate) async fn recv_from_websocket(
                         match params.decoder.clone().decode(&mut buf)
                             .map(|maybe_msg| async {
                                 maybe_msg.and_then(|(msg, _)| {
-                                    msg.into_iter().nth(0)
+                                    msg.into_iter().next()
                                 }).and_then(|e| {
                                     if let Event::Log(log_evt) = e {
                                         Some(WebSocketEvent{
@@ -229,7 +229,7 @@ async fn handle_text_message<'a>(
     out: &mut SourceSender,
     msg: WebSocketEvent<'a>,
     endpoint: String,
-) -> () {
+) {
     emit!(WsMessageReceived { url: endpoint });
 
     if let Err(error) = out.send_event(EventArray::Logs(vec![msg.into()])).await {
