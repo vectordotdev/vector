@@ -1,9 +1,11 @@
 use std::{future::ready, pin::Pin};
 
 use futures::{stream, Stream, StreamExt};
+use mlua::ExternalError;
 use ordered_float::NotNan;
 use snafu::{ResultExt, Snafu};
 use vector_config::configurable_component;
+use vrl::path::parse_target_path;
 
 use crate::config::OutputId;
 use crate::schema::Definition;
@@ -223,6 +225,7 @@ impl mlua::UserData for LuaEvent {
         methods.add_meta_method_mut(
             mlua::MetaMethod::NewIndex,
             |_lua, this, (key, value): (String, Option<mlua::Value<'lua>>)| {
+                let key_path = parse_target_path(key.as_str()).map_err(|e| e.to_lua_err())?;
                 match value {
                     Some(mlua::Value::String(string)) => {
                         this.inner.as_mut_log().insert(
@@ -233,20 +236,20 @@ impl mlua::UserData for LuaEvent {
                     Some(mlua::Value::Integer(integer)) => {
                         this.inner
                             .as_mut_log()
-                            .insert(key.as_str(), Value::Integer(integer));
+                            .insert(&key_path, Value::Integer(integer));
                     }
                     Some(mlua::Value::Number(number)) if !number.is_nan() => {
                         this.inner
                             .as_mut_log()
-                            .insert(key.as_str(), Value::Float(NotNan::new(number).unwrap()));
+                            .insert(&key_path, Value::Float(NotNan::new(number).unwrap()));
                     }
                     Some(mlua::Value::Boolean(boolean)) => {
                         this.inner
                             .as_mut_log()
-                            .insert(key.as_str(), Value::Boolean(boolean));
+                            .insert(&key_path, Value::Boolean(boolean));
                     }
                     Some(mlua::Value::Nil) | None => {
-                        this.inner.as_mut_log().remove(key.as_str());
+                        this.inner.as_mut_log().remove(&key_path);
                     }
                     _ => {
                         info!(
@@ -255,7 +258,7 @@ impl mlua::UserData for LuaEvent {
                             field = key.as_str(),
                             internal_log_rate_limit = true
                         );
-                        this.inner.as_mut_log().remove(key.as_str());
+                        this.inner.as_mut_log().remove(&key_path);
                     }
                 }
 
@@ -287,10 +290,15 @@ impl mlua::UserData for LuaEvent {
                     let keys: mlua::Table = state.raw_get("keys")?;
                     let next: mlua::Function = lua.globals().raw_get("next")?;
                     let key: Option<String> = next.call((keys, prev))?;
-                    match key
-                        .clone()
-                        .and_then(|k| event.inner.as_log().get(k.as_str()))
-                    {
+                    let value = key.clone().and_then(|k| {
+                        event
+                            .inner
+                            .as_log()
+                            .parse_path_and_get_value(k.as_str())
+                            .ok()
+                            .flatten()
+                    });
+                    match value {
                         Some(value) => {
                             Ok((key, Some(lua.create_string(&value.coerce_to_bytes())?)))
                         }

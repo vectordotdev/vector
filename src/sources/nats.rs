@@ -224,7 +224,7 @@ async fn nats_source(
                                 NatsSourceConfig::NAME,
                                 log,
                                 legacy_subject_key_field,
-                                "subject",
+                                &owned_value_path!("subject"),
                                 msg.subject.as_str(),
                             )
                         }

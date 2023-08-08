@@ -676,7 +676,7 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
         self.log_namespace.insert_vector_metadata(
             &mut log,
             log_schema().source_type_key(),
-            lookup::path!("source_type"),
+            &owned_value_path!("source_type"),
             SplunkConfig::NAME,
         );
 
@@ -685,7 +685,7 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
             self.log_namespace.insert_source_metadata(
                 SplunkConfig::NAME,
                 &mut log,
-                Some(LegacyKey::Overwrite(CHANNEL)),
+                Some(LegacyKey::Overwrite(&owned_value_path!(CHANNEL))),
                 CHANNEL,
                 guid,
             );
@@ -693,7 +693,7 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
             self.log_namespace.insert_source_metadata(
                 SplunkConfig::NAME,
                 &mut log,
-                Some(LegacyKey::Overwrite(CHANNEL)),
+                Some(LegacyKey::Overwrite(&owned_value_path!(CHANNEL))),
                 CHANNEL,
                 guid.clone(),
             );
@@ -705,7 +705,7 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
                 self.log_namespace.insert_source_metadata(
                     SplunkConfig::NAME,
                     &mut log,
-                    Some(LegacyKey::Overwrite(key.as_str())),
+                    Some(LegacyKey::Overwrite(&owned_value_path!(key.as_str()))),
                     key.as_str(),
                     value,
                 );
@@ -1009,7 +1009,7 @@ fn raw_event(
     log_namespace.insert_source_metadata(
         SplunkConfig::NAME,
         &mut log,
-        Some(LegacyKey::Overwrite(CHANNEL)),
+        Some(LegacyKey::Overwrite(&owned_value_path!(CHANNEL))),
         CHANNEL,
         channel,
     );

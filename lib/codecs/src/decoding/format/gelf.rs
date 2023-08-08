@@ -360,7 +360,7 @@ mod tests {
             let events = deserialize_gelf_input(&input).unwrap();
             assert_eq!(events.len(), 1);
             let log = events[0].as_log();
-            assert!(!log.contains("_id"));
+            assert!(!log.contains(event_path!("_id")));
         }
     }
 
