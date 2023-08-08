@@ -187,7 +187,7 @@ base: components: sinks: mezmo: configuration: {
 																`adaptive_concurrency_limit` metric.
 																"""
 						required: false
-						type: uint: {}
+						type: uint: default: 1
 					}
 					rtt_deviation_scale: {
 						description: """
