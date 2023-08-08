@@ -187,7 +187,7 @@ async fn azure_blob_insert_json_into_blob_gzip() {
     );
     assert_eq!(
         blob.properties.content_type,
-        String::from("application/json")
+        String::from("application/x-ndjson")
     );
     let expected = events
         .iter()
