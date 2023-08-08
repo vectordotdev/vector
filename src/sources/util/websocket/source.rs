@@ -1,4 +1,10 @@
 use std::{io, num::NonZeroU64};
+use vector_common::json_size::JsonSize;
+use vector_core::{
+    config::{LegacyKey, LogNamespace},
+    event::{Event, EventArray, EventContainer, LogEvent},
+    EstimatedJsonEncodedSizeOf,
+};
 
 use bytes::BytesMut;
 use chrono::Utc;
@@ -16,15 +22,11 @@ use crate::{
     },
     config::SourceContext,
     internal_events::{
-        ConnectionOpen, OpenGauge, WsConnectionError, WsConnectionShutdown, WsMessageReceived,
+        ConnectionOpen, OpenGauge, WsBytesReceived, WsConnectionError, WsConnectionShutdown,
+        WsKind, WsMessageReceived, PROTOCOL,
     },
     SourceSender,
 };
-
-use vector_core::config::{LegacyKey, LogNamespace}; //, SourceOutput};
-use vector_core::event::{Event, EventArray, LogEvent};
-
-const DEFAULT_SOURCE_NAME: &str = "websocket";
 
 #[derive(Debug, PartialEq)]
 struct WebSocketEvent<'a> {
@@ -64,6 +66,12 @@ impl From<WebSocketEvent<'_>> for LogEvent {
 impl From<WebSocketEvent<'_>> for Event {
     fn from(frame: WebSocketEvent) -> Event {
         LogEvent::from(frame).into()
+    }
+}
+
+impl EstimatedJsonEncodedSizeOf for WebSocketEvent<'_> {
+    fn estimated_json_encoded_size_of(&self) -> JsonSize {
+        self.payload.estimated_json_encoded_size_of()
     }
 }
 
@@ -118,9 +126,17 @@ pub(crate) async fn recv_from_websocket(
             },
 
             Some(msg) = ws_source.next() => {
+
                 // Pongs are sent automatically by tungstenite during reading from the stream.
                 match msg {
-                    Ok(Message::Ping(_)) => {
+                    Ok(Message::Ping(ping)) => {
+                        emit!(WsBytesReceived{
+                            byte_size: ping.len(),
+                            url: &config.uri,
+                            protocol: PROTOCOL,
+                            kind: WsKind::Ping,
+                        });
+
                         if let Err(error) = ws_sink.send(Message::Pong(PONG.to_vec())).await {
                             Err(error)
                         } else {
@@ -134,40 +150,34 @@ pub(crate) async fn recv_from_websocket(
                     },
 
                     Ok(Message::Text(msg_txt)) => {
-                        Ok(handle_text_message(&mut out.clone(), WebSocketEvent{
+                        emit!(WsBytesReceived{
+                            byte_size: msg_txt.len(),
+                            url: &config.uri,
+                            protocol: PROTOCOL,
+                            kind: WsKind::Text,
+                        });
+
+                    handle_message(
+                        &mut out.clone(),
+                        WebSocketEvent{
                             payload: msg_txt,
                             log_namespace: &params.log_namespace,
-                        }, config.uri.clone(),
-                        ).await)
+                        },
+                        &config.uri,
+                        ).await;
+
+                        Ok(())
                     },
 
                     Ok(Message::Binary(msg_bytes)) => {
-                        let mut buf: BytesMut = msg_bytes.iter().collect();
-                        match params.decoder.clone().decode(&mut buf)
-                            .map(|maybe_msg| async {
-                                maybe_msg.and_then(|(msg, _)| {
-                                    msg.into_iter().next()
-                                }).and_then(|e| {
-                                    if let Event::Log(log_evt) = e {
-                                        Some(WebSocketEvent{
-                                            payload: log_evt.value().to_string(),
-                                            log_namespace: &params.log_namespace,
-                                        })
-                                    } else {
-                                        warn!("Decoded unsupported event: {:?}", e);
-                                        None
-                                    }
-                                }).map(|evt| async {
-                                    handle_text_message(&mut out.clone(), evt, config.uri.clone()).await
-                                }).ok_or(())?.await;
-                                Ok::<(), ()>(())
-                            }).map_err(|err| {error!("Failed to process binary message: {}", err);}) {
-                                Ok(_) => Ok(()),
-                                Err(e) => {
-                                    error!("Failed to send binary message: {:?}", e);
-                                    Ok(())
-                                }
-                            }
+                        emit!(WsBytesReceived{
+                            byte_size: msg_bytes.len(),
+                            url: &config.uri,
+                            protocol: PROTOCOL,
+                            kind: WsKind::Binary,
+                        });
+
+                        handle_binary_payload(msg_bytes, &params, &config.uri, out.clone()).await
                     },
 
                     Ok(Message::Close(_)) => {
@@ -225,14 +235,60 @@ fn check_received_pong_time(
     Ok(())
 }
 
-async fn handle_text_message<'a>(
-    out: &mut SourceSender,
-    msg: WebSocketEvent<'a>,
-    endpoint: String,
-) {
-    emit!(WsMessageReceived { url: endpoint });
+async fn handle_message<'a>(out: &mut SourceSender, msg: WebSocketEvent<'a>, endpoint: &str) {
+    let json_size = msg.estimated_json_encoded_size_of();
+    let events = EventArray::Logs(vec![msg.into()]);
 
-    if let Err(error) = out.send_event(EventArray::Logs(vec![msg.into()])).await {
+    emit!(WsMessageReceived {
+        count: events.len(),
+        byte_size: json_size,
+        url: endpoint,
+        protocol: WebSocketEvent::NAME,
+        kind: WsKind::Text,
+    });
+
+    if let Err(error) = out.send_event(events).await {
         error!("Could not send events: {}", error);
+    }
+}
+
+async fn handle_binary_payload(
+    msg_bytes: Vec<u8>,
+    params: &WebSocketSourceParams,
+    uri: &str,
+    mut out: SourceSender,
+) -> Result<(), WsError> {
+    let mut buf: BytesMut = msg_bytes.iter().collect();
+    match params
+        .decoder
+        .clone()
+        .decode(&mut buf)
+        .map(|maybe_msg| async {
+            maybe_msg
+                .and_then(|(msg, _)| msg.into_iter().next())
+                .and_then(|e| {
+                    if let Event::Log(log_evt) = e {
+                        Some(WebSocketEvent {
+                            payload: log_evt.value().to_string(),
+                            log_namespace: &params.log_namespace,
+                        })
+                    } else {
+                        warn!("Decoded unsupported event: {:?}", e);
+                        None
+                    }
+                })
+                .map(|evt| async { handle_message(&mut out, evt, uri).await })
+                .ok_or(())?
+                .await;
+            Ok::<(), ()>(())
+        })
+        .map_err(|err| {
+            error!("Failed to process binary message: {}", err);
+        }) {
+        Ok(_) => Ok(()),
+        Err(e) => {
+            error!("Failed to send binary message: {:?}", e);
+            Ok(())
+        }
     }
 }

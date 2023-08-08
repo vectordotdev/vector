@@ -1,10 +1,15 @@
 use std::error::Error;
 use std::fmt::Debug;
 
-use metrics::counter;
+use metrics::{counter, histogram};
 use vector_core::internal_event::InternalEvent;
 
-use vector_common::internal_event::{error_stage, error_type};
+use vector_common::{
+    internal_event::{error_stage, error_type},
+    json_size::JsonSize,
+};
+
+pub const PROTOCOL: &str = "websocket";
 
 #[derive(Debug)]
 pub struct WsConnectionEstablished;
@@ -90,19 +95,71 @@ impl InternalEvent for WsConnectionError {
     }
 }
 
-pub struct WsMessageReceived {
-    pub url: String,
+#[allow(dead_code)]
+#[derive(Debug)]
+pub enum WsKind {
+    Ping,
+    Pong,
+    Text,
+    Binary,
+    Close,
+    Frame,
 }
 
-impl InternalEvent for WsMessageReceived {
+#[derive(Debug)]
+pub struct WsBytesReceived<'a> {
+    pub byte_size: usize,
+    pub url: &'a str,
+    pub protocol: &'static str,
+    pub kind: WsKind,
+}
+
+impl InternalEvent for WsBytesReceived<'_> {
     fn emit(self) {
         trace!(
-            message = "Event received.",
-            url =  %self.url,
+            message = "Bytes received.",
+            byte_size = %self.byte_size,
+            url = %self.url,
+            protocol = %self.protocol
         );
         counter!(
-            "component_received_events_total", 1,
-            "uri" => self.url,
+            "component_received_bytes_total", self.byte_size as u64,
+            "url" => self.url.to_string(),
+            "protocol" => self.protocol,
+        );
+    }
+}
+
+#[derive(Debug)]
+pub struct WsMessageReceived<'a> {
+    pub count: usize,
+    pub byte_size: JsonSize,
+    pub url: &'a str,
+    pub protocol: &'static str,
+    pub kind: WsKind,
+}
+
+impl InternalEvent for WsMessageReceived<'_> {
+    fn emit(self) {
+        trace!(
+            message = "Events received.",
+            count = %self.count,
+            byte_size = %self.byte_size,
+            url =  %self.url,
+            protcol = %self.protocol,
+        );
+
+        histogram!("component_received_events_count", self.count as f64);
+        counter!(
+            "component_received_events_total", self.count as u64,
+            "uri" => self.url.to_string(),
+            "protocol" => PROTOCOL,
+        );
+        counter!(
+            "component_received_event_bytes_total",
+            self.byte_size.get() as u64,
+            "url" => self.url.to_string(),
+            "protocol" => PROTOCOL,
         );
     }
 
