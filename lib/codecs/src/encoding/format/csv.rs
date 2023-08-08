@@ -119,7 +119,7 @@ impl Default for CsvSerializerOptions {
             double_quote: true,
             escape: b'"',
             quote_style: QuoteStyle::Necessary,
-            fields: vec![]
+            fields: vec![],
         }
     }
 }
@@ -130,7 +130,7 @@ impl CsvSerializerOptions {
             QuoteStyle::Always => csv::QuoteStyle::Always,
             QuoteStyle::NonNumeric => csv::QuoteStyle::NonNumeric,
             QuoteStyle::Never => csv::QuoteStyle::Never,
-            _ => csv::QuoteStyle::Necessary
+            _ => csv::QuoteStyle::Necessary,
         }
     }
 }
@@ -138,7 +138,7 @@ impl CsvSerializerOptions {
 /// Serializer that converts an `Event` to bytes using the CSV format.
 #[derive(Debug, Clone)]
 pub struct CsvSerializer {
-    config: CsvSerializerConfig
+    config: CsvSerializerConfig,
 }
 
 impl CsvSerializer {
@@ -160,11 +160,9 @@ impl Encoder<Event> for CsvSerializer {
             .double_quote(self.config.csv.double_quote)
             .escape(self.config.csv.escape)
             .quote_style(self.config.csv.csv_quote_style())
-
-            // TODO: this is wanted after https://github.com/BurntSushi/rust-csv/pull/332 got merged
-            // .terminator(csv::Terminator::NONE)
-
             .from_writer(buffer.writer());
+        // TODO: this is wanted after https://github.com/BurntSushi/rust-csv/pull/332 got merged
+        // .terminator(csv::Terminator::NONE)
 
         for field in &self.config.csv.fields {
             match log.get(field) {
@@ -223,7 +221,6 @@ mod tests {
             "bool" => Value::from(true),
             "other" => Value::from("data"),
         }));
-
         let fields = vec![
             ConfigTargetPath::try_from("foo".to_string()).unwrap(),
             ConfigTargetPath::try_from("int".to_string()).unwrap(),
@@ -236,9 +233,10 @@ mod tests {
             ConfigTargetPath::try_from("bool".to_string()).unwrap(),
         ];
 
-        let mut opts = CsvSerializerOptions::default();
-        opts.fields = fields;
-
+        let opts = CsvSerializerOptions {
+            fields,
+            ..Default::default()
+        };
         let config = CsvSerializerConfig::new(opts);
         let mut serializer = config.build().unwrap();
         let mut bytes = BytesMut::new();
@@ -267,12 +265,14 @@ mod tests {
             ConfigTargetPath::try_from("field3".to_string()).unwrap(),
             ConfigTargetPath::try_from("field2".to_string()).unwrap(),
         ];
-        let mut opts = CsvSerializerOptions::default();
-        opts.fields = fields;
-
+        let opts = CsvSerializerOptions {
+            fields,
+            ..Default::default()
+        };
         let config = CsvSerializerConfig::new(opts);
         let mut serializer = config.build().unwrap();
         let mut bytes = BytesMut::new();
+
         serializer.encode(event, &mut bytes).unwrap();
 
         assert_eq!(
@@ -289,15 +289,15 @@ mod tests {
             // "field1" => Value::from("foo\"bar"),
             "field1" => Value::from("foo bar"),
         }));
-        let fields = vec![
-            ConfigTargetPath::try_from("field1".to_string()).unwrap(),
-        ];
-        let mut opts = CsvSerializerOptions::default();
-        opts.fields = fields;
-
+        let fields = vec![ConfigTargetPath::try_from("field1".to_string()).unwrap()];
+        let opts = CsvSerializerOptions {
+            fields,
+            ..Default::default()
+        };
         let config = CsvSerializerConfig::new(opts);
         let mut serializer = config.build().unwrap();
         let mut bytes = BytesMut::new();
+
         serializer.encode(event, &mut bytes).unwrap();
 
         assert_eq!(
@@ -318,19 +318,18 @@ mod tests {
             ConfigTargetPath::try_from("field1".to_string()).unwrap(),
             ConfigTargetPath::try_from("field2".to_string()).unwrap(),
         ];
-        let mut opts = CsvSerializerOptions::default();
-        opts.fields = fields;
-        opts.delimiter = b'\t';
-
+        let opts = CsvSerializerOptions {
+            fields,
+            delimiter: b'\t',
+            ..Default::default()
+        };
         let config = CsvSerializerConfig::new(opts);
         let mut serializer = config.build().unwrap();
         let mut bytes = BytesMut::new();
+
         serializer.encode(event, &mut bytes).unwrap();
 
-        assert_eq!(
-            bytes.freeze(),
-            b"value1\tvalue2".as_slice()
-        );
+        assert_eq!(bytes.freeze(), b"value1\tvalue2".as_slice());
     }
 
     #[test]
@@ -346,20 +345,19 @@ mod tests {
             ConfigTargetPath::try_from("field1".to_string()).unwrap(),
             ConfigTargetPath::try_from("field2".to_string()).unwrap(),
         ];
-        let mut opts = CsvSerializerOptions::default();
-        opts.fields = fields;
-        opts.double_quote = false;
-        opts.escape = b'\\';
-
+        let opts = CsvSerializerOptions {
+            fields,
+            double_quote: false,
+            escape: b'\\',
+            ..Default::default()
+        };
         let config = CsvSerializerConfig::new(opts);
         let mut serializer = config.build().unwrap();
         let mut bytes = BytesMut::new();
+
         serializer.encode(event, &mut bytes).unwrap();
 
-        assert_eq!(
-            bytes.freeze(),
-            b"\"foo\\\"bar\",baz".as_slice()
-        );
+        assert_eq!(bytes.freeze(), b"\"foo\\\"bar\",baz".as_slice());
     }
 
     #[test]
@@ -367,21 +365,18 @@ mod tests {
         let event = Event::Log(LogEvent::from(btreemap! {
             "field1" => Value::from("foo\"bar"),
         }));
-        let fields = vec![
-            ConfigTargetPath::try_from("field1".to_string()).unwrap(),
-        ];
-        let mut opts = CsvSerializerOptions::default();
-        opts.fields = fields;
-        opts.quote_style = QuoteStyle::Never;
-
+        let fields = vec![ConfigTargetPath::try_from("field1".to_string()).unwrap()];
+        let opts = CsvSerializerOptions {
+            fields,
+            quote_style: QuoteStyle::Never,
+            ..Default::default()
+        };
         let config = CsvSerializerConfig::new(opts);
         let mut serializer = config.build().unwrap();
         let mut bytes = BytesMut::new();
+
         serializer.encode(event, &mut bytes).unwrap();
 
-        assert_eq!(
-            bytes.freeze(),
-            b"foo\"bar".as_slice()
-        );
+        assert_eq!(bytes.freeze(), b"foo\"bar".as_slice());
     }
 }
