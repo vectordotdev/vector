@@ -198,7 +198,7 @@ fn os_signals(_: &Runtime) -> impl Stream<Item = SignalTo> {
 
     async_stream::stream! {
         loop {
-            let signal = tokio::signal::ctrl_c().map(|_| SignalTo::Shutdown).await;
+            let signal = tokio::signal::ctrl_c().map(|_| SignalTo::Shutdown(None)).await;
             yield signal;
         }
     }
