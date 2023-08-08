@@ -146,16 +146,16 @@ fn handle_dd_trace_payload_v1(
                 &source.log_schema_source_type_key,
                 Bytes::from("datadog_agent"),
             );
-            trace_event.insert("payload_version", "v2".to_string());
+            trace_event.insert(event_path!("payload_version"), "v2".to_string());
             trace_event.insert(&source.log_schema_host_key, hostname.clone());
-            trace_event.insert("env", env.clone());
-            trace_event.insert("agent_version", agent_version.clone());
-            trace_event.insert("target_tps", target_tps);
-            trace_event.insert("error_tps", error_tps);
-            if let Some(Value::Object(span_tags)) = trace_event.get_mut("tags") {
+            trace_event.insert(event_path!("env"), env.clone());
+            trace_event.insert(event_path!("agent_version"), agent_version.clone());
+            trace_event.insert(event_path!("target_tps"), target_tps);
+            trace_event.insert(event_path!("error_tps"), error_tps);
+            if let Some(Value::Object(span_tags)) = trace_event.get_mut(event_path!("tags")) {
                 span_tags.extend(tags.clone());
             } else {
-                trace_event.insert("tags", Value::from(tags.clone()));
+                trace_event.insert(event_path!("tags"), Value::from(tags.clone()));
             }
             Event::Trace(trace_event)
         })

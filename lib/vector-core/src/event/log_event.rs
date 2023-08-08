@@ -20,7 +20,7 @@ use vector_common::{
     request_metadata::GetEventCountTags,
     EventDataEq,
 };
-use vrl::path::OwnedTargetPath;
+use vrl::path::{parse_target_path, OwnedTargetPath, PathParseError};
 
 use super::{
     estimated_json_encoded_size_of::EstimatedJsonEncodedSizeOf,
@@ -295,6 +295,16 @@ impl LogEvent {
         self.metadata.add_finalizer(finalizer);
     }
 
+    /// Parse the specified `path` and if there are no parsing errors, attempt to get a reference to a value.
+    /// # Errors
+    /// Will return an error if path parsing failed.
+    pub fn parse_path_and_get_value(
+        &self,
+        path: impl AsRef<str>,
+    ) -> Result<Option<&Value>, PathParseError> {
+        parse_target_path(path.as_ref()).map(|path| self.get(&path))
+    }
+
     #[allow(clippy::needless_pass_by_value)] // TargetPath is always a reference
     pub fn get<'a>(&self, key: impl TargetPath<'a>) -> Option<&Value> {
         match key.prefix() {
@@ -439,11 +449,14 @@ impl LogEvent {
             let Some(incoming_val) = incoming.remove(field.as_ref()) else {
                 continue
             };
-            match self.get_mut(field.as_ref()) {
-                None => {
-                    self.insert(field.as_ref(), incoming_val);
+
+            if let Ok(path) = parse_target_path(field.as_ref()) {
+                match self.get_mut(&path) {
+                    None => {
+                        self.insert(&path, incoming_val);
+                    }
+                    Some(current_val) => current_val.merge(incoming_val),
                 }
-                Some(current_val) => current_val.merge(incoming_val),
             }
         }
         self.metadata.merge(incoming.metadata);
@@ -642,7 +655,9 @@ where
     type Output = Value;
 
     fn index(&self, key: T) -> &Value {
-        self.get(key.as_ref())
+        self.parse_path_and_get_value(key.as_ref())
+            .ok()
+            .flatten()
             .unwrap_or_else(|| panic!("Key is not found: {:?}", key.as_ref()))
     }
 }
@@ -654,7 +669,9 @@ where
 {
     fn extend<I: IntoIterator<Item = (K, V)>>(&mut self, iter: I) {
         for (k, v) in iter {
-            self.insert(k.as_ref(), v.into());
+            if let Ok(path) = parse_target_path(k.as_ref()) {
+                self.insert(&path, v.into());
+            }
         }
     }
 }

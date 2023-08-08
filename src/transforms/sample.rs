@@ -130,8 +130,14 @@ impl FunctionTransform for Sample {
             .key_field
             .as_ref()
             .and_then(|key_field| match &event {
-                Event::Log(event) => event.get(key_field.as_str()),
-                Event::Trace(event) => event.get(key_field.as_str()),
+                Event::Log(event) => event
+                    .parse_path_and_get_value(key_field.as_str())
+                    .ok()
+                    .flatten(),
+                Event::Trace(event) => event
+                    .parse_path_and_get_value(key_field.as_str())
+                    .ok()
+                    .flatten(),
                 Event::Metric(_) => panic!("component can never receive metric events"),
             })
             .map(|v| v.to_string_lossy());

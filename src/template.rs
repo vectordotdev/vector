@@ -167,13 +167,17 @@ impl Template {
                 Part::Reference(key) => {
                     out.push_str(
                         &match event {
-                            EventRef::Log(log) => log.get(&**key).map(Value::to_string_lossy),
+                            EventRef::Log(log) => log
+                                .parse_path_and_get_value(key)
+                                .ok()
+                                .and_then(|v| v.map(Value::to_string_lossy)),
                             EventRef::Metric(metric) => {
                                 render_metric_field(key, metric).map(Cow::Borrowed)
                             }
-                            EventRef::Trace(trace) => {
-                                trace.get(key.as_str()).map(Value::to_string_lossy)
-                            }
+                            EventRef::Trace(trace) => trace
+                                .parse_path_and_get_value(key)
+                                .ok()
+                                .and_then(|v| v.map(Value::to_string_lossy)),
                         }
                         .unwrap_or_else(|| {
                             missing_keys.push(key.to_owned());
