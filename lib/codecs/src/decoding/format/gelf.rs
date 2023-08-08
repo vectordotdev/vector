@@ -17,6 +17,7 @@ use vrl::value::kind::Collection;
 use vrl::value::{Kind, Value};
 
 use super::{default_lossy, Deserializer};
+use crate::gelf::GELF_TARGET_PATHS;
 use crate::{gelf_fields::*, VALID_FIELD_REGEX};
 
 /// On GELF decoding behavior:
@@ -123,11 +124,11 @@ impl GelfDeserializer {
             .into());
         }
 
-        log.insert(VERSION, parsed.version.to_string());
-        log.insert(HOST, parsed.host.to_string());
+        log.insert(&GELF_TARGET_PATHS.version, parsed.version.to_string());
+        log.insert(&GELF_TARGET_PATHS.host, parsed.host.to_string());
 
         if let Some(full_message) = &parsed.full_message {
-            log.insert(FULL_MESSAGE, full_message.to_string());
+            log.insert(&GELF_TARGET_PATHS.full_message, full_message.to_string());
         }
 
         if let Some(timestamp_key) = log_schema().timestamp_key_target_path() {
@@ -145,19 +146,19 @@ impl GelfDeserializer {
         }
 
         if let Some(level) = parsed.level {
-            log.insert(LEVEL, level);
+            log.insert(&GELF_TARGET_PATHS.level, level);
         }
         if let Some(facility) = &parsed.facility {
-            log.insert(FACILITY, facility.to_string());
+            log.insert(&GELF_TARGET_PATHS.facility, facility.to_string());
         }
         if let Some(line) = parsed.line {
             log.insert(
-                LINE,
+                &GELF_TARGET_PATHS.line,
                 Value::Float(ordered_float::NotNan::new(line).expect("JSON doesn't allow NaNs")),
             );
         }
         if let Some(file) = &parsed.file {
-            log.insert(FILE, file.to_string());
+            log.insert(&GELF_TARGET_PATHS.file, file.to_string());
         }
 
         if let Some(add) = &parsed.additional_fields {

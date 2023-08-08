@@ -33,7 +33,7 @@ use crate::config::{log_schema, telemetry};
 use crate::{event::MaybeAsLogMut, ByteSizeOf};
 use lookup::{metadata_path, path};
 use once_cell::sync::Lazy;
-use vrl::owned_value_path;
+use vrl::{event_path, owned_value_path};
 
 static VECTOR_SOURCE_TYPE_PATH: Lazy<Option<OwnedTargetPath>> = Lazy::new(|| {
     Some(OwnedTargetPath::metadata(owned_value_path!(
@@ -351,6 +351,19 @@ impl LogEvent {
         }
     }
 
+    /// Parse the specified `path` and if there are no parsing errors, attempt to insert the specified `value`.
+    ///
+    /// # Errors
+    /// Will return an error if path parsing failed.
+    pub fn parse_path_and_insert(
+        &mut self,
+        path: impl AsRef<str>,
+        value: impl Into<Value>,
+    ) -> Result<Option<Value>, PathParseError> {
+        let target_path = parse_target_path(path.as_ref())?;
+        Ok(self.insert(&target_path, value))
+    }
+
     #[allow(clippy::needless_pass_by_value)] // TargetPath is always a reference
     pub fn insert<'a>(
         &mut self,
@@ -444,19 +457,18 @@ impl LogEvent {
     }
 
     /// Merge all fields specified at `fields` from `incoming` to `current`.
+    /// Note that `fields` containing dots and other special characters will be treated as a single segment.
     pub fn merge(&mut self, mut incoming: LogEvent, fields: &[impl AsRef<str>]) {
         for field in fields {
-            let Some(incoming_val) = incoming.remove(field.as_ref()) else {
+            let field_path = event_path!(field.as_ref());
+            let Some(incoming_val) = incoming.remove(field_path) else {
                 continue
             };
-
-            if let Ok(path) = parse_target_path(field.as_ref()) {
-                match self.get_mut(&path) {
-                    None => {
-                        self.insert(&path, incoming_val);
-                    }
-                    Some(current_val) => current_val.merge(incoming_val),
+            match self.get_mut(field_path) {
+                None => {
+                    self.insert(field_path, incoming_val);
                 }
+                Some(current_val) => current_val.merge(incoming_val),
             }
         }
         self.metadata.merge(incoming.metadata);
@@ -694,6 +706,24 @@ impl Serialize for LogEvent {
     }
 }
 
+// Tracing owned target paths used for tracing to log event conversions.
+struct TracingTargetPaths {
+    pub(crate) timestamp: OwnedTargetPath,
+    pub(crate) kind: OwnedTargetPath,
+    pub(crate) module_path: OwnedTargetPath,
+    pub(crate) level: OwnedTargetPath,
+    pub(crate) target: OwnedTargetPath,
+}
+
+/// Lazily initialized singleton.
+static TRACING_TARGET_PATHS: Lazy<TracingTargetPaths> = Lazy::new(|| TracingTargetPaths {
+    timestamp: OwnedTargetPath::event(owned_value_path!("timestamp")),
+    kind: OwnedTargetPath::event(owned_value_path!("metadata", "kind")),
+    level: OwnedTargetPath::event(owned_value_path!("metadata", "level")),
+    module_path: OwnedTargetPath::event(owned_value_path!("metadata", "module_path")),
+    target: OwnedTargetPath::event(owned_value_path!("metadata", "target")),
+});
+
 impl From<&tracing::Event<'_>> for LogEvent {
     fn from(event: &tracing::Event<'_>) -> Self {
         let now = chrono::Utc::now();
@@ -701,11 +731,11 @@ impl From<&tracing::Event<'_>> for LogEvent {
         event.record(&mut maker);
 
         let mut log = maker;
-        log.insert("timestamp", now);
+        log.insert(&TRACING_TARGET_PATHS.timestamp, now);
 
         let meta = event.metadata();
         log.insert(
-            "metadata.kind",
+            &TRACING_TARGET_PATHS.kind,
             if meta.is_event() {
                 Value::Bytes("event".to_string().into())
             } else if meta.is_span() {
@@ -714,42 +744,42 @@ impl From<&tracing::Event<'_>> for LogEvent {
                 Value::Null
             },
         );
-        log.insert("metadata.level", meta.level().to_string());
+        log.insert(&TRACING_TARGET_PATHS.level, meta.level().to_string());
         log.insert(
-            "metadata.module_path",
+            &TRACING_TARGET_PATHS.module_path,
             meta.module_path()
                 .map_or(Value::Null, |mp| Value::Bytes(mp.to_string().into())),
         );
-        log.insert("metadata.target", meta.target().to_string());
-
+        log.insert(&TRACING_TARGET_PATHS.target, meta.target().to_string());
         log
     }
 }
 
+/// Note that `tracing::field::Field` containing dots and other special characters will be treated as a single segment.
 impl tracing::field::Visit for LogEvent {
     fn record_str(&mut self, field: &tracing::field::Field, value: &str) {
-        self.insert(field.name(), value.to_string());
+        self.insert(event_path!(field.name()), value.to_string());
     }
 
     fn record_debug(&mut self, field: &tracing::field::Field, value: &dyn Debug) {
-        self.insert(field.name(), format!("{value:?}"));
+        self.insert(event_path!(field.name()), format!("{value:?}"));
     }
 
     fn record_i64(&mut self, field: &tracing::field::Field, value: i64) {
-        self.insert(field.name(), value);
+        self.insert(event_path!(field.name()), value);
     }
 
     fn record_u64(&mut self, field: &tracing::field::Field, value: u64) {
-        let field = field.name();
+        let field_path = event_path!(field.name());
         let converted: Result<i64, _> = value.try_into();
         match converted {
-            Ok(value) => self.insert(field, value),
-            Err(_) => self.insert(field, value.to_string()),
+            Ok(value) => self.insert(field_path, value),
+            Err(_) => self.insert(field_path, value.to_string()),
         };
     }
 
     fn record_bool(&mut self, field: &tracing::field::Field, value: bool) {
-        self.insert(field.name(), value);
+        self.insert(event_path!(field.name()), value);
     }
 }
 
