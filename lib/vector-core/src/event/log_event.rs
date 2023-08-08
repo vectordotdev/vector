@@ -660,6 +660,7 @@ impl TryInto<serde_json::Value> for LogEvent {
     }
 }
 
+#[cfg(any(test, feature = "test"))]
 impl<T> std::ops::Index<T> for LogEvent
 where
     T: AsRef<str>,
