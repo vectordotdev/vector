@@ -1,31 +1,16 @@
-use std::task::{Context, Poll};
+use std::{
+    io,
+    task::{Context, Poll},
+};
 
 use bytes::{Bytes, BytesMut};
-use futures::{future::BoxFuture, stream, FutureExt, SinkExt, StreamExt};
 use redis::{aio::ConnectionManager, RedisError, RedisResult};
-use snafu::{ResultExt, Snafu};
-use tokio_util::codec::Encoder as _;
-use tower::{Service, ServiceBuilder};
-use vector_common::internal_event::{
-    ByteSize, BytesSent, InternalEventHandle, Protocol, Registered,
-};
-use vector_config::configurable_component;
-use vector_core::EstimatedJsonEncodedSizeOf;
+use snafu::Snafu;
+use vector_core::config::telemetry;
 
-use crate::{
-    codecs::{Encoder, EncodingConfig, Transformer},
-    config::{self, AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
-    event::Event,
-    internal_events::TemplateRenderingError,
-    sinks::util::{
-        batch::BatchConfig,
-        retries::{RetryAction, RetryLogic},
-        sink::Response,
-        BatchSink, Concurrency, EncodedEvent, EncodedLength, ServiceBuilderExt, SinkBatchSettings,
-        TowerRequestConfig, VecBuffer,
-    },
-    template::{Template, TemplateParseError},
-};
+use crate::sinks::prelude::*;
+
+use super::util::{retries::RetryAction, Concurrency, VecBuffer};
 
 #[derive(Debug, Snafu)]
 enum RedisSinkError {
@@ -187,7 +172,7 @@ impl SinkConfig for RedisSinkConfig {
     }
 
     fn input(&self) -> Input {
-        Input::new(self.encoding.config().input_type() & config::DataType::Log)
+        Input::new(self.encoding.config().input_type() & DataType::Log)
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
@@ -219,25 +204,16 @@ impl RedisSinkConfig {
 
         let buffer = VecBuffer::new(batch.size);
 
-        let redis = RedisSink {
-            conn,
-            data_type,
-            bytes_sent: register!(BytesSent::from(Protocol::TCP)),
-        };
+        // let sink = BatchSink::new(svc, buffer, batch.timeout)
+        //     .with_flat_map(move |event| {
+        //         // Errors are handled by `Encoder`.
+        //         stream::iter(encode_event(event, &key, &transformer, &mut encoder)).map(Ok)
+        //     })
+        //     .sink_map_err(|error| error!(message = "Sink failed to flush.", %error));
 
-        let svc = ServiceBuilder::new()
-            .settings(request, RedisRetryLogic)
-            .service(redis);
+        let sink = RedisSink::new(&self)?;
 
-        let sink = BatchSink::new(svc, buffer, batch.timeout)
-            .with_flat_map(move |event| {
-                // Errors are handled by `Encoder`.
-                stream::iter(encode_event(event, &key, &transformer, &mut encoder)).map(Ok)
-            })
-            .sink_map_err(|error| error!(message = "Sink failed to flush.", %error));
-
-        #[allow(deprecated)]
-        Ok(super::VectorSink::from_event_sink(sink))
+        Ok(super::VectorSink::from_event_streamsink(sink))
     }
 
     async fn build_client(&self) -> RedisResult<ConnectionManager> {
@@ -258,50 +234,196 @@ impl RedisSinkConfig {
     }
 }
 
+struct RedisSink {
+    request: TowerRequestConfig,
+    encoder: crate::codecs::Encoder<()>,
+    transformer: crate::codecs::Transformer,
+}
+
+impl RedisSink {
+    pub fn new(config: &RedisSinkConfig) -> crate::Result<Self> {
+        let transformer = config.encoding.transformer();
+        let serializer = config.encoding.build()?;
+        let encoder = Encoder::<()>::new(serializer);
+        Ok(RedisSink {
+            request: config.request.clone(),
+            transformer,
+            encoder,
+        })
+    }
+
+    async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
+        let request_builder = RedisRequestBuilder {
+            encoder: RedisEncoder {
+                encoder: self.encoder,
+                transformer: self.transformer,
+            },
+        };
+
+        let request = self.request.unwrap_with(&TowerRequestConfig {
+            concurrency: Concurrency::Fixed(1),
+            ..Default::default()
+        });
+
+        let service = RedisService { conn, data_type };
+
+        let service = ServiceBuilder::new()
+            .settings(request, RedisRetryLogic)
+            .service(service);
+
+        input
+            .request_builder(None, request_builder)
+            .into_driver(service)
+            .protocol("redis")
+            .run
+            .await
+    }
+}
+
+#[async_trait]
+impl StreamSink<Event> for RedisSink {
+    async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
+        self.run_inner(input).await
+    }
+}
+
+struct RedisEncoder {
+    encoder: crate::codecs::Encoder<()>,
+    transformer: crate::codecs::Transformer,
+}
+
+impl encoding::Encoder<Event> for RedisEncoder {
+    fn encode_input(
+        &self,
+        input: Event,
+        writer: &mut dyn std::io::Write,
+    ) -> std::io::Result<(usize, GroupedCountByteSize)> {
+        self.transformer.transform(&mut input);
+
+        let mut byte_size = telemetry().create_request_count_byte_size();
+        byte_size.add_event(&input, input.estimated_json_encoded_size_of());
+
+        let mut bytes = BytesMut::new();
+        // Errors are handled by `Encoder`.
+        self.encoder
+            .encode(input, &mut bytes)
+            .map_err(|_| io::Error::new(io::ErrorKind::Other, "unable to encode"))?;
+
+        let body = bytes.freeze();
+        write_all(writer, 1, body.as_ref())?;
+
+        Ok((body.len(), byte_size))
+    }
+}
+
+struct RedisMetadata {
+    key: String,
+}
+
+struct RedisRequest {
+    request: RedisKvEntry,
+}
+
+struct RedisRequestBuilder {
+    encoder: RedisEncoder,
+}
+
+impl RequestBuilder<Event> for RedisRequestBuilder {
+    type Metadata = RedisMetadata;
+    type Events = Event;
+    type Encoder = RedisEncoder;
+    type Payload = Bytes;
+    type Request = RedisRequest;
+    type Error = io::Error;
+
+    fn compression(&self) -> Compression {
+        Compression::None
+    }
+
+    fn encoder(&self) -> &Self::Encoder {
+        &self.encoder
+    }
+
+    fn split_input(&self, input: Event) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
+        let builder = RequestMetadataBuilder::from_event(&input);
+
+        // TODO This needs to be rendered earlier.
+        let key = key
+            .render_string(&input)
+            .map_err(|error| {
+                emit!(TemplateRenderingError {
+                    error,
+                    field: Some("key"),
+                    drop_event: true,
+                });
+            })
+            .unwrap();
+
+        let metadata = RedisMetadata { key };
+        (metadata, builder, input)
+    }
+
+    fn build_request(
+        &self,
+        metadata: Self::Metadata,
+        request_metadata: RequestMetadata,
+        payload: EncodeResult<Self::Payload>,
+    ) -> Self::Request {
+        let value = payload.into_payload();
+
+        RedisRequest {
+            request: RedisKvEntry {
+                key: metadata.key,
+                value,
+            },
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 struct RedisKvEntry {
     key: String,
     value: Bytes,
 }
 
-impl EncodedLength for RedisKvEntry {
+impl super::util::EncodedLength for RedisKvEntry {
     fn encoded_length(&self) -> usize {
         self.value.len()
     }
 }
 
-fn encode_event(
-    mut event: Event,
-    key: &Template,
-    transformer: &Transformer,
-    encoder: &mut Encoder<()>,
-) -> Option<EncodedEvent<RedisKvEntry>> {
-    let key = key
-        .render_string(&event)
-        .map_err(|error| {
-            emit!(TemplateRenderingError {
-                error,
-                field: Some("key"),
-                drop_event: true,
-            });
-        })
-        .ok()?;
+// fn encode_event(
+//     mut event: Event,
+//     key: &Template,
+//     transformer: &Transformer,
+//     encoder: &mut Encoder<()>,
+// ) -> Option<super::util::EncodedEvent<RedisKvEntry>> {
+//     let key = key
+//         .render_string(&event)
+//         .map_err(|error| {
+//             emit!(TemplateRenderingError {
+//                 error,
+//                 field: Some("key"),
+//                 drop_event: true,
+//             });
+//         })
+//         .ok()?;
 
-    let event_byte_size = event.estimated_json_encoded_size_of();
+//     let event_byte_size = event.estimated_json_encoded_size_of();
 
-    transformer.transform(&mut event);
+//     transformer.transform(&mut event);
 
-    let mut bytes = BytesMut::new();
+//     let mut bytes = BytesMut::new();
 
-    // Errors are handled by `Encoder`.
-    encoder.encode(event, &mut bytes).ok()?;
+//     // Errors are handled by `Encoder`.
+//     encoder.encode(event, &mut bytes).ok()?;
 
-    let byte_size = bytes.len();
-    let value = bytes.freeze();
+//     let byte_size = bytes.len();
+//     let value = bytes.freeze();
 
-    let event = EncodedEvent::new(RedisKvEntry { key, value }, byte_size, event_byte_size);
-    Some(event)
-}
+//     let event = EncodedEvent::new(RedisKvEntry { key, value }, byte_size, event_byte_size);
+//     Some(event)
+// }
 
 type RedisPipeResult = RedisResult<Vec<bool>>;
 
@@ -331,13 +453,12 @@ impl RetryLogic for RedisRetryLogic {
 }
 
 #[derive(Clone)]
-pub struct RedisSink {
+pub struct RedisService {
     conn: ConnectionManager,
     data_type: DataType,
-    bytes_sent: Registered<BytesSent>,
 }
 
-impl Service<Vec<RedisKvEntry>> for RedisSink {
+impl Service<Vec<RedisKvEntry>> for RedisService {
     type Response = Vec<bool>;
     type Error = RedisError;
     type Future = BoxFuture<'static, RedisPipeResult>;
