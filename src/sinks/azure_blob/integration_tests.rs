@@ -111,12 +111,9 @@ async fn azure_blob_insert_json_into_blob() {
     assert_eq!(blobs.len(), 1);
     assert!(blobs[0].clone().ends_with(".log"));
     let (blob, blob_lines) = config.get_blob(blobs[0].clone()).await;
+    assert_eq!(blob.properties.content_encoding, None);
     assert_eq!(
-        blob.properties.content_encoding,
-        None
-    );
-    assert_eq!(
-        blob.properties.content_type, 
+        blob.properties.content_type,
         String::from("application/x-ndjson")
     );
     let expected = events
@@ -145,14 +142,8 @@ async fn azure_blob_insert_lines_into_blob_gzip() {
     assert_eq!(blobs.len(), 1);
     assert!(blobs[0].clone().ends_with(".log.gz"));
     let (blob, blob_lines) = config.get_blob(blobs[0].clone()).await;
-    assert_eq!(
-        blob.properties.content_encoding,
-        Some(String::from("gzip"))
-    );
-    assert_eq!(
-        blob.properties.content_type,
-        String::from("text/plain")
-    );
+    assert_eq!(blob.properties.content_encoding, Some(String::from("gzip")));
+    assert_eq!(blob.properties.content_type, String::from("text/plain"));
     assert_eq!(lines, blob_lines);
 }
 
@@ -181,10 +172,7 @@ async fn azure_blob_insert_json_into_blob_gzip() {
     assert_eq!(blobs.len(), 1);
     assert!(blobs[0].clone().ends_with(".log.gz"));
     let (blob, blob_lines) = config.get_blob(blobs[0].clone()).await;
-    assert_eq!(
-        blob.properties.content_encoding,
-        Some(String::from("gzip"))
-    );
+    assert_eq!(blob.properties.content_encoding, Some(String::from("gzip")));
     assert_eq!(
         blob.properties.content_type,
         String::from("application/x-ndjson")
