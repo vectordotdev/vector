@@ -383,7 +383,7 @@ ntapi = { git = "https://github.com/MSxDOS/ntapi.git", rev = "24fc1e47677fc9f6e3
 # The current `openssl-sys` crate will vendor the OpenSSL sources via
 # `openssl-src` at version 1.1.1*, but we want version 3.0.*. Bring in forked
 # version of that crate with the appropriate dependency patched in.
-openssl-sys = { git = "https://github.com/vectordotdev/rust-openssl.git", tag = "openssl-sys-v0.9.88+3.0.0" }
+openssl-sys = { git = "https://github.com/vectordotdev/rust-openssl.git", tag = "openssl-sys-v0.9.91+3.0.0" }
 
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin
