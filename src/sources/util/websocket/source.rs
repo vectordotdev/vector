@@ -28,15 +28,17 @@ const DEFAULT_SOURCE_NAME: &str = "websocket";
 
 #[derive(Debug, PartialEq)]
 struct WebSocketEvent<'a> {
-    name: String,
     payload: String,
     log_namespace: &'a LogNamespace,
+}
+
+impl WebSocketEvent<'_> {
+    const NAME: &str = "websocket";
 }
 
 impl From<WebSocketEvent<'_>> for LogEvent {
     fn from(frame: WebSocketEvent) -> LogEvent {
         let WebSocketEvent {
-            name,
             payload,
             log_namespace,
         } = frame;
@@ -48,7 +50,7 @@ impl From<WebSocketEvent<'_>> for LogEvent {
         }
 
         log_namespace.insert_source_metadata(
-            &name,
+            &WebSocketEvent::NAME,
             &mut log,
             Some(LegacyKey::Overwrite(path!("payload"))),
             path!("payload"),
@@ -133,7 +135,6 @@ pub(crate) async fn recv_from_websocket(
 
                     Ok(Message::Text(msg_txt)) => {
                         Ok(handle_text_message(&mut out.clone(), WebSocketEvent{
-                            name: DEFAULT_SOURCE_NAME.to_owned(),
                             payload: msg_txt,
                             log_namespace: &params.log_namespace,
                         }, config.uri.clone(),
@@ -149,7 +150,6 @@ pub(crate) async fn recv_from_websocket(
                                 }).and_then(|e| {
                                     if let Event::Log(log_evt) = e {
                                         Some(WebSocketEvent{
-                                            name: DEFAULT_SOURCE_NAME.to_owned(),
                                             payload: log_evt.value().to_string(),
                                             log_namespace: &params.log_namespace,
                                         })
