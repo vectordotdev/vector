@@ -7,8 +7,7 @@ apt-get update
 apt-get install -y \
   apt-transport-https \
   gnupg \
-  wget \
-  libipc-cmd-perl
+  wget 
 
 # we need LLVM >= 3.9 for onig_sys/bindgen
 
