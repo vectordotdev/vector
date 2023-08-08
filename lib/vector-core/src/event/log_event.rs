@@ -457,6 +457,7 @@ impl LogEvent {
     }
 
     /// Merge all fields specified at `fields` from `incoming` to `current`.
+    /// Note that `fields` containing dots and other special characters will be treated as a single segment.
     pub fn merge(&mut self, mut incoming: LogEvent, fields: &[impl AsRef<str>]) {
         for field in fields {
             let field_path = event_path!(field.as_ref());
