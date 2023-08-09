@@ -18,6 +18,7 @@ pub(super) struct HttpEncoder {
 }
 
 impl HttpEncoder {
+    /// Creates a new `HttpEncoder`.
     pub(super) const fn new(encoder: Encoder<Framer>, transformer: Transformer) -> Self {
         Self {
             encoder,

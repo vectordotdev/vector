@@ -12,8 +12,8 @@ use super::request::HttpRequest;
 /// Response type for use in the `Service` implementation of HTTP stream sinks.
 pub struct HttpResponse {
     pub(super) http_response: Response<Bytes>,
-    events_byte_size: GroupedCountByteSize,
-    raw_byte_size: usize,
+    pub(super) events_byte_size: GroupedCountByteSize,
+    pub(super) raw_byte_size: usize,
 }
 
 impl DriverResponse for HttpResponse {
@@ -34,14 +34,18 @@ impl DriverResponse for HttpResponse {
     }
 }
 
+/// Build HTTP requests for the `HttpService`.
 ///
+/// This trait exists to allow HTTP based stream sinks to utilize the common `HttpService`
+/// while being able to define sink-specific HTTP requests.
 pub trait HttpServiceRequestBuilder {
-    /// B
     fn build(&self, body: BytesMut) -> Request<Bytes>;
 }
 
 /// `Service` implementation of HTTP stream sinks.
 ///
+/// `http_request_builder` <R> must implement the `HttpServiceRequestBuilder` trait, which is
+///  used in the `Service::call()` function to handle sink-specific HTTP request building.
 #[derive(Debug, Clone)]
 pub struct HttpService<R> {
     http_request_builder: R,
@@ -50,6 +54,7 @@ pub struct HttpService<R> {
 }
 
 impl<R> HttpService<R> {
+    /// Creates a new `HttpService`.
     pub const fn new(http_request_builder: R, client: HttpClient, protocol: String) -> Self {
         Self {
             http_request_builder,
