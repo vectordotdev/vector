@@ -8171,7 +8171,16 @@ version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "011cbb39cf7c1f62871aea3cc46e5817b0937b49e9447370c93cacbe93a766d8"
 dependencies = [
- "vte",
+ "vte 0.10.1",
+]
+
+[[package]]
+name = "strip-ansi-escapes"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "55ff8ef943b384c414f54aefa961dd2bd853add74ec75e7ac74cf91dba62bcfa"
+dependencies = [
+ "vte 0.11.1",
 ]
 
 [[package]]
@@ -9619,7 +9628,7 @@ dependencies = [
  "snap",
  "socket2 0.5.3",
  "stream-cancel",
- "strip-ansi-escapes",
+ "strip-ansi-escapes 0.2.0",
  "syslog",
  "tempfile",
  "test-generator",
@@ -10038,7 +10047,7 @@ dependencies = [
  "sha2 0.10.7",
  "sha3",
  "snafu",
- "strip-ansi-escapes",
+ "strip-ansi-escapes 0.1.1",
  "syslog_loose",
  "termcolor",
  "thiserror",
@@ -10059,6 +10068,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6cbce692ab4ca2f1f3047fcf732430249c0e971bfdd2b234cf2c47ad93af5983"
 dependencies = [
  "arrayvec 0.5.2",
+ "utf8parse",
+ "vte_generate_state_changes",
+]
+
+[[package]]
+name = "vte"
+version = "0.11.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f5022b5fbf9407086c180e9557be968742d839e68346af7792b8592489732197"
+dependencies = [
  "utf8parse",
  "vte_generate_state_changes",
 ]
