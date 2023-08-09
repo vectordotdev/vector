@@ -251,7 +251,7 @@ mod tests {
 #[cfg(test)]
 mod integration_tests {
     use codecs::TextSerializerConfig;
-    use std::{thread, time::Duration};
+    use std::time::Duration;
 
     use super::*;
     use crate::nats::{NatsAuthCredentialsFile, NatsAuthNKey, NatsAuthToken, NatsAuthUserPassword};
@@ -291,7 +291,7 @@ mod integration_tests {
         run_and_assert_sink_compliance(sink, events, &SINK_TAGS).await;
 
         // Unsubscribe from the channel.
-        thread::sleep(Duration::from_secs(3));
+        tokio::time::sleep(Duration::from_secs(3)).await;
         sub.unsubscribe().await.unwrap();
 
         let mut output: Vec<String> = Vec::new();
