@@ -69,10 +69,10 @@ impl<St, Svc> Driver<St, Svc> {
 
 impl<St, Svc> Driver<St, Svc>
 where
-    St: Stream,
-    St::Item: Finalizable + MetaDescriptive,
-    Svc: Service<St::Item>,
-    Svc::Error: fmt::Debug + 'static,
+    St: Stream + Send,
+    St::Item: Finalizable + MetaDescriptive + Send,
+    Svc: Service<St::Item> + Send,
+    Svc::Error: fmt::Debug + Send + 'static,
     Svc::Future: Send + 'static,
     Svc::Response: DriverResponse,
 {
@@ -84,117 +84,120 @@ where
     ///
     /// The return type is mostly to simplify caller code.
     /// An error is currently only returned if a service returns an error from `poll_ready`
-    pub async fn run(self) -> Result<(), ()> {
-        let mut in_flight = FuturesUnorderedCount::new();
-        let mut next_batch: Option<VecDeque<St::Item>> = None;
-        let mut seq_num = 0usize;
+    #[allow(clippy::manual_async_fn)]
+    pub fn run(self) -> impl std::future::Future<Output = Result<(), ()>> + Send {
+        async move {
+            let mut in_flight = FuturesUnorderedCount::new();
+            let mut next_batch: Option<VecDeque<St::Item>> = None;
+            let mut seq_num = 0usize;
 
-        let Self {
-            input,
-            mut service,
-            protocol,
-        } = self;
+            let Self {
+                input,
+                mut service,
+                protocol,
+            } = self;
 
-        let batched_input = input.ready_chunks(1024);
-        pin!(batched_input);
+            let batched_input = input.ready_chunks(1024);
+            pin!(batched_input);
 
-        let bytes_sent = protocol.map(|protocol| register(BytesSent { protocol }));
-        let events_sent = RegisteredEventCache::new(());
+            let bytes_sent = protocol.map(|protocol| register(BytesSent { protocol }));
+            let events_sent = RegisteredEventCache::new(());
 
-        loop {
-            // Core behavior of the loop:
-            // - always check to see if we have any response futures that have completed
-            //  -- if so, handling acking as many events as we can (ordering matters)
-            // - if we have a "current" batch, try to send each request in it to the service
-            //   -- if we can't drain all requests from the batch due to lack of service readiness,
-            //   then put the batch back and try to send the rest of it when the service is ready
-            //   again
-            // - if we have no "current" batch, but there is an available batch from our input
-            //   stream, grab that batch and store it as our current batch
-            //
-            // Essentially, we bounce back and forth between "grab the new batch from the input
-            // stream" and "send all requests in the batch to our service" which _could be trivially
-            // modeled with a normal imperative loop.  However, we want to be able to interleave the
-            // acknowledgement of responses to allow buffers and sources to continue making forward
-            // progress, which necessitates a more complex weaving of logic.  Using `select!` is
-            // more code, and requires a more careful eye than blindly doing
-            // "get_next_batch().await; process_batch().await", but it does make doing the complex
-            // logic easier than if we tried to interleave it ourselves with an imperative-style loop.
+            loop {
+                // Core behavior of the loop:
+                // - always check to see if we have any response futures that have completed
+                //  -- if so, handling acking as many events as we can (ordering matters)
+                // - if we have a "current" batch, try to send each request in it to the service
+                //   -- if we can't drain all requests from the batch due to lack of service readiness,
+                //   then put the batch back and try to send the rest of it when the service is ready
+                //   again
+                // - if we have no "current" batch, but there is an available batch from our input
+                //   stream, grab that batch and store it as our current batch
+                //
+                // Essentially, we bounce back and forth between "grab the new batch from the input
+                // stream" and "send all requests in the batch to our service" which _could be trivially
+                // modeled with a normal imperative loop.  However, we want to be able to interleave the
+                // acknowledgement of responses to allow buffers and sources to continue making forward
+                // progress, which necessitates a more complex weaving of logic.  Using `select!` is
+                // more code, and requires a more careful eye than blindly doing
+                // "get_next_batch().await; process_batch().await", but it does make doing the complex
+                // logic easier than if we tried to interleave it ourselves with an imperative-style loop.
 
-            select! {
-                // Using `biased` ensures we check the branches in the order they're written, since
-                // the default behavior of the `select!` macro is to randomly order branches as a
-                // means of ensuring scheduling fairness.
-                biased;
+                select! {
+                    // Using `biased` ensures we check the branches in the order they're written, since
+                    // the default behavior of the `select!` macro is to randomly order branches as a
+                    // means of ensuring scheduling fairness.
+                    biased;
 
-                // One or more of our service calls have completed.
-                Some(_count) = in_flight.next(), if !in_flight.is_empty() => {}
+                    // One or more of our service calls have completed.
+                    Some(_count) = in_flight.next(), if !in_flight.is_empty() => {}
 
-                // We've got an input batch to process and the service is ready to accept a request.
-                maybe_ready = poll_fn(|cx| service.poll_ready(cx)), if next_batch.is_some() => {
-                    let mut batch = next_batch.take()
-                        .expect("batch should be populated");
+                    // We've got an input batch to process and the service is ready to accept a request.
+                    maybe_ready = poll_fn(|cx| service.poll_ready(cx)), if next_batch.is_some() => {
+                        let mut batch = next_batch.take()
+                            .expect("batch should be populated");
 
-                    let mut maybe_ready = Some(maybe_ready);
-                    while !batch.is_empty() {
-                        // Make sure the service is ready to take another request.
-                        let maybe_ready = match maybe_ready.take() {
-                            Some(ready) => Poll::Ready(ready),
-                            None => poll!(poll_fn(|cx| service.poll_ready(cx))),
-                        };
+                        let mut maybe_ready = Some(maybe_ready);
+                        while !batch.is_empty() {
+                            // Make sure the service is ready to take another request.
+                            let maybe_ready = match maybe_ready.take() {
+                                Some(ready) => Poll::Ready(ready),
+                                None => poll!(poll_fn(|cx| service.poll_ready(cx))),
+                            };
 
-                        let svc = match maybe_ready {
-                            Poll::Ready(Ok(())) => &mut service,
-                            Poll::Ready(Err(error)) => {
-                                emit(PollReadyError{ error });
-                                return Err(())
-                            }
-                            Poll::Pending => {
-                                next_batch = Some(batch);
-                                break
-                            },
-                        };
+                            let svc = match maybe_ready {
+                                Poll::Ready(Ok(())) => &mut service,
+                                Poll::Ready(Err(error)) => {
+                                    emit(PollReadyError{ error });
+                                    return Err(())
+                                }
+                                Poll::Pending => {
+                                    next_batch = Some(batch);
+                                    break
+                                },
+                            };
 
-                        let mut req = batch.pop_front().expect("batch should not be empty");
-                        seq_num += 1;
-                        let request_id = seq_num;
+                            let mut req = batch.pop_front().expect("batch should not be empty");
+                            seq_num += 1;
+                            let request_id = seq_num;
 
-                        trace!(
-                            message = "Submitting service request.",
-                            in_flight_requests = in_flight.len(),
-                            request_id,
-                        );
-                        let finalizers = req.take_finalizers();
-                        let bytes_sent = bytes_sent.clone();
-                        let events_sent = events_sent.clone();
-                        let event_count = req.get_metadata().event_count();
-
-                        let fut = svc.call(req)
-                            .err_into()
-                            .map(move |result| Self::handle_response(
-                                result,
+                            trace!(
+                                message = "Submitting service request.",
+                                in_flight_requests = in_flight.len(),
                                 request_id,
-                                finalizers,
-                                event_count,
-                                &bytes_sent,
-                                &events_sent,
-                            ))
-                            .instrument(info_span!("request", request_id).or_current());
+                            );
+                            let finalizers = req.take_finalizers();
+                            let bytes_sent = bytes_sent.clone();
+                            let events_sent = events_sent.clone();
+                            let event_count = req.get_metadata().event_count();
 
-                        in_flight.push(fut);
+                            let fut = svc.call(req)
+                                .err_into()
+                                .map(move |result| Self::handle_response(
+                                    result,
+                                    request_id,
+                                    finalizers,
+                                    event_count,
+                                    &bytes_sent,
+                                    &events_sent,
+                                ))
+                                .instrument(info_span!("request", request_id).or_current());
+
+                            in_flight.push(fut);
+                        }
                     }
-                }
 
-                // We've received some items from the input stream.
-                Some(reqs) = batched_input.next(), if next_batch.is_none() => {
-                    next_batch = Some(reqs.into());
-                }
+                    // We've received some items from the input stream.
+                    Some(reqs) = batched_input.next(), if next_batch.is_none() => {
+                        next_batch = Some(reqs.into());
+                    }
 
-                else => break
+                    else => break
+                }
             }
-        }
 
-        Ok(())
+            Ok(())
+        }
     }
 
     fn handle_response(

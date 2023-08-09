@@ -1,18 +1,15 @@
 use std::convert::TryInto;
 
 use aws_sdk_s3::Client as S3Client;
-use codecs::{
-    encoding::{Framer, FramingConfig},
-    TextSerializerConfig,
-};
+use codecs::{encoding::FramingConfig, TextSerializerConfig};
 use tower::ServiceBuilder;
 use vector_config::configurable_component;
 use vector_core::sink::VectorSink;
 
-use super::sink::S3RequestOptions;
+use super::sink::S3RequestBuilder;
 use crate::{
     aws::{AwsAuthentication, RegionOrEndpoint},
-    codecs::{Encoder, EncodingConfigWithFraming, SinkType},
+    codecs::{EncodingConfigWithFraming, SinkType},
     config::{AcknowledgementsConfig, GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext},
     sinks::{
         s3_common::{
@@ -212,19 +209,25 @@ impl S3SinkConfig {
 
         let transformer = self.encoding.transformer();
         let (framer, serializer) = self.encoding.build(SinkType::MessageBased)?;
-        let encoder = Encoder::<Framer>::new(framer, serializer);
 
-        let request_options = S3RequestOptions {
+        let request_builder = S3RequestBuilder {
             bucket: self.bucket.clone(),
             api_options: self.options.clone(),
             filename_extension: self.filename_extension.clone(),
             filename_time_format: self.filename_time_format.clone(),
             filename_append_uuid: self.filename_append_uuid,
-            encoder: (transformer, encoder),
             compression: self.compression,
         };
 
-        let sink = S3Sink::new(service, request_options, partitioner, batch_settings);
+        let sink = S3Sink::new(
+            service,
+            request_builder,
+            partitioner,
+            transformer,
+            serializer,
+            framer,
+            batch_settings,
+        );
 
         Ok(VectorSink::from_event_streamsink(sink))
     }

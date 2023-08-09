@@ -117,6 +117,8 @@ struct Batch<I> {
     allocation_limit: usize,
     /// The store of `I` elements.
     elements: Vec<I>,
+    /// A function that calculates the size of an item.
+    size_fn: fn(&I) -> usize,
 }
 
 impl<I> ByteSizeOf for Batch<I> {
@@ -125,10 +127,7 @@ impl<I> ByteSizeOf for Batch<I> {
     }
 }
 
-impl<I> Batch<I>
-where
-    I: ByteSizeOf,
-{
+impl<I> Batch<I> {
     /// Create a new Batch instance
     ///
     /// Creates a new batch instance with specific element and allocation limits. The element limit
@@ -140,7 +139,7 @@ where
     /// then the allocation limit will be raised such that the batch can hold a single instance of
     /// `I`.  Likewise, `element_limit` will be raised such that it is always at least 1, ensuring
     /// that a new batch can be pushed into.
-    fn new(element_limit: usize, allocation_limit: usize) -> Self {
+    fn new(element_limit: usize, allocation_limit: usize, size_fn: fn(&I) -> usize) -> Self {
         // SAFETY: `element_limit` is always non-zero because `BatcherSettings` can only be
         // constructed with `NonZeroUsize` versions of allocation limit/item limit.  `Batch` is also
         // only constructable via `Batcher`.
@@ -158,6 +157,7 @@ where
             element_limit,
             allocation_limit,
             elements: Vec::with_capacity(128),
+            size_fn,
         }
     }
 
@@ -167,7 +167,7 @@ where
     /// to call `has_space` prior to calling this and it will never
     /// panic. Intended to be used only when insertion must not fail.
     fn with(mut self, value: I) -> Self {
-        self.allocated_bytes += value.size_of();
+        self.allocated_bytes += (self.size_fn)(&value);
         self.elements.push(value);
         self
     }
@@ -187,7 +187,7 @@ where
     /// and byte count for the given item, false otherwise.
     fn has_space(&self, value: &I) -> bool {
         let too_many_elements = self.elements.len() + 1 > self.element_limit;
-        let too_many_bytes = self.allocated_bytes + value.size_of() > self.allocation_limit;
+        let too_many_bytes = self.allocated_bytes + (self.size_fn)(value) > self.allocation_limit;
         !(too_many_elements || too_many_bytes)
     }
 
@@ -203,7 +203,7 @@ where
     /// for a new element to be inserted.
     fn push(&mut self, value: I) {
         assert!(self.has_space(&value));
-        self.allocated_bytes += value.size_of();
+        self.allocated_bytes += (self.size_fn)(&value);
         self.elements.push(value);
     }
 }
@@ -310,6 +310,8 @@ where
     #[pin]
     /// The stream this `Batcher` wraps
     stream: Fuse<St>,
+    /// A function for determining the size of a given item
+    size_fn: fn(&Prt::Item) -> usize,
 }
 
 impl<St, Prt> PartitionedBatcher<St, Prt, ExpirationQueue<Prt::Key>>
@@ -317,9 +319,13 @@ where
     St: Stream<Item = Prt::Item>,
     Prt: Partitioner + Unpin,
     Prt::Key: Eq + Hash + Clone,
-    Prt::Item: ByteSizeOf,
 {
-    pub fn new(stream: St, partitioner: Prt, settings: BatcherSettings) -> Self {
+    pub fn new(
+        stream: St,
+        partitioner: Prt,
+        settings: BatcherSettings,
+        size_fn: fn(&Prt::Item) -> usize,
+    ) -> Self {
         Self {
             batch_allocation_limit: settings.size_limit,
             batch_item_limit: settings.item_limit,
@@ -328,6 +334,7 @@ where
             timer: ExpirationQueue::new(settings.timeout),
             partitioner,
             stream: stream.fuse(),
+            size_fn,
         }
     }
 }
@@ -355,6 +362,7 @@ where
             timer,
             partitioner,
             stream: stream.fuse(),
+            size_fn: ByteSizeOf::size_of,
         }
     }
 }
@@ -364,7 +372,6 @@ where
     St: Stream<Item = Prt::Item>,
     Prt: Partitioner + Unpin,
     Prt::Key: Eq + Hash + Clone,
-    Prt::Item: ByteSizeOf,
     KT: KeyedTimer<Prt::Key>,
 {
     type Item = (Prt::Key, Vec<Prt::Item>);
@@ -422,7 +429,8 @@ where
                             // push the item in and loop back around.
                             batch.push(item);
                         } else {
-                            let new_batch = Batch::new(item_limit, alloc_limit).with(item);
+                            let new_batch =
+                                Batch::new(item_limit, alloc_limit, *this.size_fn).with(item);
                             let batch = mem::replace(batch, new_batch);
 
                             // The batch for this partition key was set to
@@ -437,7 +445,7 @@ where
                         // create one and create the expiration entries as well.
                         // This allows the batch to expire before filling up,
                         // and vice versa.
-                        let batch = Batch::new(item_limit, alloc_limit).with(item);
+                        let batch = Batch::new(item_limit, alloc_limit, *this.size_fn).with(item);
                         this.batches.insert(item_key.clone(), batch);
                         this.timer.insert(item_key);
                     }

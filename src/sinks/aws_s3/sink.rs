@@ -1,79 +1,62 @@
-use std::io;
-
 use bytes::Bytes;
 use chrono::Utc;
-use codecs::encoding::Framer;
 use uuid::Uuid;
-use vector_common::request_metadata::RequestMetadata;
-use vector_core::event::Finalizable;
+use vector_common::{finalization::Finalizable, request_metadata::RequestMetadata};
+use vector_core::event::Event;
 
-use crate::{
-    codecs::{Encoder, Transformer},
-    event::Event,
-    sinks::{
-        s3_common::{
-            config::S3Options,
-            partitioner::S3PartitionKey,
-            service::{S3Metadata, S3Request},
-        },
-        util::{
-            metadata::RequestMetadataBuilder, request_builder::EncodeResult, Compression,
-            RequestBuilder,
-        },
+use crate::sinks::{
+    s3_common::{
+        config::S3Options,
+        partitioner::S3PartitionKey,
+        service::{S3Metadata, S3Request},
+        sink::RequestBuilder,
     },
+    util::Compression,
 };
 
 #[derive(Clone)]
-pub struct S3RequestOptions {
+pub struct S3RequestBuilder {
     pub bucket: String,
     pub filename_time_format: String,
     pub filename_append_uuid: bool,
     pub filename_extension: Option<String>,
     pub api_options: S3Options,
-    pub encoder: (Transformer, Encoder<Framer>),
     pub compression: Compression,
 }
 
-impl RequestBuilder<(S3PartitionKey, Vec<Event>)> for S3RequestOptions {
-    type Metadata = S3Metadata;
-    type Events = Vec<Event>;
-    type Encoder = (Transformer, Encoder<Framer>);
-    type Payload = Bytes;
+impl RequestBuilder for S3RequestBuilder {
     type Request = S3Request;
-    type Error = io::Error; // TODO: this is ugly.
+    type Metadata = S3Metadata;
+    type PartitionKey = S3PartitionKey;
 
     fn compression(&self) -> Compression {
         self.compression
     }
 
-    fn encoder(&self) -> &Self::Encoder {
-        &self.encoder
-    }
-
-    fn split_input(
+    fn build_metadata(
         &self,
-        input: (S3PartitionKey, Vec<Event>),
-    ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
-        let (partition_key, mut events) = input;
-        let builder = RequestMetadataBuilder::from_events(&events);
-
+        partition_key: Self::PartitionKey,
+        mut events: Vec<Event>,
+    ) -> S3Metadata {
+        // TODO: Finalizers aren't really sink-specific, so can we handle them in a common place
+        // instead? Do we need this phase if so? Very little else is happening here.
         let finalizers = events.take_finalizers();
         let s3_key_prefix = partition_key.key_prefix.clone();
 
-        let metadata = S3Metadata {
+        S3Metadata {
             partition_key,
             s3_key: s3_key_prefix,
             finalizers,
-        };
-
-        (metadata, builder, events)
+        }
     }
 
     fn build_request(
         &self,
-        mut s3metadata: Self::Metadata,
+        mut metadata: Self::Metadata,
+        payload: Bytes,
+        // TODO: This is just passed through, so try moving it to a common wrapper struct/service so
+        // individual sinks don't need to deal with it at all.
         request_metadata: RequestMetadata,
-        payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
         let filename = {
             let formatted_ts = Utc::now().format(self.filename_time_format.as_str());
@@ -83,7 +66,7 @@ impl RequestBuilder<(S3PartitionKey, Vec<Event>)> for S3RequestOptions {
                 .unwrap_or_else(|| formatted_ts.to_string())
         };
 
-        let ssekms_key_id = s3metadata.partition_key.ssekms_key_id.clone();
+        let ssekms_key_id = metadata.partition_key.ssekms_key_id.clone();
         let mut s3_options = self.api_options.clone();
         s3_options.ssekms_key_id = ssekms_key_id;
 
@@ -93,12 +76,12 @@ impl RequestBuilder<(S3PartitionKey, Vec<Event>)> for S3RequestOptions {
             .cloned()
             .unwrap_or_else(|| self.compression.extension().into());
 
-        s3metadata.s3_key = format!("{}{}.{}", s3metadata.s3_key, filename, extension);
+        metadata.s3_key = format!("{}{}.{}", metadata.s3_key, filename, extension);
 
         S3Request {
-            body: payload.into_payload(),
+            body: payload,
             bucket: self.bucket.clone(),
-            metadata: s3metadata,
+            metadata,
             request_metadata,
             content_encoding: self.compression.content_encoding(),
             options: s3_options,
