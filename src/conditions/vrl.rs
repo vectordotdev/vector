@@ -113,12 +113,7 @@ impl Conditional for Vrl {
         let result = result
             .map(|value| match value {
                 Value::Boolean(boolean) => boolean,
-                _ => {
-                    emit!(VrlConditionExecutionError {
-                        error: "VRL condition did not return a boolean type"
-                    });
-                    false
-                }
+                _ => panic!("VRL condition did not return a boolean type"),
             })
             .unwrap_or_else(|err| {
                 emit!(VrlConditionExecutionError {
