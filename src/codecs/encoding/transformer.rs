@@ -191,7 +191,7 @@ impl Transformer {
                             }
                         }
                         for (k, v) in unix_timestamps {
-                            log.insert(k.as_str(), v);
+                            log.parse_path_and_insert(k, v).unwrap();
                         }
                     } else {
                         // root is not an object
