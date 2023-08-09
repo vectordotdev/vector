@@ -152,7 +152,7 @@ pub(crate) fn from_tls_auth_config(
         Some(auth) => auth.to_nats_options()?,
     };
 
-    let nats_options = nats_options.name(connection_name);
+    let nats_options = nats_options.client_capacity(1024).name(connection_name);
 
     match tls_config {
         None => Ok(nats_options),
