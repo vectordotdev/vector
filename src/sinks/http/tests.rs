@@ -11,17 +11,17 @@ use codecs::{
     JsonSerializerConfig, NewlineDelimitedEncoderConfig, TextSerializerConfig,
 };
 use flate2::{read::MultiGzDecoder, read::ZlibDecoder};
-use futures::{channel::mpsc, stream, StreamExt};
+use futures::{channel::mpsc, stream};
 use headers::{Authorization, HeaderMapExt};
 use http::request::Parts;
 use hyper::{Body, Method, Response, StatusCode};
 use serde::{de, Deserialize};
+
 use vector_core::event::{BatchNotifier, BatchStatus, Event, LogEvent};
 
 use crate::{
     assert_downcast_matches,
-    codecs::{Encoder, EncodingConfigWithFraming, SinkType},
-    config::SinkContext,
+    codecs::{EncodingConfigWithFraming, SinkType},
     sinks::{
         prelude::*,
         util::{
@@ -38,9 +38,9 @@ use crate::{
 };
 
 use super::{
+    config::HttpSinkConfig,
     config::{validate_headers, validate_payload_wrapper},
     encoder::HttpEncoder,
-    HttpSinkConfig,
 };
 
 #[test]

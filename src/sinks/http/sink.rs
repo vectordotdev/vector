@@ -1,22 +1,22 @@
 //! Implementation of the `http` sink.
 
-use crate::sinks::prelude::*;
-
-use super::{
-    request_builder::HttpRequestBuilder,
-    service::{HttpRetryLogic, HttpService},
+use crate::sinks::{
+    prelude::*,
+    util::http_service::{HttpRetryLogic, HttpService},
 };
 
+use super::{request_builder::HttpRequestBuilder, service::HttpSinkRequestBuilder};
+
 pub(super) struct HttpSink {
-    service: Svc<HttpService, HttpRetryLogic>,
+    service: Svc<HttpService<HttpSinkRequestBuilder>, HttpRetryLogic>,
     batch_settings: BatcherSettings,
     request_builder: HttpRequestBuilder,
 }
 
 impl HttpSink {
     /// Creates a new `HttpSink`.
-    pub(super) fn new(
-        service: Svc<HttpService, HttpRetryLogic>,
+    pub(super) const fn new(
+        service: Svc<HttpService<HttpSinkRequestBuilder>, HttpRetryLogic>,
         batch_settings: BatcherSettings,
         request_builder: HttpRequestBuilder,
     ) -> Self {
