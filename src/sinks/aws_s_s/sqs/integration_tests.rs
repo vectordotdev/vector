@@ -6,18 +6,18 @@ use aws_sdk_sqs::{model::QueueAttributeName, Client as SqsClient, Region};
 use codecs::TextSerializerConfig;
 use tokio::time::{sleep, Duration};
 
+use crate::config::{SinkConfig, SinkContext};
+use crate::sinks::aws_s_s::sqs::config::SqsSinkConfig;
+use crate::sinks::aws_s_s::BaseSSSinkConfig;
 use crate::{
     aws::{create_client, AwsAuthentication, RegionOrEndpoint},
     common::sqs::SqsClientBuilder,
     config::ProxyConfig,
-    sinks::VectorSink,
     test_util::{
         components::{run_and_assert_sink_compliance, AWS_SINK_TAGS},
         random_lines_with_stream, random_string,
     },
 };
-use crate::sinks::aws_s_s::sink::SqsSink;
-use crate::sinks::aws_s_s::SqsSinkConfig;
 
 fn sqs_address() -> String {
     std::env::var("SQS_ADDRESS").unwrap_or_else(|_| "http://localhost:4566".into())
@@ -48,8 +48,7 @@ async fn sqs_send_message_batch() {
 
     let client = create_test_client().await;
 
-    let config = SqsSinkConfig {
-        queue_url: queue_url.clone(),
+    let baseconfig = BaseSSSinkConfig {
         region: RegionOrEndpoint::with_both("local", sqs_address().as_str()),
         encoding: TextSerializerConfig::default().into(),
         message_group_id: None,
@@ -61,10 +60,16 @@ async fn sqs_send_message_batch() {
         acknowledgements: Default::default(),
     };
 
+    let config = SqsSinkConfig {
+        queue_url: queue_url.clone(),
+        base_config: baseconfig,
+    };
+
     config.clone().healthcheck(client.clone()).await.unwrap();
 
-    let sink = SqsSink::new(config, client.clone()).unwrap();
-    let sink = VectorSink::from_event_streamsink(sink);
+    let cx = SinkContext::default();
+
+    let sink = config.build(cx).await.unwrap().0;
 
     let (mut input_lines, events) = random_lines_with_stream(100, 10, None);
     run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;

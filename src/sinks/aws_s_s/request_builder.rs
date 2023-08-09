@@ -2,7 +2,7 @@ use bytes::Bytes;
 use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
 use vector_core::ByteSizeOf;
 
-use super::config::SqsSinkConfig;
+use crate::sinks::aws_s_s::config::ConfigWithIds;
 use crate::{
     codecs::{Encoder, Transformer},
     event::{Event, EventFinalizers, Finalizable},
@@ -22,29 +22,48 @@ pub struct SqsMetadata {
 }
 
 #[derive(Clone)]
-pub(crate) struct SqsRequestBuilder {
+pub(crate) struct SqsRequestBuilder<T>
+where
+    T: MessageBuilder + Clone + Send + Sync + 'static,
+{
     encoder: (Transformer, Encoder<()>),
     message_group_id: Option<Template>,
     message_deduplication_id: Option<Template>,
-    queue_url: String,
+    message_builder: T,
 }
 
-impl SqsRequestBuilder {
-    pub fn new(config: SqsSinkConfig) -> crate::Result<Self> {
-        let transformer = config.encoding.transformer();
-        let serializer = config.encoding.build()?;
+impl<T> SqsRequestBuilder<T>
+where
+    T: MessageBuilder + Clone + Send + Sync + 'static,
+{
+    pub fn new(config: ConfigWithIds, message_builder: T) -> crate::Result<Self> {
+        let transformer = config.base_config.encoding.transformer();
+        let serializer = config.base_config.encoding.build()?;
         let encoder = Encoder::<()>::new(serializer);
 
         Ok(Self {
             encoder: (transformer, encoder),
             message_group_id: config.message_group_id()?,
             message_deduplication_id: config.message_deduplication_id()?,
-            queue_url: config.queue_url,
+            message_builder,
         })
     }
 }
 
-impl RequestBuilder<Event> for SqsRequestBuilder {
+pub trait MessageBuilder {
+    fn build_message(
+        &self,
+        message_body: String,
+        message_group_id: Option<String>,
+        message_deduplication_id: Option<String>,
+        finalizers: EventFinalizers,
+        metadata: RequestMetadata,
+    ) -> SendMessageEntry;
+}
+impl<T> RequestBuilder<Event> for SqsRequestBuilder<T>
+where
+    T: MessageBuilder + Clone + Send + Sync + 'static,
+{
     type Metadata = SqsMetadata;
     type Events = Event;
     type Encoder = (Transformer, Encoder<()>);
@@ -112,24 +131,23 @@ impl RequestBuilder<Event> for SqsRequestBuilder {
         let payload_bytes = payload.into_payload();
         let message_body = String::from(std::str::from_utf8(&payload_bytes).unwrap());
 
-        SendMessageEntry {
+        self.message_builder.build_message(
             message_body,
-            message_group_id: sqs_metadata.message_group_id,
-            message_deduplication_id: sqs_metadata.message_deduplication_id,
-            queue_url: self.queue_url.clone(),
-            finalizers: sqs_metadata.finalizers,
+            sqs_metadata.message_group_id,
+            sqs_metadata.message_deduplication_id,
+            sqs_metadata.finalizers,
             metadata,
-        }
+        )
     }
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct SendMessageEntry {
+pub struct SendMessageEntry {
     pub message_body: String,
     pub message_group_id: Option<String>,
     pub message_deduplication_id: Option<String>,
     pub queue_url: String,
-    finalizers: EventFinalizers,
+    pub finalizers: EventFinalizers,
     pub metadata: RequestMetadata,
 }
 

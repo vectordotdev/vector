@@ -1,19 +1,14 @@
 use std::convert::TryFrom;
 
-use aws_sdk_sqs::Client as SqsClient;
-use futures::FutureExt;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
+
 use vector_config::configurable_component;
 
 use crate::{
-    aws::{create_client, AwsAuthentication, RegionOrEndpoint},
+    aws::{AwsAuthentication, RegionOrEndpoint},
     codecs::EncodingConfig,
-    common::sqs::SqsClientBuilder,
-    config::{
-        AcknowledgementsConfig, DataType, GenerateConfig, Input, ProxyConfig, SinkConfig,
-        SinkContext,
-    },
+    config::AcknowledgementsConfig,
     sinks::util::TowerRequestConfig,
     template::{Template, TemplateParseError},
     tls::TlsConfig,
@@ -32,20 +27,10 @@ pub(super) enum BuildError {
 }
 
 /// Configuration for the `aws_sqs` sink.
-#[configurable_component(sink(
-    "aws_sqs",
-    "Publish observability events to AWS Simple Queue Service topics."
-))]
+#[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
-pub struct SqsSinkConfig {
-    /// The URL of the Amazon SQS queue to which messages are sent.
-    #[configurable(validation(format = "uri"))]
-    #[configurable(metadata(
-        docs::examples = "https://sqs.us-east-2.amazonaws.com/123456789012/MyQueue"
-    ))]
-    pub queue_url: String,
-
+pub struct BaseSSSinkConfig {
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
 
@@ -102,68 +87,14 @@ pub enum Encoding {
     Json,
 }
 
-impl GenerateConfig for SqsSinkConfig {
-    fn generate_config() -> toml::Value {
-        toml::from_str(
-            r#"queue_url = "https://sqs.us-east-2.amazonaws.com/123456789012/MyQueue"
-            region = "us-east-2"
-            encoding.codec = "json""#,
-        )
-        .unwrap()
-    }
+#[derive(Clone, Debug)]
+pub struct ConfigWithIds {
+    pub base_config: BaseSSSinkConfig,
+    pub fifo: bool,
 }
-
-#[async_trait::async_trait]
-#[typetag::serde(name = "aws_sqs")]
-impl SinkConfig for SqsSinkConfig {
-    async fn build(
-        &self,
-        cx: SinkContext,
-    ) -> crate::Result<(crate::sinks::VectorSink, crate::sinks::Healthcheck)> {
-        let client = self.create_client(&cx.proxy).await?;
-        let healthcheck = self.clone().healthcheck(client.clone()).boxed();
-        let sink = super::sink::SqsSink::new(self.clone(), client)?;
-        Ok((
-            crate::sinks::VectorSink::from_event_streamsink(sink),
-            healthcheck,
-        ))
-    }
-
-    fn input(&self) -> Input {
-        Input::new(self.encoding.config().input_type() & DataType::Log)
-    }
-
-    fn acknowledgements(&self) -> &AcknowledgementsConfig {
-        &self.acknowledgements
-    }
-}
-
-impl SqsSinkConfig {
-    pub async fn healthcheck(self, client: SqsClient) -> crate::Result<()> {
-        client
-            .get_queue_attributes()
-            .queue_url(self.queue_url.clone())
-            .send()
-            .await
-            .map(|_| ())
-            .map_err(Into::into)
-    }
-
-    pub async fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<SqsClient> {
-        create_client::<SqsClientBuilder>(
-            &self.auth,
-            self.region.region(),
-            self.region.endpoint(),
-            proxy,
-            &self.tls,
-            true,
-        )
-        .await
-    }
-
+impl ConfigWithIds {
     pub fn message_group_id(&self) -> crate::Result<Option<Template>> {
-        let fifo = self.queue_url.ends_with(".fifo");
-        match (self.message_group_id.as_ref(), fifo) {
+        match (self.base_config.message_group_id.as_ref(), self.fifo) {
             (Some(value), true) => Ok(Some(
                 Template::try_from(value.clone()).context(TopicTemplateSnafu)?,
             )),
@@ -175,6 +106,7 @@ impl SqsSinkConfig {
 
     pub fn message_deduplication_id(&self) -> crate::Result<Option<Template>> {
         Ok(self
+            .base_config
             .message_deduplication_id
             .clone()
             .map(Template::try_from)
