@@ -81,7 +81,7 @@ where
 /// Customized encoding specific to the Azure Monitor Logs sink, as the API does not support full
 /// 9-digit nanosecond precision timestamps.
 #[derive(Clone, Debug)]
-struct JsonEncoding {
+pub(super) struct JsonEncoding {
     time_generated_key: Option<OwnedValuePath>,
     encoder: (Transformer, Encoder<Framer>),
 }
@@ -172,43 +172,5 @@ impl RequestBuilder<Vec<Event>> for AzureMonitorLogsRequestBuilder {
             finalizers,
             metadata: request_metadata,
         }
-    }
-}
-
-#[cfg(test)]
-pub mod tests {
-    use vector_core::config::log_schema;
-
-    use super::*;
-    use crate::{event::LogEvent, sinks::util::encoding::Encoder};
-
-    fn insert_timestamp_kv(log: &mut LogEvent) -> (String, String) {
-        let now = chrono::Utc::now();
-
-        let timestamp_key = log_schema().timestamp_key().unwrap();
-        let timestamp_value = now.to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
-        log.insert((PathPrefix::Event, timestamp_key), now);
-
-        (timestamp_key.to_string(), timestamp_value)
-    }
-
-    #[test]
-    fn encode_valid() {
-        let mut log = [("message", "hello world")]
-            .iter()
-            .copied()
-            .collect::<LogEvent>();
-        let (timestamp_key, timestamp_value) = insert_timestamp_kv(&mut log);
-
-        let event = Event::from(log);
-        let encoder = JsonEncoding::new(Default::default(), log_schema().timestamp_key().cloned());
-        let mut encoded = vec![];
-        encoder.encode_input(vec![event], &mut encoded).unwrap();
-        let expected_json = serde_json::json!([{
-            timestamp_key: timestamp_value,
-            "message": "hello world"
-        }]);
-        let json: serde_json::Value = serde_json::from_slice(&encoded).unwrap();
-        assert_eq!(json, expected_json);
     }
 }
