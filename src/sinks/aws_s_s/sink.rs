@@ -7,7 +7,6 @@ use vector_core::sink::StreamSink;
 use super::{client::Client, request_builder::SqsRequestBuilder, service::SqsService};
 use crate::internal_events::SinkRequestBuildError;
 use crate::sinks::aws_s_s::config::ConfigWithIds;
-use crate::sinks::aws_s_s::request_builder::MessageBuilder;
 use crate::{
     event::Event,
     sinks::util::{
@@ -25,25 +24,23 @@ impl SinkBatchSettings for SqsSinkDefaultBatchSettings {
 }
 
 #[derive(Clone)]
-pub struct SqsSink<T, C>
+pub struct SqsSink<C>
 where
-    T: MessageBuilder + Clone + Send + Sync + 'static,
     C: Client + Clone + Send + Sync + 'static,
 {
-    request_builder: SqsRequestBuilder<T>,
+    request_builder: SqsRequestBuilder,
     service: SqsService<C>,
     request: TowerRequestConfig,
 }
 
-impl<T, C> SqsSink<T, C>
+impl<C> SqsSink<C>
 where
-    T: MessageBuilder + Clone + Send + Sync + 'static,
     C: Client + Clone + Send + Sync + 'static,
 {
-    pub fn new(config: ConfigWithIds, publisher: C, message_builder: T) -> crate::Result<Self> {
+    pub fn new(config: ConfigWithIds, publisher: C) -> crate::Result<Self> {
         let request = config.base_config.request;
         Ok(SqsSink {
-            request_builder: SqsRequestBuilder::new(config, message_builder)?,
+            request_builder: SqsRequestBuilder::new(config)?,
             service: SqsService::new(publisher),
             request,
         })
@@ -73,9 +70,8 @@ where
 }
 
 #[async_trait::async_trait]
-impl<T, C> StreamSink<Event> for SqsSink<T, C>
+impl<C> StreamSink<Event> for SqsSink<C>
 where
-    T: MessageBuilder + Clone + Send + Sync + 'static,
     C: Client + Clone + Send + Sync + 'static,
 {
     async fn run(mut self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {

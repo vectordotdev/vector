@@ -22,21 +22,14 @@ pub struct SqsMetadata {
 }
 
 #[derive(Clone)]
-pub(crate) struct SqsRequestBuilder<T>
-where
-    T: MessageBuilder + Clone + Send + Sync + 'static,
-{
+pub(crate) struct SqsRequestBuilder {
     encoder: (Transformer, Encoder<()>),
     message_group_id: Option<Template>,
     message_deduplication_id: Option<Template>,
-    message_builder: T,
 }
 
-impl<T> SqsRequestBuilder<T>
-where
-    T: MessageBuilder + Clone + Send + Sync + 'static,
-{
-    pub fn new(config: ConfigWithIds, message_builder: T) -> crate::Result<Self> {
+impl SqsRequestBuilder {
+    pub fn new(config: ConfigWithIds) -> crate::Result<Self> {
         let transformer = config.base_config.encoding.transformer();
         let serializer = config.base_config.encoding.build()?;
         let encoder = Encoder::<()>::new(serializer);
@@ -45,25 +38,11 @@ where
             encoder: (transformer, encoder),
             message_group_id: config.message_group_id()?,
             message_deduplication_id: config.message_deduplication_id()?,
-            message_builder,
         })
     }
 }
 
-pub trait MessageBuilder {
-    fn build_message(
-        &self,
-        message_body: String,
-        message_group_id: Option<String>,
-        message_deduplication_id: Option<String>,
-        finalizers: EventFinalizers,
-        metadata: RequestMetadata,
-    ) -> SendMessageEntry;
-}
-impl<T> RequestBuilder<Event> for SqsRequestBuilder<T>
-where
-    T: MessageBuilder + Clone + Send + Sync + 'static,
-{
+impl RequestBuilder<Event> for SqsRequestBuilder {
     type Metadata = SqsMetadata;
     type Events = Event;
     type Encoder = (Transformer, Encoder<()>);
@@ -131,13 +110,13 @@ where
         let payload_bytes = payload.into_payload();
         let message_body = String::from(std::str::from_utf8(&payload_bytes).unwrap());
 
-        self.message_builder.build_message(
+        SendMessageEntry {
             message_body,
-            sqs_metadata.message_group_id,
-            sqs_metadata.message_deduplication_id,
-            sqs_metadata.finalizers,
+            message_group_id: sqs_metadata.message_group_id,
+            message_deduplication_id: sqs_metadata.message_deduplication_id,
+            finalizers: sqs_metadata.finalizers,
             metadata,
-        )
+        }
     }
 }
 
@@ -146,7 +125,6 @@ pub struct SendMessageEntry {
     pub message_body: String,
     pub message_group_id: Option<String>,
     pub message_deduplication_id: Option<String>,
-    pub queue_url: String,
     pub finalizers: EventFinalizers,
     pub metadata: RequestMetadata,
 }

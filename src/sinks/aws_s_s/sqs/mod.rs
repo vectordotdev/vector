@@ -1,11 +1,10 @@
 mod config;
 mod integration_tests;
-mod request_builder;
 
 pub use super::{
     client::Client,
     config::{BaseSSSinkConfig, ConfigWithIds},
-    request_builder::{MessageBuilder, SendMessageEntry},
+    request_builder::SendMessageEntry,
     service::SendMessageResponse,
     sink::SqsSink,
 };
