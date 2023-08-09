@@ -7,10 +7,11 @@ use futures::stream::BoxStream;
 use futures_util::StreamExt;
 use tokio_util::codec::Encoder as _;
 use tower::Service;
-use vector_common::request_metadata::{GroupedCountByteSize, RequestMetadata};
+use vector_common::request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata};
 use vector_core::{
     config::telemetry,
     event::Finalizable,
+    partition::Partitioner,
     sink::StreamSink,
     stream::{BatcherSettings, DriverResponse},
     ByteSizeOf, EstimatedJsonEncodedSizeOf,
@@ -23,26 +24,21 @@ use crate::{
 };
 use crate::{internal_events::SinkRequestBuildError, sinks::util::Compressor};
 
-use super::{
-    partitioner::{S3KeyPartitioner, S3PartitionKey},
-    service::S3Request,
-};
-
-pub struct S3Sink<Svc, RB> {
+pub struct S3Sink<Svc, RB, Part> {
     service: Svc,
     request_builder: RB,
-    partitioner: S3KeyPartitioner,
+    partitioner: Part,
     transformer: Transformer,
     serializer: Serializer,
     framer: Framer,
     batcher_settings: BatcherSettings,
 }
 
-impl<Svc, RB> S3Sink<Svc, RB> {
+impl<Svc, RB, Part> S3Sink<Svc, RB, Part> {
     pub const fn new(
         service: Svc,
         request_builder: RB,
-        partitioner: S3KeyPartitioner,
+        partitioner: Part,
         transformer: Transformer,
         serializer: Serializer,
         framer: Framer,
@@ -145,13 +141,17 @@ impl EventEncoder {
     }
 }
 
-impl<Svc, RB> S3Sink<Svc, RB>
+impl<Svc, RB, Part, Req> S3Sink<Svc, RB, Part>
 where
-    Svc: Service<S3Request> + Send + 'static,
+    Svc: Service<Req> + Send + 'static,
     Svc::Future: Send + 'static,
     Svc::Response: DriverResponse + Send + 'static,
     Svc::Error: fmt::Debug + Into<crate::Error> + Send,
-    RB: RequestBuilder<Request = S3Request, PartitionKey = S3PartitionKey> + Send + Sync + 'static,
+    RB: RequestBuilder<Request = Req> + Send + Sync + 'static,
+    RB::PartitionKey: Send + 'static,
+    Part: Partitioner<Item = EncodedEvent, Key = Option<RB::PartitionKey>> + Send + Unpin + 'static,
+    Part::Key: Eq + std::hash::Hash + Clone + Send + 'static,
+    Req: MetaDescriptive + Finalizable + Send + 'static,
 {
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let partitioner = self.partitioner;
@@ -209,7 +209,11 @@ where
 
                     // Now build the actual request.
                     // TODO: how does this fail for other sinks? can it not?
-                    Ok::<_, crate::Error>(request_builder.build_request(metadata, payload.body, request_metadata))
+                    Ok::<_, crate::Error>(request_builder.build_request(
+                        metadata,
+                        payload.body,
+                        request_metadata,
+                    ))
                 })
             })
             .filter_map(|request| async move {
@@ -287,13 +291,17 @@ impl PayloadBuilder {
 }
 
 #[async_trait]
-impl<Svc, RB> StreamSink<Event> for S3Sink<Svc, RB>
+impl<Svc, RB, Part, Req> StreamSink<Event> for S3Sink<Svc, RB, Part>
 where
-    Svc: Service<S3Request> + Send + 'static,
+    Svc: Service<Req> + Send + 'static,
     Svc::Future: Send + 'static,
     Svc::Response: DriverResponse + Send + 'static,
     Svc::Error: fmt::Debug + Into<crate::Error> + Send,
-    RB: RequestBuilder<Request = S3Request, PartitionKey = S3PartitionKey> + Send + Sync + 'static,
+    RB: RequestBuilder<Request = Req> + Send + Sync + 'static,
+    RB::PartitionKey: Send + 'static,
+    Part: Partitioner<Item = EncodedEvent, Key = Option<RB::PartitionKey>> + Send + Unpin + 'static,
+    Part::Key: Eq + std::hash::Hash + Clone + Send + 'static,
+    Req: MetaDescriptive + Finalizable + Send + 'static,
 {
     async fn run(mut self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         self.run_inner(input).await
