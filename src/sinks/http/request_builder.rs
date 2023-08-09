@@ -1,4 +1,4 @@
-//! Request building for the `http` sink.
+//! `RequestBuilder` implementation for the `http` sink.
 
 use std::io;
 
