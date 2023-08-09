@@ -36,3 +36,39 @@ impl RetryLogic for HttpRetryLogic {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use bytes::Bytes;
+    use hyper::Response;
+    use vector_common::request_metadata::GroupedCountByteSize;
+
+    use super::{HttpResponse, HttpRetryLogic};
+    use crate::sinks::util::retries::RetryLogic;
+
+    #[test]
+    fn validate_retry_logic() {
+        let logic = HttpRetryLogic;
+
+        fn generate_response(code: u16) -> HttpResponse {
+            HttpResponse {
+                http_response: Response::builder().status(code).body(Bytes::new()).unwrap(),
+                events_byte_size: GroupedCountByteSize::new_untagged(),
+                raw_byte_size: 0,
+            }
+        }
+
+        assert!(logic
+            .should_retry_response(&generate_response(429))
+            .is_retryable());
+        assert!(logic
+            .should_retry_response(&generate_response(500))
+            .is_retryable());
+        assert!(logic
+            .should_retry_response(&generate_response(400))
+            .is_not_retryable());
+        assert!(logic
+            .should_retry_response(&generate_response(501))
+            .is_not_retryable());
+    }
+}

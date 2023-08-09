@@ -14,6 +14,7 @@ pub struct HttpRequest {
 }
 
 impl HttpRequest {
+    /// Creates a new `HttpRequest`.
     pub fn new(
         payload: Bytes,
         finalizers: EventFinalizers,
