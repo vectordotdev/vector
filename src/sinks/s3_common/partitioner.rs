@@ -42,13 +42,15 @@ impl Partitioner for S3KeyPartitioner {
             .1
             .as_ref()
             .map(|ssekms_key_id| {
-                ssekms_key_id.render_string(&item.original).map_err(|error| {
-                    emit!(TemplateRenderingError {
-                        error,
-                        field: Some("ssekms_key_id"),
-                        drop_event: true,
-                    });
-                })
+                ssekms_key_id
+                    .render_string(&item.original)
+                    .map_err(|error| {
+                        emit!(TemplateRenderingError {
+                            error,
+                            field: Some("ssekms_key_id"),
+                            drop_event: true,
+                        });
+                    })
             })
             .transpose()
             .ok()?;
