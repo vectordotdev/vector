@@ -382,7 +382,7 @@ nix = { git = "https://github.com/vectordotdev/nix.git", branch = "memfd/gnu/mus
 # unaligned access bug fixed in the following revision.
 ntapi = { git = "https://github.com/MSxDOS/ntapi.git", rev = "24fc1e47677fc9f6e38e5f154e6011dc9b270da6" }
 # The current `openssl-sys` crate will vendor the OpenSSL sources via
-# `openssl-src` at version 1.1.1*, but we want version 3.0.*. Bring in forked
+# `openssl-src` at version 1.1.1*, but we want version 3.1.*. Bring in forked
 # version of that crate with the appropriate dependency patched in.
 openssl-sys = { git = "https://github.com/vectordotdev/rust-openssl.git", tag = "openssl-sys-v0.9.91+3.0.0" }
 openssl-src = { git = "https://github.com/vectordotdev/openssl-src-rs.git", tag = "release-300-force-engine+3.1.2"}

@@ -195,7 +195,7 @@ pub struct RootOpts {
     )]
     pub allocation_tracing_reporting_interval_ms: u64,
 
-    /// Enable the OpenSSL legacy provider.
+    /// Load the OpenSSL legacy provider.
     #[arg(long, env = "VECTOR_OPENSSL_LEGACY_PROVIDER", default_value = "false")]
     pub openssl_legacy_provider: bool,
 }
