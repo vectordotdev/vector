@@ -21,7 +21,7 @@ pub mod aws_kinesis;
 #[cfg(feature = "sinks-aws_s3")]
 pub mod aws_s3;
 #[cfg(feature = "sinks-aws_sqs")]
-pub mod aws_sqs;
+pub mod aws_s_s;
 #[cfg(feature = "sinks-axiom")]
 pub mod axiom;
 #[cfg(feature = "sinks-azure_blob")]

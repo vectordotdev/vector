@@ -4,6 +4,7 @@ mod retry;
 mod service;
 mod sink;
 
-mod integration_tests;
-
 pub use self::config::SqsSinkConfig;
+
+#[cfg(feature = "sinks-aws_sqs")]
+pub mod sqs;

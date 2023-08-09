@@ -6,7 +6,6 @@ use aws_sdk_sqs::{model::QueueAttributeName, Client as SqsClient, Region};
 use codecs::TextSerializerConfig;
 use tokio::time::{sleep, Duration};
 
-use super::{config::SqsSinkConfig, sink::SqsSink};
 use crate::{
     aws::{create_client, AwsAuthentication, RegionOrEndpoint},
     common::sqs::SqsClientBuilder,
@@ -17,6 +16,8 @@ use crate::{
         random_lines_with_stream, random_string,
     },
 };
+use crate::sinks::aws_s_s::sink::SqsSink;
+use crate::sinks::aws_s_s::SqsSinkConfig;
 
 fn sqs_address() -> String {
     std::env::var("SQS_ADDRESS").unwrap_or_else(|_| "http://localhost:4566".into())
