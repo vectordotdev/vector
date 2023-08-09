@@ -7,7 +7,7 @@ use futures::FutureExt;
 use vector_config::configurable_component;
 
 use super::request_builder::SqsMessageBuilder;
-use super::{BaseSSSinkConfig, ConfigWithIds, SqsSink};
+use super::{client::SqsMessagePublisher, BaseSSSinkConfig, ConfigWithIds, SqsSink};
 use crate::{aws::create_client, common::sqs::SqsClientBuilder};
 
 /// Configuration for the `aws_sqs` sink.
@@ -74,13 +74,15 @@ impl SinkConfig for SqsSinkConfig {
         let client = self.create_client(&cx.proxy).await?;
         let message_builder = SqsMessageBuilder::new(self.clone())?;
 
+        let publisher = SqsMessagePublisher::new(client.clone(), self.queue_url.clone());
+
         let healthcheck = self.clone().healthcheck(client.clone()).boxed();
         let config = ConfigWithIds {
             base_config: self.base_config.clone(),
             fifo: self.queue_url.ends_with(".fifo"),
         };
 
-        let sink = SqsSink::new(config.clone(), client, message_builder.clone())?;
+        let sink = SqsSink::new(config.clone(), publisher, message_builder.clone())?;
         Ok((
             crate::sinks::VectorSink::from_event_streamsink(sink),
             healthcheck,

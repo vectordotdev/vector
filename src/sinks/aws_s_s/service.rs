@@ -1,26 +1,34 @@
 use std::task::{Context, Poll};
 
-use aws_sdk_sqs::{error::SendMessageError, types::SdkError, Client as SqsClient};
-use futures::{future::BoxFuture, TryFutureExt};
+use aws_sdk_sqs::{error::SendMessageError, types::SdkError};
+use futures::future::BoxFuture;
 use tower::Service;
-use tracing::Instrument;
 use vector_common::request_metadata::GroupedCountByteSize;
 use vector_core::{event::EventStatus, stream::DriverResponse, ByteSizeOf};
 
-use super::request_builder::SendMessageEntry;
+use super::{client::Client, request_builder::SendMessageEntry};
 
 #[derive(Clone)]
-pub(crate) struct SqsService {
-    client: SqsClient,
+pub(crate) struct SqsService<C>
+where
+    C: Client + Clone + Send + Sync + 'static,
+{
+    client: C,
 }
 
-impl SqsService {
-    pub const fn new(client: SqsClient) -> Self {
+impl<C> SqsService<C>
+where
+    C: Client + Clone + Send + Sync + 'static,
+{
+    pub const fn new(client: C) -> Self {
         Self { client }
     }
 }
 
-impl Service<SendMessageEntry> for SqsService {
+impl<C> Service<SendMessageEntry> for SqsService<C>
+where
+    C: Client + Clone + Send + Sync + 'static,
+{
     type Response = SendMessageResponse;
     type Error = SdkError<SendMessageError>;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
@@ -35,30 +43,13 @@ impl Service<SendMessageEntry> for SqsService {
         let byte_size = entry.size_of();
         let client = self.client.clone();
 
-        Box::pin(async move {
-            client
-                .send_message()
-                .message_body(entry.message_body)
-                .set_message_group_id(entry.message_group_id)
-                .set_message_deduplication_id(entry.message_deduplication_id)
-                .queue_url(entry.queue_url)
-                .send()
-                .map_ok(|_| SendMessageResponse {
-                    byte_size,
-                    json_byte_size: entry
-                        .metadata
-                        .events_estimated_json_encoded_byte_size()
-                        .clone(),
-                })
-                .instrument(info_span!("request").or_current())
-                .await
-        })
+        Box::pin(async move { client.send_message(entry, byte_size).await })
     }
 }
 
-pub(crate) struct SendMessageResponse {
-    byte_size: usize,
-    json_byte_size: GroupedCountByteSize,
+pub struct SendMessageResponse {
+    pub(crate) byte_size: usize,
+    pub(crate) json_byte_size: GroupedCountByteSize,
 }
 
 impl DriverResponse for SendMessageResponse {

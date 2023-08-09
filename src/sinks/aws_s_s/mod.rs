@@ -8,3 +8,5 @@ pub use self::config::BaseSSSinkConfig;
 
 #[cfg(feature = "sinks-aws_sqs")]
 pub mod sqs;
+
+mod client;
