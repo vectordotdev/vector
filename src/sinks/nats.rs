@@ -285,6 +285,7 @@ mod integration_tests {
             .subscribe(subject)
             .await
             .expect("failed to subscribe with test consumer");
+        consumer.flush().await.expect("failed to flush with the test consumer");
 
         // Publish events.
         let num_events = 1_000;
