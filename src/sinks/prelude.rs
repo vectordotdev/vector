@@ -3,10 +3,15 @@
 
 pub use crate::{
     codecs::{Encoder, EncodingConfig, Transformer},
+    components::validation::{
+        ExternalResource, HttpResourceConfig, ResourceDirection, ValidatableComponent,
+        ValidationConfiguration,
+    },
     config::{DataType, GenerateConfig, SinkConfig, SinkContext},
     event::{Event, LogEvent},
     internal_events::{SinkRequestBuildError, TemplateRenderingError},
-    sinks::util::retries::RetryLogic,
+    register_validatable_component,
+    sinks::util::retries::{RetryAction, RetryLogic},
     sinks::{
         util::{
             builder::SinkBuilderExt,
@@ -34,7 +39,7 @@ pub use vector_common::{
 };
 pub use vector_config::configurable_component;
 pub use vector_core::{
-    config::{AcknowledgementsConfig, Input},
+    config::{telemetry, AcknowledgementsConfig, Input},
     event::Value,
     partition::Partitioner,
     schema::Requirement,

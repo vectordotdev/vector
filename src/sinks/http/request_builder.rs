@@ -1,0 +1,49 @@
+//! Request building for the `http` sink.
+
+use std::io;
+
+use bytes::Bytes;
+
+use crate::sinks::prelude::*;
+
+use super::{encoder::HttpEncoder, service::HttpRequest};
+
+pub(super) struct HttpRequestBuilder {
+    pub(super) encoder: HttpEncoder,
+}
+
+impl RequestBuilder<Vec<Event>> for HttpRequestBuilder {
+    type Metadata = EventFinalizers;
+    type Events = Vec<Event>;
+    type Encoder = HttpEncoder;
+    type Payload = Bytes;
+    type Request = HttpRequest;
+    type Error = io::Error;
+
+    fn compression(&self) -> Compression {
+        // Compression is handled in the Service
+        Compression::None
+    }
+
+    fn encoder(&self) -> &Self::Encoder {
+        &self.encoder
+    }
+
+    fn split_input(
+        &self,
+        mut events: Vec<Event>,
+    ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
+        let finalizers = events.take_finalizers();
+        let builder = RequestMetadataBuilder::from_events(&events);
+        (finalizers, builder, events)
+    }
+
+    fn build_request(
+        &self,
+        metadata: Self::Metadata,
+        request_metadata: RequestMetadata,
+        payload: EncodeResult<Self::Payload>,
+    ) -> Self::Request {
+        HttpRequest::new(payload.into_payload(), metadata, request_metadata)
+    }
+}
