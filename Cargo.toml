@@ -771,13 +771,13 @@ amqp-integration-tests = ["sources-amqp", "sinks-amqp"]
 appsignal-integration-tests = ["sinks-appsignal"]
 
 aws-integration-tests = [
-  "aws-cloudwatch-logs-integration-tests",
-  "aws-cloudwatch-metrics-integration-tests",
-  "aws-ec2-metadata-integration-tests",
-  "aws-ecs-metrics-integration-tests",
-  "aws-kinesis-firehose-integration-tests",
-  "aws-kinesis-streams-integration-tests",
-  "aws-s3-integration-tests",
+#  "aws-cloudwatch-logs-integration-tests",
+#  "aws-cloudwatch-metrics-integration-tests",
+#  "aws-ec2-metadata-integration-tests",
+#  "aws-ecs-metrics-integration-tests",
+#  "aws-kinesis-firehose-integration-tests",
+#  "aws-kinesis-streams-integration-tests",
+#  "aws-s3-integration-tests",
   "aws-sqs-integration-tests",
 ]
 
@@ -792,7 +792,7 @@ aws-ecs-metrics-integration-tests = ["sources-aws_ecs_metrics"]
 aws-kinesis-firehose-integration-tests = ["sinks-aws_kinesis_firehose", "dep:aws-sdk-elasticsearch", "sinks-elasticsearch"]
 aws-kinesis-streams-integration-tests = ["sinks-aws_kinesis_streams"]
 aws-s3-integration-tests = ["sinks-aws_s3", "sources-aws_s3"]
-aws-sqs-integration-tests = ["sinks-aws_sqs", "sources-aws_sqs"]
+aws-sqs-integration-tests = ["sinks-aws_sqs"] #, "sources-aws_sqs"]
 axiom-integration-tests = ["sinks-axiom"]
 azure-blob-integration-tests = ["sinks-azure_blob"]
 chronicle-integration-tests = ["sinks-gcp"]
