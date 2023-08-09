@@ -544,7 +544,7 @@ pub fn init_logging(color: bool, format: LogFormat, log_level: &str, rate: u64) 
     info!(message = "Log level is enabled.", level = ?level);
 }
 
-/// Loads the legacy OpenSSL provider.
+/// Load the legacy OpenSSL provider.
 ///
 /// The returned [Provider] must stay in scope for the entire lifetime of the application, as it
 /// will be unloaded when it is dropped.
