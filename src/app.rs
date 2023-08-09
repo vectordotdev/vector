@@ -156,6 +156,7 @@ impl ApplicationConfig {
 }
 
 impl Application {
+    #[must_use]
     pub fn run() -> ExitStatus {
         let (runtime, app) = Self::prepare_start().unwrap_or_else(|code| std::process::exit(code));
 
@@ -254,10 +255,12 @@ pub struct StartedApplication {
 }
 
 impl StartedApplication {
+    #[must_use]
     pub async fn run(self) -> ExitStatus {
         self.main().await.shutdown().await
     }
 
+    #[must_use]
     pub async fn main(self) -> FinishedApplication {
         let Self {
             config_paths,
@@ -353,6 +356,7 @@ pub struct FinishedApplication {
 }
 
 impl FinishedApplication {
+    #[must_use]
     pub async fn shutdown(self) -> ExitStatus {
         let FinishedApplication {
             signal,
@@ -374,6 +378,7 @@ impl FinishedApplication {
         }
     }
 
+    #[must_use]
     async fn stop(topology_controller: TopologyController, mut signal_rx: SignalRx) -> ExitStatus {
         emit!(VectorStopped);
         tokio::select! {
@@ -389,6 +394,7 @@ impl FinishedApplication {
         }
     }
 
+    #[must_use]
     fn quit() -> ExitStatus {
         // It is highly unlikely that this event will exit from topology.
         emit!(VectorQuit);
