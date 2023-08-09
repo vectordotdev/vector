@@ -549,6 +549,7 @@ pub fn init_logging(color: bool, format: LogFormat, log_level: &str, rate: u64) 
 /// The returned [Provider] must stay in scope for the entire lifetime of the application, as it
 /// will be unloaded when it is dropped.
 pub fn load_openssl_legacy_provider() -> Option<Provider> {
+    warn!(message = "DEPRECATED The openssl legacy provider provides algorithms and key sizes no longer recommended for use.");
     Provider::try_load(None, "legacy", true)
         .map(|provider| {
             info!(message = "Loaded openssl legacy provider.");
