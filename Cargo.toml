@@ -345,6 +345,7 @@ nix = { version = "0.26.2", default-features = false, features = ["socket", "sig
 [build-dependencies]
 prost-build = { version = "0.11", default-features = false, optional = true }
 tonic-build = { version = "0.9", default-features = false, features = ["transport", "prost"], optional = true }
+openssl-src = { version = "300", default-features = false, features = ["force-engine", "legacy"] }
 
 [dev-dependencies]
 approx = "0.5.1"
@@ -384,6 +385,7 @@ ntapi = { git = "https://github.com/MSxDOS/ntapi.git", rev = "24fc1e47677fc9f6e3
 # `openssl-src` at version 1.1.1*, but we want version 3.0.*. Bring in forked
 # version of that crate with the appropriate dependency patched in.
 openssl-sys = { git = "https://github.com/vectordotdev/rust-openssl.git", tag = "openssl-sys-v0.9.91+3.0.0" }
+openssl-src = { git = "https://github.com/vectordotdev/openssl-src-rs.git", tag = "release-300-force-engine+3.1.2"}
 
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin
