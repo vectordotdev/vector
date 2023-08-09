@@ -10,56 +10,51 @@ use indexmap::IndexMap;
 
 use crate::{
     codecs::{EncodingConfigWithFraming, SinkType},
-    http::{Auth, HttpClient, MaybeAuth},
+    http::{get_http_scheme_from_uri, Auth, HttpClient, MaybeAuth},
     sinks::{
         prelude::*,
-        util::{
-            http::{HttpResponse, HttpService, HttpStatusRetryLogic, RequestConfig},
-            RealtimeSizeBasedDefaultBatchSettings, UriSerde,
-        },
+        util::{http::RequestConfig, RealtimeSizeBasedDefaultBatchSettings, UriSerde},
     },
 };
 
 use super::{
-    encoder::HttpEncoder, request_builder::HttpRequestBuilder, service::HttpSinkRequestBuilder,
+    encoder::HttpEncoder,
+    request_builder::HttpRequestBuilder,
+    service::{HttpRetryLogic, HttpService},
     sink::HttpSink,
 };
-
-const CONTENT_TYPE_TEXT: &str = "text/plain";
-const CONTENT_TYPE_NDJSON: &str = "application/x-ndjson";
-const CONTENT_TYPE_JSON: &str = "application/json";
 
 /// Configuration for the `http` sink.
 #[configurable_component(sink("http", "Deliver observability event data to an HTTP server."))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
-pub(super) struct HttpSinkConfig {
+pub struct HttpSinkConfig {
     /// The full URI to make HTTP requests to.
     ///
     /// This should include the protocol and host, but can also include the port, path, and any other valid part of a URI.
     #[configurable(metadata(docs::examples = "https://10.22.212.22:9000/endpoint"))]
-    pub(super) uri: UriSerde,
+    pub uri: UriSerde,
 
     /// The HTTP method to use when making the request.
     #[serde(default)]
-    pub(super) method: HttpMethod,
+    pub method: HttpMethod,
 
     #[configurable(derived)]
-    pub(super) auth: Option<Auth>,
+    pub auth: Option<Auth>,
 
     /// A list of custom headers to add to each request.
-    #[configurable(deprecated = "This option has been deprecated, use `request.headers` instead.")]
+    #[configurable(deprecated)]
     #[configurable(metadata(
         docs::additional_props_description = "An HTTP request header and it's value."
     ))]
-    pub(super) headers: Option<IndexMap<String, String>>,
+    pub headers: Option<IndexMap<String, String>>,
 
     #[configurable(derived)]
     #[serde(default)]
-    pub(super) compression: Compression,
+    pub compression: Compression,
 
     #[serde(flatten)]
-    pub(super) encoding: EncodingConfigWithFraming,
+    pub encoding: EncodingConfigWithFraming,
 
     /// A string to prefix the payload with.
     ///
@@ -68,7 +63,7 @@ pub(super) struct HttpSinkConfig {
     /// If specified, the `payload_suffix` must also be specified and together they must produce a valid JSON object.
     #[configurable(metadata(docs::examples = "{\"data\":"))]
     #[serde(default)]
-    pub(super) payload_prefix: String,
+    pub payload_prefix: String,
 
     /// A string to suffix the payload with.
     ///
@@ -77,18 +72,18 @@ pub(super) struct HttpSinkConfig {
     /// If specified, the `payload_prefix` must also be specified and together they must produce a valid JSON object.
     #[configurable(metadata(docs::examples = "}"))]
     #[serde(default)]
-    pub(super) payload_suffix: String,
+    pub payload_suffix: String,
 
     #[configurable(derived)]
     #[serde(default)]
-    pub(super) batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
+    pub batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
 
     #[configurable(derived)]
     #[serde(default)]
-    pub(super) request: RequestConfig,
+    pub request: RequestConfig,
 
     #[configurable(derived)]
-    pub(super) tls: Option<TlsConfig>,
+    pub tls: Option<TlsConfig>,
 
     #[configurable(derived)]
     #[serde(
@@ -96,7 +91,7 @@ pub(super) struct HttpSinkConfig {
         deserialize_with = "crate::serde::bool_or_struct",
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
-    pub(super) acknowledgements: AcknowledgementsConfig,
+    pub acknowledgements: AcknowledgementsConfig,
 }
 
 /// HTTP method.
@@ -108,7 +103,7 @@ pub(super) struct HttpSinkConfig {
 #[derive(Clone, Copy, Debug, Derivative, Eq, PartialEq)]
 #[serde(rename_all = "snake_case")]
 #[derivative(Default)]
-pub(super) enum HttpMethod {
+pub enum HttpMethod {
     /// GET.
     Get,
 
@@ -228,7 +223,7 @@ pub(super) fn validate_payload_wrapper(
 #[typetag::serde(name = "http")]
 impl SinkConfig for HttpSinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let batch_settings = self.batch.validate()?.into_batcher_settings()?;
+        let batch_settings = self.batch.into_batcher_settings()?;
 
         let encoder = self.build_encoder()?;
         let transformer = self.encoding.transformer();
@@ -241,6 +236,10 @@ impl SinkConfig for HttpSinkConfig {
         let (payload_prefix, payload_suffix) =
             validate_payload_wrapper(&self.payload_prefix, &self.payload_suffix, &encoder)?;
 
+        let endpoint = self.uri.with_default_parts();
+
+        let protocol = get_http_scheme_from_uri(&endpoint.uri);
+
         let client = self.build_http_client(&cx)?;
 
         let healthcheck = match cx.healthcheck.uri {
@@ -250,49 +249,27 @@ impl SinkConfig for HttpSinkConfig {
             None => future::ok(()).boxed(),
         };
 
-        let content_type = {
-            use Framer::*;
-            use Serializer::*;
-            match (encoder.serializer(), encoder.framer()) {
-                (RawMessage(_) | Text(_), _) => Some(CONTENT_TYPE_TEXT.to_owned()),
-                (Json(_), NewlineDelimited(_)) => Some(CONTENT_TYPE_NDJSON.to_owned()),
-                (Json(_), CharacterDelimited(CharacterDelimitedEncoder { delimiter: b',' })) => {
-                    Some(CONTENT_TYPE_JSON.to_owned())
-                }
-                _ => None,
-            }
-        };
-
         let request_builder = HttpRequestBuilder {
-            encoder: HttpEncoder::new(encoder, transformer, payload_prefix, payload_suffix),
-            compression: self.compression,
+            encoder: HttpEncoder::new(encoder.clone(), transformer),
         };
 
-        let content_encoding = self.compression.is_compressed().then(|| {
-            self.compression
-                .content_encoding()
-                .expect("Encoding should be specified for compression.")
-                .to_string()
-        });
-
-        let http_sink_request_builder = HttpSinkRequestBuilder::new(
+        let service = HttpService::new(
             self.uri.with_default_parts(),
             self.method,
             self.auth.choose_one(&self.uri.auth)?,
             headers,
-            content_type,
-            content_encoding,
+            payload_prefix,
+            payload_suffix,
+            self.compression,
+            encoder,
+            client,
+            protocol.to_string(),
         );
-
-        let service = HttpService::new(client, http_sink_request_builder);
 
         let request_limits = self.request.tower.unwrap_with(&Default::default());
 
-        let retry_logic =
-            HttpStatusRetryLogic::new(|req: &HttpResponse| req.http_response.status());
-
         let service = ServiceBuilder::new()
-            .settings(request_limits, retry_logic)
+            .settings(request_limits, HttpRetryLogic::default())
             .service(service);
 
         let sink = HttpSink::new(service, batch_settings, request_builder);

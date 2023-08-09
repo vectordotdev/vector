@@ -11,17 +11,17 @@ use codecs::{
     JsonSerializerConfig, NewlineDelimitedEncoderConfig, TextSerializerConfig,
 };
 use flate2::{read::MultiGzDecoder, read::ZlibDecoder};
-use futures::{channel::mpsc, stream};
+use futures::{channel::mpsc, stream, StreamExt};
 use headers::{Authorization, HeaderMapExt};
 use http::request::Parts;
 use hyper::{Body, Method, Response, StatusCode};
 use serde::{de, Deserialize};
-
 use vector_core::event::{BatchNotifier, BatchStatus, Event, LogEvent};
 
 use crate::{
     assert_downcast_matches,
-    codecs::{EncodingConfigWithFraming, SinkType},
+    codecs::{Encoder, EncodingConfigWithFraming, SinkType},
+    config::SinkContext,
     sinks::{
         prelude::*,
         util::{
@@ -38,9 +38,9 @@ use crate::{
 };
 
 use super::{
-    config::HttpSinkConfig,
     config::{validate_headers, validate_payload_wrapper},
     encoder::HttpEncoder,
+    HttpSinkConfig,
 };
 
 #[test]
@@ -73,7 +73,7 @@ fn http_encode_event_text() {
     let encoder = cfg.build_encoder().unwrap();
     let transformer = cfg.encoding.transformer();
 
-    let encoder = HttpEncoder::new(encoder, transformer, "".to_owned(), "".to_owned());
+    let encoder = HttpEncoder::new(encoder, transformer);
 
     let mut encoded = vec![];
     let (encoded_size, _byte_size) = encoder.encode_input(vec![event], &mut encoded).unwrap();
@@ -96,7 +96,7 @@ fn http_encode_event_ndjson() {
     let encoder = cfg.build_encoder().unwrap();
     let transformer = cfg.encoding.transformer();
 
-    let encoder = HttpEncoder::new(encoder, transformer, "".to_owned(), "".to_owned());
+    let encoder = HttpEncoder::new(encoder, transformer);
 
     let mut encoded = vec![];
     encoder.encode_input(vec![event], &mut encoded).unwrap();
