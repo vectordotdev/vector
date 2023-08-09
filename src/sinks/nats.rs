@@ -233,6 +233,8 @@ impl StreamSink<Event> for NatsSink {
             }
         }
 
+        let _ = self.connection.flush().await;
+
         Ok(())
     }
 }
