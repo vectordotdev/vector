@@ -3,7 +3,6 @@ use std::time::Duration;
 use futures::{future::ready, stream};
 use http::Response;
 use hyper::body;
-use lookup::PathPrefix;
 use openssl::{base64, hash, pkey, sign};
 use tokio::time::timeout;
 use vector_core::config::log_schema;
@@ -135,11 +134,13 @@ fn fails_config_missing_fields() {
 fn insert_timestamp_kv(log: &mut LogEvent) -> (String, String) {
     let now = chrono::Utc::now();
 
-    let timestamp_key = log_schema().timestamp_key().unwrap();
     let timestamp_value = now.to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
-    log.insert((PathPrefix::Event, timestamp_key), now);
+    log.insert(log_schema().timestamp_key_target_path().unwrap(), now);
 
-    (timestamp_key.to_string(), timestamp_value)
+    (
+        log_schema().timestamp_key().unwrap().to_string(),
+        timestamp_value,
+    )
 }
 
 fn build_authorization_header_value(
