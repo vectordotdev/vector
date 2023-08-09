@@ -13,14 +13,16 @@ use crate::{
     http::{get_http_scheme_from_uri, Auth, HttpClient, MaybeAuth},
     sinks::{
         prelude::*,
-        util::{http::RequestConfig, RealtimeSizeBasedDefaultBatchSettings, UriSerde},
+        util::{
+            http::RequestConfig,
+            http_service::{HttpRetryLogic, HttpService},
+            RealtimeSizeBasedDefaultBatchSettings, UriSerde,
+        },
     },
 };
 
 use super::{
-    encoder::HttpEncoder,
-    request_builder::HttpRequestBuilder,
-    service::{HttpRetryLogic, HttpService},
+    encoder::HttpEncoder, request_builder::HttpRequestBuilder, service::HttpSinkRequestBuilder,
     sink::HttpSink,
 };
 
@@ -253,23 +255,23 @@ impl SinkConfig for HttpSinkConfig {
             encoder: HttpEncoder::new(encoder.clone(), transformer),
         };
 
-        let service = HttpService::new(
-            self.uri.with_default_parts(),
-            self.method,
-            self.auth.choose_one(&self.uri.auth)?,
+        let http_service_request_builder = HttpSinkRequestBuilder {
+            uri: self.uri.with_default_parts(),
+            method: self.method,
+            auth: self.auth.choose_one(&self.uri.auth)?,
             headers,
             payload_prefix,
             payload_suffix,
-            self.compression,
+            compression: self.compression,
             encoder,
-            client,
-            protocol.to_string(),
-        );
+        };
+
+        let service = HttpService::new(http_service_request_builder, client, protocol.to_string());
 
         let request_limits = self.request.tower.unwrap_with(&Default::default());
 
         let service = ServiceBuilder::new()
-            .settings(request_limits, HttpRetryLogic::default())
+            .settings(request_limits, HttpRetryLogic)
             .service(service);
 
         let sink = HttpSink::new(service, batch_settings, request_builder);
