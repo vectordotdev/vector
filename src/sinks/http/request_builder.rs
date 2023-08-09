@@ -1,8 +1,7 @@
 //! `RequestBuilder` implementation for the `http` sink.
 
-use std::io;
-
 use bytes::Bytes;
+use std::io;
 
 use crate::sinks::{prelude::*, util::http_service::HttpRequest};
 
