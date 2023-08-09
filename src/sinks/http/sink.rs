@@ -33,7 +33,7 @@ impl HttpSink {
             .batched(self.batch_settings.into_byte_size_config())
             // Build requests with no concurrency limit.
             .request_builder(None, self.request_builder)
-            // Filter out any errors that occured in the request building.
+            // Filter out any errors that occurred in the request building.
             .filter_map(|request| async move {
                 match request {
                     Err(error) => {
