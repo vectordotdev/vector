@@ -509,7 +509,7 @@ mod integration_tests {
 
         let r = publish_and_check(conf).await;
         assert!(
-            matches!(r, Err(BuildError::Config { .. })),
+            matches!(r, Err(BuildError::Connect { .. })),
             "publish_and_check failed, expected BuildError::Config, got: {:?}",
             r
         );
