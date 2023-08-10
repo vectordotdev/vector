@@ -170,11 +170,11 @@ struct Compose {
 impl Compose {
     fn new(test_dir: PathBuf, env: Environment, network: String) -> Result<Option<Self>> {
         let original_path: PathBuf = [&test_dir, Path::new("compose.yaml")].iter().collect();
+
         match original_path.try_exists() {
             Err(error) => Err(error).with_context(|| format!("Could not lookup {original_path:?}")),
             Ok(false) => Ok(None),
             Ok(true) => {
-                println!("Exists");
                 let mut config = ComposeConfig::parse(&original_path)?;
                 // Inject the networks block
                 config.networks.insert(
@@ -199,8 +199,6 @@ impl Compose {
                     serde_yaml::to_string(&config)
                         .with_context(|| "Failed to serialize modified compose.yaml")?,
                 )?;
-
-                println!("Success {}", temp_file.path().display());
 
                 Ok(Some(Self {
                     original_path,
