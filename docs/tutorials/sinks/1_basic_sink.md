@@ -33,7 +33,7 @@ is deserialized to the fields in this struct so the user can customise the
 sink's behaviour.
 
 ```rust
-#[configurable_component(sink("basic", "Basic sink."))]
+#[configurable_component(sink("basic"))]
 #[derive(Clone, Debug)]
 /// A basic sink that dumps its output to stdout.
 pub struct BasicConfig {

@@ -7,6 +7,7 @@ use vector_common::internal_event::{
     ByteSize, BytesReceived, InternalEventHandle as _, Protocol, Registered,
 };
 use vector_config::configurable_component;
+use vrl::event_path;
 use vrl::value::{kind::Collection, Kind};
 
 use super::util::framestream::{build_framestream_unix_source, FrameHandler};
@@ -280,7 +281,7 @@ impl FrameHandler for DnstapFrameHandler {
 
         if self.raw_data_only {
             log_event.insert(
-                self.schema.dnstap_root_data_schema().raw_data(),
+                event_path!(self.schema.dnstap_root_data_schema().raw_data()),
                 BASE64_STANDARD.encode(&frame),
             );
         } else if let Err(err) = parse_dnstap_data(&self.schema, &mut log_event, frame) {

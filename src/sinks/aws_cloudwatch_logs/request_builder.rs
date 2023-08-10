@@ -154,13 +154,7 @@ mod tests {
         let timestamp = Utc::now();
         let message = "event message";
         let mut event = LogEvent::from(message);
-        event.insert(
-            (
-                lookup::PathPrefix::Event,
-                log_schema().timestamp_key().unwrap(),
-            ),
-            timestamp,
-        );
+        event.insert(log_schema().timestamp_key_target_path().unwrap(), timestamp);
 
         let request = request_builder.build(event.into()).unwrap();
         assert_eq!(request.timestamp, timestamp.timestamp_millis());

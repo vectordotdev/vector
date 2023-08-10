@@ -666,7 +666,7 @@ mod test {
             let mut log_event = LogEvent::from(frame);
 
             log_event.insert(
-                log_schema().source_type_key().unwrap().to_string().as_str(),
+                log_schema().source_type_key_target_path().unwrap(),
                 "framestream",
             );
             if let Some(host) = received_from {
