@@ -18,11 +18,10 @@ use crate::aws::ClientBuilder;
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct SnsSinkConfig {
-    /// The ARN of the Amazon SNS topc to which messages are sent.
+    /// The ARN of the Amazon SNS topic to which messages are sent.
     #[configurable(validation(format = "uri"))]
-    // #TODO: Fix example
     #[configurable(metadata(
-        docs::examples = "https://sqs.us-east-2.amazonaws.com/123456789012/MyQueue"
+        docs::examples = "arn:aws:sns:us-east-2:123456789012:MyTopic"
     ))]
     pub topic_arn: String,
 
@@ -33,7 +32,7 @@ pub struct SnsSinkConfig {
 impl GenerateConfig for SnsSinkConfig {
     fn generate_config() -> toml::Value {
         toml::from_str(
-            r#"queue_url = "https://sqs.us-east-2.amazonaws.com/123456789012/MyQueue"
+            r#"topic_arn = "arn:aws:sns:us-east-2:123456789012:MyTopic"
             region = "us-east-2"
             encoding.codec = "json""#,
         )
