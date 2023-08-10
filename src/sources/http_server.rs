@@ -9,6 +9,7 @@ use codecs::{
 };
 
 use http::{StatusCode, Uri};
+use http_serde;
 use lookup::{lookup_v2::OptionalValuePath, owned_value_path, path};
 use tokio_util::codec::Decoder as _;
 use vector_config::configurable_component;
@@ -129,6 +130,12 @@ pub struct SimpleHttpConfig {
     #[serde(default = "default_http_method")]
     method: HttpMethod,
 
+    /// Specifies the HTTP response status code on request success.
+    #[configurable(metadata(docs::examples = "202"))]
+    #[serde(with = "http_serde::status_code")]
+    #[serde(default = "default_http_response_code")]
+    response_code: StatusCode,
+
     #[configurable(derived)]
     tls: Option<TlsEnableableConfig>,
 
@@ -242,6 +249,7 @@ impl Default for SimpleHttpConfig {
             path: default_path(),
             path_key: default_path_key(),
             method: default_http_method(),
+            response_code: default_http_response_code(),
             strict_path: true,
             framing: None,
             decoding: Some(default_decoding()),
@@ -289,6 +297,10 @@ fn default_path_key() -> OptionalValuePath {
     OptionalValuePath::from(owned_value_path!("path"))
 }
 
+fn default_http_response_code() -> StatusCode {
+    StatusCode::OK
+}
+
 /// Removes duplicates from the list, and logs a `warn!()` for each duplicate removed.
 fn remove_duplicates(mut list: Vec<String>, list_name: &str) -> Vec<String> {
     list.sort();
@@ -328,6 +340,7 @@ impl SourceConfig for SimpleHttpConfig {
             self.address,
             self.path.as_str(),
             self.method,
+            self.response_code,
             self.strict_path,
             &self.tls,
             &self.auth,

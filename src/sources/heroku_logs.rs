@@ -175,6 +175,7 @@ impl SourceConfig for LogplexConfig {
             self.address,
             "events",
             HttpMethod::Post,
+            StatusCode::OK,
             true,
             &self.tls,
             &self.auth,
