@@ -232,7 +232,7 @@ jobs:
           export REPLICAS="10"
           export TOTAL_SAMPLES="600"
           export P_VALUE="0.1"
-          export SMP_CRATE_VERSION="0.9.1"
+          export SMP_CRATE_VERSION="0.10.0"
           export LADING_VERSION="0.12.0"
 
           echo "warmup seconds: ${WARMUP_SECONDS}"
@@ -499,7 +499,6 @@ jobs:
           chmod +x ${{ runner.temp }}/bin/smp
 
           ${{ runner.temp }}/bin/smp --team-id ${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }} job submit \
-            --use-curta \
             --lading-version ${{ needs.compute-metadata.outputs.lading-version }} \
             --total-samples ${{ needs.compute-metadata.outputs.total-samples }} \
             --warmup-seconds ${{ needs.compute-metadata.outputs.warmup-seconds }} \
@@ -529,7 +528,6 @@ jobs:
           chmod +x ${{ runner.temp }}/bin/smp
 
           ${{ runner.temp }}/bin/smp --team-id ${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }} job status \
-            --use-curta \
             --wait \
             --wait-delay-seconds 60 \
             --wait-timeout-minutes 90 \
@@ -542,7 +540,6 @@ jobs:
         run: |
           chmod +x ${{ runner.temp }}/bin/smp
           ${{ runner.temp }}/bin/smp --team-id ${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }} job cancel \
-            --use-curta \
             --submission-metadata ${{ runner.temp }}/submission-metadata
 
       - name: Check status, cancelled
@@ -623,7 +620,6 @@ jobs:
           chmod +x ${{ runner.temp }}/bin/smp
 
           ${{ runner.temp }}/bin/smp --team-id ${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }} job result \
-            --use-curta \
             --submission-metadata ${{ runner.temp }}/submission-metadata
 
       - name: Check status, cancelled
@@ -715,7 +711,6 @@ jobs:
           chmod +x ${{ runner.temp }}/bin/smp
 
           ${{ runner.temp }}/bin/smp --team-id ${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }} job sync \
-            --use-curta \
             --submission-metadata ${{ runner.temp }}/submission-metadata \
             --output-path "${{ runner.temp }}/outputs"
 
