@@ -44,7 +44,7 @@ pub trait HttpServiceRequestBuilder {
 
 /// `Service` implementation of HTTP stream sinks.
 ///
-/// `http_request_builder` <R> must implement the `HttpServiceRequestBuilder` trait, which is
+/// `http_request_builder` `<R>` must implement the `HttpServiceRequestBuilder` trait, which is
 ///  used in the `Service::call()` function to handle sink-specific HTTP request building.
 #[derive(Debug, Clone)]
 pub struct HttpService<R> {
