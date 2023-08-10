@@ -460,7 +460,14 @@ impl DataStreamConfig {
                 .or_else(|| self.namespace(log))?;
             (dtype, dataset, namespace)
         };
-        Some(format!("{}-{}-{}", dtype, dataset, namespace))
+
+        let name = [dtype, dataset, namespace]
+            .into_iter()
+            .filter(|s| !s.is_empty())
+            .collect::<Vec<_>>()
+            .join("-");
+
+        Some(name)
     }
 }
 
