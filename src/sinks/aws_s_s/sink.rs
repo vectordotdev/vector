@@ -7,6 +7,7 @@ use vector_core::sink::StreamSink;
 use super::{client::Client, request_builder::SqsRequestBuilder, service::SqsService};
 use crate::internal_events::SinkRequestBuildError;
 use crate::sinks::aws_s_s::config::ConfigWithIds;
+use crate::sinks::aws_s_s::retry::SqsRetryLogic;
 use crate::{
     event::Event,
     sinks::util::{
@@ -53,8 +54,9 @@ where
             .request
             .unwrap_with(&TowerRequestConfig::default().timeout_secs(30));
         let request_builder_concurrency_limit = NonZeroUsize::new(50);
+        let retry_logic: SqsRetryLogic<E> = super::retry::SqsRetryLogic::new();
         let service = tower::ServiceBuilder::new()
-            .settings(request, super::retry::SqsRetryLogic)
+            .settings(request, retry_logic)
             .service(self.service);
 
         input
