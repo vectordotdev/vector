@@ -24,18 +24,20 @@ impl SinkBatchSettings for SqsSinkDefaultBatchSettings {
 }
 
 #[derive(Clone)]
-pub struct SqsSink<C>
+pub struct SqsSink<C, E>
 where
-    C: Client + Clone + Send + Sync + 'static,
+    C: Client<E> + Clone + Send + Sync + 'static,
+    E: std::fmt::Debug + std::fmt::Display + std::error::Error + Sync + Send + 'static,
 {
     request_builder: SqsRequestBuilder,
-    service: SqsService<C>,
+    service: SqsService<C, E>,
     request: TowerRequestConfig,
 }
 
-impl<C> SqsSink<C>
+impl<C, E> SqsSink<C, E>
 where
-    C: Client + Clone + Send + Sync + 'static,
+    C: Client<E> + Clone + Send + Sync + 'static,
+    E: std::fmt::Debug + std::fmt::Display + std::error::Error + Sync + Send + 'static,
 {
     pub fn new(config: ConfigWithIds, publisher: C) -> crate::Result<Self> {
         let request = config.base_config.request;
@@ -70,9 +72,10 @@ where
 }
 
 #[async_trait::async_trait]
-impl<C> StreamSink<Event> for SqsSink<C>
+impl<C, E> StreamSink<Event> for SqsSink<C, E>
 where
-    C: Client + Clone + Send + Sync + 'static,
+    C: Client<E> + Clone + Send + Sync + 'static,
+    E: std::fmt::Debug + std::fmt::Display + std::error::Error + Sync + Send + 'static,
 {
     async fn run(mut self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         self.run_inner(input).await

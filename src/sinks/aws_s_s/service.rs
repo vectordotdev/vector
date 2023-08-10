@@ -1,6 +1,7 @@
+use std::marker::PhantomData;
 use std::task::{Context, Poll};
 
-use aws_sdk_sqs::{error::SendMessageError, types::SdkError};
+use aws_sdk_sqs::types::SdkError;
 use futures::future::BoxFuture;
 use tower::Service;
 use vector_common::request_metadata::GroupedCountByteSize;
@@ -8,29 +9,48 @@ use vector_core::{event::EventStatus, stream::DriverResponse, ByteSizeOf};
 
 use super::{client::Client, request_builder::SendMessageEntry};
 
-#[derive(Clone)]
-pub(crate) struct SqsService<C>
+pub(crate) struct SqsService<C, E>
 where
-    C: Client + Clone + Send + Sync + 'static,
+    C: Client<E> + Clone + Send + Sync + 'static,
+    E: std::fmt::Debug + std::fmt::Display + std::error::Error + Sync + Send + 'static,
 {
     client: C,
+    phantom: PhantomData<fn() -> E>,
 }
 
-impl<C> SqsService<C>
+impl<C, E> SqsService<C, E>
 where
-    C: Client + Clone + Send + Sync + 'static,
+    C: Client<E> + Clone + Send + Sync + 'static,
+    E: std::fmt::Debug + std::fmt::Display + std::error::Error + Sync + Send + 'static,
 {
     pub const fn new(client: C) -> Self {
-        Self { client }
+        Self {
+            client,
+            phantom: PhantomData,
+        }
     }
 }
 
-impl<C> Service<SendMessageEntry> for SqsService<C>
+impl<C, E> Clone for SqsService<C, E>
 where
-    C: Client + Clone + Send + Sync + 'static,
+    C: Client<E> + Clone + Send + Sync + 'static,
+    E: std::fmt::Debug + std::fmt::Display + std::error::Error + Sync + Send + 'static,
+{
+    fn clone(&self) -> SqsService<C, E> {
+        SqsService {
+            client: self.client.clone(),
+            phantom: PhantomData,
+        }
+    }
+}
+
+impl<C, E> Service<SendMessageEntry> for SqsService<C, E>
+where
+    C: Client<E> + Clone + Send + Sync + 'static,
+    E: std::fmt::Debug + std::fmt::Display + std::error::Error + Sync + Send + 'static,
 {
     type Response = SendMessageResponse;
-    type Error = SdkError<SendMessageError>;
+    type Error = SdkError<E>;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
     // Emission of an internal event in case of errors is handled upstream by the caller.
