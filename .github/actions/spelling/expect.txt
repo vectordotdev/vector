@@ -231,6 +231,7 @@ datname
 dbkind
 dbreader
 DBserver
+DCMAKE
 ddagent
 ddev
 ddmetric
