@@ -30,19 +30,18 @@ impl HttpEncoder {
 impl SinkEncoder<Vec<Event>> for HttpEncoder {
     fn encode_input(
         &self,
-        mut input: Vec<Event>,
+        events: Vec<Event>,
         writer: &mut dyn io::Write,
     ) -> io::Result<(usize, GroupedCountByteSize)> {
         let mut encoder = self.encoder.clone();
         let mut byte_size = telemetry().create_request_count_byte_size();
         let mut body = BytesMut::new();
 
-        for event in input.iter_mut() {
-            self.transformer.transform(event);
-            byte_size.add_event(event, event.estimated_json_encoded_size_of());
-        }
+        for mut event in events {
+            self.transformer.transform(&mut event);
 
-        for event in input.into_iter() {
+            byte_size.add_event(&event, event.estimated_json_encoded_size_of());
+
             encoder
                 .encode(event, &mut body)
                 .map_err(|_| io::Error::new(io::ErrorKind::Other, "unable to encode event"))?;
