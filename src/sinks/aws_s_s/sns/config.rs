@@ -6,7 +6,7 @@ use crate::config::{
 use futures::FutureExt;
 use vector_config::configurable_component;
 
-use super::{client::SnsMessagePublisher, BaseSSSinkConfig, ConfigWithIds, SqsSink};
+use super::{client::SnsMessagePublisher, BaseSSSinkConfig, ConfigWithIds, SSSink};
 use crate::aws::create_client;
 use crate::aws::ClientBuilder;
 
@@ -82,7 +82,7 @@ impl SinkConfig for SnsSinkConfig {
             fifo: self.topic_arn.ends_with(".fifo"),
         };
 
-        let sink = SqsSink::new(config.clone(), publisher)?;
+        let sink = SSSink::new(config.clone(), publisher)?;
         Ok((
             crate::sinks::VectorSink::from_event_streamsink(sink),
             healthcheck,

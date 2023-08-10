@@ -5,22 +5,22 @@ use super::service::SendMessageResponse;
 use crate::{aws::is_retriable_error, sinks::util::retries::RetryLogic};
 
 #[derive(Debug)]
-pub(super) struct SqsRetryLogic<E> {
+pub(super) struct SSRetryLogic<E> {
     phantom: PhantomData<fn() -> E>,
 }
 
-impl<E> SqsRetryLogic<E>
+impl<E> SSRetryLogic<E>
 where
     E: std::fmt::Debug + std::fmt::Display + std::error::Error + Sync + Send + 'static,
 {
-    pub fn new() -> SqsRetryLogic<E> {
+    pub fn new() -> SSRetryLogic<E> {
         Self {
             phantom: PhantomData,
         }
     }
 }
 
-impl<E> RetryLogic for SqsRetryLogic<E>
+impl<E> RetryLogic for SSRetryLogic<E>
 where
     E: std::fmt::Debug + std::fmt::Display + std::error::Error + Sync + Send + 'static,
 {
@@ -32,12 +32,12 @@ where
     }
 }
 
-impl<E> Clone for SqsRetryLogic<E>
+impl<E> Clone for SSRetryLogic<E>
 where
     E: std::fmt::Debug + std::fmt::Display + std::error::Error + Sync + Send + 'static,
 {
-    fn clone(&self) -> SqsRetryLogic<E> {
-        SqsRetryLogic {
+    fn clone(&self) -> SSRetryLogic<E> {
+        SSRetryLogic {
             phantom: PhantomData,
         }
     }

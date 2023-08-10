@@ -9,7 +9,7 @@ use vector_core::{event::EventStatus, stream::DriverResponse, ByteSizeOf};
 
 use super::{client::Client, request_builder::SendMessageEntry};
 
-pub(crate) struct SqsService<C, E>
+pub(crate) struct SSService<C, E>
 where
     C: Client<E> + Clone + Send + Sync + 'static,
     E: std::fmt::Debug + std::fmt::Display + std::error::Error + Sync + Send + 'static,
@@ -18,7 +18,7 @@ where
     phantom: PhantomData<fn() -> E>,
 }
 
-impl<C, E> SqsService<C, E>
+impl<C, E> SSService<C, E>
 where
     C: Client<E> + Clone + Send + Sync + 'static,
     E: std::fmt::Debug + std::fmt::Display + std::error::Error + Sync + Send + 'static,
@@ -31,20 +31,20 @@ where
     }
 }
 
-impl<C, E> Clone for SqsService<C, E>
+impl<C, E> Clone for SSService<C, E>
 where
     C: Client<E> + Clone + Send + Sync + 'static,
     E: std::fmt::Debug + std::fmt::Display + std::error::Error + Sync + Send + 'static,
 {
-    fn clone(&self) -> SqsService<C, E> {
-        SqsService {
+    fn clone(&self) -> SSService<C, E> {
+        SSService {
             client: self.client.clone(),
             phantom: PhantomData,
         }
     }
 }
 
-impl<C, E> Service<SendMessageEntry> for SqsService<C, E>
+impl<C, E> Service<SendMessageEntry> for SSService<C, E>
 where
     C: Client<E> + Clone + Send + Sync + 'static,
     E: std::fmt::Debug + std::fmt::Display + std::error::Error + Sync + Send + 'static,

@@ -6,7 +6,7 @@ pub use super::{
     config::{BaseSSSinkConfig, ConfigWithIds},
     request_builder::SendMessageEntry,
     service::SendMessageResponse,
-    sink::SqsSink,
+    sink::SSSink,
 };
 
 mod client;

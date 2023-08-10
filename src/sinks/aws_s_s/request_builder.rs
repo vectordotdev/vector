@@ -15,20 +15,20 @@ use crate::{
 };
 
 #[derive(Clone)]
-pub struct SqsMetadata {
+pub struct Metadata {
     pub finalizers: EventFinalizers,
     pub message_group_id: Option<String>,
     pub message_deduplication_id: Option<String>,
 }
 
 #[derive(Clone)]
-pub(crate) struct SqsRequestBuilder {
+pub(crate) struct SSRequestBuilder {
     encoder: (Transformer, Encoder<()>),
     message_group_id: Option<Template>,
     message_deduplication_id: Option<Template>,
 }
 
-impl SqsRequestBuilder {
+impl SSRequestBuilder {
     pub fn new(config: ConfigWithIds) -> crate::Result<Self> {
         let transformer = config.base_config.encoding.transformer();
         let serializer = config.base_config.encoding.build()?;
@@ -42,8 +42,8 @@ impl SqsRequestBuilder {
     }
 }
 
-impl RequestBuilder<Event> for SqsRequestBuilder {
-    type Metadata = SqsMetadata;
+impl RequestBuilder<Event> for SSRequestBuilder {
+    type Metadata = Metadata;
     type Events = Event;
     type Encoder = (Transformer, Encoder<()>);
     type Payload = Bytes;
@@ -93,17 +93,17 @@ impl RequestBuilder<Event> for SqsRequestBuilder {
 
         let builder = RequestMetadataBuilder::from_event(&event);
 
-        let sqs_metadata = SqsMetadata {
+        let metadata = Metadata {
             finalizers: event.take_finalizers(),
             message_group_id,
             message_deduplication_id,
         };
-        (sqs_metadata, builder, event)
+        (metadata, builder, event)
     }
 
     fn build_request(
         &self,
-        sqs_metadata: Self::Metadata,
+        client_metadata: Self::Metadata,
         metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
@@ -112,9 +112,9 @@ impl RequestBuilder<Event> for SqsRequestBuilder {
 
         SendMessageEntry {
             message_body,
-            message_group_id: sqs_metadata.message_group_id,
-            message_deduplication_id: sqs_metadata.message_deduplication_id,
-            finalizers: sqs_metadata.finalizers,
+            message_group_id: client_metadata.message_group_id,
+            message_deduplication_id: client_metadata.message_deduplication_id,
+            finalizers: client_metadata.finalizers,
             metadata,
         }
     }
