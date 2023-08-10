@@ -8,11 +8,19 @@ ARG FEATURES=api,api-client,sources-datadog_agent,sources-fluent,sources-host_me
 #
 FROM docker.io/rust:${RUST_VERSION}-${DEBIAN_RELEASE} as builder
 RUN apt-get update && apt-get -y --no-install-recommends install build-essential git clang cmake libclang-dev libsasl2-dev libstdc++-11-dev libssl-dev libxxhash-dev zlib1g-dev zlib1g
-RUN git clone https://github.com/rui314/mold.git && cd mold && git checkout v2.0.0 && make -j"$(nproc)" && make install
+RUN git clone https://github.com/rui314/mold.git \
+    && mkdir mold/build \
+    && cd mold/build \
+    && git checkout v2.0.0 \
+    && ../install-build-deps.sh \
+    && cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=c++ .. \
+    && cmake --build . -j $(nproc) \
+    && cmake --install .
 
 WORKDIR /vector
 COPY . .
 ARG FEATURES
+RUN scripts/environment/install-protoc.sh
 RUN --mount=type=cache,target=/vector/target \
     --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/usr/local/cargo/git \
