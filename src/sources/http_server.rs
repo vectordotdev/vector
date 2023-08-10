@@ -491,7 +491,7 @@ mod tests {
         Compression,
     };
     use futures::Stream;
-    use http::{HeaderMap, Method};
+    use http::{HeaderMap, Method, StatusCode};
     use lookup::lookup_v2::OptionalValuePath;
     use similar_asserts::assert_eq;
 
@@ -542,6 +542,7 @@ mod tests {
                 headers,
                 encoding: None,
                 query_parameters,
+                response_code: StatusCode::OK,
                 tls: None,
                 auth: None,
                 strict_path,
