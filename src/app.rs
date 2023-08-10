@@ -28,7 +28,7 @@ use crate::{
     cli::{handle_config_errors, LogFormat, Opts, RootOpts},
     config::{self, Config, ConfigPath},
     heartbeat,
-    signal::{SignalHandler, SignalPair, SignalRx, SignalTo},
+    signal::{ShutdownError, SignalHandler, SignalPair, SignalRx, SignalTo},
     topology::{
         self, ReloadOutcome, RunningTopology, SharedTopologyController, TopologyController,
     },
@@ -50,8 +50,8 @@ use tokio::sync::broadcast::error::RecvError;
 pub struct ApplicationConfig {
     pub config_paths: Vec<config::ConfigPath>,
     pub topology: RunningTopology,
-    pub graceful_crash_sender: mpsc::UnboundedSender<()>,
-    pub graceful_crash_receiver: mpsc::UnboundedReceiver<()>,
+    pub graceful_crash_sender: mpsc::UnboundedSender<ShutdownError>,
+    pub graceful_crash_receiver: mpsc::UnboundedReceiver<ShutdownError>,
     #[cfg(feature = "api")]
     pub api: config::api::Options,
     #[cfg(feature = "enterprise")]
@@ -141,9 +141,12 @@ impl ApplicationConfig {
 
                     Some(api_server)
                 }
-                Err(e) => {
-                    error!("An error occurred that Vector couldn't handle: {}.", e);
-                    _ = self.graceful_crash_sender.send(());
+                Err(error) => {
+                    let error = error.to_string();
+                    error!("An error occurred that Vector couldn't handle: {}.", error);
+                    _ = self
+                        .graceful_crash_sender
+                        .send(ShutdownError::ApiFailed { error });
                     None
                 }
             }
@@ -256,7 +259,7 @@ impl Application {
 
 pub struct StartedApplication {
     pub config_paths: Vec<ConfigPath>,
-    pub graceful_crash_receiver: mpsc::UnboundedReceiver<()>,
+    pub graceful_crash_receiver: mpsc::UnboundedReceiver<ShutdownError>,
     pub signals: SignalPair,
     pub topology_controller: SharedTopologyController,
     pub openssl_legacy_provider: Option<Provider>,
@@ -283,42 +286,19 @@ impl StartedApplication {
 
         let signal = loop {
             tokio::select! {
-                signal = signal_rx.recv() => {
-                    match signal {
-                        Ok(SignalTo::ReloadFromConfigBuilder(config_builder)) => {
-                            let mut topology_controller = topology_controller.lock().await;
-                            let new_config = config_builder.build().map_err(handle_config_errors).ok();
-                            if let ReloadOutcome::FatalError = topology_controller.reload(new_config).await {
-                                break SignalTo::Shutdown;
-                            }
-                        }
-                        Ok(SignalTo::ReloadFromDisk) => {
-                            let mut topology_controller = topology_controller.lock().await;
-
-                            // Reload paths
-                            if let Some(paths) = config::process_paths(&config_paths) {
-                                topology_controller.config_paths = paths;
-                            }
-
-                            // Reload config
-                            let new_config = config::load_from_paths_with_provider_and_secrets(&topology_controller.config_paths, &mut signal_handler)
-                                .await
-                                .map_err(handle_config_errors).ok();
-
-                            if let ReloadOutcome::FatalError = topology_controller.reload(new_config).await {
-                                break SignalTo::Shutdown;
-                            }
-                        },
-                        Err(RecvError::Lagged(amt)) => warn!("Overflow, dropped {} signals.", amt),
-                        Err(RecvError::Closed) => break SignalTo::Shutdown,
-                        Ok(signal) => break signal,
-                    }
-                }
+                signal = signal_rx.recv() => if let Some(signal) = handle_signal(
+                    signal,
+                    &topology_controller,
+                    &config_paths,
+                    &mut signal_handler,
+                ).await {
+                    break signal;
+                },
                 // Trigger graceful shutdown if a component crashed, or all sources have ended.
-                _ = graceful_crash.next() => break SignalTo::Shutdown,
+                error = graceful_crash.next() => break SignalTo::Shutdown(error),
                 _ = TopologyController::sources_finished(topology_controller.clone()) => {
                     info!("All sources have finished.");
-                    break SignalTo::Shutdown
+                    break SignalTo::Shutdown(None)
                 } ,
                 else => unreachable!("Signal streams never end"),
             }
@@ -333,6 +313,52 @@ impl StartedApplication {
     }
 }
 
+async fn handle_signal(
+    signal: Result<SignalTo, RecvError>,
+    topology_controller: &SharedTopologyController,
+    config_paths: &[ConfigPath],
+    signal_handler: &mut SignalHandler,
+) -> Option<SignalTo> {
+    match signal {
+        Ok(SignalTo::ReloadFromConfigBuilder(config_builder)) => {
+            let mut topology_controller = topology_controller.lock().await;
+            let new_config = config_builder.build().map_err(handle_config_errors).ok();
+            match topology_controller.reload(new_config).await {
+                ReloadOutcome::FatalError(error) => Some(SignalTo::Shutdown(Some(error))),
+                _ => None,
+            }
+        }
+        Ok(SignalTo::ReloadFromDisk) => {
+            let mut topology_controller = topology_controller.lock().await;
+
+            // Reload paths
+            if let Some(paths) = config::process_paths(config_paths) {
+                topology_controller.config_paths = paths;
+            }
+
+            // Reload config
+            let new_config = config::load_from_paths_with_provider_and_secrets(
+                &topology_controller.config_paths,
+                signal_handler,
+            )
+            .await
+            .map_err(handle_config_errors)
+            .ok();
+
+            match topology_controller.reload(new_config).await {
+                ReloadOutcome::FatalError(error) => Some(SignalTo::Shutdown(Some(error))),
+                _ => None,
+            }
+        }
+        Err(RecvError::Lagged(amt)) => {
+            warn!("Overflow, dropped {} signals.", amt);
+            None
+        }
+        Err(RecvError::Closed) => Some(SignalTo::Shutdown(None)),
+        Ok(signal) => Some(signal),
+    }
+}
+
 pub struct FinishedApplication {
     pub signal: SignalTo,
     pub signal_rx: SignalRx,
@@ -344,7 +370,7 @@ impl FinishedApplication {
     pub async fn shutdown(self) -> ExitStatus {
         let FinishedApplication {
             signal,
-            mut signal_rx,
+            signal_rx,
             topology_controller,
             openssl_legacy_provider,
         } = self;
@@ -357,50 +383,40 @@ impl FinishedApplication {
             .into_inner();
 
         let status = match signal {
-            SignalTo::Shutdown => {
-                emit!(VectorStopped);
-                tokio::select! {
-                    _ = topology_controller.stop() => ExitStatus::from_raw({
-                            #[cfg(windows)]
-                            {
-                                exitcode::OK as u32
-                            }
-                            #[cfg(unix)]
-                            exitcode::OK
-                    }), // Graceful shutdown finished
-                    _ = signal_rx.recv() => {
-                        // It is highly unlikely that this event will exit from topology.
-                        emit!(VectorQuit);
-                        // Dropping the shutdown future will immediately shut the server down
-                        ExitStatus::from_raw({
-                            #[cfg(windows)]
-                            {
-                                exitcode::UNAVAILABLE as u32
-                            }
-                            #[cfg(unix)]
-                            exitcode::OK
-                        })
-                    }
-
-                }
-            }
-            SignalTo::Quit => {
-                // It is highly unlikely that this event will exit from topology.
-                emit!(VectorQuit);
-                drop(topology_controller);
-                ExitStatus::from_raw({
-                    #[cfg(windows)]
-                    {
-                        exitcode::UNAVAILABLE as u32
-                    }
-                    #[cfg(unix)]
-                    exitcode::OK
-                })
-            }
+            SignalTo::Shutdown(_) => Self::stop(topology_controller, signal_rx).await,
+            SignalTo::Quit => Self::quit(),
             _ => unreachable!(),
         };
         drop(openssl_legacy_provider);
         status
+    }
+
+    async fn stop(topology_controller: TopologyController, mut signal_rx: SignalRx) -> ExitStatus {
+        emit!(VectorStopped);
+        tokio::select! {
+            _ = topology_controller.stop() => ExitStatus::from_raw({
+                #[cfg(windows)]
+                {
+                    exitcode::OK as u32
+                }
+                #[cfg(unix)]
+                exitcode::OK
+            }), // Graceful shutdown finished
+            _ = signal_rx.recv() => Self::quit(),
+        }
+    }
+
+    fn quit() -> ExitStatus {
+        // It is highly unlikely that this event will exit from topology.
+        emit!(VectorQuit);
+        ExitStatus::from_raw({
+            #[cfg(windows)]
+            {
+                exitcode::UNAVAILABLE as u32
+            }
+            #[cfg(unix)]
+            exitcode::OK
+        })
     }
 }
 

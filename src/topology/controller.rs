@@ -16,7 +16,7 @@ use crate::internal_events::{
     VectorConfigLoadError, VectorRecoveryError, VectorReloadError, VectorReloaded,
 };
 
-use crate::{config, topology::RunningTopology};
+use crate::{config, signal::ShutdownError, topology::RunningTopology};
 
 #[derive(Clone, Debug)]
 pub struct SharedTopologyController(Arc<Mutex<TopologyController>>);
@@ -54,12 +54,13 @@ impl std::fmt::Debug for TopologyController {
     }
 }
 
+#[derive(Clone, Debug)]
 pub enum ReloadOutcome {
     NoConfig,
     MissingApiKey,
     Success,
     RolledBack,
-    FatalError,
+    FatalError(ShutdownError),
 }
 
 impl TopologyController {
@@ -104,7 +105,6 @@ impl TopologyController {
             }
         } else if self.api_server.is_none() {
             use crate::internal_events::ApiStarted;
-            use crate::topology::ReloadOutcome::FatalError;
             use std::sync::atomic::AtomicBool;
             use tokio::runtime::Handle;
 
@@ -124,9 +124,10 @@ impl TopologyController {
 
                     Some(api_server)
                 }
-                Err(e) => {
-                    error!("An error occurred that Vector couldn't handle: {}.", e);
-                    return FatalError;
+                Err(error) => {
+                    let error = error.to_string();
+                    error!("An error occurred that Vector couldn't handle: {}.", error);
+                    return ReloadOutcome::FatalError(ShutdownError::ApiFailed { error });
                 }
             }
         }
@@ -152,7 +153,7 @@ impl TopologyController {
             Err(()) => {
                 emit!(VectorReloadError);
                 emit!(VectorRecoveryError);
-                ReloadOutcome::FatalError
+                ReloadOutcome::FatalError(ShutdownError::ReloadFailedToRestore)
             }
         }
     }

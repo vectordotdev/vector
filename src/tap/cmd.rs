@@ -53,7 +53,7 @@ pub async fn tap(opts: &super::Opts, mut signal_rx: SignalRx) -> exitcode::ExitC
     loop {
         tokio::select! {
             biased;
-            Ok(SignalTo::Shutdown | SignalTo::Quit) = signal_rx.recv() => break,
+            Ok(SignalTo::Shutdown(_) | SignalTo::Quit) = signal_rx.recv() => break,
             status = run(subscription_url.clone(), opts, outputs_patterns.clone(), formatter.clone()) => {
                 if status == exitcode::UNAVAILABLE || status == exitcode::TEMPFAIL && !opts.no_reconnect {
                     #[allow(clippy::print_stderr)]
