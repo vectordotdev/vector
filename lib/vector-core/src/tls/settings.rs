@@ -630,6 +630,7 @@ mod test {
 
     #[test]
     fn from_options_pkcs12() {
+        let _provider = openssl::provider::Provider::try_load(None, "legacy", true).unwrap();
         let options = TlsConfig {
             crt_file: Some(TEST_PKCS12_PATH.into()),
             key_pass: Some("NOPASS".into()),
