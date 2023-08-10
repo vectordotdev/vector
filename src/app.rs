@@ -359,7 +359,6 @@ async fn handle_signal(
     }
 }
 
-#[derive(Debug)]
 pub struct FinishedApplication {
     pub signal: SignalTo,
     pub signal_rx: SignalRx,
