@@ -6,7 +6,7 @@ use crate::sinks::{prelude::*, util::EncodedLength};
 
 use super::{RedisEvent, RedisKvEntry, RedisRequest};
 
-fn encode_event(
+pub(super) fn encode_event(
     mut event: Event,
     key: String,
     transformer: &Transformer,

@@ -134,8 +134,8 @@ impl SinkConfig for RedisSinkConfig {
         }
         let conn = self.build_client().await.context(RedisCreateFailedSnafu)?;
         let healthcheck = RedisSinkConfig::healthcheck(conn.clone()).boxed();
-        let sink = self.new(conn)?;
-        Ok((sink, healthcheck))
+        let sink = RedisSink::new(self, conn)?;
+        Ok((super::VectorSink::from_event_streamsink(sink), healthcheck))
     }
 
     fn input(&self) -> Input {
@@ -148,20 +148,9 @@ impl SinkConfig for RedisSinkConfig {
 }
 
 impl RedisSinkConfig {
-    pub fn new(&self, conn: ConnectionManager) -> crate::Result<super::VectorSink> {
-        // let request = self.request.unwrap_with(&TowerRequestConfig {
-        //     concurrency: Concurrency::Fixed(1),
-        //     ..Default::default()
-        // });
-
-        let sink = RedisSink::new(&self, conn)?;
-        Ok(super::VectorSink::from_event_streamsink(sink))
-    }
-
     pub(super) async fn build_client(&self) -> RedisResult<ConnectionManager> {
         let client = redis::Client::open(self.endpoint.as_str())?;
-        let conn = client.get_tokio_connection_manager().await;
-        conn
+        client.get_tokio_connection_manager().await
     }
 
     async fn healthcheck(mut conn: ConnectionManager) -> crate::Result<()> {

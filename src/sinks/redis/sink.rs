@@ -37,7 +37,7 @@ impl RedisSink {
         let serializer = config.encoding.build()?;
         let encoder = Encoder::<()>::new(serializer);
         let key = config.key.clone();
-        let request = config.request.clone();
+        let request = config.request;
 
         Ok(RedisSink {
             request,

@@ -55,8 +55,10 @@ async fn redis_sink_list_lpush() {
     // Publish events.
     let cnf2 = cnf.clone();
     assert_sink_compliance(&SINK_TAGS, async move {
-        let conn = cnf2.build_client().await.unwrap();
-        cnf2.new(conn).unwrap().run(input).await
+        // let conn = cnf2.build_client().await.unwrap();
+        let cx = SinkContext::default();
+        let (sink, _healthcheck) = cnf2.build(cx).await.unwrap();
+        sink.run(input).await
     })
     .await
     .expect("Running sink failed");
@@ -117,8 +119,10 @@ async fn redis_sink_list_rpush() {
     // Publish events.
     let cnf2 = cnf.clone();
     assert_sink_compliance(&SINK_TAGS, async move {
-        let conn = cnf2.build_client().await.unwrap();
-        cnf2.new(conn).unwrap().run(input).await
+        // let conn = cnf2.build_client().await.unwrap();
+        let cx = SinkContext::default();
+        let (sink, _healthcheck) = cnf2.build(cx).await.unwrap();
+        sink.run(input).await
     })
     .await
     .expect("Running sink failed");
@@ -184,8 +188,8 @@ async fn redis_sink_channel() {
 
     // Publish events.
     assert_sink_compliance(&SINK_TAGS, async move {
-        let conn = cnf.build_client().await.unwrap();
-        let sink = cnf.new(conn).unwrap();
+        let cx = SinkContext::default();
+        let (sink, _healthcheck) = cnf.build(cx).await.unwrap(); // Box::new(RedisSink::new(&cnf, conn).unwrap());
         let (_input, events) = random_lines_with_stream(100, num_events, None);
         sink.run(events).await
     })
