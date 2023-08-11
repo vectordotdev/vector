@@ -974,6 +974,8 @@ fn to_dnstap_message_type(type_id: i32) -> String {
 mod tests {
     use super::*;
     use crate::event::Value;
+    use chrono::DateTime;
+    use std::collections::BTreeMap;
 
     #[test]
     fn test_parse_dnstap_data_with_query_message() {
@@ -986,43 +988,91 @@ mod tests {
             .expect("Invalid base64 encoded data.");
         let parse_result = DnstapParser::parse(&mut log_event, Bytes::from(dnstap_data));
         assert!(parse_result.is_ok());
-        assert!(log_event
-            .all_fields()
-            .unwrap()
-            .any(|(key, value)| key == "time"
-                && match *value {
-                    Value::Integer(time) => time == 1_593_489_007_920_014_129,
-                    _ => false,
-                }));
-        assert!(log_event
-            .all_fields()
-            .unwrap()
-            .any(|(key, value)| key == "timestamp"
-                && match *value {
-                    Value::Timestamp(timestamp) =>
-                        timestamp.timestamp_nanos() == 1_593_489_007_920_014_129,
-                    _ => false,
-                }));
-        assert!(log_event
-            .all_fields()
-            .unwrap()
-            .any(|(key, value)| key == "requestData.header.qr"
-                && match *value {
-                    Value::Integer(qr) => qr == 0,
-                    _ => false,
-                }));
-        assert!(log_event.all_fields().unwrap().any(|(key, value)| key
-            == "requestData.opt.udpPayloadSize"
-            && match *value {
-                Value::Integer(udp_payload_size) => udp_payload_size == 512,
-                _ => false,
-            }));
-        assert!(log_event.all_fields().unwrap().any(|(key, value)| key
-            == "requestData.question[0].domainName"
-            && match value {
-                Value::Bytes(domain_name) => *domain_name == Bytes::from_static(b"facebook1.com."),
-                _ => false,
-            }));
+
+        let expected_map: BTreeMap<&str, Value> = BTreeMap::from([
+            ("dataType", Value::Bytes(Bytes::from("Message"))),
+            ("dataTypeId", Value::Integer(1)),
+            ("messageType", Value::Bytes(Bytes::from("ResolverQuery"))),
+            ("messageTypeId", Value::Integer(3)),
+            ("queryZone", Value::Bytes(Bytes::from("com."))),
+            ("requestData.fullRcode", Value::Integer(0)),
+            ("requestData.header.aa", Value::Boolean(false)),
+            ("requestData.header.ad", Value::Boolean(false)),
+            ("requestData.header.anCount", Value::Integer(0)),
+            ("requestData.header.arCount", Value::Integer(1)),
+            ("requestData.header.cd", Value::Boolean(false)),
+            ("requestData.header.id", Value::Integer(37634)),
+            ("requestData.header.nsCount", Value::Integer(0)),
+            ("requestData.header.opcode", Value::Integer(0)),
+            ("requestData.header.qdCount", Value::Integer(1)),
+            ("requestData.header.qr", Value::Integer(0)),
+            ("requestData.header.ra", Value::Boolean(false)),
+            ("requestData.header.rcode", Value::Integer(0)),
+            ("requestData.header.rd", Value::Boolean(false)),
+            ("requestData.header.tc", Value::Boolean(false)),
+            ("requestData.opt.do", Value::Boolean(true)),
+            ("requestData.opt.ednsVersion", Value::Integer(0)),
+            ("requestData.opt.extendedRcode", Value::Integer(0)),
+            ("requestData.opt.options[0].optCode", Value::Integer(10)),
+            (
+                "requestData.opt.options[0].optName",
+                Value::Bytes(Bytes::from("Cookie")),
+            ),
+            (
+                "requestData.opt.options[0].optValue",
+                Value::Bytes(Bytes::from("7GMIAb3NWDM=")),
+            ),
+            ("requestData.opt.udpPayloadSize", Value::Integer(512)),
+            (
+                "requestData.question[0].class",
+                Value::Bytes(Bytes::from("IN")),
+            ),
+            (
+                "requestData.question[0].domainName",
+                Value::Bytes(Bytes::from("facebook1.com.")),
+            ),
+            (
+                "requestData.question[0].questionType",
+                Value::Bytes(Bytes::from("A")),
+            ),
+            ("requestData.question[0].questionTypeId", Value::Integer(1)),
+            (
+                "requestData.rcodeName",
+                Value::Bytes(Bytes::from("NoError")),
+            ),
+            (
+                "responseAddress",
+                Value::Bytes(Bytes::from("2001:502:7094::30")),
+            ),
+            ("responsePort", Value::Integer(53)),
+            (
+                "serverId",
+                Value::Bytes(Bytes::from("james-Virtual-Machine")),
+            ),
+            ("serverVersion", Value::Bytes(Bytes::from("BIND 9.16.3"))),
+            ("socketFamily", Value::Bytes(Bytes::from("INET6"))),
+            ("socketProtocol", Value::Bytes(Bytes::from("UDP"))),
+            ("sourceAddress", Value::Bytes(Bytes::from("::"))),
+            ("sourcePort", Value::Integer(46835)),
+            ("time", Value::Integer(1_593_489_007_920_014_129)),
+            ("timePrecision", Value::Bytes(Bytes::from("ns"))),
+            (
+                "timestamp",
+                Value::Timestamp(
+                    Utc.from_utc_datetime(
+                        &DateTime::parse_from_rfc3339("2020-06-30T03:50:07.920014129Z")
+                            .unwrap()
+                            .naive_utc(),
+                    ),
+                ),
+            ),
+        ]);
+
+        // The maps need to contain identical keys and values.
+        for (exp_key, exp_value) in expected_map {
+            let value = log_event.get(exp_key).unwrap();
+            assert_eq!(*value, exp_value);
+        }
     }
 
     #[test]
@@ -1036,45 +1086,82 @@ mod tests {
             .expect("Invalid base64 encoded data.");
         let parse_result = DnstapParser::parse(&mut log_event, Bytes::from(dnstap_data));
         assert!(parse_result.is_ok());
-        assert!(log_event
-            .all_fields()
-            .unwrap()
-            .any(|(key, value)| key == "time"
-                && match *value {
-                    Value::Integer(time) => time == 1_593_541_950_792_494_106,
-                    _ => false,
-                }));
-        assert!(log_event
-            .all_fields()
-            .unwrap()
-            .any(|(key, value)| key == "timestamp"
-                && match *value {
-                    Value::Timestamp(timestamp) =>
-                        timestamp.timestamp_nanos() == 1_593_541_950_792_494_106,
-                    _ => false,
-                }));
-        assert!(log_event
-            .all_fields()
-            .unwrap()
-            .any(|(key, value)| key == "requestData.header.qr"
-                && match *value {
-                    Value::Integer(qr) => qr == 1,
-                    _ => false,
-                }));
-        assert!(log_event
-            .all_fields()
-            .unwrap()
-            .any(|(key, value)| key == "messageType"
-                && match value {
-                    Value::Bytes(data_type) => *data_type == Bytes::from_static(b"UpdateResponse"),
-                    _ => false,
-                }));
-        assert!(log_event.all_fields().unwrap().any(|(key, value)| key
-            == "requestData.zone.zName"
-            && match value {
-                Value::Bytes(domain_name) => *domain_name == Bytes::from_static(b"example.com."),
-                _ => false,
-            }));
+
+        let expected_map: BTreeMap<&str, Value> = BTreeMap::from([
+            ("dataType", Value::Bytes(Bytes::from("Message"))),
+            ("dataTypeId", Value::Integer(1)),
+            ("messageType", Value::Bytes(Bytes::from("UpdateResponse"))),
+            ("messageTypeId", Value::Integer(14)),
+            ("requestData.fullRcode", Value::Integer(0)),
+            ("requestData.header.adCount", Value::Integer(0)),
+            ("requestData.header.id", Value::Integer(28811)),
+            ("requestData.header.opcode", Value::Integer(5)),
+            ("requestData.header.prCount", Value::Integer(0)),
+            ("requestData.header.qr", Value::Integer(1)),
+            ("requestData.header.rcode", Value::Integer(0)),
+            ("requestData.header.upCount", Value::Integer(0)),
+            ("requestData.header.zoCount", Value::Integer(1)),
+            (
+                "requestData.rcodeName",
+                Value::Bytes(Bytes::from("NoError")),
+            ),
+            ("requestData.zone.zClass", Value::Bytes(Bytes::from("IN"))),
+            (
+                "requestData.zone.zName",
+                Value::Bytes(Bytes::from("example.com.")),
+            ),
+            ("requestData.zone.zType", Value::Bytes(Bytes::from("SOA"))),
+            ("requestData.zone.zTypeId", Value::Integer(6)),
+            ("responseAddress", Value::Bytes(Bytes::from("127.0.0.1"))),
+            ("responseData.fullRcode", Value::Integer(0)),
+            ("responseData.header.adCount", Value::Integer(0)),
+            ("responseData.header.id", Value::Integer(28811)),
+            ("responseData.header.opcode", Value::Integer(5)),
+            ("responseData.header.prCount", Value::Integer(0)),
+            ("responseData.header.qr", Value::Integer(1)),
+            ("responseData.header.rcode", Value::Integer(0)),
+            ("responseData.header.upCount", Value::Integer(0)),
+            ("responseData.header.zoCount", Value::Integer(1)),
+            (
+                "responseData.rcodeName",
+                Value::Bytes(Bytes::from("NoError")),
+            ),
+            ("responseData.zone.zClass", Value::Bytes(Bytes::from("IN"))),
+            (
+                "responseData.zone.zName",
+                Value::Bytes(Bytes::from("example.com.")),
+            ),
+            ("responseData.zone.zType", Value::Bytes(Bytes::from("SOA"))),
+            ("responseData.zone.zTypeId", Value::Integer(6)),
+            ("responsePort", Value::Integer(0)),
+            (
+                "serverId",
+                Value::Bytes(Bytes::from("james-Virtual-Machine")),
+            ),
+            ("serverVersion", Value::Bytes(Bytes::from("BIND 9.16.3"))),
+            ("socketFamily", Value::Bytes(Bytes::from("INET"))),
+            ("socketProtocol", Value::Bytes(Bytes::from("UDP"))),
+            ("sourceAddress", Value::Bytes(Bytes::from("127.0.0.1"))),
+            ("sourcePort", Value::Integer(14124)),
+            ("time", Value::Integer(1_593_541_950_792_494_106)),
+            ("timePrecision", Value::Bytes(Bytes::from("ns"))),
+            (
+                "timestamp",
+                Value::Timestamp(
+                    Utc.from_utc_datetime(
+                        &DateTime::parse_from_rfc3339("2020-06-30T18:32:30.792494106Z")
+                            .unwrap()
+                            .naive_utc(),
+                    ),
+                ),
+            ),
+        ]);
+
+        // The maps need to contain identical keys and values.
+        for (exp_key, exp_value) in expected_map {
+            let value = log_event.get(exp_key).unwrap();
+            assert_eq!(*value, exp_value);
+        }
     }
 
     #[test]
