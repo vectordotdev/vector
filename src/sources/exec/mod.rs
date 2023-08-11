@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     io::{Error, ErrorKind},
     path::PathBuf,
     process::ExitStatus,
@@ -60,6 +61,13 @@ pub struct ExecConfig {
     /// The command to run, plus any arguments required.
     #[configurable(metadata(docs::examples = "echo", docs::examples = "Hello World!"))]
     pub command: Vec<String>,
+
+    /// Custom environment variables to set or update when running the command.
+    pub environment: Option<HashMap<String, String>>,
+
+    /// Whether or not to clear the environment before applying custom environment variables.
+    #[serde(default = "default_clear_env")]
+    pub clear_env: bool,
 
     /// The directory in which to run the command.
     pub working_directory: Option<PathBuf>,
@@ -141,6 +149,8 @@ impl Default for ExecConfig {
             }),
             streaming: None,
             command: vec!["echo".to_owned(), "Hello World!".to_owned()],
+            environment: None,
+            clear_env: default_clear_env(),
             working_directory: None,
             include_stderr: default_include_stderr(),
             maximum_buffer_size_bytes: default_maximum_buffer_size(),
@@ -166,6 +176,10 @@ const fn default_respawn_interval_secs() -> u64 {
 
 const fn default_respawn_on_exit() -> bool {
     true
+}
+
+const fn default_clear_env() -> bool {
+    false
 }
 
 const fn default_include_stderr() -> bool {
@@ -610,6 +624,16 @@ fn build_command(config: &ExecConfig) -> Command {
 
     command.kill_on_drop(true);
 
+    // Clear environment variables if needed
+    if config.clear_env {
+        command.env_clear();
+    }
+
+    // Configure environment variables if needed
+    if let Some(envs) = &config.environment {
+        command.envs(envs);
+    }
+
     // Explicitly set the current dir if needed
     if let Some(current_dir) = &config.working_directory {
         command.current_dir(current_dir);
@@ -900,6 +924,8 @@ mod tests {
                 respawn_interval_secs: default_respawn_interval_secs(),
             }),
             command: vec!["./runner".to_owned(), "arg1".to_owned(), "arg2".to_owned()],
+            environment: None,
+            clear_env: default_clear_env(),
             working_directory: Some(PathBuf::from("/tmp")),
             include_stderr: default_include_stderr(),
             maximum_buffer_size_bytes: default_maximum_buffer_size(),
@@ -1112,6 +1138,8 @@ mod tests {
                 respawn_interval_secs: default_respawn_interval_secs(),
             }),
             command: vec!["yes".to_owned()],
+            environment: None,
+            clear_env: default_clear_env(),
             working_directory: None,
             include_stderr: default_include_stderr(),
             maximum_buffer_size_bytes: default_maximum_buffer_size(),
