@@ -782,10 +782,8 @@ impl Source {
         let (file_source_tx, file_source_rx) = futures::channel::mpsc::channel::<Vec<Line>>(2);
 
         let mut parser = Parser::new(log_namespace);
-        let partial_events_merger = Box::new(partial_events_merger::build(
-            auto_partial_merge,
-            log_namespace,
-        ));
+        let partial_events_merger =
+            Box::new(auto_partial_merge.then(|| partial_events_merger::build(log_namespace)));
 
         let checkpoints = checkpointer.view();
         let events = file_source_rx.flat_map(futures::stream::iter);
@@ -800,7 +798,10 @@ impl Source {
                 ingestion_timestamp_field.as_ref(),
                 log_namespace,
             );
+            // println!("Event created: {:?}", event);
             let file_info = annotator.annotate(&mut event, &line.filename);
+
+            // println!("Annotation file info: {:?}", file_info);
 
             emit!(KubernetesLogsEventsReceived {
                 file: &line.filename,
@@ -830,15 +831,21 @@ impl Source {
                     emit!(KubernetesLogsEventNodeAnnotationError { event: &event });
                 }
             }
+            // println!("Annotations applied: {:?}", event);
 
             checkpoints.update(line.file_id, line.end_offset);
             event
         });
-        let events = events.flat_map(move |event| {
-            let mut buf = OutputBuffer::with_capacity(1);
-            parser.transform(&mut buf, event);
-            futures::stream::iter(buf.into_events())
-        });
+        let events = events
+            .flat_map(move |event| {
+                let mut buf = OutputBuffer::with_capacity(1);
+                parser.transform(&mut buf, event);
+                futures::stream::iter(buf.into_events())
+            })
+            .map(|e| {
+                println!("After parser transform: {:?}", e);
+                e
+            });
         let (events_count, _) = events.size_hint();
 
         let mut stream = partial_events_merger.transform(Box::pin(events));
@@ -897,6 +904,8 @@ fn create_event(
     ingestion_timestamp_field: Option<&OwnedTargetPath>,
     log_namespace: LogNamespace,
 ) -> Event {
+    println!("CREATE EVENT with line: {:?}", line);
+
     let deserializer = BytesDeserializer;
     let mut log = deserializer.parse_single(line, log_namespace);
 
@@ -1041,12 +1050,26 @@ mod tests {
     use vrl::value::{kind::Collection, Kind};
 
     use crate::config::SourceConfig;
+    use crate::sources::kubernetes_logs::create_event;
 
     use super::Config;
 
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<Config>();
+    }
+
+    #[test]
+    fn test_create_event() {
+        let ingest_timestamp = OwnedTargetPath::event(owned_value_path!("ingest_timestamp"));
+        let event = create_event(
+            "test".into(),
+            "test_file.txt",
+            Some(&ingest_timestamp),
+            LogNamespace::Vector,
+        );
+        println!("Event: {:?}", event);
+        panic!()
     }
 
     #[test]

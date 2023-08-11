@@ -33,25 +33,32 @@ pub(super) fn build_pod_logs_directory(
 /// Assumes the input is a valid pod log file name.
 ///
 /// Inspired by <https://github.com/kubernetes/kubernetes/blob/31305966789525fca49ec26c289e565467d1f1c4/pkg/kubelet/kuberuntime/helpers.go#L186>
-pub(super) fn parse_log_file_path(path: &str) -> Option<LogFileInfo<'_>> {
-    let mut components = path.rsplit('/');
+pub(super) fn parse_log_file_path(_path: &str) -> Option<LogFileInfo<'_>> {
+    // let mut components = path.rsplit('/');
+    //
+    // let _log_file_name = components.next()?;
+    // // let container_name = components.next()?;
+    // let pod_dir = components.next()?;
+    //
+    // let mut pod_dir_components = pod_dir.rsplit(LOG_PATH_DELIMITER);
 
-    let _log_file_name = components.next()?;
-    let container_name = components.next()?;
-    let pod_dir = components.next()?;
-
-    let mut pod_dir_components = pod_dir.rsplit(LOG_PATH_DELIMITER);
-
-    let pod_uid = pod_dir_components.next()?;
-    let pod_name = pod_dir_components.next()?;
-    let pod_namespace = pod_dir_components.next()?;
+    // let pod_uid = pod_dir_components.next()?;
+    // let pod_name = pod_dir_components.next()?;
+    // let pod_namespace = pod_dir_components.next()?;
 
     Some(LogFileInfo {
-        pod_namespace,
-        pod_name,
-        pod_uid,
-        container_name,
+        pod_namespace: "default",
+        pod_name: "message-logger",
+        pod_uid: "74b0c53b-240c-4bfd-84b4-14c",
+        container_name: "logger",
     })
+
+    // Some(LogFileInfo {
+    //     pod_namespace,
+    //     pod_name,
+    //     pod_uid,
+    //     container_name,
+    // })
 }
 
 /// Contains the information extracted from the pod log file path.
