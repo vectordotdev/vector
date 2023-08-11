@@ -217,6 +217,8 @@ impl StreamSink<Event> for NatsSink {
             match self
                 .connection
                 .publish(subject.clone(), bytes.freeze())
+                .map_err(Into::into)
+                .and_then(|_| self.connection.flush().map_err(Into::into))
                 .await
             {
                 Err(error) => {
@@ -232,8 +234,6 @@ impl StreamSink<Event> for NatsSink {
                 }
             }
         }
-
-        let _ = self.connection.flush().await;
 
         Ok(())
     }
@@ -285,7 +285,10 @@ mod integration_tests {
             .subscribe(subject)
             .await
             .expect("failed to subscribe with test consumer");
-        consumer.flush().await.expect("failed to flush with the test consumer");
+        consumer
+            .flush()
+            .await
+            .expect("failed to flush with the test consumer");
 
         // Publish events.
         let num_events = 1_000;

@@ -7,7 +7,7 @@ use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub struct NatsEventSendError {
-    pub error: async_nats::PublishError,
+    pub error: async_nats::Error,
 }
 
 impl InternalEvent for NatsEventSendError {
