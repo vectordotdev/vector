@@ -63,6 +63,10 @@ pub struct ExecConfig {
     pub command: Vec<String>,
 
     /// Custom environment variables to set or update when running the command.
+    /// If a variable name already exists in the environment, its value is replaced.
+    #[serde(default)]
+    #[configurable(metadata(docs::additional_props_description = "An environment variable."))]
+    #[configurable(metadata(docs::examples = "environment_examples()"))]
     pub environment: Option<HashMap<String, String>>,
 
     /// Whether or not to clear the environment before setting custom environment variables.
@@ -184,6 +188,17 @@ const fn default_clear_environment() -> bool {
 
 const fn default_include_stderr() -> bool {
     true
+}
+
+fn environment_examples() -> HashMap<String, String> {
+    HashMap::<_, _>::from_iter(
+        [
+            ("LANG".to_owned(), "es_ES.UTF-8".to_owned()),
+            ("TZ".to_owned(), "Etc/UTC".to_owned()),
+            ("PATH".to_owned(), "/bin:/usr/bin:/usr/local/bin".to_owned()),
+        ]
+        .into_iter(),
+    )
 }
 
 fn get_hostname() -> Option<String> {
