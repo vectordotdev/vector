@@ -37,89 +37,70 @@ impl TryFrom<Vec<Event>> for MetricsApiModel {
     type Error = NewRelicSinkError;
 
     fn try_from(buf_events: Vec<Event>) -> Result<Self, Self::Error> {
-        let mut metric_array = vec![];
-
-        for buf_event in buf_events {
-            if let Event::Metric(metric) = buf_event {
+        let metric_array: Vec<_> = buf_events
+            .into_iter()
+            .filter_map(|e| e.try_into_metric())
+            .filter_map(|metric| {
                 // Generate Value::Object() from BTreeMap<String, String>
                 let (series, data, _) = metric.into_parts();
 
+                let mut metric_data = KeyValData::new();
+
                 // We only handle gauge and counter metrics
-                if let MetricValue::Gauge { value } | MetricValue::Counter { value } = data.value {
-                    let mut metric_data = KeyValData::new();
-
-                    // Set type and type related attributes
-                    if let (MetricValue::Counter { .. }, MetricKind::Incremental) =
-                        (&data.value, &data.kind)
-                    {
-                        if let Some(interval_ms) = data.time.interval_ms {
-                            metric_data.insert(
-                                "interval.ms".to_owned(),
-                                Value::from(interval_ms.get() as i64),
-                            );
-                        } else {
-                            // Incremental counter without an interval is worthless, skip this metric
-                            continue;
-                        }
-                        metric_data.insert("type".to_owned(), Value::from("count"));
-                    } else {
-                        // Anything that's not an incremental counter is considered a gauge, that is gauge and absolute counters metrics.
-                        metric_data.insert("type".to_owned(), Value::from("gauge"));
-                    }
-
-                    // Set name, value, and timestamp
-                    metric_data.insert("name".to_owned(), Value::from(series.name.name));
-                    metric_data.insert(
-                        "value".to_owned(),
-                        Value::from(
-                            NotNan::new(value)
-                                .map_err(|_| NewRelicSinkError::new("NaN value not supported"))?,
-                        ),
-                    );
-                    metric_data.insert(
-                        "timestamp".to_owned(),
-                        Value::from(
-                            data.time
-                                .timestamp
-                                .unwrap_or_else(|| DateTime::<Utc>::from(SystemTime::now()))
-                                .timestamp(),
-                        ),
-                    );
-
-                    if let Some(tags) = series.tags {
+                // Extract value & type and set type-related attributes
+                let (value, metric_type) = match (data.value, &data.kind, &data.time.interval_ms) {
+                    (
+                        MetricValue::Counter { value },
+                        MetricKind::Incremental,
+                        Some(interval_ms),
+                    ) => {
                         metric_data.insert(
-                            "attributes".to_owned(),
-                            Value::from(
-                                tags.iter_single()
-                                    .map(|(key, value)| (key.to_string(), Value::from(value)))
-                                    .collect::<BTreeMap<_, _>>(),
-                            ),
+                            "interval.ms".to_owned(),
+                            Value::from(interval_ms.get() as i64),
                         );
+                        (value, "count")
                     }
-
-                    // Set type and type related attributes
-                    if let (MetricValue::Counter { .. }, MetricKind::Incremental) =
-                        (data.value, data.kind)
-                    {
-                        if let Some(interval_ms) = data.time.interval_ms {
-                            metric_data.insert(
-                                "interval.ms".to_owned(),
-                                Value::from(interval_ms.get() as i64),
-                            );
-                        } else {
-                            // Incremental counter without an interval is worthless, skip this metric
-                            continue;
-                        }
-                        metric_data.insert("type".to_owned(), Value::from("count"));
-                    } else {
-                        // Anything that's not an incremental counter is considered a gauge, that is gauge and absolute counters metrics.
-                        metric_data.insert("type".to_owned(), Value::from("gauge"));
+                    (MetricValue::Counter { value }, MetricKind::Absolute, _) => (value, "gauge"),
+                    (MetricValue::Gauge { value }, _, _) => (value, "gauge"),
+                    _ => {
+                        // Note that this includes incremental counters without an interval
+                        return None;
                     }
+                };
 
-                    metric_array.push(metric_data);
+                // Set name, type, value, timestamp, and attributes
+                metric_data.insert("name".to_owned(), Value::from(series.name.name));
+                metric_data.insert("type".to_owned(), Value::from(metric_type));
+                let value = match NotNan::new(value) {
+                    Ok(value) => value,
+                    Err(_) => {
+                        return None;
+                    }
+                };
+                metric_data.insert("value".to_owned(), Value::from(value));
+                metric_data.insert(
+                    "timestamp".to_owned(),
+                    Value::from(
+                        data.time
+                            .timestamp
+                            .unwrap_or_else(|| DateTime::<Utc>::from(SystemTime::now()))
+                            .timestamp(),
+                    ),
+                );
+                if let Some(tags) = series.tags {
+                    metric_data.insert(
+                        "attributes".to_owned(),
+                        Value::from(
+                            tags.iter_single()
+                                .map(|(key, value)| (key.to_string(), Value::from(value)))
+                                .collect::<BTreeMap<_, _>>(),
+                        ),
+                    );
                 }
-            }
-        }
+
+                Some(metric_data)
+            })
+            .collect();
 
         if !metric_array.is_empty() {
             Ok(Self::new(metric_array))
