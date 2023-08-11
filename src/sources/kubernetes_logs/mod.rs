@@ -4,7 +4,8 @@
 //! running inside the cluster as a DaemonSet.
 
 #![deny(missing_docs)]
-
+//TODO: temporary
+#![allow(unused)]
 use std::{path::PathBuf, time::Duration};
 
 use bytes::Bytes;
@@ -847,7 +848,7 @@ impl Source {
             });
         let (events_count, _) = events.size_hint();
 
-        let mut stream = merge_partial_events(events);
+        let mut stream = merge_partial_events(events, log_namespace);
 
         // let mut stream = partial_events_merger.transform(Box::pin(events));
         let event_processing_loop = out.send_event_stream(&mut stream);

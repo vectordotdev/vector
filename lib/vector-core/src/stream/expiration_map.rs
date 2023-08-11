@@ -20,9 +20,9 @@ impl<T> Emitter<T> {
 pub fn map_with_expiration<S, T, M, E, F>(
     initial_state: S,
     input: impl Stream<Item = T> + 'static,
+    expiration_interval: Duration,
     mut map_fn: M,
     mut expiration_fn: E,
-    expiration_interval: Duration,
     mut flush_fn: F,
 ) -> impl Stream<Item = T>
 where
@@ -61,4 +61,68 @@ where
 
     })
     .flatten()
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_simple() {
+        let input = futures::stream::iter([1, 2, 3]);
+
+        let map_fn = |state: &mut i32, event, emitter: &mut Emitter<i32>| {
+            *state += event;
+            emitter.emit(*state);
+        };
+        let expiration_fn = |_state: &mut i32, _emitter: &mut Emitter<i32>| {
+            // do nothing
+        };
+        let flush_fn = |state: &mut i32, emitter: &mut Emitter<i32>| {
+            emitter.emit(*state);
+        };
+        let stream: Vec<i32> = map_with_expiration(
+            0_i32,
+            input,
+            Duration::from_secs(100),
+            map_fn,
+            expiration_fn,
+            flush_fn,
+        )
+        .take(4)
+        .collect()
+        .await;
+
+        assert_eq!(vec![1, 3, 6, 6], stream);
+    }
+
+    #[tokio::test]
+    async fn test_expiration() {
+        // an input that never ends (to test expiration)
+        let input = futures::stream::iter([1, 2, 3]).chain(futures::stream::pending());
+
+        let map_fn = |state: &mut i32, event, emitter: &mut Emitter<i32>| {
+            *state += event;
+            emitter.emit(*state);
+        };
+        let expiration_fn = |state: &mut i32, emitter: &mut Emitter<i32>| {
+            emitter.emit(*state);
+        };
+        let flush_fn = |_state: &mut i32, _emitter: &mut Emitter<i32>| {
+            // do nothing
+        };
+        let stream: Vec<i32> = map_with_expiration(
+            0_i32,
+            input,
+            Duration::from_secs(1),
+            map_fn,
+            expiration_fn,
+            flush_fn,
+        )
+        .take(4)
+        .collect()
+        .await;
+
+        assert_eq!(vec![1, 3, 6, 6], stream);
+    }
 }

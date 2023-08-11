@@ -3,14 +3,16 @@
 #![allow(unused)]
 
 use enrichment::TableRegistry;
-use futures::Stream;
+use futures::{Stream, StreamExt};
 use indexmap::IndexMap;
-use std::time::Duration;
+use std::collections::HashMap;
+use std::time::{Duration, Instant};
 use tokio_stream::wrappers::IntervalStream;
 use vector_core::config::LogNamespace;
+use vrl::owned_value_path;
 
-use crate::event::Event;
-use crate::sources::kubernetes_logs::transform_utils::get_message_field;
+use crate::event::{Event, LogEvent, Value};
+use crate::sources::kubernetes_logs::transform_utils::{get_message_field, get_message_path};
 use crate::{
     conditions::AnyCondition,
     event,
@@ -20,54 +22,113 @@ use crate::{
 /// The key we use for `file` field.
 const FILE_KEY: &str = "file";
 
+const EXPIRATION_TIME: Duration = Duration::from_secs(30);
+
 /// Partial event merger.
 pub type PartialEventsMerger = Reduce;
 
 use async_stream::stream;
+use bytes::{Bytes, BytesMut};
+use lookup::OwnedTargetPath;
+use vector_core::stream::expiration_map::{map_with_expiration, Emitter};
+use vrl::path::parse_value_path;
 
 // enum MergeEvent {
 //     Event(Event),
 //     ExpirationCheck,
 // }
 
-pub fn merge_partial_events(stream: impl Stream<Item = Event>) -> impl Stream<Item = Event> {
-    let (rx, tx) = futures::channel::mpsc::channel(10);
+struct PartialEventMergeState {
+    files: HashMap<String, Bucket>,
+}
 
-    // let expiration_check = IntervalStream::new());
-    tokio::time::interval(Duration::from_secs(30));
+impl PartialEventMergeState {
+    fn add_event(&mut self, mut event: LogEvent, file: String, message_path: &OwnedTargetPath) {
+        if let Some(bucket) = self.files.get_mut(&file) {
+            // merging with existing event
 
-    Box::pin(stream! {
-        stream! {
-              loop {
-                let mut output = Vec::new();
-                let done = tokio::select! {
-                    _ = flush_stream.tick() => {
-                      me.flush_into(&mut output);
-                      false
-                    }
-                    maybe_event = input_rx.next() => {
-                      match maybe_event {
-                        None => {
-                          me.flush_all_into(&mut output);
-                          true
-                        }
-                        Some(event) => {
-                          me.transform_one(&mut output, event);
-                          false
-                        }
-                      }
-                    }
-                };
-                yield futures::stream::iter(output.into_iter());
-                if done { break }
-              }
+            if let (Some(Value::Bytes(prev_value)), Some(Value::Bytes(new_value))) =
+                (bucket.event.get_mut(message_path), event.get(message_path))
+            {
+                let mut bytes_mut = BytesMut::new();
+                bytes_mut.extend_from_slice(prev_value);
+                bytes_mut.extend_from_slice(new_value);
+                *prev_value = bytes_mut.freeze();
             }
-            .flatten()
-    })
+        } else {
+            // new event
+            self.files.insert(
+                file,
+                Bucket {
+                    event,
+                    expiration: Instant::now() + EXPIRATION_TIME,
+                },
+            );
+        }
+    }
+}
 
-    // tokio::spawn(async move { stream });
+struct Bucket {
+    event: LogEvent,
+    expiration: Instant,
+}
 
-    // tx
+pub fn merge_partial_events(
+    stream: impl Stream<Item = Event> + 'static,
+    log_namespace: LogNamespace,
+) -> impl Stream<Item = Event> {
+    let partial_flag_path = match log_namespace {
+        LogNamespace::Vector => {
+            OwnedTargetPath::metadata(owned_value_path!(super::Config::NAME, event::PARTIAL))
+        }
+        LogNamespace::Legacy => OwnedTargetPath::event(owned_value_path!(event::PARTIAL)),
+    };
+
+    let file_path = match log_namespace {
+        LogNamespace::Vector => {
+            OwnedTargetPath::metadata(owned_value_path!(super::Config::NAME, FILE_KEY))
+        }
+        LogNamespace::Legacy => OwnedTargetPath::event(owned_value_path!(FILE_KEY)),
+    };
+
+    let state = PartialEventMergeState {
+        files: HashMap::new(),
+    };
+
+    let message_path = get_message_path(log_namespace);
+
+    map_with_expiration(
+        state,
+        stream.map(|e| e.into_log()),
+        Duration::from_secs(1),
+        move |state: &mut PartialEventMergeState,
+              event: LogEvent,
+              emitter: &mut Emitter<LogEvent>| {
+            // called for each event
+            let is_partial = event
+                .get(&partial_flag_path)
+                .and_then(|x| x.as_boolean())
+                .unwrap_or(false);
+
+            println!("Mapping event: {:?}", event);
+            let file = event
+                .get(&file_path)
+                .and_then(|x| x.as_str())
+                .map(|x| x.to_string())
+                .unwrap_or_else(|| String::new());
+            println!("File: {}", file);
+
+            state.add_event(event, file, &message_path);
+        },
+        |state: &mut PartialEventMergeState, emitter: &mut Emitter<LogEvent>| {
+            // TODO
+        },
+        |state: &mut PartialEventMergeState, emitter: &mut Emitter<LogEvent>| {
+            // TODO
+        },
+    )
+    // LogEvent -> Event
+    .map(|e| e.into())
 }
 
 pub fn build(log_namespace: LogNamespace) -> PartialEventsMerger {
