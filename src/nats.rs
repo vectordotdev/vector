@@ -132,8 +132,9 @@ impl NatsAuthConfig {
                 )
                 .context(CredentialsFileSnafu)
             }
-            NatsAuthConfig::Nkey { nkey } =>
-                Ok(async_nats::ConnectOptions::with_nkey(nkey.seed.clone())),
+            NatsAuthConfig::Nkey { nkey } => {
+                Ok(async_nats::ConnectOptions::with_nkey(nkey.seed.clone()))
+            }
             NatsAuthConfig::Token { token } => Ok(async_nats::ConnectOptions::with_token(
                 token.value.inner().to_string(),
             )),
