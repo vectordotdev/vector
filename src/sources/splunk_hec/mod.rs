@@ -681,20 +681,21 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
         );
 
         // Process channel field
+        let channel_path = owned_value_path!(CHANNEL);
         if let Some(JsonValue::String(guid)) = json.get_mut("channel").map(JsonValue::take) {
             self.log_namespace.insert_source_metadata(
                 SplunkConfig::NAME,
                 &mut log,
-                Some(LegacyKey::Overwrite(&owned_value_path!(CHANNEL))),
-                CHANNEL,
+                Some(LegacyKey::Overwrite(&channel_path)),
+                lookup::path!(CHANNEL),
                 guid,
             );
         } else if let Some(guid) = self.channel.as_ref() {
             self.log_namespace.insert_source_metadata(
                 SplunkConfig::NAME,
                 &mut log,
-                Some(LegacyKey::Overwrite(&owned_value_path!(CHANNEL))),
-                CHANNEL,
+                Some(LegacyKey::Overwrite(&channel_path)),
+                lookup::path!(CHANNEL),
                 guid.clone(),
             );
         }
@@ -706,7 +707,7 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
                     SplunkConfig::NAME,
                     &mut log,
                     Some(LegacyKey::Overwrite(&owned_value_path!(key.as_str()))),
-                    key.as_str(),
+                    lookup::path!(key.as_str()),
                     value,
                 );
             }
@@ -753,7 +754,7 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
             SplunkConfig::NAME,
             &mut log,
             log_schema().timestamp_key().map(LegacyKey::Overwrite),
-            "timestamp",
+            lookup::path!("timestamp"),
             timestamp,
         );
 
@@ -823,7 +824,7 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
                         match line {
                             // This don't quite fit the meaning of a event::schema().message_key
                             JsonValue::Array(_) | JsonValue::Object(_) => {
-                                log.insert("line", line);
+                                log.insert(event_path!("line"), line);
                             }
                             _ => {
                                 log.maybe_insert(log_schema().message_key_target_path(), line);
@@ -1010,7 +1011,7 @@ fn raw_event(
         SplunkConfig::NAME,
         &mut log,
         Some(LegacyKey::Overwrite(&owned_value_path!(CHANNEL))),
-        CHANNEL,
+        lookup::path!(CHANNEL),
         channel,
     );
 
@@ -1028,7 +1029,7 @@ fn raw_event(
             SplunkConfig::NAME,
             &mut log,
             log_schema().host_key().map(LegacyKey::InsertIfEmpty),
-            "host",
+            lookup::path!("host"),
             host,
         );
     }

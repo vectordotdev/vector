@@ -3,7 +3,6 @@ mod docker;
 mod test_util;
 
 use vector_core::config::LogNamespace;
-use vrl::path::PathPrefix;
 
 use crate::sources::kubernetes_logs::transform_utils::get_message_field;
 use crate::{
@@ -44,10 +43,7 @@ impl FunctionTransform for Parser {
         match &mut self.state {
             ParserState::Uninitialized => {
                 let message_field = get_message_field(self.log_namespace);
-                let message = match event
-                    .as_log()
-                    .get((PathPrefix::Event, message_field.as_str()))
-                {
+                let message = match event.as_log().get(&message_field) {
                     Some(message) => message,
                     None => {
                         emit!(KubernetesLogsFormatPickerEdgeCase {

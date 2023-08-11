@@ -1,5 +1,5 @@
 use codecs::JsonSerializerConfig;
-use lookup::lookup_v2::OptionalValuePath;
+use lookup::lookup_v2::{ConfigValuePath, OptionalValuePath};
 use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 
@@ -85,7 +85,7 @@ pub struct HumioLogsConfig {
     ///
     /// [humio_data_format]: https://docs.humio.com/integrations/data-shippers/hec/#format-of-data
     #[serde(default)]
-    pub(super) indexed_fields: Vec<String>,
+    pub(super) indexed_fields: Vec<ConfigValuePath>,
 
     /// Optional name of the repository to ingest into.
     ///

@@ -38,7 +38,7 @@ pub struct HecLogsSink<S> {
     pub sourcetype: Option<Template>,
     pub source: Option<Template>,
     pub index: Option<Template>,
-    pub indexed_fields: Vec<String>,
+    pub indexed_fields: Vec<OwnedValuePath>,
     pub host_key: Option<OwnedValuePath>,
     pub timestamp_nanos_key: Option<String>,
     pub timestamp_key: Option<OwnedValuePath>,
@@ -49,7 +49,7 @@ pub struct HecLogData<'a> {
     pub sourcetype: Option<&'a Template>,
     pub source: Option<&'a Template>,
     pub index: Option<&'a Template>,
-    pub indexed_fields: &'a [String],
+    pub indexed_fields: &'a [OwnedValuePath],
     pub host_key: Option<OwnedValuePath>,
     pub timestamp_nanos_key: Option<&'a String>,
     pub timestamp_key: Option<OwnedValuePath>,
@@ -277,7 +277,10 @@ pub fn process_log(event: Event, data: &HecLogData) -> HecProcessedEvent {
     let fields = data
         .indexed_fields
         .iter()
-        .filter_map(|field| log.get(field.as_str()).map(|value| (field, value.clone())))
+        .filter_map(|field| {
+            log.get((PathPrefix::Event, field))
+                .map(|value| (field, value.clone()))
+        })
         .collect::<LogEvent>();
 
     let metadata = HecLogsProcessedEventMetadata {
