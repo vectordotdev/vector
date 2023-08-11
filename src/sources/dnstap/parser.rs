@@ -33,7 +33,7 @@ use dnstap_proto::{
     message::Type as DnstapMessageType, Dnstap, Message as DnstapMessage, SocketFamily,
     SocketProtocol,
 };
-use lookup::lookup_v2::{OwnedValuePath, ValuePath};
+use lookup::lookup_v2::ValuePath;
 use lookup::PathPrefix;
 use vector_core::config::log_schema;
 
@@ -226,7 +226,6 @@ impl DnstapParser {
                 query_time_sec,
                 dnstap_message.query_time_nsec,
                 dnstap_message_type_id,
-                &DNSTAP_VALUE_PATHS.request_message,
                 dnstap_message.query_message.as_ref(),
                 &DNSTAP_MESSAGE_REQUEST_TYPE_IDS,
             );
@@ -239,7 +238,6 @@ impl DnstapParser {
                 response_time_sec,
                 dnstap_message.response_time_nsec,
                 dnstap_message_type_id,
-                &DNSTAP_VALUE_PATHS.request_message,
                 dnstap_message.response_message.as_ref(),
                 &DNSTAP_MESSAGE_RESPONSE_TYPE_IDS,
             );
@@ -352,7 +350,6 @@ impl DnstapParser {
         time_sec: u64,
         time_nsec: Option<u32>,
         dnstap_message_type_id: i32,
-        message_key: &'a OwnedValuePath,
         message: Option<&Vec<u8>>,
         type_ids: &HashSet<i32>,
     ) {
@@ -374,7 +371,12 @@ impl DnstapParser {
         }
 
         if message.is_none() {
-            DnstapParser::log_time(event, prefix.concat(message_key), time_in_nanosec, "ns");
+            DnstapParser::log_time(
+                event,
+                prefix.concat(&DNSTAP_VALUE_PATHS.request_message),
+                time_in_nanosec,
+                "ns",
+            );
         }
     }
 
