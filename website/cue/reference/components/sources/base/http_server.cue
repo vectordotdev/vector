@@ -333,6 +333,16 @@ base: components: sources: http_server: configuration: {
 			items: type: string: examples: ["application", "source"]
 		}
 	}
+	response_code: {
+		description: "Specifies the HTTP response status code on request success."
+		required:    false
+		type: u16: {
+			default: 200
+			examples: [
+				"202",
+			]
+		}
+	}
 	strict_path: {
 		description: """
 			Whether or not to treat the configured `path` as an absolute path.
