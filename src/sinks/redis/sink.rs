@@ -91,7 +91,6 @@ impl RedisSink {
         input
             .filter_map(|event| future::ready(self.make_redis_event(event)))
             .batched(batcher_settings)
-            // .request_builder(None, request_builder)
             .map(|events| request_builder(events, &transformer, &mut encoder))
             .into_driver(service)
             .protocol("redis")
