@@ -2,13 +2,19 @@ use codecs::JsonSerializerConfig;
 use futures::stream;
 use rand::Rng;
 use redis::AsyncCommands;
-use vector_core::event::LogEvent;
+use vector_core::{
+    config::{init_telemetry, Tags, Telemetry},
+    event::LogEvent,
+};
 
 use super::config::{DataTypeConfig, ListOption, Method, RedisSinkConfig};
 use crate::{
     sinks::prelude::*,
     test_util::{
-        components::{assert_sink_compliance, SINK_TAGS},
+        components::{
+            assert_data_volume_sink_compliance, assert_sink_compliance, DATA_VOLUME_SINK_TAGS,
+            SINK_TAGS,
+        },
         random_lines_with_stream, random_string, trace_init,
     },
 };
@@ -188,6 +194,82 @@ async fn redis_sink_channel() {
 
     // Publish events.
     assert_sink_compliance(&SINK_TAGS, async move {
+        let cx = SinkContext::default();
+        let (sink, _healthcheck) = cnf.build(cx).await.unwrap(); // Box::new(RedisSink::new(&cnf, conn).unwrap());
+        let (_input, events) = random_lines_with_stream(100, num_events, None);
+        sink.run(events).await
+    })
+    .await
+    .expect("Running sink failed");
+
+    // Receive events.
+    let mut received_msg_num = 0;
+    loop {
+        let _msg = pubsub_stream.next().await.unwrap();
+        received_msg_num += 1;
+        debug!("Received msg num:{}.", received_msg_num);
+        if received_msg_num == num_events {
+            assert_eq!(received_msg_num, num_events);
+            break;
+        }
+    }
+}
+
+#[tokio::test]
+async fn redis_sink_channel_data_volume_tags() {
+    trace_init();
+
+    // We need to configure Vector to emit the service and source tags.
+    // The default is to not emit these.
+    init_telemetry(
+        Telemetry {
+            tags: Tags {
+                emit_service: true,
+                emit_source: true,
+            },
+        },
+        true,
+    );
+
+    let key = Template::try_from(format!("test-{}", random_string(10)))
+        .expect("should not fail to create key template");
+    debug!("Test key name: {}.", key);
+    let mut rng = rand::thread_rng();
+    let num_events = rng.gen_range(10000..20000);
+    debug!("Test events num: {}.", num_events);
+
+    let client = redis::Client::open(redis_server()).unwrap();
+    debug!("Get Redis async connection.");
+    let conn = client
+        .get_async_connection()
+        .await
+        .expect("Failed to get Redis async connection.");
+    debug!("Get Redis async connection success.");
+    let mut pubsub_conn = conn.into_pubsub();
+    debug!("Subscribe channel:{}.", key);
+    pubsub_conn
+        .subscribe(key.clone().to_string())
+        .await
+        .unwrap_or_else(|_| panic!("Failed to subscribe channel:{}.", key));
+    debug!("Subscribed to channel:{}.", key);
+    let mut pubsub_stream = pubsub_conn.on_message();
+
+    let cnf = RedisSinkConfig {
+        endpoint: redis_server(),
+        key: key.clone(),
+        encoding: JsonSerializerConfig::default().into(),
+        data_type: DataTypeConfig::Channel,
+        list_option: None,
+        batch: BatchConfig::default(),
+        request: TowerRequestConfig {
+            rate_limit_num: Some(u64::MAX),
+            ..Default::default()
+        },
+        acknowledgements: Default::default(),
+    };
+
+    // Publish events.
+    assert_data_volume_sink_compliance(&DATA_VOLUME_SINK_TAGS, async move {
         let cx = SinkContext::default();
         let (sink, _healthcheck) = cnf.build(cx).await.unwrap(); // Box::new(RedisSink::new(&cnf, conn).unwrap());
         let (_input, events) = random_lines_with_stream(100, num_events, None);

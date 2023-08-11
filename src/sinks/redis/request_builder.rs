@@ -50,6 +50,11 @@ fn encode_events(
     }
 }
 
+/// Builds the request to be sent to Redis.
+/// This is a simple function rather than leaning on the `[RequestBuilder]` trait.
+/// That trait doesn't quite fit our needs since the encoded event is not just `Byte`s.
+/// Essentially we take in a list of `Event`s and return a list of key -> encoded event
+/// objects.
 pub(super) fn request_builder(
     mut events: Vec<RedisEvent>,
     transformer: &Transformer,
@@ -66,86 +71,3 @@ pub(super) fn request_builder(
         metadata,
     }
 }
-
-// pub(super) struct RedisRequestBuilder {
-//     encoder: RedisEncoder,
-// }
-
-// impl RequestBuilder<Vec<RedisEvent>> for RedisRequestBuilder {
-//     type Metadata = RedisMetadata;
-//     type Events = Vec<RedisEvent>;
-//     type Encoder = RedisEncoder;
-//     type Payload = Vec<RedisKvEntry>;
-//     type Request = RedisRequest;
-//     type Error = io::Error;
-
-//     fn compression(&self) -> Compression {
-//         Compression::None
-//     }
-
-//     fn encoder(&self) -> &Self::Encoder {
-//         &self.encoder
-//     }
-
-//     fn encode_events(
-//         &self,
-//         events: Self::Events,
-//     ) -> Result<EncodeResult<Self::Payload>, Self::Error> {
-//         let mut compressor = Compressor::from(self.compression());
-//         let is_compressed = compressor.is_compressed();
-//         let entries = Vec::new();
-
-//         let mut byte_size = telemetry().create_request_count_byte_size();
-
-//         for event in self.events {
-//             self.transformer.transform(&mut event);
-
-//             byte_size.add_event(&event, event.estimated_json_encoded_size_of());
-
-//             let mut bytes = BytesMut::new();
-
-//             // Errors are handled by `Encoder`.
-//             self.encoder
-//                 .encode(input, &mut bytes)
-//                 .map_err(|_| io::Error::new(io::ErrorKind::Other, "unable to encode"))?;
-
-//             let body = bytes.freeze();
-//             write_all(writer, 1, body.as_ref())?;
-//         }
-
-//         let result = if is_compressed {
-//             let compressed_byte_size = payload.len();
-//             EncodeResult::compressed(payload.into(), compressed_byte_size, json_size)
-//         } else {
-//             EncodeResult::uncompressed(payload.into(), json_size)
-//         };
-
-//         Ok(result)
-//     }
-
-//     fn split_input(
-//         &self,
-//         input: RedisEvent,
-//     ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
-//         let builder = RequestMetadataBuilder::from_event(&input.event);
-//         let metadata = RedisMetadata { key: input.key };
-
-//         (metadata, builder, input)
-//     }
-
-//     fn build_request(
-//         &self,
-//         metadata: Self::Metadata,
-//         request_metadata: RequestMetadata,
-//         payload: EncodeResult<Self::Payload>,
-//     ) -> Self::Request {
-//         let value = payload.into_payload();
-
-//         RedisRequest {
-//             request: RedisKvEntry {
-//                 key: metadata.key,
-//                 value,
-//             },
-//         }
-//     }
-// }

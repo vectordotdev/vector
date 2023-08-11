@@ -160,9 +160,3 @@ impl RedisSinkConfig {
             .map_err(Into::into)
     }
 }
-
-// impl Response for Vec<bool> {
-// fn is_successful(&self) -> bool {
-//         self.iter().all(|x| *x)
-//     }
-// }
