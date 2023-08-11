@@ -869,6 +869,7 @@ qwe
 raboof
 rande
 RANDFILE
+ratatui
 rawconfig
 rawstring
 rdkafka
