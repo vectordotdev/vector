@@ -37,7 +37,6 @@ asdf
 asdfasdf
 assertverify
 Asterix
-asynk
 atag
 atx
 aty
@@ -460,6 +459,7 @@ gty
 Guangzhou
 guenter
 gzip'ed
+hadolint
 halfsies
 hannes
 Hashbang
@@ -569,7 +569,6 @@ kernelmode
 keybase
 keyclock
 keyid
-keypair
 keyxxxxx
 khvzak
 kib
