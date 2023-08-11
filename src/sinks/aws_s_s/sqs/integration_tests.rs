@@ -7,7 +7,7 @@ use codecs::TextSerializerConfig;
 use tokio::time::{sleep, Duration};
 
 use crate::config::{SinkConfig, SinkContext};
-use crate::sinks::aws_s_s::sqs::config::SqsSinkConfig;
+use crate::sinks::aws_s_s::sqs::config::{healthcheck, SqsSinkConfig};
 use crate::sinks::aws_s_s::BaseSSSinkConfig;
 use crate::{
     aws::{create_client, AwsAuthentication, RegionOrEndpoint},
@@ -65,7 +65,9 @@ async fn sqs_send_message_batch() {
         base_config,
     };
 
-    config.clone().healthcheck(client.clone()).await.unwrap();
+    healthcheck(client.clone(), config.queue_url.clone())
+        .await
+        .unwrap();
 
     let cx = SinkContext::default();
 

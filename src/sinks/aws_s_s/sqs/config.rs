@@ -3,7 +3,6 @@ use aws_sdk_sqs::Client as SqsClient;
 use crate::config::{
     AcknowledgementsConfig, DataType, GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext,
 };
-use futures::FutureExt;
 use vector_config::configurable_component;
 
 use super::{client::SqsMessagePublisher, BaseSSSinkConfig, ConfigWithIds, SSSink};
@@ -40,16 +39,6 @@ impl GenerateConfig for SqsSinkConfig {
 }
 
 impl SqsSinkConfig {
-    pub async fn healthcheck(self, client: SqsClient) -> crate::Result<()> {
-        client
-            .get_queue_attributes()
-            .queue_url(self.queue_url.clone())
-            .send()
-            .await
-            .map(|_| ())
-            .map_err(Into::into)
-    }
-
     pub async fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<SqsClient> {
         create_client::<SqsClientBuilder>(
             &self.base_config.auth,
@@ -74,7 +63,7 @@ impl SinkConfig for SqsSinkConfig {
 
         let publisher = SqsMessagePublisher::new(client.clone(), self.queue_url.clone());
 
-        let healthcheck = self.clone().healthcheck(client.clone()).boxed();
+        let healthcheck = Box::pin(healthcheck(client.clone(), self.queue_url.clone()));
         let config = ConfigWithIds {
             base_config: self.base_config.clone(),
             fifo: self.queue_url.ends_with(".fifo"),
@@ -94,4 +83,14 @@ impl SinkConfig for SqsSinkConfig {
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.base_config.acknowledgements
     }
+}
+
+pub async fn healthcheck(client: SqsClient, queue_url: String) -> crate::Result<()> {
+    client
+        .get_queue_attributes()
+        .queue_url(queue_url)
+        .send()
+        .await
+        .map(|_| ())
+        .map_err(Into::into)
 }

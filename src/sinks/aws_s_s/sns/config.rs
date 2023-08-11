@@ -3,7 +3,6 @@ use aws_sdk_sns::Client as SnsClient;
 use crate::config::{
     AcknowledgementsConfig, DataType, GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext,
 };
-use futures::FutureExt;
 use vector_config::configurable_component;
 
 use super::{client::SnsMessagePublisher, BaseSSSinkConfig, ConfigWithIds, SSSink};
@@ -20,9 +19,7 @@ use crate::aws::ClientBuilder;
 pub struct SnsSinkConfig {
     /// The ARN of the Amazon SNS topic to which messages are sent.
     #[configurable(validation(format = "uri"))]
-    #[configurable(metadata(
-        docs::examples = "arn:aws:sns:us-east-2:123456789012:MyTopic"
-    ))]
+    #[configurable(metadata(docs::examples = "arn:aws:sns:us-east-2:123456789012:MyTopic"))]
     pub topic_arn: String,
 
     #[serde(flatten)]
@@ -41,16 +38,6 @@ impl GenerateConfig for SnsSinkConfig {
 }
 
 impl SnsSinkConfig {
-    pub async fn healthcheck(self, client: SnsClient) -> crate::Result<()> {
-        client
-            .get_topic_attributes()
-            .topic_arn(self.topic_arn.clone())
-            .send()
-            .await
-            .map(|_| ())
-            .map_err(Into::into)
-    }
-
     pub async fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<SnsClient> {
         create_client::<SnsClientBuilder>(
             &self.base_config.auth,
@@ -75,7 +62,7 @@ impl SinkConfig for SnsSinkConfig {
 
         let publisher = SnsMessagePublisher::new(client.clone(), self.topic_arn.clone());
 
-        let healthcheck = self.clone().healthcheck(client.clone()).boxed();
+        let healthcheck = Box::pin(healthcheck(client.clone(), self.topic_arn.clone()));
         let config = ConfigWithIds {
             base_config: self.base_config.clone(),
             fifo: self.topic_arn.ends_with(".fifo"),
@@ -111,4 +98,14 @@ impl ClientBuilder for SnsClientBuilder {
     fn build(client: aws_smithy_client::Client, config: &aws_types::SdkConfig) -> Self::Client {
         aws_sdk_sns::client::Client::with_config(client, config.into())
     }
+}
+
+pub async fn healthcheck(client: SnsClient, topic_arn: String) -> crate::Result<()> {
+    client
+        .get_topic_attributes()
+        .topic_arn(topic_arn.clone())
+        .send()
+        .await
+        .map(|_| ())
+        .map_err(Into::into)
 }

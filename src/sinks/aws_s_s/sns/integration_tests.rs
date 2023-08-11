@@ -8,7 +8,11 @@ use aws_sdk_sqs::Client as SqsClient;
 use codecs::TextSerializerConfig;
 use tokio::time::{sleep, Duration};
 
-use super::{config::SnsClientBuilder, config::SnsSinkConfig, BaseSSSinkConfig};
+use super::{
+    config::SnsClientBuilder,
+    config::{healthcheck, SnsSinkConfig},
+    BaseSSSinkConfig,
+};
 use crate::common::sqs::SqsClientBuilder;
 use crate::config::{SinkConfig, SinkContext};
 use crate::{
@@ -90,9 +94,7 @@ async fn sns_send_message_batch() {
         base_config,
     };
 
-    config
-        .clone()
-        .healthcheck(sns_client.clone())
+    healthcheck(sns_client.clone(), config.topic_arn.clone())
         .await
         .unwrap();
 
