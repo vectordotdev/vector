@@ -2,7 +2,8 @@ use bytes::Bytes;
 use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
 use vector_core::ByteSizeOf;
 
-use crate::sinks::aws_s_s::config::ConfigWithIds;
+use crate::codecs::EncodingConfig;
+use crate::sinks::aws_s_s::config::MessageIdConfig;
 use crate::{
     codecs::{Encoder, Transformer},
     event::{Event, EventFinalizers, Finalizable},
@@ -22,16 +23,16 @@ pub struct Metadata {
 }
 
 #[derive(Clone)]
-pub(crate) struct SSRequestBuilder {
+pub struct SSRequestBuilder {
     encoder: (Transformer, Encoder<()>),
     message_group_id: Option<Template>,
     message_deduplication_id: Option<Template>,
 }
 
 impl SSRequestBuilder {
-    pub fn new(config: ConfigWithIds) -> crate::Result<Self> {
-        let transformer = config.base_config.encoding.transformer();
-        let serializer = config.base_config.encoding.build()?;
+    pub fn new(config: MessageIdConfig, encoding_config: EncodingConfig) -> crate::Result<Self> {
+        let transformer = encoding_config.transformer();
+        let serializer = encoding_config.build()?;
         let encoder = Encoder::<()>::new(serializer);
 
         Ok(Self {

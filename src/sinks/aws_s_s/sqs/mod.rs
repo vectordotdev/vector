@@ -3,8 +3,8 @@ mod integration_tests;
 
 pub use super::{
     client::Client,
-    config::{BaseSSSinkConfig, ConfigWithIds},
-    request_builder::SendMessageEntry,
+    config::{BaseSSSinkConfig, MessageIdConfig},
+    request_builder::{SSRequestBuilder, SendMessageEntry},
     service::SendMessageResponse,
     sink::SSSink,
 };

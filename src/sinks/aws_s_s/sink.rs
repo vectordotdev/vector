@@ -6,7 +6,6 @@ use vector_core::sink::StreamSink;
 
 use super::{client::Client, request_builder::SSRequestBuilder, service::SSService};
 use crate::internal_events::SinkRequestBuildError;
-use crate::sinks::aws_s_s::config::ConfigWithIds;
 use crate::sinks::aws_s_s::retry::SSRetryLogic;
 use crate::{
     event::Event,
@@ -40,10 +39,13 @@ where
     C: Client<E> + Clone + Send + Sync + 'static,
     E: std::fmt::Debug + std::fmt::Display + std::error::Error + Sync + Send + 'static,
 {
-    pub fn new(config: ConfigWithIds, publisher: C) -> crate::Result<Self> {
-        let request = config.base_config.request;
+    pub fn new(
+        request_builder: SSRequestBuilder,
+        request: TowerRequestConfig,
+        publisher: C,
+    ) -> crate::Result<Self> {
         Ok(SSSink {
-            request_builder: SSRequestBuilder::new(config)?,
+            request_builder,
             service: SSService::new(publisher),
             request,
         })

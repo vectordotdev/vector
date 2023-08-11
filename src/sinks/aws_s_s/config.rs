@@ -88,13 +88,14 @@ pub enum Encoding {
 }
 
 #[derive(Clone, Debug)]
-pub struct ConfigWithIds {
-    pub base_config: BaseSSSinkConfig,
-    pub fifo: bool,
+pub struct MessageIdConfig {
+    message_group_id: Option<String>,
+    message_deduplication_id: Option<String>,
+    fifo: bool,
 }
-impl ConfigWithIds {
+impl MessageIdConfig {
     pub fn message_group_id(&self) -> crate::Result<Option<Template>> {
-        match (self.base_config.message_group_id.as_ref(), self.fifo) {
+        match (self.message_group_id.as_ref(), self.fifo) {
             (Some(value), true) => Ok(Some(
                 Template::try_from(value.clone()).context(TopicTemplateSnafu)?,
             )),
@@ -106,10 +107,21 @@ impl ConfigWithIds {
 
     pub fn message_deduplication_id(&self) -> crate::Result<Option<Template>> {
         Ok(self
-            .base_config
             .message_deduplication_id
             .clone()
             .map(Template::try_from)
             .transpose()?)
+    }
+
+    pub fn new(
+        message_group_id: Option<String>,
+        message_deduplication_id: Option<String>,
+        fifo: bool,
+    ) -> Self {
+        Self {
+            message_group_id,
+            message_deduplication_id,
+            fifo,
+        }
     }
 }
