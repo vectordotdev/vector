@@ -1,10 +1,15 @@
 #![deny(missing_docs)]
+// TODO: temporary
+#![allow(unused)]
 
 use enrichment::TableRegistry;
+use futures::Stream;
 use indexmap::IndexMap;
+use std::time::Duration;
+use tokio_stream::wrappers::IntervalStream;
 use vector_core::config::LogNamespace;
 
-use super::{transform_utils::optional::Optional, FILE_KEY};
+use crate::event::Event;
 use crate::sources::kubernetes_logs::transform_utils::get_message_field;
 use crate::{
     conditions::AnyCondition,
@@ -12,8 +17,58 @@ use crate::{
     transforms::reduce::{MergeStrategy, Reduce, ReduceConfig},
 };
 
+/// The key we use for `file` field.
+const FILE_KEY: &str = "file";
+
 /// Partial event merger.
 pub type PartialEventsMerger = Reduce;
+
+use async_stream::stream;
+
+// enum MergeEvent {
+//     Event(Event),
+//     ExpirationCheck,
+// }
+
+pub fn merge_partial_events(stream: impl Stream<Item = Event>) -> impl Stream<Item = Event> {
+    let (rx, tx) = futures::channel::mpsc::channel(10);
+
+    // let expiration_check = IntervalStream::new());
+    tokio::time::interval(Duration::from_secs(30));
+
+    Box::pin(stream! {
+        stream! {
+              loop {
+                let mut output = Vec::new();
+                let done = tokio::select! {
+                    _ = flush_stream.tick() => {
+                      me.flush_into(&mut output);
+                      false
+                    }
+                    maybe_event = input_rx.next() => {
+                      match maybe_event {
+                        None => {
+                          me.flush_all_into(&mut output);
+                          true
+                        }
+                        Some(event) => {
+                          me.transform_one(&mut output, event);
+                          false
+                        }
+                      }
+                    }
+                };
+                yield futures::stream::iter(output.into_iter());
+                if done { break }
+              }
+            }
+            .flatten()
+    })
+
+    // tokio::spawn(async move { stream });
+
+    // tx
+}
 
 pub fn build(log_namespace: LogNamespace) -> PartialEventsMerger {
     let key = get_message_field(log_namespace);
@@ -48,11 +103,33 @@ pub fn build(log_namespace: LogNamespace) -> PartialEventsMerger {
         .expect("should not fail to build `kubernetes_logs`-specific partial event reducer")
 }
 
+#[cfg(test)]
 mod test {
-    // use super::*;
+    use super::*;
+    use vector_core::event::LogEvent;
 
-    // #[test]
-    // fn merge_single_event_legacy() {
-    //     let merge = build()
-    // }
+    #[tokio::test]
+    async fn merge_single_event_legacy() {
+        let mut merge = build(LogNamespace::Legacy);
+        let mut output = vec![];
+
+        let mut e_1 = LogEvent::from("test message 1");
+        e_1.insert("foo", 1);
+        merge.transform_one(&mut output, e_1.into());
+
+        assert_eq!(output.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn merge_two_partial_events_legacy() {
+        let mut merge = build(LogNamespace::Legacy);
+        let mut output = vec![];
+
+        let mut e_1 = LogEvent::from("test message 1");
+        e_1.insert("foo", 1);
+        e_1.insert("_partial", true);
+        merge.transform_one(&mut output, e_1.into());
+
+        assert_eq!(output.len(), 1);
+    }
 }

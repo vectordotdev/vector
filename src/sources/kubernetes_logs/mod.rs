@@ -27,16 +27,16 @@ use kube::{
 use lifecycle::Lifecycle;
 use lookup::{lookup_v2::OptionalTargetPath, owned_value_path, path, OwnedTargetPath};
 use serde_with::serde_as;
+// use tokio_stream::StreamExt;
 use vector_common::{
     internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol},
     TimeZone,
 };
 use vector_config::configurable_component;
-use vector_core::{
-    config::LegacyKey, config::LogNamespace, transform::TaskTransform, EstimatedJsonEncodedSizeOf,
-};
+use vector_core::{config::LegacyKey, config::LogNamespace, EstimatedJsonEncodedSizeOf};
 use vrl::value::{kind::Collection, Kind};
 
+use crate::sources::kubernetes_logs::partial_events_merger::merge_partial_events;
 use crate::{
     config::{
         log_schema, ComponentKey, DataType, GenerateConfig, GlobalOptions, SourceConfig,
@@ -71,9 +71,6 @@ use self::namespace_metadata_annotator::NamespaceMetadataAnnotator;
 use self::node_metadata_annotator::NodeMetadataAnnotator;
 use self::parser::Parser;
 use self::pod_metadata_annotator::PodMetadataAnnotator;
-
-/// The key we use for `file` field.
-const FILE_KEY: &str = "file";
 
 /// The `self_node_name` value env var key.
 const SELF_NODE_NAME_ENV_KEY: &str = "VECTOR_SELF_NODE_NAME";
@@ -781,9 +778,9 @@ impl Source {
 
         let (file_source_tx, file_source_rx) = futures::channel::mpsc::channel::<Vec<Line>>(2);
 
-        let mut parser = Parser::new(log_namespace);
-        let partial_events_merger =
-            Box::new(auto_partial_merge.then(|| partial_events_merger::build(log_namespace)));
+        // let partial_events_merger = Box::new(Optional(
+        //     auto_partial_merge.then(|| partial_events_merger::build(log_namespace)),
+        // ));
 
         let checkpoints = checkpointer.view();
         let events = file_source_rx.flat_map(futures::stream::iter);
@@ -836,6 +833,8 @@ impl Source {
             checkpoints.update(line.file_id, line.end_offset);
             event
         });
+
+        let mut parser = Parser::new(log_namespace);
         let events = events
             .flat_map(move |event| {
                 let mut buf = OutputBuffer::with_capacity(1);
@@ -848,7 +847,9 @@ impl Source {
             });
         let (events_count, _) = events.size_hint();
 
-        let mut stream = partial_events_merger.transform(Box::pin(events));
+        let mut stream = merge_partial_events(events);
+
+        // let mut stream = partial_events_merger.transform(Box::pin(events));
         let event_processing_loop = out.send_event_stream(&mut stream);
 
         let mut lifecycle = Lifecycle::new();

@@ -386,7 +386,7 @@ impl Reduce {
         }
     }
 
-    fn transform_one(&mut self, output: &mut Vec<Event>, event: Event) {
+    pub(crate) fn transform_one(&mut self, output: &mut Vec<Event>, event: Event) {
         let (starts_here, event) = match &self.starts_when {
             Some(condition) => condition.check(event),
             None => (false, event),
