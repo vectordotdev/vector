@@ -1,8 +1,8 @@
 package metadata
 
 base: components: sources: exec: configuration: {
-	clear_env: {
-		description: "Whether or not to clear the environment before applying custom environment variables."
+	clear_environment: {
+		description: "Whether or not to clear the environment before setting custom environment variables."
 		required:    false
 		type: bool: default: false
 	}
@@ -151,20 +151,19 @@ base: components: sources: exec: configuration: {
 	environment: {
 		description: """
 			Custom environment variables to set or update when running the command.
-
 			If a variable name already exists in the environment, its value is replaced.
 			"""
 		required: false
 		type: object: {
 			examples: [{
 				LANG: "es_ES.UTF-8"
-				TZ:   "Etc/UTC"
 				PATH: "/bin:/usr/bin:/usr/local/bin"
+				TZ:   "Etc/UTC"
 			}]
 			options: "*": {
-				description: "An environment variable value."
+				description: "An environment variable."
 				required:    true
-				type: string: examples: ["foo", "bar"]
+				type: string: {}
 			}
 		}
 	}
