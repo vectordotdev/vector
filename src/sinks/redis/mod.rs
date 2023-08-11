@@ -1,3 +1,6 @@
+//! `redis` sink.
+//!
+//! Writes data to [redis](https://redis.io/).
 mod config;
 mod request_builder;
 mod service;
