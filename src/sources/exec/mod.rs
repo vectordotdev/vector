@@ -65,9 +65,9 @@ pub struct ExecConfig {
     /// Custom environment variables to set or update when running the command.
     pub environment: Option<HashMap<String, String>>,
 
-    /// Whether or not to clear the environment before applying custom environment variables.
-    #[serde(default = "default_clear_env")]
-    pub clear_env: bool,
+    /// Whether or not to clear the environment before setting custom environment variables.
+    #[serde(default = "default_clear_environment")]
+    pub clear_environment: bool,
 
     /// The directory in which to run the command.
     pub working_directory: Option<PathBuf>,
@@ -150,7 +150,7 @@ impl Default for ExecConfig {
             streaming: None,
             command: vec!["echo".to_owned(), "Hello World!".to_owned()],
             environment: None,
-            clear_env: default_clear_env(),
+            clear_environment: default_clear_environment(),
             working_directory: None,
             include_stderr: default_include_stderr(),
             maximum_buffer_size_bytes: default_maximum_buffer_size(),
@@ -178,7 +178,7 @@ const fn default_respawn_on_exit() -> bool {
     true
 }
 
-const fn default_clear_env() -> bool {
+const fn default_clear_environment() -> bool {
     false
 }
 
@@ -625,7 +625,7 @@ fn build_command(config: &ExecConfig) -> Command {
     command.kill_on_drop(true);
 
     // Clear environment variables if needed
-    if config.clear_env {
+    if config.clear_environment {
         command.env_clear();
     }
 
@@ -925,7 +925,7 @@ mod tests {
             }),
             command: vec!["./runner".to_owned(), "arg1".to_owned(), "arg2".to_owned()],
             environment: None,
-            clear_env: default_clear_env(),
+            clear_environment: default_clear_environment(),
             working_directory: Some(PathBuf::from("/tmp")),
             include_stderr: default_include_stderr(),
             maximum_buffer_size_bytes: default_maximum_buffer_size(),
@@ -1139,7 +1139,7 @@ mod tests {
             }),
             command: vec!["yes".to_owned()],
             environment: None,
-            clear_env: default_clear_env(),
+            clear_environment: default_clear_environment(),
             working_directory: None,
             include_stderr: default_include_stderr(),
             maximum_buffer_size_bytes: default_maximum_buffer_size(),
