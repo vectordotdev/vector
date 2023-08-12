@@ -198,6 +198,10 @@ pub struct RootOpts {
     /// Load the OpenSSL legacy provider.
     #[arg(long, env = "VECTOR_OPENSSL_LEGACY_PROVIDER", default_value = "true")]
     pub openssl_legacy_provider: bool,
+
+    /// Disable probing and configuration of root certificate locations on the system for OpenSSL.
+    #[arg(long, env = "VECTOR_OPENSSL_NO_PROBE", default_value = "false")]
+    pub openssl_no_probe: bool,
 }
 
 impl RootOpts {
