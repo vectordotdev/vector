@@ -28,16 +28,7 @@ impl CsvSerializerConfig {
         if self.csv.fields.is_empty() {
             Err("At least one CSV field must be specified".into())
         } else {
-            let opts = CsvSerializerOptions {
-                delimiter: self.csv.delimiter,
-                escape: self.csv.escape,
-                double_quote: self.csv.double_quote,
-                quote_style: self.csv.quote_style,
-                fields: self.csv.fields.clone(),
-            };
-            let config = CsvSerializerConfig::new(opts);
-
-            Ok(CsvSerializer::new(config))
+            Ok(CsvSerializer::new(self.clone()))
         }
     }
 
@@ -92,7 +83,7 @@ const fn default_double_quote() -> bool {
 
 /// Config used to build a `CsvSerializer`.
 #[crate::configurable_component]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct CsvSerializerOptions {
     /// The field delimiter to use when writing CSV.
     #[serde(
