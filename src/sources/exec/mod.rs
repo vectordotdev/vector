@@ -765,6 +765,7 @@ mod tests {
     use super::*;
     use crate::{event::LogEvent, test_util::trace_init};
     use bytes::Bytes;
+    use std::ffi::OsStr;
     use std::io::Cursor;
     use vector_core::event::EventMetadata;
     use vrl::value;
@@ -961,6 +962,64 @@ mod tests {
         let command_string = format!("{:?}", command);
 
         assert_eq!(expected_command_string, command_string);
+    }
+
+    #[test]
+    fn test_build_command_custom_environment() {
+        let config = ExecConfig {
+            mode: Mode::Streaming,
+            scheduled: None,
+            streaming: Some(StreamingConfig {
+                respawn_on_exit: default_respawn_on_exit(),
+                respawn_interval_secs: default_respawn_interval_secs(),
+            }),
+            command: vec!["./runner".to_owned(), "arg1".to_owned(), "arg2".to_owned()],
+            environment: Some(HashMap::from([("FOO".to_owned(), "foo".to_owned())])),
+            clear_environment: default_clear_environment(),
+            working_directory: Some(PathBuf::from("/tmp")),
+            include_stderr: default_include_stderr(),
+            maximum_buffer_size_bytes: default_maximum_buffer_size(),
+            framing: None,
+            decoding: default_decoding(),
+            log_namespace: None,
+        };
+
+        let command = build_command(&config);
+        let cmd = command.as_std();
+
+        let idx = cmd
+            .get_envs()
+            .position(|v| v == (OsStr::new("FOO"), Some(OsStr::new("foo"))));
+
+        assert_ne!(idx, None);
+    }
+
+    #[test]
+    fn test_build_command_clear_environment() {
+        let config = ExecConfig {
+            mode: Mode::Streaming,
+            scheduled: None,
+            streaming: Some(StreamingConfig {
+                respawn_on_exit: default_respawn_on_exit(),
+                respawn_interval_secs: default_respawn_interval_secs(),
+            }),
+            command: vec!["./runner".to_owned(), "arg1".to_owned(), "arg2".to_owned()],
+            environment: Some(HashMap::from([("FOO".to_owned(), "foo".to_owned())])),
+            clear_environment: true,
+            working_directory: Some(PathBuf::from("/tmp")),
+            include_stderr: default_include_stderr(),
+            maximum_buffer_size_bytes: default_maximum_buffer_size(),
+            framing: None,
+            decoding: default_decoding(),
+            log_namespace: None,
+        };
+
+        let command = build_command(&config);
+        let cmd = command.as_std();
+
+        let envs: Vec<_> = cmd.get_envs().collect();
+
+        assert_eq!(envs.len(), 1);
     }
 
     #[tokio::test]
