@@ -70,3 +70,10 @@ impl<'a> TargetPath<'a> for &'a ConfigTargetPath {
         &self.0.path
     }
 }
+
+#[cfg(any(test, feature = "test"))]
+impl From<&str> for ConfigTargetPath {
+    fn from(path: &str) -> Self {
+        ConfigTargetPath::try_from(path.to_string()).unwrap()
+    }
+}

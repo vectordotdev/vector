@@ -258,7 +258,7 @@ fn build_cache_entry(event: &Event, fields: &FieldMatchConfig) -> CacheEntry {
 
             if let Some(all_fields) = event.as_log().all_fields() {
                 for (field_name, value) in all_fields {
-                    if let Some(path) = ConfigTargetPath::try_from(field_name).ok() {
+                    if let Ok(path) = ConfigTargetPath::try_from(field_name) {
                         if !fields.contains(&path) {
                             entry.push((path, type_id_for_value(value), value.coerce_to_bytes()));
                         }
@@ -288,6 +288,7 @@ impl TaskTransform<Event> for Dedupe {
 mod tests {
     use std::{collections::BTreeMap, sync::Arc};
 
+    use lookup::lookup_v2::ConfigTargetPath;
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
     use vector_common::config::ComponentKey;
@@ -308,7 +309,10 @@ mod tests {
         crate::test_util::test_generate_config::<DedupeConfig>();
     }
 
-    fn make_match_transform_config(num_events: usize, fields: Vec<String>) -> DedupeConfig {
+    fn make_match_transform_config(
+        num_events: usize,
+        fields: Vec<ConfigTargetPath>,
+    ) -> DedupeConfig {
         DedupeConfig {
             cache: CacheConfig {
                 num_events: std::num::NonZeroUsize::new(num_events).expect("non-zero num_events"),
@@ -317,7 +321,10 @@ mod tests {
         }
     }
 
-    fn make_ignore_transform_config(num_events: usize, given_fields: Vec<String>) -> DedupeConfig {
+    fn make_ignore_transform_config(
+        num_events: usize,
+        given_fields: Vec<ConfigTargetPath>,
+    ) -> DedupeConfig {
         // "message" and "timestamp" are added automatically to all Events
         let mut fields = vec!["message".into(), "timestamp".into()];
         fields.extend(given_fields);
