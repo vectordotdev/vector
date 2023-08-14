@@ -51,7 +51,7 @@ pub(super) struct NatsRequest {
     pub(super) bytes: Bytes,
     pub(super) subject: String,
     finalizers: EventFinalizers,
-    metadata: RequestMetadata,
+    pub(super) metadata: RequestMetadata,
 }
 
 impl Finalizable for NatsRequest {

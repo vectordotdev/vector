@@ -43,11 +43,10 @@ impl Service<NatsRequest> for NatsService {
         Poll::Ready(Ok(()))
     }
 
-    fn call(&mut self, mut req: NatsRequest) -> Self::Future {
+    fn call(&mut self, req: NatsRequest) -> Self::Future {
         let connection = self.connection.clone();
 
         Box::pin(async move {
-            let metadata = std::mem::take(req.metadata_mut());
             match connection
                 .publish(req.subject, req.bytes)
                 .map_err(|error| async_nats::Error::from(error))
@@ -55,7 +54,9 @@ impl Service<NatsRequest> for NatsService {
                 .await
             {
                 Err(error) => Err(NatsError::ServerError { source: error }),
-                Ok(_) => Ok(NatsResponse { metadata }),
+                Ok(_) => Ok(NatsResponse {
+                    metadata: req.metadata,
+                }),
             }
         })
     }
