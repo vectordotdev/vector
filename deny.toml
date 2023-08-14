@@ -38,4 +38,8 @@ license-files = [
 
 [advisories]
 ignore = [
+    # `ed25519-dalek` is vulnerable due to "Double Public Key Signing Function Oracle Attack".
+    # Temporarily ignoring this vulnerability until the following issue is resolved:
+    # https://github.com/wasmCloud/nkeys/issues/20
+    "RUSTSEC-2022-0093"
 ]
