@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     io::{Error, ErrorKind},
     path::PathBuf,
     process::ExitStatus,
@@ -60,6 +61,17 @@ pub struct ExecConfig {
     /// The command to run, plus any arguments required.
     #[configurable(metadata(docs::examples = "echo", docs::examples = "Hello World!"))]
     pub command: Vec<String>,
+
+    /// Custom environment variables to set or update when running the command.
+    /// If a variable name already exists in the environment, its value is replaced.
+    #[serde(default)]
+    #[configurable(metadata(docs::additional_props_description = "An environment variable."))]
+    #[configurable(metadata(docs::examples = "environment_examples()"))]
+    pub environment: Option<HashMap<String, String>>,
+
+    /// Whether or not to clear the environment before setting custom environment variables.
+    #[serde(default = "default_clear_environment")]
+    pub clear_environment: bool,
 
     /// The directory in which to run the command.
     pub working_directory: Option<PathBuf>,
@@ -141,6 +153,8 @@ impl Default for ExecConfig {
             }),
             streaming: None,
             command: vec!["echo".to_owned(), "Hello World!".to_owned()],
+            environment: None,
+            clear_environment: default_clear_environment(),
             working_directory: None,
             include_stderr: default_include_stderr(),
             maximum_buffer_size_bytes: default_maximum_buffer_size(),
@@ -168,8 +182,23 @@ const fn default_respawn_on_exit() -> bool {
     true
 }
 
+const fn default_clear_environment() -> bool {
+    false
+}
+
 const fn default_include_stderr() -> bool {
     true
+}
+
+fn environment_examples() -> HashMap<String, String> {
+    HashMap::<_, _>::from_iter(
+        [
+            ("LANG".to_owned(), "es_ES.UTF-8".to_owned()),
+            ("TZ".to_owned(), "Etc/UTC".to_owned()),
+            ("PATH".to_owned(), "/bin:/usr/bin:/usr/local/bin".to_owned()),
+        ]
+        .into_iter(),
+    )
 }
 
 fn get_hostname() -> Option<String> {
@@ -610,6 +639,16 @@ fn build_command(config: &ExecConfig) -> Command {
 
     command.kill_on_drop(true);
 
+    // Clear environment variables if needed
+    if config.clear_environment {
+        command.env_clear();
+    }
+
+    // Configure environment variables if needed
+    if let Some(envs) = &config.environment {
+        command.envs(envs);
+    }
+
     // Explicitly set the current dir if needed
     if let Some(current_dir) = &config.working_directory {
         command.current_dir(current_dir);
@@ -726,6 +765,7 @@ mod tests {
     use super::*;
     use crate::{event::LogEvent, test_util::trace_init};
     use bytes::Bytes;
+    use std::ffi::OsStr;
     use std::io::Cursor;
     use vector_core::event::EventMetadata;
     use vrl::value;
@@ -900,6 +940,8 @@ mod tests {
                 respawn_interval_secs: default_respawn_interval_secs(),
             }),
             command: vec!["./runner".to_owned(), "arg1".to_owned(), "arg2".to_owned()],
+            environment: None,
+            clear_environment: default_clear_environment(),
             working_directory: Some(PathBuf::from("/tmp")),
             include_stderr: default_include_stderr(),
             maximum_buffer_size_bytes: default_maximum_buffer_size(),
@@ -920,6 +962,64 @@ mod tests {
         let command_string = format!("{:?}", command);
 
         assert_eq!(expected_command_string, command_string);
+    }
+
+    #[test]
+    fn test_build_command_custom_environment() {
+        let config = ExecConfig {
+            mode: Mode::Streaming,
+            scheduled: None,
+            streaming: Some(StreamingConfig {
+                respawn_on_exit: default_respawn_on_exit(),
+                respawn_interval_secs: default_respawn_interval_secs(),
+            }),
+            command: vec!["./runner".to_owned(), "arg1".to_owned(), "arg2".to_owned()],
+            environment: Some(HashMap::from([("FOO".to_owned(), "foo".to_owned())])),
+            clear_environment: default_clear_environment(),
+            working_directory: Some(PathBuf::from("/tmp")),
+            include_stderr: default_include_stderr(),
+            maximum_buffer_size_bytes: default_maximum_buffer_size(),
+            framing: None,
+            decoding: default_decoding(),
+            log_namespace: None,
+        };
+
+        let command = build_command(&config);
+        let cmd = command.as_std();
+
+        let idx = cmd
+            .get_envs()
+            .position(|v| v == (OsStr::new("FOO"), Some(OsStr::new("foo"))));
+
+        assert_ne!(idx, None);
+    }
+
+    #[test]
+    fn test_build_command_clear_environment() {
+        let config = ExecConfig {
+            mode: Mode::Streaming,
+            scheduled: None,
+            streaming: Some(StreamingConfig {
+                respawn_on_exit: default_respawn_on_exit(),
+                respawn_interval_secs: default_respawn_interval_secs(),
+            }),
+            command: vec!["./runner".to_owned(), "arg1".to_owned(), "arg2".to_owned()],
+            environment: Some(HashMap::from([("FOO".to_owned(), "foo".to_owned())])),
+            clear_environment: true,
+            working_directory: Some(PathBuf::from("/tmp")),
+            include_stderr: default_include_stderr(),
+            maximum_buffer_size_bytes: default_maximum_buffer_size(),
+            framing: None,
+            decoding: default_decoding(),
+            log_namespace: None,
+        };
+
+        let command = build_command(&config);
+        let cmd = command.as_std();
+
+        let envs: Vec<_> = cmd.get_envs().collect();
+
+        assert_eq!(envs.len(), 1);
     }
 
     #[tokio::test]
@@ -1112,6 +1212,8 @@ mod tests {
                 respawn_interval_secs: default_respawn_interval_secs(),
             }),
             command: vec!["yes".to_owned()],
+            environment: None,
+            clear_environment: default_clear_environment(),
             working_directory: None,
             include_stderr: default_include_stderr(),
             maximum_buffer_size_bytes: default_maximum_buffer_size(),
