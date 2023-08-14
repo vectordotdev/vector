@@ -20,6 +20,7 @@ use crate::{
     config::{ComponentKey, Config, ConfigDiff, HealthcheckOptions, Inputs, OutputId, Resource},
     event::EventArray,
     shutdown::SourceShutdownCoordinator,
+    signal::ShutdownError,
     spawn_named,
     topology::{
         build_or_log_errors, builder,
@@ -42,14 +43,14 @@ pub struct RunningTopology {
     shutdown_coordinator: SourceShutdownCoordinator,
     detach_triggers: HashMap<ComponentKey, DisabledTrigger>,
     pub(crate) config: Config,
-    abort_tx: mpsc::UnboundedSender<()>,
+    abort_tx: mpsc::UnboundedSender<ShutdownError>,
     watch: (WatchTx, WatchRx),
     pub(crate) running: Arc<AtomicBool>,
     graceful_shutdown_duration: Option<Duration>,
 }
 
 impl RunningTopology {
-    pub fn new(config: Config, abort_tx: mpsc::UnboundedSender<()>) -> Self {
+    pub fn new(config: Config, abort_tx: mpsc::UnboundedSender<ShutdownError>) -> Self {
         Self {
             inputs: HashMap::new(),
             inputs_tap_metadata: HashMap::new(),
@@ -855,7 +856,13 @@ impl RunningTopology {
         }
 
         let task_name = format!(">> {} ({})", task.typetag(), task.id());
-        let task = handle_errors(task, self.abort_tx.clone()).instrument(task_span);
+        let task = {
+            let key = key.clone();
+            handle_errors(task, self.abort_tx.clone(), |error| {
+                ShutdownError::SinkAborted { key, error }
+            })
+        }
+        .instrument(task_span);
         let spawned = spawn_named(task, task_name.as_ref());
         if let Some(previous) = self.tasks.insert(key.clone(), spawned) {
             drop(previous); // detach and forget
@@ -892,7 +899,13 @@ impl RunningTopology {
         }
 
         let task_name = format!(">> {} ({}) >>", task.typetag(), task.id());
-        let task = handle_errors(task, self.abort_tx.clone()).instrument(task_span);
+        let task = {
+            let key = key.clone();
+            handle_errors(task, self.abort_tx.clone(), |error| {
+                ShutdownError::TransformAborted { key, error }
+            })
+        }
+        .instrument(task_span);
         let spawned = spawn_named(task, task_name.as_ref());
         if let Some(previous) = self.tasks.insert(key.clone(), spawned) {
             drop(previous); // detach and forget
@@ -930,7 +943,13 @@ impl RunningTopology {
         }
 
         let task_name = format!("{} ({}) >>", task.typetag(), task.id());
-        let task = handle_errors(task, self.abort_tx.clone()).instrument(task_span.clone());
+        let task = {
+            let key = key.clone();
+            handle_errors(task, self.abort_tx.clone(), |error| {
+                ShutdownError::SourceAborted { key, error }
+            })
+        }
+        .instrument(task_span.clone());
         let spawned = spawn_named(task, task_name.as_ref());
         if let Some(previous) = self.tasks.insert(key.clone(), spawned) {
             drop(previous); // detach and forget
@@ -941,7 +960,13 @@ impl RunningTopology {
 
         // Now spawn the actual source task.
         let source_task = new_pieces.source_tasks.remove(key).unwrap();
-        let source_task = handle_errors(source_task, self.abort_tx.clone()).instrument(task_span);
+        let source_task = {
+            let key = key.clone();
+            handle_errors(source_task, self.abort_tx.clone(), |error| {
+                ShutdownError::SourceAborted { key, error }
+            })
+        }
+        .instrument(task_span);
         self.source_tasks
             .insert(key.clone(), spawn_named(source_task, task_name.as_ref()));
     }

@@ -52,6 +52,7 @@ mkdir -p %{buildroot}%{_bindir}
 mkdir -p %{buildroot}%{_sysconfdir}/%{_name}
 mkdir -p %{buildroot}%{_sysconfdir}/default
 mkdir -p %{buildroot}%{_sharedstatedir}/%{_name}
+mkdir -p %{buildroot}%{_datadir}/%{_name}
 mkdir -p %{buildroot}%{_unitdir}
 
 cp -a %{_builddir}/bin/vector %{buildroot}%{_bindir}
@@ -62,6 +63,9 @@ cp -a %{_builddir}/systemd/vector@.service %{buildroot}%{_unitdir}/vector@.servi
 cp -a %{_builddir}/systemd/hardened-vector.service %{buildroot}%{_unitdir}/hardened-vector.service
 cp -a %{_builddir}/systemd/hardened-vector@.service %{buildroot}%{_unitdir}/hardened-vector@.service
 cp -a %{_builddir}/systemd/vector.default %{buildroot}%{_sysconfdir}/default/vector
+cp -a %{_builddir}/licenses/. %{buildroot}%{_datadir}/%{_name}/licenses
+cp -a %{_builddir}/NOTICE %{buildroot}%{_datadir}/%{_name}/NOTICE
+cp -a %{_builddir}/LICENSE-3rdparty.csv %{buildroot}%{_datadir}/%{_name}/LICENSE-3rdparty.csv
 
 %post
 getent passwd %{_username} > /dev/null || \
@@ -83,6 +87,9 @@ rm -rf %{buildroot}
 %config %{_sysconfdir}/%{_name}/examples/*
 %dir %{_sharedstatedir}/%{_name}
 %doc README.md
+%doc %{_datadir}/%{_name}/NOTICE
+%doc %{_datadir}/%{_name}/licenses/*
+%doc %{_datadir}/%{_name}/LICENSE-3rdparty.csv
 %license LICENSE
 
 %changelog

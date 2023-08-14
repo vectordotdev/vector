@@ -70,6 +70,8 @@ on:
         value: ${{ jobs.int_tests.outputs.fluent }}
       gcp:
         value: ${{ jobs.int_tests.outputs.gcp }}
+      greptimedb:
+        value: ${{ jobs.int_tests.outputs.greptimedb }}
       humio:
         value: ${{ jobs.int_tests.outputs.humio }}
       http-client:
@@ -194,6 +196,7 @@ jobs:
       eventstoredb: ${{ steps.filter.outputs.eventstoredb }}
       fluent: ${{ steps.filter.outputs.fluent }}
       gcp: ${{ steps.filter.outputs.gcp }}
+      greptimedb: ${{ steps.filter.outputs.greptimedb }}
       humio: ${{ steps.filter.outputs.humio }}
       http-client: ${{ steps.filter.outputs.http-client }}
       influxdb: ${{ steps.filter.outputs.influxdb }}

@@ -3,7 +3,7 @@ use lookup::lookup_v2::OptionalValuePath;
 use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 
-use super::host_key;
+use super::config_host_key;
 use crate::sinks::splunk_hec::common::config_timestamp_key;
 use crate::{
     codecs::EncodingConfig,
@@ -74,8 +74,8 @@ pub struct HumioLogsConfig {
     /// By default, the [global `log_schema.host_key` option][global_host_key] is used.
     ///
     /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
-    #[serde(default = "host_key")]
-    pub(super) host_key: String,
+    #[serde(default = "config_host_key")]
+    pub(super) host_key: OptionalValuePath,
 
     /// Event fields to be added to Humio’s extra fields.
     ///
@@ -154,7 +154,7 @@ impl GenerateConfig for HumioLogsConfig {
             event_type: None,
             indexed_fields: vec![],
             index: None,
-            host_key: host_key(),
+            host_key: config_host_key(),
             compression: Compression::default(),
             request: TowerRequestConfig::default(),
             batch: BatchConfig::default(),
@@ -223,13 +223,12 @@ mod tests {
 #[cfg(test)]
 #[cfg(feature = "humio-integration-tests")]
 mod integration_tests {
-    use std::{collections::HashMap, convert::TryFrom};
-
     use chrono::{TimeZone, Utc};
     use futures::{future::ready, stream};
     use indoc::indoc;
     use serde::Deserialize;
     use serde_json::{json, Value as JsonValue};
+    use std::{collections::HashMap, convert::TryFrom};
     use tokio::time::Duration;
 
     use super::*;
@@ -262,16 +261,10 @@ mod integration_tests {
         let message = random_string(100);
         let host = "192.168.1.1".to_string();
         let mut event = LogEvent::from(message.clone());
-        event.insert(log_schema().host_key(), host.clone());
+        event.insert(log_schema().host_key_target_path().unwrap(), host.clone());
 
         let ts = Utc.timestamp_nanos(Utc::now().timestamp_millis() * 1_000_000 + 132_456);
-        event.insert(
-            (
-                lookup::PathPrefix::Event,
-                log_schema().timestamp_key().unwrap(),
-            ),
-            ts,
-        );
+        event.insert(log_schema().timestamp_key_target_path().unwrap(), ts);
 
         run_and_assert_sink_compliance(sink, stream::once(ready(event)), &HTTP_SINK_TAGS).await;
 
@@ -387,7 +380,9 @@ mod integration_tests {
             source: None,
             encoding: JsonSerializerConfig::default().into(),
             event_type: None,
-            host_key: log_schema().host_key().to_string(),
+            host_key: OptionalValuePath {
+                path: log_schema().host_key().cloned(),
+            },
             indexed_fields: vec![],
             index: None,
             compression: Compression::None,

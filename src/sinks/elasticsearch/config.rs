@@ -355,15 +355,12 @@ impl DataStreamConfig {
 
     /// If there is a `timestamp` field, rename it to the expected `@timestamp` for Elastic Common Schema.
     pub fn remap_timestamp(&self, log: &mut LogEvent) {
-        if let Some(timestamp_key) = log.timestamp_path() {
-            if timestamp_key == DATA_STREAM_TIMESTAMP_KEY {
+        if let Some(timestamp_key) = log.timestamp_path().cloned() {
+            if timestamp_key.to_string() == DATA_STREAM_TIMESTAMP_KEY {
                 return;
             }
 
-            log.rename_key(
-                timestamp_key.as_str(),
-                event_path!(DATA_STREAM_TIMESTAMP_KEY),
-            )
+            log.rename_key(&timestamp_key, event_path!(DATA_STREAM_TIMESTAMP_KEY));
         }
     }
 
@@ -446,7 +443,9 @@ impl DataStreamConfig {
         let (dtype, dataset, namespace) = if !self.auto_routing {
             (self.dtype(log)?, self.dataset(log)?, self.namespace(log)?)
         } else {
-            let data_stream = log.get("data_stream").and_then(|ds| ds.as_object());
+            let data_stream = log
+                .get(event_path!("data_stream"))
+                .and_then(|ds| ds.as_object());
             let dtype = data_stream
                 .and_then(|ds| ds.get("type"))
                 .map(|value| value.to_string_lossy().into_owned())
@@ -461,7 +460,14 @@ impl DataStreamConfig {
                 .or_else(|| self.namespace(log))?;
             (dtype, dataset, namespace)
         };
-        Some(format!("{}-{}-{}", dtype, dataset, namespace))
+
+        let name = [dtype, dataset, namespace]
+            .into_iter()
+            .filter(|s| !s.is_empty())
+            .collect::<Vec<_>>()
+            .join("-");
+
+        Some(name)
     }
 }
 

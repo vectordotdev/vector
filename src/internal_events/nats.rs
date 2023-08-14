@@ -1,5 +1,3 @@
-use std::io::Error;
-
 use crate::emit;
 use metrics::counter;
 use vector_common::internal_event::{
@@ -7,11 +5,9 @@ use vector_common::internal_event::{
 };
 use vector_core::internal_event::InternalEvent;
 
-use super::prelude::io_error_code;
-
 #[derive(Debug)]
 pub struct NatsEventSendError {
-    pub error: Error,
+    pub error: async_nats::Error,
 }
 
 impl InternalEvent for NatsEventSendError {
@@ -21,14 +17,12 @@ impl InternalEvent for NatsEventSendError {
             message = reason,
             error = %self.error,
             error_type = error_type::WRITER_FAILED,
-            error_code = io_error_code(&self.error),
             stage = error_stage::SENDING,
             internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,
             "error_type" => error_type::WRITER_FAILED,
-            "error_code" => io_error_code(&self.error),
             "stage" => error_stage::SENDING,
         );
         emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });

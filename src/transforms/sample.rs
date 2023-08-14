@@ -1,5 +1,6 @@
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
+use vrl::event_path;
 
 use crate::{
     conditions::{AnyCondition, Condition},
@@ -129,8 +130,14 @@ impl FunctionTransform for Sample {
             .key_field
             .as_ref()
             .and_then(|key_field| match &event {
-                Event::Log(event) => event.get(key_field.as_str()),
-                Event::Trace(event) => event.get(key_field.as_str()),
+                Event::Log(event) => event
+                    .parse_path_and_get_value(key_field.as_str())
+                    .ok()
+                    .flatten(),
+                Event::Trace(event) => event
+                    .parse_path_and_get_value(key_field.as_str())
+                    .ok()
+                    .flatten(),
                 Event::Metric(_) => panic!("component can never receive metric events"),
             })
             .map(|v| v.to_string_lossy());
@@ -145,8 +152,12 @@ impl FunctionTransform for Sample {
 
         if num % self.rate == 0 {
             match event {
-                Event::Log(ref mut event) => event.insert("sample_rate", self.rate.to_string()),
-                Event::Trace(ref mut event) => event.insert("sample_rate", self.rate.to_string()),
+                Event::Log(ref mut event) => {
+                    event.insert(event_path!("sample_rate"), self.rate.to_string())
+                }
+                Event::Trace(ref mut event) => {
+                    event.insert(event_path!("sample_rate"), self.rate.to_string())
+                }
                 Event::Metric(_) => panic!("component can never receive metric events"),
             };
             output.push(event);
@@ -194,8 +205,11 @@ mod tests {
         let events = random_events(num_events);
         let mut sampler = Sample::new(
             2,
-            Some(log_schema().message_key().into()),
-            Some(condition_contains(log_schema().message_key(), "na")),
+            log_schema().message_key().map(ToString::to_string),
+            Some(condition_contains(
+                log_schema().message_key().unwrap().to_string().as_str(),
+                "na",
+            )),
         );
         let total_passed = events
             .into_iter()
@@ -212,8 +226,11 @@ mod tests {
         let events = random_events(num_events);
         let mut sampler = Sample::new(
             25,
-            Some(log_schema().message_key().into()),
-            Some(condition_contains(log_schema().message_key(), "na")),
+            log_schema().message_key().map(ToString::to_string),
+            Some(condition_contains(
+                log_schema().message_key().unwrap().to_string().as_str(),
+                "na",
+            )),
         );
         let total_passed = events
             .into_iter()
@@ -233,8 +250,11 @@ mod tests {
         let events = random_events(1000);
         let mut sampler = Sample::new(
             2,
-            Some(log_schema().message_key().into()),
-            Some(condition_contains(log_schema().message_key(), "na")),
+            log_schema().message_key().map(ToString::to_string),
+            Some(condition_contains(
+                log_schema().message_key().unwrap().to_string().as_str(),
+                "na",
+            )),
         );
 
         let first_run = events
@@ -260,12 +280,15 @@ mod tests {
 
     #[test]
     fn always_passes_events_matching_pass_list() {
-        for key_field in &[None, Some(log_schema().message_key().into())] {
+        for key_field in &[None, log_schema().message_key().map(ToString::to_string)] {
             let event = Event::Log(LogEvent::from("i am important"));
             let mut sampler = Sample::new(
                 0,
                 key_field.clone(),
-                Some(condition_contains(log_schema().message_key(), "important")),
+                Some(condition_contains(
+                    log_schema().message_key().unwrap().to_string().as_str(),
+                    "important",
+                )),
             );
             let iterations = 0..1000;
             let total_passed = iterations
@@ -302,20 +325,17 @@ mod tests {
 
     #[test]
     fn sampler_adds_sampling_rate_to_event() {
-        for key_field in &[None, Some(log_schema().message_key().into())] {
+        for key_field in &[None, log_schema().message_key().map(ToString::to_string)] {
             let events = random_events(10000);
+            let message_key = log_schema().message_key().unwrap().to_string();
             let mut sampler = Sample::new(
                 10,
                 key_field.clone(),
-                Some(condition_contains(log_schema().message_key(), "na")),
+                Some(condition_contains(&message_key, "na")),
             );
             let passing = events
                 .into_iter()
-                .filter(|s| {
-                    !s.as_log()[log_schema().message_key()]
-                        .to_string_lossy()
-                        .contains("na")
-                })
+                .filter(|s| !s.as_log()[&message_key].to_string_lossy().contains("na"))
                 .find_map(|event| transform_one(&mut sampler, event))
                 .unwrap();
             assert_eq!(passing.as_log()["sample_rate"], "10".into());
@@ -324,15 +344,11 @@ mod tests {
             let mut sampler = Sample::new(
                 25,
                 key_field.clone(),
-                Some(condition_contains(log_schema().message_key(), "na")),
+                Some(condition_contains(&message_key, "na")),
             );
             let passing = events
                 .into_iter()
-                .filter(|s| {
-                    !s.as_log()[log_schema().message_key()]
-                        .to_string_lossy()
-                        .contains("na")
-                })
+                .filter(|s| !s.as_log()[&message_key].to_string_lossy().contains("na"))
                 .find_map(|event| transform_one(&mut sampler, event))
                 .unwrap();
             assert_eq!(passing.as_log()["sample_rate"], "25".into());
@@ -341,7 +357,7 @@ mod tests {
             let mut sampler = Sample::new(
                 25,
                 key_field.clone(),
-                Some(condition_contains(log_schema().message_key(), "na")),
+                Some(condition_contains(&message_key, "na")),
             );
             let event = Event::Log(LogEvent::from("nananana"));
             let passing = transform_one(&mut sampler, event).unwrap();

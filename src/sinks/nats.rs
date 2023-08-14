@@ -33,7 +33,7 @@ enum BuildError {
     #[snafu(display("NATS Config Error: {}", source))]
     Config { source: NatsConfigError },
     #[snafu(display("NATS Connect Error: {}", source))]
-    Connect { source: std::io::Error },
+    Connect { source: async_nats::ConnectError },
 }
 
 /**
@@ -137,7 +137,7 @@ impl SinkConfig for NatsSinkConfig {
     }
 }
 
-impl std::convert::TryFrom<&NatsSinkConfig> for nats::asynk::Options {
+impl std::convert::TryFrom<&NatsSinkConfig> for async_nats::ConnectOptions {
     type Error = NatsConfigError;
 
     fn try_from(config: &NatsSinkConfig) -> Result<Self, Self::Error> {
@@ -146,8 +146,8 @@ impl std::convert::TryFrom<&NatsSinkConfig> for nats::asynk::Options {
 }
 
 impl NatsSinkConfig {
-    async fn connect(&self) -> Result<nats::asynk::Connection, BuildError> {
-        let options: nats::asynk::Options = self.try_into().context(ConfigSnafu)?;
+    async fn connect(&self) -> Result<async_nats::Client, BuildError> {
+        let options: async_nats::ConnectOptions = self.try_into().context(ConfigSnafu)?;
 
         options.connect(&self.url).await.context(ConnectSnafu)
     }
@@ -160,7 +160,7 @@ async fn healthcheck(config: NatsSinkConfig) -> crate::Result<()> {
 pub struct NatsSink {
     transformer: Transformer,
     encoder: Encoder<()>,
-    connection: nats::asynk::Connection,
+    connection: async_nats::Client,
     subject: Template,
 }
 
@@ -213,7 +213,14 @@ impl StreamSink<Event> for NatsSink {
                 continue;
             }
 
-            match self.connection.publish(&subject, &bytes).await {
+            let message_size = bytes.len();
+            match self
+                .connection
+                .publish(subject.clone(), bytes.freeze())
+                .map_err(Into::into)
+                .and_then(|_| self.connection.flush().map_err(Into::into))
+                .await
+            {
                 Err(error) => {
                     finalizers.update_status(EventStatus::Errored);
 
@@ -223,7 +230,7 @@ impl StreamSink<Event> for NatsSink {
                     finalizers.update_status(EventStatus::Delivered);
 
                     events_sent.emit(CountByteSize(1, event_byte_size));
-                    bytes_sent.emit(ByteSize(bytes.len()));
+                    bytes_sent.emit(ByteSize(message_size));
                 }
             }
         }
@@ -246,7 +253,7 @@ mod tests {
 #[cfg(test)]
 mod integration_tests {
     use codecs::TextSerializerConfig;
-    use std::{thread, time::Duration};
+    use std::time::Duration;
 
     use super::*;
     use crate::nats::{NatsAuthCredentialsFile, NatsAuthNKey, NatsAuthToken, NatsAuthUserPassword};
@@ -274,10 +281,14 @@ mod integration_tests {
             .connect()
             .await
             .expect("failed to connect with test consumer");
-        let sub = consumer
-            .subscribe(&subject)
+        let mut sub = consumer
+            .subscribe(subject)
             .await
             .expect("failed to subscribe with test consumer");
+        consumer
+            .flush()
+            .await
+            .expect("failed to flush with the test consumer");
 
         // Publish events.
         let num_events = 1_000;
@@ -286,12 +297,12 @@ mod integration_tests {
         run_and_assert_sink_compliance(sink, events, &SINK_TAGS).await;
 
         // Unsubscribe from the channel.
-        thread::sleep(Duration::from_secs(3));
-        sub.drain().await.unwrap();
+        tokio::time::sleep(Duration::from_secs(3)).await;
+        sub.unsubscribe().await.unwrap();
 
         let mut output: Vec<String> = Vec::new();
         while let Some(msg) = sub.next().await {
-            output.push(String::from_utf8_lossy(&msg.data).to_string())
+            output.push(String::from_utf8_lossy(&msg.payload).to_string())
         }
 
         assert_eq!(output.len(), input.len());
@@ -501,7 +512,7 @@ mod integration_tests {
 
         let r = publish_and_check(conf).await;
         assert!(
-            matches!(r, Err(BuildError::Config { .. })),
+            matches!(r, Err(BuildError::Connect { .. })),
             "publish_and_check failed, expected BuildError::Config, got: {:?}",
             r
         );

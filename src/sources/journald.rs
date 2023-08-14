@@ -12,7 +12,7 @@ use bytes::Bytes;
 use chrono::{TimeZone, Utc};
 use codecs::{decoding::BoxedFramingError, CharacterDelimitedDecoder};
 use futures::{poll, stream::BoxStream, task::Poll, StreamExt};
-use lookup::{lookup_v2::parse_value_path, metadata_path, owned_value_path, path, PathPrefix};
+use lookup::{metadata_path, owned_value_path, path};
 use nix::{
     sys::signal::{kill, Signal},
     unistd::Pid,
@@ -270,9 +270,7 @@ impl JournaldConfig {
             )
             .with_source_metadata(
                 JournaldConfig::NAME,
-                parse_value_path(log_schema().host_key())
-                    .ok()
-                    .map(LegacyKey::Overwrite),
+                log_schema().host_key().cloned().map(LegacyKey::Overwrite),
                 &owned_value_path!("host"),
                 Kind::bytes().or_undefined(),
                 Some("host"),
@@ -709,10 +707,7 @@ fn enrich_log_event(log: &mut LogEvent, log_namespace: LogNamespace) {
         log_namespace.insert_source_metadata(
             JournaldConfig::NAME,
             log,
-            parse_value_path(log_schema().host_key())
-                .ok()
-                .as_ref()
-                .map(LegacyKey::Overwrite),
+            log_schema().host_key().map(LegacyKey::Overwrite),
             path!("host"),
             host,
         );
@@ -746,9 +741,7 @@ fn enrich_log_event(log: &mut LogEvent, log_namespace: LogNamespace) {
         }
         LogNamespace::Legacy => {
             if let Some(ts) = timestamp {
-                if let Some(timestamp_key) = log_schema().timestamp_key() {
-                    log.insert((PathPrefix::Event, timestamp_key), ts);
-                }
+                log.maybe_insert(log_schema().timestamp_key_target_path(), ts);
             }
         }
     }
@@ -756,7 +749,7 @@ fn enrich_log_event(log: &mut LogEvent, log_namespace: LogNamespace) {
     // Add source type.
     log_namespace.insert_vector_metadata(
         log,
-        Some(log_schema().source_type_key()),
+        log_schema().source_type_key(),
         path!("source_type"),
         JournaldConfig::NAME,
     );
@@ -789,7 +782,7 @@ fn create_log_event_from_record(
             let mut log = LogEvent::from_iter(record).with_batch_notifier_option(batch);
 
             if let Some(message) = log.remove(MESSAGE) {
-                log.insert(log_schema().message_key(), message);
+                log.maybe_insert(log_schema().message_key_target_path(), message);
             }
 
             log
@@ -1165,7 +1158,7 @@ mod tests {
             Value::Bytes("System Initialization".into())
         );
         assert_eq!(
-            received[0].as_log()[log_schema().source_type_key()],
+            received[0].as_log()[log_schema().source_type_key().unwrap().to_string()],
             "journald".into()
         );
         assert_eq!(timestamp(&received[0]), value_ts(1578529839, 140001000));
@@ -1492,7 +1485,7 @@ mod tests {
     }
 
     fn message(event: &Event) -> Value {
-        event.as_log()[log_schema().message_key()].clone()
+        event.as_log()[log_schema().message_key().unwrap().to_string()].clone()
     }
 
     fn timestamp(event: &Event) -> Value {

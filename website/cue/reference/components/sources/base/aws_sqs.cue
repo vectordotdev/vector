@@ -45,6 +45,15 @@ base: components: sources: aws_sqs: configuration: {
 				required:    true
 				type: string: examples: ["/my/aws/credentials"]
 			}
+			external_id: {
+				description: """
+					The optional unique external ID in conjunction with role to assume.
+
+					[external_id]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_create_for-user_externalid.html
+					"""
+				required: false
+				type: string: examples: ["randomEXAMPLEidString"]
+			}
 			imds: {
 				description: "Configuration for authenticating with AWS through IMDS."
 				required:    false
@@ -167,6 +176,11 @@ base: components: sources: aws_sqs: configuration: {
 															[vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
 															[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
 															"""
+						protobuf: """
+															Decodes the raw bytes as [protobuf][protobuf].
+
+															[protobuf]: https://protobuf.dev/
+															"""
 						syslog: """
 															Decodes the raw bytes as a Syslog message.
 
@@ -225,6 +239,23 @@ base: components: sources: aws_sqs: configuration: {
 						"""
 					required: false
 					type: bool: default: true
+				}
+			}
+			protobuf: {
+				description:   "Protobuf-specific decoding options."
+				relevant_when: "codec = \"protobuf\""
+				required:      false
+				type: object: options: {
+					desc_file: {
+						description: "Path to desc file"
+						required:    false
+						type: string: default: ""
+					}
+					message_type: {
+						description: "message type. e.g package.message"
+						required:    false
+						type: string: default: ""
+					}
 				}
 			}
 			syslog: {

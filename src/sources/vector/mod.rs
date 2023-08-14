@@ -181,7 +181,9 @@ impl SourceConfig for VectorConfig {
             acknowledgements,
             log_namespace,
         })
-        .accept_compressed(tonic::codec::CompressionEncoding::Gzip);
+        .accept_compressed(tonic::codec::CompressionEncoding::Gzip)
+        // Tonic added a default of 4MB in 0.9. This replaces the old behavior.
+        .max_decoding_message_size(usize::MAX);
 
         let source =
             run_grpc_server(self.address, tls_settings, service, cx.shutdown).map_err(|error| {
@@ -273,15 +275,14 @@ mod test {
 #[cfg(feature = "sinks-vector")]
 #[cfg(test)]
 mod tests {
-    use vector_common::assert_event_data_eq;
-    use vector_core::config::log_schema;
-
     use super::*;
     use crate::{
         config::{SinkConfig as _, SinkContext},
         sinks::vector::VectorConfig as SinkConfig,
         test_util, SourceSender,
     };
+    use vector_common::assert_event_data_eq;
+    use vector_core::config::log_schema;
 
     async fn run_test(vector_source_config_str: &str, addr: SocketAddr) {
         let config = format!(r#"address = "{}""#, addr);
@@ -306,9 +307,10 @@ mod tests {
         sink.run(stream).await.unwrap();
 
         for event in &mut events {
-            event
-                .as_mut_log()
-                .insert(log_schema().source_type_key(), "vector");
+            event.as_mut_log().insert(
+                log_schema().source_type_key_target_path().unwrap(),
+                "vector",
+            );
         }
 
         let output = test_util::collect_ready(rx).await;

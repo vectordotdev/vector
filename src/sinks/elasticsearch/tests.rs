@@ -49,7 +49,7 @@ async fn sets_create_action_when_configured() {
     log.insert("action", "crea");
 
     let mut encoded = vec![];
-    let encoded_size = es
+    let (encoded_size, _json_size) = es
         .request_builder
         .encoder
         .encode_input(
@@ -65,10 +65,25 @@ async fn sets_create_action_when_configured() {
     assert_eq!(encoded.len(), encoded_size);
 }
 
-fn data_stream_body() -> BTreeMap<String, Value> {
+fn data_stream_body(
+    dtype: Option<String>,
+    dataset: Option<String>,
+    namespace: Option<String>,
+) -> BTreeMap<String, Value> {
     let mut ds = BTreeMap::<String, Value>::new();
-    ds.insert("type".into(), Value::from("synthetics"));
-    ds.insert("dataset".into(), Value::from("testing"));
+
+    if let Some(dtype) = dtype {
+        ds.insert("type".into(), Value::from(dtype));
+    }
+
+    if let Some(dataset) = dataset {
+        ds.insert("dataset".into(), Value::from(dataset));
+    }
+
+    if let Some(namespace) = namespace {
+        ds.insert("namespace".into(), Value::from(namespace));
+    }
+
     ds
 }
 
@@ -100,10 +115,17 @@ async fn encode_datastream_mode() {
             .single()
             .expect("invalid timestamp"),
     );
-    log.insert("data_stream", data_stream_body());
+    log.insert(
+        "data_stream",
+        data_stream_body(
+            Some("synthetics".to_string()),
+            Some("testing".to_string()),
+            None,
+        ),
+    );
 
     let mut encoded = vec![];
-    let encoded_size = es
+    let (encoded_size, _json_size) = es
         .request_builder
         .encoder
         .encode_input(
@@ -143,7 +165,14 @@ async fn encode_datastream_mode_no_routing() {
     let es = ElasticsearchCommon::parse_single(&config).await.unwrap();
 
     let mut log = LogEvent::from("hello there");
-    log.insert("data_stream", data_stream_body());
+    log.insert(
+        "data_stream",
+        data_stream_body(
+            Some("synthetics".to_string()),
+            Some("testing".to_string()),
+            None,
+        ),
+    );
     log.insert(
         (
             lookup::PathPrefix::Event,
@@ -154,7 +183,7 @@ async fn encode_datastream_mode_no_routing() {
             .expect("invalid timestamp"),
     );
     let mut encoded = vec![];
-    let encoded_size = es
+    let (encoded_size, _json_size) = es
         .request_builder
         .encoder
         .encode_input(
@@ -287,7 +316,14 @@ async fn encode_datastream_mode_no_sync() {
     let es = ElasticsearchCommon::parse_single(&config).await.unwrap();
 
     let mut log = LogEvent::from("hello there");
-    log.insert("data_stream", data_stream_body());
+    log.insert(
+        "data_stream",
+        data_stream_body(
+            Some("synthetics".to_string()),
+            Some("testing".to_string()),
+            None,
+        ),
+    );
     log.insert(
         (
             lookup::PathPrefix::Event,
@@ -299,7 +335,7 @@ async fn encode_datastream_mode_no_sync() {
     );
 
     let mut encoded = vec![];
-    let encoded_size = es
+    let (encoded_size, _json_size) = es
         .request_builder
         .encoder
         .encode_input(
@@ -339,7 +375,7 @@ async fn allows_using_except_fields() {
     log.insert("idx", "purple");
 
     let mut encoded = vec![];
-    let encoded_size = es
+    let (encoded_size, _json_size) = es
         .request_builder
         .encoder
         .encode_input(
@@ -374,7 +410,7 @@ async fn allows_using_only_fields() {
     log.insert("idx", "purple");
 
     let mut encoded = vec![];
-    let encoded_size = es
+    let (encoded_size, _json_size) = es
         .request_builder
         .encoder
         .encode_input(
@@ -388,4 +424,123 @@ async fn allows_using_only_fields() {
 "#;
     assert_eq!(std::str::from_utf8(&encoded).unwrap(), expected);
     assert_eq!(encoded.len(), encoded_size);
+}
+
+#[tokio::test]
+async fn datastream_index_name() {
+    #[derive(Clone, Debug)]
+    struct TestCase {
+        dtype: Option<String>,
+        namespace: Option<String>,
+        dataset: Option<String>,
+        want: String,
+    }
+
+    let config = ElasticsearchConfig {
+        bulk: BulkConfig {
+            index: parse_template("vector"),
+            ..Default::default()
+        },
+        endpoints: vec![String::from("https://example.com")],
+        mode: ElasticsearchMode::DataStream,
+        api_version: ElasticsearchApiVersion::V6,
+        ..Default::default()
+    };
+    let es = ElasticsearchCommon::parse_single(&config).await.unwrap();
+
+    let test_cases = [
+        TestCase {
+            dtype: Some("type".to_string()),
+            dataset: Some("dataset".to_string()),
+            namespace: Some("namespace".to_string()),
+            want: "type-dataset-namespace".to_string(),
+        },
+        TestCase {
+            dtype: Some("type".to_string()),
+            dataset: Some("".to_string()),
+            namespace: Some("namespace".to_string()),
+            want: "type-namespace".to_string(),
+        },
+        TestCase {
+            dtype: Some("type".to_string()),
+            dataset: None,
+            namespace: Some("namespace".to_string()),
+            want: "type-generic-namespace".to_string(),
+        },
+        TestCase {
+            dtype: Some("type".to_string()),
+            dataset: Some("".to_string()),
+            namespace: Some("".to_string()),
+            want: "type".to_string(),
+        },
+        TestCase {
+            dtype: Some("type".to_string()),
+            dataset: None,
+            namespace: None,
+            want: "type-generic-default".to_string(),
+        },
+        TestCase {
+            dtype: Some("".to_string()),
+            dataset: Some("".to_string()),
+            namespace: Some("".to_string()),
+            want: "".to_string(),
+        },
+        TestCase {
+            dtype: None,
+            dataset: None,
+            namespace: None,
+            want: "logs-generic-default".to_string(),
+        },
+        TestCase {
+            dtype: Some("".to_string()),
+            dataset: Some("dataset".to_string()),
+            namespace: Some("namespace".to_string()),
+            want: "dataset-namespace".to_string(),
+        },
+        TestCase {
+            dtype: None,
+            dataset: Some("dataset".to_string()),
+            namespace: Some("namespace".to_string()),
+            want: "logs-dataset-namespace".to_string(),
+        },
+        TestCase {
+            dtype: Some("".to_string()),
+            dataset: Some("".to_string()),
+            namespace: Some("namespace".to_string()),
+            want: "namespace".to_string(),
+        },
+        TestCase {
+            dtype: None,
+            dataset: None,
+            namespace: Some("namespace".to_string()),
+            want: "logs-generic-namespace".to_string(),
+        },
+        TestCase {
+            dtype: Some("".to_string()),
+            dataset: Some("dataset".to_string()),
+            namespace: Some("".to_string()),
+            want: "dataset".to_string(),
+        },
+        TestCase {
+            dtype: None,
+            dataset: Some("dataset".to_string()),
+            namespace: None,
+            want: "logs-dataset-default".to_string(),
+        },
+    ];
+
+    for test_case in test_cases {
+        let mut log = LogEvent::from("hello there");
+        log.insert(
+            "data_stream",
+            data_stream_body(
+                test_case.dtype.clone(),
+                test_case.dataset.clone(),
+                test_case.namespace.clone(),
+            ),
+        );
+
+        let processed_event = process_log(log, &es.mode, &None, &config.encoding).unwrap();
+        assert_eq!(processed_event.index, test_case.want, "{test_case:?}");
+    }
 }

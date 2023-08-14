@@ -143,12 +143,12 @@ fn map_timestamp(mut events: EventArray) -> EventArray {
     match &mut events {
         EventArray::Logs(logs) => {
             for log in logs {
-                if let Some(path) = log.timestamp_path() {
-                    log.rename_key(path.as_str(), "@timestamp");
+                if let Some(path) = log.timestamp_path().cloned().as_ref() {
+                    log.rename_key(path, "@timestamp");
                 }
 
-                if let Some(path) = log.host_path() {
-                    log.rename_key(path.as_str(), "os.host");
+                if let Some(path) = log.host_path().cloned().as_ref() {
+                    log.rename_key(path, "os.host");
                 }
             }
         }

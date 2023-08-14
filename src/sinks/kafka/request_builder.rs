@@ -37,8 +37,6 @@ impl KafkaRequestBuilder {
             })
             .ok()?;
 
-        let metadata_builder = RequestMetadataBuilder::from_event(&event);
-
         let metadata = KafkaRequestMetadata {
             finalizers: event.take_finalizers(),
             key: get_key(&event, &self.key_field),
@@ -48,6 +46,10 @@ impl KafkaRequestBuilder {
         };
         self.transformer.transform(&mut event);
         let mut body = BytesMut::new();
+
+        // Ensure the metadata builder is built after transforming the event so we have the event
+        // size taking into account any dropped fields.
+        let metadata_builder = RequestMetadataBuilder::from_event(&event);
         self.encoder.encode(event, &mut body).ok()?;
         let body = body.freeze();
 

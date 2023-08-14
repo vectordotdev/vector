@@ -45,7 +45,7 @@ async fn insert_events() {
 
     let config = ClickhouseConfig {
         endpoint: host.parse().unwrap(),
-        table: table.clone(),
+        table: table.clone().try_into().unwrap(),
         compression: Compression::None,
         batch,
         request: TowerRequestConfig {
@@ -94,7 +94,7 @@ async fn skip_unknown_fields() {
 
     let config = ClickhouseConfig {
         endpoint: host.parse().unwrap(),
-        table: table.clone(),
+        table: table.clone().try_into().unwrap(),
         skip_unknown_fields: true,
         compression: Compression::None,
         batch,
@@ -140,7 +140,7 @@ async fn insert_events_unix_timestamps() {
 
     let config = ClickhouseConfig {
         endpoint: host.parse().unwrap(),
-        table: table.clone(),
+        table: table.clone().try_into().unwrap(),
         compression: Compression::None,
         encoding: Transformer::new(None, None, Some(TimestampFormat::Unix)).unwrap(),
         batch,
@@ -178,10 +178,7 @@ async fn insert_events_unix_timestamps() {
         format!(
             "{}",
             exp_event
-                .get((
-                    lookup::PathPrefix::Event,
-                    log_schema().timestamp_key().unwrap()
-                ))
+                .get_timestamp()
                 .unwrap()
                 .as_timestamp()
                 .unwrap()
@@ -242,10 +239,7 @@ timestamp_format = "unix""#,
         format!(
             "{}",
             exp_event
-                .get((
-                    lookup::PathPrefix::Event,
-                    log_schema().timestamp_key().unwrap()
-                ))
+                .get_timestamp()
                 .unwrap()
                 .as_timestamp()
                 .unwrap()
@@ -269,7 +263,7 @@ async fn no_retry_on_incorrect_data() {
 
     let config = ClickhouseConfig {
         endpoint: host.parse().unwrap(),
-        table: table.clone(),
+        table: table.clone().try_into().unwrap(),
         compression: Compression::None,
         batch,
         ..Default::default()
@@ -320,7 +314,7 @@ async fn no_retry_on_incorrect_data_warp() {
 
     let config = ClickhouseConfig {
         endpoint: host.parse().unwrap(),
-        table: gen_table(),
+        table: gen_table().try_into().unwrap(),
         batch,
         ..Default::default()
     };
@@ -336,6 +330,70 @@ async fn no_retry_on_incorrect_data_warp() {
         .unwrap();
 
     assert_eq!(receiver.try_recv(), Ok(BatchStatus::Rejected));
+}
+
+#[tokio::test]
+async fn templated_table() {
+    trace_init();
+
+    let n_tables = 2;
+    let table_events: Vec<(String, Event, BatchStatusReceiver)> = (0..n_tables)
+        .map(|_| {
+            let table = gen_table();
+            let (mut event, receiver) = make_event();
+            event.as_mut_log().insert("table", table.as_str());
+            (table, event, receiver)
+        })
+        .collect();
+
+    let host = clickhouse_address();
+
+    let mut batch = BatchConfig::default();
+    batch.max_events = Some(1);
+
+    let config = ClickhouseConfig {
+        endpoint: host.parse().unwrap(),
+        table: "{{ .table }}".try_into().unwrap(),
+        batch,
+        ..Default::default()
+    };
+
+    let client = ClickhouseClient::new(host);
+    for (table, _, _) in &table_events {
+        client
+            .create_table(
+                table,
+                "host String, timestamp String, message String, table String",
+            )
+            .await;
+    }
+
+    let (sink, _hc) = config.build(SinkContext::default()).await.unwrap();
+
+    let events: Vec<Event> = table_events
+        .iter()
+        .map(|(_, event, _)| event.clone())
+        .collect();
+    run_and_assert_sink_compliance(sink, stream::iter(events), &SINK_TAGS).await;
+
+    for (table, event, mut receiver) in table_events {
+        let output = client.select_all(&table).await;
+        assert_eq!(1, output.rows, "table {} should have 1 row", table);
+
+        let expected = serde_json::to_value(event.into_log()).unwrap();
+        assert_eq!(
+            expected, output.data[0],
+            "table \"{}\"'s one row should have the correct data",
+            table
+        );
+
+        assert_eq!(
+            receiver.try_recv(),
+            Ok(BatchStatus::Delivered),
+            "table \"{}\"'s event should have been delivered",
+            table
+        );
+    }
 }
 
 fn make_event() -> (Event, BatchStatusReceiver) {

@@ -2,7 +2,7 @@ use bytes::Bytes;
 use codecs::{encoding::Framer, JsonSerializerConfig, NewlineDelimitedEncoderConfig};
 
 use super::service::{ClickhouseRequest, ClickhouseRetryLogic, ClickhouseService};
-use crate::{internal_events::SinkRequestBuildError, sinks::prelude::*};
+use crate::sinks::prelude::*;
 
 pub struct ClickhouseSink {
     batch_settings: BatcherSettings,
@@ -10,6 +10,8 @@ pub struct ClickhouseSink {
     encoding: (Transformer, Encoder<Framer>),
     service: Svc<ClickhouseService, ClickhouseRetryLogic>,
     protocol: &'static str,
+    database: Template,
+    table: Template,
 }
 
 impl ClickhouseSink {
@@ -19,6 +21,8 @@ impl ClickhouseSink {
         transformer: Transformer,
         service: Svc<ClickhouseService, ClickhouseRetryLogic>,
         protocol: &'static str,
+        database: Template,
+        table: Template,
     ) -> Self {
         Self {
             batch_settings,
@@ -26,18 +30,24 @@ impl ClickhouseSink {
             encoding: (
                 transformer,
                 Encoder::<Framer>::new(
-                    NewlineDelimitedEncoderConfig::default().build().into(),
+                    NewlineDelimitedEncoderConfig.build().into(),
                     JsonSerializerConfig::default().build().into(),
                 ),
             ),
             service,
             protocol,
+            database,
+            table,
         }
     }
 
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         input
-            .batched(self.batch_settings.into_byte_size_config())
+            .batched_partitioned(
+                KeyPartitioner::new(self.database, self.table),
+                self.batch_settings,
+            )
+            .filter_map(|(key, batch)| async move { key.map(move |k| (k, batch)) })
             .request_builder(
                 None,
                 ClickhouseRequestBuilder {
@@ -76,8 +86,8 @@ struct ClickhouseRequestBuilder {
     encoding: (Transformer, Encoder<Framer>),
 }
 
-impl RequestBuilder<Vec<Event>> for ClickhouseRequestBuilder {
-    type Metadata = EventFinalizers;
+impl RequestBuilder<(PartitionKey, Vec<Event>)> for ClickhouseRequestBuilder {
+    type Metadata = (PartitionKey, EventFinalizers);
     type Events = Vec<Event>;
     type Encoder = (Transformer, Encoder<Framer>);
     type Payload = Bytes;
@@ -94,11 +104,13 @@ impl RequestBuilder<Vec<Event>> for ClickhouseRequestBuilder {
 
     fn split_input(
         &self,
-        mut events: Vec<Event>,
+        input: (PartitionKey, Vec<Event>),
     ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
+        let (key, mut events) = input;
+
         let finalizers = events.take_finalizers();
         let builder = RequestMetadataBuilder::from_events(&events);
-        (finalizers, builder, events)
+        ((key, finalizers), builder, events)
     }
 
     fn build_request(
@@ -107,11 +119,57 @@ impl RequestBuilder<Vec<Event>> for ClickhouseRequestBuilder {
         request_metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
+        let (key, finalizers) = metadata;
         ClickhouseRequest {
+            database: key.database,
+            table: key.table,
             body: payload.into_payload(),
             compression: self.compression,
-            finalizers: metadata,
+            finalizers,
             metadata: request_metadata,
         }
+    }
+}
+
+/// PartitionKey used to partition events by (database, table) pair.
+#[derive(Hash, Eq, PartialEq, Clone, Debug)]
+struct PartitionKey {
+    database: String,
+    table: String,
+}
+
+/// KeyPartitioner that partitions events by (database, table) pair.
+struct KeyPartitioner {
+    database: Template,
+    table: Template,
+}
+
+impl KeyPartitioner {
+    const fn new(database: Template, table: Template) -> Self {
+        Self { database, table }
+    }
+
+    fn render(template: &Template, item: &Event, field: &'static str) -> Option<String> {
+        template
+            .render_string(item)
+            .map_err(|error| {
+                emit!(TemplateRenderingError {
+                    error,
+                    field: Some(field),
+                    drop_event: true,
+                });
+            })
+            .ok()
+    }
+}
+
+impl Partitioner for KeyPartitioner {
+    type Item = Event;
+    type Key = Option<PartitionKey>;
+
+    fn partition(&self, item: &Self::Item) -> Self::Key {
+        let database = Self::render(&self.database, item, "database_key")?;
+        let table = Self::render(&self.table, item, "table_key")?;
+        Some(PartitionKey { database, table })
     }
 }

@@ -3,6 +3,7 @@ use std::sync::Arc;
 #[cfg(feature = "enterprise")]
 use futures_util::future::BoxFuture;
 use futures_util::FutureExt as _;
+
 use tokio::sync::{Mutex, MutexGuard};
 
 #[cfg(feature = "api")]
@@ -14,7 +15,8 @@ use crate::config::enterprise::{
 use crate::internal_events::{
     VectorConfigLoadError, VectorRecoveryError, VectorReloadError, VectorReloaded,
 };
-use crate::{config, topology::RunningTopology};
+
+use crate::{config, signal::ShutdownError, topology::RunningTopology};
 
 #[derive(Clone, Debug)]
 pub struct SharedTopologyController(Arc<Mutex<TopologyController>>);
@@ -52,12 +54,13 @@ impl std::fmt::Debug for TopologyController {
     }
 }
 
+#[derive(Clone, Debug)]
 pub enum ReloadOutcome {
     NoConfig,
     MissingApiKey,
     Success,
     RolledBack,
-    FatalError,
+    FatalError(ShutdownError),
 }
 
 impl TopologyController {
@@ -93,6 +96,42 @@ impl TopologyController {
             }
         }
 
+        // Start the api server or disable it, if necessary
+        #[cfg(feature = "api")]
+        if !new_config.api.enabled {
+            if let Some(server) = self.api_server.take() {
+                debug!("Dropping api server.");
+                drop(server)
+            }
+        } else if self.api_server.is_none() {
+            use crate::internal_events::ApiStarted;
+            use std::sync::atomic::AtomicBool;
+            use tokio::runtime::Handle;
+
+            debug!("Starting api server.");
+
+            self.api_server = match api::Server::start(
+                self.topology.config(),
+                self.topology.watch(),
+                Arc::<AtomicBool>::clone(&self.topology.running),
+                &Handle::current(),
+            ) {
+                Ok(api_server) => {
+                    emit!(ApiStarted {
+                        addr: new_config.api.address.unwrap(),
+                        playground: new_config.api.playground
+                    });
+
+                    Some(api_server)
+                }
+                Err(error) => {
+                    let error = error.to_string();
+                    error!("An error occurred that Vector couldn't handle: {}.", error);
+                    return ReloadOutcome::FatalError(ShutdownError::ApiFailed { error });
+                }
+            }
+        }
+
         match self.topology.reload_config_and_respawn(new_config).await {
             Ok(true) => {
                 #[cfg(feature = "api")]
@@ -114,7 +153,7 @@ impl TopologyController {
             Err(()) => {
                 emit!(VectorReloadError);
                 emit!(VectorRecoveryError);
-                ReloadOutcome::FatalError
+                ReloadOutcome::FatalError(ShutdownError::ReloadFailedToRestore)
             }
         }
     }

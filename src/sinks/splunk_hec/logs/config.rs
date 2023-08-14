@@ -17,7 +17,7 @@ use crate::{
     sinks::{
         splunk_hec::common::{
             acknowledgements::HecClientAcknowledgementsConfig,
-            build_healthcheck, build_http_batch_service, create_client, host_key,
+            build_healthcheck, build_http_batch_service, config_host_key, create_client,
             service::{HecService, HttpRequestBuilder},
             EndpointTarget, SplunkHecDefaultBatchSettings,
         },
@@ -64,8 +64,8 @@ pub struct HecLogsSinkConfig {
     ///
     /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
     #[configurable(metadata(docs::advanced))]
-    #[serde(default = "host_key")]
-    pub host_key: String,
+    #[serde(default = "config_host_key")]
+    pub host_key: OptionalValuePath,
 
     /// Fields to be [added to Splunk index][splunk_field_index_docs].
     ///
@@ -165,7 +165,7 @@ impl GenerateConfig for HecLogsSinkConfig {
         toml::Value::try_from(Self {
             default_token: "${VECTOR_SPLUNK_HEC_TOKEN}".to_owned().into(),
             endpoint: "endpoint".to_owned(),
-            host_key: host_key(),
+            host_key: config_host_key(),
             indexed_fields: vec![],
             index: None,
             sourcetype: None,
@@ -273,7 +273,7 @@ impl HecLogsSinkConfig {
             source: self.source.clone(),
             index: self.index.clone(),
             indexed_fields: self.indexed_fields.clone(),
-            host: self.host_key.clone(),
+            host_key: self.host_key.path.clone(),
             timestamp_nanos_key: self.timestamp_nanos_key.clone(),
             timestamp_key: self.timestamp_key.path.clone(),
             endpoint_target: self.endpoint_target,

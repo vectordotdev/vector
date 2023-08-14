@@ -1,3 +1,4 @@
+use crate::gelf::GELF_TARGET_PATHS;
 use crate::{gelf_fields::*, VALID_FIELD_REGEX};
 use bytes::{BufMut, BytesMut};
 use lookup::event_path;
@@ -130,21 +131,21 @@ fn coerce_required_fields(mut log: LogEvent) -> vector_common::Result<LogEvent> 
     }
 
     // add the VERSION if it does not exist
-    if !log.contains(VERSION) {
-        log.insert(VERSION, GELF_VERSION);
+    if !log.contains(&GELF_TARGET_PATHS.version) {
+        log.insert(&GELF_TARGET_PATHS.version, GELF_VERSION);
     }
 
-    if !log.contains(HOST) {
+    if !log.contains(&GELF_TARGET_PATHS.host) {
         err_missing_field(HOST)?;
     }
 
-    let message_key = log_schema().message_key();
-    if !log.contains(SHORT_MESSAGE) {
-        // rename the log_schema().message_key() to SHORT_MESSAGE
-        if log.contains(message_key) {
-            log.rename_key(message_key, SHORT_MESSAGE);
-        } else {
-            err_missing_field(SHORT_MESSAGE)?;
+    if !log.contains(&GELF_TARGET_PATHS.short_message) {
+        if let Some(message_key) = log_schema().message_key_target_path() {
+            if log.contains(message_key) {
+                log.rename_key(message_key, &GELF_TARGET_PATHS.short_message);
+            } else {
+                err_missing_field(SHORT_MESSAGE)?;
+            }
         }
     }
     Ok(log)
@@ -329,7 +330,7 @@ mod tests {
             let event_fields = btreemap! {
                 VERSION => "1.1",
                 HOST => "example.org",
-                log_schema().message_key() => "Some message",
+                log_schema().message_key().unwrap().to_string() => "Some message",
             };
 
             let jsn = do_serialize(true, event_fields).unwrap();

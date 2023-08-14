@@ -8,10 +8,7 @@ use codecs::{
     StreamDecodingError,
 };
 use futures::{channel::mpsc, executor, SinkExt, StreamExt};
-use lookup::{
-    lookup_v2::{parse_value_path, OptionalValuePath},
-    owned_value_path, path, OwnedValuePath,
-};
+use lookup::{lookup_v2::OptionalValuePath, owned_value_path, path, OwnedValuePath};
 use tokio_util::{codec::FramedRead, io::StreamReader};
 use vector_common::internal_event::{
     ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol,
@@ -53,10 +50,10 @@ pub trait FileDescriptorConfig: NamedComponent {
     where
         R: Send + io::BufRead + 'static,
     {
-        let host_key = self.host_key().map_or_else(
-            || parse_value_path(log_schema().host_key()).ok(),
-            |k| k.path,
-        );
+        let host_key = self
+            .host_key()
+            .and_then(|k| k.path)
+            .or(log_schema().host_key().cloned());
         let hostname = crate::get_hostname().ok();
 
         let description = self.description();
@@ -65,7 +62,7 @@ pub trait FileDescriptorConfig: NamedComponent {
         let framing = self
             .framing()
             .unwrap_or_else(|| decoding.default_stream_framing());
-        let decoder = DecodingConfig::new(framing, decoding, log_namespace).build();
+        let decoder = DecodingConfig::new(framing, decoding, log_namespace).build()?;
 
         let (sender, receiver) = mpsc::channel(1024);
 
@@ -211,17 +208,14 @@ fn outputs(
     decoding: &DeserializerConfig,
     source_name: &'static str,
 ) -> Vec<SourceOutput> {
-    let legacy_host_key = Some(LegacyKey::InsertIfEmpty(
-        host_key.clone().and_then(|k| k.path).unwrap_or_else(|| {
-            parse_value_path(log_schema().host_key()).expect("log_schema.host_key to be valid path")
-        }),
-    ));
-
     let schema_definition = decoding
         .schema_definition(log_namespace)
         .with_source_metadata(
             source_name,
-            legacy_host_key,
+            host_key
+                .clone()
+                .map_or(log_schema().host_key().cloned(), |key| key.path)
+                .map(LegacyKey::Overwrite),
             &owned_value_path!("host"),
             Kind::bytes(),
             Some("host"),

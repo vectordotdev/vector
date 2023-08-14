@@ -67,9 +67,12 @@ fn basic_config_with_sink_failing_healthcheck() -> Config {
 }
 
 fn into_message(event: Event) -> String {
+    let message_key = crate::config::log_schema()
+        .message_key_target_path()
+        .unwrap();
     event
         .as_log()
-        .get(crate::config::log_schema().message_key())
+        .get(message_key)
         .unwrap()
         .to_string_lossy()
         .into_owned()
@@ -120,7 +123,10 @@ async fn topology_shutdown_while_active() {
         .flat_map(EventArray::into_events)
     {
         assert_eq!(
-            event.as_log()[&crate::config::log_schema().message_key()],
+            event.as_log()[&crate::config::log_schema()
+                .message_key()
+                .unwrap()
+                .to_string()],
             "test transformed".to_owned().into()
         );
     }
@@ -598,7 +604,6 @@ async fn topology_swap_sink() {
     assert_eq!(vec![event1], res2);
 }
 
-#[ignore] // TODO: issue #2186
 #[tokio::test]
 async fn topology_swap_transform_is_atomic() {
     trace_init();

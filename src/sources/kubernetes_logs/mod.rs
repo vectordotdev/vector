@@ -897,7 +897,7 @@ fn create_event(
     ingestion_timestamp_field: Option<&OwnedTargetPath>,
     log_namespace: LogNamespace,
 ) -> Event {
-    let deserializer = BytesDeserializer::new();
+    let deserializer = BytesDeserializer;
     let mut log = deserializer.parse_single(line, log_namespace);
 
     log_namespace.insert_source_metadata(
@@ -910,7 +910,7 @@ fn create_event(
 
     log_namespace.insert_vector_metadata(
         &mut log,
-        Some(log_schema().source_type_key()),
+        log_schema().source_type_key(),
         path!("source_type"),
         Bytes::from(Config::NAME),
     );

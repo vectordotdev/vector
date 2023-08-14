@@ -37,6 +37,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.merge_group.head_sha || github.sha }}
   cancel-in-progress: true
 
+env:
+  SINGLE_MACHINE_PERFORMANCE_API: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_API }}
+
 jobs:
 
   # Only run this workflow if files changed in areas that could possibly introduce a regression
@@ -229,8 +232,8 @@ jobs:
           export REPLICAS="10"
           export TOTAL_SAMPLES="600"
           export P_VALUE="0.1"
-          export SMP_CRATE_VERSION="0.7.3"
-          export LADING_VERSION="0.12.0"
+          export SMP_CRATE_VERSION="0.10.0"
+          export LADING_VERSION="0.18.0"
 
           echo "warmup seconds: ${WARMUP_SECONDS}"
           echo "replicas: ${REPLICAS}"
@@ -295,7 +298,7 @@ jobs:
 
       - name: Set up Docker Buildx
         id: buildx
-        uses: docker/setup-buildx-action@v2.9.0
+        uses: docker/setup-buildx-action@v2.9.1
 
       - name: Build 'vector' target image
         uses: docker/build-push-action@v4.1.1
@@ -332,7 +335,7 @@ jobs:
 
       - name: Set up Docker Buildx
         id: buildx
-        uses: docker/setup-buildx-action@v2.9.0
+        uses: docker/setup-buildx-action@v2.9.1
 
       - name: Build 'vector' target image
         uses: docker/build-push-action@v4.1.1

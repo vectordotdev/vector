@@ -314,7 +314,7 @@ fn remove_duplicates(mut list: Vec<String>, list_name: &str) -> Vec<String> {
 #[typetag::serde(name = "http_server")]
 impl SourceConfig for SimpleHttpConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
-        let decoder = self.get_decoding_config()?.build();
+        let decoder = self.get_decoding_config()?.build()?;
         let log_namespace = cx.log_namespace(self.log_namespace);
 
         let source = SimpleHttpSource {
@@ -654,15 +654,10 @@ mod tests {
         {
             let event = events.remove(0);
             let log = event.as_log();
-            assert_eq!(log[log_schema().message_key()], "test body".into());
-            assert!(log
-                .get((
-                    lookup::PathPrefix::Event,
-                    log_schema().timestamp_key().unwrap()
-                ))
-                .is_some());
+            assert_eq!(*log.get_message().unwrap(), "test body".into());
+            assert!(log.get_timestamp().is_some());
             assert_eq!(
-                log[log_schema().source_type_key()],
+                *log.get_source_type().unwrap(),
                 SimpleHttpConfig::NAME.into()
             );
             assert_eq!(log["http_path"], "/".into());
@@ -671,7 +666,7 @@ mod tests {
         {
             let event = events.remove(0);
             let log = event.as_log();
-            assert_eq!(log[log_schema().message_key()], "test body 2".into());
+            assert_eq!(*log.get_message().unwrap(), "test body 2".into());
             assert_event_metadata(log).await;
         }
     }
@@ -703,13 +698,13 @@ mod tests {
         {
             let event = events.remove(0);
             let log = event.as_log();
-            assert_eq!(log[log_schema().message_key()], "test body".into());
+            assert_eq!(*log.get_message().unwrap(), "test body".into());
             assert_event_metadata(log).await;
         }
         {
             let event = events.remove(0);
             let log = event.as_log();
-            assert_eq!(log[log_schema().message_key()], "test body 2".into());
+            assert_eq!(*log.get_message().unwrap(), "test body 2".into());
             assert_event_metadata(log).await;
         }
     }
@@ -742,7 +737,7 @@ mod tests {
         {
             let event = events.remove(0);
             let log = event.as_log();
-            assert_eq!(log[log_schema().message_key()], "foo\nbar".into());
+            assert_eq!(*log.get_message().unwrap(), "foo\nbar".into());
             assert_event_metadata(log).await;
         }
     }
@@ -779,22 +774,8 @@ mod tests {
         })
         .await;
 
-        assert!(events
-            .remove(1)
-            .as_log()
-            .get((
-                lookup::PathPrefix::Event,
-                log_schema().timestamp_key().unwrap()
-            ))
-            .is_some());
-        assert!(events
-            .remove(0)
-            .as_log()
-            .get((
-                lookup::PathPrefix::Event,
-                log_schema().timestamp_key().unwrap()
-            ))
-            .is_some());
+        assert!(events.remove(1).as_log().get_timestamp().is_some());
+        assert!(events.remove(0).as_log().get_timestamp().is_some());
     }
 
     #[tokio::test]
@@ -952,16 +933,17 @@ mod tests {
     }
 
     async fn assert_event_metadata(log: &LogEvent) {
-        assert!(log
+        assert!(log.get_timestamp().is_some());
+
+        let source_type_key_value = log
             .get((
                 lookup::PathPrefix::Event,
-                log_schema().timestamp_key().unwrap()
+                log_schema().source_type_key().unwrap(),
             ))
-            .is_some());
-        assert_eq!(
-            log[log_schema().source_type_key()],
-            SimpleHttpConfig::NAME.into()
-        );
+            .unwrap()
+            .as_str()
+            .unwrap();
+        assert_eq!(source_type_key_value, SimpleHttpConfig::NAME);
         assert_eq!(log["http_path"], "/".into());
     }
 
@@ -1088,7 +1070,7 @@ mod tests {
         {
             let event = events.remove(0);
             let log = event.as_log();
-            assert_eq!(log[log_schema().message_key()], "test body".into());
+            assert_eq!(*log.get_message().unwrap(), "test body".into());
             assert_event_metadata(log).await;
         }
     }
@@ -1124,14 +1106,9 @@ mod tests {
             let log = event.as_log();
             assert_eq!(log["key1"], "value1".into());
             assert_eq!(log["vector_http_path"], "/event/path".into());
-            assert!(log
-                .get((
-                    lookup::PathPrefix::Event,
-                    log_schema().timestamp_key().unwrap()
-                ))
-                .is_some());
+            assert!(log.get_timestamp().is_some());
             assert_eq!(
-                log[log_schema().source_type_key()],
+                *log.get_source_type().unwrap(),
                 SimpleHttpConfig::NAME.into()
             );
         }
@@ -1177,14 +1154,9 @@ mod tests {
             let log = event.as_log();
             assert_eq!(log["key1"], "value1".into());
             assert_eq!(log["vector_http_path"], "/event/path1".into());
-            assert!(log
-                .get((
-                    lookup::PathPrefix::Event,
-                    log_schema().timestamp_key().unwrap()
-                ))
-                .is_some());
+            assert!(log.get_timestamp().is_some());
             assert_eq!(
-                log[log_schema().source_type_key()],
+                *log.get_source_type().unwrap(),
                 SimpleHttpConfig::NAME.into()
             );
         }
@@ -1193,14 +1165,9 @@ mod tests {
             let log = event.as_log();
             assert_eq!(log["key2"], "value2".into());
             assert_eq!(log["vector_http_path"], "/event/path2".into());
-            assert!(log
-                .get((
-                    lookup::PathPrefix::Event,
-                    log_schema().timestamp_key().unwrap()
-                ))
-                .is_some());
+            assert!(log.get_timestamp().is_some());
             assert_eq!(
-                log[log_schema().source_type_key()],
+                *log.get_source_type().unwrap(),
                 SimpleHttpConfig::NAME.into()
             );
         }
