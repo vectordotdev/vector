@@ -1,3 +1,6 @@
+//! `NATS` sink
+//! Publishes data using [NATS](nats.io)(Neural Autonomic Transport System).
+
 use snafu::Snafu;
 
 use crate::{nats::NatsConfigError, sinks::prelude::*};

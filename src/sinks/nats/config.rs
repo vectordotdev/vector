@@ -10,10 +10,6 @@ use crate::{
 
 use super::{sink::NatsSink, ConfigSnafu, ConnectSnafu, NatsError};
 
-/**
- * Code dealing with the SinkConfig struct.
- */
-
 /// Configuration for the `nats` sink.
 #[configurable_component(sink(
     "nats",
