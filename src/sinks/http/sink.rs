@@ -5,7 +5,9 @@ use crate::sinks::{
     util::http_service::{HttpRetryLogic, HttpService},
 };
 
-use super::{request_builder::HttpRequestBuilder, service::HttpSinkRequestBuilder};
+use super::{
+    batch::HttpBatchSizer, request_builder::HttpRequestBuilder, service::HttpSinkRequestBuilder,
+};
 
 pub(super) struct HttpSink {
     service: Svc<HttpService<HttpSinkRequestBuilder>, HttpRetryLogic>,
@@ -29,8 +31,10 @@ impl HttpSink {
 
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         input
-            // Batch the input stream with byte size calculation.
-            .batched(self.batch_settings.into_byte_size_config())
+            // Batch the input stream with size calculation dependent on the configured codec
+            .batched(self.batch_settings.into_item_size_config(HttpBatchSizer {
+                encoder: self.request_builder.encoder.encoder.clone(),
+            }))
             // Build requests with no concurrency limit.
             .request_builder(None, self.request_builder)
             // Filter out any errors that occurred in the request building.
