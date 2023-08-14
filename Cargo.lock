@@ -10601,3 +10601,8 @@ dependencies = [
  "libc",
  "pkg-config",
 ]
+
+[[patch.unused]]
+name = "ed25519-dalek"
+version = "2.0.0-rc.3"
+source = "git+https://github.com/dalek-cryptography/ed25519-dalek.git?tag=2.0.0-rc.3#58a967f6fb28806a21180c880bbec4fdeb907aef"

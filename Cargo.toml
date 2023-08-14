@@ -386,6 +386,7 @@ ntapi = { git = "https://github.com/MSxDOS/ntapi.git", rev = "24fc1e47677fc9f6e3
 # version of that crate with the appropriate dependency patched in.
 openssl-sys = { git = "https://github.com/vectordotdev/rust-openssl.git", tag = "openssl-sys-v0.9.91+3.0.0" }
 openssl-src = { git = "https://github.com/vectordotdev/openssl-src-rs.git", tag = "release-300-force-engine+3.1.2"}
+ed25519-dalek = { git= "https://github.com/dalek-cryptography/ed25519-dalek.git", tag = "2.0.0-rc.3", default-features = false, features = ["u64_backend"] }
 
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin
