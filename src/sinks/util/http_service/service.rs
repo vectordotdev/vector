@@ -79,6 +79,7 @@ where
     fn call(&mut self, request: HttpRequest) -> Self::Future {
         // for internal metrics reporting
         let raw_byte_size = request.payload.len();
+
         let events_byte_size = request
             .request_metadata
             .into_events_estimated_json_encoded_byte_size();
