@@ -779,10 +779,6 @@ impl Source {
 
         let (file_source_tx, file_source_rx) = futures::channel::mpsc::channel::<Vec<Line>>(2);
 
-        // let partial_events_merger = Box::new(Optional(
-        //     auto_partial_merge.then(|| partial_events_merger::build(log_namespace)),
-        // ));
-
         let checkpoints = checkpointer.view();
         let events = file_source_rx.flat_map(futures::stream::iter);
         let bytes_received = register!(BytesReceived::from(Protocol::HTTP));
@@ -796,10 +792,8 @@ impl Source {
                 ingestion_timestamp_field.as_ref(),
                 log_namespace,
             );
-            // println!("Event created: {:?}", event);
-            let file_info = annotator.annotate(&mut event, &line.filename);
 
-            // println!("Annotation file info: {:?}", file_info);
+            let file_info = annotator.annotate(&mut event, &line.filename);
 
             emit!(KubernetesLogsEventsReceived {
                 file: &line.filename,
@@ -848,9 +842,12 @@ impl Source {
             });
         let (events_count, _) = events.size_hint();
 
-        let mut stream = merge_partial_events(events, log_namespace);
+        let mut stream = if auto_partial_merge {
+            merge_partial_events(events, log_namespace).left_stream()
+        } else {
+            events.right_stream()
+        };
 
-        // let mut stream = partial_events_merger.transform(Box::pin(events));
         let event_processing_loop = out.send_event_stream(&mut stream);
 
         let mut lifecycle = Lifecycle::new();
