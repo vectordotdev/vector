@@ -3,7 +3,6 @@ use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
 use vector_core::ByteSizeOf;
 
 use crate::codecs::EncodingConfig;
-use crate::sinks::aws_s_s::config::MessageIdConfig;
 use crate::{
     codecs::{Encoder, Transformer},
     event::{Event, EventFinalizers, Finalizable},
@@ -30,15 +29,19 @@ pub struct SSRequestBuilder {
 }
 
 impl SSRequestBuilder {
-    pub fn new(config: MessageIdConfig, encoding_config: EncodingConfig) -> crate::Result<Self> {
+    pub fn new(
+        message_group_id: Option<Template>,
+        message_deduplication_id: Option<Template>,
+        encoding_config: EncodingConfig,
+    ) -> crate::Result<Self> {
         let transformer = encoding_config.transformer();
         let serializer = encoding_config.build()?;
         let encoder = Encoder::<()>::new(serializer);
 
         Ok(Self {
             encoder: (transformer, encoder),
-            message_group_id: config.message_group_id()?,
-            message_deduplication_id: config.message_deduplication_id()?,
+            message_group_id,
+            message_deduplication_id,
         })
     }
 }

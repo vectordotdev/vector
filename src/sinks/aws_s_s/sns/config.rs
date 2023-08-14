@@ -6,7 +6,8 @@ use crate::config::{
 use vector_config::configurable_component;
 
 use super::{
-    client::SnsMessagePublisher, BaseSSSinkConfig, MessageIdConfig, SSRequestBuilder, SSSink,
+    client::SnsMessagePublisher, message_deduplication_id, message_group_id, BaseSSSinkConfig,
+    SSRequestBuilder, SSSink,
 };
 use crate::aws::create_client;
 use crate::aws::ClientBuilder;
@@ -65,14 +66,20 @@ impl SinkConfig for SnsSinkConfig {
         let publisher = SnsMessagePublisher::new(client.clone(), self.topic_arn.clone());
 
         let healthcheck = Box::pin(healthcheck(client.clone(), self.topic_arn.clone()));
-        let config = MessageIdConfig::new(
+
+        let message_group_id = message_group_id(
             self.base_config.message_group_id.clone(),
-            self.base_config.message_deduplication_id.clone(),
             self.topic_arn.ends_with(".fifo"),
         );
+        let message_deduplication_id =
+            message_deduplication_id(self.base_config.message_deduplication_id.clone());
 
         let sink = SSSink::new(
-            SSRequestBuilder::new(config.clone(), self.base_config.encoding.clone())?,
+            SSRequestBuilder::new(
+                message_group_id?,
+                message_deduplication_id?,
+                self.base_config.encoding.clone(),
+            )?,
             self.base_config.request.clone(),
             publisher,
         )?;

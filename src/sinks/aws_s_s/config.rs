@@ -87,41 +87,24 @@ pub enum Encoding {
     Json,
 }
 
-#[derive(Clone, Debug)]
-pub struct MessageIdConfig {
+pub fn message_group_id(
     message_group_id: Option<String>,
-    message_deduplication_id: Option<String>,
     fifo: bool,
+) -> crate::Result<Option<Template>> {
+    match (message_group_id.as_ref(), fifo) {
+        (Some(value), true) => Ok(Some(
+            Template::try_from(value.clone()).context(TopicTemplateSnafu)?,
+        )),
+        (Some(_), false) => Err(Box::new(BuildError::MessageGroupIdNotAllowed)),
+        (None, true) => Err(Box::new(BuildError::MessageGroupIdMissing)),
+        (None, false) => Ok(None),
+    }
 }
-impl MessageIdConfig {
-    pub fn message_group_id(&self) -> crate::Result<Option<Template>> {
-        match (self.message_group_id.as_ref(), self.fifo) {
-            (Some(value), true) => Ok(Some(
-                Template::try_from(value.clone()).context(TopicTemplateSnafu)?,
-            )),
-            (Some(_), false) => Err(Box::new(BuildError::MessageGroupIdNotAllowed)),
-            (None, true) => Err(Box::new(BuildError::MessageGroupIdMissing)),
-            (None, false) => Ok(None),
-        }
-    }
-
-    pub fn message_deduplication_id(&self) -> crate::Result<Option<Template>> {
-        Ok(self
-            .message_deduplication_id
-            .clone()
-            .map(Template::try_from)
-            .transpose()?)
-    }
-
-    pub fn new(
-        message_group_id: Option<String>,
-        message_deduplication_id: Option<String>,
-        fifo: bool,
-    ) -> Self {
-        Self {
-            message_group_id,
-            message_deduplication_id,
-            fifo,
-        }
-    }
+pub fn message_deduplication_id(
+    message_deduplication_id: Option<String>,
+) -> crate::Result<Option<Template>> {
+    Ok(message_deduplication_id
+        .clone()
+        .map(Template::try_from)
+        .transpose()?)
 }
