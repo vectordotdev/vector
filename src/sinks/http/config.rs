@@ -225,7 +225,7 @@ pub(super) fn validate_payload_wrapper(
 #[typetag::serde(name = "http")]
 impl SinkConfig for HttpSinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let batch_settings = self.batch.into_batcher_settings()?;
+        let batch_settings = self.batch.validate()?.into_batcher_settings()?;
 
         let encoder = self.build_encoder()?;
         let transformer = self.encoding.transformer();
