@@ -13,9 +13,7 @@ use crate::sources::kubernetes_logs::transform_utils::get_message_path;
 /// The key we use for `file` field.
 const FILE_KEY: &str = "file";
 
-pub fn build(enabled: bool, log_namespace: LogNamespace) -> PartialEventsMerger {
-    let reducer = if enabled {
-        let key = get_message_field(log_namespace).to_string();
+const EXPIRATION_TIME: Duration = Duration::from_secs(30);
 
 use bytes::BytesMut;
 use lookup::OwnedTargetPath;

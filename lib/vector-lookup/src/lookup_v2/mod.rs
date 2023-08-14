@@ -38,6 +38,13 @@ impl<'a> ValuePath<'a> for &'a ConfigValuePath {
     }
 }
 
+#[cfg(any(test, feature = "test"))]
+impl From<&str> for ConfigValuePath {
+    fn from(path: &str) -> Self {
+        ConfigValuePath::try_from(path.to_string()).unwrap()
+    }
+}
+
 /// A wrapper around `OwnedTargetPath` that allows it to be used in Vector config
 /// with prefix default to `PathPrefix::Event`
 #[configurable_component]

@@ -51,10 +51,10 @@ impl<'de> Deserialize<'de> for Transformer {
         Self::new(
             inner
                 .only_fields
-                .map(|v| v.iter().map(|p| ConfigValuePath { 0: p.clone() }).collect()),
+                .map(|v| v.iter().map(|p| ConfigValuePath(p.clone())).collect()),
             inner
                 .except_fields
-                .map(|v| v.iter().map(|p| ConfigValuePath { 0: p.clone() }).collect()),
+                .map(|v| v.iter().map(|p| ConfigValuePath(p.clone())).collect()),
             inner.timestamp_format,
         )
         .map_err(serde::de::Error::custom)
@@ -156,18 +156,18 @@ impl Transformer {
 
     fn apply_except_fields(&self, log: &mut LogEvent) {
         if let Some(except_fields) = self.except_fields.as_ref() {
-            let service_path = log
-                .metadata()
-                .schema_definition()
-                .meaning_path(meaning::SERVICE);
-
             for field in except_fields {
-                let value = log.remove((PathPrefix::Event, field));
+                let value_path = &field.0;
+                let value = log.remove((PathPrefix::Event, value_path));
 
+                let service_path = log
+                    .metadata()
+                    .schema_definition()
+                    .meaning_path(meaning::SERVICE);
                 // If we are removing the service field we need to store this in a `dropped_fields` list as we may need to
                 // refer to this later when emitting metrics.
-                if let Some(v) = value {
-                    if matches!(service_path, Some(target_path) if target_path.path == field.0) {
+                if let (Some(v), Some(service_path)) = (value, service_path) {
+                    if service_path.path == *value_path {
                         log.metadata_mut()
                             .add_dropped_field(meaning::SERVICE.to_string(), v);
                     }
@@ -274,7 +274,7 @@ mod tests {
     #[test]
     fn deserialize_and_transform_except() {
         let transformer: Transformer =
-            toml::from_str(r#"except_fields = ["a.b.c", "b", "c[0].y", "d\\.z", "e"]"#).unwrap();
+            toml::from_str(r#"except_fields = ["a.b.c", "b", "c[0].y", "d.z", "e"]"#).unwrap();
         let mut log = LogEvent::default();
         {
             log.insert("a", 1);
@@ -285,7 +285,7 @@ mod tests {
             log.insert("b[1].x", 1);
             log.insert("c[0].x", 1);
             log.insert("c[0].y", 1);
-            log.insert("d\\.z", 1);
+            log.insert("d.z", 1);
             log.insert("e.a", 1);
             log.insert("e.b", 1);
         }
@@ -295,7 +295,7 @@ mod tests {
         assert!(!event.as_mut_log().contains("b"));
         assert!(!event.as_mut_log().contains("b[1].x"));
         assert!(!event.as_mut_log().contains("c[0].y"));
-        assert!(!event.as_mut_log().contains("d\\.z"));
+        assert!(!event.as_mut_log().contains("d.z"));
         assert!(!event.as_mut_log().contains("e.a"));
 
         assert!(event.as_mut_log().contains("a.b.d"));

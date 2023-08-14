@@ -272,7 +272,11 @@ impl HecLogsSinkConfig {
             sourcetype: self.sourcetype.clone(),
             source: self.source.clone(),
             index: self.index.clone(),
-            indexed_fields: self.indexed_fields.clone(),
+            indexed_fields: self
+                .indexed_fields
+                .iter()
+                .map(|config_path| config_path.0.clone())
+                .collect(),
             host_key: self.host_key.path.clone(),
             timestamp_nanos_key: self.timestamp_nanos_key.clone(),
             timestamp_key: self.timestamp_key.path.clone(),

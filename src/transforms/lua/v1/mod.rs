@@ -229,7 +229,7 @@ impl mlua::UserData for LuaEvent {
                 match value {
                     Some(mlua::Value::String(string)) => {
                         this.inner.as_mut_log().insert(
-                            key.as_str(),
+                            &key_path,
                             Value::from(string.to_str().expect("Expected UTF-8.").to_owned()),
                         );
                     }
@@ -267,7 +267,12 @@ impl mlua::UserData for LuaEvent {
         );
 
         methods.add_meta_method(mlua::MetaMethod::Index, |lua, this, key: String| {
-            if let Some(value) = this.inner.as_log().get(key.as_str()) {
+            if let Some(value) = this
+                .inner
+                .as_log()
+                .parse_path_and_get_value(key.as_str())
+                .map_err(|e| e.to_lua_err())?
+            {
                 let string = lua.create_string(&value.coerce_to_bytes())?;
                 Ok(Some(string))
             } else {

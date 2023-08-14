@@ -279,7 +279,7 @@ pub fn process_log(event: Event, data: &HecLogData) -> HecProcessedEvent {
         .iter()
         .filter_map(|field| {
             log.get((PathPrefix::Event, field))
-                .map(|value| (field, value.clone()))
+                .map(|value| (field.to_string(), value.clone()))
         })
         .collect::<LogEvent>();
 
