@@ -21,8 +21,11 @@ pub fn map_with_expiration<S, T, M, E, F>(
     initial_state: S,
     input: impl Stream<Item = T> + 'static,
     expiration_interval: Duration,
+    // called for each event
     mut map_fn: M,
+    // called periodically to allow expiring internal state
     mut expiration_fn: E,
+    // called once at the end of the input stream
     mut flush_fn: F,
 ) -> impl Stream<Item = T>
 where
