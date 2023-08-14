@@ -386,6 +386,9 @@ ntapi = { git = "https://github.com/MSxDOS/ntapi.git", rev = "24fc1e47677fc9f6e3
 # version of that crate with the appropriate dependency patched in.
 openssl-sys = { git = "https://github.com/vectordotdev/rust-openssl.git", tag = "openssl-sys-v0.9.91+3.0.0" }
 openssl-src = { git = "https://github.com/vectordotdev/openssl-src-rs.git", tag = "release-300-force-engine+3.1.2"}
+# The `nkeys` crate relies on `ed25519-dalek v1.0.1`, which contains a security vulnerability known as the 'Double Public Key Signing Function Oracle Attack.'
+# This patch updates the dependency to a newer, unreleased version that eliminates this vulnerability.
+# We can delete this patch once https://github.com/wasmCloud/nkeys/issues/21 is resolved.
 ed25519-dalek = { git= "https://github.com/dalek-cryptography/ed25519-dalek.git", tag = "2.0.0-rc.3", default-features = false, features = ["u64_backend"] }
 
 [features]
