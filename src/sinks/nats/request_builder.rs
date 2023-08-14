@@ -46,6 +46,7 @@ pub(super) struct NatsRequestBuilder {
     pub(super) encoder: NatsEncoder,
 }
 
+#[derive(Clone)]
 pub(super) struct NatsRequest {
     pub(super) bytes: Bytes,
     pub(super) subject: String,

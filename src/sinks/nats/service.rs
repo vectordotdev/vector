@@ -9,6 +9,7 @@ use crate::sinks::prelude::*;
 
 use super::{request_builder::NatsRequest, NatsError};
 
+#[derive(Clone)]
 pub(super) struct NatsService {
     pub(super) connection: Arc<async_nats::Client>,
 }
@@ -53,10 +54,7 @@ impl Service<NatsRequest> for NatsService {
                 .and_then(|_| connection.flush().map_err(Into::into))
                 .await
             {
-                Err(error) => {
-                    // emit!(NatsEventSendError { error: error });
-                    Err(NatsError::ServerError { source: error })
-                }
+                Err(error) => Err(NatsError::ServerError { source: error }),
                 Ok(_) => Ok(NatsResponse { metadata }),
             }
         })

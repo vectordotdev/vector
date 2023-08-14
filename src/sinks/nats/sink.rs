@@ -7,7 +7,7 @@ use crate::sinks::prelude::*;
 use super::{
     config::NatsSinkConfig,
     request_builder::{NatsEncoder, NatsRequestBuilder},
-    service::NatsService,
+    service::{NatsResponse, NatsService},
     EncodingSnafu, NatsError, SubjectTemplateSnafu,
 };
 
@@ -17,6 +17,7 @@ pub(super) struct NatsEvent {
 }
 
 pub(super) struct NatsSink {
+    request: TowerRequestConfig,
     transformer: Transformer,
     encoder: Encoder<()>,
     connection: Arc<async_nats::Client>,
@@ -45,8 +46,10 @@ impl NatsSink {
         let transformer = config.encoding.transformer();
         let serializer = config.encoding.build().context(EncodingSnafu)?;
         let encoder = Encoder::<()>::new(serializer);
+        let request = config.request;
 
         Ok(NatsSink {
+            request,
             connection,
             transformer,
             encoder,
@@ -55,6 +58,11 @@ impl NatsSink {
     }
 
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
+        let request = self.request.unwrap_with(&TowerRequestConfig {
+            concurrency: Concurrency::Fixed(1),
+            ..Default::default()
+        });
+
         let request_builder = NatsRequestBuilder {
             encoder: NatsEncoder {
                 encoder: self.encoder.clone(),
@@ -62,9 +70,11 @@ impl NatsSink {
             },
         };
 
-        let service = ServiceBuilder::new().service(NatsService {
-            connection: self.connection.clone(),
-        });
+        let service = ServiceBuilder::new()
+            .settings(request, NatsRetryLogic)
+            .service(NatsService {
+                connection: self.connection.clone(),
+            });
 
         input
             .filter_map(|event| std::future::ready(self.make_nats_event(event)))
@@ -89,37 +99,17 @@ impl NatsSink {
 impl StreamSink<Event> for NatsSink {
     async fn run(mut self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         self.run_inner(input).await
-        // let bytes_sent = register!(BytesSent::from(Protocol::TCP));
-        // let events_sent = register!(EventsSent::from(Output(None)));
+    }
+}
 
-        // while let Some(mut event) = input.next().await {
-        //     let finalizers = event.take_finalizers();
+#[derive(Debug, Clone)]
+pub(super) struct NatsRetryLogic;
 
-        //     let subject = match self.subject.render_string(&event) {
-        //         Ok(subject) => subject,
-        //         Err(error) => {
-        //             emit!(TemplateRenderingError {
-        //                 error,
-        //                 field: Some("subject"),
-        //                 drop_event: true,
-        //             });
-        //             finalizers.update_status(EventStatus::Rejected);
-        //             continue;
-        //         }
-        //     };
+impl RetryLogic for NatsRetryLogic {
+    type Error = NatsError;
+    type Response = NatsResponse;
 
-        //     self.transformer.transform(&mut event);
-
-        //     let event_byte_size = event.estimated_json_encoded_size_of();
-
-        //     let mut bytes = BytesMut::new();
-        //     if self.encoder.encode(event, &mut bytes).is_err() {
-        //         // Error is handled by `Encoder`.
-        //         finalizers.update_status(EventStatus::Rejected);
-        //         continue;
-        //     }
-        // }
-
-        // Ok(())
+    fn is_retriable_error(&self, _error: &Self::Error) -> bool {
+        true
     }
 }

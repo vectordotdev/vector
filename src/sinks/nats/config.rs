@@ -69,6 +69,10 @@ pub struct NatsSinkConfig {
 
     #[configurable(derived)]
     pub(super) auth: Option<NatsAuthConfig>,
+
+    #[configurable(derived)]
+    #[serde(default)]
+    pub(super) request: TowerRequestConfig,
 }
 
 fn default_name() -> String {
@@ -85,6 +89,7 @@ impl GenerateConfig for NatsSinkConfig {
             subject: "from.vector".into(),
             tls: None,
             url: "nats://127.0.0.1:4222".into(),
+            request: Default::default(),
         })
         .unwrap()
     }

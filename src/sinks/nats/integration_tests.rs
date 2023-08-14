@@ -42,7 +42,7 @@ async fn publish_and_check(conf: NatsSinkConfig) -> Result<(), NatsError> {
 
     // Publish events.
     let num_events = 10;
-    let (mut input, events) = random_lines_with_stream(100, num_events, None);
+    let (input, events) = random_lines_with_stream(100, num_events, None);
 
     run_and_assert_sink_compliance(sink, events, &SINK_TAGS).await;
 
@@ -54,9 +54,6 @@ async fn publish_and_check(conf: NatsSinkConfig) -> Result<(), NatsError> {
     while let Some(msg) = sub.next().await {
         output.push(String::from_utf8_lossy(&msg.payload).to_string())
     }
-
-    input.sort();
-    output.sort();
 
     assert_eq!(output.len(), input.len());
     assert_eq!(output, input);
@@ -80,6 +77,7 @@ async fn nats_no_auth() {
         url,
         tls: None,
         auth: None,
+        request: Default::default(),
     };
 
     let r = publish_and_check(conf).await;
@@ -111,6 +109,7 @@ async fn nats_userpass_auth_valid() {
                 password: "natspass".to_string().into(),
             },
         }),
+        request: Default::default(),
     };
 
     publish_and_check(conf)
@@ -139,6 +138,7 @@ async fn nats_userpass_auth_invalid() {
                 password: "wrongpass".to_string().into(),
             },
         }),
+        request: Default::default(),
     };
 
     let r = publish_and_check(conf).await;
@@ -169,6 +169,7 @@ async fn nats_token_auth_valid() {
                 value: "secret".to_string().into(),
             },
         }),
+        request: Default::default(),
     };
 
     let r = publish_and_check(conf).await;
@@ -199,6 +200,7 @@ async fn nats_token_auth_invalid() {
                 value: "wrongsecret".to_string().into(),
             },
         }),
+        request: Default::default(),
     };
 
     let r = publish_and_check(conf).await;
@@ -230,6 +232,7 @@ async fn nats_nkey_auth_valid() {
                 seed: "SUANIRXEZUROTXNFN3TJYMT27K7ZZVMD46FRIHF6KXKS4KGNVBS57YAFGY".into(),
             },
         }),
+        request: Default::default(),
     };
 
     let r = publish_and_check(conf).await;
@@ -261,6 +264,7 @@ async fn nats_nkey_auth_invalid() {
                 seed: "SBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB".into(),
             },
         }),
+        request: Default::default(),
     };
 
     let r = publish_and_check(conf).await;
@@ -293,6 +297,7 @@ async fn nats_tls_valid() {
             },
         }),
         auth: None,
+        request: Default::default(),
     };
 
     let r = publish_and_check(conf).await;
@@ -319,6 +324,7 @@ async fn nats_tls_invalid() {
         url,
         tls: None,
         auth: None,
+        request: Default::default(),
     };
 
     let r = publish_and_check(conf).await;
@@ -353,6 +359,7 @@ async fn nats_tls_client_cert_valid() {
             },
         }),
         auth: None,
+        request: Default::default(),
     };
 
     let r = publish_and_check(conf).await;
@@ -385,6 +392,7 @@ async fn nats_tls_client_cert_invalid() {
             },
         }),
         auth: None,
+        request: Default::default(),
     };
 
     let r = publish_and_check(conf).await;
@@ -421,6 +429,7 @@ async fn nats_tls_jwt_auth_valid() {
                 path: "tests/data/nats/nats.creds".into(),
             },
         }),
+        request: Default::default(),
     };
 
     let r = publish_and_check(conf).await;
@@ -457,6 +466,7 @@ async fn nats_tls_jwt_auth_invalid() {
                 path: "tests/data/nats/nats-bad.creds".into(),
             },
         }),
+        request: Default::default(),
     };
 
     let r = publish_and_check(conf).await;
