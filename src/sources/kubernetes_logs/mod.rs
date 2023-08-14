@@ -4,8 +4,6 @@
 //! running inside the cluster as a DaemonSet.
 
 #![deny(missing_docs)]
-//TODO: temporary
-#![allow(unused)]
 use std::{path::PathBuf, time::Duration};
 
 use bytes::Bytes;
@@ -28,7 +26,6 @@ use kube::{
 use lifecycle::Lifecycle;
 use lookup::{lookup_v2::OptionalTargetPath, owned_value_path, path, OwnedTargetPath};
 use serde_with::serde_as;
-// use tokio_stream::StreamExt;
 use vector_common::{
     internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol},
     TimeZone,
@@ -823,23 +820,18 @@ impl Source {
                     emit!(KubernetesLogsEventNodeAnnotationError { event: &event });
                 }
             }
-            // println!("Annotations applied: {:?}", event);
 
             checkpoints.update(line.file_id, line.end_offset);
             event
         });
 
         let mut parser = Parser::new(log_namespace);
-        let events = events
-            .flat_map(move |event| {
-                let mut buf = OutputBuffer::with_capacity(1);
-                parser.transform(&mut buf, event);
-                futures::stream::iter(buf.into_events())
-            })
-            .map(|e| {
-                println!("After parser transform: {:?}", e);
-                e
-            });
+        let events = events.flat_map(move |event| {
+            let mut buf = OutputBuffer::with_capacity(1);
+            parser.transform(&mut buf, event);
+            futures::stream::iter(buf.into_events())
+        });
+
         let (events_count, _) = events.size_hint();
 
         let mut stream = if auto_partial_merge {
@@ -903,8 +895,6 @@ fn create_event(
     ingestion_timestamp_field: Option<&OwnedTargetPath>,
     log_namespace: LogNamespace,
 ) -> Event {
-    println!("CREATE EVENT with line: {:?}", line);
-
     let deserializer = BytesDeserializer;
     let mut log = deserializer.parse_single(line, log_namespace);
 
@@ -1056,19 +1046,6 @@ mod tests {
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<Config>();
-    }
-
-    #[test]
-    fn test_create_event() {
-        let ingest_timestamp = OwnedTargetPath::event(owned_value_path!("ingest_timestamp"));
-        let event = create_event(
-            "test".into(),
-            "test_file.txt",
-            Some(&ingest_timestamp),
-            LogNamespace::Vector,
-        );
-        println!("Event: {:?}", event);
-        panic!()
     }
 
     #[test]

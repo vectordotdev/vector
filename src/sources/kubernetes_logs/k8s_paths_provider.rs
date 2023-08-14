@@ -152,10 +152,6 @@ where
                 &[dir, "*/*.log*"].join("/"),
             );
 
-            let path_iter = path_iter.chain(std::iter::once(
-                format!("/home/nathan/playground/test_log.txt").into(),
-            ));
-
             // Extract the containers to exclude, then build patterns from them
             // and cache the results into a Vec.
             let excluded_containers = extract_excluded_containers_for_pod(pod);
