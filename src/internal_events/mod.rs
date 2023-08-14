@@ -224,8 +224,8 @@ pub(crate) use self::loki::*;
 pub(crate) use self::lua::*;
 #[cfg(feature = "transforms-metric_to_log")]
 pub(crate) use self::metric_to_log::*;
-#[cfg(feature = "sinks-nats")]
-pub(crate) use self::nats::*;
+// #[cfg(feature = "sinks-nats")]
+// pub(crate) use self::nats::*;
 #[cfg(feature = "sources-nginx_metrics")]
 pub(crate) use self::nginx_metrics::*;
 pub(crate) use self::parser::*;
