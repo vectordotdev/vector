@@ -2,6 +2,7 @@ use async_stream::stream;
 use futures::{Stream, StreamExt};
 use std::time::Duration;
 
+#[derive(Default)]
 pub struct Emitter<T> {
     values: Vec<T>,
 }

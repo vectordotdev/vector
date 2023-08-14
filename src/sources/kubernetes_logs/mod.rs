@@ -1039,7 +1039,6 @@ mod tests {
     use vrl::value::{kind::Collection, Kind};
 
     use crate::config::SourceConfig;
-    use crate::sources::kubernetes_logs::create_event;
 
     use super::Config;
 

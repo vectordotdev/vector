@@ -37,7 +37,7 @@ pub(super) fn parse_log_file_path(path: &str) -> Option<LogFileInfo<'_>> {
     let mut components = path.rsplit('/');
 
     let _log_file_name = components.next()?;
-    // let container_name = components.next()?;
+    let container_name = components.next()?;
     let pod_dir = components.next()?;
 
     let mut pod_dir_components = pod_dir.rsplit(LOG_PATH_DELIMITER);

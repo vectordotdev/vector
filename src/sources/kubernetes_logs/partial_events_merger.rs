@@ -1,35 +1,23 @@
 #![deny(missing_docs)]
 
-use enrichment::TableRegistry;
 use futures::{Stream, StreamExt};
-use indexmap::IndexMap;
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
-use tokio_stream::wrappers::IntervalStream;
 use vector_core::config::LogNamespace;
 use vrl::owned_value_path;
 
+use crate::event;
 use crate::event::{Event, LogEvent, Value};
-use crate::sources::kubernetes_logs::transform_utils::{get_message_field, get_message_path};
-use crate::{
-    conditions::AnyCondition,
-    event,
-    transforms::reduce::{MergeStrategy, Reduce, ReduceConfig},
-};
+use crate::sources::kubernetes_logs::transform_utils::get_message_path;
 
 /// The key we use for `file` field.
 const FILE_KEY: &str = "file";
 
 const EXPIRATION_TIME: Duration = Duration::from_secs(30);
 
-/// Partial event merger.
-pub type PartialEventsMerger = Reduce;
-
-use async_stream::stream;
-use bytes::{Bytes, BytesMut};
+use bytes::BytesMut;
 use lookup::OwnedTargetPath;
 use vector_core::stream::expiration_map::{map_with_expiration, Emitter};
-use vrl::path::parse_value_path;
 
 struct PartialEventMergeState {
     buckets: HashMap<String, Bucket>,
@@ -38,7 +26,7 @@ struct PartialEventMergeState {
 impl PartialEventMergeState {
     fn add_event(
         &mut self,
-        mut event: LogEvent,
+        event: LogEvent,
         file: &str,
         message_path: &OwnedTargetPath,
         expiration_time: Duration,
@@ -143,7 +131,7 @@ fn merge_partial_events_with_custom_expiration(
                 .get(&file_path)
                 .and_then(|x| x.as_str())
                 .map(|x| x.to_string())
-                .unwrap_or_else(|| String::new());
+                .unwrap_or_else(String::new);
 
             state.add_event(event, &file, &message_path, expiration_time);
             if !is_partial {
@@ -163,39 +151,6 @@ fn merge_partial_events_with_custom_expiration(
     )
     // LogEvent -> Event
     .map(|e| e.into())
-}
-
-pub fn build(log_namespace: LogNamespace) -> PartialEventsMerger {
-    let key = get_message_field(log_namespace);
-
-    // Merge the message field of each event by concatenating it, with a space delimiter.
-    let mut merge_strategies = IndexMap::new();
-    merge_strategies.insert(key, MergeStrategy::ConcatRaw);
-
-    // Group events by their file.
-    let group_by = vec![FILE_KEY.to_string()];
-
-    // As soon as we see an event that has no "partial" field, that's when we've hit the end of the split-up message
-    // we've been incrementally aggregating.. or the message was never split up to begin with because it was already
-    // small enough.
-    let ends_when = Some(AnyCondition::String(format!(
-        "!exists(.{})",
-        event::PARTIAL
-    )));
-
-    // This will default to expiring yet-to-be-completed reduced events after 30 seconds of inactivity, with an
-    // interval of 1 second between checking if any reduced events have expired.
-    let reduce_config = ReduceConfig {
-        group_by,
-        merge_strategies,
-        ends_when,
-        ..Default::default()
-    };
-
-    // TODO: This is _slightly_ gross because the semantics of `Reduce::new` could change and break things in a way
-    // that isn't super visible in unit tests, if at all visible.
-    Reduce::new(&reduce_config, &TableRegistry::default())
-        .expect("should not fail to build `kubernetes_logs`-specific partial event reducer")
 }
 
 #[cfg(test)]
