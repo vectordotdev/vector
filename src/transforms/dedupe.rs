@@ -2,6 +2,7 @@ use std::{future::ready, num::NonZeroUsize, pin::Pin};
 
 use bytes::Bytes;
 use futures::{Stream, StreamExt};
+use lookup::lookup_v2::ConfigTargetPath;
 use lru::LruCache;
 use vector_config::configurable_component;
 use vector_core::config::{clone_input_definitions, LogNamespace};
@@ -43,7 +44,7 @@ pub enum FieldMatchConfig {
             docs::examples = "field1",
             docs::examples = "parent.child_field"
         ))]
-        Vec<String>,
+        Vec<ConfigTargetPath>,
     ),
 
     /// Matches events using all fields except for the ignored ones.
@@ -55,7 +56,7 @@ pub enum FieldMatchConfig {
             docs::examples = "host",
             docs::examples = "hostname"
         ))]
-        Vec<String>,
+        Vec<ConfigTargetPath>,
     ),
 }
 
@@ -102,16 +103,16 @@ fn default_cache_config() -> CacheConfig {
 //   These aren't great defaults in that case, but hard-coding isn't much better since the
 //   structure can vary significantly. This should probably either become a required field
 //   in the future, or maybe the "semantic meaning" can be utilized here.
-fn default_match_fields() -> Vec<String> {
+fn default_match_fields() -> Vec<ConfigTargetPath> {
     let mut fields = Vec::new();
-    if let Some(message_key) = log_schema().message_key() {
-        fields.push(message_key.to_string());
+    if let Some(message_key) = log_schema().message_key_target_path() {
+        fields.push(ConfigTargetPath(message_key.clone()));
     }
-    if let Some(host_key) = log_schema().host_key() {
-        fields.push(host_key.to_string());
+    if let Some(host_key) = log_schema().host_key_target_path() {
+        fields.push(ConfigTargetPath(host_key.clone()));
     }
-    if let Some(timestamp_key) = log_schema().timestamp_key() {
-        fields.push(timestamp_key.to_string());
+    if let Some(timestamp_key) = log_schema().timestamp_key_target_path() {
+        fields.push(ConfigTargetPath(timestamp_key.clone()));
     }
     fields
 }
@@ -197,7 +198,7 @@ type TypeId = u8;
 #[derive(PartialEq, Eq, Hash)]
 enum CacheEntry {
     Match(Vec<Option<(TypeId, Bytes)>>),
-    Ignore(Vec<(String, TypeId, Bytes)>),
+    Ignore(Vec<(ConfigTargetPath, TypeId, Bytes)>),
 }
 
 /// Assigns a unique number to each of the types supported by Event::Value.
@@ -244,7 +245,7 @@ fn build_cache_entry(event: &Event, fields: &FieldMatchConfig) -> CacheEntry {
         FieldMatchConfig::MatchFields(fields) => {
             let mut entry = Vec::new();
             for field_name in fields.iter() {
-                if let Some(value) = event.as_log().get(field_name.as_str()) {
+                if let Some(value) = event.as_log().get(field_name) {
                     entry.push(Some((type_id_for_value(value), value.coerce_to_bytes())));
                 } else {
                     entry.push(None);
@@ -257,12 +258,10 @@ fn build_cache_entry(event: &Event, fields: &FieldMatchConfig) -> CacheEntry {
 
             if let Some(all_fields) = event.as_log().all_fields() {
                 for (field_name, value) in all_fields {
-                    if !fields.contains(&field_name) {
-                        entry.push((
-                            field_name,
-                            type_id_for_value(value),
-                            value.coerce_to_bytes(),
-                        ));
+                    if let Some(path) = ConfigTargetPath::try_from(field_name).ok() {
+                        if !fields.contains(&path) {
+                            entry.push((path, type_id_for_value(value), value.coerce_to_bytes()));
+                        }
                     }
                 }
             }
