@@ -3,12 +3,13 @@
 use bytes::Bytes;
 use std::io;
 
-use crate::sinks::{prelude::*, util::http_service::HttpRequest};
+use crate::sinks::prelude::*;
 
-use super::encoder::HttpEncoder;
+use super::{encoder::HttpEncoder, service::HttpRequest};
 
 pub(super) struct HttpRequestBuilder {
     pub(super) encoder: HttpEncoder,
+    pub(super) compression: Compression,
 }
 
 impl RequestBuilder<Vec<Event>> for HttpRequestBuilder {
@@ -20,8 +21,9 @@ impl RequestBuilder<Vec<Event>> for HttpRequestBuilder {
     type Error = io::Error;
 
     fn compression(&self) -> Compression {
+        self.compression
         // Compression is handled in the Service
-        Compression::None
+        //Compression::None
     }
 
     fn encoder(&self) -> &Self::Encoder {

@@ -3,25 +3,95 @@
 //! As this sink leverages a common HTTP implementation of the `Service` itself,
 //! this module only contains the `http` sink specific logic.
 
-use std::io::Write;
-
-use bytes::{BufMut, Bytes, BytesMut};
-use codecs::{
-    encoding::{Framer, Serializer},
-    CharacterDelimitedEncoder,
+use std::{
+    sync::Arc,
+    task::{Context, Poll},
 };
-use http::{HeaderName, HeaderValue, Method, Request, Uri};
+
+use bytes::Bytes;
+use http::{HeaderName, HeaderValue, Method, Request, Response, Uri};
+use hyper::Body;
 use indexmap::IndexMap;
 
 use crate::{
-    http::Auth,
+    http::{Auth, HttpClient},
     sinks::{
         prelude::*,
-        util::{http_service::HttpServiceRequestBuilder, Compressor, UriSerde},
+        util::{http::HttpBatchService, UriSerde},
     },
 };
 
 use super::config::HttpMethod;
+
+/// Request type for use in `RequestBuilder` implementations of HTTP stream sinks.
+#[derive(Clone)]
+pub struct HttpRequest {
+    pub payload: Bytes,
+    pub finalizers: EventFinalizers,
+    pub request_metadata: RequestMetadata,
+}
+
+impl HttpRequest {
+    /// Creates a new `HttpRequest`.
+    pub fn new(
+        payload: Bytes,
+        finalizers: EventFinalizers,
+        request_metadata: RequestMetadata,
+    ) -> Self {
+        Self {
+            payload,
+            finalizers,
+            request_metadata,
+        }
+    }
+}
+
+impl Finalizable for HttpRequest {
+    fn take_finalizers(&mut self) -> EventFinalizers {
+        self.finalizers.take_finalizers()
+    }
+}
+
+impl MetaDescriptive for HttpRequest {
+    fn get_metadata(&self) -> &RequestMetadata {
+        &self.request_metadata
+    }
+
+    fn metadata_mut(&mut self) -> &mut RequestMetadata {
+        &mut self.request_metadata
+    }
+}
+
+impl ByteSizeOf for HttpRequest {
+    fn allocated_bytes(&self) -> usize {
+        self.payload.allocated_bytes() + self.finalizers.allocated_bytes()
+    }
+}
+
+/// Response type for use in the `Service` implementation of HTTP stream sinks.
+pub struct HttpResponse {
+    pub(super) http_response: Response<Bytes>,
+    pub(super) events_byte_size: GroupedCountByteSize,
+    pub(super) raw_byte_size: usize,
+}
+
+impl DriverResponse for HttpResponse {
+    fn event_status(&self) -> EventStatus {
+        if self.http_response.status().is_success() {
+            EventStatus::Delivered
+        } else {
+            EventStatus::Rejected
+        }
+    }
+
+    fn events_sent(&self) -> &GroupedCountByteSize {
+        &self.events_byte_size
+    }
+
+    fn bytes_sent(&self) -> Option<usize> {
+        Some(self.raw_byte_size)
+    }
+}
 
 #[derive(Debug, Clone)]
 pub(super) struct HttpSinkRequestBuilder {
@@ -29,87 +99,100 @@ pub(super) struct HttpSinkRequestBuilder {
     pub(super) method: HttpMethod,
     pub(super) auth: Option<Auth>,
     pub(super) headers: IndexMap<HeaderName, HeaderValue>,
-    pub(super) payload_prefix: String,
-    pub(super) payload_suffix: String,
-    pub(super) compression: Compression,
-    pub(super) encoder: Encoder<Framer>,
+    pub(super) content_type: Option<String>,
+    pub(super) content_encoding: Option<String>,
 }
 
-impl HttpServiceRequestBuilder for HttpSinkRequestBuilder {
-    fn build(&self, mut body: BytesMut) -> Request<Bytes> {
+impl HttpSinkRequestBuilder {
+    fn build(&self, body: Bytes) -> Request<Bytes> {
         let method: Method = self.method.into();
         let uri: Uri = self.uri.uri.clone();
 
-        let content_type = {
-            use Framer::*;
-            use Serializer::*;
-            match (self.encoder.serializer(), self.encoder.framer()) {
-                (RawMessage(_) | Text(_), _) => Some("text/plain"),
-                (Json(_), NewlineDelimited(_)) => {
-                    if !body.is_empty() {
-                        // Remove trailing newline for backwards-compatibility
-                        // with Vector `0.20.x`.
-                        body.truncate(body.len() - 1);
-                    }
-                    Some("application/x-ndjson")
-                }
-                (Json(_), CharacterDelimited(CharacterDelimitedEncoder { delimiter: b',' })) => {
-                    // TODO(https://github.com/vectordotdev/vector/issues/11253):
-                    // Prepend before building a request body to eliminate the
-                    // additional copy here.
-                    let message = body.split();
-                    body.put(self.payload_prefix.as_bytes());
-                    body.put_u8(b'[');
-                    if !message.is_empty() {
-                        body.unsplit(message);
-                        // remove trailing comma from last record
-                        body.truncate(body.len() - 1);
-                    }
-                    body.put_u8(b']');
-                    body.put(self.payload_suffix.as_bytes());
-                    Some("application/json")
-                }
-                _ => None,
-            }
-        };
-
         let mut builder = Request::builder().method(method).uri(uri);
 
-        if let Some(content_type) = content_type {
+        if let Some(content_type) = &self.content_type {
             builder = builder.header("Content-Type", content_type);
         }
 
-        let compression = self.compression;
-
-        if compression.is_compressed() {
-            builder = builder.header(
-                "Content-Encoding",
-                compression
-                    .content_encoding()
-                    .expect("Encoding should be specified."),
-            );
-
-            let mut compressor = Compressor::from(compression);
-            compressor
-                .write_all(&body)
-                .expect("Writing to Vec can't fail.");
-            body = compressor.finish().expect("Writing to Vec can't fail.");
+        if let Some(content_encoding) = &self.content_encoding {
+            builder = builder.header("Content-Encoding", content_encoding);
         }
 
         let headers = builder
             .headers_mut()
             // The request building should not have errors at this point, and if it did it would fail in the call to `body()` also.
             .expect("Failed to access headers in http::Request builder- builder has errors.");
+
         for (header, value) in self.headers.iter() {
             headers.insert(header, value.clone());
         }
 
-        let mut request = builder.body(body.freeze()).unwrap();
+        // The request building should not have errors at this point
+        let mut request = builder
+            .body(body)
+            .expect("Failed to assign body to request- builder has errors");
 
         if let Some(auth) = &self.auth {
             auth.apply(&mut request);
         }
 
         request
+    }
+}
+
+#[derive(Clone)]
+pub(super) struct HttpService {
+    // pub(crate) batch_service:
+    //     HttpBatchService<Ready<Result<http::Request<Bytes>, crate::Error>>, HttpRequest>,
+    batch_service:
+        HttpBatchService<BoxFuture<'static, Result<Request<Bytes>, crate::Error>>, HttpRequest>,
+}
+
+impl HttpService {
+    pub fn new(
+        http_client: HttpClient<Body>,
+        http_request_builder: HttpSinkRequestBuilder,
+    ) -> Self {
+        let http_request_builder = Arc::new(http_request_builder);
+
+        let batch_service = HttpBatchService::new(http_client, move |req| {
+            let req: HttpRequest = req;
+
+            let request_builder = Arc::clone(&http_request_builder);
+
+            let fut: BoxFuture<'static, Result<http::Request<Bytes>, crate::Error>> =
+                Box::pin(async move { Ok(request_builder.build(req.payload)) });
+
+            fut
+        });
+        Self { batch_service }
+    }
+}
+
+impl Service<HttpRequest> for HttpService {
+    type Response = HttpResponse;
+    type Error = crate::Error;
+    type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
+
+    fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Ok(()))
+    }
+
+    fn call(&mut self, mut request: HttpRequest) -> Self::Future {
+        let mut http_service = self.batch_service.clone();
+
+        let raw_byte_size = request.payload.len();
+        let metadata = std::mem::take(request.metadata_mut());
+        let events_byte_size = metadata.into_events_estimated_json_encoded_byte_size();
+
+        Box::pin(async move {
+            let http_response = http_service.call(request).await?;
+
+            Ok(HttpResponse {
+                http_response,
+                events_byte_size,
+                raw_byte_size,
+            })
+        })
     }
 }
