@@ -100,7 +100,9 @@ impl ElasticsearchCommon {
         );
 
         if let Some(pipeline) = &config.pipeline {
-            query_params.insert("pipeline".into(), pipeline.into());
+            if !pipeline.is_empty() {
+                query_params.insert("pipeline".into(), pipeline.into());
+            }
         }
 
         let bulk_url = {
