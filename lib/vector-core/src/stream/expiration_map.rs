@@ -49,12 +49,12 @@ where
                     maybe_event = input.next() => {
                       match maybe_event {
                         None => {
-                                flush_fn(&mut state, &mut emitter);
-                          true
+                            flush_fn(&mut state, &mut emitter);
+                            true
                         }
                         Some(event) => {
-                                map_fn(&mut state, event, &mut emitter);
-                          false
+                            map_fn(&mut state, event, &mut emitter);
+                            false
                         }
                       }
                     }
