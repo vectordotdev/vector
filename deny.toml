@@ -38,9 +38,8 @@ license-files = [
 
 [advisories]
 ignore = [
-    # The NATS official Rust clients are vulnerable to MitM when using TLS
-    #
-    # Will be resolved when we switch to `async_nats` crate
-    # https://github.com/vectordotdev/vector/pull/15533
-    "RUSTSEC-2023-0029",
+    # `ed25519-dalek` is vulnerable due to "Double Public Key Signing Function Oracle Attack".
+    # Temporarily ignoring this vulnerability until the following issue is resolved:
+    # https://github.com/wasmCloud/nkeys/issues/20
+    "RUSTSEC-2022-0093"
 ]

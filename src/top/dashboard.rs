@@ -9,16 +9,16 @@ use crossterm::{
 };
 use num_format::{Locale, ToFormattedString};
 use number_prefix::NumberPrefix;
-use std::io::stdout;
-use tokio::sync::oneshot;
-use tui::{
+use ratatui::{
     backend::{Backend, CrosstermBackend},
     layout::{Alignment, Constraint, Layout, Rect},
     style::{Color, Modifier, Style},
-    text::{Span, Spans},
+    text::{Line, Span},
     widgets::{Block, Borders, Cell, Paragraph, Row, Table, Wrap},
     Frame, Terminal,
 };
+use std::io::stdout;
+use tokio::sync::oneshot;
 
 use super::{
     events::capture_key_press,
@@ -180,7 +180,7 @@ impl<'a> Widgets<'a> {
         ];
         text.extend(connection_status.as_ui_spans());
 
-        let text = vec![Spans::from(text)];
+        let text = vec![Line::from(text)];
 
         let block = Block::default().borders(Borders::ALL).title(Span::styled(
             self.title,
@@ -260,7 +260,7 @@ impl<'a> Widgets<'a> {
                         .into_iter()
                         .map(Cell::from)
                         .collect::<Vec<_>>();
-                    data[1] = Cell::from(id.as_ref());
+                    data[1] = Cell::from(id.as_str());
                     data[5] = Cell::from(sent_events_metric);
                     items.push(Row::new(data).style(Style::default()));
                 }
@@ -312,7 +312,7 @@ impl<'a> Widgets<'a> {
 
     /// Renders a box showing instructions on how to exit from `vector top`.
     fn quit_box<B: Backend>(&self, f: &mut Frame<B>, area: Rect) {
-        let text = vec![Spans::from("To quit, press ESC or 'q'")];
+        let text = vec![Line::from("To quit, press ESC or 'q'")];
 
         let block = Block::default()
             .borders(Borders::ALL)

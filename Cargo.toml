@@ -146,7 +146,7 @@ loki-logproto = { path = "lib/loki-logproto", optional = true }
 
 # Tokio / Futures
 async-stream = { version = "0.3.5", default-features = false }
-async-trait = { version = "0.1.72", default-features = false }
+async-trait = { version = "0.1.73", default-features = false }
 futures = { version = "0.3.28", default-features = false, features = ["compat", "io-compat"], package = "futures" }
 tokio = { version = "1.30.0", default-features = false, features = ["full"] }
 tokio-openssl = { version = "0.6.3", default-features = false }
@@ -229,7 +229,7 @@ itertools = { version = "0.11.0", default-features = false, optional = true }
 crossterm = { version = "0.26.1", default-features = false, features = ["event-stream"], optional = true }
 num-format = { version = "0.4.4", default-features = false, features = ["with-num-bigint"], optional = true }
 number_prefix = { version = "0.4.0", default-features = false, features = ["std"], optional = true }
-tui = { version = "0.19.0", optional = true, default-features = false, features = ["crossterm"] }
+ratatui = { version = "0.22.0", optional = true, default-features = false, features = ["crossterm"] }
 
 # Datadog Pipelines
 
@@ -287,7 +287,7 @@ lru = { version = "0.11.0", default-features = false, optional = true }
 maxminddb = { version = "0.23.0", default-features = false, optional = true }
 md-5 = { version = "0.10", default-features = false, optional = true }
 mongodb = { version = "2.6.0", default-features = false, features = ["tokio-runtime"], optional = true }
-nats = { version = "0.24.0", default-features = false, optional = true }
+async-nats = { version = "0.31.0", default-features = false, optional = true }
 nkeys = { version = "0.3.1", default-features = false, optional = true }
 nom = { version = "7.1.3", default-features = false, optional = true }
 notify = { version = "6.0.1", default-features = false, features = ["macos_fsevent"] }
@@ -303,8 +303,8 @@ pulsar = { version = "6.0.1", default-features = false, features = ["tokio-runti
 rand = { version = "0.8.5", default-features = false, features = ["small_rng"] }
 rand_distr = { version = "0.4.3", default-features = false }
 rdkafka = { version = "0.33.2", default-features = false, features = ["tokio", "libz", "ssl", "zstd"], optional = true }
-redis = { version = "0.23.1", default-features = false, features = ["connection-manager", "tokio-comp", "tokio-native-tls-comp"], optional = true }
-regex = { version = "1.9.1", default-features = false, features = ["std", "perf"] }
+redis = { version = "0.23.2", default-features = false, features = ["connection-manager", "tokio-comp", "tokio-native-tls-comp"], optional = true }
+regex = { version = "1.9.3", default-features = false, features = ["std", "perf"] }
 roaring = { version = "0.10.2", default-features = false, optional = true }
 seahash = { version = "4.1.0", default-features = false }
 semver = { version = "1.0.18", default-features = false, features = ["serde", "std"], optional = true }
@@ -313,7 +313,7 @@ snafu = { version = "0.7.5", default-features = false, features = ["futures"] }
 snap = { version = "1.1.0", default-features = false, optional = true }
 socket2 = { version = "0.5.3", default-features = false }
 stream-cancel = { version = "0.8.1", default-features = false }
-strip-ansi-escapes = { version = "0.1.1", default-features = false }
+strip-ansi-escapes = { version = "0.2.0", default-features = false }
 syslog = { version = "6.1.0", default-features = false, optional = true }
 tikv-jemallocator = { version = "0.5.4", default-features = false, optional = true }
 tokio-postgres = { version = "0.7.7", default-features = false, features = ["runtime", "with-chrono-0_4"], optional = true }
@@ -443,7 +443,7 @@ api-client = [
   "dep:crossterm",
   "dep:num-format",
   "dep:number_prefix",
-  "dep:tui",
+  "dep:ratatui",
   "vector-core/api",
   "dep:vector-api-client",
 ]
@@ -542,7 +542,7 @@ sources-kafka = ["dep:rdkafka"]
 sources-kubernetes_logs = ["dep:file-source", "kubernetes", "transforms-reduce"]
 sources-logstash = ["sources-utils-net-tcp", "tokio-util/net"]
 sources-mongodb_metrics = ["dep:mongodb"]
-sources-nats = ["dep:nats", "dep:nkeys"]
+sources-nats = ["dep:async-nats", "dep:nkeys"]
 sources-nginx_metrics = ["dep:nom"]
 sources-opentelemetry = ["dep:hex", "dep:opentelemetry-proto", "dep:prost-types", "sources-http_server", "sources-utils-http", "sources-vector"]
 sources-postgresql_metrics = ["dep:postgres-openssl", "dep:tokio-postgres"]
@@ -699,7 +699,7 @@ sinks-influxdb = []
 sinks-kafka = ["dep:rdkafka"]
 sinks-mezmo = []
 sinks-loki = ["loki-logproto"]
-sinks-nats = ["dep:nats", "dep:nkeys"]
+sinks-nats = ["dep:async-nats", "dep:nkeys"]
 sinks-new_relic_logs = ["sinks-http"]
 sinks-new_relic = []
 sinks-papertrail = ["dep:syslog"]
