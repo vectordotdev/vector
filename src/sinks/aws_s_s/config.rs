@@ -1,6 +1,5 @@
 use std::convert::TryFrom;
 
-use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 
 use vector_config::configurable_component;
@@ -30,7 +29,7 @@ pub(super) enum BuildError {
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
-pub struct BaseSSSinkConfig {
+pub(super) struct BaseSSSinkConfig {
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
 
@@ -78,13 +77,6 @@ pub struct BaseSSSinkConfig {
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     pub(super) acknowledgements: AcknowledgementsConfig,
-}
-
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
-#[serde(rename_all = "snake_case")]
-pub enum Encoding {
-    Text,
-    Json,
 }
 
 pub(super) fn message_group_id(

@@ -19,14 +19,14 @@ use crate::aws::ClientBuilder;
 ))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
-pub struct SnsSinkConfig {
+pub(super) struct SnsSinkConfig {
     /// The ARN of the Amazon SNS topic to which messages are sent.
     #[configurable(validation(format = "uri"))]
     #[configurable(metadata(docs::examples = "arn:aws:sns:us-east-2:123456789012:MyTopic"))]
     pub topic_arn: String,
 
     #[serde(flatten)]
-    pub base_config: BaseSSSinkConfig,
+    pub(super) base_config: BaseSSSinkConfig,
 }
 
 impl GenerateConfig for SnsSinkConfig {
@@ -98,7 +98,7 @@ impl SinkConfig for SnsSinkConfig {
     }
 }
 
-pub(crate) struct SnsClientBuilder;
+pub(super) struct SnsClientBuilder;
 
 impl ClientBuilder for SnsClientBuilder {
     type Config = aws_sdk_sns::config::Config;
@@ -114,7 +114,7 @@ impl ClientBuilder for SnsClientBuilder {
     }
 }
 
-pub async fn healthcheck(client: SnsClient, topic_arn: String) -> crate::Result<()> {
+pub(super) async fn healthcheck(client: SnsClient, topic_arn: String) -> crate::Result<()> {
     client
         .get_topic_attributes()
         .topic_arn(topic_arn.clone())

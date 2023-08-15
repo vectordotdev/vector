@@ -4,7 +4,7 @@ use futures::TryFutureExt;
 use tracing::Instrument;
 
 #[derive(Clone, Debug)]
-pub struct SqsMessagePublisher {
+pub(super) struct SqsMessagePublisher {
     client: aws_sdk_sqs::Client,
     queue_url: String,
 }

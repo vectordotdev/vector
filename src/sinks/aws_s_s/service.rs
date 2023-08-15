@@ -9,7 +9,7 @@ use vector_core::{event::EventStatus, stream::DriverResponse, ByteSizeOf};
 
 use super::{client::Client, request_builder::SendMessageEntry};
 
-pub(crate) struct SSService<C, E>
+pub(super) struct SSService<C, E>
 where
     C: Client<E> + Clone + Send + Sync + 'static,
     E: std::fmt::Debug + std::fmt::Display + std::error::Error + Sync + Send + 'static,
@@ -67,7 +67,7 @@ where
     }
 }
 
-pub struct SendMessageResponse {
+pub(super) struct SendMessageResponse {
     pub(crate) byte_size: usize,
     pub(crate) json_byte_size: GroupedCountByteSize,
 }

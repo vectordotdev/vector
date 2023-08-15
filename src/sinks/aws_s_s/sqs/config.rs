@@ -18,7 +18,7 @@ use crate::{aws::create_client, common::sqs::SqsClientBuilder};
 ))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
-pub struct SqsSinkConfig {
+pub(super) struct SqsSinkConfig {
     /// The URL of the Amazon SQS queue to which messages are sent.
     #[configurable(validation(format = "uri"))]
     #[configurable(metadata(
@@ -27,7 +27,7 @@ pub struct SqsSinkConfig {
     pub queue_url: String,
 
     #[serde(flatten)]
-    pub base_config: BaseSSSinkConfig,
+    pub(super) base_config: BaseSSSinkConfig,
 }
 
 impl GenerateConfig for SqsSinkConfig {

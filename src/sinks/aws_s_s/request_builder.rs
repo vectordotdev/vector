@@ -15,14 +15,14 @@ use crate::{
 };
 
 #[derive(Clone)]
-pub struct Metadata {
+pub(super) struct Metadata {
     pub finalizers: EventFinalizers,
     pub message_group_id: Option<String>,
     pub message_deduplication_id: Option<String>,
 }
 
 #[derive(Clone)]
-pub struct SSRequestBuilder {
+pub(super) struct SSRequestBuilder {
     encoder: (Transformer, Encoder<()>),
     message_group_id: Option<Template>,
     message_deduplication_id: Option<Template>,
@@ -125,7 +125,7 @@ impl RequestBuilder<Event> for SSRequestBuilder {
 }
 
 #[derive(Debug, Clone)]
-pub struct SendMessageEntry {
+pub(super) struct SendMessageEntry {
     pub message_body: String,
     pub message_group_id: Option<String>,
     pub message_deduplication_id: Option<String>,

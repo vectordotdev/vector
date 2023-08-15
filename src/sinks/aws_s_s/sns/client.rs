@@ -4,7 +4,7 @@ use futures::TryFutureExt;
 use tracing::Instrument;
 
 #[derive(Clone, Debug)]
-pub struct SnsMessagePublisher {
+pub(super) struct SnsMessagePublisher {
     client: aws_sdk_sns::Client,
     topic_arn: String,
 }
