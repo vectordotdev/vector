@@ -113,12 +113,6 @@ cli: {
 			description: env_vars.VECTOR_NO_GRACEFUL_SHUTDOWN_LIMIT.description
 			env_var:     "VECTOR_NO_GRACEFUL_SHUTDOWN_LIMIT"
 		}
-		"openssl-provider": {
-			description: env_vars.VECTOR_OPENSSL_PROVIDER.description
-			default:     env_vars.VECTOR_OPENSSL_PROVIDER.type.string.default
-			enum:        env_vars.VECTOR_OPENSSL_PROVIDER.type.string.enum
-			env_var:     "VECTOR_OPENSSL_PROVIDER"
-		}
 		"openssl-no-probe": {
 			description: env_vars.VECTOR_OPENSSL_NO_PROBE.description
 			env_var:     "VECTOR_OPENSSL_NO_PROBE"
@@ -188,6 +182,12 @@ cli: {
 			default:     env_vars.VECTOR_INTERNAL_LOG_RATE_LIMIT.type.uint.default
 			type:        "integer"
 			env_var:     "VECTOR_INTERNAL_LOG_RATE_LIMIT"
+		}
+		"openssl-provider": {
+			description: env_vars.VECTOR_OPENSSL_PROVIDER.description
+			default:     env_vars.VECTOR_OPENSSL_PROVIDER.type.string.default
+			enum:        env_vars.VECTOR_OPENSSL_PROVIDER.type.string.enum
+			env_var:     "VECTOR_OPENSSL_PROVIDER"
 		}
 	}
 
