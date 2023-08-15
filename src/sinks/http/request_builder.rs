@@ -22,8 +22,6 @@ impl RequestBuilder<Vec<Event>> for HttpRequestBuilder {
 
     fn compression(&self) -> Compression {
         self.compression
-        // Compression is handled in the Service
-        //Compression::None
     }
 
     fn encoder(&self) -> &Self::Encoder {

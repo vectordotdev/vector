@@ -1,3 +1,5 @@
+//! Batch settings for the `http` sink.
+
 use codecs::encoding::Framer;
 use vector_core::{
     event::Event, stream::batcher::limiter::ItemBatchSize, ByteSizeOf, EstimatedJsonEncodedSizeOf,
@@ -5,6 +7,7 @@ use vector_core::{
 
 use crate::codecs::Encoder;
 
+/// Uses the configured encoder to determine batch sizing.
 #[derive(Default)]
 pub(super) struct HttpBatchSizer {
     pub(super) encoder: Encoder<Framer>,
