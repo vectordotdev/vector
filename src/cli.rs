@@ -195,9 +195,9 @@ pub struct RootOpts {
     )]
     pub allocation_tracing_reporting_interval_ms: u64,
 
-    /// Load the OpenSSL legacy provider.
-    #[arg(long, env = "VECTOR_OPENSSL_LEGACY_PROVIDER", default_value = "true")]
-    pub openssl_legacy_provider: bool,
+    /// Set the OpenSSL implementation provider to use.
+    #[arg(long, env = "VECTOR_OPENSSL_PROVIDER", default_value = "legacy")]
+    pub openssl_provider: OpenSSLProvider,
 
     /// Disable probing and configuration of root certificate locations on the system for OpenSSL.
     ///
@@ -327,6 +327,27 @@ impl Color {
 pub enum LogFormat {
     Text,
     Json,
+}
+
+#[derive(clap::ValueEnum, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OpenSSLProvider {
+    Default,
+    Base,
+    FIPS,
+    Legacy,
+    Null,
+}
+
+impl OpenSSLProvider {
+    pub fn name(&self) -> &str {
+        match self {
+            OpenSSLProvider::Default => "default",
+            OpenSSLProvider::Base => "base",
+            OpenSSLProvider::FIPS => "fips",
+            OpenSSLProvider::Legacy => "legacy",
+            OpenSSLProvider::Null => "null",
+        }
+    }
 }
 
 pub fn handle_config_errors(errors: Vec<String>) -> exitcode::ExitCode {

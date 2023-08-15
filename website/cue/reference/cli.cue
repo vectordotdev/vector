@@ -113,9 +113,11 @@ cli: {
 			description: env_vars.VECTOR_NO_GRACEFUL_SHUTDOWN_LIMIT.description
 			env_var:     "VECTOR_NO_GRACEFUL_SHUTDOWN_LIMIT"
 		}
-		"openssl-legacy-provider": {
-			description: env_vars.VECTOR_OPENSSL_LEGACY_PROVIDER.description
-			env_var:     "VECTOR_OPENSSL_LEGACY_PROVIDER"
+		"openssl-provider": {
+			description: env_vars.VECTOR_OPENSSL_PROVIDER.description
+			default:     env_vars.VECTOR_OPENSSL_PROVIDER.type.string.default
+			enum:        env_vars.VECTOR_OPENSSL_PROVIDER.type.string.enum
+			env_var:     "VECTOR_OPENSSL_PROVIDER"
 		}
 		"openssl-no-probe": {
 			description: env_vars.VECTOR_OPENSSL_NO_PROBE.description
@@ -632,9 +634,18 @@ cli: {
 			description: "Never time out while waiting for graceful shutdown after SIGINT or SIGTERM received. This is useful when you would like for Vector to attempt to send data until terminated by a SIGKILL. Overrides/cannot be set with `--graceful-shutdown-limit-secs`."
 			type: bool: default: false
 		}
-		VECTOR_OPENSSL_LEGACY_PROVIDER: {
-			description: "Load the OpenSSL legacy provider."
-			type: bool: default: true
+		VECTOR_OPENSSL_PROVIDER: {
+			description: "Set the OpenSSL implementation provider to use."
+			type: string: {
+				default: "legacy"
+				enum: {
+					default: "The default provider contains all of the most commonly used algorithm implementations. This is the recommended provider."
+					base:    "The base provider contains algorithm implementations for encoding and decoding for OpenSSL keys."
+					fips:    "The FIPS provider contains algorithm implementations that have been validated according to the FIPS 140-2 standard."
+					legacy:  "The legacy provider contains algorithm implementations that are considered insecure, or are no longer in common use such as MD2 or RC4. This provider is deprecated and is not recommended. It is set as default for backwards compatibility."
+					null:    "The null provider contains no algorithms in it at all. This provider is useful for testing."
+				}
+			}
 		}
 		VECTOR_OPENSSL_NO_PROBE: {
 			description: """

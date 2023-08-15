@@ -25,7 +25,7 @@ use crate::metrics;
 #[cfg(feature = "api")]
 use crate::{api, internal_events::ApiStarted};
 use crate::{
-    cli::{handle_config_errors, LogFormat, Opts, RootOpts},
+    cli::{handle_config_errors, LogFormat, OpenSSLProvider, Opts, RootOpts},
     config::{self, Config, ConfigPath},
     heartbeat,
     signal::{ShutdownError, SignalHandler, SignalPair, SignalRx, SignalTo},
@@ -62,7 +62,7 @@ pub struct Application {
     pub require_healthy: Option<bool>,
     pub config: ApplicationConfig,
     pub signals: SignalPair,
-    pub openssl_legacy_provider: Option<Provider>,
+    pub openssl_provider: Option<Provider>,
 }
 
 impl ApplicationConfig {
@@ -196,11 +196,7 @@ impl Application {
             debug!(message = "Disabled probing and configuration of root certificate locations on the system for OpenSSL.");
         }
 
-        let openssl_legacy_provider = opts
-            .root
-            .openssl_legacy_provider
-            .then(load_openssl_legacy_provider)
-            .flatten();
+        let openssl_provider = load_openssl_provider(opts.root.openssl_provider);
 
         let runtime = build_runtime(opts.root.threads, "vector-worker")?;
 
@@ -222,7 +218,7 @@ impl Application {
                 require_healthy: opts.root.require_healthy,
                 config,
                 signals,
-                openssl_legacy_provider,
+                openssl_provider,
             },
         ))
     }
@@ -239,7 +235,7 @@ impl Application {
             require_healthy,
             config,
             signals,
-            openssl_legacy_provider,
+            openssl_provider,
         } = self;
 
         let topology_controller = SharedTopologyController::new(TopologyController {
@@ -257,7 +253,7 @@ impl Application {
             graceful_crash_receiver: config.graceful_crash_receiver,
             signals,
             topology_controller,
-            openssl_legacy_provider,
+            openssl_provider,
         })
     }
 }
@@ -267,7 +263,7 @@ pub struct StartedApplication {
     pub graceful_crash_receiver: mpsc::UnboundedReceiver<ShutdownError>,
     pub signals: SignalPair,
     pub topology_controller: SharedTopologyController,
-    pub openssl_legacy_provider: Option<Provider>,
+    pub openssl_provider: Option<Provider>,
 }
 
 impl StartedApplication {
@@ -281,7 +277,7 @@ impl StartedApplication {
             graceful_crash_receiver,
             signals,
             topology_controller,
-            openssl_legacy_provider,
+            openssl_provider,
         } = self;
 
         let mut graceful_crash = UnboundedReceiverStream::new(graceful_crash_receiver);
@@ -313,7 +309,7 @@ impl StartedApplication {
             signal,
             signal_rx,
             topology_controller,
-            openssl_legacy_provider,
+            openssl_provider,
         }
     }
 }
@@ -368,7 +364,7 @@ pub struct FinishedApplication {
     pub signal: SignalTo,
     pub signal_rx: SignalRx,
     pub topology_controller: SharedTopologyController,
-    pub openssl_legacy_provider: Option<Provider>,
+    pub openssl_provider: Option<Provider>,
 }
 
 impl FinishedApplication {
@@ -377,7 +373,7 @@ impl FinishedApplication {
             signal,
             signal_rx,
             topology_controller,
-            openssl_legacy_provider,
+            openssl_provider,
         } = self;
 
         // At this point, we'll have the only reference to the shared topology controller and can
@@ -392,7 +388,7 @@ impl FinishedApplication {
             SignalTo::Quit => Self::quit(),
             _ => unreachable!(),
         };
-        drop(openssl_legacy_provider);
+        drop(openssl_provider);
         status
     }
 
@@ -567,17 +563,20 @@ pub fn init_logging(color: bool, format: LogFormat, log_level: &str, rate: u64) 
     info!(message = "Log level is enabled.", level = ?level);
 }
 
-/// Load the legacy OpenSSL provider.
+/// Load an OpenSSL provider to use.
 ///
 /// The returned [Provider] must stay in scope for the entire lifetime of the application, as it
 /// will be unloaded when it is dropped.
-pub fn load_openssl_legacy_provider() -> Option<Provider> {
-    warn!(message = "DEPRECATED The openssl legacy provider provides algorithms and key sizes no longer recommended for use.");
-    Provider::try_load(None, "legacy", true)
-        .map(|provider| {
-            info!(message = "Loaded openssl legacy provider.");
-            provider
+pub fn load_openssl_provider(provider: OpenSSLProvider) -> Option<Provider> {
+    if provider == OpenSSLProvider::Legacy {
+        warn!(message = "DEPRECATED OpenSSL provider: The legacy provider provides algorithms and key sizes no longer recommended for use.");
+    }
+    let name = provider.name();
+    Provider::try_load(None, name, true)
+        .map(|p| {
+            info!(message = "Loaded openssl provider.", name = name);
+            p
         })
-        .map_err(|error| error!(message = "Failed to load openssl legacy provider.", %error))
+        .map_err(|error| error!(message = "Failed to load openssl provider.", name = name, %error))
         .ok()
 }
