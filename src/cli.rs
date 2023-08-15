@@ -198,6 +198,14 @@ pub struct RootOpts {
     /// Load the OpenSSL legacy provider.
     #[arg(long, env = "VECTOR_OPENSSL_LEGACY_PROVIDER", default_value = "true")]
     pub openssl_legacy_provider: bool,
+
+    /// Disable probing and configuration of root certificate locations on the system for OpenSSL.
+    ///
+    /// The probe functionality manipulates the `SSL_CERT_FILE` and `SSL_CERT_DIR` environment variables
+    /// in the Vector process. This behavior can be problematic for users of the `exec` source, which by
+    /// default inherits the environment of the Vector process.
+    #[arg(long, env = "VECTOR_OPENSSL_NO_PROBE", default_value = "false")]
+    pub openssl_no_probe: bool,
 }
 
 impl RootOpts {

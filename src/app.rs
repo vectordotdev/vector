@@ -180,7 +180,7 @@ impl Application {
     }
 
     pub fn prepare_from_opts(opts: Opts) -> Result<(Runtime, Self), ExitCode> {
-        init_global();
+        init_global(!opts.root.openssl_no_probe);
 
         let color = opts.root.color.use_color();
 
@@ -190,6 +190,11 @@ impl Application {
             opts.log_level(),
             opts.root.internal_log_rate_limit,
         );
+
+        // Can only log this after initializing the logging subsystem
+        if opts.root.openssl_no_probe {
+            debug!(message = "Disabled probing and configuration of root certificate locations on the system for OpenSSL.");
+        }
 
         let openssl_legacy_provider = opts
             .root
@@ -420,8 +425,10 @@ impl FinishedApplication {
     }
 }
 
-pub fn init_global() {
-    openssl_probe::init_ssl_cert_env_vars();
+pub fn init_global(openssl_probe: bool) {
+    if openssl_probe {
+        openssl_probe::init_ssl_cert_env_vars();
+    }
 
     #[cfg(not(feature = "enterprise-tests"))]
     metrics::init_global().expect("metrics initialization failed");
