@@ -9,7 +9,7 @@ use vector_core::event::{
 
 use crate::{
     config::SinkConfig,
-    sinks::appsignal::AppsignalConfig,
+    sinks::appsignal::config::AppsignalConfig,
     sinks::util::test::{build_test_server_status, load_sink},
     test_util::{
         components::{
