@@ -9739,6 +9739,7 @@ name = "vector-core"
 version = "0.1.0"
 dependencies = [
  "async-graphql 5.0.10",
+ "async-stream",
  "async-trait",
  "base64 0.21.2",
  "bitmask-enum",
