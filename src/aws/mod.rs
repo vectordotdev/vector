@@ -149,6 +149,19 @@ pub async fn create_client<T: ClientBuilder>(
     tls_options: &Option<TlsConfig>,
     is_sink: bool,
 ) -> crate::Result<T::Client> {
+    create_client_and_region::<T>(auth, region, endpoint, proxy, tls_options, is_sink)
+        .await
+        .map(|(client, _)| client)
+}
+
+pub async fn create_client_and_region<T: ClientBuilder>(
+    auth: &AwsAuthentication,
+    region: Option<Region>,
+    endpoint: Option<String>,
+    proxy: &ProxyConfig,
+    tls_options: &Option<TlsConfig>,
+    is_sink: bool,
+) -> crate::Result<(T::Client, Region)> {
     let retry_config = RetryConfig::disabled();
 
     // The default credentials chains will look for a region if not given but we'd like to
@@ -169,9 +182,10 @@ pub async fn create_client<T: ClientBuilder>(
     let config = config_builder.build();
 
     let client =
-        create_smithy_client::<T>(region, proxy, tls_options, is_sink, retry_config).await?;
+        create_smithy_client::<T>(region.clone(), proxy, tls_options, is_sink, retry_config)
+            .await?;
 
-    Ok(T::build(client, &config))
+    Ok((T::build(client, &config), region))
 }
 
 pub async fn sign_request(
