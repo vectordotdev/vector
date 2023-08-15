@@ -198,7 +198,7 @@ type TypeId = u8;
 #[derive(PartialEq, Eq, Hash)]
 enum CacheEntry {
     Match(Vec<Option<(TypeId, Bytes)>>),
-    Ignore(Vec<(ConfigTargetPath, TypeId, Bytes)>),
+    Ignore(Vec<(OwnedTargetPath, TypeId, Bytes)>),
 }
 
 /// Assigns a unique number to each of the types supported by Event::Value.
