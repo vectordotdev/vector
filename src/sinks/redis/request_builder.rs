@@ -51,10 +51,9 @@ fn encode_events(
 }
 
 /// Builds the request to be sent to Redis.
-/// This is a simple function rather than leaning on the `[RequestBuilder]` trait.
-/// That trait doesn't quite fit our needs since the encoded event is not just `Byte`s.
-/// Essentially we take in a list of `Event`s and return a list of key -> encoded event
-/// objects.
+/// The `[RequestBuilder]` trait doesn't work since the encoded event is not just `Byte`s.
+/// This function allows us to accept a list of `Event`s and return a list of key -> encoded
+/// event objects.
 pub(super) fn request_builder(
     mut events: Vec<RedisEvent>,
     transformer: &Transformer,
