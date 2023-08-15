@@ -10,21 +10,26 @@ use indexmap::IndexMap;
 
 use crate::{
     codecs::{EncodingConfigWithFraming, SinkType},
-    http::{get_http_scheme_from_uri, Auth, HttpClient, MaybeAuth},
+    http::{Auth, HttpClient, MaybeAuth},
     sinks::{
         prelude::*,
         util::{
-            http::RequestConfig,
-            http_service::{HttpRetryLogic, HttpService},
+            http::{HttpStatusRetryLogic, RequestConfig},
             RealtimeSizeBasedDefaultBatchSettings, UriSerde,
         },
     },
 };
 
 use super::{
-    encoder::HttpEncoder, request_builder::HttpRequestBuilder, service::HttpSinkRequestBuilder,
+    encoder::HttpEncoder,
+    request_builder::HttpRequestBuilder,
+    service::{HttpResponse, HttpService, HttpSinkRequestBuilder},
     sink::HttpSink,
 };
+
+const CONTENT_TYPE_TEXT: &str = "text/plain";
+const CONTENT_TYPE_NDJSON: &str = "application/x-ndjson";
+const CONTENT_TYPE_JSON: &str = "application/json";
 
 /// Configuration for the `http` sink.
 #[configurable_component(sink("http", "Deliver observability event data to an HTTP server."))]
@@ -238,10 +243,6 @@ impl SinkConfig for HttpSinkConfig {
         let (payload_prefix, payload_suffix) =
             validate_payload_wrapper(&self.payload_prefix, &self.payload_suffix, &encoder)?;
 
-        let endpoint = self.uri.with_default_parts();
-
-        let protocol = get_http_scheme_from_uri(&endpoint.uri);
-
         let client = self.build_http_client(&cx)?;
 
         let healthcheck = match cx.healthcheck.uri {
@@ -251,27 +252,49 @@ impl SinkConfig for HttpSinkConfig {
             None => future::ok(()).boxed(),
         };
 
-        let request_builder = HttpRequestBuilder {
-            encoder: HttpEncoder::new(encoder.clone(), transformer),
+        let content_type = {
+            use Framer::*;
+            use Serializer::*;
+            match (encoder.serializer(), encoder.framer()) {
+                (RawMessage(_) | Text(_), _) => Some(CONTENT_TYPE_TEXT.to_owned()),
+                (Json(_), NewlineDelimited(_)) => Some(CONTENT_TYPE_NDJSON.to_owned()),
+                (Json(_), CharacterDelimited(CharacterDelimitedEncoder { delimiter: b',' })) => {
+                    Some(CONTENT_TYPE_JSON.to_owned())
+                }
+                _ => None,
+            }
         };
+
+        let request_builder = HttpRequestBuilder {
+            encoder: HttpEncoder::new(encoder, transformer, payload_prefix, payload_suffix),
+            compression: self.compression,
+        };
+
+        let content_encoding = self.compression.is_compressed().then(|| {
+            self.compression
+                .content_encoding()
+                .expect("Encoding should be specified for compression.")
+                .to_string()
+        });
 
         let http_service_request_builder = HttpSinkRequestBuilder {
             uri: self.uri.with_default_parts(),
             method: self.method,
             auth: self.auth.choose_one(&self.uri.auth)?,
             headers,
-            payload_prefix,
-            payload_suffix,
-            compression: self.compression,
-            encoder,
+            content_type,
+            content_encoding,
         };
 
-        let service = HttpService::new(http_service_request_builder, client, protocol.to_string());
+        let service = HttpService::new(client, http_service_request_builder);
 
         let request_limits = self.request.tower.unwrap_with(&Default::default());
 
+        let retry_logic =
+            HttpStatusRetryLogic::new(|req: &HttpResponse| req.http_response.status());
+
         let service = ServiceBuilder::new()
-            .settings(request_limits, HttpRetryLogic)
+            .settings(request_limits, retry_logic)
             .service(service);
 
         let sink = HttpSink::new(service, batch_settings, request_builder);

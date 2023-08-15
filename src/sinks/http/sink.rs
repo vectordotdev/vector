@@ -1,24 +1,25 @@
 //! Implementation of the `http` sink.
 
-use crate::sinks::{
-    prelude::*,
-    util::http_service::{HttpRetryLogic, HttpService},
-};
+use crate::sinks::prelude::*;
 
-use super::{
-    batch::HttpBatchSizer, request_builder::HttpRequestBuilder, service::HttpSinkRequestBuilder,
-};
+use super::{batch::HttpBatchSizer, request_builder::HttpRequestBuilder, service::HttpRequest};
 
-pub(super) struct HttpSink {
-    service: Svc<HttpService<HttpSinkRequestBuilder>, HttpRetryLogic>,
+pub(super) struct HttpSink<S> {
+    service: S,
     batch_settings: BatcherSettings,
     request_builder: HttpRequestBuilder,
 }
 
-impl HttpSink {
+impl<S> HttpSink<S>
+where
+    S: Service<HttpRequest> + Send + 'static,
+    S::Future: Send + 'static,
+    S::Response: DriverResponse + Send + 'static,
+    S::Error: std::fmt::Debug + Into<crate::Error> + Send,
+{
     /// Creates a new `HttpSink`.
     pub(super) const fn new(
-        service: Svc<HttpService<HttpSinkRequestBuilder>, HttpRetryLogic>,
+        service: S,
         batch_settings: BatcherSettings,
         request_builder: HttpRequestBuilder,
     ) -> Self {
@@ -30,7 +31,9 @@ impl HttpSink {
     }
 
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
+        let service = ServiceBuilder::new().service(self.service);
         input
+            // .batched(self.batch_settings.into_byte_size_config())
             // Batch the input stream with size calculation dependent on the configured codec
             .batched(self.batch_settings.into_item_size_config(HttpBatchSizer {
                 encoder: self.request_builder.encoder.encoder.clone(),
@@ -49,14 +52,20 @@ impl HttpSink {
             })
             // Generate the driver that will send requests and handle retries,
             // event finalization, and logging/internal metric reporting.
-            .into_driver(self.service)
+            .into_driver(service)
             .run()
             .await
     }
 }
 
 #[async_trait::async_trait]
-impl StreamSink<Event> for HttpSink {
+impl<S> StreamSink<Event> for HttpSink<S>
+where
+    S: Service<HttpRequest> + Send + 'static,
+    S::Future: Send + 'static,
+    S::Response: DriverResponse + Send + 'static,
+    S::Error: std::fmt::Debug + Into<crate::Error> + Send,
+{
     async fn run(
         self: Box<Self>,
         input: futures_util::stream::BoxStream<'_, Event>,
