@@ -30,6 +30,7 @@ use super::{
 };
 use crate::config::LogNamespace;
 use crate::config::{log_schema, telemetry};
+use crate::event::util::log::{all_fields, all_metadata_fields};
 use crate::{event::MaybeAsLogMut, ByteSizeOf};
 use lookup::{metadata_path, path};
 use once_cell::sync::Lazy;
@@ -420,8 +421,19 @@ impl LogEvent {
         }
     }
 
-    pub fn all_fields(&self) -> Option<impl Iterator<Item = (String, &Value)> + Serialize> {
-        self.as_map().map(util::log::all_fields)
+    /// Iterate over the event root value and return an iterator to fields and value pairs.
+    /// Note that this
+    pub fn all_event_fields(&self) -> Option<impl Iterator<Item = (String, &Value)> + Serialize> {
+        self.as_map().map(all_fields)
+    }
+
+    pub fn all_metadata_fields(
+        &self,
+    ) -> Option<impl Iterator<Item = (String, &Value)> + Serialize> {
+        match self.metadata.value() {
+            Value::Object(metadata_map) => Some(metadata_map).map(all_metadata_fields),
+            _ => None,
+        }
     }
 
     /// Returns an iterator of all fields if the value is an Object. Otherwise,
@@ -1090,5 +1102,39 @@ mod test {
         };
 
         vector_common::assert_event_data_eq!(merged, expected);
+    }
+
+    #[test]
+    fn event_fields_iter() {
+        let mut log = LogEvent::default();
+        log.insert("a", 0);
+        log.insert("a.b", 1);
+        log.insert("c", 2);
+        let actual: Vec<(String, Value)> = log
+            .all_event_fields()
+            .unwrap()
+            .map(|(s, v)| (s, v.clone()))
+            .collect();
+        assert_eq!(
+            actual,
+            vec![("a.b".to_string(), 1.into()), ("c".to_string(), 2.into())]
+        );
+    }
+
+    #[test]
+    fn metadata_fields_iter() {
+        let mut log = LogEvent::default();
+        log.insert("%a", 0);
+        log.insert("%a.b", 1);
+        log.insert("%c", 2);
+        let actual: Vec<(String, Value)> = log
+            .all_metadata_fields()
+            .unwrap()
+            .map(|(s, v)| (s, v.clone()))
+            .collect();
+        assert_eq!(
+            actual,
+            vec![("%a.b".to_string(), 1.into()), ("%c".to_string(), 2.into())]
+        );
     }
 }

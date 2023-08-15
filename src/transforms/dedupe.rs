@@ -6,6 +6,7 @@ use lookup::lookup_v2::ConfigTargetPath;
 use lru::LruCache;
 use vector_config::configurable_component;
 use vector_core::config::{clone_input_definitions, LogNamespace};
+use vrl::path::OwnedTargetPath;
 
 use crate::{
     config::{
@@ -256,11 +257,17 @@ fn build_cache_entry(event: &Event, fields: &FieldMatchConfig) -> CacheEntry {
         FieldMatchConfig::IgnoreFields(fields) => {
             let mut entry = Vec::new();
 
-            if let Some(all_fields) = event.as_log().all_fields() {
-                for (field_name, value) in all_fields {
-                    if let Ok(path) = ConfigTargetPath::try_from(field_name) {
-                        if !fields.contains(&path) {
-                            entry.push((path, type_id_for_value(value), value.coerce_to_bytes()));
+            if let Some(event_fields) = event.as_log().all_event_fields() {
+                if let Some(metadata_fields) = event.as_log().all_metadata_fields() {
+                    for (field_name, value) in event_fields.chain(metadata_fields) {
+                        if let Ok(path) = ConfigTargetPath::try_from(field_name) {
+                            if !fields.contains(&path) {
+                                entry.push((
+                                    path.0,
+                                    type_id_for_value(value),
+                                    value.coerce_to_bytes(),
+                                ));
+                            }
                         }
                     }
                 }
@@ -340,34 +347,40 @@ mod tests {
     #[tokio::test]
     async fn dedupe_match_basic() {
         let transform_config = make_match_transform_config(5, vec!["matched".into()]);
-        basic(transform_config).await;
+        basic(transform_config, "matched", "unmatched").await;
     }
 
     #[tokio::test]
     async fn dedupe_ignore_basic() {
         let transform_config = make_ignore_transform_config(5, vec!["unmatched".into()]);
-        basic(transform_config).await;
+        basic(transform_config, "matched", "unmatched").await;
     }
 
-    async fn basic(transform_config: DedupeConfig) {
+    #[tokio::test]
+    async fn dedupe_ignore_with_metadata_field() {
+        let transform_config = make_ignore_transform_config(5, vec!["%ignored".into()]);
+        basic(transform_config, "matched", "%ignored").await;
+    }
+
+    async fn basic(transform_config: DedupeConfig, first_path: &str, second_path: &str) {
         assert_transform_compliance(async {
             let (tx, rx) = mpsc::channel(1);
             let (topology, mut out) =
                 create_topology(ReceiverStream::new(rx), transform_config).await;
 
             let mut event1 = Event::Log(LogEvent::from("message"));
-            event1.as_mut_log().insert("matched", "some value");
-            event1.as_mut_log().insert("unmatched", "another value");
+            event1.as_mut_log().insert(first_path, "some value");
+            event1.as_mut_log().insert(second_path, "another value");
 
             // Test that unmatched field isn't considered
             let mut event2 = Event::Log(LogEvent::from("message"));
-            event2.as_mut_log().insert("matched", "some value2");
-            event2.as_mut_log().insert("unmatched", "another value");
+            event2.as_mut_log().insert(first_path, "some value2");
+            event2.as_mut_log().insert(second_path, "another value");
 
             // Test that matched field is considered
             let mut event3 = Event::Log(LogEvent::from("message"));
-            event3.as_mut_log().insert("matched", "some value");
-            event3.as_mut_log().insert("unmatched", "another value2");
+            event3.as_mut_log().insert(first_path, "some value");
+            event3.as_mut_log().insert(second_path, "another value2");
 
             // First event should always be passed through as-is.
             tx.send(event1.clone()).await.unwrap();

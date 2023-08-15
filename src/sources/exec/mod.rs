@@ -1137,7 +1137,7 @@ mod tests {
             assert!(log.get(PID_KEY).is_some());
             assert!(log.get_timestamp().is_some());
 
-            assert_eq!(8, log.all_fields().unwrap().count());
+            assert_eq!(8, log.all_event_fields().unwrap().count());
         } else {
             panic!("Expected to receive a linux event");
         }

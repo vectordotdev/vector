@@ -1,7 +1,7 @@
 mod all_fields;
 mod keys;
 
-pub use all_fields::{all_fields, all_fields_non_object_root};
+pub use all_fields::{all_fields, all_fields_non_object_root, all_metadata_fields};
 pub use keys::keys;
 
 pub(self) use super::Value;

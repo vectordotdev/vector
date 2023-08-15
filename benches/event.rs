@@ -15,7 +15,7 @@ fn benchmark_event_iterate(c: &mut Criterion) {
                 log.insert(event_path!("key3"), Bytes::from("value3"));
                 log
             },
-            |e| e.all_fields().unwrap().count(),
+            |e| e.all_event_fields().unwrap().count(),
             BatchSize::SmallInput,
         )
     });
@@ -35,7 +35,7 @@ fn benchmark_event_iterate(c: &mut Criterion) {
                 log.insert(event_path!("key3"), Bytes::from("value3"));
                 log
             },
-            |e| e.all_fields().unwrap().count(),
+            |e| e.all_event_fields().unwrap().count(),
             BatchSize::SmallInput,
         )
     });
@@ -48,7 +48,7 @@ fn benchmark_event_iterate(c: &mut Criterion) {
                 log.insert(event_path!("key1", "nested1", 1), Bytes::from("value2"));
                 log
             },
-            |e| e.all_fields().unwrap().count(),
+            |e| e.all_event_fields().unwrap().count(),
             BatchSize::SmallInput,
         )
     });
