@@ -87,7 +87,7 @@ pub enum Encoding {
     Json,
 }
 
-pub fn message_group_id(
+pub(super) fn message_group_id(
     message_group_id: Option<String>,
     fifo: bool,
 ) -> crate::Result<Option<Template>> {
@@ -100,7 +100,7 @@ pub fn message_group_id(
         (None, false) => Ok(None),
     }
 }
-pub fn message_deduplication_id(
+pub(super) fn message_deduplication_id(
     message_deduplication_id: Option<String>,
 ) -> crate::Result<Option<Template>> {
     Ok(message_deduplication_id
