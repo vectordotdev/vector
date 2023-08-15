@@ -209,9 +209,9 @@ mod test {
     #[test]
     fn metadata_keys_simple() {
         let fields = fields_from_json(json!({
-            "%field_1": 0,
-            "%field_0": 1,
-            "%field_2": 2
+            "field_1": 1,
+            "field_0": 0,
+            "field_2": 2
         }));
         let expected: Vec<_> = vec![
             ("%field_0", &Value::Integer(0)),
