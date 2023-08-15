@@ -42,8 +42,6 @@ use crate::{
 use lookup::{owned_value_path, path};
 use vector_core::config::{log_schema, LogNamespace};
 
-pub mod sized_bytes_codec;
-
 /// Configuration for the `exec` source.
 #[configurable_component(source("exec", "Collect output from a process running on the host."))]
 #[derive(Clone, Debug)]
