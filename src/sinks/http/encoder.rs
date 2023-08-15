@@ -21,9 +21,9 @@ use crate::sinks::prelude::*;
 #[derive(Clone, Debug)]
 pub(super) struct HttpEncoder {
     pub(super) encoder: Encoder<Framer>,
-    pub(super) transformer: Transformer,
-    pub(super) payload_prefix: String,
-    pub(super) payload_suffix: String,
+    transformer: Transformer,
+    payload_prefix: String,
+    payload_suffix: String,
 }
 
 impl HttpEncoder {
