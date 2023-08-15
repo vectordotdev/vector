@@ -157,12 +157,6 @@ cli: {
 			env_var:     "VECTOR_GRACEFUL_SHUTDOWN_LIMIT_SECS"
 			type:        "integer"
 		}
-		"graceful-shutdown-limit-secs": {
-			description: env_vars.VECTOR_GRACEFUL_SHUTDOWN_LIMIT_SECS.description
-			default:     env_vars.VECTOR_GRACEFUL_SHUTDOWN_LIMIT_SECS.type.uint.default
-			env_var:     "VECTOR_GRACEFUL_SHUTDOWN_LIMIT_SECS"
-			type:        "integer"
-		}
 	}
 
 	// Reusable options
