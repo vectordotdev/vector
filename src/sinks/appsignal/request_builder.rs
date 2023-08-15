@@ -14,10 +14,10 @@ use crate::sinks::util::{
 use super::encoder::AppsignalEncoder;
 
 #[derive(Clone)]
-pub(crate) struct AppsignalRequest {
-    pub(crate) payload: Bytes,
-    pub(crate) finalizers: EventFinalizers,
-    pub(crate) metadata: RequestMetadata,
+pub(super) struct AppsignalRequest {
+    pub(super) payload: Bytes,
+    pub(super) finalizers: EventFinalizers,
+    pub(super) metadata: RequestMetadata,
 }
 
 impl MetaDescriptive for AppsignalRequest {
@@ -42,9 +42,9 @@ impl ByteSizeOf for AppsignalRequest {
     }
 }
 
-pub(crate) struct AppsignalRequestBuilder {
-    pub(crate) encoder: AppsignalEncoder,
-    pub(crate) compression: Compression,
+pub(super) struct AppsignalRequestBuilder {
+    pub(super) encoder: AppsignalEncoder,
+    pub(super) compression: Compression,
 }
 
 impl RequestBuilder<Vec<Event>> for AppsignalRequestBuilder {

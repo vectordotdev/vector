@@ -30,12 +30,12 @@ use super::{
 /// Configuration for the `appsignal` sink.
 #[configurable_component(sink("appsignal", "Deliver log and metric event data to AppSignal."))]
 #[derive(Clone, Debug, Default)]
-pub struct AppsignalConfig {
+pub(super) struct AppsignalConfig {
     /// The URI for the AppSignal API to send data to.
     #[configurable(validation(format = "uri"))]
     #[configurable(metadata(docs::examples = "https://appsignal-endpoint.net"))]
     #[serde(default = "default_endpoint")]
-    pub endpoint: String,
+    pub(super) endpoint: String,
 
     /// A valid app-level AppSignal Push API key.
     #[configurable(metadata(docs::examples = "00000000-0000-0000-0000-000000000000"))]
@@ -73,12 +73,12 @@ pub struct AppsignalConfig {
     acknowledgements: AcknowledgementsConfig,
 }
 
-pub(crate) fn default_endpoint() -> String {
+pub(super) fn default_endpoint() -> String {
     "https://appsignal-endpoint.net".to_string()
 }
 
 #[derive(Clone, Copy, Debug, Default)]
-pub(crate) struct AppsignalDefaultBatchSettings;
+pub(super) struct AppsignalDefaultBatchSettings;
 
 impl SinkBatchSettings for AppsignalDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = Some(100);
@@ -87,13 +87,13 @@ impl SinkBatchSettings for AppsignalDefaultBatchSettings {
 }
 
 impl AppsignalConfig {
-    pub(crate) fn build_client(&self, proxy: &ProxyConfig) -> crate::Result<HttpClient> {
+    pub(super) fn build_client(&self, proxy: &ProxyConfig) -> crate::Result<HttpClient> {
         let tls = MaybeTlsSettings::from_config(&self.tls, false)?;
         let client = HttpClient::new(tls, proxy)?;
         Ok(client)
     }
 
-    pub(crate) fn build_sink(&self, http_client: HttpClient) -> crate::Result<VectorSink> {
+    pub(super) fn build_sink(&self, http_client: HttpClient) -> crate::Result<VectorSink> {
         let batch_settings = self.batch.into_batcher_settings()?;
 
         let endpoint = endpoint_uri(&self.endpoint, "vector/events")?;

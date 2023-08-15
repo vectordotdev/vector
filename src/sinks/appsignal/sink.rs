@@ -16,11 +16,11 @@ use super::{
     request_builder::{AppsignalRequest, AppsignalRequestBuilder},
 };
 
-pub(crate) struct AppsignalSink<S> {
-    pub(crate) service: S,
-    pub(crate) compression: Compression,
-    pub(crate) transformer: Transformer,
-    pub(crate) batch_settings: BatcherSettings,
+pub(super) struct AppsignalSink<S> {
+    pub(super) service: S,
+    pub(super) compression: Compression,
+    pub(super) transformer: Transformer,
+    pub(super) batch_settings: BatcherSettings,
 }
 
 impl<S> AppsignalSink<S>
@@ -30,7 +30,7 @@ where
     S::Response: DriverResponse + Send + 'static,
     S::Error: std::fmt::Debug + Into<crate::Error> + Send,
 {
-    pub(crate) async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
+    pub(super) async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let service = ServiceBuilder::new().service(self.service);
 
         input

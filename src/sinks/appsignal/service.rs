@@ -23,8 +23,8 @@ use crate::{
 use super::request_builder::AppsignalRequest;
 
 #[derive(Clone)]
-pub(crate) struct AppsignalService {
-    pub(crate) batch_service:
+pub(super) struct AppsignalService {
+    pub(super) batch_service:
         HttpBatchService<Ready<Result<http::Request<Bytes>, crate::Error>>, AppsignalRequest>,
 }
 
@@ -91,10 +91,10 @@ impl Service<AppsignalRequest> for AppsignalService {
 }
 
 pub struct AppsignalResponse {
-    pub(crate) event_status: EventStatus,
-    pub(crate) http_status: StatusCode,
-    pub(crate) event_byte_size: GroupedCountByteSize,
-    pub(crate) bytes_sent: usize,
+    pub(super) event_status: EventStatus,
+    pub(super) http_status: StatusCode,
+    pub(super) event_byte_size: GroupedCountByteSize,
+    pub(super) bytes_sent: usize,
 }
 
 impl DriverResponse for AppsignalResponse {

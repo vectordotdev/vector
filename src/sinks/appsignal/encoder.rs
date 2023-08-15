@@ -8,7 +8,7 @@ use crate::{
 };
 
 #[derive(Clone)]
-pub(crate) struct AppsignalEncoder {
+pub(super) struct AppsignalEncoder {
     pub transformer: Transformer,
 }
 
