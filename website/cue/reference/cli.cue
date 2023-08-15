@@ -637,7 +637,11 @@ cli: {
 			type: bool: default: true
 		}
 		VECTOR_OPENSSL_NO_PROBE: {
-			description: "Disable probing and configuration of root certificate locations on the system for OpenSSL. The probe functionality manipulates the `SSL_CERT_FILE` and `SSL_CERT_DIR` environment variables in the Vector process. This behavior can be problematic for users of the `exec` source, which by default inherits the environment of the Vector process."
+			description: """
+				Disable probing and configuration of root certificate locations on the system for OpenSSL.
+
+				The probe functionality manipulates the `SSL_CERT_FILE` and `SSL_CERT_DIR` environment variables in the Vector process. This behavior can be problematic for users of the `exec` source, which by default inherits the environment of the Vector process.
+				"""
 			type: bool: default: false
 		}
 	}
