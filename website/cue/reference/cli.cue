@@ -113,6 +113,14 @@ cli: {
 			description: env_vars.VECTOR_NO_GRACEFUL_SHUTDOWN_LIMIT.description
 			env_var:     "VECTOR_NO_GRACEFUL_SHUTDOWN_LIMIT"
 		}
+		"openssl-legacy-provider": {
+			description: env_vars.VECTOR_OPENSSL_LEGACY_PROVIDER.description
+			env_var:     "VECTOR_OPENSSL_LEGACY_PROVIDER"
+		}
+		"openssl-no-probe": {
+			description: env_vars.VECTOR_OPENSSL_NO_PROBE.description
+			env_var:     "VECTOR_OPENSSL_NO_PROBE"
+		}
 	}
 
 	_core_config_options: {
@@ -142,6 +150,12 @@ cli: {
 			description: env_vars.VECTOR_CONFIG_YAML.description
 			type:        "string"
 			env_var:     "VECTOR_CONFIG_YAML"
+		}
+		"graceful-shutdown-limit-secs": {
+			description: env_vars.VECTOR_GRACEFUL_SHUTDOWN_LIMIT_SECS.description
+			default:     env_vars.VECTOR_GRACEFUL_SHUTDOWN_LIMIT_SECS.type.uint.default
+			env_var:     "VECTOR_GRACEFUL_SHUTDOWN_LIMIT_SECS"
+			type:        "integer"
 		}
 		"graceful-shutdown-limit-secs": {
 			description: env_vars.VECTOR_GRACEFUL_SHUTDOWN_LIMIT_SECS.description
@@ -622,6 +636,14 @@ cli: {
 		}
 		VECTOR_NO_GRACEFUL_SHUTDOWN_LIMIT: {
 			description: "Never time out while waiting for graceful shutdown after SIGINT or SIGTERM received. This is useful when you would like for Vector to attempt to send data until terminated by a SIGKILL. Overrides/cannot be set with `--graceful-shutdown-limit-secs`."
+			type: bool: default: false
+		}
+		VECTOR_OPENSSL_LEGACY_PROVIDER: {
+			description: "Load the OpenSSL legacy provider."
+			type: bool: default: true
+		}
+		VECTOR_OPENSSL_NO_PROBE: {
+			description: "Disable probing and configuration of root certificate locations on the system for OpenSSL. The probe functionality manipulates the `SSL_CERT_FILE` and `SSL_CERT_DIR` environment variables in the Vector process. This behavior can be problematic for users of the `exec` source, which by default inherits the environment of the Vector process."
 			type: bool: default: false
 		}
 	}
