@@ -16,9 +16,9 @@ use crate::{
 
 #[derive(Clone)]
 pub(super) struct Metadata {
-    pub finalizers: EventFinalizers,
-    pub message_group_id: Option<String>,
-    pub message_deduplication_id: Option<String>,
+    pub(super) finalizers: EventFinalizers,
+    pub(super) message_group_id: Option<String>,
+    pub(super) message_deduplication_id: Option<String>,
 }
 
 #[derive(Clone)]
@@ -29,7 +29,7 @@ pub(super) struct SSRequestBuilder {
 }
 
 impl SSRequestBuilder {
-    pub fn new(
+    pub(super) fn new(
         message_group_id: Option<Template>,
         message_deduplication_id: Option<Template>,
         encoding_config: EncodingConfig,
@@ -126,11 +126,11 @@ impl RequestBuilder<Event> for SSRequestBuilder {
 
 #[derive(Debug, Clone)]
 pub(super) struct SendMessageEntry {
-    pub message_body: String,
-    pub message_group_id: Option<String>,
-    pub message_deduplication_id: Option<String>,
-    pub finalizers: EventFinalizers,
-    pub metadata: RequestMetadata,
+    pub(super) message_body: String,
+    pub(super) message_group_id: Option<String>,
+    pub(super) message_deduplication_id: Option<String>,
+    pub(super) finalizers: EventFinalizers,
+    pub(super) metadata: RequestMetadata,
 }
 
 impl ByteSizeOf for SendMessageEntry {

@@ -24,7 +24,7 @@ pub(super) struct SqsSinkConfig {
     #[configurable(metadata(
         docs::examples = "https://sqs.us-east-2.amazonaws.com/123456789012/MyQueue"
     ))]
-    pub queue_url: String,
+    pub(super) queue_url: String,
 
     #[serde(flatten)]
     pub(super) base_config: BaseSSSinkConfig,
@@ -42,7 +42,7 @@ impl GenerateConfig for SqsSinkConfig {
 }
 
 impl SqsSinkConfig {
-    pub async fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<SqsClient> {
+    pub(super) async fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<SqsClient> {
         create_client::<SqsClientBuilder>(
             &self.base_config.auth,
             self.base_config.region.region(),
@@ -98,7 +98,7 @@ impl SinkConfig for SqsSinkConfig {
     }
 }
 
-pub async fn healthcheck(client: SqsClient, queue_url: String) -> crate::Result<()> {
+pub(super) async fn healthcheck(client: SqsClient, queue_url: String) -> crate::Result<()> {
     client
         .get_queue_attributes()
         .queue_url(queue_url)

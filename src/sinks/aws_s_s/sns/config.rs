@@ -23,7 +23,7 @@ pub(super) struct SnsSinkConfig {
     /// The ARN of the Amazon SNS topic to which messages are sent.
     #[configurable(validation(format = "uri"))]
     #[configurable(metadata(docs::examples = "arn:aws:sns:us-east-2:123456789012:MyTopic"))]
-    pub topic_arn: String,
+    pub(super) topic_arn: String,
 
     #[serde(flatten)]
     pub(super) base_config: BaseSSSinkConfig,
@@ -41,7 +41,7 @@ impl GenerateConfig for SnsSinkConfig {
 }
 
 impl SnsSinkConfig {
-    pub async fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<SnsClient> {
+    pub(super) async fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<SnsClient> {
         create_client::<SnsClientBuilder>(
             &self.base_config.auth,
             self.base_config.region.region(),

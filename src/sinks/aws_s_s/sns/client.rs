@@ -10,7 +10,7 @@ pub(super) struct SnsMessagePublisher {
 }
 
 impl SnsMessagePublisher {
-    pub fn new(client: aws_sdk_sns::Client, topic_arn: String) -> Self {
+    pub(super) fn new(client: aws_sdk_sns::Client, topic_arn: String) -> Self {
         Self { client, topic_arn }
     }
 }

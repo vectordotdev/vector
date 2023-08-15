@@ -13,7 +13,7 @@ impl<E> SSRetryLogic<E>
 where
     E: std::fmt::Debug + std::fmt::Display + std::error::Error + Sync + Send + 'static,
 {
-    pub fn new() -> SSRetryLogic<E> {
+    pub(super) fn new() -> SSRetryLogic<E> {
         Self {
             phantom: PhantomData,
         }

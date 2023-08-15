@@ -10,7 +10,7 @@ pub(super) struct SqsMessagePublisher {
 }
 
 impl SqsMessagePublisher {
-    pub fn new(client: aws_sdk_sqs::Client, queue_url: String) -> Self {
+    pub(super) fn new(client: aws_sdk_sqs::Client, queue_url: String) -> Self {
         Self { client, queue_url }
     }
 }

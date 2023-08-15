@@ -31,17 +31,17 @@ pub(super) enum BuildError {
 #[serde(deny_unknown_fields)]
 pub(super) struct BaseSSSinkConfig {
     #[serde(flatten)]
-    pub region: RegionOrEndpoint,
+    pub(super) region: RegionOrEndpoint,
 
     #[configurable(derived)]
-    pub encoding: EncodingConfig,
+    pub(super) encoding: EncodingConfig,
 
     /// The tag that specifies that a message belongs to a specific message group.
     ///
     /// Can be applied only to FIFO queues.
     #[configurable(metadata(docs::examples = "vector"))]
     #[configurable(metadata(docs::examples = "vector-%Y-%m-%d"))]
-    pub message_group_id: Option<String>,
+    pub(super) message_group_id: Option<String>,
 
     /// The message deduplication ID value to allow AWS to identify duplicate messages.
     ///
@@ -50,25 +50,25 @@ pub(super) struct BaseSSSinkConfig {
     ///
     /// [deduplication_id_docs]: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/using-messagededuplicationid-property.html
     #[configurable(metadata(docs::examples = "{{ transaction_id }}"))]
-    pub message_deduplication_id: Option<String>,
+    pub(super) message_deduplication_id: Option<String>,
 
     #[configurable(derived)]
     #[serde(default)]
-    pub request: TowerRequestConfig,
+    pub(super) request: TowerRequestConfig,
 
     #[configurable(derived)]
-    pub tls: Option<TlsConfig>,
+    pub(super) tls: Option<TlsConfig>,
 
     /// The ARN of an [IAM role][iam_role] to assume at startup.
     ///
     /// [iam_role]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles.html
     #[configurable(deprecated)]
     #[configurable(metadata(docs::hidden))]
-    pub assume_role: Option<String>,
+    pub(super) assume_role: Option<String>,
 
     #[configurable(derived)]
     #[serde(default)]
-    pub auth: AwsAuthentication,
+    pub(super) auth: AwsAuthentication,
 
     #[configurable(derived)]
     #[serde(
