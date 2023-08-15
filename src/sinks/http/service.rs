@@ -23,17 +23,16 @@ use crate::{
 
 use super::config::HttpMethod;
 
-/// Request type for use in `RequestBuilder` implementations of HTTP stream sinks.
 #[derive(Clone)]
-pub struct HttpRequest {
-    pub payload: Bytes,
-    pub finalizers: EventFinalizers,
-    pub request_metadata: RequestMetadata,
+pub(super) struct HttpRequest {
+    payload: Bytes,
+    finalizers: EventFinalizers,
+    request_metadata: RequestMetadata,
 }
 
 impl HttpRequest {
     /// Creates a new `HttpRequest`.
-    pub fn new(
+    pub(super) fn new(
         payload: Bytes,
         finalizers: EventFinalizers,
         request_metadata: RequestMetadata,
@@ -69,10 +68,10 @@ impl ByteSizeOf for HttpRequest {
 }
 
 /// Response type for use in the `Service` implementation of HTTP stream sinks.
-pub struct HttpResponse {
+pub(super) struct HttpResponse {
     pub(super) http_response: Response<Bytes>,
-    pub(super) events_byte_size: GroupedCountByteSize,
-    pub(super) raw_byte_size: usize,
+    events_byte_size: GroupedCountByteSize,
+    raw_byte_size: usize,
 }
 
 impl DriverResponse for HttpResponse {
@@ -95,19 +94,37 @@ impl DriverResponse for HttpResponse {
 
 #[derive(Debug, Clone)]
 pub(super) struct HttpSinkRequestBuilder {
-    pub(super) uri: UriSerde,
-    pub(super) method: HttpMethod,
-    pub(super) auth: Option<Auth>,
-    pub(super) headers: IndexMap<HeaderName, HeaderValue>,
-    pub(super) content_type: Option<String>,
-    pub(super) content_encoding: Option<String>,
+    uri: UriSerde,
+    method: HttpMethod,
+    auth: Option<Auth>,
+    headers: IndexMap<HeaderName, HeaderValue>,
+    content_type: Option<String>,
+    content_encoding: Option<String>,
 }
 
 impl HttpSinkRequestBuilder {
+    /// Creates a new `HttpSinkRequestBuilder`
+    pub(super) const fn new(
+        uri: UriSerde,
+        method: HttpMethod,
+        auth: Option<Auth>,
+        headers: IndexMap<HeaderName, HeaderValue>,
+        content_type: Option<String>,
+        content_encoding: Option<String>,
+    ) -> Self {
+        Self {
+            uri,
+            method,
+            auth,
+            headers,
+            content_type,
+            content_encoding,
+        }
+    }
+
     fn build(&self, body: Bytes) -> Request<Bytes> {
         let method: Method = self.method.into();
         let uri: Uri = self.uri.uri.clone();
-
         let mut builder = Request::builder().method(method).uri(uri);
 
         if let Some(content_type) = &self.content_type {
@@ -142,14 +159,12 @@ impl HttpSinkRequestBuilder {
 
 #[derive(Clone)]
 pub(super) struct HttpService {
-    // pub(crate) batch_service:
-    //     HttpBatchService<Ready<Result<http::Request<Bytes>, crate::Error>>, HttpRequest>,
     batch_service:
         HttpBatchService<BoxFuture<'static, Result<Request<Bytes>, crate::Error>>, HttpRequest>,
 }
 
 impl HttpService {
-    pub fn new(
+    pub(super) fn new(
         http_client: HttpClient<Body>,
         http_request_builder: HttpSinkRequestBuilder,
     ) -> Self {

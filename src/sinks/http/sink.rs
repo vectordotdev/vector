@@ -33,8 +33,7 @@ where
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let service = ServiceBuilder::new().service(self.service);
         input
-            // .batched(self.batch_settings.into_byte_size_config())
-            // Batch the input stream with size calculation dependent on the configured codec
+            // Batch the input stream with size calculation based on the configured codec
             .batched(self.batch_settings.into_item_size_config(HttpBatchSizer {
                 encoder: self.request_builder.encoder.encoder.clone(),
             }))

@@ -35,33 +35,33 @@ const CONTENT_TYPE_JSON: &str = "application/json";
 #[configurable_component(sink("http", "Deliver observability event data to an HTTP server."))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
-pub struct HttpSinkConfig {
+pub(super) struct HttpSinkConfig {
     /// The full URI to make HTTP requests to.
     ///
     /// This should include the protocol and host, but can also include the port, path, and any other valid part of a URI.
     #[configurable(metadata(docs::examples = "https://10.22.212.22:9000/endpoint"))]
-    pub uri: UriSerde,
+    pub(super) uri: UriSerde,
 
     /// The HTTP method to use when making the request.
     #[serde(default)]
-    pub method: HttpMethod,
+    pub(super) method: HttpMethod,
 
     #[configurable(derived)]
-    pub auth: Option<Auth>,
+    pub(super) auth: Option<Auth>,
 
     /// A list of custom headers to add to each request.
     #[configurable(deprecated)]
     #[configurable(metadata(
         docs::additional_props_description = "An HTTP request header and it's value."
     ))]
-    pub headers: Option<IndexMap<String, String>>,
+    pub(super) headers: Option<IndexMap<String, String>>,
 
     #[configurable(derived)]
     #[serde(default)]
-    pub compression: Compression,
+    pub(super) compression: Compression,
 
     #[serde(flatten)]
-    pub encoding: EncodingConfigWithFraming,
+    pub(super) encoding: EncodingConfigWithFraming,
 
     /// A string to prefix the payload with.
     ///
@@ -70,7 +70,7 @@ pub struct HttpSinkConfig {
     /// If specified, the `payload_suffix` must also be specified and together they must produce a valid JSON object.
     #[configurable(metadata(docs::examples = "{\"data\":"))]
     #[serde(default)]
-    pub payload_prefix: String,
+    pub(super) payload_prefix: String,
 
     /// A string to suffix the payload with.
     ///
@@ -79,18 +79,18 @@ pub struct HttpSinkConfig {
     /// If specified, the `payload_prefix` must also be specified and together they must produce a valid JSON object.
     #[configurable(metadata(docs::examples = "}"))]
     #[serde(default)]
-    pub payload_suffix: String,
+    pub(super) payload_suffix: String,
 
     #[configurable(derived)]
     #[serde(default)]
-    pub batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
+    pub(super) batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
 
     #[configurable(derived)]
     #[serde(default)]
-    pub request: RequestConfig,
+    pub(super) request: RequestConfig,
 
     #[configurable(derived)]
-    pub tls: Option<TlsConfig>,
+    pub(super) tls: Option<TlsConfig>,
 
     #[configurable(derived)]
     #[serde(
@@ -98,7 +98,7 @@ pub struct HttpSinkConfig {
         deserialize_with = "crate::serde::bool_or_struct",
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
-    pub acknowledgements: AcknowledgementsConfig,
+    pub(super) acknowledgements: AcknowledgementsConfig,
 }
 
 /// HTTP method.
@@ -110,7 +110,7 @@ pub struct HttpSinkConfig {
 #[derive(Clone, Copy, Debug, Derivative, Eq, PartialEq)]
 #[serde(rename_all = "snake_case")]
 #[derivative(Default)]
-pub enum HttpMethod {
+pub(super) enum HttpMethod {
     /// GET.
     Get,
 
@@ -277,14 +277,14 @@ impl SinkConfig for HttpSinkConfig {
                 .to_string()
         });
 
-        let http_service_request_builder = HttpSinkRequestBuilder {
-            uri: self.uri.with_default_parts(),
-            method: self.method,
-            auth: self.auth.choose_one(&self.uri.auth)?,
+        let http_service_request_builder = HttpSinkRequestBuilder::new(
+            self.uri.with_default_parts(),
+            self.method,
+            self.auth.choose_one(&self.uri.auth)?,
             headers,
             content_type,
             content_encoding,
-        };
+        );
 
         let service = HttpService::new(client, http_service_request_builder);
 
