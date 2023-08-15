@@ -421,12 +421,14 @@ impl LogEvent {
         }
     }
 
-    /// Iterate over the event root value and return an iterator to fields and value pairs.
-    /// Note that this
+    /// If the event root value is a map, build and return an iterator to event field and value pairs.
+    /// TODO: Ideally this should return target paths to be consistent with other `LogEvent` methods.
     pub fn all_event_fields(&self) -> Option<impl Iterator<Item = (String, &Value)> + Serialize> {
         self.as_map().map(all_fields)
     }
 
+    /// If the metadata root value is a map, build and return an iterator to metadata field and value pairs.
+    /// TODO: Ideally this should return target paths to be consistent with other `LogEvent` methods.
     pub fn all_metadata_fields(
         &self,
     ) -> Option<impl Iterator<Item = (String, &Value)> + Serialize> {
