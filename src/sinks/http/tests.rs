@@ -73,7 +73,7 @@ fn http_encode_event_text() {
     let encoder = cfg.build_encoder().unwrap();
     let transformer = cfg.encoding.transformer();
 
-    let encoder = HttpEncoder::new(encoder, transformer);
+    let encoder = HttpEncoder::new(encoder, transformer, "".to_owned(), "".to_owned());
 
     let mut encoded = vec![];
     let (encoded_size, _byte_size) = encoder.encode_input(vec![event], &mut encoded).unwrap();
@@ -96,7 +96,7 @@ fn http_encode_event_ndjson() {
     let encoder = cfg.build_encoder().unwrap();
     let transformer = cfg.encoding.transformer();
 
-    let encoder = HttpEncoder::new(encoder, transformer);
+    let encoder = HttpEncoder::new(encoder, transformer, "".to_owned(), "".to_owned());
 
     let mut encoded = vec![];
     encoder.encode_input(vec![event], &mut encoded).unwrap();
