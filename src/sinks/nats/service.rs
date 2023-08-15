@@ -44,12 +44,12 @@ impl Service<NatsRequest> for NatsService {
     }
 
     fn call(&mut self, req: NatsRequest) -> Self::Future {
-        let connection = self.connection.clone();
+        let connection = Arc::clone(&self.connection);
 
         Box::pin(async move {
             match connection
                 .publish(req.subject, req.bytes)
-                .map_err(|error| async_nats::Error::from(error))
+                .map_err(async_nats::Error::from)
                 .and_then(|_| connection.flush().map_err(Into::into))
                 .await
             {

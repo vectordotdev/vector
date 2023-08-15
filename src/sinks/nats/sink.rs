@@ -73,7 +73,7 @@ impl NatsSink {
         let service = ServiceBuilder::new()
             .settings(request, NatsRetryLogic)
             .service(NatsService {
-                connection: self.connection.clone(),
+                connection: Arc::clone(&self.connection),
             });
 
         input
