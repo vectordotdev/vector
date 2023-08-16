@@ -2,7 +2,7 @@ use std::task::{Context, Poll};
 
 use redis::aio::ConnectionManager;
 
-use crate::sinks::{prelude::*, util::sink::Response};
+use crate::sinks::prelude::*;
 
 use super::{config::Method, RedisRequest, RedisSinkError};
 
@@ -10,12 +10,6 @@ use super::{config::Method, RedisRequest, RedisSinkError};
 pub struct RedisService {
     pub(super) conn: ConnectionManager,
     pub(super) data_type: super::DataType,
-}
-
-impl Response for Vec<bool> {
-    fn is_successful(&self) -> bool {
-        self.iter().all(|x| *x)
-    }
 }
 
 impl Service<RedisRequest> for RedisService {
@@ -84,9 +78,15 @@ pub struct RedisResponse {
     pub byte_size: usize,
 }
 
+impl RedisResponse {
+    pub(super) fn is_successful(&self) -> bool {
+        self.event_status.iter().all(|x| *x)
+    }
+}
+
 impl DriverResponse for RedisResponse {
     fn event_status(&self) -> EventStatus {
-        if self.event_status.is_successful() {
+        if self.is_successful() {
             EventStatus::Delivered
         } else {
             EventStatus::Errored

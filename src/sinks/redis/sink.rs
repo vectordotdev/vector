@@ -4,7 +4,7 @@ use redis::{aio::ConnectionManager, RedisError};
 
 use crate::sinks::{
     prelude::*,
-    util::{retries::RetryAction, sink::Response, Concurrency},
+    util::{retries::RetryAction, Concurrency},
 };
 
 use super::{
@@ -118,7 +118,7 @@ impl RetryLogic for RedisRetryLogic {
     }
 
     fn should_retry_response(&self, response: &Self::Response) -> RetryAction {
-        if response.event_status.is_successful() {
+        if response.is_successful() {
             RetryAction::Successful
         } else {
             RetryAction::Retry("Sending data to redis failed.".into())
