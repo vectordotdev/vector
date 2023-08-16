@@ -1,7 +1,7 @@
 features:
 - aws-integration-tests
 
-test_filter: ::aws_s3
+test_filter: ::aws_
 
 env:
   AWS_ACCESS_KEY_ID: dummy
@@ -14,7 +14,6 @@ env:
   S3_ADDRESS: http://mock-localstack:4566
   SQS_ADDRESS: http://mock-localstack:4566
   WATCHLOGS_ADDRESS: http://mock-watchlogs:6000
-  RUST_BACKTRACE: 1
 
 matrix:
   version: [latest]
