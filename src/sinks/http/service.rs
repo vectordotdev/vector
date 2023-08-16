@@ -1,7 +1,4 @@
 //! Service implementation for the `http` sink.
-//!
-//! As this sink leverages a common HTTP implementation of the `Service` itself,
-//! this module only contains the `http` sink specific logic.
 
 use std::{
     sync::Arc,
