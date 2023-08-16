@@ -199,7 +199,8 @@ impl Application {
         let openssl_providers = opts
             .root
             .openssl_legacy_provider
-            .then(load_openssl_legacy_providers);
+            .then(load_openssl_legacy_providers)
+            .transpose()?;
 
         let runtime = build_runtime(opts.root.threads, "vector-worker")?;
 
@@ -570,15 +571,17 @@ pub fn init_logging(color: bool, format: LogFormat, log_level: &str, rate: u64) 
 ///
 /// The returned [Provider] must stay in scope for the entire lifetime of the application, as it
 /// will be unloaded when it is dropped.
-pub fn load_openssl_legacy_providers() -> Vec<Provider> {
+pub fn load_openssl_legacy_providers() -> Result<Vec<Provider>, ExitCode> {
     warn!(message = "DEPRECATED The openssl legacy provider provides algorithms and key sizes no longer recommended for use.");
-    ["legacy", "default"].into_iter().filter_map(|provider_name| {
+    ["legacy", "default"].into_iter().map(|provider_name| {
         Provider::try_load(None, provider_name, true)
             .map(|provider| {
                 info!(message = "Loaded openssl provider.", provider = provider_name);
                 provider
             })
-            .map_err(|error| error!(message = "Failed to load openssl provider.", provider = provider_name, %error))
-            .ok()
+            .map_err(|error| {
+                error!(message = "Failed to load openssl provider.", provider = provider_name, %error);
+                exitcode::UNAVAILABLE
+            })
     }).collect()
 }
