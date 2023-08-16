@@ -14,6 +14,8 @@ releases: "0.32.0": {
 
 		- a new `greptimedb` sink for sending metrics to
 		    [GreptimeDB](https://github.com/greptimeteam/greptimedb)
+		- a new `protobuf` codec that can be used on sources that support codecs to decode incoming
+		  protobuf data
 		"""
 
 	changelog: [
