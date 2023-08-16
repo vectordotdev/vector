@@ -11,3 +11,6 @@ serde = { version = "1.0.183", default-features = false, features = ["derive", "
 vector-config = { path = "../vector-config" }
 vector-config-macros = { path = "../vector-config-macros" }
 vrl.workspace = true
+
+[features]
+test = []

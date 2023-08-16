@@ -14,6 +14,8 @@ releases: "0.32.0": {
 
 		- a new `greptimedb` sink for sending metrics to
 		    [GreptimeDB](https://github.com/greptimeteam/greptimedb)
+		- a new `protobuf` codec that can be used on sources that support codecs to decode incoming
+		  protobuf data
 		"""
 
 	changelog: [
@@ -143,7 +145,7 @@ releases: "0.32.0": {
 			type: "enhancement"
 			scopes: ["prometheus_scrape source"]
 			description: """
-				The `prometheus_scrape` source ow has a `scrape_timeout_secs` option to configure
+				The `prometheus_scrape` source now has a `scrape_timeout_secs` option to configure
 				how long Vector should wait for each request.
 				"""
 			contributors: ["nullren"]
