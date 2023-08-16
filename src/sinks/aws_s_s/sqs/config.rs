@@ -80,7 +80,7 @@ impl SinkConfig for SqsSinkConfig {
                 message_deduplication_id?,
                 self.base_config.encoding.clone(),
             )?,
-            self.base_config.request.clone(),
+            self.base_config.request,
             publisher,
         )?;
         Ok((

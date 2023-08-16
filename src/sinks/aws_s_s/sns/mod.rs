@@ -1,3 +1,6 @@
+#![cfg(all(test, feature = "aws-sns-integration-tests"))]
+
+mod client;
 mod config;
 mod integration_tests;
 
@@ -8,5 +11,3 @@ use super::{
     service::SendMessageResponse,
     sink::SSSink,
 };
-
-mod client;

@@ -1,5 +1,3 @@
-#![cfg(all(test, feature = "aws-sqs-integration-tests"))]
-
 use std::collections::HashMap;
 
 use aws_sdk_sqs::{model::QueueAttributeName, Client as SqsClient, Region};
