@@ -199,7 +199,7 @@ impl SourceConfig for AwsS3Config {
                 Self::NAME,
                 None,
                 &owned_value_path!("metadata"),
-                Kind::object(Collection::empty().with_unknown(Kind::bytes())),
+                Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
                 None,
             );
 
@@ -443,7 +443,7 @@ mod integration_tests {
 
     use aws_sdk_s3::{types::ByteStream, Client as S3Client};
     use aws_sdk_sqs::{model::QueueAttributeName, Client as SqsClient};
-    use codecs::decoding::DeserializerConfig;
+    use codecs::{decoding::DeserializerConfig, JsonDeserializerConfig};
     use lookup::path;
     use similar_asserts::assert_eq;
     use vrl::value::Value;
@@ -488,6 +488,34 @@ mod integration_tests {
             Delivered,
             false,
             DeserializerConfig::Bytes,
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    async fn s3_process_json_message() {
+        trace_init();
+
+        let logs: Vec<String> = random_lines(100).take(10).collect();
+
+        let json_logs: Vec<String> = logs
+            .iter()
+            .map(|msg| {
+                // convert to JSON object
+                format!(r#"{{"message": "{}"}}"#, msg)
+            })
+            .collect();
+
+        test_event(
+            None,
+            None,
+            None,
+            None,
+            json_logs.join("\n").into_bytes(),
+            logs,
+            Delivered,
+            false,
+            DeserializerConfig::Json(JsonDeserializerConfig::default()),
         )
         .await;
     }
