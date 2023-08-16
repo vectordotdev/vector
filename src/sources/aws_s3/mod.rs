@@ -849,7 +849,7 @@ mod integration_tests {
             assert_eq!(expected_lines.len(), events.len());
             for (i, event) in events.iter().enumerate() {
 
-                if let Some(schema_definition) = config.outputs(log_namespace.into()).pop().unwrap().schema_definition {
+                if let Some(schema_definition) = config.outputs(namespace).pop().unwrap().schema_definition {
                     schema_definition.is_valid_for_event(event).unwrap();
                 }
 
