@@ -1,9 +1,10 @@
 #![allow(missing_docs)]
 
+use snafu::Snafu;
 use tokio::{runtime::Runtime, sync::broadcast};
 use tokio_stream::{Stream, StreamExt};
 
-use super::config::ConfigBuilder;
+use super::config::{ComponentKey, ConfigBuilder};
 
 pub type ShutdownTx = broadcast::Sender<()>;
 pub type SignalTx = broadcast::Sender<SignalTo>;
@@ -18,9 +19,25 @@ pub enum SignalTo {
     /// Signal to reload config from the filesystem.
     ReloadFromDisk,
     /// Signal to shutdown process.
-    Shutdown,
+    Shutdown(Option<ShutdownError>),
     /// Shutdown process immediately.
     Quit,
+}
+
+#[derive(Clone, Debug, Snafu)]
+pub enum ShutdownError {
+    // For future work: It would be nice if we could keep the actual errors in here, but
+    // `crate::Error` doesn't implement `Clone`, and adding `DynClone` for errors is tricky.
+    #[snafu(display("The API failed to start: {error}"))]
+    ApiFailed { error: String },
+    #[snafu(display("Reload failed, and then failed to restore the previous config"))]
+    ReloadFailedToRestore,
+    #[snafu(display(r#"The task for source "{key}" died during execution: {error}"#))]
+    SourceAborted { key: ComponentKey, error: String },
+    #[snafu(display(r#"The task for transform "{key}" died during execution: {error}"#))]
+    TransformAborted { key: ComponentKey, error: String },
+    #[snafu(display(r#"The task for sink "{key}" died during execution: {error}"#))]
+    SinkAborted { key: ComponentKey, error: String },
 }
 
 /// Convenience struct for app setup handling.
@@ -153,11 +170,11 @@ fn os_signals(runtime: &Runtime) -> impl Stream<Item = SignalTo> {
                 let signal = tokio::select! {
                     _ = sigint.recv() => {
                         info!(message = "Signal received.", signal = "SIGINT");
-                        SignalTo::Shutdown
+                        SignalTo::Shutdown(None)
                     },
                     _ = sigterm.recv() => {
                         info!(message = "Signal received.", signal = "SIGTERM");
-                        SignalTo::Shutdown
+                        SignalTo::Shutdown(None)
                     } ,
                     _ = sigquit.recv() => {
                         info!(message = "Signal received.", signal = "SIGQUIT");
@@ -181,7 +198,7 @@ fn os_signals(_: &Runtime) -> impl Stream<Item = SignalTo> {
 
     async_stream::stream! {
         loop {
-            let signal = tokio::signal::ctrl_c().map(|_| SignalTo::Shutdown).await;
+            let signal = tokio::signal::ctrl_c().map(|_| SignalTo::Shutdown(None)).await;
             yield signal;
         }
     }

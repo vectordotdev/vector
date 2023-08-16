@@ -7,6 +7,7 @@ use futures_util::{
 };
 use tokio::sync::oneshot::{channel, Sender};
 use tower::Service;
+use vrl::event_path;
 use vrl::path::PathPrefix;
 
 use vector_core::{
@@ -54,19 +55,21 @@ impl Partitioner for EventPartitioner {
             }
             Event::Trace(t) => PartitionKey {
                 api_key: item.metadata().datadog_api_key(),
-                env: t.get("env").map(|s| s.to_string_lossy().into_owned()),
+                env: t
+                    .get(event_path!("env"))
+                    .map(|s| s.to_string_lossy().into_owned()),
                 hostname: log_schema().host_key().and_then(|key| {
                     t.get((PathPrefix::Event, key))
                         .map(|s| s.to_string_lossy().into_owned())
                 }),
                 agent_version: t
-                    .get("agent_version")
+                    .get(event_path!("agent_version"))
                     .map(|s| s.to_string_lossy().into_owned()),
                 target_tps: t
-                    .get("target_tps")
+                    .get(event_path!("target_tps"))
                     .and_then(|tps| tps.as_integer().map(Into::into)),
                 error_tps: t
-                    .get("error_tps")
+                    .get(event_path!("error_tps"))
                     .and_then(|tps| tps.as_integer().map(Into::into)),
             },
         }

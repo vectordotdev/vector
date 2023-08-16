@@ -127,6 +127,28 @@ async fn ensure_pipeline_in_params() {
 }
 
 #[tokio::test]
+async fn ensure_empty_pipeline_not_in_params() {
+    let index = gen_index();
+    let pipeline = String::from("");
+
+    let config = ElasticsearchConfig {
+        endpoints: vec![http_server()],
+        bulk: BulkConfig {
+            index,
+            ..Default::default()
+        },
+        pipeline: Some(pipeline.clone()),
+        batch: batch_settings(),
+        ..Default::default()
+    };
+    let common = ElasticsearchCommon::parse_single(&config)
+        .await
+        .expect("Config error");
+
+    assert_eq!(common.query_params.get("pipeline"), None);
+}
+
+#[tokio::test]
 async fn structures_events_correctly() {
     let index = gen_index();
     let config = ElasticsearchConfig {

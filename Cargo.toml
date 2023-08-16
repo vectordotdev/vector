@@ -1,6 +1,6 @@
 [package]
 name = "vector"
-version = "0.32.0"
+version = "0.33.0"
 authors = ["Vector Contributors <vector@datadoghq.com>"]
 edition = "2021"
 description = "A lightweight and ultra-fast tool for building observability pipelines"
@@ -119,9 +119,11 @@ members = [
 
 [workspace.dependencies]
 vrl = { version = "0.6.0", features = ["cli", "test", "test_framework", "arbitrary"] }
+pin-project = { version = "1.1.3", default-features = false }
 
 [dependencies]
 vrl.workspace = true
+pin-project.workspace = true
 
 # Internal libs
 codecs = { path = "lib/codecs", default-features = false }
@@ -146,9 +148,9 @@ loki-logproto = { path = "lib/loki-logproto", optional = true }
 
 # Tokio / Futures
 async-stream = { version = "0.3.5", default-features = false }
-async-trait = { version = "0.1.72", default-features = false }
+async-trait = { version = "0.1.73", default-features = false }
 futures = { version = "0.3.28", default-features = false, features = ["compat", "io-compat"], package = "futures" }
-tokio = { version = "1.29.1", default-features = false, features = ["full"] }
+tokio = { version = "1.30.0", default-features = false, features = ["full"] }
 tokio-openssl = { version = "0.6.3", default-features = false }
 tokio-stream = { version = "0.1.14", default-features = false, features = ["net", "sync", "time"] }
 tokio-util = { version = "0.7", default-features = false, features = ["io", "time"] }
@@ -185,10 +187,10 @@ aws-smithy-http-tower = { git = "https://github.com/vectordotdev/aws-sdk-rust", 
 aws-smithy-types = { git = "https://github.com/vectordotdev/aws-sdk-rust", rev = "3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670", default-features = false, optional = true }
 
 # Azure
-azure_core = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "b4544d4920fa3064eb921340054cd9cc130b7664", default-features = false, features = ["enable_reqwest"], optional = true }
-azure_identity = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "b4544d4920fa3064eb921340054cd9cc130b7664", default-features = false, features = ["enable_reqwest"], optional = true }
-azure_storage = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "b4544d4920fa3064eb921340054cd9cc130b7664", default-features = false, optional = true }
-azure_storage_blobs = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "b4544d4920fa3064eb921340054cd9cc130b7664", default-features = false, optional = true }
+azure_core = { version = "0.13", default-features = false, features = ["enable_reqwest"], optional = true }
+azure_identity = { version = "0.13", default-features = false, features = ["enable_reqwest"], optional = true }
+azure_storage = { version = "0.13", default-features = false, optional = true }
+azure_storage_blobs = { version = "0.13", default-features = false, optional = true }
 
 # OpenDAL
 opendal = {version = "0.38", default-features = false, features = ["native-tls", "services-webhdfs"], optional = true}
@@ -197,10 +199,10 @@ opendal = {version = "0.38", default-features = false, features = ["native-tls",
 tower = { version = "0.4.13", default-features = false, features = ["buffer", "limit", "retry", "timeout", "util", "balance", "discover"] }
 tower-http = { version = "0.4.3", default-features = false, features = ["decompression-gzip"]}
 # Serde
-serde = { version = "1.0.181", default-features = false, features = ["derive"] }
+serde = { version = "1.0.183", default-features = false, features = ["derive"] }
 serde-toml-merge = { version = "0.3.0", default-features = false }
 serde_bytes = { version = "0.11.12", default-features = false, features = ["std"], optional = true }
-serde_json = { version = "1.0.104", default-features = false, features = ["raw_value"] }
+serde_json = { version = "1.0.105", default-features = false, features = ["raw_value"] }
 serde_with = { version = "3.2.0", default-features = false, features = ["macros", "std"] }
 serde_yaml = { version = "0.9.25", default-features = false }
 
@@ -229,7 +231,7 @@ itertools = { version = "0.11.0", default-features = false, optional = true }
 crossterm = { version = "0.26.1", default-features = false, features = ["event-stream"], optional = true }
 num-format = { version = "0.4.4", default-features = false, features = ["with-num-bigint"], optional = true }
 number_prefix = { version = "0.4.0", default-features = false, features = ["std"], optional = true }
-tui = { version = "0.19.0", optional = true, default-features = false, features = ["crossterm"] }
+ratatui = { version = "0.22.0", optional = true, default-features = false, features = ["crossterm"] }
 
 # Datadog Pipelines
 
@@ -251,7 +253,7 @@ bytes = { version = "1.4.0", default-features = false, features = ["serde"] }
 bytesize = { version = "1.2.0", default-features = false }
 chrono = { version = "0.4.26", default-features = false, features = ["serde"] }
 cidr-utils = { version = "0.5.10", default-features = false }
-clap = { version = "4.1.14", default-features = false, features = ["derive", "error-context", "env", "help", "std", "string", "usage", "wrap_help"] }
+clap = { version = "4.3.21", default-features = false, features = ["derive", "error-context", "env", "help", "std", "string", "usage", "wrap_help"] }
 colored = { version = "2.0.4", default-features = false }
 csv = { version = "1.2", default-features = false }
 derivative = { version = "2.2.0", default-features = false }
@@ -260,7 +262,7 @@ dyn-clone = { version = "1.0.12", default-features = false }
 encoding_rs = { version = "0.8.32", default-features = false, features = ["serde"] }
 enum_dispatch = { version = "0.3.12", default-features = false }
 exitcode = { version = "1.1.2", default-features = false }
-flate2 = { version = "1.0.26", default-features = false, features = ["default"] }
+flate2 = { version = "1.0.27", default-features = false, features = ["default"] }
 futures-util = { version = "0.3.28", default-features = false }
 glob = { version = "0.3.1", default-features = false }
 governor = { version = "0.6.0", default-features = false, features = ["dashmap", "jitter", "std"], optional = true }
@@ -286,25 +288,24 @@ logfmt = { version = "0.0.2", default-features = false, optional = true }
 lru = { version = "0.11.0", default-features = false, optional = true }
 maxminddb = { version = "0.23.0", default-features = false, optional = true }
 md-5 = { version = "0.10", default-features = false, optional = true }
-mongodb = { version = "2.6.0", default-features = false, features = ["tokio-runtime"], optional = true }
-nats = { version = "0.24.0", default-features = false, optional = true }
+mongodb = { version = "2.6.1", default-features = false, features = ["tokio-runtime"], optional = true }
+async-nats = { version = "0.31.0", default-features = false, optional = true }
 nkeys = { version = "0.3.1", default-features = false, optional = true }
 nom = { version = "7.1.3", default-features = false, optional = true }
 notify = { version = "6.0.1", default-features = false, features = ["macos_fsevent"] }
 once_cell = { version = "1.18", default-features = false }
-openssl = { version = "0.10.55", default-features = false, features = ["vendored"] }
+openssl = { version = "0.10.56", default-features = false, features = ["vendored"] }
 openssl-probe = { version = "0.1.5", default-features = false }
 ordered-float = { version = "3.7.0", default-features = false }
 paste = "1.0.14"
 percent-encoding = { version = "2.3.0", default-features = false }
-pin-project = { version = "1.1.2", default-features = false }
 postgres-openssl = { version = "0.5.0", default-features = false, features = ["runtime"], optional = true }
 pulsar = { version = "6.0.1", default-features = false, features = ["tokio-runtime", "auth-oauth2", "flate2", "lz4", "snap", "zstd"], optional = true }
 rand = { version = "0.8.5", default-features = false, features = ["small_rng"] }
 rand_distr = { version = "0.4.3", default-features = false }
 rdkafka = { version = "0.33.2", default-features = false, features = ["tokio", "libz", "ssl", "zstd"], optional = true }
-redis = { version = "0.23.1", default-features = false, features = ["connection-manager", "tokio-comp", "tokio-native-tls-comp"], optional = true }
-regex = { version = "1.9.1", default-features = false, features = ["std", "perf"] }
+redis = { version = "0.23.2", default-features = false, features = ["connection-manager", "tokio-comp", "tokio-native-tls-comp"], optional = true }
+regex = { version = "1.9.3", default-features = false, features = ["std", "perf"] }
 roaring = { version = "0.10.2", default-features = false, optional = true }
 seahash = { version = "4.1.0", default-features = false }
 semver = { version = "1.0.18", default-features = false, features = ["serde", "std"], optional = true }
@@ -313,7 +314,7 @@ snafu = { version = "0.7.5", default-features = false, features = ["futures"] }
 snap = { version = "1.1.0", default-features = false, optional = true }
 socket2 = { version = "0.5.3", default-features = false }
 stream-cancel = { version = "0.8.1", default-features = false }
-strip-ansi-escapes = { version = "0.1.1", default-features = false }
+strip-ansi-escapes = { version = "0.2.0", default-features = false }
 syslog = { version = "6.1.0", default-features = false, optional = true }
 tikv-jemallocator = { version = "0.5.4", default-features = false, optional = true }
 tokio-postgres = { version = "0.7.7", default-features = false, features = ["runtime", "with-chrono-0_4"], optional = true }
@@ -345,15 +346,15 @@ nix = { version = "0.26.2", default-features = false, features = ["socket", "sig
 [build-dependencies]
 prost-build = { version = "0.11", default-features = false, optional = true }
 tonic-build = { version = "0.9", default-features = false, features = ["transport", "prost"], optional = true }
-openssl-src = { version = "111", default-features = false, features = ["force-engine"] }
+openssl-src = { version = "300", default-features = false, features = ["force-engine", "legacy"] }
 
 [dev-dependencies]
 approx = "0.5.1"
 assert_cmd = { version = "2.0.12", default-features = false }
-azure_core = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "b4544d4920fa3064eb921340054cd9cc130b7664", default-features = false, features = ["enable_reqwest", "azurite_workaround"] }
-azure_identity = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "b4544d4920fa3064eb921340054cd9cc130b7664", default-features = false, features = ["enable_reqwest"] }
-azure_storage_blobs = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "b4544d4920fa3064eb921340054cd9cc130b7664", default-features = false, features = ["azurite_workaround"] }
-azure_storage = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "b4544d4920fa3064eb921340054cd9cc130b7664", default-features = false, features = ["azurite_workaround"] }
+azure_core = { version = "0.13", default-features = false, features = ["enable_reqwest", "azurite_workaround"] }
+azure_identity = { version = "0.13", default-features = false, features = ["enable_reqwest"] }
+azure_storage_blobs = { version = "0.13", default-features = false, features = ["azurite_workaround"] }
+azure_storage = { version = "0.13", default-features = false }
 base64 = "0.21.2"
 criterion = { version = "0.5.1", features = ["html_reports", "async_tokio"] }
 itertools = { version = "0.11.0", default-features = false, features = ["use_alloc"] }
@@ -361,11 +362,12 @@ libc = "0.2.147"
 similar-asserts = "1.4.2"
 proptest = "1.2"
 quickcheck = "1.0.3"
+lookup = { package = "vector-lookup", path = "lib/vector-lookup", features = ["test"] }
 reqwest = { version = "0.11", features = ["json"] }
 tempfile = "3.6.0"
 test-generator = "0.3.1"
+tokio = { version = "1.30.0", features = ["test-util"] }
 tokio-test = "0.4.2"
-tokio = { version = "1.29.1", features = ["test-util"] }
 tower-test = "0.4.0"
 vector-core = { path = "lib/vector-core", default-features = false, features = ["vrl", "test"] }
 wiremock = "0.5.19"
@@ -381,6 +383,11 @@ nix = { git = "https://github.com/vectordotdev/nix.git", branch = "memfd/gnu/mus
 # The `heim` crates depend on `ntapi` 0.3.7 on Windows, but that version has an
 # unaligned access bug fixed in the following revision.
 ntapi = { git = "https://github.com/MSxDOS/ntapi.git", rev = "24fc1e47677fc9f6e38e5f154e6011dc9b270da6" }
+# The current `openssl-sys` crate will vendor the OpenSSL sources via
+# `openssl-src` at version 1.1.1*, but we want version 3.1.*. Bring in forked
+# version of that crate with the appropriate dependency patched in.
+openssl-sys = { git = "https://github.com/vectordotdev/rust-openssl.git", tag = "openssl-sys-v0.9.91+3.0.0" }
+openssl-src = { git = "https://github.com/vectordotdev/openssl-src-rs.git", tag = "release-300-force-engine+3.1.2"}
 
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin
@@ -438,7 +445,7 @@ api-client = [
   "dep:crossterm",
   "dep:num-format",
   "dep:number_prefix",
-  "dep:tui",
+  "dep:ratatui",
   "vector-core/api",
   "dep:vector-api-client",
 ]
@@ -537,7 +544,7 @@ sources-kafka = ["dep:rdkafka"]
 sources-kubernetes_logs = ["dep:file-source", "kubernetes", "transforms-reduce"]
 sources-logstash = ["sources-utils-net-tcp", "tokio-util/net"]
 sources-mongodb_metrics = ["dep:mongodb"]
-sources-nats = ["dep:nats", "dep:nkeys"]
+sources-nats = ["dep:async-nats", "dep:nkeys"]
 sources-nginx_metrics = ["dep:nom"]
 sources-opentelemetry = ["dep:hex", "dep:opentelemetry-proto", "dep:prost-types", "sources-http_server", "sources-utils-http", "sources-vector"]
 sources-postgresql_metrics = ["dep:postgres-openssl", "dep:tokio-postgres"]
@@ -694,7 +701,7 @@ sinks-influxdb = []
 sinks-kafka = ["dep:rdkafka"]
 sinks-mezmo = []
 sinks-loki = ["loki-logproto"]
-sinks-nats = ["dep:nats", "dep:nkeys"]
+sinks-nats = ["dep:async-nats", "dep:nkeys"]
 sinks-new_relic_logs = ["sinks-http"]
 sinks-new_relic = []
 sinks-papertrail = ["dep:syslog"]

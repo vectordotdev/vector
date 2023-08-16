@@ -185,13 +185,13 @@ impl Transformer {
                 TimestampFormat::Unix => {
                     if log.value().is_object() {
                         let mut unix_timestamps = Vec::new();
-                        for (k, v) in log.all_fields().expect("must be an object") {
+                        for (k, v) in log.all_event_fields().expect("must be an object") {
                             if let Value::Timestamp(ts) = v {
                                 unix_timestamps.push((k.clone(), Value::Integer(ts.timestamp())));
                             }
                         }
                         for (k, v) in unix_timestamps {
-                            log.insert(k.as_str(), v);
+                            log.parse_path_and_insert(k, v).unwrap();
                         }
                     } else {
                         // root is not an object

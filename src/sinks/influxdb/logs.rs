@@ -4,6 +4,7 @@ use bytes::{Bytes, BytesMut};
 use futures::SinkExt;
 use http::{Request, Uri};
 use indoc::indoc;
+use vrl::event_path;
 use vrl::path::OwnedValuePath;
 use vrl::value::Kind;
 
@@ -280,7 +281,7 @@ impl HttpEventEncoder<BytesMut> for InfluxDbLogsEncoder {
         }
 
         self.tags.replace("metric_type".to_string());
-        log.insert("metric_type", "logs");
+        log.insert(event_path!("metric_type"), "logs");
 
         // Timestamp
         let timestamp = encode_timestamp(match log.remove_timestamp() {

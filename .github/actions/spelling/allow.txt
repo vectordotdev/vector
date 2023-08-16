@@ -248,6 +248,7 @@ corejs
 coreutils
 curta
 daemonset
+dalek
 databend
 datacenter
 datadog
