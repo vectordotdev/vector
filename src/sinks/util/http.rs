@@ -660,10 +660,8 @@ pub struct HttpResponse {
 
 impl DriverResponse for HttpResponse {
     fn event_status(&self) -> EventStatus {
-        if self.http_response.is_successful() {
+        if self.http_response.status().is_success() {
             EventStatus::Delivered
-        } else if self.http_response.is_transient() {
-            EventStatus::Errored
         } else {
             EventStatus::Rejected
         }
@@ -678,12 +676,12 @@ impl DriverResponse for HttpResponse {
     }
 }
 
-/// HTTP request builder for HTTP stream sinks using the generic `HttpService`
+/// HTTP request builder for batched HTTP stream sinks using the generic `HttpService`
 pub trait HttpServiceRequestBuilder {
     fn build(&self, body: Bytes) -> Request<Bytes>;
 }
 
-/// Generic 'Service' implementation for HTTP stream sinks.
+/// Generic 'Service' implementation for batched HTTP stream sinks.
 #[derive(Clone)]
 pub struct HttpService<B> {
     batch_service:
@@ -698,7 +696,9 @@ where
     pub fn new(http_client: HttpClient<Body>, http_request_builder: B) -> Self {
         let http_request_builder = Arc::new(http_request_builder);
 
-        let batch_service = HttpBatchService::new(http_client, move |req: HttpRequest| {
+        let batch_service = HttpBatchService::new(http_client, move |req| {
+            let req: HttpRequest = req;
+
             let request_builder = Arc::clone(&http_request_builder);
 
             let fut: BoxFuture<'static, Result<http::Request<Bytes>, crate::Error>> =
@@ -729,9 +729,6 @@ where
         let mut http_service = self.batch_service.clone();
 
         let raw_byte_size = request.payload.len();
-
-        // NOTE: By taking the metadata here, when passing the request to `call()` below,
-        //       that function does not have access to the metadata anymore.
         let metadata = std::mem::take(request.metadata_mut());
         let events_byte_size = metadata.into_events_estimated_json_encoded_byte_size();
 
