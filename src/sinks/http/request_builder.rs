@@ -3,9 +3,9 @@
 use bytes::Bytes;
 use std::io;
 
-use crate::sinks::prelude::*;
+use crate::sinks::{prelude::*, util::http::HttpRequest};
 
-use super::{encoder::HttpEncoder, service::HttpRequest};
+use super::encoder::HttpEncoder;
 
 pub(super) struct HttpRequestBuilder {
     pub(super) encoder: HttpEncoder,

@@ -12,7 +12,7 @@ use std::{
 use bytes::{Buf, Bytes};
 use futures::{future::BoxFuture, Sink};
 use headers::HeaderName;
-use http::{header, HeaderValue, StatusCode};
+use http::{header, HeaderValue, Request, Response, StatusCode};
 use hyper::{body, Body};
 use indexmap::IndexMap;
 use pin_project::pin_project;
@@ -31,6 +31,7 @@ use crate::{
     event::Event,
     http::{HttpClient, HttpError},
     internal_events::{EndpointBytesSent, SinkRequestBuildError},
+    sinks::prelude::*,
 };
 
 pub trait HttpEventEncoder<Output> {
@@ -596,6 +597,144 @@ pub fn validate_headers(
     }
 
     Ok(validated_headers)
+}
+
+/// Request type for use in the `Service` implementation of HTTP stream sinks.
+#[derive(Clone)]
+pub struct HttpRequest {
+    payload: Bytes,
+    finalizers: EventFinalizers,
+    request_metadata: RequestMetadata,
+}
+
+impl HttpRequest {
+    /// Creates a new `HttpRequest`.
+    pub fn new(
+        payload: Bytes,
+        finalizers: EventFinalizers,
+        request_metadata: RequestMetadata,
+    ) -> Self {
+        Self {
+            payload,
+            finalizers,
+            request_metadata,
+        }
+    }
+}
+
+impl Finalizable for HttpRequest {
+    fn take_finalizers(&mut self) -> EventFinalizers {
+        self.finalizers.take_finalizers()
+    }
+}
+
+impl MetaDescriptive for HttpRequest {
+    fn get_metadata(&self) -> &RequestMetadata {
+        &self.request_metadata
+    }
+
+    fn metadata_mut(&mut self) -> &mut RequestMetadata {
+        &mut self.request_metadata
+    }
+}
+
+impl ByteSizeOf for HttpRequest {
+    fn allocated_bytes(&self) -> usize {
+        self.payload.allocated_bytes() + self.finalizers.allocated_bytes()
+    }
+}
+
+/// Response type for use in the `Service` implementation of HTTP stream sinks.
+pub struct HttpResponse {
+    pub http_response: Response<Bytes>,
+    events_byte_size: GroupedCountByteSize,
+    raw_byte_size: usize,
+}
+
+impl DriverResponse for HttpResponse {
+    fn event_status(&self) -> EventStatus {
+        if self.http_response.status().is_success() {
+            EventStatus::Delivered
+        } else {
+            EventStatus::Rejected
+        }
+    }
+
+    fn events_sent(&self) -> &GroupedCountByteSize {
+        &self.events_byte_size
+    }
+
+    fn bytes_sent(&self) -> Option<usize> {
+        Some(self.raw_byte_size)
+    }
+}
+
+/// HTTP request builder for batched HTTP stream sinks using the generic `HttpService`
+pub trait HttpServiceRequestBuilder {
+    fn build(&self, body: Bytes) -> Request<Bytes>;
+}
+
+/// Generic 'Service' implementation for batched HTTP stream sinks.
+#[derive(Clone)]
+pub struct HttpService<B> {
+    batch_service:
+        HttpBatchService<BoxFuture<'static, Result<Request<Bytes>, crate::Error>>, HttpRequest>,
+    _phantom: PhantomData<B>,
+}
+
+impl<B> HttpService<B>
+where
+    B: HttpServiceRequestBuilder + std::marker::Sync + std::marker::Send + 'static,
+{
+    pub fn new(http_client: HttpClient<Body>, http_request_builder: B) -> Self {
+        let http_request_builder = Arc::new(http_request_builder);
+
+        let batch_service = HttpBatchService::new(http_client, move |req| {
+            let req: HttpRequest = req;
+
+            let request_builder = Arc::clone(&http_request_builder);
+
+            let fut: BoxFuture<'static, Result<http::Request<Bytes>, crate::Error>> =
+                Box::pin(async move { Ok(request_builder.build(req.payload)) });
+
+            fut
+        });
+        Self {
+            batch_service,
+            _phantom: PhantomData,
+        }
+    }
+}
+
+impl<B> Service<HttpRequest> for HttpService<B>
+where
+    B: HttpServiceRequestBuilder + std::marker::Sync + std::marker::Send + 'static,
+{
+    type Response = HttpResponse;
+    type Error = crate::Error;
+    type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
+
+    fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Ok(()))
+    }
+
+    fn call(&mut self, mut request: HttpRequest) -> Self::Future {
+        let mut http_service = self.batch_service.clone();
+
+        let raw_byte_size = request.payload.len();
+        let metadata = std::mem::take(request.metadata_mut());
+        let events_byte_size = metadata.into_events_estimated_json_encoded_byte_size();
+
+        Box::pin(async move {
+            let http_response = http_service.call(request).await?;
+
+            Ok(HttpResponse {
+                http_response,
+                events_byte_size,
+                raw_byte_size,
+            })
+        })
+    }
 }
 
 #[cfg(test)]

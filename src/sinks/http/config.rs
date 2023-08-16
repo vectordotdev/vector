@@ -14,16 +14,14 @@ use crate::{
     sinks::{
         prelude::*,
         util::{
-            http::{HttpStatusRetryLogic, RequestConfig},
+            http::{HttpResponse, HttpService, HttpStatusRetryLogic, RequestConfig},
             RealtimeSizeBasedDefaultBatchSettings, UriSerde,
         },
     },
 };
 
 use super::{
-    encoder::HttpEncoder,
-    request_builder::HttpRequestBuilder,
-    service::{HttpResponse, HttpService, HttpSinkRequestBuilder},
+    encoder::HttpEncoder, request_builder::HttpRequestBuilder, service::HttpSinkRequestBuilder,
     sink::HttpSink,
 };
 
