@@ -3,7 +3,7 @@
 
 use snafu::Snafu;
 
-use crate::{nats::NatsConfigError, sinks::prelude::*};
+use crate::nats::NatsConfigError;
 
 mod config;
 #[cfg(feature = "nats-integration-tests")]
@@ -21,8 +21,6 @@ enum NatsError {
     Encoding {
         source: codecs::encoding::BuildError,
     },
-    #[snafu(display("invalid subject template: {}", source))]
-    SubjectTemplate { source: TemplateParseError },
     #[snafu(display("NATS Config Error: {}", source))]
     Config { source: NatsConfigError },
     #[snafu(display("NATS Connect Error: {}", source))]

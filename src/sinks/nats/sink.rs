@@ -8,7 +8,7 @@ use super::{
     config::NatsSinkConfig,
     request_builder::{NatsEncoder, NatsRequestBuilder},
     service::{NatsResponse, NatsService},
-    EncodingSnafu, NatsError, SubjectTemplateSnafu,
+    EncodingSnafu, NatsError,
 };
 
 pub(super) struct NatsEvent {
@@ -47,13 +47,14 @@ impl NatsSink {
         let serializer = config.encoding.build().context(EncodingSnafu)?;
         let encoder = Encoder::<()>::new(serializer);
         let request = config.request;
+        let subject = config.subject;
 
         Ok(NatsSink {
             request,
             connection,
             transformer,
             encoder,
-            subject: Template::try_from(config.subject).context(SubjectTemplateSnafu)?,
+            subject,
         })
     }
 

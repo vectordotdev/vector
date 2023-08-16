@@ -32,7 +32,7 @@ async fn publish_and_check(conf: NatsSinkConfig) -> Result<(), NatsError> {
         .await
         .expect("failed to connect with test consumer");
     let mut sub = consumer
-        .subscribe(subject)
+        .subscribe(subject.to_string())
         .await
         .expect("failed to subscribe with test consumer");
     consumer
@@ -73,7 +73,7 @@ async fn nats_no_auth() {
         acknowledgements: Default::default(),
         encoding: TextSerializerConfig::default().into(),
         connection_name: "".to_owned(),
-        subject: subject.clone(),
+        subject: Template::try_from(subject.as_str()).unwrap(),
         url,
         tls: None,
         auth: None,
@@ -100,7 +100,7 @@ async fn nats_userpass_auth_valid() {
         acknowledgements: Default::default(),
         encoding: TextSerializerConfig::default().into(),
         connection_name: "".to_owned(),
-        subject: subject.clone(),
+        subject: Template::try_from(subject.as_str()).unwrap(),
         url,
         tls: None,
         auth: Some(NatsAuthConfig::UserPassword {
@@ -129,7 +129,7 @@ async fn nats_userpass_auth_invalid() {
         acknowledgements: Default::default(),
         encoding: TextSerializerConfig::default().into(),
         connection_name: "".to_owned(),
-        subject: subject.clone(),
+        subject: Template::try_from(subject.as_str()).unwrap(),
         url,
         tls: None,
         auth: Some(NatsAuthConfig::UserPassword {
@@ -161,7 +161,7 @@ async fn nats_token_auth_valid() {
         acknowledgements: Default::default(),
         encoding: TextSerializerConfig::default().into(),
         connection_name: "".to_owned(),
-        subject: subject.clone(),
+        subject: Template::try_from(subject.as_str()).unwrap(),
         url,
         tls: None,
         auth: Some(NatsAuthConfig::Token {
@@ -192,7 +192,7 @@ async fn nats_token_auth_invalid() {
         acknowledgements: Default::default(),
         encoding: TextSerializerConfig::default().into(),
         connection_name: "".to_owned(),
-        subject: subject.clone(),
+        subject: Template::try_from(subject.as_str()).unwrap(),
         url,
         tls: None,
         auth: Some(NatsAuthConfig::Token {
@@ -223,7 +223,7 @@ async fn nats_nkey_auth_valid() {
         acknowledgements: Default::default(),
         encoding: TextSerializerConfig::default().into(),
         connection_name: "".to_owned(),
-        subject: subject.clone(),
+        subject: Template::try_from(subject.as_str()).unwrap(),
         url,
         tls: None,
         auth: Some(NatsAuthConfig::Nkey {
@@ -255,7 +255,7 @@ async fn nats_nkey_auth_invalid() {
         acknowledgements: Default::default(),
         encoding: TextSerializerConfig::default().into(),
         connection_name: "".to_owned(),
-        subject: subject.clone(),
+        subject: Template::try_from(subject.as_str()).unwrap(),
         url,
         tls: None,
         auth: Some(NatsAuthConfig::Nkey {
@@ -287,7 +287,7 @@ async fn nats_tls_valid() {
         acknowledgements: Default::default(),
         encoding: TextSerializerConfig::default().into(),
         connection_name: "".to_owned(),
-        subject: subject.clone(),
+        subject: Template::try_from(subject.as_str()).unwrap(),
         url,
         tls: Some(TlsEnableableConfig {
             enabled: Some(true),
@@ -320,7 +320,7 @@ async fn nats_tls_invalid() {
         acknowledgements: Default::default(),
         encoding: TextSerializerConfig::default().into(),
         connection_name: "".to_owned(),
-        subject: subject.clone(),
+        subject: Template::try_from(subject.as_str()).unwrap(),
         url,
         tls: None,
         auth: None,
@@ -347,7 +347,7 @@ async fn nats_tls_client_cert_valid() {
         acknowledgements: Default::default(),
         encoding: TextSerializerConfig::default().into(),
         connection_name: "".to_owned(),
-        subject: subject.clone(),
+        subject: Template::try_from(subject.as_str()).unwrap(),
         url,
         tls: Some(TlsEnableableConfig {
             enabled: Some(true),
@@ -382,7 +382,7 @@ async fn nats_tls_client_cert_invalid() {
         acknowledgements: Default::default(),
         encoding: TextSerializerConfig::default().into(),
         connection_name: "".to_owned(),
-        subject: subject.clone(),
+        subject: Template::try_from(subject.as_str()).unwrap(),
         url,
         tls: Some(TlsEnableableConfig {
             enabled: Some(true),
@@ -415,7 +415,7 @@ async fn nats_tls_jwt_auth_valid() {
         acknowledgements: Default::default(),
         encoding: TextSerializerConfig::default().into(),
         connection_name: "".to_owned(),
-        subject: subject.clone(),
+        subject: Template::try_from(subject.as_str()).unwrap(),
         url,
         tls: Some(TlsEnableableConfig {
             enabled: Some(true),
@@ -452,7 +452,7 @@ async fn nats_tls_jwt_auth_invalid() {
         acknowledgements: Default::default(),
         encoding: TextSerializerConfig::default().into(),
         connection_name: "".to_owned(),
-        subject: subject.clone(),
+        subject: Template::try_from(subject.as_str()).unwrap(),
         url,
         tls: Some(TlsEnableableConfig {
             enabled: Some(true),

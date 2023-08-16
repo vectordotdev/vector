@@ -48,7 +48,7 @@ pub struct NatsSinkConfig {
         docs::examples = "time.>",
         docs::examples = ">"
     ))]
-    pub(super) subject: String,
+    pub(super) subject: Template,
 
     /// The NATS [URL][nats_url] to connect to.
     ///
@@ -82,7 +82,7 @@ impl GenerateConfig for NatsSinkConfig {
             auth: None,
             connection_name: "vector".into(),
             encoding: JsonSerializerConfig::default().into(),
-            subject: "from.vector".into(),
+            subject: Template::try_from("from.vector").unwrap(),
             tls: None,
             url: "nats://127.0.0.1:4222".into(),
             request: Default::default(),
