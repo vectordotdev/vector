@@ -15,7 +15,7 @@ use crate::aws::ClientBuilder;
 /// Configuration for the `aws_sns` sink.
 #[configurable_component(sink(
     "aws_sns",
-    "Publish observability events to AWS Simple Queue Service topics."
+    "Publish observability events to AWS Simple Notification Service topics."
 ))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
