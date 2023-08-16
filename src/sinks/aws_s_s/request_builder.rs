@@ -15,7 +15,7 @@ use crate::{
 };
 
 #[derive(Clone)]
-pub(super) struct Metadata {
+pub(super) struct SSMetadata {
     pub(super) finalizers: EventFinalizers,
     pub(super) message_group_id: Option<String>,
     pub(super) message_deduplication_id: Option<String>,
@@ -47,7 +47,7 @@ impl SSRequestBuilder {
 }
 
 impl RequestBuilder<Event> for SSRequestBuilder {
-    type Metadata = Metadata;
+    type Metadata = SSMetadata;
     type Events = Event;
     type Encoder = (Transformer, Encoder<()>);
     type Payload = Bytes;
@@ -97,7 +97,7 @@ impl RequestBuilder<Event> for SSRequestBuilder {
 
         let builder = RequestMetadataBuilder::from_event(&event);
 
-        let metadata = Metadata {
+        let metadata = SSMetadata {
             finalizers: event.take_finalizers(),
             message_group_id,
             message_deduplication_id,

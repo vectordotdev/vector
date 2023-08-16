@@ -15,7 +15,7 @@ where
     E: std::fmt::Debug + std::fmt::Display + std::error::Error + Sync + Send + 'static,
 {
     client: C,
-    phantom: PhantomData<fn() -> E>,
+    _phantom: PhantomData<fn() -> E>,
 }
 
 impl<C, E> SSService<C, E>
@@ -26,7 +26,7 @@ where
     pub(super) const fn new(client: C) -> Self {
         Self {
             client,
-            phantom: PhantomData,
+            _phantom: PhantomData,
         }
     }
 }
@@ -39,7 +39,7 @@ where
     fn clone(&self) -> SSService<C, E> {
         SSService {
             client: self.client.clone(),
-            phantom: PhantomData,
+            _phantom: PhantomData,
         }
     }
 }

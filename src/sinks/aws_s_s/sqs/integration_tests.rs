@@ -8,7 +8,7 @@ use tokio::time::{sleep, Duration};
 
 use crate::config::{SinkConfig, SinkContext};
 use crate::sinks::aws_s_s::sqs::config::{healthcheck, SqsSinkConfig};
-use crate::sinks::aws_s_s::BaseSSSinkConfig;
+use crate::sinks::aws_s_s::sqs::BaseSSSinkConfig;
 use crate::{
     aws::{create_client, AwsAuthentication, RegionOrEndpoint},
     common::sqs::SqsClientBuilder,

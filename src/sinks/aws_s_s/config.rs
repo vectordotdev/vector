@@ -25,7 +25,7 @@ pub(super) enum BuildError {
     MessageDeduplicationIdTemplate { source: TemplateParseError },
 }
 
-/// Configuration for the `aws_sqs` sink.
+/// Base Configuration `aws_s_s` for sns and sqs sink.
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]

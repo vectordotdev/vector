@@ -6,7 +6,7 @@ use crate::{aws::is_retriable_error, sinks::util::retries::RetryLogic};
 
 #[derive(Debug)]
 pub(super) struct SSRetryLogic<E> {
-    phantom: PhantomData<fn() -> E>,
+    _phantom: PhantomData<fn() -> E>,
 }
 
 impl<E> SSRetryLogic<E>
@@ -15,7 +15,7 @@ where
 {
     pub(super) fn new() -> SSRetryLogic<E> {
         Self {
-            phantom: PhantomData,
+            _phantom: PhantomData,
         }
     }
 }
@@ -38,7 +38,7 @@ where
 {
     fn clone(&self) -> SSRetryLogic<E> {
         SSRetryLogic {
-            phantom: PhantomData,
+            _phantom: PhantomData,
         }
     }
 }
