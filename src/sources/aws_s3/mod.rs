@@ -3,7 +3,7 @@ use std::{convert::TryInto, io::ErrorKind};
 use async_compression::tokio::bufread;
 use aws_sdk_s3::types::ByteStream;
 use codecs::decoding::{DeserializerConfig, FramingConfig, NewlineDelimitedDecoderOptions};
-use codecs::{BytesDeserializerConfig, NewlineDelimitedDecoderConfig};
+use codecs::NewlineDelimitedDecoderConfig;
 use futures::{stream, stream::StreamExt, TryStreamExt};
 use lookup::owned_value_path;
 use snafu::Snafu;
@@ -163,7 +163,8 @@ impl SourceConfig for AwsS3Config {
 
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
-        let mut schema_definition = BytesDeserializerConfig
+        let mut schema_definition = self
+            .decoding
             .schema_definition(log_namespace)
             .with_source_metadata(
                 Self::NAME,
