@@ -14,7 +14,6 @@ use vrl::value::{kind::Collection, Kind};
 
 use super::util::MultilineConfig;
 use crate::codecs::DecodingConfig;
-use crate::config::DataType;
 use crate::{
     aws::{auth::AwsAuthentication, create_client, create_client_and_region, RegionOrEndpoint},
     common::{s3::S3ClientBuilder, sqs::SqsClientBuilder},
@@ -444,6 +443,7 @@ mod integration_tests {
 
     use aws_sdk_s3::{types::ByteStream, Client as S3Client};
     use aws_sdk_sqs::{model::QueueAttributeName, Client as SqsClient};
+    use codecs::decoding::DeserializerConfig;
     use lookup::path;
     use similar_asserts::assert_eq;
     use vrl::value::Value;
@@ -487,6 +487,7 @@ mod integration_tests {
             logs,
             Delivered,
             false,
+            DeserializerConfig::Bytes,
         )
         .await;
     }
@@ -506,6 +507,7 @@ mod integration_tests {
             logs,
             Delivered,
             true,
+            DeserializerConfig::Bytes,
         )
         .await;
     }
@@ -526,6 +528,7 @@ mod integration_tests {
             logs,
             Delivered,
             false,
+            DeserializerConfig::Bytes,
         )
         .await;
     }
@@ -546,6 +549,7 @@ mod integration_tests {
             logs,
             Delivered,
             false,
+            DeserializerConfig::Bytes,
         )
         .await;
     }
@@ -574,6 +578,7 @@ mod integration_tests {
             logs,
             Delivered,
             false,
+            DeserializerConfig::Bytes,
         )
         .await;
     }
@@ -603,6 +608,7 @@ mod integration_tests {
             logs,
             Delivered,
             false,
+            DeserializerConfig::Bytes,
         )
         .await;
     }
@@ -632,6 +638,7 @@ mod integration_tests {
             logs,
             Delivered,
             false,
+            DeserializerConfig::Bytes,
         )
         .await;
     }
@@ -659,6 +666,7 @@ mod integration_tests {
             vec!["abc\ndef\ngeh".to_owned()],
             Delivered,
             false,
+            DeserializerConfig::Bytes,
         )
         .await;
     }
@@ -681,6 +689,7 @@ mod integration_tests {
             logs,
             Errored,
             false,
+            DeserializerConfig::Bytes,
         )
         .await;
     }
@@ -700,6 +709,7 @@ mod integration_tests {
             logs,
             Rejected,
             false,
+            DeserializerConfig::Bytes,
         )
         .await;
     }
@@ -712,6 +722,7 @@ mod integration_tests {
         queue_url: &str,
         multiline: Option<MultilineConfig>,
         log_namespace: bool,
+        decoding: DeserializerConfig,
     ) -> AwsS3Config {
         AwsS3Config {
             region: RegionOrEndpoint::with_both("us-east-1", s3_address()),
@@ -727,6 +738,7 @@ mod integration_tests {
             }),
             acknowledgements: true.into(),
             log_namespace: Some(log_namespace),
+            decoding,
             ..Default::default()
         }
     }
@@ -742,6 +754,7 @@ mod integration_tests {
         expected_lines: Vec<String>,
         status: EventStatus,
         log_namespace: bool,
+        decoding: DeserializerConfig,
     ) {
         assert_source_compliance(&SOURCE_TAGS, async move {
             let key = key.unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
@@ -754,7 +767,7 @@ mod integration_tests {
 
             tokio::time::sleep(Duration::from_secs(1)).await;
 
-            let config = config(&queue, multiline, log_namespace);
+            let config = config(&queue, multiline, log_namespace, decoding);
 
             s3.put_object()
                 .bucket(bucket.clone())
@@ -835,6 +848,11 @@ mod integration_tests {
 
             assert_eq!(expected_lines.len(), events.len());
             for (i, event) in events.iter().enumerate() {
+
+                if let Some(schema_definition) = config.outputs(log_namespace.into()).pop().unwrap().schema_definition {
+                    schema_definition.is_valid_for_event(event).unwrap();
+                }
+
                 let message = expected_lines[i].as_str();
 
                 let log = event.as_log();
