@@ -7,9 +7,9 @@ mod sink;
 use self::config::BaseSSSinkConfig;
 
 #[cfg(feature = "sinks-aws_sqs")]
-pub mod sqs;
+mod sqs;
 
 #[cfg(feature = "sinks-aws_sns")]
-pub mod sns;
+mod sns;
 
 mod client;
