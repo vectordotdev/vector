@@ -9,7 +9,7 @@ use crate::{
 
 impl ToValue for StatusCode {
     fn to_value(&self) -> Value {
-        serde_json::to_value(self.as_u16()).expect("Could not convert status code to JSON")
+        serde_json::to_value(self.as_u16()).expect("Could not convert HTTP status code to JSON")
     }
 }
 
