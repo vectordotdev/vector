@@ -362,11 +362,12 @@ libc = "0.2.147"
 similar-asserts = "1.4.2"
 proptest = "1.2"
 quickcheck = "1.0.3"
+lookup = { package = "vector-lookup", path = "lib/vector-lookup", features = ["test"] }
 reqwest = { version = "0.11", features = ["json"] }
 tempfile = "3.6.0"
 test-generator = "0.3.1"
-tokio-test = "0.4.2"
 tokio = { version = "1.30.0", features = ["test-util"] }
+tokio-test = "0.4.2"
 tower-test = "0.4.0"
 vector-core = { path = "lib/vector-core", default-features = false, features = ["vrl", "test"] }
 wiremock = "0.5.19"

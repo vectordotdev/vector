@@ -558,7 +558,7 @@ mod integration_tests {
         }
 
         for event in events {
-            let json = serde_json::to_value(event.as_log().all_fields().unwrap()).unwrap();
+            let json = serde_json::to_value(event.as_log().all_event_fields().unwrap()).unwrap();
             match query_event {
                 "query" => {
                     if json["messageType"] == json!("ClientQuery") {
