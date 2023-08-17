@@ -23,7 +23,6 @@ where
     C: Client<E> + Clone + Send + Sync + 'static,
     E: std::fmt::Debug + std::fmt::Display + std::error::Error + Sync + Send + 'static,
 {
-    #[allow(dead_code)]
     pub(super) const fn new(client: C) -> Self {
         Self {
             client,

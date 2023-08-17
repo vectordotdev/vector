@@ -79,7 +79,6 @@ pub(super) struct BaseSSSinkConfig {
     pub(super) acknowledgements: AcknowledgementsConfig,
 }
 
-#[allow(dead_code)]
 pub(super) fn message_group_id(
     message_group_id: Option<String>,
     fifo: bool,
@@ -93,7 +92,6 @@ pub(super) fn message_group_id(
         (None, false) => Ok(None),
     }
 }
-#[allow(dead_code)]
 pub(super) fn message_deduplication_id(
     message_deduplication_id: Option<String>,
 ) -> crate::Result<Option<Template>> {

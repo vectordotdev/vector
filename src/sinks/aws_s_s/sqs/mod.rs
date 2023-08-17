@@ -1,7 +1,7 @@
-#![cfg(all(test, feature = "aws-sqs-integration-tests"))]
-
 mod client;
 mod config;
+
+#[cfg(all(test, feature = "aws-sqs-integration-tests"))]
 mod integration_tests;
 
 use super::{
