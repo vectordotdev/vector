@@ -29,6 +29,7 @@ pub(super) struct SSRequestBuilder {
 }
 
 impl SSRequestBuilder {
+    #[allow(dead_code)]
     pub(super) fn new(
         message_group_id: Option<Template>,
         message_deduplication_id: Option<Template>,
