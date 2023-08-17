@@ -334,7 +334,7 @@ base: components: sources: http_server: configuration: {
 		}
 	}
 	response_code: {
-		description: "Specifies the HTTP response status code on request success."
+		description: "Specifies the HTTP response status code that will be returned on successful requests."
 		required:    false
 		type: u16: {
 			default: 200
