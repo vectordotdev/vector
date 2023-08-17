@@ -216,7 +216,7 @@ install_from_archive() {
     printf " ✓\n"
 
     if [ "$modify_path" = "yes" ]; then
-      local _path="export PATH=$PATH:$prefix/bin"
+      local _path="export PATH=\"$PATH:$prefix/bin\""
       add_to_path "${HOME}/.zprofile" "${_path}"
       add_to_path "${HOME}/.profile" "${_path}"
     fi
