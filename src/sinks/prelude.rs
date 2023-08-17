@@ -11,7 +11,6 @@ pub use crate::{
     event::{Event, LogEvent},
     internal_events::{SinkRequestBuildError, TemplateRenderingError},
     register_validatable_component,
-    sinks::util::retries::{RetryAction, RetryLogic},
     sinks::{
         util::{
             builder::SinkBuilderExt,
