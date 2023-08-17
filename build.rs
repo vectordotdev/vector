@@ -120,7 +120,9 @@ fn main() {
         println!("cargo:rerun-if-changed=proto/dnstap.proto");
         println!("cargo:rerun-if-changed=proto/ddsketch_full.proto");
         println!("cargo:rerun-if-changed=proto/dd_metric.proto");
+        println!("cargo:rerun-if-changed=proto/google/cloud/bigquery/storage/v1/storage.proto");
         println!("cargo:rerun-if-changed=proto/google/pubsub/v1/pubsub.proto");
+        println!("cargo:rerun-if-changed=proto/google/rpc/code.proto");
         println!("cargo:rerun-if-changed=proto/google/rpc/status.proto");
         println!("cargo:rerun-if-changed=proto/vector.proto");
 
@@ -148,7 +150,9 @@ fn main() {
                     "proto/ddsketch_full.proto",
                     "proto/dd_metric.proto",
                     "proto/dd_trace.proto",
+                    "proto/google/cloud/bigquery/storage/v1/storage.proto",
                     "proto/google/pubsub/v1/pubsub.proto",
+                    "proto/google/rpc/code.proto",
                     "proto/google/rpc/status.proto",
                     "proto/vector.proto",
                 ],

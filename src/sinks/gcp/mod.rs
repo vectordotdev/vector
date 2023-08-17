@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use vector_config::configurable_component;
 
+pub mod bigquery;
 pub mod chronicle_unstructured;
 pub mod cloud_storage;
 pub mod pubsub;
