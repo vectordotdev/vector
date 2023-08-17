@@ -1,5 +1,3 @@
-#![cfg(all(test, feature = "aws-sns-integration-tests"))]
-
 use std::collections::HashMap;
 
 use aws_sdk_sns::{Client as SnsClient, Region};
