@@ -520,6 +520,7 @@ mod tests {
         path_key: &'a str,
         path: &'a str,
         method: &'a str,
+        response_code: StatusCode,
         strict_path: bool,
         status: EventStatus,
         acknowledgements: bool,
@@ -543,7 +544,7 @@ mod tests {
                 headers,
                 encoding: None,
                 query_parameters,
-                response_code: StatusCode::OK,
+                response_code: response_code,
                 tls: None,
                 auth: None,
                 strict_path,
@@ -654,6 +655,7 @@ mod tests {
                 "http_path",
                 "/",
                 "POST",
+                StatusCode::OK,
                 true,
                 EventStatus::Delivered,
                 true,
@@ -709,6 +711,7 @@ mod tests {
                 "http_path",
                 "/",
                 "POST",
+                StatusCode::OK,
                 true,
                 EventStatus::Delivered,
                 true,
@@ -752,6 +755,7 @@ mod tests {
                 "http_path",
                 "/",
                 "POST",
+                StatusCode::OK,
                 true,
                 EventStatus::Delivered,
                 true,
@@ -786,6 +790,7 @@ mod tests {
                 "http_path",
                 "/",
                 "POST",
+                StatusCode::OK,
                 true,
                 EventStatus::Delivered,
                 true,
@@ -836,6 +841,7 @@ mod tests {
                 "http_path",
                 "/",
                 "POST",
+                StatusCode::OK,
                 true,
                 EventStatus::Delivered,
                 true,
@@ -879,6 +885,7 @@ mod tests {
                 "http_path",
                 "/",
                 "POST",
+                StatusCode::OK,
                 true,
                 EventStatus::Delivered,
                 true,
@@ -928,6 +935,7 @@ mod tests {
                 "http_path",
                 "/",
                 "POST",
+                StatusCode::OK,
                 true,
                 EventStatus::Delivered,
                 true,
@@ -1018,6 +1026,7 @@ mod tests {
                 "http_path",
                 "/",
                 "POST",
+                StatusCode::OK,
                 true,
                 EventStatus::Delivered,
                 true,
@@ -1059,6 +1068,7 @@ mod tests {
                 "http_path",
                 "/",
                 "POST",
+                StatusCode::OK,
                 true,
                 EventStatus::Delivered,
                 true,
@@ -1109,6 +1119,7 @@ mod tests {
                 "http_path",
                 "/",
                 "POST",
+                StatusCode::OK,
                 true,
                 EventStatus::Delivered,
                 true,
@@ -1141,6 +1152,7 @@ mod tests {
                 "vector_http_path",
                 "/event/path",
                 "POST",
+                StatusCode::OK,
                 true,
                 EventStatus::Delivered,
                 true,
@@ -1185,6 +1197,7 @@ mod tests {
                 "vector_http_path",
                 "/event",
                 "POST",
+                StatusCode::OK,
                 false,
                 EventStatus::Delivered,
                 true,
@@ -1254,6 +1267,7 @@ mod tests {
             "vector_http_path",
             "/",
             "POST",
+            StatusCode::OK,
             true,
             EventStatus::Delivered,
             true,
@@ -1269,6 +1283,39 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn http_status_code() {
+        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async move {
+            let (rx, addr) = source(
+                vec![],
+                vec![],
+                "http_path",
+                "/",
+                "POST",
+                StatusCode::ACCEPTED,
+                true,
+                EventStatus::Delivered,
+                true,
+                None,
+                None,
+            )
+            .await;
+
+            spawn_collect_n(
+                async move {
+                    assert_eq!(
+                        StatusCode::ACCEPTED,
+                        send(addr, "{\"key1\":\"value1\"}").await
+                    );
+                },
+                rx,
+                1,
+            )
+            .await;
+        })
+        .await;
+    }
+
+    #[tokio::test]
     async fn http_delivery_failure() {
         assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let (rx, addr) = source(
@@ -1277,6 +1324,7 @@ mod tests {
                 "http_path",
                 "/",
                 "POST",
+                StatusCode::OK,
                 true,
                 EventStatus::Rejected,
                 true,
@@ -1306,6 +1354,7 @@ mod tests {
                 "http_path",
                 "/",
                 "POST",
+                StatusCode::OK,
                 true,
                 EventStatus::Rejected,
                 false,
@@ -1337,6 +1386,7 @@ mod tests {
             "http_path",
             "/",
             "GET",
+            StatusCode::OK,
             true,
             EventStatus::Delivered,
             true,
