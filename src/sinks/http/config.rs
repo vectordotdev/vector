@@ -48,7 +48,7 @@ pub(super) struct HttpSinkConfig {
     pub(super) auth: Option<Auth>,
 
     /// A list of custom headers to add to each request.
-    #[configurable(deprecated)]
+    #[configurable(deprecated = "This option has been deprecated, use `request.headers` instead.")]
     #[configurable(metadata(
         docs::additional_props_description = "An HTTP request header and it's value."
     ))]

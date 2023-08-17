@@ -689,9 +689,7 @@ where
     pub fn new(http_client: HttpClient<Body>, http_request_builder: B) -> Self {
         let http_request_builder = Arc::new(http_request_builder);
 
-        let batch_service = HttpBatchService::new(http_client, move |req| {
-            let req: HttpRequest = req;
-
+        let batch_service = HttpBatchService::new(http_client, move |req: HttpRequest| {
             let request_builder = Arc::clone(&http_request_builder);
 
             let fut: BoxFuture<'static, Result<http::Request<Bytes>, crate::Error>> =
@@ -722,6 +720,9 @@ where
         let mut http_service = self.batch_service.clone();
 
         let raw_byte_size = request.payload.len();
+
+        // NOTE: By taking the metadata here, when passing the request to `call()` below,
+        //       that function does not have access to the metadata anymore.
         let metadata = std::mem::take(request.metadata_mut());
         let events_byte_size = metadata.into_events_estimated_json_encoded_byte_size();
 
