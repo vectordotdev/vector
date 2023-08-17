@@ -8,6 +8,7 @@ pub(crate) mod remote_write;
 
 use vector_config::configurable_component;
 
+#[cfg(feature = "aws-core")]
 use crate::aws::AwsAuthentication;
 
 /// Authentication strategies.
@@ -33,6 +34,7 @@ pub enum PrometheusRemoteWriteAuth {
         token: SensitiveString,
     },
 
+    #[cfg(feature = "aws-core")]
     /// Amazon Prometheus Service-specific authentication.
     Aws(AwsAuthentication),
 }

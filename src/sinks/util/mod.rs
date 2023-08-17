@@ -23,6 +23,7 @@ pub mod udp;
 pub mod unix;
 pub mod uri;
 pub mod zstd;
+pub mod auth;
 
 use std::borrow::Cow;
 
