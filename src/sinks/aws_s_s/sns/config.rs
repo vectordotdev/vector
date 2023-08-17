@@ -1,5 +1,7 @@
 use aws_sdk_sns::Client as SnsClient;
 
+use crate::aws::RegionOrEndpoint;
+
 use crate::config::{
     AcknowledgementsConfig, DataType, GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext,
 };
@@ -26,6 +28,9 @@ pub(super) struct SnsSinkConfig {
     pub(super) topic_arn: String,
 
     #[serde(flatten)]
+    pub(super) region: RegionOrEndpoint,
+
+    #[serde(flatten)]
     pub(super) base_config: BaseSSSinkConfig,
 }
 
@@ -44,8 +49,8 @@ impl SnsSinkConfig {
     pub(super) async fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<SnsClient> {
         create_client::<SnsClientBuilder>(
             &self.base_config.auth,
-            self.base_config.region.region(),
-            self.base_config.region.endpoint(),
+            self.region.region(),
+            self.region.endpoint(),
             proxy,
             &self.base_config.tls,
             true,

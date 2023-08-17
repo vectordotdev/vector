@@ -5,7 +5,7 @@ use snafu::{ResultExt, Snafu};
 use vector_config::configurable_component;
 
 use crate::{
-    aws::{AwsAuthentication, RegionOrEndpoint},
+    aws::AwsAuthentication,
     codecs::EncodingConfig,
     config::AcknowledgementsConfig,
     sinks::util::TowerRequestConfig,
@@ -30,9 +30,6 @@ pub(super) enum BuildError {
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub(super) struct BaseSSSinkConfig {
-    #[serde(flatten)]
-    pub(super) region: RegionOrEndpoint,
-
     #[configurable(derived)]
     pub(super) encoding: EncodingConfig,
 

@@ -76,7 +76,6 @@ async fn sns_send_message_batch() {
     let sns_client = create_sns_test_client().await;
 
     let base_config = BaseSSSinkConfig {
-        region: RegionOrEndpoint::with_both("local", sns_address().as_str()),
         encoding: TextSerializerConfig::default().into(),
         message_group_id: None,
         message_deduplication_id: None,
@@ -88,6 +87,7 @@ async fn sns_send_message_batch() {
     };
 
     let config = SnsSinkConfig {
+        region: RegionOrEndpoint::with_both("local", sns_address().as_str()),
         topic_arn: topic_arn.clone(),
         base_config,
     };

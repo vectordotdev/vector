@@ -1,5 +1,7 @@
 use aws_sdk_sqs::Client as SqsClient;
 
+use crate::aws::RegionOrEndpoint;
+
 use crate::config::{
     AcknowledgementsConfig, DataType, GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext,
 };
@@ -27,6 +29,9 @@ pub(super) struct SqsSinkConfig {
     pub(super) queue_url: String,
 
     #[serde(flatten)]
+    pub(super) region: RegionOrEndpoint,
+
+    #[serde(flatten)]
     pub(super) base_config: BaseSSSinkConfig,
 }
 
@@ -45,8 +50,8 @@ impl SqsSinkConfig {
     pub(super) async fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<SqsClient> {
         create_client::<SqsClientBuilder>(
             &self.base_config.auth,
-            self.base_config.region.region(),
-            self.base_config.region.endpoint(),
+            self.region.region(),
+            self.region.endpoint(),
             proxy,
             &self.base_config.tls,
             true,

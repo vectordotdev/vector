@@ -47,7 +47,6 @@ async fn sqs_send_message_batch() {
     let client = create_test_client().await;
 
     let base_config = BaseSSSinkConfig {
-        region: RegionOrEndpoint::with_both("local", sqs_address().as_str()),
         encoding: TextSerializerConfig::default().into(),
         message_group_id: None,
         message_deduplication_id: None,
@@ -59,6 +58,7 @@ async fn sqs_send_message_batch() {
     };
 
     let config = SqsSinkConfig {
+        region: RegionOrEndpoint::with_both("local", sqs_address().as_str()),
         queue_url: queue_url.clone(),
         base_config,
     };
