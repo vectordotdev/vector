@@ -16,7 +16,7 @@ chrono-tz = { version = "0.8.3", default-features = false }
 encoding_rs = { version = "0.8", default-features = false, features = ["alloc", "serde"] }
 indexmap = { version = "2.0", default-features = false, features = ["std"] }
 inventory = { version = "0.3" }
-no-proxy = { version = "0.3.3", default-features = false, features = ["serialize"] }
+no-proxy = { version = "0.3.4", default-features = false, features = ["serialize"] }
 num-traits = { version = "0.2.16", default-features = false }
 once_cell = { version = "1", default-features = false }
 serde = { version = "1.0", default-features = false }
