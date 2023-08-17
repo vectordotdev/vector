@@ -271,7 +271,8 @@ impl mlua::UserData for LuaEvent {
                 .inner
                 .as_log()
                 .parse_path_and_get_value(key.as_str())
-                .map_err(|e| e.to_lua_err())?
+                .ok()
+                .flatten()
             {
                 let string = lua.create_string(&value.coerce_to_bytes())?;
                 Ok(Some(string))
