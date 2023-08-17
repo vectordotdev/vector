@@ -18,9 +18,10 @@ pub use crate::{
             encoding::{self, write_all},
             metadata::RequestMetadataBuilder,
             request_builder::EncodeResult,
+            retries::{RetryAction, RetryLogic},
             service::{ServiceBuilderExt, Svc},
-            BatchConfig, Compression, NoDefaultsBatchSettings, RequestBuilder, SinkBatchSettings,
-            TowerRequestConfig,
+            BatchConfig, Compression, Concurrency, NoDefaultsBatchSettings, RequestBuilder,
+            SinkBatchSettings, TowerRequestConfig,
         },
         Healthcheck, HealthcheckError,
     },
@@ -38,6 +39,7 @@ pub use vector_common::{
     request_metadata::{GetEventCountTags, GroupedCountByteSize, MetaDescriptive, RequestMetadata},
 };
 pub use vector_config::configurable_component;
+
 pub use vector_core::{
     config::{telemetry, AcknowledgementsConfig, Input},
     event::Value,
