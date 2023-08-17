@@ -682,7 +682,7 @@ fn handle_single_log(
             log_namespace.insert_source_metadata(
                 AwsS3Config::NAME,
                 log,
-                Some(LegacyKey::Overwrite(key.as_str())),
+                Some(LegacyKey::Overwrite(path!(key))),
                 path!("metadata", key.as_str()),
                 value.clone(),
             );

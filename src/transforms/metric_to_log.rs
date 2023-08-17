@@ -313,7 +313,7 @@ impl MetricToLog {
 
                         if let Some(host_tag) = &self.host_tag {
                             if let Some(host_value) =
-                                log.remove_prune(host_tag.to_string().as_str(), true)
+                                log.remove_prune((PathPrefix::Event, host_tag), true)
                             {
                                 log.maybe_insert(log_schema().host_key_target_path(), host_value);
                             }

@@ -26,6 +26,7 @@ use vector_common::internal_event::{
 use vector_common::{byte_size_of::ByteSizeOf, finalizer::UnorderedFinalizer};
 use vector_config::configurable_component;
 use vector_core::config::{LegacyKey, LogNamespace};
+use vrl::path;
 use vrl::value::{kind::Collection, Kind};
 
 use crate::{
@@ -687,15 +688,15 @@ impl PubsubSource {
                 log_namespace.insert_source_metadata(
                     PubsubConfig::NAME,
                     log,
-                    Some(LegacyKey::Overwrite("message_id")),
-                    "message_id",
+                    Some(LegacyKey::Overwrite(path!("message_id"))),
+                    path!("message_id"),
                     message.message_id.clone(),
                 );
                 log_namespace.insert_source_metadata(
                     PubsubConfig::NAME,
                     log,
-                    Some(LegacyKey::Overwrite("attributes")),
-                    "attributes",
+                    Some(LegacyKey::Overwrite(path!("attributes"))),
+                    path!("attributes"),
                     attributes.clone(),
                 )
             }

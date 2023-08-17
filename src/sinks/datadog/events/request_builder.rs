@@ -2,7 +2,7 @@ use std::{io, sync::Arc};
 
 use bytes::Bytes;
 use codecs::JsonSerializerConfig;
-use lookup::lookup_v2::OwnedSegment;
+use lookup::lookup_v2::ConfigValuePath;
 use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
 use vector_core::ByteSizeOf;
 
@@ -133,7 +133,7 @@ fn encoder() -> (Transformer, Encoder<()>) {
             "title",
         ]
         .iter()
-        .map(|field| vec![OwnedSegment::Field((*field).into())].into())
+        .map(|field| ConfigValuePath::try_from((*field).to_string()).unwrap())
         .collect(),
     );
     // DataDog Event API requires unix timestamp.

@@ -33,6 +33,7 @@ use crate::{
     transforms::metric_to_log::MetricToLogConfig,
 };
 use lookup::event_path;
+use lookup::lookup_v2::ConfigValuePath;
 use vector_core::schema::Requirement;
 use vrl::value::Kind;
 
@@ -108,7 +109,7 @@ pub struct ElasticsearchConfig {
     #[configurable(metadata(docs::advanced))]
     #[configurable(metadata(docs::examples = "id"))]
     #[configurable(metadata(docs::examples = "_id"))]
-    pub id_key: Option<String>,
+    pub id_key: Option<ConfigValuePath>,
 
     /// The name of the pipeline to apply.
     #[serde(default)]

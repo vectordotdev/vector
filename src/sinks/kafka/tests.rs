@@ -13,6 +13,7 @@ mod integration_test {
     use bytes::Bytes;
     use codecs::TextSerializerConfig;
     use futures::StreamExt;
+    use lookup::lookup_v2::ConfigTargetPath;
     use rdkafka::{
         consumer::{BaseConsumer, Consumer},
         message::Headers,
@@ -302,7 +303,7 @@ mod integration_test {
         }
 
         let topic = format!("test-{}", random_string(10));
-        let headers_key = "headers_key".to_string();
+        let headers_key = ConfigTargetPath::try_from("headers_key".to_string()).unwrap();
         let kafka_auth = KafkaAuthConfig { sasl, tls };
         let config = KafkaSinkConfig {
             bootstrap_servers: server.clone(),
@@ -335,7 +336,7 @@ mod integration_test {
                 Value::Bytes(Bytes::from(header_1_value)),
             );
             events.iter_logs_mut().for_each(move |log| {
-                log.insert(headers_key.as_str(), header_values.clone());
+                log.insert(&headers_key, header_values.clone());
             });
             events
         });

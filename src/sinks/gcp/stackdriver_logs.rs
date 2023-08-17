@@ -4,9 +4,11 @@ use bytes::Bytes;
 use futures::{FutureExt, SinkExt};
 use http::{Request, Uri};
 use hyper::Body;
+use lookup::lookup_v2::ConfigValuePath;
 use serde_json::{json, map};
 use snafu::Snafu;
 use vector_config::configurable_component;
+use vrl::path::PathPrefix;
 use vrl::value::Kind;
 
 use crate::{
@@ -71,7 +73,7 @@ pub struct StackdriverConfig {
     /// [sev_names]: https://cloud.google.com/logging/docs/reference/v2/rest/v2/LogEntry#logseverity
     /// [logsev_docs]: https://cloud.google.com/logging/docs/reference/v2/rest/v2/LogEntry#logseverity
     #[configurable(metadata(docs::examples = "severity"))]
-    pub severity_key: Option<String>,
+    pub severity_key: Option<ConfigValuePath>,
 
     #[serde(flatten)]
     pub auth: GcpAuthConfig,
@@ -111,7 +113,7 @@ fn default_endpoint() -> String {
 struct StackdriverSink {
     config: StackdriverConfig,
     auth: GcpAuthenticator,
-    severity_key: Option<String>,
+    severity_key: Option<ConfigValuePath>,
     uri: Uri,
 }
 
@@ -259,7 +261,7 @@ impl SinkConfig for StackdriverConfig {
 
 struct StackdriverEventEncoder {
     config: StackdriverConfig,
-    severity_key: Option<String>,
+    severity_key: Option<ConfigValuePath>,
 }
 
 impl HttpEventEncoder<serde_json::Value> for StackdriverEventEncoder {
@@ -294,7 +296,7 @@ impl HttpEventEncoder<serde_json::Value> for StackdriverEventEncoder {
         let severity = self
             .severity_key
             .as_ref()
-            .and_then(|key| log.remove(key.as_str()))
+            .and_then(|key| log.remove((PathPrefix::Event, &key.0)))
             .map(remap_severity)
             .unwrap_or_else(|| 0.into());
 

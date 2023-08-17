@@ -20,7 +20,7 @@ use codecs::decoding::{DeserializerConfig, FramingConfig};
 use futures::{FutureExt, StreamExt};
 use futures_util::Stream;
 use lapin::{acker::Acker, message::Delivery, Channel};
-use lookup::{lookup_v2::OptionalValuePath, metadata_path, owned_value_path, path, PathPrefix};
+use lookup::{lookup_v2::OptionalValuePath, metadata_path, owned_value_path, path};
 use snafu::Snafu;
 use std::{io::Cursor, pin::Pin};
 use tokio_util::codec::FramedRead;
@@ -253,7 +253,7 @@ fn populate_event(
             .path
             .as_ref()
             .map(LegacyKey::InsertIfEmpty),
-        "routing",
+        path!("routing"),
         keys.routing.to_string(),
     );
 
@@ -264,7 +264,7 @@ fn populate_event(
             .path
             .as_ref()
             .map(LegacyKey::InsertIfEmpty),
-        "exchange",
+        path!("exchange"),
         keys.exchange.to_string(),
     );
 
@@ -272,7 +272,7 @@ fn populate_event(
         AmqpSourceConfig::NAME,
         log,
         keys.offset_key.path.as_ref().map(LegacyKey::InsertIfEmpty),
-        "offset",
+        path!("offset"),
         keys.delivery_tag,
     );
 
@@ -298,11 +298,8 @@ fn populate_event(
             log.insert(metadata_path!("vector", "ingest_timestamp"), Utc::now());
         }
         LogNamespace::Legacy => {
-            if let Some(timestamp_key) = log_schema().timestamp_key() {
-                log.try_insert(
-                    (PathPrefix::Event, timestamp_key),
-                    timestamp.unwrap_or_else(Utc::now),
-                );
+            if let Some(timestamp_key) = log_schema().timestamp_key_target_path() {
+                log.try_insert(timestamp_key, timestamp.unwrap_or_else(Utc::now));
             }
         }
     };
