@@ -28,16 +28,7 @@ impl CsvSerializerConfig {
         if self.csv.fields.is_empty() {
             Err("At least one CSV field must be specified".into())
         } else {
-            let opts = CsvSerializerOptions {
-                delimiter: self.csv.delimiter,
-                escape: self.csv.escape,
-                double_quote: self.csv.double_quote,
-                quote_style: self.csv.quote_style,
-                fields: self.csv.fields.clone(),
-            };
-            let config = CsvSerializerConfig::new(opts);
-
-            Ok(CsvSerializer::new(config))
+            Ok(CsvSerializer::new(self.clone()))
         }
     }
 
@@ -78,17 +69,38 @@ pub enum QuoteStyle {
     Never,
 }
 
+const fn default_delimiter() -> u8 {
+    b','
+}
+
+const fn default_escape() -> u8 {
+    b','
+}
+
+const fn default_double_quote() -> bool {
+    true
+}
+
 /// Config used to build a `CsvSerializer`.
 #[crate::configurable_component]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct CsvSerializerOptions {
     /// The field delimiter to use when writing CSV.
+    #[serde(
+        default = "default_delimiter",
+        with = "vector_core::serde::ascii_char",
+        //skip_serializing_if = "vector_core::serde::skip_serializing_if_default"
+    )]
     pub delimiter: u8,
 
     /// Enable double quote escapes.
     ///
     /// This is enabled by default, but it may be disabled. When disabled, quotes in
     /// field data are escaped instead of doubled.
+    #[serde(
+        default = "default_double_quote",
+        skip_serializing_if = "vector_core::serde::skip_serializing_if_default"
+    )]
     pub double_quote: bool,
 
     /// The escape character to use when writing CSV.
@@ -97,9 +109,18 @@ pub struct CsvSerializerOptions {
     /// like \ (instead of escaping quotes by doubling them).
     ///
     /// To use this `double_quotes` needs to be disabled as well otherwise it is ignored
+    #[serde(
+        default = "default_escape",
+        with = "vector_core::serde::ascii_char",
+        skip_serializing_if = "vector_core::serde::skip_serializing_if_default"
+    )]
     pub escape: u8,
 
     /// The quoting style to use when writing CSV data.
+    #[serde(
+        default,
+        skip_serializing_if = "vector_core::serde::skip_serializing_if_default"
+    )]
     pub quote_style: QuoteStyle,
 
     /// Configures the fields that will be encoded, as well as the order in which they
@@ -112,20 +133,8 @@ pub struct CsvSerializerOptions {
     pub fields: Vec<ConfigTargetPath>,
 }
 
-impl Default for CsvSerializerOptions {
-    fn default() -> CsvSerializerOptions {
-        CsvSerializerOptions {
-            delimiter: b',',
-            double_quote: true,
-            escape: b'"',
-            quote_style: QuoteStyle::Necessary,
-            fields: vec![],
-        }
-    }
-}
-
 impl CsvSerializerOptions {
-    const fn csv_quote_style(&self) -> csv::QuoteStyle {
+    fn csv_quote_style(&self) -> csv::QuoteStyle {
         match self.quote_style {
             QuoteStyle::Always => csv::QuoteStyle::Always,
             QuoteStyle::NonNumeric => csv::QuoteStyle::NonNumeric,
