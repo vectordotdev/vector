@@ -31,12 +31,12 @@ releases: "0.32.0": {
 			- Clickhouse
 			- Datadog Logs
 
-			This will be fixed in v0.32.1.
+			This is fixed in v0.32.1.
 			""",
 		"""
 			The newly added `--openssl-legacy-provider` flag cannot actually be disabled by setting
 			it to `false` via `--openssl-legacy-provider=false`. Instead it complains of extra
-			arguments. This will be fixed in v0.32.1.
+			arguments. This is fixed in v0.32.1.
 			""",
 	]
 
