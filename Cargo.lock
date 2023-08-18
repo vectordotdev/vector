@@ -4111,6 +4111,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0bfe8eed0a9285ef776bb792479ea3834e8b94e13d615c2f66d03dd50a435a29"
 
 [[package]]
+name = "http-serde"
+version = "1.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0e272971f774ba29341db2f686255ff8a979365a26fb9e4277f6b6d9ec0cdd5e"
+dependencies = [
+ "http",
+ "serde",
+]
+
+[[package]]
 name = "http-types"
 version = "2.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9477,6 +9487,7 @@ dependencies = [
  "hostname",
  "http",
  "http-body",
+ "http-serde",
  "hyper",
  "hyper-openssl",
  "hyper-proxy",
@@ -9701,6 +9712,7 @@ dependencies = [
  "chrono",
  "chrono-tz",
  "encoding_rs",
+ "http",
  "indexmap 2.0.0",
  "inventory",
  "no-proxy",
