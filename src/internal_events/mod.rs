@@ -76,6 +76,7 @@ mod journald;
 mod kafka;
 #[cfg(feature = "sources-kubernetes_logs")]
 mod kubernetes_logs;
+#[cfg(feature = "transforms-log_to_metric")]
 mod log_to_metric;
 mod logplex;
 #[cfg(feature = "sinks-loki")]
@@ -89,6 +90,7 @@ mod mongodb_metrics;
 #[cfg(feature = "sources-nginx_metrics")]
 mod nginx_metrics;
 mod open;
+#[cfg(feature = "transforms-log_to_metric")]
 mod parser;
 #[cfg(feature = "sources-postgresql_metrics")]
 mod postgresql_metrics;
@@ -213,6 +215,7 @@ pub(crate) use self::journald::*;
 pub(crate) use self::kafka::*;
 #[cfg(feature = "sources-kubernetes_logs")]
 pub(crate) use self::kubernetes_logs::*;
+#[cfg(feature = "transforms-log_to_metric")]
 pub(crate) use self::log_to_metric::*;
 #[cfg(feature = "sources-heroku_logs")]
 pub(crate) use self::logplex::*;
@@ -224,6 +227,7 @@ pub(crate) use self::lua::*;
 pub(crate) use self::metric_to_log::*;
 #[cfg(feature = "sources-nginx_metrics")]
 pub(crate) use self::nginx_metrics::*;
+#[cfg(feature = "transforms-log_to_metric")]
 pub(crate) use self::parser::*;
 #[cfg(feature = "sources-postgresql_metrics")]
 pub(crate) use self::postgresql_metrics::*;
