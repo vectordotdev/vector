@@ -290,6 +290,12 @@ where the data is actually sent.
 
 # Service
 
+**⚠ NOTE! This section implements an HTTP tower `Service` from scratch, for the
+purpose of demonstration only. Many sinks will require implementing `Service`
+in this way. Any new HTTP based sink should ideally utilize the structure
+`HttpService`, which handles most of what this section discusses in a shared
+structure that HTTP based sinks can utilize.**
+
 We need to create a [`Tower`][tower] service that is responsible for actually
 sending our final encoded data.
 
