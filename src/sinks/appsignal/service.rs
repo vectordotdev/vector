@@ -24,6 +24,9 @@ use super::request_builder::AppsignalRequest;
 
 #[derive(Clone)]
 pub(super) struct AppsignalService {
+    // TODO: `HttpBatchService` has been deprecated for direct use in sinks.
+    //       This sink should undergo a refactor to utilize the `HttpService`
+    //       instead, which extracts much of the boilerplate code for `Service`.
     pub(super) batch_service:
         HttpBatchService<Ready<Result<http::Request<Bytes>, crate::Error>>, AppsignalRequest>,
 }

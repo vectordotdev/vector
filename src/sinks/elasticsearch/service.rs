@@ -68,6 +68,9 @@ impl MetaDescriptive for ElasticsearchRequest {
 
 #[derive(Clone)]
 pub struct ElasticsearchService {
+    // TODO: `HttpBatchService` has been deprecated for direct use in sinks.
+    //       This sink should undergo a refactor to utilize the `HttpService`
+    //       instead, which extracts much of the boilerplate code for `Service`.
     batch_service: HttpBatchService<
         BoxFuture<'static, Result<http::Request<Bytes>, crate::Error>>,
         ElasticsearchRequest,
