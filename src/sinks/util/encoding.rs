@@ -2,6 +2,7 @@ use std::io;
 
 use bytes::BytesMut;
 use codecs::encoding::Framer;
+use itertools::{Itertools, Position};
 use tokio_util::codec::Encoder as _;
 use vector_common::request_metadata::GroupedCountByteSize;
 use vector_core::{config::telemetry, EstimatedJsonEncodedSizeOf};
@@ -24,7 +25,7 @@ pub trait Encoder<T> {
 impl Encoder<Vec<Event>> for (Transformer, crate::codecs::Encoder<Framer>) {
     fn encode_input(
         &self,
-        mut events: Vec<Event>,
+        events: Vec<Event>,
         writer: &mut dyn io::Write,
     ) -> io::Result<(usize, GroupedCountByteSize)> {
         let mut encoder = self.1.clone();
@@ -36,23 +37,7 @@ impl Encoder<Vec<Event>> for (Transformer, crate::codecs::Encoder<Framer>) {
 
         let mut byte_size = telemetry().create_request_count_byte_size();
 
-        if let Some(last) = events.pop() {
-            for mut event in events {
-                self.0.transform(&mut event);
-
-                // Ensure the json size is calculated after any fields have been removed
-                // by the transformer.
-                byte_size.add_event(&event, event.estimated_json_encoded_size_of());
-
-                let mut bytes = BytesMut::new();
-                encoder
-                    .encode(event, &mut bytes)
-                    .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
-                write_all(writer, n_events_pending, &bytes)?;
-                bytes_written += bytes.len();
-                n_events_pending -= 1;
-            }
-            let mut event = last;
+        for (position, mut event) in events.into_iter().with_position() {
             self.0.transform(&mut event);
 
             // Ensure the json size is calculated after any fields have been removed
@@ -60,13 +45,23 @@ impl Encoder<Vec<Event>> for (Transformer, crate::codecs::Encoder<Framer>) {
             byte_size.add_event(&event, event.estimated_json_encoded_size_of());
 
             let mut bytes = BytesMut::new();
-            encoder
-                .serialize(event, &mut bytes)
-                .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
+            match position {
+                Position::Last | Position::Only => {
+                    encoder
+                        .serialize(event, &mut bytes)
+                        .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
+                }
+                _ => {
+                    encoder
+                        .encode(event, &mut bytes)
+                        .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
+                }
+            }
             write_all(writer, n_events_pending, &bytes)?;
             bytes_written += bytes.len();
             n_events_pending -= 1;
         }
+
         let batch_suffix = encoder.batch_suffix();
         assert!(n_events_pending == 0);
         write_all(writer, 0, batch_suffix)?;
