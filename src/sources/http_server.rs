@@ -298,7 +298,7 @@ fn default_path_key() -> OptionalValuePath {
     OptionalValuePath::from(owned_value_path!("path"))
 }
 
-fn default_http_response_code() -> StatusCode {
+const fn default_http_response_code() -> StatusCode {
     StatusCode::OK
 }
 
@@ -544,7 +544,7 @@ mod tests {
                 headers,
                 encoding: None,
                 query_parameters,
-                response_code: response_code,
+                response_code,
                 tls: None,
                 auth: None,
                 strict_path,
