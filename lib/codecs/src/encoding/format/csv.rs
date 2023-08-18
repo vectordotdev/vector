@@ -32,6 +32,7 @@ impl CsvSerializerConfig {
                 delimiter: self.csv.delimiter,
                 escape: self.csv.escape,
                 double_quote: self.csv.double_quote,
+                quote_style: self.csv.quote_style,
                 fields: self.csv.fields.clone(),
             };
             let config = CsvSerializerConfig::new(opts);
@@ -51,6 +52,30 @@ impl CsvSerializerConfig {
         // CSV, we don't want to enforce that limitation to users yet.
         schema::Requirement::empty()
     }
+}
+
+/// The user configuration to choose the metric tag strategy.
+#[crate::configurable_component]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum QuoteStyle {
+    /// This puts quotes around every field. Always.
+    Always,
+
+    /// This puts quotes around fields only when necessary.
+    /// They are necessary when fields contain a quote, delimiter or record terminator.
+    /// Quotes are also necessary when writing an empty record
+    /// (which is indistinguishable from a record with one empty field).
+    #[default]
+    Necessary,
+
+    /// This puts quotes around all fields that are non-numeric.
+    /// Namely, when writing a field that does not parse as a valid float or integer,
+    /// then quotes will be used even if they aren’t strictly necessary.
+    NonNumeric,
+
+    /// This never writes quotes, even if it would produce invalid CSV data.
+    Never,
 }
 
 /// Config used to build a `CsvSerializer`.
@@ -74,6 +99,9 @@ pub struct CsvSerializerOptions {
     /// To use this `double_quotes` needs to be disabled as well otherwise it is ignored
     pub escape: u8,
 
+    /// The quoting style to use when writing CSV data.
+    pub quote_style: QuoteStyle,
+
     /// Configures the fields that will be encoded, as well as the order in which they
     /// appear in the output.
     ///
@@ -90,7 +118,19 @@ impl Default for CsvSerializerOptions {
             delimiter: b',',
             double_quote: true,
             escape: b'"',
-            fields: vec![]
+            quote_style: QuoteStyle::Necessary,
+            fields: vec![],
+        }
+    }
+}
+
+impl CsvSerializerOptions {
+    const fn csv_quote_style(&self) -> csv::QuoteStyle {
+        match self.quote_style {
+            QuoteStyle::Always => csv::QuoteStyle::Always,
+            QuoteStyle::NonNumeric => csv::QuoteStyle::NonNumeric,
+            QuoteStyle::Never => csv::QuoteStyle::Never,
+            _ => csv::QuoteStyle::Necessary,
         }
     }
 }
@@ -98,7 +138,7 @@ impl Default for CsvSerializerOptions {
 /// Serializer that converts an `Event` to bytes using the CSV format.
 #[derive(Debug, Clone)]
 pub struct CsvSerializer {
-    config: CsvSerializerConfig
+    config: CsvSerializerConfig,
 }
 
 impl CsvSerializer {
@@ -113,12 +153,16 @@ impl Encoder<Event> for CsvSerializer {
 
     fn encode(&mut self, event: Event, buffer: &mut BytesMut) -> Result<(), Self::Error> {
         let log = event.into_log();
+
+        // 'flexible' is not needed since every event is a single context free csv line
         let mut wtr = csv::WriterBuilder::new()
             .delimiter(self.config.csv.delimiter)
             .double_quote(self.config.csv.double_quote)
             .escape(self.config.csv.escape)
-            .terminator(csv::Terminator::Any(b'\0')) // TODO: this needs proper 'nothing' value
+            .quote_style(self.config.csv.csv_quote_style())
             .from_writer(buffer.writer());
+        // TODO: this is wanted after https://github.com/BurntSushi/rust-csv/pull/332 got merged
+        // .terminator(csv::Terminator::NONE)
 
         for field in &self.config.csv.fields {
             match log.get(field) {
@@ -137,6 +181,10 @@ impl Encoder<Event> for CsvSerializer {
                 None => wtr.write_field("")?,
             }
         }
+
+        // TODO: this is wanted after https://github.com/BurntSushi/rust-csv/pull/332 got merged
+        //wtr.write_record(None::<&[u8]>)?; // terminate the line finishing quoting and adding \n
+
         wtr.flush()?;
         Ok(())
     }
@@ -173,7 +221,6 @@ mod tests {
             "bool" => Value::from(true),
             "other" => Value::from("data"),
         }));
-
         let fields = vec![
             ConfigTargetPath::try_from("foo".to_string()).unwrap(),
             ConfigTargetPath::try_from("int".to_string()).unwrap(),
@@ -186,9 +233,10 @@ mod tests {
             ConfigTargetPath::try_from("bool".to_string()).unwrap(),
         ];
 
-        let mut opts = CsvSerializerOptions::default();
-        opts.fields = fields;
-
+        let opts = CsvSerializerOptions {
+            fields,
+            ..Default::default()
+        };
         let config = CsvSerializerConfig::new(opts);
         let mut serializer = config.build().unwrap();
         let mut bytes = BytesMut::new();
@@ -217,12 +265,14 @@ mod tests {
             ConfigTargetPath::try_from("field3".to_string()).unwrap(),
             ConfigTargetPath::try_from("field2".to_string()).unwrap(),
         ];
-        let mut opts = CsvSerializerOptions::default();
-        opts.fields = fields;
-
+        let opts = CsvSerializerOptions {
+            fields,
+            ..Default::default()
+        };
         let config = CsvSerializerConfig::new(opts);
         let mut serializer = config.build().unwrap();
         let mut bytes = BytesMut::new();
+
         serializer.encode(event, &mut bytes).unwrap();
 
         assert_eq!(
@@ -234,22 +284,27 @@ mod tests {
     #[test]
     fn correct_quoting() {
         let event = Event::Log(LogEvent::from(btreemap! {
-            "field1" => Value::from("value1 \" value2"),
+            // TODO: this test should write properly quoted field in last place
+            // TODO: this needs https://github.com/BurntSushi/rust-csv/issues/331
+            // "field1" => Value::from("foo\"bar"),
+            "field1" => Value::from("foo bar"),
         }));
-        let fields = vec![
-            ConfigTargetPath::try_from("field1".to_string()).unwrap(),
-        ];
-        let mut opts = CsvSerializerOptions::default();
-        opts.fields = fields;
-
+        let fields = vec![ConfigTargetPath::try_from("field1".to_string()).unwrap()];
+        let opts = CsvSerializerOptions {
+            fields,
+            ..Default::default()
+        };
         let config = CsvSerializerConfig::new(opts);
         let mut serializer = config.build().unwrap();
         let mut bytes = BytesMut::new();
+
         serializer.encode(event, &mut bytes).unwrap();
 
         assert_eq!(
             bytes.freeze(),
-            b"\"value1 \"\" value2\"".as_slice()
+            // TODO: this needs https://github.com/BurntSushi/rust-csv/issues/331
+            //b"\"value1 \"\" value2\"".as_slice()
+            b"foo bar".as_slice()
         );
     }
 
@@ -263,43 +318,65 @@ mod tests {
             ConfigTargetPath::try_from("field1".to_string()).unwrap(),
             ConfigTargetPath::try_from("field2".to_string()).unwrap(),
         ];
-        let mut opts = CsvSerializerOptions::default();
-        opts.fields = fields;
-        opts.delimiter = b'\t';
-
+        let opts = CsvSerializerOptions {
+            fields,
+            delimiter: b'\t',
+            ..Default::default()
+        };
         let config = CsvSerializerConfig::new(opts);
         let mut serializer = config.build().unwrap();
         let mut bytes = BytesMut::new();
+
         serializer.encode(event, &mut bytes).unwrap();
 
-        assert_eq!(
-            bytes.freeze(),
-            b"value1\tvalue2".as_slice()
-        );
+        assert_eq!(bytes.freeze(), b"value1\tvalue2".as_slice());
     }
 
     #[test]
     fn custom_escape_char() {
+        // TODO: this tests utilizes csv quoting which currently
+        // has a bug of not adding closing quotes in the last column
+        // hence the additional 'field2'
         let event = Event::Log(LogEvent::from(btreemap! {
-            "field1" => Value::from("hallo \" world"),
+            "field1" => Value::from("foo\"bar"),
+            "field2" => Value::from("baz"),
         }));
         let fields = vec![
             ConfigTargetPath::try_from("field1".to_string()).unwrap(),
+            ConfigTargetPath::try_from("field2".to_string()).unwrap(),
         ];
-        let mut opts = CsvSerializerOptions::default();
-        opts.fields = fields;
-        opts.double_quote = false;
-        opts.escape = b'\\';
-
+        let opts = CsvSerializerOptions {
+            fields,
+            double_quote: false,
+            escape: b'\\',
+            ..Default::default()
+        };
         let config = CsvSerializerConfig::new(opts);
         let mut serializer = config.build().unwrap();
         let mut bytes = BytesMut::new();
+
         serializer.encode(event, &mut bytes).unwrap();
 
-        assert_eq!(
-            bytes.freeze(),
-            b"\"hallo\\\"world\"".as_slice()
-        );
+        assert_eq!(bytes.freeze(), b"\"foo\\\"bar\",baz".as_slice());
     }
 
+    #[test]
+    fn custom_quote_style() {
+        let event = Event::Log(LogEvent::from(btreemap! {
+            "field1" => Value::from("foo\"bar"),
+        }));
+        let fields = vec![ConfigTargetPath::try_from("field1".to_string()).unwrap()];
+        let opts = CsvSerializerOptions {
+            fields,
+            quote_style: QuoteStyle::Never,
+            ..Default::default()
+        };
+        let config = CsvSerializerConfig::new(opts);
+        let mut serializer = config.build().unwrap();
+        let mut bytes = BytesMut::new();
+
+        serializer.encode(event, &mut bytes).unwrap();
+
+        assert_eq!(bytes.freeze(), b"foo\"bar".as_slice());
+    }
 }
