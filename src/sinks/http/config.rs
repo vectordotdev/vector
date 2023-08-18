@@ -275,7 +275,7 @@ impl SinkConfig for HttpSinkConfig {
                 .to_string()
         });
 
-        let http_service_request_builder = HttpSinkRequestBuilder::new(
+        let http_sink_request_builder = HttpSinkRequestBuilder::new(
             self.uri.with_default_parts(),
             self.method,
             self.auth.choose_one(&self.uri.auth)?,
@@ -284,7 +284,7 @@ impl SinkConfig for HttpSinkConfig {
             content_encoding,
         );
 
-        let service = HttpService::new(client, http_service_request_builder);
+        let service = HttpService::new(client, http_sink_request_builder);
 
         let request_limits = self.request.tower.unwrap_with(&Default::default());
 

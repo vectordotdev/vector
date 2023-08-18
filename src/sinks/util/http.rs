@@ -359,7 +359,7 @@ where
 
 /// @struct HttpBatchService
 ///
-/// NOTE: This has been deprecated, please do not use directly when creating new sinks.
+/// NOTE: This has been deprecated, please do not use <directly> when creating new sinks.
 ///       The `HttpService` currently wraps this structure. Eventually all sinks currently using the
 ///       HttpBatchService directly should be updated to use `HttpService`. At which time we can
 ///       remove this struct and inline the functionality into the `HttpService` directly.
@@ -660,8 +660,10 @@ pub struct HttpResponse {
 
 impl DriverResponse for HttpResponse {
     fn event_status(&self) -> EventStatus {
-        if self.http_response.status().is_success() {
+        if self.http_response.is_successful() {
             EventStatus::Delivered
+        } else if self.http_response.is_transient() {
+            EventStatus::Errored
         } else {
             EventStatus::Rejected
         }
@@ -676,12 +678,12 @@ impl DriverResponse for HttpResponse {
     }
 }
 
-/// HTTP request builder for batched HTTP stream sinks using the generic `HttpService`
+/// HTTP request builder for HTTP stream sinks using the generic `HttpService`
 pub trait HttpServiceRequestBuilder {
     fn build(&self, body: Bytes) -> Request<Bytes>;
 }
 
-/// Generic 'Service' implementation for batched HTTP stream sinks.
+/// Generic 'Service' implementation for HTTP stream sinks.
 #[derive(Clone)]
 pub struct HttpService<B> {
     batch_service:

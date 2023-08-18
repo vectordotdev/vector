@@ -16,7 +16,9 @@ pub(super) struct HttpBatchSizer {
 impl ItemBatchSize<Event> for HttpBatchSizer {
     fn size(&self, item: &Event) -> usize {
         match self.encoder.serializer() {
-            codecs::encoding::Serializer::Json(_) => item.estimated_json_encoded_size_of().get(),
+            codecs::encoding::Serializer::Json(_) | codecs::encoding::Serializer::NativeJson(_) => {
+                item.estimated_json_encoded_size_of().get()
+            }
             _ => item.size_of(),
         }
     }

@@ -53,6 +53,14 @@ impl SinkEncoder<Vec<Event>> for HttpEncoder {
         let mut byte_size = telemetry().create_request_count_byte_size();
         let mut body = BytesMut::new();
 
+        match (self.encoder.serializer(), self.encoder.framer()) {
+            (Json(_), CharacterDelimited(CharacterDelimitedEncoder { delimiter: b',' })) => {
+                body.put(self.payload_prefix.as_bytes());
+                body.put_u8(b'[');
+            }
+            _ => {}
+        }
+
         for mut event in events {
             self.transformer.transform(&mut event);
 
@@ -72,14 +80,7 @@ impl SinkEncoder<Vec<Event>> for HttpEncoder {
                 }
             }
             (Json(_), CharacterDelimited(CharacterDelimitedEncoder { delimiter: b',' })) => {
-                // TODO(https://github.com/vectordotdev/vector/issues/11253):
-                // Prepend before building a request body to eliminate the
-                // additional copy here.
-                let message = body.split();
-                body.put(self.payload_prefix.as_bytes());
-                body.put_u8(b'[');
-                if !message.is_empty() {
-                    body.unsplit(message);
+                if !body.is_empty() {
                     // remove trailing comma from last record
                     body.truncate(body.len() - 1);
                 }
