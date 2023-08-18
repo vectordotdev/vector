@@ -579,6 +579,7 @@ transforms-logs = [
   "transforms-aws_ec2_metadata",
   "transforms-dedupe",
   "transforms-filter",
+  "transforms-log_to_metric",
   "transforms-lua",
   "transforms-metric_to_log",
   "transforms-pipelines",
@@ -591,6 +592,7 @@ transforms-logs = [
 transforms-metrics = [
   "transforms-aggregate",
   "transforms-filter",
+  "transforms-log_to_metric",
   "transforms-lua",
   "transforms-metric_to_log",
   "transforms-pipelines",
@@ -603,6 +605,7 @@ transforms-aggregate = []
 transforms-aws_ec2_metadata = ["dep:arc-swap"]
 transforms-dedupe = ["dep:lru"]
 transforms-filter = []
+transforms-log_to_metric = []
 transforms-lua = ["dep:mlua", "vector-core/lua"]
 transforms-metric_to_log = []
 transforms-pipelines = ["transforms-filter", "transforms-route"]
