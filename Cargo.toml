@@ -172,6 +172,7 @@ metrics-tracing-context = { version = "0.14.0", default-features = false }
 # depending on a fork to circumvent https://github.com/awslabs/aws-sdk-rust/issues/749
 aws-sdk-s3 = { git = "https://github.com/vectordotdev/aws-sdk-rust", rev = "3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670", default-features = false, features = ["native-tls"], optional = true }
 aws-sdk-sqs = { git = "https://github.com/vectordotdev/aws-sdk-rust", rev = "3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670", default-features = false, features = ["native-tls"], optional = true }
+aws-sdk-sns = { git = "https://github.com/vectordotdev/aws-sdk-rust", rev = "3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670", default-features = false, features = ["native-tls"], optional = true }
 aws-sdk-cloudwatch = { git = "https://github.com/vectordotdev/aws-sdk-rust", rev = "3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670", default-features = false, features = ["native-tls"], optional = true }
 aws-sdk-cloudwatchlogs = { git = "https://github.com/vectordotdev/aws-sdk-rust", rev = "3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670", default-features = false, features = ["native-tls"], optional = true }
 aws-sdk-elasticsearch = { git = "https://github.com/vectordotdev/aws-sdk-rust", rev = "3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670", default-features = false, features = ["native-tls"], optional = true }
@@ -622,6 +623,7 @@ sinks-logs = [
   "sinks-aws_kinesis_streams",
   "sinks-aws_s3",
   "sinks-aws_sqs",
+  "sinks-aws_sns",
   "sinks-axiom",
   "sinks-azure_blob",
   "sinks-azure_monitor_logs",
@@ -681,6 +683,7 @@ sinks-aws_kinesis_firehose = ["aws-core", "dep:aws-sdk-firehose"]
 sinks-aws_kinesis_streams = ["aws-core", "dep:aws-sdk-kinesis"]
 sinks-aws_s3 = ["dep:base64", "dep:md-5", "aws-core", "dep:aws-sdk-s3"]
 sinks-aws_sqs = ["aws-core", "dep:aws-sdk-sqs"]
+sinks-aws_sns = ["aws-core", "dep:aws-sdk-sns"]
 sinks-axiom = ["sinks-elasticsearch"]
 sinks-azure_blob = ["dep:azure_core", "dep:azure_identity", "dep:azure_storage", "dep:azure_storage_blobs"]
 sinks-azure_monitor_logs = []
@@ -789,6 +792,7 @@ aws-integration-tests = [
   "aws-kinesis-streams-integration-tests",
   "aws-s3-integration-tests",
   "aws-sqs-integration-tests",
+  "aws-sns-integration-tests",
 ]
 
 azure-integration-tests = [
@@ -802,7 +806,8 @@ aws-ecs-metrics-integration-tests = ["sources-aws_ecs_metrics"]
 aws-kinesis-firehose-integration-tests = ["sinks-aws_kinesis_firehose", "dep:aws-sdk-elasticsearch", "sinks-elasticsearch"]
 aws-kinesis-streams-integration-tests = ["sinks-aws_kinesis_streams"]
 aws-s3-integration-tests = ["sinks-aws_s3", "sources-aws_s3"]
-aws-sqs-integration-tests = ["sinks-aws_sqs", "sources-aws_sqs"]
+aws-sqs-integration-tests = ["sinks-aws_sqs"]
+aws-sns-integration-tests = ["sinks-aws_sns"]
 axiom-integration-tests = ["sinks-axiom"]
 azure-blob-integration-tests = ["sinks-azure_blob"]
 chronicle-integration-tests = ["sinks-gcp"]

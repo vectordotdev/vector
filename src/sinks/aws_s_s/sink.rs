@@ -1,12 +1,12 @@
 use std::num::NonZeroUsize;
 
-use aws_sdk_sqs::Client as SqsClient;
 use futures::stream::BoxStream;
 use futures_util::StreamExt;
 use vector_core::sink::StreamSink;
 
-use super::{config::SqsSinkConfig, request_builder::SqsRequestBuilder, service::SqsService};
+use super::{client::Client, request_builder::SSRequestBuilder, service::SSService};
 use crate::internal_events::SinkRequestBuildError;
+use crate::sinks::aws_s_s::retry::SSRetryLogic;
 use crate::{
     event::Event,
     sinks::util::{
@@ -24,18 +24,29 @@ impl SinkBatchSettings for SqsSinkDefaultBatchSettings {
 }
 
 #[derive(Clone)]
-pub(crate) struct SqsSink {
-    request_builder: SqsRequestBuilder,
-    service: SqsService,
+pub(super) struct SSSink<C, E>
+where
+    C: Client<E> + Clone + Send + Sync + 'static,
+    E: std::fmt::Debug + std::fmt::Display + std::error::Error + Sync + Send + 'static,
+{
+    request_builder: SSRequestBuilder,
+    service: SSService<C, E>,
     request: TowerRequestConfig,
 }
 
-impl SqsSink {
-    pub fn new(config: SqsSinkConfig, client: SqsClient) -> crate::Result<Self> {
-        let request = config.request;
-        Ok(SqsSink {
-            request_builder: SqsRequestBuilder::new(config)?,
-            service: SqsService::new(client),
+impl<C, E> SSSink<C, E>
+where
+    C: Client<E> + Clone + Send + Sync + 'static,
+    E: std::fmt::Debug + std::fmt::Display + std::error::Error + Sync + Send + 'static,
+{
+    pub(super) fn new(
+        request_builder: SSRequestBuilder,
+        request: TowerRequestConfig,
+        publisher: C,
+    ) -> crate::Result<Self> {
+        Ok(SSSink {
+            request_builder,
+            service: SSService::new(publisher),
             request,
         })
     }
@@ -45,8 +56,9 @@ impl SqsSink {
             .request
             .unwrap_with(&TowerRequestConfig::default().timeout_secs(30));
         let request_builder_concurrency_limit = NonZeroUsize::new(50);
+        let retry_logic: SSRetryLogic<E> = super::retry::SSRetryLogic::new();
         let service = tower::ServiceBuilder::new()
-            .settings(request, super::retry::SqsRetryLogic)
+            .settings(request, retry_logic)
             .service(self.service);
 
         input
@@ -64,7 +76,11 @@ impl SqsSink {
 }
 
 #[async_trait::async_trait]
-impl StreamSink<Event> for SqsSink {
+impl<C, E> StreamSink<Event> for SSSink<C, E>
+where
+    C: Client<E> + Clone + Send + Sync + 'static,
+    E: std::fmt::Debug + std::fmt::Display + std::error::Error + Sync + Send + 'static,
+{
     async fn run(mut self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         self.run_inner(input).await
     }
