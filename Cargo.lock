@@ -2130,7 +2130,7 @@ dependencies = [
  "indoc",
  "memchr",
  "once_cell",
- "ordered-float 3.7.0",
+ "ordered-float 3.8.0",
  "prost",
  "prost-reflect",
  "regex",
@@ -5157,7 +5157,7 @@ dependencies = [
  "indexmap 1.9.3",
  "metrics",
  "num_cpus",
- "ordered-float 3.7.0",
+ "ordered-float 3.8.0",
  "quanta",
  "radix_trie",
  "sketches-ddsketch",
@@ -5832,7 +5832,7 @@ dependencies = [
  "bytes 1.4.0",
  "chrono",
  "hex",
- "ordered-float 3.7.0",
+ "ordered-float 3.8.0",
  "prost",
  "prost-build",
  "tonic",
@@ -5859,9 +5859,9 @@ dependencies = [
 
 [[package]]
 name = "ordered-float"
-version = "3.7.0"
+version = "3.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2fc2dbde8f8a79f2102cc474ceb0ad68e3b80b85289ea62389b60e66777e4213"
+checksum = "7417b1484e3641a8791af3c3123cdc083ac60a0d262a2f281b6125d58917caf4"
 dependencies = [
  "num-traits",
 ]
@@ -9485,7 +9485,7 @@ dependencies = [
  "openssl-probe",
  "openssl-src",
  "opentelemetry-proto",
- "ordered-float 3.7.0",
+ "ordered-float 3.8.0",
  "paste",
  "percent-encoding",
  "pin-project",
@@ -9648,7 +9648,7 @@ dependencies = [
  "indexmap 2.0.0",
  "metrics",
  "nom",
- "ordered-float 3.7.0",
+ "ordered-float 3.8.0",
  "paste",
  "pin-project",
  "quickcheck",
@@ -9757,7 +9757,7 @@ dependencies = [
  "noisy_float",
  "once_cell",
  "openssl",
- "ordered-float 3.7.0",
+ "ordered-float 3.8.0",
  "parking_lot",
  "pin-project",
  "proptest",
@@ -9922,7 +9922,7 @@ dependencies = [
  "ofb",
  "once_cell",
  "onig",
- "ordered-float 3.7.0",
+ "ordered-float 3.8.0",
  "paste",
  "peeking_take_while",
  "percent-encoding",
