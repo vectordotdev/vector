@@ -336,10 +336,10 @@ base: components: sources: http_server: configuration: {
 	response_code: {
 		description: "Specifies the HTTP response status code that will be returned on successful requests."
 		required:    false
-		type: u16: {
+		type: uint: {
 			default: 200
 			examples: [
-				"202",
+				202,
 			]
 		}
 	}

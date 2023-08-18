@@ -131,8 +131,8 @@ pub struct SimpleHttpConfig {
     method: HttpMethod,
 
     /// Specifies the HTTP response status code that will be returned on successful requests.
-    #[configurable(metadata(docs::examples = "202"))]
-    #[configurable(metadata(docs::numeric_type = "u16"))]
+    #[configurable(metadata(docs::examples = 202))]
+    #[configurable(metadata(docs::numeric_type = "uint"))]
     #[serde(with = "http_serde::status_code")]
     #[serde(default = "default_http_response_code")]
     response_code: StatusCode,
