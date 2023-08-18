@@ -313,6 +313,45 @@ mod test {
         }
     }
 
+    #[test]
+    fn route_no_unmatched_output() {
+        let output_names = vec!["first", "second", "third", UNMATCHED_ROUTE];
+        let event = Event::try_from(serde_json::json!({"message": "NOPE"})).unwrap();
+        let config = toml::from_str::<RouteConfig>(
+            r#"
+            reroute_unmatched = false
+
+            route.first.type = "vrl"
+            route.first.source = '.message == "hello world"'
+
+            route.second.type = "vrl"
+            route.second.source = '.second == "second"'
+
+            route.third.type = "vrl"
+            route.third.source = '.third == "third"'
+        "#,
+        )
+        .unwrap();
+
+        let mut transform = Route::new(&config, &Default::default()).unwrap();
+        let mut outputs = TransformOutputsBuf::new_with_capacity(
+            output_names
+                .iter()
+                .map(|output_name| {
+                    TransformOutput::new(DataType::all(), HashMap::new())
+                        .with_port(output_name.to_owned())
+                })
+                .collect(),
+            1,
+        );
+
+        transform.transform(event.clone(), &mut outputs);
+        for output_name in output_names {
+            let events: Vec<_> = outputs.drain_named(output_name).collect();
+            assert_eq!(events.len(), 0);
+        }
+    }
+
     #[tokio::test]
     async fn route_metrics_with_output_tag() {
         init_test();
