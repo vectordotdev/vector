@@ -15,7 +15,7 @@ use crate::{
     transforms::{FunctionTransform, OutputBuffer, Transform},
 };
 
-pub static SAMPLE_RATE_FIELD: &str = "sample_rate";
+pub const SAMPLE_RATE_FIELD: &str = "sample_rate";
 
 /// Configuration for the `sample` transform.
 #[configurable_component(transform(

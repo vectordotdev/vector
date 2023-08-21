@@ -1,6 +1,7 @@
 use bytes::Bytes;
 use futures::{FutureExt, SinkExt};
 use http::{Request, StatusCode, Uri};
+use lookup::{lookup_v2::ConfigTargetPath, OwnedTargetPath};
 use serde_json::json;
 use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
@@ -18,6 +19,8 @@ use crate::{
     },
     transforms::sample::SAMPLE_RATE_FIELD,
 };
+
+const HONEYCOMB_SAMPLERATE_FIELD: &str = "samplerate";
 
 /// Configuration for the `honeycomb` sink.
 #[configurable_component(sink("honeycomb", "Deliver log events to Honeycomb."))]
@@ -38,7 +41,10 @@ pub struct HoneycombConfig {
     // but this limits us in how we can do our healthcheck.
     dataset: String,
 
-    /// The source of the sample rate for each event.
+    /// Configures how the sample rate is determined for each event. If a sample rate is found on the event
+    /// from the configured source, it will be removed from the event body and (if it is a valid integer) used
+    /// as the sample rate for that event for Honeycomb to inflate query results. If the sample rate source is
+    /// disabled, no fields will be removed and no sample rate will be sent to Honeycomb.
     #[configurable(derived)]
     #[serde(default)]
     sample_rate_source: SampleRateSource,
@@ -71,31 +77,34 @@ fn default_endpoint() -> String {
     "https://api.honeycomb.io/1/batch".to_string()
 }
 
-/// Configures how the sample rate is determined for each event. If an integer sample rate is found on the
-/// event from the configured source, it will be removed from the event body and used as the sample rate for
-/// that event for Honeycomb to inflate query results. If the sample rate source is disabled, no fields will
-/// be removed and no sample rate will be sent to Honeycomb.
+/// Configures how the sample rate is determined for each event.
 #[configurable_component]
 #[derive(Clone, Debug, Default)]
 pub enum SampleRateSource {
     /// Use the sample rate that is added to the event by the `Sample` transform.
     #[configurable(metadata(derived))]
     #[default]
-    SampleTransformField,
+    FromSampleTransform,
     /// Use the value of the specified field as the sample rate.
     #[configurable(metadata(derived))]
-    Field(String),
+    Field(
+        /// Use the value of the specified field as the sample rate.
+        ConfigTargetPath,
+    ),
     /// Do not include a sample rate.
     #[configurable(metadata(derived))]
     Disabled,
 }
 impl SampleRateSource {
-    fn field_path(&self) -> Option<&str> {
-        match self {
-            SampleRateSource::SampleTransformField => Some(SAMPLE_RATE_FIELD),
-            SampleRateSource::Field(field) => Some(field.as_str()),
+    fn field_path(self) -> Option<OwnedTargetPath> {
+        let config_path = match self {
+            SampleRateSource::FromSampleTransform => {
+                ConfigTargetPath::try_from(SAMPLE_RATE_FIELD.to_owned()).ok()
+            }
+            SampleRateSource::Field(field) => Some(field),
             SampleRateSource::Disabled => None,
-        }
+        };
+        config_path.map(|path| path.0)
     }
 }
 
@@ -161,7 +170,7 @@ impl SinkConfig for HoneycombConfig {
 
 pub struct HoneycombEventEncoder {
     transformer: Transformer,
-    sample_rate_source: SampleRateSource,
+    sample_rate_field_path: Option<OwnedTargetPath>,
 }
 
 impl HttpEventEncoder<serde_json::Value> for HoneycombEventEncoder {
@@ -176,8 +185,8 @@ impl HttpEventEncoder<serde_json::Value> for HoneycombEventEncoder {
         };
 
         let sample_rate = self
-            .sample_rate_source
-            .field_path()
+            .sample_rate_field_path
+            .as_ref()
             .and_then(|path| log.remove(path))
             .and_then(|v| v.as_integer());
 
@@ -188,7 +197,7 @@ impl HttpEventEncoder<serde_json::Value> for HoneycombEventEncoder {
         if let Some(sample_rate) = sample_rate {
             data.as_object_mut()
                 .unwrap()
-                .insert("samplerate".to_owned(), sample_rate.into());
+                .insert(HONEYCOMB_SAMPLERATE_FIELD.to_owned(), sample_rate.into());
         }
 
         Some(data)
@@ -204,7 +213,7 @@ impl HttpSink for HoneycombConfig {
     fn build_encoder(&self) -> Self::Encoder {
         HoneycombEventEncoder {
             transformer: self.encoding.clone(),
-            sample_rate_source: self.sample_rate_source.clone(),
+            sample_rate_field_path: self.sample_rate_source.clone().field_path(),
         }
     }
 
@@ -265,6 +274,7 @@ async fn healthcheck(config: HoneycombConfig, client: HttpClient) -> crate::Resu
 #[cfg(test)]
 mod test {
     use futures::{future::ready, stream};
+    use lookup::lookup_v2::OwnedTargetPath;
     use serde::Deserialize;
     use serde_json::json;
     use vector_core::event::{Event, LogEvent, Value};
@@ -280,7 +290,7 @@ mod test {
         transforms::sample::SAMPLE_RATE_FIELD,
     };
 
-    use super::{HoneycombConfig, HoneycombEventEncoder, SampleRateSource};
+    use super::{HoneycombConfig, HoneycombEventEncoder};
 
     #[test]
     fn generate_config() {
@@ -307,7 +317,7 @@ mod test {
     fn encode_event_sample_source_disabled() {
         let mut encoder = HoneycombEventEncoder {
             transformer: Transformer::default(),
-            sample_rate_source: SampleRateSource::Disabled,
+            sample_rate_field_path: None,
         };
 
         let mut log = LogEvent::from("simple message");
@@ -333,7 +343,7 @@ mod test {
     fn encode_event_sample_source_default() {
         let mut encoder = HoneycombEventEncoder {
             transformer: Transformer::default(),
-            sample_rate_source: SampleRateSource::SampleTransformField,
+            sample_rate_field_path: None,
         };
 
         let mut log = LogEvent::from("simple message");
@@ -359,7 +369,7 @@ mod test {
     fn encode_event_sample_source_default_no_rate() {
         let mut encoder = HoneycombEventEncoder {
             transformer: Transformer::default(),
-            sample_rate_source: SampleRateSource::SampleTransformField,
+            sample_rate_field_path: None,
         };
 
         let log = LogEvent::from("simple message");
@@ -383,7 +393,9 @@ mod test {
     fn encode_event_sample_source_custom() {
         let mut encoder = HoneycombEventEncoder {
             transformer: Transformer::default(),
-            sample_rate_source: SampleRateSource::Field("custom_sample_rate".to_owned()),
+            sample_rate_field_path: Some(
+                OwnedTargetPath::try_from("custom_sample_rate".to_owned()).unwrap(),
+            ),
         };
 
         let mut log = LogEvent::from("simple message");
