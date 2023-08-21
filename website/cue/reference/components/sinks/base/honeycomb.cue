@@ -248,18 +248,24 @@ base: components: sinks: honeycomb: configuration: {
 		}
 	}
 	sample_rate_source: {
-		description: "The source of the sample rate for each event."
-		required:    false
+		description: """
+			Configures how the sample rate is determined for each event. If a sample rate is found on the event
+			from the configured source, it will be removed from the event body and (if it is a valid integer) used
+			as the sample rate for that event for Honeycomb to inflate query results. If the sample rate source is
+			disabled, no fields will be removed and no sample rate will be sent to Honeycomb.
+			"""
+		required: false
 		type: {
 			object: options: Field: {
-				required: true
+				description: "Use the value of the specified field as the sample rate."
+				required:    true
 				type: string: {}
 			}
 			string: {
-				default: "SampleTransformField"
+				default: "FromSampleTransform"
 				enum: {
-					Disabled:             "Do not include a sample rate."
-					SampleTransformField: "Use the sample rate that is added to the event by the `Sample` transform."
+					Disabled:            "Do not include a sample rate."
+					FromSampleTransform: "Use the sample rate that is added to the event by the `Sample` transform."
 				}
 			}
 		}
