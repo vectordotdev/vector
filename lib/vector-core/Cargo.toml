@@ -41,9 +41,9 @@ prost = { version = "0.11", default-features = false, features = ["std"] }
 quanta = { version = "0.11.1", default-features = false }
 regex = { version = "1.9.3", default-features = false, features = ["std", "perf"] }
 ryu = { version = "1", default-features = false }
-serde = { version = "1.0.183", default-features = false, features = ["derive", "rc"] }
+serde = { version = "1.0.185", default-features = false, features = ["derive", "rc"] }
 serde_json = { version = "1.0.105", default-features = false }
-serde_with = { version = "3.2.0", default-features = false, features = ["std", "macros"] }
+serde_with = { version = "3.3.0", default-features = false, features = ["std", "macros"] }
 smallvec = { version = "1", default-features = false, features = ["serde", "const_generics"] }
 snafu = { version = "0.7.5", default-features = false }
 socket2 = { version = "0.5.3", default-features = false }
@@ -85,7 +85,7 @@ env-test-util = "1.0.1"
 quickcheck = "1"
 quickcheck_macros = "1"
 proptest = "1.2"
-similar-asserts = "1.4.2"
+similar-asserts = "1.5.0"
 tokio-test = "0.4.2"
 toml = { version = "0.7.6", default-features = false, features = ["parse"] }
 ndarray = "0.15.6"
