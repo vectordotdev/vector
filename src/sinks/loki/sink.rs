@@ -5,6 +5,7 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 use snafu::Snafu;
 use tokio_util::codec::Encoder as _;
+use vrl::path::parse_target_path;
 
 use super::{
     config::{LokiConfig, OutOfOrderAction},
@@ -239,7 +240,9 @@ impl EventEncoder {
             for template in self.labels.values() {
                 if let Some(fields) = template.get_fields() {
                     for field in fields {
-                        event.as_mut_log().remove(field.as_str());
+                        if let Ok(path) = parse_target_path(field.as_str()) {
+                            event.as_mut_log().remove(&path);
+                        }
                     }
                 }
             }

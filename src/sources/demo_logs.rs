@@ -292,7 +292,8 @@ impl SourceConfig for DemoLogsConfig {
 
         self.format.validate()?;
         let decoder =
-            DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace).build();
+            DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace)
+                .build()?;
         Ok(Box::pin(demo_logs_source(
             self.interval,
             self.count,
@@ -361,7 +362,8 @@ mod tests {
                 default_decoding(),
                 LogNamespace::Legacy,
             )
-            .build();
+            .build()
+            .unwrap();
             demo_logs_source(
                 config.interval,
                 config.count,

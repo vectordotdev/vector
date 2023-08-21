@@ -1,5 +1,5 @@
 use codecs::JsonSerializerConfig;
-use lookup::lookup_v2::OptionalValuePath;
+use lookup::lookup_v2::{ConfigValuePath, OptionalValuePath};
 use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 
@@ -85,7 +85,7 @@ pub struct HumioLogsConfig {
     ///
     /// [humio_data_format]: https://docs.humio.com/integrations/data-shippers/hec/#format-of-data
     #[serde(default)]
-    pub(super) indexed_fields: Vec<String>,
+    pub(super) indexed_fields: Vec<ConfigValuePath>,
 
     /// Optional name of the repository to ingest into.
     ///
@@ -223,15 +223,13 @@ mod tests {
 #[cfg(test)]
 #[cfg(feature = "humio-integration-tests")]
 mod integration_tests {
-    use std::{collections::HashMap, convert::TryFrom};
-
     use chrono::{TimeZone, Utc};
     use futures::{future::ready, stream};
     use indoc::indoc;
     use serde::Deserialize;
     use serde_json::{json, Value as JsonValue};
+    use std::{collections::HashMap, convert::TryFrom};
     use tokio::time::Duration;
-    use vrl::path::PathPrefix;
 
     use super::*;
     use crate::{
@@ -263,10 +261,7 @@ mod integration_tests {
         let message = random_string(100);
         let host = "192.168.1.1".to_string();
         let mut event = LogEvent::from(message.clone());
-        event.insert(
-            (PathPrefix::Event, log_schema().host_key().unwrap()),
-            host.clone(),
-        );
+        event.insert(log_schema().host_key_target_path().unwrap(), host.clone());
 
         let ts = Utc.timestamp_nanos(Utc::now().timestamp_millis() * 1_000_000 + 132_456);
         event.insert(log_schema().timestamp_key_target_path().unwrap(), ts);

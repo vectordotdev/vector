@@ -245,7 +245,8 @@ mod tests {
                 config.decoding,
                 LogNamespace::Vector,
             )
-            .build(),
+            .build()
+            .unwrap(),
             "aws_sqs",
             b"test",
             Some(now),
@@ -297,7 +298,8 @@ mod tests {
                 config.decoding,
                 LogNamespace::Legacy,
             )
-            .build(),
+            .build()
+            .unwrap(),
             "aws_sqs",
             b"test",
             Some(now),
@@ -320,10 +322,7 @@ mod tests {
             events[0]
                 .clone()
                 .as_log()
-                .get((
-                    lookup::PathPrefix::Event,
-                    log_schema().timestamp_key().unwrap()
-                ))
+                .get_timestamp()
                 .unwrap()
                 .to_string_lossy(),
             now.to_rfc3339_opts(SecondsFormat::AutoSi, true)

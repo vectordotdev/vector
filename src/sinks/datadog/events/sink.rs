@@ -50,12 +50,12 @@ where
 async fn ensure_required_fields(event: Event) -> Option<Event> {
     let mut log = event.into_log();
 
-    if !log.contains("title") {
+    if !log.contains(event_path!("title")) {
         emit!(ParserMissingFieldError::<DROP_EVENT> { field: "title" });
         return None;
     }
 
-    if !log.contains("text") {
+    if !log.contains(event_path!("text")) {
         let message_path = log
             .message_path()
             .expect("message is required (make sure the \"message\" semantic meaning is set)")
@@ -63,21 +63,21 @@ async fn ensure_required_fields(event: Event) -> Option<Event> {
         log.rename_key(&message_path, event_path!("text"));
     }
 
-    if !log.contains("host") {
+    if !log.contains(event_path!("host")) {
         if let Some(host_path) = log.host_path().cloned().as_ref() {
             log.rename_key(host_path, event_path!("host"));
         }
     }
 
-    if !log.contains("date_happened") {
+    if !log.contains(event_path!("date_happened")) {
         if let Some(timestamp_path) = log.timestamp_path().cloned().as_ref() {
-            log.rename_key(timestamp_path, "date_happened");
+            log.rename_key(timestamp_path, event_path!("date_happened"));
         }
     }
 
-    if !log.contains("source_type_name") {
+    if !log.contains(event_path!("source_type_name")) {
         if let Some(source_type_path) = log.source_type_path().cloned().as_ref() {
-            log.rename_key(source_type_path, "source_type_name");
+            log.rename_key(source_type_path, event_path!("source_type_name"));
         }
     }
 

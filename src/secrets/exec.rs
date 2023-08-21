@@ -134,7 +134,7 @@ async fn query_backend(
     loop {
         tokio::select! {
             biased;
-            Ok(signal::SignalTo::Shutdown | signal::SignalTo::Quit) = signal_rx.recv() => {
+            Ok(signal::SignalTo::Shutdown(_) | signal::SignalTo::Quit) = signal_rx.recv() => {
                 drop(command);
                 return Err("Secret retrieval was interrupted.".into());
             }

@@ -40,6 +40,7 @@ use vector_core::{
     schema::Definition,
     EstimatedJsonEncodedSizeOf,
 };
+use vrl::event_path;
 use vrl::value::{kind::Collection, Kind, Value};
 
 use crate::{
@@ -703,7 +704,7 @@ impl Drop for RunningJournalctl {
 }
 
 fn enrich_log_event(log: &mut LogEvent, log_namespace: LogNamespace) {
-    if let Some(host) = log.remove(HOSTNAME) {
+    if let Some(host) = log.remove(event_path!(HOSTNAME)) {
         log_namespace.insert_source_metadata(
             JournaldConfig::NAME,
             log,
@@ -715,8 +716,8 @@ fn enrich_log_event(log: &mut LogEvent, log_namespace: LogNamespace) {
 
     // Create a Utc timestamp from an existing log field if present.
     let timestamp = log
-        .get(SOURCE_TIMESTAMP)
-        .or_else(|| log.get(RECEIVED_TIMESTAMP))
+        .get(event_path!(SOURCE_TIMESTAMP))
+        .or_else(|| log.get(event_path!(RECEIVED_TIMESTAMP)))
         .filter(|&ts| ts.is_bytes())
         .and_then(|ts| {
             String::from_utf8_lossy(ts.as_bytes().unwrap())
@@ -781,7 +782,7 @@ fn create_log_event_from_record(
         LogNamespace::Legacy => {
             let mut log = LogEvent::from_iter(record).with_batch_notifier_option(batch);
 
-            if let Some(message) = log.remove(MESSAGE) {
+            if let Some(message) = log.remove(event_path!(MESSAGE)) {
                 log.maybe_insert(log_schema().message_key_target_path(), message);
             }
 

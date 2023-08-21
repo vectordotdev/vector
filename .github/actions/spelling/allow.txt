@@ -248,6 +248,7 @@ corejs
 coreutils
 curta
 daemonset
+dalek
 databend
 datacenter
 datadog
@@ -319,6 +320,7 @@ https
 humungus
 icecream
 ifeq
+ifneq
 imobile
 influxd
 ionik
@@ -425,6 +427,8 @@ userguide
 webhdfs
 winapi
 workarounds
+XCHACHA
+XSALSA
 yandex
 zeek
 zookeeper

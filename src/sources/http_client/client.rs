@@ -194,7 +194,7 @@ impl SourceConfig for HttpClientConfig {
         let log_namespace = cx.log_namespace(self.log_namespace);
 
         // build the decoder
-        let decoder = self.get_decoding_config(Some(log_namespace)).build();
+        let decoder = self.get_decoding_config(Some(log_namespace)).build()?;
 
         let content_type = self.decoding.content_type(&self.framing).to_string();
 

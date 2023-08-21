@@ -3,7 +3,7 @@ use codecs::JsonSerializerConfig;
 use futures::StreamExt;
 use futures_util::stream::BoxStream;
 use indoc::indoc;
-use lookup::lookup_v2::OptionalValuePath;
+use lookup::lookup_v2::{ConfigValuePath, OptionalValuePath};
 use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 use vector_core::sink::StreamSink;
@@ -97,7 +97,7 @@ pub struct HumioMetricsConfig {
     ///
     /// [humio_data_format]: https://docs.humio.com/integrations/data-shippers/hec/#format-of-data
     #[serde(default)]
-    indexed_fields: Vec<String>,
+    indexed_fields: Vec<ConfigValuePath>,
 
     /// Optional name of the repository to ingest into.
     ///

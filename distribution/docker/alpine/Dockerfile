@@ -8,6 +8,8 @@ RUN tar -xvf vector-0*-"$(cat /etc/apk/arch)"-unknown-linux-musl*.tar.gz --strip
 RUN mkdir -p /var/lib/vector
 
 FROM docker.io/alpine:3.18
+# we want the latest versions of these
+# hadolint ignore=DL3018
 RUN apk --no-cache add ca-certificates tzdata
 
 COPY --from=builder /vector/bin/* /usr/local/bin/

@@ -1,11 +1,11 @@
 use std::collections::{BTreeMap, HashMap};
 
 use chrono::{DateTime, Local};
-use tokio::sync::mpsc;
-use tui::{
+use ratatui::{
     style::{Color, Style},
     text::Span,
 };
+use tokio::sync::mpsc;
 use vector_core::internal_event::DEFAULT_OUTPUT;
 
 use crate::config::ComponentKey;

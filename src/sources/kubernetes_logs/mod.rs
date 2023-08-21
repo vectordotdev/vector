@@ -4,7 +4,6 @@
 //! running inside the cluster as a DaemonSet.
 
 #![deny(missing_docs)]
-
 use std::{path::PathBuf, time::Duration};
 
 use bytes::Bytes;
@@ -32,11 +31,10 @@ use vector_common::{
     TimeZone,
 };
 use vector_config::configurable_component;
-use vector_core::{
-    config::LegacyKey, config::LogNamespace, transform::TaskTransform, EstimatedJsonEncodedSizeOf,
-};
+use vector_core::{config::LegacyKey, config::LogNamespace, EstimatedJsonEncodedSizeOf};
 use vrl::value::{kind::Collection, Kind};
 
+use crate::sources::kubernetes_logs::partial_events_merger::merge_partial_events;
 use crate::{
     config::{
         log_schema, ComponentKey, DataType, GenerateConfig, GlobalOptions, SourceConfig,
@@ -71,9 +69,6 @@ use self::namespace_metadata_annotator::NamespaceMetadataAnnotator;
 use self::node_metadata_annotator::NodeMetadataAnnotator;
 use self::parser::Parser;
 use self::pod_metadata_annotator::PodMetadataAnnotator;
-
-/// The key we use for `file` field.
-const FILE_KEY: &str = "file";
 
 /// The `self_node_name` value env var key.
 const SELF_NODE_NAME_ENV_KEY: &str = "VECTOR_SELF_NODE_NAME";
@@ -781,12 +776,6 @@ impl Source {
 
         let (file_source_tx, file_source_rx) = futures::channel::mpsc::channel::<Vec<Line>>(2);
 
-        let mut parser = Parser::new(log_namespace);
-        let partial_events_merger = Box::new(partial_events_merger::build(
-            auto_partial_merge,
-            log_namespace,
-        ));
-
         let checkpoints = checkpointer.view();
         let events = file_source_rx.flat_map(futures::stream::iter);
         let bytes_received = register!(BytesReceived::from(Protocol::HTTP));
@@ -800,6 +789,7 @@ impl Source {
                 ingestion_timestamp_field.as_ref(),
                 log_namespace,
             );
+
             let file_info = annotator.annotate(&mut event, &line.filename);
 
             emit!(KubernetesLogsEventsReceived {
@@ -834,14 +824,22 @@ impl Source {
             checkpoints.update(line.file_id, line.end_offset);
             event
         });
+
+        let mut parser = Parser::new(log_namespace);
         let events = events.flat_map(move |event| {
             let mut buf = OutputBuffer::with_capacity(1);
             parser.transform(&mut buf, event);
             futures::stream::iter(buf.into_events())
         });
+
         let (events_count, _) = events.size_hint();
 
-        let mut stream = partial_events_merger.transform(Box::pin(events));
+        let mut stream = if auto_partial_merge {
+            merge_partial_events(events, log_namespace).left_stream()
+        } else {
+            events.right_stream()
+        };
+
         let event_processing_loop = out.send_event_stream(&mut stream);
 
         let mut lifecycle = Lifecycle::new();

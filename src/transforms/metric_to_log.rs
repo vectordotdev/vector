@@ -313,7 +313,7 @@ impl MetricToLog {
 
                         if let Some(host_tag) = &self.host_tag {
                             if let Some(host_value) =
-                                log.remove_prune(host_tag.to_string().as_str(), true)
+                                log.remove_prune((PathPrefix::Event, host_tag), true)
                             {
                                 log.maybe_insert(log_schema().host_key_target_path(), host_value);
                             }
@@ -423,7 +423,7 @@ mod tests {
         metadata.set_schema_definition(&Arc::new(schema_definition(LogNamespace::Legacy)));
 
         let log = do_transform(counter).await.unwrap();
-        let collected: Vec<_> = log.all_fields().unwrap().collect();
+        let collected: Vec<_> = log.all_event_fields().unwrap().collect();
 
         assert_eq!(
             collected,
@@ -453,7 +453,7 @@ mod tests {
         metadata.set_schema_definition(&Arc::new(schema_definition(LogNamespace::Legacy)));
 
         let log = do_transform(gauge).await.unwrap();
-        let collected: Vec<_> = log.all_fields().unwrap().collect();
+        let collected: Vec<_> = log.all_event_fields().unwrap().collect();
 
         assert_eq!(
             collected,
@@ -483,7 +483,7 @@ mod tests {
         metadata.set_schema_definition(&Arc::new(schema_definition(LogNamespace::Legacy)));
 
         let log = do_transform(set).await.unwrap();
-        let collected: Vec<_> = log.all_fields().unwrap().collect();
+        let collected: Vec<_> = log.all_event_fields().unwrap().collect();
 
         assert_eq!(
             collected,
@@ -515,7 +515,7 @@ mod tests {
         metadata.set_schema_definition(&Arc::new(schema_definition(LogNamespace::Legacy)));
 
         let log = do_transform(distro).await.unwrap();
-        let collected: Vec<_> = log.all_fields().unwrap().collect();
+        let collected: Vec<_> = log.all_event_fields().unwrap().collect();
 
         assert_eq!(
             collected,
@@ -566,7 +566,7 @@ mod tests {
         metadata.set_schema_definition(&Arc::new(schema_definition(LogNamespace::Legacy)));
 
         let log = do_transform(histo).await.unwrap();
-        let collected: Vec<_> = log.all_fields().unwrap().collect();
+        let collected: Vec<_> = log.all_event_fields().unwrap().collect();
 
         assert_eq!(
             collected,
@@ -615,7 +615,7 @@ mod tests {
         metadata.set_schema_definition(&Arc::new(schema_definition(LogNamespace::Legacy)));
 
         let log = do_transform(summary).await.unwrap();
-        let collected: Vec<_> = log.all_fields().unwrap().collect();
+        let collected: Vec<_> = log.all_event_fields().unwrap().collect();
 
         assert_eq!(
             collected,
