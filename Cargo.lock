@@ -5843,7 +5843,7 @@ checksum = "ff011a302c396a5197692431fc1948019154afc178baf7d8e37367442a4601cf"
 [[package]]
 name = "openssl-src"
 version = "300.1.3+3.1.2"
-source = "git+https://github.com/vectordotdev/openssl-src-rs.git?tag=release-300-force-engine+3.1.2#98b1172bcef15358ad7bbf4baa3a3aa59d831e81"
+source = "git+https://github.com/vectordotdev/openssl-src-rs?tag=release-300-force-engine_3.1.2#98b1172bcef15358ad7bbf4baa3a3aa59d831e81"
 dependencies = [
  "cc",
 ]
@@ -5851,7 +5851,7 @@ dependencies = [
 [[package]]
 name = "openssl-sys"
 version = "0.9.91"
-source = "git+https://github.com/vectordotdev/rust-openssl.git?tag=openssl-sys-v0.9.91+3.0.0#c3a8b494e0a8ab88db692c239d30c903353b56a3"
+source = "git+https://github.com/vectordotdev/rust-openssl?tag=openssl-sys-v0.9.91_3.0.0#c3a8b494e0a8ab88db692c239d30c903353b56a3"
 dependencies = [
  "cc",
  "libc",
