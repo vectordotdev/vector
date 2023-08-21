@@ -216,10 +216,9 @@ impl Encoder<Event> for CsvSerializer {
         let log = event.into_log();
 
         let mut internal_buffer = vec![0; self.capacity];
-        let mut fields_written = 0;
         let mut used_buffer_bytes = 0;
 
-        for field in &self.fields {
+        for (fields_written, field) in self.fields.iter().enumerate() {
             let field_value = log.get(field);
 
             // write field delimiter
@@ -275,8 +274,6 @@ impl Encoder<Event> for CsvSerializer {
                     }
                 }
             }
-
-            fields_written += 1;
         }
 
         // finish current event (potentially add closing quotes)
