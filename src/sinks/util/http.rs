@@ -690,7 +690,7 @@ pub fn http_response_retry_logic() -> HttpStatusRetryLogic<
 
 /// Uses the estimated json encoded size to determine batch sizing.
 #[derive(Default)]
-pub(super) struct HttpJsonBatchSizer;
+pub struct HttpJsonBatchSizer;
 
 impl ItemBatchSize<Event> for HttpJsonBatchSizer {
     fn size(&self, item: &Event) -> usize {
