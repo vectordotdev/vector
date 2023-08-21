@@ -136,6 +136,11 @@ cli: {
 			type:        "string"
 			env_var:     "VECTOR_CONFIG_DIR"
 		}
+		"config-yaml": {
+			description: env_vars.VECTOR_CONFIG_YAML.description
+			type:        "string"
+			env_var:     "VECTOR_CONFIG_YAML"
+		}
 		"config-toml": {
 			description: env_vars.VECTOR_CONFIG_TOML.description
 			type:        "string"
@@ -145,11 +150,6 @@ cli: {
 			description: env_vars.VECTOR_CONFIG_JSON.description
 			type:        "string"
 			env_var:     "VECTOR_CONFIG_JSON"
-		}
-		"config-yaml": {
-			description: env_vars.VECTOR_CONFIG_YAML.description
-			type:        "string"
-			env_var:     "VECTOR_CONFIG_YAML"
 		}
 		"graceful-shutdown-limit-secs": {
 			description: env_vars.VECTOR_GRACEFUL_SHUTDOWN_LIMIT_SECS.description
@@ -200,7 +200,7 @@ cli: {
 				You can also visualize the output online at [webgraphviz.com](http://www.webgraphviz.com/).
 				"""
 
-			example: "vector graph --config /etc/vector/vector.toml | dot -Tsvg > graph.svg"
+			example: "vector graph --config /etc/vector/vector.yaml | dot -Tsvg > graph.svg"
 
 			options: _core_options
 		}
@@ -333,8 +333,8 @@ cli: {
 					type:        "enum"
 					default:     "json"
 					enum: {
-						json:   "Output events as JSON"
 						yaml:   "Output events as YAML"
+						json:   "Output events as JSON"
 						logfmt: "Output events as logfmt"
 					}
 				}
@@ -416,6 +416,13 @@ cli: {
 			}
 
 			options: {
+				"config-yaml": {
+					description: """
+						Any number of Vector config files to validate.
+						YAML file format is assumed.
+						"""
+					type: "string"
+				}
 				"config-toml": {
 					description: """
 						Any number of Vector config files to validate.
@@ -427,13 +434,6 @@ cli: {
 					description: """
 						Any number of Vector config files to validate.
 						JSON file format is assumed.
-						"""
-					type: "string"
-				}
-				"config-yaml": {
-					description: """
-						Any number of Vector config files to validate.
-						YAML file format is assumed.
 						"""
 					type: "string"
 				}
@@ -537,7 +537,7 @@ cli: {
 				Read configuration from one or more files. Wildcard paths are supported. If no files are
 				specified the default config path `/etc/vector/vector.toml` is targeted. TOML, YAML and
 				JSON file formats are supported. The format to interpret the file with is determined from
-				the file extension (`.toml`, `.yaml`, `.json`). Vector falls back to TOML if it can't
+				the file extension (`.yaml`, `.toml`, `.json`). Vector falls back to YAML if it can't
 				detect a supported format.
 				"""
 			type: string: {
