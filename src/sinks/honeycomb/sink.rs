@@ -1,6 +1,9 @@
 //! Implementation of the `honeycomb` sink.
 
-use crate::sinks::{prelude::*, util::http::HttpRequest};
+use crate::sinks::{
+    prelude::*,
+    util::http::{HttpJsonBatchSizer, HttpRequest},
+};
 
 use super::request_builder::HoneycombRequestBuilder;
 
@@ -33,8 +36,11 @@ where
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let service = ServiceBuilder::new().service(self.service);
         input
-            // Batch the input stream with byte size calculation
-            .batched(self.batch_settings.into_byte_size_config())
+            // Batch the input stream with size calculation based on the estimated encoded json size
+            .batched(
+                self.batch_settings
+                    .into_item_size_config(HttpJsonBatchSizer),
+            )
             // Build requests with no concurrency limit.
             .request_builder(None, self.request_builder)
             // Filter out any errors that occurred in the request building.

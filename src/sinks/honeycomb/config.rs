@@ -1,3 +1,5 @@
+//! Configuration for the `honeycomb` sink.
+
 use bytes::Bytes;
 use futures::FutureExt;
 use http::{Request, StatusCode, Uri};
@@ -9,7 +11,7 @@ use crate::{
     sinks::{
         prelude::*,
         util::{
-            http::{HttpResponse, HttpService, HttpStatusRetryLogic},
+            http::{http_response_retry_logic, HttpService},
             BatchConfig, BoxedRawValue,
         },
     },
@@ -100,8 +102,10 @@ impl SinkConfig for HoneycombConfig {
             },
         };
 
+        let uri = self.build_uri()?;
+
         let honeycomb_service_request_builder = HoneycombSvcRequestBuilder {
-            uri: self.build_uri(),
+            uri: uri.clone(),
             api_key: self.api_key.clone(),
         };
 
@@ -111,16 +115,13 @@ impl SinkConfig for HoneycombConfig {
 
         let request_limits = self.request.unwrap_with(&TowerRequestConfig::default());
 
-        let retry_logic =
-            HttpStatusRetryLogic::new(|req: &HttpResponse| req.http_response.status());
-
         let service = ServiceBuilder::new()
-            .settings(request_limits, retry_logic)
+            .settings(request_limits, http_response_retry_logic())
             .service(service);
 
         let sink = HoneycombSink::new(service, batch_settings, request_builder);
 
-        let healthcheck = healthcheck(self.build_request(Vec::new())?, client).boxed();
+        let healthcheck = healthcheck(uri, self.api_key.clone(), client).boxed();
 
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }
@@ -137,22 +138,18 @@ impl SinkConfig for HoneycombConfig {
 }
 
 impl HoneycombConfig {
-    fn build_uri(&self) -> Uri {
+    fn build_uri(&self) -> crate::Result<Uri> {
         let uri = format!("{}/{}", self.endpoint, self.dataset);
-
-        uri.parse::<Uri>().expect("This should be a valid uri")
-    }
-
-    fn build_request(&self, events: Vec<BoxedRawValue>) -> crate::Result<Request<Bytes>> {
-        let uri = self.build_uri();
-        let request = Request::post(uri).header(HTTP_HEADER_HONEYCOMB, self.api_key.inner());
-        let body = crate::serde::json::to_bytes(&events).unwrap().freeze();
-
-        request.body(body).map_err(Into::into)
+        uri.parse::<Uri>().map_err(Into::into)
     }
 }
 
-async fn healthcheck(req: Request<Bytes>, client: HttpClient) -> crate::Result<()> {
+async fn healthcheck(uri: Uri, api_key: SensitiveString, client: HttpClient) -> crate::Result<()> {
+    let request = Request::post(uri).header(HTTP_HEADER_HONEYCOMB, api_key.inner());
+    let body = crate::serde::json::to_bytes(&Vec::<BoxedRawValue>::new())
+        .unwrap()
+        .freeze();
+    let req: Request<Bytes> = request.body(body)?;
     let req = req.map(hyper::Body::from);
 
     let res = client.send(req).await?;
