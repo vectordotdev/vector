@@ -253,7 +253,7 @@ impl Encoder<Event> for CsvSerializer {
                 None => String::new(),
             };
 
-            // mutable byte_slice so it can be written in chunks of buffer fills up
+            // mutable byte_slice so it can be written in chunks if internal_buffer fills up
             let mut field_value = field_value.as_bytes();
             // write field_value to internal buffer
             loop {
@@ -289,6 +289,7 @@ impl Encoder<Event> for CsvSerializer {
             }
         }
 
+        // final flush of internal_buffer
         if used_buffer_bytes > 0 {
             buffer.extend_from_slice(&self.internal_buffer[..used_buffer_bytes]);
         }
