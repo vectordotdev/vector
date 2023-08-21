@@ -361,7 +361,7 @@ where
 
 /// @struct HttpBatchService
 ///
-/// NOTE: This has been deprecated, please do not use <directly> when creating new sinks.
+/// NOTE: This has been deprecated, please do not use directly when creating new sinks.
 ///       The `HttpService` currently wraps this structure. Eventually all sinks currently using the
 ///       HttpBatchService directly should be updated to use `HttpService`. At which time we can
 ///       remove this struct and inline the functionality into the `HttpService` directly.

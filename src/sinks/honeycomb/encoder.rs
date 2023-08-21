@@ -22,6 +22,7 @@ impl SinkEncoder<Vec<Event>> for HoneycombEncoder {
     ) -> io::Result<(usize, GroupedCountByteSize)> {
         let mut byte_size = telemetry().create_request_count_byte_size();
         let mut body = BytesMut::new();
+        let n_events = events.len();
 
         for mut event in events {
             self.transformer.transform(&mut event);
@@ -46,6 +47,6 @@ impl SinkEncoder<Vec<Event>> for HoneycombEncoder {
 
         let body = body.freeze();
 
-        write_all(writer, 1, body.as_ref()).map(|()| (body.len(), byte_size))
+        write_all(writer, n_events, body.as_ref()).map(|()| (body.len(), byte_size))
     }
 }
