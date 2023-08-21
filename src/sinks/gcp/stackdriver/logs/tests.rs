@@ -5,6 +5,7 @@ use chrono::{TimeZone, Utc};
 use futures::{future::ready, stream};
 use http::{Request, Uri};
 use indoc::indoc;
+use lookup::lookup_v2::ConfigValuePath;
 use serde::Deserialize;
 use serde_json::value::RawValue;
 use std::collections::HashMap;
@@ -83,7 +84,7 @@ fn encode_valid() {
                 ),
             ]),
         },
-        Some("anumber".into()),
+        Some(ConfigValuePath::try_from("anumber".to_owned()).unwrap()),
     );
 
     let log = [
@@ -125,7 +126,7 @@ fn encode_inserts_timestamp() {
                 Template::try_from("office").unwrap(),
             )]),
         },
-        Some("anumber".to_owned()),
+        Some(ConfigValuePath::try_from("anumber".to_owned()).unwrap()),
     );
 
     let mut log = LogEvent::default();
