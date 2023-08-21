@@ -279,7 +279,7 @@ impl Encoder<Event> for CsvSerializer {
             fields_written += 1;
         }
 
-        // finish current event (potantially add closing quotes)
+        // finish current event (potentially add closing quotes)
         loop {
             let (res, bytes_written) = self.wtr.finish(&mut internal_buffer[used_buffer_bytes..]);
             used_buffer_bytes += bytes_written;
