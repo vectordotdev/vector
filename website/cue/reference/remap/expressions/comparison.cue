@@ -1,10 +1,10 @@
 package metadata
 
 remap: expressions: comparison: {
-	title: "Comparison"
+	title:       "Comparison"
 	description: """
 		A _comparison_ expression compares two expressions (operands) and produces a Boolean as defined by the
-		operator.
+		operator. Please refer to the [match function](\(urls.vrl_match_function)) for matching a string against a regex.
 		"""
 	return: """
 		Returns a Boolean as defined by the operator.
@@ -75,7 +75,7 @@ remap: expressions: comparison: {
 			return: true
 		},
 		{
-			title: "Not equal - different types"
+			title: "Not equal - string vs regex"
 			source: #"""
 				"foo" == r"foo"
 				"""#
