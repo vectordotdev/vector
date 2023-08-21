@@ -90,7 +90,6 @@ mod mongodb_metrics;
 #[cfg(feature = "sources-nginx_metrics")]
 mod nginx_metrics;
 mod open;
-#[cfg(feature = "transforms-log_to_metric")]
 mod parser;
 #[cfg(feature = "sources-postgresql_metrics")]
 mod postgresql_metrics;
@@ -227,7 +226,6 @@ pub(crate) use self::lua::*;
 pub(crate) use self::metric_to_log::*;
 #[cfg(feature = "sources-nginx_metrics")]
 pub(crate) use self::nginx_metrics::*;
-#[cfg(feature = "transforms-log_to_metric")]
 pub(crate) use self::parser::*;
 #[cfg(feature = "sources-postgresql_metrics")]
 pub(crate) use self::postgresql_metrics::*;
