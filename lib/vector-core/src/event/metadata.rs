@@ -54,6 +54,37 @@ pub struct EventMetadata {
     /// This field could almost be keyed by `&'static str`, but because it needs to be deserializable
     /// we have to use `String`.
     dropped_fields: BTreeMap<String, Value>,
+
+    #[serde(default)]
+    datadog_origin_metadata: Option<DatadogMetricOriginMetadata>,
+}
+
+/// Metric Origin metadata for submission to Datadog.
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub struct DatadogMetricOriginMetadata {
+    /// OriginProduct
+    product: Option<u32>,
+    /// OriginCategory
+    category: Option<u32>,
+    /// OriginService
+    service: Option<u32>,
+}
+
+impl DatadogMetricOriginMetadata {
+    /// Returns a reference to the OriginProduct
+    pub fn product(&self) -> Option<u32> {
+        self.product
+    }
+
+    /// Returns a reference to the OriginCategory
+    pub fn category(&self) -> Option<u32> {
+        self.category
+    }
+
+    /// Returns a reference to the OriginService
+    pub fn service(&self) -> Option<u32> {
+        self.service
+    }
 }
 
 fn default_metadata_value() -> Value {
@@ -144,6 +175,11 @@ impl EventMetadata {
     pub fn dropped_field(&self, meaning: impl AsRef<str>) -> Option<&Value> {
         self.dropped_fields.get(meaning.as_ref())
     }
+
+    /// Returns a reference to the `DatadogMetricOriginMetadata`.
+    pub fn datadog_origin_metadata(&self) -> Option<&DatadogMetricOriginMetadata> {
+        self.datadog_origin_metadata.as_ref()
+    }
 }
 
 impl Default for EventMetadata {
@@ -156,6 +192,7 @@ impl Default for EventMetadata {
             source_id: None,
             upstream_id: None,
             dropped_fields: BTreeMap::new(),
+            datadog_origin_metadata: None,
         }
     }
 }
