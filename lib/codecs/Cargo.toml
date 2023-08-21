@@ -37,7 +37,7 @@ vector-core = { path = "../vector-core", default-features = false }
 futures = { version = "0.3", default-features = false }
 indoc = { version = "2", default-features = false }
 tokio = { version = "1", features = ["test-util"] }
-similar-asserts = "1.4.2"
+similar-asserts = "1.5.0"
 
 [features]
 syslog = ["dep:syslog_loose"]
