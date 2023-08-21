@@ -1,4 +1,4 @@
-//! Service implementation for the `http` sink.
+//! Service implementation for the `gcp_stackdriver_logs` sink.
 
 use bytes::Bytes;
 use http::{Request, Uri};

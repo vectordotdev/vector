@@ -57,32 +57,16 @@ async fn component_spec_compliance() {
 
 #[test]
 fn encode_valid() {
-    // let config: StackdriverConfig = toml::from_str(indoc! {r#"
-    //         project_id = "project"
-    //         log_id = "{{ log_id }}"
-    //         resource.type = "generic_node"
-    //         resource.namespace = "office"
-    //         resource.node_id = "{{ node_id }}"
-    //         encoding.except_fields = ["anumber", "node_id", "log_id"]
-    //     "#})
-    // .unwrap();
-
-    // let sink = StackdriverSink {
-    //     config,
-    //     auth: GcpAuthenticator::None,
-    //     severity_key: Some("anumber".into()),
-    //     uri: default_endpoint().parse().unwrap(),
-    // };
     let mut transformer = Transformer::default();
     transformer
         .set_except_fields(Some(vec![
-            "anumber".to_owned(),
-            "node_id".to_owned(),
-            "log_id".to_owned(),
+            "anumber".into(),
+            "node_id".into(),
+            "log_id".into(),
         ]))
         .unwrap();
 
-    let encoder = build_encoder(
+    let encoder = StackdriverLogsEncoder::new(
         transformer,
         Template::try_from("{{ log_id }}").unwrap(),
         StackdriverLogName::Project("project".to_owned()),
@@ -128,23 +112,9 @@ fn encode_valid() {
 
 #[test]
 fn encode_inserts_timestamp() {
-    // let config: StackdriverConfig = toml::from_str(indoc! {r#"
-    //         project_id = "project"
-    //         log_id = "testlogs"
-    //         resource.type = "generic_node"
-    //         resource.namespace = "office"
-    //     "#})
-    // .unwrap();
-
-    // let sink = StackdriverSink {
-    //     config,
-    //     auth: GcpAuthenticator::None,
-    //     severity_key: Some("anumber".into()),
-    //     uri: default_endpoint().parse().unwrap(),
-    // };
     let transformer = Transformer::default();
 
-    let encoder = build_encoder(
+    let encoder = StackdriverLogsEncoder::new(
         transformer,
         Template::try_from("testlogs").unwrap(),
         StackdriverLogName::Project("project".to_owned()),
@@ -213,16 +183,6 @@ fn severity_remaps_strings() {
     }
 }
 
-fn build_encoder(
-    transformer: Transformer,
-    log_id: Template,
-    log_name: StackdriverLogName,
-    resource: StackdriverResource,
-    severity_key: Option<String>,
-) -> StackdriverLogsEncoder {
-    StackdriverLogsEncoder::new(transformer, log_id, log_name, resource, severity_key)
-}
-
 async fn build_request(
     auth: GcpAuthenticator,
     uri: Uri,
@@ -243,18 +203,10 @@ async fn build_request(
 
 #[tokio::test]
 async fn correct_request() {
-    // let config: StackdriverConfig = toml::from_str(indoc! {r#"
-    //         project_id = "project"
-    //         log_id = "testlogs"
-    //         resource.type = "generic_node"
-    //         resource.namespace = "office"
-    //     "#})
-    // .unwrap();
-
     let uri: Uri = default_endpoint().parse().unwrap();
 
     let transformer = Transformer::default();
-    let encoder = build_encoder(
+    let encoder = StackdriverLogsEncoder::new(
         transformer,
         Template::try_from("testlogs").unwrap(),
         StackdriverLogName::Project("project".to_owned()),

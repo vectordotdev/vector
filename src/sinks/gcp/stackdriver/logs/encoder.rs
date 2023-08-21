@@ -1,4 +1,4 @@
-//! Encoding for the `http` sink.
+//! Encoding for the `gcp_stackdriver_logs` sink.
 
 use std::{collections::HashMap, io};
 

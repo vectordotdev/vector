@@ -20,7 +20,9 @@ use snafu::{ResultExt, Snafu};
 use tower::{Service, ServiceBuilder};
 use tower_http::decompression::DecompressionLayer;
 use vector_config::configurable_component;
-use vector_core::{ByteSizeOf, EstimatedJsonEncodedSizeOf};
+use vector_core::{
+    stream::batcher::limiter::ItemBatchSize, ByteSizeOf, EstimatedJsonEncodedSizeOf,
+};
 
 use super::{
     retries::{RetryAction, RetryLogic},
@@ -359,7 +361,7 @@ where
 
 /// @struct HttpBatchService
 ///
-/// NOTE: This has been deprecated, please do not use <directly> when creating new sinks.
+/// NOTE: This has been deprecated, please do not use directly when creating new sinks.
 ///       The `HttpService` currently wraps this structure. Eventually all sinks currently using the
 ///       HttpBatchService directly should be updated to use `HttpService`. At which time we can
 ///       remove this struct and inline the functionality into the `HttpService` directly.
@@ -675,6 +677,24 @@ impl DriverResponse for HttpResponse {
 
     fn bytes_sent(&self) -> Option<usize> {
         Some(self.raw_byte_size)
+    }
+}
+
+/// Creates a `RetryLogic` for use with `HttpResponse`.
+pub fn http_response_retry_logic() -> HttpStatusRetryLogic<
+    impl Fn(&HttpResponse) -> StatusCode + Clone + Send + Sync + 'static,
+    HttpResponse,
+> {
+    HttpStatusRetryLogic::new(|req: &HttpResponse| req.http_response.status())
+}
+
+/// Uses the estimated json encoded size to determine batch sizing.
+#[derive(Default)]
+pub(super) struct HttpJsonBatchSizer;
+
+impl ItemBatchSize<Event> for HttpJsonBatchSizer {
+    fn size(&self, item: &Event) -> usize {
+        item.estimated_json_encoded_size_of().get()
     }
 }
 

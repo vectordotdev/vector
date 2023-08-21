@@ -52,6 +52,7 @@ impl SinkEncoder<Vec<Event>> for HttpEncoder {
         let mut encoder = self.encoder.clone();
         let mut byte_size = telemetry().create_request_count_byte_size();
         let mut body = BytesMut::new();
+        let n_events = events.len();
 
         if let (Json(_), CharacterDelimited(CharacterDelimitedEncoder { delimiter: b',' })) =
             (self.encoder.serializer(), self.encoder.framer())
@@ -91,6 +92,6 @@ impl SinkEncoder<Vec<Event>> for HttpEncoder {
 
         let body = body.freeze();
 
-        write_all(writer, 1, body.as_ref()).map(|()| (body.len(), byte_size))
+        write_all(writer, n_events, body.as_ref()).map(|()| (body.len(), byte_size))
     }
 }

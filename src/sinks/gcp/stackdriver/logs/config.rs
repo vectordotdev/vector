@@ -19,7 +19,7 @@ use crate::{
         gcs_common::config::healthcheck_response,
         prelude::*,
         util::{
-            http::{HttpResponse, HttpService, HttpStatusRetryLogic},
+            http::{http_response_retry_logic, HttpService},
             BatchConfig, BoxedRawValue, RealtimeSizeBasedDefaultBatchSettings, TowerRequestConfig,
         },
     },
@@ -239,11 +239,8 @@ impl SinkConfig for StackdriverConfig {
 
         let service = HttpService::new(client.clone(), stackdriver_logs_service_request_builder);
 
-        let retry_logic =
-            HttpStatusRetryLogic::new(|req: &HttpResponse| req.http_response.status());
-
         let service = ServiceBuilder::new()
-            .settings(request_limits, retry_logic)
+            .settings(request_limits, http_response_retry_logic())
             .service(service);
 
         let sink = StackdriverLogsSink::new(service, batch_settings, request_builder);
