@@ -97,7 +97,6 @@ tracing-subscriber = { version = "0.3.17", default-features = false, features = 
 vector-common = { path = "../vector-common", default-features = false, features = ["test"] }
 vrl = { version = "0.6.0", features = ["cli", "test", "test_framework", "arbitrary"] }
 
-
 [features]
 api = ["dep:async-graphql"]
 default = []
