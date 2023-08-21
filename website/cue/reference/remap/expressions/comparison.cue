@@ -39,9 +39,16 @@ remap: expressions: comparison: {
 
 	examples: [
 		{
-			title: "Equal"
+			title: "Equal integers"
 			source: #"""
 				1 == 1
+				"""#
+			return: true
+		},
+		{
+			title: "Equal integer and float"
+			source: #"""
+				1 == 1.0
 				"""#
 			return: true
 		},
@@ -51,6 +58,28 @@ remap: expressions: comparison: {
 				1 != 2
 				"""#
 			return: true
+		},
+		{
+			title: "Equal string"
+			source: #"""
+				x = "foo"
+				x == "foo"
+				"""#
+			return: true
+		},
+		{
+			title: "Not equal strings"
+			source: #"""
+				"foo" != "bar"
+				"""#
+			return: true
+		},
+		{
+			title: "Not equal - different types"
+			source: #"""
+				"foo" == r"foo"
+				"""#
+			return: false
 		},
 		{
 			title: "Greater than or equal"
