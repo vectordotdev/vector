@@ -180,7 +180,7 @@ impl CsvSerializerOptions {
 pub struct CsvSerializer {
     wtr: csv_core::Writer,
     fields: Vec<ConfigTargetPath>,
-    capacity: usize,
+    internal_buffer: Vec<u8>,
 }
 
 impl CsvSerializer {
@@ -195,15 +195,15 @@ impl CsvSerializer {
             .quote(config.csv.quote)
             .build();
 
-        let capacity = if config.csv.capacity < 1 {
-            1
+        let internal_buffer = if config.csv.capacity < 1 {
+            vec![0; 1]
         } else {
-            config.csv.capacity
+            vec![0; config.csv.capacity]
         };
 
         Self {
             wtr,
-            capacity,
+            internal_buffer,
             fields: config.csv.fields,
         }
     }
@@ -215,9 +215,7 @@ impl Encoder<Event> for CsvSerializer {
     fn encode(&mut self, event: Event, buffer: &mut BytesMut) -> Result<(), Self::Error> {
         let log = event.into_log();
 
-        let mut internal_buffer = vec![0; self.capacity];
         let mut used_buffer_bytes = 0;
-
         for (fields_written, field) in self.fields.iter().enumerate() {
             let field_value = log.get(field);
 
@@ -226,14 +224,14 @@ impl Encoder<Event> for CsvSerializer {
                 loop {
                     let (res, bytes_written) = self
                         .wtr
-                        .delimiter(&mut internal_buffer[used_buffer_bytes..]);
+                        .delimiter(&mut self.internal_buffer[used_buffer_bytes..]);
                     used_buffer_bytes += bytes_written;
                     match res {
                         csv_core::WriteResult::InputEmpty => {
                             break;
                         }
                         csv_core::WriteResult::OutputFull => {
-                            buffer.extend_from_slice(&internal_buffer[..used_buffer_bytes]);
+                            buffer.extend_from_slice(&self.internal_buffer[..used_buffer_bytes]);
                             used_buffer_bytes = 0;
                         }
                     }
@@ -261,7 +259,7 @@ impl Encoder<Event> for CsvSerializer {
             loop {
                 let (res, bytes_read, bytes_written) = self
                     .wtr
-                    .field(field_value, &mut internal_buffer[used_buffer_bytes..]);
+                    .field(field_value, &mut self.internal_buffer[used_buffer_bytes..]);
 
                 field_value = &field_value[bytes_read..];
                 used_buffer_bytes += bytes_written;
@@ -269,7 +267,7 @@ impl Encoder<Event> for CsvSerializer {
                 match res {
                     csv_core::WriteResult::InputEmpty => break,
                     csv_core::WriteResult::OutputFull => {
-                        buffer.extend_from_slice(&internal_buffer[..used_buffer_bytes]);
+                        buffer.extend_from_slice(&self.internal_buffer[..used_buffer_bytes]);
                         used_buffer_bytes = 0;
                     }
                 }
@@ -278,19 +276,21 @@ impl Encoder<Event> for CsvSerializer {
 
         // finish current event (potentially add closing quotes)
         loop {
-            let (res, bytes_written) = self.wtr.finish(&mut internal_buffer[used_buffer_bytes..]);
+            let (res, bytes_written) = self
+                .wtr
+                .finish(&mut self.internal_buffer[used_buffer_bytes..]);
             used_buffer_bytes += bytes_written;
             match res {
                 csv_core::WriteResult::InputEmpty => break,
                 csv_core::WriteResult::OutputFull => {
-                    buffer.extend_from_slice(&internal_buffer[..used_buffer_bytes]);
+                    buffer.extend_from_slice(&self.internal_buffer[..used_buffer_bytes]);
                     used_buffer_bytes = 0;
                 }
             }
         }
 
         if used_buffer_bytes > 0 {
-            buffer.extend_from_slice(&internal_buffer[..used_buffer_bytes]);
+            buffer.extend_from_slice(&self.internal_buffer[..used_buffer_bytes]);
         }
 
         Ok(())
