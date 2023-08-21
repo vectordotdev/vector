@@ -9730,6 +9730,7 @@ dependencies = [
  "url",
  "vector-config-common",
  "vector-config-macros",
+ "vector-core",
  "vrl",
 ]
 
