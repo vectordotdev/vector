@@ -5,6 +5,7 @@ use std::collections::HashMap;
 use futures::FutureExt;
 use http::{Request, Uri};
 use hyper::Body;
+use lookup::lookup_v2::ConfigValuePath;
 use snafu::Snafu;
 use vector_config::configurable_component;
 use vrl::value::Kind;
@@ -74,7 +75,7 @@ pub(super) struct StackdriverConfig {
     /// [sev_names]: https://cloud.google.com/logging/docs/reference/v2/rest/v2/LogEntry#logseverity
     /// [logsev_docs]: https://cloud.google.com/logging/docs/reference/v2/rest/v2/LogEntry#logseverity
     #[configurable(metadata(docs::examples = "severity"))]
-    pub(super) severity_key: Option<String>,
+    pub(super) severity_key: Option<ConfigValuePath>,
 
     #[serde(flatten)]
     pub(super) auth: GcpAuthConfig,

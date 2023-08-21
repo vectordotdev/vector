@@ -3,7 +3,9 @@
 use std::{collections::HashMap, io};
 
 use bytes::BytesMut;
+use lookup::lookup_v2::ConfigValuePath;
 use serde_json::{json, to_vec, Map};
+use vrl::path::PathPrefix;
 
 use crate::{
     sinks::{prelude::*, util::encoding::Encoder as SinkEncoder},
@@ -18,7 +20,7 @@ pub(super) struct StackdriverLogsEncoder {
     log_id: Template,
     log_name: StackdriverLogName,
     resource: StackdriverResource,
-    severity_key: Option<String>,
+    severity_key: Option<ConfigValuePath>,
 }
 
 impl StackdriverLogsEncoder {
@@ -28,7 +30,7 @@ impl StackdriverLogsEncoder {
         log_id: Template,
         log_name: StackdriverLogName,
         resource: StackdriverResource,
-        severity_key: Option<String>,
+        severity_key: Option<ConfigValuePath>,
     ) -> Self {
         Self {
             transformer,
@@ -69,7 +71,7 @@ impl StackdriverLogsEncoder {
         let severity = self
             .severity_key
             .as_ref()
-            .and_then(|key| log.remove(key.as_str()))
+            .and_then(|key| log.remove((PathPrefix::Event, &key.0)))
             .map(remap_severity)
             .unwrap_or_else(|| 0.into());
 
