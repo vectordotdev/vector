@@ -345,7 +345,7 @@ no-proxy,https://github.com/jdrouet/no-proxy,MIT,Jérémie Drouet <jeremie.droue
 no-std-compat,https://gitlab.com/jD91mZM2/no-std-compat,MIT,jD91mZM2 <me@krake.one>
 nom,https://github.com/Geal/nom,MIT,contact@geoffroycouprie.com
 nonzero_ext,https://github.com/antifuchs/nonzero_ext,Apache-2.0,Andreas Fuchs <asf@boinkor.net>
-notify,https://github.com/notify-rs/notify,CC0-1.0 OR Artistic-2.0,"Félix Saparelli <me@passcod.name>, Daniel Faust <hessijames@gmail.com>"
+notify,https://github.com/notify-rs/notify,CC0-1.0,"Félix Saparelli <me@passcod.name>, Daniel Faust <hessijames@gmail.com>, Aron Heinecke <Ox0p54r36@t-online.de>"
 ntapi,https://github.com/MSxDOS/ntapi,Apache-2.0 OR MIT,MSxDOS <melcodos@gmail.com>
 nu-ansi-term,https://github.com/nushell/nu-ansi-term,MIT,"ogham@bsago.me, Ryan Scheel (Havvy) <ryan.havvy@gmail.com>, Josh Triplett <josh@joshtriplett.org>, The Nushell Project Developers"
 nuid,https://github.com/casualjim/rs-nuid,Apache-2.0,Ivan Porto Carrero <ivan@oflanders.co.nz>
@@ -483,7 +483,6 @@ serde,https://github.com/serde-rs/serde,MIT OR Apache-2.0,"Erick Tryzelaar <eric
 serde-toml-merge,https://github.com/jdrouet/serde-toml-merge,MIT,Jeremie Drouet <jeremie.drouet@gmail.com>
 serde-value,https://github.com/arcnmx/serde-value,MIT,arcnmx
 serde_bytes,https://github.com/serde-rs/bytes,MIT OR Apache-2.0,David Tolnay <dtolnay@gmail.com>
-serde_derive,https://github.com/serde-rs/serde,MIT OR Apache-2.0,David Tolnay <dtolnay@gmail.com>
 serde_json,https://github.com/serde-rs/json,MIT OR Apache-2.0,"Erick Tryzelaar <erick.tryzelaar@gmail.com>, David Tolnay <dtolnay@gmail.com>"
 serde_nanos,https://github.com/caspervonb/serde_nanos,MIT OR Apache-2.0,Casper Beyer <caspervonb@pm.me>
 serde_path_to_error,https://github.com/dtolnay/path-to-error,MIT OR Apache-2.0,David Tolnay <dtolnay@gmail.com>
@@ -621,6 +620,7 @@ webpki,https://github.com/briansmith/webpki,ISC,Brian Smith <brian@briansmith.or
 webpki-roots,https://github.com/rustls/webpki-roots,MPL-2.0,Joseph Birr-Pixton <jpixton@gmail.com>
 webpki-roots,https://github.com/rustls/webpki-roots,MPL-2.0,The webpki-roots Authors
 wepoll-ffi,https://github.com/aclysma/wepoll-ffi,MIT OR Apache-2.0 OR BSD-2-Clause,Philip Degarmo <aclysma@gmail.com>
+whoami,https://github.com/ardaku/whoami,Apache-2.0 OR BSL-1.0 OR MIT,The whoami Authors
 widestring,https://github.com/starkat99/widestring-rs,MIT OR Apache-2.0,Kathryn Long <squeeself@gmail.com>
 widestring,https://github.com/starkat99/widestring-rs,MIT OR Apache-2.0,The widestring Authors
 winapi,https://github.com/retep998/winapi-rs,MIT OR Apache-2.0,Peter Atashian <retep998@gmail.com>
