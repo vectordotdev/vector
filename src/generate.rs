@@ -59,7 +59,7 @@ pub struct Opts {
     #[arg(long)]
     pub(crate) file: Option<PathBuf>,
 
-    #[arg(short, long, default_value = "yaml")]
+    #[arg(long, default_value = "yaml")]
     pub(crate) format: Format,
 }
 
@@ -81,8 +81,11 @@ pub struct TransformOuter {
 
 #[derive(Serialize, Default)]
 pub struct Config {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub sources: Option<IndexMap<String, Value>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub transforms: Option<IndexMap<String, TransformOuter>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub sinks: Option<IndexMap<String, SinkOuter>>,
 }
 
@@ -102,6 +105,14 @@ pub(crate) enum TransformInputsStrategy {
     All,
 }
 
+#[derive(Serialize, Default)]
+struct FullConfig {
+    #[serde(flatten)]
+    global_options: Option<GlobalOptions>,
+    #[serde(flatten)]
+    config: Config,
+}
+
 pub(crate) fn generate_example(
     opts: &Opts,
     transform_inputs_strategy: TransformInputsStrategy,
@@ -117,10 +128,6 @@ pub(crate) fn generate_example(
         })
         .collect();
 
-    let globals = GlobalOptions {
-        data_dir: default_data_dir(),
-        ..Default::default()
-    };
     let mut config = Config::default();
 
     let mut errs = Vec::new();
@@ -307,59 +314,25 @@ pub(crate) fn generate_example(
         return Err(errs);
     }
 
-    let mut builder = if !opts.fragment {
-        match format::serialize(&globals, opts.format) {
-            Ok(s) => s,
-            Err(err) => {
-                errs.push(format!("failed to marshal globals: {err}"));
-                return Err(errs);
-            }
-        }
-    } else {
-        String::new()
+    let full_config = FullConfig {
+        global_options: if !opts.fragment {
+            Some(GlobalOptions {
+                data_dir: default_data_dir(),
+                ..Default::default()
+            })
+        } else {
+            None
+        },
+        config,
     };
-    if let Some(sources) = config.sources {
-        match format::serialize(
-            &{
-                Config {
-                    sources: Some(sources),
-                    ..Default::default()
-                }
-            },
-            opts.format,
-        ) {
-            Ok(v) => builder = [builder, v].join("\n"),
-            Err(e) => errs.push(format!("failed to marshal sources: {e}")),
+
+    let builder = match format::serialize(&full_config, opts.format) {
+        Ok(v) => v,
+        Err(e) => {
+            errs.push(format!("failed to marshal sources: {e}"));
+            return Err(errs);
         }
-    }
-    if let Some(transforms) = config.transforms {
-        match format::serialize(
-            &{
-                Config {
-                    transforms: Some(transforms),
-                    ..Default::default()
-                }
-            },
-            opts.format,
-        ) {
-            Ok(v) => builder = [builder, v].join("\n"),
-            Err(e) => errs.push(format!("failed to marshal transforms: {e}")),
-        }
-    }
-    if let Some(sinks) = config.sinks {
-        match format::serialize(
-            &{
-                Config {
-                    sinks: Some(sinks),
-                    ..Default::default()
-                }
-            },
-            opts.format,
-        ) {
-            Ok(v) => builder = [builder, v].join("\n"),
-            Err(e) => errs.push(format!("failed to marshal sinks: {e}")),
-        }
-    }
+    };
 
     let file = opts.file.as_ref();
     if file.is_some() {
@@ -419,16 +392,18 @@ fn write_config(filepath: &Path, body: &str) -> Result<(), crate::Error> {
 mod tests {
     use super::*;
     use crate::config::ConfigBuilder;
+    use proptest::prelude::*;
 
-    fn generate_and_deserialize(expression: String) {
+    fn generate_and_deserialize(expression: String, format: Format) {
         let opts = Opts {
             fragment: false,
             expression,
             file: None,
-            format: Format::Toml,
+            format,
         };
         let cfg_string = generate_example(&opts, TransformInputsStrategy::Auto).unwrap();
         if let Err(error) = format::deserialize::<ConfigBuilder>(&cfg_string, opts.format) {
+            println!("{cfg_string}");
             panic!(
                 "Failed to generate example for {} with error: {error:?})",
                 opts.expression
@@ -436,18 +411,20 @@ mod tests {
         }
     }
 
-    #[test]
-    fn generate_all() {
-        for name in SourceDescription::types() {
-            generate_and_deserialize(format!("{}//", name));
-        }
+    proptest! {
+        #[test]
+        fn generate_all(format in any::<Format>()) {
+            for name in SourceDescription::types() {
+                generate_and_deserialize(format!("{}//", name), format);
+            }
 
-        for name in TransformDescription::types() {
-            generate_and_deserialize(format!("/{}/", name));
-        }
+            for name in TransformDescription::types() {
+                generate_and_deserialize(format!("/{}/", name), format);
+            }
 
-        for name in SinkDescription::types() {
-            generate_and_deserialize(format!("//{}", name));
+            for name in SinkDescription::types() {
+                generate_and_deserialize(format!("//{}", name), format);
+            }
         }
     }
 
@@ -645,7 +622,6 @@ mod tests {
         assert_eq!(
             generate_example(&opts, TransformInputsStrategy::Auto),
             Ok(indoc::indoc! {r#"
-
                 [transforms.transform0]
                 inputs = []
                 increase = 0.0
