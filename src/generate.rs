@@ -403,7 +403,6 @@ mod tests {
         };
         let cfg_string = generate_example(&opts, TransformInputsStrategy::Auto).unwrap();
         if let Err(error) = format::deserialize::<ConfigBuilder>(&cfg_string, opts.format) {
-            println!("{cfg_string}");
             panic!(
                 "Failed to generate example for {} with error: {error:?})",
                 opts.expression
@@ -455,7 +454,7 @@ mod tests {
 
     #[cfg(all(feature = "sources-stdin", feature = "sinks-console"))]
     #[test]
-    fn generate_basic() {
+    fn generate_basic_toml() {
         let mut opts = Opts {
             fragment: false,
             expression: "stdin/test_basic/console".to_string(),
@@ -641,6 +640,124 @@ mod tests {
                 type = "test_basic"
             "#}
             .to_string())
+        );
+    }
+
+    #[test]
+    fn generate_basic_yaml() {
+        let opts = Opts {
+            fragment: false,
+            expression: "demo_logs/remap/console".to_string(),
+            file: None,
+            format: Format::Yaml,
+        };
+
+        assert_eq!(
+            generate_example(&opts, TransformInputsStrategy::Auto).unwrap(),
+            indoc::indoc! {r#"
+            data_dir: /var/lib/vector/
+            sources:
+              source0:
+                count: 9223372036854775807
+                format: json
+                interval: 1.0
+                type: demo_logs
+                decoding:
+                  codec: bytes
+                framing:
+                  method: bytes
+            transforms:
+              transform0:
+                inputs:
+                - source0
+                drop_on_abort: false
+                drop_on_error: false
+                metric_tag_values: single
+                reroute_dropped: false
+                runtime: ast
+                type: remap
+            sinks:
+              sink0:
+                inputs:
+                - transform0
+                target: stdout
+                type: console
+                encoding:
+                  codec: json
+                healthcheck:
+                  enabled: true
+                  uri: null
+                buffer:
+                  type: memory
+                  max_events: 500
+                  when_full: block
+            "#}
+        );
+    }
+
+    #[test]
+    fn generate_basic_json() {
+        let opts = Opts {
+            fragment: false,
+            expression: "demo_logs/remap/console".to_string(),
+            file: None,
+            format: Format::Json,
+        };
+
+        assert_eq!(
+            generate_example(&opts, TransformInputsStrategy::Auto).unwrap(),
+            indoc::indoc! {r#"
+            {
+              "data_dir": "/var/lib/vector/",
+              "sources": {
+                "source0": {
+                  "count": 9223372036854775807,
+                  "format": "json",
+                  "interval": 1.0,
+                  "type": "demo_logs",
+                  "decoding": {
+                    "codec": "bytes"
+                  },
+                  "framing": {
+                    "method": "bytes"
+                  }
+                }
+              },
+              "transforms": {
+                "transform0": {
+                  "inputs": [
+                    "source0"
+                  ],
+                  "drop_on_abort": false,
+                  "drop_on_error": false,
+                  "metric_tag_values": "single",
+                  "reroute_dropped": false,
+                  "runtime": "ast",
+                  "type": "remap"
+                }
+              },
+              "sinks": {
+                "sink0": {
+                  "inputs": [
+                    "transform0"
+                  ],
+                  "target": "stdout",
+                  "type": "console",
+                  "encoding": {
+                    "codec": "json"
+                  },
+                  "healthcheck": {
+                    "enabled": true,
+                    "uri": null
+                  },
+                  "buffer": {
+                    "type": "memory",
+                    "max_events": 500,
+                    "when_full": "block"
+                  }
+                }
+              }
+            }"#}
         );
     }
 }
