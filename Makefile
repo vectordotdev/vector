@@ -221,7 +221,7 @@ build-graphql-schema: ## Generate the `schema.json` for Vector's GraphQL API
 .PHONY: check-build-tools
 check-build-tools:
 ifneq ($(ENVIRONMENT), true)
-ifeq (, $(shell command -v cargo))
+ifeq ($(shell command -v cargo >/dev/null || echo not-found), not-found)
 	$(error "Please install Rust: https://www.rust-lang.org/tools/install")
 endif
 endif

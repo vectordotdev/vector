@@ -270,7 +270,7 @@ environment variable example.
 
 ### Formats
 
-Vector supports [TOML], [YAML], and [JSON] to ensure that Vector fits into your
+Vector supports [YAML], [TOML], and [JSON] to ensure that Vector fits into your
 workflow. A side benefit of supporting YAML and JSON is that they enable you to use
 data templating languages such as [ytt], [Jsonnet] and [Cue].
 

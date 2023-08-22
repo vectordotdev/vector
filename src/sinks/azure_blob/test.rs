@@ -129,7 +129,7 @@ fn azure_blob_build_request_with_compression() {
 
     assert_eq!(request.metadata.partition_key, "blob.log.gz".to_string());
     assert_eq!(request.content_encoding, Some("gzip"));
-    assert_eq!(request.content_type, "application/gzip");
+    assert_eq!(request.content_type, "text/plain");
 }
 
 #[test]

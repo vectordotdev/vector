@@ -403,7 +403,7 @@ impl Formatter {
             .as_ref()
             .lines()
             .map(|line| {
-                String::from_utf8_lossy(&strip_ansi_escapes::strip(line).unwrap())
+                String::from_utf8_lossy(&strip_ansi_escapes::strip(line))
                     .chars()
                     .count()
             })

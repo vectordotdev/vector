@@ -5,8 +5,10 @@ use chrono::Utc;
 use indexmap::IndexMap;
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
+use vrl::path::parse_target_path;
 
 use crate::config::schema::Definition;
+use crate::transforms::log_to_metric::TransformError::FieldNotFound;
 use crate::{
     config::{
         DataType, GenerateConfig, Input, OutputId, TransformConfig, TransformContext,
@@ -263,9 +265,11 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
         .clone()
         .with_schema_definition(&Arc::new(Definition::any()));
 
-    let field = config.field();
+    let field = parse_target_path(config.field()).map_err(|_e| FieldNotFound {
+        field: config.field().to_string(),
+    })?;
 
-    let value = match log.get(field) {
+    let value = match log.get(&field) {
         None => Err(TransformError::FieldNotFound {
             field: field.to_string(),
         }),

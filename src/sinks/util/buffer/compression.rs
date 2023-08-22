@@ -431,7 +431,21 @@ impl<'de> de::Deserialize<'de> for CompressionLevel {
             where
                 E: de::Error,
             {
-                Ok(CompressionLevel::Val(v as u32))
+                u32::try_from(v).map(CompressionLevel::Val).map_err(|err| {
+                    de::Error::custom(format!(
+                        "unsigned integer could not be converted to u32: {}",
+                        err
+                    ))
+                })
+            }
+
+            fn visit_i64<E>(self, v: i64) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                u32::try_from(v).map(CompressionLevel::Val).map_err(|err| {
+                    de::Error::custom(format!("integer could not be converted to u32: {}", err))
+                })
             }
         }
 
@@ -490,7 +504,7 @@ mod test {
     use super::{Compression, CompressionLevel};
 
     #[test]
-    fn deserialization() {
+    fn deserialization_json() {
         let fixtures_valid = [
             (r#""none""#, Compression::None),
             (r#""gzip""#, Compression::Gzip(CompressionLevel::default())),
@@ -545,7 +559,7 @@ mod test {
             ),
             (
                 r#"{"algorithm": "gzip", "level": -1}"#,
-                r#"invalid type: integer `-1`, expected unsigned number or string at line 1 column 33"#,
+                r#"integer could not be converted to u32: out of range integral type conversion attempted at line 1 column 33"#,
             ),
             (
                 r#"{"algorithm": "gzip", "level": "good"}"#,
@@ -572,6 +586,22 @@ mod test {
             let deserialized: Result<Compression, _> = serde_json::from_str(source);
             let error = deserialized.expect_err("invalid source");
             assert_eq!(error.to_string().as_str(), *result);
+        }
+    }
+
+    #[test]
+    fn deserialization_toml() {
+        let fixtures_valid = [
+            // TOML differs from YAML and JSON by always parsing integers as signed
+            (
+                r#"algorithm = "gzip"
+                   level = 8"#,
+                Compression::Gzip(CompressionLevel::Val(8)),
+            ),
+        ];
+        for (sources, result) in fixtures_valid.iter() {
+            let deserialized: Result<Compression, _> = toml::from_str(sources);
+            assert_eq!(deserialized.expect("valid source"), *result);
         }
     }
 

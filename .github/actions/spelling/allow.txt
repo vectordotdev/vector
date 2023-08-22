@@ -248,6 +248,7 @@ corejs
 coreutils
 curta
 daemonset
+dalek
 databend
 datacenter
 datadog
@@ -425,6 +426,8 @@ userguide
 webhdfs
 winapi
 workarounds
+XCHACHA
+XSALSA
 yandex
 zeek
 zookeeper

@@ -25,6 +25,7 @@ use vector_common::internal_event::{
 };
 use vector_config::configurable_component;
 use vector_core::config::{LegacyKey, LogNamespace};
+use vrl::event_path;
 use vrl::value::{kind::Collection, Kind};
 
 use super::util::MultilineConfig;
@@ -1270,21 +1271,24 @@ fn line_agg_adapter(
 ) -> impl Stream<Item = LogEvent> {
     let line_agg_in = inner.map(move |mut log| {
         let message_value = match log_namespace {
-            LogNamespace::Vector => log.remove(".").expect("`.` must exist in the event"),
+            LogNamespace::Vector => log
+                .remove(event_path!())
+                .expect("`.` must exist in the event"),
             LogNamespace::Legacy => log
-                .remove((
-                    PathPrefix::Event,
+                .remove(
                     log_schema()
-                        .message_key()
+                        .message_key_target_path()
                         .expect("global log_schema.message_key to be valid path"),
-                ))
+                )
                 .expect("`message` must exist in the event"),
         };
         let stream_value = match log_namespace {
             LogNamespace::Vector => log
                 .get(metadata_path!(DockerLogsConfig::NAME, STREAM))
                 .expect("`docker_logs.stream` must exist in the metadata"),
-            LogNamespace::Legacy => log.get(STREAM).expect("stream must exist in the event"),
+            LogNamespace::Legacy => log
+                .get(event_path!(STREAM))
+                .expect("stream must exist in the event"),
         };
 
         let stream = stream_value.coerce_to_bytes();
@@ -1294,14 +1298,11 @@ fn line_agg_adapter(
     let line_agg_out = LineAgg::<_, Bytes, LogEvent>::new(line_agg_in, logic);
     line_agg_out.map(move |(_, message, mut log)| {
         match log_namespace {
-            LogNamespace::Vector => log.insert(".", message),
+            LogNamespace::Vector => log.insert(event_path!(), message),
             LogNamespace::Legacy => log.insert(
-                (
-                    PathPrefix::Event,
-                    log_schema()
-                        .message_key()
-                        .expect("global log_schema.message_key to be valid path"),
-                ),
+                log_schema()
+                    .message_key_target_path()
+                    .expect("global log_schema.message_key to be valid path"),
                 message,
             ),
         };

@@ -9,6 +9,7 @@ use chrono::{DateTime, Utc};
 use ordered_float::NotNan;
 use serde::{Deserialize, Serialize};
 use vector_common::internal_event::{ComponentEventsDropped, INTENTIONAL, UNINTENTIONAL};
+use vrl::event_path;
 
 use super::NewRelicSinkError;
 use crate::event::{Event, MetricKind, MetricValue, Value};
@@ -174,7 +175,7 @@ impl TryFrom<Vec<Event>> for EventsApiModel {
                     event_model.insert(k, v.clone());
                 }
 
-                if let Some(message) = log.get("message") {
+                if let Some(message) = log.get(event_path!("message")) {
                     let message = message.to_string_lossy().replace("\\\"", "\"");
                     // If message contains a JSON string, parse it and insert all fields into self
                     if let serde_json::Result::Ok(json_map) =
@@ -269,7 +270,7 @@ impl TryFrom<Vec<Event>> for LogsApiModel {
                 for (k, v) in log.convert_to_fields() {
                     log_model.insert(k, v.clone());
                 }
-                if log.get("message").is_none() {
+                if log.get(event_path!("message")).is_none() {
                     log_model.insert(
                         "message".to_owned(),
                         Value::from("log from vector".to_owned()),

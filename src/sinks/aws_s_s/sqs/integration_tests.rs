@@ -1,17 +1,16 @@
-#![cfg(all(test, feature = "aws-sqs-integration-tests"))]
-
 use std::collections::HashMap;
 
 use aws_sdk_sqs::{model::QueueAttributeName, Client as SqsClient, Region};
 use codecs::TextSerializerConfig;
 use tokio::time::{sleep, Duration};
 
-use super::{config::SqsSinkConfig, sink::SqsSink};
+use crate::config::{SinkConfig, SinkContext};
+use crate::sinks::aws_s_s::sqs::config::{healthcheck, SqsSinkConfig};
+use crate::sinks::aws_s_s::sqs::BaseSSSinkConfig;
 use crate::{
     aws::{create_client, AwsAuthentication, RegionOrEndpoint},
     common::sqs::SqsClientBuilder,
     config::ProxyConfig,
-    sinks::VectorSink,
     test_util::{
         components::{run_and_assert_sink_compliance, AWS_SINK_TAGS},
         random_lines_with_stream, random_string,
@@ -47,9 +46,7 @@ async fn sqs_send_message_batch() {
 
     let client = create_test_client().await;
 
-    let config = SqsSinkConfig {
-        queue_url: queue_url.clone(),
-        region: RegionOrEndpoint::with_both("local", sqs_address().as_str()),
+    let base_config = BaseSSSinkConfig {
         encoding: TextSerializerConfig::default().into(),
         message_group_id: None,
         message_deduplication_id: None,
@@ -60,10 +57,19 @@ async fn sqs_send_message_batch() {
         acknowledgements: Default::default(),
     };
 
-    config.clone().healthcheck(client.clone()).await.unwrap();
+    let config = SqsSinkConfig {
+        region: RegionOrEndpoint::with_both("local", sqs_address().as_str()),
+        queue_url: queue_url.clone(),
+        base_config,
+    };
 
-    let sink = SqsSink::new(config, client.clone()).unwrap();
-    let sink = VectorSink::from_event_streamsink(sink);
+    healthcheck(client.clone(), config.queue_url.clone())
+        .await
+        .unwrap();
+
+    let cx = SinkContext::default();
+
+    let sink = config.build(cx).await.unwrap().0;
 
     let (mut input_lines, events) = random_lines_with_stream(100, 10, None);
     run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;

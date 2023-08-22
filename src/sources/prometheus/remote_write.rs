@@ -80,6 +80,7 @@ impl SourceConfig for PrometheusRemoteWriteConfig {
             self.address,
             "",
             HttpMethod::Post,
+            StatusCode::OK,
             true,
             &self.tls,
             &self.auth,

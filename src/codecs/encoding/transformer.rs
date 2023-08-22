@@ -4,15 +4,12 @@ use core::fmt::Debug;
 use std::collections::BTreeMap;
 
 use lookup::lookup_v2::ConfigValuePath;
-use lookup::{
-    event_path,
-    lookup_v2::{parse_value_path, OwnedValuePath},
-    PathPrefix,
-};
+use lookup::{event_path, PathPrefix};
 use serde::{Deserialize, Deserializer};
 use vector_config::configurable_component;
 use vector_core::event::{LogEvent, MaybeAsLogMut};
 use vector_core::schema::meaning;
+use vrl::path::OwnedValuePath;
 use vrl::value::Value;
 
 use crate::{event::Event, serde::skip_serializing_if_default};
@@ -27,7 +24,7 @@ pub struct Transformer {
 
     /// List of fields that are excluded from the encoded event.
     #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
-    except_fields: Option<Vec<String>>,
+    except_fields: Option<Vec<ConfigValuePath>>,
 
     /// Format used for timestamp fields.
     #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
@@ -45,15 +42,19 @@ impl<'de> Deserialize<'de> for Transformer {
             #[serde(default)]
             only_fields: Option<Vec<OwnedValuePath>>,
             #[serde(default)]
-            except_fields: Option<Vec<String>>,
+            except_fields: Option<Vec<OwnedValuePath>>,
             #[serde(default)]
             timestamp_format: Option<TimestampFormat>,
         }
 
         let inner: TransformerInner = Deserialize::deserialize(deserializer)?;
         Self::new(
-            inner.only_fields,
-            inner.except_fields,
+            inner
+                .only_fields
+                .map(|v| v.iter().map(|p| ConfigValuePath(p.clone())).collect()),
+            inner
+                .except_fields
+                .map(|v| v.iter().map(|p| ConfigValuePath(p.clone())).collect()),
             inner.timestamp_format,
         )
         .map_err(serde::de::Error::custom)
@@ -66,13 +67,12 @@ impl Transformer {
     /// Returns `Err` if `only_fields` and `except_fields` fail validation, i.e. are not mutually
     /// exclusive.
     pub fn new(
-        only_fields: Option<Vec<OwnedValuePath>>,
-        except_fields: Option<Vec<String>>,
+        only_fields: Option<Vec<ConfigValuePath>>,
+        except_fields: Option<Vec<ConfigValuePath>>,
         timestamp_format: Option<TimestampFormat>,
     ) -> Result<Self, crate::Error> {
         Self::validate_fields(only_fields.as_ref(), except_fields.as_ref())?;
 
-        let only_fields = only_fields.map(|x| x.into_iter().map(ConfigValuePath).collect());
         Ok(Self {
             only_fields,
             except_fields,
@@ -87,7 +87,7 @@ impl Transformer {
     }
 
     /// Get the `Transformer`'s `except_fields`.
-    pub const fn except_fields(&self) -> &Option<Vec<String>> {
+    pub const fn except_fields(&self) -> &Option<Vec<ConfigValuePath>> {
         &self.except_fields
     }
 
@@ -100,14 +100,14 @@ impl Transformer {
     ///
     /// If an error is returned, the entire encoding configuration should be considered inoperable.
     fn validate_fields(
-        only_fields: Option<&Vec<OwnedValuePath>>,
-        except_fields: Option<&Vec<String>>,
+        only_fields: Option<&Vec<ConfigValuePath>>,
+        except_fields: Option<&Vec<ConfigValuePath>>,
     ) -> crate::Result<()> {
         if let (Some(only_fields), Some(except_fields)) = (only_fields, except_fields) {
-            if except_fields.iter().any(|f| {
-                let path_iter = parse_value_path(f).unwrap();
-                only_fields.iter().any(|v| v == &path_iter)
-            }) {
+            if except_fields
+                .iter()
+                .any(|f| only_fields.iter().any(|v| v == f))
+            {
                 return Err(
                     "`except_fields` and `only_fields` should be mutually exclusive.".into(),
                 );
@@ -155,22 +155,19 @@ impl Transformer {
     }
 
     fn apply_except_fields(&self, log: &mut LogEvent) {
-        use lookup::path::TargetPath;
-
         if let Some(except_fields) = self.except_fields.as_ref() {
-            let service_path = log
-                .metadata()
-                .schema_definition()
-                .meaning_path(meaning::SERVICE)
-                .map(|path| path.value_path().to_string());
-
             for field in except_fields {
-                let value = log.remove(field.as_str());
+                let value_path = &field.0;
+                let value = log.remove((PathPrefix::Event, value_path));
 
+                let service_path = log
+                    .metadata()
+                    .schema_definition()
+                    .meaning_path(meaning::SERVICE);
                 // If we are removing the service field we need to store this in a `dropped_fields` list as we may need to
                 // refer to this later when emitting metrics.
-                if let Some(v) = value {
-                    if matches!(service_path.as_ref(), Some(path) if path == field) {
+                if let (Some(v), Some(service_path)) = (value, service_path) {
+                    if service_path.path == *value_path {
                         log.metadata_mut()
                             .add_dropped_field(meaning::SERVICE.to_string(), v);
                     }
@@ -185,13 +182,13 @@ impl Transformer {
                 TimestampFormat::Unix => {
                     if log.value().is_object() {
                         let mut unix_timestamps = Vec::new();
-                        for (k, v) in log.all_fields().expect("must be an object") {
+                        for (k, v) in log.all_event_fields().expect("must be an object") {
                             if let Value::Timestamp(ts) = v {
                                 unix_timestamps.push((k.clone(), Value::Integer(ts.timestamp())));
                             }
                         }
                         for (k, v) in unix_timestamps {
-                            log.insert(k.as_str(), v);
+                            log.parse_path_and_insert(k, v).unwrap();
                         }
                     } else {
                         // root is not an object
@@ -216,17 +213,12 @@ impl Transformer {
     /// Returns `Err` if the new `except_fields` fail validation, i.e. are not mutually exclusive
     /// with `only_fields`.
     #[cfg(test)]
-    pub fn set_except_fields(&mut self, except_fields: Option<Vec<String>>) -> crate::Result<()> {
-        Self::validate_fields(
-            self.only_fields
-                .clone()
-                .map(|x| x.into_iter().map(|x| x.0).collect())
-                .as_ref(),
-            except_fields.as_ref(),
-        )?;
-
+    pub fn set_except_fields(
+        &mut self,
+        except_fields: Option<Vec<ConfigValuePath>>,
+    ) -> crate::Result<()> {
+        Self::validate_fields(self.only_fields.as_ref(), except_fields.as_ref())?;
         self.except_fields = except_fields;
-
         Ok(())
     }
 }
@@ -282,7 +274,7 @@ mod tests {
     #[test]
     fn deserialize_and_transform_except() {
         let transformer: Transformer =
-            toml::from_str(r#"except_fields = ["a.b.c", "b", "c[0].y", "d\\.z", "e"]"#).unwrap();
+            toml::from_str(r#"except_fields = ["a.b.c", "b", "c[0].y", "d.z", "e"]"#).unwrap();
         let mut log = LogEvent::default();
         {
             log.insert("a", 1);
@@ -293,7 +285,7 @@ mod tests {
             log.insert("b[1].x", 1);
             log.insert("c[0].x", 1);
             log.insert("c[0].y", 1);
-            log.insert("d\\.z", 1);
+            log.insert("d.z", 1);
             log.insert("e.a", 1);
             log.insert("e.b", 1);
         }
@@ -303,7 +295,7 @@ mod tests {
         assert!(!event.as_mut_log().contains("b"));
         assert!(!event.as_mut_log().contains("b[1].x"));
         assert!(!event.as_mut_log().contains("c[0].y"));
-        assert!(!event.as_mut_log().contains("d\\.z"));
+        assert!(!event.as_mut_log().contains("d.z"));
         assert!(!event.as_mut_log().contains("e.a"));
 
         assert!(event.as_mut_log().contains("a.b.d"));
