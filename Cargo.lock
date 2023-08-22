@@ -7365,8 +7365,7 @@ dependencies = [
 [[package]]
 name = "rustls-webpki"
 version = "0.101.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7d93931baf2d282fff8d3a532bbfd7653f734643161b87e3e01e59a04439bf0d"
+source = "git+https://github.com/rustls/webpki?tag=v/0.101.4#d7f6aa4d2138de89cec1daf1d07e7d3263f7d9b6"
 dependencies = [
  "ring",
  "untrusted",
