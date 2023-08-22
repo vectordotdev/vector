@@ -8,6 +8,7 @@ use std::{
 use chrono::{DateTime, Utc};
 use ordered_float::NotNan;
 use serde::{Deserialize, Serialize};
+use vector_common::internal_event::{ComponentEventsDropped, INTENTIONAL, UNINTENTIONAL};
 
 use super::NewRelicSinkError;
 use crate::event::{Event, MetricKind, MetricValue, Value};
@@ -37,10 +38,18 @@ impl TryFrom<Vec<Event>> for MetricsApiModel {
     type Error = NewRelicSinkError;
 
     fn try_from(buf_events: Vec<Event>) -> Result<Self, Self::Error> {
+        let mut num_non_metric_events = 0;
+        let mut num_missing_interval = 0;
+        let mut num_nan_value = 0;
+
         let metric_array: Vec<_> = buf_events
             .into_iter()
-            .filter_map(|e| e.try_into_metric())
-            .filter_map(|metric| {
+            .filter_map(|event| {
+                let metric = event.try_into_metric().or_else(|| {
+                    num_non_metric_events += 1;
+                    None
+                })?;
+
                 // Generate Value::Object() from BTreeMap<String, String>
                 let (series, data, _) = metric.into_parts();
 
@@ -48,20 +57,20 @@ impl TryFrom<Vec<Event>> for MetricsApiModel {
 
                 // We only handle gauge and counter metrics
                 // Extract value & type and set type-related attributes
-                let (value, metric_type) = match (data.value, &data.kind, &data.time.interval_ms) {
-                    (
-                        MetricValue::Counter { value },
-                        MetricKind::Incremental,
-                        Some(interval_ms),
-                    ) => {
+                let (value, metric_type) = match (data.value, &data.kind) {
+                    (MetricValue::Counter { value }, MetricKind::Incremental) => {
+                        let interval_ms = data.time.interval_ms.or_else(|| {
+                            num_missing_interval += 1;
+                            None
+                        })?;
                         metric_data.insert(
                             "interval.ms".to_owned(),
                             Value::from(interval_ms.get() as i64),
                         );
                         (value, "count")
                     }
-                    (MetricValue::Counter { value }, MetricKind::Absolute, _) => (value, "gauge"),
-                    (MetricValue::Gauge { value }, _, _) => (value, "gauge"),
+                    (MetricValue::Counter { value }, MetricKind::Absolute) => (value, "gauge"),
+                    (MetricValue::Gauge { value }, _) => (value, "gauge"),
                     _ => {
                         // Note that this includes incremental counters without an interval
                         return None;
@@ -71,12 +80,10 @@ impl TryFrom<Vec<Event>> for MetricsApiModel {
                 // Set name, type, value, timestamp, and attributes
                 metric_data.insert("name".to_owned(), Value::from(series.name.name));
                 metric_data.insert("type".to_owned(), Value::from(metric_type));
-                let value = match NotNan::new(value) {
-                    Ok(value) => value,
-                    Err(_) => {
-                        return None;
-                    }
-                };
+                let value = NotNan::new(value).ok().or_else(|| {
+                    num_nan_value += 1;
+                    None
+                })?;
                 metric_data.insert("value".to_owned(), Value::from(value));
                 metric_data.insert(
                     "timestamp".to_owned(),
@@ -102,6 +109,25 @@ impl TryFrom<Vec<Event>> for MetricsApiModel {
             })
             .collect();
 
+        if num_non_metric_events > 0 {
+            emit!(ComponentEventsDropped::<INTENTIONAL> {
+                count: num_non_metric_events,
+                reason: "non-metric event"
+            });
+        }
+        if num_nan_value > 0 {
+            emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+                count: num_nan_value,
+                reason: "NaN value not supported"
+            });
+        }
+        if num_missing_interval > 0 {
+            emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+                count: num_missing_interval,
+                reason: "incremental counter missing interval"
+            });
+        }
+
         if !metric_array.is_empty() {
             Ok(Self::new(metric_array))
         } else {
@@ -123,9 +149,17 @@ impl TryFrom<Vec<Event>> for EventsApiModel {
     type Error = NewRelicSinkError;
 
     fn try_from(buf_events: Vec<Event>) -> Result<Self, Self::Error> {
-        let mut events_array = vec![];
-        for buf_event in buf_events {
-            if let Event::Log(log) = buf_event {
+        let mut num_non_log_events = 0;
+        let mut num_nan_value = 0;
+
+        let events_array: Vec<HashMap<String, Value>> = buf_events
+            .into_iter()
+            .filter_map(|event| {
+                let log = event.try_into_log().or_else(|| {
+                    num_non_log_events += 1;
+                    None
+                })?;
+
                 let mut event_model = KeyValData::new();
                 for (k, v) in log.convert_to_fields() {
                     event_model.insert(k, v.clone());
@@ -146,8 +180,9 @@ impl TryFrom<Vec<Event>> for EventsApiModel {
                                     if let Some(f) = n.as_f64() {
                                         event_model.insert(
                                             k,
-                                            Value::from(NotNan::new(f).map_err(|_| {
-                                                NewRelicSinkError::new("NaN value not supported")
+                                            Value::from(NotNan::new(f).ok().or_else(|| {
+                                                num_nan_value += 1;
+                                                None
                                             })?),
                                         );
                                     } else {
@@ -157,7 +192,9 @@ impl TryFrom<Vec<Event>> for EventsApiModel {
                                 serde_json::Value::Bool(b) => {
                                     event_model.insert(k, Value::from(b));
                                 }
-                                _ => {}
+                                _ => {
+                                    // Note that arrays and nested objects are silently dropped.
+                                }
                             }
                         }
                         event_model.remove("message");
@@ -169,8 +206,21 @@ impl TryFrom<Vec<Event>> for EventsApiModel {
                         .insert("eventType".to_owned(), Value::from("VectorSink".to_owned()));
                 }
 
-                events_array.push(event_model);
-            }
+                Some(event_model)
+            })
+            .collect();
+
+        if num_non_log_events > 0 {
+            emit!(ComponentEventsDropped::<INTENTIONAL> {
+                count: num_non_log_events,
+                reason: "non-log event"
+            });
+        }
+        if num_nan_value > 0 {
+            emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+                count: num_nan_value,
+                reason: "NaN value not supported"
+            });
         }
 
         if !events_array.is_empty() {
@@ -196,9 +246,16 @@ impl TryFrom<Vec<Event>> for LogsApiModel {
     type Error = NewRelicSinkError;
 
     fn try_from(buf_events: Vec<Event>) -> Result<Self, Self::Error> {
-        let mut logs_array = vec![];
-        for buf_event in buf_events {
-            if let Event::Log(log) = buf_event {
+        let mut num_non_log_events = 0;
+
+        let logs_array: Vec<HashMap<String, Value>> = buf_events
+            .into_iter()
+            .filter_map(|event| {
+                let log = event.try_into_log().or_else(|| {
+                    num_non_log_events += 1;
+                    None
+                })?;
+
                 let mut log_model = KeyValData::new();
                 for (k, v) in log.convert_to_fields() {
                     log_model.insert(k, v.clone());
@@ -209,8 +266,16 @@ impl TryFrom<Vec<Event>> for LogsApiModel {
                         Value::from("log from vector".to_owned()),
                     );
                 }
-                logs_array.push(log_model);
-            }
+
+                Some(log_model)
+            })
+            .collect();
+
+        if num_non_log_events > 0 {
+            emit!(ComponentEventsDropped::<INTENTIONAL> {
+                count: num_non_log_events,
+                reason: "non-log event"
+            });
         }
 
         if !logs_array.is_empty() {
