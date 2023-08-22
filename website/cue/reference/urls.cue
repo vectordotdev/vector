@@ -635,6 +635,7 @@ urls: {
 	vrl_features:                               "\(vrl_reference)/#features"
 	vrl_functions:                              "\(vrl_reference)/functions"
 	vrl_literals:                               "\(vrl_expressions)/#literal-expressions"
+	vrl_match_function:                         "\(vrl_functions)/#match"
 	vrl_parsing_functions:                      "\(vrl_functions)/#parse-functions"
 	vrl_path_expressions:                       "\(vrl_expressions)#path"
 	vrl_performance:                            "\(vrl_reference)#performance"
