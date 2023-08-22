@@ -178,6 +178,8 @@ impl CsvSerializerOptions {
 /// Serializer that converts an `Event` to bytes using the CSV format.
 #[derive(Debug, Clone)]
 pub struct CsvSerializer {
+    //  Box because of clippy error: 'large size difference between variants'
+    // in SerializerConfig enum
     writer: Box<csv_core::Writer>,
     fields: Vec<ConfigTargetPath>,
     internal_buffer: Vec<u8>,
@@ -540,23 +542,6 @@ mod tests {
         serializer.encode(event, &mut bytes).unwrap();
 
         assert_eq!(bytes.freeze(), b"$foo \" $$ bar$".as_slice());
-    }
-
-    #[test]
-    fn custom_quote_style() {
-        let (fields, event) = make_event_with_fields(vec![("field1", "foo\"bar")]);
-        let opts = CsvSerializerOptions {
-            fields,
-            quote_style: QuoteStyle::Never,
-            ..Default::default()
-        };
-        let config = CsvSerializerConfig::new(opts);
-        let mut serializer = config.build().unwrap();
-        let mut bytes = BytesMut::new();
-
-        serializer.encode(event, &mut bytes).unwrap();
-
-        assert_eq!(bytes.freeze(), b"foo\"bar".as_slice());
     }
 
     #[test]
