@@ -4,7 +4,7 @@ use std::{collections::HashMap, num::ParseFloatError};
 use chrono::Utc;
 use indexmap::IndexMap;
 use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
+use vector_core::{config::LogNamespace, event::DatadogMetricOriginMetadata};
 use vrl::path::parse_target_path;
 
 use crate::config::schema::Definition;
@@ -260,10 +260,16 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
         .and_then(Value::as_timestamp)
         .cloned()
         .or_else(|| Some(Utc::now()));
+
+    // Assign the OriginService for the new metric
+    let logs_to_metrics_service = 3; // make this a const?
     let metadata = event
         .metadata()
         .clone()
-        .with_schema_definition(&Arc::new(Definition::any()));
+        .with_schema_definition(&Arc::new(Definition::any()))
+        .with_origin_metadata(
+            DatadogMetricOriginMetadata::default().with_service(logs_to_metrics_service),
+        );
 
     let field = parse_target_path(config.field()).map_err(|_e| FieldNotFound {
         field: config.field().to_string(),

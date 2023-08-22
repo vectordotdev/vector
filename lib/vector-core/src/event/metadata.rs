@@ -60,7 +60,7 @@ pub struct EventMetadata {
 }
 
 /// Metric Origin metadata for submission to Datadog.
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Default, Debug, Deserialize, PartialEq, Serialize)]
 pub struct DatadogMetricOriginMetadata {
     /// OriginProduct
     product: Option<u32>,
@@ -71,6 +71,27 @@ pub struct DatadogMetricOriginMetadata {
 }
 
 impl DatadogMetricOriginMetadata {
+    /// Replaces the OriginProduct.
+    // #[must_use]
+    // pub fn with_product(mut self, product: u32) -> Self {
+    //     self.product = Some(product);
+    //     self
+    // }
+
+    /// Replaces the OriginCategory.
+    // #[must_use]
+    // pub fn with_category(mut self, category: u32) -> Self {
+    //     self.category = Some(category);
+    //     self
+    // }
+
+    /// Replaces the OriginService.
+    #[must_use]
+    pub fn with_service(mut self, service: u32) -> Self {
+        self.service = Some(service);
+        self
+    }
+
     /// Returns a reference to the OriginProduct
     pub fn product(&self) -> Option<u32> {
         self.product
@@ -247,6 +268,13 @@ impl EventMetadata {
     #[must_use]
     pub fn with_schema_definition(mut self, schema_definition: &Arc<schema::Definition>) -> Self {
         self.schema_definition = Arc::clone(schema_definition);
+        self
+    }
+
+    /// Replaces the existing datgadog origin metadata with the given ones.
+    #[must_use]
+    pub fn with_origin_metadata(mut self, origin_metadata: DatadogMetricOriginMetadata) -> Self {
+        self.datadog_origin_metadata = Some(origin_metadata);
         self
     }
 
