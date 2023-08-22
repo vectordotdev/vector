@@ -75,13 +75,6 @@ remap: expressions: comparison: {
 			return: true
 		},
 		{
-			title: "Not equal - string vs regex"
-			source: #"""
-				"foo" == r"foo"
-				"""#
-			return: false
-		},
-		{
 			title: "Greater than or equal"
 			source: #"""
 				2 >= 2
