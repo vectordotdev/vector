@@ -3,6 +3,7 @@
 #![deny(missing_docs, missing_debug_implementations)]
 
 use std::path::Path;
+use std::str::FromStr;
 
 use serde::de;
 
@@ -19,6 +20,19 @@ pub enum Format {
     Json,
     /// YAML format is used.
     Yaml,
+}
+
+impl FromStr for Format {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "toml" => Ok(Format::Toml),
+            "json" => Ok(Format::Json),
+            "yaml" => Ok(Format::Yaml),
+            _ => Err(format!("Invalid format: {}", s)),
+        }
+    }
 }
 
 impl Format {
@@ -44,6 +58,17 @@ where
         Format::Toml => toml::from_str(content).map_err(|e| vec![e.to_string()]),
         Format::Yaml => serde_yaml::from_str(content).map_err(|e| vec![e.to_string()]),
         Format::Json => serde_json::from_str(content).map_err(|e| vec![e.to_string()]),
+    }
+}
+
+pub fn serialize<T>(value: &T, format: Format) -> Result<String, String>
+where
+    T: serde::ser::Serialize,
+{
+    match format {
+        Format::Toml => toml::to_string(value).map_err(|e| e.to_string()),
+        Format::Yaml => serde_yaml::to_string(value).map_err(|e| e.to_string()),
+        Format::Json => serde_json::to_string(value).map_err(|e| e.to_string()),
     }
 }
 
