@@ -41,6 +41,7 @@ impl TryFrom<Vec<Event>> for MetricsApiModel {
         let mut num_non_metric_events = 0;
         let mut num_missing_interval = 0;
         let mut num_nan_value = 0;
+        let mut num_unsupported_metric_type = 0;
 
         let metric_array: Vec<_> = buf_events
             .into_iter()
@@ -60,6 +61,7 @@ impl TryFrom<Vec<Event>> for MetricsApiModel {
                 let (value, metric_type) = match (data.value, &data.kind) {
                     (MetricValue::Counter { value }, MetricKind::Incremental) => {
                         let interval_ms = data.time.interval_ms.or_else(|| {
+                            // Incremental counter without an interval is worthless, skip this metric
                             num_missing_interval += 1;
                             None
                         })?;
@@ -72,7 +74,8 @@ impl TryFrom<Vec<Event>> for MetricsApiModel {
                     (MetricValue::Counter { value }, MetricKind::Absolute) => (value, "gauge"),
                     (MetricValue::Gauge { value }, _) => (value, "gauge"),
                     _ => {
-                        // Note that this includes incremental counters without an interval
+                        // Unsupported metric type
+                        num_unsupported_metric_type += 1;
                         return None;
                     }
                 };
@@ -113,6 +116,12 @@ impl TryFrom<Vec<Event>> for MetricsApiModel {
             emit!(ComponentEventsDropped::<INTENTIONAL> {
                 count: num_non_metric_events,
                 reason: "non-metric event"
+            });
+        }
+        if num_unsupported_metric_type > 0 {
+            emit!(ComponentEventsDropped::<INTENTIONAL> {
+                count: num_unsupported_metric_type,
+                reason: "unsupported metric type"
             });
         }
         if num_nan_value > 0 {
