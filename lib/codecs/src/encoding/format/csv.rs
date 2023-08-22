@@ -9,6 +9,30 @@ use vector_core::{
     schema,
 };
 
+/// The user configuration to choose the metric tag strategy.
+#[crate::configurable_component]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum QuoteStyle {
+    /// This puts quotes around every field. Always.
+    Always,
+
+    /// This puts quotes around fields only when necessary.
+    /// They are necessary when fields contain a quote, delimiter or record terminator.
+    /// Quotes are also necessary when writing an empty record
+    /// (which is indistinguishable from a record with one empty field).
+    #[default]
+    Necessary,
+
+    /// This puts quotes around all fields that are non-numeric.
+    /// Namely, when writing a field that does not parse as a valid float or integer,
+    /// then quotes will be used even if they aren’t strictly necessary.
+    NonNumeric,
+
+    /// This never writes quotes, even if it would produce invalid CSV data.
+    Never,
+}
+
 /// Config used to build a `CsvSerializer`.
 #[crate::configurable_component]
 #[derive(Debug, Clone)]
@@ -43,30 +67,6 @@ impl CsvSerializerConfig {
         // CSV, we don't want to enforce that limitation to users yet.
         schema::Requirement::empty()
     }
-}
-
-/// The user configuration to choose the metric tag strategy.
-#[crate::configurable_component]
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Default)]
-#[serde(rename_all = "snake_case")]
-pub enum QuoteStyle {
-    /// This puts quotes around every field. Always.
-    Always,
-
-    /// This puts quotes around fields only when necessary.
-    /// They are necessary when fields contain a quote, delimiter or record terminator.
-    /// Quotes are also necessary when writing an empty record
-    /// (which is indistinguishable from a record with one empty field).
-    #[default]
-    Necessary,
-
-    /// This puts quotes around all fields that are non-numeric.
-    /// Namely, when writing a field that does not parse as a valid float or integer,
-    /// then quotes will be used even if they aren’t strictly necessary.
-    NonNumeric,
-
-    /// This never writes quotes, even if it would produce invalid CSV data.
-    Never,
 }
 
 /// Config used to build a `CsvSerializer`.
@@ -178,7 +178,7 @@ impl CsvSerializerOptions {
 /// Serializer that converts an `Event` to bytes using the CSV format.
 #[derive(Debug, Clone)]
 pub struct CsvSerializer {
-    wtr: csv_core::Writer,
+    writer: Box<csv_core::Writer>,
     fields: Vec<ConfigTargetPath>,
     internal_buffer: Vec<u8>,
 }
@@ -187,13 +187,15 @@ impl CsvSerializer {
     /// Creates a new `CsvSerializer`.
     pub fn new(config: CsvSerializerConfig) -> Self {
         // 'flexible' is not needed since every event is a single context free csv line
-        let wtr = csv_core::WriterBuilder::new()
-            .delimiter(config.csv.delimiter)
-            .double_quote(config.csv.double_quote)
-            .escape(config.csv.escape)
-            .quote_style(config.csv.csv_quote_style())
-            .quote(config.csv.quote)
-            .build();
+        let writer = Box::new(
+            csv_core::WriterBuilder::new()
+                .delimiter(config.csv.delimiter)
+                .double_quote(config.csv.double_quote)
+                .escape(config.csv.escape)
+                .quote_style(config.csv.csv_quote_style())
+                .quote(config.csv.quote)
+                .build(),
+        );
 
         let internal_buffer = if config.csv.capacity < 1 {
             vec![0; 1]
@@ -202,7 +204,7 @@ impl CsvSerializer {
         };
 
         Self {
-            wtr,
+            writer,
             internal_buffer,
             fields: config.csv.fields,
         }
@@ -223,7 +225,7 @@ impl Encoder<Event> for CsvSerializer {
             if fields_written > 0 {
                 loop {
                     let (res, bytes_written) = self
-                        .wtr
+                        .writer
                         .delimiter(&mut self.internal_buffer[used_buffer_bytes..]);
                     used_buffer_bytes += bytes_written;
                     match res {
@@ -258,7 +260,7 @@ impl Encoder<Event> for CsvSerializer {
             // write field_value to internal buffer
             loop {
                 let (res, bytes_read, bytes_written) = self
-                    .wtr
+                    .writer
                     .field(field_value, &mut self.internal_buffer[used_buffer_bytes..]);
 
                 field_value = &field_value[bytes_read..];
@@ -277,7 +279,7 @@ impl Encoder<Event> for CsvSerializer {
         // finish current event (potentially add closing quotes)
         loop {
             let (res, bytes_written) = self
-                .wtr
+                .writer
                 .finish(&mut self.internal_buffer[used_buffer_bytes..]);
             used_buffer_bytes += bytes_written;
             match res {
@@ -307,6 +309,22 @@ mod tests {
     use vector_core::event::{LogEvent, Value};
 
     use super::*;
+
+    fn make_event_with_fields(field_data: Vec<(&str, &str)>) -> (Vec<ConfigTargetPath>, Event) {
+        let mut fields: Vec<ConfigTargetPath> = std::vec::Vec::new();
+        let mut tree = std::collections::BTreeMap::new();
+
+        for (field_name, field_value) in field_data.iter() {
+            let field = ConfigTargetPath::try_from(field_name.to_string()).unwrap();
+            fields.push(field);
+
+            let field_value = Value::from(field_value.to_string());
+            tree.insert(field_name.to_string().clone(), field_value);
+        }
+
+        let event = Event::Log(LogEvent::from(tree));
+        (fields, event)
+    }
 
     #[test]
     fn build_error_on_empty_fields() {
@@ -392,37 +410,89 @@ mod tests {
     #[test]
     fn correct_quoting() {
         let event = Event::Log(LogEvent::from(btreemap! {
-            "field1" => Value::from(1),
-            "field2" => Value::from("foo\"bar"),
+            "field1" => Value::from("hello world"),
+            "field2" => Value::from(1),
+            "field3" => Value::from("foo\"bar"),
+            "field4" => Value::from("baz,bas"),
         }));
         let fields = vec![
             ConfigTargetPath::try_from("field1".to_string()).unwrap(),
             ConfigTargetPath::try_from("field2".to_string()).unwrap(),
+            ConfigTargetPath::try_from("field3".to_string()).unwrap(),
+            ConfigTargetPath::try_from("field4".to_string()).unwrap(),
         ];
-        let opts = CsvSerializerOptions {
-            fields,
+
+        let mut default_bytes = BytesMut::new();
+        let mut never_bytes = BytesMut::new();
+        let mut always_bytes = BytesMut::new();
+        let mut non_numeric_bytes = BytesMut::new();
+
+        let mut default_serializer = CsvSerializerConfig::new(CsvSerializerOptions {
+            fields: fields.clone(),
+            ..Default::default()
+        })
+        .build()
+        .unwrap();
+
+        let mut never_serializer = CsvSerializerConfig::new(CsvSerializerOptions {
+            fields: fields.clone(),
+            quote_style: QuoteStyle::Never,
+            ..Default::default()
+        })
+        .build()
+        .unwrap();
+
+        let mut always_serializer = CsvSerializerConfig::new(CsvSerializerOptions {
+            fields: fields.clone(),
             quote_style: QuoteStyle::Always,
             ..Default::default()
-        };
-        let config = CsvSerializerConfig::new(opts);
-        let mut serializer = config.build().unwrap();
-        let mut bytes = BytesMut::new();
+        })
+        .build()
+        .unwrap();
 
-        serializer.encode(event, &mut bytes).unwrap();
+        let mut non_numeric_serializer = CsvSerializerConfig::new(CsvSerializerOptions {
+            fields: fields.clone(),
+            quote_style: QuoteStyle::NonNumeric,
+            ..Default::default()
+        })
+        .build()
+        .unwrap();
 
-        assert_eq!(bytes.freeze(), b"\"1\",\"foo\"\"bar\"".as_slice());
+        default_serializer
+            .encode(event.clone(), &mut default_bytes)
+            .unwrap();
+        never_serializer
+            .encode(event.clone(), &mut never_bytes)
+            .unwrap();
+        always_serializer
+            .encode(event.clone(), &mut always_bytes)
+            .unwrap();
+        non_numeric_serializer
+            .encode(event.clone(), &mut non_numeric_bytes)
+            .unwrap();
+
+        assert_eq!(
+            default_bytes.freeze(),
+            b"hello world,1,\"foo\"\"bar\",\"baz,bas\"".as_slice()
+        );
+        assert_eq!(
+            never_bytes.freeze(),
+            b"hello world,1,foo\"bar,baz,bas".as_slice()
+        );
+        assert_eq!(
+            always_bytes.freeze(),
+            b"\"hello world\",\"1\",\"foo\"\"bar\",\"baz,bas\"".as_slice()
+        );
+        assert_eq!(
+            non_numeric_bytes.freeze(),
+            b"\"hello world\",1,\"foo\"\"bar\",\"baz,bas\"".as_slice()
+        );
     }
 
     #[test]
     fn custom_delimiter() {
-        let event = Event::Log(LogEvent::from(btreemap! {
-            "field1" => Value::from("value1"),
-            "field2" => Value::from("value2"),
-        }));
-        let fields = vec![
-            ConfigTargetPath::try_from("field1".to_string()).unwrap(),
-            ConfigTargetPath::try_from("field2".to_string()).unwrap(),
-        ];
+        let (fields, event) =
+            make_event_with_fields(vec![("field1", "value1"), ("field2", "value2")]);
         let opts = CsvSerializerOptions {
             fields,
             delimiter: b'\t',
@@ -439,10 +509,7 @@ mod tests {
 
     #[test]
     fn custom_escape_char() {
-        let event = Event::Log(LogEvent::from(btreemap! {
-            "field1" => Value::from("foo\"bar"),
-        }));
-        let fields = vec![ConfigTargetPath::try_from("field1".to_string()).unwrap()];
+        let (fields, event) = make_event_with_fields(vec![("field1", "foo\"bar")]);
         let opts = CsvSerializerOptions {
             fields,
             double_quote: false,
@@ -460,10 +527,7 @@ mod tests {
 
     #[test]
     fn custom_quote_char() {
-        let event = Event::Log(LogEvent::from(btreemap! {
-            "field1" => Value::from("foo \" $ bar"),
-        }));
-        let fields = vec![ConfigTargetPath::try_from("field1".to_string()).unwrap()];
+        let (fields, event) = make_event_with_fields(vec![("field1", "foo \" $ bar")]);
         let opts = CsvSerializerOptions {
             fields,
             quote: b'$',
@@ -480,10 +544,7 @@ mod tests {
 
     #[test]
     fn custom_quote_style() {
-        let event = Event::Log(LogEvent::from(btreemap! {
-            "field1" => Value::from("foo\"bar"),
-        }));
-        let fields = vec![ConfigTargetPath::try_from("field1".to_string()).unwrap()];
+        let (fields, event) = make_event_with_fields(vec![("field1", "foo\"bar")]);
         let opts = CsvSerializerOptions {
             fields,
             quote_style: QuoteStyle::Never,
@@ -500,10 +561,7 @@ mod tests {
 
     #[test]
     fn more_input_then_capacity() {
-        let event = Event::Log(LogEvent::from(btreemap! {
-            "field1" => Value::from("foo bar"),
-        }));
-        let fields = vec![ConfigTargetPath::try_from("field1".to_string()).unwrap()];
+        let (fields, event) = make_event_with_fields(vec![("field1", "foo bar")]);
         let opts = CsvSerializerOptions {
             fields,
             capacity: 3,
