@@ -269,7 +269,7 @@ futures-util = { version = "0.3.28", default-features = false }
 glob = { version = "0.3.1", default-features = false }
 governor = { version = "0.6.0", default-features = false, features = ["dashmap", "jitter", "std"], optional = true }
 grok = { version = "2.0.0", default-features = false, optional = true }
-h2 = { version = "0.3.20", default-features = false, optional = true }
+h2 = { version = "0.3.21", default-features = false, optional = true }
 hash_hasher = { version = "2.0.0", default-features = false }
 hashbrown = { version = "0.14.0", default-features = false, optional = true, features = ["ahash"] }
 headers = { version = "0.3.8", default-features = false }
@@ -320,7 +320,7 @@ stream-cancel = { version = "0.8.1", default-features = false }
 strip-ansi-escapes = { version = "0.2.0", default-features = false }
 syslog = { version = "6.1.0", default-features = false, optional = true }
 tikv-jemallocator = { version = "0.5.4", default-features = false, optional = true }
-tokio-postgres = { version = "0.7.7", default-features = false, features = ["runtime", "with-chrono-0_4"], optional = true }
+tokio-postgres = { version = "0.7.9", default-features = false, features = ["runtime", "with-chrono-0_4"], optional = true }
 tokio-tungstenite = {version = "0.20.0", default-features = false, features = ["connect"], optional = true}
 toml = { version = "0.7.6", default-features = false, features = ["parse", "display"] }
 tonic = { version = "0.9", optional = true, default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "gzip"] }
@@ -391,8 +391,9 @@ ntapi = { git = "https://github.com/MSxDOS/ntapi.git", rev = "24fc1e47677fc9f6e3
 # The current `openssl-sys` crate will vendor the OpenSSL sources via
 # `openssl-src` at version 1.1.1*, but we want version 3.1.*. Bring in forked
 # version of that crate with the appropriate dependency patched in.
-openssl-sys = { git = "https://github.com/vectordotdev/rust-openssl.git", tag = "openssl-sys-v0.9.91+3.0.0" }
-openssl-src = { git = "https://github.com/vectordotdev/openssl-src-rs.git", tag = "release-300-force-engine+3.1.2"}
+openssl-sys = { git = "https://github.com/vectordotdev/rust-openssl", tag = "openssl-sys-v0.9.91_3.0.0" }
+openssl-src = { git = "https://github.com/vectordotdev/openssl-src-rs", tag = "release-300-force-engine_3.1.2" }
+
 
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin
