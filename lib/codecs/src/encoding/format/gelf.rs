@@ -224,7 +224,10 @@ fn to_gelf_event(log: LogEvent) -> vector_common::Result<LogEvent> {
         coerce_field_names_and_values(log).map(|(mut log, missing_prefix)| {
             // rename additional fields that were flagged as missing the underscore prefix
             for field in missing_prefix {
-                log.rename_key(event_path!(field.as_str()), format!("_{}", &field).as_str());
+                log.rename_key(
+                    event_path!(field.as_str()),
+                    event_path!(format!("_{}", &field).as_str()),
+                );
             }
             log
         })

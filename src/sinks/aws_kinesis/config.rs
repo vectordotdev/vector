@@ -1,3 +1,4 @@
+use lookup::lookup_v2::ConfigValuePath;
 use std::marker::PhantomData;
 
 use vector_core::stream::BatcherSettings;
@@ -79,7 +80,7 @@ impl KinesisSinkBaseConfig {
 /// Builds an aws_kinesis sink.
 pub fn build_sink<C, R, RR, E, RT>(
     config: &KinesisSinkBaseConfig,
-    partition_key_field: Option<String>,
+    partition_key_field: Option<ConfigValuePath>,
     batch_settings: BatcherSettings,
     client: C,
     retry_logic: RT,

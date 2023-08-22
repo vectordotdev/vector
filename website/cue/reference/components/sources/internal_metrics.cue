@@ -730,6 +730,14 @@ components: sources: internal_metrics: {
 				status: _status
 			}
 		}
+		http_client_requests_sent_total: {
+			description:       "The total number of sent HTTP requests, tagged with the request method."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags & {
+				method: _method
+			}
+		}
 		http_client_responses_total: {
 			description:       "The total number of HTTP requests, tagged with the response code."
 			type:              "counter"
@@ -1181,6 +1189,10 @@ components: sources: internal_metrics: {
 		}
 		_status: {
 			description: "The HTTP status code of the request."
+			required:    false
+		}
+		_method: {
+			description: "The HTTP method of the request."
 			required:    false
 		}
 		_path: {

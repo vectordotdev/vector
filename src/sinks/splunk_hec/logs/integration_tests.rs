@@ -3,7 +3,7 @@ use std::{convert::TryFrom, iter, num::NonZeroU8};
 use chrono::{TimeZone, Timelike, Utc};
 use codecs::{JsonSerializerConfig, TextSerializerConfig};
 use futures::{future::ready, stream};
-use lookup::lookup_v2::OptionalValuePath;
+use lookup::lookup_v2::{ConfigValuePath, OptionalValuePath};
 use serde_json::Value as JsonValue;
 use tokio::time::{sleep, Duration};
 use vector_core::{
@@ -106,7 +106,10 @@ async fn find_entries(messages: &[String]) -> bool {
     found_all
 }
 
-async fn config(encoding: EncodingConfig, indexed_fields: Vec<String>) -> HecLogsSinkConfig {
+async fn config(
+    encoding: EncodingConfig,
+    indexed_fields: Vec<ConfigValuePath>,
+) -> HecLogsSinkConfig {
     let mut batch = BatchConfig::default();
     batch.max_events = Some(5);
 
@@ -302,7 +305,7 @@ async fn splunk_insert_index() {
 async fn splunk_index_is_interpolated() {
     let cx = SinkContext::default();
 
-    let indexed_fields = vec!["asdf".to_string()];
+    let indexed_fields = vec!["asdf".into()];
     let mut config = config(JsonSerializerConfig::default().into(), indexed_fields).await;
     config.index = Template::try_from("{{ index_name }}".to_string()).ok();
 
@@ -379,7 +382,7 @@ async fn splunk_hostname() {
 async fn splunk_sourcetype() {
     let cx = SinkContext::default();
 
-    let indexed_fields = vec!["asdf".to_string()];
+    let indexed_fields = vec!["asdf".into()];
     let mut config = config(JsonSerializerConfig::default().into(), indexed_fields).await;
     config.sourcetype = Template::try_from("_json".to_string()).ok();
 
@@ -405,11 +408,7 @@ async fn splunk_configure_hostname() {
 
     let config = HecLogsSinkConfig {
         host_key: OptionalValuePath::new("roast"),
-        ..config(
-            JsonSerializerConfig::default().into(),
-            vec!["asdf".to_string()],
-        )
-        .await
+        ..config(JsonSerializerConfig::default().into(), vec!["asdf".into()]).await
     };
 
     let (sink, _) = config.build(cx).await.unwrap();
@@ -443,11 +442,7 @@ async fn splunk_indexer_acknowledgements() {
     let config = HecLogsSinkConfig {
         default_token: String::from(ACK_TOKEN).into(),
         acknowledgements: acknowledgements_config,
-        ..config(
-            JsonSerializerConfig::default().into(),
-            vec!["asdf".to_string()],
-        )
-        .await
+        ..config(JsonSerializerConfig::default().into(), vec!["asdf".into()]).await
     };
     let (sink, _) = config.build(cx).await.unwrap();
 
@@ -464,11 +459,7 @@ async fn splunk_indexer_acknowledgements() {
 async fn splunk_indexer_acknowledgements_disabled_on_server() {
     let cx = SinkContext::default();
 
-    let config = config(
-        JsonSerializerConfig::default().into(),
-        vec!["asdf".to_string()],
-    )
-    .await;
+    let config = config(JsonSerializerConfig::default().into(), vec!["asdf".into()]).await;
     let (sink, _) = config.build(cx).await.unwrap();
 
     let (tx, mut rx) = BatchNotifier::new_with_receiver();

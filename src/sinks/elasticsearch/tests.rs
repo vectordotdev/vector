@@ -12,7 +12,6 @@ use crate::{
     },
     template::Template,
 };
-use lookup::owned_value_path;
 
 // helper to unwrap template strings for tests only
 fn parse_template(input: &str) -> Template {
@@ -53,7 +52,7 @@ async fn sets_create_action_when_configured() {
         .request_builder
         .encoder
         .encode_input(
-            vec![process_log(log, &es.mode, &None, &config.encoding).unwrap()],
+            vec![process_log(log, &es.mode, None, &config.encoding).unwrap()],
             &mut encoded,
         )
         .unwrap();
@@ -129,7 +128,7 @@ async fn encode_datastream_mode() {
         .request_builder
         .encoder
         .encode_input(
-            vec![process_log(log, &es.mode, &None, &config.encoding).unwrap()],
+            vec![process_log(log, &es.mode, None, &config.encoding).unwrap()],
             &mut encoded,
         )
         .unwrap();
@@ -187,7 +186,7 @@ async fn encode_datastream_mode_no_routing() {
         .request_builder
         .encoder
         .encode_input(
-            vec![process_log(log, &es.mode, &None, &config.encoding).unwrap()],
+            vec![process_log(log, &es.mode, None, &config.encoding).unwrap()],
             &mut encoded,
         )
         .unwrap();
@@ -223,7 +222,7 @@ async fn handle_metrics() {
     es.request_builder
         .encoder
         .encode_input(
-            vec![process_log(log, &es.mode, &None, &config.encoding).unwrap()],
+            vec![process_log(log, &es.mode, None, &config.encoding).unwrap()],
             &mut encoded,
         )
         .unwrap();
@@ -339,7 +338,7 @@ async fn encode_datastream_mode_no_sync() {
         .request_builder
         .encoder
         .encode_input(
-            vec![process_log(log, &es.mode, &None, &config.encoding).unwrap()],
+            vec![process_log(log, &es.mode, None, &config.encoding).unwrap()],
             &mut encoded,
         )
         .unwrap();
@@ -358,12 +357,8 @@ async fn allows_using_except_fields() {
             index: parse_template("{{ idx }}"),
             ..Default::default()
         },
-        encoding: Transformer::new(
-            None,
-            Some(vec!["idx".to_string(), "timestamp".to_string()]),
-            None,
-        )
-        .unwrap(),
+        encoding: Transformer::new(None, Some(vec!["idx".into(), "timestamp".into()]), None)
+            .unwrap(),
         endpoints: vec![String::from("https://example.com")],
         api_version: ElasticsearchApiVersion::V6,
         ..Default::default()
@@ -379,7 +374,7 @@ async fn allows_using_except_fields() {
         .request_builder
         .encoder
         .encode_input(
-            vec![process_log(log, &es.mode, &None, &config.encoding).unwrap()],
+            vec![process_log(log, &es.mode, None, &config.encoding).unwrap()],
             &mut encoded,
         )
         .unwrap();
@@ -398,7 +393,7 @@ async fn allows_using_only_fields() {
             index: parse_template("{{ idx }}"),
             ..Default::default()
         },
-        encoding: Transformer::new(Some(vec![owned_value_path!("foo")]), None, None).unwrap(),
+        encoding: Transformer::new(Some(vec!["foo".into()]), None, None).unwrap(),
         endpoints: vec![String::from("https://example.com")],
         api_version: ElasticsearchApiVersion::V6,
         ..Default::default()
@@ -414,7 +409,7 @@ async fn allows_using_only_fields() {
         .request_builder
         .encoder
         .encode_input(
-            vec![process_log(log, &es.mode, &None, &config.encoding).unwrap()],
+            vec![process_log(log, &es.mode, None, &config.encoding).unwrap()],
             &mut encoded,
         )
         .unwrap();
@@ -540,7 +535,7 @@ async fn datastream_index_name() {
             ),
         );
 
-        let processed_event = process_log(log, &es.mode, &None, &config.encoding).unwrap();
+        let processed_event = process_log(log, &es.mode, None, &config.encoding).unwrap();
         assert_eq!(processed_event.index, test_case.want, "{test_case:?}");
     }
 }

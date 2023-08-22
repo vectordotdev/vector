@@ -609,8 +609,8 @@ mod tests {
 
     use indoc::{formatdoc, indoc};
     use vector_core::{config::GlobalOptions, event::EventMetadata, metric_tags};
-    use vrl::btreemap;
     use vrl::value::kind::Collection;
+    use vrl::{btreemap, event_path};
 
     use super::*;
     use crate::{
@@ -1174,12 +1174,12 @@ mod tests {
         let log = output.as_log();
         assert_eq!(log["hello"], "world".into());
         assert_eq!(log["foo"], "bar".into());
-        assert!(!log.contains("metadata"));
+        assert!(!log.contains(event_path!("metadata")));
 
         let output = transform_one_fallible(&mut tform, abort).unwrap_err();
         let log = output.as_log();
         assert_eq!(log["hello"], "goodbye".into());
-        assert!(!log.contains("foo"));
+        assert!(!log.contains(event_path!("foo")));
         assert_eq!(
             log["metadata"],
             serde_json::json!({
@@ -1198,7 +1198,7 @@ mod tests {
         let output = transform_one_fallible(&mut tform, error).unwrap_err();
         let log = output.as_log();
         assert_eq!(log["hello"], 42.into());
-        assert!(!log.contains("foo"));
+        assert!(!log.contains(event_path!("foo")));
         assert_eq!(
             log["metadata"],
             serde_json::json!({
@@ -1310,7 +1310,7 @@ mod tests {
             transform_one_fallible(&mut tform, error_trigger_assert_custom_message).unwrap_err();
         let log = output.as_log();
         assert_eq!(log["hello"], 42.into());
-        assert!(!log.contains("foo"));
+        assert!(!log.contains(event_path!("foo")));
         assert_eq!(
             log["metadata"],
             serde_json::json!({
@@ -1330,7 +1330,7 @@ mod tests {
             transform_one_fallible(&mut tform, error_trigger_default_assert_message).unwrap_err();
         let log = output.as_log();
         assert_eq!(log["hello"], 0.into());
-        assert!(!log.contains("foo"));
+        assert!(!log.contains(event_path!("foo")));
         assert_eq!(
             log["metadata"],
             serde_json::json!({
@@ -1368,7 +1368,7 @@ mod tests {
         let output = transform_one_fallible(&mut tform, error).unwrap_err();
         let log = output.as_log();
         assert_eq!(log["hello"], 42.into());
-        assert!(!log.contains("foo"));
+        assert!(!log.contains(event_path!("foo")));
         assert_eq!(
             log["metadata"],
             serde_json::json!({
@@ -1448,7 +1448,7 @@ mod tests {
         let log = output.as_log();
         assert_eq!(log["hello"], "world".into());
         assert_eq!(log["foo"], "bar".into());
-        assert!(!log.contains("metadata"));
+        assert!(!log.contains(event_path!("metadata")));
 
         let out = collect_outputs(&mut tform, abort);
         assert!(out.primary.is_empty());

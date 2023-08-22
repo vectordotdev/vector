@@ -43,6 +43,9 @@ impl DriverResponse for DatadogEventsResponse {
 
 #[derive(Clone)]
 pub struct DatadogEventsService {
+    // TODO: `HttpBatchService` has been deprecated for direct use in sinks.
+    //       This sink should undergo a refactor to utilize the `HttpService`
+    //       instead, which extracts much of the boilerplate code for `Service`.
     batch_http_service:
         HttpBatchService<Ready<Result<http::Request<Bytes>, crate::Error>>, DatadogEventsRequest>,
 }

@@ -18,6 +18,28 @@ releases: "0.32.0": {
 		  protobuf data
 		"""
 
+	known_issues: [
+		"""
+			A number of sinks emit incorrect telemetry for the `component_sent_*` metrics:
+
+			- WebHDFS
+			- GCP Cloud Storage
+			- AWS S3
+			- Azure Blob Storage
+			- Azure Monitor Logs
+			- Databend
+			- Clickhouse
+			- Datadog Logs
+
+			This is fixed in v0.32.1.
+			""",
+		"""
+			The newly added `--openssl-legacy-provider` flag cannot actually be disabled by setting
+			it to `false` via `--openssl-legacy-provider=false`. Instead it complains of extra
+			arguments. This is fixed in v0.32.1.
+			""",
+	]
+
 	changelog: [
 		{
 			type: "fix"

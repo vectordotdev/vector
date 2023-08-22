@@ -3,6 +3,7 @@ use aws_sdk_kinesis::{
     types::SdkError,
 };
 use futures::FutureExt;
+use lookup::lookup_v2::ConfigValuePath;
 use snafu::Snafu;
 use vector_config::{component::GenerateConfig, configurable_component};
 
@@ -80,7 +81,7 @@ pub struct KinesisStreamsSinkConfig {
     ///
     /// If not specified, a unique partition key is generated for each Kinesis record.
     #[configurable(metadata(docs::examples = "user_id"))]
-    pub partition_key_field: Option<String>,
+    pub partition_key_field: Option<ConfigValuePath>,
 
     #[configurable(derived)]
     #[serde(default)]
