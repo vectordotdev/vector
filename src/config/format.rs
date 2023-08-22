@@ -5,8 +5,6 @@
 use std::path::Path;
 use std::str::FromStr;
 
-// use proptest::prelude::{Arbitrary, BoxedStrategy, Just, Strategy};
-// use proptest::prop_oneof;
 use serde::de;
 
 /// A type alias to better capture the semantics.
@@ -36,16 +34,6 @@ impl FromStr for Format {
         }
     }
 }
-
-// #[cfg(test)]
-// impl Arbitrary for Format {
-//     type Parameters = ();
-//     fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
-//         prop_oneof![Just(Format::Toml), Just(Format::Json), Just(Format::Yaml),].boxed()
-//     }
-//
-//     type Strategy = BoxedStrategy<Self>;
-// }
 
 impl Format {
     /// Obtain the format from the file path using extension as a hint.
