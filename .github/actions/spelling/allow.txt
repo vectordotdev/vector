@@ -403,6 +403,7 @@ rootfs
 roundrobin
 rpmbuild
 rpms
+rstest
 rsyslog
 rsyslogd
 servlet
