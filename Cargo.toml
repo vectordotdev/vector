@@ -215,6 +215,7 @@ rmpv = { version = "1.0.0", default-features = false, features = ["with-serde"],
 # Prost / Protocol Buffers
 prost = { version = "0.11", default-features = false, features = ["std"] }
 prost-reflect = { version = "0.11", default-features = false, optional = true }
+protofish = { version = "0.5", default-features = false, optional = true }
 prost-types = { version = "0.11", default-features = false, optional = true }
 
 # GCP
@@ -348,6 +349,7 @@ nix = { version = "0.26.2", default-features = false, features = ["socket", "sig
 
 [build-dependencies]
 prost-build = { version = "0.11", default-features = false, optional = true }
+prost-reflect = { version = "0.11", default-features = false, optional = true }
 tonic-build = { version = "0.9", default-features = false, features = ["transport", "prost"], optional = true }
 openssl-src = { version = "300", default-features = false, features = ["force-engine", "legacy"] }
 
@@ -527,7 +529,7 @@ sources-aws_ecs_metrics = []
 sources-aws_kinesis_firehose = ["dep:base64", "dep:infer"]
 sources-aws_s3 = ["aws-core", "dep:aws-sdk-sqs", "dep:aws-sdk-s3", "dep:semver", "dep:async-compression", "sources-aws_sqs", "tokio-util/io"]
 sources-aws_sqs = ["aws-core", "dep:aws-sdk-sqs"]
-sources-datadog_agent = ["sources-utils-http-error", "protobuf-build"]
+sources-datadog_agent = ["sources-utils-http-error", "protobuf-build", "dep:protofish"]
 sources-demo_logs = ["dep:fakedata"]
 sources-dnstap = ["dep:base64", "dep:trust-dns-proto", "dep:dnsmsg-parser", "protobuf-build"]
 sources-docker_logs = ["docker"]

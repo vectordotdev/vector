@@ -228,10 +228,172 @@ fn decode_datadog_series_v2(
     Ok(metrics)
 }
 
+fn decode_with_unknown_origin(frame: &Bytes) {
+    use protofish::decode::UnknownValue;
+    use protofish::prelude::*;
+
+    fn _print_type(value: &Value) {
+        match value {
+            Value::Double(_) => println!("double"),
+            Value::Float(_) => println!("float"),
+            Value::Int32(_) => println!("int32"),
+            Value::Int64(_) => println!("int64"),
+            Value::UInt32(_) => println!("uint32"),
+            Value::UInt64(_) => println!("uint64"),
+            Value::SInt32(_) => println!("sint32"),
+            Value::SInt64(_) => println!("sint64"),
+            Value::Fixed32(_) => println!("fixed32"),
+            Value::Fixed64(_) => println!("fixed64"),
+            Value::SFixed32(_) => println!("sfixed32"),
+            Value::SFixed64(_) => println!("sfixed64"),
+            Value::Bool(_) => println!("bool"),
+            Value::String(_) => println!("string"),
+            Value::Bytes(_) => println!("bytes"),
+            Value::Packed(_) => println!("packed"),
+            Value::Message(_) => println!("message"),
+            Value::Enum(_) => println!("enum"),
+            Value::Incomplete(_, _) => println!("incomplete"),
+            Value::Unknown(_) => println!("unknown"),
+        }
+    }
+
+    let contents = std::fs::read_to_string("proto/dd_metric.proto")
+        .expect("Should have been able to read the file");
+    let context = Context::parse(&[contents]).unwrap();
+    let metric_payload = context
+        .get_message("datadog.agentpayload.MetricPayload")
+        .unwrap();
+
+    let metric_payload_value = metric_payload.decode(&frame, &context);
+
+    // TODO the below works hackishly but it assumes a fixed order of the protobuf fields, which
+    // is incorrect as they can be in any order.
+
+    for field_value in &metric_payload_value.fields {
+        let Value::Message(ref series) = field_value.value else {
+            panic!("incorrect protobuf");
+        };
+
+        println!("n series fields: {}", series.fields.len());
+
+        assert!(series.fields.len() >= 5);
+
+        let mut idx = 0;
+
+        // TODO unclear behavior if the repeated Value::Message has more than one entry. may need
+        // to adapt this to loop on resources and points as well.
+
+        // resources and metric name
+        let _metric_name_value = if let Value::Message(ref _resources) = series.fields[0].value {
+            idx += 2;
+            &series.fields[1].value
+        } else {
+            idx += 1;
+            &series.fields[0].value
+        };
+
+        // has tags and points
+        if let Value::String(_first_tag) = &series.fields[idx].value {
+            println!("got tag: {_first_tag}");
+            idx += 1;
+            loop {
+                if let Value::String(_a_tag) = &series.fields[idx].value {
+                    println!("got tag: {_a_tag}");
+                    idx += 1;
+                } else {
+                    break;
+                }
+            }
+        }
+
+        // points
+        if let Value::Message(_points) = &series.fields[idx].value {
+            println!("got points");
+            idx += 1;
+        }
+
+        // type
+        if let Value::Enum(_type) = &series.fields[idx].value {
+            println!("got type");
+            idx += 1;
+        };
+
+        // print_type(&series.fields[idx].value);
+
+        // unit or source_type_name
+        if let Value::String(_unit_or_source_type_name) = &series.fields[idx].value {
+            println!("got unit or source type name: {_unit_or_source_type_name}");
+            idx += 1;
+        };
+
+        // source_type_name
+        if let Value::String(_source_type_name) = &series.fields[idx].value {
+            println!("got source type name: {_source_type_name}");
+            idx += 1;
+        };
+
+        // interval
+        if let Value::Int64(_interval) = &series.fields[idx].value {
+            println!("got interval {_interval}");
+            idx += 1;
+        };
+        _print_type(&series.fields[idx].value);
+
+        // points
+        if let Value::Message(metadata_value) = &series.fields[idx].value {
+            idx += 1;
+            println!("got message");
+            println!("n message fields: {}", metadata_value.fields.len());
+            for field in &metadata_value.fields {
+                _print_type(&field.value);
+                if let Value::Double(val) = &field.value {
+                    println!("got double value {}", val);
+                }
+                if let Value::Int64(val) = &field.value {
+                    println!("got int64 value {}", val);
+                }
+                if let Value::Enum(val) = &field.value {
+                    println!("got enum value {}", val.value);
+                }
+            }
+        }
+
+        _print_type(&series.fields[idx].value);
+
+        // metadata
+        if let Value::Unknown(unknown_value) = &series.fields[idx].value {
+            println!("got unknown value");
+            idx += 1;
+            match unknown_value {
+                UnknownValue::VariableLength(bytes) => {
+                    println!("got bytes for metadata: {:?}", bytes);
+                }
+                UnknownValue::Invalid(var, bytes) => {
+                    println!("got invalid for metadata: {:?} {:?}", var, bytes);
+                }
+                UnknownValue::Varint(var) => {
+                    println!("got u128 for metadata: {}", var);
+                }
+                UnknownValue::Fixed64(var) => {
+                    println!("got u64 for metadata: {}", var);
+                }
+                UnknownValue::Fixed32(var) => {
+                    println!("got u32 for metadata: {}", var);
+                }
+            }
+        }
+
+        println!("idx: {idx}");
+        //break;
+    }
+}
+
 pub(crate) fn decode_ddseries_v2(
     frame: Bytes,
     api_key: &Option<Arc<str>>,
 ) -> crate::Result<Vec<Event>> {
+    decode_with_unknown_origin(&frame);
+
     let payload = MetricPayload::decode(frame)?;
     let decoded_metrics: Vec<Event> = payload
         .series

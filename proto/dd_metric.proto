@@ -73,8 +73,7 @@ message SketchPayload {
 		string host = 2;
 		repeated Distribution distributions = 3;
 		repeated string tags = 4;
-                reserved 5, 6;
-				reserved "distributionsK", "distributionsC";
+		reserved 5, 6;
 		repeated Dogsketch dogsketches = 7;
 	}
 	repeated Sketch sketches = 1;
