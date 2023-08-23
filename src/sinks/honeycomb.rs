@@ -1,6 +1,7 @@
 use bytes::Bytes;
 use futures::{FutureExt, SinkExt};
 use http::{Request, StatusCode, Uri};
+use lookup::{lookup_v2::ConfigTargetPath, OwnedTargetPath};
 use serde_json::json;
 use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
@@ -16,7 +17,10 @@ use crate::{
         http::{BatchedHttpSink, HttpEventEncoder, HttpSink},
         BatchConfig, BoxedRawValue, JsonArrayBuffer, SinkBatchSettings, TowerRequestConfig,
     },
+    transforms::sample::SAMPLE_RATE_FIELD,
 };
+
+const HONEYCOMB_SAMPLERATE_FIELD: &str = "samplerate";
 
 /// Configuration for the `honeycomb` sink.
 #[configurable_component(sink("honeycomb", "Deliver log events to Honeycomb."))]
@@ -36,6 +40,14 @@ pub struct HoneycombConfig {
     // TODO: we probably want to make this a template
     // but this limits us in how we can do our healthcheck.
     dataset: String,
+
+    /// Configures how the sample rate is determined for each event. If a sample rate is found on the event
+    /// from the configured source, it will be removed from the event body and (if it is a valid integer) used
+    /// as the sample rate for that event for Honeycomb to inflate query results. If the sample rate source is
+    /// disabled, no fields will be removed and no sample rate will be sent to Honeycomb.
+    #[configurable(derived)]
+    #[serde(default)]
+    sample_rate_source: SampleRateSource,
 
     #[configurable(derived)]
     #[serde(default)]
@@ -63,6 +75,37 @@ pub struct HoneycombConfig {
 
 fn default_endpoint() -> String {
     "https://api.honeycomb.io/1/batch".to_string()
+}
+
+/// Configures how the sample rate is determined for each event.
+#[configurable_component]
+#[derive(Clone, Debug, Default)]
+pub enum SampleRateSource {
+    /// Use the sample rate that is added to the event by the `Sample` transform.
+    #[configurable(metadata(derived))]
+    #[default]
+    FromSampleTransform,
+    /// Use the value of the specified field as the sample rate.
+    #[configurable(metadata(derived))]
+    Field(
+        /// Use the value of the specified field as the sample rate.
+        ConfigTargetPath,
+    ),
+    /// Do not include a sample rate.
+    #[configurable(metadata(derived))]
+    Disabled,
+}
+impl SampleRateSource {
+    fn field_path(self) -> Option<OwnedTargetPath> {
+        let config_path = match self {
+            SampleRateSource::FromSampleTransform => {
+                ConfigTargetPath::try_from(SAMPLE_RATE_FIELD.to_owned()).ok()
+            }
+            SampleRateSource::Field(field) => Some(field),
+            SampleRateSource::Disabled => None,
+        };
+        config_path.map(|path| path.0)
+    }
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -127,6 +170,7 @@ impl SinkConfig for HoneycombConfig {
 
 pub struct HoneycombEventEncoder {
     transformer: Transformer,
+    sample_rate_field_path: Option<OwnedTargetPath>,
 }
 
 impl HttpEventEncoder<serde_json::Value> for HoneycombEventEncoder {
@@ -140,10 +184,21 @@ impl HttpEventEncoder<serde_json::Value> for HoneycombEventEncoder {
             chrono::Utc::now()
         };
 
-        let data = json!({
+        let sample_rate = self
+            .sample_rate_field_path
+            .as_ref()
+            .and_then(|path| log.remove(path))
+            .and_then(|v| v.as_integer());
+
+        let mut data = json!({
             "time": timestamp.to_rfc3339_opts(chrono::SecondsFormat::Nanos, true),
-            "data": log.convert_to_fields(),
+            "data": log.convert_to_fields()
         });
+        if let Some(sample_rate) = sample_rate {
+            data.as_object_mut()
+                .unwrap()
+                .insert(HONEYCOMB_SAMPLERATE_FIELD.to_owned(), sample_rate.into());
+        }
 
         Some(data)
     }
@@ -158,6 +213,7 @@ impl HttpSink for HoneycombConfig {
     fn build_encoder(&self) -> Self::Encoder {
         HoneycombEventEncoder {
             transformer: self.encoding.clone(),
+            sample_rate_field_path: self.sample_rate_source.clone().field_path(),
         }
     }
 
@@ -218,18 +274,23 @@ async fn healthcheck(config: HoneycombConfig, client: HttpClient) -> crate::Resu
 #[cfg(test)]
 mod test {
     use futures::{future::ready, stream};
+    use lookup::lookup_v2::OwnedTargetPath;
     use serde::Deserialize;
-    use vector_core::event::{Event, LogEvent};
+    use serde_json::json;
+    use vector_core::event::{Event, LogEvent, Value};
 
     use crate::{
+        codecs::Transformer,
         config::{GenerateConfig, SinkConfig, SinkContext},
+        sinks::util::http::HttpEventEncoder,
         test_util::{
             components::{run_and_assert_sink_compliance, HTTP_SINK_TAGS},
             http::{always_200_response, spawn_blackhole_http_server},
         },
+        transforms::sample::SAMPLE_RATE_FIELD,
     };
 
-    use super::HoneycombConfig;
+    use super::{HoneycombConfig, HoneycombEventEncoder};
 
     #[test]
     fn generate_config() {
@@ -250,5 +311,109 @@ mod test {
 
         let event = Event::Log(LogEvent::from("simple message"));
         run_and_assert_sink_compliance(sink, stream::once(ready(event)), &HTTP_SINK_TAGS).await;
+    }
+
+    #[test]
+    fn encode_event_sample_source_disabled() {
+        let mut encoder = HoneycombEventEncoder {
+            transformer: Transformer::default(),
+            sample_rate_field_path: None,
+        };
+
+        let mut log = LogEvent::from("simple message");
+        log.insert(SAMPLE_RATE_FIELD, Value::Integer(40));
+        let timestamp = *log.get_timestamp().and_then(|t| t.as_timestamp()).unwrap();
+        let event = Event::Log(log);
+
+        let encoded = encoder.encode_event(event);
+
+        assert_eq!(
+            encoded,
+            Some(json! ({
+                "time": timestamp.to_rfc3339_opts(chrono::SecondsFormat::Nanos, true),
+                "data": {
+                    "message": "simple message",
+                    "sample_rate": 40
+                }
+            }))
+        )
+    }
+
+    #[test]
+    fn encode_event_sample_source_default() {
+        let mut encoder = HoneycombEventEncoder {
+            transformer: Transformer::default(),
+            sample_rate_field_path: None,
+        };
+
+        let mut log = LogEvent::from("simple message");
+        log.insert(SAMPLE_RATE_FIELD, Value::Integer(40));
+        let timestamp = *log.get_timestamp().and_then(|t| t.as_timestamp()).unwrap();
+        let event = Event::Log(log);
+
+        let encoded = encoder.encode_event(event);
+
+        assert_eq!(
+            encoded,
+            Some(json! ({
+                "time": timestamp.to_rfc3339_opts(chrono::SecondsFormat::Nanos, true),
+                "data": {
+                    "message": "simple message"
+                },
+                "samplerate": 40
+            }))
+        )
+    }
+
+    #[test]
+    fn encode_event_sample_source_default_no_rate() {
+        let mut encoder = HoneycombEventEncoder {
+            transformer: Transformer::default(),
+            sample_rate_field_path: None,
+        };
+
+        let log = LogEvent::from("simple message");
+        let timestamp = *log.get_timestamp().and_then(|t| t.as_timestamp()).unwrap();
+        let event = Event::Log(log);
+
+        let encoded = encoder.encode_event(event);
+
+        assert_eq!(
+            encoded,
+            Some(json! ({
+                "time": timestamp.to_rfc3339_opts(chrono::SecondsFormat::Nanos, true),
+                "data": {
+                    "message": "simple message"
+                }
+            }))
+        )
+    }
+
+    #[test]
+    fn encode_event_sample_source_custom() {
+        let mut encoder = HoneycombEventEncoder {
+            transformer: Transformer::default(),
+            sample_rate_field_path: Some(
+                OwnedTargetPath::try_from("custom_sample_rate".to_owned()).unwrap(),
+            ),
+        };
+
+        let mut log = LogEvent::from("simple message");
+        log.insert("custom_sample_rate", Value::Integer(40));
+        let timestamp = *log.get_timestamp().and_then(|t| t.as_timestamp()).unwrap();
+        let event = Event::Log(log);
+
+        let encoded = encoder.encode_event(event);
+
+        assert_eq!(
+            encoded,
+            Some(json! ({
+                "time": timestamp.to_rfc3339_opts(chrono::SecondsFormat::Nanos, true),
+                "data": {
+                    "message": "simple message"
+                },
+                "samplerate": 40
+            }))
+        )
     }
 }

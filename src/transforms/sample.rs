@@ -15,6 +15,8 @@ use crate::{
     transforms::{FunctionTransform, OutputBuffer, Transform},
 };
 
+pub const SAMPLE_RATE_FIELD: &str = "sample_rate";
+
 /// Configuration for the `sample` transform.
 #[configurable_component(transform(
     "sample",
@@ -91,8 +93,8 @@ impl TransformConfig for SampleConfig {
                         output.clone(),
                         definition.clone().with_source_metadata(
                             SampleConfig::NAME,
-                            Some(LegacyKey::Overwrite(owned_value_path!("sample_rate"))),
-                            &owned_value_path!("sample_rate"),
+                            Some(LegacyKey::Overwrite(owned_value_path!(SAMPLE_RATE_FIELD))),
+                            &owned_value_path!(SAMPLE_RATE_FIELD),
                             Kind::bytes(),
                             None,
                         ),
@@ -168,13 +170,13 @@ impl FunctionTransform for Sample {
                     event.namespace().insert_source_metadata(
                         SampleConfig::NAME,
                         event,
-                        Some(LegacyKey::Overwrite(vrl::path!("sample_rate"))),
-                        vrl::path!("sample_rate"),
+                        Some(LegacyKey::Overwrite(vrl::path!(SAMPLE_RATE_FIELD))),
+                        vrl::path!(SAMPLE_RATE_FIELD),
                         self.rate.to_string(),
                     );
                 }
                 Event::Trace(ref mut event) => {
-                    event.insert(event_path!("sample_rate"), self.rate.to_string());
+                    event.insert(event_path!(SAMPLE_RATE_FIELD), self.rate.to_string());
                 }
                 Event::Metric(_) => panic!("component can never receive metric events"),
             };
@@ -356,7 +358,7 @@ mod tests {
                 .filter(|s| !s.as_log()[&message_key].to_string_lossy().contains("na"))
                 .find_map(|event| transform_one(&mut sampler, event))
                 .unwrap();
-            assert_eq!(passing.as_log()["sample_rate"], "10".into());
+            assert_eq!(passing.as_log()[SAMPLE_RATE_FIELD], "10".into());
 
             let events = random_events(10000);
             let mut sampler = Sample::new(
@@ -369,7 +371,7 @@ mod tests {
                 .filter(|s| !s.as_log()[&message_key].to_string_lossy().contains("na"))
                 .find_map(|event| transform_one(&mut sampler, event))
                 .unwrap();
-            assert_eq!(passing.as_log()["sample_rate"], "25".into());
+            assert_eq!(passing.as_log()[SAMPLE_RATE_FIELD], "25".into());
 
             // If the event passed the regex check, don't include the sampling rate
             let mut sampler = Sample::new(
@@ -379,7 +381,7 @@ mod tests {
             );
             let event = Event::Log(LogEvent::from("nananana"));
             let passing = transform_one(&mut sampler, event).unwrap();
-            assert!(passing.as_log().get("sample_rate").is_none());
+            assert!(passing.as_log().get(SAMPLE_RATE_FIELD).is_none());
         }
     }
 
