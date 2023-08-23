@@ -2,6 +2,7 @@
 
 #![deny(missing_docs, missing_debug_implementations)]
 
+use std::fmt;
 use std::path::Path;
 use std::str::FromStr;
 
@@ -31,6 +32,16 @@ impl FromStr for Format {
             "yaml" => Ok(Format::Yaml),
             "json" => Ok(Format::Json),
             _ => Err(format!("Invalid format: {}", s)),
+        }
+    }
+}
+
+impl fmt::Display for Format {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Format::Toml => write!(f, "toml"),
+            Format::Json => write!(f, "json"),
+            Format::Yaml => write!(f, "yaml"),
         }
     }
 }
