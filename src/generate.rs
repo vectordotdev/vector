@@ -392,7 +392,7 @@ fn write_config(filepath: &Path, body: &str) -> Result<(), crate::Error> {
 mod tests {
     use super::*;
     use crate::config::ConfigBuilder;
-    use proptest::prelude::*;
+    use rstest::rstest;
 
     fn generate_and_deserialize(expression: String, format: Format) {
         let opts = Opts {
@@ -410,20 +410,22 @@ mod tests {
         }
     }
 
-    proptest! {
-        #[test]
-        fn generate_all(format in any::<Format>()) {
-            for name in SourceDescription::types() {
-                generate_and_deserialize(format!("{}//", name), format);
-            }
+    #[rstest]
+    #[case(Format::Toml)]
+    #[case(Format::Json)]
+    #[case(Format::Yaml)]
+    #[test]
+    fn generate_all(#[case] format: Format) {
+        for name in SourceDescription::types() {
+            generate_and_deserialize(format!("{}//", name), format);
+        }
 
-            for name in TransformDescription::types() {
-                generate_and_deserialize(format!("/{}/", name), format);
-            }
+        for name in TransformDescription::types() {
+            generate_and_deserialize(format!("/{}/", name), format);
+        }
 
-            for name in SinkDescription::types() {
-                generate_and_deserialize(format!("//{}", name), format);
-            }
+        for name in SinkDescription::types() {
+            generate_and_deserialize(format!("//{}", name), format);
         }
     }
 
