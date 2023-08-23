@@ -1389,6 +1389,32 @@ dependencies = [
 ]
 
 [[package]]
+name = "azure_core"
+version = "0.14.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2331555a3618a32516c6172a63e9fec4af0edb43c6fcfeb5303a0716fc34498b"
+dependencies = [
+ "async-trait",
+ "base64 0.21.2",
+ "bytes 1.4.0",
+ "dyn-clone",
+ "futures 0.3.28",
+ "getrandom 0.2.10",
+ "http-types",
+ "log",
+ "paste",
+ "pin-project",
+ "quick-xml 0.30.0",
+ "rand 0.8.5",
+ "rustc_version 0.4.0",
+ "serde",
+ "serde_json",
+ "time",
+ "url",
+ "uuid",
+]
+
+[[package]]
 name = "azure_identity"
 version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1396,7 +1422,7 @@ checksum = "61712538f43d64b56725f335bc931d0eb42d2b082fb157056465bbadfdeb5dd3"
 dependencies = [
  "async-lock",
  "async-trait",
- "azure_core",
+ "azure_core 0.13.0",
  "fix-hidden-lifetime-bug",
  "futures 0.3.28",
  "log",
@@ -1417,7 +1443,30 @@ checksum = "32d9cfa13ed9acb51cd663e04f343bd550a92b455add96c90de387a9a6bc4dbc"
 dependencies = [
  "RustyXML",
  "async-trait",
- "azure_core",
+ "azure_core 0.13.0",
+ "bytes 1.4.0",
+ "futures 0.3.28",
+ "hmac",
+ "log",
+ "once_cell",
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "sha2",
+ "time",
+ "url",
+ "uuid",
+]
+
+[[package]]
+name = "azure_storage"
+version = "0.14.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "16565073e533053f4e29e6b139de2af758e984108a1cddbb1a432387e7f4474d"
+dependencies = [
+ "RustyXML",
+ "async-trait",
+ "azure_core 0.14.0",
  "bytes 1.4.0",
  "futures 0.3.28",
  "hmac",
@@ -1439,8 +1488,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "57cb0fe58af32a3fb49e560613cb1e4937f9f13161a2c1caf1bba0224435f2af"
 dependencies = [
  "RustyXML",
- "azure_core",
- "azure_storage",
+ "azure_core 0.13.0",
+ "azure_storage 0.13.0",
  "bytes 1.4.0",
  "futures 0.3.28",
  "log",
@@ -6698,6 +6747,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "quick-xml"
+version = "0.30.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "eff6510e86862b57b210fd8cbe8ed3f0d7d600b9c2863cd4549a2e033c66e956"
+dependencies = [
+ "memchr",
+ "serde",
+]
+
+[[package]]
 name = "quickcheck"
 version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9445,9 +9504,9 @@ dependencies = [
  "aws-smithy-types",
  "aws-types",
  "axum",
- "azure_core",
+ "azure_core 0.13.0",
  "azure_identity",
- "azure_storage",
+ "azure_storage 0.14.0",
  "azure_storage_blobs",
  "base64 0.21.2",
  "bloomy",
