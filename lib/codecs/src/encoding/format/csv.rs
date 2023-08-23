@@ -1,6 +1,7 @@
 use crate::encoding::BuildError;
 use bytes::BytesMut;
 use chrono::SecondsFormat;
+use csv_core::{WriteResult, Writer, WriterBuilder};
 use lookup::lookup_v2::ConfigTargetPath;
 use tokio_util::codec::Encoder;
 use vector_core::{
@@ -178,9 +179,9 @@ impl CsvSerializerOptions {
 /// Serializer that converts an `Event` to bytes using the CSV format.
 #[derive(Debug, Clone)]
 pub struct CsvSerializer {
-    //  Box because of clippy error: 'large size difference between variants'
+    // Box because of clippy error: 'large size difference between variants'
     // in SerializerConfig enum
-    writer: Box<csv_core::Writer>,
+    writer: Box<Writer>,
     fields: Vec<ConfigTargetPath>,
     internal_buffer: Vec<u8>,
 }
@@ -190,7 +191,7 @@ impl CsvSerializer {
     pub fn new(config: CsvSerializerConfig) -> Self {
         // 'flexible' is not needed since every event is a single context free csv line
         let writer = Box::new(
-            csv_core::WriterBuilder::new()
+            WriterBuilder::new()
                 .delimiter(config.csv.delimiter)
                 .double_quote(config.csv.double_quote)
                 .escape(config.csv.escape)
@@ -231,10 +232,10 @@ impl Encoder<Event> for CsvSerializer {
                         .delimiter(&mut self.internal_buffer[used_buffer_bytes..]);
                     used_buffer_bytes += bytes_written;
                     match res {
-                        csv_core::WriteResult::InputEmpty => {
+                        WriteResult::InputEmpty => {
                             break;
                         }
-                        csv_core::WriteResult::OutputFull => {
+                        WriteResult::OutputFull => {
                             buffer.extend_from_slice(&self.internal_buffer[..used_buffer_bytes]);
                             used_buffer_bytes = 0;
                         }
@@ -269,8 +270,8 @@ impl Encoder<Event> for CsvSerializer {
                 used_buffer_bytes += bytes_written;
 
                 match res {
-                    csv_core::WriteResult::InputEmpty => break,
-                    csv_core::WriteResult::OutputFull => {
+                    WriteResult::InputEmpty => break,
+                    WriteResult::OutputFull => {
                         buffer.extend_from_slice(&self.internal_buffer[..used_buffer_bytes]);
                         used_buffer_bytes = 0;
                     }
@@ -285,8 +286,8 @@ impl Encoder<Event> for CsvSerializer {
                 .finish(&mut self.internal_buffer[used_buffer_bytes..]);
             used_buffer_bytes += bytes_written;
             match res {
-                csv_core::WriteResult::InputEmpty => break,
-                csv_core::WriteResult::OutputFull => {
+                WriteResult::InputEmpty => break,
+                WriteResult::OutputFull => {
                     buffer.extend_from_slice(&self.internal_buffer[..used_buffer_bytes]);
                     used_buffer_bytes = 0;
                 }
@@ -558,8 +559,8 @@ mod tests {
 
     #[test]
     fn multiple_events() {
-        let (fields, event1) = make_event_with_fields(vec![("field1", "foo\"")]);
-        let (_, event2) = make_event_with_fields(vec![("field1", "\"bar")]);
+        let (fields, event1) = make_event_with_fields(vec![("field1", "foo,")]);
+        let (_, event2) = make_event_with_fields(vec![("field1", "\nbar")]);
         let opts = CsvSerializerOptions {
             fields,
             ..Default::default()
@@ -571,6 +572,6 @@ mod tests {
         serializer.encode(event1, &mut bytes).unwrap();
         serializer.encode(event2, &mut bytes).unwrap();
 
-        assert_eq!(bytes.freeze(), b"\"foo\"\"\"\"\"bar\"".as_slice());
+        assert_eq!(bytes.freeze(), b"\"foo,\"\"\nbar\"".as_slice());
     }
 }
