@@ -3,11 +3,10 @@
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
 use futures::{future::ready, stream};
-use http::{Request, Uri};
+use http::Uri;
 use indoc::indoc;
 use lookup::lookup_v2::ConfigValuePath;
 use serde::Deserialize;
-use serde_json::value::RawValue;
 use std::collections::HashMap;
 
 use crate::{
@@ -15,12 +14,15 @@ use crate::{
     event::{LogEvent, Value},
     gcp::GcpAuthenticator,
     sinks::{
-        gcp::stackdriver::logs::{config::StackdriverLogName, encoder::remap_severity},
+        gcp::stackdriver::logs::{
+            config::StackdriverLogName, encoder::remap_severity,
+            service::StackdriverLogsServiceRequestBuilder,
+        },
         prelude::*,
-        util::BoxedRawValue,
+        util::{encoding::Encoder as _, http::HttpServiceRequestBuilder},
     },
     test_util::{
-        components::{run_and_assert_sink_compliance, SINK_TAGS},
+        components::{run_and_assert_sink_compliance, HTTP_SINK_TAGS},
         http::{always_200_response, spawn_blackhole_http_server},
     },
 };
@@ -53,7 +55,7 @@ async fn component_spec_compliance() {
     let (sink, _healthcheck) = config.build(context).await.unwrap();
 
     let event = Event::Log(LogEvent::from("simple message"));
-    run_and_assert_sink_compliance(sink, stream::once(ready(event)), &SINK_TAGS).await;
+    run_and_assert_sink_compliance(sink, stream::once(ready(event)), &HTTP_SINK_TAGS).await;
 }
 
 #[test]
@@ -184,24 +186,6 @@ fn severity_remaps_strings() {
     }
 }
 
-async fn build_request(
-    auth: GcpAuthenticator,
-    uri: Uri,
-    events: Vec<BoxedRawValue>,
-) -> crate::Result<Request<Bytes>> {
-    let events = serde_json::json!({ "entries": events });
-
-    let body = crate::serde::json::to_bytes(&events).unwrap().freeze();
-
-    let mut request = Request::post(uri.clone())
-        .header("Content-Type", "application/json")
-        .body(body)
-        .unwrap();
-    auth.apply(&mut request);
-
-    Ok(request)
-}
-
 #[tokio::test]
 async fn correct_request() {
     let uri: Uri = default_endpoint().parse().unwrap();
@@ -223,22 +207,21 @@ async fn correct_request() {
 
     let log1 = [("message", "hello")].iter().copied().collect::<LogEvent>();
     let log2 = [("message", "world")].iter().copied().collect::<LogEvent>();
-    let event1 = encoder.encode_event(Event::from(log1)).unwrap();
-    let event2 = encoder.encode_event(Event::from(log2)).unwrap();
 
-    let json1 = serde_json::to_string(&event1).unwrap();
-    let json2 = serde_json::to_string(&event2).unwrap();
-    let raw1 = RawValue::from_string(json1).unwrap();
-    let raw2 = RawValue::from_string(json2).unwrap();
+    let events = vec![Event::from(log1), Event::from(log2)];
 
-    let events = vec![raw1, raw2];
+    let mut writer = Vec::new();
+    let (_, _) = encoder.encode_input(events, &mut writer).unwrap();
 
-    let request = build_request(GcpAuthenticator::None, uri, events)
-        .await
-        .unwrap();
+    let body = Bytes::copy_from_slice(&writer);
 
+    let stackdriver_logs_service_request_builder = StackdriverLogsServiceRequestBuilder {
+        uri: uri.clone(),
+        auth: GcpAuthenticator::None,
+    };
+
+    let request = stackdriver_logs_service_request_builder.build(body);
     let (parts, body) = request.into_parts();
-
     let json: serde_json::Value = serde_json::from_slice(&body[..]).unwrap();
 
     assert_eq!(

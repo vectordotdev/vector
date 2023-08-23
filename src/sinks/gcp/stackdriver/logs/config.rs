@@ -1,18 +1,6 @@
 //! Configuration for the `gcp_stackdriver_logs` sink.
 
-use std::collections::HashMap;
-
-use futures::FutureExt;
-use http::{Request, Uri};
-use hyper::Body;
-use lookup::lookup_v2::ConfigValuePath;
-use snafu::Snafu;
-use vector_config::configurable_component;
-use vrl::value::Kind;
-
 use crate::{
-    codecs::Transformer,
-    config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext},
     gcp::{GcpAuthConfig, GcpAuthenticator, Scope},
     http::HttpClient,
     schema,
@@ -21,16 +9,20 @@ use crate::{
         prelude::*,
         util::{
             http::{http_response_retry_logic, HttpService},
-            BatchConfig, BoxedRawValue, RealtimeSizeBasedDefaultBatchSettings, TowerRequestConfig,
+            BoxedRawValue, RealtimeSizeBasedDefaultBatchSettings,
         },
     },
-    template::Template,
-    tls::{TlsConfig, TlsSettings},
 };
+use http::{Request, Uri};
+use hyper::Body;
+use lookup::lookup_v2::ConfigValuePath;
+use snafu::Snafu;
+use std::collections::HashMap;
+use vrl::value::Kind;
 
 use super::{
     encoder::StackdriverLogsEncoder, request_builder::StackdriverLogsRequestBuilder,
-    service::StackdriverLogsSinkRequestBuilder, sink::StackdriverLogsSink,
+    service::StackdriverLogsServiceRequestBuilder, sink::StackdriverLogsSink,
 };
 
 #[derive(Debug, Snafu)]
@@ -233,7 +225,7 @@ impl SinkConfig for StackdriverConfig {
 
         let uri: Uri = self.endpoint.parse()?;
 
-        let stackdriver_logs_service_request_builder = StackdriverLogsSinkRequestBuilder {
+        let stackdriver_logs_service_request_builder = StackdriverLogsServiceRequestBuilder {
             uri: uri.clone(),
             auth: auth.clone(),
         };

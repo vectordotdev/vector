@@ -164,14 +164,15 @@ impl SinkEncoder<Vec<Event>> for StackdriverLogsEncoder {
         let mut n_events = events.len();
         let mut body = BytesMut::new();
 
-        let mut array = json!([]);
-        let entries = array.as_array_mut().expect("Should be array");
+        let mut entries = Vec::with_capacity(n_events);
         for event in &events {
             let size = event.estimated_json_encoded_size_of();
             if let Some(data) = self.encode_event(event.clone()) {
                 byte_size.add_event(event, size);
                 entries.push(data)
             } else {
+                // encode_event() emits the `TemplateRenderingError` internal event,
+                // which emits an `EventsDropped`, so no need to here.
                 n_events -= 1;
             }
         }
