@@ -429,49 +429,44 @@ mod tests {
         let mut always_bytes = BytesMut::new();
         let mut non_numeric_bytes = BytesMut::new();
 
-        let mut default_serializer = CsvSerializerConfig::new(CsvSerializerOptions {
+        CsvSerializerConfig::new(CsvSerializerOptions {
             fields: fields.clone(),
             ..Default::default()
         })
         .build()
+        .unwrap()
+        .encode(event.clone(), &mut default_bytes)
         .unwrap();
 
-        let mut never_serializer = CsvSerializerConfig::new(CsvSerializerOptions {
+        CsvSerializerConfig::new(CsvSerializerOptions {
             fields: fields.clone(),
             quote_style: QuoteStyle::Never,
             ..Default::default()
         })
         .build()
+        .unwrap()
+        .encode(event.clone(), &mut never_bytes)
         .unwrap();
 
-        let mut always_serializer = CsvSerializerConfig::new(CsvSerializerOptions {
+        CsvSerializerConfig::new(CsvSerializerOptions {
             fields: fields.clone(),
             quote_style: QuoteStyle::Always,
             ..Default::default()
         })
         .build()
+        .unwrap()
+        .encode(event.clone(), &mut always_bytes)
         .unwrap();
 
-        let mut non_numeric_serializer = CsvSerializerConfig::new(CsvSerializerOptions {
+        CsvSerializerConfig::new(CsvSerializerOptions {
             fields: fields.clone(),
             quote_style: QuoteStyle::NonNumeric,
             ..Default::default()
         })
         .build()
+        .unwrap()
+        .encode(event.clone(), &mut non_numeric_bytes)
         .unwrap();
-
-        default_serializer
-            .encode(event.clone(), &mut default_bytes)
-            .unwrap();
-        never_serializer
-            .encode(event.clone(), &mut never_bytes)
-            .unwrap();
-        always_serializer
-            .encode(event.clone(), &mut always_bytes)
-            .unwrap();
-        non_numeric_serializer
-            .encode(event.clone(), &mut non_numeric_bytes)
-            .unwrap();
 
         assert_eq!(
             default_bytes.freeze(),
@@ -559,5 +554,23 @@ mod tests {
         serializer.encode(event, &mut bytes).unwrap();
 
         assert_eq!(bytes.freeze(), b"foo bar".as_slice());
+    }
+
+    #[test]
+    fn multiple_events() {
+        let (fields, event1) = make_event_with_fields(vec![("field1", "foo\"")]);
+        let (_, event2) = make_event_with_fields(vec![("field1", "\"bar")]);
+        let opts = CsvSerializerOptions {
+            fields,
+            ..Default::default()
+        };
+        let config = CsvSerializerConfig::new(opts);
+        let mut serializer = config.build().unwrap();
+        let mut bytes = BytesMut::new();
+
+        serializer.encode(event1, &mut bytes).unwrap();
+        serializer.encode(event2, &mut bytes).unwrap();
+
+        assert_eq!(bytes.freeze(), b"\"foo\"\"\"\"\"bar\"".as_slice());
     }
 }
