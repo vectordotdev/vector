@@ -31,6 +31,19 @@ message MetricPayload {
         string name = 2;
     }
 
+    message Origin {
+        uint32 product = 1;
+        uint32 service = 2;
+        uint32 metric_type = 3;
+        uint32 origin_product = 4;
+        uint32 origin_category = 5;
+        uint32 origin_service = 6;
+    }
+
+    message Metadata {
+        Origin origin = 1;
+    }
+
     message MetricSeries {
         repeated Resource resources = 1;
         string metric = 2;
@@ -40,7 +53,7 @@ message MetricPayload {
         string unit = 6;
         string source_type_name = 7;
         int64 interval = 8;
-        reserved 9;
+        Metadata metadata = 9;
     }
     repeated MetricSeries series = 1;
 }
@@ -73,7 +86,8 @@ message SketchPayload {
 		string host = 2;
 		repeated Distribution distributions = 3;
 		repeated string tags = 4;
-		reserved 5, 6;
+                reserved 5, 6;
+				reserved "distributionsK", "distributionsC";
 		repeated Dogsketch dogsketches = 7;
 	}
 	repeated Sketch sketches = 1;

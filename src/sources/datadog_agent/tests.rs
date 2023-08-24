@@ -1885,6 +1885,7 @@ async fn decode_series_endpoint_v2() {
                 unit: "".to_string(),
                 source_type_name: "a_random_source_type_name".to_string(),
                 interval: 0,
+                metadata: None,
             },
             ddmetric_proto::metric_payload::MetricSeries {
                 resources: vec![ddmetric_proto::metric_payload::Resource {
@@ -1901,6 +1902,7 @@ async fn decode_series_endpoint_v2() {
                 unit: "".to_string(),
                 source_type_name: "another_random_source_type_name".to_string(),
                 interval: 10,
+                metadata: None,
             },
             ddmetric_proto::metric_payload::MetricSeries {
                 resources: vec![ddmetric_proto::metric_payload::Resource {
@@ -1917,6 +1919,16 @@ async fn decode_series_endpoint_v2() {
                 unit: "".to_string(),
                 source_type_name: "a_very_random_source_type_name".to_string(),
                 interval: 0,
+                metadata: Some(ddmetric_proto::metric_payload::Metadata {
+                    origin: Some(ddmetric_proto::metric_payload::Origin {
+                        product: 0,
+                        service: 0,
+                        metric_type: 0,
+                        origin_product: 10,
+                        origin_category: 10,
+                        origin_service: 42,
+                    }),
+                }),
             },
         ];
 
@@ -2057,6 +2069,34 @@ async fn decode_series_endpoint_v2() {
             assert_eq!(
                 &events[3].metadata().datadog_api_key().as_ref().unwrap()[..],
                 "12345678abcdefgh12345678abcdefgh"
+            );
+
+            assert_eq!(
+                events[3]
+                    .metadata()
+                    .datadog_origin_metadata()
+                    .unwrap()
+                    .product()
+                    .unwrap(),
+                10
+            );
+            assert_eq!(
+                events[3]
+                    .metadata()
+                    .datadog_origin_metadata()
+                    .unwrap()
+                    .category()
+                    .unwrap(),
+                10
+            );
+            assert_eq!(
+                events[3]
+                    .metadata()
+                    .datadog_origin_metadata()
+                    .unwrap()
+                    .service()
+                    .unwrap(),
+                42
             );
         }
     })

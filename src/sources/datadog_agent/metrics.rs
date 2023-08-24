@@ -8,7 +8,11 @@ use serde::{Deserialize, Serialize};
 use warp::{filters::BoxedFilter, path, path::FullPath, reply::Response, Filter};
 
 use vector_common::internal_event::{CountByteSize, InternalEventHandle as _, Registered};
-use vector_core::{metrics::AgentDDSketch, EstimatedJsonEncodedSizeOf};
+use vector_core::{
+    event::{DatadogMetricOriginMetadata, EventMetadata},
+    metrics::AgentDDSketch,
+    EstimatedJsonEncodedSizeOf,
+};
 
 use crate::{
     common::datadog::{DatadogMetricType, DatadogSeriesMetric},
@@ -228,7 +232,7 @@ fn decode_datadog_series_v2(
     Ok(metrics)
 }
 
-fn decode_with_unknown_origin(frame: &Bytes) {
+fn _decode_with_unknown_origin(frame: &Bytes) {
     use protofish::decode::UnknownValue;
     use protofish::prelude::*;
 
@@ -388,11 +392,34 @@ fn decode_with_unknown_origin(frame: &Bytes) {
     }
 }
 
+/// Builds Vector's `EventMetadata` from the series' metadata. Currently this is only
+/// utilized for passing through origin metadata set by the Agent.
+fn get_event_metadata(metadata: Option<&metric_payload::Metadata>) -> EventMetadata {
+    metadata.map_or(EventMetadata::default(), |metadata| {
+        metadata
+            .origin
+            .as_ref()
+            .map_or(EventMetadata::default(), |origin| {
+                // TODO remove
+                println!(
+                    "origin_product: `{}` origin_category: `{}` origin_service: `{}`",
+                    origin.origin_product, origin.origin_category, origin.origin_service
+                );
+                EventMetadata::default().with_origin_metadata(
+                    DatadogMetricOriginMetadata::default()
+                        .with_product(origin.origin_product)
+                        .with_category(origin.origin_category)
+                        .with_service(origin.origin_service),
+                )
+            })
+    })
+}
+
 pub(crate) fn decode_ddseries_v2(
     frame: Bytes,
     api_key: &Option<Arc<str>>,
 ) -> crate::Result<Vec<Event>> {
-    decode_with_unknown_origin(&frame);
+    // decode_with_unknown_origin(&frame);
 
     let payload = MetricPayload::decode(frame)?;
     let decoded_metrics: Vec<Event> = payload
@@ -401,6 +428,8 @@ pub(crate) fn decode_ddseries_v2(
         .flat_map(|serie| {
             let (namespace, name) = namespace_name_from_dd_metric(&serie.metric);
             let mut tags = into_metric_tags(serie.tags);
+
+            let event_metadata = get_event_metadata(serie.metadata.as_ref());
 
             serie.resources.into_iter().for_each(|r| {
                 // As per https://github.com/DataDog/datadog-agent/blob/a62ac9fb13e1e5060b89e731b8355b2b20a07c5b/pkg/serializer/internal/metrics/iterable_series.go#L180-L189
@@ -423,12 +452,13 @@ pub(crate) fn decode_ddseries_v2(
                     .points
                     .iter()
                     .map(|dd_point| {
-                        Metric::new(
+                        Metric::new_with_metadata(
                             name.to_string(),
                             MetricKind::Incremental,
                             MetricValue::Counter {
                                 value: dd_point.value,
                             },
+                            event_metadata.clone(),
                         )
                         .with_timestamp(Some(
                             Utc.timestamp_opt(dd_point.timestamp, 0)
@@ -443,12 +473,13 @@ pub(crate) fn decode_ddseries_v2(
                     .points
                     .iter()
                     .map(|dd_point| {
-                        Metric::new(
+                        Metric::new_with_metadata(
                             name.to_string(),
                             MetricKind::Absolute,
                             MetricValue::Gauge {
                                 value: dd_point.value,
                             },
+                            event_metadata.clone(),
                         )
                         .with_timestamp(Some(
                             Utc.timestamp_opt(dd_point.timestamp, 0)
@@ -467,12 +498,13 @@ pub(crate) fn decode_ddseries_v2(
                             .filter(|v| *v != 0)
                             .map(|v| v as u32)
                             .unwrap_or(1);
-                        Metric::new(
+                        Metric::new_with_metadata(
                             name.to_string(),
                             MetricKind::Incremental,
                             MetricValue::Counter {
                                 value: dd_point.value * (i as f64),
                             },
+                            event_metadata.clone(),
                         )
                         .with_timestamp(Some(
                             Utc.timestamp_opt(dd_point.timestamp, 0)
@@ -495,7 +527,6 @@ pub(crate) fn decode_ddseries_v2(
             if let Some(k) = &api_key {
                 metric.metadata_mut().set_datadog_api_key(Arc::clone(k));
             }
-
             metric.into()
         })
         .collect();
