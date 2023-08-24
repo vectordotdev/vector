@@ -476,6 +476,9 @@ gcp = ["dep:base64", "dep:goauth", "dep:smpl_jwt"]
 enrichment-tables = ["enrichment-tables-geoip"]
 enrichment-tables-geoip = ["dep:maxminddb"]
 
+# Codecs
+codecs-syslog = ["codecs/syslog"]
+
 # Sources
 sources = ["sources-logs", "sources-metrics"]
 sources-logs = [
@@ -559,7 +562,7 @@ sources-socket = ["sources-utils-net", "tokio-util/net"]
 sources-splunk_hec = ["dep:roaring"]
 sources-statsd = ["sources-utils-net", "tokio-util/net"]
 sources-stdin = ["tokio-util/io"]
-sources-syslog = ["codecs/syslog", "sources-utils-net", "tokio-util/net"]
+sources-syslog = ["codecs-syslog", "sources-utils-net", "tokio-util/net"]
 sources-utils-http = ["dep:snap", "sources-utils-http-auth", "sources-utils-http-encoding", "sources-utils-http-error", "sources-utils-http-prelude"]
 sources-utils-http-auth = ["sources-utils-http-error"]
 sources-utils-http-encoding = ["dep:snap", "sources-utils-http-error"]
