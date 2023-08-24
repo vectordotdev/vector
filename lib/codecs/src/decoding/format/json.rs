@@ -1,5 +1,3 @@
-use std::convert::TryInto;
-
 use bytes::Bytes;
 use chrono::Utc;
 use derivative::Derivative;
@@ -122,9 +120,9 @@ impl Deserializer for JsonDeserializer {
         let mut events = match json {
             serde_json::Value::Array(values) => values
                 .into_iter()
-                .map(TryInto::try_into)
+                .map(|json| Event::from_json_value(json, log_namespace))
                 .collect::<Result<SmallVec<[Event; 1]>, _>>()?,
-            _ => smallvec![json.try_into()?],
+            _ => smallvec![Event::from_json_value(json, log_namespace)?],
         };
 
         let events = match log_namespace {
@@ -160,6 +158,7 @@ impl From<&JsonDeserializerConfig> for JsonDeserializer {
 #[cfg(test)]
 mod tests {
     use vector_core::config::log_schema;
+    use vrl::core::Value;
 
     use super::*;
 
@@ -188,6 +187,22 @@ mod tests {
 
             assert_eq!(events.next(), None);
         }
+    }
+
+    #[test]
+    fn deserialize_non_object_vector_namespace() {
+        let input = Bytes::from(r#"null"#);
+        let deserializer = JsonDeserializer::default();
+
+        let namespace = LogNamespace::Vector;
+        let events = deserializer.parse(input.clone(), namespace).unwrap();
+        let mut events = events.into_iter();
+
+        let event = events.next().unwrap();
+        let log = event.as_log();
+        assert_eq!(log["."], Value::Null);
+
+        assert_eq!(events.next(), None);
     }
 
     #[test]

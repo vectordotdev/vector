@@ -1024,8 +1024,11 @@ mod tests {
 
     #[test]
     fn remap_timezone_fallback() {
-        let error =
-            Event::try_from(serde_json::json!({"timestamp": "2022-12-27 00:00:00"})).unwrap();
+        let error = Event::from_json_value(
+            serde_json::json!({"timestamp": "2022-12-27 00:00:00"}),
+            LogNamespace::Legacy,
+        )
+        .unwrap();
         let conf = RemapConfig {
             source: Some(formatdoc! {r#"
                 .timestamp = parse_timestamp!(.timestamp, format: "%Y-%m-%d %H:%M:%S")
@@ -1058,8 +1061,11 @@ mod tests {
 
     #[test]
     fn remap_timezone_override() {
-        let error =
-            Event::try_from(serde_json::json!({"timestamp": "2022-12-27 00:00:00"})).unwrap();
+        let error = Event::from_json_value(
+            serde_json::json!({"timestamp": "2022-12-27 00:00:00"}),
+            LogNamespace::Legacy,
+        )
+        .unwrap();
         let conf = RemapConfig {
             source: Some(formatdoc! {r#"
                 .timestamp = parse_timestamp!(.timestamp, format: "%Y-%m-%d %H:%M:%S")
@@ -1093,9 +1099,16 @@ mod tests {
 
     #[test]
     fn check_remap_branching() {
-        let happy = Event::try_from(serde_json::json!({"hello": "world"})).unwrap();
-        let abort = Event::try_from(serde_json::json!({"hello": "goodbye"})).unwrap();
-        let error = Event::try_from(serde_json::json!({"hello": 42})).unwrap();
+        let happy =
+            Event::from_json_value(serde_json::json!({"hello": "world"}), LogNamespace::Legacy)
+                .unwrap();
+        let abort = Event::from_json_value(
+            serde_json::json!({"hello": "goodbye"}),
+            LogNamespace::Legacy,
+        )
+        .unwrap();
+        let error =
+            Event::from_json_value(serde_json::json!({"hello": 42}), LogNamespace::Legacy).unwrap();
 
         let happy_metric = {
             let mut metric = Metric::new(
@@ -1287,9 +1300,9 @@ mod tests {
     #[test]
     fn check_remap_branching_assert_with_message() {
         let error_trigger_assert_custom_message =
-            Event::try_from(serde_json::json!({"hello": 42})).unwrap();
+            Event::from_json_value(serde_json::json!({"hello": 42}), LogNamespace::Legacy).unwrap();
         let error_trigger_default_assert_message =
-            Event::try_from(serde_json::json!({"hello": 0})).unwrap();
+            Event::from_json_value(serde_json::json!({"hello": 0}), LogNamespace::Legacy).unwrap();
         let conf = RemapConfig {
             source: Some(formatdoc! {r#"
                 assert_eq!(.hello, 0, "custom message here")
@@ -1349,7 +1362,8 @@ mod tests {
 
     #[test]
     fn check_remap_branching_abort_with_message() {
-        let error = Event::try_from(serde_json::json!({"hello": 42})).unwrap();
+        let error =
+            Event::from_json_value(serde_json::json!({"hello": 42}), LogNamespace::Legacy).unwrap();
         let conf = RemapConfig {
             source: Some(formatdoc! {r#"
                 abort "custom message here"
@@ -1387,9 +1401,16 @@ mod tests {
 
     #[test]
     fn check_remap_branching_disabled() {
-        let happy = Event::try_from(serde_json::json!({"hello": "world"})).unwrap();
-        let abort = Event::try_from(serde_json::json!({"hello": "goodbye"})).unwrap();
-        let error = Event::try_from(serde_json::json!({"hello": 42})).unwrap();
+        let happy =
+            Event::from_json_value(serde_json::json!({"hello": "world"}), LogNamespace::Legacy)
+                .unwrap();
+        let abort = Event::from_json_value(
+            serde_json::json!({"hello": "goodbye"}),
+            LogNamespace::Legacy,
+        )
+        .unwrap();
+        let error =
+            Event::from_json_value(serde_json::json!({"hello": 42}), LogNamespace::Legacy).unwrap();
 
         let conf = RemapConfig {
             source: Some(formatdoc! {r#"
