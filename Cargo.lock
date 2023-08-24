@@ -172,16 +172,15 @@ dependencies = [
 
 [[package]]
 name = "anstream"
-version = "0.3.2"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0ca84f3628370c59db74ee214b3263d58f9aadd9b4fe7e711fd87dc452b7f163"
+checksum = "b1f58811cfac344940f1a400b6e6231ce35171f614f26439e80f8c1465c5cc0c"
 dependencies = [
  "anstyle 1.0.0",
  "anstyle-parse",
  "anstyle-query",
  "anstyle-wincon",
  "colorchoice",
- "is-terminal",
  "utf8parse",
 ]
 
@@ -217,9 +216,9 @@ dependencies = [
 
 [[package]]
 name = "anstyle-wincon"
-version = "1.0.1"
+version = "2.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "180abfa45703aebe0093f79badacc01b8fd4ea2e35118747e5811127f926e188"
+checksum = "58f54d10c6dfa51283a066ceab3ec1ab78d13fae00aa49243a45e4571fb79dfd"
 dependencies = [
  "anstyle 1.0.0",
  "windows-sys 0.48.0",
@@ -2062,9 +2061,9 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "4.3.24"
+version = "4.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fb690e81c7840c0d7aade59f242ea3b41b9bc27bcd5997890e7702ae4b32e487"
+checksum = "1d5f1946157a96594eb2d2c10eb7ad9a2b27518cb3000209dec700c35df9197d"
 dependencies = [
  "clap_builder",
  "clap_derive",
@@ -2077,15 +2076,15 @@ version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1eef05769009513df2eb1c3b4613e7fad873a14c600ff025b08f250f59fee7de"
 dependencies = [
- "clap 4.3.24",
+ "clap 4.4.0",
  "log",
 ]
 
 [[package]]
 name = "clap_builder"
-version = "4.3.24"
+version = "4.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5ed2e96bc16d8d740f6f48d663eddf4b8a0983e79210fd55479b7bcd0a69860e"
+checksum = "78116e32a042dd73c2901f0dc30790d20ff3447f3e3472fad359e8c3d282bcd6"
 dependencies = [
  "anstream",
  "anstyle 1.0.0",
@@ -2100,14 +2099,14 @@ version = "4.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "586a385f7ef2f8b4d86bddaa0c094794e7ccbfe5ffef1f434fe928143fc783a5"
 dependencies = [
- "clap 4.3.24",
+ "clap 4.4.0",
 ]
 
 [[package]]
 name = "clap_derive"
-version = "4.3.12"
+version = "4.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "54a9bb5758fc5dfe728d1019941681eccaf0cf8a4189b692a0ee2f2ecf90a050"
+checksum = "c9fd1a5729c4548118d7d70ff234a44868d00489a4b6597b0b020918a0e91a1a"
 dependencies = [
  "heck 0.4.1",
  "proc-macro2 1.0.66",
@@ -2405,7 +2404,7 @@ dependencies = [
  "anes",
  "cast",
  "ciborium",
- "clap 4.3.24",
+ "clap 4.4.0",
  "criterion-plot",
  "futures 0.3.28",
  "is-terminal",
@@ -9379,7 +9378,7 @@ dependencies = [
  "atty",
  "cached",
  "chrono",
- "clap 4.3.24",
+ "clap 4.4.0",
  "clap-verbosity-flag",
  "clap_complete",
  "confy",
@@ -9456,7 +9455,7 @@ dependencies = [
  "bytesize",
  "chrono",
  "cidr-utils",
- "clap 4.3.24",
+ "clap 4.4.0",
  "codecs",
  "colored",
  "console-subscriber",
@@ -9616,7 +9615,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "chrono",
- "clap 4.3.24",
+ "clap 4.4.0",
  "futures 0.3.28",
  "graphql_client",
  "indoc",
@@ -9639,7 +9638,7 @@ dependencies = [
  "async-trait",
  "bytecheck",
  "bytes 1.4.0",
- "clap 4.3.24",
+ "clap 4.4.0",
  "crc32fast",
  "criterion",
  "crossbeam-queue",
@@ -9860,7 +9859,7 @@ dependencies = [
 name = "vector-vrl-cli"
 version = "0.1.0"
 dependencies = [
- "clap 4.3.24",
+ "clap 4.4.0",
  "vector-vrl-functions",
  "vrl",
 ]
@@ -9879,7 +9878,7 @@ dependencies = [
  "ansi_term",
  "chrono",
  "chrono-tz",
- "clap 4.3.24",
+ "clap 4.4.0",
  "enrichment",
  "glob",
  "prettydiff",
@@ -9939,7 +9938,7 @@ dependencies = [
  "chrono",
  "chrono-tz",
  "cidr-utils",
- "clap 4.3.24",
+ "clap 4.4.0",
  "codespan-reporting",
  "crypto_secretbox",
  "csv",
