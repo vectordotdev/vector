@@ -1890,4 +1890,55 @@ mod tests {
             outputs1[0].schema_definitions(true),
         );
     }
+
+    #[test]
+    fn check_remap_array_vector_namespace() {
+        let event = {
+            let mut event = LogEvent::from("input");
+            // mark the event as a "Vector" namespaced log
+            event
+                .metadata_mut()
+                .value_mut()
+                .insert("vector", BTreeMap::new());
+            Event::from(event)
+        };
+
+        let conf = RemapConfig {
+            source: Some(
+                r#". = [null]
+"#
+                .to_string(),
+            ),
+            file: None,
+            drop_on_error: true,
+            drop_on_abort: false,
+            ..Default::default()
+        };
+        let mut tform = remap(conf.clone()).unwrap();
+        let result = transform_one(&mut tform, event).unwrap();
+
+        // Legacy namespace nests this under "message", Vector should set it as the root
+        assert_eq!(result.as_log().get("."), Some(&Value::Null));
+
+        let enrichment_tables = enrichment::TableRegistry::default();
+        let outputs1 = conf.outputs(
+            enrichment_tables,
+            &[(
+                "in".into(),
+                schema::Definition::new_with_default_metadata(
+                    Kind::any_object(),
+                    [LogNamespace::Vector],
+                ),
+            )],
+            LogNamespace::Vector,
+        );
+
+        let wanted =
+            schema::Definition::new_with_default_metadata(Kind::null(), [LogNamespace::Vector]);
+
+        assert_eq!(
+            HashMap::from([(OutputId::from("in"), wanted)]),
+            outputs1[0].schema_definitions(true),
+        );
+    }
 }
