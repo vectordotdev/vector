@@ -14,7 +14,7 @@ use crate::{
     sinks::{
         prelude::*,
         util::{
-            http::{HttpResponse, HttpService, HttpStatusRetryLogic, RequestConfig},
+            http::{http_response_retry_logic, HttpService, RequestConfig},
             RealtimeSizeBasedDefaultBatchSettings, UriSerde,
         },
     },
@@ -288,11 +288,8 @@ impl SinkConfig for HttpSinkConfig {
 
         let request_limits = self.request.tower.unwrap_with(&Default::default());
 
-        let retry_logic =
-            HttpStatusRetryLogic::new(|req: &HttpResponse| req.http_response.status());
-
         let service = ServiceBuilder::new()
-            .settings(request_limits, retry_logic)
+            .settings(request_limits, http_response_retry_logic())
             .service(service);
 
         let sink = HttpSink::new(service, batch_settings, request_builder);
