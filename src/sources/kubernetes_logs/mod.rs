@@ -171,6 +171,10 @@ pub struct Config {
     #[configurable(metadata(docs::type_unit = "bytes"))]
     max_read_bytes: usize,
 
+    /// Instead of balancing read capacity fairly across all watched files, prioritize draining the oldest files before moving on to read data from younger files.
+    #[serde(default = "default_oldest_first")]
+    pub oldest_first: bool,
+
     /// The maximum number of bytes a line can contain before being discarded.
     ///
     /// This protects against malformed lines or tailing incorrect files.
@@ -264,6 +268,7 @@ impl Default for Config {
             read_from: default_read_from(),
             ignore_older_secs: None,
             max_read_bytes: default_max_read_bytes(),
+            oldest_first: default_oldest_first(),
             max_line_bytes: default_max_line_bytes(),
             fingerprint_lines: default_fingerprint_lines(),
             glob_minimum_cooldown_ms: default_glob_minimum_cooldown_ms(),
@@ -516,6 +521,7 @@ struct Source {
     read_from: ReadFrom,
     ignore_older_secs: Option<u64>,
     max_read_bytes: usize,
+    oldest_first: bool,
     max_line_bytes: usize,
     fingerprint_lines: usize,
     glob_minimum_cooldown: Duration,
@@ -593,6 +599,7 @@ impl Source {
             read_from: ReadFrom::from(config.read_from),
             ignore_older_secs: config.ignore_older_secs,
             max_read_bytes: config.max_read_bytes,
+            oldest_first: config.oldest_first,
             max_line_bytes: config.max_line_bytes,
             fingerprint_lines: config.fingerprint_lines,
             glob_minimum_cooldown,
@@ -624,6 +631,7 @@ impl Source {
             read_from,
             ignore_older_secs,
             max_read_bytes,
+            oldest_first,
             max_line_bytes,
             fingerprint_lines,
             glob_minimum_cooldown,
@@ -763,9 +771,7 @@ impl Source {
                 max_line_length: max_line_bytes,
                 ignore_not_found: true,
             },
-            // We'd like to consume rotated pod log files first to release our file handle and let
-            // the space be reclaimed
-            oldest_first: true,
+            oldest_first,
             // We do not remove the log files, `kubelet` is responsible for it.
             remove_after: None,
             // The standard emitter.
@@ -942,6 +948,12 @@ fn default_path_exclusion() -> Vec<PathBuf> {
 
 const fn default_max_read_bytes() -> usize {
     2048
+}
+
+// We'd like to consume rotated pod log files first to release our file handle and let
+// the space be reclaimed
+const fn default_oldest_first() -> bool {
+    true
 }
 
 const fn default_max_line_bytes() -> usize {

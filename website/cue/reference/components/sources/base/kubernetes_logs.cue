@@ -209,6 +209,11 @@ base: components: sources: kubernetes_logs: configuration: {
 			}
 		}
 	}
+	oldest_first: {
+		description: "Instead of balancing read capacity fairly across all watched files, prioritize draining the oldest files before moving on to read data from younger files."
+		required:    false
+		type: bool: default: true
+	}
 	pod_annotation_fields: {
 		description: "Configuration for how the events are enriched with Pod metadata."
 		required:    false
