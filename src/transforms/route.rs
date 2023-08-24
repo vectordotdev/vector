@@ -189,8 +189,9 @@ mod test {
     #[test]
     fn route_pass_all_route_conditions() {
         let output_names = vec!["first", "second", "third", UNMATCHED_ROUTE];
-        let event = Event::try_from(
+        let event = Event::from_json_value(
             serde_json::json!({"message": "hello world", "second": "second", "third": "third"}),
+            LogNamespace::Legacy,
         )
         .unwrap();
         let config = toml::from_str::<RouteConfig>(
@@ -234,7 +235,11 @@ mod test {
     #[test]
     fn route_pass_one_route_condition() {
         let output_names = vec!["first", "second", "third", UNMATCHED_ROUTE];
-        let event = Event::try_from(serde_json::json!({"message": "hello world"})).unwrap();
+        let event = Event::from_json_value(
+            serde_json::json!({"message": "hello world"}),
+            LogNamespace::Legacy,
+        )
+        .unwrap();
         let config = toml::from_str::<RouteConfig>(
             r#"
             route.first.type = "vrl"
@@ -275,7 +280,9 @@ mod test {
     #[test]
     fn route_pass_no_route_condition() {
         let output_names = vec!["first", "second", "third", UNMATCHED_ROUTE];
-        let event = Event::try_from(serde_json::json!({"message": "NOPE"})).unwrap();
+        let event =
+            Event::from_json_value(serde_json::json!({"message": "NOPE"}), LogNamespace::Legacy)
+                .unwrap();
         let config = toml::from_str::<RouteConfig>(
             r#"
             route.first.type = "vrl"
@@ -316,7 +323,9 @@ mod test {
     #[test]
     fn route_no_unmatched_output() {
         let output_names = vec!["first", "second", "third", UNMATCHED_ROUTE];
-        let event = Event::try_from(serde_json::json!({"message": "NOPE"})).unwrap();
+        let event =
+            Event::from_json_value(serde_json::json!({"message": "NOPE"}), LogNamespace::Legacy)
+                .unwrap();
         let config = toml::from_str::<RouteConfig>(
             r#"
             reroute_unmatched = false
