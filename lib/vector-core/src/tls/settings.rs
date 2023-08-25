@@ -351,7 +351,7 @@ impl TlsConfig {
             None => Ok(None),
             Some(protocols) => {
                 let mut data: Vec<u8> = Vec::new();
-                for str in protocols.iter() {
+                for str in protocols {
                     data.push(str.len().try_into().context(EncodeAlpnProtocolsSnafu)?);
                     data.append(&mut str.clone().into_bytes());
                 }

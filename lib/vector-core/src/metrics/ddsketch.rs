@@ -882,7 +882,7 @@ impl BinMap {
             Some(
                 self.keys
                     .into_iter()
-                    .zip(self.counts.into_iter())
+                    .zip(self.counts)
                     .map(|(k, n)| Bin { k, n })
                     .collect(),
             )

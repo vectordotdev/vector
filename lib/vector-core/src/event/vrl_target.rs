@@ -1246,16 +1246,14 @@ mod test {
             MetricValue::Counter { value: 1.23 },
         );
 
-        let validpaths_get = vec![
-            ".name",
+        let validpaths_get = [".name",
             ".namespace",
             ".timestamp",
             ".kind",
             ".tags",
-            ".type",
-        ];
+            ".type"];
 
-        let validpaths_set = vec![".name", ".namespace", ".timestamp", ".kind", ".tags"];
+        let validpaths_set = [".name", ".namespace", ".timestamp", ".kind", ".tags"];
 
         let info = ProgramInfo {
             fallible: false,
