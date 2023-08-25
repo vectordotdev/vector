@@ -210,7 +210,7 @@ impl TlsSettings {
     ///
     /// # Panics
     ///
-    /// Panics if the identiy is invalid.
+    /// Panics if the identity is invalid.
     fn identity(&self) -> Option<ParsedPkcs12_2> {
         // This data was test-built previously, so we can just use it
         // here and expect the results will not fail. This can all be
@@ -224,11 +224,11 @@ impl TlsSettings {
         })
     }
 
-    /// Returns the identiy as PEM data
+    /// Returns the identity as PEM data
     ///
     /// # Panics
     ///
-    /// Panics if the identiy is missing, invalid, or the authorities to chain are invalid.
+    /// Panics if the identity is missing, invalid, or the authorities to chain are invalid.
     pub fn identity_pem(&self) -> Option<(Vec<u8>, Vec<u8>)> {
         self.identity().map(|identity| {
             let mut cert = identity
