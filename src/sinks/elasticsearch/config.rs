@@ -194,7 +194,7 @@ fn default_doc_type() -> String {
 }
 
 fn query_examples() -> HashMap<String, String> {
-    HashMap::<_, _>::from_iter([("X-Powered-By".to_owned(), "Vector".to_owned())].into_iter())
+    HashMap::<_, _>::from_iter([("X-Powered-By".to_owned(), "Vector".to_owned())])
 }
 
 impl Default for ElasticsearchConfig {

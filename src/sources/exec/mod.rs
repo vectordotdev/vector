@@ -197,8 +197,7 @@ fn environment_examples() -> HashMap<String, String> {
             ("LANG".to_owned(), "es_ES.UTF-8".to_owned()),
             ("TZ".to_owned(), "Etc/UTC".to_owned()),
             ("PATH".to_owned(), "/bin:/usr/bin:/usr/local/bin".to_owned()),
-        ]
-        .into_iter(),
+        ],
     )
 }
 

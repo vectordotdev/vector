@@ -130,8 +130,7 @@ fn example_tags() -> HashMap<String, String> {
             ("Project".to_string(), "Blue".to_string()),
             ("Classification".to_string(), "confidential".to_string()),
             ("PHI".to_string(), "True".to_string()),
-        ]
-        .into_iter(),
+        ],
     )
 }
 

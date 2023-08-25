@@ -666,7 +666,7 @@ mod tests {
         // Services future will be spawned and work between `yield_now` calls.
         let svc = tower::service_fn(|req: Vec<Request>| async move {
             let duration = match req[0].0 {
-                1 | 2 | 3 => Duration::from_secs(1),
+                1..=3 => Duration::from_secs(1),
 
                 // The 4th request will introduce some sort of
                 // latency spike to ensure later events don't

@@ -216,8 +216,7 @@ fn matches_examples() -> HashMap<String, Vec<String>> {
                 vec!["sshd.service".to_owned(), "ntpd.service".to_owned()],
             ),
             ("_TRANSPORT".to_owned(), vec!["kernel".to_owned()]),
-        ]
-        .into_iter(),
+        ],
     )
 }
 

@@ -564,8 +564,7 @@ fn headers_examples() -> IndexMap<String, String> {
         [
             ("Accept".to_owned(), "text/plain".to_owned()),
             ("X-My-Custom-Header".to_owned(), "A-Value".to_owned()),
-        ]
-        .into_iter(),
+        ],
     )
 }
 

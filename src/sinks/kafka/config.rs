@@ -136,8 +136,7 @@ fn example_librdkafka_options() -> HashMap<String, String> {
             ("client.id".to_string(), "${ENV_VAR}".to_string()),
             ("fetch.error.backoff.ms".to_string(), "1000".to_string()),
             ("socket.send.buffer.bytes".to_string(), "100".to_string()),
-        ]
-        .into_iter(),
+        ],
     )
 }
 

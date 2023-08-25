@@ -131,8 +131,7 @@ fn query_examples() -> HashMap<String, Vec<String>> {
                 "fruit".to_owned(),
                 vec!["mango".to_owned(), "papaya".to_owned(), "kiwi".to_owned()],
             ),
-        ]
-        .into_iter(),
+        ],
     )
 }
 
@@ -152,8 +151,7 @@ fn headers_examples() -> HashMap<String, Vec<String>> {
                     "values".to_owned(),
                 ],
             ),
-        ]
-        .into_iter(),
+        ],
     )
 }
 
@@ -290,7 +288,7 @@ impl HttpClientContext {
         loop {
             match self.decoder.decode_eof(buf) {
                 Ok(Some((next, _))) => {
-                    events.extend(next.into_iter());
+                    events.extend(next);
                 }
                 Ok(None) => break,
                 Err(error) => {
