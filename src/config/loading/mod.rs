@@ -307,7 +307,7 @@ where
 #[cfg(not(windows))]
 fn default_config_paths() -> Vec<ConfigPath> {
     vec![ConfigPath::File(
-        "/etc/vector/vector.toml".into(),
+        "/etc/vector/vector.yaml".into(),
         Some(Format::Toml),
     )]
 }

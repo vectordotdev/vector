@@ -112,7 +112,7 @@ The components coming from the pipeline will be cloned inside the final `Config`
 For example, the following configuration and pipeline, and its **equivalent** once built.
 
 ```toml
-# /etc/vector/vector.toml
+# /etc/vector/vector.yaml
 [sources.in]
 # ...
 

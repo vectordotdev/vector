@@ -711,7 +711,7 @@ configuration: {
 			title: "Location"
 			body: """
 				The location of your Vector configuration file depends on your installation method. For most Linux
-				based systems, the file can be found at `/etc/vector/vector.toml`.
+				based systems, the file can be found at `/etc/vector/vector.yaml`.
 
 				All files in `/etc/vector` are user configuration files and can be safely overridden to craft your
 				desired Vector configuration.

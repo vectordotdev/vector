@@ -86,7 +86,7 @@ supports JSON and YAML.
 To start Vector using this topology:
 
 ```bash
-vector --config-toml /etc/vector/vector.toml
+vector --config-toml /etc/vector/vector.yaml
 ```
 
 You should see lines like this emitted via stdout (formatted for readability

@@ -44,7 +44,7 @@ source $HOME/.profile
 Start Vector:
 
 ```shell
-vector --config config/vector.toml
+vector --config config/vector.yaml
 ```
 
 ### Linux (ARMv7)
@@ -79,7 +79,7 @@ source $HOME/.profile
 Start Vector:
 
 ```shell
-vector --config config/vector.toml
+vector --config config/vector.yaml
 ```
 
 ### macoS (x86_64)
@@ -114,7 +114,7 @@ source $HOME/.profile
 Start Vector:
 
 ```shell
-vector --config config/vector.toml
+vector --config config/vector.yaml
 ```
 
 ### Windows (x86_64)
@@ -180,7 +180,7 @@ source $HOME/.profile
 Start Vector:
 
 ```shell
-vector --config config/vector.toml
+vector --config config/vector.yaml
 ```
 
 ## Next steps
@@ -190,7 +190,7 @@ vector --config config/vector.toml
 The Vector configuration file is located at:
 
 ```shell
-config/vector.toml
+config/vector.yaml
 ```
 
 Example configurations are located in `config/vector/examples/*`. You can learn more about configuring Vector in the [Configuration] documentation.

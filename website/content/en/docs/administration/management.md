@@ -23,7 +23,7 @@ To manage the Vector executable directly, without a process manager:
 {{< tab title="Start" >}}
 
 ```bash
-vector --config /etc/vector/vector.toml
+vector --config /etc/vector/vector.yaml
 
 # Or supply a JSON or YAML config file
 ```
@@ -147,7 +147,7 @@ If you're running Vector using [Docker], the command interface is the same acros
 ```bash
 docker run \
   -d \
-  -v ~/vector.toml:/etc/vector/vector.toml:ro \
+  -v ~/vector.toml:/etc/vector/vector.yaml:ro \
   -p 8686:8686 \
   timberio/vector:{{< version >}}-alpine
 ```
