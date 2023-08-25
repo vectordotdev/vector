@@ -13,7 +13,7 @@ use snafu::{ResultExt, Snafu};
 use vector_common::request_metadata::GroupedCountByteSize;
 use vector_core::{
     config::{log_schema, telemetry, LogSchema},
-    event::{metric::MetricSketch, Metric, MetricTags, MetricValue},
+    event::{metric::MetricSketch, DatadogMetricOriginMetadata, Metric, MetricTags, MetricValue},
     metrics::AgentDDSketch,
     EstimatedJsonEncodedSizeOf,
 };
@@ -22,7 +22,9 @@ use super::config::{
     DatadogMetricsEndpoint, MAXIMUM_PAYLOAD_COMPRESSED_SIZE, MAXIMUM_PAYLOAD_SIZE,
 };
 use crate::{
-    common::datadog::{DatadogMetricType, DatadogPoint, DatadogSeriesMetric},
+    common::datadog::{
+        DatadogMetricType, DatadogPoint, DatadogSeriesMetric, DatadogSeriesMetricMetadata,
+    },
     proto::fds::protobuf_descriptors,
     sinks::util::{encode_namespace, request_builder::EncodeResult, Compression, Compressor},
 };
@@ -509,6 +511,39 @@ fn generate_series_metrics(
 ) -> Result<Vec<DatadogSeriesMetric>, EncoderError> {
     let name = get_namespaced_name(metric, default_namespace);
 
+    // TODO we actually dont have that in the metadata yet :/ need to add
+    // let vector_source_type = metric.metadata().source_type();
+
+    let origin_metadata = metric.metadata().datadog_origin_metadata();
+
+    // either a vector source or a transform has set the origin metadata already.
+    let metadata = if let Some(pass_through_metadata) = origin_metadata {
+        Some(DatadogSeriesMetricMetadata {
+            origin: Some(
+                DatadogMetricOriginMetadata::default()
+                    // product and category should both either be set or not set in this scenario.
+                    // if they are not set, it means the upstream vector component only set the service
+                    // and we need to set the product and category for vector.
+                    .with_product(pass_through_metadata.product().unwrap_or(14))
+                    .with_category(pass_through_metadata.category().unwrap_or(11))
+                    // The service should have been set by vector
+                    .with_service(pass_through_metadata.service().unwrap_or(0)),
+            ),
+        })
+
+    // no metadata has been set
+    } else {
+        // the agent didn't set anything, so we won't either to keep consistent behavior
+        // if vector_source_type == "datadog_agent" {
+        // }
+
+        // for the metric sources we care about, set the OriginProduct and OriginService
+        // {
+        //     todo!();
+        // }
+        None
+    };
+
     let mut tags = metric.tags().cloned().unwrap_or_default();
     let host = log_schema
         .host_key()
@@ -542,6 +577,7 @@ fn generate_series_metrics(
                 host,
                 source_type_name,
                 device,
+                metadata,
             }]
         }
         (MetricValue::Set { values }, _) => vec![DatadogSeriesMetric {
@@ -553,6 +589,7 @@ fn generate_series_metrics(
             host,
             source_type_name,
             device,
+            metadata,
         }],
         (MetricValue::Gauge { value }, _) => vec![DatadogSeriesMetric {
             metric: name,
@@ -563,6 +600,7 @@ fn generate_series_metrics(
             host,
             source_type_name,
             device,
+            metadata,
         }],
         (value, _) => {
             return Err(EncoderError::InvalidMetric {
