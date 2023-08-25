@@ -370,7 +370,7 @@ reqwest = { version = "0.11", features = ["json"] }
 tempfile = "3.6.0"
 test-generator = "0.3.1"
 tokio = { version = "1.32.0", features = ["test-util"] }
-tokio-test = "0.4.2"
+tokio-test = "0.4.3"
 tower-test = "0.4.0"
 vector-core = { path = "lib/vector-core", default-features = false, features = ["vrl", "test"] }
 vrl = { version = "0.6.0", features = ["cli", "test", "test_framework", "arbitrary"] }
