@@ -504,45 +504,93 @@ fn encode_timestamp(timestamp: Option<DateTime<Utc>>) -> i64 {
     }
 }
 
-fn generate_series_metrics(
-    metric: &Metric,
-    default_namespace: &Option<Arc<str>>,
-    log_schema: &'static LogSchema,
-) -> Result<Vec<DatadogSeriesMetric>, EncoderError> {
-    let name = get_namespaced_name(metric, default_namespace);
+fn source_type_to_service(source_type: &str) -> Option<u32> {
+    if source_type == "apache_metrics" {
+        Some(17)
+    } else if source_type == "aws_ecs_metrics" {
+        Some(209)
+    } else if source_type == "eventstoredb_metrics" {
+        Some(210)
+    } else if source_type == "host_metrics" {
+        Some(211)
+    } else if source_type == "internal_metrics" {
+        Some(212)
+    } else if source_type == "mongodb_metrics" {
+        Some(111)
+    } else if source_type == "nginx_metrics" {
+        Some(117)
+    } else if source_type == "open_telemetry" {
+        Some(213)
+    } else if source_type == "postgresql_metrics" {
+        Some(128)
+    } else if source_type == "prometheus_remote_write" {
+        Some(214)
+    } else if source_type == "prometheus_scrape" {
+        Some(215)
+    } else if source_type == "statsd" {
+        Some(153)
+    } else {
+        None
+    }
+}
+
+fn generate_series_metadata(
+    maybe_pass_through: Option<&DatadogMetricOriginMetadata>,
+    source_type: &str,
+) -> Option<DatadogSeriesMetricMetadata> {
+    let origin_product_value = option_env!("ORIGIN_PRODUCT")
+        .unwrap_or("14")
+        .parse::<u32>()
+        .expect("Env var ORIGIN_PRODUCT must be an unsigned 32 bit integer.");
+
+    let origin_category_value = 11;
+
+    let no_value = 0;
 
     // TODO we actually dont have that in the metadata yet :/ need to add
     // let vector_source_type = metric.metadata().source_type();
 
-    let origin_metadata = metric.metadata().datadog_origin_metadata();
-
     // either a vector source or a transform has set the origin metadata already.
-    let metadata = if let Some(pass_through_metadata) = origin_metadata {
+    if let Some(pass_through) = maybe_pass_through {
         Some(DatadogSeriesMetricMetadata {
             origin: Some(
                 DatadogMetricOriginMetadata::default()
                     // product and category should both either be set or not set in this scenario.
                     // if they are not set, it means the upstream vector component only set the service
                     // and we need to set the product and category for vector.
-                    .with_product(pass_through_metadata.product().unwrap_or(14))
-                    .with_category(pass_through_metadata.category().unwrap_or(11))
+                    .with_product(pass_through.product().unwrap_or(origin_product_value))
+                    .with_category(pass_through.category().unwrap_or(origin_category_value))
                     // The service should have been set by vector
-                    .with_service(pass_through_metadata.service().unwrap_or(0)),
+                    .with_service(pass_through.service().unwrap_or(no_value)),
             ),
         })
 
     // no metadata has been set
     } else {
-        // the agent didn't set anything, so we won't either to keep consistent behavior
-        // if vector_source_type == "datadog_agent" {
-        // }
+        // for the metric sources that need it, set the OriginProduct and OriginService
+        // NOTE: Intentionally not setting for the case where the Datadog Agent did not set,
+        //       in order to maintain consistent behavior.
+        if let Some(origin_service_value) = source_type_to_service(source_type) {
+            Some(DatadogSeriesMetricMetadata {
+                origin: Some(
+                    DatadogMetricOriginMetadata::default()
+                        .with_product(origin_product_value)
+                        .with_category(origin_category_value)
+                        .with_service(origin_service_value),
+                ),
+            })
+        } else {
+            None
+        }
+    }
+}
 
-        // for the metric sources we care about, set the OriginProduct and OriginService
-        // {
-        //     todo!();
-        // }
-        None
-    };
+fn generate_series_metrics(
+    metric: &Metric,
+    default_namespace: &Option<Arc<str>>,
+    log_schema: &'static LogSchema,
+) -> Result<Vec<DatadogSeriesMetric>, EncoderError> {
+    let name = get_namespaced_name(metric, default_namespace);
 
     let mut tags = metric.tags().cloned().unwrap_or_default();
     let host = log_schema
@@ -553,6 +601,12 @@ fn generate_series_metrics(
     let device = tags.remove("device");
     let ts = encode_timestamp(metric.timestamp());
     let tags = Some(encode_tags(&tags));
+
+    let event_metadata = metric.metadata();
+    let metadata = generate_series_metadata(
+        event_metadata.datadog_origin_metadata(),
+        event_metadata.source_type(),
+    );
 
     let results = match (metric.value(), metric.interval_ms()) {
         (MetricValue::Counter { value }, maybe_interval_ms) => {
