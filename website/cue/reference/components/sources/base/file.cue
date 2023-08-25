@@ -228,8 +228,14 @@ base: components: sources: file: configuration: {
 		}
 	}
 	max_read_bytes: {
-		description: "An approximate limit on the amount of data read from a single file at a given time."
-		required:    false
+		description: """
+			Max amount of bytes to read from a single file before switching over to the next file.
+			**Note:** This does not apply when `oldest_first` is `true.
+
+			This allows distributing the reads more or less evenly across
+			the files.
+			"""
+		required: false
 		type: uint: {
 			default: 2048
 			unit:    "bytes"

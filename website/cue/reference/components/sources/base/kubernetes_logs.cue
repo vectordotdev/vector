@@ -165,8 +165,8 @@ base: components: sources: kubernetes_logs: configuration: {
 	}
 	max_read_bytes: {
 		description: """
-			Max amount of bytes to read from a single file before switching over
-			to the next file.
+			Max amount of bytes to read from a single file before switching over to the next file.
+			**Note:** This does not apply when `oldest_first` is `true.
 
 			This allows distributing the reads more or less evenly across
 			the files.

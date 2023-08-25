@@ -163,8 +163,8 @@ pub struct Config {
     #[configurable(metadata(docs::human_name = "Ignore Files Older Than"))]
     ignore_older_secs: Option<u64>,
 
-    /// Max amount of bytes to read from a single file before switching over
-    /// to the next file.
+    /// Max amount of bytes to read from a single file before switching over to the next file.
+    /// **Note:** This does not apply when `oldest_first` is `true.
     ///
     /// This allows distributing the reads more or less evenly across
     /// the files.
