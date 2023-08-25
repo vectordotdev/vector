@@ -232,7 +232,7 @@ fn decode_datadog_series_v2(
     Ok(metrics)
 }
 
-/// Builds Vector's `EventMetadata` from the series' metadata. Currently this is only
+/// Builds Vector's `EventMetadata` from the received metadata. Currently this is only
 /// utilized for passing through origin metadata set by the Agent.
 fn get_event_metadata(metadata: Option<&Metadata>) -> EventMetadata {
     metadata.map_or(EventMetadata::default(), |metadata| {
@@ -240,7 +240,6 @@ fn get_event_metadata(metadata: Option<&Metadata>) -> EventMetadata {
             .origin
             .as_ref()
             .map_or(EventMetadata::default(), |origin| {
-                // TODO remove
                 debug!(
                     "Deserialized origin_product: `{}` origin_category: `{}` origin_service: `{}`",
                     origin.origin_product, origin.origin_category, origin.origin_service
