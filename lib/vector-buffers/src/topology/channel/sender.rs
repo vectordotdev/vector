@@ -201,7 +201,7 @@ impl<T: Bufferable> BufferSender<T> {
                     sent_to_base = false;
                     self.overflow
                         .as_mut()
-                        .expect("overflow must exist")
+                        .unwrap_or_else(|| unreachable!("overflow must exist"))
                         .send(item)
                         .await?;
                 }

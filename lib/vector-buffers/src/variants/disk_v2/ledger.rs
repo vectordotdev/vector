@@ -735,6 +735,6 @@ where
             )
             .field("writer_done", &self.writer_done.load(Ordering::Acquire))
             .field("last_flush", &self.last_flush.load())
-            .finish()
+            .finish_non_exhaustive()
     }
 }

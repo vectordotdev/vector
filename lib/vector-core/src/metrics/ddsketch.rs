@@ -643,7 +643,8 @@ impl AgentDDSketch {
             // generally enforced at the source level by converting from cumulative buckets, or
             // enforced by the internal structures that hold bucketed data i.e. Vector's internal
             // `Histogram` data structure used for collecting histograms from `metrics`.
-            let count = u32::try_from(bucket.count).expect("count range has already been checked.");
+            let count = u32::try_from(bucket.count)
+                .unwrap_or_else(|_| unreachable!("count range has already been checked."));
 
             self.insert_interpolate_bucket(lower, upper, count);
             lower = bucket.upper_limit;
