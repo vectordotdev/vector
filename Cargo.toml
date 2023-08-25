@@ -190,9 +190,9 @@ aws-smithy-types = { git = "https://github.com/vectordotdev/aws-sdk-rust", rev =
 
 # Azure
 azure_core = { version = "0.14", default-features = false, features = ["enable_reqwest"], optional = true }
-azure_identity = { version = "0.13", default-features = false, features = ["enable_reqwest"], optional = true }
-azure_storage = { version = "0.13", default-features = false, optional = true }
-azure_storage_blobs = { version = "0.13", default-features = false, optional = true }
+azure_identity = { version = "0.14", default-features = false, features = ["enable_reqwest"], optional = true }
+azure_storage = { version = "0.14", default-features = false, optional = true }
+azure_storage_blobs = { version = "0.14", default-features = false, optional = true }
 
 # OpenDAL
 opendal = {version = "0.38", default-features = false, features = ["native-tls", "services-webhdfs"], optional = true}
