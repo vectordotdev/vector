@@ -306,21 +306,22 @@ where
 
 #[cfg(not(windows))]
 fn default_config_paths() -> Vec<ConfigPath> {
-    vec![ConfigPath::File(
-        "/etc/vector/vector.yaml".into(),
-        Some(Format::Toml),
-    )]
+    vec![
+        ConfigPath::File("/etc/vector/vector.yaml".into(), Some(Format::Yaml)),
+        ConfigPath::File("/etc/vector/vector.toml".into(), Some(Format::Toml)),
+    ]
 }
 
 #[cfg(windows)]
 fn default_config_paths() -> Vec<ConfigPath> {
     let program_files =
         std::env::var("ProgramFiles").expect("%ProgramFiles% environment variable must be defined");
-    let config_path = format!("{}\\Vector\\config\\vector.toml", program_files);
-    vec![ConfigPath::File(
-        PathBuf::from(config_path),
-        Some(Format::Toml),
-    )]
+    let toml_config_path = format!("{}\\Vector\\config\\vector.toml", program_files);
+    let yaml_config_path = format!("{}\\Vector\\config\\vector.yaml", program_files);
+    vec![
+        ConfigPath::File(PathBuf::from(yaml_config_path), Some(Format::Yaml)),
+        ConfigPath::File(PathBuf::from(toml_config_path), Some(Format::Toml)),
+    ]
 }
 
 #[cfg(all(

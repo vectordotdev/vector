@@ -37,7 +37,7 @@ To solve for above, we'd like to introduce implicit configuration namespacing ba
 - When loading Vector's configuration using `--config-dir` (let say `--config-dir /etc/vector`), it will look in every subfolder for any component configuration file, with their filenames being their component ID.
 
 ```toml
-# /etc/vector/vector.yaml
+# /etc/vector/vector.toml
 [sinks.foo]
 type = "anything"
 ```
