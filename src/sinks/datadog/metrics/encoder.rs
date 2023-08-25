@@ -388,6 +388,25 @@ fn get_sketch_payload_sketches_field_number() -> u32 {
     })
 }
 
+fn generate_sketch_metadata(
+    maybe_pass_through: Option<&DatadogMetricOriginMetadata>,
+    maybe_source_type: Option<&Arc<String>>,
+) -> Option<ddmetric_proto::Metadata> {
+    generate_origin_metadata(maybe_pass_through, maybe_source_type).map(|origin| {
+        ddmetric_proto::Metadata {
+            origin: Some(ddmetric_proto::Origin {
+                // TODO are the first two correct?
+                product: 0,
+                service: 0,
+                metric_type: 0,
+                origin_product: origin.product().expect("OriginProduct should be set"),
+                origin_category: origin.category().expect("OriginCategory should be set"),
+                origin_service: origin.service().expect("OriginService should be set"),
+            }),
+        }
+    })
+}
+
 fn sketch_to_proto_message(
     metric: &Metric,
     ddsketch: &AgentDDSketch,
@@ -421,6 +440,14 @@ fn sketch_to_proto_message(
     let k = bins.into_iter().map(Into::into).collect();
     let n = counts.into_iter().map(Into::into).collect();
 
+    let event_metadata = metric.metadata();
+    let metadata = generate_sketch_metadata(
+        event_metadata.datadog_origin_metadata(),
+        event_metadata.source_type(),
+    );
+
+    debug!("generated sketch metadata: {:?}", metadata);
+
     ddmetric_proto::sketch_payload::Sketch {
         metric: name,
         tags,
@@ -436,6 +463,7 @@ fn sketch_to_proto_message(
             k,
             n,
         }],
+        metadata,
     }
 }
 
@@ -534,55 +562,61 @@ fn source_type_to_service(source_type: &str) -> Option<u32> {
     }
 }
 
-fn generate_series_metadata(
+/// Determine the correct Origin metadata values to use depending on if they have been
+/// set already upstream or not. The generalized struct `DatadogMetricOriginMetadata` is
+/// utilized in this function, which allows the series and sketch encoding to call and map
+/// the result appropriately for the given protocol they operate on.
+fn generate_origin_metadata(
     maybe_pass_through: Option<&DatadogMetricOriginMetadata>,
-    source_type: &str,
-) -> Option<DatadogSeriesMetricMetadata> {
+    maybe_source_type: Option<&Arc<String>>,
+) -> Option<DatadogMetricOriginMetadata> {
     let origin_product_value = option_env!("ORIGIN_PRODUCT")
-        .unwrap_or("14")
-        .parse::<u32>()
-        .expect("Env var ORIGIN_PRODUCT must be an unsigned 32 bit integer.");
+        .map(|p| {
+            p.parse::<u32>()
+                .expect("Env var ORIGIN_PRODUCT must be an unsigned 32 bit integer.")
+        })
+        .unwrap_or(14);
 
     let origin_category_value = 11;
 
     let no_value = 0;
 
-    // TODO we actually dont have that in the metadata yet :/ need to add
-    // let vector_source_type = metric.metadata().source_type();
-
-    // either a vector source or a transform has set the origin metadata already.
+    // An upstream  vector source or a transform has set the origin metadata already.
     if let Some(pass_through) = maybe_pass_through {
-        Some(DatadogSeriesMetricMetadata {
-            origin: Some(
-                DatadogMetricOriginMetadata::default()
-                    // product and category should both either be set or not set in this scenario.
-                    // if they are not set, it means the upstream vector component only set the service
-                    // and we need to set the product and category for vector.
-                    .with_product(pass_through.product().unwrap_or(origin_product_value))
-                    .with_category(pass_through.category().unwrap_or(origin_category_value))
-                    // The service should have been set by vector
-                    .with_service(pass_through.service().unwrap_or(no_value)),
-            ),
-        })
+        Some(
+            DatadogMetricOriginMetadata::default()
+                // product and category should both either be set or not set in this scenario.
+                // if they are not set, it means the upstream vector component only set the service
+                // and we need to set the product and category for vector.
+                .with_product(pass_through.product().unwrap_or(origin_product_value))
+                .with_category(pass_through.category().unwrap_or(origin_category_value))
+                .with_service(pass_through.service().unwrap_or(no_value)),
+        )
 
-    // no metadata has been set
+    // no metadata has been set upstream
     } else {
-        // for the metric sources that need it, set the OriginProduct and OriginService
-        // NOTE: Intentionally not setting for the case where the Datadog Agent did not set,
-        //       in order to maintain consistent behavior.
-        if let Some(origin_service_value) = source_type_to_service(source_type) {
-            Some(DatadogSeriesMetricMetadata {
-                origin: Some(
-                    DatadogMetricOriginMetadata::default()
-                        .with_product(origin_product_value)
-                        .with_category(origin_category_value)
-                        .with_service(origin_service_value),
-                ),
+        // NOTE: Intentionally don't set origin metadata for the case where the Datadog Agent did
+        //       not set, in order to maintain consistent behavior.
+        maybe_source_type.and_then(|source_type| {
+            source_type_to_service(source_type.as_str()).map(|origin_service_value| {
+                DatadogMetricOriginMetadata::default()
+                    .with_product(origin_product_value)
+                    .with_category(origin_category_value)
+                    .with_service(origin_service_value)
             })
-        } else {
-            None
-        }
+        })
     }
+}
+
+fn generate_series_metadata(
+    maybe_pass_through: Option<&DatadogMetricOriginMetadata>,
+    maybe_source_type: Option<&Arc<String>>,
+) -> Option<DatadogSeriesMetricMetadata> {
+    generate_origin_metadata(maybe_pass_through, maybe_source_type).map(|origin| {
+        DatadogSeriesMetricMetadata {
+            origin: Some(origin),
+        }
+    })
 }
 
 fn generate_series_metrics(
@@ -607,6 +641,8 @@ fn generate_series_metrics(
         event_metadata.datadog_origin_metadata(),
         event_metadata.source_type(),
     );
+
+    debug!("generated series metadata: {:?}", metadata);
 
     let results = match (metric.value(), metric.interval_ms()) {
         (MetricValue::Counter { value }, maybe_interval_ms) => {
@@ -794,7 +830,8 @@ mod tests {
         config::{log_schema, LogSchema},
         event::{
             metric::{MetricSketch, TagValue},
-            Metric, MetricKind, MetricTags, MetricValue,
+            DatadogMetricOriginMetadata, EventMetadata, Metric, MetricKind, MetricTags,
+            MetricValue,
         },
         metric_tags,
         metrics::AgentDDSketch,
@@ -813,6 +850,12 @@ mod tests {
     fn get_simple_counter() -> Metric {
         let value = MetricValue::Counter { value: 3.14 };
         Metric::new("basic_counter", MetricKind::Incremental, value).with_timestamp(Some(ts()))
+    }
+
+    fn get_simple_counter_with_metadata(metadata: EventMetadata) -> Metric {
+        let value = MetricValue::Counter { value: 3.14 };
+        Metric::new_with_metadata("basic_counter", MetricKind::Incremental, value, metadata)
+            .with_timestamp(Some(ts()))
     }
 
     fn get_simple_rate_counter(value: f64, interval_ms: u32) -> Metric {
@@ -970,6 +1013,66 @@ mod tests {
         assert_eq!(actual.interval, Some(expected_interval));
         assert_eq!(actual.points.len(), 1);
         assert_eq!(actual.points[0].1, expected_value);
+    }
+
+    #[test]
+    fn encode_origin_metadata_pass_through() {
+        let product = 10;
+        let category = 11;
+        let service = 9;
+
+        let event_metadata = EventMetadata::default().with_origin_metadata(
+            DatadogMetricOriginMetadata::default()
+                .with_product(10)
+                .with_category(11)
+                .with_service(9),
+        );
+        let counter = get_simple_counter_with_metadata(event_metadata);
+
+        let result = generate_series_metrics(&counter, &None, log_schema());
+        assert!(result.is_ok());
+
+        let metrics = result.unwrap();
+        assert_eq!(metrics.len(), 1);
+
+        let actual = &metrics[0];
+        let generated_origin = actual.metadata.as_ref().unwrap().origin.as_ref().unwrap();
+
+        assert_eq!(generated_origin.product().unwrap(), product);
+        assert_eq!(generated_origin.category().unwrap(), category);
+        assert_eq!(generated_origin.service().unwrap(), service);
+    }
+
+    #[test]
+    fn encode_origin_metadata_vector_sourced() {
+        let product = option_env!("ORIGIN_PRODUCT")
+            .map(|p| {
+                p.parse::<u32>()
+                    .expect("Env var ORIGIN_PRODUCT must be an unsigned 32 bit integer.")
+            })
+            .unwrap_or(14);
+
+        let category = 11;
+        let service = 153;
+
+        let mut counter = get_simple_counter();
+
+        counter
+            .metadata_mut()
+            .set_source_type(Arc::new("statsd".to_owned()));
+
+        let result = generate_series_metrics(&counter, &None, log_schema());
+        assert!(result.is_ok());
+
+        let metrics = result.unwrap();
+        assert_eq!(metrics.len(), 1);
+
+        let actual = &metrics[0];
+        let generated_origin = actual.metadata.as_ref().unwrap().origin.as_ref().unwrap();
+
+        assert_eq!(generated_origin.product().unwrap(), product);
+        assert_eq!(generated_origin.category().unwrap(), category);
+        assert_eq!(generated_origin.service().unwrap(), service);
     }
 
     #[test]

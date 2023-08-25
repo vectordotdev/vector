@@ -33,6 +33,9 @@ pub struct EventMetadata {
     /// The id of the source
     source_id: Option<Arc<ComponentKey>>,
 
+    /// The type of the source
+    source_type: Option<Arc<String>>,
+
     /// The id of the component this event originated from. This is used to
     /// determine which schema definition to attach to an event in transforms.
     /// This should always have a value set for events in transforms. It will always be `None`
@@ -147,6 +150,12 @@ impl EventMetadata {
         self.source_id.as_ref()
     }
 
+    /// Returns a reference to the metadata source id.
+    #[must_use]
+    pub fn source_type(&self) -> Option<&Arc<String>> {
+        self.source_type.as_ref()
+    }
+
     /// Returns a reference to the metadata parent id. This is the `OutputId`
     /// of the previous component the event was sent through (if any).
     #[must_use]
@@ -157,6 +166,11 @@ impl EventMetadata {
     /// Sets the `source_id` in the metadata to the provided value.
     pub fn set_source_id(&mut self, source_id: Arc<ComponentKey>) {
         self.source_id = Some(source_id);
+    }
+
+    /// Sets the `source_type` in the metadata to the provided value.
+    pub fn set_source_type(&mut self, source_type: Arc<String>) {
+        self.source_type = Some(source_type);
     }
 
     /// Sets the `upstream_id` in the metadata to the provided value.
@@ -211,6 +225,7 @@ impl Default for EventMetadata {
             finalizers: Default::default(),
             schema_definition: default_schema_definition(),
             source_id: None,
+            source_type: None,
             upstream_id: None,
             dropped_fields: BTreeMap::new(),
             datadog_origin_metadata: None,

@@ -742,6 +742,7 @@ async fn decode_series_endpoint_v1() {
                     host: Some("random_host".to_string()),
                     source_type_name: None,
                     device: None,
+                    metadata: None,
                 },
                 DatadogSeriesMetric {
                     metric: "dd_rate".to_string(),
@@ -752,6 +753,7 @@ async fn decode_series_endpoint_v1() {
                     host: Some("another_random_host".to_string()),
                     source_type_name: None,
                     device: None,
+                    metadata: None,
                 },
                 DatadogSeriesMetric {
                     metric: "dd_count".to_string(),
@@ -762,6 +764,7 @@ async fn decode_series_endpoint_v1() {
                     host: Some("a_host".to_string()),
                     source_type_name: None,
                     device: None,
+                    metadata: None,
                 },
                 DatadogSeriesMetric {
                     metric: "system.disk.free".to_string(),
@@ -772,6 +775,7 @@ async fn decode_series_endpoint_v1() {
                     host: None,
                     source_type_name: None,
                     device: None,
+                    metadata: None,
                 },
                 DatadogSeriesMetric {
                     metric: "system.disk".to_string(),
@@ -782,6 +786,7 @@ async fn decode_series_endpoint_v1() {
                     host: None,
                     source_type_name: None,
                     device: None,
+                    metadata: None,
                 },
             ],
         };
@@ -960,6 +965,16 @@ async fn decode_sketches() {
                 k: vec![1517, 1559],
                 n: vec![1, 1],
             }],
+            metadata: Some(ddmetric_proto::Metadata {
+                origin: Some(ddmetric_proto::Origin {
+                    product: 0,
+                    service: 0,
+                    metric_type: 0,
+                    origin_product: 10,
+                    origin_category: 11,
+                    origin_service: 9,
+                }),
+            }),
         };
 
         let sketch_payload = ddmetric_proto::SketchPayload {
@@ -1026,6 +1041,11 @@ async fn decode_sketches() {
                 &events[0].metadata().datadog_api_key().as_ref().unwrap()[..],
                 "12345678abcdefgh12345678abcdefgh"
             );
+
+            let event_origin = &events[0].metadata().datadog_origin_metadata().unwrap();
+            assert_eq!(event_origin.product().unwrap(), 10);
+            assert_eq!(event_origin.category().unwrap(), 11);
+            assert_eq!(event_origin.service().unwrap(), 9);
         }
     })
     .await;
@@ -1335,6 +1355,7 @@ async fn split_outputs() {
                 host: Some("random_host".to_string()),
                 source_type_name: None,
                 device: None,
+                metadata: None,
             }],
         };
         let mut metric_event = spawn_collect_n(
@@ -1919,8 +1940,8 @@ async fn decode_series_endpoint_v2() {
                 unit: "".to_string(),
                 source_type_name: "a_very_random_source_type_name".to_string(),
                 interval: 0,
-                metadata: Some(ddmetric_proto::metric_payload::Metadata {
-                    origin: Some(ddmetric_proto::metric_payload::Origin {
+                metadata: Some(ddmetric_proto::Metadata {
+                    origin: Some(ddmetric_proto::Origin {
                         product: 0,
                         service: 0,
                         metric_type: 0,
