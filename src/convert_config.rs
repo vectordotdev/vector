@@ -60,8 +60,8 @@ pub(crate) fn cmd(opts: &Opts) -> exitcode::ExitCode {
     }
 
     return if opts.input_path.is_file() && opts.output_path.extension().is_some() {
-        if let Some(base_dir) = opts.output_path.file_name() {
-            if fs::metadata(base_dir).is_err() {
+        if let Some(base_dir) = opts.output_path.parent() {
+            if !base_dir.exists() {
                 fs::create_dir_all(base_dir).unwrap_or_else(|_| {
                     panic!("Failed to create output dir(s): {:?}", &opts.output_path)
                 });
@@ -106,19 +106,28 @@ fn convert_config(
     output_path: &Path,
     output_format: Format,
 ) -> Result<(), Vec<String>> {
-    let input_format = Format::from_str(
+    if output_path.exists() {
+        return Err(vec![format!("Output path {output_path:?} exists")]);
+    }
+    let input_format = match Format::from_str(
         input_path
             .extension()
             .unwrap_or_else(|| panic!("Failed to get extension for: {input_path:?}"))
             .to_str()
             .unwrap_or_else(|| panic!("Failed to convert OsStr to &str for: {input_path:?}")),
-    )
-    .unwrap_or_else(|_| panic!("Failed to convert extension to Format for: {input_path:?}"));
+    ) {
+        Ok(format) => format,
+        Err(_) => return Ok(()), // skip irrelevant files
+    };
 
     if input_format == output_format {
         return Ok(());
     }
 
+    #[allow(clippy::print_stdout)]
+    {
+        println!("Converting {input_path:?} config to {output_format:?}.");
+    }
     let file_contents = fs::read_to_string(input_path).map_err(|e| vec![e.to_string()])?;
     let builder: ConfigBuilder = format::deserialize(&file_contents, input_format)?;
     let config = builder.build()?;
@@ -128,7 +137,7 @@ fn convert_config(
 
     #[allow(clippy::print_stdout)]
     {
-        println!("Converted {input_path:?} config and wrote result to {output_path:?}.");
+        println!("Wrote result to {output_path:?}.");
     }
     Ok(())
 }
@@ -148,9 +157,16 @@ fn walk_dir_and_convert(
                 .unwrap_or_else(|_| panic!("Failed to get entry for dir: {input_path:?}"))
                 .path();
             let new_output_dir = if entry_path.is_dir() {
-                let new_dir = output_dir.join(entry_path.clone());
-                fs::create_dir(&new_dir)
-                    .unwrap_or_else(|_| panic!("Failed to create output dir: {new_dir:?}"));
+                let last_component = entry_path
+                    .file_name()
+                    .unwrap_or_else(|| panic!("Failed to get file_name for {entry_path:?}"))
+                    .clone();
+                let new_dir = output_dir.join(last_component);
+
+                if !new_dir.exists() {
+                    fs::create_dir_all(&new_dir)
+                        .unwrap_or_else(|_| panic!("Failed to create output dir: {new_dir:?}"));
+                }
                 new_dir
             } else {
                 output_dir.to_path_buf()
