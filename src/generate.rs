@@ -643,6 +643,11 @@ mod tests {
         );
     }
 
+    #[cfg(all(
+        feature = "sources-demo_logs",
+        feature = "transforms-remap",
+        feature = "sinks-console"
+    ))]
     #[test]
     fn generate_basic_yaml() {
         let opts = Opts {
@@ -695,6 +700,11 @@ mod tests {
         );
     }
 
+    #[cfg(all(
+        feature = "sources-demo_logs",
+        feature = "transforms-remap",
+        feature = "sinks-console"
+    ))]
     #[test]
     fn generate_basic_json() {
         let opts = Opts {
