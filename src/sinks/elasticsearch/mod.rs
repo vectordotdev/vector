@@ -24,8 +24,6 @@ use snafu::Snafu;
 use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 
-#[cfg(feature = "aws-core")]
-use crate::aws::AwsAuthentication;
 use crate::{
     event::{EventRef, LogEvent},
     internal_events::TemplateRenderingError,
@@ -53,7 +51,7 @@ pub enum ElasticsearchAuthConfig {
 
     #[cfg(feature = "aws-core")]
     /// Amazon OpenSearch Service-specific authentication.
-    Aws(AwsAuthentication),
+    Aws(crate::aws::AwsAuthentication),
 }
 
 /// Elasticsearch Indexing mode.

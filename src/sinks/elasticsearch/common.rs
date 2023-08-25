@@ -1,9 +1,5 @@
 use std::collections::HashMap;
 
-#[cfg(feature = "aws-core")]
-use aws_credential_types::provider::SharedCredentialsProvider;
-#[cfg(feature = "aws-core")]
-use aws_types::region::Region;
 use bytes::{Buf, Bytes};
 use http::{Response, StatusCode, Uri};
 use hyper::{body, Body};
@@ -257,8 +253,8 @@ impl ElasticsearchCommon {
 #[cfg(feature = "aws-core")]
 pub async fn sign_request(
     request: &mut http::Request<Bytes>,
-    credentials_provider: &SharedCredentialsProvider,
-    region: &Option<Region>,
+    credentials_provider: &aws_credential_types::provider::SharedCredentialsProvider,
+    region: &Option<aws_types::region::Region>,
 ) -> crate::Result<()> {
     crate::aws::sign_request("es", request, credentials_provider, region).await
 }
@@ -321,7 +317,10 @@ async fn get(
                 http_auth.apply(&mut request);
             }
             #[cfg(feature = "aws-core")]
-            Auth::Aws { credentials_provider: provider, region } => {
+            Auth::Aws {
+                credentials_provider: provider,
+                region,
+            } => {
                 let region = region.clone();
                 sign_request(&mut request, provider, &Some(region)).await?;
             }

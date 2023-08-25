@@ -15,8 +15,6 @@ use vector_common::{
 };
 use vector_core::{stream::DriverResponse, ByteSizeOf};
 
-#[cfg(feature = "aws-core")]
-use crate::sinks::elasticsearch::sign_request;
 use crate::{
     event::{EventFinalizers, EventStatus, Finalizable},
     http::HttpClient,
@@ -142,7 +140,7 @@ impl HttpRequestBuilder {
                     auth.apply(&mut request);
                 }
                 Auth::Aws { credentials_provider: provider, region } => {
-                    sign_request(&mut request, provider, &Some(region.clone())).await?;
+                    crate::sinks::elasticsearch::sign_request(&mut request, provider, &Some(region.clone())).await?;
                 }
             }
         }

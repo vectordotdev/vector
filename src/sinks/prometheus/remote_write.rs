@@ -14,8 +14,6 @@ use vector_config::configurable_component;
 use vector_core::{ByteSizeOf, EstimatedJsonEncodedSizeOf};
 
 use super::collector::{self, MetricCollector as _};
-#[cfg(feature = "aws-core")]
-use crate::aws::RegionOrEndpoint;
 use crate::{
     config::{self, AcknowledgementsConfig, Input, SinkConfig},
     event::{Event, Metric},
@@ -122,7 +120,7 @@ pub struct RemoteWriteConfig {
     #[cfg(feature = "aws-core")]
     #[configurable(derived)]
     #[configurable(metadata(docs::advanced))]
-    pub aws: Option<RegionOrEndpoint>,
+    pub aws: Option<crate::aws::RegionOrEndpoint>,
 
     #[configurable(derived)]
     #[serde(

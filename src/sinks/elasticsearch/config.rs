@@ -6,8 +6,6 @@ use std::{
 use futures::{FutureExt, TryFutureExt};
 use vector_config::configurable_component;
 
-#[cfg(feature = "aws-core")]
-use crate::aws::RegionOrEndpoint;
 use crate::{
     codecs::Transformer,
     config::{AcknowledgementsConfig, DataType, Input, SinkConfig, SinkContext},
@@ -155,7 +153,7 @@ pub struct ElasticsearchConfig {
     #[serde(default)]
     #[configurable(derived)]
     #[cfg(feature = "aws-core")]
-    pub aws: Option<RegionOrEndpoint>,
+    pub aws: Option<crate::aws::RegionOrEndpoint>,
 
     #[serde(default)]
     #[configurable(derived)]
