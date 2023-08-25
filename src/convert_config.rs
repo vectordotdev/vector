@@ -190,7 +190,7 @@ fn walk_dir_and_convert(
 #[cfg(test)]
 mod tests {
     use crate::config::{format, ConfigBuilder, Format};
-    use crate::convert_config::walk_dir_and_convert;
+    use crate::convert_config::{check_paths, walk_dir_and_convert, Opts};
     use std::path::{Path, PathBuf};
     use std::str::FromStr;
     use std::{env, fs};
@@ -200,14 +200,52 @@ mod tests {
         PathBuf::from(env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("tests/data/cmd/config")
     }
 
+    // Read the contents of the specified `path` and deserialize them into a `ConfigBuilder`.
+    // Finally serialize them a string again. Configs do not implement equality,
+    // so for these tests we will rely on strings for comparisons.
     fn convert_file_to_config_string(path: &Path) -> String {
         let files_contents = fs::read_to_string(path).unwrap();
         let extension = path.extension().unwrap().to_str().unwrap();
         let file_format = Format::from_str(extension).unwrap();
         let builder: ConfigBuilder = format::deserialize(&files_contents, file_format).unwrap();
         let config = builder.build().unwrap();
-        // Configs do not implement equality, so will rely on strings for comparisons
+
         format::serialize(&config, file_format).unwrap()
+    }
+
+    #[test]
+    fn invalid_path_opts() {
+        let check_error = |opts, pattern| {
+            let error = check_paths(&opts).unwrap_err();
+            assert!(error.contains(pattern));
+        };
+
+        check_error(
+            Opts {
+                input_path: ["./"].iter().collect(),
+                output_path: ["./"].iter().collect(),
+                output_format: Format::Yaml,
+            },
+            "already exists",
+        );
+
+        check_error(
+            Opts {
+                input_path: ["./"].iter().collect(),
+                output_path: ["./out.yaml"].iter().collect(),
+                output_format: Format::Yaml,
+            },
+            "points to a file.",
+        );
+
+        check_error(
+            Opts {
+                input_path: [test_data_dir(), "config_2.toml".into()].iter().collect(),
+                output_path: ["./another_dir"].iter().collect(),
+                output_format: Format::Yaml,
+            },
+            "points to a directory.",
+        );
     }
 
     #[test]
@@ -218,21 +256,22 @@ mod tests {
             .into_path();
         walk_dir_and_convert(&input_path, &output_dir, Format::Yaml).unwrap();
 
-        let entries = fs::read_dir(&output_dir).unwrap();
         let mut count: usize = 0;
         let original_config = convert_file_to_config_string(&test_data_dir().join("config_1.yaml"));
-        for entry in entries {
+        for entry in fs::read_dir(&output_dir).unwrap() {
             let entry = entry.unwrap();
             let path = entry.path();
             if path.is_file() {
                 let extension = path.extension().unwrap().to_str().unwrap();
                 if extension == Format::Yaml.to_string() {
+                    // Note that here we read the converted string directly.
                     let converted_config = fs::read_to_string(&output_dir.join(&path)).unwrap();
                     assert_eq!(converted_config, original_config);
                     count += 1;
                 }
             }
         }
+        // There two non-yaml configs in the input directory.
         assert_eq!(count, 2);
     }
 }

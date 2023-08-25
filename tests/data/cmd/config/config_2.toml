@@ -1,3 +1,8 @@
+# Comments are dropped.
+#[api]
+#enabled = true
+#address = "127.0.0.1:8686"
+
 data_dir = "/var/lib/vector/"
 
 [sources.source0]
