@@ -5851,8 +5851,8 @@ dependencies = [
 
 [[package]]
 name = "openssl-sys"
-version = "0.9.91"
-source = "git+https://github.com/vectordotdev/rust-openssl?tag=openssl-sys-v0.9.91_3.0.0#c3a8b494e0a8ab88db692c239d30c903353b56a3"
+version = "0.9.92"
+source = "git+https://github.com/vectordotdev/rust-openssl?tag=openssl-sys-v0.9.92_3.0.0#109e24197321dd167420413b5231f6a644088935"
 dependencies = [
  "cc",
  "libc",
