@@ -59,7 +59,7 @@ pub struct EventMetadata {
     dropped_fields: BTreeMap<String, Value>,
 
     /// Metadata to track the origin of metrics. This is always `None` for log and trace events.
-    /// Only subset of Vector sources explicitly set this field.
+    /// Only a subset of Vector sources explicitly set this field.
     #[serde(default)]
     datadog_origin_metadata: Option<DatadogMetricOriginMetadata>,
 }
