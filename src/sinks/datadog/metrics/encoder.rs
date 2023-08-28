@@ -395,7 +395,6 @@ fn generate_sketch_metadata(
     generate_origin_metadata(maybe_pass_through, maybe_source_type).map(|origin| {
         ddmetric_proto::Metadata {
             origin: Some(ddmetric_proto::Origin {
-                // TODO are the first two correct?
                 product: 0,
                 service: 0,
                 metric_type: 0,

@@ -311,7 +311,7 @@ impl Event {
         self.metadata_mut().set_upstream_id(upstream_id);
     }
 
-    /// Sets the `upstream_id` in the event metadata to the provided value.
+    /// Sets the `source_type` in the event metadata to the provided value.
     pub fn set_source_type(&mut self, source_type: Arc<String>) {
         self.metadata_mut().set_source_type(source_type);
     }

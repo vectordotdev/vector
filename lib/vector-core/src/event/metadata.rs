@@ -58,6 +58,8 @@ pub struct EventMetadata {
     /// we have to use `String`.
     dropped_fields: BTreeMap<String, Value>,
 
+    /// Metadata to track the origin of metrics. This is always `None` for log and trace events.
+    /// Only subset of Vector sources explicitly set this field.
     #[serde(default)]
     datadog_origin_metadata: Option<DatadogMetricOriginMetadata>,
 }
@@ -150,7 +152,7 @@ impl EventMetadata {
         self.source_id.as_ref()
     }
 
-    /// Returns a reference to the metadata source id.
+    /// Returns a reference to the metadata source type.
     #[must_use]
     pub fn source_type(&self) -> Option<&Arc<String>> {
         self.source_type.as_ref()
@@ -286,7 +288,7 @@ impl EventMetadata {
         self
     }
 
-    /// Replaces the existing datgadog origin metadata with the given ones.
+    /// Replaces the existing datgadog origin metadata with the given one.
     #[must_use]
     pub fn with_origin_metadata(mut self, origin_metadata: DatadogMetricOriginMetadata) -> Self {
         self.datadog_origin_metadata = Some(origin_metadata);
