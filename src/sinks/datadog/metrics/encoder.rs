@@ -445,7 +445,7 @@ fn sketch_to_proto_message(
         event_metadata.source_type(),
     );
 
-    debug!("generated sketch metadata: {:?}", metadata);
+    debug!("Generated sketch metadata: {:?}", metadata);
 
     ddmetric_proto::sketch_payload::Sketch {
         metric: name,
@@ -641,7 +641,7 @@ fn generate_series_metrics(
         event_metadata.source_type(),
     );
 
-    debug!("generated series metadata: {:?}", metadata);
+    debug!("Generated series metadata: {:?}", metadata);
 
     let results = match (metric.value(), metric.interval_ms()) {
         (MetricValue::Counter { value }, maybe_interval_ms) => {

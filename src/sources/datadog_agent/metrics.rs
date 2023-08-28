@@ -241,7 +241,7 @@ fn get_event_metadata(metadata: Option<&Metadata>) -> EventMetadata {
             .as_ref()
             .map_or(EventMetadata::default(), |origin| {
                 debug!(
-                    "Deserialized origin_product: `{}` origin_category: `{}` origin_service: `{}`",
+                    "Deserialized origin_product: `{}` origin_category: `{}` origin_service: `{}`.",
                     origin.origin_product, origin.origin_category, origin.origin_service
                 );
                 EventMetadata::default().with_origin_metadata(
