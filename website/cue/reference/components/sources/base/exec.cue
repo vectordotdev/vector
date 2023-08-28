@@ -1,6 +1,11 @@
 package metadata
 
 base: components: sources: exec: configuration: {
+	clear_environment: {
+		description: "Whether or not to clear the environment before setting custom environment variables."
+		required:    false
+		type: bool: default: false
+	}
 	command: {
 		description: "The command to run, plus any arguments required."
 		required:    true
@@ -42,6 +47,11 @@ base: components: sources: exec: configuration: {
 
 															[vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
 															[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
+															"""
+						protobuf: """
+															Decodes the raw bytes as [protobuf][protobuf].
+
+															[protobuf]: https://protobuf.dev/
 															"""
 						syslog: """
 															Decodes the raw bytes as a Syslog message.
@@ -103,6 +113,23 @@ base: components: sources: exec: configuration: {
 					type: bool: default: true
 				}
 			}
+			protobuf: {
+				description:   "Protobuf-specific decoding options."
+				relevant_when: "codec = \"protobuf\""
+				required:      false
+				type: object: options: {
+					desc_file: {
+						description: "Path to desc file"
+						required:    false
+						type: string: default: ""
+					}
+					message_type: {
+						description: "message type. e.g package.message"
+						required:    false
+						type: string: default: ""
+					}
+				}
+			}
 			syslog: {
 				description:   "Syslog-specific decoding options."
 				relevant_when: "codec = \"syslog\""
@@ -118,6 +145,25 @@ base: components: sources: exec: configuration: {
 					required: false
 					type: bool: default: true
 				}
+			}
+		}
+	}
+	environment: {
+		description: """
+			Custom environment variables to set or update when running the command.
+			If a variable name already exists in the environment, its value is replaced.
+			"""
+		required: false
+		type: object: {
+			examples: [{
+				LANG: "es_ES.UTF-8"
+				PATH: "/bin:/usr/bin:/usr/local/bin"
+				TZ:   "Etc/UTC"
+			}]
+			options: "*": {
+				description: "An environment variable."
+				required:    true
+				type: string: {}
 			}
 		}
 	}

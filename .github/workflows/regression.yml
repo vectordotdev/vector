@@ -37,6 +37,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.merge_group.head_sha || github.sha }}
   cancel-in-progress: true
 
+env:
+  SINGLE_MACHINE_PERFORMANCE_API: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_API }}
+
 jobs:
 
   # Only run this workflow if files changed in areas that could possibly introduce a regression
@@ -48,8 +51,6 @@ jobs:
       comment_valid: ${{ steps.comment.outputs.isTeamMember }}
     steps:
     - uses: actions/checkout@v3
-      with:
-        submodules: "recursive"
 
     - name: Collect file changes
       id: changes
@@ -131,7 +132,6 @@ jobs:
       - uses: actions/checkout@v3
         with:
           fetch-depth: 1000
-          submodules: "recursive"
 
       # If triggered by issue comment, the event payload doesn't directly contain the head and base sha from the PR.
       # But, we can retrieve this info from some commands.
@@ -232,8 +232,8 @@ jobs:
           export REPLICAS="10"
           export TOTAL_SAMPLES="600"
           export P_VALUE="0.1"
-          export SMP_CRATE_VERSION="0.7.3"
-          export LADING_VERSION="0.12.0"
+          export SMP_CRATE_VERSION="0.10.0"
+          export LADING_VERSION="0.18.0"
 
           echo "warmup seconds: ${WARMUP_SECONDS}"
           echo "replicas: ${REPLICAS}"
@@ -290,18 +290,15 @@ jobs:
       - uses: colpal/actions-clean@v1
 
       - uses: actions/checkout@v3
-        with:
-          submodules: "recursive"
 
       - uses: actions/checkout@v3
         with:
           ref: ${{ needs.compute-metadata.outputs.baseline-sha }}
           path: baseline-vector
-          submodules: "recursive"
 
       - name: Set up Docker Buildx
         id: buildx
-        uses: docker/setup-buildx-action@v2.8.0
+        uses: docker/setup-buildx-action@v2.9.1
 
       - name: Build 'vector' target image
         uses: docker/build-push-action@v4.1.1
@@ -330,18 +327,15 @@ jobs:
       - uses: colpal/actions-clean@v1
 
       - uses: actions/checkout@v3
-        with:
-          submodules: "recursive"
 
       - uses: actions/checkout@v3
         with:
           ref: ${{ needs.compute-metadata.outputs.comparison-sha }}
           path: comparison-vector
-          submodules: "recursive"
 
       - name: Set up Docker Buildx
         id: buildx
-        uses: docker/setup-buildx-action@v2.8.0
+        uses: docker/setup-buildx-action@v2.9.1
 
       - name: Build 'vector' target image
         uses: docker/build-push-action@v4.1.1
@@ -368,7 +362,7 @@ jobs:
       - compute-metadata
     steps:
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v2.2.0
+        uses: aws-actions/configure-aws-credentials@v3.0.1
         with:
           aws-access-key-id: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_SECRET_ACCESS_KEY }}
@@ -400,7 +394,7 @@ jobs:
           docker load --input baseline-image.tar
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v2.2.0
+        uses: aws-actions/configure-aws-credentials@v3.0.1
         with:
           aws-access-key-id: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_SECRET_ACCESS_KEY }}
@@ -438,7 +432,7 @@ jobs:
           docker load --input comparison-image.tar
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v2.2.0
+        uses: aws-actions/configure-aws-credentials@v3.0.1
         with:
           aws-access-key-id: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_SECRET_ACCESS_KEY }}
@@ -482,10 +476,9 @@ jobs:
       - uses: actions/checkout@v3
         with:
           ref: ${{ needs.compute-metadata.outputs.comparison-sha }}
-          submodules: "recursive"
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v2.2.0
+        uses: aws-actions/configure-aws-credentials@v3.0.1
         with:
           aws-access-key-id: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_SECRET_ACCESS_KEY }}
@@ -602,11 +595,9 @@ jobs:
       - compute-metadata
     steps:
       - uses: actions/checkout@v3
-        with:
-          submodules: "recursive"
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v2.2.0
+        uses: aws-actions/configure-aws-credentials@v3.0.1
         with:
           aws-access-key-id: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_SECRET_ACCESS_KEY }}
@@ -695,10 +686,9 @@ jobs:
       - uses: actions/checkout@v3
         with:
           ref: ${{ needs.compute-metadata.outputs.comparison-sha }}
-          submodules: "recursive"
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v2.2.0
+        uses: aws-actions/configure-aws-credentials@v3.0.1
         with:
           aws-access-key-id: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_SECRET_ACCESS_KEY }}

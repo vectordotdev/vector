@@ -12,6 +12,7 @@ use vector_core::{
     stream::{BatcherSettings, DriverResponse},
     ByteSizeOf,
 };
+use vrl::path::OwnedValuePath;
 
 use super::request_builder::HecMetricsRequestBuilder;
 use crate::{
@@ -32,7 +33,7 @@ pub struct HecMetricsSink<S> {
     pub sourcetype: Option<Template>,
     pub source: Option<Template>,
     pub index: Option<Template>,
-    pub host: String,
+    pub host_key: Option<OwnedValuePath>,
     pub default_namespace: Option<String>,
 }
 
@@ -47,7 +48,7 @@ where
         let sourcetype = self.sourcetype.as_ref();
         let source = self.source.as_ref();
         let index = self.index.as_ref();
-        let host = self.host.as_ref();
+        let host_key = self.host_key.as_ref();
         let default_namespace = self.default_namespace.as_deref();
 
         let builder_limit = NonZeroUsize::new(64);
@@ -60,11 +61,11 @@ where
                     sourcetype,
                     source,
                     index,
-                    host,
+                    host_key,
                     default_namespace,
                 ))
             })
-            .batched_partitioned(EventPartitioner::default(), self.batch_settings)
+            .batched_partitioned(EventPartitioner, self.batch_settings)
             .request_builder(builder_limit, self.request_builder)
             .filter_map(|request| async move {
                 match request {
@@ -158,7 +159,7 @@ pub fn process_metric(
     sourcetype: Option<&Template>,
     source: Option<&Template>,
     index: Option<&Template>,
-    host_key: &str,
+    host_key: Option<&OwnedValuePath>,
     default_namespace: Option<&str>,
 ) -> Option<HecProcessedEvent> {
     let templated_field_keys = [index.as_ref(), source.as_ref(), sourcetype.as_ref()]
@@ -176,7 +177,7 @@ pub fn process_metric(
         sourcetype.and_then(|sourcetype| render_template_string(sourcetype, &metric, "sourcetype"));
     let source = source.and_then(|source| render_template_string(source, &metric, "source"));
     let index = index.and_then(|index| render_template_string(index, &metric, "index"));
-    let host = metric.tag_value(host_key);
+    let host = host_key.and_then(|key| metric.tag_value(key.to_string().as_str()));
 
     let metadata = HecMetricsProcessedEventMetadata {
         event_byte_size,

@@ -1,7 +1,7 @@
 use bytes::Bytes;
 use chrono::{DateTime, NaiveDateTime, Utc};
 use derivative::Derivative;
-use lookup::{event_path, owned_value_path, PathPrefix};
+use lookup::{event_path, owned_value_path};
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use std::collections::HashMap;
@@ -17,6 +17,7 @@ use vrl::value::kind::Collection;
 use vrl::value::{Kind, Value};
 
 use super::{default_lossy, Deserializer};
+use crate::gelf::GELF_TARGET_PATHS;
 use crate::{gelf_fields::*, VALID_FIELD_REGEX};
 
 /// On GELF decoding behavior:
@@ -123,44 +124,41 @@ impl GelfDeserializer {
             .into());
         }
 
-        log.insert(VERSION, parsed.version.to_string());
-        log.insert(HOST, parsed.host.to_string());
+        log.insert(&GELF_TARGET_PATHS.version, parsed.version.to_string());
+        log.insert(&GELF_TARGET_PATHS.host, parsed.host.to_string());
 
         if let Some(full_message) = &parsed.full_message {
-            log.insert(FULL_MESSAGE, full_message.to_string());
+            log.insert(&GELF_TARGET_PATHS.full_message, full_message.to_string());
         }
 
-        if let Some(timestamp_key) = log_schema().timestamp_key() {
+        if let Some(timestamp_key) = log_schema().timestamp_key_target_path() {
             if let Some(timestamp) = parsed.timestamp {
                 let naive = NaiveDateTime::from_timestamp_opt(
                     f64::trunc(timestamp) as i64,
                     f64::fract(timestamp) as u32,
                 )
                 .expect("invalid timestamp");
-                log.insert(
-                    (PathPrefix::Event, timestamp_key),
-                    DateTime::<Utc>::from_utc(naive, Utc),
-                );
+                log.insert(timestamp_key, DateTime::<Utc>::from_utc(naive, Utc));
                 // per GELF spec- add timestamp if not provided
             } else {
-                log.insert((PathPrefix::Event, timestamp_key), Utc::now());
+                log.insert(timestamp_key, Utc::now());
             }
         }
 
         if let Some(level) = parsed.level {
-            log.insert(LEVEL, level);
+            log.insert(&GELF_TARGET_PATHS.level, level);
         }
         if let Some(facility) = &parsed.facility {
-            log.insert(FACILITY, facility.to_string());
+            log.insert(&GELF_TARGET_PATHS.facility, facility.to_string());
         }
         if let Some(line) = parsed.line {
             log.insert(
-                LINE,
+                &GELF_TARGET_PATHS.line,
                 Value::Float(ordered_float::NotNan::new(line).expect("JSON doesn't allow NaNs")),
             );
         }
         if let Some(file) = &parsed.file {
-            log.insert(FILE, file.to_string());
+            log.insert(&GELF_TARGET_PATHS.file, file.to_string());
         }
 
         if let Some(add) = &parsed.additional_fields {
@@ -293,7 +291,7 @@ mod tests {
             Some(&Value::Bytes(Bytes::from_static(b"example.org")))
         );
         assert_eq!(
-            log.get(log_schema().message_key()),
+            log.get(log_schema().message_key_target_path().unwrap()),
             Some(&Value::Bytes(Bytes::from_static(
                 b"A short message that helps you identify what is going on"
             )))
@@ -348,7 +346,7 @@ mod tests {
             let events = deserialize_gelf_input(&input).unwrap();
             assert_eq!(events.len(), 1);
             let log = events[0].as_log();
-            assert!(log.contains(log_schema().message_key()));
+            assert!(log.contains(log_schema().message_key_target_path().unwrap()));
         }
 
         // filter out id
@@ -362,7 +360,7 @@ mod tests {
             let events = deserialize_gelf_input(&input).unwrap();
             assert_eq!(events.len(), 1);
             let log = events[0].as_log();
-            assert!(!log.contains("_id"));
+            assert!(!log.contains(event_path!("_id")));
         }
     }
 

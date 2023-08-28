@@ -16,6 +16,8 @@ use crate::test_util::{
 
 pub(crate) const INTERVAL: Duration = Duration::from_secs(1);
 
+pub(crate) const TIMEOUT: Duration = Duration::from_secs(1);
+
 /// The happy path should yield at least one event and must emit the required internal events for sources.
 pub(crate) async fn run_compliance(config: HttpClientConfig) -> Vec<Event> {
     let events =
@@ -47,6 +49,7 @@ async fn bytes_decoding() {
     run_compliance(HttpClientConfig {
         endpoint: format!("http://{}/endpoint", in_addr),
         interval: INTERVAL,
+        timeout: TIMEOUT,
         query: HashMap::new(),
         decoding: default_decoding(),
         framing: default_framing_message_based(),
@@ -75,6 +78,7 @@ async fn json_decoding_newline_delimited() {
     run_compliance(HttpClientConfig {
         endpoint: format!("http://{}/endpoint", in_addr),
         interval: INTERVAL,
+        timeout: TIMEOUT,
         query: HashMap::new(),
         decoding: DeserializerConfig::Json(Default::default()),
         framing: FramingConfig::NewlineDelimited(Default::default()),
@@ -103,6 +107,7 @@ async fn json_decoding_character_delimited() {
     run_compliance(HttpClientConfig {
         endpoint: format!("http://{}/endpoint", in_addr),
         interval: INTERVAL,
+        timeout: TIMEOUT,
         query: HashMap::new(),
         decoding: DeserializerConfig::Json(Default::default()),
         framing: FramingConfig::CharacterDelimited(CharacterDelimitedDecoderConfig {
@@ -135,6 +140,7 @@ async fn request_query_applied() {
     let events = run_compliance(HttpClientConfig {
         endpoint: format!("http://{}/endpoint?key1=val1", in_addr),
         interval: INTERVAL,
+        timeout: TIMEOUT,
         query: HashMap::from([
             ("key1".to_string(), vec!["val2".to_string()]),
             (
@@ -203,6 +209,7 @@ async fn headers_applied() {
     run_compliance(HttpClientConfig {
         endpoint: format!("http://{}/endpoint", in_addr),
         interval: INTERVAL,
+        timeout: TIMEOUT,
         query: HashMap::new(),
         decoding: default_decoding(),
         framing: default_framing_message_based(),
@@ -234,6 +241,7 @@ async fn accept_header_override() {
     run_compliance(HttpClientConfig {
         endpoint: format!("http://{}/endpoint", in_addr),
         interval: INTERVAL,
+        timeout: TIMEOUT,
         query: HashMap::new(),
         decoding: DeserializerConfig::Bytes,
         framing: default_framing_message_based(),

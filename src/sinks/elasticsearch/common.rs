@@ -100,7 +100,9 @@ impl ElasticsearchCommon {
         );
 
         if let Some(pipeline) = &config.pipeline {
-            query_params.insert("pipeline".into(), pipeline.into());
+            if !pipeline.is_empty() {
+                query_params.insert("pipeline".into(), pipeline.into());
+            }
         }
 
         let bulk_url = {
@@ -238,7 +240,7 @@ impl ElasticsearchCommon {
     #[cfg(test)]
     pub async fn parse_single(config: &ElasticsearchConfig) -> crate::Result<Self> {
         let mut commons =
-            Self::parse_many(config, crate::config::SinkContext::new_test().proxy()).await?;
+            Self::parse_many(config, crate::config::SinkContext::default().proxy()).await?;
         assert_eq!(commons.len(), 1);
         Ok(commons.remove(0))
     }

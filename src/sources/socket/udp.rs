@@ -89,7 +89,7 @@ pub struct UdpConfig {
 }
 
 fn default_host_key() -> OptionalValuePath {
-    OptionalValuePath::from(owned_value_path!(log_schema().host_key()))
+    log_schema().host_key().cloned().into()
 }
 
 fn default_port_key() -> OptionalValuePath {

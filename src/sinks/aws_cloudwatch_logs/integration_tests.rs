@@ -51,7 +51,7 @@ async fn cloudwatch_insert_log_event() {
         acknowledgements: Default::default(),
     };
 
-    let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
+    let (sink, _) = config.build(SinkContext::default()).await.unwrap();
 
     let timestamp = chrono::Utc::now();
 
@@ -101,7 +101,7 @@ async fn cloudwatch_insert_log_events_sorted() {
         acknowledgements: Default::default(),
     };
 
-    let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
+    let (sink, _) = config.build(SinkContext::default()).await.unwrap();
 
     let timestamp = chrono::Utc::now() - Duration::days(1);
 
@@ -176,7 +176,7 @@ async fn cloudwatch_insert_out_of_range_timestamp() {
         acknowledgements: Default::default(),
     };
 
-    let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
+    let (sink, _) = config.build(SinkContext::default()).await.unwrap();
 
     let now = chrono::Utc::now();
 
@@ -188,10 +188,7 @@ async fn cloudwatch_insert_out_of_range_timestamp() {
         let line = input_lines.next().unwrap();
         let mut event = LogEvent::from(line.clone());
         event.insert(
-            (
-                lookup::PathPrefix::Event,
-                log_schema().timestamp_key().unwrap(),
-            ),
+            log_schema().timestamp_key_target_path().unwrap(),
             now + offset,
         );
         events.push(Event::Log(event));
@@ -255,7 +252,7 @@ async fn cloudwatch_dynamic_group_and_stream_creation() {
         acknowledgements: Default::default(),
     };
 
-    let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
+    let (sink, _) = config.build(SinkContext::default()).await.unwrap();
 
     let timestamp = chrono::Utc::now();
 
@@ -310,7 +307,7 @@ async fn cloudwatch_insert_log_event_batched() {
         acknowledgements: Default::default(),
     };
 
-    let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
+    let (sink, _) = config.build(SinkContext::default()).await.unwrap();
 
     let timestamp = chrono::Utc::now();
 
@@ -360,7 +357,7 @@ async fn cloudwatch_insert_log_event_partitioned() {
         acknowledgements: Default::default(),
     };
 
-    let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
+    let (sink, _) = config.build(SinkContext::default()).await.unwrap();
 
     let timestamp = chrono::Utc::now();
 

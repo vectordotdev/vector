@@ -2,6 +2,7 @@ use std::{collections::HashMap, time::Duration};
 
 use codecs::JsonSerializerConfig;
 use futures::FutureExt;
+use lookup::lookup_v2::ConfigTargetPath;
 use rdkafka::ClientConfig;
 use serde_with::serde_as;
 use vector_config::configurable_component;
@@ -53,7 +54,9 @@ pub struct KafkaSinkConfig {
     /// no key.
     #[configurable(metadata(docs::advanced))]
     #[configurable(metadata(docs::examples = "user_id"))]
-    pub key_field: Option<String>,
+    #[configurable(metadata(docs::examples = ".my_topic"))]
+    #[configurable(metadata(docs::examples = "%my_topic"))]
+    pub key_field: Option<ConfigTargetPath>,
 
     #[configurable(derived)]
     pub encoding: EncodingConfig,
@@ -108,7 +111,7 @@ pub struct KafkaSinkConfig {
     #[configurable(metadata(docs::advanced))]
     #[serde(alias = "headers_field")] // accidentally released as `headers_field` in 0.18
     #[configurable(metadata(docs::examples = "headers"))]
-    pub headers_key: Option<String>,
+    pub headers_key: Option<ConfigTargetPath>,
 
     #[configurable(derived)]
     #[serde(
@@ -249,7 +252,7 @@ impl GenerateConfig for KafkaSinkConfig {
         toml::Value::try_from(Self {
             bootstrap_servers: "10.14.22.123:9092,10.14.23.332:9092".to_owned(),
             topic: Template::try_from("topic-1234".to_owned()).unwrap(),
-            key_field: Some("user_id".to_owned()),
+            key_field: Some(ConfigTargetPath::try_from("user_id".to_owned()).unwrap()),
             encoding: JsonSerializerConfig::default().into(),
             batch: Default::default(),
             compression: KafkaCompression::None,

@@ -44,7 +44,6 @@ jobs:
         with:
           # check-version needs tags
           fetch-depth: 0 # fetch everything
-          submodules: "recursive"
 
       - uses: actions/cache@v3
         name: Cache Cargo registry + index
@@ -128,7 +127,7 @@ jobs:
     name: Test Suite
     runs-on: ubuntu-20.04
     if: always()
-    needs: checks
+    needs: [changes, checks]
     env:
       FAILED: ${{ contains(needs.*.result, 'failure') }}
     steps:

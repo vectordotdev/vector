@@ -14,8 +14,7 @@ use chrono::{DateTime, FixedOffset, Local, ParseError, Utc};
 use codecs::{BytesDeserializer, BytesDeserializerConfig};
 use futures::{Stream, StreamExt};
 use lookup::{
-    lookup_v2::{parse_value_path, OptionalValuePath},
-    metadata_path, owned_value_path, path, OwnedValuePath, PathPrefix,
+    lookup_v2::OptionalValuePath, metadata_path, owned_value_path, path, OwnedValuePath, PathPrefix,
 };
 use once_cell::sync::Lazy;
 use serde_with::serde_as;
@@ -26,6 +25,7 @@ use vector_common::internal_event::{
 };
 use vector_config::configurable_component;
 use vector_core::config::{LegacyKey, LogNamespace};
+use vrl::event_path;
 use vrl::value::{kind::Collection, Kind};
 
 use super::util::MultilineConfig;
@@ -189,7 +189,7 @@ impl Default for DockerLogsConfig {
 }
 
 fn default_host_key() -> OptionalValuePath {
-    OptionalValuePath::from(owned_value_path!(log_schema().host_key()))
+    log_schema().host_key().cloned().into()
 }
 
 fn default_partial_event_marker_field() -> Option<String> {
@@ -338,9 +338,7 @@ impl SourceConfig for DockerLogsConfig {
                 Some("timestamp"),
             )
             .with_vector_metadata(
-                parse_value_path(log_schema().source_type_key())
-                    .ok()
-                    .as_ref(),
+                log_schema().source_type_key(),
                 &owned_value_path!("source_type"),
                 Kind::bytes(),
                 None,
@@ -1062,7 +1060,7 @@ impl ContainerLogInfo {
         };
 
         // Build the log.
-        let deserializer = BytesDeserializer::new();
+        let deserializer = BytesDeserializer;
         let mut log = deserializer.parse_single(bytes_message, log_namespace);
 
         // Container ID
@@ -1119,7 +1117,7 @@ impl ContainerLogInfo {
 
         log_namespace.insert_vector_metadata(
             &mut log,
-            Some(log_schema().source_type_key()),
+            log_schema().source_type_key(),
             path!("source_type"),
             Bytes::from_static(DockerLogsConfig::NAME.as_bytes()),
         );
@@ -1169,7 +1167,10 @@ impl ContainerLogInfo {
                         LogNamespace::Legacy => {
                             partial_event_merge_state.merge_in_next_event(
                                 log,
-                                &[log_schema().message_key().to_string()],
+                                &[log_schema()
+                                    .message_key()
+                                    .expect("global log_schema.message_key to be valid path")
+                                    .to_string()],
                             );
                         }
                     }
@@ -1190,8 +1191,13 @@ impl ContainerLogInfo {
                     LogNamespace::Vector => {
                         partial_event_merge_state.merge_in_final_event(log, &["."])
                     }
-                    LogNamespace::Legacy => partial_event_merge_state
-                        .merge_in_final_event(log, &[log_schema().message_key().to_string()]),
+                    LogNamespace::Legacy => partial_event_merge_state.merge_in_final_event(
+                        log,
+                        &[log_schema()
+                            .message_key()
+                            .expect("global log_schema.message_key to be valid path")
+                            .to_string()],
+                    ),
                 },
                 None => log,
             }
@@ -1265,16 +1271,24 @@ fn line_agg_adapter(
 ) -> impl Stream<Item = LogEvent> {
     let line_agg_in = inner.map(move |mut log| {
         let message_value = match log_namespace {
-            LogNamespace::Vector => log.remove(".").expect("`.` must exist in the event"),
+            LogNamespace::Vector => log
+                .remove(event_path!())
+                .expect("`.` must exist in the event"),
             LogNamespace::Legacy => log
-                .remove(log_schema().message_key())
+                .remove(
+                    log_schema()
+                        .message_key_target_path()
+                        .expect("global log_schema.message_key to be valid path"),
+                )
                 .expect("`message` must exist in the event"),
         };
         let stream_value = match log_namespace {
             LogNamespace::Vector => log
                 .get(metadata_path!(DockerLogsConfig::NAME, STREAM))
                 .expect("`docker_logs.stream` must exist in the metadata"),
-            LogNamespace::Legacy => log.get(STREAM).expect("stream must exist in the event"),
+            LogNamespace::Legacy => log
+                .get(event_path!(STREAM))
+                .expect("stream must exist in the event"),
         };
 
         let stream = stream_value.coerce_to_bytes();
@@ -1284,8 +1298,13 @@ fn line_agg_adapter(
     let line_agg_out = LineAgg::<_, Bytes, LogEvent>::new(line_agg_in, logic);
     line_agg_out.map(move |(_, message, mut log)| {
         match log_namespace {
-            LogNamespace::Vector => log.insert(".", message),
-            LogNamespace::Legacy => log.insert(log_schema().message_key(), message),
+            LogNamespace::Vector => log.insert(event_path!(), message),
+            LogNamespace::Legacy => log.insert(
+                log_schema()
+                    .message_key_target_path()
+                    .expect("global log_schema.message_key to be valid path"),
+                message,
+            ),
         };
         log
     })

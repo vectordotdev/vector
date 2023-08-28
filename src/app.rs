@@ -8,6 +8,7 @@ use futures::StreamExt;
 #[cfg(feature = "enterprise")]
 use futures_util::future::BoxFuture;
 use once_cell::race::OnceNonZeroUsize;
+use openssl::provider::Provider;
 use tokio::{
     runtime::{self, Runtime},
     sync::mpsc,
@@ -27,7 +28,7 @@ use crate::{
     cli::{handle_config_errors, LogFormat, Opts, RootOpts},
     config::{self, Config, ConfigPath},
     heartbeat,
-    signal::{SignalHandler, SignalPair, SignalRx, SignalTo},
+    signal::{ShutdownError, SignalHandler, SignalPair, SignalRx, SignalTo},
     topology::{
         self, ReloadOutcome, RunningTopology, SharedTopologyController, TopologyController,
     },
@@ -38,6 +39,7 @@ use crate::{
 use std::os::unix::process::ExitStatusExt;
 #[cfg(windows)]
 use std::os::windows::process::ExitStatusExt;
+use tokio::runtime::Handle;
 
 pub static WORKER_THREADS: OnceNonZeroUsize = OnceNonZeroUsize::new();
 
@@ -48,8 +50,8 @@ use tokio::sync::broadcast::error::RecvError;
 pub struct ApplicationConfig {
     pub config_paths: Vec<config::ConfigPath>,
     pub topology: RunningTopology,
-    pub graceful_crash_sender: mpsc::UnboundedSender<()>,
-    pub graceful_crash_receiver: mpsc::UnboundedReceiver<()>,
+    pub graceful_crash_sender: mpsc::UnboundedSender<ShutdownError>,
+    pub graceful_crash_receiver: mpsc::UnboundedReceiver<ShutdownError>,
     #[cfg(feature = "api")]
     pub api: config::api::Options,
     #[cfg(feature = "enterprise")]
@@ -60,6 +62,7 @@ pub struct Application {
     pub require_healthy: Option<bool>,
     pub config: ApplicationConfig,
     pub signals: SignalPair,
+    pub openssl_providers: Option<Vec<Provider>>,
 }
 
 impl ApplicationConfig {
@@ -122,13 +125,13 @@ impl ApplicationConfig {
 
     /// Configure the API server, if applicable
     #[cfg(feature = "api")]
-    pub fn setup_api(&self, runtime: &Runtime) -> Option<api::Server> {
+    pub fn setup_api(&self, handle: &Handle) -> Option<api::Server> {
         if self.api.enabled {
             match api::Server::start(
                 self.topology.config(),
                 self.topology.watch(),
                 std::sync::Arc::clone(&self.topology.running),
-                runtime,
+                handle,
             ) {
                 Ok(api_server) => {
                     emit!(ApiStarted {
@@ -138,9 +141,12 @@ impl ApplicationConfig {
 
                     Some(api_server)
                 }
-                Err(e) => {
-                    error!("An error occurred that Vector couldn't handle: {}.", e);
-                    _ = self.graceful_crash_sender.send(());
+                Err(error) => {
+                    let error = error.to_string();
+                    error!("An error occurred that Vector couldn't handle: {}.", error);
+                    _ = self
+                        .graceful_crash_sender
+                        .send(ShutdownError::ApiFailed { error });
                     None
                 }
             }
@@ -159,7 +165,8 @@ impl Application {
     }
 
     pub fn prepare_start() -> Result<(Runtime, StartedApplication), ExitCode> {
-        Self::prepare().and_then(|(runtime, app)| app.start(&runtime).map(|app| (runtime, app)))
+        Self::prepare()
+            .and_then(|(runtime, app)| app.start(runtime.handle()).map(|app| (runtime, app)))
     }
 
     pub fn prepare() -> Result<(Runtime, Self), ExitCode> {
@@ -173,7 +180,7 @@ impl Application {
     }
 
     pub fn prepare_from_opts(opts: Opts) -> Result<(Runtime, Self), ExitCode> {
-        init_global();
+        init_global(!opts.root.openssl_no_probe);
 
         let color = opts.root.color.use_color();
 
@@ -183,6 +190,17 @@ impl Application {
             opts.log_level(),
             opts.root.internal_log_rate_limit,
         );
+
+        // Can only log this after initializing the logging subsystem
+        if opts.root.openssl_no_probe {
+            debug!(message = "Disabled probing and configuration of root certificate locations on the system for OpenSSL.");
+        }
+
+        let openssl_providers = opts
+            .root
+            .openssl_legacy_provider
+            .then(load_openssl_legacy_providers)
+            .transpose()?;
 
         let runtime = build_runtime(opts.root.threads, "vector-worker")?;
 
@@ -204,27 +222,29 @@ impl Application {
                 require_healthy: opts.root.require_healthy,
                 config,
                 signals,
+                openssl_providers,
             },
         ))
     }
 
-    pub fn start(self, runtime: &Runtime) -> Result<StartedApplication, ExitCode> {
+    pub fn start(self, handle: &Handle) -> Result<StartedApplication, ExitCode> {
         // Any internal_logs sources will have grabbed a copy of the
         // early buffer by this point and set up a subscriber.
         crate::trace::stop_early_buffering();
 
         emit!(VectorStarted);
-        runtime.spawn(heartbeat::heartbeat());
+        handle.spawn(heartbeat::heartbeat());
 
         let Self {
             require_healthy,
             config,
             signals,
+            openssl_providers,
         } = self;
 
         let topology_controller = SharedTopologyController::new(TopologyController {
             #[cfg(feature = "api")]
-            api_server: config.setup_api(runtime),
+            api_server: config.setup_api(handle),
             topology: config.topology,
             config_paths: config.config_paths.clone(),
             require_healthy,
@@ -237,15 +257,17 @@ impl Application {
             graceful_crash_receiver: config.graceful_crash_receiver,
             signals,
             topology_controller,
+            openssl_providers,
         })
     }
 }
 
 pub struct StartedApplication {
     pub config_paths: Vec<ConfigPath>,
-    pub graceful_crash_receiver: mpsc::UnboundedReceiver<()>,
+    pub graceful_crash_receiver: mpsc::UnboundedReceiver<ShutdownError>,
     pub signals: SignalPair,
     pub topology_controller: SharedTopologyController,
+    pub openssl_providers: Option<Vec<Provider>>,
 }
 
 impl StartedApplication {
@@ -259,6 +281,7 @@ impl StartedApplication {
             graceful_crash_receiver,
             signals,
             topology_controller,
+            openssl_providers,
         } = self;
 
         let mut graceful_crash = UnboundedReceiverStream::new(graceful_crash_receiver);
@@ -268,42 +291,19 @@ impl StartedApplication {
 
         let signal = loop {
             tokio::select! {
-                signal = signal_rx.recv() => {
-                    match signal {
-                        Ok(SignalTo::ReloadFromConfigBuilder(config_builder)) => {
-                            let mut topology_controller = topology_controller.lock().await;
-                            let new_config = config_builder.build().map_err(handle_config_errors).ok();
-                            if let ReloadOutcome::FatalError = topology_controller.reload(new_config).await {
-                                break SignalTo::Shutdown;
-                            }
-                        }
-                        Ok(SignalTo::ReloadFromDisk) => {
-                            let mut topology_controller = topology_controller.lock().await;
-
-                            // Reload paths
-                            if let Some(paths) = config::process_paths(&config_paths) {
-                                topology_controller.config_paths = paths;
-                            }
-
-                            // Reload config
-                            let new_config = config::load_from_paths_with_provider_and_secrets(&topology_controller.config_paths, &mut signal_handler)
-                                .await
-                                .map_err(handle_config_errors).ok();
-
-                            if let ReloadOutcome::FatalError = topology_controller.reload(new_config).await {
-                                break SignalTo::Shutdown;
-                            }
-                        },
-                        Err(RecvError::Lagged(amt)) => warn!("Overflow, dropped {} signals.", amt),
-                        Err(RecvError::Closed) => break SignalTo::Shutdown,
-                        Ok(signal) => break signal,
-                    }
-                }
+                signal = signal_rx.recv() => if let Some(signal) = handle_signal(
+                    signal,
+                    &topology_controller,
+                    &config_paths,
+                    &mut signal_handler,
+                ).await {
+                    break signal;
+                },
                 // Trigger graceful shutdown if a component crashed, or all sources have ended.
-                _ = graceful_crash.next() => break SignalTo::Shutdown,
+                error = graceful_crash.next() => break SignalTo::Shutdown(error),
                 _ = TopologyController::sources_finished(topology_controller.clone()) => {
                     info!("All sources have finished.");
-                    break SignalTo::Shutdown
+                    break SignalTo::Shutdown(None)
                 } ,
                 else => unreachable!("Signal streams never end"),
             }
@@ -313,7 +313,54 @@ impl StartedApplication {
             signal,
             signal_rx,
             topology_controller,
+            openssl_providers,
         }
+    }
+}
+
+async fn handle_signal(
+    signal: Result<SignalTo, RecvError>,
+    topology_controller: &SharedTopologyController,
+    config_paths: &[ConfigPath],
+    signal_handler: &mut SignalHandler,
+) -> Option<SignalTo> {
+    match signal {
+        Ok(SignalTo::ReloadFromConfigBuilder(config_builder)) => {
+            let mut topology_controller = topology_controller.lock().await;
+            let new_config = config_builder.build().map_err(handle_config_errors).ok();
+            match topology_controller.reload(new_config).await {
+                ReloadOutcome::FatalError(error) => Some(SignalTo::Shutdown(Some(error))),
+                _ => None,
+            }
+        }
+        Ok(SignalTo::ReloadFromDisk) => {
+            let mut topology_controller = topology_controller.lock().await;
+
+            // Reload paths
+            if let Some(paths) = config::process_paths(config_paths) {
+                topology_controller.config_paths = paths;
+            }
+
+            // Reload config
+            let new_config = config::load_from_paths_with_provider_and_secrets(
+                &topology_controller.config_paths,
+                signal_handler,
+            )
+            .await
+            .map_err(handle_config_errors)
+            .ok();
+
+            match topology_controller.reload(new_config).await {
+                ReloadOutcome::FatalError(error) => Some(SignalTo::Shutdown(Some(error))),
+                _ => None,
+            }
+        }
+        Err(RecvError::Lagged(amt)) => {
+            warn!("Overflow, dropped {} signals.", amt);
+            None
+        }
+        Err(RecvError::Closed) => Some(SignalTo::Shutdown(None)),
+        Ok(signal) => Some(signal),
     }
 }
 
@@ -321,14 +368,16 @@ pub struct FinishedApplication {
     pub signal: SignalTo,
     pub signal_rx: SignalRx,
     pub topology_controller: SharedTopologyController,
+    pub openssl_providers: Option<Vec<Provider>>,
 }
 
 impl FinishedApplication {
     pub async fn shutdown(self) -> ExitStatus {
         let FinishedApplication {
             signal,
-            mut signal_rx,
+            signal_rx,
             topology_controller,
+            openssl_providers,
         } = self;
 
         // At this point, we'll have the only reference to the shared topology controller and can
@@ -338,54 +387,48 @@ impl FinishedApplication {
             .expect("fail to unwrap topology controller")
             .into_inner();
 
-        match signal {
-            SignalTo::Shutdown => {
-                emit!(VectorStopped);
-                tokio::select! {
-                    _ = topology_controller.stop() => ExitStatus::from_raw({
-                            #[cfg(windows)]
-                            {
-                                exitcode::OK as u32
-                            }
-                            #[cfg(unix)]
-                            exitcode::OK
-                    }), // Graceful shutdown finished
-                    _ = signal_rx.recv() => {
-                        // It is highly unlikely that this event will exit from topology.
-                        emit!(VectorQuit);
-                        // Dropping the shutdown future will immediately shut the server down
-                        ExitStatus::from_raw({
-                            #[cfg(windows)]
-                            {
-                                exitcode::UNAVAILABLE as u32
-                            }
-                            #[cfg(unix)]
-                            exitcode::OK
-                        })
-                    }
-
-                }
-            }
-            SignalTo::Quit => {
-                // It is highly unlikely that this event will exit from topology.
-                emit!(VectorQuit);
-                drop(topology_controller);
-                ExitStatus::from_raw({
-                    #[cfg(windows)]
-                    {
-                        exitcode::UNAVAILABLE as u32
-                    }
-                    #[cfg(unix)]
-                    exitcode::OK
-                })
-            }
+        let status = match signal {
+            SignalTo::Shutdown(_) => Self::stop(topology_controller, signal_rx).await,
+            SignalTo::Quit => Self::quit(),
             _ => unreachable!(),
+        };
+        drop(openssl_providers);
+        status
+    }
+
+    async fn stop(topology_controller: TopologyController, mut signal_rx: SignalRx) -> ExitStatus {
+        emit!(VectorStopped);
+        tokio::select! {
+            _ = topology_controller.stop() => ExitStatus::from_raw({
+                #[cfg(windows)]
+                {
+                    exitcode::OK as u32
+                }
+                #[cfg(unix)]
+                exitcode::OK
+            }), // Graceful shutdown finished
+            _ = signal_rx.recv() => Self::quit(),
         }
+    }
+
+    fn quit() -> ExitStatus {
+        // It is highly unlikely that this event will exit from topology.
+        emit!(VectorQuit);
+        ExitStatus::from_raw({
+            #[cfg(windows)]
+            {
+                exitcode::UNAVAILABLE as u32
+            }
+            #[cfg(unix)]
+            exitcode::OK
+        })
     }
 }
 
-pub fn init_global() {
-    openssl_probe::init_ssl_cert_env_vars();
+pub fn init_global(openssl_probe: bool) {
+    if openssl_probe {
+        openssl_probe::init_ssl_cert_env_vars();
+    }
 
     #[cfg(not(feature = "enterprise-tests"))]
     metrics::init_global().expect("metrics initialization failed");
@@ -466,12 +509,14 @@ pub async fn load_configs(
         paths = ?config_paths.iter().map(<&PathBuf>::from).collect::<Vec<_>>()
     );
 
+    // config::init_log_schema should be called before initializing sources.
+    #[cfg(not(feature = "enterprise-tests"))]
+    config::init_log_schema(&config_paths, true).map_err(handle_config_errors)?;
+
     let mut config =
         config::load_from_paths_with_provider_and_secrets(&config_paths, signal_handler)
             .await
             .map_err(handle_config_errors)?;
-    #[cfg(not(feature = "enterprise-tests"))]
-    config::init_log_schema(config.global.log_schema.clone(), true);
 
     config::init_telemetry(config.global.telemetry.clone(), true);
 
@@ -520,4 +565,23 @@ pub fn init_logging(color: bool, format: LogFormat, log_level: &str, rate: u64) 
         internal_log_rate_secs = rate,
     );
     info!(message = "Log level is enabled.", level = ?level);
+}
+
+/// Load the legacy OpenSSL provider.
+///
+/// The returned [Provider] must stay in scope for the entire lifetime of the application, as it
+/// will be unloaded when it is dropped.
+pub fn load_openssl_legacy_providers() -> Result<Vec<Provider>, ExitCode> {
+    warn!(message = "DEPRECATED The openssl legacy provider provides algorithms and key sizes no longer recommended for use. Set `--openssl-legacy-provider=false` or `VECTOR_OPENSSL_LEGACY_PROVIDER=false` to disable. See https://vector.dev/highlights/2023-08-15-0-32-0-upgrade-guide/#legacy-openssl for details.");
+    ["legacy", "default"].into_iter().map(|provider_name| {
+        Provider::try_load(None, provider_name, true)
+            .map(|provider| {
+                info!(message = "Loaded openssl provider.", provider = provider_name);
+                provider
+            })
+            .map_err(|error| {
+                error!(message = "Failed to load openssl provider.", provider = provider_name, %error);
+                exitcode::UNAVAILABLE
+            })
+    }).collect()
 }

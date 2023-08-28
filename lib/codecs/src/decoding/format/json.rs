@@ -1,9 +1,6 @@
-use std::convert::TryInto;
-
 use bytes::Bytes;
 use chrono::Utc;
 use derivative::Derivative;
-use lookup::PathPrefix;
 use smallvec::{smallvec, SmallVec};
 use vector_config::configurable_component;
 use vector_core::{
@@ -123,9 +120,9 @@ impl Deserializer for JsonDeserializer {
         let mut events = match json {
             serde_json::Value::Array(values) => values
                 .into_iter()
-                .map(TryInto::try_into)
+                .map(|json| Event::from_json_value(json, log_namespace))
                 .collect::<Result<SmallVec<[Event; 1]>, _>>()?,
-            _ => smallvec![json.try_into()?],
+            _ => smallvec![Event::from_json_value(json, log_namespace)?],
         };
 
         let events = match log_namespace {
@@ -133,11 +130,11 @@ impl Deserializer for JsonDeserializer {
             LogNamespace::Legacy => {
                 let timestamp = Utc::now();
 
-                if let Some(timestamp_key) = log_schema().timestamp_key() {
+                if let Some(timestamp_key) = log_schema().timestamp_key_target_path() {
                     for event in &mut events {
                         let log = event.as_mut_log();
-                        if !log.contains((PathPrefix::Event, timestamp_key)) {
-                            log.insert((PathPrefix::Event, timestamp_key), timestamp);
+                        if !log.contains(timestamp_key) {
+                            log.insert(timestamp_key, timestamp);
                         }
                     }
                 }
@@ -161,6 +158,7 @@ impl From<&JsonDeserializerConfig> for JsonDeserializer {
 #[cfg(test)]
 mod tests {
     use vector_core::config::log_schema;
+    use vrl::core::Value;
 
     use super::*;
 
@@ -192,6 +190,22 @@ mod tests {
     }
 
     #[test]
+    fn deserialize_non_object_vector_namespace() {
+        let input = Bytes::from(r#"null"#);
+        let deserializer = JsonDeserializer::default();
+
+        let namespace = LogNamespace::Vector;
+        let events = deserializer.parse(input.clone(), namespace).unwrap();
+        let mut events = events.into_iter();
+
+        let event = events.next().unwrap();
+        let log = event.as_log();
+        assert_eq!(log["."], Value::Null);
+
+        assert_eq!(events.next(), None);
+    }
+
+    #[test]
     fn deserialize_json_array() {
         let input = Bytes::from(r#"[{ "foo": 123 }, { "bar": 456 }]"#);
         let deserializer = JsonDeserializer::default();
@@ -218,7 +232,7 @@ mod tests {
                 let log = event.as_log();
                 assert_eq!(log["bar"], 456.into());
                 assert_eq!(
-                    log.get((PathPrefix::Event, log_schema().timestamp_key().unwrap()))
+                    log.get(log_schema().timestamp_key_target_path().unwrap())
                         .is_some(),
                     namespace == LogNamespace::Legacy
                 );

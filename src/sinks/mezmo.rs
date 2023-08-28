@@ -6,6 +6,7 @@ use http::{Request, StatusCode, Uri};
 use serde_json::json;
 use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
+use vrl::event_path;
 use vrl::value::{Kind, Value};
 
 use crate::{
@@ -253,12 +254,15 @@ impl HttpEventEncoder<PartitionInnerBuffer<serde_json::Value, PartitionKey>> for
 
         let line = log
             .message_path()
-            .and_then(|path| log.remove(path.as_str()))
+            .cloned()
+            .as_ref()
+            .and_then(|path| log.remove(path))
             .unwrap_or_else(|| String::from("").into());
 
         let timestamp: Value = log
             .timestamp_path()
-            .and_then(|path| log.remove(path.as_str()))
+            .cloned()
+            .and_then(|path| log.remove(&path))
             .unwrap_or_else(|| chrono::Utc::now().into());
 
         let mut map = serde_json::map::Map::new();
@@ -266,15 +270,15 @@ impl HttpEventEncoder<PartitionInnerBuffer<serde_json::Value, PartitionKey>> for
         map.insert("line".to_string(), json!(line));
         map.insert("timestamp".to_string(), json!(timestamp));
 
-        if let Some(env) = log.remove("env") {
+        if let Some(env) = log.remove(event_path!("env")) {
             map.insert("env".to_string(), json!(env));
         }
 
-        if let Some(app) = log.remove("app") {
+        if let Some(app) = log.remove(event_path!("app")) {
             map.insert("app".to_string(), json!(app));
         }
 
-        if let Some(file) = log.remove("file") {
+        if let Some(file) = log.remove(event_path!("file")) {
             map.insert("file".to_string(), json!(file));
         }
 

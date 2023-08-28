@@ -138,7 +138,10 @@ impl SourceConfig for OpentelemetryConfig {
             log_namespace,
             events_received: events_received.clone(),
         })
-        .accept_compressed(tonic::codec::CompressionEncoding::Gzip);
+        .accept_compressed(tonic::codec::CompressionEncoding::Gzip)
+        // Tonic added a default of 4MB in 0.9. This replaces the old behavior.
+        .max_decoding_message_size(usize::MAX);
+
         let grpc_source = run_grpc_server(
             self.grpc.address,
             grpc_tls_settings,

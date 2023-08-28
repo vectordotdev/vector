@@ -70,6 +70,8 @@ on:
         value: ${{ jobs.int_tests.outputs.fluent }}
       gcp:
         value: ${{ jobs.int_tests.outputs.gcp }}
+      greptimedb:
+        value: ${{ jobs.int_tests.outputs.greptimedb }}
       humio:
         value: ${{ jobs.int_tests.outputs.humio }}
       http-client:
@@ -119,8 +121,6 @@ jobs:
       k8s: ${{ steps.filter.outputs.k8s }}
     steps:
     - uses: actions/checkout@v3
-      with:
-        submodules: "recursive"
 
     - uses: dorny/paths-filter@v2
       id: filter
@@ -196,6 +196,7 @@ jobs:
       eventstoredb: ${{ steps.filter.outputs.eventstoredb }}
       fluent: ${{ steps.filter.outputs.fluent }}
       gcp: ${{ steps.filter.outputs.gcp }}
+      greptimedb: ${{ steps.filter.outputs.greptimedb }}
       humio: ${{ steps.filter.outputs.humio }}
       http-client: ${{ steps.filter.outputs.http-client }}
       influxdb: ${{ steps.filter.outputs.influxdb }}
@@ -214,8 +215,6 @@ jobs:
       webhdfs: ${{ steps.filter.outputs.webhdfs }}
     steps:
       - uses: actions/checkout@v3
-        with:
-          submodules: "recursive"
 
       # creates a yaml file that contains the filters for each integration,
       # extracted from the output of the `vdev int ci-paths` command, which

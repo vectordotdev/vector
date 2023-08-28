@@ -241,7 +241,7 @@ base: components: sinks: kafka: configuration: {
 			no key.
 			"""
 		required: false
-		type: string: examples: ["user_id"]
+		type: string: examples: ["user_id", ".my_topic", "%my_topic"]
 	}
 	librdkafka_options: {
 		description: """

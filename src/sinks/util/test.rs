@@ -20,7 +20,7 @@ where
     for<'a> T: Deserialize<'a> + SinkConfig,
 {
     let sink_config: T = toml::from_str(config)?;
-    let cx = SinkContext::new_test();
+    let cx = SinkContext::default();
 
     Ok((sink_config, cx))
 }

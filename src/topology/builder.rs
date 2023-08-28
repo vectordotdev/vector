@@ -20,6 +20,7 @@ use vector_common::internal_event::{
     self, CountByteSize, EventsSent, InternalEventHandle as _, Registered,
 };
 use vector_core::config::LogNamespace;
+use vector_core::transform::update_runtime_schema_definition;
 use vector_core::{
     buffers::{
         topology::{
@@ -69,6 +70,8 @@ static TRANSFORM_CONCURRENCY_LIMIT: Lazy<usize> = Lazy::new(|| {
         .map(std::num::NonZeroUsize::get)
         .unwrap_or_else(crate::num_threads)
 });
+
+const INTERNAL_SOURCES: [&str; 2] = ["internal_logs", "internal_metrics"];
 
 /// Builds only the new pieces, and doesn't check their topology.
 pub async fn build_pieces(
@@ -242,7 +245,7 @@ impl<'a> Builder<'a> {
             let mut schema_definitions = HashMap::with_capacity(source_outputs.len());
 
             for output in source_outputs.into_iter() {
-                let mut rx = builder.add_source_output(output.clone());
+                let mut rx = builder.add_source_output(output.clone(), key.clone());
 
                 let (mut fanout, control) = Fanout::new();
                 let source = Arc::new(key.clone());
@@ -312,8 +315,9 @@ impl<'a> Builder<'a> {
 
             let pipeline = builder.build();
 
-            let (shutdown_signal, force_shutdown_tripwire) =
-                self.shutdown_coordinator.register_source(key);
+            let (shutdown_signal, force_shutdown_tripwire) = self
+                .shutdown_coordinator
+                .register_source(key, INTERNAL_SOURCES.contains(&typetag));
 
             let context = SourceContext {
                 key: key.clone(),
@@ -735,6 +739,7 @@ fn build_transform(
             node.input_details.data_type(),
             node.typetag,
             &node.key,
+            &node.outputs,
         ),
     }
 }
@@ -744,7 +749,7 @@ fn build_sync_transform(
     node: TransformNode,
     input_rx: BufferReceiver<EventArray>,
 ) -> (Task, HashMap<OutputId, fanout::ControlChannel>) {
-    let (outputs, controls) = TransformOutputs::new(node.outputs);
+    let (outputs, controls) = TransformOutputs::new(node.outputs, &node.key);
 
     let runner = Runner::new(t, input_rx, node.input_details.data_type(), outputs);
     let transform = if node.enable_concurrency {
@@ -926,6 +931,7 @@ fn build_task_transform(
     input_type: DataType,
     typetag: &str,
     key: &ComponentKey,
+    outputs: &[TransformOutput],
 ) -> (Task, HashMap<OutputId, fanout::ControlChannel>) {
     let (mut fanout, control) = Fanout::new();
 
@@ -941,8 +947,30 @@ fn build_task_transform(
             ))
         });
     let events_sent = register!(EventsSent::from(internal_event::Output(None)));
+    let output_id = Arc::new(OutputId {
+        component: key.clone(),
+        port: None,
+    });
+
+    // Task transforms can only write to the default output, so only a single schema def map is needed
+    let schema_definition_map = outputs
+        .iter()
+        .find(|x| x.port.is_none())
+        .expect("output for default port required for task transforms")
+        .log_schema_definitions
+        .clone()
+        .into_iter()
+        .map(|(key, value)| (key, Arc::new(value)))
+        .collect();
+
     let stream = t
         .transform(Box::pin(filtered))
+        .map(move |mut events| {
+            for event in events.iter_events_mut() {
+                update_runtime_schema_definition(event, &output_id, &schema_definition_map);
+            }
+            events
+        })
         .inspect(move |events: &EventArray| {
             events_sent.emit(CountByteSize(
                 events.len(),

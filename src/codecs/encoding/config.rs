@@ -172,10 +172,7 @@ mod test {
             transformer.only_fields(),
             &Some(vec![ConfigValuePath(parse_value_path("a.b[0]").unwrap())])
         );
-        assert_eq!(
-            transformer.except_fields(),
-            &Some(vec!["ignore_me".to_owned()])
-        );
+        assert_eq!(transformer.except_fields(), &Some(vec!["ignore_me".into()]));
         assert_eq!(transformer.timestamp_format(), &Some(TimestampFormat::Unix));
     }
 
@@ -207,10 +204,7 @@ mod test {
             transformer.only_fields(),
             &Some(vec![ConfigValuePath(parse_value_path("a.b[0]").unwrap())])
         );
-        assert_eq!(
-            transformer.except_fields(),
-            &Some(vec!["ignore_me".to_owned()])
-        );
+        assert_eq!(transformer.except_fields(), &Some(vec!["ignore_me".into()]));
         assert_eq!(transformer.timestamp_format(), &Some(TimestampFormat::Unix));
     }
 
@@ -239,10 +233,7 @@ mod test {
             transformer.only_fields(),
             &Some(vec![ConfigValuePath(parse_value_path("a.b[0]").unwrap())])
         );
-        assert_eq!(
-            transformer.except_fields(),
-            &Some(vec!["ignore_me".to_owned()])
-        );
+        assert_eq!(transformer.except_fields(), &Some(vec!["ignore_me".into()]));
         assert_eq!(transformer.timestamp_format(), &Some(TimestampFormat::Unix));
     }
 }

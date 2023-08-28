@@ -3,6 +3,7 @@ use futures::stream::{BoxStream, StreamExt};
 use indoc::indoc;
 use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
+use vrl::event_path;
 
 use super::Region;
 use crate::{
@@ -143,12 +144,12 @@ fn map_timestamp(mut events: EventArray) -> EventArray {
     match &mut events {
         EventArray::Logs(logs) => {
             for log in logs {
-                if let Some(path) = log.timestamp_path() {
-                    log.rename_key(path.as_str(), "@timestamp");
+                if let Some(path) = log.timestamp_path().cloned().as_ref() {
+                    log.rename_key(path, event_path!("@timestamp"));
                 }
 
-                if let Some(path) = log.host_path() {
-                    log.rename_key(path.as_str(), "os.host");
+                if let Some(path) = log.host_path().cloned().as_ref() {
+                    log.rename_key(path, event_path!("os.host"));
                 }
             }
         }

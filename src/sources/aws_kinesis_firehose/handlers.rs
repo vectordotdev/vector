@@ -93,7 +93,7 @@ pub(super) async fn firehose(
                         if let Event::Log(ref mut log) = event {
                             log_namespace.insert_vector_metadata(
                                 log,
-                                Some(log_schema().source_type_key()),
+                                log_schema().source_type_key(),
                                 path!("source_type"),
                                 Bytes::from_static(AwsKinesisFirehoseConfig::NAME.as_bytes()),
                             );

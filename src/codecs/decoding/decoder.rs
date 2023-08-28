@@ -27,7 +27,7 @@ impl Default for Decoder {
     fn default() -> Self {
         Self {
             framer: Framer::NewlineDelimited(NewlineDelimitedDecoder::new()),
-            deserializer: Deserializer::Bytes(BytesDeserializer::new()),
+            deserializer: Deserializer::Bytes(BytesDeserializer),
             log_namespace: LogNamespace::Legacy,
         }
     }

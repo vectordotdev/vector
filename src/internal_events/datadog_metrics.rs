@@ -7,19 +7,17 @@ use vector_common::internal_event::{
 };
 
 #[derive(Debug)]
-pub struct DatadogMetricsEncodingError {
-    pub error_message: &'static str,
+pub struct DatadogMetricsEncodingError<'a> {
+    pub reason: &'a str,
     pub error_code: &'static str,
     pub dropped_events: usize,
 }
 
-impl InternalEvent for DatadogMetricsEncodingError {
+impl<'a> InternalEvent for DatadogMetricsEncodingError<'a> {
     fn emit(self) {
-        let reason = "Failed to encode Datadog metrics.";
         error!(
-            message = reason,
-            error = %self.error_message,
-            error_code = %self.error_code,
+            message = self.reason,
+            error_code = self.error_code,
             error_type = error_type::ENCODER_FAILED,
             intentional = "false",
             stage = error_stage::PROCESSING,
@@ -35,7 +33,7 @@ impl InternalEvent for DatadogMetricsEncodingError {
         if self.dropped_events > 0 {
             emit!(ComponentEventsDropped::<UNINTENTIONAL> {
                 count: self.dropped_events,
-                reason,
+                reason: self.reason,
             });
         }
     }

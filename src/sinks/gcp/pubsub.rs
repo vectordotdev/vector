@@ -260,7 +260,7 @@ mod tests {
                 encoding.codec = "json"
             "#})
         .unwrap();
-        if config.build(SinkContext::new_test()).await.is_ok() {
+        if config.build(SinkContext::default()).await.is_ok() {
             panic!("config.build failed to error");
         }
     }
@@ -302,7 +302,7 @@ mod integration_tests {
     }
 
     async fn config_build(topic: &str) -> (VectorSink, crate::sinks::Healthcheck) {
-        let cx = SinkContext::new_test();
+        let cx = SinkContext::default();
         config(topic).build(cx).await.expect("Building sink failed")
     }
 
@@ -329,7 +329,8 @@ mod integration_tests {
         for i in 0..input.len() {
             let data = messages[i].message.decode_data();
             let data = serde_json::to_value(data).unwrap();
-            let expected = serde_json::to_value(input[i].as_log().all_fields().unwrap()).unwrap();
+            let expected =
+                serde_json::to_value(input[i].as_log().all_event_fields().unwrap()).unwrap();
             assert_eq!(data, expected);
         }
     }

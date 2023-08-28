@@ -3,6 +3,7 @@ use std::num::NonZeroUsize;
 use bytes::{Bytes, BytesMut};
 use rdkafka::message::{Header, OwnedHeaders};
 use tokio_util::codec::Encoder as _;
+use vrl::path::OwnedTargetPath;
 
 use crate::{
     codecs::{Encoder, Transformer},
@@ -16,8 +17,8 @@ use crate::{
 };
 
 pub struct KafkaRequestBuilder {
-    pub key_field: Option<String>,
-    pub headers_key: Option<String>,
+    pub key_field: Option<OwnedTargetPath>,
+    pub headers_key: Option<OwnedTargetPath>,
     pub topic_template: Template,
     pub transformer: Transformer,
     pub encoder: Encoder<()>,
@@ -37,17 +38,19 @@ impl KafkaRequestBuilder {
             })
             .ok()?;
 
-        let metadata_builder = RequestMetadataBuilder::from_event(&event);
-
         let metadata = KafkaRequestMetadata {
             finalizers: event.take_finalizers(),
-            key: get_key(&event, &self.key_field),
+            key: get_key(&event, self.key_field.as_ref()),
             timestamp_millis: get_timestamp_millis(&event),
-            headers: get_headers(&event, &self.headers_key),
+            headers: get_headers(&event, self.headers_key.as_ref()),
             topic,
         };
         self.transformer.transform(&mut event);
         let mut body = BytesMut::new();
+
+        // Ensure the metadata builder is built after transforming the event so we have the event
+        // size taking into account any dropped fields.
+        let metadata_builder = RequestMetadataBuilder::from_event(&event);
         self.encoder.encode(event, &mut body).ok()?;
         let body = body.freeze();
 
@@ -62,14 +65,12 @@ impl KafkaRequestBuilder {
     }
 }
 
-fn get_key(event: &Event, key_field: &Option<String>) -> Option<Bytes> {
-    key_field.as_ref().and_then(|key_field| match event {
-        Event::Log(log) => log
-            .get(key_field.as_str())
-            .map(|value| value.coerce_to_bytes()),
+fn get_key(event: &Event, key_field: Option<&OwnedTargetPath>) -> Option<Bytes> {
+    key_field.and_then(|key_field| match event {
+        Event::Log(log) => log.get(key_field).map(|value| value.coerce_to_bytes()),
         Event::Metric(metric) => metric
             .tags()
-            .and_then(|tags| tags.get(key_field))
+            .and_then(|tags| tags.get(key_field.to_string().as_str()))
             .map(|value| value.to_owned().into()),
         _ => None,
     })
@@ -84,10 +85,10 @@ fn get_timestamp_millis(event: &Event) -> Option<i64> {
     .map(|ts| ts.timestamp_millis())
 }
 
-fn get_headers(event: &Event, headers_key: &Option<String>) -> Option<OwnedHeaders> {
-    headers_key.as_ref().and_then(|headers_key| {
+fn get_headers(event: &Event, headers_key: Option<&OwnedTargetPath>) -> Option<OwnedHeaders> {
+    headers_key.and_then(|headers_key| {
         if let Event::Log(log) = event {
-            if let Some(headers) = log.get(headers_key.as_str()) {
+            if let Some(headers) = log.get(headers_key) {
                 match headers {
                     Value::Object(headers_map) => {
                         let mut owned_headers = OwnedHeaders::new_with_capacity(headers_map.len());
@@ -129,15 +130,15 @@ mod tests {
 
     #[test]
     fn kafka_get_headers() {
-        let headers_key = "headers";
+        let headers_key = OwnedTargetPath::try_from("headers".to_string()).unwrap();
         let mut header_values = BTreeMap::new();
         header_values.insert("a-key".to_string(), Value::Bytes(Bytes::from("a-value")));
         header_values.insert("b-key".to_string(), Value::Bytes(Bytes::from("b-value")));
 
         let mut event = Event::Log(LogEvent::from("hello"));
-        event.as_mut_log().insert(headers_key, header_values);
+        event.as_mut_log().insert(&headers_key, header_values);
 
-        let headers = get_headers(&event, &Some(headers_key.to_string())).unwrap();
+        let headers = get_headers(&event, Some(&headers_key)).unwrap();
         assert_eq!(headers.get(0).key, "a-key");
         assert_eq!(headers.get(0).value.unwrap(), "a-value".as_bytes());
         assert_eq!(headers.get(1).key, "b-key");

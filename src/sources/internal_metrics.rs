@@ -1,6 +1,7 @@
 use std::time::Duration;
 
 use futures::StreamExt;
+use lookup::lookup_v2::OptionalValuePath;
 use serde_with::serde_as;
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
@@ -26,7 +27,7 @@ use crate::{
 #[serde(deny_unknown_fields, default)]
 pub struct InternalMetricsConfig {
     /// The interval between metric gathering, in seconds.
-    #[serde_as(as = "serde_with::DurationSeconds<f64>")]
+    #[serde_as(as = "serde_with::DurationSecondsWithFrac<f64>")]
     #[serde(default = "default_scrape_interval")]
     #[configurable(metadata(docs::human_name = "Scrape Interval"))]
     pub scrape_interval_secs: Duration,
@@ -64,7 +65,7 @@ pub struct TagsConfig {
     ///
     /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
     #[serde(default = "default_host_key")]
-    pub host_key: String,
+    pub host_key: OptionalValuePath,
 
     /// Sets the name of the tag to use to add the current process ID to each metric.
     ///
@@ -91,8 +92,8 @@ fn default_namespace() -> String {
     "vector".to_owned()
 }
 
-fn default_host_key() -> String {
-    log_schema().host_key().to_owned()
+fn default_host_key() -> OptionalValuePath {
+    log_schema().host_key().cloned().into()
 }
 
 impl_generate_config_from_default!(InternalMetricsConfig);
@@ -111,10 +112,7 @@ impl SourceConfig for InternalMetricsConfig {
         // namespace for created metrics is already "vector" by default.
         let namespace = self.namespace.clone();
 
-        let host_key = match self.tags.host_key.as_str() {
-            "" => None,
-            s => Some(s.to_owned()),
-        };
+        let host_key = self.tags.host_key.clone();
 
         let pid_key = self
             .tags
@@ -147,7 +145,7 @@ impl SourceConfig for InternalMetricsConfig {
 
 struct InternalMetrics<'a> {
     namespace: String,
-    host_key: Option<String>,
+    host_key: OptionalValuePath,
     pid_key: Option<String>,
     controller: &'a Controller,
     interval: time::Duration,
@@ -179,9 +177,9 @@ impl<'a> InternalMetrics<'a> {
                     metric = metric.with_namespace(Some(self.namespace.clone()));
                 }
 
-                if let Some(host_key) = &self.host_key {
+                if let Some(host_key) = &self.host_key.path {
                     if let Ok(hostname) = &hostname {
-                        metric.replace_tag(host_key.to_owned(), hostname.to_owned());
+                        metric.replace_tag(host_key.to_string(), hostname.to_owned());
                     }
                 }
                 if let Some(pid_key) = &self.pid_key {
@@ -317,7 +315,7 @@ mod tests {
     async fn sets_tags() {
         let event = event_from_config(InternalMetricsConfig {
             tags: TagsConfig {
-                host_key: String::from("my_host_key"),
+                host_key: OptionalValuePath::new("my_host_key"),
                 pid_key: Some(String::from("my_pid_key")),
             },
             ..Default::default()

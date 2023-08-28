@@ -80,6 +80,7 @@ impl SourceConfig for PrometheusRemoteWriteConfig {
             self.address,
             "",
             HttpMethod::Post,
+            StatusCode::OK,
             true,
             &self.tls,
             &self.auth,
@@ -205,7 +206,7 @@ mod test {
                 ..Default::default()
             };
             let (sink, _) = sink
-                .build(SinkContext::new_test())
+                .build(SinkContext::default())
                 .await
                 .expect("Error building config.");
 
@@ -299,7 +300,7 @@ mod test {
                 ..Default::default()
             };
             let (sink, _) = sink
-                .build(SinkContext::new_test())
+                .build(SinkContext::default())
                 .await
                 .expect("Error building config.");
 
