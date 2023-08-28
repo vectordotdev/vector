@@ -488,7 +488,7 @@ impl KafkaPartitionState {
     /// and an AbortHandle that can be used to forcefully end the task.
     fn consume_partition(
         &self,
-        joinset: &mut tokio::task::JoinSet<TopicPartition>,
+        join_set: &mut tokio::task::JoinSet<TopicPartition>,
         tp: TopicPartition,
         consumer: Arc<StreamConsumer<KafkaSourceContext>>,
         p: StreamPartitionQueue<KafkaSourceContext>,
@@ -503,7 +503,7 @@ impl KafkaPartitionState {
 
         let (end_tx, mut end_signal) = tokio::sync::oneshot::channel::<()>();
 
-        let handle = joinset.spawn(async move {
+        let handle = join_set.spawn(async move {
             let mut messages = p.stream();
             let (finalizer, mut ack_stream) = OrderedFinalizer::<FinalizerEntry>::new(None);
 
