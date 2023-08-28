@@ -167,7 +167,7 @@ impl Default for PrometheusExporterConfig {
     }
 }
 
-fn default_address() -> SocketAddr {
+const fn default_address() -> SocketAddr {
     use std::net::{IpAddr, Ipv4Addr};
 
     SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), 9598)
