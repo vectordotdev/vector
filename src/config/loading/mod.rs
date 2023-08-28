@@ -330,20 +330,14 @@ fn default_config_paths() -> Vec<ConfigPath> {
             default_path,
             yaml_path);
 
-        vec![ConfigPath::File(
-            PathBuf::from(default_path),
-            Some(Format::Toml),
-        )]
+        vec![ConfigPath::File(default_path, Some(Format::Toml))]
     } else {
         warn!(
             "The {:?} config path does not exist. Vector will attempt to use new default {:?} instead.",
             default_path, yaml_path
         );
 
-        vec![ConfigPath::File(
-            PathBuf::from(yaml_path),
-            Some(Format::Yaml),
-        )]
+        vec![ConfigPath::File(yaml_path, Some(Format::Yaml))]
     }
 }
 
