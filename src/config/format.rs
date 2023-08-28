@@ -74,16 +74,6 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use proptest::prelude::*;
-
-    impl Arbitrary for Format {
-        type Parameters = ();
-        fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
-            prop_oneof![Just(Format::Toml), Just(Format::Json), Just(Format::Yaml),].boxed()
-        }
-
-        type Strategy = BoxedStrategy<Self>;
-    }
 
     /// This test ensures the logic to guess file format from the file path
     /// works correctly.
