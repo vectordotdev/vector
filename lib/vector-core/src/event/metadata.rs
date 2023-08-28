@@ -288,7 +288,7 @@ impl EventMetadata {
         self
     }
 
-    /// Replaces the existing datgadog origin metadata with the given one.
+    /// Replaces the existing `DatadogMetricOriginMetadata` with the given one.
     #[must_use]
     pub fn with_origin_metadata(mut self, origin_metadata: DatadogMetricOriginMetadata) -> Self {
         self.datadog_origin_metadata = Some(origin_metadata);
