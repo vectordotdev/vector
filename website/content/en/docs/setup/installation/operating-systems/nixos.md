@@ -8,7 +8,7 @@ weight: 6
 [NixOS] is a Linux distribution built on top of the Nix package manager. This
 page covers installing and managing Vector on NixOS.
 
-Nixpkgs has a [community maintained package][nixpkg-vector] for Vector. It can 
+Nixpkgs has a [community maintained package][nixpkg-vector] for Vector. It can
 be installed on a NixOS system with the following snippet in
 `configuration.nix`:
 
