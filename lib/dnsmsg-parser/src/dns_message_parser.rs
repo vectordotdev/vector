@@ -846,9 +846,7 @@ fn parse_edns_options(edns: &Edns) -> DnsParserResult<Vec<EdnsOptionEntry>> {
             EdnsOption::Unknown(_, opt_data) => Ok(parse_edns_opt(*code, opt_data)),
             option => Vec::<u8>::try_from(option)
                 .map(|bytes| parse_edns_opt(*code, &bytes))
-                .map_err(|source| DnsMessageParserError::TrustDnsError {
-                    source: ProtoError::from(source),
-                }),
+                .map_err(|source| DnsMessageParserError::TrustDnsError { source }),
         })
         .collect()
 }
