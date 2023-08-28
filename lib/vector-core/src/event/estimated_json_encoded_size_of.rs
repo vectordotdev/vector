@@ -87,7 +87,7 @@ impl EstimatedJsonEncodedSizeOf for Value {
 /// need for UTF-8 replacement characters.
 ///
 /// This is the main reason why `EstimatedJsonEncodedSizeOf` is named as is, as most other types can
-/// be calculated exactly without a noticable performance penalty.
+/// be calculated exactly without a noticeable performance penalty.
 impl EstimatedJsonEncodedSizeOf for str {
     fn estimated_json_encoded_size_of(&self) -> JsonSize {
         JsonSize::new(QUOTES_SIZE + self.len())

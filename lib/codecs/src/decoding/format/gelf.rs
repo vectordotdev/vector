@@ -22,7 +22,7 @@ use crate::{gelf_fields::*, VALID_FIELD_REGEX};
 
 /// On GELF decoding behavior:
 ///   Graylog has a relaxed decoding. They are much more lenient than the spec would
-///   suggest. We've elected to take a more strict approach to maintain backwards compatability
+///   suggest. We've elected to take a more strict approach to maintain backwards compatibility
 ///   in the event that we need to change the behavior to be more relaxed, so that prior versions
 ///   of vector will still work with the new relaxed decoding.
 
