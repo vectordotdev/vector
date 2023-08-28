@@ -242,7 +242,12 @@ pub enum SubCommand {
     /// Validate the target config, then exit.
     Validate(validate::Opts),
 
-    /// Convert a config (or a directory of configs) from one format to another.
+    /// Convert a config file from one format to another.
+    /// This command can also walk directories recursively and convert all config files that are discovered.
+    /// Note that this is a best effort conversion due to the following reasons:
+    /// * The comments from the original config file are not preserved.
+    /// * Explicitly set default values in the original implementation might be omitted.
+    /// * Depending on how each source/sink config configuration serde, there might be entries with null values.
     ConvertConfig(convert_config::Opts),
 
     /// Generate a Vector configuration containing a list of components.
