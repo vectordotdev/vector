@@ -528,6 +528,13 @@ fn encode_timestamp(timestamp: Option<DateTime<Utc>>) -> i64 {
     }
 }
 
+// Given the vector source type, return the OriginService value associated with that integration.
+//
+// In order to preserve consistent behavior, we intentionally don't set origin metadata
+// for the case where the Datadog Agent did not set it.
+// Some sources such as `kafka`, `nats`, `redis` for example, are only capable of receiving metrics
+// with the `native` or `native_json` codec. In such cases we intentionally do not set the origin
+// metadata here, because the true origin will have already been determined to be a pass-through.
 fn source_type_to_service(source_type: &str) -> Option<u32> {
     if source_type == "apache_metrics" {
         Some(17)
@@ -577,13 +584,15 @@ fn generate_origin_metadata(
 
     let no_value = 0;
 
-    // An upstream  vector source or a transform has set the origin metadata already.
+    // An upstream vector source or a transform has set the origin metadata already.
+    // Currently this is only possible by these scenarios:
+    //     - `datadog_agent` source receiving the metadata on ingested metrics
+    //     - `vector` source receiving events with EventMetadata that already has the origins set
+    //     - `log_to_metric` transform set the OriginService in the EventMetadata when it creates
+    //        the new metric.
     if let Some(pass_through) = maybe_pass_through {
         Some(
             DatadogMetricOriginMetadata::default()
-                // product and category should both either be set or not set in this scenario.
-                // if they are not set, it means the upstream vector component only set the service
-                // and we need to set the product and category for vector.
                 .with_product(pass_through.product().unwrap_or(origin_product_value))
                 .with_category(pass_through.category().unwrap_or(origin_category_value))
                 .with_service(pass_through.service().unwrap_or(no_value)),
@@ -591,9 +600,8 @@ fn generate_origin_metadata(
 
     // no metadata has been set upstream
     } else {
-        // NOTE: Intentionally don't set origin metadata for the case where the Datadog Agent did
-        //       not set, in order to maintain consistent behavior.
         maybe_source_type.and_then(|source_type| {
+            // only set the metadata if the source is a metric source we should set it for.
             source_type_to_service(source_type.as_str()).map(|origin_service_value| {
                 DatadogMetricOriginMetadata::default()
                     .with_product(origin_product_value)
