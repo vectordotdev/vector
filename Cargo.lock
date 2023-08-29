@@ -1755,6 +1755,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "built"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b99c4cdc7b2c2364182331055623bdf45254fcb679fea565c40c3c11c101889a"
+dependencies = [
+ "cargo-lock",
+]
+
+[[package]]
 name = "bumpalo"
 version = "3.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1869,6 +1878,28 @@ name = "cached_proc_macro_types"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3a4f925191b4367301851c6d99b09890311d74b0d43f274c0b34c86d308a3663"
+
+[[package]]
+name = "cargo-lock"
+version = "9.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e11c675378efb449ed3ce8de78d75d0d80542fc98487c26aba28eb3b82feac72"
+dependencies = [
+ "semver 1.0.18",
+ "serde",
+ "toml 0.7.6",
+ "url",
+]
+
+[[package]]
+name = "cargo_toml"
+version = "0.15.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "599aa35200ffff8f04c1925aa1acc92fa2e08874379ef42e210a80e527e60838"
+dependencies = [
+ "serde",
+ "toml 0.7.6",
+]
 
 [[package]]
 name = "cassowary"
@@ -9949,6 +9980,8 @@ dependencies = [
 name = "vector-vrl-web-playground"
 version = "0.1.0"
 dependencies = [
+ "built",
+ "cargo_toml",
  "enrichment",
  "getrandom 0.2.10",
  "gloo-utils",
