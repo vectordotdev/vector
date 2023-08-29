@@ -107,10 +107,12 @@ impl EncodingConfigWithFraming {
             (None, Serializer::Avro(_) | Serializer::Native(_)) => {
                 LengthDelimitedEncoder::new().into()
             }
+            (None, Serializer::Gelf(_)) => { 
+                CharacterDelimitedEncoder::new(0).into() 
+            }
             (
                 None,
                 Serializer::Csv(_)
-                | Serializer::Gelf(_)
                 | Serializer::Logfmt(_)
                 | Serializer::NativeJson(_)
                 | Serializer::RawMessage(_)
