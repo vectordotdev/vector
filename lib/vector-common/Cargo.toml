@@ -51,12 +51,12 @@ futures = { version = "0.3.28", default-features = false, features = ["std"] }
 indexmap = { version = "~2.0.0", default-features = false, features = ["std"] }
 metrics = "0.21.1"
 nom = { version = "7", optional = true }
-ordered-float = { version = "3.9.0", default-features = false }
+ordered-float = { version = "3.9.1", default-features = false }
 paste = "1.0.14"
 pin-project.workspace = true
 ryu = { version = "1", default-features = false }
 serde_json = { version = "1.0.105", default-features = false, features = ["std", "raw_value"] }
-serde = { version = "1.0.185", optional = true, features = ["derive"] }
+serde = { version = "1.0.188", optional = true, features = ["derive"] }
 smallvec = { version = "1", default-features = false }
 snafu = { version = "0.7", optional = true }
 stream-cancel = { version = "0.8.1", default-features = false }

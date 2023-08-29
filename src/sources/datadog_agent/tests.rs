@@ -1676,7 +1676,7 @@ fn test_config_outputs() {
                 ]),
             },
         ),
-        #[cfg(feature = "sources-syslog")]
+        #[cfg(feature = "codecs-syslog")]
         (
             "syslog / single output",
             TestCase {
@@ -1751,7 +1751,7 @@ fn test_config_outputs() {
                 )]),
             },
         ),
-        #[cfg(feature = "sources-syslog")]
+        #[cfg(feature = "codecs-syslog")]
         (
             "syslog / multiple output",
             TestCase {

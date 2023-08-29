@@ -16,7 +16,7 @@ administration: management: {
 		variables: {
 			variants?: [string, ...string]
 
-			config_formats: ["toml", "yaml", "json"]
+			config_formats: ["yaml", "toml", "json"]
 		}
 
 		manage?: {

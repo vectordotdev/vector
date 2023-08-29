@@ -98,14 +98,23 @@ async fn metrics_real_endpoint() {
 #[tokio::test]
 async fn metrics_shape() {
     let events: Vec<_> = (0..5)
-        .map(|index| {
-            Event::Metric(Metric::new(
-                format!("counter_{}", index),
-                MetricKind::Absolute,
-                MetricValue::Counter {
-                    value: index as f64,
-                },
-            ))
+        .flat_map(|index| {
+            vec![
+                Event::Metric(Metric::new(
+                    format!("counter_{}", index),
+                    MetricKind::Absolute,
+                    MetricValue::Counter {
+                        value: index as f64,
+                    },
+                )),
+                Event::Metric(Metric::new(
+                    format!("counter_{}", index),
+                    MetricKind::Absolute,
+                    MetricValue::Counter {
+                        value: (index + index) as f64,
+                    },
+                )),
+            ]
         })
         .collect();
     let api_key = push_api_key();
@@ -146,11 +155,11 @@ async fn metrics_shape() {
             .collect();
         assert_eq!(
             vec![
-                ("counter_0", "absolute", 0.0),
-                ("counter_1", "absolute", 1.0),
-                ("counter_2", "absolute", 2.0),
-                ("counter_3", "absolute", 3.0),
-                ("counter_4", "absolute", 4.0),
+                ("counter_0", "incremental", 0.0),
+                ("counter_1", "incremental", 1.0),
+                ("counter_2", "incremental", 2.0),
+                ("counter_3", "incremental", 3.0),
+                ("counter_4", "incremental", 4.0),
             ],
             metrics
         );
@@ -231,11 +240,18 @@ async fn error_scenario_real_endpoint() {
 
         let (sink, _) = config.build(cx).await.unwrap();
         let (batch, receiver) = BatchNotifier::new_with_receiver();
-        let events = vec![Event::Metric(Metric::new(
-            "counter",
-            MetricKind::Absolute,
-            MetricValue::Counter { value: 1.0 },
-        ))];
+        let events = vec![
+            Event::Metric(Metric::new(
+                "counter",
+                MetricKind::Absolute,
+                MetricValue::Counter { value: 1.0 },
+            )),
+            Event::Metric(Metric::new(
+                "counter",
+                MetricKind::Absolute,
+                MetricValue::Counter { value: 2.0 },
+            )),
+        ];
         let stream = map_event_batch_stream(stream::iter(events.clone()), Some(batch));
 
         sink.run(stream).await.unwrap();

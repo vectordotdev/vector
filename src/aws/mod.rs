@@ -168,6 +168,9 @@ pub async fn create_client_and_region<T: ClientBuilder>(
     // error up front if later SDK calls will fail due to lack of region configuration
     let region = resolve_region(region).await?;
 
+    let provider_config =
+        aws_config::provider_config::ProviderConfig::empty().with_region(Some(region.clone()));
+
     // Build the configuration first.
     let mut config_builder = SdkConfig::builder()
         .credentials_cache(auth.credentials_cache().await?)
@@ -177,6 +180,12 @@ pub async fn create_client_and_region<T: ClientBuilder>(
 
     if let Some(endpoint_override) = endpoint {
         config_builder = config_builder.endpoint_url(endpoint_override);
+    }
+
+    if let Some(use_fips) =
+        aws_config::default_provider::use_fips::use_fips_provider(&provider_config).await
+    {
+        config_builder = config_builder.use_fips(use_fips);
     }
 
     let config = config_builder.build();

@@ -1,10 +1,6 @@
-use std::{
-    collections::BTreeMap,
-    convert::{TryFrom, TryInto},
-    fmt::Debug,
-    sync::Arc,
-};
+use std::{collections::BTreeMap, convert::TryInto, fmt::Debug, sync::Arc};
 
+use crate::config::LogNamespace;
 use crate::{config::OutputId, ByteSizeOf};
 pub use array::{into_event_stream, EventArray, EventContainer, LogArray, MetricArray, TraceArray};
 pub use estimated_json_encoded_size_of::EstimatedJsonEncodedSizeOf;
@@ -329,6 +325,31 @@ impl Event {
         self.metadata_mut().set_upstream_id(upstream_id);
         self
     }
+
+    /// Creates an Event from a JSON value.
+    ///
+    /// # Errors
+    /// If a non-object JSON value is passed in with the `Legacy` namespace, this will return an error.
+    pub fn from_json_value(
+        value: serde_json::Value,
+        log_namespace: LogNamespace,
+    ) -> crate::Result<Self> {
+        match log_namespace {
+            LogNamespace::Vector => Ok(LogEvent::from(Value::from(value)).into()),
+            LogNamespace::Legacy => match value {
+                serde_json::Value::Object(fields) => Ok(LogEvent::from(
+                    fields
+                        .into_iter()
+                        .map(|(k, v)| (k, v.into()))
+                        .collect::<BTreeMap<_, _>>(),
+                )
+                .into()),
+                _ => Err(crate::Error::from(
+                    "Attempted to convert non-Object JSON into an Event.",
+                )),
+            },
+        }
+    }
 }
 
 impl EventDataEq for Event {
@@ -349,25 +370,6 @@ impl finalization::AddBatchNotifier for Event {
             Self::Log(log) => log.add_finalizer(finalizer),
             Self::Metric(metric) => metric.add_finalizer(finalizer),
             Self::Trace(trace) => trace.add_finalizer(finalizer),
-        }
-    }
-}
-
-impl TryFrom<serde_json::Value> for Event {
-    type Error = crate::Error;
-
-    fn try_from(map: serde_json::Value) -> Result<Self, Self::Error> {
-        match map {
-            serde_json::Value::Object(fields) => Ok(LogEvent::from(
-                fields
-                    .into_iter()
-                    .map(|(k, v)| (k, v.into()))
-                    .collect::<BTreeMap<_, _>>(),
-            )
-            .into()),
-            _ => Err(crate::Error::from(
-                "Attempted to convert non-Object JSON into an Event.",
-            )),
         }
     }
 }

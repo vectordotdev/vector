@@ -1,7 +1,7 @@
 # RFC 7117 - 2021-07-27 - VRL string interpolation
 
 VRL needs a better way to format strings. Currently the only way to do this is
-to concatenate strings, which can get unwieldly.
+to concatenate strings, which can get unwieldy.
 
 ## Scope
 
@@ -13,7 +13,7 @@ literals, also known as string interpolation, to format strings.
 Currently the way to create strings is through either string concatenation or
 the `join` function.
 
-Syntactically this is unwieldly. It requires extra key presses and the code
+Syntactically this is unwieldy. It requires extra key presses and the code
 created doesn't necessarily give an instant idea of what the resulting string
 will look like. Thus the true intent behind the code is obfuscated, which can
 result in bugs.

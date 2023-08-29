@@ -455,8 +455,8 @@ _values: {
 
 			Config format | Example
 			:-------------|:-------
-			[TOML](\(urls.toml)) | `condition = ".status == 200"`
 			[YAML](\(urls.yaml)) | `condition: .status == 200`
+			[TOML](\(urls.toml)) | `condition = ".status == 200"`
 			[JSON](\(urls.json)) | `"condition": ".status == 200"`
 			"""
 	}

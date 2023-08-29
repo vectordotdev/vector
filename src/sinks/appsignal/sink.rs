@@ -1,4 +1,5 @@
 use futures::{stream::BoxStream, StreamExt};
+use futures_util::future::ready;
 use tower::{Service, ServiceBuilder};
 use vector_core::{
     event::Event,
@@ -7,12 +8,14 @@ use vector_core::{
 };
 
 use crate::{
-    codecs::Transformer, internal_events::SinkRequestBuildError,
-    sinks::util::builder::SinkBuilderExt, sinks::util::Compression,
+    codecs::Transformer,
+    internal_events::SinkRequestBuildError,
+    sinks::util::{buffer::metrics::MetricNormalizer, builder::SinkBuilderExt, Compression},
 };
 
 use super::{
     encoder::AppsignalEncoder,
+    normalizer::AppsignalMetricsNormalizer,
     request_builder::{AppsignalRequest, AppsignalRequestBuilder},
 };
 
@@ -32,8 +35,16 @@ where
 {
     pub(super) async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let service = ServiceBuilder::new().service(self.service);
+        let mut normalizer = MetricNormalizer::<AppsignalMetricsNormalizer>::default();
 
         input
+            .filter_map(move |event| {
+                ready(if let Event::Metric(metric) = event {
+                    normalizer.normalize(metric).map(Event::Metric)
+                } else {
+                    Some(event)
+                })
+            })
             .batched(self.batch_settings.into_byte_size_config())
             .request_builder(
                 None,
