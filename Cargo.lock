@@ -362,7 +362,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "88903cb14723e4d4003335bb7f8a14f27691649105346a0f0957466c096adfe6"
 dependencies = [
  "anstyle 1.0.0",
- "bstr 1.6.0",
+ "bstr 1.6.1",
  "doc-comment",
  "predicates",
  "predicates-core",
@@ -1745,9 +1745,9 @@ dependencies = [
 
 [[package]]
 name = "bstr"
-version = "1.6.0"
+version = "1.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6798148dccfbff0fae41c7574d2fa8f1ef3492fba0face179de5d8d447d67b05"
+checksum = "8042c26c77e5bd6897a7358e0abb3ec412ed126d826988135653fc669263899d"
 dependencies = [
  "memchr",
  "regex-automata 0.3.7",
@@ -3347,7 +3347,7 @@ checksum = "e825f6987101665dea6ec934c09ec6d721de7bc1bf92248e1d5810c8cd636b77"
 name = "file-source"
 version = "0.1.0"
 dependencies = [
- "bstr 1.6.0",
+ "bstr 1.6.1",
  "bytes 1.4.0",
  "chrono",
  "crc",
@@ -5125,9 +5125,9 @@ dependencies = [
 
 [[package]]
 name = "memchr"
-version = "2.6.0"
+version = "2.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "76fc44e2588d5b436dbc3c6cf62aef290f90dab6235744a93dfe1cc18f451e2c"
+checksum = "f478948fd84d9f8e86967bf432640e46adfb5a4bd4f14ef7e864ab38220534ae"
 
 [[package]]
 name = "memmap2"
