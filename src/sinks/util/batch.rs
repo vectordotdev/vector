@@ -270,10 +270,10 @@ where
     }
 }
 
-#[allow(clippy::incorrect_clone_impl_on_copy_type)] // https://github.com/mcarton/rust-derivative/issues/112
 #[derive(Debug, Derivative)]
 #[derivative(Clone(bound = ""))]
 #[derivative(Copy(bound = ""))]
+#[allow(clippy::incorrect_clone_impl_on_copy_type)] // https://github.com/mcarton/rust-derivative/issues/112
 pub struct BatchSize<B> {
     pub bytes: usize,
     pub events: usize,
@@ -299,10 +299,10 @@ impl<B> Default for BatchSize<B> {
     }
 }
 
-#[allow(clippy::incorrect_clone_impl_on_copy_type)] // https://github.com/mcarton/rust-derivative/issues/112
 #[derive(Debug, Derivative)]
 #[derivative(Clone(bound = ""))]
 #[derivative(Copy(bound = ""))]
+#[allow(clippy::incorrect_clone_impl_on_copy_type)] // https://github.com/mcarton/rust-derivative/issues/112
 pub struct BatchSettings<B> {
     pub size: BatchSize<B>,
     pub timeout: Duration,

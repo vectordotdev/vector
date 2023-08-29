@@ -164,7 +164,9 @@ impl CommandExt for Command {
         let result = self.output();
         progress_bar.finish_and_clear();
 
-        let Ok(output) = result else {bail!("could not run command")};
+        let Ok(output) = result else {
+            bail!("could not run command")
+        };
 
         if output.status.success() {
             Ok(())

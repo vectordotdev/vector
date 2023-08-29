@@ -209,15 +209,13 @@ const fn default_batch_size() -> usize {
 }
 
 fn matches_examples() -> HashMap<String, Vec<String>> {
-    HashMap::<_, _>::from_iter(
-        [
-            (
-                "_SYSTEMD_UNIT".to_owned(),
-                vec!["sshd.service".to_owned(), "ntpd.service".to_owned()],
-            ),
-            ("_TRANSPORT".to_owned(), vec!["kernel".to_owned()]),
-        ],
-    )
+    HashMap::<_, _>::from_iter([
+        (
+            "_SYSTEMD_UNIT".to_owned(),
+            vec!["sshd.service".to_owned(), "ntpd.service".to_owned()],
+        ),
+        ("_TRANSPORT".to_owned(), vec!["kernel".to_owned()]),
+    ])
 }
 
 impl JournaldConfig {

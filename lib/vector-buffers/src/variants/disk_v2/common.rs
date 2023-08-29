@@ -348,7 +348,7 @@ where
             return Err(BuildError::InvalidParameter {
                 param_name: "max_record_size",
                 reason: "must be less than 2^64 bytes".to_string(),
-            })
+            });
         };
 
         if max_record_size_converted > max_data_file_size {

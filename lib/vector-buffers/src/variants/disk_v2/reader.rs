@@ -855,7 +855,7 @@ where
                         // If there's an error decoding the item, just fall back to the slow path,
                         // because this file might actually be where we left off, so we don't want
                         // to incorrectly skip ahead or anything.
-                        break
+                        break;
                     };
 
                     // We have to remove 1 from the event count here because otherwise the ID would

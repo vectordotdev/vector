@@ -124,35 +124,31 @@ const fn default_http_method() -> HttpMethod {
 }
 
 fn query_examples() -> HashMap<String, Vec<String>> {
-    HashMap::<_, _>::from_iter(
-        [
-            ("field".to_owned(), vec!["value".to_owned()]),
-            (
-                "fruit".to_owned(),
-                vec!["mango".to_owned(), "papaya".to_owned(), "kiwi".to_owned()],
-            ),
-        ],
-    )
+    HashMap::<_, _>::from_iter([
+        ("field".to_owned(), vec!["value".to_owned()]),
+        (
+            "fruit".to_owned(),
+            vec!["mango".to_owned(), "papaya".to_owned(), "kiwi".to_owned()],
+        ),
+    ])
 }
 
 fn headers_examples() -> HashMap<String, Vec<String>> {
-    HashMap::<_, _>::from_iter(
-        [
-            (
-                "Accept".to_owned(),
-                vec!["text/plain".to_owned(), "text/html".to_owned()],
-            ),
-            (
-                "X-My-Custom-Header".to_owned(),
-                vec![
-                    "a".to_owned(),
-                    "vector".to_owned(),
-                    "of".to_owned(),
-                    "values".to_owned(),
-                ],
-            ),
-        ],
-    )
+    HashMap::<_, _>::from_iter([
+        (
+            "Accept".to_owned(),
+            vec!["text/plain".to_owned(), "text/html".to_owned()],
+        ),
+        (
+            "X-My-Custom-Header".to_owned(),
+            vec![
+                "a".to_owned(),
+                "vector".to_owned(),
+                "of".to_owned(),
+                "values".to_owned(),
+            ],
+        ),
+    ])
 }
 
 impl Default for HttpClientConfig {

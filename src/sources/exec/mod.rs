@@ -192,13 +192,11 @@ const fn default_include_stderr() -> bool {
 }
 
 fn environment_examples() -> HashMap<String, String> {
-    HashMap::<_, _>::from_iter(
-        [
-            ("LANG".to_owned(), "es_ES.UTF-8".to_owned()),
-            ("TZ".to_owned(), "Etc/UTC".to_owned()),
-            ("PATH".to_owned(), "/bin:/usr/bin:/usr/local/bin".to_owned()),
-        ],
-    )
+    HashMap::<_, _>::from_iter([
+        ("LANG".to_owned(), "es_ES.UTF-8".to_owned()),
+        ("TZ".to_owned(), "Etc/UTC".to_owned()),
+        ("PATH".to_owned(), "/bin:/usr/bin:/usr/local/bin".to_owned()),
+    ])
 }
 
 fn get_hostname() -> Option<String> {
