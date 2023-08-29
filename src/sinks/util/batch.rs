@@ -270,6 +270,7 @@ where
     }
 }
 
+#[allow(clippy::incorrect_partial_ord_impl_on_ord_type)] // https://github.com/mcarton/rust-derivative/issues/112
 #[derive(Debug, Derivative)]
 #[derivative(Clone(bound = ""))]
 #[derivative(Copy(bound = ""))]
@@ -298,6 +299,7 @@ impl<B> Default for BatchSize<B> {
     }
 }
 
+#[allow(clippy::incorrect_partial_ord_impl_on_ord_type)] // https://github.com/mcarton/rust-derivative/issues/112
 #[derive(Debug, Derivative)]
 #[derivative(Clone(bound = ""))]
 #[derivative(Copy(bound = ""))]
