@@ -39,7 +39,7 @@ fn write_build_constants(manifest: &Manifest, dest_path: &Path) -> io::Result<()
         .unwrap()
         .detail()
         .unwrap()
-        .version()
+        .version
         .unwrap();
     let vrl_version_const = format!("pub const {}: &str = \"{}\"", "VRL_VERSION", vrl_version);
     output_file
