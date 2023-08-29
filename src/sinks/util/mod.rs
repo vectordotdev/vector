@@ -1,4 +1,6 @@
 pub mod adaptive_concurrency;
+// https://github.com/mcarton/rust-derivative/issues/112
+#[allow(clippy::incorrect_clone_impl_on_copy_type)]
 pub mod batch;
 pub mod buffer;
 pub mod builder;
