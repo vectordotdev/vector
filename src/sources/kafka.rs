@@ -686,7 +686,7 @@ async fn coordinate_kafka_callbacks(
                         partition_state.clear();
                         drop(drain);
                     } else if drain_signal.replace(drain).is_some() {
-                        unreachable!("Shutdown callback happened somehow during an ongoing rebalance...?")
+                        debug!("Kafka consumer shutting down mid-rebalance.");
                     }
 
                     callbacks.close();
