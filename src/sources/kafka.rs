@@ -488,7 +488,7 @@ impl KafkaPartitionState {
     /// and an AbortHandle that can be used to forcefully end the task.
     fn consume_partition(
         &self,
-        join_set: &mut tokio::task::JoinSet<TopicPartition>,
+        join_set: &mut tokio::task::JoinSet<(TopicPartition, PartitionConsumerStatus)>,
         tp: TopicPartition,
         consumer: Arc<StreamConsumer<KafkaSourceContext>>,
         p: StreamPartitionQueue<KafkaSourceContext>,
@@ -512,6 +512,8 @@ impl KafkaPartitionState {
             // task will end when it reaches the end of ack_stream
             let mut finalizer = Some(finalizer);
 
+            let mut status = PartitionConsumerStatus::NormalExit;
+
             loop {
                 tokio::select!(
                     _ = &mut end_signal, if finalizer.is_some() => {
@@ -522,6 +524,7 @@ impl KafkaPartitionState {
                         Some(Err(error)) => match error {
                             rdkafka::error::KafkaError::PartitionEOF(partition) if exit_eof => {
                                 debug!("EOF for partition {}.", partition);
+                                status = PartitionConsumerStatus::PartitionEOF;
                                 finalizer.take();
                             },
                             _ => emit!(KafkaReadError { error }),
@@ -555,7 +558,7 @@ impl KafkaPartitionState {
                     }
                 )
             }
-            tp
+            (tp, status)
         });
         (end_tx, handle)
     }
@@ -600,7 +603,7 @@ async fn coordinate_kafka_callbacks(
     // is both consuming the messages (passing them to the output stream) _and_
     // processing the corresponding acknowledgement stream. A consumer task
     // should completely drain its acknowledgement stream after receiving an end signal
-    let mut partition_consumers: tokio::task::JoinSet<TopicPartition> = Default::default();
+    let mut partition_consumers: tokio::task::JoinSet<(TopicPartition, PartitionConsumerStatus)> = Default::default();
 
     // Handles that will let us end any consumer task that exceeds a drain deadline
     let mut abort_handles: HashMap<TopicPartition, tokio::task::AbortHandle> = HashMap::new();
@@ -609,7 +612,7 @@ async fn coordinate_kafka_callbacks(
 
     loop {
         tokio::select! {
-            Some(Ok(finished_partition)) = partition_consumers.join_next(), if !partition_consumers.is_empty() => {
+            Some(Ok((finished_partition, status))) = partition_consumers.join_next(), if !partition_consumers.is_empty() => {
                 debug!("Partition consumer finished for {}:{}", &finished_partition.0, finished_partition.1);
                 abort_handles.remove(&finished_partition);
                 partition_state.observed_last_ack(finished_partition);
@@ -624,11 +627,16 @@ async fn coordinate_kafka_callbacks(
                     drain_signal.take();
                 }
 
-                // NB this is not production-ready EOF/end-of-partition detection,
-                // and is only enabled under specific scenarios in testing
-                if exit_eof && partition_consumers.is_empty() {
-                    debug!("All partitions have exited or reached EOF");
-                    let _ = eof.take().map(|e| e.send(()));
+                match status {
+                    // PartitionConsumerStatus differentiates between a task that exited after
+                    // being signaled to end, and one that reached the end of its partition and
+                    // was configured to exit. After the last such task ends, we signal the kafka
+                    // driver task to shut down the main consumer too. Note this is only used in tests.
+                    PartitionConsumerStatus::PartitionEOF if exit_eof && partition_consumers.is_empty() => {
+                        debug!("All partitions have exited or reached EOF.");
+                        let _ = eof.take().map(|e| e.send(()));
+                    },
+                    _ => {}
                 }
             },
             Some(callback) = callbacks.recv() => match callback {
@@ -640,12 +648,13 @@ async fn coordinate_kafka_callbacks(
                         // It _should_ be impossible for this expect() to panic, since we receive the topic/partition pair from the rebalance callback
                         let pq = consumer.split_partition_queue(topic, partition).expect("Failed to get partition queue: invalid topic or partition.");
 
-                        debug!("Consuming partition {}:{}", &tp.0, tp.1);
+                        debug!("Consuming partition {}:{}.", &tp.0, tp.1);
                         let (end_tx, handle) = partition_state.consume_partition(&mut partition_consumers, tp.clone(), Arc::clone(&consumer), pq, acks, exit_eof);
                         abort_handles.insert(tp.clone(), handle);
                         end_signals.insert(tp, end_tx);
                     }
-                    drop(done); // Implied, probably..but just to be explicit about when this is dropped, since it is important
+                    // ensure this is retained until all individual queues are set up
+                    drop(done);
                 },
                 KafkaCallback::PartitionsRevoked(mut revoked_partitions, drain) => {
                     drain_deadline = tokio::spawn(revoke_timeout(max_drain_ms));
@@ -1037,6 +1046,14 @@ fn create_consumer(
 }
 
 type TopicPartition = (String, i32);
+
+/// Status returned by partition consumer tasks, allowing the coordination task
+/// to differentiate between a consumer exiting normally (after receiving an end
+/// signal) and exiting when it reaches the end of a partition
+enum PartitionConsumerStatus {
+    NormalExit,
+    PartitionEOF,
+}
 
 enum KafkaCallback {
     PartitionsAssigned(Vec<TopicPartition>, SyncSender<()>),
