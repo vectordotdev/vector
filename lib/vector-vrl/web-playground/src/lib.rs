@@ -10,9 +10,9 @@ use vrl::value::Secrets;
 use vrl::value::Value;
 use wasm_bindgen::prelude::*;
 
-// pub mod vector_built_info {
-//     include!(concat!(env!("OUT_DIR"), "/vector_built.rs"));
-// }
+pub mod built_info {
+    include!(concat!(env!("OUT_DIR"), "/built.rs"));
+}
 
 #[derive(Serialize, Deserialize)]
 pub struct Input {
@@ -117,10 +117,10 @@ pub fn run_vrl(incoming: &JsValue) -> JsValue {
 
 #[wasm_bindgen]
 pub fn vector_version() -> String {
-    "".to_string()
+    built_info::VECTOR_VERSION.to_string()
 }
 
 #[wasm_bindgen]
 pub fn vrl_version() -> String {
-    "".to_string()
+    built_info::VRL_VERSION.to_string()
 }
