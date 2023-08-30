@@ -243,7 +243,7 @@ mod tests {
     use crate::encoding::SerializerConfig;
 
     use super::*;
-    use chrono::{DateTime, NaiveDateTime, Utc};
+    use chrono::NaiveDateTime;
     use vector_core::event::{Event, EventMetadata};
     use vrl::btreemap;
     use vrl::value::Value;
@@ -347,7 +347,7 @@ mod tests {
         {
             let naive_dt =
                 NaiveDateTime::parse_from_str("1970-01-01 00:00:00.1", "%Y-%m-%d %H:%M:%S%.f");
-            let dt = DateTime::<Utc>::from_utc(naive_dt.unwrap(), Utc);
+            let dt = naive_dt.unwrap().and_utc();
 
             let event_fields = btreemap! {
                 VERSION => "1.1",
@@ -365,7 +365,7 @@ mod tests {
         {
             let naive_dt =
                 NaiveDateTime::parse_from_str("1970-01-01 00:00:00.0", "%Y-%m-%d %H:%M:%S%.f");
-            let dt = DateTime::<Utc>::from_utc(naive_dt.unwrap(), Utc);
+            let dt = naive_dt.unwrap().and_utc();
 
             let event_fields = btreemap! {
                 VERSION => "1.1",
