@@ -15,9 +15,9 @@ body {
 }
 
 .headers-grid-item {
-  background-color: #e8e1f1;
+  background-color: #dfd8ec;
   padding: 0 60px; /* Horizontal padding */
-  border-radius: 10px;
+  border-radius: 4px;
   border: none;
   display: grid;
   /*place-items: center;*/
@@ -33,6 +33,7 @@ body {
 }
 
 div#App {
+
   display: grid;
   width: 100%;
   height: 100%;
@@ -48,15 +49,19 @@ div#toolbar-section {
   display: grid;
   grid-row: 1;
   grid-column: 1 / span 2;
-  grid-template-columns: 2fr 1fr 2fr 6fr
+  grid-template-columns: 2fr 2fr 6fr;
+  grid-gap: 1rem;
+  align-items: center;
 }
 
   #toolbar-section #run-code-btn {
     grid-column: 1;
+    height: 40px;
   }
 
   #toolbar-section #share-code-btn {
-    grid-column: 3;
+    grid-column: 2;
+    height: 40px;
   }
 
   /* input pane */
@@ -129,6 +134,7 @@ div#toolbar-section {
     grid-row: 1;
     font-weight: bold;
     font-family: "Helvetica Neue", serif;
+    height: 50px;
   }
 
   #output-section #output-cell #container-output {
@@ -143,39 +149,41 @@ div#toolbar-section {
       Segoe UI Symbol, Noto Color Emoji;
   }
 
-  .btn-primary {
-    display: inline-block;
-    outline: 0;
-    border: none;
-    cursor: pointer;
-    border-radius: 4px;
-    font-size: 13px;
-    height: 30px;
-    background-color: #9147ff;
-    color: white;
-    padding: 0 20px;
-  }
+/*  BUTTONS */
+.btn {
+  display: inline-block;
+  outline: 0;
+  border: none;
+  cursor: pointer;
+  border-radius: 8px;
+  font-size: 13px;
+  height: 30px;
+  padding: 0 20px;
+}
 
-  .btn-primary:hover {
-    background-color: #772ce8;
-  }
+.btn:active {
+  box-shadow: 0 4px #666;
+  transform: translateY(2px);
+}
 
-  .btn-secondary {
-    display: inline-block;
-    outline: 0;
-    border: none;
-    cursor: pointer;
-    border-radius: 4px;
-    font-size: 13px;
-    height: 30px;
-    background-color: #0000001a;
-    color: #000000;
-    padding: 0 20px;
-  }
+.btn-primary {
+  background-color: #9147ff;
+  color: white;
+}
 
-  .btn-secondary:hover {
-    background-color: #dcdcdc;
-  }
+.btn-primary:hover {
+  background-color: #6a1ae1;
+}
+
+.btn-secondary {
+  background-color: #0000001a;
+  color: #000000;
+}
+
+.btn-secondary:hover {
+  background-color: #c0bdbd;
+}
+/* END OF BUTTONS */
 
 /* Portrait and Landscape */
 @media only screen
