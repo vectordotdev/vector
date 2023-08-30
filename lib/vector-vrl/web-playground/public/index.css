@@ -3,36 +3,53 @@ body {
     margin-left: 2vw;
 }
 
+.headers-grid {
+  display: grid;
+  grid-template-columns: 2fr 3fr;
+  grid-template-rows: repeat(2, 85px);
+  gap: 10px;
+  font-family: "Helvetica Neue", serif;
+  width: 100%;
+  height: 100%;
+  margin: auto;
+}
+
+.headers-grid-item {
+  background-color: #e8e1f1;
+  padding: 0 60px; /* Horizontal padding */
+  border-radius: 10px;
+  border: none;
+  display: grid;
+  /*place-items: center;*/
+  align-items: center;
+  justify-content: center;
+}
+
+#description-cell {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  display: grid;
+  font-size: large;
+}
+
 div#App {
-    display: grid;
-    width: 100%;
-    height: 100%;
-    /* the app will have two columns, one for input
-  one for output, left and right */
-    grid-template-columns: repeat(2, 1fr);
-    grid-template-rows: 15vh 1vh 75vh;
-    grid-gap: 1rem;
-  }
+  display: grid;
+  width: 100%;
+  height: 100%;
+  /* the app will have two columns, one for input
+one for output, left and right */
+  grid-template-columns: repeat(2, 1fr);
+  grid-template-rows: 1fr 18fr;
+  grid-gap: 1rem;
+}
 
-  div#summary-section {
-    display: grid;
-    grid-row: 1;
-    grid-template-rows: 35% 65%;
-    width: 100%;
-    font-size: 1vw;
-    grid-gap: 1vw;
-  }
-
-  div#summary-section p{
-    font-size: .9vw;
-  }
-
-  div#toolbar-section {
-    display: grid;
-    grid-row: 2;
-    grid-column: 1 / span 2;
-    grid-template-columns: repeat(8, 1fr);
-  }
+div#toolbar-section {
+  padding-top: 30px;
+  display: grid;
+  grid-row: 1;
+  grid-column: 1 / span 2;
+  grid-template-columns: 2fr 1fr 2fr 6fr
+}
 
   #toolbar-section #run-code-btn {
     grid-column: 1;
@@ -46,7 +63,7 @@ div#App {
   div#input-section {
     display: grid;
     grid-column: 1;
-    grid-row: 3;
+    grid-row: 2;
     overflow: hidden;
   }
 
@@ -59,6 +76,8 @@ div#App {
   #input-section #cell #input-cell-title {
     height: 100%;
     grid-row: 1;
+    font-weight: bold;
+    font-family: "Helvetica Neue", serif;
   }
 
   #input-section #cell #container-program {
@@ -69,8 +88,8 @@ div#App {
   div#output-section {
     display: grid;
     grid-column: 2;
-    grid-row: 3;
-    grid-template-rows: 50% 50%;
+    grid-row: 2;
+    grid-template-rows: 35% 65%;
     overflow: hidden;
   }
 
@@ -87,6 +106,8 @@ div#App {
   #output-section #event-cell #event-cell-title {
     display: grid;
     grid-row: 1;
+    font-weight: bold;
+    font-family: "Helvetica Neue", serif;
   }
 
   #output-section #event-cell #container-event {
@@ -106,6 +127,8 @@ div#App {
   #output-section #output-cell #output-cell-title {
     display: grid;
     grid-row: 1;
+    font-weight: bold;
+    font-family: "Helvetica Neue", serif;
   }
 
   #output-section #output-cell #container-output {
@@ -164,27 +187,13 @@ div#App {
         height: 100%;
         /* the app will have multiple rows
         stacking each section on top of each other */
-        grid-template-rows: 20vh 25vh 10vh 50vh;
+        grid-template-rows: 20vh 10vh 50vh;
         grid-template-columns: 100%;
-      }
-
-      div#summary-section {
-        display: grid;
-        grid-row: 1;
-        grid-template-rows: 20% 80%;
-        width: 100%;
-        font-size: 1.5vh;
-        grid-gap: 2vw;
-      }
-
-      div#summary-section p {
-        grid-row: 2;
-        font-size: 2vh;
       }
 
       div#toolbar-section {
         display: grid;
-        grid-row: 3;
+        grid-row: 1;
         grid-column: 1;
         grid-template-columns: 100%;
         grid-template-rows: repeat(2, 1fr);

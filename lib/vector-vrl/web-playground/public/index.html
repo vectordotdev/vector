@@ -22,21 +22,27 @@
   </head>
 
   <body>
-    <div id="App">
-      <div id="summary-section">
+    <div class="headers-grid">
+      <div class="headers-grid-item">
         <h1>VRL Playground</h1>
-        <p id="vector-version"></p>
-        <p id="vrl-version"></p>
-        <p>
-          <a href="https://vector.dev/docs/reference/vrl/functions/">Vector Remap Language (VRL)</a> is an expression-oriented language designed for transforming
-          observability data. This playground lets you write a program, run it against an event or
-          events, share it, and see how the events are transformed.
-        </p>
       </div>
+      <div class="headers-grid-item" id="description-cell">
+          <p id="description-paragraph" >
+            <a href="https://vector.dev/docs/reference/vrl/functions/">Vector Remap Language (VRL)</a> is an expression-oriented language designed for transforming
+            observability data. This playground lets you write a program, run it against an event or
+            events, share it, and see how the events are transformed.
+          </p>
+      </div>
+      <div class="headers-grid-item">
+        <h4 id="versions-header"></h4>
+      </div>
+    </div>
+    <div id="App">
+
 
       <div id="toolbar-section">
-        <button id="run-code-btn" class="btn-primary" onClick="vrlPlayground.handleRunCode()">run code</button>
-        <button id="share-code-btn" class="btn-secondary" onClick="vrlPlayground.handleShareCode()">share code</button>
+        <button id="run-code-btn" class="btn-primary" onClick="vrlPlayground.handleRunCode()">Run program</button>
+        <button id="share-code-btn" class="btn-secondary" onClick="vrlPlayground.handleShareCode()">Share program</button>
       </div>
 
       <div id="input-section">
