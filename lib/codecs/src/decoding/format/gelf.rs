@@ -40,19 +40,19 @@ pub struct GelfDeserializerConfig {
 
 impl GelfDeserializerConfig {
     /// Creates a new `GelfDeserializerConfig`.
-    pub fn new(options: GelfDeserializerOptions) -> Self {
+    pub const fn new(options: GelfDeserializerOptions) -> Self {
         Self { gelf: options }
     }
 
     /// Build the `GelfDeserializer` from this configuration.
-    pub fn build(&self) -> GelfDeserializer {
+    pub const fn build(&self) -> GelfDeserializer {
         GelfDeserializer {
             lossy: self.gelf.lossy,
         }
     }
 
     /// Return the type of event built by this deserializer.
-    pub fn output_type(&self) -> DataType {
+    pub const fn output_type(&self) -> DataType {
         DataType::Log
     }
 
@@ -106,7 +106,7 @@ pub struct GelfDeserializer {
 
 impl GelfDeserializer {
     /// Create a new `GelfDeserializer`.
-    pub fn new(lossy: bool) -> GelfDeserializer {
+    pub const fn new(lossy: bool) -> GelfDeserializer {
         GelfDeserializer { lossy }
     }
 

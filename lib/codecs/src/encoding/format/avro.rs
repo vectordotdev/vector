@@ -28,7 +28,7 @@ impl AvroSerializerConfig {
     }
 
     /// The data type of events that are accepted by `AvroSerializer`.
-    pub fn input_type(&self) -> DataType {
+    pub const fn input_type(&self) -> DataType {
         DataType::Log
     }
 

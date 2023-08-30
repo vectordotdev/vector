@@ -18,12 +18,12 @@ pub struct NativeDeserializerConfig;
 
 impl NativeDeserializerConfig {
     /// Build the `NativeDeserializer` from this configuration.
-    pub fn build(&self) -> NativeDeserializer {
+    pub const fn build(&self) -> NativeDeserializer {
         NativeDeserializer
     }
 
     /// Return the type of event build by this deserializer.
-    pub fn output_type(&self) -> DataType {
+    pub const fn output_type(&self) -> DataType {
         DataType::all()
     }
 

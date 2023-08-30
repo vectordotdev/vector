@@ -26,7 +26,7 @@ pub struct JsonDeserializerConfig {
 
 impl JsonDeserializerConfig {
     /// Creates a new `JsonDeserializerConfig`.
-    pub fn new(options: JsonDeserializerOptions) -> Self {
+    pub const fn new(options: JsonDeserializerOptions) -> Self {
         Self { json: options }
     }
 
@@ -36,7 +36,7 @@ impl JsonDeserializerConfig {
     }
 
     /// Return the type of event build by this deserializer.
-    pub fn output_type(&self) -> DataType {
+    pub const fn output_type(&self) -> DataType {
         DataType::Log
     }
 
@@ -93,7 +93,7 @@ pub struct JsonDeserializer {
 
 impl JsonDeserializer {
     /// Creates a new `JsonDeserializer`.
-    pub fn new(lossy: bool) -> Self {
+    pub const fn new(lossy: bool) -> Self {
         Self { lossy }
     }
 }

@@ -20,7 +20,7 @@ impl RawMessageSerializerConfig {
     }
 
     /// The data type of events that are accepted by `RawMessageSerializer`.
-    pub fn input_type(&self) -> DataType {
+    pub const fn input_type(&self) -> DataType {
         DataType::Log
     }
 

@@ -14,7 +14,7 @@ impl NativeJsonSerializerConfig {
     }
 
     /// The data type of events that are accepted by `NativeJsonSerializer`.
-    pub fn input_type(&self) -> DataType {
+    pub const fn input_type(&self) -> DataType {
         DataType::all()
     }
 

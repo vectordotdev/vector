@@ -34,7 +34,7 @@ pub struct SyslogDeserializerConfig {
 
 impl SyslogDeserializerConfig {
     /// Creates a new `SyslogDeserializerConfig`.
-    pub fn new(options: SyslogDeserializerOptions) -> Self {
+    pub const fn new(options: SyslogDeserializerOptions) -> Self {
         Self {
             source: None,
             syslog: options,
@@ -58,7 +58,7 @@ impl SyslogDeserializerConfig {
     }
 
     /// Return the type of event build by this deserializer.
-    pub fn output_type(&self) -> DataType {
+    pub const fn output_type(&self) -> DataType {
         DataType::Log
     }
 

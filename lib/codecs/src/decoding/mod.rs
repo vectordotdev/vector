@@ -309,7 +309,7 @@ impl DeserializerConfig {
     }
 
     /// Return the type of event build by this deserializer.
-    pub fn output_type(&self) -> DataType {
+    pub const fn output_type(&self) -> DataType {
         match self {
             DeserializerConfig::Bytes => BytesDeserializerConfig.output_type(),
             DeserializerConfig::Json(config) => config.output_type(),

@@ -58,7 +58,7 @@ impl CsvSerializerConfig {
     }
 
     /// The data type of events that are accepted by `CsvSerializer`.
-    pub fn input_type(&self) -> DataType {
+    pub const fn input_type(&self) -> DataType {
         DataType::Log
     }
 
@@ -166,7 +166,7 @@ impl Default for CsvSerializerOptions {
 }
 
 impl CsvSerializerOptions {
-    fn csv_quote_style(&self) -> csv_core::QuoteStyle {
+    const fn csv_quote_style(&self) -> csv_core::QuoteStyle {
         match self.quote_style {
             QuoteStyle::Always => csv_core::QuoteStyle::Always,
             QuoteStyle::Necessary => csv_core::QuoteStyle::Necessary,

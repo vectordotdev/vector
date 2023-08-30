@@ -31,7 +31,7 @@ impl JsonSerializerConfig {
     }
 
     /// The data type of events that are accepted by `JsonSerializer`.
-    pub fn input_type(&self) -> DataType {
+    pub const fn input_type(&self) -> DataType {
         DataType::all()
     }
 

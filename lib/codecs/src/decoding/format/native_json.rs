@@ -23,21 +23,21 @@ pub struct NativeJsonDeserializerConfig {
 
 impl NativeJsonDeserializerConfig {
     /// Creates a new `NativeJsonDeserializerConfig`.
-    pub fn new(options: NativeJsonDeserializerOptions) -> Self {
+    pub const fn new(options: NativeJsonDeserializerOptions) -> Self {
         Self {
             native_json: options,
         }
     }
 
     /// Build the `NativeJsonDeserializer` from this configuration.
-    pub fn build(&self) -> NativeJsonDeserializer {
+    pub const fn build(&self) -> NativeJsonDeserializer {
         NativeJsonDeserializer {
             lossy: self.native_json.lossy,
         }
     }
 
     /// Return the type of event build by this deserializer.
-    pub fn output_type(&self) -> DataType {
+    pub const fn output_type(&self) -> DataType {
         DataType::all()
     }
 

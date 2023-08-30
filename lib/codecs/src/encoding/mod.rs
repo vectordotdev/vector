@@ -319,7 +319,7 @@ impl SerializerConfig {
     }
 
     /// Return an appropriate default framer for the given serializer.
-    pub fn default_stream_framing(&self) -> FramingConfig {
+    pub const fn default_stream_framing(&self) -> FramingConfig {
         match self {
             // TODO: Technically, Avro messages are supposed to be framed[1] as a vector of
             // length-delimited buffers -- `len` as big-endian 32-bit unsigned integer, followed by
@@ -405,7 +405,7 @@ pub enum Serializer {
 
 impl Serializer {
     /// Check if the serializer supports encoding an event to JSON via `Serializer::to_json_value`.
-    pub fn supports_json(&self) -> bool {
+    pub const fn supports_json(&self) -> bool {
         match self {
             Serializer::Json(_) | Serializer::NativeJson(_) | Serializer::Gelf(_) => true,
             Serializer::Avro(_)

@@ -38,7 +38,7 @@ impl ProtobufDeserializerConfig {
     }
 
     /// Return the type of event build by this deserializer.
-    pub fn output_type(&self) -> DataType {
+    pub const fn output_type(&self) -> DataType {
         DataType::Log
     }
 
@@ -87,7 +87,7 @@ pub struct ProtobufDeserializer {
 
 impl ProtobufDeserializer {
     /// Creates a new `ProtobufDeserializer`.
-    pub fn new(message_descriptor: MessageDescriptor) -> Self {
+    pub const fn new(message_descriptor: MessageDescriptor) -> Self {
         Self { message_descriptor }
     }
 

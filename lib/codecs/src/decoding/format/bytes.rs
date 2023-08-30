@@ -24,12 +24,12 @@ impl BytesDeserializerConfig {
     }
 
     /// Build the `BytesDeserializer` from this configuration.
-    pub fn build(&self) -> BytesDeserializer {
+    pub const fn build(&self) -> BytesDeserializer {
         BytesDeserializer
     }
 
     /// Return the type of event build by this deserializer.
-    pub fn output_type(&self) -> DataType {
+    pub const fn output_type(&self) -> DataType {
         DataType::Log
     }
 

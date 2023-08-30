@@ -53,7 +53,7 @@ pub struct CharacterDelimitedDecoderOptions {
 
 impl CharacterDelimitedDecoderOptions {
     /// Create a `CharacterDelimitedDecoderOptions` with a delimiter and optional max_length.
-    pub fn new(delimiter: u8, max_length: Option<usize>) -> Self {
+    pub const fn new(delimiter: u8, max_length: Option<usize>) -> Self {
         Self {
             delimiter,
             max_length,

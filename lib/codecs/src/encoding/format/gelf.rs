@@ -53,12 +53,12 @@ impl GelfSerializerConfig {
     }
 
     /// Build the `GelfSerializer` from this configuration.
-    pub fn build(&self) -> GelfSerializer {
+    pub const fn build(&self) -> GelfSerializer {
         GelfSerializer::new()
     }
 
     /// The data type of events that are accepted by `GelfSerializer`.
-    pub fn input_type() -> DataType {
+    pub const fn input_type() -> DataType {
         DataType::Log
     }
 
@@ -77,7 +77,7 @@ pub struct GelfSerializer;
 
 impl GelfSerializer {
     /// Creates a new `GelfSerializer`.
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         GelfSerializer
     }
 
