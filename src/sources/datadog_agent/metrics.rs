@@ -237,7 +237,6 @@ fn decode_datadog_series_v2(
 fn get_event_metadata(metadata: Option<&Metadata>) -> EventMetadata {
     metadata
         .and_then(|metadata| metadata.origin.as_ref())
-        // .map(|metadata| metadata.origin.as_ref())
         .map_or_else(EventMetadata::default, |origin| {
             trace!(
                 "Deserialized origin_product: `{}` origin_category: `{}` origin_service: `{}`.",
