@@ -149,6 +149,8 @@ pub struct DatadogMetricsEncoder {
 
     state: EncoderState,
     log_schema: &'static LogSchema,
+
+    origin_product_value: u32,
 }
 
 impl DatadogMetricsEncoder {
@@ -185,8 +187,18 @@ impl DatadogMetricsEncoder {
             compressed_limit,
             state: EncoderState::default(),
             log_schema: log_schema(),
+            origin_product_value: determine_origin_product_value(),
         })
     }
+}
+
+fn determine_origin_product_value() -> u32 {
+    option_env!("ORIGIN_PRODUCT")
+        .map(|p| {
+            p.parse::<u32>()
+                .expect("Env var ORIGIN_PRODUCT must be an unsigned 32 bit integer.")
+        })
+        .unwrap_or(14)
 }
 
 impl DatadogMetricsEncoder {
@@ -216,8 +228,12 @@ impl DatadogMetricsEncoder {
             // Series metrics are encoded via JSON, in an incremental fashion.
             DatadogMetricsEndpoint::Series => {
                 // A single `Metric` might generate multiple Datadog series metrics.
-                let all_series =
-                    generate_series_metrics(&metric, &self.default_namespace, self.log_schema)?;
+                let all_series = generate_series_metrics(
+                    &metric,
+                    &self.default_namespace,
+                    self.log_schema,
+                    self.origin_product_value,
+                )?;
 
                 // We handle adding the JSON array separator (comma) manually since the encoding is
                 // happening incrementally.
@@ -242,6 +258,7 @@ impl DatadogMetricsEncoder {
                             &self.default_namespace,
                             self.log_schema,
                             &mut self.state.buf,
+                            self.origin_product_value,
                         )
                         .map_err(|_| EncoderError::ProtoEncodingFailed)?;
                     }
@@ -390,17 +407,18 @@ fn get_sketch_payload_sketches_field_number() -> u32 {
 
 fn generate_sketch_metadata(
     maybe_pass_through: Option<&DatadogMetricOriginMetadata>,
-    maybe_source_type: Option<&Arc<String>>,
+    maybe_source_type: Option<&'static str>,
+    origin_product_value: u32,
 ) -> Option<ddmetric_proto::Metadata> {
-    generate_origin_metadata(maybe_pass_through, maybe_source_type).map(|origin| {
-        ddmetric_proto::Metadata {
+    generate_origin_metadata(maybe_pass_through, maybe_source_type, origin_product_value).map(
+        |origin| ddmetric_proto::Metadata {
             origin: Some(ddmetric_proto::Origin {
                 origin_product: origin.product().expect("OriginProduct should be set"),
                 origin_category: origin.category().expect("OriginCategory should be set"),
                 origin_service: origin.service().expect("OriginService should be set"),
             }),
-        }
-    })
+        },
+    )
 }
 
 fn sketch_to_proto_message(
@@ -408,6 +426,7 @@ fn sketch_to_proto_message(
     ddsketch: &AgentDDSketch,
     default_namespace: &Option<Arc<str>>,
     log_schema: &'static LogSchema,
+    origin_product_value: u32,
 ) -> ddmetric_proto::sketch_payload::Sketch {
     let name = get_namespaced_name(metric, default_namespace);
     let ts = encode_timestamp(metric.timestamp());
@@ -440,9 +459,10 @@ fn sketch_to_proto_message(
     let metadata = generate_sketch_metadata(
         event_metadata.datadog_origin_metadata(),
         event_metadata.source_type(),
+        origin_product_value,
     );
 
-    debug!("Generated sketch metadata: {:?}", metadata);
+    trace!("Generated sketch metadata: {:?}", metadata);
 
     ddmetric_proto::sketch_payload::Sketch {
         metric: name,
@@ -469,6 +489,7 @@ fn encode_sketch_incremental<B>(
     default_namespace: &Option<Arc<str>>,
     log_schema: &'static LogSchema,
     buf: &mut B,
+    origin_product_value: u32,
 ) -> Result<(), prost::EncodeError>
 where
     B: BufMut,
@@ -486,7 +507,13 @@ where
     // for `SketchPayload` with a single sketch looks just like as if we literally wrote out a
     // single value for the given field.
 
-    let sketch_proto = sketch_to_proto_message(metric, ddsketch, default_namespace, log_schema);
+    let sketch_proto = sketch_to_proto_message(
+        metric,
+        ddsketch,
+        default_namespace,
+        log_schema,
+        origin_product_value,
+    );
 
     // Manually write the field tag for `sketches` and then encode the sketch payload directly as a
     // length-delimited message.
@@ -535,33 +562,21 @@ fn encode_timestamp(timestamp: Option<DateTime<Utc>>) -> i64 {
 // Some sources such as `kafka`, `nats`, `redis` for example, are only capable of receiving metrics
 // with the `native` or `native_json` codec. In such cases we intentionally do not set the origin
 // metadata here, because the true origin will have already been determined to be a pass-through.
-fn source_type_to_service(source_type: &str) -> Option<u32> {
-    if source_type == "apache_metrics" {
-        Some(17)
-    } else if source_type == "aws_ecs_metrics" {
-        Some(209)
-    } else if source_type == "eventstoredb_metrics" {
-        Some(210)
-    } else if source_type == "host_metrics" {
-        Some(211)
-    } else if source_type == "internal_metrics" {
-        Some(212)
-    } else if source_type == "mongodb_metrics" {
-        Some(111)
-    } else if source_type == "nginx_metrics" {
-        Some(117)
-    } else if source_type == "open_telemetry" {
-        Some(213)
-    } else if source_type == "postgresql_metrics" {
-        Some(128)
-    } else if source_type == "prometheus_remote_write" {
-        Some(214)
-    } else if source_type == "prometheus_scrape" {
-        Some(215)
-    } else if source_type == "statsd" {
-        Some(153)
-    } else {
-        None
+fn source_type_to_service(source_type: &'static str) -> Option<u32> {
+    match source_type {
+        "apache_metrics" => Some(17),
+        "aws_ecs_metrics" => Some(209),
+        "eventstoredb_metrics" => Some(210),
+        "host_metrics" => Some(211),
+        "internal_metrics" => Some(212),
+        "mongodb_metrics" => Some(111),
+        "nginx_metrics" => Some(117),
+        "open_telemetry" => Some(213),
+        "postgresql_metrics" => Some(128),
+        "prometheus_remote_write" => Some(214),
+        "prometheus_scrape" => Some(215),
+        "statsd" => Some(153),
+        _ => None,
     }
 }
 
@@ -571,15 +586,9 @@ fn source_type_to_service(source_type: &str) -> Option<u32> {
 /// the result appropriately for the given protocol they operate on.
 fn generate_origin_metadata(
     maybe_pass_through: Option<&DatadogMetricOriginMetadata>,
-    maybe_source_type: Option<&Arc<String>>,
+    maybe_source_type: Option<&'static str>,
+    origin_product_value: u32,
 ) -> Option<DatadogMetricOriginMetadata> {
-    let origin_product_value = option_env!("ORIGIN_PRODUCT")
-        .map(|p| {
-            p.parse::<u32>()
-                .expect("Env var ORIGIN_PRODUCT must be an unsigned 32 bit integer.")
-        })
-        .unwrap_or(14);
-
     let origin_category_value = 11;
 
     let no_value = 0;
@@ -588,6 +597,8 @@ fn generate_origin_metadata(
     // Currently this is only possible by these scenarios:
     //     - `datadog_agent` source receiving the metadata on ingested metrics
     //     - `vector` source receiving events with EventMetadata that already has the origins set
+    //     - A metrics source configured with the `native` or `native_json` codecs, where the upstream
+    //       Vector instance enriched the EventMetadata with Origin metadata.
     //     - `log_to_metric` transform set the OriginService in the EventMetadata when it creates
     //        the new metric.
     if let Some(pass_through) = maybe_pass_through {
@@ -602,7 +613,7 @@ fn generate_origin_metadata(
     } else {
         maybe_source_type.and_then(|source_type| {
             // only set the metadata if the source is a metric source we should set it for.
-            source_type_to_service(source_type.as_str()).map(|origin_service_value| {
+            source_type_to_service(source_type).map(|origin_service_value| {
                 DatadogMetricOriginMetadata::default()
                     .with_product(origin_product_value)
                     .with_category(origin_category_value)
@@ -614,19 +625,21 @@ fn generate_origin_metadata(
 
 fn generate_series_metadata(
     maybe_pass_through: Option<&DatadogMetricOriginMetadata>,
-    maybe_source_type: Option<&Arc<String>>,
+    maybe_source_type: Option<&'static str>,
+    origin_product_value: u32,
 ) -> Option<DatadogSeriesMetricMetadata> {
-    generate_origin_metadata(maybe_pass_through, maybe_source_type).map(|origin| {
-        DatadogSeriesMetricMetadata {
+    generate_origin_metadata(maybe_pass_through, maybe_source_type, origin_product_value).map(
+        |origin| DatadogSeriesMetricMetadata {
             origin: Some(origin),
-        }
-    })
+        },
+    )
 }
 
 fn generate_series_metrics(
     metric: &Metric,
     default_namespace: &Option<Arc<str>>,
     log_schema: &'static LogSchema,
+    origin_product_value: u32,
 ) -> Result<Vec<DatadogSeriesMetric>, EncoderError> {
     let name = get_namespaced_name(metric, default_namespace);
 
@@ -644,9 +657,10 @@ fn generate_series_metrics(
     let metadata = generate_series_metadata(
         event_metadata.datadog_origin_metadata(),
         event_metadata.source_type(),
+        origin_product_value,
     );
 
-    debug!("Generated series metadata: {:?}", metadata);
+    trace!("Generated series metadata: {:?}", metadata);
 
     let results = match (metric.value(), metric.interval_ms()) {
         (MetricValue::Counter { value }, maybe_interval_ms) => {
@@ -848,7 +862,10 @@ mod tests {
         write_payload_footer, write_payload_header, DatadogMetricsEncoder, EncoderError,
     };
     use crate::{
-        common::datadog::DatadogMetricType, sinks::datadog::metrics::config::DatadogMetricsEndpoint,
+        common::datadog::DatadogMetricType,
+        sinks::datadog::metrics::{
+            config::DatadogMetricsEndpoint, encoder::determine_origin_product_value,
+        },
     };
 
     fn get_simple_counter() -> Metric {
@@ -933,8 +950,13 @@ mod tests {
                         continue;
                     }
 
-                    let sketch =
-                        sketch_to_proto_message(metric, ddsketch, default_namespace, log_schema);
+                    let sketch = sketch_to_proto_message(
+                        metric,
+                        ddsketch,
+                        default_namespace,
+                        log_schema,
+                        14,
+                    );
 
                     sketches.push(sketch);
                 }
@@ -1006,7 +1028,7 @@ mod tests {
         let expected_interval = interval_ms / 1000;
 
         // Encode the metric and make sure we did the rate conversion correctly.
-        let result = generate_series_metrics(&rate_counter, &None, log_schema());
+        let result = generate_series_metrics(&rate_counter, &None, log_schema(), 14);
         assert!(result.is_ok());
 
         let metrics = result.unwrap();
@@ -1027,13 +1049,13 @@ mod tests {
 
         let event_metadata = EventMetadata::default().with_origin_metadata(
             DatadogMetricOriginMetadata::default()
-                .with_product(10)
-                .with_category(11)
-                .with_service(9),
+                .with_product(product)
+                .with_category(category)
+                .with_service(service),
         );
         let counter = get_simple_counter_with_metadata(event_metadata);
 
-        let result = generate_series_metrics(&counter, &None, log_schema());
+        let result = generate_series_metrics(&counter, &None, log_schema(), 14);
         assert!(result.is_ok());
 
         let metrics = result.unwrap();
@@ -1049,12 +1071,7 @@ mod tests {
 
     #[test]
     fn encode_origin_metadata_vector_sourced() {
-        let product = option_env!("ORIGIN_PRODUCT")
-            .map(|p| {
-                p.parse::<u32>()
-                    .expect("Env var ORIGIN_PRODUCT must be an unsigned 32 bit integer.")
-            })
-            .unwrap_or(14);
+        let product = determine_origin_product_value();
 
         let category = 11;
         let service = 153;
@@ -1063,7 +1080,7 @@ mod tests {
 
         counter.metadata_mut().set_source_type("statsd");
 
-        let result = generate_series_metrics(&counter, &None, log_schema());
+        let result = generate_series_metrics(&counter, &None, log_schema(), product);
         assert!(result.is_ok());
 
         let metrics = result.unwrap();
@@ -1146,6 +1163,7 @@ mod tests {
                         &None,
                         log_schema(),
                         &mut incremental_buf,
+                        14,
                     )
                     .unwrap(),
                 },

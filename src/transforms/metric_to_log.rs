@@ -409,9 +409,7 @@ mod tests {
     }
 
     fn event_metadata() -> EventMetadata {
-        let mut event_metadata = EventMetadata::default();
-        event_metadata.set_source_type("unit_test_stream");
-        event_metadata
+        EventMetadata::default().with_source_type("unit_test_stream")
     }
 
     #[tokio::test]

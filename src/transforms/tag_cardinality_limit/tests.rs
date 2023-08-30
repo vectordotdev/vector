@@ -25,8 +25,7 @@ fn generate_config() {
 }
 
 fn make_metric(tags: MetricTags) -> Event {
-    let mut event_metadata = EventMetadata::default();
-    event_metadata.set_source_type("unit_test_stream");
+    let event_metadata = EventMetadata::default().with_source_type("unit_test_stream");
 
     Event::Metric(
         Metric::new_with_metadata(

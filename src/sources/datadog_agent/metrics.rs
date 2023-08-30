@@ -235,23 +235,23 @@ fn decode_datadog_series_v2(
 /// Builds Vector's `EventMetadata` from the received metadata. Currently this is only
 /// utilized for passing through origin metadata set by the Agent.
 fn get_event_metadata(metadata: Option<&Metadata>) -> EventMetadata {
-    metadata.map_or(EventMetadata::default(), |metadata| {
-        metadata
-            .origin
-            .as_ref()
-            .map_or(EventMetadata::default(), |origin| {
-                debug!(
-                    "Deserialized origin_product: `{}` origin_category: `{}` origin_service: `{}`.",
-                    origin.origin_product, origin.origin_category, origin.origin_service
-                );
-                EventMetadata::default().with_origin_metadata(
-                    DatadogMetricOriginMetadata::default()
-                        .with_product(origin.origin_product)
-                        .with_category(origin.origin_category)
-                        .with_service(origin.origin_service),
-                )
-            })
-    })
+    metadata
+        .and_then(|metadata| metadata.origin.as_ref())
+        // .map(|metadata| metadata.origin.as_ref())
+        .map_or_else(EventMetadata::default, |origin| {
+            trace!(
+                "Deserialized origin_product: `{}` origin_category: `{}` origin_service: `{}`.",
+                origin.origin_product,
+                origin.origin_category,
+                origin.origin_service,
+            );
+            EventMetadata::default().with_origin_metadata(
+                DatadogMetricOriginMetadata::default()
+                    .with_product(origin.origin_product)
+                    .with_category(origin.origin_category)
+                    .with_service(origin.origin_service),
+            )
+        })
 }
 
 pub(crate) fn decode_ddseries_v2(

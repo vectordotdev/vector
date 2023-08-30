@@ -288,6 +288,13 @@ impl EventMetadata {
         self
     }
 
+    /// Replaces the existing `source_type` with the given one.
+    #[must_use]
+    pub fn with_source_type(mut self, source_type: &'static str) -> Self {
+        self.source_type = Some(source_type);
+        self
+    }
+
     /// Replaces the existing `DatadogMetricOriginMetadata` with the given one.
     #[must_use]
     pub fn with_origin_metadata(mut self, origin_metadata: DatadogMetricOriginMetadata) -> Self {
