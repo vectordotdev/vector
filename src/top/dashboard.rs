@@ -9,16 +9,16 @@ use crossterm::{
 };
 use num_format::{Locale, ToFormattedString};
 use number_prefix::NumberPrefix;
-use std::io::stdout;
-use tokio::sync::oneshot;
-use tui::{
+use ratatui::{
     backend::{Backend, CrosstermBackend},
     layout::{Alignment, Constraint, Layout, Rect},
     style::{Color, Modifier, Style},
-    text::{Span, Spans},
+    text::{Line, Span},
     widgets::{Block, Borders, Cell, Paragraph, Row, Table, Wrap},
     Frame, Terminal,
 };
+use std::io::stdout;
+use tokio::sync::oneshot;
 
 use super::{
     events::capture_key_press,
@@ -143,11 +143,12 @@ struct Widgets<'a> {
     constraints: Vec<Constraint>,
     url_string: &'a str,
     opts: &'a super::Opts,
+    title: &'a str,
 }
 
 impl<'a> Widgets<'a> {
     /// Creates a new Widgets, containing constraints to re-use across renders.
-    pub fn new(url_string: &'a str, opts: &'a super::Opts) -> Self {
+    pub fn new(title: &'a str, url_string: &'a str, opts: &'a super::Opts) -> Self {
         let constraints = vec![
             Constraint::Length(3),
             Constraint::Max(90),
@@ -158,10 +159,11 @@ impl<'a> Widgets<'a> {
             constraints,
             url_string,
             opts,
+            title,
         }
     }
 
-    /// Renders a title showing 'Vector', and the URL the dashboard is currently connected to.
+    /// Renders a title and the URL the dashboard is currently connected to.
     fn title<B: Backend>(
         &'a self,
         f: &mut Frame<B>,
@@ -178,10 +180,10 @@ impl<'a> Widgets<'a> {
         ];
         text.extend(connection_status.as_ui_spans());
 
-        let text = vec![Spans::from(text)];
+        let text = vec![Line::from(text)];
 
         let block = Block::default().borders(Borders::ALL).title(Span::styled(
-            "Vector",
+            self.title,
             Style::default()
                 .fg(Color::Green)
                 .add_modifier(Modifier::BOLD),
@@ -258,7 +260,7 @@ impl<'a> Widgets<'a> {
                         .into_iter()
                         .map(Cell::from)
                         .collect::<Vec<_>>();
-                    data[1] = Cell::from(id.as_ref());
+                    data[1] = Cell::from(id.as_str());
                     data[5] = Cell::from(sent_events_metric);
                     items.push(Row::new(data).style(Style::default()));
                 }
@@ -310,7 +312,7 @@ impl<'a> Widgets<'a> {
 
     /// Renders a box showing instructions on how to exit from `vector top`.
     fn quit_box<B: Backend>(&self, f: &mut Frame<B>, area: Rect) {
-        let text = vec![Spans::from("To quit, press ESC or 'q'")];
+        let text = vec![Line::from("To quit, press ESC or 'q'")];
 
         let block = Block::default()
             .borders(Borders::ALL)
@@ -353,6 +355,7 @@ pub fn is_tty() -> bool {
 /// as well as entering an 'alternate screen' to overlay the console. This ensures that when
 /// the dashboard is exited, the user's previous terminal session can commence, unaffected.
 pub async fn init_dashboard<'a>(
+    title: &'a str,
     url: &'a str,
     opts: &'a super::Opts,
     mut state_rx: state::StateRx,
@@ -377,7 +380,7 @@ pub async fn init_dashboard<'a>(
     // Clear the screen, readying it for output
     terminal.clear()?;
 
-    let widgets = Widgets::new(url, opts);
+    let widgets = Widgets::new(title, url, opts);
 
     loop {
         tokio::select! {

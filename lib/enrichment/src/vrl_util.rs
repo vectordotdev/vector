@@ -80,6 +80,26 @@ pub(crate) fn add_index(
     Ok(index)
 }
 
+pub(crate) fn is_case_sensitive(
+    arguments: &ArgumentList,
+    state: &TypeState,
+) -> Result<Case, function::Error> {
+    Ok(arguments
+        .optional_literal("case_sensitive", state)?
+        .map(|value| {
+            let case_sensitive = value
+                .as_boolean()
+                .expect("case_sensitive should be boolean"); // This will have been caught by the type checker.
+
+            if case_sensitive {
+                Case::Sensitive
+            } else {
+                Case::Insensitive
+            }
+        })
+        .unwrap_or(Case::Sensitive))
+}
+
 #[cfg(test)]
 mod tests {
     use std::sync::{Arc, Mutex};

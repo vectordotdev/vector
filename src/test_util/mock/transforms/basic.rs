@@ -75,13 +75,11 @@ impl FunctionTransform for BasicTransform {
     fn transform(&mut self, output: &mut OutputBuffer, mut event: Event) {
         match &mut event {
             Event::Log(log) => {
-                let mut v = log
-                    .get(crate::config::log_schema().message_key())
-                    .unwrap()
-                    .to_string_lossy()
-                    .into_owned();
-                v.push_str(&self.suffix);
-                log.insert(crate::config::log_schema().message_key(), Value::from(v));
+                if let Some(message_key) = crate::config::log_schema().message_key_target_path() {
+                    let mut v = log.get(message_key).unwrap().to_string_lossy().into_owned();
+                    v.push_str(&self.suffix);
+                    log.insert(message_key, Value::from(v));
+                }
             }
             Event::Metric(metric) => {
                 let increment = match metric.value() {
@@ -118,13 +116,15 @@ impl FunctionTransform for BasicTransform {
                 }
             }
             Event::Trace(trace) => {
-                let mut v = trace
-                    .get(crate::config::log_schema().message_key())
-                    .unwrap()
-                    .to_string_lossy()
-                    .into_owned();
-                v.push_str(&self.suffix);
-                trace.insert(crate::config::log_schema().message_key(), Value::from(v));
+                if let Some(message_key) = crate::config::log_schema().message_key_target_path() {
+                    let mut v = trace
+                        .get(message_key)
+                        .unwrap()
+                        .to_string_lossy()
+                        .into_owned();
+                    v.push_str(&self.suffix);
+                    trace.insert(message_key, Value::from(v));
+                }
             }
         };
         output.push(event);

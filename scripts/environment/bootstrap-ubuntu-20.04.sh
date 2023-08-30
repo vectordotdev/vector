@@ -23,14 +23,13 @@ apt install --yes \
 apt upgrade --yes
 
 # Deps
-apt install --yes \
+apt install --yes --no-install-recommends \
     awscli \
     build-essential \
     ca-certificates \
     cmake \
     cmark-gfm \
     curl \
-    docker-compose \
     gawk \
     gnupg2 \
     gnupg-agent \

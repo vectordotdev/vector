@@ -52,7 +52,7 @@ fn default_loki_path() -> String {
 }
 
 /// Configuration for the `loki` sink.
-#[configurable_component(sink("loki"))]
+#[configurable_component(sink("loki", "Deliver log event data to the Loki aggregation system."))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct LokiConfig {
@@ -211,6 +211,7 @@ impl LokiConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "loki")]
 impl SinkConfig for LokiConfig {
     async fn build(
         &self,

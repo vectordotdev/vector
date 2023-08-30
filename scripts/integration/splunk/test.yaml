@@ -9,3 +9,13 @@ env:
 
 matrix:
   version: ["8.2.4", "7.3"]
+
+# changes to these files/paths will invoke the integration test in CI
+# expressions are evaluated using https://github.com/micromatch/picomatch
+paths:
+- "src/internal_events/splunk_hec.rs"
+- "src/sources/splunk_hec/**"
+- "src/sources/util/**"
+- "src/sinks/splunk_hec/**"
+- "src/sinks/util/**"
+- "scripts/integration/splunk/**"

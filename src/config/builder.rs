@@ -8,18 +8,16 @@ use serde_json::Value;
 use vector_config::configurable_component;
 use vector_core::config::GlobalOptions;
 
-use crate::{
-    enrichment_tables::EnrichmentTables, providers::Providers, secrets::SecretBackends,
-    sinks::Sinks,
-};
+use crate::{enrichment_tables::EnrichmentTables, providers::Providers, secrets::SecretBackends};
 
 #[cfg(feature = "api")]
 use super::api;
 #[cfg(feature = "enterprise")]
 use super::enterprise;
 use super::{
-    compiler, schema, BoxedSource, BoxedTransform, ComponentKey, Config, EnrichmentTableOuter,
-    HealthcheckOptions, SinkOuter, SourceOuter, TestDefinition, TransformOuter,
+    compiler, schema, BoxedSink, BoxedSource, BoxedTransform, ComponentKey, Config,
+    EnrichmentTableOuter, HealthcheckOptions, SinkOuter, SourceOuter, TestDefinition,
+    TransformOuter,
 };
 
 /// A complete Vector configuration.
@@ -269,7 +267,12 @@ impl ConfigBuilder {
             .insert(ComponentKey::from(key.into()), SourceOuter::new(source));
     }
 
-    pub fn add_sink<K: Into<String>, S: Into<Sinks>>(&mut self, key: K, inputs: &[&str], sink: S) {
+    pub fn add_sink<K: Into<String>, S: Into<BoxedSink>>(
+        &mut self,
+        key: K,
+        inputs: &[&str],
+        sink: S,
+    ) {
         let inputs = inputs
             .iter()
             .map(|value| value.to_string())

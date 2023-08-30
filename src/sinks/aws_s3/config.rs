@@ -33,7 +33,10 @@ use crate::{
 };
 
 /// Configuration for the `aws_s3` sink.
-#[configurable_component(sink("aws_s3"))]
+#[configurable_component(sink(
+    "aws_s3",
+    "Store observability events in the AWS S3 object storage system."
+))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct S3SinkConfig {
@@ -166,6 +169,7 @@ impl GenerateConfig for S3SinkConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "aws_s3")]
 impl SinkConfig for S3SinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let service = self.create_service(&cx.proxy).await?;

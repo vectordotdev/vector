@@ -1,5 +1,6 @@
 use metrics::{counter, gauge};
 use vector_core::{internal_event::InternalEvent, update_counter};
+use vrl::path::OwnedTargetPath;
 
 use vector_common::{
     internal_event::{error_stage, error_type},
@@ -161,7 +162,7 @@ impl InternalEvent for KafkaStatisticsReceived<'_> {
 }
 
 pub struct KafkaHeaderExtractionError<'a> {
-    pub header_field: &'a str,
+    pub header_field: &'a OwnedTargetPath,
 }
 
 impl InternalEvent for KafkaHeaderExtractionError<'_> {
@@ -171,7 +172,7 @@ impl InternalEvent for KafkaHeaderExtractionError<'_> {
             error_code = "extracting_header",
             error_type = error_type::PARSER_FAILED,
             stage = error_stage::RECEIVING,
-            header_field = self.header_field,
+            header_field = self.header_field.to_string(),
             internal_log_rate_limit = true,
         );
         counter!(

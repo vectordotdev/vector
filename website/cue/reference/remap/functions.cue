@@ -24,6 +24,7 @@ remap: {
 		}
 		internal_failure_reasons: [...string]
 		examples?: [remap.#Example, ...remap.#Example]
+		deprecated: bool | *false
 	}
 
 	#FunctionCategory: "Array" | "Codec" | "Coerce" | "Convert" | "Debug" | "Enrichment" | "Enumerate" | "Event" | "Path" | "Cryptography" | "IP" | "Number" | "Object" | "Parse" | "Random" | "String" | "System" | "Timestamp" | "Type"

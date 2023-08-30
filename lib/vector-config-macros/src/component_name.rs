@@ -106,7 +106,7 @@ pub fn derive_component_name_impl(input: TokenStream) -> TokenStream {
 fn attr_to_component_name(attr: &Attribute) -> Result<Option<String>, Error> {
     // First, filter out anything that isn't ours.
     if !path_matches(
-        &attr.path,
+        attr.path(),
         &[
             attrs::ENRICHMENT_TABLE_COMPONENT,
             attrs::PROVIDER_COMPONENT,
@@ -121,14 +121,14 @@ fn attr_to_component_name(attr: &Attribute) -> Result<Option<String>, Error> {
 
     // Reconstruct the original attribute path (i.e. `source`) from our marker version of it (i.e.
     // `source_component`), so that any error message we emit is contextually relevant.
-    let path_str = path_to_string(&attr.path);
+    let path_str = path_to_string(attr.path());
     let component_type_attr = path_str.replace("_component", "");
     let component_type = component_type_attr.replace('_', " ");
 
     // Make sure the attribute actually has inner tokens. If it doesn't, this means they forgot
     // entirely to specify a component name, and we want to give back a meaningful error that looks
     // correct when applied in the context of `#[configurable_component(...)]`.
-    if attr.tokens.is_empty() {
+    if attr.meta.require_list().is_err() {
         return Err(Error::new(
             attr.span(),
             format!(
@@ -161,6 +161,10 @@ fn attr_to_component_name(attr: &Attribute) -> Result<Option<String>, Error> {
 fn check_component_name_validity(component_name: &str) -> Result<(), String> {
     // In a nutshell, component names must contain only lowercase ASCII alphabetic characters, or
     // numbers, or underscores.
+
+    if component_name.is_empty() {
+        return Err("component name must be non-empty".to_string());
+    }
 
     // We only support ASCII names, so get that out of the way.
     if !component_name.is_ascii() {

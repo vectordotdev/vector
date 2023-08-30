@@ -5,7 +5,7 @@ on:
 
 jobs:
   test-cli:
-    runs-on: [linux, ubuntu-20.04-8core]
+    runs-on: ubuntu-latest
     env:
       CARGO_INCREMENTAL: 0
     steps:

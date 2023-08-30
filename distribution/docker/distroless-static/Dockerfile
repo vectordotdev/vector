@@ -1,4 +1,4 @@
-FROM docker.io/alpine:3.14 AS builder
+FROM docker.io/alpine:3.18 AS builder
 
 WORKDIR /vector
 
@@ -7,7 +7,9 @@ RUN tar -xvf vector-0*-"$(cat /etc/apk/arch)"-unknown-linux-musl*.tar.gz --strip
 
 RUN mkdir -p /var/lib/vector
 
-FROM gcr.io/distroless/static
+# distroless doesn't use static tags
+# hadolint ignore=DL3007
+FROM gcr.io/distroless/static:latest
 
 COPY --from=builder /vector/bin/* /usr/local/bin/
 COPY --from=builder /vector/config/vector.toml /etc/vector/vector.toml

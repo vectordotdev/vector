@@ -195,6 +195,9 @@ pub trait TransformConfig: DynClone + NamedComponent + core::fmt::Debug + Send +
         &self,
         enrichment_tables: enrichment::TableRegistry,
         input_definitions: &[(OutputId, schema::Definition)],
+
+        // This only exists for transforms that create logs from non-logs, to know which namespace
+        // to use, such as `metric_to_log`
         global_log_namespace: LogNamespace,
     ) -> Vec<TransformOutput>;
 

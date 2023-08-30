@@ -1,18 +1,25 @@
 mod bytes_received;
 mod bytes_sent;
+pub mod cached_event;
 pub mod component_events_dropped;
 mod events_received;
 mod events_sent;
+mod optional_tag;
 mod prelude;
 pub mod service;
+
+use std::ops::{Add, AddAssign};
 
 pub use metrics::SharedString;
 
 pub use bytes_received::BytesReceived;
 pub use bytes_sent::BytesSent;
+#[allow(clippy::module_name_repetitions)]
+pub use cached_event::{RegisterTaggedInternalEvent, RegisteredEventCache};
 pub use component_events_dropped::{ComponentEventsDropped, INTENTIONAL, UNINTENTIONAL};
 pub use events_received::EventsReceived;
-pub use events_sent::{EventsSent, DEFAULT_OUTPUT};
+pub use events_sent::{EventsSent, TaggedEventsSent, DEFAULT_OUTPUT};
+pub use optional_tag::OptionalTag;
 pub use prelude::{error_stage, error_type};
 pub use service::{CallError, PollReadyError};
 
@@ -109,8 +116,23 @@ pub struct ByteSize(pub usize);
 pub struct Count(pub usize);
 
 /// Holds the tuple `(count_of_events, estimated_json_size_of_events)`.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct CountByteSize(pub usize, pub JsonSize);
+
+impl AddAssign for CountByteSize {
+    fn add_assign(&mut self, rhs: Self) {
+        self.0 += rhs.0;
+        self.1 += rhs.1;
+    }
+}
+
+impl Add<CountByteSize> for CountByteSize {
+    type Output = CountByteSize;
+
+    fn add(self, rhs: CountByteSize) -> Self::Output {
+        CountByteSize(self.0 + rhs.0, self.1 + rhs.1)
+    }
+}
 
 // Wrapper types used to hold parameters for registering events
 
@@ -172,7 +194,7 @@ impl From<Protocol> for SharedString {
 macro_rules! registered_event {
     // A registered event struct with no fields (zero-sized type).
     ($event:ident => $($tail:tt)*) => {
-        #[derive(Debug)]
+        #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
         pub struct $event;
 
         $crate::registered_event!(=> $event $($tail)*);
@@ -180,7 +202,7 @@ macro_rules! registered_event {
 
     // A normal registered event struct.
     ($event:ident { $( $field:ident: $type:ty, )* } => $($tail:tt)*) => {
-        #[derive(Debug)]
+        #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
         pub struct $event {
             $( pub $field: $type, )*
         }
@@ -196,6 +218,9 @@ macro_rules! registered_event {
 
         fn emit(&$slf:ident, $data_name:ident: $data:ident)
             $emit_body:block
+
+        $(fn register($fixed_name:ident: $fixed_tags:ty, $tags_name:ident: $tags:ty)
+            $register_body:block)?
     ) => {
         paste::paste!{
             #[derive(Clone)]
@@ -223,6 +248,19 @@ macro_rules! registered_event {
                 fn emit(&$slf, $data_name: $data)
                     $emit_body
             }
+
+            $(impl $crate::internal_event::cached_event::RegisterTaggedInternalEvent for $event {
+                type Tags = $tags;
+                type Fixed = $fixed_tags;
+
+                fn register(
+                    $fixed_name: $fixed_tags,
+                    $tags_name: $tags,
+                ) -> <Self as $crate::internal_event::RegisterInternalEvent>::Handle {
+                    $register_body
+                }
+            })?
+
         }
     };
 }

@@ -273,9 +273,9 @@ fn apache_metrics(
                 debug!("Finished sending.");
                 Ok(())
             }
-            Err(error) => {
+            Err(_) => {
                 let (count, _) = stream.size_hint();
-                emit!(StreamClosedError { error, count });
+                emit!(StreamClosedError { count });
                 Err(())
             }
         }

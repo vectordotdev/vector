@@ -50,6 +50,9 @@ pub fn create_client(
     Ok(HttpClient::new(tls_settings, proxy_config)?)
 }
 
+// TODO: `HttpBatchService` has been deprecated for direct use in sinks.
+//       This sink should undergo a refactor to utilize the `HttpService`
+//       instead, which extracts much of the boilerplate code for `Service`.
 pub fn build_http_batch_service(
     client: HttpClient,
     http_request_builder: Arc<HttpRequestBuilder>,
@@ -132,8 +135,10 @@ pub fn build_uri(
     uri.parse::<Uri>()
 }
 
-pub fn host_key() -> String {
-    crate::config::log_schema().host_key().to_string()
+pub fn config_host_key() -> OptionalValuePath {
+    OptionalValuePath {
+        path: crate::config::log_schema().host_key().cloned(),
+    }
 }
 
 pub fn config_timestamp_key() -> OptionalValuePath {

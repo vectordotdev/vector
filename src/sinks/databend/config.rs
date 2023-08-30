@@ -30,7 +30,7 @@ use super::{
 };
 
 /// Configuration for the `databend` sink.
-#[configurable_component(sink("databend"))]
+#[configurable_component(sink("databend", "Deliver log data to a Databend database."))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct DatabendConfig {
@@ -103,6 +103,7 @@ impl DatabendConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "databend")]
 impl SinkConfig for DatabendConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let auth = self.auth.choose_one(&self.endpoint.auth)?;

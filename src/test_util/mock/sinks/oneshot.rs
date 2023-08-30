@@ -16,7 +16,7 @@ use crate::{
 };
 
 /// Configurable for the `test_oneshot` sink.
-#[configurable_component(sink("test_oneshot"))]
+#[configurable_component(sink("test_oneshot", "Test (oneshot)."))]
 #[derive(Clone, Debug, Default)]
 pub struct OneshotSinkConfig {
     #[serde(skip)]
@@ -34,6 +34,7 @@ impl OneshotSinkConfig {
 }
 
 #[async_trait]
+#[typetag::serde(name = "test_oneshot")]
 impl SinkConfig for OneshotSinkConfig {
     fn input(&self) -> Input {
         Input::all()

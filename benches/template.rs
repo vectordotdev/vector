@@ -13,10 +13,7 @@ fn bench_elasticsearch_index(c: &mut Criterion) {
         let index = Template::try_from("index-%Y.%m.%d").unwrap();
         let mut event = Event::Log(LogEvent::from("hello world"));
         event.as_mut_log().insert(
-            (
-                lookup::PathPrefix::Event,
-                log_schema().timestamp_key().unwrap(),
-            ),
+            log_schema().timestamp_key_target_path().unwrap(),
             Utc::now(),
         );
 
@@ -31,10 +28,7 @@ fn bench_elasticsearch_index(c: &mut Criterion) {
         let index = Template::try_from("index").unwrap();
         let mut event = Event::Log(LogEvent::from("hello world"));
         event.as_mut_log().insert(
-            (
-                lookup::PathPrefix::Event,
-                log_schema().timestamp_key().unwrap(),
-            ),
+            log_schema().timestamp_key_target_path().unwrap(),
             Utc::now(),
         );
 

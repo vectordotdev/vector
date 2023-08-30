@@ -5,6 +5,7 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 use snafu::Snafu;
 use tokio_util::codec::Encoder as _;
+use vrl::path::parse_target_path;
 
 use super::{
     config::{LokiConfig, OutOfOrderAction},
@@ -239,7 +240,9 @@ impl EventEncoder {
             for template in self.labels.values() {
                 if let Some(fields) = template.get_fields() {
                     for field in fields {
-                        event.as_mut_log().remove(field.as_str());
+                        if let Ok(path) = parse_target_path(field.as_str()) {
+                            event.as_mut_log().remove(&path);
+                        }
                     }
                 }
             }
@@ -261,6 +264,8 @@ impl EventEncoder {
         if self.remove_timestamp {
             event.as_mut_log().remove_timestamp();
         }
+
+        let event_count_tags = event.get_tags();
 
         self.transformer.transform(&mut event);
         let mut bytes = BytesMut::new();
@@ -285,6 +290,7 @@ impl EventEncoder {
             partition,
             finalizers,
             json_byte_size,
+            event_count_tags,
         })
     }
 }
@@ -450,7 +456,7 @@ impl LokiSink {
             .map(|event| encoder.encode_event(event))
             .filter_map(|event| async { event })
             .map(|record| filter.filter_record(record))
-            .batched_partitioned(RecordPartitioner::default(), self.batch_settings)
+            .batched_partitioned(RecordPartitioner, self.batch_settings)
             .filter_map(|(partition, batch)| async {
                 if let Some(partition) = partition {
                     let mut count: usize = 0;

@@ -33,7 +33,7 @@ pub fn decode_message<'a>(
                 if let Event::Log(ref mut log) = event {
                     log_namespace.insert_vector_metadata(
                         log,
-                        Some(schema.source_type_key()),
+                        schema.source_type_key(),
                         path!("source_type"),
                         Bytes::from(source_type),
                     );

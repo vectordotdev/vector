@@ -127,7 +127,7 @@ mod tests {
             }
         }));
 
-        let mut visitor = GenerateHumanFriendlyNameVisitor::default();
+        let mut visitor = GenerateHumanFriendlyNameVisitor;
         visitor.visit_root_schema(&mut actual_schema);
 
         assert_schemas_eq(expected_schema, actual_schema);
@@ -150,7 +150,7 @@ mod tests {
             }
         }));
 
-        let mut visitor = GenerateHumanFriendlyNameVisitor::default();
+        let mut visitor = GenerateHumanFriendlyNameVisitor;
         visitor.visit_root_schema(&mut actual_schema);
 
         assert_schemas_eq(expected_schema, actual_schema);
@@ -177,7 +177,7 @@ mod tests {
             }
         }));
 
-        let mut visitor = GenerateHumanFriendlyNameVisitor::default();
+        let mut visitor = GenerateHumanFriendlyNameVisitor;
         visitor.visit_root_schema(&mut actual_schema);
 
         assert_schemas_eq(expected_schema, actual_schema);
@@ -204,7 +204,7 @@ mod tests {
             }
         }));
 
-        let mut visitor = GenerateHumanFriendlyNameVisitor::default();
+        let mut visitor = GenerateHumanFriendlyNameVisitor;
         visitor.visit_root_schema(&mut actual_schema);
 
         assert_schemas_eq(expected_schema, actual_schema);
@@ -222,7 +222,7 @@ mod tests {
 
         let expected_schema = actual_schema.clone();
 
-        let mut visitor = GenerateHumanFriendlyNameVisitor::default();
+        let mut visitor = GenerateHumanFriendlyNameVisitor;
         visitor.visit_root_schema(&mut actual_schema);
 
         assert_schemas_eq(expected_schema, actual_schema);
@@ -244,7 +244,7 @@ mod tests {
 
         let expected_schema = actual_schema.clone();
 
-        let mut visitor = GenerateHumanFriendlyNameVisitor::default();
+        let mut visitor = GenerateHumanFriendlyNameVisitor;
         visitor.visit_root_schema(&mut actual_schema);
 
         assert_schemas_eq(expected_schema, actual_schema);
@@ -278,7 +278,7 @@ mod tests {
             }
         }));
 
-        let mut visitor = GenerateHumanFriendlyNameVisitor::default();
+        let mut visitor = GenerateHumanFriendlyNameVisitor;
         visitor.visit_root_schema(&mut actual_schema);
 
         assert_schemas_eq(expected_schema, actual_schema);
