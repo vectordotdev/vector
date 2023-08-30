@@ -27,6 +27,7 @@ fn write_build_constants(manifest: &Manifest, dest_path: &Path) -> io::Result<()
     let create_const_statement =
         |name, value| format!("pub const {}: &str = \"{}\";\n", name, value);
     // TODO: For releases, we should use the manifest.package().version().
+    // https://github.com/vectordotdev/vector/issues/18425
     let vector_version_const = create_const_statement("VECTOR_VERSION", "master");
     output_file
         .write_all(vector_version_const.as_bytes())
