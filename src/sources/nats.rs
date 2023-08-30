@@ -1,6 +1,6 @@
 use chrono::Utc;
 use codecs::decoding::{DeserializerConfig, FramingConfig, StreamDecodingError};
-use futures::{pin_mut, stream, Stream, StreamExt};
+use futures::{pin_mut, StreamExt};
 use lookup::{lookup_v2::OptionalValuePath, owned_value_path};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
@@ -31,9 +31,9 @@ enum BuildError {
     #[snafu(display("NATS Config Error: {}", source))]
     Config { source: NatsConfigError },
     #[snafu(display("NATS Connect Error: {}", source))]
-    Connect { source: std::io::Error },
+    Connect { source: async_nats::ConnectError },
     #[snafu(display("NATS Subscribe Error: {}", source))]
-    Subscribe { source: std::io::Error },
+    Subscribe { source: async_nats::SubscribeError },
 }
 
 /// Configuration for the `nats` source.
@@ -122,7 +122,8 @@ impl SourceConfig for NatsSourceConfig {
         let log_namespace = cx.log_namespace(self.log_namespace);
         let (connection, subscription) = create_subscription(self).await?;
         let decoder =
-            DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace).build();
+            DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace)
+                .build()?;
 
         Ok(Box::pin(nats_source(
             self.clone(),
@@ -166,13 +167,13 @@ impl SourceConfig for NatsSourceConfig {
 }
 
 impl NatsSourceConfig {
-    async fn connect(&self) -> Result<nats::asynk::Connection, BuildError> {
-        let options: nats::asynk::Options = self.try_into().context(ConfigSnafu)?;
+    async fn connect(&self) -> Result<async_nats::Client, BuildError> {
+        let options: async_nats::ConnectOptions = self.try_into().context(ConfigSnafu)?;
         options.connect(&self.url).await.context(ConnectSnafu)
     }
 }
 
-impl TryFrom<&NatsSourceConfig> for nats::asynk::Options {
+impl TryFrom<&NatsSourceConfig> for async_nats::ConnectOptions {
     type Error = NatsConfigError;
 
     fn try_from(config: &NatsSourceConfig) -> Result<Self, Self::Error> {
@@ -180,31 +181,23 @@ impl TryFrom<&NatsSourceConfig> for nats::asynk::Options {
     }
 }
 
-fn get_subscription_stream(
-    subscription: nats::asynk::Subscription,
-) -> impl Stream<Item = nats::asynk::Message> {
-    stream::unfold(subscription, |subscription| async move {
-        subscription.next().await.map(|msg| (msg, subscription))
-    })
-}
-
 async fn nats_source(
     config: NatsSourceConfig,
     // Take ownership of the connection so it doesn't get dropped.
-    _connection: nats::asynk::Connection,
-    subscription: nats::asynk::Subscription,
+    _connection: async_nats::Client,
+    subscriber: async_nats::Subscriber,
     decoder: Decoder,
     log_namespace: LogNamespace,
     shutdown: ShutdownSignal,
     mut out: SourceSender,
 ) -> Result<(), ()> {
     let events_received = register!(EventsReceived);
-    let stream = get_subscription_stream(subscription).take_until(shutdown);
+    let stream = subscriber.take_until(shutdown);
     pin_mut!(stream);
     let bytes_received = register!(BytesReceived::from(Protocol::TCP));
     while let Some(msg) = stream.next().await {
-        bytes_received.emit(ByteSize(msg.data.len()));
-        let mut stream = FramedRead::new(msg.data.as_ref(), decoder.clone());
+        bytes_received.emit(ByteSize(msg.payload.len()));
+        let mut stream = FramedRead::new(msg.payload.as_ref(), decoder.clone());
         while let Some(next) = stream.next().await {
             match next {
                 Ok((events, _byte_size)) => {
@@ -231,15 +224,15 @@ async fn nats_source(
                                 NatsSourceConfig::NAME,
                                 log,
                                 legacy_subject_key_field,
-                                "subject",
+                                &owned_value_path!("subject"),
                                 msg.subject.as_str(),
                             )
                         }
                         event
                     });
 
-                    out.send_batch(events).await.map_err(|error| {
-                        emit!(StreamClosedError { error, count });
+                    out.send_batch(events).await.map_err(|_| {
+                        emit!(StreamClosedError { count });
                     })?;
                 }
                 Err(error) => {
@@ -257,12 +250,15 @@ async fn nats_source(
 
 async fn create_subscription(
     config: &NatsSourceConfig,
-) -> Result<(nats::asynk::Connection, nats::asynk::Subscription), BuildError> {
+) -> Result<(async_nats::Client, async_nats::Subscriber), BuildError> {
     let nc = config.connect().await?;
 
     let subscription = match &config.queue {
-        None => nc.subscribe(&config.subject).await,
-        Some(queue) => nc.queue_subscribe(&config.subject, queue).await,
+        None => nc.subscribe(config.subject.clone()).await,
+        Some(queue) => {
+            nc.queue_subscribe(config.subject.clone(), queue.clone())
+                .await
+        }
     };
 
     let subscription = subscription.context(SubscribeSnafu)?;
@@ -349,6 +345,7 @@ mod tests {
 mod integration_tests {
     #![allow(clippy::print_stdout)] //tests
 
+    use bytes::Bytes;
     use vector_core::config::log_schema;
 
     use super::*;
@@ -373,7 +370,8 @@ mod integration_tests {
                 conf.decoding.clone(),
                 LogNamespace::Legacy,
             )
-            .build();
+            .build()
+            .unwrap();
             tokio::spawn(nats_source(
                 conf.clone(),
                 nc,
@@ -383,14 +381,20 @@ mod integration_tests {
                 ShutdownSignal::noop(),
                 tx,
             ));
-            nc_pub.publish(&subject, msg).await.unwrap();
+            nc_pub
+                .publish(subject, Bytes::from_static(msg.as_bytes()))
+                .await
+                .unwrap();
 
             collect_n(rx, 1).await
         })
         .await;
 
         println!("Received event  {:?}", events[0].as_log());
-        assert_eq!(events[0].as_log()[log_schema().message_key()], msg.into());
+        assert_eq!(
+            events[0].as_log()[log_schema().message_key().unwrap().to_string()],
+            msg.into()
+        );
         Ok(())
     }
 
@@ -605,7 +609,7 @@ mod integration_tests {
 
         let r = publish_and_check(conf).await;
         assert!(
-            matches!(r, Err(BuildError::Config { .. })),
+            matches!(r, Err(BuildError::Connect { .. })),
             "publish_and_check failed, expected BuildError::Config, got: {:?}",
             r
         );

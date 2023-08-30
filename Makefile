@@ -34,7 +34,13 @@ export VERBOSE ?= false
 # Override the container tool. Tries docker first and then tries podman.
 export CONTAINER_TOOL ?= auto
 ifeq ($(CONTAINER_TOOL),auto)
-	override CONTAINER_TOOL = $(shell docker version >/dev/null 2>&1 && echo docker || echo podman)
+	ifeq ($(shell docker version >/dev/null 2>&1 && echo docker), docker)
+		override CONTAINER_TOOL = docker
+	else ifeq ($(shell podman version >/dev/null 2>&1 && echo podman), podman)
+		override CONTAINER_TOOL = podman
+	else
+		override CONTAINER_TOOL = unknown
+	endif
 endif
 # If we're using podman create pods else if we're using docker create networks.
 export CURRENT_DIR = $(shell pwd)
@@ -54,7 +60,7 @@ export AWS_ACCESS_KEY_ID ?= "dummy"
 export AWS_SECRET_ACCESS_KEY ?= "dummy"
 
 # Set version
-export VERSION ?= $(shell cargo vdev version)
+export VERSION ?= $(shell command -v cargo >/dev/null && cargo vdev version || echo unknown)
 
 # Set if you are on the CI and actually want the things to happen. (Non-CI users should never set this.)
 export CI ?= false
@@ -128,6 +134,7 @@ define ENVIRONMENT_EXEC
 endef
 
 
+ifneq ($(CONTAINER_TOOL), unknown)
 ifeq ($(ENVIRONMENT_AUTOBUILD), true)
 define ENVIRONMENT_PREPARE
 	@echo "Building the environment. (ENVIRONMENT_AUTOBUILD=true) This may take a few minutes..."
@@ -140,6 +147,11 @@ endef
 else
 define ENVIRONMENT_PREPARE
 	$(CONTAINER_TOOL) pull $(ENVIRONMENT_UPSTREAM)
+endef
+endif
+else
+define ENVIRONMENT_PREPARE
+$(error "Please install a container tool such as Docker or Podman")
 endef
 endif
 
@@ -208,8 +220,10 @@ build-graphql-schema: ## Generate the `schema.json` for Vector's GraphQL API
 
 .PHONY: check-build-tools
 check-build-tools:
-ifeq (, $(shell which cargo))
+ifneq ($(ENVIRONMENT), true)
+ifeq ($(shell command -v cargo >/dev/null || echo not-found), not-found)
 	$(error "Please install Rust: https://www.rust-lang.org/tools/install")
+endif
 endif
 
 ##@ Cross Compiling
@@ -270,6 +284,9 @@ target/%/vector.tar.gz: target/%/vector CARGO_HANDLES_FRESHNESS
 	cp -R -f -v \
 		README.md \
 		LICENSE \
+		licenses \
+		NOTICE \
+		LICENSE-3rdparty.csv \
 		config \
 		target/scratch/vector-${TRIPLE}/
 	cp -R -f -v \
@@ -332,7 +349,7 @@ test-behavior: test-behavior-transforms test-behavior-formats test-behavior-conf
 test-integration: ## Runs all integration tests
 test-integration: test-integration-amqp test-integration-appsignal test-integration-aws test-integration-axiom test-integration-azure test-integration-chronicle test-integration-clickhouse
 test-integration: test-integration-databend test-integration-docker-logs test-integration-elasticsearch
-test-integration: test-integration-eventstoredb test-integration-fluent test-integration-gcp test-integration-humio test-integration-http-client test-integration-influxdb
+test-integration: test-integration-eventstoredb test-integration-fluent test-integration-gcp test-integration-greptimedb test-integration-humio test-integration-http-client test-integration-influxdb
 test-integration: test-integration-kafka test-integration-logstash test-integration-loki test-integration-mongodb test-integration-nats
 test-integration: test-integration-nginx test-integration-opentelemetry test-integration-postgres test-integration-prometheus test-integration-pulsar
 test-integration: test-integration-redis test-integration-splunk test-integration-dnstap test-integration-datadog-agent test-integration-datadog-logs
@@ -501,7 +518,7 @@ package-aarch64-unknown-linux-musl-all: package-aarch64-unknown-linux-musl # Bui
 package-aarch64-unknown-linux-gnu-all: package-aarch64-unknown-linux-gnu package-deb-aarch64 package-rpm-aarch64 # Build all aarch64 GNU packages
 
 .PHONY: package-armv7-unknown-linux-gnueabihf-all
-package-armv7-unknown-linux-gnueabihf-all: package-armv7-unknown-linux-gnueabihf package-deb-armv7-gnu package-rpm-armv7-gnu  # Build all armv7-unknown-linux-gnueabihf MUSL packages
+package-armv7-unknown-linux-gnueabihf-all: package-armv7-unknown-linux-gnueabihf package-deb-armv7-gnu package-rpm-armv7hl-gnu package-rpm-armv7-gnu  # Build all armv7-unknown-linux-gnueabihf MUSL packages
 
 .PHONY: package-x86_64-unknown-linux-gnu
 package-x86_64-unknown-linux-gnu: target/artifacts/vector-${VERSION}-x86_64-unknown-linux-gnu.tar.gz ## Build an archive suitable for the `x86_64-unknown-linux-gnu` triple.
@@ -562,6 +579,10 @@ package-rpm-aarch64: package-aarch64-unknown-linux-gnu ## Build the aarch64 rpm 
 .PHONY: package-rpm-armv7-gnu
 package-rpm-armv7-gnu: package-armv7-unknown-linux-gnueabihf ## Build the armv7-unknown-linux-gnueabihf rpm package
 	$(CONTAINER_TOOL) run -v  $(PWD):/git/vectordotdev/vector/ -e TARGET=armv7-unknown-linux-gnueabihf -e VECTOR_VERSION $(ENVIRONMENT_UPSTREAM) cargo vdev package rpm
+
+.PHONY: package-rpm-armv7hl-gnu
+package-rpm-armv7hl-gnu: package-armv7-unknown-linux-gnueabihf ## Build the armv7hl-unknown-linux-gnueabihf rpm package
+	$(CONTAINER_TOOL) run -v  $(PWD):/git/vectordotdev/vector/ -e TARGET=armv7-unknown-linux-gnueabihf -e ARCH=armv7hl -e VECTOR_VERSION $(ENVIRONMENT_UPSTREAM) cargo vdev package rpm
 
 ##@ Releasing
 

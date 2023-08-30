@@ -41,6 +41,7 @@ use zstd::Decoder as ZstdDecoder;
 
 use crate::{
     config::{Config, ConfigDiff, GenerateConfig},
+    signal::ShutdownError,
     topology::{self, RunningTopology},
     trace,
 };
@@ -683,8 +684,8 @@ pub async fn start_topology(
 ) -> (
     RunningTopology,
     (
-        tokio::sync::mpsc::UnboundedSender<()>,
-        tokio::sync::mpsc::UnboundedReceiver<()>,
+        tokio::sync::mpsc::UnboundedSender<ShutdownError>,
+        tokio::sync::mpsc::UnboundedReceiver<ShutdownError>,
     ),
 ) {
     config.healthchecks.set_require_healthy(require_healthy);

@@ -8,7 +8,7 @@ use rdkafka::{
     util::Timeout,
 };
 use vector_core::internal_event::{
-    ByteSize, BytesSent, CountByteSize, InternalEventHandle as _, Protocol, Registered,
+    ByteSize, BytesSent, InternalEventHandle as _, Protocol, Registered,
 };
 
 use crate::{kafka::KafkaStatisticsContext, sinks::prelude::*};
@@ -28,7 +28,7 @@ pub struct KafkaRequestMetadata {
 }
 
 pub struct KafkaResponse {
-    event_byte_size: JsonSize,
+    event_byte_size: GroupedCountByteSize,
 }
 
 impl DriverResponse for KafkaResponse {
@@ -36,8 +36,8 @@ impl DriverResponse for KafkaResponse {
         EventStatus::Delivered
     }
 
-    fn events_sent(&self) -> CountByteSize {
-        CountByteSize(1, self.event_byte_size)
+    fn events_sent(&self) -> &GroupedCountByteSize {
+        &self.event_byte_size
     }
 }
 
@@ -48,8 +48,12 @@ impl Finalizable for KafkaRequest {
 }
 
 impl MetaDescriptive for KafkaRequest {
-    fn get_metadata(&self) -> RequestMetadata {
-        self.request_metadata
+    fn get_metadata(&self) -> &RequestMetadata {
+        &self.request_metadata
+    }
+
+    fn metadata_mut(&mut self) -> &mut RequestMetadata {
+        &mut self.request_metadata
     }
 }
 
@@ -82,8 +86,8 @@ impl Service<KafkaRequest> for KafkaService {
 
         Box::pin(async move {
             let event_byte_size = request
-                .get_metadata()
-                .events_estimated_json_encoded_byte_size();
+                .request_metadata
+                .into_events_estimated_json_encoded_byte_size();
 
             let mut record =
                 FutureRecord::to(&request.metadata.topic).payload(request.body.as_ref());

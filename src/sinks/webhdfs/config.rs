@@ -21,7 +21,7 @@ use crate::{
 };
 
 /// Configuration for the `webhdfs` sink.
-#[configurable_component(sink("webhdfs"))]
+#[configurable_component(sink("webhdfs", "WebHDFS."))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct WebHdfsConfig {
@@ -97,6 +97,7 @@ impl GenerateConfig for WebHdfsConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "webhdfs")]
 impl SinkConfig for WebHdfsConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let op = self.build_operator()?;

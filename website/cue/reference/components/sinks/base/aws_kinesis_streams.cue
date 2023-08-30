@@ -50,6 +50,15 @@ base: components: sinks: aws_kinesis_streams: configuration: {
 				required:    true
 				type: string: examples: ["/my/aws/credentials"]
 			}
+			external_id: {
+				description: """
+					The optional unique external ID in conjunction with role to assume.
+
+					[external_id]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_create_for-user_externalid.html
+					"""
+				required: false
+				type: string: examples: ["randomEXAMPLEidString"]
+			}
 			imds: {
 				description: "Configuration for authenticating with AWS through IMDS."
 				required:    false
@@ -268,18 +277,82 @@ base: components: sinks: aws_kinesis_streams: configuration: {
 				description:   "The CSV Serializer Options."
 				relevant_when: "codec = \"csv\""
 				required:      true
-				type: object: options: fields: {
-					description: """
-						Configures the fields that will be encoded, as well as the order in which they
-						appear in the output.
+				type: object: options: {
+					capacity: {
+						description: """
+																Set the capacity (in bytes) of the internal buffer used in the CSV writer.
+																This defaults to a reasonable setting.
+																"""
+						required: false
+						type: uint: default: 8192
+					}
+					delimiter: {
+						description: "The field delimiter to use when writing CSV."
+						required:    false
+						type: uint: default: 44
+					}
+					double_quote: {
+						description: """
+																Enable double quote escapes.
 
-						If a field is not present in the event, the output will be an empty string.
+																This is enabled by default, but it may be disabled. When disabled, quotes in
+																field data are escaped instead of doubled.
+																"""
+						required: false
+						type: bool: default: true
+					}
+					escape: {
+						description: """
+																The escape character to use when writing CSV.
 
-						Values of type `Array`, `Object`, and `Regex` are not supported and the
-						output will be an empty string.
-						"""
-					required: true
-					type: array: items: type: string: {}
+																In some variants of CSV, quotes are escaped using a special escape character
+																like \\ (instead of escaping quotes by doubling them).
+
+																To use this `double_quotes` needs to be disabled as well otherwise it is ignored
+																"""
+						required: false
+						type: uint: default: 34
+					}
+					fields: {
+						description: """
+																Configures the fields that will be encoded, as well as the order in which they
+																appear in the output.
+
+																If a field is not present in the event, the output will be an empty string.
+
+																Values of type `Array`, `Object`, and `Regex` are not supported and the
+																output will be an empty string.
+																"""
+						required: true
+						type: array: items: type: string: {}
+					}
+					quote: {
+						description: "The quote character to use when writing CSV."
+						required:    false
+						type: uint: default: 34
+					}
+					quote_style: {
+						description: "The quoting style to use when writing CSV data."
+						required:    false
+						type: string: {
+							default: "necessary"
+							enum: {
+								always: "This puts quotes around every field. Always."
+								necessary: """
+																			This puts quotes around fields only when necessary.
+																			They are necessary when fields contain a quote, delimiter or record terminator.
+																			Quotes are also necessary when writing an empty record
+																			(which is indistinguishable from a record with one empty field).
+																			"""
+								never: "This never writes quotes, even if it would produce invalid CSV data."
+								non_numeric: """
+																			This puts quotes around all fields that are non-numeric.
+																			Namely, when writing a field that does not parse as a valid float or integer,
+																			then quotes will be used even if they aren’t strictly necessary.
+																			"""
+							}
+						}
+					}
 				}
 			}
 			except_fields: {
@@ -388,6 +461,17 @@ base: components: sinks: aws_kinesis_streams: configuration: {
 						required: false
 						type: float: default: 0.4
 					}
+					initial_concurrency: {
+						description: """
+																The initial concurrency limit to use. If not specified, the initial limit will be 1 (no concurrency).
+
+																It is recommended to set this value to your service's average limit if you're seeing that it takes a
+																long time to ramp up adaptive concurrency after a restart. You can find this value by looking at the
+																`adaptive_concurrency_limit` metric.
+																"""
+						required: false
+						type: uint: default: 1
+					}
 					rtt_deviation_scale: {
 						description: """
 																Scale of RTT deviations which are not considered anomalous.
@@ -488,6 +572,11 @@ base: components: sinks: aws_kinesis_streams: configuration: {
 				}
 			}
 		}
+	}
+	request_retry_partial: {
+		description: "Whether or not to retry successful requests containing partial failures."
+		required:    false
+		type: bool: default: false
 	}
 	stream_name: {
 		description: """

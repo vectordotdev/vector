@@ -2,8 +2,12 @@ use std::{io, io::Write};
 
 use serde::Serialize;
 use vector_buffers::EventCount;
-use vector_common::json_size::JsonSize;
-use vector_core::{event::Event, ByteSizeOf, EstimatedJsonEncodedSizeOf};
+use vector_common::{
+    internal_event::TaggedEventsSent,
+    json_size::JsonSize,
+    request_metadata::{GetEventCountTags, GroupedCountByteSize},
+};
+use vector_core::{config::telemetry, event::Event, ByteSizeOf, EstimatedJsonEncodedSizeOf};
 
 use crate::{
     codecs::Transformer,
@@ -47,6 +51,12 @@ impl EventCount for ProcessedEvent {
     }
 }
 
+impl GetEventCountTags for ProcessedEvent {
+    fn get_tags(&self) -> TaggedEventsSent {
+        self.log.get_tags()
+    }
+}
+
 #[derive(PartialEq, Eq, Default, Clone, Debug)]
 pub struct ElasticsearchEncoder {
     pub transformer: Transformer,
@@ -59,12 +69,15 @@ impl Encoder<Vec<ProcessedEvent>> for ElasticsearchEncoder {
         &self,
         input: Vec<ProcessedEvent>,
         writer: &mut dyn Write,
-    ) -> std::io::Result<usize> {
+    ) -> std::io::Result<(usize, GroupedCountByteSize)> {
         let mut written_bytes = 0;
+        let mut byte_size = telemetry().create_request_count_byte_size();
         for event in input {
             let log = {
                 let mut event = Event::from(event.log);
                 self.transformer.transform(&mut event);
+                byte_size.add_event(&event, event.estimated_json_encoded_size_of());
+
                 event.into_log()
             };
             written_bytes += write_bulk_action(
@@ -83,7 +96,8 @@ impl Encoder<Vec<ProcessedEvent>> for ElasticsearchEncoder {
                     Ok(())
                 })?;
         }
-        Ok(written_bytes)
+
+        Ok((written_bytes, byte_size))
     }
 }
 

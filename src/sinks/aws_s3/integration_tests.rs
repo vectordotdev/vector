@@ -51,7 +51,7 @@ fn s3_address() -> String {
 
 #[tokio::test]
 async fn s3_insert_message_into_with_flat_key_prefix() {
-    let cx = SinkContext::new_test();
+    let cx = SinkContext::default();
 
     let bucket = uuid::Uuid::new_v4().to_string();
 
@@ -85,7 +85,7 @@ async fn s3_insert_message_into_with_flat_key_prefix() {
 
 #[tokio::test]
 async fn s3_insert_message_into_with_folder_key_prefix() {
-    let cx = SinkContext::new_test();
+    let cx = SinkContext::default();
 
     let bucket = uuid::Uuid::new_v4().to_string();
 
@@ -119,7 +119,7 @@ async fn s3_insert_message_into_with_folder_key_prefix() {
 
 #[tokio::test]
 async fn s3_insert_message_into_with_ssekms_key_id() {
-    let cx = SinkContext::new_test();
+    let cx = SinkContext::default();
 
     let bucket = uuid::Uuid::new_v4().to_string();
 
@@ -156,7 +156,7 @@ async fn s3_insert_message_into_with_ssekms_key_id() {
 
 #[tokio::test]
 async fn s3_rotate_files_after_the_buffer_size_is_reached() {
-    let cx = SinkContext::new_test();
+    let cx = SinkContext::default();
 
     let bucket = uuid::Uuid::new_v4().to_string();
 
@@ -213,7 +213,7 @@ async fn s3_gzip() {
     // to 1000, and using gzip compression.  We test to ensure that all of the keys we end up
     // writing represent the sum total of the lines: we expect 3 batches, each of which should
     // have 1000 lines.
-    let cx = SinkContext::new_test();
+    let cx = SinkContext::default();
 
     let bucket = uuid::Uuid::new_v4().to_string();
 
@@ -258,7 +258,7 @@ async fn s3_zstd() {
     // to 1000, and using zstd compression.  We test to ensure that all of the keys we end up
     // writing represent the sum total of the lines: we expect 3 batches, each of which should
     // have 1000 lines.
-    let cx = SinkContext::new_test();
+    let cx = SinkContext::default();
 
     let bucket = uuid::Uuid::new_v4().to_string();
 
@@ -303,7 +303,7 @@ async fn s3_zstd() {
 // https://github.com/localstack/localstack/issues/4166
 #[tokio::test]
 async fn s3_insert_message_into_object_lock() {
-    let cx = SinkContext::new_test();
+    let cx = SinkContext::default();
 
     let bucket = uuid::Uuid::new_v4().to_string();
 
@@ -357,7 +357,7 @@ async fn s3_insert_message_into_object_lock() {
 
 #[tokio::test]
 async fn acknowledges_failures() {
-    let cx = SinkContext::new_test();
+    let cx = SinkContext::default();
 
     let bucket = uuid::Uuid::new_v4().to_string();
 
@@ -406,6 +406,80 @@ async fn s3_healthchecks_invalid_bucket() {
         .is_err());
 }
 
+#[tokio::test]
+async fn s3_flush_on_exhaustion() {
+    let cx = SinkContext::default();
+
+    let bucket = uuid::Uuid::new_v4().to_string();
+    create_bucket(&bucket, false).await;
+
+    // batch size of ten events, timeout of ten seconds
+    let config = {
+        let mut batch = BatchConfig::default();
+        batch.max_events = Some(10);
+        batch.timeout_secs = Some(10.0);
+
+        S3SinkConfig {
+            bucket: bucket.to_string(),
+            key_prefix: random_string(10) + "/date=%F",
+            filename_time_format: default_filename_time_format(),
+            filename_append_uuid: true,
+            filename_extension: None,
+            options: S3Options::default(),
+            region: RegionOrEndpoint::with_both("minio", s3_address()),
+            encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
+            compression: Compression::None,
+            batch,
+            request: TowerRequestConfig::default(),
+            tls: Default::default(),
+            auth: Default::default(),
+            acknowledgements: Default::default(),
+        }
+    };
+    let prefix = config.key_prefix.clone();
+    let service = config.create_service(&cx.globals.proxy).await.unwrap();
+    let sink = config.build_processor(service).unwrap();
+
+    let (lines, _events) = random_lines_with_stream(100, 2, None); // only generate two events (less than batch size)
+
+    let events = lines.clone().into_iter().enumerate().map(|(i, line)| {
+        let mut e = LogEvent::from(line);
+        let i = if i < 10 {
+            1
+        } else if i < 20 {
+            2
+        } else {
+            3
+        };
+        e.insert("i", i.to_string());
+        Event::from(e)
+    });
+
+    // Here, we validate that the s3 sink flushes when its source stream is exhausted
+    // by giving it a number of inputs less than the batch size, verifying that the
+    // outputs for the in-flight batch are flushed. By timing out in 3 seconds with a
+    // flush period of ten seconds, we verify that the flush is triggered *at stream
+    // completion* and not because of periodic flushing.
+    assert!(tokio::time::timeout(
+        Duration::from_secs(3),
+        run_and_assert_sink_compliance(sink, stream::iter(events), &AWS_SINK_TAGS)
+    )
+    .await
+    .is_ok());
+
+    let keys = get_keys(&bucket, prefix).await;
+    assert_eq!(keys.len(), 1);
+
+    let mut response_lines: Vec<String> = Vec::new();
+    let mut key_stream = stream::iter(keys);
+    while let Some(key) = key_stream.next().await {
+        let obj = get_object(&bucket, key).await;
+        response_lines.append(&mut get_lines(obj).await);
+    }
+
+    assert_eq!(lines, response_lines); // if all events are received, and lines.len() < batch size, then a flush was performed.
+}
+
 async fn client() -> S3Client {
     let auth = AwsAuthentication::test_auth();
     let region = RegionOrEndpoint::with_both("minio", s3_address());
@@ -414,7 +488,7 @@ async fn client() -> S3Client {
     create_client::<S3ClientBuilder>(
         &auth,
         region.region(),
-        region.endpoint().unwrap(),
+        region.endpoint(),
         &proxy,
         &tls_options,
         true,
@@ -471,7 +545,7 @@ async fn create_bucket(bucket: &str, object_lock_enabled: bool) {
     {
         Ok(_) => {}
         Err(err) => match err {
-            SdkError::ServiceError { err, raw: _ } => match err.kind {
+            SdkError::ServiceError(inner) => match &inner.err().kind {
                 CreateBucketErrorKind::BucketAlreadyOwnedByYou(_) => {}
                 err => panic!("Failed to create bucket: {:?}", err),
             },

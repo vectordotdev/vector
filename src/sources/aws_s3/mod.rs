@@ -3,7 +3,7 @@ use std::{convert::TryInto, io::ErrorKind};
 use async_compression::tokio::bufread;
 use aws_sdk_s3::types::ByteStream;
 use codecs::decoding::{DeserializerConfig, FramingConfig, NewlineDelimitedDecoderOptions};
-use codecs::BytesDeserializerConfig;
+use codecs::NewlineDelimitedDecoderConfig;
 use futures::{stream, stream::StreamExt, TryStreamExt};
 use lookup::owned_value_path;
 use snafu::Snafu;
@@ -14,9 +14,8 @@ use vrl::value::{kind::Collection, Kind};
 
 use super::util::MultilineConfig;
 use crate::codecs::DecodingConfig;
-use crate::config::DataType;
 use crate::{
-    aws::{auth::AwsAuthentication, create_client, RegionOrEndpoint},
+    aws::{auth::AwsAuthentication, create_client, create_client_and_region, RegionOrEndpoint},
     common::{s3::S3ClientBuilder, sqs::SqsClientBuilder},
     config::{
         ProxyConfig, SourceAcknowledgementsConfig, SourceConfig, SourceContext, SourceOutput,
@@ -133,9 +132,9 @@ pub struct AwsS3Config {
 
 const fn default_framing() -> FramingConfig {
     // This is used for backwards compatibility. It used to be the only (hardcoded) option.
-    FramingConfig::NewlineDelimited {
+    FramingConfig::NewlineDelimited(NewlineDelimitedDecoderConfig {
         newline_delimited: NewlineDelimitedDecoderOptions { max_length: None },
-    }
+    })
 }
 
 impl_generate_config_from_default!(AwsS3Config);
@@ -163,7 +162,8 @@ impl SourceConfig for AwsS3Config {
 
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
-        let mut schema_definition = BytesDeserializerConfig
+        let mut schema_definition = self
+            .decoding
             .schema_definition(log_namespace)
             .with_source_metadata(
                 Self::NAME,
@@ -199,7 +199,7 @@ impl SourceConfig for AwsS3Config {
                 Self::NAME,
                 None,
                 &owned_value_path!("metadata"),
-                Kind::object(Collection::empty().with_unknown(Kind::bytes())),
+                Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
                 None,
             );
 
@@ -208,7 +208,10 @@ impl SourceConfig for AwsS3Config {
             schema_definition = schema_definition.unknown_fields(Kind::bytes());
         }
 
-        vec![SourceOutput::new_logs(DataType::Log, schema_definition)]
+        vec![SourceOutput::new_logs(
+            self.decoding.output_type(),
+            schema_definition,
+        )]
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -223,19 +226,12 @@ impl AwsS3Config {
         proxy: &ProxyConfig,
         log_namespace: LogNamespace,
     ) -> crate::Result<sqs::Ingestor> {
-        let region = self
-            .region
-            .region()
-            .ok_or(CreateSqsIngestorError::RegionMissing)?;
-
-        let endpoint = self
-            .region
-            .endpoint()
-            .map_err(|_| CreateSqsIngestorError::InvalidEndpoint)?;
+        let region = self.region.region();
+        let endpoint = self.region.endpoint();
 
         let s3_client = create_client::<S3ClientBuilder>(
             &self.auth,
-            Some(region.clone()),
+            region.clone(),
             endpoint.clone(),
             proxy,
             &self.tls_options,
@@ -244,13 +240,14 @@ impl AwsS3Config {
         .await?;
 
         let decoder =
-            DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace).build();
+            DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace)
+                .build()?;
 
         match self.sqs {
             Some(ref sqs) => {
-                let sqs_client = create_client::<SqsClientBuilder>(
+                let (sqs_client, region) = create_client_and_region::<SqsClientBuilder>(
                     &self.auth,
-                    Some(region.clone()),
+                    region.clone(),
                     endpoint,
                     proxy,
                     &sqs.tls_options,
@@ -286,8 +283,6 @@ enum CreateSqsIngestorError {
     Credentials { source: crate::Error },
     #[snafu(display("Configuration for `sqs` required when strategy=sqs"))]
     ConfigMissing,
-    #[snafu(display("Region is required"))]
-    RegionMissing,
     #[snafu(display("Endpoint is invalid"))]
     InvalidEndpoint,
 }
@@ -448,6 +443,7 @@ mod integration_tests {
 
     use aws_sdk_s3::{types::ByteStream, Client as S3Client};
     use aws_sdk_sqs::{model::QueueAttributeName, Client as SqsClient};
+    use codecs::{decoding::DeserializerConfig, JsonDeserializerConfig};
     use lookup::path;
     use similar_asserts::assert_eq;
     use vrl::value::Value;
@@ -491,6 +487,35 @@ mod integration_tests {
             logs,
             Delivered,
             false,
+            DeserializerConfig::Bytes,
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    async fn s3_process_json_message() {
+        trace_init();
+
+        let logs: Vec<String> = random_lines(100).take(10).collect();
+
+        let json_logs: Vec<String> = logs
+            .iter()
+            .map(|msg| {
+                // convert to JSON object
+                format!(r#"{{"message": "{}"}}"#, msg)
+            })
+            .collect();
+
+        test_event(
+            None,
+            None,
+            None,
+            None,
+            json_logs.join("\n").into_bytes(),
+            logs,
+            Delivered,
+            false,
+            DeserializerConfig::Json(JsonDeserializerConfig::default()),
         )
         .await;
     }
@@ -510,6 +535,7 @@ mod integration_tests {
             logs,
             Delivered,
             true,
+            DeserializerConfig::Bytes,
         )
         .await;
     }
@@ -530,6 +556,7 @@ mod integration_tests {
             logs,
             Delivered,
             false,
+            DeserializerConfig::Bytes,
         )
         .await;
     }
@@ -550,6 +577,7 @@ mod integration_tests {
             logs,
             Delivered,
             false,
+            DeserializerConfig::Bytes,
         )
         .await;
     }
@@ -578,6 +606,7 @@ mod integration_tests {
             logs,
             Delivered,
             false,
+            DeserializerConfig::Bytes,
         )
         .await;
     }
@@ -607,6 +636,7 @@ mod integration_tests {
             logs,
             Delivered,
             false,
+            DeserializerConfig::Bytes,
         )
         .await;
     }
@@ -636,6 +666,7 @@ mod integration_tests {
             logs,
             Delivered,
             false,
+            DeserializerConfig::Bytes,
         )
         .await;
     }
@@ -663,6 +694,7 @@ mod integration_tests {
             vec!["abc\ndef\ngeh".to_owned()],
             Delivered,
             false,
+            DeserializerConfig::Bytes,
         )
         .await;
     }
@@ -685,6 +717,7 @@ mod integration_tests {
             logs,
             Errored,
             false,
+            DeserializerConfig::Bytes,
         )
         .await;
     }
@@ -704,6 +737,7 @@ mod integration_tests {
             logs,
             Rejected,
             false,
+            DeserializerConfig::Bytes,
         )
         .await;
     }
@@ -716,6 +750,7 @@ mod integration_tests {
         queue_url: &str,
         multiline: Option<MultilineConfig>,
         log_namespace: bool,
+        decoding: DeserializerConfig,
     ) -> AwsS3Config {
         AwsS3Config {
             region: RegionOrEndpoint::with_both("us-east-1", s3_address()),
@@ -731,6 +766,7 @@ mod integration_tests {
             }),
             acknowledgements: true.into(),
             log_namespace: Some(log_namespace),
+            decoding,
             ..Default::default()
         }
     }
@@ -746,6 +782,7 @@ mod integration_tests {
         expected_lines: Vec<String>,
         status: EventStatus,
         log_namespace: bool,
+        decoding: DeserializerConfig,
     ) {
         assert_source_compliance(&SOURCE_TAGS, async move {
             let key = key.unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
@@ -758,7 +795,7 @@ mod integration_tests {
 
             tokio::time::sleep(Duration::from_secs(1)).await;
 
-            let config = config(&queue, multiline, log_namespace);
+            let config = config(&queue, multiline, log_namespace, decoding);
 
             s3.put_object()
                 .bucket(bucket.clone())
@@ -839,6 +876,11 @@ mod integration_tests {
 
             assert_eq!(expected_lines.len(), events.len());
             for (i, event) in events.iter().enumerate() {
+
+                if let Some(schema_definition) = config.outputs(namespace).pop().unwrap().schema_definition {
+                    schema_definition.is_valid_for_event(event).unwrap();
+                }
+
                 let message = expected_lines[i].as_str();
 
                 let log = event.as_log();
@@ -925,7 +967,7 @@ mod integration_tests {
         create_client::<S3ClientBuilder>(
             &auth,
             region_endpoint.region(),
-            region_endpoint.endpoint().unwrap(),
+            region_endpoint.endpoint(),
             &proxy_config,
             &None,
             false,
@@ -944,7 +986,7 @@ mod integration_tests {
         create_client::<SqsClientBuilder>(
             &auth,
             region_endpoint.region(),
-            region_endpoint.endpoint().unwrap(),
+            region_endpoint.endpoint(),
             &proxy_config,
             &None,
             false,

@@ -201,7 +201,12 @@ impl ProxyConfig {
 mod tests {
     use base64::prelude::{Engine as _, BASE64_STANDARD};
     use env_test_util::TempEnvVar;
-    use http::{HeaderValue, Uri};
+    use http::{
+        header::{AUTHORIZATION, PROXY_AUTHORIZATION},
+        HeaderName, HeaderValue, Uri,
+    };
+
+    const PROXY_HEADERS: [HeaderName; 2] = [AUTHORIZATION, PROXY_AUTHORIZATION];
 
     use super::*;
 
@@ -341,20 +346,18 @@ mod tests {
             Some(first.uri()),
             Uri::try_from("http://user:pass@1.2.3.4:5678").as_ref().ok()
         );
-        assert_eq!(
-            first.headers().get("authorization"),
-            expected_header_value.as_ref().ok()
-        );
+        for h in &PROXY_HEADERS {
+            assert_eq!(first.headers().get(h), expected_header_value.as_ref().ok());
+        }
         assert_eq!(
             Some(second.uri()),
             Uri::try_from("https://user:pass@2.3.4.5:9876")
                 .as_ref()
                 .ok()
         );
-        assert_eq!(
-            second.headers().get("authorization"),
-            expected_header_value.as_ref().ok()
-        );
+        for h in &PROXY_HEADERS {
+            assert_eq!(second.headers().get(h), expected_header_value.as_ref().ok());
+        }
     }
 
     #[ignore]
@@ -371,10 +374,8 @@ mod tests {
             .expect("should not be None");
         let encoded_header = format!("Basic {}", BASE64_STANDARD.encode("user:P@ssw0rd"));
         let expected_header_value = HeaderValue::from_str(encoded_header.as_str());
-
-        assert_eq!(
-            first.headers().get("authorization"),
-            expected_header_value.as_ref().ok()
-        );
+        for h in &PROXY_HEADERS {
+            assert_eq!(first.headers().get(h), expected_header_value.as_ref().ok());
+        }
     }
 }

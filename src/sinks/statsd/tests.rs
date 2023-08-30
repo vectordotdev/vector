@@ -71,7 +71,7 @@ async fn test_send_to_statsd() {
     ];
     let (tx, rx) = mpsc::channel(1);
 
-    let context = SinkContext::new_test();
+    let context = SinkContext::default();
     assert_sink_compliance(&SINK_TAGS, async move {
         let (sink, _healthcheck) = config.build(context).await.unwrap();
 

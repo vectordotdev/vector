@@ -137,8 +137,8 @@ fn eventstoredb(
 
                                 events_received.emit(CountByteSize(count, byte_size));
 
-                                if let Err(error) = cx.out.send_batch(metrics).await {
-                                    emit!(StreamClosedError { count, error });
+                                if (cx.out.send_batch(metrics).await).is_err() {
+                                    emit!(StreamClosedError { count });
                                     break;
                                 }
                             }

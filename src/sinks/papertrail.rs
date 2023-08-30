@@ -16,7 +16,7 @@ use crate::{
 };
 
 /// Configuration for the `papertrail` sink.
-#[configurable_component(sink("papertrail"))]
+#[configurable_component(sink("papertrail", "Deliver log events to Papertrail from SolarWinds."))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct PapertrailConfig {
@@ -65,6 +65,7 @@ impl GenerateConfig for PapertrailConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "papertrail")]
 impl SinkConfig for PapertrailConfig {
     async fn build(
         &self,
@@ -212,7 +213,7 @@ mod tests {
         config.endpoint = mock_endpoint.into();
         config.tls = Some(TlsEnableableConfig::default());
 
-        let context = SinkContext::new_test();
+        let context = SinkContext::default();
         let (sink, _healthcheck) = config.build(context).await.unwrap();
 
         let event = Event::Log(LogEvent::from("simple message"));

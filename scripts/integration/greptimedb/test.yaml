@@ -1,0 +1,12 @@
+features:
+- greptimedb-integration-tests
+
+test_filter: '::greptimedb::'
+
+runner:
+  env:
+    GREPTIMEDB_ENDPOINT: greptimedb:4001
+    GREPTIMEDB_HTTP: http://greptimedb:4000
+
+matrix:
+  version: ['latest']

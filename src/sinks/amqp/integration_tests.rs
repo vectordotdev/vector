@@ -72,7 +72,7 @@ async fn amqp_happy_path() {
         .await
         .unwrap();
 
-    let cx = SinkContext::new_test();
+    let cx = SinkContext::default();
     let (sink, healthcheck) = config.build(cx).await.unwrap();
     healthcheck.await.expect("Health check failed");
 
@@ -153,7 +153,7 @@ async fn amqp_round_trip() {
         .await
         .unwrap();
 
-    let cx = SinkContext::new_test();
+    let cx = SinkContext::default();
     let (amqp_sink, healthcheck) = config.build(cx).await.unwrap();
     healthcheck.await.expect("Health check failed");
 

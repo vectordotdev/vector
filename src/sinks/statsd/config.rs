@@ -35,7 +35,7 @@ impl SinkBatchSettings for StatsdDefaultBatchSettings {
 }
 
 /// Configuration for the `statsd` sink.
-#[configurable_component(sink("statsd"))]
+#[configurable_component(sink("statsd", "Deliver metric data to a StatsD aggregator."))]
 #[derive(Clone, Debug)]
 pub struct StatsdSinkConfig {
     /// Sets the default namespace for any metrics sent.
@@ -121,6 +121,7 @@ impl GenerateConfig for StatsdSinkConfig {
 }
 
 #[async_trait]
+#[typetag::serde(name = "statsd")]
 impl SinkConfig for StatsdSinkConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let batcher_settings = self.batch.into_batcher_settings()?;

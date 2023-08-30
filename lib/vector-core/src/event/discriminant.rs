@@ -27,7 +27,13 @@ impl Discriminant {
     pub fn from_log_event(event: &LogEvent, discriminant_fields: &[impl AsRef<str>]) -> Self {
         let values: Vec<Option<Value>> = discriminant_fields
             .iter()
-            .map(|discriminant_field| event.get(discriminant_field.as_ref()).cloned())
+            .map(|discriminant_field| {
+                event
+                    .parse_path_and_get_value(discriminant_field.as_ref())
+                    .ok()
+                    .flatten()
+                    .cloned()
+            })
             .collect();
         Self { values }
     }

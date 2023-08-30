@@ -110,7 +110,7 @@ impl SqsSource {
             .visibility_timeout(self.visibility_timeout_secs as i32)
             // I think this should be a known attribute
             // https://github.com/awslabs/aws-sdk-rust/issues/411
-            .attribute_names(QueueAttributeName::Unknown(String::from("SentTimestamp")))
+            .attribute_names(QueueAttributeName::from("SentTimestamp"))
             .send()
             .await;
 
@@ -180,7 +180,7 @@ impl SqsSource {
                         }
                     }
                 }
-                Err(error) => emit!(StreamClosedError { error, count }),
+                Err(_) => emit!(StreamClosedError { count }),
             }
         }
     }
@@ -219,13 +219,12 @@ async fn delete_messages(client: SqsClient, receipts: Vec<String>, queue_url: St
 
 #[cfg(test)]
 mod tests {
-    use crate::codecs::DecodingConfig;
-    use chrono::SecondsFormat;
-    use lookup::path;
-
     use super::*;
+    use crate::codecs::DecodingConfig;
     use crate::config::{log_schema, SourceConfig};
     use crate::sources::aws_sqs::AwsSqsConfig;
+    use chrono::SecondsFormat;
+    use lookup::path;
 
     #[tokio::test]
     async fn test_decode_vector_namespace() {
@@ -246,7 +245,8 @@ mod tests {
                 config.decoding,
                 LogNamespace::Vector,
             )
-            .build(),
+            .build()
+            .unwrap(),
             "aws_sqs",
             b"test",
             Some(now),
@@ -298,7 +298,8 @@ mod tests {
                 config.decoding,
                 LogNamespace::Legacy,
             )
-            .build(),
+            .build()
+            .unwrap(),
             "aws_sqs",
             b"test",
             Some(now),
@@ -312,7 +313,7 @@ mod tests {
             events[0]
                 .clone()
                 .as_log()
-                .get(log_schema().message_key())
+                .get(log_schema().message_key_target_path().unwrap())
                 .unwrap()
                 .to_string_lossy(),
             message
@@ -321,10 +322,7 @@ mod tests {
             events[0]
                 .clone()
                 .as_log()
-                .get((
-                    lookup::PathPrefix::Event,
-                    log_schema().timestamp_key().unwrap()
-                ))
+                .get_timestamp()
                 .unwrap()
                 .to_string_lossy(),
             now.to_rfc3339_opts(SecondsFormat::AutoSi, true)

@@ -101,12 +101,12 @@ pub mod sources;
 pub mod stats;
 #[cfg(feature = "api-client")]
 #[allow(unreachable_pub)]
-mod tap;
+pub mod tap;
 pub mod template;
 pub mod test_util;
 #[cfg(feature = "api-client")]
 #[allow(unreachable_pub)]
-pub(crate) mod top;
+pub mod top;
 #[allow(unreachable_pub)]
 pub mod topology;
 pub mod trace;

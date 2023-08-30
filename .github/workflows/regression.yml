@@ -34,8 +34,11 @@ on:
   pull_request:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.merge_group.head_sha || github.sha }}
+  group: ${{ github.workflow }}-${{ github.event.comment.html_url || github.event.merge_group.head_sha || github.sha }}
   cancel-in-progress: true
+
+env:
+  SINGLE_MACHINE_PERFORMANCE_API: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_API }}
 
 jobs:
 
@@ -126,33 +129,9 @@ jobs:
       smp-version: ${{ steps.experimental-meta.outputs.SMP_CRATE_VERSION }}
       lading-version: ${{ steps.experimental-meta.outputs.LADING_VERSION }}
     steps:
-
       - uses: actions/checkout@v3
-
-      - name: Checkout PR (issue_comment)
-        if: github.event_name == 'issue_comment'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh pr checkout ${{ github.event.issue.number }}
-
-      - name: Get PR branch name (issue_comment)
-        id: get-pr-branch-name
-        if: github.event_name == 'issue_comment'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          export BRANCH=$(git branch --show-current)
-          echo "BRANCH=${BRANCH}"
-          echo "BRANCH=${BRANCH}" >> $GITHUB_OUTPUT
-
-      - name: Checkout PR branch (issue_comment)
-        if: github.event_name == 'issue_comment'
-        uses: actions/checkout@v3
         with:
-          # TODO: this can be done more elegantly in a follow-up by using a depth value and
-          #       increasing it until the merge-base is found.
-          fetch-depth: 500
-          ref: "${{ steps.get-pr-branch-name.outputs.BRANCH }}"
+          fetch-depth: 1000
 
       # If triggered by issue comment, the event payload doesn't directly contain the head and base sha from the PR.
       # But, we can retrieve this info from some commands.
@@ -165,7 +144,9 @@ jobs:
           export PR_NUMBER=${{ github.event.issue.number }}
           echo "PR_NUMBER=${PR_NUMBER}" >> $GITHUB_OUTPUT
 
-          export BASELINE_SHA=$(git merge-base --fork-point master)
+          gh pr checkout ${{ github.event.issue.number }}
+
+          export BASELINE_SHA=$(git merge-base master HEAD)
           echo "BASELINE_SHA=${BASELINE_SHA}" >> $GITHUB_OUTPUT
 
           export COMPARISON_SHA=$(git rev-parse HEAD)
@@ -251,8 +232,8 @@ jobs:
           export REPLICAS="10"
           export TOTAL_SAMPLES="600"
           export P_VALUE="0.1"
-          export SMP_CRATE_VERSION="0.7.3"
-          export LADING_VERSION="0.12.0"
+          export SMP_CRATE_VERSION="0.10.0"
+          export LADING_VERSION="0.18.0"
 
           echo "warmup seconds: ${WARMUP_SECONDS}"
           echo "replicas: ${REPLICAS}"
@@ -302,7 +283,7 @@ jobs:
 
   build-baseline:
     name: Build baseline Vector container
-    runs-on: [linux, ubuntu-20.04-8core]
+    runs-on: [linux, ubuntu-20.04-4core]
     needs:
       - compute-metadata
     steps:
@@ -317,10 +298,10 @@ jobs:
 
       - name: Set up Docker Buildx
         id: buildx
-        uses: docker/setup-buildx-action@v2.5.0
+        uses: docker/setup-buildx-action@v2.10.0
 
       - name: Build 'vector' target image
-        uses: docker/build-push-action@v4.0.0
+        uses: docker/build-push-action@v4.1.1
         with:
           context: baseline-vector/
           cache-from: type=gha
@@ -339,7 +320,7 @@ jobs:
 
   build-comparison:
     name: Build comparison Vector container
-    runs-on: [linux, soak-builder]
+    runs-on: [linux, ubuntu-20.04-4core]
     needs:
       - compute-metadata
     steps:
@@ -354,10 +335,10 @@ jobs:
 
       - name: Set up Docker Buildx
         id: buildx
-        uses: docker/setup-buildx-action@v2.5.0
+        uses: docker/setup-buildx-action@v2.10.0
 
       - name: Build 'vector' target image
-        uses: docker/build-push-action@v4.0.0
+        uses: docker/build-push-action@v4.1.1
         with:
           context: comparison-vector/
           cache-from: type=gha
@@ -381,7 +362,7 @@ jobs:
       - compute-metadata
     steps:
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v2.1.0
+        uses: aws-actions/configure-aws-credentials@v3.0.1
         with:
           aws-access-key-id: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_SECRET_ACCESS_KEY }}
@@ -413,7 +394,7 @@ jobs:
           docker load --input baseline-image.tar
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v2.1.0
+        uses: aws-actions/configure-aws-credentials@v3.0.1
         with:
           aws-access-key-id: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_SECRET_ACCESS_KEY }}
@@ -451,7 +432,7 @@ jobs:
           docker load --input comparison-image.tar
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v2.1.0
+        uses: aws-actions/configure-aws-credentials@v3.0.1
         with:
           aws-access-key-id: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_SECRET_ACCESS_KEY }}
@@ -497,7 +478,7 @@ jobs:
           ref: ${{ needs.compute-metadata.outputs.comparison-sha }}
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v2.1.0
+        uses: aws-actions/configure-aws-credentials@v3.0.1
         with:
           aws-access-key-id: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_SECRET_ACCESS_KEY }}
@@ -616,7 +597,7 @@ jobs:
       - uses: actions/checkout@v3
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v2.1.0
+        uses: aws-actions/configure-aws-credentials@v3.0.1
         with:
           aws-access-key-id: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_SECRET_ACCESS_KEY }}
@@ -707,7 +688,7 @@ jobs:
           ref: ${{ needs.compute-metadata.outputs.comparison-sha }}
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v2.1.0
+        uses: aws-actions/configure-aws-credentials@v3.0.1
         with:
           aws-access-key-id: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_SECRET_ACCESS_KEY }}

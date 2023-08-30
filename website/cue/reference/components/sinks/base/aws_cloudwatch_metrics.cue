@@ -50,6 +50,15 @@ base: components: sinks: aws_cloudwatch_metrics: configuration: {
 				required:    true
 				type: string: examples: ["/my/aws/credentials"]
 			}
+			external_id: {
+				description: """
+					The optional unique external ID in conjunction with role to assume.
+
+					[external_id]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_create_for-user_externalid.html
+					"""
+				required: false
+				type: string: examples: ["randomEXAMPLEidString"]
+			}
 			imds: {
 				description: "Configuration for authenticating with AWS through IMDS."
 				required:    false
@@ -248,6 +257,17 @@ base: components: sinks: aws_cloudwatch_metrics: configuration: {
 																"""
 						required: false
 						type: float: default: 0.4
+					}
+					initial_concurrency: {
+						description: """
+																The initial concurrency limit to use. If not specified, the initial limit will be 1 (no concurrency).
+
+																It is recommended to set this value to your service's average limit if you're seeing that it takes a
+																long time to ramp up adaptive concurrency after a restart. You can find this value by looking at the
+																`adaptive_concurrency_limit` metric.
+																"""
+						required: false
+						type: uint: default: 1
 					}
 					rtt_deviation_scale: {
 						description: """

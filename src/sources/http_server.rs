@@ -9,6 +9,7 @@ use codecs::{
 };
 
 use http::{StatusCode, Uri};
+use http_serde;
 use lookup::{lookup_v2::OptionalValuePath, owned_value_path, path};
 use tokio_util::codec::Decoder as _;
 use vector_config::configurable_component;
@@ -129,6 +130,13 @@ pub struct SimpleHttpConfig {
     #[serde(default = "default_http_method")]
     method: HttpMethod,
 
+    /// Specifies the HTTP response status code that will be returned on successful requests.
+    #[configurable(metadata(docs::examples = 202))]
+    #[configurable(metadata(docs::numeric_type = "uint"))]
+    #[serde(with = "http_serde::status_code")]
+    #[serde(default = "default_http_response_code")]
+    response_code: StatusCode,
+
     #[configurable(derived)]
     tls: Option<TlsEnableableConfig>,
 
@@ -202,11 +210,11 @@ impl SimpleHttpConfig {
                 ),
                 Encoding::Json => (
                     BytesDecoderConfig::new().into(),
-                    JsonDeserializerConfig::new().into(),
+                    JsonDeserializerConfig::default().into(),
                 ),
                 Encoding::Ndjson => (
                     NewlineDelimitedDecoderConfig::new().into(),
-                    JsonDeserializerConfig::new().into(),
+                    JsonDeserializerConfig::default().into(),
                 ),
                 Encoding::Binary => (
                     BytesDecoderConfig::new().into(),
@@ -242,6 +250,7 @@ impl Default for SimpleHttpConfig {
             path: default_path(),
             path_key: default_path_key(),
             method: default_http_method(),
+            response_code: default_http_response_code(),
             strict_path: true,
             framing: None,
             decoding: Some(default_decoding()),
@@ -256,7 +265,7 @@ impl_generate_config_from_default!(SimpleHttpConfig);
 impl ValidatableComponent for SimpleHttpConfig {
     fn validation_configuration() -> ValidationConfiguration {
         let config = Self {
-            decoding: Some(DeserializerConfig::Json),
+            decoding: Some(DeserializerConfig::Json(Default::default())),
             ..Default::default()
         };
 
@@ -289,6 +298,10 @@ fn default_path_key() -> OptionalValuePath {
     OptionalValuePath::from(owned_value_path!("path"))
 }
 
+const fn default_http_response_code() -> StatusCode {
+    StatusCode::OK
+}
+
 /// Removes duplicates from the list, and logs a `warn!()` for each duplicate removed.
 fn remove_duplicates(mut list: Vec<String>, list_name: &str) -> Vec<String> {
     list.sort();
@@ -314,7 +327,7 @@ fn remove_duplicates(mut list: Vec<String>, list_name: &str) -> Vec<String> {
 #[typetag::serde(name = "http_server")]
 impl SourceConfig for SimpleHttpConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
-        let decoder = self.get_decoding_config()?.build();
+        let decoder = self.get_decoding_config()?.build()?;
         let log_namespace = cx.log_namespace(self.log_namespace);
 
         let source = SimpleHttpSource {
@@ -328,6 +341,7 @@ impl SourceConfig for SimpleHttpConfig {
             self.address,
             self.path.as_str(),
             self.method,
+            self.response_code,
             self.strict_path,
             &self.tls,
             &self.auth,
@@ -478,7 +492,7 @@ mod tests {
         Compression,
     };
     use futures::Stream;
-    use http::{HeaderMap, Method};
+    use http::{HeaderMap, Method, StatusCode};
     use lookup::lookup_v2::OptionalValuePath;
     use similar_asserts::assert_eq;
 
@@ -506,6 +520,7 @@ mod tests {
         path_key: &'a str,
         path: &'a str,
         method: &'a str,
+        response_code: StatusCode,
         strict_path: bool,
         status: EventStatus,
         acknowledgements: bool,
@@ -529,6 +544,7 @@ mod tests {
                 headers,
                 encoding: None,
                 query_parameters,
+                response_code,
                 tls: None,
                 auth: None,
                 strict_path,
@@ -639,6 +655,7 @@ mod tests {
                 "http_path",
                 "/",
                 "POST",
+                StatusCode::OK,
                 true,
                 EventStatus::Delivered,
                 true,
@@ -654,15 +671,10 @@ mod tests {
         {
             let event = events.remove(0);
             let log = event.as_log();
-            assert_eq!(log[log_schema().message_key()], "test body".into());
-            assert!(log
-                .get((
-                    lookup::PathPrefix::Event,
-                    log_schema().timestamp_key().unwrap()
-                ))
-                .is_some());
+            assert_eq!(*log.get_message().unwrap(), "test body".into());
+            assert!(log.get_timestamp().is_some());
             assert_eq!(
-                log[log_schema().source_type_key()],
+                *log.get_source_type().unwrap(),
                 SimpleHttpConfig::NAME.into()
             );
             assert_eq!(log["http_path"], "/".into());
@@ -671,7 +683,7 @@ mod tests {
         {
             let event = events.remove(0);
             let log = event.as_log();
-            assert_eq!(log[log_schema().message_key()], "test body 2".into());
+            assert_eq!(*log.get_message().unwrap(), "test body 2".into());
             assert_event_metadata(log).await;
         }
     }
@@ -688,6 +700,7 @@ mod tests {
                 "http_path",
                 "/",
                 "POST",
+                StatusCode::OK,
                 true,
                 EventStatus::Delivered,
                 true,
@@ -703,13 +716,13 @@ mod tests {
         {
             let event = events.remove(0);
             let log = event.as_log();
-            assert_eq!(log[log_schema().message_key()], "test body".into());
+            assert_eq!(*log.get_message().unwrap(), "test body".into());
             assert_event_metadata(log).await;
         }
         {
             let event = events.remove(0);
             let log = event.as_log();
-            assert_eq!(log[log_schema().message_key()], "test body 2".into());
+            assert_eq!(*log.get_message().unwrap(), "test body 2".into());
             assert_event_metadata(log).await;
         }
     }
@@ -725,6 +738,7 @@ mod tests {
                 "http_path",
                 "/",
                 "POST",
+                StatusCode::OK,
                 true,
                 EventStatus::Delivered,
                 true,
@@ -742,7 +756,7 @@ mod tests {
         {
             let event = events.remove(0);
             let log = event.as_log();
-            assert_eq!(log[log_schema().message_key()], "foo\nbar".into());
+            assert_eq!(*log.get_message().unwrap(), "foo\nbar".into());
             assert_event_metadata(log).await;
         }
     }
@@ -756,11 +770,12 @@ mod tests {
                 "http_path",
                 "/",
                 "POST",
+                StatusCode::OK,
                 true,
                 EventStatus::Delivered,
                 true,
                 None,
-                Some(JsonDeserializerConfig::new().into()),
+                Some(JsonDeserializerConfig::default().into()),
             )
             .await;
 
@@ -779,22 +794,8 @@ mod tests {
         })
         .await;
 
-        assert!(events
-            .remove(1)
-            .as_log()
-            .get((
-                lookup::PathPrefix::Event,
-                log_schema().timestamp_key().unwrap()
-            ))
-            .is_some());
-        assert!(events
-            .remove(0)
-            .as_log()
-            .get((
-                lookup::PathPrefix::Event,
-                log_schema().timestamp_key().unwrap()
-            ))
-            .is_some());
+        assert!(events.remove(1).as_log().get_timestamp().is_some());
+        assert!(events.remove(0).as_log().get_timestamp().is_some());
     }
 
     #[tokio::test]
@@ -806,11 +807,12 @@ mod tests {
                 "http_path",
                 "/",
                 "POST",
+                StatusCode::OK,
                 true,
                 EventStatus::Delivered,
                 true,
                 None,
-                Some(JsonDeserializerConfig::new().into()),
+                Some(JsonDeserializerConfig::default().into()),
             )
             .await;
 
@@ -849,11 +851,12 @@ mod tests {
                 "http_path",
                 "/",
                 "POST",
+                StatusCode::OK,
                 true,
                 EventStatus::Delivered,
                 true,
                 None,
-                Some(JsonDeserializerConfig::new().into()),
+                Some(JsonDeserializerConfig::default().into()),
             )
             .await;
 
@@ -898,11 +901,12 @@ mod tests {
                 "http_path",
                 "/",
                 "POST",
+                StatusCode::OK,
                 true,
                 EventStatus::Delivered,
                 true,
                 None,
-                Some(JsonDeserializerConfig::new().into()),
+                Some(JsonDeserializerConfig::default().into()),
             )
             .await;
 
@@ -952,16 +956,17 @@ mod tests {
     }
 
     async fn assert_event_metadata(log: &LogEvent) {
-        assert!(log
+        assert!(log.get_timestamp().is_some());
+
+        let source_type_key_value = log
             .get((
                 lookup::PathPrefix::Event,
-                log_schema().timestamp_key().unwrap()
+                log_schema().source_type_key().unwrap(),
             ))
-            .is_some());
-        assert_eq!(
-            log[log_schema().source_type_key()],
-            SimpleHttpConfig::NAME.into()
-        );
+            .unwrap()
+            .as_str()
+            .unwrap();
+        assert_eq!(source_type_key_value, SimpleHttpConfig::NAME);
         assert_eq!(log["http_path"], "/".into());
     }
 
@@ -982,11 +987,12 @@ mod tests {
                 "http_path",
                 "/",
                 "POST",
+                StatusCode::OK,
                 true,
                 EventStatus::Delivered,
                 true,
                 None,
-                Some(JsonDeserializerConfig::new().into()),
+                Some(JsonDeserializerConfig::default().into()),
             )
             .await;
 
@@ -1023,11 +1029,12 @@ mod tests {
                 "http_path",
                 "/",
                 "POST",
+                StatusCode::OK,
                 true,
                 EventStatus::Delivered,
                 true,
                 None,
-                Some(JsonDeserializerConfig::new().into()),
+                Some(JsonDeserializerConfig::default().into()),
             )
             .await;
 
@@ -1073,6 +1080,7 @@ mod tests {
                 "http_path",
                 "/",
                 "POST",
+                StatusCode::OK,
                 true,
                 EventStatus::Delivered,
                 true,
@@ -1088,7 +1096,7 @@ mod tests {
         {
             let event = events.remove(0);
             let log = event.as_log();
-            assert_eq!(log[log_schema().message_key()], "test body".into());
+            assert_eq!(*log.get_message().unwrap(), "test body".into());
             assert_event_metadata(log).await;
         }
     }
@@ -1102,11 +1110,12 @@ mod tests {
                 "vector_http_path",
                 "/event/path",
                 "POST",
+                StatusCode::OK,
                 true,
                 EventStatus::Delivered,
                 true,
                 None,
-                Some(JsonDeserializerConfig::new().into()),
+                Some(JsonDeserializerConfig::default().into()),
             )
             .await;
 
@@ -1124,14 +1133,9 @@ mod tests {
             let log = event.as_log();
             assert_eq!(log["key1"], "value1".into());
             assert_eq!(log["vector_http_path"], "/event/path".into());
-            assert!(log
-                .get((
-                    lookup::PathPrefix::Event,
-                    log_schema().timestamp_key().unwrap()
-                ))
-                .is_some());
+            assert!(log.get_timestamp().is_some());
             assert_eq!(
-                log[log_schema().source_type_key()],
+                *log.get_source_type().unwrap(),
                 SimpleHttpConfig::NAME.into()
             );
         }
@@ -1146,11 +1150,12 @@ mod tests {
                 "vector_http_path",
                 "/event",
                 "POST",
+                StatusCode::OK,
                 false,
                 EventStatus::Delivered,
                 true,
                 None,
-                Some(JsonDeserializerConfig::new().into()),
+                Some(JsonDeserializerConfig::default().into()),
             )
             .await;
 
@@ -1177,14 +1182,9 @@ mod tests {
             let log = event.as_log();
             assert_eq!(log["key1"], "value1".into());
             assert_eq!(log["vector_http_path"], "/event/path1".into());
-            assert!(log
-                .get((
-                    lookup::PathPrefix::Event,
-                    log_schema().timestamp_key().unwrap()
-                ))
-                .is_some());
+            assert!(log.get_timestamp().is_some());
             assert_eq!(
-                log[log_schema().source_type_key()],
+                *log.get_source_type().unwrap(),
                 SimpleHttpConfig::NAME.into()
             );
         }
@@ -1193,14 +1193,9 @@ mod tests {
             let log = event.as_log();
             assert_eq!(log["key2"], "value2".into());
             assert_eq!(log["vector_http_path"], "/event/path2".into());
-            assert!(log
-                .get((
-                    lookup::PathPrefix::Event,
-                    log_schema().timestamp_key().unwrap()
-                ))
-                .is_some());
+            assert!(log.get_timestamp().is_some());
             assert_eq!(
-                log[log_schema().source_type_key()],
+                *log.get_source_type().unwrap(),
                 SimpleHttpConfig::NAME.into()
             );
         }
@@ -1215,11 +1210,12 @@ mod tests {
             "vector_http_path",
             "/",
             "POST",
+            StatusCode::OK,
             true,
             EventStatus::Delivered,
             true,
             None,
-            Some(JsonDeserializerConfig::new().into()),
+            Some(JsonDeserializerConfig::default().into()),
         )
         .await;
 
@@ -1227,6 +1223,39 @@ mod tests {
             404,
             send_with_path(addr, "{\"key1\":\"value1\"}", "/event/path").await
         );
+    }
+
+    #[tokio::test]
+    async fn http_status_code() {
+        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async move {
+            let (rx, addr) = source(
+                vec![],
+                vec![],
+                "http_path",
+                "/",
+                "POST",
+                StatusCode::ACCEPTED,
+                true,
+                EventStatus::Delivered,
+                true,
+                None,
+                None,
+            )
+            .await;
+
+            spawn_collect_n(
+                async move {
+                    assert_eq!(
+                        StatusCode::ACCEPTED,
+                        send(addr, "{\"key1\":\"value1\"}").await
+                    );
+                },
+                rx,
+                1,
+            )
+            .await;
+        })
+        .await;
     }
 
     #[tokio::test]
@@ -1238,6 +1267,7 @@ mod tests {
                 "http_path",
                 "/",
                 "POST",
+                StatusCode::OK,
                 true,
                 EventStatus::Rejected,
                 true,
@@ -1267,6 +1297,7 @@ mod tests {
                 "http_path",
                 "/",
                 "POST",
+                StatusCode::OK,
                 true,
                 EventStatus::Rejected,
                 false,
@@ -1298,6 +1329,7 @@ mod tests {
             "http_path",
             "/",
             "GET",
+            StatusCode::OK,
             true,
             EventStatus::Delivered,
             true,

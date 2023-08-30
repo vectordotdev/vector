@@ -4,14 +4,20 @@ use futures::{channel::mpsc::Receiver, stream, StreamExt};
 use hyper::StatusCode;
 use indoc::indoc;
 use rand::{thread_rng, Rng};
-use vector_core::event::{BatchNotifier, BatchStatus, Event, Metric, MetricKind, MetricValue};
+use vector_core::{
+    config::{init_telemetry, Tags, Telemetry},
+    event::{BatchNotifier, BatchStatus, Event, Metric, MetricKind, MetricValue},
+};
 
 use super::DatadogMetricsConfig;
 use crate::{
     config::SinkConfig,
     sinks::util::test::{build_test_server_status, load_sink},
     test_util::{
-        components::{assert_sink_compliance, SINK_TAGS},
+        components::{
+            assert_data_volume_sink_compliance, assert_sink_compliance, DATA_VOLUME_SINK_TAGS,
+            SINK_TAGS,
+        },
         map_event_batch_stream, next_addr,
     },
 };
@@ -168,35 +174,51 @@ async fn smoke() {
     }
 }
 
-#[tokio::test]
-async fn real_endpoint() {
-    assert_sink_compliance(&SINK_TAGS, async {
-        let config = indoc! {r#"
+async fn run_sink() {
+    let config = indoc! {r#"
         default_api_key = "${TEST_DATADOG_API_KEY}"
         default_namespace = "fake.test.integration"
     "#};
-        let api_key = std::env::var("TEST_DATADOG_API_KEY").unwrap();
-        assert!(!api_key.is_empty(), "$TEST_DATADOG_API_KEY required");
-        let config = config.replace("${TEST_DATADOG_API_KEY}", &api_key);
-        let (config, cx) = load_sink::<DatadogMetricsConfig>(config.as_str()).unwrap();
+    let api_key = std::env::var("TEST_DATADOG_API_KEY").unwrap();
+    assert!(!api_key.is_empty(), "$TEST_DATADOG_API_KEY required");
+    let config = config.replace("${TEST_DATADOG_API_KEY}", &api_key);
+    let (config, cx) = load_sink::<DatadogMetricsConfig>(config.as_str()).unwrap();
 
-        let (sink, _) = config.build(cx).await.unwrap();
-        let (batch, receiver) = BatchNotifier::new_with_receiver();
-        let events: Vec<_> = (0..10)
-            .map(|index| {
-                Event::Metric(Metric::new(
-                    "counter",
-                    MetricKind::Absolute,
-                    MetricValue::Counter {
-                        value: index as f64,
-                    },
-                ))
-            })
-            .collect();
-        let stream = map_event_batch_stream(stream::iter(events.clone()), Some(batch));
+    let (sink, _) = config.build(cx).await.unwrap();
+    let (batch, receiver) = BatchNotifier::new_with_receiver();
+    let events: Vec<_> = (0..10)
+        .map(|index| {
+            Event::Metric(Metric::new(
+                "counter",
+                MetricKind::Absolute,
+                MetricValue::Counter {
+                    value: index as f64,
+                },
+            ))
+        })
+        .collect();
+    let stream = map_event_batch_stream(stream::iter(events.clone()), Some(batch));
 
-        sink.run(stream).await.unwrap();
-        assert_eq!(receiver.await, BatchStatus::Delivered);
-    })
-    .await;
+    sink.run(stream).await.unwrap();
+    assert_eq!(receiver.await, BatchStatus::Delivered);
+}
+
+#[tokio::test]
+async fn real_endpoint() {
+    assert_sink_compliance(&SINK_TAGS, async { run_sink().await }).await;
+}
+
+#[tokio::test]
+async fn data_volume_tags() {
+    init_telemetry(
+        Telemetry {
+            tags: Tags {
+                emit_service: true,
+                emit_source: true,
+            },
+        },
+        true,
+    );
+
+    assert_data_volume_sink_compliance(&DATA_VOLUME_SINK_TAGS, async { run_sink().await }).await;
 }
