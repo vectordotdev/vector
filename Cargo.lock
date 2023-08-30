@@ -1968,8 +1968,8 @@ dependencies = [
 
 [[package]]
 name = "chrono"
-version = "0.4.26"
-source = "git+https://github.com/vectordotdev/chrono.git?tag=v0.4.26-no-default-time-1#d44a3b100183d68f8a3e3cb431fcc4a47152a0a3"
+version = "0.4.27"
+source = "git+https://github.com/vectordotdev/chrono.git?tag=v0.4.27-no-default-time-1#15dc0b73a0f70d50b742208c4edf57def45ea2a8"
 dependencies = [
  "android-tzdata",
  "iana-time-zone",
@@ -1977,7 +1977,7 @@ dependencies = [
  "num-traits",
  "serde",
  "wasm-bindgen",
- "winapi",
+ "windows-targets 0.48.0",
 ]
 
 [[package]]
