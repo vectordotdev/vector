@@ -164,12 +164,10 @@ impl EventArray {
     }
 
     /// Sets the `source_type` in the metadata for all metric events in this array.
-    pub fn set_source_type(&mut self, source_type: &Arc<String>) {
+    pub fn set_source_type(&mut self, source_type: &'static str) {
         if let EventArray::Metrics(metrics) = self {
             for metric in metrics {
-                metric
-                    .metadata_mut()
-                    .set_source_type(Arc::clone(source_type));
+                metric.metadata_mut().set_source_type(source_type);
             }
         }
     }

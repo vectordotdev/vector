@@ -1061,9 +1061,7 @@ mod tests {
 
         let mut counter = get_simple_counter();
 
-        counter
-            .metadata_mut()
-            .set_source_type(Arc::new("statsd".to_owned()));
+        counter.metadata_mut().set_source_type("statsd");
 
         let result = generate_series_metrics(&counter, &None, log_schema());
         assert!(result.is_ok());

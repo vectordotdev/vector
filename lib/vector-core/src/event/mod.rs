@@ -308,7 +308,7 @@ impl Event {
     }
 
     /// Sets the `source_type` in the event metadata to the provided value.
-    pub fn set_source_type(&mut self, source_type: Arc<String>) {
+    pub fn set_source_type(&mut self, source_type: &'static str) {
         self.metadata_mut().set_source_type(source_type);
     }
 

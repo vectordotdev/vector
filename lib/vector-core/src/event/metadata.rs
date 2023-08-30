@@ -34,7 +34,7 @@ pub struct EventMetadata {
     source_id: Option<Arc<ComponentKey>>,
 
     /// The type of the source
-    source_type: Option<Arc<String>>,
+    source_type: Option<&'static str>,
 
     /// The id of the component this event originated from. This is used to
     /// determine which schema definition to attach to an event in transforms.
@@ -154,8 +154,8 @@ impl EventMetadata {
 
     /// Returns a reference to the metadata source type.
     #[must_use]
-    pub fn source_type(&self) -> Option<&Arc<String>> {
-        self.source_type.as_ref()
+    pub fn source_type(&self) -> Option<&'static str> {
+        self.source_type
     }
 
     /// Returns a reference to the metadata parent id. This is the `OutputId`
@@ -171,7 +171,7 @@ impl EventMetadata {
     }
 
     /// Sets the `source_type` in the metadata to the provided value.
-    pub fn set_source_type(&mut self, source_type: Arc<String>) {
+    pub fn set_source_type(&mut self, source_type: &'static str) {
         self.source_type = Some(source_type);
     }
 

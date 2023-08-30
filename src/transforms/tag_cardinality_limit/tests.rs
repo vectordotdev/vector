@@ -25,9 +25,8 @@ fn generate_config() {
 }
 
 fn make_metric(tags: MetricTags) -> Event {
-    let source_type = Arc::new("unit_test_stream".to_owned());
     let mut event_metadata = EventMetadata::default();
-    event_metadata.set_source_type(source_type);
+    event_metadata.set_source_type("unit_test_stream");
 
     Event::Metric(
         Metric::new_with_metadata(

@@ -183,8 +183,7 @@ mod tests {
             Definition::new_with_default_metadata(Kind::any_object(), [LogNamespace::Legacy]),
         ));
 
-        let source_type = Arc::new("unit_test_stream".to_owned());
-        event.metadata_mut().set_source_type(source_type);
+        event.metadata_mut().set_source_type("unit_test_stream");
 
         event
     }
