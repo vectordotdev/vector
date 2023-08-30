@@ -4,7 +4,7 @@ use std::{
     time::Duration,
 };
 
-use chrono::{DateTime, NaiveDateTime, Utc};
+use chrono::NaiveDateTime;
 use codecs::decoding::{DeserializerConfig, FramingConfig};
 use derivative::Derivative;
 use futures::{stream, stream::FuturesUnordered, FutureExt, Stream, StreamExt, TryFutureExt};
@@ -673,11 +673,9 @@ impl PubsubSource {
             "gcp_pubsub",
             &message.data,
             message.publish_time.map(|dt| {
-                DateTime::from_utc(
-                    NaiveDateTime::from_timestamp_opt(dt.seconds, dt.nanos as u32)
-                        .expect("invalid timestamp"),
-                    Utc,
-                )
+                NaiveDateTime::from_timestamp_opt(dt.seconds, dt.nanos as u32)
+                    .expect("invalid timestamp")
+                    .and_utc()
             }),
             batch,
             log_namespace,
@@ -840,6 +838,7 @@ mod integration_tests {
     use std::collections::{BTreeMap, HashSet};
 
     use base64::prelude::{Engine as _, BASE64_STANDARD};
+    use chrono::{DateTime, Utc};
     use futures::{Stream, StreamExt};
     use http::method::Method;
     use hyper::{Request, StatusCode};
@@ -1003,10 +1002,9 @@ mod integration_tests {
     fn now_trunc() -> DateTime<Utc> {
         let start = Utc::now().timestamp();
         // Truncate the milliseconds portion, the hard way.
-        DateTime::<Utc>::from_utc(
-            NaiveDateTime::from_timestamp_opt(start, 0).expect("invalid timestamp"),
-            Utc,
-        )
+        NaiveDateTime::from_timestamp_opt(start, 0)
+            .expect("invalid timestamp")
+            .and_utc()
     }
 
     struct Tester {
