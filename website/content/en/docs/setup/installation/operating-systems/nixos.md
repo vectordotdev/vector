@@ -12,7 +12,7 @@ Nixpkgs has a [community maintained package][nixpkg-vector] for Vector. It can
 be installed on a NixOS system with the following snippet in
 `configuration.nix`:
 
-```
+```nix
 environment.systemPackages = [
   pkgs.vector
 ];
