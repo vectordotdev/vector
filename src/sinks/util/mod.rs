@@ -1,4 +1,5 @@
 pub mod adaptive_concurrency;
+pub mod auth;
 pub mod batch;
 pub mod buffer;
 pub mod builder;
