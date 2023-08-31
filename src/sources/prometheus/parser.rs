@@ -1,7 +1,9 @@
 use std::cmp::Ordering;
 
 use chrono::{DateTime, TimeZone, Utc};
-use prometheus_parser::{proto, GroupKind, MetricGroup, ParserError};
+#[cfg(feature = "sources-prometheus-remote-write")]
+use prometheus_parser::proto;
+use prometheus_parser::{GroupKind, MetricGroup, ParserError};
 
 use crate::event::{
     metric::{Bucket, Metric, MetricKind, MetricTags, MetricValue, Quantile},
@@ -21,6 +23,7 @@ pub(super) fn parse_text(packet: &str) -> Result<Vec<Event>, ParserError> {
     prometheus_parser::parse_text(packet).map(reparse_groups)
 }
 
+#[cfg(feature = "sources-prometheus-remote-write")]
 pub(super) fn parse_request(request: proto::WriteRequest) -> Result<Vec<Event>, ParserError> {
     prometheus_parser::parse_request(request).map(reparse_groups)
 }
