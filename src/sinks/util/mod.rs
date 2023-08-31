@@ -1,4 +1,5 @@
 pub mod adaptive_concurrency;
+pub mod auth;
 pub mod batch;
 pub mod buffer;
 pub mod builder;
@@ -23,7 +24,6 @@ pub mod udp;
 pub mod unix;
 pub mod uri;
 pub mod zstd;
-pub mod auth;
 
 use std::borrow::Cow;
 

@@ -139,8 +139,16 @@ impl HttpRequestBuilder {
                 Auth::Basic(auth) => {
                     auth.apply(&mut request);
                 }
-                Auth::Aws { credentials_provider: provider, region } => {
-                    crate::sinks::elasticsearch::sign_request(&mut request, provider, &Some(region.clone())).await?;
+                Auth::Aws {
+                    credentials_provider: provider,
+                    region,
+                } => {
+                    crate::sinks::elasticsearch::sign_request(
+                        &mut request,
+                        provider,
+                        &Some(region.clone()),
+                    )
+                    .await?;
                 }
             }
         }

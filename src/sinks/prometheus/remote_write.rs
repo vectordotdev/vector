@@ -404,9 +404,10 @@ impl HttpRequestBuilder {
             match auth {
                 Auth::Basic(http_auth) => http_auth.apply(&mut request),
                 #[cfg(feature = "aws-core")]
-                Auth::Aws { credentials_provider: provider, region } => {
-                    sign_request(&mut request, provider, &Some(region.clone())).await?
-                }
+                Auth::Aws {
+                    credentials_provider: provider,
+                    region,
+                } => sign_request(&mut request, provider, &Some(region.clone())).await?,
             }
         }
 
