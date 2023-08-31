@@ -13,7 +13,9 @@ use crate::{
     aws::{create_client, AwsAuthentication, ImdsAuthentication, RegionOrEndpoint},
     config::{ProxyConfig, SinkConfig, SinkContext},
     sinks::{
-        elasticsearch::{BulkConfig, ElasticsearchAuth, ElasticsearchCommon, ElasticsearchConfig},
+        elasticsearch::{
+            BulkConfig, ElasticsearchAuthConfig, ElasticsearchCommon, ElasticsearchConfig,
+        },
         util::{BatchConfig, Compression, TowerRequestConfig},
     },
     template::Template,
@@ -73,7 +75,7 @@ async fn firehose_put_records() {
     sleep(Duration::from_secs(5)).await;
 
     let config = ElasticsearchConfig {
-        auth: Some(ElasticsearchAuth::Aws(AwsAuthentication::Default {
+        auth: Some(ElasticsearchAuthConfig::Aws(AwsAuthentication::Default {
             load_timeout_secs: Some(5),
             imds: ImdsAuthentication::default(),
             region: None,
