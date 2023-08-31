@@ -94,7 +94,11 @@ mod parser;
 #[cfg(feature = "sources-postgresql_metrics")]
 mod postgresql_metrics;
 mod process;
-#[cfg(any(feature = "sources-prometheus", feature = "sinks-prometheus"))]
+#[cfg(any(
+    feature = "sources-prometheus-scrape",
+    feature = "sources-prometheus-remote-write",
+    feature = "sinks-prometheus"
+))]
 mod prometheus;
 #[cfg(feature = "sinks-pulsar")]
 mod pulsar;
