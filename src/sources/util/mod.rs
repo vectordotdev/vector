@@ -14,11 +14,7 @@ pub mod grpc;
     feature = "sources-utils-http-query"
 ))]
 pub mod http;
-#[cfg(any(
-    feature = "sources-http_client",
-    feature = "sources-prometheus-scrape",
-    feature = "sources-prometheus-remote-write"
-))]
+#[cfg(any(feature = "sources-http_client", feature = "sources-prometheus-scrape",))]
 pub mod http_client;
 #[cfg(any(feature = "sources-aws_sqs", feature = "sources-gcp_pubsub"))]
 mod message_decoding;
