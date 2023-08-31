@@ -322,7 +322,7 @@ where
     ///
     /// # Panics
     ///
-    /// Will if pending markers is empty when last pending marker is an unknown size.
+    /// Panics if pending markers is empty when last pending marker is an unknown size.
     pub fn add_marker(
         &mut self,
         id: N,
