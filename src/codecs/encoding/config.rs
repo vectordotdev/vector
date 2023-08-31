@@ -108,6 +108,8 @@ impl EncodingConfigWithFraming {
                 LengthDelimitedEncoder::new().into()
             }
             (None, Serializer::Gelf(_)) => { 
+                /// Graylog/GELF always uses null byte delimiter on TCP, see
+                /// https://github.com/Graylog2/graylog2-server/issues/1240
                 CharacterDelimitedEncoder::new(0).into() 
             }
             (
