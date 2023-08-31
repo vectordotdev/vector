@@ -55,7 +55,8 @@ pub use self::body_decoding::Encoding;
 #[cfg(feature = "sources-utils-http-query")]
 pub use self::http::add_query_parameters;
 #[cfg(any(
-    feature = "sources-prometheus",
+    feature = "sources-prometheus-scrape",
+    feature = "sources-prometheus-remote-write",
     feature = "sources-utils-http-encoding"
 ))]
 pub use self::http::decode;
