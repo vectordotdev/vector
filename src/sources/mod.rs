@@ -67,7 +67,6 @@ pub mod opentelemetry;
 #[cfg(feature = "sources-postgresql_metrics")]
 pub mod postgresql_metrics;
 #[cfg(any(
-    feature = "sources-prometheus",
     feature = "sources-prometheus-scrape",
     feature = "sources-prometheus-remote-write"
 ))]
