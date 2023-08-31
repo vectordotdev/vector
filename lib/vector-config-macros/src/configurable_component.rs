@@ -1,10 +1,10 @@
-use darling::{Error, FromMeta};
+use darling::{ast::NestedMeta, Error, FromMeta};
 use proc_macro::TokenStream;
 use proc_macro2::{Ident, Span};
 use quote::{quote, quote_spanned};
 use syn::{
     parse_macro_input, parse_quote, parse_quote_spanned, punctuated::Punctuated, spanned::Spanned,
-    token::Comma, AttributeArgs, DeriveInput, Lit, LitStr, Meta, MetaList, NestedMeta, Path,
+    token::Comma, DeriveInput, Lit, LitStr, Meta, MetaList, Path,
 };
 use vector_config_common::{
     constants::ComponentType, human_friendly::generate_human_friendly_string,
@@ -41,16 +41,19 @@ impl TypedComponent {
     /// If the meta list does not have a path that matches a known component type, `None` is
     /// returned. Otherwise, `Some(...)` is returned with a valid `TypedComponent`.
     fn from_meta_list(ml: &MetaList) -> Option<Self> {
-        let mut items = ml.nested.iter();
+        let mut items = ml
+            .parse_args_with(Punctuated::<NestedMeta, Comma>::parse_terminated)
+            .unwrap_or_default()
+            .into_iter();
         ComponentType::try_from(&ml.path)
             .ok()
             .map(|component_type| {
                 let component_name = match items.next() {
-                    Some(NestedMeta::Lit(Lit::Str(component_name))) => Some(component_name.clone()),
+                    Some(NestedMeta::Lit(Lit::Str(component_name))) => Some(component_name),
                     _ => None,
                 };
                 let description = match items.next() {
-                    Some(NestedMeta::Lit(Lit::Str(description))) => Some(description.clone()),
+                    Some(NestedMeta::Lit(Lit::Str(description))) => Some(description),
                     _ => None,
                 };
                 Self {
@@ -157,7 +160,7 @@ struct Options {
 }
 
 impl FromMeta for Options {
-    fn from_list(items: &[syn::NestedMeta]) -> darling::Result<Self> {
+    fn from_list(items: &[NestedMeta]) -> darling::Result<Self> {
         let mut typed_component = None;
         let mut no_ser = false;
         let mut no_deser = false;
@@ -255,7 +258,10 @@ impl Options {
 }
 
 pub fn configurable_component_impl(args: TokenStream, item: TokenStream) -> TokenStream {
-    let args = parse_macro_input!(args as AttributeArgs);
+    let args: Vec<NestedMeta> =
+        parse_macro_input!(args with Punctuated::<NestedMeta, Comma>::parse_terminated)
+            .into_iter()
+            .collect();
     let input = parse_macro_input!(item as DeriveInput);
 
     let options = match Options::from_list(&args) {

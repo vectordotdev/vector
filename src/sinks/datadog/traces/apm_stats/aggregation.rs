@@ -1,6 +1,7 @@
 use std::{collections::BTreeMap, sync::Arc};
 
 use chrono::Utc;
+use vrl::event_path;
 
 use super::{
     bucket::Bucket, ClientStatsBucket, ClientStatsPayload, PartitionKey,
@@ -179,7 +180,7 @@ impl Aggregator {
     pub(crate) fn handle_trace(&mut self, partition_key: &PartitionKey, trace: &TraceEvent) {
         // Based on https://github.com/DataDog/datadog-agent/blob/cfa750c7412faa98e87a015f8ee670e5828bbe7f/pkg/trace/stats/concentrator.go#L148-L184
 
-        let spans = match trace.get("spans") {
+        let spans = match trace.get(event_path!("spans")) {
             Some(Value::Array(v)) => v.iter().filter_map(|s| s.as_object()).collect(),
             _ => vec![],
         };
@@ -189,16 +190,16 @@ impl Aggregator {
             env: partition_key.env.clone().unwrap_or_default(),
             hostname: partition_key.hostname.clone().unwrap_or_default(),
             version: trace
-                .get("app_version")
+                .get(event_path!("app_version"))
                 .map(|v| v.to_string_lossy().into_owned())
                 .unwrap_or_default(),
             container_id: trace
-                .get("container_id")
+                .get(event_path!("container_id"))
                 .map(|v| v.to_string_lossy().into_owned())
                 .unwrap_or_default(),
         };
         let synthetics = trace
-            .get("origin")
+            .get(event_path!("origin"))
             .map(|v| v.to_string_lossy().starts_with(TAG_SYNTHETICS))
             .unwrap_or(false);
 

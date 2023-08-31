@@ -1,4 +1,7 @@
 use serde::Serialize;
+use vector_common::{
+    internal_event::TaggedEventsSent, json_size::JsonSize, request_metadata::GetEventCountTags,
+};
 use vector_core::{
     event::{EventFinalizers, Finalizable, LogEvent, MaybeAsLogMut},
     ByteSizeOf, EstimatedJsonEncodedSizeOf,
@@ -44,7 +47,16 @@ impl<E, M> EstimatedJsonEncodedSizeOf for ProcessedEvent<E, M>
 where
     E: EstimatedJsonEncodedSizeOf,
 {
-    fn estimated_json_encoded_size_of(&self) -> usize {
+    fn estimated_json_encoded_size_of(&self) -> JsonSize {
         self.event.estimated_json_encoded_size_of()
+    }
+}
+
+impl<E, M> GetEventCountTags for ProcessedEvent<E, M>
+where
+    E: GetEventCountTags,
+{
+    fn get_tags(&self) -> TaggedEventsSent {
+        self.event.get_tags()
     }
 }

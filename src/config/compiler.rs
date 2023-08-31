@@ -56,6 +56,7 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
         tests,
         provider: _,
         secret,
+        graceful_shutdown_duration,
     } = builder;
 
     let graph = match Graph::new(&sources, &transforms, &sinks, schema) {
@@ -111,6 +112,7 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
             transforms,
             tests,
             secret,
+            graceful_shutdown_duration,
         };
 
         config.propagate_acknowledgements()?;

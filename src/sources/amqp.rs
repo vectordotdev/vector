@@ -20,7 +20,7 @@ use codecs::decoding::{DeserializerConfig, FramingConfig};
 use futures::{FutureExt, StreamExt};
 use futures_util::Stream;
 use lapin::{acker::Acker, message::Delivery, Channel};
-use lookup::{lookup_v2::OptionalValuePath, metadata_path, owned_value_path, path, PathPrefix};
+use lookup::{lookup_v2::OptionalValuePath, metadata_path, owned_value_path, path};
 use snafu::Snafu;
 use std::{io::Cursor, pin::Pin};
 use tokio_util::codec::FramedRead;
@@ -127,7 +127,7 @@ fn default_offset_key() -> OptionalValuePath {
 impl_generate_config_from_default!(AmqpSourceConfig);
 
 impl AmqpSourceConfig {
-    fn decoder(&self, log_namespace: LogNamespace) -> Decoder {
+    fn decoder(&self, log_namespace: LogNamespace) -> vector_common::Result<Decoder> {
         DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace).build()
     }
 }
@@ -253,7 +253,7 @@ fn populate_event(
             .path
             .as_ref()
             .map(LegacyKey::InsertIfEmpty),
-        "routing",
+        path!("routing"),
         keys.routing.to_string(),
     );
 
@@ -264,7 +264,7 @@ fn populate_event(
             .path
             .as_ref()
             .map(LegacyKey::InsertIfEmpty),
-        "exchange",
+        path!("exchange"),
         keys.exchange.to_string(),
     );
 
@@ -272,13 +272,13 @@ fn populate_event(
         AmqpSourceConfig::NAME,
         log,
         keys.offset_key.path.as_ref().map(LegacyKey::InsertIfEmpty),
-        "offset",
+        path!("offset"),
         keys.delivery_tag,
     );
 
     log_namespace.insert_vector_metadata(
         log,
-        Some(log_schema().source_type_key()),
+        log_schema().source_type_key(),
         path!("source_type"),
         Bytes::from_static(AmqpSourceConfig::NAME.as_bytes()),
     );
@@ -298,11 +298,8 @@ fn populate_event(
             log.insert(metadata_path!("vector", "ingest_timestamp"), Utc::now());
         }
         LogNamespace::Legacy => {
-            if let Some(timestamp_key) = log_schema().timestamp_key() {
-                log.try_insert(
-                    (PathPrefix::Event, timestamp_key),
-                    timestamp.unwrap_or_else(Utc::now),
-                );
+            if let Some(timestamp_key) = log_schema().timestamp_key_target_path() {
+                log.try_insert(timestamp_key, timestamp.unwrap_or_else(Utc::now));
             }
         }
     };
@@ -317,7 +314,8 @@ async fn receive_event(
     msg: Delivery,
 ) -> Result<(), ()> {
     let payload = Cursor::new(Bytes::copy_from_slice(&msg.data));
-    let mut stream = FramedRead::new(payload, config.decoder(log_namespace));
+    let decoder = config.decoder(log_namespace).map_err(|_e| ())?;
+    let mut stream = FramedRead::new(payload, decoder);
 
     // Extract timestamp from AMQP message
     let timestamp = msg
@@ -392,8 +390,8 @@ async fn finalize_event_stream(
             let mut stream = stream.map(|event| event.with_batch_notifier(&batch));
 
             match out.send_event_stream(&mut stream).await {
-                Err(error) => {
-                    emit!(StreamClosedError { error, count: 1 });
+                Err(_) => {
+                    emit!(StreamClosedError { count: 1 });
                 }
                 Ok(_) => {
                     finalizer.add(msg.into(), receiver);
@@ -401,8 +399,8 @@ async fn finalize_event_stream(
             }
         }
         None => match out.send_event_stream(&mut stream).await {
-            Err(error) => {
-                emit!(StreamClosedError { error, count: 1 });
+            Err(_) => {
+                emit!(StreamClosedError { count: 1 });
             }
             Ok(_) => {
                 let ack_options = lapin::options::BasicAckOptions::default();
@@ -711,9 +709,9 @@ mod integration_test {
 
         let log = events[0].as_log();
         trace!("{:?}", log);
-        assert_eq!(log[log_schema().message_key()], "my message".into());
+        assert_eq!(*log.get_message().unwrap(), "my message".into());
         assert_eq!(log["routing"], routing_key.into());
-        assert_eq!(log[log_schema().source_type_key()], "amqp".into());
+        assert_eq!(*log.get_source_type().unwrap(), "amqp".into());
         let log_ts = log[log_schema().timestamp_key().unwrap().to_string()]
             .as_timestamp()
             .unwrap();

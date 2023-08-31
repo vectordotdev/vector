@@ -33,12 +33,13 @@ async fn check_batch_size() {
         request: Default::default(),
         tls: None,
         auth: Default::default(),
+        request_retry_partial: false,
         acknowledgements: Default::default(),
     };
 
     let config = KinesisFirehoseSinkConfig { batch, base };
 
-    let cx = SinkContext::new_test();
+    let cx = SinkContext::default();
     let res = config.build(cx).await;
 
     assert_eq!(
@@ -62,12 +63,13 @@ async fn check_batch_events() {
         request: Default::default(),
         tls: None,
         auth: Default::default(),
+        request_retry_partial: false,
         acknowledgements: Default::default(),
     };
 
     let config = KinesisFirehoseSinkConfig { batch, base };
 
-    let cx = SinkContext::new_test();
+    let cx = SinkContext::default();
     let res = config.build(cx).await;
 
     assert_eq!(

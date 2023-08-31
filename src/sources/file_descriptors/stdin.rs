@@ -117,7 +117,7 @@ mod tests {
     };
     use futures::StreamExt;
     use lookup::path;
-    use vrl::value::value;
+    use vrl::value;
 
     #[test]
     fn generate_config() {
@@ -142,17 +142,21 @@ mod tests {
             let event = stream.next().await;
             assert_eq!(
                 Some("hello world".into()),
-                event.map(|event| event.as_log()[log_schema().message_key()]
-                    .to_string_lossy()
-                    .into_owned())
+                event.map(
+                    |event| event.as_log()[log_schema().message_key().unwrap().to_string()]
+                        .to_string_lossy()
+                        .into_owned()
+                )
             );
 
             let event = stream.next().await;
             assert_eq!(
                 Some("hello world again".into()),
-                event.map(|event| event.as_log()[log_schema().message_key()]
-                    .to_string_lossy()
-                    .into_owned())
+                event.map(
+                    |event| event.as_log()[log_schema().message_key().unwrap().to_string()]
+                        .to_string_lossy()
+                        .into_owned()
+                )
             );
 
             let event = stream.next().await;

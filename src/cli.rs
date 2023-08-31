@@ -1,5 +1,5 @@
 #![allow(missing_docs)]
-use std::path::PathBuf;
+use std::{num::NonZeroU64, path::PathBuf};
 
 use clap::{ArgAction, CommandFactory, FromArgMatches, Parser};
 
@@ -159,6 +159,28 @@ pub struct RootOpts {
     )]
     pub internal_log_rate_limit: u64,
 
+    /// Set the duration in seconds to wait for graceful shutdown after SIGINT or SIGTERM are
+    /// received. After the duration has passed, Vector will force shutdown. To never force
+    /// shutdown, use `--no-graceful-shutdown-limit`.
+    #[arg(
+        long,
+        default_value = "60",
+        env = "VECTOR_GRACEFUL_SHUTDOWN_LIMIT_SECS",
+        group = "graceful-shutdown-limit"
+    )]
+    pub graceful_shutdown_limit_secs: NonZeroU64,
+
+    /// Never time out while waiting for graceful shutdown after SIGINT or SIGTERM received.
+    /// This is useful when you would like for Vector to attempt to send data until terminated
+    /// by a SIGKILL. Overrides/cannot be set with `--graceful-shutdown-limit-secs`.
+    #[arg(
+        long,
+        default_value = "false",
+        env = "VECTOR_NO_GRACEFUL_SHUTDOWN_LIMIT",
+        group = "graceful-shutdown-limit"
+    )]
+    pub no_graceful_shutdown_limit: bool,
+
     /// Set runtime allocation tracing
     #[cfg(feature = "allocation-tracing")]
     #[arg(long, env = "ALLOCATION_TRACING", default_value = "false")]
@@ -172,6 +194,26 @@ pub struct RootOpts {
         default_value = "5000"
     )]
     pub allocation_tracing_reporting_interval_ms: u64,
+
+    /// Load the OpenSSL legacy provider.
+    #[arg(
+        long,
+        env = "VECTOR_OPENSSL_LEGACY_PROVIDER",
+        default_value = "true",
+        default_missing_value = "true",
+        num_args = 0..=1,
+        require_equals = true,
+        action = ArgAction::Set
+    )]
+    pub openssl_legacy_provider: bool,
+
+    /// Disable probing and configuration of root certificate locations on the system for OpenSSL.
+    ///
+    /// The probe functionality manipulates the `SSL_CERT_FILE` and `SSL_CERT_DIR` environment variables
+    /// in the Vector process. This behavior can be problematic for users of the `exec` source, which by
+    /// default inherits the environment of the Vector process.
+    #[arg(long, env = "VECTOR_OPENSSL_NO_PROBE", default_value = "false")]
+    pub openssl_no_probe: bool,
 }
 
 impl RootOpts {

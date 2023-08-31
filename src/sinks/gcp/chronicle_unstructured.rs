@@ -12,12 +12,13 @@ use snafu::Snafu;
 use std::io;
 use tokio_util::codec::Encoder as _;
 use tower::{Service, ServiceBuilder};
-use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
+use vector_common::request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata};
 use vector_config::configurable_component;
 use vector_core::{
-    config::{AcknowledgementsConfig, Input},
+    config::{telemetry, AcknowledgementsConfig, Input},
     event::{Event, EventFinalizers, Finalizable},
     sink::VectorSink,
+    EstimatedJsonEncodedSizeOf,
 };
 use vrl::value::Kind;
 
@@ -97,7 +98,10 @@ impl SinkBatchSettings for ChronicleUnstructuredDefaultBatchSettings {
 }
 
 /// Configuration for the `gcp_chronicle_unstructured` sink.
-#[configurable_component(sink("gcp_chronicle_unstructured"))]
+#[configurable_component(sink(
+    "gcp_chronicle_unstructured",
+    "Store unstructured log events in Google Chronicle."
+))]
 #[derive(Clone, Debug)]
 pub struct ChronicleUnstructuredConfig {
     /// The endpoint to send data to.
@@ -190,6 +194,7 @@ pub enum ChronicleError {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "gcp_chronicle_unstructured")]
 impl SinkConfig for ChronicleUnstructuredConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let creds = self.auth.build(Scope::MalachiteIngestion).await?;
@@ -282,8 +287,12 @@ impl Finalizable for ChronicleRequest {
 }
 
 impl MetaDescriptive for ChronicleRequest {
-    fn get_metadata(&self) -> RequestMetadata {
-        self.metadata
+    fn get_metadata(&self) -> &RequestMetadata {
+        &self.metadata
+    }
+
+    fn metadata_mut(&mut self) -> &mut RequestMetadata {
+        &mut self.metadata
     }
 }
 
@@ -299,9 +308,10 @@ impl Encoder<(String, Vec<Event>)> for ChronicleEncoder {
         &self,
         input: (String, Vec<Event>),
         writer: &mut dyn io::Write,
-    ) -> io::Result<usize> {
+    ) -> io::Result<(usize, GroupedCountByteSize)> {
         let (partition_key, events) = input;
         let mut encoder = self.encoder.clone();
+        let mut byte_size = telemetry().create_request_count_byte_size();
         let events = events
             .into_iter()
             .filter_map(|mut event| {
@@ -312,6 +322,9 @@ impl Encoder<(String, Vec<Event>)> for ChronicleEncoder {
                     .cloned();
                 let mut bytes = BytesMut::new();
                 self.transformer.transform(&mut event);
+
+                byte_size.add_event(&event, event.estimated_json_encoded_size_of());
+
                 encoder.encode(event, &mut bytes).ok()?;
 
                 let mut value = json!({
@@ -341,7 +354,7 @@ impl Encoder<(String, Vec<Event>)> for ChronicleEncoder {
             Ok(())
         })?;
 
-        Ok(size)
+        Ok((size, byte_size))
     }
 }
 
@@ -470,7 +483,7 @@ impl Service<ChronicleRequest> for ChronicleService {
             HeaderValue::from_str(&request.body.len().to_string()).unwrap(),
         );
 
-        let metadata = request.get_metadata();
+        let metadata = request.get_metadata().clone();
 
         let mut http_request = builder.body(Body::from(request.body)).unwrap();
         self.creds.apply(&mut http_request);
@@ -533,7 +546,7 @@ mod integration_tests {
         log_type: &str,
         auth_path: &str,
     ) -> crate::Result<(VectorSink, crate::sinks::Healthcheck)> {
-        let cx = SinkContext::new_test();
+        let cx = SinkContext::default();
         config(log_type, auth_path).build(cx).await
     }
 
@@ -542,12 +555,10 @@ mod integration_tests {
         trace_init();
 
         let log_type = random_string(10);
-        let (sink, healthcheck) = config_build(
-            &log_type,
-            "/home/vector/scripts/integration/chronicle/auth.json",
-        )
-        .await
-        .expect("Building sink failed");
+        let (sink, healthcheck) =
+            config_build(&log_type, "/home/vector/scripts/integration/gcp/auth.json")
+                .await
+                .expect("Building sink failed");
 
         healthcheck.await.expect("Health check failed");
 
@@ -577,7 +588,7 @@ mod integration_tests {
         // Test with an auth file that doesnt match the public key sent to the dummy chronicle server.
         let sink = config_build(
             &log_type,
-            "/home/vector/scripts/integration/chronicle/invalidauth.json",
+            "/home/vector/scripts/integration/gcp/invalidauth.json",
         )
         .await;
 
@@ -591,12 +602,10 @@ mod integration_tests {
         // The chronicle-emulator we are testing against is setup so a `log_type` of "INVALID"
         // will return a `400 BAD_REQUEST`.
         let log_type = "INVALID";
-        let (sink, healthcheck) = config_build(
-            log_type,
-            "/home/vector/scripts/integration/chronicle/auth.json",
-        )
-        .await
-        .expect("Building sink failed");
+        let (sink, healthcheck) =
+            config_build(log_type, "/home/vector/scripts/integration/gcp/auth.json")
+                .await
+                .expect("Building sink failed");
 
         healthcheck.await.expect("Health check failed");
 

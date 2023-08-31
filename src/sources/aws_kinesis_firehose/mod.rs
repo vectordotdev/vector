@@ -37,7 +37,7 @@ pub struct AwsKinesisFirehoseConfig {
     #[configurable(metadata(docs::examples = "localhost:443"))]
     address: SocketAddr,
 
-    /// An optional access key to authenticate requests against.
+    /// An access key to authenticate requests against.
     ///
     /// AWS Kinesis Firehose can be configured to pass along a user-configurable access key with each request. If
     /// configured, `access_key` should be set to the same value. Otherwise, all requests are allowed.
@@ -45,7 +45,7 @@ pub struct AwsKinesisFirehoseConfig {
     #[configurable(metadata(docs::examples = "A94A8FE5CCB19BA61C4C08"))]
     access_key: Option<SensitiveString>,
 
-    /// An optional list of access keys to authenticate requests against.
+    /// A list of access keys to authenticate requests against.
     ///
     /// AWS Kinesis Firehose can be configured to pass along a user-configurable access key with each request. If
     /// configured, `access_keys` should be set to the same value. Otherwise, all requests are allowed.
@@ -143,7 +143,8 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let log_namespace = cx.log_namespace(self.log_namespace);
         let decoder =
-            DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace).build();
+            DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace)
+                .build()?;
 
         let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
 
@@ -255,7 +256,7 @@ mod tests {
     use similar_asserts::assert_eq;
     use tokio::time::{sleep, Duration};
     use vector_common::assert_event_data_eq;
-    use vrl::value::value;
+    use vrl::value;
 
     use super::*;
     use crate::{

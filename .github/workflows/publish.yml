@@ -203,7 +203,7 @@ jobs:
 
   build-x86_64-apple-darwin-packages:
     name: Build Vector for x86_64-apple-darwin (.tar.gz)
-    runs-on: macos-11
+    runs-on: macos-latest-xl
     needs: generate-publish-metadata
     env:
       VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
@@ -286,14 +286,15 @@ jobs:
     strategy:
       matrix:
         container:
-          - ubuntu:14.04
           - ubuntu:16.04
           - ubuntu:18.04
           - ubuntu:20.04
           - ubuntu:22.04
+          - ubuntu:22.10
           - ubuntu:23.04
           - debian:10
           - debian:11
+          - debian:12
     container:
       image: ${{ matrix.container }}
     steps:
@@ -430,12 +431,12 @@ jobs:
           username: ${{ secrets.CI_DOCKER_USERNAME }}
           password: ${{ secrets.CI_DOCKER_PASSWORD }}
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v2.1.0
+        uses: docker/setup-qemu-action@v2.2.0
         with:
           platforms: all
       - name: Set up Docker Buildx
         id: buildx
-        uses: docker/setup-buildx-action@v2.5.0
+        uses: docker/setup-buildx-action@v2.10.0
         with:
           version: latest
           install: true
@@ -548,7 +549,7 @@ jobs:
   publish-github:
     name: Publish to GitHub
     # We only publish to GitHub for versioned releases, not nightlies.
-    if: ${{ inputs.channel == 'release' }}
+    if: inputs.channel == 'release'
     runs-on: ubuntu-20.04
     needs:
       - generate-publish-metadata
@@ -618,7 +619,7 @@ jobs:
   publish-homebrew:
     name: Publish to Homebrew
     # We only publish to Homebrew for versioned releases, not nightlies.
-    if: ${{ inputs.channel == 'release' }}
+    if: inputs.channel == 'release'
     runs-on: ubuntu-20.04
     needs:
       - generate-publish-metadata
@@ -638,7 +639,7 @@ jobs:
   publish-cloudsmith:
     name: Publish to Cloudsmith
     # We only publish to CloudSmith for versioned releases, not nightlies.
-    if: ${{ inputs.channel == 'release' }}
+    if:  inputs.channel == 'release'
     runs-on: ubuntu-20.04
     needs:
       - generate-publish-metadata
@@ -748,32 +749,16 @@ jobs:
           release: "any-version"
           republish: "true"
           file: "target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.armv7.rpm"
-
-  publish-failure:
-    name: Send Publish Failure Notification
-    if: ${{ inputs.channel != 'custom' }} && failure()
-    runs-on: ubuntu-20.04
-    needs:
-      - generate-publish-metadata
-      - build-x86_64-unknown-linux-gnu-packages
-      - build-x86_64-unknown-linux-musl-packages
-      - build-aarch64-unknown-linux-musl-packages
-      - build-aarch64-unknown-linux-gnu-packages
-      - build-x86_64-apple-darwin-packages
-      - build-x86_64-pc-windows-msvc-packages
-      - build-armv7-unknown-linux-gnueabihf-packages
-      - build-armv7-unknown-linux-musleabihf-packages
-      - deb-verify
-      - rpm-verify
-      - macos-verify
-      - publish-docker
-      - publish-s3
-      - publish-cloudsmith
-      - publish-github
-    steps:
-    - name: Send notification to Discord
-      env:
-        DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
-      uses: Ilshidur/action-discord@0.3.2
-      with:
-        args: "${{ inputs.channel }} failed: <https://github.com/${{github.repository}}/actions/runs/${{github.run_id}}>"
+      - name: Push armv7hl-gnu RPM
+        id: push-rpm-armv7hl-gnu
+        uses: cloudsmith-io/action@v0.5.3
+        with:
+          api-key: ${{ secrets.CLOUDSMITH_API_KEY }}
+          command: "push"
+          format: "rpm"
+          owner: "timber"
+          repo: ${{ env.CLOUDSMITH_REPO }}
+          distro: "any-distro"
+          release: "any-version"
+          republish: "true"
+          file: "target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.armv7hl.rpm"

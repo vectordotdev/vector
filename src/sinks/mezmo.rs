@@ -6,6 +6,7 @@ use http::{Request, StatusCode, Uri};
 use serde_json::json;
 use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
+use vrl::event_path;
 use vrl::value::{Kind, Value};
 
 use crate::{
@@ -25,7 +26,7 @@ use crate::{
 const PATH: &str = "/logs/ingest";
 
 /// Configuration for the `logdna` sink.
-#[configurable_component(sink("logdna"))]
+#[configurable_component(sink("logdna", "Deliver log event data to LogDNA."))]
 #[configurable(metadata(
     deprecated = "The `logdna` sink has been renamed. Please use `mezmo` instead."
 ))]
@@ -39,6 +40,7 @@ impl GenerateConfig for LogdnaConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "logdna")]
 impl SinkConfig for LogdnaConfig {
     async fn build(
         &self,
@@ -58,7 +60,7 @@ impl SinkConfig for LogdnaConfig {
 }
 
 /// Configuration for the `mezmo` (formerly `logdna`) sink.
-#[configurable_component(sink("mezmo"))]
+#[configurable_component(sink("mezmo", "Deliver log event data to Mezmo."))]
 #[derive(Clone, Debug)]
 pub struct MezmoConfig {
     /// The Ingestion API key.
@@ -82,10 +84,12 @@ pub struct MezmoConfig {
 
     /// The MAC address that is attached to each batch of events.
     #[configurable(metadata(docs::examples = "my-mac-address"))]
+    #[configurable(metadata(docs::human_name = "MAC Address"))]
     mac: Option<String>,
 
     /// The IP address that is attached to each batch of events.
     #[configurable(metadata(docs::examples = "0.0.0.0"))]
+    #[configurable(metadata(docs::human_name = "IP Address"))]
     ip: Option<String>,
 
     /// The tags that are attached to each batch of events.
@@ -153,6 +157,7 @@ impl GenerateConfig for MezmoConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "mezmo")]
 impl SinkConfig for MezmoConfig {
     async fn build(
         &self,
@@ -173,6 +178,7 @@ impl SinkConfig for MezmoConfig {
 
         let healthcheck = healthcheck(self.clone(), client).boxed();
 
+        #[allow(deprecated)]
         Ok((super::VectorSink::from_event_sink(sink), healthcheck))
     }
 
@@ -248,12 +254,15 @@ impl HttpEventEncoder<PartitionInnerBuffer<serde_json::Value, PartitionKey>> for
 
         let line = log
             .message_path()
-            .and_then(|path| log.remove(path.as_str()))
+            .cloned()
+            .as_ref()
+            .and_then(|path| log.remove(path))
             .unwrap_or_else(|| String::from("").into());
 
         let timestamp: Value = log
             .timestamp_path()
-            .and_then(|path| log.remove(path.as_str()))
+            .cloned()
+            .and_then(|path| log.remove(&path))
             .unwrap_or_else(|| chrono::Utc::now().into());
 
         let mut map = serde_json::map::Map::new();
@@ -261,15 +270,15 @@ impl HttpEventEncoder<PartitionInnerBuffer<serde_json::Value, PartitionKey>> for
         map.insert("line".to_string(), json!(line));
         map.insert("timestamp".to_string(), json!(timestamp));
 
-        if let Some(env) = log.remove("env") {
+        if let Some(env) = log.remove(event_path!("env")) {
             map.insert("env".to_string(), json!(env));
         }
 
-        if let Some(app) = log.remove("app") {
+        if let Some(app) = log.remove(event_path!("app")) {
             map.insert("app".to_string(), json!(app));
         }
 
-        if let Some(file) = log.remove("file") {
+        if let Some(file) = log.remove(event_path!("file")) {
             map.insert("file".to_string(), json!(file));
         }
 

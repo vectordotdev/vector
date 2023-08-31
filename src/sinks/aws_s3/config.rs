@@ -33,7 +33,10 @@ use crate::{
 };
 
 /// Configuration for the `aws_s3` sink.
-#[configurable_component(sink("aws_s3"))]
+#[configurable_component(sink(
+    "aws_s3",
+    "Store observability events in the AWS S3 object storage system."
+))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct S3SinkConfig {
@@ -83,6 +86,7 @@ pub struct S3SinkConfig {
     /// This ensures there are no name collisions, and can be useful in high-volume workloads where
     /// object keys must be unique.
     #[serde(default = "crate::serde::default_true")]
+    #[configurable(metadata(docs::human_name = "Append UUID to Filename"))]
     pub filename_append_uuid: bool,
 
     /// The filename extension to use in the object key.
@@ -165,6 +169,7 @@ impl GenerateConfig for S3SinkConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "aws_s3")]
 impl SinkConfig for S3SinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let service = self.create_service(&cx.proxy).await?;

@@ -111,19 +111,8 @@ impl DatabendAPIClient {
 
     async fn do_request(
         &self,
-        url: String,
-        req: Option<DatabendHttpRequest>,
+        mut request: Request<Body>,
     ) -> Result<DatabendHttpResponse, DatabendError> {
-        let body = match req {
-            Some(r) => {
-                let body = serde_json::to_vec(&r)?;
-                Body::from(body)
-            }
-            None => Body::empty(),
-        };
-        let mut request = Request::post(url)
-            .header("Content-Type", "application/json")
-            .body(body)?;
         if let Some(a) = &self.auth {
             a.apply(&mut request);
         }
@@ -163,7 +152,10 @@ impl DatabendAPIClient {
         next_uri: String,
     ) -> Result<DatabendHttpResponse, DatabendError> {
         let endpoint = self.get_page_endpoint(&next_uri)?;
-        self.do_request(endpoint, None).await
+        let request = Request::get(endpoint)
+            .header("Content-Type", "application/json")
+            .body(Body::empty())?;
+        self.do_request(request).await
     }
 
     pub(super) async fn query(
@@ -171,7 +163,10 @@ impl DatabendAPIClient {
         req: DatabendHttpRequest,
     ) -> Result<DatabendHttpResponse, DatabendError> {
         let endpoint = self.get_query_endpoint()?;
-        let resp = self.do_request(endpoint, Some(req)).await?;
+        let request = Request::post(endpoint)
+            .header("Content-Type", "application/json")
+            .body(Body::from(serde_json::to_vec(&req)?))?;
+        let resp = self.do_request(request).await?;
         match resp.next_uri {
             None => Ok(resp),
             Some(_) => {

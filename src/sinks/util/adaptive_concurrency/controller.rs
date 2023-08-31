@@ -69,7 +69,7 @@ impl<L> Controller<L> {
         // current limit and the maximum, effectively bypassing all the
         // mechanisms. Otherwise, the current limit is set to 1 and the
         // maximum to MAX_CONCURRENCY.
-        let current_limit = concurrency.unwrap_or(1);
+        let current_limit = concurrency.unwrap_or(settings.initial_concurrency);
         Self {
             semaphore: Arc::new(ShrinkableSemaphore::new(current_limit)),
             concurrency,

@@ -1,9 +1,9 @@
-#[cfg(feature = "sources-prometheus")]
+#[cfg(feature = "sources-prometheus-scrape")]
 use std::borrow::Cow;
 
 use hyper::StatusCode;
 use metrics::counter;
-#[cfg(feature = "sources-prometheus")]
+#[cfg(feature = "sources-prometheus-scrape")]
 use prometheus_parser::ParserError;
 use vector_core::internal_event::InternalEvent;
 
@@ -12,7 +12,7 @@ use vector_common::internal_event::{
     error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL,
 };
 
-#[cfg(feature = "sources-prometheus")]
+#[cfg(feature = "sources-prometheus-scrape")]
 #[derive(Debug)]
 pub struct PrometheusParseError<'a> {
     pub error: ParserError,
@@ -20,7 +20,7 @@ pub struct PrometheusParseError<'a> {
     pub body: Cow<'a, str>,
 }
 
-#[cfg(feature = "sources-prometheus")]
+#[cfg(feature = "sources-prometheus-scrape")]
 impl<'a> InternalEvent for PrometheusParseError<'a> {
     fn emit(self) {
         error!(

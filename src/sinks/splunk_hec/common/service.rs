@@ -109,12 +109,13 @@ where
         }
     }
 
-    fn call(&mut self, req: HecRequest) -> Self::Future {
+    fn call(&mut self, mut req: HecRequest) -> Self::Future {
         let ack_finalizer_tx = self.ack_finalizer_tx.clone();
         let ack_slot = self.current_ack_slot.take();
 
-        let events_count = req.get_metadata().event_count();
-        let events_byte_size = req.get_metadata().events_byte_size();
+        let metadata = std::mem::take(req.metadata_mut());
+        let events_count = metadata.event_count();
+        let events_byte_size = metadata.into_events_estimated_json_encoded_byte_size();
         let response = self.inner.call(req);
 
         Box::pin(async move {
@@ -281,6 +282,7 @@ mod tests {
     use bytes::Bytes;
     use futures_util::{poll, stream::FuturesUnordered, StreamExt};
     use tower::{util::BoxService, Service, ServiceExt};
+    use vector_common::internal_event::CountByteSize;
     use vector_core::{
         config::proxy::ProxyConfig,
         event::{EventFinalizers, EventStatus},
@@ -338,7 +340,11 @@ mod tests {
         let body = Bytes::from("test-message");
         let events_byte_size = body.len();
 
-        let builder = RequestMetadataBuilder::new(1, events_byte_size, events_byte_size);
+        let builder = RequestMetadataBuilder::new(
+            1,
+            events_byte_size,
+            CountByteSize(1, events_byte_size.into()).into(),
+        );
         let bytes_len =
             NonZeroUsize::new(events_byte_size).expect("payload should never be zero length");
         let metadata = builder.with_request_size(bytes_len);

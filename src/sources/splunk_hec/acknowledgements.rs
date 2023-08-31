@@ -27,28 +27,34 @@ pub struct HecAcknowledgementsConfig {
     /// Enables end-to-end acknowledgements.
     pub enabled: Option<bool>,
 
-    /// The maximum number of ack statuses pending query across all channels.
+    /// The maximum number of acknowledgement statuses pending query across all channels.
     ///
     /// Equivalent to the `max_number_of_acked_requests_pending_query` Splunk HEC setting.
     ///
     /// Minimum of `1`.
+    #[configurable(metadata(docs::human_name = "Max Number of Pending Acknowledgements"))]
     pub max_pending_acks: NonZeroU64,
 
     /// The maximum number of Splunk HEC channels clients can use with this source.
     ///
     /// Minimum of `1`.
+    #[configurable(metadata(docs::human_name = "Max Number of Acknowledgement Channels"))]
     pub max_number_of_ack_channels: NonZeroU64,
 
-    /// The maximum number of ack statuses pending query for a single channel.
+    /// The maximum number of acknowledgement statuses pending query for a single channel.
     ///
     /// Equivalent to the `max_number_of_acked_requests_pending_query_per_ack_channel` Splunk HEC setting.
     ///
     /// Minimum of `1`.
+    #[configurable(metadata(
+        docs::human_name = "Max Number of Pending Acknowledgements Per Channel"
+    ))]
     pub max_pending_acks_per_channel: NonZeroU64,
 
     /// Whether or not to remove channels after idling for `max_idle_time` seconds.
     ///
-    /// A channel is idling if it is not used for sending data or querying ack statuses.
+    /// A channel is idling if it is not used for sending data or querying acknowledgement statuses.
+    #[configurable(metadata(docs::human_name = "Acknowledgement Idle Cleanup"))]
     pub ack_idle_cleanup: bool,
 
     /// The amount of time, in seconds, a channel is allowed to idle before removal.

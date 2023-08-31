@@ -5,6 +5,7 @@ use serde_json::Value as JsonValue;
 use snafu::{OptionExt, ResultExt, Snafu};
 use vector_core::config::{LegacyKey, LogNamespace};
 
+use crate::sources::kubernetes_logs::transform_utils::get_message_path;
 use crate::{
     config::log_schema,
     event::{self, Event, LogEvent, Value},
@@ -51,13 +52,10 @@ impl FunctionTransform for Docker {
 
 /// Parses `message` as json object and removes it.
 fn parse_json(log: &mut LogEvent, log_namespace: LogNamespace) -> Result<(), ParsingError> {
-    let message_field = match log_namespace {
-        LogNamespace::Vector => ".",
-        LogNamespace::Legacy => log_schema().message_key(),
-    };
+    let target_path = get_message_path(log_namespace);
 
     let value = log
-        .remove(message_field)
+        .remove(&target_path)
         .ok_or(ParsingError::NoMessageField)?;
 
     let bytes = match value {
@@ -69,7 +67,7 @@ fn parse_json(log: &mut LogEvent, log_namespace: LogNamespace) -> Result<(), Par
         Ok(JsonValue::Object(object)) => {
             for (key, value) in object {
                 match key.as_str() {
-                    MESSAGE_KEY => drop(log.insert(message_field, value)),
+                    MESSAGE_KEY => drop(log.insert(&target_path, value)),
                     STREAM_KEY => log_namespace.insert_source_metadata(
                         Config::NAME,
                         log,
@@ -133,12 +131,8 @@ fn normalize_event(
     }
 
     // Parse message, remove trailing newline and detect if it's partial.
-    let message_key = match log_namespace {
-        LogNamespace::Vector => ".",
-        LogNamespace::Legacy => log_schema().message_key(),
-    };
-    let message = log.remove(message_key).context(LogFieldMissingSnafu)?;
-
+    let message_path = get_message_path(log_namespace);
+    let message = log.remove(&message_path).context(LogFieldMissingSnafu)?;
     let mut message = match message {
         Value::Bytes(val) => val,
         _ => return Err(NormalizationError::LogValueUnexpectedType),
@@ -159,7 +153,7 @@ fn normalize_event(
         message.truncate(message.len() - 1);
         is_partial = false;
     };
-    log.insert(message_key, message);
+    log.insert(&message_path, message);
 
     // For partial messages add a partial event indicator.
     if is_partial {
@@ -207,7 +201,7 @@ enum NormalizationError {
 pub mod tests {
     use super::{super::test_util, *};
     use crate::test_util::trace_init;
-    use vrl::value::value;
+    use vrl::value;
 
     fn make_long_string(base: &str, len: usize) -> String {
         base.chars().cycle().take(len).collect()

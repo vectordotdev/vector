@@ -63,6 +63,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
         address: SocketAddr,
         path: &str,
         method: HttpMethod,
+        response_code: StatusCode,
         strict_path: bool,
         tls: &Option<TlsEnableableConfig>,
         auth: &Option<HttpSourceAuthConfig>,
@@ -152,7 +153,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                                 events
                             });
 
-                        handle_request(events, acknowledgements, cx.out.clone())
+                        handle_request(events, acknowledgements, response_code, cx.out.clone())
                     },
                 )
                 .with(warp::trace(move |_info| span.clone()));
@@ -205,6 +206,7 @@ impl warp::reject::Reject for RejectShuttingDown {}
 async fn handle_request(
     events: Result<Vec<Event>, ErrorMessage>,
     acknowledgements: bool,
+    response_code: StatusCode,
     mut out: SourceSender,
 ) -> Result<impl warp::Reply, Rejection> {
     match events {
@@ -213,13 +215,13 @@ async fn handle_request(
 
             let count = events.len();
             out.send_batch(events)
-                .map_err(move |error: crate::source_sender::ClosedError| {
+                .map_err(|_| {
                     // can only fail if receiving end disconnected, so we are shutting down,
                     // probably not gracefully.
-                    emit!(StreamClosedError { error, count });
+                    emit!(StreamClosedError { count });
                     warp::reject::custom(RejectShuttingDown)
                 })
-                .and_then(|_| handle_batch_status(receiver))
+                .and_then(|_| handle_batch_status(response_code, receiver))
                 .await
         }
         Err(error) => {
@@ -230,12 +232,13 @@ async fn handle_request(
 }
 
 async fn handle_batch_status(
+    success_response_code: StatusCode,
     receiver: Option<BatchStatusReceiver>,
 ) -> Result<impl warp::Reply, Rejection> {
     match receiver {
-        None => Ok(warp::reply()),
+        None => Ok(success_response_code),
         Some(receiver) => match receiver.await {
-            BatchStatus::Delivered => Ok(warp::reply()),
+            BatchStatus::Delivered => Ok(success_response_code),
             BatchStatus::Errored => Err(warp::reject::custom(ErrorMessage::new(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "Error delivering contents to sink".into(),

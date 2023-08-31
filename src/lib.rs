@@ -83,6 +83,7 @@ pub mod line_agg;
 pub mod list;
 #[cfg(any(feature = "sources-nats", feature = "sinks-nats"))]
 pub(crate) mod nats;
+pub mod net;
 #[allow(unreachable_pub)]
 pub(crate) mod proto;
 pub mod providers;
@@ -100,19 +101,18 @@ pub mod sources;
 pub mod stats;
 #[cfg(feature = "api-client")]
 #[allow(unreachable_pub)]
-mod tap;
+pub mod tap;
 pub mod template;
 pub mod test_util;
 #[cfg(feature = "api-client")]
 #[allow(unreachable_pub)]
-pub(crate) mod top;
+pub mod top;
 #[allow(unreachable_pub)]
 pub mod topology;
 pub mod trace;
 #[allow(unreachable_pub)]
 pub mod transforms;
 pub mod types;
-pub mod udp;
 pub mod unit_test;
 pub(crate) mod utilization;
 pub mod validate;

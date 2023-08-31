@@ -18,7 +18,10 @@ use tokio::{sync::oneshot, task::spawn_blocking};
 use tracing::{Instrument, Span};
 use vector_common::finalizer::OrderedFinalizer;
 use vector_config::configurable_component;
-use vector_core::config::{LegacyKey, LogNamespace};
+use vector_core::{
+    config::{LegacyKey, LogNamespace},
+    EstimatedJsonEncodedSizeOf,
+};
 use vrl::value::Kind;
 
 use super::util::{EncodingConfig, MultilineConfig};
@@ -118,6 +121,7 @@ pub struct FileConfig {
     #[serde(alias = "ignore_older", default)]
     #[configurable(metadata(docs::type_unit = "seconds"))]
     #[configurable(metadata(docs::examples = 600))]
+    #[configurable(metadata(docs::human_name = "Ignore Older Files"))]
     pub ignore_older_secs: Option<u64>,
 
     /// The maximum size of a line before it is discarded.
@@ -146,6 +150,7 @@ pub struct FileConfig {
     /// [global_data_dir]: https://vector.dev/docs/reference/configuration/global-options/#data_dir
     #[serde(default)]
     #[configurable(metadata(docs::examples = "/var/local/lib/vector/"))]
+    #[configurable(metadata(docs::human_name = "Data Directory"))]
     pub data_dir: Option<PathBuf>,
 
     /// Enables adding the file offset to each event and sets the name of the log field used.
@@ -157,7 +162,7 @@ pub struct FileConfig {
     #[configurable(metadata(docs::examples = "offset"))]
     pub offset_key: Option<OptionalValuePath>,
 
-    /// Delay between file discovery calls.
+    /// The delay between file discovery calls.
     ///
     /// This controls the interval at which files are searched. A higher value results in greater
     /// chances of some short-lived files being missed between searches, but a lower value increases
@@ -168,6 +173,7 @@ pub struct FileConfig {
     )]
     #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
     #[configurable(metadata(docs::type_unit = "milliseconds"))]
+    #[configurable(metadata(docs::human_name = "Glob Minimum Cooldown"))]
     pub glob_minimum_cooldown_ms: Duration,
 
     #[configurable(derived)]
@@ -199,7 +205,11 @@ pub struct FileConfig {
     #[serde(default)]
     pub multiline: Option<MultilineConfig>,
 
-    /// An approximate limit on the amount of data read from a single file at a given time.
+    /// Max amount of bytes to read from a single file before switching over to the next file.
+    /// **Note:** This does not apply when `oldest_first` is `true.
+    ///
+    /// This allows distributing the reads more or less evenly across
+    /// the files.
     #[serde(default = "default_max_read_bytes")]
     #[configurable(metadata(docs::type_unit = "bytes"))]
     pub max_read_bytes: usize,
@@ -208,7 +218,7 @@ pub struct FileConfig {
     #[serde(default)]
     pub oldest_first: bool,
 
-    /// Timeout from reaching `EOF` after which the file is removed from the filesystem, unless new data is written in the meantime.
+    /// After reaching EOF, the number of seconds to wait before removing the file, unless new data is written.
     ///
     /// If not specified, files are not removed.
     #[serde(alias = "remove_after", default)]
@@ -216,6 +226,7 @@ pub struct FileConfig {
     #[configurable(metadata(docs::examples = 0))]
     #[configurable(metadata(docs::examples = 5))]
     #[configurable(metadata(docs::examples = 60))]
+    #[configurable(metadata(docs::human_name = "Wait Time Before Removing File"))]
     pub remove_after_secs: Option<u64>,
 
     /// String sequence used to separate one file line from another.
@@ -246,7 +257,7 @@ fn default_file_key() -> OptionalValuePath {
 }
 
 fn default_host_key() -> OptionalValuePath {
-    OptionalValuePath::from(owned_value_path!(log_schema().host_key()))
+    log_schema().host_key().cloned().into()
 }
 
 const fn default_read_from() -> ReadFromConfig {
@@ -652,9 +663,9 @@ pub fn file_source(
                 Ok(()) => {
                     debug!("Finished sending.");
                 }
-                Err(error) => {
+                Err(_) => {
                     let (count, _) = messages.size_hint();
-                    emit!(StreamClosedError { error, count });
+                    emit!(StreamClosedError { count });
                 }
             }
         });
@@ -739,18 +750,12 @@ fn create_event(
     meta: &EventMetadata,
     log_namespace: LogNamespace,
 ) -> LogEvent {
-    emit!(FileEventsReceived {
-        count: 1,
-        file,
-        byte_size: line.len(),
-    });
-
-    let deserializer = BytesDeserializer::new();
+    let deserializer = BytesDeserializer;
     let mut event = deserializer.parse_single(line, log_namespace);
 
     log_namespace.insert_vector_metadata(
         &mut event,
-        Some(log_schema().source_type_key()),
+        log_schema().source_type_key(),
         path!("source_type"),
         Bytes::from_static(FileConfig::NAME.as_bytes()),
     );
@@ -791,6 +796,12 @@ fn create_event(
         file,
     );
 
+    emit!(FileEventsReceived {
+        count: 1,
+        file,
+        byte_size: event.estimated_json_encoded_size_of(),
+    });
+
     event
 }
 
@@ -818,7 +829,7 @@ mod tests {
         sources::file,
         test_util::components::{assert_source_compliance, FILE_SOURCE_TAGS},
     };
-    use vrl::value::value;
+    use vrl::value;
 
     #[test]
     fn generate_config() {
@@ -1029,8 +1040,8 @@ mod tests {
         assert_eq!(log["file"], "some_file.rs".into());
         assert_eq!(log["host"], "Some.Machine".into());
         assert_eq!(log["offset"], 0.into());
-        assert_eq!(log[log_schema().message_key()], "hello world".into());
-        assert_eq!(log[log_schema().source_type_key()], "file".into());
+        assert_eq!(*log.get_message().unwrap(), "hello world".into());
+        assert_eq!(*log.get_source_type().unwrap(), "file".into());
         assert!(log[log_schema().timestamp_key().unwrap().to_string()].is_timestamp());
     }
 
@@ -1051,8 +1062,8 @@ mod tests {
         assert_eq!(log["file_path"], "some_file.rs".into());
         assert_eq!(log["hostname"], "Some.Machine".into());
         assert_eq!(log["off"], 0.into());
-        assert_eq!(log[log_schema().message_key()], "hello world".into());
-        assert_eq!(log[log_schema().source_type_key()], "file".into());
+        assert_eq!(*log.get_message().unwrap(), "hello world".into());
+        assert_eq!(*log.get_source_type().unwrap(), "file".into());
         assert!(log[log_schema().timestamp_key().unwrap().to_string()].is_timestamp());
     }
 
@@ -1141,7 +1152,8 @@ mod tests {
         let mut goodbye_i = 0;
 
         for event in received {
-            let line = event.as_log()[log_schema().message_key()].to_string_lossy();
+            let line =
+                event.as_log()[log_schema().message_key().unwrap().to_string()].to_string_lossy();
             if line.starts_with("hello") {
                 assert_eq!(line, format!("hello {}", hello_i));
                 assert_eq!(
@@ -1235,7 +1247,8 @@ mod tests {
                 path.to_str().unwrap()
             );
 
-            let line = event.as_log()[log_schema().message_key()].to_string_lossy();
+            let line =
+                event.as_log()[log_schema().message_key().unwrap().to_string()].to_string_lossy();
 
             if pre_trunc {
                 assert_eq!(line, format!("pretrunc {}", i));
@@ -1296,7 +1309,8 @@ mod tests {
                 path.to_str().unwrap()
             );
 
-            let line = event.as_log()[log_schema().message_key()].to_string_lossy();
+            let line =
+                event.as_log()[log_schema().message_key().unwrap().to_string()].to_string_lossy();
 
             if pre_rot {
                 assert_eq!(line, format!("prerot {}", i));
@@ -1349,7 +1363,8 @@ mod tests {
         let mut is = [0; 3];
 
         for event in received {
-            let line = event.as_log()[log_schema().message_key()].to_string_lossy();
+            let line =
+                event.as_log()[log_schema().message_key().unwrap().to_string()].to_string_lossy();
             let mut split = line.split(' ');
             let file = split.next().unwrap().parse::<usize>().unwrap();
             assert_ne!(file, 4);
@@ -1456,10 +1471,10 @@ mod tests {
                         .path
                         .expect("file key to exist")
                         .to_string(),
-                    log_schema().host_key().to_string(),
-                    log_schema().message_key().to_string(),
+                    log_schema().host_key().unwrap().to_string(),
+                    log_schema().message_key().unwrap().to_string(),
                     log_schema().timestamp_key().unwrap().to_string(),
-                    log_schema().source_type_key().to_string()
+                    log_schema().source_type_key().unwrap().to_string()
                 ]
                 .into_iter()
                 .collect::<HashSet<_>>()
@@ -1739,12 +1754,16 @@ mod tests {
         let before_lines = received
             .iter()
             .filter(|event| event.as_log()["file"].to_string_lossy().ends_with("before"))
-            .map(|event| event.as_log()[log_schema().message_key()].to_string_lossy())
+            .map(|event| {
+                event.as_log()[log_schema().message_key().unwrap().to_string()].to_string_lossy()
+            })
             .collect::<Vec<_>>();
         let after_lines = received
             .iter()
             .filter(|event| event.as_log()["file"].to_string_lossy().ends_with("after"))
-            .map(|event| event.as_log()[log_schema().message_key()].to_string_lossy())
+            .map(|event| {
+                event.as_log()[log_schema().message_key().unwrap().to_string()].to_string_lossy()
+            })
             .collect::<Vec<_>>();
         assert_eq!(before_lines, vec!["second line"]);
         assert_eq!(after_lines, vec!["_first line", "_second line"]);
@@ -2309,11 +2328,7 @@ mod tests {
         received
             .into_iter()
             .map(Event::into_log)
-            .map(|log| {
-                log[log_schema().message_key()]
-                    .to_string_lossy()
-                    .into_owned()
-            })
+            .map(|log| log.get_message().unwrap().to_string_lossy().into_owned())
             .collect()
     }
 
@@ -2321,7 +2336,7 @@ mod tests {
         received
             .into_iter()
             .map(Event::into_log)
-            .map(|log| log[log_schema().message_key()].clone())
+            .map(|log| log.get_message().unwrap().clone())
             .collect()
     }
 }
