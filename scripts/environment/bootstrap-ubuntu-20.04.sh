@@ -109,6 +109,12 @@ if ! [ -x "$(command -v docker)" ]; then
     usermod --append --groups docker ubuntu || true
 fi
 
+# docker-compose
+if ! [ -x "$(command -v docker-compose)" ]; then
+  curl -fsSL "https://github.com/docker/compose/releases/download/v2.20.3/docker-compose-linux-$(uname -m)" -o /usr/local/bin/docker-compose
+  chmod +x /usr/local/bin/docker-compose
+fi
+
 bash scripts/environment/install-protoc.sh
 
 # Apt cleanup
