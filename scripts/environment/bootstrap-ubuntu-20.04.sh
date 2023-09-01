@@ -111,7 +111,7 @@ fi
 
 # docker-compose
 if ! [ -x "$(command -v docker-compose)" ]; then
-  curl -fsSL "https://github.com/docker/compose/releases/download/2.20.3/docker-compose-linux-$(dpkg --print-architecture)" -o /usr/local/bin/docker-compose
+  curl -fsSL "https://github.com/docker/compose/releases/download/2.20.3/docker-compose-linux-$(uname -m)" -o /usr/local/bin/docker-compose
   chmod +x /usr/local/bin/docker-compose
 fi
 
