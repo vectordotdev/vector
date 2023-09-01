@@ -223,6 +223,14 @@ build-armv7-unknown-linux-gnueabihf: target/armv7-unknown-linux-gnueabihf/releas
 build-armv7-unknown-linux-musleabihf: target/armv7-unknown-linux-musleabihf/release/vector ## Build a release binary for the armv7-unknown-linux-musleabihf triple.
 	@echo "Output to ${<}"
 
+.PHONY: build-arm-unknown-linux-gnueabihf
+build-arm-unknown-linux-gnueabihf: target/arm-unknown-linux-gnueabihf/release/vector ## Build a release binary for the arm-unknown-linux-gnueabihf triple.
+	@echo "Output to ${<}"
+
+.PHONY: build-arm-unknown-linux-musleabihf
+build-arm-unknown-linux-musleabihf: target/arm-unknown-linux-musleabihf/release/vector ## Build a release binary for the arm-unknown-linux-musleabihf triple.
+	@echo "Output to ${<}"
+
 .PHONY: build-graphql-schema
 build-graphql-schema: ## Generate the `schema.json` for Vector's GraphQL API
 	${MAYBE_ENVIRONMENT_EXEC} cargo run --bin graphql-schema --no-default-features --features=default-no-api-client
@@ -529,6 +537,9 @@ package-aarch64-unknown-linux-gnu-all: package-aarch64-unknown-linux-gnu package
 .PHONY: package-armv7-unknown-linux-gnueabihf-all
 package-armv7-unknown-linux-gnueabihf-all: package-armv7-unknown-linux-gnueabihf package-deb-armv7-gnu package-rpm-armv7hl-gnu  # Build all armv7-unknown-linux-gnueabihf MUSL packages
 
+.PHONY: package-arm-unknown-linux-gnueabihf-all
+package-arm-unknown-linux-gnueabihf-all: package-arm-unknown-linux-gnueabihf package-deb-arm-gnu package-rpm-armhl-gnu package-rpm-arm-gnu  # Build all arm-unknown-linux-gnueabihf MUSL packages
+
 .PHONY: package-x86_64-unknown-linux-gnu
 package-x86_64-unknown-linux-gnu: target/artifacts/vector-${VERSION}-x86_64-unknown-linux-gnu.tar.gz ## Build an archive suitable for the `x86_64-unknown-linux-gnu` triple.
 	@echo "Output to ${<}."
@@ -551,6 +562,14 @@ package-armv7-unknown-linux-gnueabihf: target/artifacts/vector-${VERSION}-armv7-
 
 .PHONY: package-armv7-unknown-linux-musleabihf
 package-armv7-unknown-linux-musleabihf: target/artifacts/vector-${VERSION}-armv7-unknown-linux-musleabihf.tar.gz ## Build an archive suitable for the `armv7-unknown-linux-musleabihf triple.
+	@echo "Output to ${<}."
+
+.PHONY: package-arm-unknown-linux-gnueabihf
+package-arm-unknown-linux-gnueabihf: target/artifacts/vector-${VERSION}-arm-unknown-linux-gnueabihf.tar.gz ## Build an archive suitable for the `arm-unknown-linux-gnueabihf` triple.
+	@echo "Output to ${<}."
+
+.PHONY: package-arm-unknown-linux-musleabihf
+package-arm-unknown-linux-musleabihf: target/artifacts/vector-${VERSION}-arm-unknown-linux-musleabihf.tar.gz ## Build an archive suitable for the `arm-unknown-linux-musleabihf triple.
 	@echo "Output to ${<}."
 
 # debs
