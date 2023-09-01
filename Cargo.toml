@@ -322,7 +322,7 @@ tikv-jemallocator = { version = "0.5.4", default-features = false, optional = tr
 tokio-postgres = { version = "0.7.10", default-features = false, features = ["runtime", "with-chrono-0_4"], optional = true }
 tokio-tungstenite = {version = "0.20.0", default-features = false, features = ["connect"], optional = true}
 toml = { version = "0.7.6", default-features = false, features = ["parse", "display"] }
-tonic = { version = "0.9", optional = true, default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "gzip"] }
+tonic = { version = "0.10", optional = true, default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "gzip"] }
 trust-dns-proto = { version = "0.23.0", default-features = false, features = ["dnssec"], optional = true }
 typetag = { version = "0.2.13", default-features = false }
 url = { version = "2.4.1", default-features = false, features = ["serde"] }

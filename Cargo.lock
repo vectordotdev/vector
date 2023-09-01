@@ -2164,7 +2164,7 @@ dependencies = [
  "memchr",
  "once_cell",
  "ordered-float 3.9.1",
- "prost",
+ "prost 0.11.9",
  "prost-reflect",
  "regex",
  "serde",
@@ -2289,9 +2289,9 @@ version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2895653b4d9f1538a83970077cb01dfc77a4810524e51a110944688e916b18e"
 dependencies = [
- "prost",
+ "prost 0.11.9",
  "prost-types",
- "tonic",
+ "tonic 0.9.2",
  "tracing-core 0.1.30",
 ]
 
@@ -2313,7 +2313,7 @@ dependencies = [
  "thread_local",
  "tokio",
  "tokio-stream",
- "tonic",
+ "tonic 0.9.2",
  "tracing 0.1.37",
  "tracing-core 0.1.30",
  "tracing-subscriber",
@@ -3791,10 +3791,10 @@ name = "greptime-proto"
 version = "0.1.0"
 source = "git+https://github.com/GreptimeTeam/greptime-proto.git?tag=0.2.1#4398d20c56d5f7939cc2960789cb1fa7dd18e6fe"
 dependencies = [
- "prost",
+ "prost 0.11.9",
  "serde",
  "serde_json",
- "tonic",
+ "tonic 0.9.2",
  "tonic-build",
 ]
 
@@ -3809,12 +3809,12 @@ dependencies = [
  "futures-util",
  "greptime-proto",
  "parking_lot",
- "prost",
+ "prost 0.11.9",
  "rand 0.8.5",
  "snafu",
  "tokio",
  "tokio-stream",
- "tonic",
+ "tonic 0.9.2",
  "tonic-build",
  "tower",
 ]
@@ -4982,7 +4982,7 @@ version = "0.1.0"
 dependencies = [
  "bytes 1.4.0",
  "chrono",
- "prost",
+ "prost 0.11.9",
  "prost-build",
  "prost-types",
  "snap",
@@ -5892,9 +5892,9 @@ dependencies = [
  "chrono",
  "hex",
  "ordered-float 3.9.1",
- "prost",
+ "prost 0.11.9",
  "prost-build",
- "tonic",
+ "tonic 0.10.0",
  "tonic-build",
  "vector-core",
  "vector-lookup",
@@ -6518,7 +6518,7 @@ dependencies = [
  "indexmap 2.0.0",
  "nom",
  "num_enum 0.7.0",
- "prost",
+ "prost 0.11.9",
  "prost-build",
  "prost-types",
  "snafu",
@@ -6556,6 +6556,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "prost"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aa8473a65b88506c106c28ae905ca4a2b83a2993640467a41bb3080627ddfd2c"
+dependencies = [
+ "bytes 1.4.0",
+]
+
+[[package]]
 name = "prost-build"
 version = "0.11.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6569,7 +6578,7 @@ dependencies = [
  "multimap",
  "petgraph",
  "prettyplease",
- "prost",
+ "prost 0.11.9",
  "prost-types",
  "regex",
  "syn 1.0.109",
@@ -6598,7 +6607,7 @@ checksum = "6b823de344848e011658ac981009100818b322421676740546f8b52ed5249428"
 dependencies = [
  "base64 0.21.3",
  "once_cell",
- "prost",
+ "prost 0.11.9",
  "prost-types",
  "serde",
  "serde-value",
@@ -6610,7 +6619,7 @@ version = "0.11.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "213622a1460818959ac1181aaeb2dc9c7f63df720db7d788b3e24eacd1983e13"
 dependencies = [
- "prost",
+ "prost 0.11.9",
 ]
 
 [[package]]
@@ -6656,7 +6665,7 @@ dependencies = [
  "oauth2",
  "openidconnect",
  "pem",
- "prost",
+ "prost 0.11.9",
  "prost-build",
  "prost-derive",
  "rand 0.8.5",
@@ -7403,9 +7412,9 @@ dependencies = [
 
 [[package]]
 name = "rustls-native-certs"
-version = "0.6.2"
+version = "0.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0167bac7a9f490495f3c33013e7722b53cb087ecbe082fb0c6387c96f634ea50"
+checksum = "a9aace74cb666635c918e9c12bc0d348266037aa8eb599b5cba565709a8dff00"
 dependencies = [
  "openssl-probe",
  "rustls-pemfile",
@@ -8811,7 +8820,6 @@ dependencies = [
  "axum",
  "base64 0.21.3",
  "bytes 1.4.0",
- "flate2",
  "futures-core",
  "futures-util",
  "h2",
@@ -8821,7 +8829,37 @@ dependencies = [
  "hyper-timeout",
  "percent-encoding",
  "pin-project",
- "prost",
+ "prost 0.11.9",
+ "rustls-pemfile",
+ "tokio",
+ "tokio-rustls 0.24.0",
+ "tokio-stream",
+ "tower",
+ "tower-layer",
+ "tower-service",
+ "tracing 0.1.37",
+]
+
+[[package]]
+name = "tonic"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5469afaf78a11265c343a88969045c1568aa8ecc6c787dbf756e92e70f199861"
+dependencies = [
+ "async-stream",
+ "async-trait",
+ "axum",
+ "base64 0.21.3",
+ "bytes 1.4.0",
+ "flate2",
+ "h2",
+ "http",
+ "http-body",
+ "hyper",
+ "hyper-timeout",
+ "percent-encoding",
+ "pin-project",
+ "prost 0.12.0",
  "rustls-native-certs",
  "rustls-pemfile",
  "tokio",
@@ -9593,7 +9631,7 @@ dependencies = [
  "postgres-openssl",
  "prometheus-parser",
  "proptest",
- "prost",
+ "prost 0.11.9",
  "prost-build",
  "prost-reflect",
  "prost-types",
@@ -9639,7 +9677,7 @@ dependencies = [
  "tokio-tungstenite 0.20.0",
  "tokio-util",
  "toml 0.7.6",
- "tonic",
+ "tonic 0.10.0",
  "tonic-build",
  "tower",
  "tower-http",
@@ -9863,7 +9901,7 @@ dependencies = [
  "parking_lot",
  "pin-project",
  "proptest",
- "prost",
+ "prost 0.11.9",
  "prost-build",
  "prost-types",
  "quanta",
@@ -9888,7 +9926,7 @@ dependencies = [
  "tokio-test",
  "tokio-util",
  "toml 0.7.6",
- "tonic",
+ "tonic 0.10.0",
  "tower",
  "tracing 0.1.37",
  "tracing-core 0.1.30",
