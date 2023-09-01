@@ -49,6 +49,7 @@ authsvc
 autobenches
 AUTOBUILD
 AUTODESPAWN
+AUTOPULL
 autodiscovered
 autodiscovery
 autogen
