@@ -716,6 +716,11 @@ async fn metadata_annotation() -> Result<(), Box<dyn std::error::Error>> {
             .unwrap()
             .is_empty());
         assert_eq!(val["kubernetes"]["container_image"], BUSYBOX_IMAGE);
+        assert!(
+            val["kubernetes"]["container_start_time"].is_string(),
+            "{:?}[container_start_time] is not a string",
+            val["kubernetes"]
+        );
 
         // Request to stop the flow.
         FlowControlCommand::Terminate

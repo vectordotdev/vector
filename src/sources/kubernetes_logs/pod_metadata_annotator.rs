@@ -3,7 +3,9 @@
 #![deny(missing_docs)]
 
 use k8s_openapi::{
-    api::core::v1::{Container, ContainerStatus, Pod, PodSpec, PodStatus},
+    api::core::v1::{
+        Container, ContainerState, ContainerStateRunning, ContainerStatus, Pod, PodSpec, PodStatus,
+    },
     apimachinery::pkg::apis::meta::v1::ObjectMeta,
 };
 use kube::runtime::reflector::{store::Store, ObjectRef};
@@ -128,6 +130,14 @@ pub struct FieldsSpec {
     #[configurable(metadata(docs::examples = "k8s.container_image_id"))]
     #[configurable(metadata(docs::examples = ""))]
     pub container_image_id: OptionalTargetPath,
+
+    /// Event field for the Container's start time.
+    ///
+    /// Set to `""` to suppress this key.
+    #[configurable(metadata(docs::examples = ".k8s.container_start_time"))]
+    #[configurable(metadata(docs::examples = "k8s.container_start_time"))]
+    #[configurable(metadata(docs::examples = ""))]
+    pub container_start_time: OptionalTargetPath,
 }
 
 impl Default for FieldsSpec {
@@ -164,6 +174,11 @@ impl Default for FieldsSpec {
             container_image_id: OwnedTargetPath::event(owned_value_path!(
                 "kubernetes",
                 "container_image_id"
+            ))
+            .into(),
+            container_start_time: OwnedTargetPath::event(owned_value_path!(
+                "kubernetes",
+                "container_start_time"
             ))
             .into(),
         }
@@ -436,6 +451,29 @@ fn annotate_from_container_status(
         )
     }
 
+    if let Some(ContainerState {
+        running: Some(ContainerStateRunning {
+            started_at: Some(start_time),
+        }),
+        ..
+    }) = &container_status.state
+    {
+        let legacy_key = fields_spec
+            .container_start_time
+            .path
+            .as_ref()
+            .map(|k| &k.path)
+            .map(LegacyKey::Overwrite);
+
+        log_namespace.insert_source_metadata(
+            Config::NAME,
+            log,
+            legacy_key,
+            path!("container_start_time"),
+            start_time.0.to_string(),
+        )
+    }
+
     let legacy_key = fields_spec
         .container_image_id
         .path
@@ -479,6 +517,7 @@ fn annotate_from_container(
 #[cfg(test)]
 mod tests {
     use k8s_openapi::api::core::v1::PodIP;
+    use k8s_openapi::apimachinery::pkg::apis::meta::v1::Time;
     use lookup::{event_path, metadata_path};
     use similar_asserts::assert_eq;
 
@@ -961,6 +1000,14 @@ mod tests {
                 ContainerStatus {
                     container_id: Some("container_id_foo".to_owned()),
                     image_id: "test_image_id".to_owned(),
+                    state: Some(ContainerState {
+                        running: Some(ContainerStateRunning {
+                            started_at: Some(Time(
+                                chrono::DateTime::<chrono::offset::Utc>::MAX_UTC,
+                            )),
+                        }),
+                        ..ContainerState::default()
+                    }),
                     ..ContainerStatus::default()
                 },
                 {
@@ -972,6 +1019,10 @@ mod tests {
                     log.insert(
                         event_path!("kubernetes", "container_image_id"),
                         "test_image_id",
+                    );
+                    log.insert(
+                        event_path!("kubernetes", "container_start_time"),
+                        "+262143-12-31 23:59:59.999999999 UTC",
                     );
                     log
                 },

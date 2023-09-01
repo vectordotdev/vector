@@ -266,6 +266,18 @@ base: components: sources: kubernetes_logs: configuration: {
 					examples: [".k8s.container_name", "k8s.container_name", ""]
 				}
 			}
+			container_start_time: {
+				description: """
+					Event field for the Container's start time.
+
+					Set to `""` to suppress this key.
+					"""
+				required: false
+				type: string: {
+					default: ".kubernetes.container_start_time"
+					examples: [".k8s.container_start_time", "k8s.container_start_time", ""]
+				}
+			}
 			pod_annotations: {
 				description: """
 					Event field for the Pod's annotations.

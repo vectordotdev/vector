@@ -96,6 +96,15 @@ components: sources: kubernetes_logs: {
 					examples: ["busybox@sha256:1e7b63c09af457b93c17d25ef4e6aee96b5bb95f087840cffd7c4bb2fe8ae5c6"]
 				}
 			}
+			"kubernetes.container_start_time": {
+				description: "Container start time"
+				required:    false
+				common:      true
+				type: string: {
+					default: null
+					examples: ["2023-01-01T10:10:10Z"]
+				}
+			}
 			"kubernetes.container_name": {
 				description: "Container name."
 				required:    false
