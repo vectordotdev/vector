@@ -81,7 +81,10 @@ fn get_processed_event_timestamp(
     let sourcetype = Template::try_from("{{ event_sourcetype }}".to_string()).ok();
     let source = Template::try_from("{{ event_source }}".to_string()).ok();
     let index = Template::try_from("{{ event_index }}".to_string()).ok();
-    let indexed_fields = vec!["event_field1".to_string(), "event_field2".to_string()];
+    let indexed_fields = vec![
+        owned_value_path!("event_field1"),
+        owned_value_path!("event_field2"),
+    ];
     let timestamp_nanos_key = Some(String::from("ts_nanos_key"));
 
     process_log(

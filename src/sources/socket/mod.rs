@@ -233,7 +233,7 @@ impl SourceConfig for SocketConfig {
                         Self::NAME,
                         legacy_port_key,
                         &owned_value_path!("port"),
-                        Kind::bytes(),
+                        Kind::integer(),
                         None,
                     )
                     .with_source_metadata(
@@ -262,7 +262,7 @@ impl SourceConfig for SocketConfig {
                         Self::NAME,
                         legacy_port_key,
                         &owned_value_path!("port"),
-                        Kind::bytes(),
+                        Kind::integer(),
                         None,
                     )
             }

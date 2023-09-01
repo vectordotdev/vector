@@ -53,6 +53,7 @@ Enot
 Evercoss
 Explay
 FAQs
+FDO
 FQDNs
 Fabro
 Figma
@@ -248,6 +249,7 @@ corejs
 coreutils
 curta
 daemonset
+dalek
 databend
 datacenter
 datadog
@@ -402,6 +404,7 @@ rootfs
 roundrobin
 rpmbuild
 rpms
+rstest
 rsyslog
 rsyslogd
 servlet

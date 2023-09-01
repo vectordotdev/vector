@@ -22,7 +22,7 @@ pub struct Cli {
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
-        let re_crate = Regex::new(r#" (\S+) v([0-9.]+)"#).unwrap();
+        let re_crate = Regex::new(r" (\S+) v([0-9.]+)").unwrap();
         let mut versions: HashMap<String, HashSet<String>> = HashMap::default();
 
         for line in Command::new("cargo")

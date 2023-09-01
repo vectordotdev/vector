@@ -205,7 +205,11 @@ pub struct FileConfig {
     #[serde(default)]
     pub multiline: Option<MultilineConfig>,
 
-    /// An approximate limit on the amount of data read from a single file at a given time.
+    /// Max amount of bytes to read from a single file before switching over to the next file.
+    /// **Note:** This does not apply when `oldest_first` is `true.
+    ///
+    /// This allows distributing the reads more or less evenly across
+    /// the files.
     #[serde(default = "default_max_read_bytes")]
     #[configurable(metadata(docs::type_unit = "bytes"))]
     pub max_read_bytes: usize,

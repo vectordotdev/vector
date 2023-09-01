@@ -1,5 +1,5 @@
 use bytes::Bytes;
-use chrono::{DateTime, NaiveDateTime, Utc};
+use chrono::{NaiveDateTime, Utc};
 use derivative::Derivative;
 use lookup::{event_path, owned_value_path};
 use serde::{Deserialize, Serialize};
@@ -22,7 +22,7 @@ use crate::{gelf_fields::*, VALID_FIELD_REGEX};
 
 /// On GELF decoding behavior:
 ///   Graylog has a relaxed decoding. They are much more lenient than the spec would
-///   suggest. We've elected to take a more strict approach to maintain backwards compatability
+///   suggest. We've elected to take a more strict approach to maintain backwards compatibility
 ///   in the event that we need to change the behavior to be more relaxed, so that prior versions
 ///   of vector will still work with the new relaxed decoding.
 
@@ -138,7 +138,7 @@ impl GelfDeserializer {
                     f64::fract(timestamp) as u32,
                 )
                 .expect("invalid timestamp");
-                log.insert(timestamp_key, DateTime::<Utc>::from_utc(naive, Utc));
+                log.insert(timestamp_key, naive.and_utc());
                 // per GELF spec- add timestamp if not provided
             } else {
                 log.insert(timestamp_key, Utc::now());
@@ -239,7 +239,7 @@ impl Deserializer for GelfDeserializer {
 mod tests {
     use super::*;
     use bytes::Bytes;
-    use chrono::{DateTime, NaiveDateTime, Utc};
+    use chrono::NaiveDateTime;
     use lookup::event_path;
     use serde_json::json;
     use similar_asserts::assert_eq;
@@ -304,10 +304,7 @@ mod tests {
         );
         // Vector does not use the nanos
         let naive = NaiveDateTime::from_timestamp_opt(1385053862, 0).expect("invalid timestamp");
-        assert_eq!(
-            log.get(TIMESTAMP),
-            Some(&Value::Timestamp(DateTime::<Utc>::from_utc(naive, Utc)))
-        );
+        assert_eq!(log.get(TIMESTAMP), Some(&Value::Timestamp(naive.and_utc())));
         assert_eq!(log.get(LEVEL), Some(&Value::Integer(1)));
         assert_eq!(
             log.get(FACILITY),
@@ -360,7 +357,7 @@ mod tests {
             let events = deserialize_gelf_input(&input).unwrap();
             assert_eq!(events.len(), 1);
             let log = events[0].as_log();
-            assert!(!log.contains("_id"));
+            assert!(!log.contains(event_path!("_id")));
         }
     }
 

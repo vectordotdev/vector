@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use codecs::TextSerializerConfig;
 use futures_util::FutureExt;
-use lookup::lookup_v2::OptionalValuePath;
+use lookup::lookup_v2::{ConfigValuePath, OptionalValuePath};
 use tower::ServiceBuilder;
 use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
@@ -73,7 +73,7 @@ pub struct HecLogsSinkConfig {
     #[configurable(metadata(docs::advanced))]
     #[serde(default)]
     #[configurable(metadata(docs::examples = "field1", docs::examples = "field2"))]
-    pub indexed_fields: Vec<String>,
+    pub indexed_fields: Vec<ConfigValuePath>,
 
     /// The name of the index to send events to.
     ///
@@ -272,7 +272,11 @@ impl HecLogsSinkConfig {
             sourcetype: self.sourcetype.clone(),
             source: self.source.clone(),
             index: self.index.clone(),
-            indexed_fields: self.indexed_fields.clone(),
+            indexed_fields: self
+                .indexed_fields
+                .iter()
+                .map(|config_path| config_path.0.clone())
+                .collect(),
             host_key: self.host_key.path.clone(),
             timestamp_nanos_key: self.timestamp_nanos_key.clone(),
             timestamp_key: self.timestamp_key.path.clone(),

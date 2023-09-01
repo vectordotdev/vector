@@ -10,7 +10,7 @@ Vector's pipeline model is based on a [directed acyclic graph][dag] of [componen
 
 ## Defining pipelines
 
-A Vector pipeline is defined through a TOML, YAML, or JSON [configuration] file. For maintainability, many Vector users use configuration and data templating languages like [Jsonnet] or [CUE].
+A Vector pipeline is defined through a YAML, TOML, or JSON [configuration] file. For maintainability, many Vector users use configuration and data templating languages like [Jsonnet] or [CUE].
 
 Configuration is checked at pipeline compile time (when Vector boots). This prevents simple mistakes and enforces DAG properties.
 

@@ -9,6 +9,7 @@ use codecs::{
 };
 
 use http::{StatusCode, Uri};
+use http_serde;
 use lookup::{lookup_v2::OptionalValuePath, owned_value_path, path};
 use tokio_util::codec::Decoder as _;
 use vector_config::configurable_component;
@@ -129,6 +130,13 @@ pub struct SimpleHttpConfig {
     #[serde(default = "default_http_method")]
     method: HttpMethod,
 
+    /// Specifies the HTTP response status code that will be returned on successful requests.
+    #[configurable(metadata(docs::examples = 202))]
+    #[configurable(metadata(docs::numeric_type = "uint"))]
+    #[serde(with = "http_serde::status_code")]
+    #[serde(default = "default_http_response_code")]
+    response_code: StatusCode,
+
     #[configurable(derived)]
     tls: Option<TlsEnableableConfig>,
 
@@ -242,6 +250,7 @@ impl Default for SimpleHttpConfig {
             path: default_path(),
             path_key: default_path_key(),
             method: default_http_method(),
+            response_code: default_http_response_code(),
             strict_path: true,
             framing: None,
             decoding: Some(default_decoding()),
@@ -289,6 +298,10 @@ fn default_path_key() -> OptionalValuePath {
     OptionalValuePath::from(owned_value_path!("path"))
 }
 
+const fn default_http_response_code() -> StatusCode {
+    StatusCode::OK
+}
+
 /// Removes duplicates from the list, and logs a `warn!()` for each duplicate removed.
 fn remove_duplicates(mut list: Vec<String>, list_name: &str) -> Vec<String> {
     list.sort();
@@ -328,6 +341,7 @@ impl SourceConfig for SimpleHttpConfig {
             self.address,
             self.path.as_str(),
             self.method,
+            self.response_code,
             self.strict_path,
             &self.tls,
             &self.auth,
@@ -440,7 +454,7 @@ impl HttpSource for SimpleHttpSource {
         loop {
             match decoder.decode_eof(&mut bytes) {
                 Ok(Some((next, _))) => {
-                    events.extend(next.into_iter());
+                    events.extend(next);
                 }
                 Ok(None) => break,
                 Err(error) => {
@@ -478,7 +492,7 @@ mod tests {
         Compression,
     };
     use futures::Stream;
-    use http::{HeaderMap, Method};
+    use http::{HeaderMap, Method, StatusCode};
     use lookup::lookup_v2::OptionalValuePath;
     use similar_asserts::assert_eq;
 
@@ -506,6 +520,7 @@ mod tests {
         path_key: &'a str,
         path: &'a str,
         method: &'a str,
+        response_code: StatusCode,
         strict_path: bool,
         status: EventStatus,
         acknowledgements: bool,
@@ -529,6 +544,7 @@ mod tests {
                 headers,
                 encoding: None,
                 query_parameters,
+                response_code,
                 tls: None,
                 auth: None,
                 strict_path,
@@ -639,6 +655,7 @@ mod tests {
                 "http_path",
                 "/",
                 "POST",
+                StatusCode::OK,
                 true,
                 EventStatus::Delivered,
                 true,
@@ -683,6 +700,7 @@ mod tests {
                 "http_path",
                 "/",
                 "POST",
+                StatusCode::OK,
                 true,
                 EventStatus::Delivered,
                 true,
@@ -720,6 +738,7 @@ mod tests {
                 "http_path",
                 "/",
                 "POST",
+                StatusCode::OK,
                 true,
                 EventStatus::Delivered,
                 true,
@@ -751,6 +770,7 @@ mod tests {
                 "http_path",
                 "/",
                 "POST",
+                StatusCode::OK,
                 true,
                 EventStatus::Delivered,
                 true,
@@ -787,6 +807,7 @@ mod tests {
                 "http_path",
                 "/",
                 "POST",
+                StatusCode::OK,
                 true,
                 EventStatus::Delivered,
                 true,
@@ -830,6 +851,7 @@ mod tests {
                 "http_path",
                 "/",
                 "POST",
+                StatusCode::OK,
                 true,
                 EventStatus::Delivered,
                 true,
@@ -879,6 +901,7 @@ mod tests {
                 "http_path",
                 "/",
                 "POST",
+                StatusCode::OK,
                 true,
                 EventStatus::Delivered,
                 true,
@@ -964,6 +987,7 @@ mod tests {
                 "http_path",
                 "/",
                 "POST",
+                StatusCode::OK,
                 true,
                 EventStatus::Delivered,
                 true,
@@ -1005,6 +1029,7 @@ mod tests {
                 "http_path",
                 "/",
                 "POST",
+                StatusCode::OK,
                 true,
                 EventStatus::Delivered,
                 true,
@@ -1055,6 +1080,7 @@ mod tests {
                 "http_path",
                 "/",
                 "POST",
+                StatusCode::OK,
                 true,
                 EventStatus::Delivered,
                 true,
@@ -1084,6 +1110,7 @@ mod tests {
                 "vector_http_path",
                 "/event/path",
                 "POST",
+                StatusCode::OK,
                 true,
                 EventStatus::Delivered,
                 true,
@@ -1123,6 +1150,7 @@ mod tests {
                 "vector_http_path",
                 "/event",
                 "POST",
+                StatusCode::OK,
                 false,
                 EventStatus::Delivered,
                 true,
@@ -1182,6 +1210,7 @@ mod tests {
             "vector_http_path",
             "/",
             "POST",
+            StatusCode::OK,
             true,
             EventStatus::Delivered,
             true,
@@ -1197,6 +1226,39 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn http_status_code() {
+        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async move {
+            let (rx, addr) = source(
+                vec![],
+                vec![],
+                "http_path",
+                "/",
+                "POST",
+                StatusCode::ACCEPTED,
+                true,
+                EventStatus::Delivered,
+                true,
+                None,
+                None,
+            )
+            .await;
+
+            spawn_collect_n(
+                async move {
+                    assert_eq!(
+                        StatusCode::ACCEPTED,
+                        send(addr, "{\"key1\":\"value1\"}").await
+                    );
+                },
+                rx,
+                1,
+            )
+            .await;
+        })
+        .await;
+    }
+
+    #[tokio::test]
     async fn http_delivery_failure() {
         assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let (rx, addr) = source(
@@ -1205,6 +1267,7 @@ mod tests {
                 "http_path",
                 "/",
                 "POST",
+                StatusCode::OK,
                 true,
                 EventStatus::Rejected,
                 true,
@@ -1234,6 +1297,7 @@ mod tests {
                 "http_path",
                 "/",
                 "POST",
+                StatusCode::OK,
                 true,
                 EventStatus::Rejected,
                 false,
@@ -1265,6 +1329,7 @@ mod tests {
             "http_path",
             "/",
             "GET",
+            StatusCode::OK,
             true,
             EventStatus::Delivered,
             true,
