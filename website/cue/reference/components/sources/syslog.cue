@@ -60,7 +60,7 @@ components: sources: syslog: {
 				}
 			}
 			host: {
-				description: "The hostname extracted from the Syslog line."
+				description: "The hostname extracted from the Syslog message. If no hostname can be extracted from the Syslog message, the IP address of the peer is used instead."
 				required:    true
 				type: string: {
 					examples: ["my.host.com"]
