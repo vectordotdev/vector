@@ -75,7 +75,7 @@ security-framework = "2.9.2"
 schannel = "0.1.22"
 
 [build-dependencies]
-prost-build = "0.11"
+prost-build = "0.12"
 
 [dev-dependencies]
 base64 = "0.21.3"
