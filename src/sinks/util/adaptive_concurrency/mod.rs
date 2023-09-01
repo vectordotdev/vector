@@ -17,7 +17,7 @@ pub(crate) use layer::AdaptiveConcurrencyLimitLayer;
 pub(crate) use service::AdaptiveConcurrencyLimit;
 use vector_config::configurable_component;
 
-pub(self) fn instant_now() -> std::time::Instant {
+fn instant_now() -> std::time::Instant {
     tokio::time::Instant::now().into()
 }
 

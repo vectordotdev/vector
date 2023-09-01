@@ -1041,11 +1041,11 @@ mod tests {
         )
     }
 
-    pub(self) fn create_metric(name: Option<String>, value: MetricValue) -> (String, Event) {
+    fn create_metric(name: Option<String>, value: MetricValue) -> (String, Event) {
         create_metric_with_tags(name, value, Some(metric_tags!("some_tag" => "some_value")))
     }
 
-    pub(self) fn create_metric_with_tags(
+    fn create_metric_with_tags(
         name: Option<String>,
         value: MetricValue,
         tags: Option<MetricTags>,

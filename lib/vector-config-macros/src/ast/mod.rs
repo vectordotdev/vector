@@ -4,7 +4,7 @@ use serde_derive_internals::{ast as serde_ast, attr as serde_attr};
 
 mod container;
 mod field;
-pub(self) mod util;
+mod util;
 mod variant;
 
 pub use container::Container;

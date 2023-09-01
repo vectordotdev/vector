@@ -476,7 +476,7 @@ impl LogEvent {
         for field in fields {
             let field_path = event_path!(field.as_ref());
             let Some(incoming_val) = incoming.remove(field_path) else {
-                continue
+                continue;
             };
             match self.get_mut(field_path) {
                 None => {

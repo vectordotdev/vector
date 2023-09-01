@@ -560,13 +560,10 @@ pub struct RequestConfig {
 }
 
 fn headers_examples() -> IndexMap<String, String> {
-    IndexMap::<_, _>::from_iter(
-        [
-            ("Accept".to_owned(), "text/plain".to_owned()),
-            ("X-My-Custom-Header".to_owned(), "A-Value".to_owned()),
-        ]
-        .into_iter(),
-    )
+    IndexMap::<_, _>::from_iter([
+        ("Accept".to_owned(), "text/plain".to_owned()),
+        ("X-My-Custom-Header".to_owned(), "A-Value".to_owned()),
+    ])
 }
 
 impl RequestConfig {

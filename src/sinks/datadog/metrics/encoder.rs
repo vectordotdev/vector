@@ -785,7 +785,9 @@ mod tests {
     {
         let mut sketches = Vec::new();
         for metric in metrics {
-            let MetricValue::Sketch { sketch } = metric.value() else { panic!("must be sketch") };
+            let MetricValue::Sketch { sketch } = metric.value() else {
+                panic!("must be sketch")
+            };
             match sketch {
                 MetricSketch::AgentDDSketch(ddsketch) => {
                     // Don't encode any empty sketches.

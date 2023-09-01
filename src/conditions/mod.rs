@@ -3,7 +3,7 @@ use vector_config::configurable_component;
 
 use crate::event::Event;
 
-pub(self) mod datadog_search;
+mod datadog_search;
 pub(crate) mod is_log;
 pub(crate) mod is_metric;
 pub(crate) mod is_trace;
