@@ -59,7 +59,13 @@ components: sources: syslog: {
 					examples: ["app-name"]
 				}
 			}
-			host: fields._local_host
+			host: {
+				description: "The hostname extracted from the Syslog line."
+				required:    true
+				type: string: {
+					examples: ["my.host.com"]
+				}
+			}
 			hostname: {
 				description: "The hostname extracted from the Syslog line. (`host` is also this value if it exists in the log.)"
 				required:    true
