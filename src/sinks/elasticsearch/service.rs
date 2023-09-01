@@ -4,8 +4,6 @@ use std::{
     task::{Context, Poll},
 };
 
-use aws_credential_types::provider::SharedCredentialsProvider;
-use aws_types::region::Region;
 use bytes::Bytes;
 use futures::future::BoxFuture;
 use http::{Response, Uri};
@@ -17,11 +15,11 @@ use vector_common::{
 };
 use vector_core::{stream::DriverResponse, ByteSizeOf};
 
-use crate::sinks::elasticsearch::sign_request;
 use crate::{
     event::{EventFinalizers, EventStatus, Finalizable},
-    http::{Auth, HttpClient},
+    http::HttpClient,
     sinks::util::{
+        auth::Auth,
         http::{HttpBatchService, RequestConfig},
         Compression, ElementCount,
     },
@@ -96,11 +94,9 @@ impl ElasticsearchService {
 pub struct HttpRequestBuilder {
     pub bulk_uri: Uri,
     pub query_params: HashMap<String, String>,
-    pub region: Option<Region>,
+    pub auth: Option<Auth>,
     pub compression: Compression,
     pub http_request_config: RequestConfig,
-    pub http_auth: Option<Auth>,
-    pub credentials_provider: Option<SharedCredentialsProvider>,
 }
 
 impl HttpRequestBuilder {
@@ -108,11 +104,9 @@ impl HttpRequestBuilder {
         HttpRequestBuilder {
             bulk_uri: common.bulk_uri.clone(),
             http_request_config: config.request.clone(),
-            http_auth: common.http_auth.clone(),
+            auth: common.auth.clone(),
             query_params: common.query_params.clone(),
-            region: common.region.clone(),
             compression: config.compression,
-            credentials_provider: common.aws_auth.clone(),
         }
     }
 
@@ -136,16 +130,27 @@ impl HttpRequestBuilder {
             builder = builder.header(&header[..], &value[..]);
         }
 
-        if let Some(auth) = &self.http_auth {
-            builder = auth.apply_builder(builder);
-        }
-
         let mut request = builder
             .body(es_req.payload)
             .expect("Invalid http request value used");
 
-        if let Some(credentials_provider) = &self.credentials_provider {
-            sign_request(&mut request, credentials_provider, &self.region).await?;
+        if let Some(auth) = &self.auth {
+            match auth {
+                Auth::Basic(auth) => {
+                    auth.apply(&mut request);
+                }
+                Auth::Aws {
+                    credentials_provider: provider,
+                    region,
+                } => {
+                    crate::sinks::elasticsearch::sign_request(
+                        &mut request,
+                        provider,
+                        &Some(region.clone()),
+                    )
+                    .await?;
+                }
+            }
         }
 
         Ok(request)

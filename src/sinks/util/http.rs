@@ -20,7 +20,9 @@ use snafu::{ResultExt, Snafu};
 use tower::{Service, ServiceBuilder};
 use tower_http::decompression::DecompressionLayer;
 use vector_config::configurable_component;
-use vector_core::{ByteSizeOf, EstimatedJsonEncodedSizeOf};
+use vector_core::{
+    stream::batcher::limiter::ItemBatchSize, ByteSizeOf, EstimatedJsonEncodedSizeOf,
+};
 
 use super::{
     retries::{RetryAction, RetryLogic},
@@ -558,13 +560,10 @@ pub struct RequestConfig {
 }
 
 fn headers_examples() -> IndexMap<String, String> {
-    IndexMap::<_, _>::from_iter(
-        [
-            ("Accept".to_owned(), "text/plain".to_owned()),
-            ("X-My-Custom-Header".to_owned(), "A-Value".to_owned()),
-        ]
-        .into_iter(),
-    )
+    IndexMap::<_, _>::from_iter([
+        ("Accept".to_owned(), "text/plain".to_owned()),
+        ("X-My-Custom-Header".to_owned(), "A-Value".to_owned()),
+    ])
 }
 
 impl RequestConfig {
@@ -675,6 +674,24 @@ impl DriverResponse for HttpResponse {
 
     fn bytes_sent(&self) -> Option<usize> {
         Some(self.raw_byte_size)
+    }
+}
+
+/// Creates a `RetryLogic` for use with `HttpResponse`.
+pub fn http_response_retry_logic() -> HttpStatusRetryLogic<
+    impl Fn(&HttpResponse) -> StatusCode + Clone + Send + Sync + 'static,
+    HttpResponse,
+> {
+    HttpStatusRetryLogic::new(|req: &HttpResponse| req.http_response.status())
+}
+
+/// Uses the estimated json encoded size to determine batch sizing.
+#[derive(Default)]
+pub struct HttpJsonBatchSizer;
+
+impl ItemBatchSize<Event> for HttpJsonBatchSizer {
+    fn size(&self, item: &Event) -> usize {
+        item.estimated_json_encoded_size_of().get()
     }
 }
 

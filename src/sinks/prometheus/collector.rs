@@ -923,7 +923,7 @@ mod tests {
         let tags = metric_tags!(
             "code" => "200",
             "quoted" => r#"host"1""#,
-            "path" => r#"c:\Windows"#,
+            "path" => r"c:\Windows",
         );
         let metric = Metric::new(
             "something".to_owned(),

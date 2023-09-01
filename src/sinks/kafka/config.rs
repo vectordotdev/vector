@@ -131,14 +131,11 @@ const fn default_message_timeout_ms() -> Duration {
 }
 
 fn example_librdkafka_options() -> HashMap<String, String> {
-    HashMap::<_, _>::from_iter(
-        [
-            ("client.id".to_string(), "${ENV_VAR}".to_string()),
-            ("fetch.error.backoff.ms".to_string(), "1000".to_string()),
-            ("socket.send.buffer.bytes".to_string(), "100".to_string()),
-        ]
-        .into_iter(),
-    )
+    HashMap::<_, _>::from_iter([
+        ("client.id".to_string(), "${ENV_VAR}".to_string()),
+        ("fetch.error.backoff.ms".to_string(), "1000".to_string()),
+        ("socket.send.buffer.bytes".to_string(), "100".to_string()),
+    ])
 }
 
 /// Used to determine the options to set in configs, since both Kafka consumers and producers have
