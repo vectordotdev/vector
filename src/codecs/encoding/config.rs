@@ -107,10 +107,14 @@ impl EncodingConfigWithFraming {
             (None, Serializer::Avro(_) | Serializer::Native(_)) => {
                 LengthDelimitedEncoder::new().into()
             }
+            (None, Serializer::Gelf(_)) => {
+                // Graylog/GELF always uses null byte delimiter on TCP, see
+                // https://github.com/Graylog2/graylog2-server/issues/1240
+                CharacterDelimitedEncoder::new(0).into()
+            }
             (
                 None,
                 Serializer::Csv(_)
-                | Serializer::Gelf(_)
                 | Serializer::Logfmt(_)
                 | Serializer::NativeJson(_)
                 | Serializer::RawMessage(_)

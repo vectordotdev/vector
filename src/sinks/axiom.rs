@@ -6,7 +6,7 @@ use vector_config::configurable_component;
 use crate::{
     config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
     sinks::{
-        elasticsearch::{ElasticsearchApiVersion, ElasticsearchAuth, ElasticsearchConfig},
+        elasticsearch::{ElasticsearchApiVersion, ElasticsearchAuthConfig, ElasticsearchConfig},
         util::{http::RequestConfig, Compression},
         Healthcheck, VectorSink,
     },
@@ -95,7 +95,7 @@ impl SinkConfig for AxiomConfig {
         let elasticsearch_config = ElasticsearchConfig {
             endpoints: vec![self.build_endpoint()],
             compression: self.compression,
-            auth: Some(ElasticsearchAuth::Basic {
+            auth: Some(ElasticsearchAuthConfig::Basic {
                 user: "axiom".to_string(),
                 password: self.token.clone(),
             }),

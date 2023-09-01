@@ -18,4 +18,5 @@ getrandom = { version = "0.2", features = ["js"] }
 vector-vrl-functions = { path = "../functions" }
 enrichment = { path = "../../enrichment" }
 
-
+[build-dependencies]
+cargo_toml = "0.15.3"

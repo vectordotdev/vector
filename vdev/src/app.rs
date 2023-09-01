@@ -1,13 +1,14 @@
 use std::ffi::{OsStr, OsString};
 pub use std::process::Command;
 use std::{
-    borrow::Cow, env, io::Read, path::PathBuf, process::ExitStatus, process::Stdio, time::Duration,
+    borrow::Cow, env, io::Read, path::PathBuf, process::ExitStatus, process::Stdio, sync::OnceLock,
+    time::Duration,
 };
 
 use anyhow::{bail, Context as _, Result};
 use indicatif::{ProgressBar, ProgressStyle};
 use log::LevelFilter;
-use once_cell::sync::{Lazy, OnceCell};
+use once_cell::sync::Lazy;
 
 use crate::{config::Config, git, platform, util};
 
@@ -25,9 +26,9 @@ const DEFAULT_SHELL: &str = "/bin/sh";
 pub static SHELL: Lazy<OsString> =
     Lazy::new(|| (env::var_os("SHELL").unwrap_or_else(|| DEFAULT_SHELL.into())));
 
-static VERBOSITY: OnceCell<LevelFilter> = OnceCell::new();
-static CONFIG: OnceCell<Config> = OnceCell::new();
-static PATH: OnceCell<String> = OnceCell::new();
+static VERBOSITY: OnceLock<LevelFilter> = OnceLock::new();
+static CONFIG: OnceLock<Config> = OnceLock::new();
+static PATH: OnceLock<String> = OnceLock::new();
 
 pub fn verbosity() -> &'static LevelFilter {
     VERBOSITY.get().expect("verbosity is not initialized")

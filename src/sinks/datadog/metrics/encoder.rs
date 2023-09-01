@@ -2,12 +2,11 @@ use std::{
     cmp,
     io::{self, Write},
     mem,
-    sync::Arc,
+    sync::{Arc, OnceLock},
 };
 
 use bytes::{BufMut, Bytes};
 use chrono::{DateTime, Utc};
-use once_cell::sync::OnceCell;
 use prost::Message;
 use snafu::{ResultExt, Snafu};
 use vector_common::request_metadata::GroupedCountByteSize;
@@ -372,7 +371,7 @@ impl DatadogMetricsEncoder {
 }
 
 fn get_sketch_payload_sketches_field_number() -> u32 {
-    static SKETCH_PAYLOAD_SKETCHES_FIELD_NUM: OnceCell<u32> = OnceCell::new();
+    static SKETCH_PAYLOAD_SKETCHES_FIELD_NUM: OnceLock<u32> = OnceLock::new();
     *SKETCH_PAYLOAD_SKETCHES_FIELD_NUM.get_or_init(|| {
         let descriptors = protobuf_descriptors();
         let descriptor = descriptors

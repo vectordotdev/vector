@@ -7,7 +7,6 @@ use futures::{FutureExt, TryFutureExt};
 use vector_config::configurable_component;
 
 use crate::{
-    aws::RegionOrEndpoint,
     codecs::Transformer,
     config::{AcknowledgementsConfig, DataType, Input, SinkConfig, SinkContext},
     event::{EventRef, LogEvent, Value},
@@ -19,7 +18,7 @@ use crate::{
             retry::ElasticsearchRetryLogic,
             service::{ElasticsearchService, HttpRequestBuilder},
             sink::ElasticsearchSink,
-            ElasticsearchApiVersion, ElasticsearchAuth, ElasticsearchCommon,
+            ElasticsearchApiVersion, ElasticsearchAuthConfig, ElasticsearchCommon,
             ElasticsearchCommonMode, ElasticsearchMode,
         },
         util::{
@@ -142,7 +141,7 @@ pub struct ElasticsearchConfig {
     pub request: RequestConfig,
 
     #[configurable(derived)]
-    pub auth: Option<ElasticsearchAuth>,
+    pub auth: Option<ElasticsearchAuthConfig>,
 
     /// Custom parameters to add to the query string for each HTTP request sent to Elasticsearch.
     #[serde(default)]
@@ -153,7 +152,8 @@ pub struct ElasticsearchConfig {
 
     #[serde(default)]
     #[configurable(derived)]
-    pub aws: Option<RegionOrEndpoint>,
+    #[cfg(feature = "aws-core")]
+    pub aws: Option<crate::aws::RegionOrEndpoint>,
 
     #[serde(default)]
     #[configurable(derived)]
@@ -215,6 +215,7 @@ impl Default for ElasticsearchConfig {
             request: Default::default(),
             auth: None,
             query: None,
+            #[cfg(feature = "aws-core")]
             aws: None,
             tls: None,
             endpoint_health: None,

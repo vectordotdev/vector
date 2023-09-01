@@ -2,7 +2,7 @@ use std::{
     convert::Infallible,
     hash::Hash,
     mem::{discriminant, Discriminant},
-    net::SocketAddr,
+    net::{IpAddr, Ipv4Addr, SocketAddr},
     sync::{Arc, RwLock},
     time::{Duration, Instant},
 };
@@ -167,10 +167,8 @@ impl Default for PrometheusExporterConfig {
     }
 }
 
-fn default_address() -> SocketAddr {
-    use std::net::{IpAddr, Ipv4Addr};
-
-    SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), 9598)
+const fn default_address() -> SocketAddr {
+    SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), 9598)
 }
 
 const fn default_distributions_as_summaries() -> bool {

@@ -1,9 +1,11 @@
+use std::sync::OnceLock;
+
 use lookup::lookup_v2::OptionalTargetPath;
 use lookup::{OwnedTargetPath, OwnedValuePath};
-use once_cell::sync::{Lazy, OnceCell};
+use once_cell::sync::Lazy;
 use vector_config::configurable_component;
 
-static LOG_SCHEMA: OnceCell<LogSchema> = OnceCell::new();
+static LOG_SCHEMA: OnceLock<LogSchema> = OnceLock::new();
 static LOG_SCHEMA_DEFAULT: Lazy<LogSchema> = Lazy::new(LogSchema::default);
 
 const MESSAGE: &str = "message";

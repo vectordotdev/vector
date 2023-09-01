@@ -18,7 +18,7 @@ use crate::{
     config::{ProxyConfig, SinkConfig, SinkContext},
     http::HttpClient,
     sinks::{
-        util::{BatchConfig, Compression, SinkBatchSettings},
+        util::{auth::Auth, BatchConfig, Compression, SinkBatchSettings},
         HealthcheckError,
     },
     test_util::{
@@ -58,14 +58,16 @@ impl ElasticsearchCommon {
             builder = builder.header(&header[..], &value[..]);
         }
 
-        if let Some(auth) = &self.http_auth {
-            builder = auth.apply_builder(builder);
-        }
-
         let mut request = builder.body(Bytes::new())?;
-
-        if let Some(credentials_provider) = &self.aws_auth {
-            sign_request(&mut request, credentials_provider, &self.region).await?;
+        if let Some(auth) = &self.auth {
+            match auth {
+                Auth::Basic(http_auth) => http_auth.apply(&mut request),
+                #[cfg(feature = "aws-core")]
+                Auth::Aws {
+                    credentials_provider: provider,
+                    region,
+                } => sign_request(&mut request, provider, &Some(region.clone())).await?,
+            }
         }
 
         let proxy = ProxyConfig::default();
@@ -251,12 +253,13 @@ async fn auto_version_http() {
         .expect("Config error");
 }
 
+#[cfg(feature = "aws-core")]
 #[tokio::test]
 async fn auto_version_https() {
     trace_init();
 
     let config = ElasticsearchConfig {
-        auth: Some(ElasticsearchAuth::Basic {
+        auth: Some(ElasticsearchAuthConfig::Basic {
             user: "elastic".to_string(),
             password: "vector".to_string().into(),
         }),
@@ -276,16 +279,19 @@ async fn auto_version_https() {
         .expect("Config error");
 }
 
+#[cfg(feature = "aws-core")]
 #[tokio::test]
 async fn auto_version_aws() {
     trace_init();
 
     let config = ElasticsearchConfig {
-        auth: Some(ElasticsearchAuth::Aws(AwsAuthentication::Default {
-            load_timeout_secs: Some(5),
-            imds: ImdsAuthentication::default(),
-            region: None,
-        })),
+        auth: Some(ElasticsearchAuthConfig::Aws(
+            crate::aws::AwsAuthentication::Default {
+                load_timeout_secs: Some(5),
+                imds: ImdsAuthentication::default(),
+                region: None,
+            },
+        )),
         endpoints: vec![aws_server()],
         aws: Some(RegionOrEndpoint::with_region(String::from("localstack"))),
         api_version: ElasticsearchApiVersion::Auto,
@@ -358,7 +364,7 @@ async fn insert_events_over_https() {
 
     run_insert_tests(
         ElasticsearchConfig {
-            auth: Some(ElasticsearchAuth::Basic {
+            auth: Some(ElasticsearchAuthConfig::Basic {
                 user: "elastic".to_string(),
                 password: "vector".to_string().into(),
             }),
@@ -378,17 +384,20 @@ async fn insert_events_over_https() {
     .await;
 }
 
+#[cfg(feature = "aws-core")]
 #[tokio::test]
 async fn insert_events_on_aws() {
     trace_init();
 
     run_insert_tests(
         ElasticsearchConfig {
-            auth: Some(ElasticsearchAuth::Aws(AwsAuthentication::Default {
-                load_timeout_secs: Some(5),
-                imds: ImdsAuthentication::default(),
-                region: None,
-            })),
+            auth: Some(ElasticsearchAuthConfig::Aws(
+                crate::aws::AwsAuthentication::Default {
+                    load_timeout_secs: Some(5),
+                    imds: ImdsAuthentication::default(),
+                    region: None,
+                },
+            )),
             endpoints: vec![aws_server()],
             aws: Some(RegionOrEndpoint::with_region(String::from("localstack"))),
             api_version: ElasticsearchApiVersion::V6,
@@ -401,17 +410,20 @@ async fn insert_events_on_aws() {
     .await;
 }
 
+#[cfg(feature = "aws-core")]
 #[tokio::test]
 async fn insert_events_on_aws_with_compression() {
     trace_init();
 
     run_insert_tests(
         ElasticsearchConfig {
-            auth: Some(ElasticsearchAuth::Aws(AwsAuthentication::Default {
-                load_timeout_secs: Some(5),
-                imds: ImdsAuthentication::default(),
-                region: None,
-            })),
+            auth: Some(ElasticsearchAuthConfig::Aws(
+                crate::aws::AwsAuthentication::Default {
+                    load_timeout_secs: Some(5),
+                    imds: ImdsAuthentication::default(),
+                    region: None,
+                },
+            )),
             endpoints: vec![aws_server()],
             aws: Some(RegionOrEndpoint::with_region(String::from("localstack"))),
             compression: Compression::gzip_default(),
@@ -498,7 +510,7 @@ async fn distributed_insert_events() {
 
     // Assumes that behind https_server and http_server addresses lies the same server
     let mut config = ElasticsearchConfig {
-        auth: Some(ElasticsearchAuth::Basic {
+        auth: Some(ElasticsearchAuthConfig::Basic {
             user: "elastic".into(),
             password: "vector".to_string().into(),
         }),
@@ -524,7 +536,7 @@ async fn distributed_insert_events_failover() {
     trace_init();
 
     let mut config = ElasticsearchConfig {
-        auth: Some(ElasticsearchAuth::Basic {
+        auth: Some(ElasticsearchAuthConfig::Basic {
             user: "elastic".into(),
             password: "vector".to_string().into(),
         }),
