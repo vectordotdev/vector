@@ -1,6 +1,6 @@
 use crate::codecs::{Decoder, DecodingConfig};
 use crate::config::{SourceConfig, SourceContext};
-use crate::event::{BatchNotifier};
+use crate::event::BatchNotifier;
 use crate::internal_events::PulsarReadError;
 use crate::internal_events::StreamClosedError;
 use crate::internal_events::{EventsReceived, PulsarAcknowledgmentError, PulsarNegativeAcknowledgmentError};
@@ -8,30 +8,35 @@ use crate::serde::{bool_or_struct, default_decoding, default_framing_message_bas
 use crate::SourceSender;
 use codecs::decoding::{DeserializerConfig, FramingConfig};
 use futures_util::StreamExt;
+use lookup::{owned_value_path,path};
 use pulsar::authentication::oauth2::{OAuth2Authentication, OAuth2Params};
 use pulsar::error::AuthenticationError;
 use pulsar::{Authentication, SubType};
 use pulsar::{Consumer, Pulsar, TokioExecutor};
-use std::sync::Arc;
-use tokio::sync::Mutex;
+use pulsar::message::proto::MessageIdData;
 use tokio_util::codec::FramedRead;
 use vector_common::finalization::BatchStatus;
 use vector_common::finalizer::OrderedFinalizer;
 use vector_common::internal_event::ByteSize;
 use vector_common::internal_event::{
+    CountByteSize,
     BytesReceived, InternalEventHandle as _, Protocol,
 };
 use vector_common::sensitive_string::SensitiveString;
 use vector_common::shutdown::ShutdownSignal;
-use vector_config::component::GenerateConfig;
 use vector_config_macros::configurable_component;
-use vector_core::config::{LogNamespace, Output, SourceAcknowledgementsConfig};
+use vector_core::config::{LegacyKey, LogNamespace, SourceOutput, SourceAcknowledgementsConfig};
 use vector_core::event::Event;
 use codecs::StreamDecodingError;
 use vector_core::ByteSizeOf;
 
+use vrl::value::Kind;
+
 /// Configuration for the `pulsar` source.
-#[configurable_component(source("pulsar"))]
+#[configurable_component(source(
+    "pulsar",
+    "Collect logs from Apache Pulsar."
+))]
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(deny_unknown_fields)]
@@ -78,6 +83,11 @@ pub struct PulsarSourceConfig {
     #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
+
+    /// The namespace to use for logs. This overrides the global setting.
+    #[configurable(metadata(docs::hidden))]
+    #[serde(default)]
+    log_namespace: Option<bool>,
 }
 
 /// Authentication configuration.
@@ -130,40 +140,27 @@ struct DeadLetterQueuePolicy {
     pub dead_letter_topic: String,
 }
 
+#[derive(Debug)]
 struct FinalizerEntry {
-    consumer: Arc<Mutex<Consumer<String, TokioExecutor>>>,
-    message: pulsar::consumer::Message<std::string::String>,
+    topic:String,
+    message_id: MessageIdData,
 }
 
-impl std::fmt::Debug for FinalizerEntry {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("FinalizerEntry")
-            .field("message", &self.message.payload)
-            .finish()
-    }
-}
-
-impl GenerateConfig for PulsarSourceConfig {
-    fn generate_config() -> toml::Value {
-        toml::from_str(
-            r#"
-            topics = ["topic1", "topic2"]
-            endpoint = "pulsar://127.0.0.1:6650""#,
-        )
-        .unwrap()
-    }
-}
+impl_generate_config_from_default!(PulsarSourceConfig);
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "pulsar")]
 impl SourceConfig for PulsarSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
+        let log_namespace = cx.log_namespace(self.log_namespace);
+
         let consumer = create_consumer(self).await?;
         let decoder = DecodingConfig::new(
             self.framing.clone(),
             self.decoding.clone(),
-            LogNamespace::Legacy,
+            log_namespace,
         )
-        .build();
+        .build()?;
         let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
 
         Ok(Box::pin(pulsar_source(
@@ -172,11 +169,28 @@ impl SourceConfig for PulsarSourceConfig {
             cx.shutdown,
             cx.out,
             acknowledgements,
+            log_namespace,
         )))
     }
 
-    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
-        vec![Output::default(self.decoding.output_type())]
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
+        let log_namespace = global_log_namespace.merge(self.log_namespace);
+
+        let schema_definition = self
+            .decoding
+            .schema_definition(log_namespace)
+            .with_standard_vector_source_metadata()
+            .with_source_metadata(
+                Self::NAME,
+                Some(LegacyKey::InsertIfEmpty(owned_value_path!("timestamp"))),
+                &owned_value_path!("timestamp"),
+                Kind::timestamp(),
+                Some("timestamp"),
+            );
+        vec![SourceOutput::new_logs(
+            self.decoding.output_type(),
+            schema_definition
+        )]
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -251,26 +265,30 @@ async fn create_consumer(
 }
 
 async fn pulsar_source(
-    consumer: Consumer<String, TokioExecutor>,
+    mut consumer: Consumer<String, TokioExecutor>,
     decoder: Decoder,
     mut shutdown: ShutdownSignal,
     mut out: SourceSender,
     acknowledgements: bool,
+    log_namespace: LogNamespace,
 ) -> Result<(), ()> {
-    let consumer = Arc::new(Mutex::new(consumer));
+    // let consumer = Arc::new(Mutex::new(consumer));
+    // let consumer = Arc::new(consumer);
     let (finalizer, mut ack_stream) =
-        OrderedFinalizer::<FinalizerEntry>::maybe_new(acknowledgements, shutdown.clone());
+        OrderedFinalizer::<FinalizerEntry>::maybe_new(acknowledgements, Some(shutdown.clone()));
 
     let bytes_received = register!(BytesReceived::from(Protocol::TCP));
+    // let events_received = register!(EventsReceived);
+
     loop {
         tokio::select! {
             _ = &mut shutdown => break,
             entry = ack_stream.next() => {
                 if let Some((status, entry)) = entry {
-                    handle_ack(status, entry).await;
+                    handle_ack(&mut consumer, status, entry).await;
                 }
             },
-            Some(maybe_message) = consumer.lock().await.next() => {
+            Some(maybe_message) = consumer.next() => {
                 match maybe_message {
                     Ok(msg) => {
                         bytes_received.emit(ByteSize(msg.payload.data.len()));
@@ -280,20 +298,27 @@ async fn pulsar_source(
                             match next {
                                 Ok((events, _byte_size)) => {
                                     let count = events.len();
-                                    emit!(EventsReceived {
-                                        count,
-                                        byte_size: events.size_of()
-                                    });
+                                    let events_received = register!(EventsReceived);
+                                    events_received.emit(CountByteSize(count, events.size_of().into()));
 
                                     let now = chrono::Utc::now();
 
                                     let events = events.into_iter().map(|mut event| {
                                         if let Event::Log(ref mut log) = event {
-                                            log.try_insert(
-                                                crate::config::log_schema().source_type_key(),
-                                                bytes::Bytes::from("pulsar"),
+                                            log_namespace.insert_standard_vector_source_metadata(
+                                                log,
+                                                PulsarSourceConfig::NAME,
+                                                now,
                                             );
-                                            log.try_insert(crate::config::log_schema().timestamp_key(), now);
+
+                                            // FIXME: demo
+                                            log_namespace.insert_source_metadata(
+                                                PulsarSourceConfig::NAME,
+                                                log,
+                                                Some(LegacyKey::InsertIfEmpty(path!("timestamp"))),
+                                                path!("timestamp"),
+                                                now,
+                                            );
                                         }
                                         event
                                     });
@@ -313,7 +338,7 @@ async fn pulsar_source(
                         }
                         }.boxed();
 
-                        finalize_event_stream(consumer.clone(), &finalizer, &mut out, stream, msg.clone()).await;
+                        finalize_event_stream(&mut consumer, &finalizer, &mut out, stream,msg.topic.clone(), msg.message_id().clone()).await;
                     }
                     Err(error) => {
                         emit!(PulsarReadError { error })
@@ -328,11 +353,12 @@ async fn pulsar_source(
 
 /// Send the event stream created by the framed read to the `out` stream.
 async fn finalize_event_stream(
-    consumer: Arc<Mutex<Consumer<String, TokioExecutor>>>,
+    consumer: &mut Consumer<String, TokioExecutor>,
     finalizer: &Option<OrderedFinalizer<FinalizerEntry>>,
     out: &mut SourceSender,
     mut stream: std::pin::Pin<Box<dyn futures_util::Stream<Item = Event> + Send + '_>>,
-    message: pulsar::consumer::Message<std::string::String>,
+    topic:String,
+    message_id: MessageIdData,
 ) {
     match finalizer {
         Some(finalizer) => {
@@ -340,20 +366,20 @@ async fn finalize_event_stream(
             let mut stream = stream.map(|event| event.with_batch_notifier(&batch));
 
             match out.send_event_stream(&mut stream).await {
-                Err(error) => {
-                    emit!(StreamClosedError { error, count: 1 });
+                Err(_error) => {
+                    emit!(StreamClosedError { count: 1 });
                 }
                 Ok(_) => {
-                    finalizer.add(FinalizerEntry{ consumer, message }, receiver);
+                    finalizer.add(FinalizerEntry{ topic, message_id }, receiver);
                 }
             }
         }
         None => match out.send_event_stream(&mut stream).await {
-            Err(error) => {
-                emit!(StreamClosedError { error, count: 1 });
+            Err(_error) => {
+                emit!(StreamClosedError { count: 1 });
             }
             Ok(_) => {
-                if let Err(error) = consumer.lock().await.ack(&message).await {
+                if let Err(error) = consumer.ack_with_id(topic.as_str(),message_id).await {
                     emit!(PulsarAcknowledgmentError { error });
                 }
             }
@@ -361,20 +387,20 @@ async fn finalize_event_stream(
     }
 }
 
-async fn handle_ack(status: BatchStatus, entry: FinalizerEntry) {
+async fn handle_ack(consumer:&mut Consumer<String, TokioExecutor>,status: BatchStatus, entry: FinalizerEntry) {
     match status {
         BatchStatus::Delivered => {
-            if let Err(error) = entry.consumer.lock().await.ack(&entry.message).await {
+            if let Err(error) = consumer.ack_with_id(entry.topic.as_str(),entry.message_id).await {
                 emit!(PulsarAcknowledgmentError { error });
             }
         }
         BatchStatus::Errored => {
-            if let Err(error) = entry.consumer.lock().await.nack(&entry.message).await {
+            if let Err(error) = consumer.nack_with_id(entry.topic.as_str(),entry.message_id).await {
                 emit!(PulsarNegativeAcknowledgmentError { error });
             }
         }
         BatchStatus::Rejected => {
-            if let Err(error) = entry.consumer.lock().await.nack(&entry.message).await {
+            if let Err(error) = consumer.nack_with_id(entry.topic.as_str(),entry.message_id).await {
                 emit!(PulsarNegativeAcknowledgmentError { error });
             }
         }
