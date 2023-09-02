@@ -42,16 +42,20 @@ use vrl::value::Kind;
 #[serde(deny_unknown_fields)]
 pub struct PulsarSourceConfig {
     /// The endpoint to which the Pulsar client should connect to.
+    #[configurable(metadata(docs::examples = "pulsar://127.0.0.1:6650"))]
     #[serde(alias = "address")]
     endpoint: String,
 
     /// The Pulsar topic names to read events from.
+    #[configurable(metadata(docs::examples = "[persistent://public/default/my-topic]"))]
     topics: Vec<String>,
 
     /// The Pulsar consumer name.
+    #[configurable(metadata(docs::examples = "consumer-name"))]
     consumer_name: Option<String>,
 
     /// The Pulsar subscription name.
+    #[configurable(metadata(docs::examples = "subscription_name"))]
     subscription_name: Option<String>,
 
     /// Priority level for a consumer to which a broker gives more priority while dispatching messages in Shared subscription type.
@@ -98,12 +102,16 @@ struct AuthConfig {
     ///
     /// This can be used either for basic authentication (username/password) or JWT authentication.
     /// When used for JWT, the value should be `token`.
+    #[configurable(metadata(docs::examples = "${PULSAR_NAME}"))]
+    #[configurable(metadata(docs::examples = "name123"))]
     name: Option<String>,
 
     /// Basic authentication password/token.
     ///
     /// This can be used either for basic authentication (username/password) or JWT authentication.
     /// When used for JWT, the value should be the signed JWT, in the compact representation.
+    #[configurable(metadata(docs::examples = "${PULSAR_TOKEN}"))]
+    #[configurable(metadata(docs::examples = "123456789"))]
     token: Option<SensitiveString>,
 
     #[configurable(derived)]
@@ -115,17 +123,26 @@ struct AuthConfig {
 #[derive(Clone, Debug)]
 pub struct OAuth2Config {
     /// The issuer URL.
+    #[configurable(metadata(docs::examples = "${OAUTH2_ISSUER_URL}"))]
+    #[configurable(metadata(docs::examples = "https://oauth2.issuer"))]
     issuer_url: String,
 
     /// The credentials URL.
     ///
     /// A data URL is also supported.
+    #[configurable(metadata(docs::examples = "{OAUTH2_CREDENTIALS_URL}"))]
+    #[configurable(metadata(docs::examples = "file:///oauth2_credentials"))]
+    #[configurable(metadata(docs::examples = "data:application/json;base64,cHVsc2FyCg=="))]
     credentials_url: String,
 
     /// The OAuth2 audience.
+    #[configurable(metadata(docs::examples = "${OAUTH2_AUDIENCE}"))]
+    #[configurable(metadata(docs::examples = "pulsar"))]
     audience: Option<String>,
 
     /// The OAuth2 scope.
+    #[configurable(metadata(docs::examples = "${OAUTH2_SCOPE}"))]
+    #[configurable(metadata(docs::examples = "admin"))]
     scope: Option<String>,
 }
 
