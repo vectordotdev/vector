@@ -171,7 +171,7 @@ impl SourceConfig for PulsarSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let log_namespace = cx.log_namespace(self.log_namespace);
 
-        let consumer = create_consumer(self).await?;
+        let consumer = self.create_consumer().await?;
         let decoder = DecodingConfig::new(
             self.framing.clone(),
             self.decoding.clone(),
@@ -215,70 +215,72 @@ impl SourceConfig for PulsarSourceConfig {
     }
 }
 
-async fn create_consumer(
-    config: &PulsarSourceConfig,
-) -> crate::Result<pulsar::consumer::Consumer<String, TokioExecutor>> {
-    let mut builder = Pulsar::builder(&config.endpoint, TokioExecutor);
-
-    if let Some(auth) = &config.auth {
-        builder = match (
-            auth.name.as_ref(),
-            auth.token.as_ref(),
-            auth.oauth2.as_ref(),
-        ) {
-            (Some(name), Some(token), None) => builder.with_auth(Authentication {
-                name: name.clone(),
-                data: token.inner().as_bytes().to_vec(),
-            }),
-            (None, None, Some(oauth2)) => {
-                builder.with_auth_provider(OAuth2Authentication::client_credentials(OAuth2Params {
-                    issuer_url: oauth2.issuer_url.clone(),
-                    credentials_url: oauth2.credentials_url.clone(),
-                    audience: oauth2.audience.clone(),
-                    scope: oauth2.scope.clone(),
-                }))
-            }
-            _ => return Err(Box::new(pulsar::error::Error::Authentication(
-                AuthenticationError::Custom(
-                    "Invalid auth config: can only specify name and token or oauth2 configuration"
-                        .to_string(),
-                ),
-            ))),
-        };
-    }
-
-    let pulsar = builder.build().await?;
-
-    let mut consumer_builder = pulsar
-        .consumer()
-        .with_topics(&config.topics)
-        .with_subscription_type(SubType::Shared)
-        .with_options(pulsar::consumer::ConsumerOptions {
-            priority_level: config.priority_level,
-            ..Default::default()
-        });
-
-    if let Some(dead_letter_queue_policy) = &config.dead_letter_queue_policy {
-        consumer_builder =
-            consumer_builder.with_dead_letter_policy(pulsar::consumer::DeadLetterPolicy {
-                max_redeliver_count: dead_letter_queue_policy.max_redeliver_count,
-                dead_letter_topic: dead_letter_queue_policy.dead_letter_topic.clone(),
+impl PulsarSourceConfig {
+    async fn create_consumer(
+        &self,
+    ) -> crate::Result<pulsar::consumer::Consumer<String, TokioExecutor>> {
+        let mut builder = Pulsar::builder(&self.endpoint, TokioExecutor);
+    
+        if let Some(auth) = &self.auth {
+            builder = match (
+                auth.name.as_ref(),
+                auth.token.as_ref(),
+                auth.oauth2.as_ref(),
+            ) {
+                (Some(name), Some(token), None) => builder.with_auth(Authentication {
+                    name: name.clone(),
+                    data: token.inner().as_bytes().to_vec(),
+                }),
+                (None, None, Some(oauth2)) => {
+                    builder.with_auth_provider(OAuth2Authentication::client_credentials(OAuth2Params {
+                        issuer_url: oauth2.issuer_url.clone(),
+                        credentials_url: oauth2.credentials_url.clone(),
+                        audience: oauth2.audience.clone(),
+                        scope: oauth2.scope.clone(),
+                    }))
+                }
+                _ => return Err(Box::new(pulsar::error::Error::Authentication(
+                    AuthenticationError::Custom(
+                        "Invalid auth config: can only specify name and token or oauth2 configuration"
+                            .to_string(),
+                    ),
+                ))),
+            };
+        }
+    
+        let pulsar = builder.build().await?;
+    
+        let mut consumer_builder = pulsar
+            .consumer()
+            .with_topics(&self.topics)
+            .with_subscription_type(SubType::Shared)
+            .with_options(pulsar::consumer::ConsumerOptions {
+                priority_level: self.priority_level,
+                ..Default::default()
             });
+    
+        if let Some(dead_letter_queue_policy) = &self.dead_letter_queue_policy {
+            consumer_builder =
+                consumer_builder.with_dead_letter_policy(pulsar::consumer::DeadLetterPolicy {
+                    max_redeliver_count: dead_letter_queue_policy.max_redeliver_count,
+                    dead_letter_topic: dead_letter_queue_policy.dead_letter_topic.clone(),
+                });
+        }
+    
+        if let Some(batch_size) = self.batch_size {
+            consumer_builder = consumer_builder.with_batch_size(batch_size);
+        }
+        if let Some(consumer_name) = &self.consumer_name {
+            consumer_builder = consumer_builder.with_consumer_name(consumer_name);
+        }
+        if let Some(subscription_name) = &self.subscription_name {
+            consumer_builder = consumer_builder.with_subscription(subscription_name);
+        }
+    
+        let consumer = consumer_builder.build::<String>().await?;
+    
+        Ok(consumer)
     }
-
-    if let Some(batch_size) = config.batch_size {
-        consumer_builder = consumer_builder.with_batch_size(batch_size);
-    }
-    if let Some(consumer_name) = &config.consumer_name {
-        consumer_builder = consumer_builder.with_consumer_name(consumer_name);
-    }
-    if let Some(subscription_name) = &config.subscription_name {
-        consumer_builder = consumer_builder.with_subscription(subscription_name);
-    }
-
-    let consumer = consumer_builder.build::<String>().await?;
-
-    Ok(consumer)
 }
 
 async fn pulsar_source(
@@ -468,7 +470,7 @@ mod integration_tests {
             .await
             .unwrap();
 
-        let consumer = create_consumer(&cnf).await.unwrap();
+        let consumer = cnf.create_consumer().await.unwrap();
         let decoder = DecodingConfig::new(
             cnf.framing.clone(),
             cnf.decoding.clone(),
