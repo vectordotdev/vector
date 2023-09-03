@@ -10,6 +10,7 @@ use codecs::decoding::{DeserializerConfig, FramingConfig};
 use futures_util::StreamExt;
 use lookup::{owned_value_path,path};
 use pulsar::authentication::oauth2::{OAuth2Authentication, OAuth2Params};
+use pulsar::consumer::Message;
 use pulsar::error::AuthenticationError;
 use pulsar::{Authentication, SubType};
 use pulsar::{Consumer, Pulsar, TokioExecutor};
@@ -291,8 +292,6 @@ async fn pulsar_source(
     acknowledgements: bool,
     log_namespace: LogNamespace,
 ) -> Result<(), ()> {
-    // let consumer = Arc::new(Mutex::new(consumer));
-    // let consumer = Arc::new(consumer);
     let (finalizer, mut ack_stream) =
         OrderedFinalizer::<FinalizerEntry>::maybe_new(acknowledgements, Some(shutdown.clone()));
 
@@ -311,53 +310,7 @@ async fn pulsar_source(
                 match maybe_message {
                     Ok(msg) => {
                         bytes_received.emit(ByteSize(msg.payload.data.len()));
-                        let mut stream = FramedRead::new(msg.payload.data.as_ref(), decoder.clone());
-                        let stream = async_stream::stream! {
-                            while let Some(next) = stream.next().await {
-                            match next {
-                                Ok((events, _byte_size)) => {
-                                    let count = events.len();
-                                    let events_received = register!(EventsReceived);
-                                    events_received.emit(CountByteSize(count, events.size_of().into()));
-
-                                    let now = chrono::Utc::now();
-
-                                    let events = events.into_iter().map(|mut event| {
-                                        if let Event::Log(ref mut log) = event {
-                                            log_namespace.insert_standard_vector_source_metadata(
-                                                log,
-                                                PulsarSourceConfig::NAME,
-                                                now,
-                                            );
-
-                                            // FIXME: demo
-                                            log_namespace.insert_source_metadata(
-                                                PulsarSourceConfig::NAME,
-                                                log,
-                                                Some(LegacyKey::InsertIfEmpty(path!("timestamp"))),
-                                                path!("timestamp"),
-                                                now,
-                                            );
-                                        }
-                                        event
-                                    });
-
-                                    for event in events {
-                                        yield event;
-                                    }
-                                }
-                                Err(error) => {
-                                    // Error is logged by `crate::codecs`, no further
-                                    // handling is needed here.
-                                    if !error.can_continue() {
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-                        }.boxed();
-
-                        finalize_event_stream(&mut consumer, &finalizer, &mut out, stream,msg.topic.clone(), msg.message_id().clone()).await;
+                        parse_message(msg,&decoder,&finalizer,&mut out,&mut consumer,log_namespace).await;
                     }
                     Err(error) => {
                         emit!(PulsarReadError { error })
@@ -368,6 +321,63 @@ async fn pulsar_source(
     }
 
     Ok(())
+}
+
+async fn parse_message(
+    msg: Message<String>,
+    decoder: &Decoder,
+    finalizer: &Option<OrderedFinalizer<FinalizerEntry>>,
+    out: &mut SourceSender,
+    consumer: &mut Consumer<String, TokioExecutor>,
+    log_namespace: LogNamespace,
+) {
+    let mut stream = FramedRead::new(msg.payload.data.as_ref(), decoder.clone());
+    let stream = async_stream::stream! {
+        while let Some(next) = stream.next().await {
+            match next {
+                Ok((events, _byte_size)) => {
+                    let count = events.len();
+                    let events_received = register!(EventsReceived);
+                    events_received.emit(CountByteSize(count, events.size_of().into()));
+
+                    let now = chrono::Utc::now();
+
+                    let events = events.into_iter().map(|mut event| {
+                        if let Event::Log(ref mut log) = event {
+                            log_namespace.insert_standard_vector_source_metadata(
+                                log,
+                                PulsarSourceConfig::NAME,
+                                now,
+                            );
+
+                            // FIXME: demo
+                            log_namespace.insert_source_metadata(
+                                PulsarSourceConfig::NAME,
+                                log,
+                                Some(LegacyKey::InsertIfEmpty(path!("timestamp"))),
+                                path!("timestamp"),
+                                now,
+                            );
+                        }
+                        event
+                    });
+
+                    for event in events {
+                        yield event;
+                    }
+                }
+                Err(error) => {
+                    // Error is logged by `crate::codecs`, no further
+                    // handling is needed here.
+                    if !error.can_continue() {
+                        break;
+                    }
+                }
+            }
+        }
+    }.boxed();
+
+    finalize_event_stream(consumer, &finalizer, out, stream,msg.topic.clone(), msg.message_id().clone()).await;
 }
 
 /// Send the event stream created by the framed read to the `out` stream.
