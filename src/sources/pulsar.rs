@@ -6,6 +6,7 @@ use crate::internal_events::StreamClosedError;
 use crate::internal_events::{EventsReceived, PulsarAcknowledgmentError, PulsarNegativeAcknowledgmentError};
 use crate::serde::{bool_or_struct, default_decoding, default_framing_message_based};
 use crate::SourceSender;
+use chrono::TimeZone;
 use codecs::decoding::{DeserializerConfig, FramingConfig};
 use futures_util::StreamExt;
 use lookup::{owned_value_path,path};
@@ -200,10 +201,22 @@ impl SourceConfig for PulsarSourceConfig {
             .with_standard_vector_source_metadata()
             .with_source_metadata(
                 Self::NAME,
-                Some(LegacyKey::InsertIfEmpty(owned_value_path!("timestamp"))),
-                &owned_value_path!("timestamp"),
+                Some(LegacyKey::InsertIfEmpty(owned_value_path!("publish_time"))),
+                &owned_value_path!("publish_time"),
                 Kind::timestamp(),
-                Some("timestamp"),
+                Some("publish_time"),
+            ).with_source_metadata(
+                Self::NAME,
+                Some(LegacyKey::InsertIfEmpty(owned_value_path!("topic"))),
+                &owned_value_path!("topic"),
+                Kind::bytes(),
+                Some("topic"),
+            ).with_source_metadata(
+                Self::NAME,
+                Some(LegacyKey::InsertIfEmpty(owned_value_path!("producer_name"))),
+                &owned_value_path!("producer_name"),
+                Kind::bytes(),
+                Some("producer_name"),
             );
         vec![SourceOutput::new_logs(
             self.decoding.output_type(),
@@ -331,6 +344,12 @@ async fn parse_message(
     consumer: &mut Consumer<String, TokioExecutor>,
     log_namespace: LogNamespace,
 ) {
+    let publish_time = i64::try_from(msg.payload.metadata.publish_time)
+        .ok()
+        .and_then(|millis|chrono::Utc.timestamp_millis_opt(millis).latest());
+    let topic = msg.topic.clone();
+    let producer_name = msg.payload.metadata.producer_name.clone();
+
     let mut stream = FramedRead::new(msg.payload.data.as_ref(), decoder.clone());
     let stream = async_stream::stream! {
         while let Some(next) = stream.next().await {
@@ -350,13 +369,28 @@ async fn parse_message(
                                 now,
                             );
 
-                            // FIXME: demo
                             log_namespace.insert_source_metadata(
                                 PulsarSourceConfig::NAME,
                                 log,
-                                Some(LegacyKey::InsertIfEmpty(path!("timestamp"))),
-                                path!("timestamp"),
-                                now,
+                                Some(LegacyKey::InsertIfEmpty(path!("publish_time"))),
+                                path!("publish_time"),
+                                publish_time,
+                            );
+
+                            log_namespace.insert_source_metadata(
+                                PulsarSourceConfig::NAME,
+                                log,
+                                Some(LegacyKey::InsertIfEmpty(path!("topic"))),
+                                path!("topic"),
+                                topic.clone(),
+                            );
+
+                            log_namespace.insert_source_metadata(
+                                PulsarSourceConfig::NAME,
+                                log,
+                                Some(LegacyKey::InsertIfEmpty(path!("producer_name"))),
+                                path!("producer_name"),
+                                producer_name.clone(),
                             );
                         }
                         event
