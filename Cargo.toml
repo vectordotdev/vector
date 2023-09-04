@@ -503,6 +503,7 @@ sources-logs = [
   "sources-logstash",
   "sources-nats",
   "sources-opentelemetry",
+  "sources-pulsar",
   "sources-file-descriptor",
   "sources-redis",
   "sources-socket",
@@ -559,6 +560,7 @@ sources-postgresql_metrics = ["dep:postgres-openssl", "dep:tokio-postgres"]
 sources-prometheus = ["sources-prometheus-scrape", "sources-prometheus-remote-write"]
 sources-prometheus-scrape = ["dep:prometheus-parser", "sinks-prometheus", "sources-utils-http-client"]
 sources-prometheus-remote-write = ["dep:prometheus-parser", "sinks-prometheus", "sources-utils-http"]
+sources-pulsar = ["dep:apache-avro", "dep:pulsar"]
 sources-redis= ["dep:redis"]
 sources-socket = ["sources-utils-net", "tokio-util/net"]
 sources-splunk_hec = ["dep:roaring"]
@@ -846,7 +848,7 @@ nginx-integration-tests = ["sources-nginx_metrics"]
 opentelemetry-integration-tests = ["sources-opentelemetry"]
 postgresql_metrics-integration-tests = ["sources-postgresql_metrics"]
 prometheus-integration-tests = ["sinks-prometheus", "sources-prometheus", "sinks-influxdb"]
-pulsar-integration-tests = ["sinks-pulsar"]
+pulsar-integration-tests = ["sinks-pulsar", "sources-pulsar"]
 redis-integration-tests = ["sinks-redis", "sources-redis"]
 splunk-integration-tests = ["sinks-splunk_hec"]
 dnstap-integration-tests = ["sources-dnstap", "dep:bollard"]

@@ -71,6 +71,8 @@ pub mod postgresql_metrics;
     feature = "sources-prometheus-remote-write"
 ))]
 pub mod prometheus;
+#[cfg(feature = "sources-pulsar")]
+pub mod pulsar;
 #[cfg(feature = "sources-redis")]
 pub mod redis;
 #[cfg(feature = "sources-socket")]
