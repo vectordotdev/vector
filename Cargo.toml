@@ -214,7 +214,7 @@ rmpv = { version = "1.0.1", default-features = false, features = ["with-serde"],
 # Prost / Protocol Buffers
 prost = { version = "0.11", default-features = false, features = ["std"] }
 prost-reflect = { version = "0.11", default-features = false, optional = true }
-prost-types = { version = "0.11", default-features = false, optional = true }
+prost-types = { version = "0.12", default-features = false, optional = true }
 
 # GCP
 goauth = { version = "0.13.1", optional = true }
