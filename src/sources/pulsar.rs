@@ -356,7 +356,7 @@ async fn parse_message(
                     emit!(PulsarEventsReceived{
                         count: events.len(),
                         byte_size: events.size_of().into(),
-                        topic: &topic.clone().as_str(),
+                        topic: topic.clone().as_str(),
                     });
 
                     let now = chrono::Utc::now();
@@ -411,7 +411,7 @@ async fn parse_message(
         }
     }.boxed();
 
-    finalize_event_stream(consumer, &finalizer, out, stream,msg.topic.clone(), msg.message_id().clone()).await;
+    finalize_event_stream(consumer, finalizer, out, stream,msg.topic.clone(), msg.message_id().clone()).await;
 }
 
 /// Send the event stream created by the framed read to the `out` stream.
@@ -484,6 +484,7 @@ mod tests {
 #[cfg(test)]
 mod integration_tests {
     use super::*;
+    use crate::config::log_schema;
     use crate::test_util::components::{assert_source_compliance, SOURCE_TAGS};
     use crate::test_util::{collect_n, random_string, trace_init};
 
@@ -492,7 +493,29 @@ mod integration_tests {
     }
 
     #[tokio::test]
-    async fn pulsar_happy() {
+    async fn consumes_event_with_acknowledgements() {
+        pulsar_send_receive(true, LogNamespace::Legacy).await;
+    }
+
+    #[tokio::test]
+    async fn consumes_event_with_acknowledgements_vector_namespace() {
+        pulsar_send_receive(true, LogNamespace::Vector).await;
+    }
+
+    #[tokio::test]
+    async fn consumes_event_without_acknowledgements() {
+        pulsar_send_receive(false, LogNamespace::Legacy).await;
+    }
+
+    #[tokio::test]
+    async fn consumes_event_without_acknowledgements_vector_namespace() {
+        pulsar_send_receive(false, LogNamespace::Vector).await;
+    }
+
+    async fn pulsar_send_receive(
+        acknowledgements: bool,
+        log_namespace: LogNamespace,
+    ) {
         trace_init();
 
         let topic = format!("test-{}", random_string(10));
@@ -507,6 +530,8 @@ mod integration_tests {
             dead_letter_queue_policy: None,
             framing: FramingConfig::Bytes,
             decoding: DeserializerConfig::Bytes,
+            acknowledgements: acknowledgements.into(),
+            log_namespace: None,
         };
 
         let pulsar = Pulsar::<TokioExecutor>::builder(&cnf.endpoint, TokioExecutor)
@@ -520,7 +545,8 @@ mod integration_tests {
             cnf.decoding.clone(),
             LogNamespace::Legacy,
         )
-        .build();
+        .build()
+        .unwrap();
 
         let mut producer = pulsar.producer().with_topic(topic).build().await.unwrap();
 
@@ -528,13 +554,19 @@ mod integration_tests {
 
         let events = assert_source_compliance(&SOURCE_TAGS, async move {
             let (tx, rx) = SourceSender::new_test();
-            tokio::spawn(pulsar_source(consumer, decoder, ShutdownSignal::noop(), tx));
+            tokio::spawn(pulsar_source(
+                consumer,
+                decoder,
+                ShutdownSignal::noop(),
+                tx,
+                acknowledgements,
+                log_namespace));
             producer.send(msg).await.unwrap();
 
             collect_n(rx, 1).await
         })
         .await;
 
-        assert_eq!(events[0].as_log()[log_schema().message_key()], msg.into());
+        assert_eq!(events[0].as_log()[log_schema().message_key().unwrap().to_string()], msg.into());
     }
 }
