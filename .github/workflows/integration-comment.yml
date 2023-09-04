@@ -80,7 +80,7 @@ jobs:
     needs: prep-pr
     runs-on: [linux, ubuntu-20.04-4core]
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           submodules: "recursive"
 

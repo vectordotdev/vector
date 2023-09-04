@@ -24,13 +24,13 @@ jobs:
 
       - name: (PR comment) Checkout PR branch
         if: ${{ github.event_name == 'issue_comment' }}
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           ref: ${{ steps.comment-branch.outputs.head_ref }}
 
       - name: Checkout branch
         if: ${{ github.event_name != 'issue_comment' }}
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - run: .\scripts\environment\bootstrap-windows-2019.ps1
       - run: make test
