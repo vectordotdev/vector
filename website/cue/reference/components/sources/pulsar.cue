@@ -6,18 +6,31 @@ components: sources: pulsar: {
 	classes: {
 		commonly_used: false
 		delivery:      "at_least_once"
+		deployment_roles: ["aggregator"]
 		development:   "beta"
 		egress_method: "stream"
-		service_providers: []
 		stateful: false
 	}
 
-	features: {}
+	features: {
+		auto_generated:   true
+		acknowledgements: true
+		multiline: enabled: false
+		codecs: {
+			enabled:         true
+			default_framing: "bytes"
+		}
+		generate: {}
+	}
 
 	support: {
 		requirements: []
 		warnings: []
 		notices: []
+	}
+
+	installation: {
+		platform_name: null
 	}
 
 	configuration: {
@@ -107,10 +120,44 @@ components: sources: pulsar: {
 		}
 	}
 
-	input: {
-		logs:    true
-		metrics: null
-		traces:  false
+	output: logs: record: {
+		description: "An individual Pulsar record"
+		fields: {
+			message: {
+				description: "The raw line from the Kafka record."
+				required:    true
+				type: string: {
+					examples: ["53.126.150.246 - - [01/Oct/2020:11:25:58 -0400] \"GET /disintermediate HTTP/2.0\" 401 20308"]
+				}
+			}
+			source_type: {
+				description: "The name of the source type."
+				required:    true
+				type: string: {
+					examples: ["pulsar"]
+				}
+			}
+			timestamp: fields._current_timestamp & {
+				description: "The current time if it cannot be fetched."
+			}
+			publish_time: fields._current_timestamp & {
+				description: "The timestamp encoded in the Pulsar message."
+			}
+			topic: {
+				description: "The Pulsar topic that the record came from."
+				required:    true
+				type: string: {
+					examples: ["topic"]
+				}
+			}
+			producer_name: {
+				description: "The Pulsar producer's name which the record came from."
+				required:    true
+				type: string: {
+					examples: ["pulsar-client"]
+				}
+			}
+		}
 	}
 
 	telemetry: metrics: {
