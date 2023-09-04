@@ -81,9 +81,9 @@ base: components: sources: pulsar: configuration: {
 		description: """
 			Priority level for a consumer to which a broker gives more priority while dispatching messages in Shared subscription type.
 
-            The broker follows descending priorities. For example, 0=max-priority, 1, 2,...
+			The broker follows descending priorities. For example, 0=max-priority, 1, 2,...
 
-            In Shared subscription type, the broker first dispatches messages to the max priority level consumers if they have permits. Otherwise, the broker considers next priority level consumers.
+			In Shared subscription type, the broker first dispatches messages to the max priority level consumers if they have permits. Otherwise, the broker considers next priority level consumers.
 			"""
 		required: false
 		type:     int
