@@ -1,43 +1,38 @@
 use crate::codecs::{Decoder, DecodingConfig};
 use crate::config::{SourceConfig, SourceContext};
 use crate::event::BatchNotifier;
-use crate::internal_events::{PulsarReadError,PulsarEventsReceived};
 use crate::internal_events::StreamClosedError;
 use crate::internal_events::{PulsarAcknowledgmentError, PulsarNegativeAcknowledgmentError};
+use crate::internal_events::{PulsarEventsReceived, PulsarReadError};
 use crate::serde::{bool_or_struct, default_decoding, default_framing_message_based};
 use crate::SourceSender;
 use chrono::TimeZone;
 use codecs::decoding::{DeserializerConfig, FramingConfig};
+use codecs::StreamDecodingError;
 use futures_util::StreamExt;
-use lookup::{owned_value_path,path};
+use lookup::{owned_value_path, path};
 use pulsar::authentication::oauth2::{OAuth2Authentication, OAuth2Params};
 use pulsar::consumer::Message;
 use pulsar::error::AuthenticationError;
+use pulsar::message::proto::MessageIdData;
 use pulsar::{Authentication, SubType};
 use pulsar::{Consumer, Pulsar, TokioExecutor};
-use pulsar::message::proto::MessageIdData;
 use tokio_util::codec::FramedRead;
 use vector_common::finalization::BatchStatus;
 use vector_common::finalizer::OrderedFinalizer;
 use vector_common::internal_event::ByteSize;
-use vector_common::internal_event::{
-    BytesReceived, InternalEventHandle as _, Protocol,
-};
+use vector_common::internal_event::{BytesReceived, InternalEventHandle as _, Protocol};
 use vector_common::sensitive_string::SensitiveString;
 use vector_common::shutdown::ShutdownSignal;
 use vector_config_macros::configurable_component;
-use vector_core::config::{LegacyKey, LogNamespace, SourceOutput, SourceAcknowledgementsConfig};
+use vector_core::config::{LegacyKey, LogNamespace, SourceAcknowledgementsConfig, SourceOutput};
 use vector_core::event::Event;
-use codecs::StreamDecodingError;
 use vector_core::ByteSizeOf;
 
 use vrl::value::Kind;
 
 /// Configuration for the `pulsar` source.
-#[configurable_component(source(
-    "pulsar",
-    "Collect logs from Apache Pulsar."
-))]
+#[configurable_component(source("pulsar", "Collect logs from Apache Pulsar."))]
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(deny_unknown_fields)]
@@ -160,7 +155,7 @@ struct DeadLetterQueuePolicy {
 
 #[derive(Debug)]
 struct FinalizerEntry {
-    topic:String,
+    topic: String,
     message_id: MessageIdData,
 }
 
@@ -173,12 +168,9 @@ impl SourceConfig for PulsarSourceConfig {
         let log_namespace = cx.log_namespace(self.log_namespace);
 
         let consumer = self.create_consumer().await?;
-        let decoder = DecodingConfig::new(
-            self.framing.clone(),
-            self.decoding.clone(),
-            log_namespace,
-        )
-        .build()?;
+        let decoder =
+            DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace)
+                .build()?;
         let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
 
         Ok(Box::pin(pulsar_source(
@@ -204,13 +196,15 @@ impl SourceConfig for PulsarSourceConfig {
                 &owned_value_path!("publish_time"),
                 Kind::timestamp(),
                 Some("publish_time"),
-            ).with_source_metadata(
+            )
+            .with_source_metadata(
                 Self::NAME,
                 Some(LegacyKey::InsertIfEmpty(owned_value_path!("topic"))),
                 &owned_value_path!("topic"),
                 Kind::bytes(),
                 Some("topic"),
-            ).with_source_metadata(
+            )
+            .with_source_metadata(
                 Self::NAME,
                 Some(LegacyKey::InsertIfEmpty(owned_value_path!("producer_name"))),
                 &owned_value_path!("producer_name"),
@@ -219,7 +213,7 @@ impl SourceConfig for PulsarSourceConfig {
             );
         vec![SourceOutput::new_logs(
             self.decoding.output_type(),
-            schema_definition
+            schema_definition,
         )]
     }
 
@@ -233,7 +227,7 @@ impl PulsarSourceConfig {
         &self,
     ) -> crate::Result<pulsar::consumer::Consumer<String, TokioExecutor>> {
         let mut builder = Pulsar::builder(&self.endpoint, TokioExecutor);
-    
+
         if let Some(auth) = &self.auth {
             builder = match (
                 auth.name.as_ref(),
@@ -260,9 +254,9 @@ impl PulsarSourceConfig {
                 ))),
             };
         }
-    
+
         let pulsar = builder.build().await?;
-    
+
         let mut consumer_builder = pulsar
             .consumer()
             .with_topics(&self.topics)
@@ -271,7 +265,7 @@ impl PulsarSourceConfig {
                 priority_level: self.priority_level,
                 ..Default::default()
             });
-    
+
         if let Some(dead_letter_queue_policy) = &self.dead_letter_queue_policy {
             consumer_builder =
                 consumer_builder.with_dead_letter_policy(pulsar::consumer::DeadLetterPolicy {
@@ -279,7 +273,7 @@ impl PulsarSourceConfig {
                     dead_letter_topic: dead_letter_queue_policy.dead_letter_topic.clone(),
                 });
         }
-    
+
         if let Some(batch_size) = self.batch_size {
             consumer_builder = consumer_builder.with_batch_size(batch_size);
         }
@@ -289,9 +283,9 @@ impl PulsarSourceConfig {
         if let Some(subscription_name) = &self.subscription_name {
             consumer_builder = consumer_builder.with_subscription(subscription_name);
         }
-    
+
         let consumer = consumer_builder.build::<String>().await?;
-    
+
         Ok(consumer)
     }
 }
@@ -344,7 +338,7 @@ async fn parse_message(
 ) {
     let publish_time = i64::try_from(msg.payload.metadata.publish_time)
         .ok()
-        .and_then(|millis|chrono::Utc.timestamp_millis_opt(millis).latest());
+        .and_then(|millis| chrono::Utc.timestamp_millis_opt(millis).latest());
     let topic = msg.topic.clone();
     let producer_name = msg.payload.metadata.producer_name.clone();
 
@@ -409,9 +403,18 @@ async fn parse_message(
                 }
             }
         }
-    }.boxed();
+    }
+    .boxed();
 
-    finalize_event_stream(consumer, finalizer, out, stream,msg.topic.clone(), msg.message_id().clone()).await;
+    finalize_event_stream(
+        consumer,
+        finalizer,
+        out,
+        stream,
+        msg.topic.clone(),
+        msg.message_id().clone(),
+    )
+    .await;
 }
 
 /// Send the event stream created by the framed read to the `out` stream.
@@ -420,7 +423,7 @@ async fn finalize_event_stream(
     finalizer: &Option<OrderedFinalizer<FinalizerEntry>>,
     out: &mut SourceSender,
     mut stream: std::pin::Pin<Box<dyn futures_util::Stream<Item = Event> + Send + '_>>,
-    topic:String,
+    topic: String,
     message_id: MessageIdData,
 ) {
     match finalizer {
@@ -433,7 +436,7 @@ async fn finalize_event_stream(
                     emit!(StreamClosedError { count: 1 });
                 }
                 Ok(_) => {
-                    finalizer.add(FinalizerEntry{ topic, message_id }, receiver);
+                    finalizer.add(FinalizerEntry { topic, message_id }, receiver);
                 }
             }
         }
@@ -442,7 +445,7 @@ async fn finalize_event_stream(
                 emit!(StreamClosedError { count: 1 });
             }
             Ok(_) => {
-                if let Err(error) = consumer.ack_with_id(topic.as_str(),message_id).await {
+                if let Err(error) = consumer.ack_with_id(topic.as_str(), message_id).await {
                     emit!(PulsarAcknowledgmentError { error });
                 }
             }
@@ -450,20 +453,33 @@ async fn finalize_event_stream(
     }
 }
 
-async fn handle_ack(consumer:&mut Consumer<String, TokioExecutor>,status: BatchStatus, entry: FinalizerEntry) {
+async fn handle_ack(
+    consumer: &mut Consumer<String, TokioExecutor>,
+    status: BatchStatus,
+    entry: FinalizerEntry,
+) {
     match status {
         BatchStatus::Delivered => {
-            if let Err(error) = consumer.ack_with_id(entry.topic.as_str(),entry.message_id).await {
+            if let Err(error) = consumer
+                .ack_with_id(entry.topic.as_str(), entry.message_id)
+                .await
+            {
                 emit!(PulsarAcknowledgmentError { error });
             }
         }
         BatchStatus::Errored => {
-            if let Err(error) = consumer.nack_with_id(entry.topic.as_str(),entry.message_id).await {
+            if let Err(error) = consumer
+                .nack_with_id(entry.topic.as_str(), entry.message_id)
+                .await
+            {
                 emit!(PulsarNegativeAcknowledgmentError { error });
             }
         }
         BatchStatus::Rejected => {
-            if let Err(error) = consumer.nack_with_id(entry.topic.as_str(),entry.message_id).await {
+            if let Err(error) = consumer
+                .nack_with_id(entry.topic.as_str(), entry.message_id)
+                .await
+            {
                 emit!(PulsarNegativeAcknowledgmentError { error });
             }
         }
@@ -512,10 +528,7 @@ mod integration_tests {
         pulsar_send_receive(false, LogNamespace::Vector).await;
     }
 
-    async fn pulsar_send_receive(
-        acknowledgements: bool,
-        log_namespace: LogNamespace,
-    ) {
+    async fn pulsar_send_receive(acknowledgements: bool, log_namespace: LogNamespace) {
         trace_init();
 
         let topic = format!("test-{}", random_string(10));
@@ -560,13 +573,17 @@ mod integration_tests {
                 ShutdownSignal::noop(),
                 tx,
                 acknowledgements,
-                log_namespace));
+                log_namespace,
+            ));
             producer.send(msg).await.unwrap();
 
             collect_n(rx, 1).await
         })
         .await;
 
-        assert_eq!(events[0].as_log()[log_schema().message_key().unwrap().to_string()], msg.into());
+        assert_eq!(
+            events[0].as_log()[log_schema().message_key().unwrap().to_string()],
+            msg.into()
+        );
     }
 }

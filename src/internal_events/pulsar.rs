@@ -3,10 +3,10 @@ use pulsar::error::ConsumerError;
 use vector_core::internal_event::InternalEvent;
 
 use crate::emit;
-use vector_common::json_size::JsonSize;
 use vector_common::internal_event::{
     error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL,
 };
+use vector_common::json_size::JsonSize;
 
 #[derive(Debug)]
 pub struct PulsarSendingError {
