@@ -1,9 +1,9 @@
 use crate::codecs::{Decoder, DecodingConfig};
 use crate::config::{SourceConfig, SourceContext};
 use crate::event::BatchNotifier;
-use crate::internal_events::PulsarReadError;
+use crate::internal_events::{PulsarReadError,PulsarEventsReceived};
 use crate::internal_events::StreamClosedError;
-use crate::internal_events::{EventsReceived, PulsarAcknowledgmentError, PulsarNegativeAcknowledgmentError};
+use crate::internal_events::{PulsarAcknowledgmentError, PulsarNegativeAcknowledgmentError};
 use crate::serde::{bool_or_struct, default_decoding, default_framing_message_based};
 use crate::SourceSender;
 use chrono::TimeZone;
@@ -21,7 +21,6 @@ use vector_common::finalization::BatchStatus;
 use vector_common::finalizer::OrderedFinalizer;
 use vector_common::internal_event::ByteSize;
 use vector_common::internal_event::{
-    CountByteSize,
     BytesReceived, InternalEventHandle as _, Protocol,
 };
 use vector_common::sensitive_string::SensitiveString;
@@ -309,7 +308,6 @@ async fn pulsar_source(
         OrderedFinalizer::<FinalizerEntry>::maybe_new(acknowledgements, Some(shutdown.clone()));
 
     let bytes_received = register!(BytesReceived::from(Protocol::TCP));
-    // let events_received = register!(EventsReceived);
 
     loop {
         tokio::select! {
@@ -355,9 +353,11 @@ async fn parse_message(
         while let Some(next) = stream.next().await {
             match next {
                 Ok((events, _byte_size)) => {
-                    let count = events.len();
-                    let events_received = register!(EventsReceived);
-                    events_received.emit(CountByteSize(count, events.size_of().into()));
+                    emit!(PulsarEventsReceived{
+                        count: events.len(),
+                        byte_size: events.size_of().into(),
+                        topic: &topic.clone().as_str(),
+                    });
 
                     let now = chrono::Utc::now();
 
