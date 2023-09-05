@@ -45,18 +45,28 @@ impl Cli {
             (Some(environment), Some(active)) if environment != active => {
                 bail!("Requested environment {environment:?} does not match active one {active:?}")
             }
-            (Some(environment), _) => {
-                IntegrationTest::new(self.integration, environment, self.build_all, retries)?
-                    .test(self.args)
-            }
+            (Some(environment), _) => IntegrationTest::new(
+                self.integration,
+                environment,
+                self.build_all,
+                retries,
+                self.args,
+            )?
+            .test(),
             (None, Some(active)) => {
-                IntegrationTest::new(self.integration, active, self.build_all, retries)?
-                    .test(self.args)
+                IntegrationTest::new(self.integration, active, self.build_all, retries, self.args)?
+                    .test()
             }
             (None, None) => {
                 for env_name in envs.keys() {
-                    IntegrationTest::new(&self.integration, env_name, self.build_all, retries)?
-                        .test(self.args.clone())?;
+                    IntegrationTest::new(
+                        &self.integration,
+                        env_name,
+                        self.build_all,
+                        retries,
+                        self.args.clone(),
+                    )?
+                    .test()?;
                 }
                 Ok(())
             }

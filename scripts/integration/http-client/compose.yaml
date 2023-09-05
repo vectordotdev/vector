@@ -1,6 +1,10 @@
 version: '3'
 
 services:
+  foo:
+    image: tomgeorge/sleep-infinity:latest
+    depends_on:
+      - runner
   dufs:
     image: docker.io/sigoden/dufs:${CONFIG_VERSION}
     command:
