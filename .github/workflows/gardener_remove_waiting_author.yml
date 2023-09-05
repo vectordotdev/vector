@@ -8,7 +8,7 @@ jobs:
   remove_label:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: actions-ecosystem/action-remove-labels@v1
         with:
           labels: "meta: awaiting author"
