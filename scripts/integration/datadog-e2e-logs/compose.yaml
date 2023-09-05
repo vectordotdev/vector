@@ -24,8 +24,7 @@ services:
     - ../../../tests/data/e2e/datadog/logs/custom_log.log:/var/log/a_custom_log.log
   datadog-agent-vector:
     image: docker.io/datadog/agent:${CONFIG_VERSION}
-    depends_on:
-      - runner
+    # depends_on:
     #   waitforit:
     #     condition: service_healthy
     environment:
@@ -50,10 +49,8 @@ services:
   # waitforit:
   #   image: docker.io/debian:buster-slim
   #   command: tail -f /dev/null
-  #   # ports:
-  #   #   - "4321:4321"
   #   healthcheck:
-  #     test: curl -f http://localhost:4321 || exit 1
+  #     test: curl -f http://runner:8181 || exit 1
   #     #test: ["CMD", "curl", "-f", "http://runner:8181", "||", "exit", "1"]
   #     interval: 15s
   #     timeout: 10s

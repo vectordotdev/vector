@@ -6,7 +6,6 @@ use tokio::{
 
 use vector::{
     config::ConfigBuilder,
-    signal::ShutdownError,
     test_util::{start_topology, trace_init},
     topology::RunningTopology,
 };
@@ -15,10 +14,7 @@ use super::*;
 
 async fn start_vector() -> (
     RunningTopology,
-    (
-        mpsc::UnboundedSender<ShutdownError>,
-        mpsc::UnboundedReceiver<ShutdownError>,
-    ),
+    (mpsc::UnboundedSender<()>, mpsc::UnboundedReceiver<()>),
 ) {
     let dd_agent_address = format!("0.0.0.0:{}", vector_receive_port());
 

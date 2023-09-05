@@ -66,16 +66,10 @@ pub struct ComposeService {
     pub volumes: Option<Vec<String>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub environment: Option<Vec<String>>,
-    // #[serde(default, skip_serializing_if = "Option::is_none")]
-    // pub depends_on: Option<Value>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub depends_on: Option<Vec<String>>,
+    pub depends_on: Option<Value>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub healthcheck: Option<Value>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub working_dir: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub labels: Option<Vec<String>>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
