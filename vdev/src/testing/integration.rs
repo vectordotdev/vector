@@ -1,17 +1,14 @@
 use std::{collections::BTreeMap, fs, path::Path, path::PathBuf, process::Command};
 
 use anyhow::{bail, Context, Result};
-use serde_yaml::{Mapping, Value};
+use serde_yaml::{Value, Mapping};
 use tempfile::{Builder, NamedTempFile};
 
 use super::config::{ComposeConfig, ComposeService};
 use super::config::{Environment, IntegrationTestConfig};
 use super::runner::{
     // ContainerTestRunner as _, IntegrationTestRunner, TestRunner as _, CONTAINER_TOOL, DOCKER_SOCKET,
-    ContainerTestRunner as _,
-    IntegrationTestRunner,
-    CONTAINER_TOOL,
-    DOCKER_SOCKET,
+    ContainerTestRunner as _, IntegrationTestRunner, CONTAINER_TOOL, DOCKER_SOCKET,
 };
 use super::state::EnvsDir;
 use crate::app::CommandExt as _;
@@ -47,16 +44,16 @@ impl IntegrationTest {
         };
         let network_name = format!("vector-integration-tests-{integration}");
 
-        let volumes = config
-            .runner
+        let volumes =  config.runner
             .volumes
             .iter()
             .map(|(a, b)| format!("{a}:{b}"))
             .collect();
-
+        
         // None if compiling with all integration test feature flag.
         let runner_name = (!build_all).then(|| integration.clone());
 
+        
         let mut args = config.args.clone().unwrap_or_default();
 
         args.push("--features".to_string());
@@ -92,6 +89,7 @@ impl IntegrationTest {
             args.push(retries.to_string());
         }
 
+        
         let mut env_vars = config.env.clone();
 
         env_vars.extend(config.runner.env.clone());
@@ -104,15 +102,7 @@ impl IntegrationTest {
         env_vars.insert("TEST_LOG".to_string(), Some("info".into()));
 
         println!("new compose");
-        let compose = Compose::new(
-            test_dir,
-            env_config.clone(),
-            network_name.clone(),
-            runner_name.clone(),
-            volumes,
-            &args,
-            env_vars,
-        )?;
+        let compose = Compose::new(test_dir, env_config.clone(), network_name.clone(), runner_name.clone(), volumes, &args, env_vars)?;
 
         println!("int runner");
         let runner = IntegrationTestRunner::new(
@@ -244,7 +234,7 @@ struct Compose {
     config: ComposeConfig,
     network: String,
     temp_file: NamedTempFile,
-    //args: Vec<String>,
+    args: Vec<String>,
 }
 const MOUNT_PATH: &str = "/home/vector";
 const TARGET_PATH: &str = "/home/target";
@@ -252,24 +242,22 @@ const VOLUME_TARGET: &str = "vector_target";
 const VOLUME_CARGO_GIT: &str = "vector_cargo_git";
 const VOLUME_CARGO_REGISTRY: &str = "vector_cargo_registry";
 
-fn default_runner_block(
-    runner_name: Option<String>,
-    mut other_volumes: Vec<String>,
-    dep_on_services: Option<Vec<String>>,
-    args: &[String],
-    env: Environment,
-) -> ComposeService {
-    //let command = vec!["/bin/sleep".to_string(), "infinity".to_string()];
+fn default_runner_block(runner_name: Option<String>, mut other_volumes: Vec<String>, dep_on_services: Option<Vec<String>>, _args: &[String], env: Environment) -> ComposeService {
 
-    let mut command = vec![
-        "cargo".to_string(),
-        "nextest".to_string(),
-        "run".to_string(),
-        "--no-fail-fast".to_string(),
-        "--no-default-features".to_string(),
+    let command = vec![
+        "/bin/sleep".to_string(),
+        "infinity".to_string(),
     ];
 
-    command.extend_from_slice(args);
+    // let mut command = vec![
+    //     "cargo".to_string(),
+    //     "nextest".to_string(),
+    //     "run".to_string(),
+    //     "--no-fail-fast".to_string(),
+    //     "--no-default-features".to_string(),
+    // ];
+
+    // command.extend_from_slice(args);
 
     let mut volumes = vec![
         format!("{}:{MOUNT_PATH}", crate::app::path()),
@@ -282,12 +270,12 @@ fn default_runner_block(
 
     let mut environment = vec![];
 
-    for (key, value) in env {
-        match value {
-            Some(value) => environment.push(format!("{key}={value}")),
-            None => println!("got inner env key: {key}"),
+        for (key, value) in env {
+            match value {
+                Some(value) => environment.push(format!("{key}={value}")),
+                None => println!("got inner env key: {key}"),
+            }
         }
-    }
     let environment = if environment.len() > 0 {
         Some(environment)
     } else {
@@ -300,31 +288,19 @@ fn default_runner_block(
         // hostname: Some("runner".to_string()),
         container_name: Some(container_name(runner_name)),
         build: Some(Value::Mapping(Mapping::from_iter([
-            (
-                Value::String("context".to_string()),
-                Value::String("${PWD}".to_string()),
-            ),
-            (
-                Value::String("dockerfile".to_string()),
-                Value::String("scripts/integration/Dockerfile".to_string()),
-            ),
-            (
-                Value::String("args".to_string()),
-                Value::Sequence(vec![Value::String(format!(
-                    "RUST_VERSION={}",
-                    super::get_rust_version()
-                ))]),
-            ),
+            (Value::String("context".to_string()), Value::String("${PWD}".to_string())),
+            (Value::String("dockerfile".to_string()), Value::String("scripts/integration/Dockerfile".to_string())),
+            (Value::String("args".to_string()), Value::Sequence(vec![Value::String(format!("RUST_VERSION={}", super::get_rust_version())) ] ) )
         ]))),
         command: Some(super::config::Command::Multiple(command)),
         ports: None,
         env_file: None,
         volumes: Some(volumes),
-        environment,
+        environment: environment,
         depends_on: dep_on_services,
         healthcheck: None,
         working_dir: Some("/home/vector".to_string()),
-        labels: Some(vec!["vector-test-runner=true".to_string()]),
+        labels: Some(vec!["vector-test-runner=true".to_string()])
     }
     // BTreeMap::from_iter([
     //     (
@@ -360,15 +336,7 @@ fn container_name(runner_name: Option<String>) -> String {
 // }
 
 impl Compose {
-    fn new(
-        test_dir: PathBuf,
-        env: Environment,
-        network: String,
-        runner_name: Option<String>,
-        volumes: Vec<String>,
-        args: &[String],
-        runner_env: Environment,
-    ) -> Result<Option<Self>> {
+    fn new(test_dir: PathBuf, env: Environment, network: String, runner_name: Option<String>, volumes: Vec<String>, args: &[String], runner_env: Environment) -> Result<Option<Self>> {
         let original_path: PathBuf = [&test_dir, Path::new("compose.yaml")].iter().collect();
 
         match original_path.try_exists() {
@@ -394,6 +362,7 @@ impl Compose {
                                 is_runner_dep = true;
                             }
                         }
+                        
                     }
                     if !is_runner_dep {
                         runner_dep_on_services.push(name.to_string());
@@ -407,32 +376,18 @@ impl Compose {
                 } else {
                     Some(runner_dep_on_services)
                 };
+                
 
                 // Inject the runner block to the services
-                config.services.insert(
-                    "runner".to_string(),
-                    default_runner_block(
-                        runner_name,
-                        volumes,
-                        runner_dep_on_services,
-                        args,
-                        runner_env,
-                    ),
-                );
+                config
+                    .services
+                    .insert("runner".to_string(), default_runner_block(runner_name, volumes, runner_dep_on_services, args, runner_env));
 
                 // Inject the volumes
-                config
-                    .volumes
-                    .insert("vector_target".to_string(), Value::Mapping(Mapping::new()));
+                config.volumes.insert("vector_target".to_string(), Value::Mapping(Mapping::new()));
 
-                config.volumes.insert(
-                    "vector_cargo_git".to_string(),
-                    Value::Mapping(Mapping::new()),
-                );
-                config.volumes.insert(
-                    "vector_cargo_registry".to_string(),
-                    Value::Mapping(Mapping::new()),
-                );
+                config.volumes.insert("vector_cargo_git".to_string(), Value::Mapping(Mapping::new()));
+                config.volumes.insert("vector_cargo_registry".to_string(), Value::Mapping(Mapping::new()));
 
                 // Create a named tempfile, there may be resource leakage here in case of SIGINT
                 // Tried tempfile::tempfile() but this returns a File object without a usable path
@@ -455,7 +410,7 @@ impl Compose {
                         .with_context(|| "Failed to serialize modified compose.yaml")?,
                 )?;
 
-                //let args = Vec::from(args);
+                let args = Vec::from(args);
 
                 Ok(Some(Self {
                     original_path,
@@ -464,7 +419,7 @@ impl Compose {
                     config,
                     network,
                     temp_file,
-                    //args,
+                    args,
                 }))
             }
         }
@@ -472,55 +427,31 @@ impl Compose {
 
     fn start(&self, config: &Environment) -> Result<()> {
         self.prepare()?;
-        self.command("Building", &vec!["build".to_string()], Some(config))
-        //self.command(
-        //    "Starting",
-        //    &vec!["up".to_string(), "--detach".to_string()],
-        //    Some(config),
-        //)
+        self.command("Building", &vec!["build".to_string()], Some(config))?;
+        self.command("Starting", &vec!["up".to_string(), "--detach".to_string()], Some(config))
     }
-
+    
     fn run(&self, config: &Environment) -> Result<()> {
-        self.command(
-            "Starting",
-            &vec!["up".to_string(), "--detach".to_string()],
-            Some(config),
-        )
-        //let mut args = vec![
-        //    "run".to_string(),
-        //    "runner".to_string(),
-        //    "cargo".to_string(),
-        //    "nextest".to_string(),
-        //    "run".to_string(),
-        //    "--no-fail-fast".to_string(),
-        //    "--no-default-features".to_string(),
-        //];
-        //args.extend(self.args.clone());
 
-        //self.command("Starting", &args, Some(config))
+        let mut args = vec!["run".to_string(), "runner".to_string(),
+            "cargo".to_string(),
+            "nextest".to_string(),
+            "run".to_string(),
+            "--no-fail-fast".to_string(),
+            "--no-default-features".to_string(),
+        ];
+        args.extend(self.args.clone());
+        
+        self.command("Starting", &args, Some(config))
     }
 
     fn stop(&self, config: &Environment) -> Result<()> {
         // The config settings are not needed when stopping a compose setup.
-        self.command(
-            "Stopping",
-            &vec![
-                "down".to_string(),
-                "--timeout".to_string(),
-                "0".to_string(),
-                "--volumes".to_string(),
-            ],
-            Some(config),
-        )
+        self.command("Stopping", &vec!["down".to_string(), "--timeout".to_string(), "0".to_string(), "--volumes".to_string()], Some(config))
     }
 
     // fn command(&self, action: &str, args: &[&'static str], config: Option<&Environment>) -> Result<()> {
-    fn command(
-        &self,
-        action: &str,
-        args: &Vec<String>,
-        config: Option<&Environment>,
-    ) -> Result<()> {
+    fn command(&self, action: &str, args: &Vec<String>, config: Option<&Environment>) -> Result<()> {
         let mut command = CONTAINER_TOOL.clone();
         command.push("-compose");
         let mut command = Command::new(command);

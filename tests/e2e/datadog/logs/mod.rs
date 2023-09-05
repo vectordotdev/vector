@@ -74,7 +74,7 @@ async fn test_logs() {
 
     dbg!(&_vector_payloads);
 
-    sleep(Duration::from_secs(300)).await;
+    sleep(Duration::from_secs(90)).await;
 
     assert!(true);
 }
