@@ -3,7 +3,7 @@ use crate::config::{SourceConfig, SourceContext};
 use crate::event::BatchNotifier;
 use crate::internal_events::StreamClosedError;
 use crate::internal_events::{PulsarAcknowledgmentError, PulsarNegativeAcknowledgmentError};
-use crate::internal_events::{PulsarEventsReceived, PulsarReadError};
+use crate::internal_events::PulsarReadError;
 use crate::serde::{bool_or_struct, default_decoding, default_framing_message_based};
 use crate::SourceSender;
 use chrono::TimeZone;
@@ -20,8 +20,9 @@ use pulsar::{Consumer, Pulsar, TokioExecutor};
 use tokio_util::codec::FramedRead;
 use vector_common::finalization::BatchStatus;
 use vector_common::finalizer::OrderedFinalizer;
-use vector_common::internal_event::ByteSize;
-use vector_common::internal_event::{BytesReceived, InternalEventHandle as _, Protocol};
+use vector_common::internal_event::{
+    ByteSize, BytesReceived, CountByteSize, EventsReceived, InternalEventHandle as _, Protocol, Registered
+};
 use vector_common::sensitive_string::SensitiveString;
 use vector_common::shutdown::ShutdownSignal;
 use vector_config_macros::configurable_component;
@@ -302,6 +303,7 @@ async fn pulsar_source(
         OrderedFinalizer::<FinalizerEntry>::maybe_new(acknowledgements, Some(shutdown.clone()));
 
     let bytes_received = register!(BytesReceived::from(Protocol::TCP));
+    let events_received = register!(EventsReceived);
 
     loop {
         tokio::select! {
@@ -315,7 +317,7 @@ async fn pulsar_source(
                 match maybe_message {
                     Ok(msg) => {
                         bytes_received.emit(ByteSize(msg.payload.data.len()));
-                        parse_message(msg,&decoder,&finalizer,&mut out,&mut consumer,log_namespace).await;
+                        parse_message(msg, &decoder, &finalizer,&events_received, &mut out, &mut consumer, log_namespace).await;
                     }
                     Err(error) => {
                         emit!(PulsarReadError { error })
@@ -332,6 +334,7 @@ async fn parse_message(
     msg: Message<String>,
     decoder: &Decoder,
     finalizer: &Option<OrderedFinalizer<FinalizerEntry>>,
+    events_received: &Registered<EventsReceived>,
     out: &mut SourceSender,
     consumer: &mut Consumer<String, TokioExecutor>,
     log_namespace: LogNamespace,
@@ -347,11 +350,10 @@ async fn parse_message(
         while let Some(next) = stream.next().await {
             match next {
                 Ok((events, _byte_size)) => {
-                    emit!(PulsarEventsReceived{
-                        count: events.len(),
-                        byte_size: events.size_of().into(),
-                        topic: topic.clone().as_str(),
-                    });
+                    events_received.emit(CountByteSize(
+                        events.len(),
+                        events.size_of().into(),
+                    ));
 
                     let now = chrono::Utc::now();
 

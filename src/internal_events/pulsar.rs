@@ -6,7 +6,6 @@ use crate::emit;
 use vector_common::internal_event::{
     error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL,
 };
-use vector_common::json_size::JsonSize;
 
 #[derive(Debug)]
 pub struct PulsarSendingError {
@@ -134,29 +133,5 @@ impl InternalEvent for PulsarNegativeAcknowledgmentError {
         );
         // deprecated
         counter!("events_failed_total", 1);
-    }
-}
-
-#[derive(Debug)]
-pub struct PulsarEventsReceived<'a> {
-    pub byte_size: JsonSize,
-    pub count: usize,
-    pub topic: &'a str,
-}
-
-impl<'a> InternalEvent for PulsarEventsReceived<'a> {
-    fn emit(self) {
-        trace!(
-            message = "Events received.",
-            count = %self.count,
-            byte_size = %self.byte_size,
-            topic = self.topic,
-        );
-        counter!("component_received_events_total", self.count as u64, "topic" => self.topic.to_string());
-        counter!(
-            "component_received_event_bytes_total",
-            self.byte_size.get() as u64,
-            "topic" => self.topic.to_string(),
-        );
     }
 }
