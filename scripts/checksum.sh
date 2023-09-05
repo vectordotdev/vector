@@ -12,8 +12,11 @@ VECTOR_VERSION=${VECTOR_VERSION:-nightly}
 
 pushd "${ROOT}/target/artifacts"
 
-ARTIFACTS=$(ls | grep -v SHA256SUMS)
+shopt -s extglob
+ARTIFACTS=$(ls !(*SHA256SUMS))
+shopt -u extglob
 
-sha256sum $ARTIFACTS > vector-$VECTOR_VERSION-SHA256SUMS
+# shellcheck disable=SC2086 # Intended splitting of ARTIFACTS
+sha256sum $ARTIFACTS > vector-"$VECTOR_VERSION"-SHA256SUMS
 
 popd
