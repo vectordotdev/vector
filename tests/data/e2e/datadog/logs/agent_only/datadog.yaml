@@ -11,4 +11,4 @@ logs_config:
 #  process_realtime: 1
 
 use_dogstatsd: false
-#log_level: 'debug'
+log_level: 'info'
