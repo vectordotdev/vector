@@ -139,6 +139,7 @@ impl HttpRequestBuilder {
                 Auth::Basic(auth) => {
                     auth.apply(&mut request);
                 }
+                #[cfg(feature = "aws-core")]
                 Auth::Aws {
                     credentials_provider: provider,
                     region,

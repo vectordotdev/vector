@@ -2,7 +2,9 @@ use std::io::Read;
 use std::sync::Arc;
 use std::task;
 
+#[cfg(feature = "aws-core")]
 use aws_credential_types::provider::SharedCredentialsProvider;
+#[cfg(feature = "aws-core")]
 use aws_types::region::Region;
 use bytes::{Bytes, BytesMut};
 use futures::{future::BoxFuture, stream, FutureExt, SinkExt};
@@ -399,7 +401,7 @@ impl HttpRequestBuilder {
             builder = builder.header("X-Scope-OrgID", tenant_id);
         }
 
-        let mut request = builder.body(body.into()).unwrap();
+        let mut request: Request<Bytes> = builder.body(body.into()).unwrap();
         if let Some(auth) = &self.auth {
             match auth {
                 Auth::Basic(http_auth) => http_auth.apply(&mut request),
