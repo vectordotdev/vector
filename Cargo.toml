@@ -13,6 +13,9 @@ autobenches = false # our benchmarks are not runnable on their own either way
 # Minimum supported rust version
 rust-version = "1.70.0"
 
+[env]
+JEMALLOC_SYS_WITH_LG_PAGE = 16
+
 [[bin]]
 name = "vector"
 test = false
