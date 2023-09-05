@@ -1,9 +1,9 @@
 use crate::codecs::{Decoder, DecodingConfig};
 use crate::config::{SourceConfig, SourceContext};
 use crate::event::BatchNotifier;
-use crate::internal_events::StreamClosedError;
-use crate::internal_events::{PulsarAcknowledgmentError, PulsarNegativeAcknowledgmentError};
-use crate::internal_events::PulsarReadError;
+use crate::internal_events::{
+    PulsarErrorEvent, PulsarErrorEventData, PulsarErrorEventType, StreamClosedError,
+};
 use crate::serde::{bool_or_struct, default_decoding, default_framing_message_based};
 use crate::SourceSender;
 use chrono::TimeZone;
@@ -21,7 +21,8 @@ use tokio_util::codec::FramedRead;
 use vector_common::finalization::BatchStatus;
 use vector_common::finalizer::OrderedFinalizer;
 use vector_common::internal_event::{
-    ByteSize, BytesReceived, CountByteSize, EventsReceived, InternalEventHandle as _, Protocol, Registered
+    ByteSize, BytesReceived, CountByteSize, EventsReceived, InternalEventHandle as _, Protocol,
+    Registered,
 };
 use vector_common::sensitive_string::SensitiveString;
 use vector_common::shutdown::ShutdownSignal;
@@ -304,23 +305,27 @@ async fn pulsar_source(
 
     let bytes_received = register!(BytesReceived::from(Protocol::TCP));
     let events_received = register!(EventsReceived);
+    let pulsar_error_events = register!(PulsarErrorEvent);
 
     loop {
         tokio::select! {
             _ = &mut shutdown => break,
             entry = ack_stream.next() => {
                 if let Some((status, entry)) = entry {
-                    handle_ack(&mut consumer, status, entry).await;
+                    handle_ack(&mut consumer, status, entry, &pulsar_error_events).await;
                 }
             },
             Some(maybe_message) = consumer.next() => {
                 match maybe_message {
                     Ok(msg) => {
                         bytes_received.emit(ByteSize(msg.payload.data.len()));
-                        parse_message(msg, &decoder, &finalizer,&events_received, &mut out, &mut consumer, log_namespace).await;
+                        parse_message(msg, &decoder, &finalizer, &mut out, &mut consumer, log_namespace, &events_received, &pulsar_error_events).await;
                     }
                     Err(error) => {
-                        emit!(PulsarReadError { error })
+                        pulsar_error_events.emit(PulsarErrorEventData{
+                            msg: error.to_string(),
+                            error_type:PulsarErrorEventType::ReadError,
+                        });
                     }
                 }
             },
@@ -334,10 +339,11 @@ async fn parse_message(
     msg: Message<String>,
     decoder: &Decoder,
     finalizer: &Option<OrderedFinalizer<FinalizerEntry>>,
-    events_received: &Registered<EventsReceived>,
     out: &mut SourceSender,
     consumer: &mut Consumer<String, TokioExecutor>,
     log_namespace: LogNamespace,
+    events_received: &Registered<EventsReceived>,
+    pulsar_error_events: &Registered<PulsarErrorEvent>,
 ) {
     let publish_time = i64::try_from(msg.payload.metadata.publish_time)
         .ok()
@@ -415,6 +421,7 @@ async fn parse_message(
         stream,
         msg.topic.clone(),
         msg.message_id().clone(),
+        pulsar_error_events,
     )
     .await;
 }
@@ -427,6 +434,7 @@ async fn finalize_event_stream(
     mut stream: std::pin::Pin<Box<dyn futures_util::Stream<Item = Event> + Send + '_>>,
     topic: String,
     message_id: MessageIdData,
+    pulsar_error_events: &Registered<PulsarErrorEvent>,
 ) {
     match finalizer {
         Some(finalizer) => {
@@ -448,7 +456,10 @@ async fn finalize_event_stream(
             }
             Ok(_) => {
                 if let Err(error) = consumer.ack_with_id(topic.as_str(), message_id).await {
-                    emit!(PulsarAcknowledgmentError { error });
+                    pulsar_error_events.emit(PulsarErrorEventData {
+                        msg: error.to_string(),
+                        error_type: PulsarErrorEventType::AckError,
+                    });
                 }
             }
         },
@@ -459,6 +470,7 @@ async fn handle_ack(
     consumer: &mut Consumer<String, TokioExecutor>,
     status: BatchStatus,
     entry: FinalizerEntry,
+    pulsar_error_events: &Registered<PulsarErrorEvent>,
 ) {
     match status {
         BatchStatus::Delivered => {
@@ -466,7 +478,10 @@ async fn handle_ack(
                 .ack_with_id(entry.topic.as_str(), entry.message_id)
                 .await
             {
-                emit!(PulsarAcknowledgmentError { error });
+                pulsar_error_events.emit(PulsarErrorEventData {
+                    msg: error.to_string(),
+                    error_type: PulsarErrorEventType::AckError,
+                });
             }
         }
         BatchStatus::Errored => {
@@ -474,7 +489,10 @@ async fn handle_ack(
                 .nack_with_id(entry.topic.as_str(), entry.message_id)
                 .await
             {
-                emit!(PulsarNegativeAcknowledgmentError { error });
+                pulsar_error_events.emit(PulsarErrorEventData {
+                    msg: error.to_string(),
+                    error_type: PulsarErrorEventType::NAckError,
+                });
             }
         }
         BatchStatus::Rejected => {
@@ -482,7 +500,10 @@ async fn handle_ack(
                 .nack_with_id(entry.topic.as_str(), entry.message_id)
                 .await
             {
-                emit!(PulsarNegativeAcknowledgmentError { error });
+                pulsar_error_events.emit(PulsarErrorEventData {
+                    msg: error.to_string(),
+                    error_type: PulsarErrorEventType::NAckError,
+                });
             }
         }
     }

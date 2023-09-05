@@ -1,10 +1,11 @@
 use metrics::counter;
-use pulsar::error::ConsumerError;
+use metrics::{register_counter, register_histogram, Counter, Histogram};
 use vector_core::internal_event::InternalEvent;
 
 use crate::emit;
-use vector_common::internal_event::{
-    error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL,
+use vector_common::{
+    internal_event::{error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL},
+    registered_event,
 };
 
 #[derive(Debug)]
@@ -58,80 +59,100 @@ impl<F: std::fmt::Display> InternalEvent for PulsarPropertyExtractionError<F> {
     }
 }
 
-#[derive(Debug)]
-pub struct PulsarReadError {
-    pub error: pulsar::Error,
+pub enum PulsarErrorEventType {
+    ReadError,
+    AckError,
+    NAckError,
 }
 
-impl InternalEvent for PulsarReadError {
-    fn emit(self) {
-        error!(
-            message = "Failed to read message.",
-            error = %self.error,
-            error_code = "reading_message",
-            error_type = error_type::READER_FAILED,
-            stage = error_stage::RECEIVING,
-            internal_log_rate_limit = true,
-        );
-        counter!(
-            "component_errors_total", 1,
-            "error_code" => "reading_message",
-            "error_type" => error_type::READER_FAILED,
-            "stage" => error_stage::RECEIVING,
-        );
-        // deprecated
-        counter!("events_failed_total", 1);
-    }
+pub struct PulsarErrorEventData {
+    pub msg: String,
+    pub error_type:PulsarErrorEventType,
 }
 
-#[derive(Debug)]
-pub struct PulsarAcknowledgmentError {
-    pub error: ConsumerError,
-}
-
-impl InternalEvent for PulsarAcknowledgmentError {
-    fn emit(self) {
-        error!(
-            message = "Failed to acknowledge message.",
-            error = %self.error,
-            error_code = "acknowledge_message",
-            error_type = error_type::ACKNOWLEDGMENT_FAILED,
-            stage = error_stage::RECEIVING,
-            internal_log_rate_limit = true,
-        );
-        counter!(
-            "component_errors_total", 1,
+registered_event!(
+    PulsarErrorEvent => {
+        ack_errors_count: Histogram = register_histogram!(
+            "component_errors_count",
             "error_code" => "acknowledge_message",
             "error_type" => error_type::ACKNOWLEDGMENT_FAILED,
             "stage" => error_stage::RECEIVING,
-        );
-        // deprecated
-        counter!("events_failed_total", 1);
-    }
-}
+        ),
+        ack_errors: Counter = register_counter!(
+            "component_errors_total",
+            "error_code" => "acknowledge_message",
+            "error_type" => error_type::ACKNOWLEDGMENT_FAILED,
+            "stage" => error_stage::RECEIVING,
+        ),
 
-#[derive(Debug)]
-pub struct PulsarNegativeAcknowledgmentError {
-    pub error: ConsumerError,
-}
-
-impl InternalEvent for PulsarNegativeAcknowledgmentError {
-    fn emit(self) {
-        error!(
-            message = "Failed to negatively acknowledge message.",
-            error = %self.error,
-            error_code = "negative_acknowledge_message",
-            error_type = error_type::ACKNOWLEDGMENT_FAILED,
-            stage = error_stage::RECEIVING,
-            internal_log_rate_limit = true,
-        );
-        counter!(
-            "component_errors_total", 1,
+        nack_errors_count: Histogram = register_histogram!(
+            "component_errors_count",
             "error_code" => "negative_acknowledge_message",
             "error_type" => error_type::ACKNOWLEDGMENT_FAILED,
             "stage" => error_stage::RECEIVING,
-        );
-        // deprecated
-        counter!("events_failed_total", 1);
+        ),
+        nack_errors: Counter = register_counter!(
+            "component_errors_total",
+            "error_code" => "negative_acknowledge_message",
+            "error_type" => error_type::ACKNOWLEDGMENT_FAILED,
+            "stage" => error_stage::RECEIVING,
+        ),
+
+        read_errors_count: Histogram = register_histogram!(
+            "component_errors_count",
+            "error_code" => "reading_message",
+            "error_type" => error_type::READER_FAILED,
+            "stage" => error_stage::RECEIVING,
+        ),
+        read_errors: Counter = register_counter!(
+            "component_errors_total",
+            "error_code" => "reading_message",
+            "error_type" => error_type::READER_FAILED,
+            "stage" => error_stage::RECEIVING,
+        ),
     }
-}
+
+    fn emit(&self,error:PulsarErrorEventData) {
+        match error.error_type{
+            PulsarErrorEventType::ReadError=>{
+                error!(
+                    message = "Failed to read message.",
+                    error = error.msg,
+                    error_code = "reading_message",
+                    error_type = error_type::READER_FAILED,
+                    stage = error_stage::RECEIVING,
+                    internal_log_rate_limit = true,
+                );
+
+                self.read_errors_count.record(1_f64);
+                self.read_errors.increment(1_u64);
+            }
+            PulsarErrorEventType::AckError=>{
+                error!(
+                    message = "Failed to acknowledge message.",
+                    error = error.msg,
+                    error_code = "acknowledge_message",
+                    error_type = error_type::ACKNOWLEDGMENT_FAILED,
+                    stage = error_stage::RECEIVING,
+                    internal_log_rate_limit = true,
+                );
+
+                self.ack_errors_count.record(1_f64);
+                self.ack_errors.increment(1_u64);
+            }
+            PulsarErrorEventType::NAckError=>{
+                error!(
+                    message = "Failed to negatively acknowledge message.",
+                    error = error.msg,
+                    error_code = "negative_acknowledge_message",
+                    error_type = error_type::ACKNOWLEDGMENT_FAILED,
+                    stage = error_stage::RECEIVING,
+                    internal_log_rate_limit = true,
+                );
+
+                self.nack_errors_count.record(1_f64);
+                self.nack_errors.increment(1_u64);
+            }
+        }
+    }
+);
