@@ -10,15 +10,12 @@ use std::str::FromStr;
 pub struct Opts {
     /// The input path. It can be a single file or a directory. If this points to a directory,
     /// all files with a "toml", "yaml" or "json" extension will be converted.
-    #[arg(short, long)]
     pub(crate) input_path: PathBuf,
 
     /// The output file or directory to be created. This command will fail if the output directory exists.
-    #[arg(short, long)]
     pub(crate) output_path: PathBuf,
 
     /// The target format to which existing config files will be converted to.
-    #[arg(long, default_value = "yaml")]
     pub(crate) output_format: Format,
 }
 
