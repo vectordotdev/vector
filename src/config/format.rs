@@ -38,11 +38,12 @@ impl FromStr for Format {
 
 impl fmt::Display for Format {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Format::Toml => write!(f, "toml"),
-            Format::Json => write!(f, "json"),
-            Format::Yaml => write!(f, "yaml"),
-        }
+        let format = match self {
+            Format::Toml => "toml",
+            Format::Json => "json",
+            Format::Yaml => "yaml",
+        };
+        write!(f, format)
     }
 }
 
