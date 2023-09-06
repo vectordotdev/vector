@@ -207,7 +207,7 @@ components: _aws: {
 				4. [ECS credentials (IAM roles for
 				   tasks)](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-iam-roles.html).
 				   These credentials will automatically refresh when expired.
-				5. As entries in the credentials file in the .aws directory in your home directory
+				5. As entries in the credentials file in the `.aws` directory in your home directory
 				   (`~/.aws/credentials` on Linux, OS X, and Unix; `%userprofile%\\.aws\\credentials`
 				   on Microsoft Windows).
 				6. Using a named profile specified in the credentials file via the AWS_PROFILE environment variable.
