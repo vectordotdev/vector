@@ -43,7 +43,7 @@ impl fmt::Display for Format {
             Format::Json => "json",
             Format::Yaml => "yaml",
         };
-        write!(f, format)
+        write!(f, "{}", format)
     }
 }
 
