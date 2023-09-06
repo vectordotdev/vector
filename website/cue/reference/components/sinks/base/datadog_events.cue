@@ -43,13 +43,13 @@ base: components: sinks: datadog_events: configuration: {
 		description: """
 			The endpoint to send observability data to.
 
-			The endpoint must contain an HTTP scheme, and may specify a
-			hostname or IP address and port.
+			The endpoint must contain an HTTP scheme, and may specify a hostname or IP
+			address and port. The path must be specified if expected by the downstream.
 
 			If set, overrides the `site` option.
 			"""
 		required: false
-		type: string: examples: ["http://127.0.0.1:8080", "http://example.com:12345"]
+		type: string: examples: ["http://127.0.0.1:8080/api/v2/logs", "http://example.com:12345/api/beta/sketches"]
 	}
 	region: {
 		deprecated:         true
