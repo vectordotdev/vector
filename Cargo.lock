@@ -5847,15 +5847,16 @@ checksum = "ff011a302c396a5197692431fc1948019154afc178baf7d8e37367442a4601cf"
 [[package]]
 name = "openssl-src"
 version = "300.1.3+3.1.2"
-source = "git+https://github.com/vectordotdev/openssl-src-rs?tag=release-300-force-engine_3.1.2#98b1172bcef15358ad7bbf4baa3a3aa59d831e81"
+source = "git+https://github.com/alexcrichton/openssl-src-rs#26dc3c81d8ebee5f7ec40835e29bf9f37e648ab2"
 dependencies = [
  "cc",
 ]
 
 [[package]]
 name = "openssl-sys"
-version = "0.9.92"
-source = "git+https://github.com/vectordotdev/rust-openssl?tag=openssl-sys-v0.9.92_3.0.0#109e24197321dd167420413b5231f6a644088935"
+version = "0.9.93"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "db4d56a4c0478783083cfafcc42493dd4a981d41669da64b4572a2a089b51b1d"
 dependencies = [
  "cc",
  "libc",
@@ -6410,7 +6411,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6c64d9ba0963cdcea2e1b2230fbae2bab30eb25a174be395c41e764bfb65dd62"
 dependencies = [
  "proc-macro2 1.0.66",
- "syn 2.0.29",
+ "syn 2.0.31",
 ]
 
 [[package]]
@@ -6594,7 +6595,7 @@ dependencies = [
  "prost 0.12.0",
  "prost-types 0.12.0",
  "regex",
- "syn 2.0.29",
+ "syn 2.0.31",
  "tempfile",
  "which",
 ]
@@ -6622,7 +6623,7 @@ dependencies = [
  "itertools 0.11.0",
  "proc-macro2 1.0.66",
  "quote 1.0.33",
- "syn 2.0.29",
+ "syn 2.0.31",
 ]
 
 [[package]]
@@ -8929,7 +8930,7 @@ dependencies = [
  "proc-macro2 1.0.66",
  "prost-build 0.12.0",
  "quote 1.0.33",
- "syn 2.0.29",
+ "syn 2.0.31",
 ]
 
 [[package]]
