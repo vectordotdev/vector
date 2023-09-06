@@ -1362,9 +1362,9 @@ dependencies = [
 
 [[package]]
 name = "azure_core"
-version = "0.13.0"
+version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "86b0f0eea648347e40f5f7f7e6bfea4553bcefad0fbf52044ea339e5ce3aba61"
+checksum = "2331555a3618a32516c6172a63e9fec4af0edb43c6fcfeb5303a0716fc34498b"
 dependencies = [
  "async-trait",
  "base64 0.21.3",
@@ -1376,7 +1376,7 @@ dependencies = [
  "log",
  "paste",
  "pin-project",
- "quick-xml 0.29.0",
+ "quick-xml 0.30.0",
  "rand 0.8.5",
  "reqwest",
  "rustc_version 0.4.0",
@@ -1389,9 +1389,9 @@ dependencies = [
 
 [[package]]
 name = "azure_identity"
-version = "0.13.0"
+version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "61712538f43d64b56725f335bc931d0eb42d2b082fb157056465bbadfdeb5dd3"
+checksum = "f6f12ef55a5ca0701205f8d81384c2409292533d09686897f1dda16380158875"
 dependencies = [
  "async-lock",
  "async-trait",
@@ -1410,9 +1410,9 @@ dependencies = [
 
 [[package]]
 name = "azure_storage"
-version = "0.13.0"
+version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "32d9cfa13ed9acb51cd663e04f343bd550a92b455add96c90de387a9a6bc4dbc"
+checksum = "16565073e533053f4e29e6b139de2af758e984108a1cddbb1a432387e7f4474d"
 dependencies = [
  "RustyXML",
  "async-trait",
@@ -1433,9 +1433,9 @@ dependencies = [
 
 [[package]]
 name = "azure_storage_blobs"
-version = "0.13.1"
+version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "57cb0fe58af32a3fb49e560613cb1e4937f9f13161a2c1caf1bba0224435f2af"
+checksum = "0900e63940d1ba51039efda3d8cf658157a1c75449081a6e18069d2588809329"
 dependencies = [
  "RustyXML",
  "azure_core",
@@ -6692,9 +6692,9 @@ dependencies = [
 
 [[package]]
 name = "quick-xml"
-version = "0.29.0"
+version = "0.30.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "81b9228215d82c7b61490fec1de287136b5de6f5700f6e58ea9ad61a7964ca51"
+checksum = "eff6510e86862b57b210fd8cbe8ed3f0d7d600b9c2863cd4549a2e033c66e956"
 dependencies = [
  "memchr",
  "serde",
