@@ -16,6 +16,7 @@ use codecs::{
     StreamDecodingError,
 };
 use futures::{Stream, StreamExt};
+use futures_util::future::OptionFuture;
 use lookup::{lookup_v2::OptionalValuePath, owned_value_path, path, OwnedValuePath};
 use once_cell::sync::OnceCell;
 use rdkafka::{
@@ -36,6 +37,7 @@ use tokio::{
         mpsc::{self, UnboundedReceiver, UnboundedSender},
         oneshot,
     },
+    task::JoinSet,
 };
 use tokio_util::codec::FramedRead;
 
@@ -414,7 +416,12 @@ async fn kafka_source(
         .expect("Error setting up consumer callback channel.");
 
     // EOF signal allowing the coordination task to tell the kafka client task when all partitions have reached EOF
-    let (eof_tx, eof_rx) = tokio::sync::oneshot::channel::<()>();
+    let (eof_tx, eof_rx) = if eof {
+        let (tx, rx) = oneshot::channel::<()>();
+        (Some(tx), Some(rx))
+    } else {
+        (None, None)
+    };
 
     let coordination_task = {
         let span = span.clone();
@@ -428,7 +435,7 @@ async fn kafka_source(
                 callback_rx,
                 partition_state,
                 session_timeout_ms,
-                if eof { Some(eof_tx) } else { None },
+                eof_tx,
             )
             .await;
         })
@@ -488,7 +495,7 @@ impl KafkaPartitionState {
     /// and an AbortHandle that can be used to forcefully end the task.
     fn consume_partition(
         &self,
-        join_set: &mut tokio::task::JoinSet<(TopicPartition, PartitionConsumerStatus)>,
+        join_set: &mut JoinSet<(TopicPartition, PartitionConsumerStatus)>,
         tp: TopicPartition,
         consumer: Arc<StreamConsumer<KafkaSourceContext>>,
         p: StreamPartitionQueue<KafkaSourceContext>,
@@ -501,7 +508,7 @@ impl KafkaPartitionState {
         let log_namespace = self.log_namespace;
         let mut out = self.out.clone();
 
-        let (end_tx, mut end_signal) = tokio::sync::oneshot::channel::<()>();
+        let (end_tx, mut end_signal) = oneshot::channel::<()>();
 
         let handle = join_set.spawn(async move {
             let mut messages = p.stream();
@@ -572,12 +579,13 @@ impl KafkaPartitionState {
     }
 
     pub fn is_drain_complete(&self) -> bool {
-        self.observed_drain == self.expect_drain
+        self.expect_drain.is_subset(&self.observed_drain)
     }
 
     pub fn clear(&mut self) {
-        self.expect_drain.clear();
-        self.observed_drain.clear();
+        for item in self.expect_drain.drain() {
+            self.observed_drain.remove(&item);
+        }
     }
 }
 
@@ -586,24 +594,20 @@ async fn coordinate_kafka_callbacks(
     mut callbacks: UnboundedReceiver<KafkaCallback>,
     mut partition_state: KafkaPartitionState,
     max_drain_ms: Duration,
-    mut eof: Option<tokio::sync::oneshot::Sender<()>>,
+    mut eof: Option<oneshot::Sender<()>>,
 ) {
     let mut drain_signal: Option<SyncSender<()>> = None;
-
-    async fn revoke_timeout(t: Duration) {
-        tokio::time::sleep(t).await;
-    }
-    let mut drain_deadline = tokio::spawn(revoke_timeout(max_drain_ms));
+    let mut drain_deadline: OptionFuture<_> = None.into();
 
     // A oneshot channel is used for each consumed partition, so that we can
     // signal to that task to stop consuming, drain pending acks, and exit
-    let mut end_signals: HashMap<TopicPartition, tokio::sync::oneshot::Sender<()>> = HashMap::new();
+    let mut end_signals: HashMap<TopicPartition, oneshot::Sender<()>> = HashMap::new();
 
     // The set of consumer tasks, each consuming a specific partition. The task
     // is both consuming the messages (passing them to the output stream) _and_
     // processing the corresponding acknowledgement stream. A consumer task
     // should completely drain its acknowledgement stream after receiving an end signal
-    let mut partition_consumers: tokio::task::JoinSet<(TopicPartition, PartitionConsumerStatus)> = Default::default();
+    let mut partition_consumers: JoinSet<(TopicPartition, PartitionConsumerStatus)> = Default::default();
 
     // Handles that will let us end any consumer task that exceeds a drain deadline
     let mut abort_handles: HashMap<TopicPartition, tokio::task::AbortHandle> = HashMap::new();
@@ -614,17 +618,20 @@ async fn coordinate_kafka_callbacks(
         tokio::select! {
             Some(Ok((finished_partition, status))) = partition_consumers.join_next(), if !partition_consumers.is_empty() => {
                 debug!("Partition consumer finished for {}:{}", &finished_partition.0, finished_partition.1);
+                // If this task ended on its own, the end_signal for it will still be in here.
+                end_signals.remove(&finished_partition);
                 abort_handles.remove(&finished_partition);
                 partition_state.observed_last_ack(finished_partition);
 
                 // Signal the client task that at least one partition has completed
                 _ = drain_signal.as_ref().map(|sig| _ = sig.send(()) );
 
-                if partition_state.is_drain_complete() {
+                if drain_signal.is_some() && partition_state.is_drain_complete() {
                     debug!("All expected partitions have drained.");
                     partition_state.clear();
                     // Signal the client task that all partitions that are expected to drain have completed
                     drain_signal.take();
+                    drain_deadline = None.into();
                 }
 
                 match status {
@@ -657,7 +664,7 @@ async fn coordinate_kafka_callbacks(
                     drop(done);
                 },
                 KafkaCallback::PartitionsRevoked(mut revoked_partitions, drain) => {
-                    drain_deadline = tokio::spawn(revoke_timeout(max_drain_ms));
+                    drain_deadline = Some(Box::pin(tokio::time::sleep(max_drain_ms))).into();
 
                     for tp in revoked_partitions.drain(0..) {
                         if let Some(end) = end_signals.remove(&tp) {
@@ -690,7 +697,7 @@ async fn coordinate_kafka_callbacks(
                         });
                     }
 
-                    drain_deadline = tokio::spawn(revoke_timeout(max_drain_ms));
+                    drain_deadline = Some(Box::pin(tokio::time::sleep(max_drain_ms))).into();
                     if partition_state.is_drain_complete() {
                         partition_state.clear();
                         drop(drain);
@@ -702,7 +709,7 @@ async fn coordinate_kafka_callbacks(
                 },
             },
 
-            _ = &mut drain_deadline, if drain_signal.is_some() => {
+            Some(_) = &mut drain_deadline => {
                 debug!("Acknowledgement drain deadline reached. Dropping any pending ack streams for revoked partitions.");
                 for tp in partition_state.expect_drain.drain() {
                     if let Some(handle) = abort_handles.remove(&tp) {
@@ -710,9 +717,11 @@ async fn coordinate_kafka_callbacks(
                     }
                 }
                 partition_state.clear();
-
-                if let Err(e) = drain_signal.take().unwrap().send(()) {
-                    warn!("Error sending to drain signal: {}.", e);
+                drain_deadline = None.into();
+                if let Some(s) = drain_signal.take() {
+                    if let Err(e) = s.send(()) {
+                        warn!("Error sending to drain signal: {}.", e);
+                    }
                 }
             },
 
@@ -727,9 +736,10 @@ async fn coordinate_kafka_callbacks(
 fn drive_kafka_consumer(
     consumer: Arc<StreamConsumer<KafkaSourceContext>>,
     mut shutdown: ShutdownSignal,
-    mut eof: tokio::sync::oneshot::Receiver<()>,
+    eof: Option<oneshot::Receiver<()>>,
 ) {
     Handle::current().block_on(async move {
+        let mut eof: OptionFuture<_> = eof.into();
         let mut stream = consumer.stream();
         loop {
             tokio::select! {
@@ -738,7 +748,7 @@ fn drive_kafka_consumer(
                     break
                 },
 
-                _ = &mut eof => {
+                Some(_) = &mut eof => {
                     consumer.context().shutdown();
                     break
                 },
