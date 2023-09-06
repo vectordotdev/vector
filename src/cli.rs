@@ -247,7 +247,7 @@ pub enum SubCommand {
     /// Note that this is a best effort conversion due to the following reasons:
     /// * The comments from the original config file are not preserved.
     /// * Explicitly set default values in the original implementation might be omitted.
-    /// * Depending on how each source/sink config configuration serde, there might be entries with null values.
+    /// * Depending on how each source/sink config struct configures serde, there might be entries with null values.
     ConvertConfig(convert_config::Opts),
 
     /// Generate a Vector configuration containing a list of components.
