@@ -62,7 +62,7 @@ impl Opts {
 pub struct RootOpts {
     /// Read configuration from one or more files. Wildcard paths are supported.
     /// File format is detected from the file name.
-    /// If zero files are specified the default config path
+    /// If zero files are specified the deprecated default config path
     /// `/etc/vector/vector.toml` will be targeted.
     /// And if the aforementioned file does not exist,
     /// then `/etc/vector/vector.yaml` will be used.
