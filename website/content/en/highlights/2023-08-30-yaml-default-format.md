@@ -20,7 +20,7 @@ Existing TOML and JSON configurations are not affected by this decision and will
 
 ## Action Needed
 
-If you are relying on Vector auto-loading `/etc/vector/vector.toml`, this behavior will change in the next release. The `/etc/vector/vector.yaml` will become the new default path. You can keep using the same config by providing the following option `--config /etc/vector/vector.toml` explicitly. Alternatively, you can convert your existing configuration to YAML and write it to the new default path.
+If you are relying on Vector auto-loading `/etc/vector/vector.toml`, this will still work in `0.33.0` but it is now deprecated. The aforementioned location will no longer be considered in `0.34.0`. The `/etc/vector/vector.yaml` will be used as the secondary default location in `0.33.0` and will become the  default path in `0.34.0`. You can keep using your existing config by providing the following option `--config /etc/vector/vector.toml` explicitly. Alternatively, you can convert your existing configuration to YAML and write it to the new default path.
 
 ## New Tools
 
