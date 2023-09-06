@@ -388,12 +388,8 @@ nix = { git = "https://github.com/vectordotdev/nix.git", branch = "memfd/gnu/mus
 # The `heim` crates depend on `ntapi` 0.3.7 on Windows, but that version has an
 # unaligned access bug fixed in the following revision.
 ntapi = { git = "https://github.com/MSxDOS/ntapi.git", rev = "24fc1e47677fc9f6e38e5f154e6011dc9b270da6" }
-# The current `openssl-sys` crate will vendor the OpenSSL sources via
-# `openssl-src` at version 1.1.1*, but we want version 3.1.*. Bring in forked
-# version of that crate with the appropriate dependency patched in.
-openssl-sys = { git = "https://github.com/vectordotdev/rust-openssl", tag = "openssl-sys-v0.9.92_3.0.0" }
-openssl-src = { git = "https://github.com/vectordotdev/openssl-src-rs", tag = "release-300-force-engine_3.1.2" }
-
+# 300.1.3+3.1.2 + a commit that re-adds force-engine flag. Can be removed after next release of openssl-src.
+openssl-src = { git = "https://github.com/alexcrichton/openssl-src-rs", ref = "26dc3c81d8ebee5f7ec40835e29bf9f37e648ab2" }
 
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin
