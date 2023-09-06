@@ -68,9 +68,9 @@ impl IntegrationTest {
         let active = self.envs_dir.check_active(&self.environment)?;
         self.config.check_required()?;
 
-        //if !active {
-        //    self.start()?;
-        //}
+        if !active {
+            self.start()?;
+        }
 
         let mut env_vars = self.config.env.clone();
         // Make sure the test runner has the same config environment vars as the services do.

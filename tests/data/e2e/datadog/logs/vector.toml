@@ -1,0 +1,22 @@
+data_dir = "/tmp/"
+
+[sources.agent]
+type = "datadog_agent"
+address = "0.0.0.0:8181"
+multiple_outputs = true
+disable_metrics = true
+disable_traces = true
+store_api_key = false
+
+[sinks.dd]
+inputs = [ "agent.logs" ]
+type = "datadog_logs"
+default_api_key="unused"
+endpoint = "http://fakeintake-agent-vector:80/api/v2/logs"
+batch.max_events = 1
+compression = "gzip"
+
+[sinks.console]
+inputs = [ "agent.logs" ]
+type = "console"
+encoding.codec = "json"

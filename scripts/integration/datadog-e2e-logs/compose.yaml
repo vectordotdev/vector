@@ -2,6 +2,25 @@
 version: '3'
 
 services:
+  vector:
+    depends_on:
+      - fakeintake-agent-vector
+    build:
+      context: ${PWD}
+      dockerfile: tests/data/e2e/datadog/logs/Dockerfile
+      args:
+        - RUST_VERSION=${RUST_VERSION}
+    working_dir: /home/vector
+    network_mode: host
+    command:
+      - "-vvv"
+      - "-c"
+      - "/home/vector/tests/data/e2e/datadog/logs/vector.toml"
+    volumes:
+      - ${PWD}:/home/vector
+      - target:/home/vector/target
+      - cargogit:/cargo/git
+      - cargoregistry:/cargo/registry
   datadog-agent:
     image: docker.io/datadog/agent:${CONFIG_VERSION}
     environment:
@@ -24,7 +43,8 @@ services:
     - ../../../tests/data/e2e/datadog/logs/custom_log.log:/var/log/a_custom_log.log
   datadog-agent-vector:
     image: docker.io/datadog/agent:${CONFIG_VERSION}
-    # depends_on:
+    depends_on:
+      - vector
     #   waitforit:
     #     condition: service_healthy
     environment:
@@ -61,3 +81,8 @@ services:
 networks:
   default:
     name: ${VECTOR_NETWORK}
+
+volumes:
+  target: {}
+  cargogit: {}
+  cargoregistry: {}

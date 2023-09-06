@@ -67,7 +67,7 @@ pub struct ComposeService {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub environment: Option<Vec<String>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub depends_on: Option<Value>,
+    pub depends_on: Option<Vec<String>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub healthcheck: Option<Value>,
 }

@@ -1,16 +1,7 @@
 pub mod logs;
 
-
 use reqwest::{Client, Method};
 use serde::Deserialize;
-
-
-fn vector_receive_port() -> u16 {
-    std::env::var("VECTOR_RECEIVE_PORT")
-        .unwrap_or_else(|_| "8081".to_string())
-        .parse::<u16>()
-        .unwrap()
-}
 
 fn fake_intake_vector_endpoint() -> String {
     std::env::var("FAKE_INTAKE_VECTOR_ENDPOINT")
@@ -38,22 +29,48 @@ struct Payload {
 }
 
 async fn get_fakeintake_payloads(base: &str, endpoint: &str) -> Payloads {
-    let url = format!("{}/fakeintake/payloads?endpoint={}", base, endpoint,);
+    let url = format!(
+        "{}/fakeintake/payloads?endpoint={}",
+        // "{}/fakeintake/payloads?endpoint={}&format=json",
+        base,
+        endpoint,
+    );
 
-    Client::new()
+    let res = Client::new()
         .request(Method::GET, &url)
         .send()
         .await
         .unwrap_or_else(|_| panic!("Sending GET request to {} failed", &url))
+        //.text()
         .json::<Payloads>()
         .await
-        .expect("Parsing fakeintake payloads failed")
+        .expect("Parsing fakeintake payloads failed");
+
+    res
+
+    //println!("body= {:?}", res);
+
+    //Payloads { payloads: vec![] }
 }
 
-async fn get_payloads_agent(endpoint: &str) -> Payloads {
-    get_fakeintake_payloads(&fake_intake_agent_endpoint(), endpoint).await
+async fn get_payloads_agent(endpoint: &str) -> Vec<Payload> {
+    let mut raw_payloads = get_fakeintake_payloads(&fake_intake_agent_endpoint(), endpoint)
+        .await
+        .payloads;
+
+    // Not sure what this is but the logs endpoint receives some empty payload in the beginning
+    if raw_payloads.len() > 0 && endpoint == "/api/v2/logs" {
+        if raw_payloads[0].data == "" && raw_payloads[0].encoding == "" {
+            raw_payloads.remove(0);
+            return raw_payloads;
+        }
+    }
+
+    raw_payloads
 }
 
-async fn get_payloads_vector(endpoint: &str) -> Payloads {
-    get_fakeintake_payloads(&fake_intake_vector_endpoint(), endpoint).await
+async fn get_payloads_vector(endpoint: &str) -> Vec<Payload> {
+    get_fakeintake_payloads(&fake_intake_vector_endpoint(), endpoint)
+        .await
+        .payloads
 }
