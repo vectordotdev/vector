@@ -325,8 +325,8 @@ fn default_config_paths() -> Vec<ConfigPath> {
 
     let yaml_path = default_path.with_extension("yaml");
     if default_path.exists() {
-        warn!("Using the deprecated {:?} config path as the default config location. Vector is migrating to YAML as the \
-        default config format. Future Vector versions will use {:?} as the default config location.",
+        warn!("DEPRECATED Using the deprecated {:?} config path as the default config location. Vector is migrating \
+        to YAML as the default config format. Future Vector versions will use {:?} as the default config location.",
             default_path,
             yaml_path);
 
