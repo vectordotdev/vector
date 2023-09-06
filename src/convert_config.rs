@@ -16,6 +16,7 @@ pub struct Opts {
     pub(crate) output_path: PathBuf,
 
     /// The target format to which existing config files will be converted to.
+    #[arg(long, default_value = "yaml")]
     pub(crate) output_format: Format,
 }
 
