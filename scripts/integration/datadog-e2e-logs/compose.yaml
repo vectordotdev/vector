@@ -23,9 +23,10 @@ services:
       - fakeintake-agent-vector
     build:
       context: ${PWD}
-      dockerfile: tests/data/e2e/datadog/logs/Dockerfile
+      dockerfile: tests/data/e2e/datadog/Dockerfile
       args:
         - RUST_VERSION=${RUST_VERSION}
+        - FEATURES=sources-datadog_agent,sinks-datadog_logs
     working_dir: /home/vector
     network_mode: host
     command:
@@ -53,9 +54,9 @@ services:
     - DD_CONTAINER_EXCLUDE="name:.*"
     volumes:
     # The Agent config file
-    - ../../../tests/data/e2e/datadog/logs/agent_only/datadog.yaml:/etc/datadog-agent/datadog.yaml
+    - ../../../tests/data/e2e/datadog/logs/agent_only.yaml:/etc/datadog-agent/datadog.yaml
     # The custom logs check
-    - ../../../tests/data/e2e/datadog/logs/agent_only/logs.conf.d:/conf.d:ro
+    - ../../../tests/data/e2e/datadog/logs/logs.conf.d:/conf.d:ro
     # The custom log to tail, created by the `log_generator` service
     - log_path:/var/log/
 
@@ -74,9 +75,9 @@ services:
     - DD_CONTAINER_EXCLUDE="name:.*"
     volumes:
     # The Agent config file
-    - ../../../tests/data/e2e/datadog/logs/agent_vector/datadog.yaml:/etc/datadog-agent/datadog.yaml
+    - ../../../tests/data/e2e/datadog/logs/agent_vector.yaml:/etc/datadog-agent/datadog.yaml
     # The custom logs check
-    - ../../../tests/data/e2e/datadog/logs/agent_vector/logs.conf.d:/conf.d:ro
+    - ../../../tests/data/e2e/datadog/logs/logs.conf.d:/conf.d:ro
     # The custom log to tail, created by the `log_generator` service
     - log_path:/var/log/
 

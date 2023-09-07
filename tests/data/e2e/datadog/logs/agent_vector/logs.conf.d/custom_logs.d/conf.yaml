@@ -1,6 +1,0 @@
-logs:
-  - type: file
-    path: /var/log/a_custom.log
-    service: an_app
-    source: custom_log
-    start_position: beginning
