@@ -13,10 +13,5 @@ inputs = [ "agent.logs" ]
 type = "datadog_logs"
 default_api_key="unused"
 endpoint = "http://fakeintake-agent-vector:80/api/v2/logs"
-batch.max_events = 1
+batch.timeout_secs = 1
 compression = "gzip"
-
-[sinks.console]
-inputs = [ "agent.logs" ]
-type = "console"
-encoding.codec = "json"

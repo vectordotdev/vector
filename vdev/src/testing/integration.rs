@@ -10,6 +10,7 @@ use super::runner::{
 };
 use super::state::EnvsDir;
 use crate::app::CommandExt as _;
+use crate::util::export_rust_version;
 
 const NETWORK_ENV_VAR: &str = "VECTOR_NETWORK";
 
@@ -32,6 +33,9 @@ impl IntegrationTest {
         build_all: bool,
         retries: u8,
     ) -> Result<Self> {
+        // some tests require the rust version env var to be set
+        export_rust_version()?;
+
         let integration = integration.into();
         let environment = environment.into();
         let (test_dir, config) = IntegrationTestConfig::load(&integration)?;

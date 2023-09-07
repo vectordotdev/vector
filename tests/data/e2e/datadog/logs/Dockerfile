@@ -1,6 +1,6 @@
 ARG RUST_VERSION
 ARG DEBIAN_RELEASE=bookworm
-ARG FEATURES=sources-datadog_agent,sinks-datadog_logs,sinks-console
+ARG FEATURES=sources-datadog_agent,sinks-datadog_logs
 
 #
 # VECTOR BUILDER
