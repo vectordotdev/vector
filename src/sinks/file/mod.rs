@@ -4,6 +4,7 @@ use std::time::{Duration, Instant};
 use async_compression::tokio::write::{GzipEncoder, ZstdEncoder};
 use async_trait::async_trait;
 use bytes::{Bytes, BytesMut};
+use chrono_tz::UTC;
 use codecs::{
     encoding::{Framer, FramingConfig},
     TextSerializerConfig,
@@ -28,16 +29,18 @@ use vector_core::{
 
 use crate::{
     codecs::{Encoder, EncodingConfigWithFraming, SinkType, Transformer},
-    config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, PathTz, SinkConfig, SinkContext},
+    config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
     event::{Event, EventStatus, Finalizable},
     expiring_hash_map::ExpiringHashMap,
     internal_events::{FileBytesSent, FileIoError, FileOpen, TemplateRenderingError},
     sinks::util::StreamSink,
     template::Template,
 };
+
 mod bytes_path;
 
 use bytes_path::BytesPath;
+use vrl::compiler::TimeZone;
 
 /// Configuration for the `file` sink.
 #[serde_as]
@@ -84,12 +87,8 @@ pub struct FileSinkConfig {
     pub acknowledgements: AcknowledgementsConfig,
 
     #[configurable(derived)]
-    #[configurable(metadata(docs::examples = "Asia/Singapore"))]
-    #[serde(
-        default,
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
-    )]
-    pub path_tz: PathTz,
+    #[serde(default)]
+    pub timezone: Option<TimeZone>,
 }
 
 impl GenerateConfig for FileSinkConfig {
@@ -100,7 +99,7 @@ impl GenerateConfig for FileSinkConfig {
             encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             compression: Default::default(),
             acknowledgements: Default::default(),
-            path_tz: PathTz::default(),
+            timezone: Default::default(),
         })
         .unwrap()
     }
@@ -184,9 +183,32 @@ impl OutFile {
 impl SinkConfig for FileSinkConfig {
     async fn build(
         &self,
-        _cx: SinkContext,
+        cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        let sink = FileSink::new(self)?;
+        let timezone = match self.timezone {
+            Some(tz) => {
+                Some(tz)
+            },
+            None => {
+                match cx.globals.timezone {
+                    Some(tz) => {
+                        Some(tz)
+                    },
+                    None => {
+                        Some(TimeZone::default())
+                    }
+                }
+            }
+        };
+        let c = Self {
+            path: self.path.clone(),
+            idle_timeout: self.idle_timeout,
+            encoding: self.encoding.clone(),
+            compression: self.compression,
+            acknowledgements: self.acknowledgements,
+            timezone: timezone,
+        };
+        let sink = FileSink::new(&c)?;
         Ok((
             super::VectorSink::from_event_streamsink(sink),
             future::ok(()).boxed(),
@@ -217,9 +239,13 @@ impl FileSink {
         let transformer = config.encoding.transformer();
         let (framer, serializer) = config.encoding.build(SinkType::StreamBased)?;
         let encoder = Encoder::<Framer>::new(framer, serializer);
+        let timezone = match config.timezone.unwrap() {
+            TimeZone::Local =>  UTC,
+            TimeZone::Named(tz) => tz
+        };
 
         Ok(Self {
-            path: config.path.clone().with_timezone(config.path_tz.timezone()),
+            path: config.path.clone().with_timezone(timezone),
             transformer,
             encoder,
             idle_timeout: config.idle_timeout,
@@ -464,7 +490,7 @@ mod tests {
             encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             compression: Compression::None,
             acknowledgements: Default::default(),
-            path_tz: PathTz::default(),
+            timezone: Default::default(),
         };
 
         let (input, _events) = random_lines_with_stream(100, 64, None);
@@ -487,7 +513,7 @@ mod tests {
             encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             compression: Compression::Gzip,
             acknowledgements: Default::default(),
-            path_tz: PathTz::default(),
+            timezone: Default::default(),
         };
 
         let (input, _) = random_lines_with_stream(100, 64, None);
@@ -510,7 +536,7 @@ mod tests {
             encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             compression: Compression::Zstd,
             acknowledgements: Default::default(),
-            path_tz: PathTz::default(),
+            timezone: Default::default(),
         };
 
         let (input, _) = random_lines_with_stream(100, 64, None);
@@ -538,7 +564,7 @@ mod tests {
             encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             compression: Compression::None,
             acknowledgements: Default::default(),
-            path_tz: PathTz::default(),
+            timezone: Default::default(),
         };
 
         let (mut input, _events) = random_events_with_stream(32, 8, None);
@@ -617,7 +643,7 @@ mod tests {
             encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             compression: Compression::None,
             acknowledgements: Default::default(),
-            path_tz: PathTz::default(),
+            timezone: Default::default(),
         };
 
         let (mut input, _events) = random_lines_with_stream(10, 64, None);

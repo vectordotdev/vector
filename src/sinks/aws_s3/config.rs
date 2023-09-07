@@ -32,6 +32,8 @@ use crate::{
     tls::TlsConfig,
 };
 
+use vrl::compiler::TimeZone;
+
 /// Configuration for the `aws_s3` sink.
 #[configurable_component(sink(
     "aws_s3",
@@ -136,6 +138,10 @@ pub struct S3SinkConfig {
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     pub acknowledgements: AcknowledgementsConfig,
+
+    #[configurable(derived)]
+    #[serde(default)]
+    pub timezone: Option<TimeZone>,
 }
 
 pub(super) fn default_key_prefix() -> String {
@@ -163,6 +169,7 @@ impl GenerateConfig for S3SinkConfig {
             tls: Some(TlsConfig::default()),
             auth: AwsAuthentication::default(),
             acknowledgements: Default::default(),
+            timezone: Default::default(),
         })
         .unwrap()
     }
@@ -174,7 +181,7 @@ impl SinkConfig for S3SinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let service = self.create_service(&cx.proxy).await?;
         let healthcheck = self.build_healthcheck(service.client())?;
-        let sink = self.build_processor(service)?;
+        let sink = self.build_processor(service, cx)?;
         Ok((sink, healthcheck))
     }
 
@@ -188,7 +195,7 @@ impl SinkConfig for S3SinkConfig {
 }
 
 impl S3SinkConfig {
-    pub fn build_processor(&self, service: S3Service) -> crate::Result<VectorSink> {
+    pub fn build_processor(&self, service: S3Service, cx: SinkContext) -> crate::Result<VectorSink> {
         // Build our S3 client/service, which is what we'll ultimately feed
         // requests into in order to ship files to S3.  We build this here in
         // order to configure the client/service with retries, concurrency
@@ -214,6 +221,11 @@ impl S3SinkConfig {
         let (framer, serializer) = self.encoding.build(SinkType::MessageBased)?;
         let encoder = Encoder::<Framer>::new(framer, serializer);
 
+        let timezone = match self.timezone {
+            Some(tz) => tz,
+            None => cx.globals.timezone(),
+        };
+
         let request_options = S3RequestOptions {
             bucket: self.bucket.clone(),
             api_options: self.options.clone(),
@@ -222,6 +234,7 @@ impl S3SinkConfig {
             filename_append_uuid: self.filename_append_uuid,
             encoder: (transformer, encoder),
             compression: self.compression,
+            filename_timezone: timezone,
         };
 
         let sink = S3Sink::new(service, request_options, partitioner, batch_settings);

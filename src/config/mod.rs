@@ -30,7 +30,6 @@ pub mod format;
 mod graph;
 mod id;
 mod loading;
-pub mod path_tz;
 pub mod provider;
 pub mod schema;
 mod secret;
@@ -53,7 +52,6 @@ pub use loading::{
     load_from_str, load_source_from_paths, merge_path_lists, process_paths, COLLECTOR,
     CONFIG_PATHS,
 };
-pub use path_tz::PathTz;
 pub use provider::ProviderConfig;
 pub use secret::SecretBackend;
 pub use sink::{BoxedSink, SinkConfig, SinkContext, SinkHealthcheckOptions, SinkOuter};
