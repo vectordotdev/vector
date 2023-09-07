@@ -413,7 +413,8 @@ where
                 .service(http_client);
 
             // Any errors raised in `http_client.call` results in a `GotHttpWarning` event being emitted
-            // in `HttpClient::send`.
+            // in `HttpClient::send`. This does not result in incremeneting `component_errors_total` however,
+            // because that is incremented by the driver when retries have been exhausted.
             let response = decompression_service.call(request).await?;
 
             if response.status().is_success() {
