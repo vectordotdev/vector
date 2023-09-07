@@ -3,7 +3,7 @@ use std::{
     io::Cursor,
     sync::{
         mpsc::{sync_channel, SyncSender},
-        Arc, Weak,
+        Arc, OnceLock, Weak,
     },
     time::Duration,
 };
@@ -18,7 +18,6 @@ use codecs::{
 use futures::{Stream, StreamExt};
 use futures_util::future::OptionFuture;
 use lookup::{lookup_v2::OptionalValuePath, owned_value_path, path, OwnedValuePath};
-use once_cell::sync::OnceCell;
 use rdkafka::{
     consumer::{
         stream_consumer::StreamPartitionQueue, CommitMode, Consumer, ConsumerContext, Rebalance,
@@ -1076,10 +1075,10 @@ struct KafkaSourceContext {
     stats: kafka::KafkaStatisticsContext,
 
     /// A callback channel used to coordinate between the main consumer task and the acknowledgement task
-    callbacks: OnceCell<UnboundedSender<KafkaCallback>>,
+    callbacks: OnceLock<UnboundedSender<KafkaCallback>>,
 
     /// A weak reference to the consumer, so that we can commit offsets during a rebalance operation
-    consumer: OnceCell<Weak<StreamConsumer<KafkaSourceContext>>>,
+    consumer: OnceLock<Weak<StreamConsumer<KafkaSourceContext>>>,
 }
 
 impl KafkaSourceContext {
@@ -1087,8 +1086,8 @@ impl KafkaSourceContext {
         Self {
             stats: kafka::KafkaStatisticsContext { expose_lag_metrics },
             acknowledgements,
-            callbacks: OnceCell::default(),
-            consumer: OnceCell::default(),
+            callbacks: OnceLock::default(),
+            consumer: OnceLock::default(),
         }
     }
 
