@@ -273,7 +273,7 @@ emit the event. Change the body of `run_inner` to look like the following:
 
 ## EventSent
 
-[`EventSent`][events_sent] is emmitted by each component in Vector to
+[`EventSent`][events_sent] is emitted by each component in Vector to
 instrument how many bytes have been sent to the next downstream component.
 
 Add the following after emitting `BytesSent`:

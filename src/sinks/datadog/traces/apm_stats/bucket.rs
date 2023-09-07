@@ -94,7 +94,7 @@ fn convert_stores(agent_sketch: &AgentDDSketch) -> (BTreeMap<i32, f64>, BTreeMap
     bin_map
         .keys
         .into_iter()
-        .zip(bin_map.counts.into_iter())
+        .zip(bin_map.counts)
         .for_each(|(k, n)| {
             match k.signum() {
                 0 => zeroes = n as f64,

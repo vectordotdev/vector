@@ -1,7 +1,9 @@
 use std::cmp::Ordering;
 
 use chrono::{DateTime, TimeZone, Utc};
-use prometheus_parser::{proto, GroupKind, MetricGroup, ParserError};
+#[cfg(feature = "sources-prometheus-remote-write")]
+use prometheus_parser::proto;
+use prometheus_parser::{GroupKind, MetricGroup, ParserError};
 
 use crate::event::{
     metric::{Bucket, Metric, MetricKind, MetricTags, MetricValue, Quantile},
@@ -17,10 +19,12 @@ fn utc_timestamp(timestamp: Option<i64>, default: DateTime<Utc>) -> DateTime<Utc
         .unwrap_or(default)
 }
 
+#[cfg(any(test, feature = "sources-prometheus-scrape"))]
 pub(super) fn parse_text(packet: &str) -> Result<Vec<Event>, ParserError> {
     prometheus_parser::parse_text(packet).map(reparse_groups)
 }
 
+#[cfg(feature = "sources-prometheus-remote-write")]
 pub(super) fn parse_request(request: proto::WriteRequest) -> Result<Vec<Event>, ParserError> {
     prometheus_parser::parse_request(request).map(reparse_groups)
 }
@@ -194,10 +198,10 @@ mod test {
 
     #[test]
     fn test_counter_nan() {
-        let exp = r##"
+        let exp = r#"
             # TYPE name counter
             name{labelname="val1",basename="basevalue"} NaN
-            "##;
+            "#;
 
         match parse_text(exp).unwrap()[0].value() {
             MetricValue::Counter { value } => {
@@ -209,7 +213,7 @@ mod test {
 
     #[test]
     fn test_counter_weird() {
-        let exp = r##"
+        let exp = r#"
             # A normal comment.
             #
             # TYPE name counter
@@ -219,7 +223,7 @@ mod test {
             #    TYPE    name2 counter
             name2{labelname="val2"	,basename   =   "basevalue2"		} +Inf 1612411506789
             name2{ labelname = "val1" , }-Inf 1612411506789
-            "##;
+            "#;
 
         assert_event_data_eq!(
             parse_text(exp),
@@ -261,12 +265,12 @@ mod test {
 
     #[test]
     fn test_counter_tags_and_timestamp() {
-        let exp = r##"
+        let exp = r#"
             # HELP http_requests_total The total number of HTTP requests.
             # TYPE http_requests_total counter
             http_requests_total{method="post",code="200"} 1027 1395066363000
             http_requests_total{method="post",code="400"}    3 1395066363000
-            "##;
+            "#;
 
         assert_event_data_eq!(
             parse_text(exp),
@@ -350,9 +354,9 @@ mod test {
 
     #[test]
     fn test_gauge_minimalistic_escaped() {
-        let exp = r##"
+        let exp = r#"
             msdos_file_access_time_seconds{path="C:\\DIR\\FILE.TXT",error="Cannot find file:\n\"FILE.TXT\""} 1.458255915e9 1612411506789
-            "##;
+            "#;
 
         assert_event_data_eq!(
             parse_text(exp),
@@ -373,11 +377,11 @@ mod test {
 
     #[test]
     fn test_tag_value_contain_bracket() {
-        let exp = r##"
+        let exp = r#"
             # HELP name counter
             # TYPE name counter
             name{tag="}"} 0 1612411506789
-            "##;
+            "#;
         assert_event_data_eq!(
             parse_text(exp),
             Ok(vec![Metric::new(
@@ -392,11 +396,11 @@ mod test {
 
     #[test]
     fn test_parse_tag_value_contain_comma() {
-        let exp = r##"
+        let exp = r#"
             # HELP name counter
             # TYPE name counter
             name{tag="a,b"} 0 1612411506789
-            "##;
+            "#;
         assert_event_data_eq!(
             parse_text(exp),
             Ok(vec![Metric::new(
@@ -411,11 +415,11 @@ mod test {
 
     #[test]
     fn test_parse_tag_escaping() {
-        let exp = r##"
+        let exp = r#"
             # HELP name counter
             # TYPE name counter
             name{tag="\\n"} 0 1612411506789
-            "##;
+            "#;
         assert_event_data_eq!(
             parse_text(exp),
             Ok(vec![Metric::new(
@@ -430,11 +434,11 @@ mod test {
 
     #[test]
     fn test_parse_tag_dont_trim_value() {
-        let exp = r##"
+        let exp = r#"
             # HELP name counter
             # TYPE name counter
             name{tag=" * "} 0 1612411506789
-            "##;
+            "#;
         assert_event_data_eq!(
             parse_text(exp),
             Ok(vec![Metric::new(
@@ -449,9 +453,9 @@ mod test {
 
     #[test]
     fn test_parse_tag_value_containing_equals() {
-        let exp = r##"
+        let exp = r#"
             telemetry_scrape_size_bytes_count{registry="default",content_type="text/plain; version=0.0.4"} 1890 1612411506789
-            "##;
+            "#;
 
         assert_event_data_eq!(
             parse_text(exp),
@@ -468,27 +472,27 @@ mod test {
 
     #[test]
     fn test_parse_tag_error_no_value() {
-        let exp = r##"
+        let exp = r#"
             telemetry_scrape_size_bytes_count{registry="default",content_type} 1890 1612411506789
-            "##;
+            "#;
 
         assert!(parse_text(exp).is_err());
     }
 
     #[test]
     fn test_parse_tag_error_equals_empty_value() {
-        let exp = r##"
+        let exp = r#"
             telemetry_scrape_size_bytes_count{registry="default",content_type=} 1890 1612411506789
-            "##;
+            "#;
 
         assert!(parse_text(exp).is_err());
     }
 
     #[test]
     fn test_gauge_weird_timestamp() {
-        let exp = r##"
+        let exp = r#"
             something_weird{problem="division by zero"} +Inf -3982045000
-            "##;
+            "#;
 
         assert_event_data_eq!(
             parse_text(exp),
@@ -508,11 +512,11 @@ mod test {
 
     #[test]
     fn test_gauge_tabs() {
-        let exp = r##"
+        let exp = r#"
             # TYPE	latency	gauge
             latency{env="production"}	1.0		1395066363000
             latency{env="testing"}		2.0		1395066363000
-            "##;
+            "#;
 
         assert_event_data_eq!(
             parse_text(exp),
@@ -573,10 +577,10 @@ mod test {
 
     #[test]
     fn test_no_value() {
-        let exp = r##"
+        let exp = r#"
             # TYPE latency counter
             latency{env="production"}
-            "##;
+            "#;
 
         assert!(parse_text(exp).is_err());
     }
@@ -635,7 +639,7 @@ mod test {
 
     #[test]
     fn test_histogram() {
-        let exp = r##"
+        let exp = r#"
             # HELP http_request_duration_seconds A histogram of the request duration.
             # TYPE http_request_duration_seconds histogram
             http_request_duration_seconds_bucket{le="0.05"} 24054 1612411506789
@@ -646,7 +650,7 @@ mod test {
             http_request_duration_seconds_bucket{le="+Inf"} 144320 1612411506789
             http_request_duration_seconds_sum 53423 1612411506789
             http_request_duration_seconds_count 144320 1612411506789
-            "##;
+            "#;
 
         assert_event_data_eq!(
             parse_text(exp),
@@ -667,14 +671,14 @@ mod test {
 
     #[test]
     fn test_histogram_out_of_order() {
-        let exp = r##"
+        let exp = r#"
             # HELP duration A histogram of the request duration.
             # TYPE duration histogram
             duration_bucket{le="+Inf"} 144320 1612411506789
             duration_bucket{le="1"} 133988 1612411506789
             duration_sum 53423 1612411506789
             duration_count 144320 1612411506789
-            "##;
+            "#;
 
         assert_event_data_eq!(
             parse_text(exp),
@@ -693,7 +697,7 @@ mod test {
 
     #[test]
     fn test_histogram_backward_values() {
-        let exp = r##"
+        let exp = r#"
             # HELP duration A histogram of the request duration.
             # TYPE duration histogram
             duration_bucket{le="1"} 2000 1612411506789
@@ -701,7 +705,7 @@ mod test {
             duration_bucket{le="+Inf"} 2000 1612411506789
             duration_sum 2000 1612411506789
             duration_count 2000 1612411506789
-            "##;
+            "#;
 
         assert_event_data_eq!(
             parse_text(exp),
@@ -720,7 +724,7 @@ mod test {
 
     #[test]
     fn test_histogram_with_labels() {
-        let exp = r##"
+        let exp = r#"
             # HELP gitlab_runner_job_duration_seconds Histogram of job durations
             # TYPE gitlab_runner_job_duration_seconds histogram
             gitlab_runner_job_duration_seconds_bucket{runner="z",le="30"} 327 1612411506789
@@ -762,7 +766,7 @@ mod test {
             gitlab_runner_job_duration_seconds_bucket{runner="y",le="+Inf"} 3255 1612411506789
             gitlab_runner_job_duration_seconds_sum{runner="y"} 381111.7498891335 1612411506789
             gitlab_runner_job_duration_seconds_count{runner="y"} 3255 1612411506789
-        "##;
+        "#;
 
         assert_event_data_eq!(
             parse_text(exp),
@@ -825,7 +829,7 @@ mod test {
 
     #[test]
     fn test_summary() {
-        let exp = r##"
+        let exp = r#"
             # HELP rpc_duration_seconds A summary of the RPC duration in seconds.
             # TYPE rpc_duration_seconds summary
             rpc_duration_seconds{service="a",quantile="0.01"} 3102 1612411506789
@@ -844,7 +848,7 @@ mod test {
             go_gc_duration_seconds{quantile="1"} 0.018827136 1612411506789
             go_gc_duration_seconds_sum 4668.551713715 1612411506789
             go_gc_duration_seconds_count 602767 1612411506789
-            "##;
+            "#;
 
         assert_event_data_eq!(
             parse_text(exp),
@@ -889,7 +893,7 @@ mod test {
     // https://github.com/vectordotdev/vector/issues/3276
     #[test]
     fn test_nginx() {
-        let exp = r##"
+        let exp = r#"
             # HELP nginx_server_bytes request/response bytes
             # TYPE nginx_server_bytes counter
             nginx_server_bytes{direction="in",host="*"} 263719
@@ -906,7 +910,7 @@ mod test {
             nginx_server_cache{host="*",status="miss"} 0
             nginx_server_cache{host="*",status="revalidated"} 0
             nginx_server_cache{host="*",status="scarce"} 0
-            "##;
+            "#;
 
         let now = Utc::now();
         let result = parse_text(exp).expect("Parsing failed");

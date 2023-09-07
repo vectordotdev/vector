@@ -148,6 +148,7 @@ Podcast
 Podkicker
 Positivo
 Prestigio
+pront
 Proscan
 Qmobilevn
 RPZ
@@ -404,6 +405,7 @@ rootfs
 roundrobin
 rpmbuild
 rpms
+rstest
 rsyslog
 rsyslogd
 servlet

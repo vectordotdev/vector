@@ -17,6 +17,10 @@ impl Arbitrary for MetricValue {
     type Parameters = ();
     type Strategy = BoxedStrategy<MetricValue>;
 
+    // TODO(jszwedko): clippy allow can be removed once
+    // https://github.com/proptest-rs/proptest/commit/466d59daeca317f815bb8358e8d981bb9bd9431a is
+    // released
+    #[allow(clippy::arc_with_non_send_sync)]
     fn arbitrary_with(_: Self::Parameters) -> Self::Strategy {
         let strategy = prop_oneof![
             realistic_float().prop_map(|value| MetricValue::Counter { value }),

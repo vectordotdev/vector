@@ -1,9 +1,11 @@
+use std::sync::OnceLock;
+
 use lookup::lookup_v2::OptionalTargetPath;
 use lookup::{OwnedTargetPath, OwnedValuePath};
-use once_cell::sync::{Lazy, OnceCell};
+use once_cell::sync::Lazy;
 use vector_config::configurable_component;
 
-static LOG_SCHEMA: OnceCell<LogSchema> = OnceCell::new();
+static LOG_SCHEMA: OnceLock<LogSchema> = OnceLock::new();
 static LOG_SCHEMA_DEFAULT: Lazy<LogSchema> = Lazy::new(LogSchema::default);
 
 const MESSAGE: &str = "message";
@@ -118,6 +120,10 @@ impl LogSchema {
     ///
     /// This should only be used where the result will either be cached,
     /// or performance isn't critical, since this requires memory allocation.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the path in `self.message_key` is invalid.
     pub fn owned_message_path(&self) -> OwnedTargetPath {
         self.message_key
             .path

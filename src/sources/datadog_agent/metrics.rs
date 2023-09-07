@@ -256,8 +256,8 @@ pub(crate) fn decode_ddseries_v2(
                 .then(|| tags.replace("source_type_name".into(), serie.source_type_name));
             // As per https://github.com/DataDog/datadog-agent/blob/a62ac9fb13e1e5060b89e731b8355b2b20a07c5b/pkg/serializer/internal/metrics/iterable_series.go#L224
             // serie.unit is omitted
-            match metric_payload::MetricType::from_i32(serie.r#type) {
-                Some(metric_payload::MetricType::Count) => serie
+            match metric_payload::MetricType::try_from(serie.r#type) {
+                Ok(metric_payload::MetricType::Count) => serie
                     .points
                     .iter()
                     .map(|dd_point| {
@@ -277,7 +277,7 @@ pub(crate) fn decode_ddseries_v2(
                         .with_namespace(namespace)
                     })
                     .collect::<Vec<_>>(),
-                Some(metric_payload::MetricType::Gauge) => serie
+                Ok(metric_payload::MetricType::Gauge) => serie
                     .points
                     .iter()
                     .map(|dd_point| {
@@ -297,7 +297,7 @@ pub(crate) fn decode_ddseries_v2(
                         .with_namespace(namespace)
                     })
                     .collect::<Vec<_>>(),
-                Some(metric_payload::MetricType::Rate) => serie
+                Ok(metric_payload::MetricType::Rate) => serie
                     .points
                     .iter()
                     .map(|dd_point| {
@@ -323,7 +323,7 @@ pub(crate) fn decode_ddseries_v2(
                         .with_namespace(namespace)
                     })
                     .collect::<Vec<_>>(),
-                Some(metric_payload::MetricType::Unspecified) | None => {
+                Ok(metric_payload::MetricType::Unspecified) | Err(_) => {
                     warn!("Unspecified metric type ({}).", serie.r#type);
                     Vec::new()
                 }

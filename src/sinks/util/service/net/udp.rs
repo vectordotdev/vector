@@ -1,4 +1,4 @@
-use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
+use std::net::SocketAddr;
 
 use snafu::ResultExt;
 use tokio::net::UdpSocket;
@@ -59,7 +59,7 @@ impl UdpConnector {
             .ok_or(NetError::NoAddresses)?;
 
         let addr = SocketAddr::new(ip, self.address.port);
-        let bind_address = find_bind_address(&addr);
+        let bind_address = crate::sinks::util::udp::find_bind_address(&addr);
 
         let socket = UdpSocket::bind(bind_address).await.context(FailedToBind)?;
 
@@ -72,12 +72,5 @@ impl UdpConnector {
         socket.connect(addr).await.context(FailedToConnect)?;
 
         Ok(socket)
-    }
-}
-
-fn find_bind_address(remote_addr: &SocketAddr) -> SocketAddr {
-    match remote_addr {
-        SocketAddr::V4(_) => SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), 0),
-        SocketAddr::V6(_) => SocketAddr::new(IpAddr::V6(Ipv6Addr::UNSPECIFIED), 0),
     }
 }

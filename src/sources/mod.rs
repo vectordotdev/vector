@@ -66,7 +66,10 @@ pub mod nginx_metrics;
 pub mod opentelemetry;
 #[cfg(feature = "sources-postgresql_metrics")]
 pub mod postgresql_metrics;
-#[cfg(feature = "sources-prometheus")]
+#[cfg(any(
+    feature = "sources-prometheus-scrape",
+    feature = "sources-prometheus-remote-write"
+))]
 pub mod prometheus;
 #[cfg(feature = "sources-redis")]
 pub mod redis;

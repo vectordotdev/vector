@@ -107,10 +107,14 @@ impl EncodingConfigWithFraming {
             (None, Serializer::Avro(_) | Serializer::Native(_)) => {
                 LengthDelimitedEncoder::new().into()
             }
+            (None, Serializer::Gelf(_)) => {
+                // Graylog/GELF always uses null byte delimiter on TCP, see
+                // https://github.com/Graylog2/graylog2-server/issues/1240
+                CharacterDelimitedEncoder::new(0).into()
+            }
             (
                 None,
                 Serializer::Csv(_)
-                | Serializer::Gelf(_)
                 | Serializer::Logfmt(_)
                 | Serializer::NativeJson(_)
                 | Serializer::RawMessage(_)
@@ -224,7 +228,7 @@ mod test {
         let encoding = serde_json::from_str::<EncodingConfigWithFraming>(string).unwrap();
         let (framing, serializer) = encoding.config();
 
-        assert!(matches!(framing, None));
+        assert!(framing.is_none());
         assert!(matches!(serializer, SerializerConfig::Json(_)));
 
         let transformer = encoding.transformer();
