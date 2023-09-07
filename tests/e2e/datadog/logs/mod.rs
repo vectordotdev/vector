@@ -1,5 +1,4 @@
 use serde_json::Value;
-use std::{thread::sleep, time::Duration};
 
 use vector::test_util::trace_init;
 
@@ -57,10 +56,6 @@ fn common_assertions(payloads: &mut Vec<Value>) {
 #[tokio::test]
 async fn test_logs() {
     trace_init();
-
-    // As it stands, we do still need a small sleep to allow the events to flow through.
-    // There doesn't seem to be a great way to avoid this.
-    sleep(Duration::from_secs(5));
 
     println!("getting log payloads from agent-only pipeline");
     let mut agent_payloads = get_payloads_agent(LOGS_ENDPOIINT).await;
