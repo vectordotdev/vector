@@ -38,6 +38,7 @@ pub struct FileDescriptorSourceConfig {
 
     /// The file descriptor number to read from.
     #[configurable(metadata(docs::examples = 10))]
+    #[configurable(metadata(docs::human_name = "File Descriptor Number"))]
     pub fd: u32,
 
     /// The namespace to use for logs. This overrides the global setting.
@@ -112,6 +113,7 @@ mod tests {
         SourceSender,
     };
     use futures::StreamExt;
+    use vrl::value;
 
     #[test]
     fn generate_config() {
@@ -141,19 +143,16 @@ mod tests {
             config.build(context).await.unwrap().await.unwrap();
 
             let event = stream.next().await;
+            let message_key = log_schema().message_key().unwrap().to_string();
             assert_eq!(
                 Some("hello world".into()),
-                event.map(|event| event.as_log()[log_schema().message_key()]
-                    .to_string_lossy()
-                    .into_owned())
+                event.map(|event| event.as_log()[&message_key].to_string_lossy().into_owned())
             );
 
             let event = stream.next().await;
             assert_eq!(
                 Some("hello world again".into()),
-                event.map(|event| event.as_log()[log_schema().message_key()]
-                    .to_string_lossy()
-                    .into_owned())
+                event.map(|event| event.as_log()[message_key].to_string_lossy().into_owned())
             );
 
             let event = stream.next().await;
@@ -189,10 +188,10 @@ mod tests {
             let log = event.as_log();
             let meta = log.metadata().value();
 
-            assert_eq!(&vrl::value!("hello world"), log.value());
+            assert_eq!(&value!("hello world"), log.value());
             assert_eq!(
                 meta.get(path!("vector", "source_type")).unwrap(),
-                &vrl::value!("file_descriptor")
+                &value!("file_descriptor")
             );
             assert!(meta
                 .get(path!("vector", "ingest_timestamp"))
@@ -203,7 +202,7 @@ mod tests {
             let event = event.unwrap();
             let log = event.as_log();
 
-            assert_eq!(&vrl::value!("hello world again"), log.value());
+            assert_eq!(&value!("hello world again"), log.value());
 
             let event = stream.next().await;
             assert!(event.is_none());

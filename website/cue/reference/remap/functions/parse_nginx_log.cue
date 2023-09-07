@@ -3,8 +3,9 @@ package metadata
 remap: functions: parse_nginx_log: {
 	category:    "Parse"
 	description: """
-        Parses Nginx access and error log lines. Lines can be in [`combined`](\(urls.nginx_combined)), or [`error`](\(urls.nginx_error)) format.
-        """
+      Parses Nginx access and error log lines. Lines can be in [`combined`](\(urls.nginx_combined)),
+      [`ingress_upstreaminfo`](\(urls.nginx_ingress_upstreaminfo)) or [`error`](\(urls.nginx_error)) format.
+      """
 	notices: [
 		"""
 			Missing information in the log message may be indicated by `-`. These fields are omitted in the result.
@@ -35,8 +36,9 @@ remap: functions: parse_nginx_log: {
 			description: "The format to use for parsing the log."
 			required:    true
 			enum: {
-				"combined": "Nginx combined format"
-				"error":    "Default Nginx error format"
+				"combined":             "Nginx combined format"
+				"error":                "Default Nginx error format"
+				"ingress_upstreaminfo": "Provides detailed upstream information (Nginx Ingress Controller)"
 			}
 			type: ["string"]
 		},
@@ -59,18 +61,15 @@ remap: functions: parse_nginx_log: {
 				)
 				"""#
 			return: {
-				client:      "172.17.0.1"
-				user:        "alice"
-				timestamp:   "2021-04-01T12:02:31Z"
-				request:     "POST /not-found HTTP/1.1"
-				method:      "POST"
-				path:        "/not-found"
-				protocol:    "HTTP/1.1"
-				status:      404
-				size:        153
-				referer:     "http://localhost/somewhere"
 				agent:       "Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/72.0.3626.119 Safari/537.36"
+				client:      "172.17.0.1"
 				compression: "2.75"
+				referer:     "http://localhost/somewhere"
+				request:     "POST /not-found HTTP/1.1"
+				size:        153
+				status:      404
+				timestamp:   "2021-04-01T12:02:31Z"
+				user:        "alice"
 			}
 		},
 		{

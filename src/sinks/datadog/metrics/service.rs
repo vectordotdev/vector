@@ -10,10 +10,9 @@ use http::{
 use hyper::Body;
 use snafu::ResultExt;
 use tower::Service;
-use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
+use vector_common::request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata};
 use vector_core::{
     event::{EventFinalizers, EventStatus, Finalizable},
-    internal_event::CountByteSize,
     stream::DriverResponse,
 };
 
@@ -61,7 +60,6 @@ pub struct DatadogMetricsRequest {
     pub uri: Uri,
     pub content_type: &'static str,
     pub finalizers: EventFinalizers,
-    pub raw_bytes: usize,
     pub metadata: RequestMetadata,
 }
 
@@ -112,8 +110,12 @@ impl Finalizable for DatadogMetricsRequest {
 }
 
 impl MetaDescriptive for DatadogMetricsRequest {
-    fn get_metadata(&self) -> RequestMetadata {
-        self.metadata
+    fn get_metadata(&self) -> &RequestMetadata {
+        &self.metadata
+    }
+
+    fn metadata_mut(&mut self) -> &mut RequestMetadata {
+        &mut self.metadata
     }
 }
 
@@ -122,9 +124,7 @@ impl MetaDescriptive for DatadogMetricsRequest {
 pub struct DatadogMetricsResponse {
     status_code: StatusCode,
     body: Bytes,
-    batch_size: usize,
-    byte_size: usize,
-    raw_byte_size: usize,
+    request_metadata: RequestMetadata,
 }
 
 impl DriverResponse for DatadogMetricsResponse {
@@ -138,12 +138,13 @@ impl DriverResponse for DatadogMetricsResponse {
         }
     }
 
-    fn events_sent(&self) -> CountByteSize {
-        CountByteSize(self.batch_size, self.byte_size)
+    fn events_sent(&self) -> &GroupedCountByteSize {
+        self.request_metadata
+            .events_estimated_json_encoded_byte_size()
     }
 
     fn bytes_sent(&self) -> Option<usize> {
-        Some(self.raw_byte_size)
+        Some(self.request_metadata.request_wire_size())
     }
 }
 
@@ -177,14 +178,12 @@ impl Service<DatadogMetricsRequest> for DatadogMetricsService {
     }
 
     // Emission of Error internal event is handled upstream by the caller
-    fn call(&mut self, request: DatadogMetricsRequest) -> Self::Future {
+    fn call(&mut self, mut request: DatadogMetricsRequest) -> Self::Future {
         let client = self.client.clone();
         let api_key = self.api_key.clone();
 
         Box::pin(async move {
-            let byte_size = request.get_metadata().events_byte_size();
-            let batch_size = request.get_metadata().event_count();
-            let raw_byte_size = request.raw_bytes;
+            let request_metadata = std::mem::take(request.metadata_mut());
 
             let request = request
                 .into_http_request(api_key)
@@ -203,9 +202,7 @@ impl Service<DatadogMetricsRequest> for DatadogMetricsService {
             Ok(DatadogMetricsResponse {
                 status_code: parts.status,
                 body,
-                batch_size,
-                byte_size,
-                raw_byte_size,
+                request_metadata,
             })
         })
     }

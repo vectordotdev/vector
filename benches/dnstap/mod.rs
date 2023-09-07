@@ -1,14 +1,10 @@
 use bytes::Bytes;
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion, Throughput};
-use vector::{
-    event::LogEvent,
-    sources::dnstap::{schema::DnstapEventSchema, DnstapParser},
-};
+use vector::event::LogEvent;
+use vector::sources::dnstap::parser::DnstapParser;
 
 fn benchmark_query_parsing(c: &mut Criterion) {
     let mut event = LogEvent::default();
-    let schema = DnstapEventSchema::new();
-    let mut parser = DnstapParser::new(&schema, &mut event);
     let raw_dnstap_data = "ChVqYW1lcy1WaXJ0dWFsLU1hY2hpbmUSC0JJTkQgOS4xNi4zcnoIAxACGAEiEAAAAAAAAA\
     AAAAAAAAAAAAAqECABBQJwlAAAAAAAAAAAADAw8+0CODVA7+zq9wVNMU3WNlI2kwIAAAABAAAAAAABCWZhY2Vib29rMQNjb\
     20AAAEAAQAAKQIAAACAAAAMAAoACOxjCAG9zVgzWgUDY29tAHgB";
@@ -19,7 +15,7 @@ fn benchmark_query_parsing(c: &mut Criterion) {
     group.bench_function("dns_query_parsing", |b| {
         b.iter_batched(
             || dnstap_data.clone(),
-            |dnstap_data| parser.parse_dnstap_data(Bytes::from(dnstap_data)).unwrap(),
+            |dnstap_data| DnstapParser::parse(&mut event, Bytes::from(dnstap_data)).unwrap(),
             BatchSize::SmallInput,
         )
     });
@@ -29,8 +25,6 @@ fn benchmark_query_parsing(c: &mut Criterion) {
 
 fn benchmark_update_parsing(c: &mut Criterion) {
     let mut event = LogEvent::default();
-    let schema = DnstapEventSchema::new();
-    let mut parser = DnstapParser::new(&schema, &mut event);
     let raw_dnstap_data = "ChVqYW1lcy1WaXJ0dWFsLU1hY2hpbmUSC0JJTkQgOS4xNi4zcmsIDhABGAEiBH8AAA\
     EqBH8AAAEwrG44AEC+iu73BU14gfofUh1wi6gAAAEAAAAAAAAHZXhhbXBsZQNjb20AAAYAAWC+iu73BW0agDwvch1wi6gAA\
     AEAAAAAAAAHZXhhbXBsZQNjb20AAAYAAXgB";
@@ -41,7 +35,7 @@ fn benchmark_update_parsing(c: &mut Criterion) {
     group.bench_function("dns_update_parsing", |b| {
         b.iter_batched(
             || dnstap_data.clone(),
-            |dnstap_data| parser.parse_dnstap_data(Bytes::from(dnstap_data)).unwrap(),
+            |dnstap_data| DnstapParser::parse(&mut event, Bytes::from(dnstap_data)).unwrap(),
             BatchSize::SmallInput,
         )
     });

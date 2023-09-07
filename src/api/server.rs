@@ -9,6 +9,7 @@ use async_graphql::{
     Data, Request, Schema,
 };
 use async_graphql_warp::{graphql_protocol, GraphQLResponse, GraphQLWebSocket};
+use tokio::runtime::Handle;
 use tokio::sync::oneshot;
 use warp::{filters::BoxedFilter, http::Response, ws::Ws, Filter, Reply};
 
@@ -31,13 +32,13 @@ impl Server {
         config: &config::Config,
         watch_rx: topology::WatchRx,
         running: Arc<AtomicBool>,
-        runtime: &tokio::runtime::Runtime,
+        handle: &Handle,
     ) -> crate::Result<Self> {
         let routes = make_routes(config.api.playground, watch_rx, running);
 
         let (_shutdown, rx) = oneshot::channel();
         // warp uses `tokio::spawn` and so needs us to enter the runtime context.
-        let _guard = runtime.enter();
+        let _guard = handle.enter();
         let (addr, server) = warp::serve(routes)
             .try_bind_with_graceful_shutdown(
                 config.api.address.expect("No socket address"),
@@ -57,7 +58,7 @@ impl Server {
         schema::components::update_config(config);
 
         // Spawn the server in the background.
-        runtime.spawn(server);
+        handle.spawn(server);
 
         Ok(Self { _shutdown, addr })
     }

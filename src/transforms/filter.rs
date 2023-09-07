@@ -96,11 +96,15 @@ impl FunctionTransform for Filter {
 
 #[cfg(test)]
 mod test {
+    use std::sync::Arc;
+
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
+    use vector_common::config::ComponentKey;
     use vector_core::event::{Metric, MetricKind, MetricValue};
 
     use super::*;
+    use crate::config::schema::Definition;
     use crate::{
         conditions::ConditionConfig,
         event::{Event, LogEvent},
@@ -122,8 +126,13 @@ mod test {
             let (topology, mut out) =
                 create_topology(ReceiverStream::new(rx), transform_config).await;
 
-            let log = Event::from(LogEvent::from("message"));
+            let mut log = Event::from(LogEvent::from("message"));
             tx.send(log.clone()).await.unwrap();
+
+            log.set_source_id(Arc::new(ComponentKey::from("in")));
+            log.set_upstream_id(Arc::new(OutputId::from("transform")));
+            log.metadata_mut()
+                .set_schema_definition(&Arc::new(Definition::default_legacy_namespace()));
 
             assert_eq!(out.recv().await.unwrap(), log);
 

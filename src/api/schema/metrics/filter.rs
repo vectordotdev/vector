@@ -5,8 +5,8 @@ use tokio::time::Duration;
 use tokio_stream::{Stream, StreamExt};
 
 use super::{
-    filter_output_metric, EventsInTotal, EventsOutTotal, OutputThroughput, ProcessedBytesTotal,
-    ProcessedEventsTotal, ReceivedEventsTotal, SentEventsTotal,
+    filter_output_metric, OutputThroughput, ReceivedBytesTotal, ReceivedEventsTotal,
+    SentBytesTotal, SentEventsTotal,
 };
 use crate::{
     config::ComponentKey,
@@ -46,31 +46,20 @@ fn sum_metrics_owned<I: IntoIterator<Item = Metric>>(metrics: I) -> Option<Metri
 }
 
 pub trait MetricsFilter<'a> {
-    fn processed_events_total(&self) -> Option<ProcessedEventsTotal>;
-    fn processed_bytes_total(&self) -> Option<ProcessedBytesTotal>;
+    fn received_bytes_total(&self) -> Option<ReceivedBytesTotal>;
     fn received_events_total(&self) -> Option<ReceivedEventsTotal>;
-    fn events_in_total(&self) -> Option<EventsInTotal>;
-    fn events_out_total(&self) -> Option<EventsOutTotal>;
+    fn sent_bytes_total(&self) -> Option<SentBytesTotal>;
     fn sent_events_total(&self) -> Option<SentEventsTotal>;
 }
 
 impl<'a> MetricsFilter<'a> for Vec<Metric> {
-    fn processed_events_total(&self) -> Option<ProcessedEventsTotal> {
-        let sum = sum_metrics(self.iter().filter(|m| m.name() == "processed_events_total"))?;
+    fn received_bytes_total(&self) -> Option<ReceivedBytesTotal> {
+        let sum = sum_metrics(
+            self.iter()
+                .filter(|m| m.name() == "component_received_bytes_total"),
+        )?;
 
-        Some(ProcessedEventsTotal::new(sum))
-    }
-
-    fn processed_bytes_total(&self) -> Option<ProcessedBytesTotal> {
-        let sum = sum_metrics(self.iter().filter(|m| m.name() == "processed_bytes_total"))?;
-
-        Some(ProcessedBytesTotal::new(sum))
-    }
-
-    fn events_in_total(&self) -> Option<EventsInTotal> {
-        let sum = sum_metrics(self.iter().filter(|m| m.name() == "events_in_total"))?;
-
-        Some(EventsInTotal::new(sum))
+        Some(ReceivedBytesTotal::new(sum))
     }
 
     fn received_events_total(&self) -> Option<ReceivedEventsTotal> {
@@ -82,10 +71,13 @@ impl<'a> MetricsFilter<'a> for Vec<Metric> {
         Some(ReceivedEventsTotal::new(sum))
     }
 
-    fn events_out_total(&self) -> Option<EventsOutTotal> {
-        let sum = sum_metrics(self.iter().filter(|m| m.name() == "events_out_total"))?;
+    fn sent_bytes_total(&self) -> Option<SentBytesTotal> {
+        let sum = sum_metrics(
+            self.iter()
+                .filter(|m| m.name() == "component_sent_bytes_total"),
+        )?;
 
-        Some(EventsOutTotal::new(sum))
+        Some(SentBytesTotal::new(sum))
     }
 
     fn sent_events_total(&self) -> Option<SentEventsTotal> {
@@ -99,24 +91,14 @@ impl<'a> MetricsFilter<'a> for Vec<Metric> {
 }
 
 impl<'a> MetricsFilter<'a> for Vec<&'a Metric> {
-    fn processed_events_total(&self) -> Option<ProcessedEventsTotal> {
+    fn received_bytes_total(&self) -> Option<ReceivedBytesTotal> {
         let sum = sum_metrics(
             self.iter()
-                .filter(|m| m.name() == "processed_events_total")
+                .filter(|m| m.name() == "component_received_bytes_total")
                 .copied(),
         )?;
 
-        Some(ProcessedEventsTotal::new(sum))
-    }
-
-    fn processed_bytes_total(&self) -> Option<ProcessedBytesTotal> {
-        let sum = sum_metrics(
-            self.iter()
-                .filter(|m| m.name() == "processed_bytes_total")
-                .copied(),
-        )?;
-
-        Some(ProcessedBytesTotal::new(sum))
+        Some(ReceivedBytesTotal::new(sum))
     }
 
     fn received_events_total(&self) -> Option<ReceivedEventsTotal> {
@@ -129,24 +111,14 @@ impl<'a> MetricsFilter<'a> for Vec<&'a Metric> {
         Some(ReceivedEventsTotal::new(sum))
     }
 
-    fn events_in_total(&self) -> Option<EventsInTotal> {
+    fn sent_bytes_total(&self) -> Option<SentBytesTotal> {
         let sum = sum_metrics(
             self.iter()
-                .filter(|m| m.name() == "events_in_total")
+                .filter(|m| m.name() == "component_sent_bytes_total")
                 .copied(),
         )?;
 
-        Some(EventsInTotal::new(sum))
-    }
-
-    fn events_out_total(&self) -> Option<EventsOutTotal> {
-        let sum = sum_metrics(
-            self.iter()
-                .filter(|m| m.name() == "events_out_total")
-                .copied(),
-        )?;
-
-        Some(EventsOutTotal::new(sum))
+        Some(SentBytesTotal::new(sum))
     }
 
     fn sent_events_total(&self) -> Option<SentEventsTotal> {
@@ -202,7 +174,7 @@ pub fn by_component_key(component_key: &ComponentKey) -> Vec<Metric> {
 type MetricFilterFn = dyn Fn(&Metric) -> bool + Send + Sync;
 
 /// Returns a stream of `Vec<Metric>`, where `metric_name` matches the name of the metric
-/// (e.g. "processed_events_total"), and the value is derived from `MetricValue::Counter`. Uses a
+/// (e.g. "component_sent_events_total"), and the value is derived from `MetricValue::Counter`. Uses a
 /// local cache to match against the `component_id` of a metric, to return results only when
 /// the value of a current iteration is greater than the previous. This is useful for the client
 /// to be notified as metrics increase without returning 'empty' or identical results.
@@ -230,7 +202,7 @@ pub fn component_counter_metrics(
 }
 
 /// Returns a stream of `Vec<Metric>`, where `metric_name` matches the name of the metric
-/// (e.g. "processed_events_total"), and the value is derived from `MetricValue::Gauge`. Uses a
+/// (e.g. "component_sent_events_total"), and the value is derived from `MetricValue::Gauge`. Uses a
 /// local cache to match against the `component_id` of a metric, to return results only when
 /// the value of a current iteration is greater than the previous. This is useful for the client
 /// to be notified as metrics increase without returning 'empty' or identical results.

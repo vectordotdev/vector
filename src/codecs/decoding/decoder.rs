@@ -27,7 +27,7 @@ impl Default for Decoder {
     fn default() -> Self {
         Self {
             framer: Framer::NewlineDelimited(NewlineDelimitedDecoder::new()),
-            deserializer: Deserializer::Bytes(BytesDeserializer::new()),
+            deserializer: Deserializer::Bytes(BytesDeserializer),
             log_namespace: LogNamespace::Legacy,
         }
     }
@@ -109,7 +109,7 @@ mod tests {
     };
     use futures::{stream, StreamExt};
     use tokio_util::{codec::FramedRead, io::StreamReader};
-    use value::Value;
+    use vrl::value::Value;
 
     #[tokio::test]
     async fn framed_read_recover_from_error() {
@@ -122,7 +122,7 @@ mod tests {
         let reader = StreamReader::new(stream);
         let decoder = Decoder::new(
             Framer::NewlineDelimited(NewlineDelimitedDecoder::new()),
-            Deserializer::Json(JsonDeserializer::new()),
+            Deserializer::Json(JsonDeserializer::default()),
         );
         let mut stream = FramedRead::new(reader, decoder);
 

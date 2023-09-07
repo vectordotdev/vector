@@ -3,7 +3,7 @@ mod optional_path;
 pub use optional_path::{OptionalTargetPath, OptionalValuePath};
 use vector_config_macros::configurable_component;
 
-pub use lookup::lookup_v2::{
+pub use vrl::path::{
     parse_target_path, parse_value_path, BorrowedSegment, OwnedSegment, OwnedTargetPath,
     OwnedValuePath, PathConcat, PathParseError, PathPrefix, TargetPath, ValuePath,
 };
@@ -38,6 +38,13 @@ impl<'a> ValuePath<'a> for &'a ConfigValuePath {
     }
 }
 
+#[cfg(any(test, feature = "test"))]
+impl From<&str> for ConfigValuePath {
+    fn from(path: &str) -> Self {
+        ConfigValuePath::try_from(path.to_string()).unwrap()
+    }
+}
+
 /// A wrapper around `OwnedTargetPath` that allows it to be used in Vector config
 /// with prefix default to `PathPrefix::Event`
 #[configurable_component]
@@ -68,5 +75,12 @@ impl<'a> TargetPath<'a> for &'a ConfigTargetPath {
 
     fn value_path(&self) -> Self::ValuePath {
         &self.0.path
+    }
+}
+
+#[cfg(any(test, feature = "test"))]
+impl From<&str> for ConfigTargetPath {
+    fn from(path: &str) -> Self {
+        ConfigTargetPath::try_from(path.to_string()).unwrap()
     }
 }

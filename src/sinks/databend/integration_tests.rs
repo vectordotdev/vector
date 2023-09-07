@@ -124,7 +124,7 @@ async fn insert_event_with_cfg(cfg: String, table: String, client: DatabendAPICl
         .unwrap();
 
     let (config, _) = load_sink::<DatabendConfig>(&cfg).unwrap();
-    let (sink, _hc) = config.build(SinkContext::new_test()).await.unwrap();
+    let (sink, _hc) = config.build(SinkContext::default()).await.unwrap();
 
     let (input_event, mut receiver) = make_event();
     run_and_assert_sink_compliance(

@@ -87,6 +87,7 @@ pub struct AwsEcsMetricsSourceConfig {
     /// The interval between scrapes, in seconds.
     #[serde(default = "default_scrape_interval_secs")]
     #[serde_as(as = "serde_with::DurationSeconds<u64>")]
+    #[configurable(metadata(docs::human_name = "Scrape Interval"))]
     scrape_interval_secs: Duration,
 
     /// The namespace of the metric.
@@ -206,8 +207,8 @@ async fn aws_ecs_metrics(
                                     endpoint: uri.path(),
                                 });
 
-                                if let Err(error) = out.send_batch(metrics).await {
-                                    emit!(StreamClosedError { error, count });
+                                if (out.send_batch(metrics).await).is_err() {
+                                    emit!(StreamClosedError { count });
                                     return Err(());
                                 }
                             }
@@ -271,7 +272,7 @@ mod test {
         let make_svc = make_service_fn(|_| async {
             Ok::<_, Error>(service_fn(|_| async {
                 Ok::<_, Error>(Response::new(Body::from(
-                    r##"
+                    r#"
                     {
                         "0cf54b87-f0f0-4044-b9d6-20dc54d5c414-3822082590": {
                             "read": "2020-09-23T20:32:26.292561674Z",
@@ -562,7 +563,7 @@ mod test {
                             }
                         }
                     }
-                    "##,
+                    "#,
                 )))
             }))
         });

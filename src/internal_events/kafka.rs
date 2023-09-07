@@ -1,7 +1,11 @@
 use metrics::{counter, gauge};
 use vector_core::{internal_event::InternalEvent, update_counter};
+use vrl::path::OwnedTargetPath;
 
-use vector_common::internal_event::{error_stage, error_type};
+use vector_common::{
+    internal_event::{error_stage, error_type},
+    json_size::JsonSize,
+};
 
 #[derive(Debug)]
 pub struct KafkaBytesReceived<'a> {
@@ -32,7 +36,7 @@ impl<'a> InternalEvent for KafkaBytesReceived<'a> {
 
 #[derive(Debug)]
 pub struct KafkaEventsReceived<'a> {
-    pub byte_size: usize,
+    pub byte_size: JsonSize,
     pub count: usize,
     pub topic: &'a str,
     pub partition: i32,
@@ -50,12 +54,10 @@ impl<'a> InternalEvent for KafkaEventsReceived<'a> {
         counter!("component_received_events_total", self.count as u64, "topic" => self.topic.to_string(), "partition" => self.partition.to_string());
         counter!(
             "component_received_event_bytes_total",
-            self.byte_size as u64,
+            self.byte_size.get() as u64,
             "topic" => self.topic.to_string(),
             "partition" => self.partition.to_string(),
         );
-        // deprecated
-        counter!("events_in_total", self.count as u64);
     }
 }
 
@@ -106,8 +108,6 @@ impl InternalEvent for KafkaReadError {
             "error_type" => error_type::READER_FAILED,
             "stage" => error_stage::RECEIVING,
         );
-        // deprecated
-        counter!("events_failed_total", 1);
     }
 }
 
@@ -162,7 +162,7 @@ impl InternalEvent for KafkaStatisticsReceived<'_> {
 }
 
 pub struct KafkaHeaderExtractionError<'a> {
-    pub header_field: &'a str,
+    pub header_field: &'a OwnedTargetPath,
 }
 
 impl InternalEvent for KafkaHeaderExtractionError<'_> {
@@ -172,7 +172,7 @@ impl InternalEvent for KafkaHeaderExtractionError<'_> {
             error_code = "extracting_header",
             error_type = error_type::PARSER_FAILED,
             stage = error_stage::RECEIVING,
-            header_field = self.header_field,
+            header_field = self.header_field.to_string(),
             internal_log_rate_limit = true,
         );
         counter!(

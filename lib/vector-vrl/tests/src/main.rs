@@ -4,12 +4,12 @@
 mod docs;
 mod test_enrichment;
 
-use vrl_tests::{get_tests_from_functions, run_tests, Test, TestConfig};
+use vrl::test::{get_tests_from_functions, run_tests, Test, TestConfig};
 
 use chrono_tz::Tz;
 use clap::Parser;
 use glob::glob;
-use vrl::{CompileConfig, TimeZone, VrlRuntime};
+use vrl::compiler::{CompileConfig, TimeZone, VrlRuntime};
 
 #[cfg(not(target_env = "msvc"))]
 #[global_allocator]
@@ -93,7 +93,7 @@ fn main() {
         timezone: cmd.timezone(),
     };
 
-    let mut functions = stdlib::all();
+    let mut functions = vrl::stdlib::all();
     functions.extend(vector_vrl_functions::all());
     functions.extend(enrichment::vrl_functions());
 
@@ -118,7 +118,7 @@ fn get_tests(cmd: &Cmd) -> Vec<Test> {
             let path = entry.ok()?;
             Some(Test::from_path(&path))
         })
-        .chain(docs::tests(cmd.ignore_cue).into_iter())
+        .chain(docs::tests(cmd.ignore_cue))
         .chain(get_tests_from_functions(
             vector_vrl_functions::all()
                 .into_iter()

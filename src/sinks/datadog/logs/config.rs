@@ -2,9 +2,9 @@ use std::{convert::TryFrom, sync::Arc};
 
 use indoc::indoc;
 use tower::ServiceBuilder;
-use value::Kind;
 use vector_config::configurable_component;
-use vector_core::config::proxy::ProxyConfig;
+use vector_core::{config::proxy::ProxyConfig, schema::meaning};
+use vrl::value::Kind;
 
 use super::{service::LogApiRetry, sink::LogSinkBuilder};
 use crate::{
@@ -46,7 +46,7 @@ impl SinkBatchSettings for DatadogLogsDefaultBatchSettings {
 }
 
 /// Configuration for the `datadog_logs` sink.
-#[configurable_component(sink("datadog_logs"))]
+#[configurable_component(sink("datadog_logs", "Publish log events to Datadog."))]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct DatadogLogsConfig {
@@ -160,6 +160,7 @@ impl DatadogLogsConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "datadog_logs")]
 impl SinkConfig for DatadogLogsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let client = self.create_client(&cx.proxy)?;
@@ -175,13 +176,13 @@ impl SinkConfig for DatadogLogsConfig {
 
     fn input(&self) -> Input {
         let requirement = schema::Requirement::empty()
-            .required_meaning("message", Kind::bytes())
-            .required_meaning("timestamp", Kind::timestamp())
-            .optional_meaning("host", Kind::bytes())
-            .optional_meaning("source", Kind::bytes())
-            .optional_meaning("severity", Kind::bytes())
-            .optional_meaning("service", Kind::bytes())
-            .optional_meaning("trace_id", Kind::bytes());
+            .required_meaning(meaning::MESSAGE, Kind::bytes())
+            .required_meaning(meaning::TIMESTAMP, Kind::timestamp())
+            .optional_meaning(meaning::HOST, Kind::bytes())
+            .optional_meaning(meaning::SOURCE, Kind::bytes())
+            .optional_meaning(meaning::SEVERITY, Kind::bytes())
+            .optional_meaning(meaning::SERVICE, Kind::bytes())
+            .optional_meaning(meaning::TRACE_ID, Kind::bytes());
 
         Input::log().with_schema_requirement(requirement)
     }
@@ -193,7 +194,7 @@ impl SinkConfig for DatadogLogsConfig {
 
 #[cfg(test)]
 mod test {
-    use crate::sinks::datadog::logs::DatadogLogsConfig;
+    use super::super::config::DatadogLogsConfig;
 
     #[test]
     fn generate_config() {

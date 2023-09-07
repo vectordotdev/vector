@@ -117,7 +117,7 @@ fn examples_to_tests(
 }
 
 fn test_from_cue_example(category: &'static str, name: String, example: Example) -> Test {
-    use ::value::Value;
+    use vrl::value::Value;
 
     let Example {
         title,

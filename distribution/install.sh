@@ -12,7 +12,7 @@ set -u
 
 # If PACKAGE_ROOT is unset or empty, default it.
 PACKAGE_ROOT="${PACKAGE_ROOT:-"https://packages.timber.io/vector"}"
-VECTOR_VERSION="0.29.1"
+VECTOR_VERSION="0.32.1"
 _divider="--------------------------------------------------------------------------------"
 _prompt=">>>"
 _indent="   "
@@ -76,9 +76,11 @@ main() {
                 ;;
             --no-modify-path)
                 modify_path=no
+                shift
                 ;;
             -y)
                 prompt=no
+                shift
                 ;;
             *)
                 ;;
@@ -139,6 +141,7 @@ install_from_archive() {
     assert_nz "$_arch" "arch"
 
     local _archive_arch=""
+
     case "$_arch" in
         x86_64-apple-darwin)
             _archive_arch=$_arch
@@ -149,16 +152,26 @@ install_from_archive() {
         x86_64-*linux*-musl)
             _archive_arch="x86_64-unknown-linux-musl"
             ;;
+        aarch64-apple-darwin)
+            # This if statement can be removed when Vector publishes aarch64-apple-darwin builds
+            if /usr/bin/pgrep oahd >/dev/null 2>&1; then
+                echo "Rosetta is installed, installing x86_64-apple-darwin archive"
+                _archive_arch="x86_64-apple-darwin"
+            else
+                echo "Builds for Apple Silicon are not published today, please install Rosetta"
+                err "unsupported arch: $_arch"
+            fi
+            ;;
         aarch64-*linux*)
             _archive_arch="aarch64-unknown-linux-musl"
             ;;
-	    armv7-*linux*-gnu)
+        armv7-*linux*-gnueabihf)
             _archive_arch="armv7-unknown-linux-gnueabihf"
             ;;
-	    armv7-*linux*-musl)
+        armv7-*linux*-musleabihf)
             _archive_arch="armv7-unknown-linux-musleabihf"
             ;;
-        *)
+          *)
             err "unsupported arch: $_arch"
             ;;
     esac
@@ -203,7 +216,7 @@ install_from_archive() {
     printf " ✓\n"
 
     if [ "$modify_path" = "yes" ]; then
-      local _path="export PATH=$PATH:$prefix/bin"
+      local _path="export PATH=\"$PATH:$prefix/bin\""
       add_to_path "${HOME}/.zprofile" "${_path}"
       add_to_path "${HOME}/.profile" "${_path}"
     fi

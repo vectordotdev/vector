@@ -3,7 +3,11 @@ use std::{collections::BTreeMap, fmt::Debug};
 use lookup::lookup_v2::TargetPath;
 use serde::{Deserialize, Serialize};
 use vector_buffers::EventCount;
-use vector_common::EventDataEq;
+use vector_common::{
+    internal_event::TaggedEventsSent, json_size::JsonSize, request_metadata::GetEventCountTags,
+    EventDataEq,
+};
+use vrl::path::PathParseError;
 
 use super::{
     BatchNotifier, EstimatedJsonEncodedSizeOf, EventFinalizer, EventFinalizers, EventMetadata,
@@ -68,25 +72,46 @@ impl TraceEvent {
         self.0.as_map().expect("inner value must be a map")
     }
 
+    /// Parse the specified `path` and if there are no parsing errors, attempt to get a reference to a value.
+    /// # Errors
+    /// Will return an error if path parsing failed.
+    pub fn parse_path_and_get_value(
+        &self,
+        path: impl AsRef<str>,
+    ) -> Result<Option<&Value>, PathParseError> {
+        self.0.parse_path_and_get_value(path)
+    }
+
     #[allow(clippy::needless_pass_by_value)] // TargetPath is always a reference
     pub fn get<'a>(&self, key: impl TargetPath<'a>) -> Option<&Value> {
         self.0.get(key)
     }
 
-    pub fn get_mut(&mut self, key: impl AsRef<str>) -> Option<&mut Value> {
-        self.0.get_mut(key.as_ref())
+    pub fn get_mut<'a>(&mut self, key: impl TargetPath<'a>) -> Option<&mut Value> {
+        self.0.get_mut(key)
     }
 
-    pub fn contains(&self, key: impl AsRef<str>) -> bool {
-        self.0.contains(key.as_ref())
+    pub fn contains<'a>(&self, key: impl TargetPath<'a>) -> bool {
+        self.0.contains(key)
     }
 
-    pub fn insert(
+    pub fn insert<'a>(
         &mut self,
-        key: impl AsRef<str>,
+        key: impl TargetPath<'a>,
         value: impl Into<Value> + Debug,
     ) -> Option<Value> {
-        self.0.insert(key.as_ref(), value.into())
+        self.0.insert(key, value.into())
+    }
+
+    pub fn maybe_insert<'a, F: FnOnce() -> Value>(
+        &mut self,
+        path: Option<impl TargetPath<'a>>,
+        value_callback: F,
+    ) -> Option<Value> {
+        if let Some(path) = path {
+            return self.0.insert(path, value_callback());
+        }
+        None
     }
 }
 
@@ -109,7 +134,7 @@ impl ByteSizeOf for TraceEvent {
 }
 
 impl EstimatedJsonEncodedSizeOf for TraceEvent {
-    fn estimated_json_encoded_size_of(&self) -> usize {
+    fn estimated_json_encoded_size_of(&self) -> JsonSize {
         self.0.estimated_json_encoded_size_of()
     }
 }
@@ -141,5 +166,11 @@ impl AsRef<LogEvent> for TraceEvent {
 impl AsMut<LogEvent> for TraceEvent {
     fn as_mut(&mut self) -> &mut LogEvent {
         &mut self.0
+    }
+}
+
+impl GetEventCountTags for TraceEvent {
+    fn get_tags(&self) -> TaggedEventsSent {
+        self.0.get_tags()
     }
 }

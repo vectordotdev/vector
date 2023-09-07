@@ -3,13 +3,13 @@ use codecs::BytesDeserializerConfig;
 use futures::{stream, StreamExt};
 use lookup::lookup_v2::OptionalValuePath;
 use lookup::{owned_value_path, path, OwnedValuePath};
-use value::Kind;
 use vector_config::configurable_component;
 use vector_core::config::log_schema;
 use vector_core::{
     config::{LegacyKey, LogNamespace},
     schema::Definition,
 };
+use vrl::value::Kind;
 
 use crate::{
     config::{DataType, SourceConfig, SourceContext, SourceOutput},
@@ -53,7 +53,7 @@ pub struct InternalLogsConfig {
 }
 
 fn default_host_key() -> OptionalValuePath {
-    OptionalValuePath::from(owned_value_path!(log_schema().host_key()))
+    log_schema().host_key().cloned().into()
 }
 
 fn default_pid_key() -> OptionalValuePath {
@@ -155,12 +155,14 @@ async fn run(
     // any logs that don't break the loop, as that could cause an
     // infinite loop since it receives all such logs.
     while let Some(mut log) = rx.next().await {
-        let byte_size = log.estimated_json_encoded_size_of();
+        // TODO: Should this actually be in memory size?
+        let byte_size = log.estimated_json_encoded_size_of().get();
+        let json_byte_size = log.estimated_json_encoded_size_of();
         // This event doesn't emit any log
         emit!(InternalLogsBytesReceived { byte_size });
         emit!(InternalLogsEventsReceived {
             count: 1,
-            byte_size,
+            byte_size: json_byte_size,
         });
 
         if let Ok(hostname) = &hostname {
@@ -189,9 +191,9 @@ async fn run(
             Utc::now(),
         );
 
-        if let Err(error) = out.send_event(Event::from(log)).await {
+        if (out.send_event(Event::from(log)).await).is_err() {
             // this wont trigger any infinite loop considering it stops the component
-            emit!(StreamClosedError { error, count: 1 });
+            emit!(StreamClosedError { count: 1 });
             return Err(());
         }
     }
@@ -204,8 +206,8 @@ mod tests {
     use futures::Stream;
     use lookup::OwnedTargetPath;
     use tokio::time::{sleep, Duration};
-    use value::kind::Collection;
     use vector_core::event::Value;
+    use vrl::value::kind::Collection;
 
     use super::*;
     use crate::{

@@ -14,7 +14,7 @@ fn event_iteration() {
     log.insert("Pitbull", "The bigger they are, the harder they fall");
 
     let all = log
-        .all_fields()
+        .all_event_fields()
         .unwrap()
         .map(|(k, v)| (k, v.to_string_lossy()))
         .collect::<HashSet<_>>();
@@ -39,7 +39,7 @@ fn event_iteration_order() {
     log.insert("o9amkaRY", Value::from("pGsfG7Nr"));
     log.insert("YRjhxXcg", Value::from("nw8iM5Jr"));
 
-    let collected: Vec<_> = log.all_fields().unwrap().collect();
+    let collected: Vec<_> = log.all_event_fields().unwrap().collect();
     assert_eq!(
         collected,
         vec![

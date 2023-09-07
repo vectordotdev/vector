@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use lookup::OwnedTargetPath;
-use value::Kind;
+use vrl::value::Kind;
 
 use crate::config::LogNamespace;
 
@@ -14,7 +14,7 @@ use super::Definition;
 #[derive(Debug, Clone, PartialEq)]
 pub struct Requirement {
     /// Semantic meanings configured for this requirement.
-    meaning: BTreeMap<&'static str, SemanticMeaning>,
+    meaning: BTreeMap<String, SemanticMeaning>,
 }
 
 /// The semantic meaning of an event.
@@ -52,7 +52,7 @@ impl Requirement {
 
     /// Add a restriction to the schema.
     #[must_use]
-    pub fn required_meaning(mut self, meaning: &'static str, kind: Kind) -> Self {
+    pub fn required_meaning(mut self, meaning: impl Into<String>, kind: Kind) -> Self {
         self.insert_meaning(meaning, kind, false);
         self
     }
@@ -63,14 +63,14 @@ impl Requirement {
     /// specified meaning defined, but invalid for that meaning to be defined, but its [`Kind`] not
     /// matching the configured expectation.
     #[must_use]
-    pub fn optional_meaning(mut self, meaning: &'static str, kind: Kind) -> Self {
+    pub fn optional_meaning(mut self, meaning: impl Into<String>, kind: Kind) -> Self {
         self.insert_meaning(meaning, kind, true);
         self
     }
 
-    fn insert_meaning(&mut self, identifier: &'static str, kind: Kind, optional: bool) {
+    fn insert_meaning(&mut self, identifier: impl Into<String>, kind: Kind, optional: bool) {
         let meaning = SemanticMeaning { kind, optional };
-        self.meaning.insert(identifier, meaning);
+        self.meaning.insert(identifier.into(), meaning);
     }
 
     /// Validate the provided [`Definition`] against the current requirement.
@@ -97,7 +97,10 @@ impl Requirement {
             // Check if we're dealing with an invalid meaning, meaning the definition has a single
             // meaning identifier pointing to multiple paths.
             if let Some(paths) = definition.invalid_meaning(identifier).cloned() {
-                errors.push(ValidationError::MeaningDuplicate { identifier, paths });
+                errors.push(ValidationError::MeaningDuplicate {
+                    identifier: identifier.clone(),
+                    paths,
+                });
                 continue;
             }
 
@@ -118,14 +121,16 @@ impl Requirement {
                         // The semantic meaning kind does not match the expected
                         // kind, so we can't use it in the sink.
                         errors.push(ValidationError::MeaningKind {
-                            identifier,
+                            identifier: identifier.clone(),
                             want: req_meaning.kind.clone(),
                             got: definition_kind,
                         });
                     }
                 }
                 None if !req_meaning.optional => {
-                    errors.push(ValidationError::MeaningMissing { identifier });
+                    errors.push(ValidationError::MeaningMissing {
+                        identifier: identifier.clone(),
+                    });
                 }
                 _ => {}
             }
@@ -176,18 +181,18 @@ impl std::fmt::Display for ValidationErrors {
 #[allow(clippy::enum_variant_names)]
 pub enum ValidationError {
     /// A required semantic meaning is missing.
-    MeaningMissing { identifier: &'static str },
+    MeaningMissing { identifier: String },
 
     /// A semantic meaning has an invalid `[Kind]`.
     MeaningKind {
-        identifier: &'static str,
+        identifier: String,
         want: Kind,
         got: Kind,
     },
 
     /// A semantic meaning is pointing to multiple paths.
     MeaningDuplicate {
-        identifier: &'static str,
+        identifier: String,
         paths: BTreeSet<OwnedTargetPath>,
     },
 }
@@ -301,7 +306,9 @@ mod tests {
                 TestCase {
                     requirement: Requirement::empty().required_meaning("foo", Kind::any()),
                     definition: Definition::default_for_namespace(&[LogNamespace::Vector].into()),
-                    errors: vec![ValidationError::MeaningMissing { identifier: "foo" }],
+                    errors: vec![ValidationError::MeaningMissing {
+                        identifier: "foo".into(),
+                    }],
                 },
             ),
             (
@@ -312,8 +319,12 @@ mod tests {
                         .required_meaning("bar", Kind::any()),
                     definition: Definition::default_for_namespace(&[LogNamespace::Vector].into()),
                     errors: vec![
-                        ValidationError::MeaningMissing { identifier: "bar" },
-                        ValidationError::MeaningMissing { identifier: "foo" },
+                        ValidationError::MeaningMissing {
+                            identifier: "bar".into(),
+                        },
+                        ValidationError::MeaningMissing {
+                            identifier: "foo".into(),
+                        },
                     ],
                 },
             ),
@@ -332,7 +343,9 @@ mod tests {
                         .optional_meaning("foo", Kind::any())
                         .required_meaning("bar", Kind::any()),
                     definition: Definition::default_for_namespace(&[LogNamespace::Vector].into()),
-                    errors: vec![ValidationError::MeaningMissing { identifier: "bar" }],
+                    errors: vec![ValidationError::MeaningMissing {
+                        identifier: "bar".into(),
+                    }],
                 },
             ),
             (
@@ -342,7 +355,7 @@ mod tests {
                     definition: Definition::default_for_namespace(&[LogNamespace::Vector].into())
                         .with_event_field(&owned_value_path!("foo"), Kind::integer(), Some("foo")),
                     errors: vec![ValidationError::MeaningKind {
-                        identifier: "foo",
+                        identifier: "foo".into(),
                         want: Kind::boolean(),
                         got: Kind::integer(),
                     }],
@@ -355,7 +368,7 @@ mod tests {
                     definition: Definition::default_for_namespace(&[LogNamespace::Vector].into())
                         .with_event_field(&owned_value_path!("foo"), Kind::integer(), Some("foo")),
                     errors: vec![ValidationError::MeaningKind {
-                        identifier: "foo",
+                        identifier: "foo".into(),
                         want: Kind::boolean(),
                         got: Kind::integer(),
                     }],
@@ -376,7 +389,7 @@ mod tests {
                                 ),
                         ),
                     errors: vec![ValidationError::MeaningDuplicate {
-                        identifier: "foo",
+                        identifier: "foo".into(),
                         paths: BTreeSet::from([
                             parse_target_path("foo").unwrap(),
                             parse_target_path("bar").unwrap(),

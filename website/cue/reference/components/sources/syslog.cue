@@ -59,9 +59,15 @@ components: sources: syslog: {
 					examples: ["app-name"]
 				}
 			}
-			host: fields._local_host
+			host: {
+				description: "Same as `hostname` if that field is set, or the IP address of the peer otherwise."
+				required:    true
+				type: string: {
+					examples: ["my.host.com", "127.0.0.1"]
+				}
+			}
 			hostname: {
-				description: "The hostname extracted from the Syslog line. (`host` is also this value if it exists in the log.)"
+				description: "The `hostname` field extracted from the Syslog line. If a `hostname` field is found, `host` is also set to this value."
 				required:    true
 				type: string: {
 					examples: ["my.host.com"]
@@ -103,7 +109,7 @@ components: sources: syslog: {
 				}
 			}
 			source_ip: {
-				description: "The upstream hostname. In the case where `mode` = `\"unix\"` the socket path will be used. (`host` is also this value if `hostname` does not exist in the log.)"
+				description: "The IP address of the client. In the case where `mode` = `\"unix\"` the socket path will be used."
 				required:    true
 				type: string: {
 					examples: ["127.0.0.1"]
@@ -205,12 +211,7 @@ components: sources: syslog: {
 	}
 
 	telemetry: metrics: {
-		events_in_total:                 components.sources.internal_metrics.output.metrics.events_in_total
-		connection_read_errors_total:    components.sources.internal_metrics.output.metrics.connection_read_errors_total
-		processed_bytes_total:           components.sources.internal_metrics.output.metrics.processed_bytes_total
-		processed_events_total:          components.sources.internal_metrics.output.metrics.processed_events_total
-		component_received_bytes_total:  components.sources.internal_metrics.output.metrics.component_received_bytes_total
-		component_received_events_total: components.sources.internal_metrics.output.metrics.component_received_events_total
-		utf8_convert_errors_total:       components.sources.internal_metrics.output.metrics.utf8_convert_errors_total
+		connection_read_errors_total: components.sources.internal_metrics.output.metrics.connection_read_errors_total
+		utf8_convert_errors_total:    components.sources.internal_metrics.output.metrics.utf8_convert_errors_total
 	}
 }

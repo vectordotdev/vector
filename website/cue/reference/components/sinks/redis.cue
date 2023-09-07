@@ -5,7 +5,7 @@ components: sinks: redis: {
 	classes: {
 		commonly_used: false
 		delivery:      "best_effort"
-		development:   "beta"
+		development:   "stable"
 		egress_method: "batch"
 		service_providers: []
 		stateful: false
@@ -75,12 +75,6 @@ components: sinks: redis: {
 	}
 
 	telemetry: metrics: {
-		component_sent_events_total:      components.sources.internal_metrics.output.metrics.component_sent_events_total
-		component_sent_event_bytes_total: components.sources.internal_metrics.output.metrics.component_sent_event_bytes_total
-		events_in_total:                  components.sources.internal_metrics.output.metrics.events_in_total
-		events_out_total:                 components.sources.internal_metrics.output.metrics.events_out_total
-		send_errors_total:                components.sources.internal_metrics.output.metrics.send_errors_total
-		processed_bytes_total:            components.sources.internal_metrics.output.metrics.processed_bytes_total
-		processed_events_total:           components.sources.internal_metrics.output.metrics.processed_events_total
+		send_errors_total: components.sources.internal_metrics.output.metrics.send_errors_total
 	}
 }

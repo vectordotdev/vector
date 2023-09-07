@@ -1,13 +1,11 @@
-use futures::StreamExt;
+use vector_core::config::proxy::ProxyConfig;
 
 use super::{config::LokiConfig, healthcheck::healthcheck, sink::LokiSink};
 use crate::{
-    config::ProxyConfig,
-    event::{Event, LogEvent},
     http::HttpClient,
+    sinks::prelude::*,
     sinks::util::test::{build_test_server, load_sink},
     test_util,
-    tls::TlsSettings,
 };
 
 #[test]

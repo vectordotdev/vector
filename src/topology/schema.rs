@@ -6,7 +6,7 @@ use vector_core::config::SourceOutput;
 pub(super) use crate::schema::Definition;
 
 use crate::{
-    config::{ComponentKey, Config, OutputId, SinkConfig, SinkOuter, TransformOutput},
+    config::{ComponentKey, Config, OutputId, SinkOuter, TransformOutput},
     topology,
 };
 
@@ -444,8 +444,8 @@ mod tests {
     use indexmap::IndexMap;
     use lookup::owned_value_path;
     use similar_asserts::assert_eq;
-    use value::Kind;
     use vector_core::config::{DataType, SourceOutput, TransformOutput};
+    use vrl::value::Kind;
 
     use super::*;
 

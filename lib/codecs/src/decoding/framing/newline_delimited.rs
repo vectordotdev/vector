@@ -1,19 +1,19 @@
 use bytes::{Bytes, BytesMut};
 use derivative::Derivative;
-use serde::{Deserialize, Serialize};
 use tokio_util::codec::Decoder;
 use vector_config::configurable_component;
 
 use super::{BoxedFramingError, CharacterDelimitedDecoder};
 
 /// Config used to build a `NewlineDelimitedDecoder`.
-#[derive(Debug, Clone, Default, Deserialize, Serialize, PartialEq, Eq)]
+#[configurable_component]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct NewlineDelimitedDecoderConfig {
+    /// Options for the newline delimited decoder.
     #[serde(
         default,
         skip_serializing_if = "vector_core::serde::skip_serializing_if_default"
     )]
-    /// Options for the newline delimited decoder.
     pub newline_delimited: NewlineDelimitedDecoderOptions,
 }
 

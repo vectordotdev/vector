@@ -9,6 +9,7 @@ use ordered_float::NotNan;
 use prost::Message;
 use rmp_serde;
 use vector_core::event::{BatchNotifier, BatchStatus, Event};
+use vrl::event_path;
 
 use super::{apm_stats::StatsPayload, dd_proto, ddsketch_full, DatadogTracesConfig};
 
@@ -95,15 +96,15 @@ fn simple_span(resource: String) -> BTreeMap<String, Value> {
 
 pub fn simple_trace_event(resource: String) -> TraceEvent {
     let mut t = TraceEvent::default();
-    t.insert("language", "a_language");
-    t.insert("agent_version", "1.23456");
-    t.insert("host", "a_host");
-    t.insert("env", "an_env");
-    t.insert("trace_id", Value::Integer(123));
-    t.insert("target_tps", Value::Integer(10));
-    t.insert("error_tps", Value::Integer(5));
+    t.insert(event_path!("language"), "a_language");
+    t.insert(event_path!("agent_version"), "1.23456");
+    t.insert(event_path!("host"), "a_host");
+    t.insert(event_path!("env"), "an_env");
+    t.insert(event_path!("trace_id"), Value::Integer(123));
+    t.insert(event_path!("target_tps"), Value::Integer(10));
+    t.insert(event_path!("error_tps"), Value::Integer(5));
     t.insert(
-        "spans",
+        event_path!("spans"),
         Value::Array(vec![Value::from(simple_span(resource))]),
     );
     t

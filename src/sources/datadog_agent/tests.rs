@@ -19,18 +19,18 @@ use ordered_float::NotNan;
 use prost::Message;
 use quickcheck::{Arbitrary, Gen, QuickCheck, TestResult};
 use similar_asserts::assert_eq;
-use value::Kind;
 use vector_core::{
     config::LogNamespace,
     event::{metric::TagValue, MetricTags},
     metric_tags,
 };
-use vrl::prelude::Collection;
+use vrl::compiler::value::Collection;
+use vrl::value::Kind;
 
 use crate::schema::Definition;
 use crate::{
     common::datadog::{DatadogMetricType, DatadogPoint, DatadogSeriesMetric},
-    config::{log_schema, SourceConfig, SourceContext},
+    config::{SourceConfig, SourceContext},
     event::{
         into_event_stream,
         metric::{MetricKind, MetricSketch, MetricValue},
@@ -85,7 +85,7 @@ fn test_decode_log_body() {
         let api_key = None;
         let decoder = crate::codecs::Decoder::new(
             Framer::Bytes(BytesDecoder::new()),
-            Deserializer::Bytes(BytesDeserializer::new()),
+            Deserializer::Bytes(BytesDeserializer),
         );
 
         let source = DatadogAgentSource::new(
@@ -238,7 +238,7 @@ async fn full_payload_v1() {
             assert_eq!(log["ddsource"], "curl".into());
             assert_eq!(log["ddtags"], "one,two,three".into());
             assert!(event.metadata().datadog_api_key().is_none());
-            assert_eq!(log[log_schema().source_type_key()], "datadog_agent".into());
+            assert_eq!(*log.get_source_type().unwrap(), "datadog_agent".into());
             assert_eq!(
                 event.metadata().schema_definition(),
                 &test_logs_schema_definition()
@@ -300,7 +300,7 @@ async fn full_payload_v2() {
             assert_eq!(log["ddsource"], "curl".into());
             assert_eq!(log["ddtags"], "one,two,three".into());
             assert!(event.metadata().datadog_api_key().is_none());
-            assert_eq!(log[log_schema().source_type_key()], "datadog_agent".into());
+            assert_eq!(*log.get_source_type().unwrap(), "datadog_agent".into());
             assert_eq!(
                 event.metadata().schema_definition(),
                 &test_logs_schema_definition()
@@ -362,7 +362,7 @@ async fn no_api_key() {
             assert_eq!(log["ddsource"], "curl".into());
             assert_eq!(log["ddtags"], "one,two,three".into());
             assert!(event.metadata().datadog_api_key().is_none());
-            assert_eq!(log[log_schema().source_type_key()], "datadog_agent".into());
+            assert_eq!(*log.get_source_type().unwrap(), "datadog_agent".into());
             assert_eq!(
                 event.metadata().schema_definition(),
                 &test_logs_schema_definition()
@@ -423,7 +423,7 @@ async fn api_key_in_url() {
             assert_eq!(log["service"], "vector".into());
             assert_eq!(log["ddsource"], "curl".into());
             assert_eq!(log["ddtags"], "one,two,three".into());
-            assert_eq!(log[log_schema().source_type_key()], "datadog_agent".into());
+            assert_eq!(*log.get_source_type().unwrap(), "datadog_agent".into());
             assert_eq!(
                 &event.metadata().datadog_api_key().as_ref().unwrap()[..],
                 "12345678abcdefgh12345678abcdefgh"
@@ -488,7 +488,7 @@ async fn api_key_in_query_params() {
             assert_eq!(log["service"], "vector".into());
             assert_eq!(log["ddsource"], "curl".into());
             assert_eq!(log["ddtags"], "one,two,three".into());
-            assert_eq!(log[log_schema().source_type_key()], "datadog_agent".into());
+            assert_eq!(*log.get_source_type().unwrap(), "datadog_agent".into());
             assert_eq!(
                 &event.metadata().datadog_api_key().as_ref().unwrap()[..],
                 "12345678abcdefgh12345678abcdefgh"
@@ -559,7 +559,7 @@ async fn api_key_in_header() {
             assert_eq!(log["service"], "vector".into());
             assert_eq!(log["ddsource"], "curl".into());
             assert_eq!(log["ddtags"], "one,two,three".into());
-            assert_eq!(log[log_schema().source_type_key()], "datadog_agent".into());
+            assert_eq!(*log.get_source_type().unwrap(), "datadog_agent".into());
             assert_eq!(
                 &event.metadata().datadog_api_key().as_ref().unwrap()[..],
                 "12345678abcdefgh12345678abcdefgh"
@@ -706,7 +706,7 @@ async fn ignores_api_key() {
             assert_eq!(log["service"], "vector".into());
             assert_eq!(log["ddsource"], "curl".into());
             assert_eq!(log["ddtags"], "one,two,three".into());
-            assert_eq!(log[log_schema().source_type_key()], "datadog_agent".into());
+            assert_eq!(*log.get_source_type().unwrap(), "datadog_agent".into());
             assert!(event.metadata().datadog_api_key().is_none());
             assert_eq!(
                 event.metadata().schema_definition(),
@@ -1398,7 +1398,7 @@ async fn split_outputs() {
             assert_eq!(log["service"], "vector".into());
             assert_eq!(log["ddsource"], "curl".into());
             assert_eq!(log["ddtags"], "one,two,three".into());
-            assert_eq!(log[log_schema().source_type_key()], "datadog_agent".into());
+            assert_eq!(*log.get_source_type().unwrap(), "datadog_agent".into());
             assert_eq!(
                 &event.metadata().datadog_api_key().as_ref().unwrap()[..],
                 "12345678abcdefgh12345678abcdefgh"
@@ -1595,7 +1595,7 @@ fn test_config_outputs() {
         (
             "json / single output",
             TestCase {
-                decoding: DeserializerConfig::Json,
+                decoding: DeserializerConfig::Json(Default::default()),
                 multiple_outputs: false,
                 want: HashMap::from([(
                     None,
@@ -1620,7 +1620,7 @@ fn test_config_outputs() {
         (
             "json / multiple output",
             TestCase {
-                decoding: DeserializerConfig::Json,
+                decoding: DeserializerConfig::Json(Default::default()),
                 multiple_outputs: true,
                 want: HashMap::from([
                     (
@@ -1658,11 +1658,11 @@ fn test_config_outputs() {
                 ]),
             },
         ),
-        #[cfg(feature = "sources-syslog")]
+        #[cfg(feature = "codecs-syslog")]
         (
             "syslog / single output",
             TestCase {
-                decoding: DeserializerConfig::Syslog,
+                decoding: DeserializerConfig::Syslog(Default::default()),
                 multiple_outputs: false,
                 want: HashMap::from([(
                     None,
@@ -1690,7 +1690,11 @@ fn test_config_outputs() {
                             )
                             .optional_field(&owned_value_path!("facility"), Kind::bytes(), None)
                             .optional_field(&owned_value_path!("version"), Kind::integer(), None)
-                            .optional_field(&owned_value_path!("appname"), Kind::bytes(), None)
+                            .optional_field(
+                                &owned_value_path!("appname"),
+                                Kind::bytes(),
+                                Some("service"),
+                            )
                             .optional_field(&owned_value_path!("msgid"), Kind::bytes(), None)
                             .optional_field(
                                 &owned_value_path!("procid"),
@@ -1722,18 +1726,18 @@ fn test_config_outputs() {
                                 Kind::bytes().or_object(Collection::from_unknown(Kind::bytes())),
                                 None,
                             )
-                            .unknown_fields(Kind::object(value::kind::Collection::from_unknown(
-                                Kind::bytes(),
-                            ))),
+                            .unknown_fields(Kind::object(
+                                vrl::value::kind::Collection::from_unknown(Kind::bytes()),
+                            )),
                     ),
                 )]),
             },
         ),
-        #[cfg(feature = "sources-syslog")]
+        #[cfg(feature = "codecs-syslog")]
         (
             "syslog / multiple output",
             TestCase {
-                decoding: DeserializerConfig::Syslog,
+                decoding: DeserializerConfig::Syslog(Default::default()),
                 multiple_outputs: true,
                 want: HashMap::from([
                     (
@@ -1766,7 +1770,11 @@ fn test_config_outputs() {
                                     Kind::integer(),
                                     None,
                                 )
-                                .optional_field(&owned_value_path!("appname"), Kind::bytes(), None)
+                                .optional_field(
+                                    &owned_value_path!("appname"),
+                                    Kind::bytes(),
+                                    Some("service"),
+                                )
                                 .optional_field(&owned_value_path!("msgid"), Kind::bytes(), None)
                                 .optional_field(
                                     &owned_value_path!("procid"),
@@ -1804,7 +1812,7 @@ fn test_config_outputs() {
                                     None,
                                 )
                                 .unknown_fields(Kind::object(
-                                    value::kind::Collection::from_unknown(Kind::bytes()),
+                                    vrl::value::kind::Collection::from_unknown(Kind::bytes()),
                                 )),
                         ),
                     ),

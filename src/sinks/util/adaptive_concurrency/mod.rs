@@ -9,13 +9,15 @@ mod service;
 #[cfg(test)]
 pub mod tests;
 
+// Make sure to update the max range of the `AdaptiveConcurrencySettings::initial_concurrency` when changing
+// this constant.
 pub(super) const MAX_CONCURRENCY: usize = 200;
 
 pub(crate) use layer::AdaptiveConcurrencyLimitLayer;
 pub(crate) use service::AdaptiveConcurrencyLimit;
 use vector_config::configurable_component;
 
-pub(self) fn instant_now() -> std::time::Instant {
+fn instant_now() -> std::time::Instant {
     tokio::time::Instant::now().into()
 }
 
@@ -29,6 +31,15 @@ pub(self) fn instant_now() -> std::time::Instant {
 #[derive(Clone, Copy, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct AdaptiveConcurrencySettings {
+    /// The initial concurrency limit to use. If not specified, the initial limit will be 1 (no concurrency).
+    ///
+    /// It is recommended to set this value to your service's average limit if you're seeing that it takes a
+    /// long time to ramp up adaptive concurrency after a restart. You can find this value by looking at the
+    /// `adaptive_concurrency_limit` metric.
+    #[configurable(validation(range(min = 1, max = 200)))]
+    #[serde(default = "default_initial_concurrency")]
+    pub(super) initial_concurrency: usize,
+
     /// The fraction of the current value to set the new concurrency limit when decreasing the limit.
     ///
     /// Valid values are greater than `0` and less than `1`. Smaller values cause the algorithm to scale back rapidly
@@ -63,6 +74,10 @@ pub struct AdaptiveConcurrencySettings {
     pub(super) rtt_deviation_scale: f64,
 }
 
+const fn default_initial_concurrency() -> usize {
+    1
+}
+
 const fn default_decrease_ratio() -> f64 {
     0.9
 }
@@ -84,6 +99,7 @@ impl AdaptiveConcurrencySettings {
 impl Default for AdaptiveConcurrencySettings {
     fn default() -> Self {
         Self {
+            initial_concurrency: default_initial_concurrency(),
             decrease_ratio: default_decrease_ratio(),
             ewma_alpha: default_ewma_alpha(),
             rtt_deviation_scale: default_rtt_deviation_scale(),

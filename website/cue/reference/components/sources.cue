@@ -94,7 +94,7 @@ components: sources: [Name=string]: {
 								type: string: {
 									default: features.codecs.default_framing
 									enum: {
-										bytes:               "Byte frames are passed through as-is according to the underlying I/O boundaries (e.g. split between messages or stream segments)."
+										bytes:               "Byte frames are passed through as-is according to the underlying I/O boundaries (e.g. split between messages, payloads, or streams)."
 										character_delimited: "Byte frames which are delimited by a chosen character."
 										length_delimited:    "Byte frames which are prefixed by an unsigned big-endian 32-bit integer indicating the length."
 										newline_delimited:   "Byte frames which are delimited by a newline character."
@@ -401,9 +401,14 @@ components: sources: [Name=string]: {
 	}
 
 	telemetry: metrics: {
-		events_out_total:                 components.sources.internal_metrics.output.metrics.events_out_total
-		component_sent_events_total:      components.sources.internal_metrics.output.metrics.component_sent_events_total
-		component_sent_event_bytes_total: components.sources.internal_metrics.output.metrics.component_sent_event_bytes_total
-		source_lag_time_seconds:          components.sources.internal_metrics.output.metrics.source_lag_time_seconds
+		component_discarded_events_total:     components.sources.internal_metrics.output.metrics.component_discarded_events_total
+		component_errors_total:               components.sources.internal_metrics.output.metrics.component_errors_total
+		component_received_bytes_total:       components.sources.internal_metrics.output.metrics.component_received_bytes_total
+		component_received_events_count:      components.sources.internal_metrics.output.metrics.component_received_events_count
+		component_received_events_total:      components.sources.internal_metrics.output.metrics.component_received_events_total
+		component_received_event_bytes_total: components.sources.internal_metrics.output.metrics.component_received_event_bytes_total
+		component_sent_events_total:          components.sources.internal_metrics.output.metrics.component_sent_events_total
+		component_sent_event_bytes_total:     components.sources.internal_metrics.output.metrics.component_sent_event_bytes_total
+		source_lag_time_seconds:              components.sources.internal_metrics.output.metrics.source_lag_time_seconds
 	}
 }

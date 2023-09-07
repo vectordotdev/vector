@@ -30,12 +30,12 @@ pub fn backpressure_source(counter: &Arc<AtomicUsize>) -> BackpressureSourceConf
 }
 
 pub fn basic_source() -> (SourceSender, BasicSourceConfig) {
-    let (tx, rx) = SourceSender::new_with_buffer(1);
+    let (tx, rx) = SourceSender::new_test_sender_with_buffer(1);
     (tx, BasicSourceConfig::new(rx))
 }
 
 pub fn basic_source_with_data(data: &str) -> (SourceSender, BasicSourceConfig) {
-    let (tx, rx) = SourceSender::new_with_buffer(1);
+    let (tx, rx) = SourceSender::new_test_sender_with_buffer(1);
     (tx, BasicSourceConfig::new_with_data(rx, data))
 }
 
@@ -43,7 +43,7 @@ pub fn basic_source_with_event_counter(
     force_shutdown: bool,
 ) -> (SourceSender, BasicSourceConfig, Arc<AtomicUsize>) {
     let event_counter = Arc::new(AtomicUsize::new(0));
-    let (tx, rx) = SourceSender::new_with_buffer(1);
+    let (tx, rx) = SourceSender::new_test_sender_with_buffer(1);
     let mut source = BasicSourceConfig::new_with_event_counter(rx, Arc::clone(&event_counter));
     source.set_force_shutdown(force_shutdown);
 
@@ -75,7 +75,7 @@ pub const fn backpressure_sink(num_to_consume: usize) -> BackpressureSinkConfig 
 }
 
 pub fn basic_sink(channel_size: usize) -> (impl Stream<Item = EventArray>, BasicSinkConfig) {
-    let (tx, rx) = SourceSender::new_with_buffer(channel_size);
+    let (tx, rx) = SourceSender::new_test_sender_with_buffer(channel_size);
     let sink = BasicSinkConfig::new(tx, true);
     (rx.into_stream(), sink)
 }
@@ -84,7 +84,7 @@ pub fn basic_sink_with_data(
     channel_size: usize,
     data: &str,
 ) -> (impl Stream<Item = EventArray>, BasicSinkConfig) {
-    let (tx, rx) = SourceSender::new_with_buffer(channel_size);
+    let (tx, rx) = SourceSender::new_test_sender_with_buffer(channel_size);
     let sink = BasicSinkConfig::new_with_data(tx, true, data);
     (rx.into_stream(), sink)
 }
@@ -92,7 +92,7 @@ pub fn basic_sink_with_data(
 pub fn basic_sink_failing_healthcheck(
     channel_size: usize,
 ) -> (impl Stream<Item = EventArray>, BasicSinkConfig) {
-    let (tx, rx) = SourceSender::new_with_buffer(channel_size);
+    let (tx, rx) = SourceSender::new_test_sender_with_buffer(channel_size);
     let sink = BasicSinkConfig::new(tx, false);
     (rx.into_stream(), sink)
 }

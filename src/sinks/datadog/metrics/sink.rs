@@ -123,9 +123,9 @@ where
             .filter_map(|request| async move {
                 match request {
                     Err(e) => {
-                        let (error_message, error_code, dropped_events) = e.into_parts();
+                        let (reason, error_code, dropped_events) = e.into_parts();
                         emit!(DatadogMetricsEncodingError {
-                            error_message,
+                            reason: reason.as_str(),
                             error_code,
                             dropped_events: dropped_events as usize,
                         });

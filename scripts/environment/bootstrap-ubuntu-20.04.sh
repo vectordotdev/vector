@@ -11,7 +11,7 @@ fi
 export DEBIAN_FRONTEND=noninteractive
 export ACCEPT_EULA=Y
 
-echo 'APT::Acquire::Retries "5";' > /etc/apt/apt.conf.d/80-retries
+echo 'Acquire::Retries "5";' > /etc/apt/apt.conf.d/80-retries
 
 apt update --yes
 
@@ -23,14 +23,13 @@ apt install --yes \
 apt upgrade --yes
 
 # Deps
-apt install --yes \
+apt install --yes --no-install-recommends \
     awscli \
     build-essential \
     ca-certificates \
     cmake \
     cmark-gfm \
     curl \
-    docker-compose \
     gawk \
     gnupg2 \
     gnupg-agent \
@@ -108,6 +107,12 @@ if ! [ -x "$(command -v docker)" ]; then
 
     # ubuntu user doesn't exist in scripts/environment/Dockerfile which runs this
     usermod --append --groups docker ubuntu || true
+fi
+
+# docker-compose
+if ! [ -x "$(command -v docker-compose)" ]; then
+  curl -fsSL "https://github.com/docker/compose/releases/download/v2.20.3/docker-compose-linux-$(uname -m)" -o /usr/local/bin/docker-compose
+  chmod +x /usr/local/bin/docker-compose
 fi
 
 bash scripts/environment/install-protoc.sh

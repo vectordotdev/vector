@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::io::{self, Read};
 use std::net::SocketAddr;
 use std::time::Duration;
@@ -8,16 +9,16 @@ use chrono::Utc;
 use codecs::{BytesDeserializerConfig, StreamDecodingError};
 use flate2::read::MultiGzDecoder;
 use lookup::lookup_v2::parse_value_path;
-use lookup::{metadata_path, owned_value_path, path, OwnedValuePath, PathPrefix};
-use rmp_serde::{decode, Deserializer};
-use serde::Deserialize;
+use lookup::{metadata_path, owned_value_path, path, OwnedValuePath};
+use rmp_serde::{decode, Deserializer, Serializer};
+use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use tokio_util::codec::Decoder;
-use value::kind::Collection;
-use value::{Kind, Value};
 use vector_config::configurable_component;
 use vector_core::config::{LegacyKey, LogNamespace};
 use vector_core::schema::Definition;
+use vrl::value::kind::Collection;
+use vrl::value::{Kind, Value};
 
 use super::util::net::{SocketListenAddr, TcpSource, TcpSourceAck, TcpSourceAcker};
 use crate::{
@@ -134,8 +135,9 @@ impl FluentConfig {
     /// Builds the `schema::Definition` for this source using the provided `LogNamespace`.
     fn schema_definition(&self, log_namespace: LogNamespace) -> Definition {
         // `host_key` is only inserted if not present already.
-        let host_key = parse_value_path(log_schema().host_key())
-            .ok()
+        let host_key = log_schema()
+            .host_key()
+            .cloned()
             .map(LegacyKey::InsertIfEmpty);
 
         let tag_key = parse_value_path("tag").ok().map(LegacyKey::Overwrite);
@@ -208,7 +210,7 @@ impl FluentSource {
     fn new(log_namespace: LogNamespace) -> Self {
         Self {
             log_namespace,
-            legacy_host_key_path: parse_value_path(log_schema().host_key()).ok(),
+            legacy_host_key_path: log_schema().host_key().cloned(),
         }
     }
 }
@@ -532,15 +534,18 @@ impl TcpSourceAcker for FluentAcker {
             return None;
         }
 
-        let mut acks = String::new();
+        let mut buf = Vec::new();
+        let mut ser = Serializer::new(&mut buf);
+        let mut ack_map = HashMap::new();
+
         for chunk in self.chunks {
-            let ack = match ack {
-                TcpSourceAck::Ack => format!(r#"{{"ack": "{}"}}"#, chunk),
-                _ => String::from("{}"),
+            ack_map.clear();
+            if let TcpSourceAck::Ack = ack {
+                ack_map.insert("ack", chunk);
             };
-            acks.push_str(&ack);
+            ack_map.serialize(&mut ser).unwrap();
         }
-        Some(acks.into())
+        Some(buf.into())
     }
 }
 
@@ -583,7 +588,7 @@ impl From<FluentEvent<'_>> for LogEvent {
 
         log_namespace.insert_vector_metadata(
             &mut log,
-            Some(log_schema().source_type_key()),
+            log_schema().source_type_key(),
             path!("source_type"),
             Bytes::from_static(FluentConfig::NAME.as_bytes()),
         );
@@ -594,9 +599,7 @@ impl From<FluentEvent<'_>> for LogEvent {
                 log.insert(metadata_path!("vector", "ingest_timestamp"), Utc::now());
             }
             LogNamespace::Legacy => {
-                if let Some(timestamp_key) = log_schema().timestamp_key() {
-                    log.insert((PathPrefix::Event, timestamp_key), timestamp);
-                }
+                log.maybe_insert(log_schema().timestamp_key_target_path(), timestamp);
             }
         }
 
@@ -635,9 +638,9 @@ mod tests {
         time::{error::Elapsed, timeout, Duration},
     };
     use tokio_util::codec::Decoder;
-    use value::kind::Collection;
     use vector_common::assert_event_data_eq;
     use vector_core::{event::Value, schema::Definition};
+    use vrl::value::kind::Collection;
 
     use super::{message::FluentMessageOptions, *};
     use crate::{
@@ -661,7 +664,7 @@ mod tests {
         Event::Log(LogEvent::from(BTreeMap::from([
             (String::from("message"), Value::from(name)),
             (
-                String::from(log_schema().source_type_key()),
+                log_schema().source_type_key().unwrap().to_string(),
                 Value::from(FluentConfig::NAME),
             ),
             (String::from("tag"), Value::from("tag.name")),
@@ -853,7 +856,7 @@ mod tests {
     #[tokio::test]
     async fn ack_delivered_without_chunk() {
         let (result, output) = check_acknowledgements(EventStatus::Delivered, false).await;
-        assert!(matches!(result, Err(_))); // the `_` inside this error is `Elapsed`
+        assert!(result.is_err()); // the `_` inside this error is `Elapsed`
         assert!(output.is_empty());
     }
 
@@ -861,7 +864,8 @@ mod tests {
     async fn ack_delivered_with_chunk() {
         let (result, output) = check_acknowledgements(EventStatus::Delivered, true).await;
         assert_eq!(result.unwrap().unwrap(), output.len());
-        assert!(output.starts_with(b"{\"ack\":"));
+        let expected: Vec<u8> = vec![0x81, 0xa3, 0x61, 0x63]; // { "ack": ...
+        assert_eq!(output[..expected.len()], expected);
     }
 
     #[tokio::test]
@@ -875,7 +879,8 @@ mod tests {
     async fn ack_failed_with_chunk() {
         let (result, output) = check_acknowledgements(EventStatus::Rejected, true).await;
         assert_eq!(result.unwrap().unwrap(), output.len());
-        assert_eq!(output, &b"{}"[..]);
+        let expected: Vec<u8> = vec![0x80]; // { }
+        assert_eq!(output, expected);
     }
 
     async fn check_acknowledgements(
