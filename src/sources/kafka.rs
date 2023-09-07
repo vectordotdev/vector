@@ -1,6 +1,7 @@
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
     io::Cursor,
+    pin::Pin,
     sync::{
         mpsc::{sync_channel, SyncSender},
         Arc, OnceLock, Weak,
@@ -37,6 +38,7 @@ use tokio::{
         oneshot,
     },
     task::JoinSet,
+    time::Sleep,
 };
 use tokio_util::codec::FramedRead;
 
@@ -423,13 +425,14 @@ async fn kafka_source(
         let span = span.clone();
         let consumer = Arc::clone(&consumer);
         let session_timeout_ms = config.session_timeout_ms;
-        let partition_state = KafkaPartitionState::new(config, decoder, out, log_namespace);
+        let consumer_state =
+            ConsumerStateInner::<Consuming>::new(config, decoder, out, log_namespace);
         tokio::spawn(async move {
             let _enter = span.enter();
             coordinate_kafka_callbacks(
                 consumer,
                 callback_rx,
-                partition_state,
+                consumer_state,
                 session_timeout_ms,
                 eof_tx,
             )
@@ -454,11 +457,16 @@ async fn kafka_source(
 /// KafkaPartitionState holds all the pieces that are needed to consume a kafka
 /// partition stream, and track the state needed in order to correctly manage
 /// rebalance events
-struct KafkaPartitionState {
+struct ConsumerStateInner<S> {
     config: KafkaSourceConfig,
     decoder: Decoder,
     out: SourceSender,
     log_namespace: LogNamespace,
+    consumer_state: S,
+}
+struct Consuming;
+struct Draining {
+    signal: SyncSender<()>,
 
     /// The Set of partitions expected to drain during a shutdown or rebalance that revokes partitions
     expect_drain: HashSet<TopicPartition>,
@@ -468,9 +476,26 @@ struct KafkaPartitionState {
     /// and "expect to complete" (based on seeing a rebalance callback with revoked partition info) are tracked separately.
     observed_drain: HashSet<TopicPartition>,
 }
+enum ConsumerState {
+    Consuming(ConsumerStateInner<Consuming>),
+    Draining(ConsumerStateInner<Draining>),
+}
+impl Draining {
+    fn new(signal: SyncSender<()>) -> Self {
+        Self {
+            signal,
+            expect_drain: HashSet::new(),
+            observed_drain: HashSet::new(),
+        }
+    }
 
-impl KafkaPartitionState {
-    fn new(
+    fn is_complete(&self) -> bool {
+        self.expect_drain.is_subset(&self.observed_drain)
+    }
+}
+
+impl ConsumerStateInner<Consuming> {
+    const fn new(
         config: KafkaSourceConfig,
         decoder: Decoder,
         out: SourceSender,
@@ -481,8 +506,7 @@ impl KafkaPartitionState {
             decoder,
             out,
             log_namespace,
-            expect_drain: HashSet::new(),
-            observed_drain: HashSet::new(),
+            consumer_state: Consuming,
         }
     }
 
@@ -552,11 +576,11 @@ impl KafkaPartitionState {
                             }
                         }
                         None if finalizer.is_none() => {
-                            debug!("acknowledgement stream complete for partition {}:{}.", &tp.0, tp.1);
+                            debug!("Acknowledgement stream complete for partition {}:{}.", &tp.0, tp.1);
                             break
                         }
                         None => {
-                            debug!("acknowledgement stream empty for {}:{}", &tp.0, tp.1);
+                            debug!("Acknowledgement stream empty for {}:{}", &tp.0, tp.1);
                         }
                     }
                 )
@@ -566,21 +590,57 @@ impl KafkaPartitionState {
         (end_tx, handle)
     }
 
+    /// Consume self, and return a "Draining" ConsumerState, along with a Future
+    /// representing a drain deadline, based on max_drain_ms
+    pub fn begin_drain(
+        self,
+        max_drain_ms: Duration,
+        sig: SyncSender<()>,
+    ) -> (Pin<Box<Sleep>>, ConsumerStateInner<Draining>) {
+        let deadline = Box::pin(tokio::time::sleep(max_drain_ms));
+
+        let draining = ConsumerStateInner {
+            config: self.config,
+            decoder: self.decoder,
+            out: self.out,
+            log_namespace: self.log_namespace,
+            consumer_state: Draining::new(sig),
+        };
+
+        (deadline, draining)
+    }
+}
+
+impl ConsumerStateInner<Draining> {
+    /// Mark the given TopicPartition as being revoked, adding it to the set of
+    /// partitions expected to drain
     pub fn revoke_partition(&mut self, tp: TopicPartition) {
-        self.expect_drain.insert(tp);
+        self.consumer_state.expect_drain.insert(tp);
     }
 
-    pub fn observed_last_ack(&mut self, tp: TopicPartition) {
-        self.observed_drain.insert(tp);
+    /// Add the given TopicPartition to the set of known "drained" partitions,
+    /// i.e. the consumer has drained the acknowledgement channel. A signal is
+    /// sent on the signal channel, indicating to the client that offsets may be committed
+    pub fn partition_drained(&mut self, tp: TopicPartition) {
+        _ = self.consumer_state.signal.send(());
+        self.consumer_state.observed_drain.insert(tp);
     }
 
+    /// Return true if the set of expected drained partitions is a subset of the
+    /// partitions that have been observed to be finished
     pub fn is_drain_complete(&self) -> bool {
-        self.expect_drain.is_subset(&self.observed_drain)
+        self.consumer_state.is_complete()
     }
 
-    pub fn clear(&mut self) {
-        for item in self.expect_drain.drain() {
-            self.observed_drain.remove(&item);
+    /// Finish partition drain mode. Consumes self and the drain deadline
+    /// future, and returns a "Consuming" ConsumerState
+    pub fn finish(self, _deadline: OptionFuture<Pin<Box<Sleep>>>) -> ConsumerStateInner<Consuming> {
+        ConsumerStateInner {
+            config: self.config,
+            decoder: self.decoder,
+            out: self.out,
+            log_namespace: self.log_namespace,
+            consumer_state: Consuming,
         }
     }
 }
@@ -588,12 +648,12 @@ impl KafkaPartitionState {
 async fn coordinate_kafka_callbacks(
     consumer: Arc<StreamConsumer<KafkaSourceContext>>,
     mut callbacks: UnboundedReceiver<KafkaCallback>,
-    mut partition_state: KafkaPartitionState,
+    consumer_state: ConsumerStateInner<Consuming>,
     max_drain_ms: Duration,
     mut eof: Option<oneshot::Sender<()>>,
 ) {
-    let mut drain_signal: Option<SyncSender<()>> = None;
     let mut drain_deadline: OptionFuture<_> = None.into();
+    let mut consumer_state = ConsumerState::Consuming(consumer_state);
 
     // A oneshot channel is used for each consumed partition, so that we can
     // signal to that task to stop consuming, drain pending acks, and exit
@@ -618,18 +678,28 @@ async fn coordinate_kafka_callbacks(
                 // If this task ended on its own, the end_signal for it will still be in here.
                 end_signals.remove(&finished_partition);
                 abort_handles.remove(&finished_partition);
-                partition_state.observed_last_ack(finished_partition);
 
-                // Signal the client task that at least one partition has completed
-                _ = drain_signal.as_ref().map(|sig| _ = sig.send(()) );
+                consumer_state = match consumer_state {
+                    ConsumerState::Consuming(s) => {
+                        // If we are here, it is likely because the consumer tasks are set up to exit upon reaching the end of the partition
+                        if !exit_eof {
+                            warn!("Partition consumer task finished, while not in draining mode.");
+                        }
+                        ConsumerState::Consuming(s)
+                    },
+                    ConsumerState::Draining(mut state) => {
+                        state.partition_drained(finished_partition);
 
-                if drain_signal.is_some() && partition_state.is_drain_complete() {
-                    debug!("All expected partitions have drained.");
-                    partition_state.clear();
-                    // Signal the client task that all partitions that are expected to drain have completed
-                    drain_signal.take();
-                    drain_deadline = None.into();
-                }
+                        if state.is_drain_complete() {
+                            debug!("All expected partitions have drained.");
+                            let state = state.finish(drain_deadline);
+                            drain_deadline = None.into();
+                            ConsumerState::Consuming(state)
+                        } else {
+                            ConsumerState::Draining(state)
+                        }
+                    }
+                };
 
                 match status {
                     // PartitionConsumerStatus differentiates between a task that exited after
@@ -644,81 +714,90 @@ async fn coordinate_kafka_callbacks(
                 }
             },
             Some(callback) = callbacks.recv() => match callback {
-                KafkaCallback::PartitionsAssigned(mut assigned_partitions, done) => {
-                    let acks = consumer.context().acknowledgements;
-                    for tp in assigned_partitions.drain(0..) {
-                        let topic = tp.0.as_str();
-                        let partition = tp.1;
-                        // It _should_ be impossible for this expect() to panic, since we receive the topic/partition pair from the rebalance callback
-                        let pq = consumer.split_partition_queue(topic, partition).expect("Failed to get partition queue: invalid topic or partition.");
+                KafkaCallback::PartitionsAssigned(mut assigned_partitions, done) => match consumer_state {
+                    ConsumerState::Draining(_) => error!("Kafka client is draining revoked partitions, invalid assignment?"),
+                    ConsumerState::Consuming(ref consumer_state) => {
+                        let acks = consumer.context().acknowledgements;
+                        for tp in assigned_partitions.drain(0..) {
+                            let topic = tp.0.as_str();
+                            let partition = tp.1;
+                            // It _should_ be impossible for this expect() to panic, since we receive the topic/partition pair from the rebalance callback
+                            let pq = consumer.split_partition_queue(topic, partition).expect("Failed to get partition queue: invalid topic or partition.");
 
-                        debug!("Consuming partition {}:{}.", &tp.0, tp.1);
-                        let (end_tx, handle) = partition_state.consume_partition(&mut partition_consumers, tp.clone(), Arc::clone(&consumer), pq, acks, exit_eof);
-                        abort_handles.insert(tp.clone(), handle);
-                        end_signals.insert(tp, end_tx);
-                    }
-                    // ensure this is retained until all individual queues are set up
-                    drop(done);
-                },
-                KafkaCallback::PartitionsRevoked(mut revoked_partitions, drain) => {
-                    drain_deadline = Some(Box::pin(tokio::time::sleep(max_drain_ms))).into();
-
-                    for tp in revoked_partitions.drain(0..) {
-                        if let Some(end) = end_signals.remove(&tp) {
-                            let _ = end.send(());
+                            debug!("Consuming partition {}:{}.", &tp.0, tp.1);
+                            let (end_tx, handle) = consumer_state.consume_partition(&mut partition_consumers, tp.clone(), Arc::clone(&consumer), pq, acks, exit_eof);
+                            abort_handles.insert(tp.clone(), handle);
+                            end_signals.insert(tp, end_tx);
                         }
-                        debug!("Revoking partition {}:{}", &tp.0, tp.1);
-                        partition_state.revoke_partition(tp);
-                    }
-
-                    if partition_state.is_drain_complete() {
-                        partition_state.clear();
-                        drop(drain);
-                    } else if drain_signal.replace(drain).is_some() {
-                        unreachable!("Concurrent rebalance callbacks should not be possible.");
+                        // ensure this is retained until all individual queues are set up
+                        drop(done);
                     }
                 },
-                KafkaCallback::ShuttingDown(drain) => {
-                    // Shutting down is just like a full assignment revoke, but we also close the
-                    // callback channels, since we don't expect additional assignments or rebalances
-                    if let Ok(tpl) = consumer.assignment() {
-                        tpl.elements()
-                            .iter()
-                            .for_each(|el| {
+                KafkaCallback::PartitionsRevoked(mut revoked_partitions, drain) => consumer_state = match consumer_state {
+                    ConsumerState::Draining(d) => {
+                        error!("Kafka client is already draining revoked partitions.");
+                        ConsumerState::Draining(d)
+                    },
+                    ConsumerState::Consuming(state) => {
+                        let (deadline, mut state) = state.begin_drain(max_drain_ms, drain);
+                        drain_deadline = Some(deadline).into();
 
-                            let tp: TopicPartition = (el.topic().into(), el.partition());
+                        for tp in revoked_partitions.drain(0..) {
                             if let Some(end) = end_signals.remove(&tp) {
                                 let _ = end.send(());
                             }
-                            partition_state.revoke_partition(tp);
-                        });
-                    }
+                            debug!("Revoking partition {}:{}", &tp.0, tp.1);
+                            state.revoke_partition(tp);
+                        }
 
-                    drain_deadline = Some(Box::pin(tokio::time::sleep(max_drain_ms))).into();
-                    if partition_state.is_drain_complete() {
-                        partition_state.clear();
-                        drop(drain);
-                    } else if drain_signal.replace(drain).is_some() {
-                        debug!("Kafka consumer shutting down mid-rebalance.");
+                        ConsumerState::Draining(state)
                     }
+                },
+                KafkaCallback::ShuttingDown(drain) => consumer_state = match consumer_state {
+                    ConsumerState::Draining(d) => {
+                        error!("Kafka client handled a shutdown signal while a rebalance was in progress.");
+                        ConsumerState::Draining(d)
+                    },
+                    ConsumerState::Consuming(state) => {
+                        // Shutting down is just like a full assignment revoke, but we also close the
+                        // callback channels, since we don't expect additional assignments or rebalances
+                        let (deadline, mut state) = state.begin_drain(max_drain_ms, drain);
+                        drain_deadline = Some(deadline).into();
 
-                    callbacks.close();
+                        if let Ok(tpl) = consumer.assignment() {
+                            tpl.elements()
+                                .iter()
+                                .for_each(|el| {
+
+                                let tp: TopicPartition = (el.topic().into(), el.partition());
+                                if let Some(end) = end_signals.remove(&tp) {
+                                    let _ = end.send(());
+                                }
+                                state.revoke_partition(tp);
+                            });
+                        }
+                        callbacks.close();
+                        ConsumerState::Draining(state)
+                    }
                 },
             },
 
-            Some(_) = &mut drain_deadline => {
-                debug!("Acknowledgement drain deadline reached. Dropping any pending ack streams for revoked partitions.");
-                for tp in partition_state.expect_drain.drain() {
-                    if let Some(handle) = abort_handles.remove(&tp) {
-                        handle.abort();
+            Some(_) = &mut drain_deadline => consumer_state = match consumer_state {
+                ConsumerState::Consuming(s) => {
+                    warn!("A drain deadline fired outside of draining mode.");
+                    drain_deadline = None.into();
+                    ConsumerState::Consuming(s)
+                },
+                ConsumerState::Draining(mut draining) => {
+                    debug!("Acknowledgement drain deadline reached. Dropping any pending ack streams for revoked partitions.");
+                    for tp in draining.consumer_state.expect_drain.drain() {
+                        if let Some(handle) = abort_handles.remove(&tp) {
+                            handle.abort();
+                        }
                     }
-                }
-                partition_state.clear();
-                drain_deadline = None.into();
-                if let Some(s) = drain_signal.take() {
-                    if let Err(e) = s.send(()) {
-                        warn!("Error sending to drain signal: {}.", e);
-                    }
+                    let state = draining.finish(drain_deadline);
+                    drain_deadline = None.into();
+                    ConsumerState::Consuming(state)
                 }
             },
 
