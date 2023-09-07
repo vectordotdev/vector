@@ -26,7 +26,7 @@ impl<'a> Variant<'a> {
         is_virtual_newtype: bool,
     ) -> darling::Result<Variant<'a>> {
         let original = serde.original;
-        let name = serde.attrs.name().deserialize_name();
+        let name = serde.attrs.name().deserialize_name().to_string();
         let style = serde.style.into();
         let is_newtype_wrapper_field = style == Style::Newtype;
 
