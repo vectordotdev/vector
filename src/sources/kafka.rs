@@ -603,7 +603,8 @@ async fn coordinate_kafka_callbacks(
     // is both consuming the messages (passing them to the output stream) _and_
     // processing the corresponding acknowledgement stream. A consumer task
     // should completely drain its acknowledgement stream after receiving an end signal
-    let mut partition_consumers: JoinSet<(TopicPartition, PartitionConsumerStatus)> = Default::default();
+    let mut partition_consumers: JoinSet<(TopicPartition, PartitionConsumerStatus)> =
+        Default::default();
 
     // Handles that will let us end any consumer task that exceeds a drain deadline
     let mut abort_handles: HashMap<TopicPartition, tokio::task::AbortHandle> = HashMap::new();
