@@ -465,6 +465,7 @@ struct ConsumerStateInner<S> {
     consumer_state: S,
 }
 struct Consuming;
+struct Complete;
 struct Draining {
     signal: SyncSender<()>,
 
@@ -475,15 +476,21 @@ struct Draining {
     /// can complete before we get a rebalance callback, so "observed complete" (based on seeing the end of the stream)
     /// and "expect to complete" (based on seeing a rebalance callback with revoked partition info) are tracked separately.
     observed_drain: HashSet<TopicPartition>,
+
+    /// Whether the client is shutting down after draining
+    shutdown: bool,
 }
+type OptionDeadline = OptionFuture<Pin<Box<Sleep>>>;
 enum ConsumerState {
     Consuming(ConsumerStateInner<Consuming>),
     Draining(ConsumerStateInner<Draining>),
+    Complete(ConsumerStateInner<Complete>),
 }
 impl Draining {
-    fn new(signal: SyncSender<()>) -> Self {
+    fn new(signal: SyncSender<()>, shutdown: bool) -> Self {
         Self {
             signal,
+            shutdown,
             expect_drain: HashSet::new(),
             observed_drain: HashSet::new(),
         }
@@ -491,6 +498,21 @@ impl Draining {
 
     fn is_complete(&self) -> bool {
         self.expect_drain.is_subset(&self.observed_drain)
+    }
+}
+
+impl<C> ConsumerStateInner<C> {
+    pub fn complete(self, _deadline: OptionDeadline) -> (OptionDeadline, ConsumerState) {
+        (
+            None.into(),
+            ConsumerState::Complete(ConsumerStateInner {
+                config: self.config,
+                decoder: self.decoder,
+                out: self.out,
+                log_namespace: self.log_namespace,
+                consumer_state: Complete,
+            }),
+        )
     }
 }
 
@@ -596,7 +618,8 @@ impl ConsumerStateInner<Consuming> {
         self,
         max_drain_ms: Duration,
         sig: SyncSender<()>,
-    ) -> (Pin<Box<Sleep>>, ConsumerStateInner<Draining>) {
+        shutdown: bool,
+    ) -> (OptionDeadline, ConsumerStateInner<Draining>) {
         let deadline = Box::pin(tokio::time::sleep(max_drain_ms));
 
         let draining = ConsumerStateInner {
@@ -604,10 +627,14 @@ impl ConsumerStateInner<Consuming> {
             decoder: self.decoder,
             out: self.out,
             log_namespace: self.log_namespace,
-            consumer_state: Draining::new(sig),
+            consumer_state: Draining::new(sig, shutdown),
         };
 
-        (deadline, draining)
+        (Some(deadline).into(), draining)
+    }
+
+    pub const fn keep_consuming(self, deadline: OptionDeadline) -> (OptionDeadline, ConsumerState) {
+        (deadline, ConsumerState::Consuming(self))
     }
 }
 
@@ -633,15 +660,26 @@ impl ConsumerStateInner<Draining> {
     }
 
     /// Finish partition drain mode. Consumes self and the drain deadline
-    /// future, and returns a "Consuming" ConsumerState
-    pub fn finish(self, _deadline: OptionFuture<Pin<Box<Sleep>>>) -> ConsumerStateInner<Consuming> {
-        ConsumerStateInner {
-            config: self.config,
-            decoder: self.decoder,
-            out: self.out,
-            log_namespace: self.log_namespace,
-            consumer_state: Consuming,
+    /// future, and returns a "Consuming" or "Complete" ConsumerState
+    pub fn finish_drain(self, deadline: OptionDeadline) -> (OptionDeadline, ConsumerState) {
+        if self.consumer_state.shutdown {
+            self.complete(deadline)
+        } else {
+            (
+                None.into(),
+                ConsumerState::Consuming(ConsumerStateInner {
+                    config: self.config,
+                    decoder: self.decoder,
+                    out: self.out,
+                    log_namespace: self.log_namespace,
+                    consumer_state: Consuming,
+                }),
+            )
         }
+    }
+
+    pub const fn keep_draining(self, deadline: OptionDeadline) -> (OptionDeadline, ConsumerState) {
+        (deadline, ConsumerState::Draining(self))
     }
 }
 
@@ -679,26 +717,27 @@ async fn coordinate_kafka_callbacks(
                 end_signals.remove(&finished_partition);
                 abort_handles.remove(&finished_partition);
 
-                consumer_state = match consumer_state {
-                    ConsumerState::Consuming(s) => {
-                        // If we are here, it is likely because the consumer tasks are set up to exit upon reaching the end of the partition
-                        if !exit_eof {
-                            warn!("Partition consumer task finished, while not in draining mode.");
-                        }
-                        ConsumerState::Consuming(s)
-                    },
+                (drain_deadline, consumer_state) = match consumer_state {
+                    ConsumerState::Complete(_) => unreachable!("Partition consumer finished after completion."),
                     ConsumerState::Draining(mut state) => {
                         state.partition_drained(finished_partition);
 
                         if state.is_drain_complete() {
                             debug!("All expected partitions have drained.");
-                            let state = state.finish(drain_deadline);
-                            drain_deadline = None.into();
-                            ConsumerState::Consuming(state)
+                            state.finish_drain(drain_deadline)
                         } else {
-                            ConsumerState::Draining(state)
+                            state.keep_draining(drain_deadline)
                         }
-                    }
+                    },
+                    ConsumerState::Consuming(state) => {
+                        // If we are here, it is likely because the consumer
+                        // tasks are set up to exit upon reaching the end of the
+                        // partition.
+                        if !exit_eof {
+                            debug!("Partition consumer task finished, while not in draining mode.");
+                        }
+                        state.keep_consuming(drain_deadline)
+                    },
                 };
 
                 match status {
@@ -715,6 +754,7 @@ async fn coordinate_kafka_callbacks(
             },
             Some(callback) = callbacks.recv() => match callback {
                 KafkaCallback::PartitionsAssigned(mut assigned_partitions, done) => match consumer_state {
+                    ConsumerState::Complete(_) => unreachable!("Partition assignment received after completion."),
                     ConsumerState::Draining(_) => error!("Kafka client is draining revoked partitions, invalid assignment?"),
                     ConsumerState::Consuming(ref consumer_state) => {
                         let acks = consumer.context().acknowledgements;
@@ -734,13 +774,17 @@ async fn coordinate_kafka_callbacks(
                     }
                 },
                 KafkaCallback::PartitionsRevoked(mut revoked_partitions, drain) => consumer_state = match consumer_state {
+                    ConsumerState::Complete(_) => unreachable!("Partitions revoked after completion."),
                     ConsumerState::Draining(d) => {
-                        error!("Kafka client is already draining revoked partitions.");
+                        // NB: This would only happen if the task driving the kafka client (i.e. rebalance handlers)
+                        // is not handling shutdown signals, and a revoke happens during a shutdown drain; otherwise
+                        // this is unreachable code.
+                        warn!("Kafka client is already draining revoked partitions.");
                         ConsumerState::Draining(d)
                     },
                     ConsumerState::Consuming(state) => {
-                        let (deadline, mut state) = state.begin_drain(max_drain_ms, drain);
-                        drain_deadline = Some(deadline).into();
+                        let (deadline, mut state) = state.begin_drain(max_drain_ms, drain, false);
+                        drain_deadline = deadline;
 
                         for tp in revoked_partitions.drain(0..) {
                             if let Some(end) = end_signals.remove(&tp) {
@@ -753,40 +797,49 @@ async fn coordinate_kafka_callbacks(
                         ConsumerState::Draining(state)
                     }
                 },
-                KafkaCallback::ShuttingDown(drain) => consumer_state = match consumer_state {
-                    ConsumerState::Draining(d) => {
+                KafkaCallback::ShuttingDown(drain) => (drain_deadline, consumer_state) = match consumer_state {
+                    ConsumerState::Complete(_) => unreachable!("Shutdown received after completion."),
+                    // Shutting down is just like a full assignment revoke, but we also close the
+                    // callback channels, since we don't expect additional assignments or rebalances
+                    ConsumerState::Draining(state) => {
+                        // NB: This would only happen if the task driving the kafka client is
+                        // not handling shutdown signals; otherwise this is unreachable code
                         error!("Kafka client handled a shutdown signal while a rebalance was in progress.");
-                        ConsumerState::Draining(d)
+                        callbacks.close();
+                        state.keep_draining(drain_deadline)
                     },
                     ConsumerState::Consuming(state) => {
-                        // Shutting down is just like a full assignment revoke, but we also close the
-                        // callback channels, since we don't expect additional assignments or rebalances
-                        let (deadline, mut state) = state.begin_drain(max_drain_ms, drain);
-                        drain_deadline = Some(deadline).into();
-
-                        if let Ok(tpl) = consumer.assignment() {
-                            tpl.elements()
-                                .iter()
-                                .for_each(|el| {
-
-                                let tp: TopicPartition = (el.topic().into(), el.partition());
-                                if let Some(end) = end_signals.remove(&tp) {
-                                    let _ = end.send(());
-                                }
-                                state.revoke_partition(tp);
-                            });
-                        }
                         callbacks.close();
-                        ConsumerState::Draining(state)
+                        if partition_consumers.is_empty() {
+                            // Skip the draining phase if this shutdown was initiated by all tasks reaching PartitionEOF
+                            debug!("All consumer tasks have already finished (reached EOF); shutting down.");
+                            state.complete(drain_deadline)
+                        } else {
+                            debug!("Signaling {} consumer tasks to shut down.", partition_consumers.len());
+                            let (deadline, mut state) = state.begin_drain(max_drain_ms, drain, true);
+                            if let Ok(tpl) = consumer.assignment() {
+                                tpl.elements()
+                                    .iter()
+                                    .for_each(|el| {
+
+                                    let tp: TopicPartition = (el.topic().into(), el.partition());
+                                    if let Some(end) = end_signals.remove(&tp) {
+                                        let _ = end.send(());
+                                    }
+                                    state.revoke_partition(tp);
+                                });
+                            }
+                            (deadline, ConsumerState::Draining(state))
+                        }
                     }
                 },
             },
 
-            Some(_) = &mut drain_deadline => consumer_state = match consumer_state {
+            Some(_) = &mut drain_deadline => (drain_deadline, consumer_state) = match consumer_state {
+                ConsumerState::Complete(_) => unreachable!("Drain deadline received after completion."),
                 ConsumerState::Consuming(s) => {
                     warn!("A drain deadline fired outside of draining mode.");
-                    drain_deadline = None.into();
-                    ConsumerState::Consuming(s)
+                    (None.into(), ConsumerState::Consuming(s))
                 },
                 ConsumerState::Draining(mut draining) => {
                     debug!("Acknowledgement drain deadline reached. Dropping any pending ack streams for revoked partitions.");
@@ -795,9 +848,7 @@ async fn coordinate_kafka_callbacks(
                             handle.abort();
                         }
                     }
-                    let state = draining.finish(drain_deadline);
-                    drain_deadline = None.into();
-                    ConsumerState::Consuming(state)
+                    draining.finish_drain(drain_deadline)
                 }
             },
 
