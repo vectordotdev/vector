@@ -773,18 +773,17 @@ async fn coordinate_kafka_callbacks(
                         drop(done);
                     }
                 },
-                KafkaCallback::PartitionsRevoked(mut revoked_partitions, drain) => consumer_state = match consumer_state {
+                KafkaCallback::PartitionsRevoked(mut revoked_partitions, drain) => (drain_deadline, consumer_state) = match consumer_state {
                     ConsumerState::Complete(_) => unreachable!("Partitions revoked after completion."),
                     ConsumerState::Draining(d) => {
                         // NB: This would only happen if the task driving the kafka client (i.e. rebalance handlers)
                         // is not handling shutdown signals, and a revoke happens during a shutdown drain; otherwise
                         // this is unreachable code.
                         warn!("Kafka client is already draining revoked partitions.");
-                        ConsumerState::Draining(d)
+                        d.keep_draining(drain_deadline)
                     },
                     ConsumerState::Consuming(state) => {
                         let (deadline, mut state) = state.begin_drain(max_drain_ms, drain, false);
-                        drain_deadline = deadline;
 
                         for tp in revoked_partitions.drain(0..) {
                             if let Some(end) = end_signals.remove(&tp) {
@@ -794,7 +793,7 @@ async fn coordinate_kafka_callbacks(
                             state.revoke_partition(tp);
                         }
 
-                        ConsumerState::Draining(state)
+                        state.keep_draining(deadline)
                     }
                 },
                 KafkaCallback::ShuttingDown(drain) => (drain_deadline, consumer_state) = match consumer_state {
@@ -829,7 +828,7 @@ async fn coordinate_kafka_callbacks(
                                     state.revoke_partition(tp);
                                 });
                             }
-                            (deadline, ConsumerState::Draining(state))
+                            state.keep_draining(deadline)
                         }
                     }
                 },
