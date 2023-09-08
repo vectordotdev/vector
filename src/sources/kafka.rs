@@ -850,9 +850,9 @@ async fn coordinate_kafka_callbacks(
 
             Some(_) = &mut drain_deadline => (drain_deadline, consumer_state) = match consumer_state {
                 ConsumerState::Complete(_) => unreachable!("Drain deadline received after completion."),
-                ConsumerState::Consuming(s) => {
+                ConsumerState::Consuming(state) => {
                     warn!("A drain deadline fired outside of draining mode.");
-                    (None.into(), ConsumerState::Consuming(s))
+                    state.keep_consuming(None.into())
                 },
                 ConsumerState::Draining(mut draining) => {
                     debug!("Acknowledgement drain deadline reached. Dropping any pending ack streams for revoked partitions.");
