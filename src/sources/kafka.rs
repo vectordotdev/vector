@@ -1957,9 +1957,9 @@ mod integration_test {
         assert_ne!(
             events1.len(),
             0,
-            "First batch of events is non-zero (increase KAFKA_SHUTDOWN_DELAY?)"
+            "First batch of events should be non-zero (increase KAFKA_SHUTDOWN_DELAY?)"
         );
-        assert_ne!(events2.len(), 0, "Second batch of events is non-zero (decrease KAFKA_SHUTDOWN_DELAY or increase KAFKA_SEND_COUNT?) ");
+        assert_ne!(events2.len(), 0, "Second batch of events should be non-zero (decrease KAFKA_SHUTDOWN_DELAY or increase KAFKA_SEND_COUNT?) ");
         assert_eq!(total, expect_count);
     }
 
@@ -2070,17 +2070,17 @@ mod integration_test {
         assert_ne!(
             events2.len(),
             0,
-            "Second batch of events is non-zero (decrease delay or increase KAFKA_SEND_COUNT?) "
+            "Second batch of events should be non-zero (decrease delay or increase KAFKA_SEND_COUNT?) "
         );
         assert_ne!(
             events3.len(),
             0,
-            "Third batch of events is non-zero (decrease delay or increase KAFKA_SEND_COUNT?) "
+            "Third batch of events should be non-zero (decrease delay or increase KAFKA_SEND_COUNT?) "
         );
         assert_eq!(
             unconsumed.len(),
             0,
-            "The first set of consumer should consume and ack all messages."
+            "The first set of consumers should consume and ack all messages."
         );
         assert_eq!(total, expect_count);
     }
