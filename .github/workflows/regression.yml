@@ -271,7 +271,7 @@ jobs:
 
       - name: (PR comment) Set latest commit status as pending
         if: ${{ github.event_name == 'issue_comment' }}
-        uses: myrotvorets/set-commit-status-action@v1.1.7
+        uses: myrotvorets/set-commit-status-action@v2.0.0
         with:
           sha: ${{ steps.pr-metadata-comment.outputs.COMPARISON_SHA }}
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -800,7 +800,7 @@ jobs:
 
       - name: (PR comment) Submit PR result as failed
         if: github.event_name == 'issue_comment' && env.FAILED == 'true'
-        uses: myrotvorets/set-commit-status-action@v1.1.7
+        uses: myrotvorets/set-commit-status-action@v2.0.0
         with:
           sha: ${{ steps.comment-branch.outputs.head_sha }}
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -809,7 +809,7 @@ jobs:
 
       - name: (PR comment) Submit PR result as success
         if: github.event_name == 'issue_comment' && env.FAILED != 'true'
-        uses: myrotvorets/set-commit-status-action@v1.1.7
+        uses: myrotvorets/set-commit-status-action@v2.0.0
         with:
           sha: ${{ steps.comment-branch.outputs.head_sha }}
           token: ${{ secrets.GITHUB_TOKEN }}
