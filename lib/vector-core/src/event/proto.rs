@@ -235,9 +235,13 @@ impl From<Metric> for event::Metric {
         let value = event::MetricValue::from(metric.value.unwrap());
 
         let mut metadata = event::EventMetadata::default();
-        if let Some(metadata_value) = metric.metadata {
-            if let Some(decoded_value) = decode_value(metadata_value) {
-                *metadata.value_mut() = decoded_value;
+        if let Some(received_metadata) = metric.metadata {
+            let (maybe_value, maybe_origin_metadata) = decode_metadata(received_metadata);
+            if let Some(value) = maybe_value {
+                *metadata.value_mut() = value;
+            }
+            if let Some(origin_metadata) = maybe_origin_metadata {
+                metadata = metadata.with_origin_metadata(origin_metadata);
             }
         }
 
@@ -442,6 +446,8 @@ impl From<event::Metric> for WithMetadata<Metric> {
             })
             .collect();
 
+        let encoded_metadata = encode_metadata(&metadata);
+
         let data = Metric {
             name,
             namespace,
@@ -451,7 +457,7 @@ impl From<event::Metric> for WithMetadata<Metric> {
             kind,
             interval_ms,
             value: Some(metric),
-            metadata: Some(encode_value(metadata.value().clone())),
+            metadata: Some(encoded_metadata),
         };
         Self { data, metadata }
     }
@@ -537,6 +543,38 @@ impl From<sketch::AgentDdSketch> for MetricSketch {
     }
 }
 
+fn decode_metadata(
+    input: Metadata,
+) -> (
+    Option<event::Value>,
+    Option<super::DatadogMetricOriginMetadata>,
+) {
+    let value = input.value.and_then(decode_value);
+
+    let datadog_origin_metadata = input
+        .datadog_origin_metadata
+        .as_ref()
+        .map(decode_origin_metadata);
+
+    (value, datadog_origin_metadata)
+}
+
+fn decode_origin_metadata(input: &DatadogOriginMetadata) -> super::DatadogMetricOriginMetadata {
+    let mut origin = super::DatadogMetricOriginMetadata::default();
+
+    if let Some(product) = input.origin_product {
+        origin = origin.with_product(product);
+    }
+    if let Some(category) = input.origin_category {
+        origin = origin.with_category(category);
+    }
+    if let Some(service) = input.origin_service {
+        origin = origin.with_service(service);
+    }
+
+    origin
+}
+
 fn decode_value(input: Value) -> Option<event::Value> {
     match input.kind {
         Some(value::Kind::RawBytes(data)) => Some(event::Value::Bytes(data)),
@@ -573,6 +611,21 @@ fn decode_array(items: Vec<Value>) -> Option<event::Value> {
         .map(decode_value)
         .collect::<Option<Vec<_>>>()
         .map(event::Value::Array)
+}
+
+fn encode_metadata(metadata: &event::EventMetadata) -> Metadata {
+    let datadog_origin_metadata =
+        metadata
+            .datadog_origin_metadata()
+            .map(|om| DatadogOriginMetadata {
+                origin_product: om.product(),
+                origin_category: om.category(),
+                origin_service: om.service(),
+            });
+    Metadata {
+        value: Some(encode_value(metadata.value().clone())),
+        datadog_origin_metadata,
+    }
 }
 
 fn encode_value(value: event::Value) -> Value {
