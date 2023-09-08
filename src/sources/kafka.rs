@@ -454,9 +454,23 @@ async fn kafka_source(
     Ok(())
 }
 
-/// KafkaPartitionState holds all the pieces that are needed to consume a kafka
-/// partition stream, and track the state needed in order to correctly manage
-/// rebalance events
+/// ConsumerStateInner implements a small struct/enum-based state machine.
+///
+/// With a ConsumerStateInner<Consuming>, the client is able to spawn new tasks
+/// when partitions are assigned. When a shutdown signal is received, or
+/// partitions are being revoked, the Consuming state is traded for a Draining
+/// state (and associated drain deadline future) via the `begin_drain` method
+///
+/// A ConsumerStateInner<Draining> keeps track of partitions that are expected
+/// to complete, and also owns the signal that, when dropped, indicates to the
+/// client driver task that it is safe to proceed with the rebalance or shutdown.
+/// When draining is complete, or the deadline is reached, Draining is traded in for
+/// either a Consuming (after a revoke) or Complete (in the case of shutdown) state,
+/// via the `finish_drain` method.
+///
+/// A ConsumerStateInner<Complete> is the final state, reached after a shutdown
+/// signal is received. This can not be traded for another state, and the
+/// coordination task should exit when this state is reached.
 struct ConsumerStateInner<S> {
     config: KafkaSourceConfig,
     decoder: Decoder,
@@ -709,7 +723,7 @@ async fn coordinate_kafka_callbacks(
 
     let exit_eof = eof.is_some();
 
-    loop {
+    while let ConsumerState::Consuming(_) | ConsumerState::Draining(_) = consumer_state {
         tokio::select! {
             Some(Ok((finished_partition, status))) = partition_consumers.join_next(), if !partition_consumers.is_empty() => {
                 debug!("Partition consumer finished for {}:{}", &finished_partition.0, finished_partition.1);
