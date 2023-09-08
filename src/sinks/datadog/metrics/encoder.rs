@@ -33,6 +33,9 @@ const SERIES_PAYLOAD_HEADER: &[u8] = b"{\"series\":[";
 const SERIES_PAYLOAD_FOOTER: &[u8] = b"]}";
 const SERIES_PAYLOAD_DELIMITER: &[u8] = b",";
 
+const DEFAULT_ORIGIN_PRODUCT_VALUE: u32 = 14;
+const ORIGIN_CATEGORY_VALUE: u32 = 11;
+
 #[allow(warnings, clippy::pedantic, clippy::nursery)]
 mod ddmetric_proto {
     include!(concat!(env!("OUT_DIR"), "/datadog.agentpayload.rs"));
@@ -198,7 +201,7 @@ fn determine_origin_product_value() -> u32 {
             p.parse::<u32>()
                 .expect("Env var ORIGIN_PRODUCT must be an unsigned 32 bit integer.")
         })
-        .unwrap_or(14)
+        .unwrap_or(DEFAULT_ORIGIN_PRODUCT_VALUE)
 }
 
 impl DatadogMetricsEncoder {
@@ -462,7 +465,7 @@ fn sketch_to_proto_message(
         origin_product_value,
     );
 
-    trace!("Generated sketch metadata: {:?}", metadata);
+    trace!(?metadata, "Generated sketch metadata");
 
     ddmetric_proto::sketch_payload::Sketch {
         metric: name,
@@ -557,8 +560,6 @@ fn encode_timestamp(timestamp: Option<DateTime<Utc>>) -> i64 {
 
 // Given the vector source type, return the OriginService value associated with that integration.
 //
-// In order to preserve consistent behavior, we intentionally don't set origin metadata
-// for the case where the Datadog Agent did not set it.
 // Some sources such as `kafka`, `nats`, `redis` for example, are only capable of receiving metrics
 // with the `native` or `native_json` codec. In such cases we intentionally do not set the origin
 // metadata here, because the true origin will have already been determined to be a pass-through.
@@ -589,8 +590,6 @@ fn generate_origin_metadata(
     maybe_source_type: Option<&'static str>,
     origin_product_value: u32,
 ) -> Option<DatadogMetricOriginMetadata> {
-    let origin_category_value = 11;
-
     let no_value = 0;
 
     // An upstream vector source or a transform has set the origin metadata already.
@@ -605,18 +604,20 @@ fn generate_origin_metadata(
         Some(
             DatadogMetricOriginMetadata::default()
                 .with_product(pass_through.product().unwrap_or(origin_product_value))
-                .with_category(pass_through.category().unwrap_or(origin_category_value))
+                .with_category(pass_through.category().unwrap_or(ORIGIN_CATEGORY_VALUE))
                 .with_service(pass_through.service().unwrap_or(no_value)),
         )
 
-    // no metadata has been set upstream
+    // No metadata has been set upstream
     } else {
         maybe_source_type.and_then(|source_type| {
-            // only set the metadata if the source is a metric source we should set it for.
+            // Only set the metadata if the source is a metric source we should set it for.
+            // In order to preserve consistent behavior, we intentionally don't set origin metadata
+            // for the case where the Datadog Agent did not set it.
             source_type_to_service(source_type).map(|origin_service_value| {
                 DatadogMetricOriginMetadata::default()
                     .with_product(origin_product_value)
-                    .with_category(origin_category_value)
+                    .with_category(ORIGIN_CATEGORY_VALUE)
                     .with_service(origin_service_value)
             })
         })
@@ -660,7 +661,7 @@ fn generate_series_metrics(
         origin_product_value,
     );
 
-    trace!("Generated series metadata: {:?}", metadata);
+    trace!(?metadata, "Generated series metadata");
 
     let results = match (metric.value(), metric.interval_ms()) {
         (MetricValue::Counter { value }, maybe_interval_ms) => {
@@ -864,7 +865,8 @@ mod tests {
     use crate::{
         common::datadog::DatadogMetricType,
         sinks::datadog::metrics::{
-            config::DatadogMetricsEndpoint, encoder::determine_origin_product_value,
+            config::DatadogMetricsEndpoint,
+            encoder::{determine_origin_product_value, DEFAULT_ORIGIN_PRODUCT_VALUE},
         },
     };
 
@@ -1028,7 +1030,12 @@ mod tests {
         let expected_interval = interval_ms / 1000;
 
         // Encode the metric and make sure we did the rate conversion correctly.
-        let result = generate_series_metrics(&rate_counter, &None, log_schema(), 14);
+        let result = generate_series_metrics(
+            &rate_counter,
+            &None,
+            log_schema(),
+            DEFAULT_ORIGIN_PRODUCT_VALUE,
+        );
         assert!(result.is_ok());
 
         let metrics = result.unwrap();
@@ -1055,7 +1062,8 @@ mod tests {
         );
         let counter = get_simple_counter_with_metadata(event_metadata);
 
-        let result = generate_series_metrics(&counter, &None, log_schema(), 14);
+        let result =
+            generate_series_metrics(&counter, &None, log_schema(), DEFAULT_ORIGIN_PRODUCT_VALUE);
         assert!(result.is_ok());
 
         let metrics = result.unwrap();
