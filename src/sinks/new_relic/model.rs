@@ -61,11 +61,11 @@ impl TryFrom<Vec<Event>> for MetricsApiModel {
                 // Extract value & type and set type-related attributes
                 let (value, metric_type) = match (data.value, &data.kind) {
                     (MetricValue::Counter { value }, MetricKind::Incremental) => {
-                        let interval_ms = data.time.interval_ms.or_else(|| {
+                        let Some(interval_ms) = data.time.interval_ms else {
                             // Incremental counter without an interval is worthless, skip this metric
                             num_missing_interval += 1;
-                            None
-                        })?;
+                            return None;
+                        };
                         metric_data.insert(
                             "interval.ms".to_owned(),
                             Value::from(interval_ms.get() as i64),
@@ -84,10 +84,10 @@ impl TryFrom<Vec<Event>> for MetricsApiModel {
                 // Set name, type, value, timestamp, and attributes
                 metric_data.insert("name".to_owned(), Value::from(series.name.name));
                 metric_data.insert("type".to_owned(), Value::from(metric_type));
-                let value = NotNan::new(value).ok().or_else(|| {
+                let Some(value) = NotNan::new(value).ok() else {
                     num_nan_value += 1;
-                    None
-                })?;
+                    return None;
+                };
                 metric_data.insert("value".to_owned(), Value::from(value));
                 metric_data.insert(
                     "timestamp".to_owned(),
