@@ -1964,8 +1964,8 @@ dependencies = [
 
 [[package]]
 name = "chrono"
-version = "0.4.27"
-source = "git+https://github.com/vectordotdev/chrono.git?tag=v0.4.27-no-default-time-1#15dc0b73a0f70d50b742208c4edf57def45ea2a8"
+version = "0.4.30"
+source = "git+https://github.com/vectordotdev/chrono.git?tag=v0.4.30-no-default-time-1#f59d4df9fc887bba7365e8bc39eb9ab3f3f5750c"
 dependencies = [
  "android-tzdata",
  "iana-time-zone",
