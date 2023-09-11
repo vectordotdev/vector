@@ -202,6 +202,15 @@ jobs:
           max_attempts: 3
           command: bash scripts/ci-integration-test.sh  datadog-traces
 
+      - if: (github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.datadog == 'true') &&
+          (github.event_name != 'pull_request' || env.PR_HAS_ACCESS_TO_SECRETS == 'true')
+        name: datadog-e2e-logs
+        uses: nick-fields/retry@v2
+        with:
+          timeout_minutes: 30
+          max_attempts: 3
+          command: bash scripts/ci-integration-test.sh  datadog-e2e-logs
+
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.dnstap == 'true' }}
         name: dnstap
         uses: nick-fields/retry@v2
