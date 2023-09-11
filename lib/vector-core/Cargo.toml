@@ -42,7 +42,7 @@ quanta = { version = "0.11.1", default-features = false }
 regex = { version = "1.9.5", default-features = false, features = ["std", "perf"] }
 ryu = { version = "1", default-features = false }
 serde = { version = "1.0.188", default-features = false, features = ["derive", "rc"] }
-serde_json = { version = "1.0.105", default-features = false }
+serde_json = { version = "1.0.106", default-features = false }
 serde_with = { version = "3.3.0", default-features = false, features = ["std", "macros"] }
 smallvec = { version = "1", default-features = false, features = ["serde", "const_generics"] }
 snafu = { version = "0.7.5", default-features = false }
