@@ -10,7 +10,7 @@ async-graphql = { version = "5.0.10", default-features = false, features = ["pla
 async-stream = { version = "0.3.5", default-features = false }
 async-trait = { version = "0.1", default-features = false }
 bitmask-enum = { version = "2.2.2", default-features = false }
-bytes = { version = "1.4.0", default-features = false, features = ["serde"] }
+bytes = { version = "1.5.0", default-features = false, features = ["serde"] }
 chrono = { version = "0.4.19", default-features = false, features = ["serde"] }
 crossbeam-utils = { version = "0.8.16", default-features = false }
 db-key = { version = "0.0.5", default-features = false, optional = true }
@@ -42,7 +42,7 @@ quanta = { version = "0.11.1", default-features = false }
 regex = { version = "1.9.5", default-features = false, features = ["std", "perf"] }
 ryu = { version = "1", default-features = false }
 serde = { version = "1.0.188", default-features = false, features = ["derive", "rc"] }
-serde_json = { version = "1.0.105", default-features = false }
+serde_json = { version = "1.0.106", default-features = false }
 serde_with = { version = "3.3.0", default-features = false, features = ["std", "macros"] }
 smallvec = { version = "1", default-features = false, features = ["serde", "const_generics"] }
 snafu = { version = "0.7.5", default-features = false }
@@ -51,7 +51,7 @@ tokio = { version = "1.32.0", default-features = false, features = ["net"] }
 tokio-openssl = { version = "0.6.3", default-features = false }
 tokio-stream = { version = "0.1", default-features = false, features = ["time"], optional = true }
 tokio-util = { version = "0.7.0", default-features = false, features = ["time"] }
-toml = { version = "0.7.6", default-features = false }
+toml = { version = "0.7.8", default-features = false }
 tonic = { version = "0.10", default-features = false, features = ["transport"] }
 tower = { version = "0.4", default-features = false, features = ["util"] }
 tracing = { version = "0.1.34", default-features = false }
@@ -78,7 +78,7 @@ schannel = "0.1.22"
 prost-build = "0.12"
 
 [dev-dependencies]
-base64 = "0.21.3"
+base64 = "0.21.4"
 chrono-tz = { version = "0.8.3", default-features = false }
 criterion = { version = "0.5.1", features = ["html_reports"] }
 env-test-util = "1.0.1"
@@ -87,7 +87,7 @@ quickcheck_macros = "1"
 proptest = "1.2"
 similar-asserts = "1.5.0"
 tokio-test = "0.4.3"
-toml = { version = "0.7.6", default-features = false, features = ["parse"] }
+toml = { version = "0.7.8", default-features = false, features = ["parse"] }
 ndarray = "0.15.6"
 ndarray-stats = "0.5.1"
 noisy_float = "0.2.0"
