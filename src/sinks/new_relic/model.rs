@@ -47,10 +47,10 @@ impl TryFrom<Vec<Event>> for MetricsApiModel {
         let metric_array: Vec<_> = buf_events
             .into_iter()
             .filter_map(|event| {
-                let metric = event.try_into_metric().or_else(|| {
+                let Some(metric) = event.try_into_metric() else {
                     num_non_metric_events += 1;
-                    None
-                })?;
+                    return None;
+                };
 
                 // Generate Value::Object() from BTreeMap<String, String>
                 let (series, data, _) = metric.into_parts();
@@ -165,10 +165,10 @@ impl TryFrom<Vec<Event>> for EventsApiModel {
         let events_array: Vec<HashMap<String, Value>> = buf_events
             .into_iter()
             .filter_map(|event| {
-                let log = event.try_into_log().or_else(|| {
+                let Some(log) = event.try_into_log() else {
                     num_non_log_events += 1;
-                    None
-                })?;
+                    return None;
+                };
 
                 let mut event_model = KeyValData::new();
                 for (k, v) in log.convert_to_fields() {
@@ -261,10 +261,10 @@ impl TryFrom<Vec<Event>> for LogsApiModel {
         let logs_array: Vec<HashMap<String, Value>> = buf_events
             .into_iter()
             .filter_map(|event| {
-                let log = event.try_into_log().or_else(|| {
+                let Some(log) = event.try_into_log() else {
                     num_non_log_events += 1;
-                    None
-                })?;
+                    return None;
+                };
 
                 let mut log_model = KeyValData::new();
                 for (k, v) in log.convert_to_fields() {
