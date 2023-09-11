@@ -4,7 +4,7 @@ use vector::test_util::trace_init;
 
 use super::*;
 
-const LOGS_ENDPOIINT: &str = "/api/v2/logs";
+const LOGS_ENDPOINT: &str = "/api/v2/logs";
 
 fn expected_log_events() -> u32 {
     std::env::var("EXPECTED_LOG_EVENTS")
@@ -42,8 +42,6 @@ fn assert_timestamp_hostname(payloads: &mut Vec<Value>) -> u32 {
 // runs assertions that each set of payloads should be true to regardless
 // of the pipeline
 fn common_assertions(payloads: &mut Vec<Value>) {
-    //dbg!(&payloads);
-
     assert!(payloads.len() > 0);
 
     let n_log_events = assert_timestamp_hostname(payloads);
@@ -58,12 +56,12 @@ async fn test_logs() {
     trace_init();
 
     println!("getting log payloads from agent-only pipeline");
-    let mut agent_payloads = get_payloads_agent(LOGS_ENDPOIINT).await;
+    let mut agent_payloads = get_payloads_agent(LOGS_ENDPOINT).await;
 
     common_assertions(&mut agent_payloads);
 
     println!("getting log payloads from agent-vector pipeline");
-    let mut vector_payloads = get_payloads_vector(LOGS_ENDPOIINT).await;
+    let mut vector_payloads = get_payloads_vector(LOGS_ENDPOINT).await;
 
     common_assertions(&mut vector_payloads);
 

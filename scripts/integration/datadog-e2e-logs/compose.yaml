@@ -36,8 +36,6 @@ services:
     volumes:
       - ${PWD}:/home/vector
       - target:/home/vector/target
-      - cargogit:/cargo/git
-      - cargoregistry:/cargo/registry
 
   # Tails a custom log created by `log_generator` and sends log data to
   # the `fakeintake-agent` service
@@ -98,5 +96,3 @@ networks:
 volumes:
   log_path: {}
   target: {}
-  cargogit: {}
-  cargoregistry: {}
