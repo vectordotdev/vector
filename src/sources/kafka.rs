@@ -483,13 +483,11 @@ struct Complete;
 struct Draining {
     signal: SyncSender<()>,
 
-    /// The Set of partitions expected to drain during a shutdown or rebalance that revokes partitions
+    /// The set of topic-partition tasks that have completed, populated at the
+    /// beginning of a rebalance or shutdown. Partitions that are not being
+    /// actively consumed (e.g. due to the consumer task exiting early) should not
+    /// be added. The draining phase is considered complete when this set is empty.
     expect_drain: HashSet<TopicPartition>,
-
-    /// The set of partitions we have observed and stored the final acknowledgement for. Ack streams
-    /// can complete before we get a rebalance callback, so "observed complete" (based on seeing the end of the stream)
-    /// and "expect to complete" (based on seeing a rebalance callback with revoked partition info) are tracked separately.
-    observed_drain: HashSet<TopicPartition>,
 
     /// Whether the client is shutting down after draining
     shutdown: bool,
@@ -506,12 +504,11 @@ impl Draining {
             signal,
             shutdown,
             expect_drain: HashSet::new(),
-            observed_drain: HashSet::new(),
         }
     }
 
     fn is_complete(&self) -> bool {
-        self.expect_drain.is_subset(&self.observed_drain)
+        self.expect_drain.is_empty()
     }
 }
 
@@ -655,7 +652,11 @@ impl ConsumerStateInner<Consuming> {
 impl ConsumerStateInner<Draining> {
     /// Mark the given TopicPartition as being revoked, adding it to the set of
     /// partitions expected to drain
-    pub fn revoke_partition(&mut self, tp: TopicPartition) {
+    pub fn revoke_partition(&mut self, tp: TopicPartition, end_signal: oneshot::Sender<()>) {
+        // Note that if this send() returns Err, it means the task has already
+        // ended, but the completion has not been processed yet (otherwise we wouldn't have access to the end_signal),
+        // so we should still add it to the "expect to drain" set
+        _ = end_signal.send(());
         self.consumer_state.expect_drain.insert(tp);
     }
 
@@ -664,11 +665,10 @@ impl ConsumerStateInner<Draining> {
     /// sent on the signal channel, indicating to the client that offsets may be committed
     pub fn partition_drained(&mut self, tp: TopicPartition) {
         _ = self.consumer_state.signal.send(());
-        self.consumer_state.observed_drain.insert(tp);
+        self.consumer_state.expect_drain.remove(&tp);
     }
 
-    /// Return true if the set of expected drained partitions is a subset of the
-    /// partitions that have been observed to be finished
+    /// Return true if all expected partitions have drained
     pub fn is_drain_complete(&self) -> bool {
         self.consumer_state.is_complete()
     }
@@ -801,10 +801,11 @@ async fn coordinate_kafka_callbacks(
 
                         for tp in revoked_partitions.drain(0..) {
                             if let Some(end) = end_signals.remove(&tp) {
-                                let _ = end.send(());
+                                debug!("Revoking partition {}:{}", &tp.0, tp.1);
+                                state.revoke_partition(tp, end);
+                            } else {
+                                debug!("Consumer task for partition {}:{} already finished.", &tp.0, tp.1);
                             }
-                            debug!("Revoking partition {}:{}", &tp.0, tp.1);
-                            state.revoke_partition(tp);
                         }
 
                         state.keep_draining(deadline)
@@ -837,9 +838,10 @@ async fn coordinate_kafka_callbacks(
 
                                     let tp: TopicPartition = (el.topic().into(), el.partition());
                                     if let Some(end) = end_signals.remove(&tp) {
-                                        let _ = end.send(());
+                                        state.revoke_partition(tp, end);
+                                    } else {
+                                        debug!("Consumer task for partition {}:{} already finished.", &tp.0, tp.1);
                                     }
-                                    state.revoke_partition(tp);
                                 });
                             }
                             state.keep_draining(deadline)
