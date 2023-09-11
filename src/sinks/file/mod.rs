@@ -4,7 +4,7 @@ use std::time::{Duration, Instant};
 use async_compression::tokio::write::{GzipEncoder, ZstdEncoder};
 use async_trait::async_trait;
 use bytes::{Bytes, BytesMut};
-use chrono_tz::UTC;
+use chrono::{Utc, Offset};
 use codecs::{
     encoding::{Framer, FramingConfig},
     TextSerializerConfig,
@@ -186,21 +186,10 @@ impl SinkConfig for FileSinkConfig {
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let timezone = match self.timezone {
-            Some(tz) => {
-                Some(tz)
-            },
-            None => {
-                match cx.globals.timezone {
-                    Some(tz) => {
-                        Some(tz)
-                    },
-                    None => {
-                        Some(TimeZone::default())
-                    }
-                }
-            }
+            Some(tz) => Some(tz),
+            None => cx.globals.timezone,
         };
-        let c = Self {
+        let config = Self {
             path: self.path.clone(),
             idle_timeout: self.idle_timeout,
             encoding: self.encoding.clone(),
@@ -208,7 +197,7 @@ impl SinkConfig for FileSinkConfig {
             acknowledgements: self.acknowledgements,
             timezone: timezone,
         };
-        let sink = FileSink::new(&c)?;
+        let sink = FileSink::new(&config)?;
         Ok((
             super::VectorSink::from_event_streamsink(sink),
             future::ok(()).boxed(),
@@ -239,13 +228,19 @@ impl FileSink {
         let transformer = config.encoding.transformer();
         let (framer, serializer) = config.encoding.build(SinkType::StreamBased)?;
         let encoder = Encoder::<Framer>::new(framer, serializer);
-        let timezone = match config.timezone.unwrap() {
-            TimeZone::Local =>  UTC,
-            TimeZone::Named(tz) => tz
+
+        let offset = match config.timezone {
+            Some(TimeZone::Local) => {
+                Some(*Utc::now().with_timezone(&chrono::Local).offset())
+            },
+            Some(TimeZone::Named(tz)) => {
+                Some(Utc::now().with_timezone(&tz).offset().fix())
+            },
+            None => None
         };
 
         Ok(Self {
-            path: config.path.clone().with_timezone(timezone),
+            path: config.path.clone().with_tz_offset(offset),
             transformer,
             encoder,
             idle_timeout: config.idle_timeout,

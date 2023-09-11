@@ -885,6 +885,17 @@ base: components: sinks: aws_s3: configuration: {
 			}
 		}
 	}
+	timezone: {
+		description: """
+			Timezone reference.
+
+			This can refer to any valid timezone as defined in the [TZ database][tzdb], or "local" which refers to the system local timezone.
+
+			[tzdb]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
+			"""
+		required: false
+		type: string: examples: ["local", "America/New_York", "EST5EDT"]
+	}
 	tls: {
 		description: "TLS configuration."
 		required:    false

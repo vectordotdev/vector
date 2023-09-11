@@ -1,8 +1,7 @@
 use std::{collections::HashMap, convert::TryFrom, io};
 
 use bytes::Bytes;
-use chrono::Utc;
-use chrono_tz::UTC;
+use chrono::{Utc, Offset, FixedOffset};
 use codecs::encoding::Framer;
 use http::header::{HeaderName, HeaderValue};
 use http::Uri;
@@ -293,7 +292,7 @@ struct RequestSettings {
     append_uuid: bool,
     encoder: (Transformer, Encoder<Framer>),
     compression: Compression,
-    timezone: TimeZone
+    tz_offset: Option<FixedOffset>
 }
 
 impl RequestBuilder<(String, Vec<Event>)> for RequestSettings {
@@ -332,12 +331,10 @@ impl RequestBuilder<(String, Vec<Event>)> for RequestSettings {
         let (key, finalizers) = gcp_metadata;
         // TODO: pull the seconds from the last event
         let filename = {
-            let tz = match self.timezone {
-                TimeZone::Local =>  UTC,
-                TimeZone::Named(tz) => tz
+            let seconds = match self.tz_offset {
+                Some(offset) => Utc::now().with_timezone(&offset).format(&self.time_format),
+                None => Utc::now().with_timezone(&chrono::Utc).format(&self.time_format)
             };
-
-            let seconds = Utc::now().with_timezone(&tz).format(&self.time_format);
 
             if self.append_uuid {
                 let uuid = Uuid::new_v4();
@@ -398,8 +395,18 @@ impl RequestSettings {
         let time_format = config.filename_time_format.clone();
         let append_uuid = config.filename_append_uuid;
         let timezone = match config.timezone {
-            Some(tz) => tz,
-            None => cx.globals.timezone()
+            Some(tz) => Some(tz),
+            None => cx.globals.timezone
+        };
+
+        let offset = match timezone {
+            Some(TimeZone::Local) => {
+                Some(*Utc::now().with_timezone(&chrono::Local).offset())
+            },
+            Some(TimeZone::Named(tz)) => {
+                Some(Utc::now().with_timezone(&tz).offset().fix())
+            },
+            None => None
         };
         Ok(Self {
             acl,
@@ -412,7 +419,7 @@ impl RequestSettings {
             append_uuid,
             compression: config.compression,
             encoder: (transformer, encoder),
-            timezone: timezone,
+            tz_offset: offset,
         })
     }
 }

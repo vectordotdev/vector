@@ -1,13 +1,11 @@
 use std::io;
 
 use bytes::Bytes;
-use chrono::Utc;
-use chrono_tz::UTC;
+use chrono::{Utc, FixedOffset};
 use codecs::encoding::Framer;
 use uuid::Uuid;
 use vector_common::request_metadata::RequestMetadata;
 use vector_core::event::Finalizable;
-use vrl::compiler::TimeZone;
 
 use crate::{
     codecs::{Encoder, Transformer},
@@ -35,7 +33,7 @@ pub struct S3RequestOptions {
     pub api_options: S3Options,
     pub encoder: (Transformer, Encoder<Framer>),
     pub compression: Compression,
-    pub filename_timezone: TimeZone,
+    pub filename_tz_offset: Option<FixedOffset>,
 }
 
 impl RequestBuilder<(S3PartitionKey, Vec<Event>)> for S3RequestOptions {
@@ -62,12 +60,11 @@ impl RequestBuilder<(S3PartitionKey, Vec<Event>)> for S3RequestOptions {
         let builder = RequestMetadataBuilder::from_events(&events);
 
         let finalizers = events.take_finalizers();
-        let tz = match self.filename_timezone {
-            TimeZone::Local =>  UTC,
-            TimeZone::Named(tz) => tz
-        };
 
-        let s3_key_prefix = Template::try_from(partition_key.key_prefix.clone()).unwrap().with_timezone(tz).to_string();
+        let s3_key_prefix = Template::try_from(partition_key.key_prefix.clone())
+            .unwrap()
+            .with_tz_offset(self.filename_tz_offset)
+            .to_string();
 
         let metadata = S3Metadata {
             partition_key,
@@ -85,12 +82,18 @@ impl RequestBuilder<(S3PartitionKey, Vec<Event>)> for S3RequestOptions {
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
         let filename = {
-            let tz = match self.filename_timezone {
-                TimeZone::Local =>  UTC,
-                TimeZone::Named(tz) => tz
+            let formatted_ts = match self.filename_tz_offset {
+                Some(offset) => {
+                    Utc::now()
+                        .with_timezone(&offset)
+                        .format(self.filename_time_format.as_str())
+                },
+                None => {
+                    Utc::now()
+                        .with_timezone(&chrono::Utc)
+                        .format(self.filename_time_format.as_str())
+                }
             };
-
-            let formatted_ts = Utc::now().with_timezone(&tz).format(self.filename_time_format.as_str());
 
             self.filename_append_uuid
                 .then(|| format!("{}-{}", formatted_ts, Uuid::new_v4().hyphenated()))

@@ -1,6 +1,7 @@
 use std::convert::TryInto;
 
 use aws_sdk_s3::Client as S3Client;
+use chrono::{Utc, Offset};
 use codecs::{
     encoding::{Framer, FramingConfig},
     TextSerializerConfig,
@@ -222,8 +223,14 @@ impl S3SinkConfig {
         let encoder = Encoder::<Framer>::new(framer, serializer);
 
         let timezone = match self.timezone {
-            Some(tz) => tz,
-            None => cx.globals.timezone(),
+            Some(tz) => Some(tz),
+            None => cx.globals.timezone,
+        };
+
+        let offset = match timezone {
+            Some(TimeZone::Local) => Some(*Utc::now().with_timezone(&chrono::Local).offset()),
+            Some(TimeZone::Named(tz)) => Some(Utc::now().with_timezone(&tz).offset().fix()),
+            None => None
         };
 
         let request_options = S3RequestOptions {
@@ -234,7 +241,7 @@ impl S3SinkConfig {
             filename_append_uuid: self.filename_append_uuid,
             encoder: (transformer, encoder),
             compression: self.compression,
-            filename_timezone: timezone,
+            filename_tz_offset: offset,
         };
 
         let sink = S3Sink::new(service, request_options, partitioner, batch_settings);

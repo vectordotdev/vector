@@ -4,10 +4,9 @@ use std::{borrow::Cow, convert::TryFrom, fmt, hash::Hash, path::PathBuf};
 use bytes::Bytes;
 use chrono::{
     format::{strftime::StrftimeItems, Item},
-    Utc,
+    Utc, FixedOffset,
 };
 
-use chrono_tz::{Tz, UTC};
 use lookup::lookup_v2::parse_target_path;
 use once_cell::sync::Lazy;
 use regex::Regex;
@@ -67,7 +66,7 @@ pub struct Template {
     reserve_size: usize,
 
     #[serde(skip)]
-    timezone: Option<Tz>,
+    tz_offset: Option<FixedOffset>,
 }
 
 impl TryFrom<&str> for Template {
@@ -121,7 +120,7 @@ impl TryFrom<Cow<'_, str>> for Template {
                 src: src.into_owned(),
                 is_static,
                 reserve_size,
-                timezone: Some(UTC),
+                tz_offset: None,
             }
         })
     }
@@ -144,8 +143,8 @@ impl ConfigurableString for Template {}
 
 impl Template {
     /// set tz offset
-    pub const fn with_timezone(mut self, timezone: Tz) -> Self {
-        self.timezone = Some(timezone);
+    pub const fn with_tz_offset(mut self, tz_offset: Option<FixedOffset>) -> Self {
+        self.tz_offset = tz_offset;
         self
     }
     /// Renders the given template with data from the event.
@@ -175,7 +174,7 @@ impl Template {
             match part {
                 Part::Literal(lit) => out.push_str(lit),
                 Part::Strftime(items) => {
-                    out.push_str(&render_timestamp(items, event, self.timezone.unwrap()))
+                    out.push_str(&render_timestamp(items, event, self.tz_offset))
                 }
                 Part::Reference(key) => {
                     out.push_str(
@@ -357,8 +356,8 @@ fn render_metric_field<'a>(key: &str, metric: &'a Metric) -> Option<&'a str> {
     }
 }
 
-fn render_timestamp(items: &ParsedStrftime, event: EventRef<'_>, timezone: Tz) -> String {
-    match event {
+fn render_timestamp(items: &ParsedStrftime, event: EventRef<'_>, tz_offset: Option<FixedOffset>) -> String {
+    let timestamp = match event {
         EventRef::Log(log) => log_schema()
             .timestamp_key_target_path()
             .and_then(|timestamp_key| {
@@ -378,10 +377,20 @@ fn render_timestamp(items: &ParsedStrftime, event: EventRef<'_>, timezone: Tz) -
                 })
         }
     }
-    .unwrap_or_else(Utc::now)
-    .with_timezone(&timezone)
-    .format_with_items(items.as_items())
-    .to_string()
+    .unwrap_or_else(Utc::now);
+
+    match tz_offset {
+        Some(offset) => {
+            timestamp.with_timezone(&offset)
+                .format_with_items(items.as_items())
+                .to_string()
+        },
+        None => {
+            timestamp.with_timezone(&chrono::Utc)
+                .format_with_items(items.as_items())
+                .to_string()
+        }
+    }
 }
 
 #[cfg(test)]

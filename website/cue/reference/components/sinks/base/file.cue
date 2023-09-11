@@ -307,15 +307,15 @@ base: components: sinks: file: configuration: {
 			syntax: "template"
 		}
 	}
-	path_tz: {
+	timezone: {
 		description: """
-			handle tz offset configuration
-			Defaults to UTC
+			Timezone reference.
+
+			This can refer to any valid timezone as defined in the [TZ database][tzdb], or "local" which refers to the system local timezone.
+
+			[tzdb]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
 			"""
 		required: false
-		type: string: {
-			default: "UTC"
-			examples: ["Asia/Singapore"]
-		}
+		type: string: examples: ["local", "America/New_York", "EST5EDT"]
 	}
 }
