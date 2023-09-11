@@ -413,7 +413,8 @@ where
                 .service(http_client);
 
             // Any errors raised in `http_client.call` results in a `GotHttpWarning` event being emitted
-            // in `HttpClient::send`.
+            // in `HttpClient::send`. This does not result in incrementing `component_errors_total` however,
+            // because that is incremented by the driver when retries have been exhausted.
             let response = decompression_service.call(request).await?;
 
             if response.status().is_success() {
@@ -560,13 +561,10 @@ pub struct RequestConfig {
 }
 
 fn headers_examples() -> IndexMap<String, String> {
-    IndexMap::<_, _>::from_iter(
-        [
-            ("Accept".to_owned(), "text/plain".to_owned()),
-            ("X-My-Custom-Header".to_owned(), "A-Value".to_owned()),
-        ]
-        .into_iter(),
-    )
+    IndexMap::<_, _>::from_iter([
+        ("Accept".to_owned(), "text/plain".to_owned()),
+        ("X-My-Custom-Header".to_owned(), "A-Value".to_owned()),
+    ])
 }
 
 impl RequestConfig {

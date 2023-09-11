@@ -6,7 +6,7 @@ use std::error::Error;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 use std::task::{Context, Poll};
 use std::time::SystemTime;
 
@@ -27,7 +27,6 @@ use aws_types::SdkConfig;
 use bytes::Bytes;
 use http::HeaderMap;
 use http_body::Body;
-use once_cell::sync::OnceCell;
 use pin_project::pin_project;
 use regex::RegexSet;
 pub use region::RegionOrEndpoint;
@@ -38,7 +37,7 @@ use crate::http::{build_proxy_connector, build_tls_connector};
 use crate::internal_events::AwsBytesSent;
 use crate::tls::{MaybeTlsSettings, TlsConfig};
 
-static RETRIABLE_CODES: OnceCell<RegexSet> = OnceCell::new();
+static RETRIABLE_CODES: OnceLock<RegexSet> = OnceLock::new();
 
 pub fn is_retriable_error<T>(error: &SdkError<T>) -> bool {
     match error {

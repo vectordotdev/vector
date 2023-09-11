@@ -125,14 +125,11 @@ pub struct S3Options {
 }
 
 fn example_tags() -> HashMap<String, String> {
-    HashMap::<_, _>::from_iter(
-        [
-            ("Project".to_string(), "Blue".to_string()),
-            ("Classification".to_string(), "confidential".to_string()),
-            ("PHI".to_string(), "True".to_string()),
-        ]
-        .into_iter(),
-    )
+    HashMap::<_, _>::from_iter([
+        ("Project".to_string(), "Blue".to_string()),
+        ("Classification".to_string(), "confidential".to_string()),
+        ("PHI".to_string(), "True".to_string()),
+    ])
 }
 
 /// S3 storage classes.

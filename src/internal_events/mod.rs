@@ -94,7 +94,11 @@ mod parser;
 #[cfg(feature = "sources-postgresql_metrics")]
 mod postgresql_metrics;
 mod process;
-#[cfg(any(feature = "sources-prometheus", feature = "sinks-prometheus"))]
+#[cfg(any(
+    feature = "sources-prometheus-scrape",
+    feature = "sources-prometheus-remote-write",
+    feature = "sinks-prometheus"
+))]
 mod prometheus;
 #[cfg(feature = "sinks-pulsar")]
 mod pulsar;
@@ -230,7 +234,11 @@ pub(crate) use self::nginx_metrics::*;
 pub(crate) use self::parser::*;
 #[cfg(feature = "sources-postgresql_metrics")]
 pub(crate) use self::postgresql_metrics::*;
-#[cfg(any(feature = "sources-prometheus", feature = "sinks-prometheus"))]
+#[cfg(any(
+    feature = "sources-prometheus-scrape",
+    feature = "sources-prometheus-remote-write",
+    feature = "sinks-prometheus"
+))]
 pub(crate) use self::prometheus::*;
 #[cfg(feature = "sinks-pulsar")]
 pub(crate) use self::pulsar::*;

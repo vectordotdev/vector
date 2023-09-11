@@ -41,7 +41,7 @@ impl<'a> FromLua<'a> for Event {
                 from: value.type_name(),
                 to: "Event",
                 message: Some("Event should be a Lua table".to_string()),
-            })
+            });
         };
         match (table.raw_get("log")?, table.raw_get("metric")?) {
             (LuaValue::Table(log), LuaValue::Nil) => {

@@ -454,7 +454,7 @@ impl HttpSource for SimpleHttpSource {
         loop {
             match decoder.decode_eof(&mut bytes) {
                 Ok(Some((next, _))) => {
-                    events.extend(next.into_iter());
+                    events.extend(next);
                 }
                 Ok(None) => break,
                 Err(error) => {

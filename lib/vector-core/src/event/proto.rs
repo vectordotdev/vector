@@ -229,7 +229,7 @@ impl From<Metric> for event::Metric {
         // The current Vector encoding includes copies of the "single" values of tags in `tags_v2`
         // above. This `extend` will re-add those values, forcing them to become the last added in
         // the value set.
-        tags.extend(metric.tags_v1.into_iter());
+        tags.extend(metric.tags_v1);
         let tags = (!tags.is_empty()).then_some(tags);
 
         let value = event::MetricValue::from(metric.value.unwrap());
