@@ -9,7 +9,7 @@ use crate::service;
 use crate::tap;
 #[cfg(feature = "api-client")]
 use crate::top;
-use crate::{config, generate, get_version, graph, list, unit_test, validate};
+use crate::{config, convert_config, generate, get_version, graph, list, unit_test, validate};
 use crate::{generate_schema, signal};
 
 #[derive(Parser, Debug)]
@@ -34,6 +34,7 @@ impl Opts {
             Some(SubCommand::Validate(_))
             | Some(SubCommand::Graph(_))
             | Some(SubCommand::Generate(_))
+            | Some(SubCommand::ConvertConfig(_))
             | Some(SubCommand::List(_))
             | Some(SubCommand::Test(_)) => {
                 if self.root.verbose == 0 {
@@ -241,6 +242,14 @@ pub enum SubCommand {
     /// Validate the target config, then exit.
     Validate(validate::Opts),
 
+    /// Convert a config file from one format to another.
+    /// This command can also walk directories recursively and convert all config files that are discovered.
+    /// Note that this is a best effort conversion due to the following reasons:
+    /// * The comments from the original config file are not preserved.
+    /// * Explicitly set default values in the original implementation might be omitted.
+    /// * Depending on how each source/sink config struct configures serde, there might be entries with null values.
+    ConvertConfig(convert_config::Opts),
+
     /// Generate a Vector configuration containing a list of components.
     Generate(generate::Opts),
 
@@ -290,6 +299,7 @@ impl SubCommand {
     ) -> exitcode::ExitCode {
         match self {
             Self::Config(c) => config::cmd(c),
+            Self::ConvertConfig(opts) => convert_config::cmd(opts),
             Self::Generate(g) => generate::cmd(g),
             Self::GenerateSchema => generate_schema::cmd(),
             Self::Graph(g) => graph::cmd(g),
