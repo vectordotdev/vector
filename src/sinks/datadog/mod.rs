@@ -37,12 +37,13 @@ pub struct DatadogCommonConfig {
     /// The endpoint to send observability data to.
     ///
     /// The endpoint must contain an HTTP scheme, and may specify a hostname or IP
-    /// address and port. The path must be specified if expected by the downstream.
+    /// address and port. The API path should NOT be specified as this is handled by
+    /// the sink.
     ///
     /// If set, overrides the `site` option.
     #[configurable(metadata(docs::advanced))]
-    #[configurable(metadata(docs::examples = "http://127.0.0.1:8080/api/v2/logs"))]
-    #[configurable(metadata(docs::examples = "http://example.com:12345/api/beta/sketches"))]
+    #[configurable(metadata(docs::examples = "http://127.0.0.1:8080"))]
+    #[configurable(metadata(docs::examples = "http://example.com:12345"))]
     #[serde(default)]
     pub endpoint: Option<String>,
 
