@@ -128,7 +128,7 @@ impl Service<LogApiRequest> for LogApiService {
         let mut client = self.client.clone();
         let http_request = Request::post(&self.uri)
             .header(CONTENT_TYPE, "application/json")
-            .header("DD-EVP-ORIGIN", "vector")
+            .header("DD-EVP-ORIGIN", crate::get_app_name())
             .header("DD-EVP-ORIGIN-VERSION", crate::get_version())
             .header("DD-API-KEY", request.api_key.to_string());
 
