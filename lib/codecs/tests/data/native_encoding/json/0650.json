@@ -1,1 +1,1 @@
-{"log":{"":-3531455741933477809,"@":{}}}
+{"metric":{"name":"r","tags":{"a":"q"},"interval_ms":2203298246,"kind":"absolute","distribution":{"samples":[],"statistic":"histogram"}}}

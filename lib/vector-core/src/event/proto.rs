@@ -235,8 +235,18 @@ impl From<Metric> for event::Metric {
         let value = event::MetricValue::from(metric.value.unwrap());
 
         let mut metadata = event::EventMetadata::default();
-        if let Some(received_metadata) = metric.metadata {
+
+        // deprecated
+        if let Some(metadata_value) = metric.metadata {
+            if let Some(decoded_value) = decode_value(metadata_value) {
+                *metadata.value_mut() = decoded_value;
+            }
+        }
+
+        if let Some(received_metadata) = metric.metadata_full {
             let (maybe_value, maybe_origin_metadata) = decode_metadata(received_metadata);
+
+            // if both the deprecated and this one are specified, use the non-deprecated
             if let Some(value) = maybe_value {
                 *metadata.value_mut() = value;
             }
@@ -457,7 +467,8 @@ impl From<event::Metric> for WithMetadata<Metric> {
             kind,
             interval_ms,
             value: Some(metric),
-            metadata: Some(encoded_metadata),
+            metadata: Some(encode_value(metadata.value().clone())),
+            metadata_full: Some(encoded_metadata),
         };
         Self { data, metadata }
     }

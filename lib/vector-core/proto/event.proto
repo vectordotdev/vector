@@ -107,7 +107,8 @@ message Metric {
   }
   string namespace = 11;
   uint32 interval_ms = 18;
-  Metadata metadata = 19;
+  Value metadata = 19;
+  Metadata metadata_full = 21;
 }
 
 message TagValues {

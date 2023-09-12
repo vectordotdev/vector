@@ -1,1 +1,1 @@
-{"metric":{"name":"g","kind":"absolute","gauge":{"value":-895488.0}}}
+{"metric":{"name":"u","interval_ms":652849232,"kind":"incremental","counter":{"value":69312.0}}}

@@ -1,1 +1,1 @@
-{"log":{}}
+{"metric":{"name":"p","tags":{"c":"p","r":"a","s":"y"},"kind":"incremental","distribution":{"samples":[{"value":219712.0,"rate":1633909672},{"value":395840.0,"rate":299357696},{"value":-862208.0,"rate":1830963093},{"value":-873088.0,"rate":3181442944},{"value":-522816.0,"rate":1246336210}],"statistic":"summary"}}}

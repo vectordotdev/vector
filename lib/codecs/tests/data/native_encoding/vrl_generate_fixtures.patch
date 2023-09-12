@@ -1,0 +1,50 @@
+diff --git a/src/value/value/arbitrary.rs b/src/value/value/arbitrary.rs
+index dde213281..d2d426dd1 100644
+--- a/src/value/value/arbitrary.rs
++++ b/src/value/value/arbitrary.rs
+@@ -1,7 +1,6 @@
+ use std::collections::BTreeMap;
+ 
+ use bytes::Bytes;
+-use chrono::{DateTime, NaiveDateTime, Utc};
+ use ordered_float::NotNan;
+ use quickcheck::{Arbitrary, Gen};
+ 
+@@ -11,18 +10,6 @@ const MAX_ARRAY_SIZE: usize = 4;
+ const MAX_MAP_SIZE: usize = 4;
+ const MAX_F64_SIZE: f64 = 1_000_000.0;
+ 
+-fn datetime(g: &mut Gen) -> DateTime<Utc> {
+-    // `chrono` documents that there is an out-of-range for both second and
+-    // nanosecond values but doesn't actually document what the valid ranges
+-    // are. We just sort of arbitrarily restrict things.
+-    let secs = i64::arbitrary(g) % 32_000;
+-    let nanosecs = u32::arbitrary(g) % 32_000;
+-    DateTime::<Utc>::from_utc(
+-        NaiveDateTime::from_timestamp_opt(secs, nanosecs).expect("invalid timestamp"),
+-        Utc,
+-    )
+-}
+-
+ impl Arbitrary for Value {
+     fn arbitrary(g: &mut Gen) -> Self {
+         // Quickcheck can't derive Arbitrary for enums, see
+@@ -32,7 +19,7 @@ impl Arbitrary for Value {
+         // field picking.
+         match u8::arbitrary(g) % 8 {
+             0 => {
+-                let bytes: Vec<u8> = Vec::arbitrary(g);
++                let bytes = String::arbitrary(g);
+                 Self::Bytes(Bytes::from(bytes))
+             }
+             1 => Self::Integer(i64::arbitrary(g)),
+@@ -42,8 +29,7 @@ impl Arbitrary for Value {
+                 Self::from(not_nan)
+             }
+             3 => Self::Boolean(bool::arbitrary(g)),
+-            4 => Self::Timestamp(datetime(g)),
+-            5 => {
++            4 | 5 => {
+                 let mut gen = Gen::new(MAX_MAP_SIZE);
+                 Self::Object(BTreeMap::arbitrary(&mut gen))
+             }

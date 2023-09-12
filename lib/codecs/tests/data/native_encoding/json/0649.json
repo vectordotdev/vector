@@ -1,1 +1,1 @@
-{"log":{"":"]","\u001d!":[]}}
+{"metric":{"name":"g","namespace":"s","timestamp":"1970-01-01T02:04:25.000031803Z","kind":"incremental","counter":{"value":265856.0}}}

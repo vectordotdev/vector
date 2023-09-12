@@ -1,1 +1,1 @@
-{"log":{"(/":{"k\t":">‿A"},"G}`":6871981850808162717,"y,\u000f":{"¤":"~?%","㦡":null}}}
+{"metric":{"name":"y","tags":{"b":"x"},"kind":"absolute","aggregated_summary":{"quantiles":[{"quantile":-196352.0,"value":-754816.0},{"quantile":332480.0,"value":16320.0},{"quantile":-858368.0,"value":-905920.0},{"quantile":-649088.0,"value":-15680.0},{"quantile":-664448.0,"value":346368.0},{"quantile":-788224.0,"value":-847296.0},{"quantile":-741248.0,"value":723712.0}],"count":6442829457677006837,"sum":578240.0}}}

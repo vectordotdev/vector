@@ -1,1 +1,1 @@
-{"metric":{"name":"w","namespace":"i","interval_ms":78765643,"kind":"incremental","counter":{"value":29312.0}}}
+{"metric":{"name":"s","namespace":"f","interval_ms":3855128895,"kind":"absolute","aggregated_histogram":{"buckets":[],"count":8441430769184417899,"sum":-337216.0}}}
