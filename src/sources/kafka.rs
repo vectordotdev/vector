@@ -483,13 +483,16 @@ struct Complete;
 struct Draining {
     signal: SyncSender<()>,
 
-    /// The set of topic-partition tasks that have completed, populated at the
-    /// beginning of a rebalance or shutdown. Partitions that are not being
-    /// actively consumed (e.g. due to the consumer task exiting early) should not
-    /// be added. The draining phase is considered complete when this set is empty.
+    /// The set of topic-partition tasks that are required to complete during
+    /// the draining phase, populated at the beginning of a rebalance or shutdown.
+    /// Partitions that are being revoked, but not being actively consumed
+    /// (e.g. due to the consumer task exiting early) should not be included.
+    /// The draining phase is considered complete when this set is empty.
     expect_drain: HashSet<TopicPartition>,
 
-    /// Whether the client is shutting down after draining
+    /// Whether the client is shutting down after draining. If set to true,
+    /// the `finish_drain` method will return a Complete state, otherwise
+    /// a Consuming state.
     shutdown: bool,
 }
 type OptionDeadline = OptionFuture<Pin<Box<Sleep>>>;
