@@ -290,7 +290,6 @@ jobs:
           - ubuntu:18.04
           - ubuntu:20.04
           - ubuntu:22.04
-          - ubuntu:22.10
           - ubuntu:23.04
           - debian:10
           - debian:11
