@@ -476,8 +476,8 @@ pub fn build_runtime(threads: Option<usize>, thread_name: &str) -> Result<Runtim
         .set(NonZeroUsize::new(threads).expect("already checked"))
         .expect("double thread initialization");
     rt_builder.worker_threads(threads);
-    info!("tokio runtime created with {threads} worker threads");
 
+    debug!(messaged = "Building runtime.", threads);
     Ok(rt_builder.build().expect("Unable to create async runtime"))
 }
 
