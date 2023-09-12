@@ -1,1 +1,1 @@
-{"metric":{"name":"h","namespace":"_","timestamp":"1970-01-01T08:18:20.000007936Z","kind":"absolute","gauge":{"value":-718784.0}}}
+{"metric":{"name":"_","namespace":"y","timestamp":"1969-12-31T18:35:17.000025869Z","kind":"incremental","counter":{"value":490752.0}}}

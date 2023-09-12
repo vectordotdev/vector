@@ -1,1 +1,1 @@
-{"metric":{"name":"m","tags":{"f":"s","p":"k","y":"v"},"kind":"absolute","distribution":{"samples":[{"value":395584.0,"rate":16704828},{"value":940992.0,"rate":1185111596},{"value":966528.0,"rate":61131680},{"value":819520.0,"rate":0},{"value":-817344.0,"rate":3479534891},{"value":646656.0,"rate":3580066578},{"value":-62570.0,"rate":3903068990},{"value":411072.0,"rate":4222211429}],"statistic":"summary"}}}
+{"log":{"n":363072.0,"¥o_":6878691609198277379}}

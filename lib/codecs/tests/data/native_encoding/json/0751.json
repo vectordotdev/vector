@@ -1,1 +1,1 @@
-{"log":{"":[null,{"":-605120.0}]}}
+{"metric":{"name":"z","tags":{"g":"v","t":"b","y":"i"},"interval_ms":664525591,"kind":"absolute","gauge":{"value":-670208.0}}}

@@ -1,1 +1,1 @@
-{"metric":{"name":"v","timestamp":"1970-01-01T01:34:41.000013755Z","kind":"absolute","counter":{"value":-341248.0}}}
+{"metric":{"name":"a","namespace":"l","timestamp":"1969-12-31T23:47:54.000026665Z","interval_ms":510841978,"kind":"incremental","counter":{"value":-200384.0}}}
