@@ -1374,7 +1374,7 @@ mod test {
             auto_offset_reset: "beginning".into(),
             session_timeout_ms: Duration::from_millis(6000),
             commit_interval_ms: Duration::from_millis(1),
-            librdkafka_options: librdkafka_options,
+            librdkafka_options,
             key_field: default_key_field(),
             topic_key: default_topic_key(),
             partition_key: default_partition_key(),
@@ -1525,7 +1525,7 @@ mod integration_test {
 
     fn kafka_test_topic() -> String {
         std::env::var("KAFKA_TEST_TOPIC")
-            .unwrap_or_else(|_| format!("test-topic-{}", random_string(10)).into())
+            .unwrap_or_else(|_| format!("test-topic-{}", random_string(10)))
     }
     fn kafka_max_bytes() -> String {
         std::env::var("KAFKA_MAX_BYTES").unwrap_or_else(|_| "1024".into())
@@ -1917,7 +1917,7 @@ mod integration_test {
             .parse()
             .expect("Number of messages to send to kafka.");
         let expect_count: usize = std::env::var("KAFKA_EXPECT_COUNT")
-            .unwrap_or_else(|_| format!("{}", send_count).into())
+            .unwrap_or_else(|_| format!("{}", send_count))
             .parse()
             .expect("Number of messages to expect consumers to process.");
         let delay_ms: u64 = std::env::var("KAFKA_SHUTDOWN_DELAY")
@@ -1932,7 +1932,7 @@ mod integration_test {
         let mut opts = HashMap::new();
         // Set options to get partition EOF notifications, and fetch data in small/configurable size chunks
         opts.insert("enable.partition.eof".into(), "true".into());
-        opts.insert("fetch.message.max.bytes".into(), kafka_max_bytes().into());
+        opts.insert("fetch.message.max.bytes".into(), kafka_max_bytes());
         let events1 = {
             let config = make_config(&topic, &group_id, LogNamespace::Legacy, Some(opts.clone()));
             let (tx, rx) = SourceSender::new_test_errors(|_| false);
@@ -1989,7 +1989,7 @@ mod integration_test {
             .parse()
             .expect("Number of messages to send to kafka.");
         let expect_count: usize = std::env::var("KAFKA_EXPECT_COUNT")
-            .unwrap_or_else(|_| format!("{}", send_count).into())
+            .unwrap_or_else(|_| format!("{}", send_count))
             .parse()
             .expect("Number of messages to expect consumers to process.");
         let delay_ms: u64 = std::env::var("KAFKA_CONSUMER_DELAY")
@@ -2005,7 +2005,7 @@ mod integration_test {
         // 3. Start 2nd & 3rd consumers using the same group.id, triggering rebalance events
         let mut kafka_options = HashMap::new();
         kafka_options.insert("enable.partition.eof".into(), "true".into());
-        kafka_options.insert("fetch.message.max.bytes".into(), kafka_max_bytes().into());
+        kafka_options.insert("fetch.message.max.bytes".into(), kafka_max_bytes());
         kafka_options.insert("partition.assignment.strategy".into(), rebalance_strategy);
         let config1 = make_config(
             &topic,
