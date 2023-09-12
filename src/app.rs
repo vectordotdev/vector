@@ -477,7 +477,7 @@ pub fn build_runtime(threads: Option<usize>, thread_name: &str) -> Result<Runtim
         .expect("double thread initialization");
     rt_builder.worker_threads(threads);
 
-    debug!(messaged = "Building runtime.", threads);
+    debug!(messaged = "Building runtime.", worker_threads = threads);
     Ok(rt_builder.build().expect("Unable to create async runtime"))
 }
 
