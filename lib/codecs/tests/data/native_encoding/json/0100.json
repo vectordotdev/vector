@@ -1,1 +1,1 @@
-{"metric":{"name":"l","namespace":"i","timestamp":"1970-01-01T00:00:00.000016783Z","interval_ms":1284103501,"kind":"absolute","counter":{"value":334784.0}}}
+{"metric":{"name":"v","tags":{"b":"y","d":"i","o":"b"},"interval_ms":775898622,"kind":"incremental","distribution":{"samples":[{"value":-779648.0,"rate":111788733},{"value":678144.0,"rate":3704748797}],"statistic":"summary"}}}

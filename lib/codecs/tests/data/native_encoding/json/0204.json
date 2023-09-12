@@ -1,1 +1,1 @@
-{"metric":{"name":"s","tags":{"_":"k","x":"w"},"interval_ms":2913539457,"kind":"incremental","counter":{"value":155776.0}}}
+{"metric":{"name":"m","tags":{"g":"r"},"interval_ms":2216566046,"kind":"incremental","counter":{"value":559424.0}}}

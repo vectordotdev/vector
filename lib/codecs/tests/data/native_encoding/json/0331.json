@@ -1,1 +1,1 @@
-{"log":{"m":-9223372036854775808}}
+{"metric":{"name":"z","namespace":"x","timestamp":"1970-01-01T03:02:02.000000999Z","kind":"incremental","gauge":{"value":-599104.0}}}

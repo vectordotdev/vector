@@ -1,1 +1,1 @@
-{"metric":{"name":"t","tags":{"_":"b","i":"d","w":"y"},"interval_ms":4294967295,"kind":"absolute","counter":{"value":-876352.0}}}
+{"metric":{"name":"n","tags":{"j":"n","p":"q"},"timestamp":"1970-01-01T03:43:43.000012579Z","kind":"incremental","gauge":{"value":-591168.0}}}
