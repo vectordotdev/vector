@@ -960,7 +960,6 @@ mod tests {
                     {
                         sketches.push(sketch);
                     }
-
                 }
             }
         }
