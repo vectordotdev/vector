@@ -8,7 +8,7 @@ use futures::future::BoxFuture;
 use headers::HeaderName;
 use http::{
     header::{CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE},
-    HeaderMap, HeaderValue, Request, Uri,
+    HeaderValue, Request, Uri,
 };
 use hyper::Body;
 use indexmap::IndexMap;
@@ -95,7 +95,7 @@ pub struct LogApiService {
     client: HttpClient,
     uri: Uri,
     user_provided_headers: IndexMap<HeaderName, HeaderValue>,
-    default_headers: HeaderMap,
+    default_headers: IndexMap<HeaderName, HeaderValue>,
 }
 
 impl LogApiService {
@@ -105,16 +105,18 @@ impl LogApiService {
         headers: IndexMap<String, String>,
     ) -> crate::Result<Self> {
         let user_provided_headers = validate_headers(&headers)?;
-        let mut default_headers = HeaderMap::new();
-        default_headers.insert(CONTENT_TYPE, HeaderValue::try_from("application/json")?);
-        default_headers.insert(
-            HeaderName::try_from("DD-EVP-ORIGIN")?,
-            HeaderValue::try_from(crate::get_app_name().to_lowercase())?,
-        );
-        default_headers.insert(
-            HeaderName::try_from("DD-EVP-ORIGIN-VERSION")?,
-            HeaderValue::try_from(crate::get_version())?,
-        );
+
+        let default_headers = &[
+            (CONTENT_TYPE.to_string(), "application/json".to_string()),
+            (
+                "DD-EVP-ORIGIN".to_string(),
+                crate::get_app_name().to_lowercase(),
+            ),
+            ("DD-EVP-ORIGIN-VERSION".to_string(), crate::get_version()),
+        ]
+        .into_iter()
+        .collect();
+        let default_headers = validate_headers(&default_headers)?;
 
         Ok(Self {
             client,
