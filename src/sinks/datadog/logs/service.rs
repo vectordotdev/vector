@@ -8,7 +8,7 @@ use futures::future::BoxFuture;
 use headers::HeaderName;
 use http::{
     header::{CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE},
-    HeaderValue, Request, Uri,
+    HeaderMap, HeaderValue, Request, Uri,
 };
 use hyper::Body;
 use indexmap::IndexMap;
@@ -95,6 +95,7 @@ pub struct LogApiService {
     client: HttpClient,
     uri: Uri,
     user_provided_headers: IndexMap<HeaderName, HeaderValue>,
+    default_headers: HeaderMap,
 }
 
 impl LogApiService {
@@ -103,12 +104,23 @@ impl LogApiService {
         uri: Uri,
         headers: IndexMap<String, String>,
     ) -> crate::Result<Self> {
-        let headers = validate_headers(&headers)?;
+        let user_provided_headers = validate_headers(&headers)?;
+        let mut default_headers = HeaderMap::new();
+        default_headers.insert(CONTENT_TYPE, HeaderValue::try_from("application/json")?);
+        default_headers.insert(
+            HeaderName::try_from("DD-EVP-ORIGIN")?,
+            HeaderValue::try_from(crate::get_app_name().to_lowercase())?,
+        );
+        default_headers.insert(
+            HeaderName::try_from("DD-EVP-ORIGIN-VERSION")?,
+            HeaderValue::try_from(crate::get_version())?,
+        );
 
         Ok(Self {
             client,
             uri,
-            user_provided_headers: headers,
+            user_provided_headers,
+            default_headers,
         })
     }
 }
@@ -126,11 +138,8 @@ impl Service<LogApiRequest> for LogApiService {
     // Emission of Error internal event is handled upstream by the caller
     fn call(&mut self, mut request: LogApiRequest) -> Self::Future {
         let mut client = self.client.clone();
-        let http_request = Request::post(&self.uri)
-            .header(CONTENT_TYPE, "application/json")
-            .header("DD-EVP-ORIGIN", crate::get_app_name())
-            .header("DD-EVP-ORIGIN-VERSION", crate::get_version())
-            .header("DD-API-KEY", request.api_key.to_string());
+        let http_request =
+            Request::post(&self.uri).header("DD-API-KEY", request.api_key.to_string());
 
         let http_request = if let Some(ce) = request.compression.content_encoding() {
             http_request.header(CONTENT_ENCODING, ce)
@@ -145,6 +154,10 @@ impl Service<LogApiRequest> for LogApiService {
         let mut http_request = http_request.header(CONTENT_LENGTH, request.body.len());
 
         if let Some(headers) = http_request.headers_mut() {
+            for (name, value) in &self.default_headers {
+                headers.insert(name, value.clone());
+            }
+
             for (name, value) in &self.user_provided_headers {
                 // Replace rather than append to any existing header values
                 headers.insert(name, value.clone());

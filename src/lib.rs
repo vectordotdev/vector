@@ -129,7 +129,7 @@ pub use vector_core::{event, metrics, schema, tcp, tls};
 /// This can be set at compile-time through the VECTOR_APP_NAME env variable.
 /// Defaults to "vector".
 pub fn get_app_name() -> &'static str {
-    option_env!("VECTOR_APP_NAME").unwrap_or("vector")
+    option_env!("VECTOR_APP_NAME").unwrap_or("Vector")
 }
 
 /// The current version of Vector in simplified format.
