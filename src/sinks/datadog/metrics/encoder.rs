@@ -468,7 +468,7 @@ fn sketch_to_proto_message(
         origin_product_value,
     );
 
-    trace!(?metadata, "Generated sketch metadata");
+    trace!(?metadata, "Generated sketch metadata.");
 
     Some(ddmetric_proto::sketch_payload::Sketch {
         metric: name,
@@ -667,7 +667,7 @@ fn generate_series_metrics(
         origin_product_value,
     );
 
-    trace!(?metadata, "Generated series metadata");
+    trace!(?metadata, "Generated series metadata.");
 
     let results = match (metric.value(), metric.interval_ms()) {
         (MetricValue::Counter { value }, maybe_interval_ms) => {
