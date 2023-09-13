@@ -111,13 +111,13 @@ impl LogApiService {
             (CONTENT_TYPE.to_string(), "application/json".to_string()),
             (
                 "DD-EVP-ORIGIN".to_string(),
-                crate::get_app_name().to_lowercase().replace(" ", "_"),
+                crate::get_app_name().to_lowercase().replace(' ', "_"),
             ),
             ("DD-EVP-ORIGIN-VERSION".to_string(), crate::get_version()),
         ]
         .into_iter()
         .collect();
-        let default_headers = validate_headers(&default_headers)?;
+        let default_headers = validate_headers(default_headers)?;
 
         Ok(Self {
             client,
