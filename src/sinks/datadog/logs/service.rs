@@ -111,7 +111,7 @@ impl LogApiService {
             (CONTENT_TYPE.to_string(), "application/json".to_string()),
             (
                 "DD-EVP-ORIGIN".to_string(),
-                crate::get_app_name().to_lowercase(),
+                crate::get_app_name().to_lowercase().replace(" ", "_"),
             ),
             ("DD-EVP-ORIGIN-VERSION".to_string(), crate::get_version()),
         ]
