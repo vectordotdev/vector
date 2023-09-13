@@ -124,7 +124,7 @@ pub use source_sender::SourceSender;
 pub use vector_common::{shutdown, Error, Result};
 pub use vector_core::{event, metrics, schema, tcp, tls};
 
-/// The name used to identify this Vector service.
+/// The name used to identify this Vector application.
 ///
 /// This can be set at compile-time through the VECTOR_APP_NAME env variable.
 /// Defaults to "vector".
