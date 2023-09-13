@@ -827,26 +827,26 @@ async fn coordinate_kafka_callbacks(
                     },
                     ConsumerState::Consuming(state) => {
                         callbacks.close();
-                        if partition_consumers.is_empty() {
-                            // Skip the draining phase if this shutdown was initiated by all tasks reaching PartitionEOF
-                            debug!("All consumer tasks have already finished (reached EOF); shutting down.");
-                            state.complete(drain_deadline)
-                        } else {
-                            debug!("Signaling {} consumer tasks to shut down.", partition_consumers.len());
-                            let (deadline, mut state) = state.begin_drain(max_drain_ms, drain, true);
-                            if let Ok(tpl) = consumer.assignment() {
-                                tpl.elements()
-                                    .iter()
-                                    .for_each(|el| {
+                        let (deadline, mut state) = state.begin_drain(max_drain_ms, drain, true);
+                        if let Ok(tpl) = consumer.assignment() {
+                            tpl.elements()
+                                .iter()
+                                .for_each(|el| {
 
-                                    let tp: TopicPartition = (el.topic().into(), el.partition());
-                                    if let Some(end) = end_signals.remove(&tp) {
-                                        state.revoke_partition(tp, end);
-                                    } else {
-                                        debug!("Consumer task for partition {}:{} already finished.", &tp.0, tp.1);
-                                    }
-                                });
-                            }
+                                let tp: TopicPartition = (el.topic().into(), el.partition());
+                                if let Some(end) = end_signals.remove(&tp) {
+                                    debug!("Shutting down and revoking partition {}:{}", &tp.0, tp.1);
+                                    state.revoke_partition(tp, end);
+                                } else {
+                                    debug!("Consumer task for partition {}:{} already finished.", &tp.0, tp.1);
+                                }
+                            });
+                        }
+                        // If shutdown was initiated by partition EOF mode, the drain phase
+                        // will already be complete and would time out if not accounted for here
+                        if state.is_drain_complete() {
+                            state.finish_drain(deadline)
+                        } else {
                             state.keep_draining(deadline)
                         }
                     }
@@ -869,11 +869,6 @@ async fn coordinate_kafka_callbacks(
                     draining.finish_drain(drain_deadline)
                 }
             },
-
-            // Consumers are done, and callback channel is closed
-            else => {
-                break
-            }
         }
     }
 }
