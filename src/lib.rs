@@ -127,7 +127,7 @@ pub use vector_core::{event, metrics, schema, tcp, tls};
 /// The name used to identify this Vector application.
 ///
 /// This can be set at compile-time through the VECTOR_APP_NAME env variable.
-/// Defaults to "vector".
+/// Defaults to "Vector".
 pub fn get_app_name() -> &'static str {
     option_env!("VECTOR_APP_NAME").unwrap_or("Vector")
 }
