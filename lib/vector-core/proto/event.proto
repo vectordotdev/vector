@@ -69,18 +69,6 @@ message Value {
   }
 }
 
-message DatadogOriginMetadata {
-  optional uint32 origin_product = 1;
-  optional uint32 origin_category = 2;
-  optional uint32 origin_service = 3;
-}
-
-message Metadata {
-  Value value = 1;
-  reserved 2,3,4,5,6,7,8;
-  DatadogOriginMetadata datadog_origin_metadata = 9;
-}
-
 message Metric {
   string name = 1;
   google.protobuf.Timestamp timestamp = 2;
