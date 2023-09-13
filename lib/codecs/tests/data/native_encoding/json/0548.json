@@ -1,1 +1,1 @@
-{"metric":{"name":"t","namespace":"y","interval_ms":2643185732,"kind":"absolute","distribution":{"samples":[{"value":-247616.0,"rate":2312291170},{"value":-761920.0,"rate":2718385354},{"value":-455872.0,"rate":3733465075},{"value":824448.0,"rate":3165603143},{"value":278720.0,"rate":2137680571},{"value":-171200.0,"rate":2972709797},{"value":-704576.0,"rate":1829500864}],"statistic":"histogram"}}}
+{"log":{"":{}}}

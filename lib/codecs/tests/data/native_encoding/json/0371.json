@@ -1,1 +1,1 @@
-{"log":{"4":true,"f`8":{"":{"\u0004":null,"®󂬤 ":43584.0,".":null}}}}
+{"metric":{"name":"x","tags":{"i":"p","r":"y","s":"b"},"interval_ms":241209126,"kind":"incremental","gauge":{"value":-836224.0}}}

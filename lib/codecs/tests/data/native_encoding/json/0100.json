@@ -1,1 +1,1 @@
-{"metric":{"name":"v","tags":{"b":"y","d":"i","o":"b"},"interval_ms":775898622,"kind":"incremental","distribution":{"samples":[{"value":-779648.0,"rate":111788733},{"value":678144.0,"rate":3704748797}],"statistic":"summary"}}}
+{"log":{"5":6880732155769974828}}

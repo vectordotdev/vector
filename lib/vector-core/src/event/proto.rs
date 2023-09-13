@@ -238,20 +238,21 @@ impl From<Metric> for event::Metric {
 
         // deprecated
         if let Some(metadata_value) = metric.metadata {
-            if let Some(decoded_value) = decode_value(metadata_value) {
-                *metadata.value_mut() = decoded_value;
+            if let Some(value) = decode_value(metadata_value) {
+                *metadata.value_mut() = value;
             }
         }
 
         if let Some(received_metadata) = metric.metadata_full {
-            let (maybe_value, maybe_origin_metadata) = decode_metadata(received_metadata);
+            let (maybe_metadata_value, maybe_origin_metadata) = decode_metadata(received_metadata);
 
-            // if both the deprecated and this one are specified, use the non-deprecated
-            if let Some(value) = maybe_value {
-                *metadata.value_mut() = value;
-            }
             if let Some(origin_metadata) = maybe_origin_metadata {
                 metadata = metadata.with_origin_metadata(origin_metadata);
+            }
+
+            // if both the deprecated and this one are specified, use the non-deprecated
+            if let Some(value) = maybe_metadata_value {
+                *metadata.value_mut() = value;
             }
         }
 

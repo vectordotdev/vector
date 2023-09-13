@@ -1,1 +1,1 @@
-{"metric":{"name":"j","namespace":"q","interval_ms":2040743342,"kind":"absolute","aggregated_summary":{"quantiles":[{"quantile":-864960.0,"value":-507648.0},{"quantile":858368.0,"value":985537.028},{"quantile":91904.0,"value":-618112.0},{"quantile":160000.0,"value":559744.0},{"quantile":-977536.0,"value":999296.0},{"quantile":-424384.0,"value":-455616.0},{"quantile":791168.0,"value":-905024.0},{"quantile":-94656.0,"value":-204800.0},{"quantile":-126784.0,"value":-41344.0}],"count":9570888510601210718,"sum":66688.0}}}
+{"log":{"":[6819524775863648631]}}

@@ -1,1 +1,1 @@
-{"metric":{"name":"y","timestamp":"1970-01-01T07:04:07.000000467Z","kind":"incremental","gauge":{"value":-436736.0}}}
+{"metric":{"name":"l","namespace":"d","tags":{"b":"f","f":"o","g":"f"},"timestamp":"1969-12-31T19:44:22.000010969Z","kind":"incremental","gauge":{"value":-571456.0}}}

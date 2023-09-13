@@ -1,5 +1,5 @@
 diff --git a/lib/vector-core/src/event/test/common.rs b/lib/vector-core/src/event/test/common.rs
-index c7ccca952..e03f8c65d 100644
+index c7ccca952..f851288ce 100644
 --- a/lib/vector-core/src/event/test/common.rs
 +++ b/lib/vector-core/src/event/test/common.rs
 @@ -26,6 +26,15 @@ const ALPHABET: [&str; 27] = [
@@ -40,7 +40,7 @@ index c7ccca952..e03f8c65d 100644
              },
              2 => MetricValue::Set {
                  values: BTreeSet::arbitrary(g),
-@@ -197,12 +206,12 @@ impl Arbitrary for MetricValue {
+@@ -197,19 +206,20 @@ impl Arbitrary for MetricValue {
              4 => MetricValue::AggregatedHistogram {
                  buckets: Vec::arbitrary(g),
                  count: u64::arbitrary(g),
@@ -55,7 +55,25 @@ index c7ccca952..e03f8c65d 100644
              },
              6 => {
                  // We're working around quickcheck's limitations here, and
-@@ -368,7 +377,7 @@ impl Arbitrary for MetricValue {
+                 // should really migrate the tests in question to use proptest
+                 let num_samples = u8::arbitrary(g);
+                 let samples = std::iter::repeat_with(|| loop {
+-                    let f = f64::arbitrary(g);
++                    // let f = f64::arbitrary(g);
++                    let f = make_simple_f64(g);
+                     if f.is_normal() {
+                         return f;
+                     }
+@@ -219,6 +229,8 @@ impl Arbitrary for MetricValue {
+ 
+                 let mut sketch = AgentDDSketch::with_agent_defaults();
+                 sketch.insert_many(&samples);
++                sketch.sum = make_simple_f64(g);
++                sketch.avg = make_simple_f64(g);
+ 
+                 MetricValue::Sketch {
+                     sketch: MetricSketch::AgentDDSketch(sketch),
+@@ -368,7 +380,7 @@ impl Arbitrary for MetricValue {
  impl Arbitrary for Sample {
      fn arbitrary(g: &mut Gen) -> Self {
          Sample {
@@ -64,7 +82,7 @@ index c7ccca952..e03f8c65d 100644
              rate: u32::arbitrary(g),
          }
      }
-@@ -398,8 +407,8 @@ impl Arbitrary for Sample {
+@@ -398,8 +410,8 @@ impl Arbitrary for Sample {
  impl Arbitrary for Quantile {
      fn arbitrary(g: &mut Gen) -> Self {
          Quantile {
@@ -75,7 +93,7 @@ index c7ccca952..e03f8c65d 100644
          }
      }
  
-@@ -428,7 +437,7 @@ impl Arbitrary for Quantile {
+@@ -428,7 +440,7 @@ impl Arbitrary for Quantile {
  impl Arbitrary for Bucket {
      fn arbitrary(g: &mut Gen) -> Self {
          Bucket {

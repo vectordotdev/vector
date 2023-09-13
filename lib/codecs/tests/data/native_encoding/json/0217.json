@@ -1,1 +1,1 @@
-{"metric":{"name":"z","namespace":"t","interval_ms":3297555690,"kind":"absolute","counter":{"value":-72064.0}}}
+{"metric":{"name":"a","namespace":"e","tags":{"c":"a","j":"r","s":"t"},"kind":"absolute","gauge":{"value":-915136.0}}}
