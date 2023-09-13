@@ -2067,9 +2067,9 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "4.4.2"
+version = "4.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6a13b88d2c62ff462f88e4a121f17a82c1af05693a2f192b5c38d14de73c19f6"
+checksum = "84ed82781cea27b43c9b106a979fe450a13a31aab0500595fb3fc06616de08e6"
 dependencies = [
  "clap_builder",
  "clap_derive",
@@ -2081,7 +2081,7 @@ version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1eef05769009513df2eb1c3b4613e7fad873a14c600ff025b08f250f59fee7de"
 dependencies = [
- "clap 4.4.2",
+ "clap 4.4.3",
  "log",
 ]
 
@@ -2104,7 +2104,7 @@ version = "4.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4110a1e6af615a9e6d0a36f805d5c99099f8bab9b8042f5bc1fa220a4a89e36f"
 dependencies = [
- "clap 4.4.2",
+ "clap 4.4.3",
 ]
 
 [[package]]
@@ -2409,7 +2409,7 @@ dependencies = [
  "anes",
  "cast",
  "ciborium",
- "clap 4.4.2",
+ "clap 4.4.3",
  "criterion-plot",
  "futures 0.3.28",
  "is-terminal",
@@ -9526,7 +9526,7 @@ dependencies = [
  "atty",
  "cached",
  "chrono",
- "clap 4.4.2",
+ "clap 4.4.3",
  "clap-verbosity-flag",
  "clap_complete",
  "confy",
@@ -9603,7 +9603,7 @@ dependencies = [
  "bytesize",
  "chrono",
  "cidr-utils",
- "clap 4.4.2",
+ "clap 4.4.3",
  "codecs",
  "colored",
  "console-subscriber",
@@ -9764,7 +9764,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "chrono",
- "clap 4.4.2",
+ "clap 4.4.3",
  "futures 0.3.28",
  "graphql_client",
  "indoc",
@@ -9787,7 +9787,7 @@ dependencies = [
  "async-trait",
  "bytecheck",
  "bytes 1.5.0",
- "clap 4.4.2",
+ "clap 4.4.3",
  "crc32fast",
  "criterion",
  "crossbeam-queue",
@@ -10007,7 +10007,7 @@ dependencies = [
 name = "vector-vrl-cli"
 version = "0.1.0"
 dependencies = [
- "clap 4.4.2",
+ "clap 4.4.3",
  "vector-vrl-functions",
  "vrl",
 ]
@@ -10026,7 +10026,7 @@ dependencies = [
  "ansi_term",
  "chrono",
  "chrono-tz",
- "clap 4.4.2",
+ "clap 4.4.3",
  "enrichment",
  "glob",
  "prettydiff",
@@ -10087,7 +10087,7 @@ dependencies = [
  "chrono",
  "chrono-tz",
  "cidr-utils",
- "clap 4.4.2",
+ "clap 4.4.3",
  "codespan-reporting",
  "crypto_secretbox",
  "csv",
