@@ -106,6 +106,7 @@ impl LogApiService {
     ) -> crate::Result<Self> {
         let user_provided_headers = validate_headers(&headers)?;
 
+        // Note that these headers cannot be overriden by the user.
         let default_headers = &[
             (CONTENT_TYPE.to_string(), "application/json".to_string()),
             (
@@ -156,12 +157,11 @@ impl Service<LogApiRequest> for LogApiService {
         let mut http_request = http_request.header(CONTENT_LENGTH, request.body.len());
 
         if let Some(headers) = http_request.headers_mut() {
-            for (name, value) in &self.default_headers {
-                headers.insert(name, value.clone());
-            }
-
             for (name, value) in &self.user_provided_headers {
                 // Replace rather than append to any existing header values
+                headers.insert(name, value.clone());
+            }
+            for (name, value) in &self.default_headers {
                 headers.insert(name, value.clone());
             }
         }
