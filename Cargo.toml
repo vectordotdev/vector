@@ -862,7 +862,8 @@ cli-tests = ["sinks-blackhole", "sinks-socket", "sources-demo_logs", "sources-fi
 
 e2e-tests-datadog = [
   "sources-datadog_agent",
-  "sinks-datadog_logs"
+  "sinks-datadog_logs",
+  "sinks-datadog_metrics"
 ]
 
 vector-api-tests = [

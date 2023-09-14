@@ -1,4 +1,5 @@
 pub mod logs;
+pub mod metrics;
 
 use reqwest::{Client, Method};
 use serde::Deserialize;
