@@ -51,8 +51,7 @@ message MetricPayload {
         string unit = 6;
         string source_type_name = 7;
         int64 interval = 8;
-        reserved 9;
-        Metadata metadata = 10;
+        Metadata metadata = 9;
     }
     repeated MetricSeries series = 1;
 }
