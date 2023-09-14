@@ -568,6 +568,14 @@ impl<'a> Builder<'a> {
                 globals: self.config.global.clone(),
                 proxy: ProxyConfig::merge_with_env(&self.config.global.proxy, sink.proxy()),
                 schema: self.config.schema,
+
+                #[cfg(feature = "enterprise")]
+                enterprise_in_use: self
+                    .config
+                    .enterprise
+                    .as_ref()
+                    .map(|e| e.enabled)
+                    .unwrap_or_default(),
             };
 
             let (sink, healthcheck) = match sink.inner.build(cx).await {

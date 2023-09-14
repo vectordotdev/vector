@@ -103,16 +103,14 @@ impl LogApiService {
         client: HttpClient,
         uri: Uri,
         headers: IndexMap<String, String>,
+        dd_evp_origin: String,
     ) -> crate::Result<Self> {
         let user_provided_headers = validate_headers(&headers)?;
 
         // Note that these headers cannot be overriden by the user.
         let default_headers = &[
             (CONTENT_TYPE.to_string(), "application/json".to_string()),
-            (
-                "DD-EVP-ORIGIN".to_string(),
-                crate::get_app_name().to_lowercase().replace(' ', "_"),
-            ),
+            ("DD-EVP-ORIGIN".to_string(), dd_evp_origin),
             ("DD-EVP-ORIGIN-VERSION".to_string(), crate::get_version()),
         ]
         .into_iter()

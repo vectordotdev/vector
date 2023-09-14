@@ -241,6 +241,9 @@ pub struct SinkContext {
     pub globals: GlobalOptions,
     pub proxy: ProxyConfig,
     pub schema: schema::Options,
+
+    #[cfg(feature = "enterprise")]
+    pub enterprise_in_use: bool,
 }
 
 impl SinkContext {

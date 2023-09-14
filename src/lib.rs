@@ -128,8 +128,29 @@ pub use vector_core::{event, metrics, schema, tcp, tls};
 ///
 /// This can be set at compile-time through the VECTOR_APP_NAME env variable.
 /// Defaults to "Vector".
-pub fn get_app_name() -> &'static str {
-    option_env!("VECTOR_APP_NAME").unwrap_or("Vector")
+pub fn get_app_name(#[cfg(feature = "enterprise")] enterprise_in_use: bool) -> &'static str {
+    #[cfg(not(feature = "enterprise"))]
+    let default_app_name = "Vector";
+    #[cfg(feature = "enterprise")]
+    let default_app_name = if enterprise_in_use {
+        "Vector Enterprise"
+    } else {
+        "Vector"
+    };
+
+    option_env!("VECTOR_APP_NAME").unwrap_or(default_app_name)
+}
+
+/// Returns a sluggified version of the name used to identify this Vector application.
+///
+/// Defaults to "vector".
+pub fn get_sluggified_app_name(#[cfg(feature = "enterprise")] enterprise_in_use: bool) -> String {
+    get_app_name(
+        #[cfg(feature = "enterprise")]
+        enterprise_in_use,
+    )
+    .to_lowercase()
+    .replace(' ', "-")
 }
 
 /// The current version of Vector in simplified format.

@@ -82,7 +82,12 @@ where
         let proxy_connector = build_proxy_connector(tls_settings.into(), proxy_config)?;
         let client = client_builder.build(proxy_connector.clone());
 
-        let app_name = crate::get_app_name();
+        let app_name = crate::get_app_name(
+            // TODO: correctly set this field.
+            // Note that Vector Enterprise is deprecated so the effort does not seem worthwhile.
+            #[cfg(feature = "enterprise")]
+            false,
+        );
         let version = crate::get_version();
         let user_agent = HeaderValue::from_str(&format!("{}/{}", app_name, version))
             .expect("Invalid header value for user-agent!");
