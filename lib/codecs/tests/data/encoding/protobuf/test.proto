@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+package test;
+
+message Integers {
+  int32 i32 = 1;
+  int64 i64 = 2;
+  uint32 u32 = 3;
+  uint64 u64 = 4;
+}
+
+message Floats {
+  double d = 1;
+  float f = 2;
+}
+
+message Bytes {
+  string text = 1;
+  bytes binary = 2;
+}
+
+message RepeatedPrimitive {
+  repeated int64 numbers = 1;
+}
+
+message RepeatedMessage {
+  message EmbeddedMessage {
+    optional string text = 1;
+    optional uint32 index = 2;
+  }
+  repeated EmbeddedMessage messages = 1;
+}

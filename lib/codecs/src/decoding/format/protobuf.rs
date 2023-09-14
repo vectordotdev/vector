@@ -73,10 +73,10 @@ impl ProtobufDeserializerConfig {
 #[derivative(Default)]
 pub struct ProtobufDeserializerOptions {
     /// Path to desc file
-    desc_file: PathBuf,
+    pub desc_file: PathBuf,
 
     /// message type. e.g package.message
-    message_type: String,
+    pub message_type: String,
 }
 
 /// Deserializer that builds `Event`s from a byte frame containing protobuf.
