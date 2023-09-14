@@ -1,4 +1,4 @@
---
+---
 title: Sizing and Capacity Planning
 description: Guidance for single-tenant Vector environments.
 weight: 6
