@@ -128,11 +128,11 @@ pub use vector_core::{event, metrics, schema, tcp, tls};
 ///
 /// This can be set at compile-time through the VECTOR_APP_NAME env variable.
 /// Defaults to "Vector".
-pub fn get_app_name(#[cfg(feature = "enterprise")] enterprise_in_use: bool) -> &'static str {
+pub fn get_app_name(#[cfg(feature = "enterprise")] enterprise_enabled: bool) -> &'static str {
     #[cfg(not(feature = "enterprise"))]
     let default_app_name = "Vector";
     #[cfg(feature = "enterprise")]
-    let default_app_name = if enterprise_in_use {
+    let default_app_name = if enterprise_enabled {
         "Vector Enterprise"
     } else {
         "Vector"
@@ -141,13 +141,13 @@ pub fn get_app_name(#[cfg(feature = "enterprise")] enterprise_in_use: bool) -> &
     option_env!("VECTOR_APP_NAME").unwrap_or(default_app_name)
 }
 
-/// Returns a sluggified version of the name used to identify this Vector application.
+/// Returns a slugified version of the name used to identify this Vector application.
 ///
 /// Defaults to "vector".
-pub fn get_sluggified_app_name(#[cfg(feature = "enterprise")] enterprise_in_use: bool) -> String {
+pub fn get_slugified_app_name(#[cfg(feature = "enterprise")] enterprise_enabled: bool) -> String {
     get_app_name(
         #[cfg(feature = "enterprise")]
-        enterprise_in_use,
+        enterprise_enabled,
     )
     .to_lowercase()
     .replace(' ', "-")

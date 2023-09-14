@@ -243,7 +243,7 @@ pub struct SinkContext {
     pub schema: schema::Options,
 
     #[cfg(feature = "enterprise")]
-    pub enterprise_in_use: bool,
+    pub enterprise_enabled: bool,
 }
 
 impl SinkContext {

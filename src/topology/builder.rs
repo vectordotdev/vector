@@ -570,7 +570,7 @@ impl<'a> Builder<'a> {
                 schema: self.config.schema,
 
                 #[cfg(feature = "enterprise")]
-                enterprise_in_use: self
+                enterprise_enabled: self
                     .config
                     .enterprise
                     .as_ref()

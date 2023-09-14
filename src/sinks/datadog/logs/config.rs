@@ -174,11 +174,11 @@ impl SinkConfig for DatadogLogsConfig {
             .dd_common
             .build_healthcheck(client.clone(), self.region.as_ref())?;
 
-        let sluggified_app_name = crate::get_sluggified_app_name(
+        let slugified_app_name = crate::get_slugified_app_name(
             #[cfg(feature = "enterprise")]
-            cx.enterprise_in_use,
+            cx.enterprise_enabled,
         );
-        let sink = self.build_processor(client, sluggified_app_name)?;
+        let sink = self.build_processor(client, slugified_app_name)?;
 
         Ok((sink, healthcheck))
     }
