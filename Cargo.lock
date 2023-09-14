@@ -1965,7 +1965,8 @@ dependencies = [
 [[package]]
 name = "chrono"
 version = "0.4.30"
-source = "git+https://github.com/vectordotdev/chrono.git?tag=v0.4.30-no-default-time-1#f59d4df9fc887bba7365e8bc39eb9ab3f3f5750c"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "defd4e7873dbddba6c7c91e199c7fcb946abc4a6a4ac3195400bcfb01b5de877"
 dependencies = [
  "android-tzdata",
  "iana-time-zone",

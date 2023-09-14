@@ -379,9 +379,6 @@ wiremock = "0.5.19"
 zstd = { version = "0.12.4", default-features = false }
 
 [patch.crates-io]
-# Removes dependency on `time` v0.1
-# https://github.com/chronotope/chrono/pull/578
-chrono = { git = "https://github.com/vectordotdev/chrono.git", tag = "v0.4.30-no-default-time-1" }
 # The upgrade for `tokio-util` >= 0.6.9 is blocked on https://github.com/vectordotdev/vector/issues/11257.
 tokio-util = { git = "https://github.com/vectordotdev/tokio", branch = "tokio-util-0.7.8-framed-read-continue-on-error" }
 nix = { git = "https://github.com/vectordotdev/nix.git", branch = "memfd/gnu/musl" }
