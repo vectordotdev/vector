@@ -52,7 +52,7 @@ fn common_assertions(payloads: &mut Vec<Value>) {
 }
 
 #[tokio::test]
-async fn test_logs() {
+async fn validate() {
     trace_init();
 
     println!("getting log payloads from agent-only pipeline");

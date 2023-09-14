@@ -3,6 +3,8 @@ features:
 
 test: "e2e"
 
+test_filter: "datadog::logs::"
+
 runner:
   env:
     EXPECTED_LOG_EVENTS: '1000'
