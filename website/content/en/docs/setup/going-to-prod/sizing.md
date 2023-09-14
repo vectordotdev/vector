@@ -59,7 +59,7 @@ Sizing disks is only relevant if you’re using Vector’s disk buffers. In this
 
 Provision enough space and throughput to prevent upstream clients from experiencing back pressure during normal operation. For archiving sinks, sinks fronted with a disk buffer, 10 minutes worth of data is usually sufficient.
 
-Note that a disk buffer can become the bottleneck in your Vector topology if its configured throughput is less than the throughput sent to Vector. We recommend configuring disk throughput (if applicable) to at least 2x the expected maximum throughput to give the application adequate headroom. The recommended disks should all have sufficent throughput configurations by default.
+Note that a disk buffer can become the bottleneck in your Vector topology if its configured throughput is less than the throughput sent to Vector. We recommend configuring disk throughput (if applicable) to at least 2x the expected maximum throughput to give the application adequate headroom. The recommended disks should all have sufficient throughput configurations by default.
 
 For example, if you’re averaging 10 MiB/s/vCPU on an 8 vCPU machine, you should provision at least 48 GiB of disk space (`10 MiB * 60 seconds * 10 minutes * 8 vCPUs`). This costs $6.00/month, or ~$0.20/day, for AWS EBS `io2`.
 
