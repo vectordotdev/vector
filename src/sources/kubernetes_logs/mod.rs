@@ -243,6 +243,13 @@ pub struct Config {
     #[configurable(derived)]
     #[serde(default)]
     internal_metrics: FileInternalMetricsConfig,
+
+    /// How long to keep an open handle to a rotated log file.
+    /// The default value represents "no limit"
+    #[serde_as(as = "serde_with::DurationSeconds<u64>")]
+    #[configurable(metadata(docs::type_unit = "seconds"))]
+    #[serde(default = "default_rotate_wait", rename = "rotate_wait_secs")]
+    rotate_wait: Duration,
 }
 
 const fn default_read_from() -> ReadFromConfig {
@@ -287,6 +294,7 @@ impl Default for Config {
             delay_deletion_ms: default_delay_deletion_ms(),
             log_namespace: None,
             internal_metrics: Default::default(),
+            rotate_wait: default_rotate_wait(),
         }
     }
 }
@@ -538,6 +546,7 @@ struct Source {
     ingestion_timestamp_field: Option<OwnedTargetPath>,
     delay_deletion: Duration,
     include_file_metric_tag: bool,
+    rotate_wait: Duration,
 }
 
 impl Source {
@@ -617,6 +626,7 @@ impl Source {
             ingestion_timestamp_field,
             delay_deletion,
             include_file_metric_tag: config.internal_metrics.include_file_tag,
+            rotate_wait: config.rotate_wait,
         })
     }
 
@@ -650,6 +660,7 @@ impl Source {
             ingestion_timestamp_field,
             delay_deletion,
             include_file_metric_tag,
+            rotate_wait,
         } = self;
 
         let mut reflectors = Vec::new();
@@ -792,6 +803,7 @@ impl Source {
             },
             // A handle to the current tokio runtime
             handle: tokio::runtime::Handle::current(),
+            rotate_wait,
         };
 
         let (file_source_tx, file_source_rx) = futures::channel::mpsc::channel::<Vec<Line>>(2);
@@ -993,6 +1005,10 @@ const fn default_fingerprint_lines() -> usize {
 
 const fn default_delay_deletion_ms() -> Duration {
     Duration::from_millis(60_000)
+}
+
+const fn default_rotate_wait() -> Duration {
+    Duration::from_secs(u64::MAX / 2)
 }
 
 // This function constructs the patterns we exclude from file watching, created
