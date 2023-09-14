@@ -467,21 +467,17 @@ pub fn build_runtime(threads: Option<usize>, thread_name: &str) -> Result<Runtim
     rt_builder.max_blocking_threads(20_000);
     rt_builder.enable_all().thread_name(thread_name);
 
-    if let Some(threads) = threads {
-        if threads < 1 {
-            #[allow(clippy::print_stderr)]
-            {
-                eprintln!("The `threads` argument must be greater or equal to 1.");
-            }
-            return Err(exitcode::CONFIG);
-        } else {
-            WORKER_THREADS
-                .set(NonZeroUsize::new(threads).expect("already checked"))
-                .expect("double thread initialization");
-            rt_builder.worker_threads(threads);
-        }
+    let threads = threads.unwrap_or_else(crate::num_threads);
+    if threads < 1 {
+        error!("The `threads` argument must be greater or equal to 1.");
+        return Err(exitcode::CONFIG);
     }
+    WORKER_THREADS
+        .set(NonZeroUsize::new(threads).expect("already checked"))
+        .expect("double thread initialization");
+    rt_builder.worker_threads(threads);
 
+    debug!(messaged = "Building runtime.", worker_threads = threads);
     Ok(rt_builder.build().expect("Unable to create async runtime"))
 }
 
