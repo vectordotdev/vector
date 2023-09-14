@@ -14,7 +14,7 @@ message CommonMetadata {
 }
 
 message Origin {
-		reserved 1,2,3;
+    reserved 1,2,3;
     uint32 origin_product = 4;
     uint32 origin_category = 5;
     uint32 origin_service = 6;
@@ -87,7 +87,7 @@ message SketchPayload {
                 reserved 5, 6;
 				reserved "distributionsK", "distributionsC";
 		repeated Dogsketch dogsketches = 7;
-    Metadata metadata = 8;
+		Metadata metadata = 8;
 	}
 	repeated Sketch sketches = 1;
 	CommonMetadata metadata = 2;
