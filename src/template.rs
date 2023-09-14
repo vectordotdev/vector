@@ -701,9 +701,10 @@ mod tests {
         );
 
         let tz = "Asia/Singapore".parse().unwrap();
+        let offset = Some(Utc::now().with_timezone(&tz).offset().fix());
         assert_eq!(
             Ok(Bytes::from("vector-2001-02-03-12.log")),
-            template.with_timezone(tz).render(&event)
+            template.with_tz_offset(offset).render(&event)
         );
     }
 

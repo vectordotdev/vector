@@ -394,10 +394,7 @@ impl RequestSettings {
             .unwrap_or_else(|| config.compression.extension().into());
         let time_format = config.filename_time_format.clone();
         let append_uuid = config.filename_append_uuid;
-        let timezone = match config.timezone {
-            Some(tz) => Some(tz),
-            None => cx.globals.timezone
-        };
+        let timezone = config.timezone.or(cx.globals.timezone);
 
         let offset = match timezone {
             Some(TimeZone::Local) => {

@@ -33,7 +33,7 @@ use crate::{
     tls::TlsConfig,
 };
 
-use vrl::compiler::TimeZone;
+use vector_common::TimeZone;
 
 /// Configuration for the `aws_s3` sink.
 #[configurable_component(sink(
@@ -206,9 +206,20 @@ impl S3SinkConfig {
             .settings(request_limits, S3RetryLogic)
             .service(service);
 
+        let timezone = self.timezone.or(cx.globals.timezone);
+
+        let offset = match timezone {
+            Some(TimeZone::Local) => Some(*Utc::now().with_timezone(&chrono::Local).offset()),
+            Some(TimeZone::Named(tz)) => Some(Utc::now().with_timezone(&tz).offset().fix()),
+            None => None
+        };
+
         // Configure our partitioning/batching.
         let batch_settings = self.batch.into_batcher_settings()?;
-        let key_prefix = self.key_prefix.clone().try_into()?;
+
+        let key_prefix = Template::try_from(self.key_prefix.clone())?
+            .with_tz_offset(offset).try_into()?;
+
         let ssekms_key_id = self
             .options
             .ssekms_key_id
@@ -216,22 +227,13 @@ impl S3SinkConfig {
             .cloned()
             .map(|ssekms_key_id| Template::try_from(ssekms_key_id.as_str()))
             .transpose()?;
+
         let partitioner = S3KeyPartitioner::new(key_prefix, ssekms_key_id);
 
         let transformer = self.encoding.transformer();
         let (framer, serializer) = self.encoding.build(SinkType::MessageBased)?;
         let encoder = Encoder::<Framer>::new(framer, serializer);
 
-        let timezone = match self.timezone {
-            Some(tz) => Some(tz),
-            None => cx.globals.timezone,
-        };
-
-        let offset = match timezone {
-            Some(TimeZone::Local) => Some(*Utc::now().with_timezone(&chrono::Local).offset()),
-            Some(TimeZone::Named(tz)) => Some(Utc::now().with_timezone(&tz).offset().fix()),
-            None => None
-        };
 
         let request_options = S3RequestOptions {
             bucket: self.bucket.clone(),

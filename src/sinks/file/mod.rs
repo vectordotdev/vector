@@ -185,17 +185,14 @@ impl SinkConfig for FileSinkConfig {
         &self,
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        let timezone = match self.timezone {
-            Some(tz) => Some(tz),
-            None => cx.globals.timezone,
-        };
+        let timezone = self.timezone.or(cx.globals.timezone);
         let config = Self {
             path: self.path.clone(),
             idle_timeout: self.idle_timeout,
             encoding: self.encoding.clone(),
             compression: self.compression,
             acknowledgements: self.acknowledgements,
-            timezone: timezone,
+            timezone,
         };
         let sink = FileSink::new(&config)?;
         Ok((

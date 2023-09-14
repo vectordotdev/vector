@@ -21,7 +21,6 @@ use crate::{
             RequestBuilder,
         },
     },
-    template::Template,
 };
 
 #[derive(Clone)]
@@ -60,11 +59,7 @@ impl RequestBuilder<(S3PartitionKey, Vec<Event>)> for S3RequestOptions {
         let builder = RequestMetadataBuilder::from_events(&events);
 
         let finalizers = events.take_finalizers();
-
-        let s3_key_prefix = Template::try_from(partition_key.key_prefix.clone())
-            .unwrap()
-            .with_tz_offset(self.filename_tz_offset)
-            .to_string();
+        let s3_key_prefix = partition_key.key_prefix.clone();
 
         let metadata = S3Metadata {
             partition_key,
