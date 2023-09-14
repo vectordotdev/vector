@@ -1246,7 +1246,7 @@ mod test {
             MetricValue::Counter { value: 1.23 },
         );
 
-        let validpaths_get = vec![
+        let validpaths_get = [
             ".name",
             ".namespace",
             ".timestamp",
@@ -1255,7 +1255,7 @@ mod test {
             ".type",
         ];
 
-        let validpaths_set = vec![".name", ".namespace", ".timestamp", ".kind", ".tags"];
+        let validpaths_set = [".name", ".namespace", ".timestamp", ".kind", ".tags"];
 
         let info = ProgramInfo {
             fallible: false,
@@ -1340,7 +1340,9 @@ mod test {
             )]))
         );
 
-        let VrlTarget::Metric { metric, .. } = target else {unreachable!()};
+        let VrlTarget::Metric { metric, .. } = target else {
+            unreachable!()
+        };
 
         // get single value (should be the last one)
         assert_eq!(metric.tag_value("foo"), Some("b".into()));

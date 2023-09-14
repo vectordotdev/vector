@@ -2,6 +2,7 @@ use cargo_toml::Manifest;
 use std::fs::File;
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 use std::{env, fs, io};
 
 fn get_vector_toml_path() -> PathBuf {
@@ -18,6 +19,16 @@ fn get_vector_toml_path() -> PathBuf {
         .to_path_buf()
 }
 
+fn get_git_hash() -> String {
+    let output = Command::new("git")
+        .args(["rev-parse", "HEAD"])
+        .output()
+        .expect("Failed to get git HEAD sha");
+    let mut git_hash = String::from_utf8(output.stdout).unwrap();
+    git_hash.truncate(8);
+    git_hash
+}
+
 fn write_build_constants(manifest: &Manifest, dest_path: &Path) -> io::Result<()> {
     let mut output_file = File::create(dest_path)?;
     output_file.write_all(
@@ -26,14 +37,15 @@ fn write_build_constants(manifest: &Manifest, dest_path: &Path) -> io::Result<()
 
     let create_const_statement =
         |name, value| format!("pub const {}: &str = \"{}\";\n", name, value);
+
     // TODO: For releases, we should use the manifest.package().version().
     // https://github.com/vectordotdev/vector/issues/18425
-    let vector_version_const = create_const_statement("VECTOR_VERSION", "master");
+    let vector_version_const = create_const_statement("VECTOR_VERSION", get_git_hash());
     output_file
         .write_all(vector_version_const.as_bytes())
         .expect("Failed to write Vector version constant");
 
-    let vrl_version = &manifest
+    let vrl_version = manifest
         .dependencies
         .get("vrl")
         .unwrap()

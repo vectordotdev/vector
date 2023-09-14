@@ -856,7 +856,7 @@ mod tests {
     #[tokio::test]
     async fn ack_delivered_without_chunk() {
         let (result, output) = check_acknowledgements(EventStatus::Delivered, false).await;
-        assert!(matches!(result, Err(_))); // the `_` inside this error is `Elapsed`
+        assert!(result.is_err()); // the `_` inside this error is `Elapsed`
         assert!(output.is_empty());
     }
 

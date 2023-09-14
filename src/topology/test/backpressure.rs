@@ -11,7 +11,7 @@ use crate::{test_util::mock::backpressure_sink, topology::builder::SOURCE_SENDER
 
 // Based on how we pump events from `SourceSender` into `Fanout`, there's always one extra event we
 // may pull out of `SourceSender` but can't yet send into `Fanout`, so we account for that here.
-pub(self) const EXTRA_SOURCE_PUMP_EVENT: usize = 1;
+const EXTRA_SOURCE_PUMP_EVENT: usize = 1;
 
 /// Connects a single source to a single sink and makes sure the sink backpressure is propagated
 /// to the source.

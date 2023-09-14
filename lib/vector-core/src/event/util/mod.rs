@@ -1,3 +1,3 @@
 pub mod log;
 
-pub(self) use super::Value;
+use super::Value;

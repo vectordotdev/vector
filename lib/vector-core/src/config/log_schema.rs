@@ -120,6 +120,10 @@ impl LogSchema {
     ///
     /// This should only be used where the result will either be cached,
     /// or performance isn't critical, since this requires memory allocation.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the path in `self.message_key` is invalid.
     pub fn owned_message_path(&self) -> OwnedTargetPath {
         self.message_key
             .path

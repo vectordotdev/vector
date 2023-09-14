@@ -221,11 +221,15 @@ impl AwsAuthentication {
                 ));
                 if let Some(assume_role) = assume_role {
                     let auth_region = region.clone().map(Region::new).unwrap_or(service_region);
-                    let auth_external_id = external_id.clone().unwrap();
-                    let provider = AssumeRoleProviderBuilder::new(assume_role)
-                        .region(auth_region)
-                        .external_id(auth_external_id)
-                        .build(provider);
+                    let mut builder =
+                        AssumeRoleProviderBuilder::new(assume_role).region(auth_region);
+
+                    if let Some(external_id) = external_id {
+                        builder = builder.external_id(external_id)
+                    }
+
+                    let provider = builder.build(provider);
+
                     return Ok(SharedCredentialsProvider::new(provider));
                 }
                 Ok(provider)
@@ -253,11 +257,16 @@ impl AwsAuthentication {
                 ..
             } => {
                 let auth_region = region.clone().map(Region::new).unwrap_or(service_region);
-                let auth_external_id = external_id.clone().unwrap();
-                let provider = AssumeRoleProviderBuilder::new(assume_role)
-                    .region(auth_region.clone())
-                    .external_id(auth_external_id)
-                    .build(default_credentials_provider(auth_region, *imds).await?);
+                let mut builder =
+                    AssumeRoleProviderBuilder::new(assume_role).region(auth_region.clone());
+
+                if let Some(external_id) = external_id {
+                    builder = builder.external_id(external_id)
+                }
+
+                let provider =
+                    builder.build(default_credentials_provider(auth_region, *imds).await?);
+
                 Ok(SharedCredentialsProvider::new(provider))
             }
             AwsAuthentication::Default { imds, region, .. } => Ok(SharedCredentialsProvider::new(

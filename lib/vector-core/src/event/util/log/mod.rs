@@ -4,10 +4,10 @@ mod keys;
 pub use all_fields::{all_fields, all_fields_non_object_root, all_metadata_fields};
 pub use keys::keys;
 
-pub(self) use super::Value;
+use super::Value;
 
 #[cfg(test)]
-pub(self) mod test {
+mod test {
     use std::collections::BTreeMap;
 
     use serde_json::Value as JsonValue;

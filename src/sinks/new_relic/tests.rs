@@ -1,4 +1,4 @@
-use std::{collections::HashMap, convert::TryFrom, time::SystemTime};
+use std::{collections::HashMap, convert::TryFrom, num::NonZeroU32, time::SystemTime};
 
 use chrono::{DateTime, Utc};
 use futures::{future::ready, stream};
@@ -211,7 +211,7 @@ fn generate_metric_api_model() {
         MetricsApiModel::try_from(vec![event]).expect("Failed mapping metrics into API model");
     let metrics = model.0[0]
         .get("metrics")
-        .expect("Logs data store not present");
+        .expect("Metric data store not present");
 
     assert_eq!(metrics.len(), 1);
     assert!(metrics[0].get("name").is_some());
@@ -235,7 +235,7 @@ fn generate_metric_api_model() {
         MetricsApiModel::try_from(vec![event]).expect("Failed mapping metrics into API model");
     let metrics = model.0[0]
         .get("metrics")
-        .expect("Logs data store not present");
+        .expect("Metric data store not present");
 
     assert_eq!(metrics.len(), 1);
     assert!(metrics[0].get("name").is_some());
@@ -246,4 +246,31 @@ fn generate_metric_api_model() {
     assert!(metrics[0].get("value").is_some());
     assert_eq!(metrics[0].get("value").unwrap(), &Value::from(100.0));
     assert!(metrics[0].get("timestamp").is_some());
+
+    // Incremental counter
+    let m = Metric::new(
+        "my_metric",
+        MetricKind::Incremental,
+        MetricValue::Counter { value: 100.0 },
+    )
+    .with_timestamp(Some(DateTime::<Utc>::from(SystemTime::now())))
+    .with_interval_ms(NonZeroU32::new(1000));
+    let event = Event::Metric(m);
+    let model =
+        MetricsApiModel::try_from(vec![event]).expect("Failed mapping metrics into API model");
+    let metrics = model.0[0]
+        .get("metrics")
+        .expect("Metric data store not present");
+
+    assert_eq!(metrics.len(), 1);
+    assert!(metrics[0].get("name").is_some());
+    assert_eq!(
+        metrics[0].get("name").unwrap().to_string_lossy(),
+        "my_metric".to_owned()
+    );
+    assert!(metrics[0].get("value").is_some());
+    assert_eq!(metrics[0].get("value").unwrap(), &Value::from(100.0));
+    assert!(metrics[0].get("timestamp").is_some());
+    assert!(metrics[0].get("interval.ms").is_some());
+    assert_eq!(metrics[0].get("interval.ms").unwrap(), &Value::from(1000));
 }
