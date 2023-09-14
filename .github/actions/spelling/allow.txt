@@ -45,9 +45,10 @@ Comcast
 Consolas
 Coolpad
 DEBHELPER
-DOOV
 Danew
+dkr
 Dockerfiles
+DOOV
 Douban
 Enot
 Evercoss

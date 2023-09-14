@@ -1,0 +1,355 @@
+# Workload Checks
+#
+# Runs Vector Workload Checks.
+#
+# Runs on:
+#  - scheduled daily UTC midnight
+
+# This workflow runs the collection of our workload checks, using the repo HEAD SHA,
+# which depends on when the workflow is invoked.
+#
+# The goal is to establish a baseline of check results for a variety of cases
+# and visualize trends for important Vector use cases.
+#
+# The HEAD SHA is also used to tag the Vector Docker image.
+
+name: Workload Checks
+
+on:
+  workflow_call:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * *'
+  pull_request: #TODO delete this before merging
+    types:
+      - opened
+      - synchronize
+env:
+  SINGLE_MACHINE_PERFORMANCE_API: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_API }}
+
+jobs:
+  compute-metadata:
+    name: Compute metadata
+    runs-on: ubuntu-22.04
+    needs: should-run
+    outputs:
+      target-sha: ${{ steps.pr-metadata-comment.outputs.TARGET_SHA }}
+
+      # below are used in the experiment/analyze jobs
+      cpus: ${{ steps.system.outputs.CPUS }}
+      memory: ${{ steps.system.outputs.MEMORY }}
+      vector-cpus: ${{ steps.system.outputs.VECTOR_CPUS }}
+
+      replicas: ${{ steps.experimental-meta.outputs.REPLICAS }}
+      warmup-seconds: ${{ steps.experimental-meta.outputs.WARMUP_SECONDS }}
+      total-samples: ${{ steps.experimental-meta.outputs.TOTAL_SAMPLES }}
+      p-value: ${{ steps.experimental-meta.outputs.P_VALUE }}
+      smp-version: ${{ steps.experimental-meta.outputs.SMP_CRATE_VERSION }}
+      lading-version: ${{ steps.experimental-meta.outputs.LADING_VERSION }}
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 1000
+
+      - name: Get git metadata
+        id: git-metadata
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          export TARGET_SHA=$(git merge-base master HEAD)
+          echo "TARGET_SHA=${TARGET_SHA}" >> $GITHUB_OUTPUT
+
+          echo "target sha is: ${TARGET_SHA}"
+
+          if [ "${TARGET_SHA}" = "" ] ; then
+            echo "TARGET_SHA not found, exiting."
+            exit 1
+          fi
+
+      - name: Setup experimental metadata
+        id: experimental-meta
+        run: |
+          export WARMUP_SECONDS="45"
+          export REPLICAS="10"
+          export TOTAL_SAMPLES="600"
+          export P_VALUE="0.1"
+          export SMP_CRATE_VERSION="0.10.0"
+          export LADING_VERSION="0.18.0"
+
+          echo "warmup seconds: ${WARMUP_SECONDS}"
+          echo "replicas: ${REPLICAS}"
+          echo "total samples: ${TOTAL_SAMPLES}"
+          echo "regression p-value: ${P_VALUE}"
+          echo "smp crate version: ${SMP_CRATE_VERSION}"
+          echo "lading version: ${LADING_VERSION}"
+
+          echo "WARMUP_SECONDS=${WARMUP_SECONDS}" >> $GITHUB_OUTPUT
+          echo "REPLICAS=${REPLICAS}" >> $GITHUB_OUTPUT
+          echo "TOTAL_SAMPLES=${TOTAL_SAMPLES}" >> $GITHUB_OUTPUT
+          echo "P_VALUE=${P_VALUE}" >> $GITHUB_OUTPUT
+          echo "SMP_CRATE_VERSION=${SMP_CRATE_VERSION}" >> $GITHUB_OUTPUT
+          echo "LADING_VERSION=${LADING_VERSION}" >> $GITHUB_OUTPUT
+
+      - name: Setup system details
+        id: system
+        run: |
+          export CPUS="7"
+          export MEMORY="30g"
+          export VECTOR_CPUS="4"
+
+          echo "cpus total: ${CPUS}"
+          echo "memory total: ${MEMORY}"
+          echo "vector cpus: ${VECTOR_CPUS}"
+
+          echo "CPUS=${CPUS}" >> $GITHUB_OUTPUT
+          echo "MEMORY=${MEMORY}" >> $GITHUB_OUTPUT
+          echo "VECTOR_CPUS=${VECTOR_CPUS}" >> $GITHUB_OUTPUT
+
+  ##
+  ## BUILD
+  ##
+
+  build-target:
+    name: Build target Vector container
+    runs-on: [linux, ubuntu-20.04-4core]
+    needs:
+      - compute-metadata
+    steps:
+      - uses: colpal/actions-clean@v1
+
+      - uses: actions/checkout@v3
+        with:
+          ref: ${{ needs.compute-metadata.outputs.target-sha }}
+          path: target-vector
+
+      - name: Set up Docker Buildx
+        id: buildx
+        uses: docker/setup-buildx-action@v3.0.0
+
+      - name: Build 'vector' target image
+        uses: docker/build-push-action@v5.0.0
+        with:
+          context: target-vector/
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          file: regression/Dockerfile
+          builder: ${{ steps.buildx.outputs.name }}
+          outputs: type=docker,dest=${{ runner.temp }}/target-image.tar
+          tags: |
+            vector:${{ needs.compute-metadata.outputs.target-sha }}
+
+      - name: Upload image as artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: target-image
+          path: "${{ runner.temp }}/target-image.tar"
+
+  confirm-valid-credentials:
+    name: Confirm AWS credentials are minimally valid
+    runs-on: ubuntu-22.04
+    needs:
+      - compute-metadata
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4.0.0
+        with:
+          aws-access-key-id: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_SECRET_ACCESS_KEY }}
+          aws-region: us-west-2
+
+      - name: Download SMP binary
+        run: |
+          aws s3 cp s3://smp-cli-releases/v${{ needs.compute-metadata.outputs.smp-version }}/x86_64-unknown-linux-gnu/smp ${{ runner.temp }}/bin/smp
+
+  ##
+  ## SUBMIT
+  ##
+
+  upload-target-image-to-ecr:
+    name: Upload target images to ECR
+    runs-on: ubuntu-22.04
+    needs:
+      - compute-metadata
+      - confirm-valid-credentials
+      - build-target
+    steps:
+      - name: 'Download target image'
+        uses: actions/download-artifact@v3
+        with:
+          name: target-image
+
+      - name: Load target image
+        run: |
+          docker load --input target-image.tar
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4.0.0
+        with:
+          aws-access-key-id: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_SECRET_ACCESS_KEY }}
+          aws-region: us-west-2
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Docker Login to ECR
+        uses: docker/login-action@v2
+        with:
+          registry: ${{ steps.login-ecr.outputs.registry }}
+
+      - name: Tag & push target image
+        run: |
+          docker tag vector:${{ needs.compute-metadata.outputs.target-sha }} ${{ steps.login-ecr.outputs.registry }}/${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }}-vector:${{ needs.compute-metadata.outputs.target-sha }}
+          docker push ${{ steps.login-ecr.outputs.registry }}/${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }}-vector:${{ needs.compute-metadata.outputs.target-sha }}
+
+  submit-job:
+    name: Submit workload checks job
+    runs-on: ubuntu-22.04
+    needs:
+      - compute-metadata
+      - upload-target-image-to-ecr
+    steps:
+      - name: Check status, in-progress
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api \
+            --method POST \
+            -H "Accept: application/vnd.github+json" \
+            /repos/${{ github.repository }}/statuses/${{ needs.compute-metadata.outputs.target-sha }} \
+            -f state='pending' \
+            -f description='Experiments submitted to the Regression Detection cluster.' \
+            -f context='Regression Detection Suite / submission' \
+            -f target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+      - uses: actions/checkout@v3
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4.0.0
+        with:
+          aws-access-key-id: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_SECRET_ACCESS_KEY }}
+          aws-region: us-west-2
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Download SMP binary
+        run: |
+          aws s3 cp s3://smp-cli-releases/v${{ needs.compute-metadata.outputs.smp-version }}/x86_64-unknown-linux-gnu/smp ${{ runner.temp }}/bin/smp
+
+      - name: Submit job
+        env:
+          RUST_LOG: info
+        run: |
+          git fetch origin
+
+          # Setup AWS credentials for single-machine-performance AWS account
+          AWS_NAMED_PROFILE="single-machine-performance"
+          SMP_ACCOUNT_ID=$(aws ssm get-parameter --region us-east-1 --name ci.datadog-agent.single-machine-performance-account-id --with-decryption --query "Parameter.Value" --out text)
+          SMP_ECR_URL=${SMP_ACCOUNT_ID}.dkr.ecr.us-west-2.amazonaws.com
+          SMP_AGENT_TEAM_ID=$(aws ssm get-parameter --region us-east-1 --name ci.datadog-agent.single-machine-performance-agent-team-id --with-decryption --query "Parameter.Value" --out text)
+          SMP_API=$(aws ssm get-parameter --region us-east-1 --name ci.datadog-agent.single-machine-performance-api --with-decryption --query "Parameter.Value" --out text)
+          aws configure set aws_access_key_id $(aws ssm get-parameter --region us-east-1 --name ci.datadog-agent.single-machine-performance-bot-access-key-id --with-decryption --query "Parameter.Value" --out text) --profile ${AWS_NAMED_PROFILE}
+          aws configure set aws_secret_access_key $(aws ssm get-parameter --region us-east-1 --name ci.datadog-agent.single-machine-performance-bot-access-key --with-decryption --query "Parameter.Value" --out text) --profile ${AWS_NAMED_PROFILE}
+          aws configure set region us-west-2 --profile ${AWS_NAMED_PROFILE}
+
+          # Download smp binary and prepare it for use
+          aws --profile single-machine-performance s3 cp s3://smp-cli-releases/v${SMP_VERSION}/x86_64-unknown-linux-gnu/smp smp
+          chmod +x smp
+
+          TARGET_IMAGE =${{ steps.login-ecr.outputs.registry }}/${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }}-vector:${{ needs.compute-metadata.outputs.target-sha }}
+          CURRENT_DATE=$(date --utc '+%Y_%m_%d')
+
+          RUST_LOG="info,aws_config::profile::credentials=error"
+          RUST_LOG_DEBUG="debug,aws_config::profile::credentials=error"
+
+          chmod +x ${{ runner.temp }}/bin/smp
+
+          RUST_BACKTRACE=1 RUST_LOG="${RUST_LOG_DEBUG}" ${{ runner.temp }}/bin/smp \
+             --team-id ${SMP_AGENT_TEAM_ID} --api-base ${SMP_API} --aws-named-profile ${AWS_NAMED_PROFILE} \
+            job submit-workload \
+              --lading-version ${LADING_VERSION} \
+              --total-samples ${TOTAL_SAMPLES} \
+              --warmup-seconds ${WARMUP_SECONDS} \
+              --replicas ${REPLICAS} \
+              --target-image ${TARGET_IMAGE} \
+              --target-sha ${TARGET_SHA} \
+              --target-config-dir ${{ github.workspace }}/workload-checks \
+              --target-name vector \
+              --target-command "/usr/local/bin/vector" \
+              --target-environment-variables "DD_HOSTNAME=smp-workload-checks,DD_DD_URL=http://127.0.0.1:9092,DD_API_KEY=00000001" \
+              --tags smp_status=nightly,client_team="agent",tag_date="${CURRENT_DATE}" \
+              --submission-metadata ${{ runner.temp }}/submission-metadata
+
+      - uses: actions/upload-artifact@v3
+        with:
+          name: vector-submission-metadata
+          path: ${{ runner.temp }}/submission-metadata
+
+      - name: Await job
+        timeout-minutes: 120
+        env:
+          RUST_LOG: info
+        run: |
+          chmod +x ${{ runner.temp }}/bin/smp
+
+          ${{ runner.temp }}/bin/smp --team-id ${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }} \
+             job status \
+              --wait \
+              --wait-delay-seconds 60 \
+              --wait-timeout-minutes 90 \
+              --submission-metadata ${{ runner.temp }}/submission-metadata
+
+      - name: Handle cancellation if necessary
+        if: ${{ cancelled() }}
+        env:
+          RUST_LOG: info
+        run: |
+          chmod +x ${{ runner.temp }}/bin/smp
+          ${{ runner.temp }}/bin/smp --team-id ${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }} job cancel \
+            --submission-metadata ${{ runner.temp }}/submission-metadata
+
+      - name: Check status, cancelled
+        if: ${{ cancelled() }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api \
+            --method POST \
+            -H "Accept: application/vnd.github+json" \
+            /repos/${{ github.repository }}/statuses/${{ needs.compute-metadata.outputs.target-sha }} \
+            -f state='failure' \
+            -f description='Experiments submitted to the Regression Detection cluster cancelled.' \
+            -f context='Regression Detection Suite / submission' \
+            -f target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+      - name: Check status, success
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api \
+            --method POST \
+            -H "Accept: application/vnd.github+json" \
+            /repos/${{ github.repository }}/statuses/${{ needs.compute-metadata.outputs.target-sha }} \
+            -f state='success' \
+            -f description='Experiments submitted to the Regression Detection cluster successfully.' \
+            -f context='Regression Detection Suite / submission' \
+            -f target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+      - name: Check status, failure
+        if: ${{ failure() }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api \
+            --method POST \
+            -H "Accept: application/vnd.github+json" \
+            /repos/${{ github.repository }}/statuses/${{ needs.compute-metadata.outputs.target-sha }} \
+            -f state='success' \
+            -f description='Experiments submitted to the Regression Detection Suite failed.' \
+            -f context='Regression Detection Suite / submission' \
+            -f target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
