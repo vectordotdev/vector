@@ -10,7 +10,6 @@ FROM ghcr.io/vectordotdev/vector/soak-builder@sha256:c51a7091de2caebaa690e17f37d
 WORKDIR /vector
 COPY . .
 RUN bash scripts/environment/install-protoc.sh
-ENV JEMALLOC_SYS_WITH_LG_PAGE 16
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/usr/local/cargo/git \
     --mount=type=cache,target=/vector/target \
