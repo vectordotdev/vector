@@ -37,10 +37,10 @@ macro_rules! gauge {
     };
 }
 
-/// Configuration for the `nats` source.
+/// Configuration for the `opcua` source.
 #[configurable_component(source(
 "opcua",
-"Read metrics data from opcua."
+"Read metrics data from OPC UA."
 ))]
 #[serde(deny_unknown_fields)]
 #[derive(Clone, Debug, Derivative)]
@@ -62,11 +62,11 @@ pub struct OpcUaSourceConfig {
 
     /// Whether to trust the server's certificate.
     #[serde(default)]
-    pub trust_server_certs: Option<bool>,
+    pub trust_server_certs: bool,
 
     /// Whether to create a sample keypair if one is not found.
     #[serde(default)]
-    pub create_sample_keypair: Option<bool>,
+    pub create_sample_keypair: bool,
 
     /// The node ids to monitor.
     pub node_ids: Vec<NodeIdConfig>,
@@ -80,7 +80,7 @@ pub struct NodeIdConfig {
     #[configurable(metadata(docs::examples = "ns=2;s=Demo.Static.Scalar.UInt32"))]
     pub node_id: String,
 
-    /// The metric name to use for the node id
+    /// The metric name to use for the node id.
     #[configurable(metadata(docs::examples = "demo_val"))]
     pub metric_name: String,
 }
