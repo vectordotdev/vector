@@ -80,7 +80,7 @@ pub struct NodeIdConfig {
     #[configurable(metadata(docs::examples = "ns=2;s=Demo.Static.Scalar.UInt32"))]
     pub node_id: String,
 
-    /// The metric name to use for the node id
+    /// The metric name to use for the node id.
     #[configurable(metadata(docs::examples = "demo_val"))]
     pub metric_name: String,
 }
