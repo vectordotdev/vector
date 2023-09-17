@@ -74,7 +74,7 @@ pub struct OpcUaSourceConfig {
 #[configurable_component]
 #[derive(Clone, Debug)]
 pub struct NodeIdConfig {
-    /// The node id to monitor
+    /// The node id to monitor.
     #[configurable(metadata(docs::examples = "ns=2;s=Demo.Static.Scalar.UInt32"))]
     pub node_id: String,
 
