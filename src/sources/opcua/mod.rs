@@ -62,11 +62,11 @@ pub struct OpcUaSourceConfig {
 
     /// Whether to trust the server's certificate.
     #[serde(default)]
-    pub trust_server_certs: Option<bool>,
+    pub trust_server_certs: bool,
 
     /// Whether to create a sample keypair if one is not found.
     #[serde(default)]
-    pub create_sample_keypair: Option<bool>,
+    pub create_sample_keypair: bool,
 
     /// The node ids to monitor.
     pub node_ids: Vec<NodeIdConfig>,
