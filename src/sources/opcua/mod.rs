@@ -40,7 +40,7 @@ macro_rules! gauge {
 /// Configuration for the `nats` source.
 #[configurable_component(source(
 "opcua",
-"Read metrics data from opcua."
+"Read metrics data from OPC UA."
 ))]
 #[serde(deny_unknown_fields)]
 #[derive(Clone, Debug, Derivative)]
