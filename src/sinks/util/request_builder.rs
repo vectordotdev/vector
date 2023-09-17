@@ -1,13 +1,14 @@
 use std::io;
 
 use bytes::Bytes;
-use vector_common::request_metadata::RequestMetadata;
+use vector_common::request_metadata::{GroupedCountByteSize, RequestMetadata};
 
 use super::{encoding::Encoder, metadata::RequestMetadataBuilder, Compression, Compressor};
 
 pub struct EncodeResult<P> {
     pub payload: P,
     pub uncompressed_byte_size: usize,
+    pub transformed_json_size: GroupedCountByteSize,
     pub compressed_byte_size: Option<usize>,
 }
 
@@ -15,20 +16,26 @@ impl<P> EncodeResult<P>
 where
     P: AsRef<[u8]>,
 {
-    pub fn uncompressed(payload: P) -> Self {
+    pub fn uncompressed(payload: P, transformed_json_size: GroupedCountByteSize) -> Self {
         let uncompressed_byte_size = payload.as_ref().len();
         Self {
             payload,
             uncompressed_byte_size,
+            transformed_json_size,
             compressed_byte_size: None,
         }
     }
 
-    pub fn compressed(payload: P, uncompressed_byte_size: usize) -> Self {
+    pub fn compressed(
+        payload: P,
+        uncompressed_byte_size: usize,
+        transformed_json_size: GroupedCountByteSize,
+    ) -> Self {
         let compressed_byte_size = payload.as_ref().len();
         Self {
             payload,
             uncompressed_byte_size,
+            transformed_json_size,
             compressed_byte_size: Some(compressed_byte_size),
         }
     }
@@ -74,14 +81,14 @@ pub trait RequestBuilder<Input> {
         // of clash-y with `Self::Metadata`.
         let mut compressor = Compressor::from(self.compression());
         let is_compressed = compressor.is_compressed();
-        _ = self.encoder().encode_input(events, &mut compressor)?;
+        let (_, json_size) = self.encoder().encode_input(events, &mut compressor)?;
 
         let payload = compressor.into_inner().freeze();
         let result = if is_compressed {
             let compressed_byte_size = payload.len();
-            EncodeResult::compressed(payload.into(), compressed_byte_size)
+            EncodeResult::compressed(payload.into(), compressed_byte_size, json_size)
         } else {
-            EncodeResult::uncompressed(payload.into())
+            EncodeResult::uncompressed(payload.into(), json_size)
         };
 
         Ok(result)

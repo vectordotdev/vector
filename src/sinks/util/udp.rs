@@ -248,7 +248,7 @@ async fn udp_send(socket: &mut UdpSocket, buf: &[u8]) -> tokio::io::Result<()> {
     Ok(())
 }
 
-fn find_bind_address(remote_addr: &SocketAddr) -> SocketAddr {
+pub(super) const fn find_bind_address(remote_addr: &SocketAddr) -> SocketAddr {
     match remote_addr {
         SocketAddr::V4(_) => SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), 0),
         SocketAddr::V6(_) => SocketAddr::new(IpAddr::V6(Ipv6Addr::UNSPECIFIED), 0),

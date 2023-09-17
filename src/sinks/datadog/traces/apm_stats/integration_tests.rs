@@ -16,6 +16,7 @@ use tokio::time::{sleep, Duration};
 
 use crate::{
     config::ConfigBuilder,
+    signal::ShutdownError,
     sinks::datadog::traces::{apm_stats::StatsPayload, DatadogTracesConfig},
     sources::datadog_agent::DatadogAgentConfig,
     test_util::{start_topology, trace_init},
@@ -322,8 +323,8 @@ fn validate_stats(agent_stats: &StatsPayload, vector_stats: &StatsPayload) {
 async fn start_vector() -> (
     RunningTopology,
     (
-        tokio::sync::mpsc::UnboundedSender<()>,
-        tokio::sync::mpsc::UnboundedReceiver<()>,
+        tokio::sync::mpsc::UnboundedSender<ShutdownError>,
+        tokio::sync::mpsc::UnboundedReceiver<ShutdownError>,
     ),
 ) {
     let dd_agent_address = format!("0.0.0.0:{}", vector_receive_port());

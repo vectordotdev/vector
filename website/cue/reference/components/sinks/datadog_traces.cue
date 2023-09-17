@@ -64,7 +64,18 @@ components: sinks: datadog_traces: {
 
 	support: {
 		requirements: []
-		warnings: ["APM stats are in Beta. Currently the sink does not support the Datadog Agent sampling feature. This must be disabled in the Agent in order for APM stats output from vector to be accurate."]
+		warnings: [
+			"""
+				Support for APM statistics is in beta.
+
+				Currently the sink does not support the Datadog Agent sampling feature. Sampling must be
+				disabled in the Agent in order for APM stats output from vector to be accurate.
+
+				Currently the sink does not calculate statistics aggregated across `peer.service`. Any
+				functionality in Datadog's APM product that depends on this aggregation will not
+				function correctly.
+				""",
+		]
 		notices: []
 	}
 

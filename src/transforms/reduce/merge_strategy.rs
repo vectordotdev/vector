@@ -4,6 +4,7 @@ use bytes::{Bytes, BytesMut};
 use chrono::{DateTime, Utc};
 use ordered_float::NotNan;
 use vector_config::configurable_component;
+use vrl::event_path;
 
 use crate::event::{LogEvent, Value};
 
@@ -68,7 +69,7 @@ impl ReduceValueMerger for DiscardMerger {
     }
 
     fn insert_into(self: Box<Self>, k: String, v: &mut LogEvent) -> Result<(), String> {
-        v.insert(k.as_str(), self.v);
+        v.insert(event_path!(k.as_str()), self.v);
         Ok(())
     }
 }
@@ -94,7 +95,7 @@ impl ReduceValueMerger for RetainMerger {
     }
 
     fn insert_into(self: Box<Self>, k: String, v: &mut LogEvent) -> Result<(), String> {
-        v.insert(k.as_str(), self.v);
+        v.insert(event_path!(k.as_str()), self.v);
         Ok(())
     }
 }
@@ -134,7 +135,7 @@ impl ReduceValueMerger for ConcatMerger {
     }
 
     fn insert_into(self: Box<Self>, k: String, v: &mut LogEvent) -> Result<(), String> {
-        v.insert(k.as_str(), Value::Bytes(self.v.into()));
+        v.insert(event_path!(k.as_str()), Value::Bytes(self.v.into()));
         Ok(())
     }
 }
@@ -161,7 +162,7 @@ impl ReduceValueMerger for ConcatArrayMerger {
     }
 
     fn insert_into(self: Box<Self>, k: String, v: &mut LogEvent) -> Result<(), String> {
-        v.insert(k.as_str(), Value::Array(self.v));
+        v.insert(event_path!(k.as_str()), Value::Array(self.v));
         Ok(())
     }
 }
@@ -184,7 +185,7 @@ impl ReduceValueMerger for ArrayMerger {
     }
 
     fn insert_into(self: Box<Self>, k: String, v: &mut LogEvent) -> Result<(), String> {
-        v.insert(k.as_str(), Value::Array(self.v));
+        v.insert(event_path!(k.as_str()), Value::Array(self.v));
         Ok(())
     }
 }
@@ -216,7 +217,7 @@ impl ReduceValueMerger for LongestArrayMerger {
     }
 
     fn insert_into(self: Box<Self>, k: String, v: &mut LogEvent) -> Result<(), String> {
-        v.insert(k.as_str(), Value::Array(self.v));
+        v.insert(event_path!(k.as_str()), Value::Array(self.v));
         Ok(())
     }
 }
@@ -248,7 +249,7 @@ impl ReduceValueMerger for ShortestArrayMerger {
     }
 
     fn insert_into(self: Box<Self>, k: String, v: &mut LogEvent) -> Result<(), String> {
-        v.insert(k.as_str(), Value::Array(self.v));
+        v.insert(event_path!(k.as_str()), Value::Array(self.v));
         Ok(())
     }
 }
@@ -293,7 +294,10 @@ impl ReduceValueMerger for FlatUniqueMerger {
     }
 
     fn insert_into(self: Box<Self>, k: String, v: &mut LogEvent) -> Result<(), String> {
-        v.insert(k.as_str(), Value::Array(self.v.into_iter().collect()));
+        v.insert(
+            event_path!(k.as_str()),
+            Value::Array(self.v.into_iter().collect()),
+        );
         Ok(())
     }
 }
@@ -327,8 +331,11 @@ impl ReduceValueMerger for TimestampWindowMerger {
     }
 
     fn insert_into(self: Box<Self>, k: String, v: &mut LogEvent) -> Result<(), String> {
-        v.insert(format!("{}_end", k).as_str(), Value::Timestamp(self.latest));
-        v.insert(k.as_str(), Value::Timestamp(self.started));
+        v.insert(
+            event_path!(format!("{}_end", k).as_str()),
+            Value::Timestamp(self.latest),
+        );
+        v.insert(event_path!(k.as_str()), Value::Timestamp(self.started));
         Ok(())
     }
 }
@@ -389,8 +396,8 @@ impl ReduceValueMerger for AddNumbersMerger {
 
     fn insert_into(self: Box<Self>, k: String, v: &mut LogEvent) -> Result<(), String> {
         match self.v {
-            NumberMergerValue::Float(f) => v.insert(k.as_str(), Value::Float(f)),
-            NumberMergerValue::Int(i) => v.insert(k.as_str(), Value::Integer(i)),
+            NumberMergerValue::Float(f) => v.insert(event_path!(k.as_str()), Value::Float(f)),
+            NumberMergerValue::Int(i) => v.insert(event_path!(k.as_str()), Value::Integer(i)),
         };
         Ok(())
     }
@@ -448,8 +455,8 @@ impl ReduceValueMerger for MaxNumberMerger {
 
     fn insert_into(self: Box<Self>, k: String, v: &mut LogEvent) -> Result<(), String> {
         match self.v {
-            NumberMergerValue::Float(f) => v.insert(k.as_str(), Value::Float(f)),
-            NumberMergerValue::Int(i) => v.insert(k.as_str(), Value::Integer(i)),
+            NumberMergerValue::Float(f) => v.insert(event_path!(k.as_str()), Value::Float(f)),
+            NumberMergerValue::Int(i) => v.insert(event_path!(k.as_str()), Value::Integer(i)),
         };
         Ok(())
     }
@@ -507,8 +514,8 @@ impl ReduceValueMerger for MinNumberMerger {
 
     fn insert_into(self: Box<Self>, k: String, v: &mut LogEvent) -> Result<(), String> {
         match self.v {
-            NumberMergerValue::Float(f) => v.insert(k.as_str(), Value::Float(f)),
-            NumberMergerValue::Int(i) => v.insert(k.as_str(), Value::Integer(i)),
+            NumberMergerValue::Float(f) => v.insert(event_path!(k.as_str()), Value::Float(f)),
+            NumberMergerValue::Int(i) => v.insert(event_path!(k.as_str()), Value::Integer(i)),
         };
         Ok(())
     }

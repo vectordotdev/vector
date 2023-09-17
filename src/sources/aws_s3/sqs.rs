@@ -574,9 +574,9 @@ impl IngestorProcess {
 
         let send_error = match self.out.send_event_stream(&mut stream).await {
             Ok(_) => None,
-            Err(error) => {
+            Err(_) => {
                 let (count, _) = stream.size_hint();
-                emit!(StreamClosedError { error, count });
+                emit!(StreamClosedError { count });
                 Some(crate::source_sender::ClosedError)
             }
         };
@@ -682,7 +682,7 @@ fn handle_single_log(
             log_namespace.insert_source_metadata(
                 AwsS3Config::NAME,
                 log,
-                Some(LegacyKey::Overwrite(key.as_str())),
+                Some(LegacyKey::Overwrite(path!(key))),
                 path!("metadata", key.as_str()),
                 value.clone(),
             );
@@ -691,7 +691,7 @@ fn handle_single_log(
 
     log_namespace.insert_vector_metadata(
         log,
-        Some(log_schema().source_type_key()),
+        log_schema().source_type_key(),
         path!("source_type"),
         Bytes::from_static(AwsS3Config::NAME.as_bytes()),
     );

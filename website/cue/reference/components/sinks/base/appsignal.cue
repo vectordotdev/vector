@@ -170,6 +170,17 @@ base: components: sinks: appsignal: configuration: {
 						required: false
 						type: float: default: 0.4
 					}
+					initial_concurrency: {
+						description: """
+																The initial concurrency limit to use. If not specified, the initial limit will be 1 (no concurrency).
+
+																It is recommended to set this value to your service's average limit if you're seeing that it takes a
+																long time to ramp up adaptive concurrency after a restart. You can find this value by looking at the
+																`adaptive_concurrency_limit` metric.
+																"""
+						required: false
+						type: uint: default: 1
+					}
 					rtt_deviation_scale: {
 						description: """
 																Scale of RTT deviations which are not considered anomalous.
@@ -272,7 +283,7 @@ base: components: sinks: appsignal: configuration: {
 		}
 	}
 	tls: {
-		description: "TLS configuration."
+		description: "Configures the TLS options for incoming/outgoing connections."
 		required:    false
 		type: object: options: {
 			alpn_protocols: {
@@ -305,6 +316,16 @@ base: components: sinks: appsignal: configuration: {
 					"""
 				required: false
 				type: string: examples: ["/path/to/host_certificate.crt"]
+			}
+			enabled: {
+				description: """
+					Whether or not to require TLS for incoming or outgoing connections.
+
+					When enabled and used for incoming connections, an identity certificate is also required. See `tls.crt_file` for
+					more information.
+					"""
+				required: false
+				type: bool: {}
 			}
 			key_file: {
 				description: """

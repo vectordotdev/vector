@@ -14,8 +14,8 @@
 # /ci-run-unit-mac            : runs Unit - Mac
 # /ci-run-unit-windows        : runs Unit - Windows
 # /ci-run-environment         : runs Environment Suite
-# /ci-run-install             : runs Update install.sh Suite
 # /ci-run-regression          : runs Regression Detection Suite
+# /ci-run-k8s                 : runs K8s E2E Suite
 
 name: Comment Trigger
 
@@ -55,17 +55,27 @@ jobs:
           || contains(github.event.comment.body, '/ci-run-unit-mac')
           || contains(github.event.comment.body, '/ci-run-unit-windows')
           || contains(github.event.comment.body, '/ci-run-environment')
-          || contains(github.event.comment.body, '/ci-run-install')
           || contains(github.event.comment.body, '/ci-run-regression')
+          || contains(github.event.comment.body, '/ci-run-k8s')
       )
     steps:
-      - name: Validate issue comment
+      - name: Generate authentication token
+        id: generate_token
+        uses: tibdex/github-app-token@0914d50df753bbc42180d982a6550f195390069f
+        with:
+          app_id: ${{ secrets.GH_APP_DATADOG_VECTOR_CI_APP_ID }}
+          private_key: ${{ secrets.GH_APP_DATADOG_VECTOR_CI_APP_PRIVATE_KEY }}
+      - name: Get PR comment author
         id: comment
         uses: tspascoal/get-user-teams-membership@v2
         with:
           username: ${{ github.actor }}
           team: 'Vector'
-          GITHUB_TOKEN: ${{ secrets.GH_PAT_ORG }}
+          GITHUB_TOKEN: ${{ steps.generate_token.outputs.token }}
+
+      - name: Validate author membership
+        if: steps.comment.outputs.isTeamMember == 'false'
+        run: exit 1
 
   cli:
     needs: validate
@@ -109,14 +119,14 @@ jobs:
     uses: ./.github/workflows/environment.yml
     secrets: inherit
 
-  install:
-    needs: validate
-    if: contains(github.event.comment.body, '/ci-run-all') || contains(github.event.comment.body, '/ci-run-install')
-    uses: ./.github/workflows/install-sh.yml
-    secrets: inherit
-
   regression:
     needs: validate
     if: contains(github.event.comment.body, '/ci-run-all') || contains(github.event.comment.body, '/ci-run-regression')
     uses: ./.github/workflows/regression.yml
+    secrets: inherit
+
+  k8s:
+    needs: validate
+    if: contains(github.event.comment.body, '/ci-run-all') || contains(github.event.comment.body, '/ci-run-k8s')
+    uses: ./.github/workflows/k8s_e2e.yml
     secrets: inherit

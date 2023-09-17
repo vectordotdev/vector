@@ -3,13 +3,13 @@ use codecs::JsonSerializerConfig;
 use futures::StreamExt;
 use futures_util::stream::BoxStream;
 use indoc::indoc;
-use lookup::lookup_v2::OptionalValuePath;
+use lookup::lookup_v2::{ConfigValuePath, OptionalValuePath};
 use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 use vector_core::sink::StreamSink;
 
 use super::{
-    host_key,
+    config_host_key,
     logs::{HumioLogsConfig, HOST},
 };
 use crate::{
@@ -38,7 +38,7 @@ use crate::{
 // `humio_logs` config here.
 //
 // [1]: https://github.com/serde-rs/serde/issues/1504
-#[configurable_component(sink("humio_metrics"))]
+#[configurable_component(sink("humio_metrics", "Deliver metric event data to Humio."))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct HumioMetricsConfig {
@@ -86,8 +86,8 @@ pub struct HumioMetricsConfig {
     /// By default, the [global `log_schema.host_key` option][global_host_key] is used.
     ///
     /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
-    #[serde(default = "host_key")]
-    host_key: String,
+    #[serde(default = "config_host_key")]
+    host_key: OptionalValuePath,
 
     /// Event fields to be added to Humio’s extra fields.
     ///
@@ -97,7 +97,7 @@ pub struct HumioMetricsConfig {
     ///
     /// [humio_data_format]: https://docs.humio.com/integrations/data-shippers/hec/#format-of-data
     #[serde(default)]
-    indexed_fields: Vec<String>,
+    indexed_fields: Vec<ConfigValuePath>,
 
     /// Optional name of the repository to ingest into.
     ///
@@ -151,6 +151,7 @@ impl GenerateConfig for HumioMetricsConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "humio_metrics")]
 impl SinkConfig for HumioMetricsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let transform = self

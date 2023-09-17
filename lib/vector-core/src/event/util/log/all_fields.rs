@@ -5,6 +5,7 @@ use std::{
 };
 
 use serde::{Serialize, Serializer};
+use vrl::path::PathPrefix;
 
 use super::Value;
 
@@ -12,6 +13,12 @@ use super::Value;
 /// and their corresponding values.
 pub fn all_fields(fields: &BTreeMap<String, Value>) -> FieldsIter {
     FieldsIter::new(fields)
+}
+
+/// Same functionality as `all_fields` but it prepends a character that denotes the
+/// path type.
+pub fn all_metadata_fields(fields: &BTreeMap<String, Value>) -> FieldsIter {
+    FieldsIter::new_with_prefix(PathPrefix::Metadata, fields)
 }
 
 /// An iterator with a single "message" element
@@ -37,6 +44,8 @@ enum PathComponent<'a> {
 /// If a key maps to an empty collection, the key and the empty collection will be returned.
 #[derive(Clone)]
 pub struct FieldsIter<'a> {
+    /// If specified, this will be prepended to each path.
+    path_prefix: Option<PathPrefix>,
     /// Stack of iterators used for the depth-first traversal.
     stack: Vec<LeafIter<'a>>,
     /// Path components from the root up to the top of the stack.
@@ -44,8 +53,21 @@ pub struct FieldsIter<'a> {
 }
 
 impl<'a> FieldsIter<'a> {
+    // TODO deprecate this in favor of `new_with_prefix`.
     fn new(fields: &'a BTreeMap<String, Value>) -> FieldsIter<'a> {
         FieldsIter {
+            path_prefix: None,
+            stack: vec![LeafIter::Map(fields.iter())],
+            path: vec![],
+        }
+    }
+
+    fn new_with_prefix(
+        path_prefix: PathPrefix,
+        fields: &'a BTreeMap<String, Value>,
+    ) -> FieldsIter<'a> {
+        FieldsIter {
+            path_prefix: Some(path_prefix),
             stack: vec![LeafIter::Map(fields.iter())],
             path: vec![],
         }
@@ -55,6 +77,7 @@ impl<'a> FieldsIter<'a> {
     /// will be treated as an object with a single "message" key
     fn non_object(value: &'a Value) -> FieldsIter<'a> {
         FieldsIter {
+            path_prefix: None,
             stack: vec![LeafIter::Root((value, false))],
             path: vec![],
         }
@@ -82,7 +105,13 @@ impl<'a> FieldsIter<'a> {
     }
 
     fn make_path(&mut self, component: PathComponent<'a>) -> String {
-        let mut res = String::new();
+        let mut res = match self.path_prefix {
+            None => String::new(),
+            Some(prefix) => match prefix {
+                PathPrefix::Event => String::from("."),
+                PathPrefix::Metadata => String::from("%"),
+            },
+        };
         let mut path_iter = self.path.iter().chain(iter::once(&component)).peekable();
         loop {
             match path_iter.next() {
@@ -174,6 +203,26 @@ mod test {
         .collect();
 
         let collected: Vec<_> = all_fields(&fields).collect();
+        assert_eq!(collected, expected);
+    }
+
+    #[test]
+    fn metadata_keys_simple() {
+        let fields = fields_from_json(json!({
+            "field_1": 1,
+            "field_0": 0,
+            "field_2": 2
+        }));
+        let expected: Vec<_> = vec![
+            ("%field_0", &Value::Integer(0)),
+            ("%field_1", &Value::Integer(1)),
+            ("%field_2", &Value::Integer(2)),
+        ]
+        .into_iter()
+        .map(|(k, v)| (k.into(), v))
+        .collect();
+
+        let collected: Vec<_> = all_metadata_fields(&fields).collect();
         assert_eq!(collected, expected);
     }
 

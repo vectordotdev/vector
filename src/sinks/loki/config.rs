@@ -1,21 +1,12 @@
 use std::collections::HashMap;
 
-use futures::future::FutureExt;
-use vector_config::configurable_component;
 use vrl::value::Kind;
 
 use super::{healthcheck::healthcheck, sink::LokiSink};
 use crate::{
-    codecs::EncodingConfig,
-    config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
     http::{Auth, HttpClient, MaybeAuth},
     schema,
-    sinks::{
-        util::{BatchConfig, Compression, SinkBatchSettings, TowerRequestConfig, UriSerde},
-        VectorSink,
-    },
-    template::Template,
-    tls::{TlsConfig, TlsSettings},
+    sinks::{prelude::*, util::UriSerde},
 };
 
 /// Loki-specific compression.
@@ -61,7 +52,7 @@ fn default_loki_path() -> String {
 }
 
 /// Configuration for the `loki` sink.
-#[configurable_component(sink("loki"))]
+#[configurable_component(sink("loki", "Deliver log event data to the Loki aggregation system."))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct LokiConfig {
@@ -220,6 +211,7 @@ impl LokiConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "loki")]
 impl SinkConfig for LokiConfig {
     async fn build(
         &self,

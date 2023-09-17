@@ -135,6 +135,24 @@ macro_rules! assert_reader_writer_v2_file_positions {
 }
 
 #[macro_export]
+macro_rules! assert_reader_last_writer_next_positions {
+    ($ledger:expr, $reader_expected:expr, $writer_expected:expr) => {{
+        let reader_actual = $ledger.state().get_last_reader_record_id();
+        let writer_actual = $ledger.state().get_next_writer_record_id();
+        assert_eq!(
+            $reader_expected, reader_actual,
+            "expected reader last read record ID of {}, got {} instead",
+            $reader_expected, reader_actual,
+        );
+        assert_eq!(
+            $writer_expected, writer_actual,
+            "expected writer next record ID of {}, got {} instead",
+            $writer_expected, writer_actual,
+        );
+    }};
+}
+
+#[macro_export]
 macro_rules! assert_enough_bytes_written {
     ($written:expr, $record_type:ty, $record_payload_size:expr) => {
         assert!(

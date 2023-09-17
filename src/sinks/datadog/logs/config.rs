@@ -3,7 +3,7 @@ use std::{convert::TryFrom, sync::Arc};
 use indoc::indoc;
 use tower::ServiceBuilder;
 use vector_config::configurable_component;
-use vector_core::config::proxy::ProxyConfig;
+use vector_core::{config::proxy::ProxyConfig, schema::meaning};
 use vrl::value::Kind;
 
 use super::{service::LogApiRetry, sink::LogSinkBuilder};
@@ -46,7 +46,7 @@ impl SinkBatchSettings for DatadogLogsDefaultBatchSettings {
 }
 
 /// Configuration for the `datadog_logs` sink.
-#[configurable_component(sink("datadog_logs"))]
+#[configurable_component(sink("datadog_logs", "Publish log events to Datadog."))]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct DatadogLogsConfig {
@@ -91,23 +91,18 @@ impl DatadogLogsConfig {
     // TODO: We should probably hoist this type of base URI generation so that all DD sinks can
     // utilize it, since it all follows the same pattern.
     fn get_uri(&self) -> http::Uri {
-        let endpoint = self
-            .dd_common
-            .endpoint
-            .clone()
-            .or_else(|| {
-                Some(format!(
-                    "https://http-intake.logs.{}/api/v2/logs",
-                    self.dd_common.site
-                ))
-            })
-            .unwrap_or_else(|| match self.region {
-                Some(Region::Eu) => "https://http-intake.logs.datadoghq.eu/api/v2/logs".to_string(),
-                None | Some(Region::Us) => {
-                    "https://http-intake.logs.datadoghq.com/api/v2/logs".to_string()
+        let base_url = self.dd_common.endpoint.clone().unwrap_or_else(|| {
+            if let Some(region) = self.region {
+                match region {
+                    Region::Eu => "https://http-intake.logs.datadoghq.eu".to_string(),
+                    Region::Us => "https://http-intake.logs.datadoghq.com".to_string(),
                 }
-            });
-        http::Uri::try_from(endpoint).expect("URI not valid")
+            } else {
+                format!("https://http-intake.logs.{}", self.dd_common.site)
+            }
+        });
+
+        http::Uri::try_from(format!("{}/api/v2/logs", base_url)).expect("URI not valid")
     }
 
     fn get_protocol(&self) -> String {
@@ -160,6 +155,7 @@ impl DatadogLogsConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "datadog_logs")]
 impl SinkConfig for DatadogLogsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let client = self.create_client(&cx.proxy)?;
@@ -175,13 +171,13 @@ impl SinkConfig for DatadogLogsConfig {
 
     fn input(&self) -> Input {
         let requirement = schema::Requirement::empty()
-            .required_meaning("message", Kind::bytes())
-            .required_meaning("timestamp", Kind::timestamp())
-            .optional_meaning("host", Kind::bytes())
-            .optional_meaning("source", Kind::bytes())
-            .optional_meaning("severity", Kind::bytes())
-            .optional_meaning("service", Kind::bytes())
-            .optional_meaning("trace_id", Kind::bytes());
+            .required_meaning(meaning::MESSAGE, Kind::bytes())
+            .required_meaning(meaning::TIMESTAMP, Kind::timestamp())
+            .optional_meaning(meaning::HOST, Kind::bytes())
+            .optional_meaning(meaning::SOURCE, Kind::bytes())
+            .optional_meaning(meaning::SEVERITY, Kind::bytes())
+            .optional_meaning(meaning::SERVICE, Kind::bytes())
+            .optional_meaning(meaning::TRACE_ID, Kind::bytes());
 
         Input::log().with_schema_requirement(requirement)
     }
@@ -193,7 +189,7 @@ impl SinkConfig for DatadogLogsConfig {
 
 #[cfg(test)]
 mod test {
-    use crate::sinks::datadog::logs::DatadogLogsConfig;
+    use super::super::config::DatadogLogsConfig;
 
     #[test]
     fn generate_config() {

@@ -143,7 +143,7 @@ impl SourceContext {
         out: SourceSender,
     ) -> (Self, crate::shutdown::SourceShutdownCoordinator) {
         let mut shutdown = crate::shutdown::SourceShutdownCoordinator::default();
-        let (shutdown_signal, _) = shutdown.register_source(key);
+        let (shutdown_signal, _) = shutdown.register_source(key, false);
         (
             Self {
                 key: key.clone(),

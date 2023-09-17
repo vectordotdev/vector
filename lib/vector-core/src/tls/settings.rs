@@ -206,6 +206,11 @@ impl TlsSettings {
         })
     }
 
+    /// Returns the identity as PKCS12
+    ///
+    /// # Panics
+    ///
+    /// Panics if the identity is invalid.
     fn identity(&self) -> Option<ParsedPkcs12_2> {
         // This data was test-built previously, so we can just use it
         // here and expect the results will not fail. This can all be
@@ -219,6 +224,11 @@ impl TlsSettings {
         })
     }
 
+    /// Returns the identity as PEM data
+    ///
+    /// # Panics
+    ///
+    /// Panics if the identity is missing, invalid, or the authorities to chain are invalid.
     pub fn identity_pem(&self) -> Option<(Vec<u8>, Vec<u8>)> {
         self.identity().map(|identity| {
             let mut cert = identity
@@ -244,6 +254,11 @@ impl TlsSettings {
         })
     }
 
+    /// Returns the authorities as PEM data
+    ///
+    /// # Panics
+    ///
+    /// Panics if the authority is invalid.
     pub fn authorities_pem(&self) -> impl Iterator<Item = Vec<u8>> + '_ {
         self.authorities.iter().map(|authority| {
             authority
@@ -351,7 +366,7 @@ impl TlsConfig {
             None => Ok(None),
             Some(protocols) => {
                 let mut data: Vec<u8> = Vec::new();
-                for str in protocols.iter() {
+                for str in protocols {
                     data.push(str.len().try_into().context(EncodeAlpnProtocolsSnafu)?);
                     data.append(&mut str.clone().into_bytes());
                 }
@@ -498,7 +513,7 @@ impl fmt::Debug for TlsSettings {
         f.debug_struct("TlsSettings")
             .field("verify_certificate", &self.verify_certificate)
             .field("verify_hostname", &self.verify_hostname)
-            .finish()
+            .finish_non_exhaustive()
     }
 }
 
@@ -630,6 +645,7 @@ mod test {
 
     #[test]
     fn from_options_pkcs12() {
+        let _provider = openssl::provider::Provider::try_load(None, "legacy", true).unwrap();
         let options = TlsConfig {
             crt_file: Some(TEST_PKCS12_PATH.into()),
             key_pass: Some("NOPASS".into()),

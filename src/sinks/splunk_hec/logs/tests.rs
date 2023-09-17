@@ -10,6 +10,7 @@ use vector_core::{
     config::log_schema,
     event::{Event, LogEvent, Value},
 };
+use vrl::owned_value_path;
 
 use super::sink::HecProcessedEvent;
 use crate::sinks::splunk_hec::common::config_timestamp_key;
@@ -80,7 +81,10 @@ fn get_processed_event_timestamp(
     let sourcetype = Template::try_from("{{ event_sourcetype }}".to_string()).ok();
     let source = Template::try_from("{{ event_source }}".to_string()).ok();
     let index = Template::try_from("{{ event_index }}".to_string()).ok();
-    let indexed_fields = vec!["event_field1".to_string(), "event_field2".to_string()];
+    let indexed_fields = vec![
+        owned_value_path!("event_field1"),
+        owned_value_path!("event_field2"),
+    ];
     let timestamp_nanos_key = Some(String::from("ts_nanos_key"));
 
     process_log(
@@ -89,7 +93,7 @@ fn get_processed_event_timestamp(
             sourcetype: sourcetype.as_ref(),
             source: source.as_ref(),
             index: index.as_ref(),
-            host_key: "host_key",
+            host_key: Some(owned_value_path!("host_key")),
             indexed_fields: indexed_fields.as_slice(),
             timestamp_nanos_key: timestamp_nanos_key.as_ref(),
             timestamp_key,
@@ -151,7 +155,9 @@ fn splunk_encode_log_event_json() {
     assert_eq!(event.get("key").unwrap(), &serde_json::Value::from("value"));
     assert_eq!(event.get("int_val").unwrap(), &serde_json::Value::from(123));
     assert_eq!(
-        event.get(&log_schema().message_key().to_string()).unwrap(),
+        event
+            .get(&log_schema().message_key().unwrap().to_string())
+            .unwrap(),
         &serde_json::Value::from("hello world")
     );
     assert!(event
@@ -200,7 +206,9 @@ async fn splunk_passthrough_token() {
     let config = HecLogsSinkConfig {
         default_token: "token".to_string().into(),
         endpoint: format!("http://{}", addr),
-        host_key: "host".into(),
+        host_key: OptionalValuePath {
+            path: log_schema().host_key().cloned(),
+        },
         indexed_fields: Vec::new(),
         index: None,
         sourcetype: None,
@@ -218,7 +226,7 @@ async fn splunk_passthrough_token() {
         auto_extract_timestamp: None,
         endpoint_target: EndpointTarget::Event,
     };
-    let cx = SinkContext::new_test();
+    let cx = SinkContext::default();
 
     let (sink, _) = config.build(cx).await.unwrap();
 

@@ -71,7 +71,7 @@ pub enum Collector {
 /// Filtering configuration.
 #[configurable_component]
 #[derive(Clone, Debug, Default)]
-pub(self) struct FilterList {
+struct FilterList {
     /// Any patterns which should be included.
     ///
     /// The patterns are matched using globbing.
@@ -296,8 +296,8 @@ impl HostMetricsConfig {
             bytes_received.emit(ByteSize(0));
             let metrics = generator.capture_metrics().await;
             let count = metrics.len();
-            if let Err(error) = out.send_batch(metrics).await {
-                emit!(StreamClosedError { count, error });
+            if (out.send_batch(metrics).await).is_err() {
+                emit!(StreamClosedError { count });
                 return Err(());
             }
         }
@@ -483,7 +483,7 @@ impl MetricsBuffer {
     }
 }
 
-pub(self) fn filter_result_sync<T, E>(result: Result<T, E>, message: &'static str) -> Option<T>
+fn filter_result_sync<T, E>(result: Result<T, E>, message: &'static str) -> Option<T>
 where
     E: std::error::Error,
 {
@@ -492,7 +492,7 @@ where
         .ok()
 }
 
-pub(self) async fn filter_result<T, E>(result: Result<T, E>, message: &'static str) -> Option<T>
+async fn filter_result<T, E>(result: Result<T, E>, message: &'static str) -> Option<T>
 where
     E: std::error::Error,
 {
@@ -627,7 +627,7 @@ impl From<PatternWrapper> for String {
 }
 
 #[cfg(test)]
-pub(self) mod tests {
+mod tests {
     use crate::test_util::components::{run_and_assert_source_compliance, SOURCE_TAGS};
     use std::{collections::HashSet, future::Future, time::Duration};
 

@@ -9,6 +9,7 @@ use vector::{
     test_util::collect_ready,
     transforms::{self, OutputBuffer, Transform},
 };
+use vrl::event_path;
 
 fn bench_add_fields(c: &mut Criterion) {
     let event = Event::from(LogEvent::default());
@@ -87,7 +88,7 @@ fn bench_field_filter(c: &mut Criterion) {
     let events = (0..num_events)
         .map(|i| {
             let mut event = LogEvent::default();
-            event.insert("the_field", (i % 10).to_string());
+            event.insert(event_path!("the_field"), (i % 10).to_string());
             Event::from(event)
         })
         .collect::<Vec<_>>();

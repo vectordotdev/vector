@@ -4,7 +4,7 @@ use std::{
     time::Duration,
 };
 
-use chrono::{DateTime, NaiveDateTime, Utc};
+use chrono::NaiveDateTime;
 use codecs::decoding::{DeserializerConfig, FramingConfig};
 use derivative::Derivative;
 use futures::{stream, stream::FuturesUnordered, FutureExt, Stream, StreamExt, TryFutureExt};
@@ -26,6 +26,7 @@ use vector_common::internal_event::{
 use vector_common::{byte_size_of::ByteSizeOf, finalizer::UnorderedFinalizer};
 use vector_config::configurable_component;
 use vector_core::config::{LegacyKey, LogNamespace};
+use vrl::path;
 use vrl::value::{kind::Collection, Kind};
 
 use crate::{
@@ -162,7 +163,7 @@ pub struct PubsubConfig {
     /// How often to poll the currently active streams to see if they
     /// are all busy and so open a new stream.
     #[serde(default = "default_poll_time")]
-    #[serde_as(as = "serde_with::DurationSeconds<f64>")]
+    #[serde_as(as = "serde_with::DurationSecondsWithFrac<f64>")]
     #[configurable(metadata(docs::human_name = "Poll Time"))]
     pub poll_time_seconds: Duration,
 
@@ -184,7 +185,7 @@ pub struct PubsubConfig {
 
     /// The amount of time, in seconds, to wait between retry attempts after an error.
     #[serde(default = "default_retry_delay")]
-    #[serde_as(as = "serde_with::DurationSeconds<f64>")]
+    #[serde_as(as = "serde_with::DurationSecondsWithFrac<f64>")]
     #[configurable(metadata(docs::human_name = "Retry Delay"))]
     pub retry_delay_secs: Duration,
 
@@ -198,7 +199,7 @@ pub struct PubsubConfig {
     /// before sending a keepalive request. If this is set larger than
     /// `60`, you may see periodic errors sent from the server.
     #[serde(default = "default_keepalive")]
-    #[serde_as(as = "serde_with::DurationSeconds<f64>")]
+    #[serde_as(as = "serde_with::DurationSecondsWithFrac<f64>")]
     #[configurable(metadata(docs::human_name = "Keepalive"))]
     pub keepalive_secs: Duration,
 
@@ -314,7 +315,7 @@ impl SourceConfig for PubsubConfig {
                 self.decoding.clone(),
                 log_namespace,
             )
-            .build(),
+            .build()?,
             acknowledgements: cx.do_acknowledgements(self.acknowledgements),
             shutdown: cx.shutdown,
             out: cx.out,
@@ -618,7 +619,7 @@ impl PubsubSource {
 
         let count = events.len();
         match self.out.send_batch(events).await {
-            Err(error) => emit!(StreamClosedError { error, count }),
+            Err(_) => emit!(StreamClosedError { count }),
             Ok(()) => match notifier {
                 None => ack_ids
                     .send(ids)
@@ -672,11 +673,9 @@ impl PubsubSource {
             "gcp_pubsub",
             &message.data,
             message.publish_time.map(|dt| {
-                DateTime::from_utc(
-                    NaiveDateTime::from_timestamp_opt(dt.seconds, dt.nanos as u32)
-                        .expect("invalid timestamp"),
-                    Utc,
-                )
+                NaiveDateTime::from_timestamp_opt(dt.seconds, dt.nanos as u32)
+                    .expect("invalid timestamp")
+                    .and_utc()
             }),
             batch,
             log_namespace,
@@ -687,15 +686,15 @@ impl PubsubSource {
                 log_namespace.insert_source_metadata(
                     PubsubConfig::NAME,
                     log,
-                    Some(LegacyKey::Overwrite("message_id")),
-                    "message_id",
+                    Some(LegacyKey::Overwrite(path!("message_id"))),
+                    path!("message_id"),
                     message.message_id.clone(),
                 );
                 log_namespace.insert_source_metadata(
                     PubsubConfig::NAME,
                     log,
-                    Some(LegacyKey::Overwrite("attributes")),
-                    "attributes",
+                    Some(LegacyKey::Overwrite(path!("attributes"))),
+                    path!("attributes"),
                     attributes.clone(),
                 )
             }
@@ -839,6 +838,7 @@ mod integration_tests {
     use std::collections::{BTreeMap, HashSet};
 
     use base64::prelude::{Engine as _, BASE64_STANDARD};
+    use chrono::{DateTime, Utc};
     use futures::{Stream, StreamExt};
     use http::method::Method;
     use hyper::{Request, StatusCode};
@@ -1002,10 +1002,9 @@ mod integration_tests {
     fn now_trunc() -> DateTime<Utc> {
         let start = Utc::now().timestamp();
         // Truncate the milliseconds portion, the hard way.
-        DateTime::<Utc>::from_utc(
-            NaiveDateTime::from_timestamp_opt(start, 0).expect("invalid timestamp"),
-            Utc,
-        )
+        NaiveDateTime::from_timestamp_opt(start, 0)
+            .expect("invalid timestamp")
+            .and_utc()
     }
 
     struct Tester {

@@ -58,10 +58,7 @@ where
             // other metric types in type-specific ways i.e. incremental gauge updates use a
             // different syntax, etc.
             .normalized_with_default::<StatsdNormalizer>()
-            .batched(
-                self.batch_settings
-                    .into_item_size_config(StatsdBatchSizer::default()),
-            )
+            .batched(self.batch_settings.into_item_size_config(StatsdBatchSizer))
             // We build our requests "incrementally", which means that for a single batch of
             // metrics, we might generate N requests to represent all of the metrics in the batch.
             //

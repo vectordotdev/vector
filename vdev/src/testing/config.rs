@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use std::{env, fs};
 
 use anyhow::{bail, Context, Result};
-use hashlink::LinkedHashMap;
+use indexmap::IndexMap;
 use itertools::{self, Itertools};
 use serde::{Deserialize, Serialize};
 use serde_yaml::Value;
@@ -98,7 +98,7 @@ pub struct IntegrationTestConfig {
     #[serde(default)]
     pub env: Environment,
     /// The matrix of environment configurations values.
-    matrix: LinkedHashMap<String, Vec<String>>,
+    matrix: IndexMap<String, Vec<String>>,
     /// Configuration specific to the compose services.
     #[serde(default)]
     pub runner: IntegrationRunnerConfig,
@@ -108,6 +108,8 @@ pub struct IntegrationTestConfig {
     pub test: Option<String>,
 
     pub test_filter: Option<String>,
+
+    pub paths: Option<Vec<String>>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize)]
@@ -140,7 +142,7 @@ impl IntegrationTestConfig {
         Ok(config)
     }
 
-    pub fn environments(&self) -> LinkedHashMap<String, Environment> {
+    pub fn environments(&self) -> IndexMap<String, Environment> {
         self.matrix
             .values()
             .multi_cartesian_product()
@@ -149,7 +151,7 @@ impl IntegrationTestConfig {
                 let config: Environment = self
                     .matrix
                     .keys()
-                    .zip(product.into_iter())
+                    .zip(product)
                     .map(|(variable, value)| (variable.clone(), Some(value.clone())))
                     .collect();
                 (key, config)

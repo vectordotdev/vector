@@ -2,7 +2,7 @@ use std::{io, sync::Arc};
 
 use bytes::Bytes;
 use codecs::JsonSerializerConfig;
-use lookup::lookup_v2::OwnedSegment;
+use lookup::lookup_v2::ConfigValuePath;
 use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
 use vector_core::ByteSizeOf;
 
@@ -42,8 +42,12 @@ impl ElementCount for DatadogEventsRequest {
 }
 
 impl MetaDescriptive for DatadogEventsRequest {
-    fn get_metadata(&self) -> RequestMetadata {
-        self.request_metadata
+    fn get_metadata(&self) -> &RequestMetadata {
+        &self.request_metadata
+    }
+
+    fn metadata_mut(&mut self) -> &mut RequestMetadata {
+        &mut self.request_metadata
     }
 }
 
@@ -86,7 +90,7 @@ impl RequestBuilder<Event> for DatadogEventsRequestBuilder {
     }
 
     fn split_input(&self, event: Event) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
-        let builder = RequestMetadataBuilder::from_events(&event);
+        let builder = RequestMetadataBuilder::from_event(&event);
 
         let mut log = event.into_log();
         let metadata = Metadata {
@@ -129,7 +133,7 @@ fn encoder() -> (Transformer, Encoder<()>) {
             "title",
         ]
         .iter()
-        .map(|field| vec![OwnedSegment::Field((*field).into())].into())
+        .map(|field| ConfigValuePath::try_from((*field).to_string()).unwrap())
         .collect(),
     );
     // DataDog Event API requires unix timestamp.

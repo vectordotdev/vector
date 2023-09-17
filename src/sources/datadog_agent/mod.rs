@@ -34,6 +34,7 @@ use vector_common::internal_event::{EventsReceived, Registered};
 use vector_config::configurable_component;
 use vector_core::config::{LegacyKey, LogNamespace};
 use vector_core::event::{BatchNotifier, BatchStatus};
+use vrl::path::OwnedTargetPath;
 use vrl::value::Kind;
 use warp::{filters::BoxedFilter, reject::Rejection, reply::Response, Filter, Reply};
 
@@ -155,7 +156,8 @@ impl SourceConfig for DatadogAgentConfig {
             .clone();
 
         let decoder =
-            DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace).build();
+            DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace)
+                .build()?;
 
         let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
         let source = DatadogAgentSource::new(
@@ -283,8 +285,8 @@ pub struct ApiKeyQueryParams {
 #[derive(Clone)]
 pub(crate) struct DatadogAgentSource {
     pub(crate) api_key_extractor: ApiKeyExtractor,
-    pub(crate) log_schema_host_key: &'static str,
-    pub(crate) log_schema_source_type_key: &'static str,
+    pub(crate) log_schema_host_key: OwnedTargetPath,
+    pub(crate) log_schema_source_type_key: OwnedTargetPath,
     pub(crate) log_namespace: LogNamespace,
     pub(crate) decoder: Decoder,
     protocol: &'static str,
@@ -333,8 +335,14 @@ impl DatadogAgentSource {
                 matcher: Regex::new(r"^/v1/input/(?P<api_key>[[:alnum:]]{32})/??")
                     .expect("static regex always compiles"),
             },
-            log_schema_host_key: log_schema().host_key(),
-            log_schema_source_type_key: log_schema().source_type_key(),
+            log_schema_host_key: log_schema()
+                .host_key_target_path()
+                .expect("global log_schema.host_key to be valid path")
+                .clone(),
+            log_schema_source_type_key: log_schema()
+                .source_type_key_target_path()
+                .expect("global log_schema.source_type_key to be valid path")
+                .clone(),
             decoder,
             protocol,
             logs_schema_definition: Arc::new(logs_schema_definition),
@@ -443,8 +451,8 @@ pub(crate) async fn handle_request(
             } else {
                 out.send_batch(events).await
             }
-            .map_err(move |error: crate::source_sender::ClosedError| {
-                emit!(StreamClosedError { error, count });
+            .map_err(|_| {
+                emit!(StreamClosedError { count });
                 warp::reject::custom(ApiError::ServerShutdown)
             })?;
             match receiver {

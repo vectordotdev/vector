@@ -1,12 +1,9 @@
 use crate::{
-    codecs::EncodingConfig,
-    config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     schema,
     sinks::{
+        prelude::*,
         pulsar::sink::{healthcheck, PulsarSink},
-        Healthcheck, VectorSink,
     },
-    template::Template,
 };
 use codecs::{encoding::SerializerConfig, TextSerializerConfig};
 use futures_util::FutureExt;
@@ -21,12 +18,11 @@ use pulsar::{
 use pulsar::{error::AuthenticationError, OperationRetryOptions};
 use snafu::ResultExt;
 use vector_common::sensitive_string::SensitiveString;
-use vector_config::configurable_component;
 use vector_core::config::DataType;
 use vrl::value::Kind;
 
 /// Configuration for the `pulsar` sink.
-#[configurable_component(sink("pulsar"))]
+#[configurable_component(sink("pulsar", "Publish observability events to Apache Pulsar topics."))]
 #[derive(Clone, Debug)]
 pub struct PulsarSinkConfig {
     /// The endpoint to which the Pulsar client should connect to.
@@ -285,6 +281,7 @@ impl GenerateConfig for PulsarSinkConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "pulsar")]
 impl SinkConfig for PulsarSinkConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let client = self

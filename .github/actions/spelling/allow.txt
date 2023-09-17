@@ -36,6 +36,7 @@ Celkon
 Ceph
 Chromecast
 Citrix
+Cloudflare
 Cloudfone
 Cmx
 Coby
@@ -52,6 +53,7 @@ Enot
 Evercoss
 Explay
 FAQs
+FDO
 FQDNs
 Fabro
 Figma
@@ -146,6 +148,7 @@ Podcast
 Podkicker
 Positivo
 Prestigio
+pront
 Proscan
 Qmobilevn
 RPZ
@@ -165,6 +168,7 @@ Samsung
 Sega
 Segoe
 Shopify
+SIGINTs
 Simvalley
 Skype
 Skytex
@@ -244,7 +248,9 @@ compiletime
 coredns
 corejs
 coreutils
+curta
 daemonset
+dalek
 databend
 datacenter
 datadog
@@ -295,6 +301,9 @@ gpg
 gql
 grafana
 graphiql
+greptime
+greptimecloud
+greptimedb
 gvisor
 gws
 hadoop
@@ -313,6 +322,7 @@ https
 humungus
 icecream
 ifeq
+ifneq
 imobile
 influxd
 ionik
@@ -395,6 +405,7 @@ rootfs
 roundrobin
 rpmbuild
 rpms
+rstest
 rsyslog
 rsyslogd
 servlet
@@ -411,12 +422,15 @@ timespan
 timestamped
 tzdata
 ubuntu
+upstreaminfo
 useragents
 usergroups
 userguide
 webhdfs
 winapi
 workarounds
+XCHACHA
+XSALSA
 yandex
 zeek
 zookeeper

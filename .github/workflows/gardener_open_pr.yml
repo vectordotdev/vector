@@ -13,12 +13,18 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ github.actor != 'dependabot[bot]' }}
     steps:
+      - name: Generate authentication token
+        id: generate_token
+        uses: tibdex/github-app-token@0914d50df753bbc42180d982a6550f195390069f
+        with:
+          app_id: ${{ secrets.GH_APP_DATADOG_VECTOR_CI_APP_ID }}
+          private_key: ${{ secrets.GH_APP_DATADOG_VECTOR_CI_APP_PRIVATE_KEY }}
       - uses: tspascoal/get-user-teams-membership@v2
         id: checkVectorMember
         with:
           username: ${{ github.actor }}
           team: vector
-          GITHUB_TOKEN: ${{ secrets.GH_PROJECT_PAT }}
+          GITHUB_TOKEN: ${{ steps.generate_token.outputs.token }}
       - uses: actions/add-to-project@v0.5.0
         if: ${{ steps.checkVectorMember.outputs.isTeamMember == 'false' }}
         with:

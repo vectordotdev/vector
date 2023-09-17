@@ -1,9 +1,7 @@
 abcd
 abcdefghijklm
 abcdefghijklmnopqrstuvwxyzand
-abced
 abortable
-acb
 ack'ing
 acking
 Acq
@@ -38,10 +36,8 @@ ARNOTAREALIDD
 arshiyasolei
 asdf
 asdfasdf
-ASMS
 assertverify
 Asterix
-asynk
 atag
 atx
 aty
@@ -58,6 +54,7 @@ autodiscovered
 autodiscovery
 autogen
 autoinstalling
+AUTOPULL
 autospawn
 autospawning
 autotools
@@ -141,7 +138,6 @@ casttype
 castvalue
 cbe
 CBOR
-cbs
 cddl
 cdeab
 cdylib
@@ -225,6 +221,7 @@ cwl
 Dailywarehousing
 daschl
 dashmap
+datadir
 dataflows
 datafuselabs
 datasources
@@ -235,6 +232,7 @@ datname
 dbkind
 dbreader
 DBserver
+DCMAKE
 ddagent
 ddev
 ddmetric
@@ -288,6 +286,7 @@ Doop
 downcasted
 droptest
 dsl
+dsmith
 dstat
 dstport
 dtype
@@ -304,7 +303,6 @@ ebfcee
 edenhill
 edns
 eeyun
-efg
 efgh
 Elhage
 emca
@@ -325,7 +323,6 @@ ENVARS
 envsubst
 EOIG
 EOL'ed
-Erfxl
 Err'ing
 errorf
 Errorsfor
@@ -352,6 +349,7 @@ exitcodes
 exprhere
 extendedstatus
 extendee
+extglob
 extr
 extralight
 extrepo
@@ -464,12 +462,12 @@ gty
 Guangzhou
 guenter
 gzip'ed
+hadolint
 halfsies
 hannes
 Hashbang
 hashbrown
 hashindex
-hashlink
 hashring
 hashset
 hashsum
@@ -574,7 +572,6 @@ kernelmode
 keybase
 keyclock
 keyid
-keypair
 keyxxxxx
 khvzak
 kib
@@ -779,6 +776,7 @@ NQTP
 nresamples
 nullishness
 numbackends
+oahd
 oap
 OKD
 omfwd
@@ -824,6 +822,7 @@ pathgen
 peekable
 PEMS
 pgmajfault
+pgrep
 PII
 Pitbull
 pkc
@@ -876,6 +875,7 @@ qwe
 raboof
 rande
 RANDFILE
+ratatui
 rawconfig
 rawstring
 rdkafka
@@ -1057,7 +1057,6 @@ supertrait
 suser
 sustainability
 svalue
-Sya
 sysfs
 sysinit
 syslogng
@@ -1118,7 +1117,6 @@ Tomola
 tonydanza
 toolbars
 toolchains
-TOOLSDIRECTORY
 toolset
 toor
 topdir
@@ -1205,6 +1203,7 @@ watchexec
 watchlogs
 wayfor
 webgraphviz
+webpki
 webservers
 websites
 weee

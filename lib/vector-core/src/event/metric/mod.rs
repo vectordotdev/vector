@@ -11,10 +11,16 @@ use std::{
 };
 
 use chrono::{DateTime, Utc};
-use vector_common::{json_size::JsonSize, EventDataEq};
+use vector_common::{
+    internal_event::{OptionalTag, TaggedEventsSent},
+    json_size::JsonSize,
+    request_metadata::GetEventCountTags,
+    EventDataEq,
+};
 use vector_config::configurable_component;
 
 use crate::{
+    config::telemetry,
     event::{
         estimated_json_encoded_size_of::EstimatedJsonEncodedSizeOf, BatchNotifier, EventFinalizer,
         EventFinalizers, EventMetadata, Finalizable,
@@ -476,6 +482,28 @@ impl Finalizable for Metric {
     }
 }
 
+impl GetEventCountTags for Metric {
+    fn get_tags(&self) -> TaggedEventsSent {
+        let source = if telemetry().tags().emit_source {
+            self.metadata().source_id().cloned().into()
+        } else {
+            OptionalTag::Ignored
+        };
+
+        // Currently there is no way to specify a tag that means the service,
+        // so we will be hardcoding it to "service".
+        let service = if telemetry().tags().emit_service {
+            self.tags()
+                .and_then(|tags| tags.get("service").map(ToString::to_string))
+                .into()
+        } else {
+            OptionalTag::Ignored
+        };
+
+        TaggedEventsSent { source, service }
+    }
+}
+
 /// Metric kind.
 ///
 /// Metrics can be either absolute of incremental. Absolute metrics represent a sort of "last write wins" scenario,
@@ -550,7 +578,7 @@ pub(crate) fn zip_samples(
 ) -> Vec<Sample> {
     values
         .into_iter()
-        .zip(rates.into_iter())
+        .zip(rates)
         .map(|(value, rate)| Sample { value, rate })
         .collect()
 }
@@ -562,7 +590,7 @@ pub(crate) fn zip_buckets(
 ) -> Vec<Bucket> {
     limits
         .into_iter()
-        .zip(counts.into_iter())
+        .zip(counts)
         .map(|(upper_limit, count)| Bucket { upper_limit, count })
         .collect()
 }
@@ -574,7 +602,7 @@ pub(crate) fn zip_quantiles(
 ) -> Vec<Quantile> {
     quantiles
         .into_iter()
-        .zip(values.into_iter())
+        .zip(values)
         .map(|(quantile, value)| Quantile { quantile, value })
         .collect()
 }

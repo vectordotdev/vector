@@ -43,8 +43,9 @@ base: components: sinks: datadog_events: configuration: {
 		description: """
 			The endpoint to send observability data to.
 
-			The endpoint must contain an HTTP scheme, and may specify a
-			hostname or IP address and port.
+			The endpoint must contain an HTTP scheme, and may specify a hostname or IP
+			address and port. The API path should NOT be specified as this is handled by
+			the sink.
 
 			If set, overrides the `site` option.
 			"""
@@ -102,6 +103,17 @@ base: components: sinks: datadog_events: configuration: {
 																"""
 						required: false
 						type: float: default: 0.4
+					}
+					initial_concurrency: {
+						description: """
+																The initial concurrency limit to use. If not specified, the initial limit will be 1 (no concurrency).
+
+																It is recommended to set this value to your service's average limit if you're seeing that it takes a
+																long time to ramp up adaptive concurrency after a restart. You can find this value by looking at the
+																`adaptive_concurrency_limit` metric.
+																"""
+						required: false
+						type: uint: default: 1
 					}
 					rtt_deviation_scale: {
 						description: """

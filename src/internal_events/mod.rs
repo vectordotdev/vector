@@ -78,6 +78,7 @@ mod journald;
 mod kafka;
 #[cfg(feature = "sources-kubernetes_logs")]
 mod kubernetes_logs;
+#[cfg(feature = "transforms-log_to_metric")]
 mod log_to_metric;
 mod logplex;
 #[cfg(feature = "sinks-loki")]
@@ -88,8 +89,6 @@ mod lua;
 mod metric_to_log;
 #[cfg(feature = "sources-mongodb_metrics")]
 mod mongodb_metrics;
-#[cfg(feature = "sinks-nats")]
-mod nats;
 #[cfg(feature = "sources-nginx_metrics")]
 mod nginx_metrics;
 mod open;
@@ -97,7 +96,11 @@ mod parser;
 #[cfg(feature = "sources-postgresql_metrics")]
 mod postgresql_metrics;
 mod process;
-#[cfg(any(feature = "sources-prometheus", feature = "sinks-prometheus"))]
+#[cfg(any(
+    feature = "sources-prometheus-scrape",
+    feature = "sources-prometheus-remote-write",
+    feature = "sinks-prometheus"
+))]
 mod prometheus;
 #[cfg(feature = "sinks-pulsar")]
 mod pulsar;
@@ -219,6 +222,7 @@ pub(crate) use self::journald::*;
 pub(crate) use self::kafka::*;
 #[cfg(feature = "sources-kubernetes_logs")]
 pub(crate) use self::kubernetes_logs::*;
+#[cfg(feature = "transforms-log_to_metric")]
 pub(crate) use self::log_to_metric::*;
 #[cfg(feature = "sources-heroku_logs")]
 pub(crate) use self::logplex::*;
@@ -228,14 +232,17 @@ pub(crate) use self::loki::*;
 pub(crate) use self::lua::*;
 #[cfg(feature = "transforms-metric_to_log")]
 pub(crate) use self::metric_to_log::*;
-#[cfg(feature = "sinks-nats")]
-pub(crate) use self::nats::*;
 #[cfg(feature = "sources-nginx_metrics")]
 pub(crate) use self::nginx_metrics::*;
+#[allow(unused_imports)]
 pub(crate) use self::parser::*;
 #[cfg(feature = "sources-postgresql_metrics")]
 pub(crate) use self::postgresql_metrics::*;
-#[cfg(any(feature = "sources-prometheus", feature = "sinks-prometheus"))]
+#[cfg(any(
+    feature = "sources-prometheus-scrape",
+    feature = "sources-prometheus-remote-write",
+    feature = "sinks-prometheus"
+))]
 pub(crate) use self::prometheus::*;
 #[cfg(feature = "sinks-pulsar")]
 pub(crate) use self::pulsar::*;
@@ -263,7 +270,7 @@ pub(crate) use self::unix::*;
 pub(crate) use self::websocket::*;
 #[cfg(windows)]
 pub(crate) use self::windows::*;
-pub(crate) use self::{
+pub use self::{
     adaptive_concurrency::*, batch::*, common::*, conditions::*, encoding_transcode::*,
     heartbeat::*, open::*, process::*, socket::*, tcp::*, template::*, udp::*,
 };

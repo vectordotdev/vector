@@ -6,6 +6,7 @@ use vrl::compiler::{CompilationResult, CompileConfig, Program, TypeState, VrlRun
 use vrl::diagnostic::Formatter;
 use vrl::value::Value;
 
+use crate::config::LogNamespace;
 use crate::event::TargetEvents;
 use crate::{
     conditions::{Condition, Conditional, ConditionalConfig},
@@ -42,7 +43,7 @@ impl ConditionalConfig for VrlConfig {
 
         let functions = vrl::stdlib::all()
             .into_iter()
-            .chain(enrichment::vrl_functions().into_iter())
+            .chain(enrichment::vrl_functions())
             .chain(vector_vrl_functions::all())
             .collect::<Vec<_>>();
 
@@ -61,6 +62,10 @@ impl ConditionalConfig for VrlConfig {
                 .colored()
                 .to_string()
         })?;
+
+        if !program.final_type_info().result.is_boolean() {
+            return Err("VRL conditions must return a boolean.".into());
+        }
 
         if !warnings.is_empty() {
             let warnings = Formatter::new(&self.source, warnings).colored().to_string();
@@ -84,12 +89,16 @@ pub struct Vrl {
 
 impl Vrl {
     fn run(&self, event: Event) -> (Event, RuntimeResult) {
+        let log_namespace = event
+            .maybe_as_log()
+            .map(|log| log.namespace())
+            .unwrap_or(LogNamespace::Legacy);
         let mut target = VrlTarget::new(event, self.program.info(), false);
         // TODO: use timezone from remap config
         let timezone = TimeZone::default();
 
         let result = Runtime::default().resolve(&mut target, &self.program, &timezone);
-        let original_event = match target.into_events() {
+        let original_event = match target.into_events(log_namespace) {
             TargetEvents::One(event) => event,
             _ => panic!("Event was modified in a condition. This is an internal compiler error."),
         };
@@ -104,7 +113,7 @@ impl Conditional for Vrl {
         let result = result
             .map(|value| match value {
                 Value::Boolean(boolean) => boolean,
-                _ => false,
+                _ => panic!("VRL condition did not return a boolean type"),
             })
             .unwrap_or_else(|err| {
                 emit!(VrlConditionExecutionError {
@@ -226,6 +235,12 @@ mod test {
                 ),
                 r#".name == "zork" && .tags.host == "zoobub" && .kind == "incremental""#,
                 Ok(()),
+                Ok(()),
+            ),
+            (
+                log_event![],
+                r#""i_return_a_string""#,
+                Err("VRL conditions must return a boolean.".into()),
                 Ok(()),
             ),
         ];

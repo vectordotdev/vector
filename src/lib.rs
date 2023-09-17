@@ -67,6 +67,7 @@ pub mod aws;
 #[allow(unreachable_pub)]
 pub mod codecs;
 pub(crate) mod common;
+mod convert_config;
 pub mod encoding_transcode;
 pub mod enrichment_tables;
 #[cfg(feature = "gcp")]
@@ -101,12 +102,12 @@ pub mod sources;
 pub mod stats;
 #[cfg(feature = "api-client")]
 #[allow(unreachable_pub)]
-mod tap;
+pub mod tap;
 pub mod template;
 pub mod test_util;
 #[cfg(feature = "api-client")]
 #[allow(unreachable_pub)]
-pub(crate) mod top;
+pub mod top;
 #[allow(unreachable_pub)]
 pub mod topology;
 pub mod trace;
