@@ -37,7 +37,7 @@ macro_rules! gauge {
     };
 }
 
-/// Configuration for the `nats` source.
+/// Configuration for the `opcua` source.
 #[configurable_component(source(
 "opcua",
 "Read metrics data from OPC UA."
