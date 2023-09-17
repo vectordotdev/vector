@@ -573,6 +573,7 @@ keybase
 keyclock
 keyid
 keyxxxxx
+keypair
 khvzak
 kib
 killall
