@@ -1,5 +1,6 @@
-use metrics::gauge;
-use vector_common::internal_event::{CountByteSize, EventsReceived, InternalEventHandle};
+//! `opcua` source.
+//! Handles opcua endpoints mostly used in industrial environments
+use vector_common::internal_event::{CountByteSize, EventsReceived, InternalEventHandle, BytesReceived, Protocol, ByteSize};
 use vector_common::shutdown::ShutdownSignal;
 use vector_config::configurable_component;
 use opcua::client::prelude::*;
@@ -20,9 +21,6 @@ use crate::{
     config::{GenerateConfig, SourceConfig, SourceContext, SourceOutput},
     event::metric::MetricValue,
     SourceSender,
-    internal_events::{
-        OpcUaBytesReceived
-    },
 };
 
 use vector_core::{config::LogNamespace, EstimatedJsonEncodedSizeOf, metric_tags};
@@ -46,11 +44,11 @@ macro_rules! gauge {
 #[derive(Clone, Debug, Derivative)]
 #[configurable(metadata(status = "beta"))]
 pub struct OpcUaSourceConfig {
-    /// The OPC/UA URL to connect to.
+    /// The opcua URL to connect to.
     ///
     /// The URL takes the form of `opc.tcp://server:port`.
     #[configurable(metadata(docs::examples = "opc.tcp://localhost:4840"))]
-    url: String,
+    endpoint: String,
 
     /// The application URI to use when connecting to the server.
     #[configurable(metadata(docs::examples = "urn:example:client"))]
@@ -88,11 +86,11 @@ pub struct NodeIdConfig {
 impl GenerateConfig for OpcUaSourceConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
-            url: "opc.tcp://localhost:4855".to_string(),
+            endpoint: "opc.tcp://localhost:4855".to_string(),
             application_uri: "urn:SimpleClient".to_string(),
             product_uri: "urn:SimpleClient".to_string(),
-            trust_server_certs: None,
-            create_sample_keypair: None,
+            trust_server_certs: true,
+            create_sample_keypair: true,
             node_ids: vec![],
         })
             .unwrap()
@@ -121,16 +119,18 @@ impl SourceConfig for OpcUaSourceConfig {
 async fn opcua_source(config: OpcUaSourceConfig, shutdown: ShutdownSignal, out: SourceSender) -> Result<(), ()> {
     let mut session_shutdown = shutdown.clone().fuse();
     let (sender, mut receiver) = mpsc::channel::<Vec<Metric>>(1);
-    let url = config.url.clone();
+    let url = config.endpoint.clone();
     let node_ids = config.node_ids.clone();
+    let events_received = register!(EventsReceived);
+    let bytes_received = register!(BytesReceived::from(Protocol::from("opcua")));
 
     tokio::spawn(async move {
         let mut client = ClientBuilder::new()
             .application_name("Vector Client")
             .application_uri(config.application_uri)
             .product_uri(config.product_uri)
-            .trust_server_certs(config.trust_server_certs.unwrap_or(false))
-            .create_sample_keypair(config.create_sample_keypair.unwrap_or(false))
+            .trust_server_certs(config.trust_server_certs)
+            .create_sample_keypair(config.create_sample_keypair)
             .session_retry_limit(3)
             .client()
             .unwrap();
@@ -180,17 +180,13 @@ async fn opcua_source(config: OpcUaSourceConfig, shutdown: ShutdownSignal, out: 
                             let len = events.len();
 
                             let byte_size = events.estimated_json_encoded_size_of();
-                            let events_received = register!(EventsReceived);
+
                             events_received.emit(CountByteSize(len, byte_size));
 
+                            bytes_received.emit(ByteSize(byte_size.get() as usize));
 
-                            emit!(OpcUaBytesReceived{
-                                byte_size,
-                                protocol: "opcua",
-                            });
-
-                            if let Err(error) = out.send_batch(events).await {
-                                emit!(StreamClosedError { error, count:len });
+                            if let Err(_) = out.send_batch(events).await {
+                                emit!(StreamClosedError { count:len });
                             }
                         }
                     }
@@ -320,11 +316,11 @@ mod integration_tests {
     #[tokio::test]
     async fn test_connection_with_metric_change() {
         let config = OpcUaSourceConfig {
-            url: "opc.tcp://127.0.0.1:4840/UA".to_string(),
+            endpoint: "opc.tcp://127.0.0.1:4840/UA".to_string(),
             application_uri: "urn:SimpleClient".to_string(),
             product_uri: "urn:SimpleClient".to_string(),
-            trust_server_certs: None,
-            create_sample_keypair: None,
+            trust_server_certs: true,
+            create_sample_keypair: true,
             node_ids: vec![NodeIdConfig {
                 metric_name: "SpindleOverride".to_string(),
                 node_id: "ns=34;i=6099".to_string(),

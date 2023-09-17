@@ -337,6 +337,7 @@ heim = { git = "https://github.com/vectordotdev/heim.git", branch = "update-nix"
 
 # make sure to update the external docs when the Lua version changes
 mlua = { version = "0.8.10", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
+opcua = { version = "0.11.0", default-features = false, optional = true, features = ["client"] }
 
 [target.'cfg(windows)'.dependencies]
 windows-service = "0.6.0"
@@ -495,6 +496,7 @@ sources-logs = [
   "sources-kubernetes_logs",
   "sources-logstash",
   "sources-nats",
+  "sources-opcua",
   "sources-opentelemetry",
   "sources-file-descriptor",
   "sources-redis",
@@ -546,6 +548,7 @@ sources-kubernetes_logs = ["dep:file-source", "kubernetes", "transforms-reduce"]
 sources-logstash = ["sources-utils-net-tcp", "tokio-util/net"]
 sources-mongodb_metrics = ["dep:mongodb"]
 sources-nats = ["dep:async-nats", "dep:nkeys"]
+sources-opcua = ["dep:opcua"]
 sources-nginx_metrics = ["dep:nom"]
 sources-opentelemetry = ["dep:hex", "dep:opentelemetry-proto", "dep:prost-types", "sources-http_server", "sources-utils-http", "sources-vector"]
 sources-postgresql_metrics = ["dep:postgres-openssl", "dep:tokio-postgres"]
@@ -771,6 +774,7 @@ all-integration-tests = [
   "loki-integration-tests",
   "mongodb_metrics-integration-tests",
   "nats-integration-tests",
+  "opcua-integration-tests",
   "nginx-integration-tests",
   "opentelemetry-integration-tests",
   "postgresql_metrics-integration-tests",
@@ -835,6 +839,7 @@ logstash-integration-tests = ["docker", "sources-logstash"]
 loki-integration-tests = ["sinks-loki"]
 mongodb_metrics-integration-tests = ["sources-mongodb_metrics"]
 nats-integration-tests = ["sinks-nats", "sources-nats"]
+opcua-integration-tests = ["sources-opcua"]
 nginx-integration-tests = ["sources-nginx_metrics"]
 opentelemetry-integration-tests = ["sources-opentelemetry"]
 postgresql_metrics-integration-tests = ["sources-postgresql_metrics"]
