@@ -5,9 +5,6 @@ test_filter: '::opcua::'
 
 runner:
   env:
-    NGINX_ADDRESS: http://nginx:8000
-    NGINX_PROXY_ADDRESS: http://nginx-proxy:8000
-    SQUID_ADDRESS: http://squid:3128
 
 matrix:
   version: [ latest ]
