@@ -1,12 +1,16 @@
 use std::io;
 
-use bytes::Bytes;
+use bytes::{Bytes, BytesMut};
 use http::{Request, Uri};
 use vector_core::config::telemetry;
 
 use crate::{
     http::Auth,
-    sinks::{prelude::*, prometheus::PrometheusRemoteWriteAuth, util::PartitionInnerBuffer},
+    sinks::{
+        prelude::*,
+        prometheus::{collector, PrometheusRemoteWriteAuth},
+        util::PartitionInnerBuffer,
+    },
 };
 
 use super::{sink::RemoteWriteMetric, PartitionKey};
@@ -22,7 +26,7 @@ impl encoding::Encoder<Vec<RemoteWriteMetric>> for RemoteWriteEncoder {
         let mut byte_size = telemetry().create_request_count_byte_size();
 
         let mut time_series = collector::TimeSeries::new();
-        for metric in metrics {
+        for metric in input {
             byte_size.add_event(&metric.metric, metric.estimated_json_encoded_size_of());
 
             time_series.encode_metric(
@@ -38,14 +42,14 @@ impl encoding::Encoder<Vec<RemoteWriteMetric>> for RemoteWriteEncoder {
         request.encode(&mut out).expect("Out of memory");
         let body = out.freeze();
 
-        write_all(writer, metrics.len(), body.as_ref())?;
+        write_all(writer, input.len(), body.as_ref())?;
 
         Ok((body.len(), byte_size))
     }
 }
 
 pub(super) struct RemoteWriteRequest {
-    request: http::Request<Bytes>,
+    pub(super) request: http::Request<Bytes>,
     finalizers: EventFinalizers,
     metadata: RequestMetadata,
     tenant_id: String,

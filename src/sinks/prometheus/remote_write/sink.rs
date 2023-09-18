@@ -8,7 +8,7 @@ use super::{
 };
 
 pub(super) struct RemoteWriteMetric {
-    metric: Metric,
+    pub(super) metric: Metric,
     tenant_id: String,
 }
 
@@ -30,7 +30,7 @@ pub struct PrometheusRemoteWriteDefaultBatchSettings;
 pub(super) struct PrometheusTenantIdPartitioner;
 
 impl Partitioner for PrometheusTenantIdPartitioner {
-    type Item = PrometheusMetric;
+    type Item = RemoteWriteMetric;
     type Key = String;
 
     fn partition(&self, item: &Self::Item) -> Self::Key {

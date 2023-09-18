@@ -1,10 +1,14 @@
+#[cfg(feature = "aws-core")]
+use aws_credential_types::provider::SharedCredentialsProvider;
+#[cfg(feature = "aws-core")]
+use aws_types::region::Region;
 use http::Uri;
 use snafu::prelude::*;
 
 use crate::{
     aws::RegionOrEndpoint,
     http::{Auth, HttpClient},
-    sinks::{prelude::*, prometheus::PrometheusRemoteWriteAuth},
+    sinks::{prelude::*, prometheus::PrometheusRemoteWriteAuth, UriParseSnafu},
 };
 
 use super::{
@@ -115,22 +119,17 @@ impl SinkConfig for RemoteWriteConfig {
         let client = HttpClient::new(tls_settings, cx.proxy())?;
         let tenant_id = self.tenant_id.clone();
 
-        let (http_auth, credentials_provider, aws_region) = match &self.auth {
-            Some(PrometheusRemoteWriteAuth::Basic { user, password }) => (
-                Some(Auth::Basic {
-                    user: user.clone(),
-                    password: password.clone().into(),
-                }),
-                None,
-                None,
-            ),
-            Some(PrometheusRemoteWriteAuth::Bearer { token }) => (
-                Some(Auth::Bearer {
-                    token: token.clone(),
-                }),
-                None,
-                None,
-            ),
+        let auth = match &self.auth {
+            Some(PrometheusRemoteWriteAuth::Basic { user, password }) => Some(Auth::Basic {
+                user: user.clone(),
+                password: password.clone().into(),
+            }),
+
+            Some(PrometheusRemoteWriteAuth::Bearer { token }) => Some(Auth::Bearer {
+                token: token.clone(),
+            }),
+
+            #[cfg(feature = "aws_core")]
             Some(PrometheusRemoteWriteAuth::Aws(aws_auth)) => {
                 let region = self
                     .aws
@@ -139,13 +138,13 @@ impl SinkConfig for RemoteWriteConfig {
                     .ok_or(Errors::AwsRegionRequired)?
                     .ok_or(Errors::AwsRegionRequired)?;
 
-                (
-                    None,
-                    Some(aws_auth.credentials_provider(region.clone()).await?),
-                    Some(region),
-                )
+                Some(Auth::Aws {
+                    credentials_provider: aws_auth.credentials_provider(region.clone()).await?,
+                    region,
+                })
             }
-            None => (None, None, None),
+
+            None => None,
         };
 
         // let http_request_builder = Arc::new(RemoteWriteRequestBuilder {
@@ -160,7 +159,7 @@ impl SinkConfig for RemoteWriteConfig {
             client.clone(),
             endpoint,
             self.compression.clone(),
-            http_auth.clone(),
+            auth.clone(),
         )
         .boxed();
 
@@ -169,7 +168,7 @@ impl SinkConfig for RemoteWriteConfig {
             compression: self.compression.clone(),
             batch_settings: self.batch.validate()?.into_batcher_settings()?,
             endpoint: endpoint.clone(),
-            http_auth,
+            auth,
         };
 
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))

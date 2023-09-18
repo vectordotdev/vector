@@ -1,11 +1,17 @@
-use std::sync::Arc;
+use std::{
+    sync::Arc,
+    task::{Context, Poll},
+};
 
+use aws_sdk_cloudwatch::Region;
+use bytes::Bytes;
 use http::StatusCode;
 
+use super::request_builder::RemoteWriteRequest;
 use crate::{http::HttpClient, sinks::prelude::*};
 
 #[derive(Clone)]
-struct RemoteWriteService {
+pub(super) struct RemoteWriteService {
     pub endpoint: Uri,
     pub aws_region: Option<Region>,
     pub credentials_provider: Option<SharedCredentialsProvider>,
@@ -42,9 +48,9 @@ struct RemoteWriteResponse {
     response: http::Response<Bytes>,
 }
 
-impl DriverResponse for AmqpResponse {
+impl DriverResponse for RemoteWriteResponse {
     fn event_status(&self) -> EventStatus {
-        if response.status().is_success() {
+        if self.response.status().is_success() {
             EventStatus::Delivered
         } else {
             EventStatus::Errored
@@ -65,8 +71,8 @@ impl Service<RemoteWriteRequest> for RemoteWriteService {
     type Error = crate::Error;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
-    fn poll_ready(&mut self, _task: &mut task::Context<'_>) -> task::Poll<Result<(), Self::Error>> {
-        task::Poll::Ready(Ok(()))
+    fn poll_ready(&mut self, _task: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Ok(()))
     }
 
     // Emission of internal events for errors and dropped events is handled upstream by the caller.

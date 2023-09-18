@@ -1,6 +1,6 @@
 use snafu::prelude::*;
 
-use crate::sinks::util::buffer::metrics::MetricNormalize;
+use crate::sinks::{prelude::*, util::buffer::metrics::MetricNormalize};
 
 mod config;
 mod request_builder;
@@ -36,6 +36,7 @@ pub(super) enum Compression {
 enum Errors {
     #[snafu(display(r#"Prometheus remote_write sink cannot accept "set" metrics"#))]
     SetMetricInvalid,
+    #[cfg(feature = "aws-core")]
     #[snafu(display("aws.region required when AWS authentication is in use"))]
     AwsRegionRequired,
 }
