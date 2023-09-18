@@ -1620,27 +1620,28 @@ dependencies = [
 
 [[package]]
 name = "bollard"
-version = "0.14.0"
+version = "0.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "af254ed2da4936ef73309e9597180558821cb16ae9bba4cb24ce6b612d8d80ed"
+checksum = "f03db470b3c0213c47e978da93200259a1eb4dae2e5512cba9955e2b540a6fc6"
 dependencies = [
  "base64 0.21.4",
  "bollard-stubs",
  "bytes 1.5.0",
  "chrono",
- "dirs-next",
  "futures-core",
  "futures-util",
  "hex",
+ "home",
  "http",
  "hyper",
- "hyper-rustls 0.23.1",
+ "hyper-rustls 0.24.0",
  "hyperlocal",
  "log",
  "pin-project-lite",
- "rustls 0.20.7",
+ "rustls 0.21.6",
  "rustls-native-certs",
  "rustls-pemfile",
+ "rustls-webpki",
  "serde",
  "serde_derive",
  "serde_json",
@@ -1650,20 +1651,20 @@ dependencies = [
  "tokio",
  "tokio-util",
  "url",
- "webpki",
- "webpki-roots 0.22.5",
+ "webpki-roots 0.25.2",
  "winapi",
 ]
 
 [[package]]
 name = "bollard-stubs"
-version = "1.42.0-rc.7"
+version = "1.43.0-rc.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "602bda35f33aeb571cef387dcd4042c643a8bf689d8aaac2cc47ea24cb7bc7e0"
+checksum = "b58071e8fd9ec1e930efd28e3a90c1251015872a2ce49f81f36421b86466932e"
 dependencies = [
  "chrono",
  "serde",
- "serde_with 2.3.2",
+ "serde_repr",
+ "serde_with 3.3.0",
 ]
 
 [[package]]
@@ -4076,6 +4077,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "home"
+version = "0.5.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5444c27eef6923071f7ebcc33e3444508466a76f7a2b93da00ed6e19f30c1ddb"
+dependencies = [
+ "windows-sys 0.48.0",
+]
+
+[[package]]
 name = "hostname"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4245,7 +4255,9 @@ checksum = "0646026eb1b3eea4cd9ba47912ea5ce9cc07713d105b1a14698f4e6433d348b7"
 dependencies = [
  "http",
  "hyper",
+ "log",
  "rustls 0.21.6",
+ "rustls-native-certs",
  "tokio",
  "tokio-rustls 0.24.0",
 ]
@@ -7813,21 +7825,6 @@ checksum = "678b5a069e50bf00ecd22d0cd8ddf7c236f68581b03db652061ed5eb13a312ff"
 dependencies = [
  "serde",
  "serde_with_macros 1.5.2",
-]
-
-[[package]]
-name = "serde_with"
-version = "2.3.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "331bb8c3bf9b92457ab7abecf07078c13f7d270ba490103e84e8b014490cd0b0"
-dependencies = [
- "base64 0.13.1",
- "chrono",
- "hex",
- "indexmap 1.9.3",
- "serde",
- "serde_json",
- "time",
 ]
 
 [[package]]
