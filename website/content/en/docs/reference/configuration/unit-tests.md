@@ -28,7 +28,7 @@ You can execute tests within a [configuration](#configuring) file using Vector's
 [`test`][vector_test] subcommand:
 
 ```bash
-vector test /etc/vector/vector.toml
+vector test /etc/vector/vector.yaml
 ```
 
 You can also specify multiple configuration files to test:

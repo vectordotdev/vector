@@ -559,7 +559,7 @@ components: sinks: [Name=string]: {
 							`--require-healthy` flag:
 
 							```bash
-							vector --config /etc/vector/vector.toml --require-healthy
+							vector --config /etc/vector/vector.yaml --require-healthy
 							```
 							"""
 					},

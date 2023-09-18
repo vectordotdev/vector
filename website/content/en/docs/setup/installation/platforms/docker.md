@@ -59,7 +59,7 @@ EOF
 ```shell
 docker run \
   -d \
-  -v $PWD/vector.toml:/etc/vector/vector.toml:ro \
+  -v $PWD/vector.yaml:/etc/vector/vector.yaml:ro \
   -p 8686:8686 \
   timberio/vector:{{< version >}}-debian
 ```
