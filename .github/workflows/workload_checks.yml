@@ -1,11 +1,11 @@
-# Workload Checks
+# Workload Checks Suite
 #
 # Runs Vector Workload Checks.
 #
 # Runs on:
 #  - scheduled daily UTC midnight
 
-# This workflow runs the collection of our workload checks, using the repo HEAD SHA,
+# This workflow runs the collection of our workload checks, using the Vector repo HEAD SHA,
 # which depends on when the workflow is invoked.
 #
 # The goal is to establish a baseline of check results for a variety of cases
@@ -13,7 +13,7 @@
 #
 # The HEAD SHA is also used to tag the Vector Docker image.
 
-name: Workload Checks
+name: Workload Checks Suite
 
 on:
   workflow_call:
