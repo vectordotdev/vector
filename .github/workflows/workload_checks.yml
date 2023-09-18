@@ -5,13 +5,11 @@
 # Runs on:
 #  - scheduled daily UTC midnight
 
-# This workflow runs the collection of our workload checks, using the Vector repo HEAD SHA,
+# This workflow runs the collection of our workload checks, using the latest Vector nightly image,
 # which depends on when the workflow is invoked.
 #
 # The goal is to establish a baseline of check results for a variety of cases
 # and visualize trends for important Vector use cases.
-#
-# The HEAD SHA is also used to tag the Vector Docker image.
 
 name: Workload Checks Suite
 
@@ -81,112 +79,11 @@ jobs:
           echo "SMP_CRATE_VERSION=${SMP_CRATE_VERSION}" >> $GITHUB_OUTPUT
           echo "LADING_VERSION=${LADING_VERSION}" >> $GITHUB_OUTPUT
 
-  ##
-  ## BUILD
-  ##
-
-#  build-target:
-#    name: Build target Vector container
-#    runs-on: [linux, ubuntu-20.04-4core]
-#    needs:
-#      - compute-metadata
-#    steps:
-#      - uses: colpal/actions-clean@v1
-#
-#      - uses: actions/checkout@v3
-#
-#      - uses: actions/checkout@v3
-#        with:
-#          ref: ${{ needs.compute-metadata.outputs.target-sha }}
-#          path: target-vector
-#
-#      - name: Set up Docker Buildx
-#        id: buildx
-#        uses: docker/setup-buildx-action@v3.0.0
-#
-#      - name: Build 'vector' target image
-#        uses: docker/build-push-action@v5.0.0
-#        with:
-#          context: target-vector/
-#          cache-from: type=gha
-#          cache-to: type=gha,mode=max
-#          file: regression/Dockerfile
-#          builder: ${{ steps.buildx.outputs.name }}
-#          outputs: type=docker,dest=${{ runner.temp }}/target-image.tar
-#          tags: |
-#            vector:${{ needs.compute-metadata.outputs.target-sha }}
-#
-#      - name: Upload image as artifact
-#        uses: actions/upload-artifact@v3
-#        with:
-#          name: target-image
-#          path: "${{ runner.temp }}/target-image.tar"
-#
-#  confirm-valid-credentials:
-#    name: Confirm AWS credentials are minimally valid
-#    runs-on: ubuntu-22.04
-#    needs:
-#      - compute-metadata
-#    steps:
-#      - name: Configure AWS Credentials
-#        uses: aws-actions/configure-aws-credentials@v4.0.0
-#        with:
-#          aws-access-key-id: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY_ID }}
-#          aws-secret-access-key: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_SECRET_ACCESS_KEY }}
-#          aws-region: us-west-2
-#
-#      - name: Download SMP binary
-#        run: |
-#          aws s3 cp s3://smp-cli-releases/v${{ needs.compute-metadata.outputs.smp-version }}/x86_64-unknown-linux-gnu/smp ${{ runner.temp }}/bin/smp
-#
-#  upload-target-image-to-ecr:
-#    name: Upload target images to ECR
-#    runs-on: ubuntu-22.04
-#    needs:
-#      - compute-metadata
-#      - confirm-valid-credentials
-#      - build-target
-#    steps:
-#      - name: 'Download target image'
-#        uses: actions/download-artifact@v3
-#        with:
-#          name: target-image
-#
-#      - name: Load target image
-#        run: |
-#          docker load --input target-image.tar
-#
-#      - name: Configure AWS Credentials
-#        uses: aws-actions/configure-aws-credentials@v4.0.0
-#        with:
-#          aws-access-key-id: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY_ID }}
-#          aws-secret-access-key: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_SECRET_ACCESS_KEY }}
-#          aws-region: us-west-2
-#
-#      - name: Login to Amazon ECR
-#        id: login-ecr
-#        uses: aws-actions/amazon-ecr-login@v1
-#
-#      - name: Docker Login to ECR
-#        uses: docker/login-action@v2
-#        with:
-#          registry: ${{ steps.login-ecr.outputs.registry }}
-#
-#      - name: Tag & push target image
-#        run: |
-#          docker tag vector:${{ needs.compute-metadata.outputs.target-sha }} ${{ steps.login-ecr.outputs.registry }}/${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }}-vector:${{ needs.compute-metadata.outputs.target-sha }}
-#          docker push ${{ steps.login-ecr.outputs.registry }}/${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }}-vector:${{ needs.compute-metadata.outputs.target-sha }}
-
-  ##
-  ## SUBMIT
-  ##
-
   submit-job:
     name: Submit workload checks job
     runs-on: ubuntu-22.04
     needs:
       - compute-metadata
-      - upload-target-image-to-ecr
     steps:
       - name: Check status, in-progress
         env:
@@ -222,32 +119,25 @@ jobs:
         env:
           RUST_LOG: info
         run: |
-          chmod +x ${{ runner.temp }}/bin/smp
+             CURRENT_DATE=$(date --utc '+%Y_%m_%d')
+             RUST_LOG_DEBUG="debug,aws_config::profile::credentials=error"
 
-#          TARGET_IMAGE =${{ steps.login-ecr.outputs.registry }}/${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }}-vector:${{ needs.compute-metadata.outputs.target-sha }}
-          TARGET_IMAGE=timberio/vector:nightly-debian
-          CURRENT_DATE=$(date --utc '+%Y_%m_%d')
-
-          RUST_LOG="info,aws_config::profile::credentials=error"
-          RUST_LOG_DEBUG="debug,aws_config::profile::credentials=error"
-
-          chmod +x ${{ runner.temp }}/bin/smp
-
-          RUST_BACKTRACE=1 RUST_LOG="${RUST_LOG_DEBUG}" ${{ runner.temp }}/bin/smp \
-             --team-id ${SMP_AGENT_TEAM_ID} --api-base ${SMP_API} --aws-named-profile ${AWS_NAMED_PROFILE} \
-            job submit-workload \
-              --lading-version ${LADING_VERSION} \
-              --total-samples ${TOTAL_SAMPLES} \
-              --warmup-seconds ${WARMUP_SECONDS} \
-              --replicas ${REPLICAS} \
-              --target-image ${TARGET_IMAGE} \
-              --target-sha ${TARGET_SHA} \
-              --target-config-dir ${{ github.workspace }}/workload-checks \
-              --target-name vector \
-              --target-command "/usr/local/bin/vector" \
-              --target-environment-variables "DD_HOSTNAME=smp-workload-checks,DD_DD_URL=http://127.0.0.1:9092,DD_API_KEY=00000001" \
-              --tags smp_status=nightly,client_team="agent",tag_date="${CURRENT_DATE}" \
-              --submission-metadata ${{ runner.temp }}/submission-metadata
+             chmod +x ${{ runner.temp }}/bin/smp
+             RUST_BACKTRACE=1 RUST_LOG="${RUST_LOG_DEBUG}" ${{ runner.temp }}/bin/smp \
+                --team-id ${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }} \
+                job submit-workload \
+                --lading-version ${{ needs.compute-metadata.outputs.lading-version }} \
+                --total-samples ${{ needs.compute-metadata.outputs.total-samples }} \
+                --warmup-seconds ${{ needs.compute-metadata.outputs.warmup-seconds }} \
+                --replicas ${{ needs.compute-metadata.outputs.replicas }} \
+                --target-image timberio/vector:nightly-debian \
+                --target-sha ${{ needs.compute-metadata.outputs.target-sha }} \
+                --target-config-dir ${{ github.workspace }}/workload-checks \
+                --target-name vector \
+                --target-command "/usr/bin/vector" \
+                --target-environment-variables "DD_HOSTNAME=smp-workload-checks,DD_DD_URL=http://127.0.0.1:9092,DD_API_KEY=00000001" \
+                --tags smp_status=nightly,client_team="agent",tag_date="${CURRENT_DATE}" \
+                --submission-metadata ${{ runner.temp }}/submission-metadata
 
       - uses: actions/upload-artifact@v3
         with:
