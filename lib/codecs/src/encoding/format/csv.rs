@@ -15,22 +15,22 @@ use vector_core::{
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum QuoteStyle {
-    /// This always puts quotes around every field.
+    /// Always puts quotes around every field.
     Always,
 
-    /// This puts quotes around fields only when necessary.
+    /// Puts quotes around fields only when necessary.
     /// They are necessary when fields contain a quote, delimiter, or record terminator.
     /// Quotes are also necessary when writing an empty record
     /// (which is indistinguishable from a record with one empty field).
     #[default]
     Necessary,
 
-    /// This puts quotes around all fields that are non-numeric.
+    /// Puts quotes around all fields that are non-numeric.
     /// Namely, when writing a field that does not parse as a valid float or integer,
     /// then quotes are used even if they aren't strictly necessary.
     NonNumeric,
 
-    /// This never writes quotes, even if it produces invalid CSV data.
+    /// Never writes quotes, even if it produces invalid CSV data.
     Never,
 }
 
