@@ -31,21 +31,14 @@ jobs:
   compute-metadata:
     name: Compute metadata
     runs-on: ubuntu-22.04
-    needs: should-run
     outputs:
-      target-sha: ${{ steps.pr-metadata-comment.outputs.TARGET_SHA }}
-
-      # below are used in the experiment/analyze jobs
-      cpus: ${{ steps.system.outputs.CPUS }}
-      memory: ${{ steps.system.outputs.MEMORY }}
-      vector-cpus: ${{ steps.system.outputs.VECTOR_CPUS }}
-
       replicas: ${{ steps.experimental-meta.outputs.REPLICAS }}
       warmup-seconds: ${{ steps.experimental-meta.outputs.WARMUP_SECONDS }}
       total-samples: ${{ steps.experimental-meta.outputs.TOTAL_SAMPLES }}
-      p-value: ${{ steps.experimental-meta.outputs.P_VALUE }}
       smp-version: ${{ steps.experimental-meta.outputs.SMP_CRATE_VERSION }}
       lading-version: ${{ steps.experimental-meta.outputs.LADING_VERSION }}
+
+      target-sha: ${{ steps.git-metadata.outputs.TARGET_SHA }}
 
     steps:
       - uses: actions/checkout@v3
@@ -57,7 +50,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          export TARGET_SHA=$(git merge-base master HEAD)
+          export TARGET_SHA=$(git rev-parse HEAD)
           echo "TARGET_SHA=${TARGET_SHA}" >> $GITHUB_OUTPUT
 
           echo "target sha is: ${TARGET_SHA}"
@@ -73,38 +66,20 @@ jobs:
           export WARMUP_SECONDS="45"
           export REPLICAS="10"
           export TOTAL_SAMPLES="600"
-          export P_VALUE="0.1"
           export SMP_CRATE_VERSION="0.10.0"
           export LADING_VERSION="0.18.0"
 
           echo "warmup seconds: ${WARMUP_SECONDS}"
           echo "replicas: ${REPLICAS}"
           echo "total samples: ${TOTAL_SAMPLES}"
-          echo "regression p-value: ${P_VALUE}"
           echo "smp crate version: ${SMP_CRATE_VERSION}"
           echo "lading version: ${LADING_VERSION}"
 
           echo "WARMUP_SECONDS=${WARMUP_SECONDS}" >> $GITHUB_OUTPUT
           echo "REPLICAS=${REPLICAS}" >> $GITHUB_OUTPUT
           echo "TOTAL_SAMPLES=${TOTAL_SAMPLES}" >> $GITHUB_OUTPUT
-          echo "P_VALUE=${P_VALUE}" >> $GITHUB_OUTPUT
           echo "SMP_CRATE_VERSION=${SMP_CRATE_VERSION}" >> $GITHUB_OUTPUT
           echo "LADING_VERSION=${LADING_VERSION}" >> $GITHUB_OUTPUT
-
-      - name: Setup system details
-        id: system
-        run: |
-          export CPUS="7"
-          export MEMORY="30g"
-          export VECTOR_CPUS="4"
-
-          echo "cpus total: ${CPUS}"
-          echo "memory total: ${MEMORY}"
-          echo "vector cpus: ${VECTOR_CPUS}"
-
-          echo "CPUS=${CPUS}" >> $GITHUB_OUTPUT
-          echo "MEMORY=${MEMORY}" >> $GITHUB_OUTPUT
-          echo "VECTOR_CPUS=${VECTOR_CPUS}" >> $GITHUB_OUTPUT
 
   ##
   ## BUILD
@@ -117,6 +92,8 @@ jobs:
       - compute-metadata
     steps:
       - uses: colpal/actions-clean@v1
+
+      - uses: actions/checkout@v3
 
       - uses: actions/checkout@v3
         with:
@@ -162,10 +139,6 @@ jobs:
         run: |
           aws s3 cp s3://smp-cli-releases/v${{ needs.compute-metadata.outputs.smp-version }}/x86_64-unknown-linux-gnu/smp ${{ runner.temp }}/bin/smp
 
-  ##
-  ## SUBMIT
-  ##
-
   upload-target-image-to-ecr:
     name: Upload target images to ECR
     runs-on: ubuntu-22.04
@@ -204,6 +177,10 @@ jobs:
           docker tag vector:${{ needs.compute-metadata.outputs.target-sha }} ${{ steps.login-ecr.outputs.registry }}/${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }}-vector:${{ needs.compute-metadata.outputs.target-sha }}
           docker push ${{ steps.login-ecr.outputs.registry }}/${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }}-vector:${{ needs.compute-metadata.outputs.target-sha }}
 
+  ##
+  ## SUBMIT
+  ##
+
   submit-job:
     name: Submit workload checks job
     runs-on: ubuntu-22.04
@@ -220,8 +197,8 @@ jobs:
             -H "Accept: application/vnd.github+json" \
             /repos/${{ github.repository }}/statuses/${{ needs.compute-metadata.outputs.target-sha }} \
             -f state='pending' \
-            -f description='Experiments submitted to the Regression Detection cluster.' \
-            -f context='Regression Detection Suite / submission' \
+            -f description='Experiments submitted to the Workload Checks cluster.' \
+            -f context='Workload Checks Suite / submission' \
             -f target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
       - uses: actions/checkout@v3
@@ -245,21 +222,7 @@ jobs:
         env:
           RUST_LOG: info
         run: |
-          git fetch origin
-
-          # Setup AWS credentials for single-machine-performance AWS account
-          AWS_NAMED_PROFILE="single-machine-performance"
-          SMP_ACCOUNT_ID=$(aws ssm get-parameter --region us-east-1 --name ci.datadog-agent.single-machine-performance-account-id --with-decryption --query "Parameter.Value" --out text)
-          SMP_ECR_URL=${SMP_ACCOUNT_ID}.dkr.ecr.us-west-2.amazonaws.com
-          SMP_AGENT_TEAM_ID=$(aws ssm get-parameter --region us-east-1 --name ci.datadog-agent.single-machine-performance-agent-team-id --with-decryption --query "Parameter.Value" --out text)
-          SMP_API=$(aws ssm get-parameter --region us-east-1 --name ci.datadog-agent.single-machine-performance-api --with-decryption --query "Parameter.Value" --out text)
-          aws configure set aws_access_key_id $(aws ssm get-parameter --region us-east-1 --name ci.datadog-agent.single-machine-performance-bot-access-key-id --with-decryption --query "Parameter.Value" --out text) --profile ${AWS_NAMED_PROFILE}
-          aws configure set aws_secret_access_key $(aws ssm get-parameter --region us-east-1 --name ci.datadog-agent.single-machine-performance-bot-access-key --with-decryption --query "Parameter.Value" --out text) --profile ${AWS_NAMED_PROFILE}
-          aws configure set region us-west-2 --profile ${AWS_NAMED_PROFILE}
-
-          # Download smp binary and prepare it for use
-          aws --profile single-machine-performance s3 cp s3://smp-cli-releases/v${SMP_VERSION}/x86_64-unknown-linux-gnu/smp smp
-          chmod +x smp
+          chmod +x ${{ runner.temp }}/bin/smp
 
           TARGET_IMAGE =${{ steps.login-ecr.outputs.registry }}/${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }}-vector:${{ needs.compute-metadata.outputs.target-sha }}
           CURRENT_DATE=$(date --utc '+%Y_%m_%d')
@@ -323,8 +286,8 @@ jobs:
             -H "Accept: application/vnd.github+json" \
             /repos/${{ github.repository }}/statuses/${{ needs.compute-metadata.outputs.target-sha }} \
             -f state='failure' \
-            -f description='Experiments submitted to the Regression Detection cluster cancelled.' \
-            -f context='Regression Detection Suite / submission' \
+            -f description='Experiments submitted to the Workload Checks cluster cancelled.' \
+            -f context='Workload Checks Suite / submission' \
             -f target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
       - name: Check status, success
@@ -336,8 +299,8 @@ jobs:
             -H "Accept: application/vnd.github+json" \
             /repos/${{ github.repository }}/statuses/${{ needs.compute-metadata.outputs.target-sha }} \
             -f state='success' \
-            -f description='Experiments submitted to the Regression Detection cluster successfully.' \
-            -f context='Regression Detection Suite / submission' \
+            -f description='Experiments submitted to the Workload Checks cluster successfully.' \
+            -f context='Workload Checks Suite / submission' \
             -f target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
       - name: Check status, failure
@@ -350,6 +313,6 @@ jobs:
             -H "Accept: application/vnd.github+json" \
             /repos/${{ github.repository }}/statuses/${{ needs.compute-metadata.outputs.target-sha }} \
             -f state='success' \
-            -f description='Experiments submitted to the Regression Detection Suite failed.' \
-            -f context='Regression Detection Suite / submission' \
+            -f description='Experiments submitted to the Workload Checks Suite failed.' \
+            -f context='Workload Checks Suite / submission' \
             -f target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
