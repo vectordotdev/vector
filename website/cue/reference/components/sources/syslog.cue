@@ -59,9 +59,15 @@ components: sources: syslog: {
 					examples: ["app-name"]
 				}
 			}
-			host: fields._local_host
+			host: {
+				description: "Same as `hostname` if that field is set, or the IP address of the peer otherwise."
+				required:    true
+				type: string: {
+					examples: ["my.host.com", "127.0.0.1"]
+				}
+			}
 			hostname: {
-				description: "The hostname extracted from the Syslog line. (`host` is also this value if it exists in the log.)"
+				description: "The `hostname` field extracted from the Syslog line. If a `hostname` field is found, `host` is also set to this value."
 				required:    true
 				type: string: {
 					examples: ["my.host.com"]

@@ -50,6 +50,7 @@ pub struct TargetIter<T> {
     iter: std::vec::IntoIter<Value>,
     metadata: EventMetadata,
     _marker: PhantomData<T>,
+    log_namespace: LogNamespace,
 }
 
 fn create_log_event(value: Value, metadata: EventMetadata) -> LogEvent {
@@ -63,9 +64,12 @@ impl Iterator for TargetIter<LogEvent> {
 
     fn next(&mut self) -> Option<Self::Item> {
         self.iter.next().map(|v| {
-            match v {
-                value @ Value::Object(_) => LogEvent::from_parts(value, self.metadata.clone()),
-                value => create_log_event(value, self.metadata.clone()),
+            match self.log_namespace {
+                LogNamespace::Legacy => match v {
+                    value @ Value::Object(_) => LogEvent::from_parts(value, self.metadata.clone()),
+                    value => create_log_event(value, self.metadata.clone()),
+                },
+                LogNamespace::Vector => LogEvent::from_parts(v, self.metadata.clone()),
             }
             .into()
         })
@@ -142,6 +146,7 @@ impl VrlTarget {
                     iter: values.into_iter(),
                     metadata,
                     _marker: PhantomData,
+                    log_namespace,
                 }),
 
                 v => match log_namespace {
@@ -161,6 +166,7 @@ impl VrlTarget {
                     iter: values.into_iter(),
                     metadata,
                     _marker: PhantomData,
+                    log_namespace,
                 }),
 
                 v => TargetEvents::One(create_log_event(v, metadata).into()),
@@ -1240,7 +1246,7 @@ mod test {
             MetricValue::Counter { value: 1.23 },
         );
 
-        let validpaths_get = vec![
+        let validpaths_get = [
             ".name",
             ".namespace",
             ".timestamp",
@@ -1249,7 +1255,7 @@ mod test {
             ".type",
         ];
 
-        let validpaths_set = vec![".name", ".namespace", ".timestamp", ".kind", ".tags"];
+        let validpaths_set = [".name", ".namespace", ".timestamp", ".kind", ".tags"];
 
         let info = ProgramInfo {
             fallible: false,
@@ -1334,7 +1340,9 @@ mod test {
             )]))
         );
 
-        let VrlTarget::Metric { metric, .. } = target else {unreachable!()};
+        let VrlTarget::Metric { metric, .. } = target else {
+            unreachable!()
+        };
 
         // get single value (should be the last one)
         assert_eq!(metric.tag_value("foo"), Some("b".into()));

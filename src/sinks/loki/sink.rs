@@ -5,6 +5,7 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 use snafu::Snafu;
 use tokio_util::codec::Encoder as _;
+use vrl::path::parse_target_path;
 
 use super::{
     config::{LokiConfig, OutOfOrderAction},
@@ -239,7 +240,9 @@ impl EventEncoder {
             for template in self.labels.values() {
                 if let Some(fields) = template.get_fields() {
                     for field in fields {
-                        event.as_mut_log().remove(field.as_str());
+                        if let Ok(path) = parse_target_path(field.as_str()) {
+                            event.as_mut_log().remove(&path);
+                        }
                     }
                 }
             }
@@ -634,7 +637,7 @@ mod tests {
             remove_timestamp: false,
         };
 
-        let message = r###"
+        let message = r#"
         {
         	"kubernetes": {
         		"pod_labels": {
@@ -648,7 +651,7 @@ mod tests {
         		"cluster_version": "1.2.3"
         	}
         }
-        "###;
+        "#;
         let msg: BTreeMap<String, Value> = serde_json::from_str(message)?;
         let event = Event::Log(LogEvent::from(msg));
         let record = encoder.encode_event(event).unwrap();
@@ -684,7 +687,7 @@ mod tests {
             remove_timestamp: false,
         };
 
-        let message = r###"
+        let message = r#"
         {
         	"map1": {
         		"key1": "val1"
@@ -693,7 +696,7 @@ mod tests {
         		"l1_key1": "val2"
         	}
         }
-        "###;
+        "#;
         let msg: BTreeMap<String, Value> = serde_json::from_str(message)?;
         let event = Event::Log(LogEvent::from(msg));
         let record = encoder.encode_event(event).unwrap();
@@ -701,7 +704,7 @@ mod tests {
         assert_eq!(record.labels.len(), 1);
         let labels: HashMap<String, String> = record.labels.into_iter().collect();
         // EventEncoder.labels is type HashMap (unordered) -> both values can be valid
-        assert!(vec!["val1".to_string(), "val2".to_string()].contains(&labels["l1_key1"]));
+        assert!(["val1".to_string(), "val2".to_string()].contains(&labels["l1_key1"]));
         Ok(())
     }
 

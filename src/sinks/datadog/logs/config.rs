@@ -91,23 +91,18 @@ impl DatadogLogsConfig {
     // TODO: We should probably hoist this type of base URI generation so that all DD sinks can
     // utilize it, since it all follows the same pattern.
     fn get_uri(&self) -> http::Uri {
-        let endpoint = self
-            .dd_common
-            .endpoint
-            .clone()
-            .or_else(|| {
-                Some(format!(
-                    "https://http-intake.logs.{}/api/v2/logs",
-                    self.dd_common.site
-                ))
-            })
-            .unwrap_or_else(|| match self.region {
-                Some(Region::Eu) => "https://http-intake.logs.datadoghq.eu/api/v2/logs".to_string(),
-                None | Some(Region::Us) => {
-                    "https://http-intake.logs.datadoghq.com/api/v2/logs".to_string()
+        let base_url = self.dd_common.endpoint.clone().unwrap_or_else(|| {
+            if let Some(region) = self.region {
+                match region {
+                    Region::Eu => "https://http-intake.logs.datadoghq.eu".to_string(),
+                    Region::Us => "https://http-intake.logs.datadoghq.com".to_string(),
                 }
-            });
-        http::Uri::try_from(endpoint).expect("URI not valid")
+            } else {
+                format!("https://http-intake.logs.{}", self.dd_common.site)
+            }
+        });
+
+        http::Uri::try_from(format!("{}/api/v2/logs", base_url)).expect("URI not valid")
     }
 
     fn get_protocol(&self) -> String {

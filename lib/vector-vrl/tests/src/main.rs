@@ -118,7 +118,7 @@ fn get_tests(cmd: &Cmd) -> Vec<Test> {
             let path = entry.ok()?;
             Some(Test::from_path(&path))
         })
-        .chain(docs::tests(cmd.ignore_cue).into_iter())
+        .chain(docs::tests(cmd.ignore_cue))
         .chain(get_tests_from_functions(
             vector_vrl_functions::all()
                 .into_iter()

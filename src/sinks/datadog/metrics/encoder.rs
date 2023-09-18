@@ -2,12 +2,11 @@ use std::{
     cmp,
     io::{self, Write},
     mem,
-    sync::Arc,
+    sync::{Arc, OnceLock},
 };
 
 use bytes::{BufMut, Bytes};
 use chrono::{DateTime, Utc};
-use once_cell::sync::OnceCell;
 use prost::Message;
 use snafu::{ResultExt, Snafu};
 use vector_common::request_metadata::GroupedCountByteSize;
@@ -372,7 +371,7 @@ impl DatadogMetricsEncoder {
 }
 
 fn get_sketch_payload_sketches_field_number() -> u32 {
-    static SKETCH_PAYLOAD_SKETCHES_FIELD_NUM: OnceCell<u32> = OnceCell::new();
+    static SKETCH_PAYLOAD_SKETCHES_FIELD_NUM: OnceLock<u32> = OnceLock::new();
     *SKETCH_PAYLOAD_SKETCHES_FIELD_NUM.get_or_init(|| {
         let descriptors = protobuf_descriptors();
         let descriptor = descriptors
@@ -391,7 +390,11 @@ fn sketch_to_proto_message(
     ddsketch: &AgentDDSketch,
     default_namespace: &Option<Arc<str>>,
     log_schema: &'static LogSchema,
-) -> ddmetric_proto::sketch_payload::Sketch {
+) -> Option<ddmetric_proto::sketch_payload::Sketch> {
+    if ddsketch.is_empty() {
+        return None;
+    }
+
     let name = get_namespaced_name(metric, default_namespace);
     let ts = encode_timestamp(metric.timestamp());
     let mut tags = metric.tags().cloned().unwrap_or_default();
@@ -419,7 +422,7 @@ fn sketch_to_proto_message(
     let k = bins.into_iter().map(Into::into).collect();
     let n = counts.into_iter().map(Into::into).collect();
 
-    ddmetric_proto::sketch_payload::Sketch {
+    Some(ddmetric_proto::sketch_payload::Sketch {
         metric: name,
         tags,
         host,
@@ -434,7 +437,7 @@ fn sketch_to_proto_message(
             k,
             n,
         }],
-    }
+    })
 }
 
 fn encode_sketch_incremental<B>(
@@ -460,16 +463,21 @@ where
     // for `SketchPayload` with a single sketch looks just like as if we literally wrote out a
     // single value for the given field.
 
-    let sketch_proto = sketch_to_proto_message(metric, ddsketch, default_namespace, log_schema);
-
-    // Manually write the field tag for `sketches` and then encode the sketch payload directly as a
-    // length-delimited message.
-    prost::encoding::encode_key(
-        get_sketch_payload_sketches_field_number(),
-        prost::encoding::WireType::LengthDelimited,
-        buf,
-    );
-    sketch_proto.encode_length_delimited(buf)
+    if let Some(sketch_proto) =
+        sketch_to_proto_message(metric, ddsketch, default_namespace, log_schema)
+    {
+        // Manually write the field tag for `sketches` and then encode the sketch payload directly as a
+        // length-delimited message.
+        prost::encoding::encode_key(
+            get_sketch_payload_sketches_field_number(),
+            prost::encoding::WireType::LengthDelimited,
+            buf,
+        );
+        sketch_proto.encode_length_delimited(buf)
+    } else {
+        // If the sketch was empty, that's fine too
+        Ok(())
+    }
 }
 
 fn get_namespaced_name(metric: &Metric, default_namespace: &Option<Arc<str>>) -> String {
@@ -786,18 +794,16 @@ mod tests {
     {
         let mut sketches = Vec::new();
         for metric in metrics {
-            let MetricValue::Sketch { sketch } = metric.value() else { panic!("must be sketch") };
+            let MetricValue::Sketch { sketch } = metric.value() else {
+                panic!("must be sketch")
+            };
             match sketch {
                 MetricSketch::AgentDDSketch(ddsketch) => {
-                    // Don't encode any empty sketches.
-                    if ddsketch.is_empty() {
-                        continue;
+                    if let Some(sketch) =
+                        sketch_to_proto_message(metric, ddsketch, default_namespace, log_schema)
+                    {
+                        sketches.push(sketch);
                     }
-
-                    let sketch =
-                        sketch_to_proto_message(metric, ddsketch, default_namespace, log_schema);
-
-                    sketches.push(sketch);
                 }
             }
         }
@@ -910,6 +916,34 @@ mod tests {
         let mut encoder = DatadogMetricsEncoder::new(DatadogMetricsEndpoint::Sketches, None)
             .expect("default payload size limits should be valid");
         let sketch = get_simple_sketch();
+        let expected = sketch.clone();
+
+        // Encode the sketch.
+        let result = encoder.try_encode(sketch);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), None);
+
+        // Finish the payload, make sure we got what we came for.
+        let result = encoder.finish();
+        assert!(result.is_ok());
+
+        let (_payload, mut processed) = result.unwrap();
+        assert_eq!(processed.len(), 1);
+        assert_eq!(expected, processed.pop().unwrap());
+    }
+
+    #[test]
+    fn encode_empty_sketch() {
+        // This is a simple test where we ensure that a single metric, with the default limits, can
+        // be encoded without hitting any errors.
+        let mut encoder = DatadogMetricsEncoder::new(DatadogMetricsEndpoint::Sketches, None)
+            .expect("default payload size limits should be valid");
+        let sketch = Metric::new(
+            "empty",
+            MetricKind::Incremental,
+            AgentDDSketch::with_agent_defaults().into(),
+        )
+        .with_timestamp(Some(ts()));
         let expected = sketch.clone();
 
         // Encode the sketch.

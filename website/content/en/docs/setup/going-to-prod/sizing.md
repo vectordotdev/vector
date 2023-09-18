@@ -55,9 +55,11 @@ Due to Vector’s affine type system, memory is rarely constrained due to data p
 
 #### Disks
 
-Sizing disks is only relevant if you’re using Vector’s disk buffers. In this case, we recommend choosing a disk that optimizes for durability. Disk I/O is never the bottleneck, and expensive, high-performance disks are unnecessary. Therefore, we recommend generic block storage for its high durability and cost-efficiency.
+Sizing disks is only relevant if you’re using Vector’s disk buffers. In this case, we recommend choosing a disk that optimizes for durability. Disk I/O is typically not the bottleneck, and expensive, high-performance disks are unnecessary. Therefore, we recommend generic block storage for its high durability and cost-efficiency.
 
-Provision enough space to prevent upstream clients from experiencing back pressure during normal operation. For archiving sinks, sinks fronted with a disk buffer, 10 minutes worth of data is usually sufficient.
+Provision enough space and throughput to prevent upstream clients from experiencing back pressure during normal operation. For archiving sinks, sinks fronted with a disk buffer, 10 minutes worth of data is usually sufficient.
+
+Note that a disk buffer can become the bottleneck in your Vector topology if its configured throughput is less than the throughput sent to Vector. We recommend configuring disk throughput (if applicable) to at least 2x the expected maximum throughput to give the application adequate headroom. The recommended disks should all have sufficient throughput configurations by default.
 
 For example, if you’re averaging 10 MiB/s/vCPU on an 8 vCPU machine, you should provision at least 48 GiB of disk space (`10 MiB * 60 seconds * 10 minutes * 8 vCPUs`). This costs $6.00/month, or ~$0.20/day, for AWS EBS `io2`.
 

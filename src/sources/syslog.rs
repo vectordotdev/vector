@@ -15,6 +15,7 @@ use smallvec::SmallVec;
 use tokio_util::udp::UdpFramed;
 use vector_config::configurable_component;
 use vector_core::config::{LegacyKey, LogNamespace};
+use vrl::event_path;
 
 #[cfg(unix)]
 use crate::sources::util::build_unix_stream_source;
@@ -394,14 +395,14 @@ fn enrich_syslog_event(
         log_namespace.insert_source_metadata(
             SyslogConfig::NAME,
             log,
-            Some(LegacyKey::Overwrite("source_ip")),
+            Some(LegacyKey::Overwrite(path!("source_ip"))),
             path!("source_ip"),
             default_host.clone(),
         );
     }
 
     let parsed_hostname = log
-        .get("hostname")
+        .get(event_path!("hostname"))
         .map(|hostname| hostname.coerce_to_bytes());
 
     if let Some(parsed_host) = parsed_hostname.or(default_host) {
@@ -420,7 +421,7 @@ fn enrich_syslog_event(
 
     if log_namespace == LogNamespace::Legacy {
         let timestamp = log
-            .get("timestamp")
+            .get(event_path!("timestamp"))
             .and_then(|timestamp| timestamp.as_timestamp().cloned())
             .unwrap_or_else(Utc::now);
         log.maybe_insert(log_schema().timestamp_key_target_path(), timestamp);

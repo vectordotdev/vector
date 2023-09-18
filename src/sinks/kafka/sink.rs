@@ -8,6 +8,7 @@ use rdkafka::{
 use snafu::{ResultExt, Snafu};
 use tokio::time::Duration;
 use tower::limit::ConcurrencyLimit;
+use vrl::path::OwnedTargetPath;
 
 use super::config::{KafkaRole, KafkaSinkConfig};
 use crate::{
@@ -32,8 +33,8 @@ pub struct KafkaSink {
     encoder: Encoder<()>,
     service: KafkaService,
     topic: Template,
-    key_field: Option<String>,
-    headers_key: Option<String>,
+    key_field: Option<OwnedTargetPath>,
+    headers_key: Option<OwnedTargetPath>,
 }
 
 pub(crate) fn create_producer(
@@ -54,12 +55,12 @@ impl KafkaSink {
         let encoder = Encoder::<()>::new(serializer);
 
         Ok(KafkaSink {
-            headers_key: config.headers_key,
+            headers_key: config.headers_key.map(|key| key.0),
             transformer,
             encoder,
             service: KafkaService::new(producer),
             topic: config.topic,
-            key_field: config.key_field,
+            key_field: config.key_field.map(|key| key.0),
         })
     }
 

@@ -62,7 +62,7 @@ pub struct Application {
     pub require_healthy: Option<bool>,
     pub config: ApplicationConfig,
     pub signals: SignalPair,
-    pub openssl_legacy_provider: Option<Provider>,
+    pub openssl_providers: Option<Vec<Provider>>,
 }
 
 impl ApplicationConfig {
@@ -180,7 +180,7 @@ impl Application {
     }
 
     pub fn prepare_from_opts(opts: Opts) -> Result<(Runtime, Self), ExitCode> {
-        init_global();
+        init_global(!opts.root.openssl_no_probe);
 
         let color = opts.root.color.use_color();
 
@@ -191,11 +191,16 @@ impl Application {
             opts.root.internal_log_rate_limit,
         );
 
-        let openssl_legacy_provider = opts
+        // Can only log this after initializing the logging subsystem
+        if opts.root.openssl_no_probe {
+            debug!(message = "Disabled probing and configuration of root certificate locations on the system for OpenSSL.");
+        }
+
+        let openssl_providers = opts
             .root
             .openssl_legacy_provider
-            .then(load_openssl_legacy_provider)
-            .flatten();
+            .then(load_openssl_legacy_providers)
+            .transpose()?;
 
         let runtime = build_runtime(opts.root.threads, "vector-worker")?;
 
@@ -217,7 +222,7 @@ impl Application {
                 require_healthy: opts.root.require_healthy,
                 config,
                 signals,
-                openssl_legacy_provider,
+                openssl_providers,
             },
         ))
     }
@@ -234,7 +239,7 @@ impl Application {
             require_healthy,
             config,
             signals,
-            openssl_legacy_provider,
+            openssl_providers,
         } = self;
 
         let topology_controller = SharedTopologyController::new(TopologyController {
@@ -252,7 +257,7 @@ impl Application {
             graceful_crash_receiver: config.graceful_crash_receiver,
             signals,
             topology_controller,
-            openssl_legacy_provider,
+            openssl_providers,
         })
     }
 }
@@ -262,7 +267,7 @@ pub struct StartedApplication {
     pub graceful_crash_receiver: mpsc::UnboundedReceiver<ShutdownError>,
     pub signals: SignalPair,
     pub topology_controller: SharedTopologyController,
-    pub openssl_legacy_provider: Option<Provider>,
+    pub openssl_providers: Option<Vec<Provider>>,
 }
 
 impl StartedApplication {
@@ -276,7 +281,7 @@ impl StartedApplication {
             graceful_crash_receiver,
             signals,
             topology_controller,
-            openssl_legacy_provider,
+            openssl_providers,
         } = self;
 
         let mut graceful_crash = UnboundedReceiverStream::new(graceful_crash_receiver);
@@ -308,7 +313,7 @@ impl StartedApplication {
             signal,
             signal_rx,
             topology_controller,
-            openssl_legacy_provider,
+            openssl_providers,
         }
     }
 }
@@ -363,7 +368,7 @@ pub struct FinishedApplication {
     pub signal: SignalTo,
     pub signal_rx: SignalRx,
     pub topology_controller: SharedTopologyController,
-    pub openssl_legacy_provider: Option<Provider>,
+    pub openssl_providers: Option<Vec<Provider>>,
 }
 
 impl FinishedApplication {
@@ -372,7 +377,7 @@ impl FinishedApplication {
             signal,
             signal_rx,
             topology_controller,
-            openssl_legacy_provider,
+            openssl_providers,
         } = self;
 
         // At this point, we'll have the only reference to the shared topology controller and can
@@ -387,7 +392,7 @@ impl FinishedApplication {
             SignalTo::Quit => Self::quit(),
             _ => unreachable!(),
         };
-        drop(openssl_legacy_provider);
+        drop(openssl_providers);
         status
     }
 
@@ -420,8 +425,10 @@ impl FinishedApplication {
     }
 }
 
-pub fn init_global() {
-    openssl_probe::init_ssl_cert_env_vars();
+pub fn init_global(openssl_probe: bool) {
+    if openssl_probe {
+        openssl_probe::init_ssl_cert_env_vars();
+    }
 
     #[cfg(not(feature = "enterprise-tests"))]
     metrics::init_global().expect("metrics initialization failed");
@@ -460,21 +467,17 @@ pub fn build_runtime(threads: Option<usize>, thread_name: &str) -> Result<Runtim
     rt_builder.max_blocking_threads(20_000);
     rt_builder.enable_all().thread_name(thread_name);
 
-    if let Some(threads) = threads {
-        if threads < 1 {
-            #[allow(clippy::print_stderr)]
-            {
-                eprintln!("The `threads` argument must be greater or equal to 1.");
-            }
-            return Err(exitcode::CONFIG);
-        } else {
-            WORKER_THREADS
-                .set(NonZeroUsize::new(threads).expect("already checked"))
-                .expect("double thread initialization");
-            rt_builder.worker_threads(threads);
-        }
+    let threads = threads.unwrap_or_else(crate::num_threads);
+    if threads < 1 {
+        error!("The `threads` argument must be greater or equal to 1.");
+        return Err(exitcode::CONFIG);
     }
+    WORKER_THREADS
+        .set(NonZeroUsize::new(threads).expect("already checked"))
+        .expect("double thread initialization");
+    rt_builder.worker_threads(threads);
 
+    debug!(messaged = "Building runtime.", worker_threads = threads);
     Ok(rt_builder.build().expect("Unable to create async runtime"))
 }
 
@@ -564,13 +567,17 @@ pub fn init_logging(color: bool, format: LogFormat, log_level: &str, rate: u64) 
 ///
 /// The returned [Provider] must stay in scope for the entire lifetime of the application, as it
 /// will be unloaded when it is dropped.
-pub fn load_openssl_legacy_provider() -> Option<Provider> {
-    warn!(message = "DEPRECATED The openssl legacy provider provides algorithms and key sizes no longer recommended for use.");
-    Provider::try_load(None, "legacy", true)
-        .map(|provider| {
-            info!(message = "Loaded openssl legacy provider.");
-            provider
-        })
-        .map_err(|error| error!(message = "Failed to load openssl legacy provider.", %error))
-        .ok()
+pub fn load_openssl_legacy_providers() -> Result<Vec<Provider>, ExitCode> {
+    warn!(message = "DEPRECATED The openssl legacy provider provides algorithms and key sizes no longer recommended for use. Set `--openssl-legacy-provider=false` or `VECTOR_OPENSSL_LEGACY_PROVIDER=false` to disable. See https://vector.dev/highlights/2023-08-15-0-32-0-upgrade-guide/#legacy-openssl for details.");
+    ["legacy", "default"].into_iter().map(|provider_name| {
+        Provider::try_load(None, provider_name, true)
+            .map(|provider| {
+                info!(message = "Loaded openssl provider.", provider = provider_name);
+                provider
+            })
+            .map_err(|error| {
+                error!(message = "Failed to load openssl provider.", provider = provider_name, %error);
+                exitcode::UNAVAILABLE
+            })
+    }).collect()
 }

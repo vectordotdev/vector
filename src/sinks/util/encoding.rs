@@ -2,6 +2,7 @@ use std::io;
 
 use bytes::BytesMut;
 use codecs::encoding::Framer;
+use itertools::{Itertools, Position};
 use tokio_util::codec::Encoder as _;
 use vector_common::request_metadata::GroupedCountByteSize;
 use vector_core::{config::telemetry, EstimatedJsonEncodedSizeOf};
@@ -24,7 +25,7 @@ pub trait Encoder<T> {
 impl Encoder<Vec<Event>> for (Transformer, crate::codecs::Encoder<Framer>) {
     fn encode_input(
         &self,
-        mut events: Vec<Event>,
+        events: Vec<Event>,
         writer: &mut dyn io::Write,
     ) -> io::Result<(usize, GroupedCountByteSize)> {
         let mut encoder = self.1.clone();
@@ -36,18 +37,7 @@ impl Encoder<Vec<Event>> for (Transformer, crate::codecs::Encoder<Framer>) {
 
         let mut byte_size = telemetry().create_request_count_byte_size();
 
-        if let Some(last) = events.pop() {
-            for mut event in events {
-                self.0.transform(&mut event);
-                let mut bytes = BytesMut::new();
-                encoder
-                    .encode(event, &mut bytes)
-                    .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
-                write_all(writer, n_events_pending, &bytes)?;
-                bytes_written += bytes.len();
-                n_events_pending -= 1;
-            }
-            let mut event = last;
+        for (position, mut event) in events.into_iter().with_position() {
             self.0.transform(&mut event);
 
             // Ensure the json size is calculated after any fields have been removed
@@ -55,13 +45,23 @@ impl Encoder<Vec<Event>> for (Transformer, crate::codecs::Encoder<Framer>) {
             byte_size.add_event(&event, event.estimated_json_encoded_size_of());
 
             let mut bytes = BytesMut::new();
-            encoder
-                .serialize(event, &mut bytes)
-                .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
+            match position {
+                Position::Last | Position::Only => {
+                    encoder
+                        .serialize(event, &mut bytes)
+                        .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
+                }
+                _ => {
+                    encoder
+                        .encode(event, &mut bytes)
+                        .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
+                }
+            }
             write_all(writer, n_events_pending, &bytes)?;
             bytes_written += bytes.len();
             n_events_pending -= 1;
         }
+
         let batch_suffix = encoder.batch_suffix();
         assert!(n_events_pending == 0);
         write_all(writer, 0, batch_suffix)?;
@@ -150,6 +150,7 @@ mod tests {
         CharacterDelimitedEncoder, JsonSerializerConfig, NewlineDelimitedEncoder,
         TextSerializerConfig,
     };
+    use vector_common::{internal_event::CountByteSize, json_size::JsonSize};
     use vector_core::event::LogEvent;
     use vrl::value::Value;
 
@@ -166,10 +167,14 @@ mod tests {
         );
 
         let mut writer = Vec::new();
-        let (written, _json_size) = encoding.encode_input(vec![], &mut writer).unwrap();
+        let (written, json_size) = encoding.encode_input(vec![], &mut writer).unwrap();
         assert_eq!(written, 2);
 
         assert_eq!(String::from_utf8(writer).unwrap(), "[]");
+        assert_eq!(
+            CountByteSize(0, JsonSize::zero()),
+            json_size.size().unwrap()
+        );
     }
 
     #[test]
@@ -183,18 +188,21 @@ mod tests {
         );
 
         let mut writer = Vec::new();
-        let (written, _json_size) = encoding
-            .encode_input(
-                vec![Event::Log(LogEvent::from(BTreeMap::from([(
-                    String::from("key"),
-                    Value::from("value"),
-                )])))],
-                &mut writer,
-            )
-            .unwrap();
+        let input = vec![Event::Log(LogEvent::from(BTreeMap::from([(
+            String::from("key"),
+            Value::from("value"),
+        )])))];
+
+        let input_json_size = input
+            .iter()
+            .map(|event| event.estimated_json_encoded_size_of())
+            .sum::<JsonSize>();
+
+        let (written, json_size) = encoding.encode_input(input, &mut writer).unwrap();
         assert_eq!(written, 17);
 
         assert_eq!(String::from_utf8(writer).unwrap(), r#"[{"key":"value"}]"#);
+        assert_eq!(CountByteSize(1, input_json_size), json_size.size().unwrap());
     }
 
     #[test]
@@ -207,32 +215,36 @@ mod tests {
             ),
         );
 
+        let input = vec![
+            Event::Log(LogEvent::from(BTreeMap::from([(
+                String::from("key"),
+                Value::from("value1"),
+            )]))),
+            Event::Log(LogEvent::from(BTreeMap::from([(
+                String::from("key"),
+                Value::from("value2"),
+            )]))),
+            Event::Log(LogEvent::from(BTreeMap::from([(
+                String::from("key"),
+                Value::from("value3"),
+            )]))),
+        ];
+
+        let input_json_size = input
+            .iter()
+            .map(|event| event.estimated_json_encoded_size_of())
+            .sum::<JsonSize>();
+
         let mut writer = Vec::new();
-        let (written, _json_size) = encoding
-            .encode_input(
-                vec![
-                    Event::Log(LogEvent::from(BTreeMap::from([(
-                        String::from("key"),
-                        Value::from("value1"),
-                    )]))),
-                    Event::Log(LogEvent::from(BTreeMap::from([(
-                        String::from("key"),
-                        Value::from("value2"),
-                    )]))),
-                    Event::Log(LogEvent::from(BTreeMap::from([(
-                        String::from("key"),
-                        Value::from("value3"),
-                    )]))),
-                ],
-                &mut writer,
-            )
-            .unwrap();
+        let (written, json_size) = encoding.encode_input(input, &mut writer).unwrap();
         assert_eq!(written, 52);
 
         assert_eq!(
             String::from_utf8(writer).unwrap(),
             r#"[{"key":"value1"},{"key":"value2"},{"key":"value3"}]"#
         );
+
+        assert_eq!(CountByteSize(3, input_json_size), json_size.size().unwrap());
     }
 
     #[test]
@@ -246,10 +258,14 @@ mod tests {
         );
 
         let mut writer = Vec::new();
-        let (written, _json_size) = encoding.encode_input(vec![], &mut writer).unwrap();
+        let (written, json_size) = encoding.encode_input(vec![], &mut writer).unwrap();
         assert_eq!(written, 0);
 
         assert_eq!(String::from_utf8(writer).unwrap(), "");
+        assert_eq!(
+            CountByteSize(0, JsonSize::zero()),
+            json_size.size().unwrap()
+        );
     }
 
     #[test]
@@ -263,18 +279,20 @@ mod tests {
         );
 
         let mut writer = Vec::new();
-        let (written, _json_size) = encoding
-            .encode_input(
-                vec![Event::Log(LogEvent::from(BTreeMap::from([(
-                    String::from("key"),
-                    Value::from("value"),
-                )])))],
-                &mut writer,
-            )
-            .unwrap();
+        let input = vec![Event::Log(LogEvent::from(BTreeMap::from([(
+            String::from("key"),
+            Value::from("value"),
+        )])))];
+        let input_json_size = input
+            .iter()
+            .map(|event| event.estimated_json_encoded_size_of())
+            .sum::<JsonSize>();
+
+        let (written, json_size) = encoding.encode_input(input, &mut writer).unwrap();
         assert_eq!(written, 15);
 
         assert_eq!(String::from_utf8(writer).unwrap(), r#"{"key":"value"}"#);
+        assert_eq!(CountByteSize(1, input_json_size), json_size.size().unwrap());
     }
 
     #[test]
@@ -288,31 +306,33 @@ mod tests {
         );
 
         let mut writer = Vec::new();
-        let (written, _json_size) = encoding
-            .encode_input(
-                vec![
-                    Event::Log(LogEvent::from(BTreeMap::from([(
-                        String::from("key"),
-                        Value::from("value1"),
-                    )]))),
-                    Event::Log(LogEvent::from(BTreeMap::from([(
-                        String::from("key"),
-                        Value::from("value2"),
-                    )]))),
-                    Event::Log(LogEvent::from(BTreeMap::from([(
-                        String::from("key"),
-                        Value::from("value3"),
-                    )]))),
-                ],
-                &mut writer,
-            )
-            .unwrap();
+        let input = vec![
+            Event::Log(LogEvent::from(BTreeMap::from([(
+                String::from("key"),
+                Value::from("value1"),
+            )]))),
+            Event::Log(LogEvent::from(BTreeMap::from([(
+                String::from("key"),
+                Value::from("value2"),
+            )]))),
+            Event::Log(LogEvent::from(BTreeMap::from([(
+                String::from("key"),
+                Value::from("value3"),
+            )]))),
+        ];
+        let input_json_size = input
+            .iter()
+            .map(|event| event.estimated_json_encoded_size_of())
+            .sum::<JsonSize>();
+
+        let (written, json_size) = encoding.encode_input(input, &mut writer).unwrap();
         assert_eq!(written, 50);
 
         assert_eq!(
             String::from_utf8(writer).unwrap(),
             "{\"key\":\"value1\"}\n{\"key\":\"value2\"}\n{\"key\":\"value3\"}"
         );
+        assert_eq!(CountByteSize(3, input_json_size), json_size.size().unwrap());
     }
 
     #[test]
@@ -323,18 +343,17 @@ mod tests {
         );
 
         let mut writer = Vec::new();
-        let (written, _json_size) = encoding
-            .encode_input(
-                Event::Log(LogEvent::from(BTreeMap::from([(
-                    String::from("key"),
-                    Value::from("value"),
-                )]))),
-                &mut writer,
-            )
-            .unwrap();
+        let input = Event::Log(LogEvent::from(BTreeMap::from([(
+            String::from("key"),
+            Value::from("value"),
+        )])));
+        let input_json_size = input.estimated_json_encoded_size_of();
+
+        let (written, json_size) = encoding.encode_input(input, &mut writer).unwrap();
         assert_eq!(written, 15);
 
         assert_eq!(String::from_utf8(writer).unwrap(), r#"{"key":"value"}"#);
+        assert_eq!(CountByteSize(1, input_json_size), json_size.size().unwrap());
     }
 
     #[test]
@@ -345,17 +364,16 @@ mod tests {
         );
 
         let mut writer = Vec::new();
-        let (written, _json_size) = encoding
-            .encode_input(
-                Event::Log(LogEvent::from(BTreeMap::from([(
-                    String::from("message"),
-                    Value::from("value"),
-                )]))),
-                &mut writer,
-            )
-            .unwrap();
+        let input = Event::Log(LogEvent::from(BTreeMap::from([(
+            String::from("message"),
+            Value::from("value"),
+        )])));
+        let input_json_size = input.estimated_json_encoded_size_of();
+
+        let (written, json_size) = encoding.encode_input(input, &mut writer).unwrap();
         assert_eq!(written, 5);
 
         assert_eq!(String::from_utf8(writer).unwrap(), r#"value"#);
+        assert_eq!(CountByteSize(1, input_json_size), json_size.size().unwrap());
     }
 }

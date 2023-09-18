@@ -283,7 +283,7 @@ base: components: sinks: appsignal: configuration: {
 		}
 	}
 	tls: {
-		description: "TLS configuration."
+		description: "Configures the TLS options for incoming/outgoing connections."
 		required:    false
 		type: object: options: {
 			alpn_protocols: {
@@ -316,6 +316,16 @@ base: components: sinks: appsignal: configuration: {
 					"""
 				required: false
 				type: string: examples: ["/path/to/host_certificate.crt"]
+			}
+			enabled: {
+				description: """
+					Whether or not to require TLS for incoming or outgoing connections.
+
+					When enabled and used for incoming connections, an identity certificate is also required. See `tls.crt_file` for
+					more information.
+					"""
+				required: false
+				type: bool: {}
 			}
 			key_file: {
 				description: """

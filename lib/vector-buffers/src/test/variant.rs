@@ -72,7 +72,7 @@ impl Variant {
         let (sender, receiver) = builder
             .build(String::from("benches"), Span::none())
             .await
-            .expect("topology build should not fail");
+            .unwrap_or_else(|_| unreachable!("topology build should not fail"));
 
         (sender, receiver)
     }

@@ -2,7 +2,9 @@
 
 #![deny(missing_docs, missing_debug_implementations)]
 
+use std::fmt;
 use std::path::Path;
+use std::str::FromStr;
 
 use serde::de;
 
@@ -21,6 +23,30 @@ pub enum Format {
     Yaml,
 }
 
+impl FromStr for Format {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "toml" => Ok(Format::Toml),
+            "yaml" => Ok(Format::Yaml),
+            "json" => Ok(Format::Json),
+            _ => Err(format!("Invalid format: {}", s)),
+        }
+    }
+}
+
+impl fmt::Display for Format {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let format = match self {
+            Format::Toml => "toml",
+            Format::Json => "json",
+            Format::Yaml => "yaml",
+        };
+        write!(f, "{}", format)
+    }
+}
+
 impl Format {
     /// Obtain the format from the file path using extension as a hint.
     pub fn from_path<T: AsRef<Path>>(path: T) -> Result<Self, T> {
@@ -34,8 +60,6 @@ impl Format {
 }
 
 /// Parse the string represented in the specified format.
-/// If the format is unknown - fallback to the default format and attempt
-/// parsing using that.
 pub fn deserialize<T>(content: &str, format: Format) -> Result<T, Vec<String>>
 where
     T: de::DeserializeOwned,
@@ -44,6 +68,18 @@ where
         Format::Toml => toml::from_str(content).map_err(|e| vec![e.to_string()]),
         Format::Yaml => serde_yaml::from_str(content).map_err(|e| vec![e.to_string()]),
         Format::Json => serde_json::from_str(content).map_err(|e| vec![e.to_string()]),
+    }
+}
+
+/// Serialize the specified `value` into a string.
+pub fn serialize<T>(value: &T, format: Format) -> Result<String, String>
+where
+    T: serde::ser::Serialize,
+{
+    match format {
+        Format::Toml => toml::to_string(value).map_err(|e| e.to_string()),
+        Format::Yaml => serde_yaml::to_string(value).map_err(|e| e.to_string()),
+        Format::Json => serde_json::to_string_pretty(value).map_err(|e| e.to_string()),
     }
 }
 

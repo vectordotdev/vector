@@ -228,7 +228,7 @@ impl SourceConfig for RedisSourceConfig {
     }
 }
 
-pub(self) struct InputHandler {
+struct InputHandler {
     pub client: redis::Client,
     pub bytes_received: Registered<BytesReceived>,
     pub events_received: Registered<EventsReceived>,

@@ -12,7 +12,7 @@ set -u
 
 # If PACKAGE_ROOT is unset or empty, default it.
 PACKAGE_ROOT="${PACKAGE_ROOT:-"https://packages.timber.io/vector"}"
-VECTOR_VERSION="0.31.0"
+VECTOR_VERSION="0.32.1"
 _divider="--------------------------------------------------------------------------------"
 _prompt=">>>"
 _indent="   "
@@ -216,7 +216,7 @@ install_from_archive() {
     printf " ✓\n"
 
     if [ "$modify_path" = "yes" ]; then
-      local _path="export PATH=$PATH:$prefix/bin"
+      local _path="export PATH=\"$PATH:$prefix/bin\""
       add_to_path "${HOME}/.zprofile" "${_path}"
       add_to_path "${HOME}/.profile" "${_path}"
     fi

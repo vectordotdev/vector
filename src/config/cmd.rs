@@ -202,8 +202,10 @@ mod tests {
     use serde_json::json;
     use vector_config::component::{SinkDescription, SourceDescription, TransformDescription};
 
+    use crate::config::Format;
     use crate::{
         config::{cmd::serialize_to_json, vars, ConfigBuilder},
+        generate,
         generate::{generate_example, TransformInputsStrategy},
     };
 
@@ -325,13 +327,13 @@ mod tests {
                 .collect::<Vec<_>>()
                 .join(","),
         );
-        generate_example(
-            false,
-            generate_config_str.as_ref(),
-            &None,
-            TransformInputsStrategy::All,
-        )
-        .expect("invalid config generated")
+        let opts = generate::Opts {
+            fragment: true,
+            expression: generate_config_str.to_string(),
+            file: None,
+            format: Format::Toml,
+        };
+        generate_example(&opts, TransformInputsStrategy::All).expect("invalid config generated")
     }
 
     proptest! {

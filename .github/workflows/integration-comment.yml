@@ -49,7 +49,7 @@ jobs:
     steps:
       - name: Generate authentication token
         id: generate_token
-        uses: tibdex/github-app-token@b62528385c34dbc9f38e5f4225ac829252d1ea92
+        uses: tibdex/github-app-token@0914d50df753bbc42180d982a6550f195390069f
         with:
           app_id: ${{ secrets.GH_APP_DATADOG_VECTOR_CI_APP_ID }}
           private_key: ${{ secrets.GH_APP_DATADOG_VECTOR_CI_APP_PRIVATE_KEY }}
@@ -70,7 +70,7 @@ jobs:
         id: comment-branch
 
       - name: (PR comment) Set latest commit status as pending
-        uses: myrotvorets/set-commit-status-action@v1.1.7
+        uses: myrotvorets/set-commit-status-action@v2.0.0
         with:
           sha: ${{ steps.comment-branch.outputs.head_sha }}
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -381,7 +381,7 @@ jobs:
     steps:
       - name: Generate authentication token
         id: generate_token
-        uses: tibdex/github-app-token@b62528385c34dbc9f38e5f4225ac829252d1ea92
+        uses: tibdex/github-app-token@0914d50df753bbc42180d982a6550f195390069f
         with:
           app_id: ${{ secrets.GH_APP_DATADOG_VECTOR_CI_APP_ID }}
           private_key: ${{ secrets.GH_APP_DATADOG_VECTOR_CI_APP_PRIVATE_KEY }}
@@ -398,7 +398,7 @@ jobs:
         id: comment-branch
 
       - name: (PR comment) Submit PR result as ${{ needs.integration-tests.result }}
-        uses: myrotvorets/set-commit-status-action@v1.1.7
+        uses: myrotvorets/set-commit-status-action@v2.0.0
         with:
           sha: ${{ steps.comment-branch.outputs.head_sha }}
           token: ${{ secrets.GITHUB_TOKEN }}

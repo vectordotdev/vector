@@ -114,7 +114,7 @@ impl Geoip {
         let dbkind = DatabaseKind::from(dbreader.metadata.database_type.as_str());
 
         // Check if we can read database with dummy Ip.
-        let ip = IpAddr::V4(std::net::Ipv4Addr::new(0, 0, 0, 0));
+        let ip = IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED);
         let result = match dbkind {
             DatabaseKind::Asn | DatabaseKind::Isp => dbreader.lookup::<Isp>(ip).map(|_| ()),
             DatabaseKind::ConnectionType => dbreader.lookup::<ConnectionType>(ip).map(|_| ()),

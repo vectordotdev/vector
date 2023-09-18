@@ -6,7 +6,7 @@ use std::error::Error;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 use std::task::{Context, Poll};
 use std::time::SystemTime;
 
@@ -27,7 +27,6 @@ use aws_types::SdkConfig;
 use bytes::Bytes;
 use http::HeaderMap;
 use http_body::Body;
-use once_cell::sync::OnceCell;
 use pin_project::pin_project;
 use regex::RegexSet;
 pub use region::RegionOrEndpoint;
@@ -38,7 +37,7 @@ use crate::http::{build_proxy_connector, build_tls_connector};
 use crate::internal_events::AwsBytesSent;
 use crate::tls::{MaybeTlsSettings, TlsConfig};
 
-static RETRIABLE_CODES: OnceCell<RegexSet> = OnceCell::new();
+static RETRIABLE_CODES: OnceLock<RegexSet> = OnceLock::new();
 
 pub fn is_retriable_error<T>(error: &SdkError<T>) -> bool {
     match error {
@@ -149,11 +148,27 @@ pub async fn create_client<T: ClientBuilder>(
     tls_options: &Option<TlsConfig>,
     is_sink: bool,
 ) -> crate::Result<T::Client> {
+    create_client_and_region::<T>(auth, region, endpoint, proxy, tls_options, is_sink)
+        .await
+        .map(|(client, _)| client)
+}
+
+pub async fn create_client_and_region<T: ClientBuilder>(
+    auth: &AwsAuthentication,
+    region: Option<Region>,
+    endpoint: Option<String>,
+    proxy: &ProxyConfig,
+    tls_options: &Option<TlsConfig>,
+    is_sink: bool,
+) -> crate::Result<(T::Client, Region)> {
     let retry_config = RetryConfig::disabled();
 
     // The default credentials chains will look for a region if not given but we'd like to
     // error up front if later SDK calls will fail due to lack of region configuration
     let region = resolve_region(region).await?;
+
+    let provider_config =
+        aws_config::provider_config::ProviderConfig::empty().with_region(Some(region.clone()));
 
     // Build the configuration first.
     let mut config_builder = SdkConfig::builder()
@@ -166,12 +181,19 @@ pub async fn create_client<T: ClientBuilder>(
         config_builder = config_builder.endpoint_url(endpoint_override);
     }
 
+    if let Some(use_fips) =
+        aws_config::default_provider::use_fips::use_fips_provider(&provider_config).await
+    {
+        config_builder = config_builder.use_fips(use_fips);
+    }
+
     let config = config_builder.build();
 
     let client =
-        create_smithy_client::<T>(region, proxy, tls_options, is_sink, retry_config).await?;
+        create_smithy_client::<T>(region.clone(), proxy, tls_options, is_sink, retry_config)
+            .await?;
 
-    Ok(T::build(client, &config))
+    Ok((T::build(client, &config), region))
 }
 
 pub async fn sign_request(
