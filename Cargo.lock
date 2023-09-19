@@ -4964,8 +4964,8 @@ dependencies = [
  "bytes 1.5.0",
  "chrono",
  "prost 0.12.1",
- "prost-build 0.12.1",
- "prost-types 0.12.1",
+ "prost-build 0.12.0",
+ "prost-types 0.12.0",
  "snap",
 ]
 
@@ -5875,7 +5875,7 @@ dependencies = [
  "hex",
  "ordered-float 3.9.1",
  "prost 0.12.1",
- "prost-build 0.12.1",
+ "prost-build 0.12.0",
  "tonic 0.10.0",
  "tonic-build 0.10.0",
  "vector-core",
@@ -6511,8 +6511,8 @@ dependencies = [
  "nom",
  "num_enum 0.7.0",
  "prost 0.12.1",
- "prost-build 0.12.1",
- "prost-types 0.12.1",
+ "prost-build 0.12.0",
+ "prost-types 0.12.0",
  "snafu",
  "vector-common",
 ]
@@ -6581,9 +6581,9 @@ dependencies = [
 
 [[package]]
 name = "prost-build"
-version = "0.12.1"
+version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8bdf592881d821b83d471f8af290226c8d51402259e9bb5be7f9f8bdebbb11ac"
+checksum = "30d3e647e9eb04ddfef78dfee2d5b3fefdf94821c84b710a3d8ebc89ede8b164"
 dependencies = [
  "bytes 1.5.0",
  "heck 0.4.1",
@@ -6594,7 +6594,7 @@ dependencies = [
  "petgraph",
  "prettyplease 0.2.12",
  "prost 0.12.1",
- "prost-types 0.12.1",
+ "prost-types 0.12.0",
  "regex",
  "syn 2.0.33",
  "tempfile",
@@ -6636,7 +6636,7 @@ dependencies = [
  "base64 0.21.4",
  "once_cell",
  "prost 0.12.1",
- "prost-types 0.12.1",
+ "prost-types 0.12.0",
  "serde",
  "serde-value",
 ]
@@ -6652,11 +6652,57 @@ dependencies = [
 
 [[package]]
 name = "prost-types"
-version = "0.12.1"
+version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e081b29f63d83a4bc75cfc9f3fe424f9156cf92d8a4f0c9407cce9a1b67327cf"
+checksum = "cebe0a918c97f86c217b0f76fd754e966f8b9f41595095cf7d74cb4e59d730f6"
 dependencies = [
  "prost 0.12.1",
+]
+
+[[package]]
+name = "prost-wkt"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "562788060bcf2bfabe055194bd991ed2442457661744c88e0a0828ff9a08c08b"
+dependencies = [
+ "chrono",
+ "inventory",
+ "prost 0.11.9",
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "typetag",
+]
+
+[[package]]
+name = "prost-wkt-build"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c4dca8bcead3b728a6a7da017cc95e7f4cb2320ec4f6896bc593a1c4700f7328"
+dependencies = [
+ "heck 0.4.1",
+ "prost 0.11.9",
+ "prost-build 0.11.9",
+ "prost-types 0.11.9",
+ "quote 1.0.33",
+]
+
+[[package]]
+name = "prost-wkt-types"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2377c5680f2342871823045052e791b4487f7c90aae17e0feaee24cf59578a34"
+dependencies = [
+ "chrono",
+ "prost 0.11.9",
+ "prost-build 0.11.9",
+ "prost-types 0.11.9",
+ "prost-wkt",
+ "prost-wkt-build",
+ "regex",
+ "serde",
+ "serde_derive",
+ "serde_json",
 ]
 
 [[package]]
@@ -8929,7 +8975,7 @@ checksum = "8b477abbe1d18c0b08f56cd01d1bc288668c5b5cfd19b2ae1886bbf599c546f1"
 dependencies = [
  "prettyplease 0.2.12",
  "proc-macro2 1.0.67",
- "prost-build 0.12.1",
+ "prost-build 0.12.0",
  "quote 1.0.33",
  "syn 2.0.33",
 ]
@@ -9682,9 +9728,9 @@ dependencies = [
  "prometheus-parser",
  "proptest",
  "prost 0.12.1",
- "prost-build 0.12.1",
+ "prost-build 0.12.0",
  "prost-reflect",
- "prost-types 0.12.1",
+ "prost-types 0.12.0",
  "pulsar",
  "quickcheck",
  "rand 0.8.5",
@@ -9951,9 +9997,12 @@ dependencies = [
  "parking_lot",
  "pin-project",
  "proptest",
- "prost 0.12.1",
- "prost-build 0.12.1",
- "prost-types 0.12.1",
+ "prost 0.11.9",
+ "prost-build 0.11.9",
+ "prost-types 0.12.0",
+ "prost-wkt",
+ "prost-wkt-build",
+ "prost-wkt-types",
  "quanta",
  "quickcheck",
  "quickcheck_macros",

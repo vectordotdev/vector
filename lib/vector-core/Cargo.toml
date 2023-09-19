@@ -36,8 +36,10 @@ openssl = { version = "0.10.57", default-features = false, features = ["vendored
 parking_lot = { version = "0.12.1", default-features = false }
 pin-project.workspace = true
 proptest = { version = "1.2", optional = true }
+prost = { version = "0.11", default-features = false, features = ["std", "prost-derive"] }
 prost-types = { version = "0.12", default-features = false }
-prost = { version = "0.12", default-features = false, features = ["std"] }
+prost-wkt = "0.4"
+prost-wkt-types = "0.4"
 quanta = { version = "0.11.1", default-features = false }
 regex = { version = "1.9.5", default-features = false, features = ["std", "perf"] }
 ryu = { version = "1", default-features = false }
@@ -75,7 +77,8 @@ security-framework = "2.9.2"
 schannel = "0.1.22"
 
 [build-dependencies]
-prost-build = "0.12"
+prost-build = "0.11"
+prost-wkt-build = "0.4"
 
 [dev-dependencies]
 base64 = "0.21.4"
