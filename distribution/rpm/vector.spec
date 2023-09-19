@@ -79,7 +79,7 @@ rm -rf %{buildroot}
 %defattr(-,root,root,-)
 %{_bindir}/*
 %{_unitdir}/vector.service
-%config(noreplace) %{_sysconfdir}/%{_name}/vector.toml
+%config(noreplace) %{_sysconfdir}/%{_name}/vector.yaml
 %config(noreplace) %{_sysconfdir}/default/vector
 %config %{_sysconfdir}/%{_name}/examples/*
 %dir %{_sharedstatedir}/%{_name}
