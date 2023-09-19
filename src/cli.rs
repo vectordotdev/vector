@@ -202,8 +202,8 @@ pub struct RootOpts {
     #[arg(
         long,
         env = "VECTOR_OPENSSL_LEGACY_PROVIDER",
-        default_value = "true",
-        default_missing_value = "true",
+        default_value = "false",
+        default_missing_value = "false",
         num_args = 0..=1,
         require_equals = true,
         action = ArgAction::Set
