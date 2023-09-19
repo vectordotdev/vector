@@ -387,6 +387,9 @@ nix = { git = "https://github.com/vectordotdev/nix.git", branch = "memfd/gnu/mus
 ntapi = { git = "https://github.com/MSxDOS/ntapi.git", rev = "24fc1e47677fc9f6e38e5f154e6011dc9b270da6" }
 # 300.1.3+3.1.2 + a commit that re-adds force-engine flag. Can be removed after next release of openssl-src.
 openssl-src = { git = "https://github.com/alexcrichton/openssl-src-rs", ref = "26dc3c81d8ebee5f7ec40835e29bf9f37e648ab2" }
+prost-wkt = { git = "https://github.com/dragonnn/prost-wkt", branch = "master" }
+prost-wkt-types = { git = "https://github.com/dragonnn/prost-wkt", branch = "master" }
+prost-wkt-build = { git = "https://github.com/dragonnn/prost-wkt", branch = "master" }
 
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin
