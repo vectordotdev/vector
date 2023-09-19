@@ -32,7 +32,9 @@ components: sources: opentelemetry: {
 			}
 			tls: {
 				// enabled per listener below
-				enabled: true
+				enabled:                true
+				can_verify_certificate: false
+				enabled_default:        false
 			}
 		}
 	}
