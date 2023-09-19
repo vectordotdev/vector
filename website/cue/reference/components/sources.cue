@@ -356,9 +356,11 @@ components: sources: [Name=string]: {
 		_tls: {
 			title: "Transport Layer Security (TLS)"
 			body:  """
-				  Vector uses [OpenSSL](\(urls.openssl)) for TLS protocols. You can
-				  adjust TLS behavior via the `tls.*` options.
-				  """
+				Vector uses [OpenSSL](\(urls.openssl)) for TLS protocols due to OpenSSL's maturity. You can
+				enable and adjust TLS behavior using the [`tls.*`](#tls) options and/or using the 
+				[OpenSSL configuration options](\(urls.openssl_conf)) exposed through environment variables, 
+				particularly `OPENSSL_CONF`.
+				"""
 		}
 
 		if features.collect != _|_ {

@@ -32,7 +32,7 @@ components: sources: opentelemetry: {
 			}
 			tls: {
 				// enabled per listener below
-				enabled: false
+				enabled: true
 			}
 		}
 	}
@@ -191,16 +191,6 @@ components: sources: opentelemetry: {
 					}
 				}
 			}
-		}
-	}
-
-	how_it_works: {
-		tls: {
-			title: "Transport Layer Security (TLS)"
-			body:  """
-				  Vector uses [OpenSSL](\(urls.openssl)) for TLS protocols. You can
-				  adjust TLS behavior via the `grpc.tls.*` and `http.tls.*` options.
-				  """
 		}
 	}
 }

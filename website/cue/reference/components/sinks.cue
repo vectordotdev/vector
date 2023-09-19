@@ -644,7 +644,9 @@ components: sinks: [Name=string]: {
 					title: "Transport Layer Security (TLS)"
 					body:  """
 						Vector uses [OpenSSL](\(urls.openssl)) for TLS protocols due to OpenSSL's maturity. You can
-						enable and adjust TLS behavior using the [`tls.*`](#tls) options.
+						enable and adjust TLS behavior using the [`tls.*`](#tls) options and/or using the 
+						[OpenSSL configuration options](\(urls.openssl_conf)) exposed through environment variables, 
+						particularly `OPENSSL_CONF`.
 						"""
 				}
 			}
