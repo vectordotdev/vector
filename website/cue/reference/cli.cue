@@ -634,7 +634,7 @@ cli: {
 		}
 		VECTOR_OPENSSL_LEGACY_PROVIDER: {
 			description: "Load the OpenSSL legacy provider."
-			type: bool: default: true
+			type: bool: default: false
 		}
 		VECTOR_OPENSSL_NO_PROBE: {
 			description: """
