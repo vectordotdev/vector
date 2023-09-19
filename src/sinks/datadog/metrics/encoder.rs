@@ -32,7 +32,7 @@ const SERIES_PAYLOAD_HEADER: &[u8] = b"{\"series\":[";
 const SERIES_PAYLOAD_FOOTER: &[u8] = b"]}";
 const SERIES_PAYLOAD_DELIMITER: &[u8] = b",";
 
-const DEFAULT_ORIGIN_PRODUCT_VALUE: u32 = 14;
+const DEFAULT_DD_ORIGIN_PRODUCT_VALUE: u32 = 14;
 const ORIGIN_CATEGORY_VALUE: u32 = 11;
 
 #[allow(warnings, clippy::pedantic, clippy::nursery)]
@@ -195,12 +195,12 @@ impl DatadogMetricsEncoder {
 }
 
 fn determine_origin_product_value() -> u32 {
-    option_env!("ORIGIN_PRODUCT")
+    option_env!("DD_ORIGIN_PRODUCT")
         .map(|p| {
             p.parse::<u32>()
-                .expect("Env var ORIGIN_PRODUCT must be an unsigned 32 bit integer.")
+                .expect("Env var DD_ORIGIN_PRODUCT must be an unsigned 32 bit integer.")
         })
-        .unwrap_or(DEFAULT_ORIGIN_PRODUCT_VALUE)
+        .unwrap_or(DEFAULT_DD_ORIGIN_PRODUCT_VALUE)
 }
 
 impl DatadogMetricsEncoder {
@@ -872,7 +872,7 @@ mod tests {
         common::datadog::DatadogMetricType,
         sinks::datadog::metrics::{
             config::DatadogMetricsEndpoint,
-            encoder::{determine_origin_product_value, DEFAULT_ORIGIN_PRODUCT_VALUE},
+            encoder::{determine_origin_product_value, DEFAULT_DD_ORIGIN_PRODUCT_VALUE},
         },
     };
 
@@ -1033,7 +1033,7 @@ mod tests {
             &rate_counter,
             &None,
             log_schema(),
-            DEFAULT_ORIGIN_PRODUCT_VALUE,
+            DEFAULT_DD_ORIGIN_PRODUCT_VALUE,
         );
         assert!(result.is_ok());
 
@@ -1061,8 +1061,12 @@ mod tests {
         );
         let counter = get_simple_counter_with_metadata(event_metadata);
 
-        let result =
-            generate_series_metrics(&counter, &None, log_schema(), DEFAULT_ORIGIN_PRODUCT_VALUE);
+        let result = generate_series_metrics(
+            &counter,
+            &None,
+            log_schema(),
+            DEFAULT_DD_ORIGIN_PRODUCT_VALUE,
+        );
         assert!(result.is_ok());
 
         let metrics = result.unwrap();

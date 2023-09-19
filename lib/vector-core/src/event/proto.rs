@@ -236,7 +236,7 @@ impl From<Metric> for event::Metric {
 
         let mut metadata = event::EventMetadata::default();
 
-        // deprecated
+        #[allow(deprecated)]
         if let Some(metadata_value) = metric.metadata {
             if let Some(value) = decode_value(metadata_value) {
                 *metadata.value_mut() = value;
@@ -459,6 +459,7 @@ impl From<event::Metric> for WithMetadata<Metric> {
 
         let encoded_metadata = encode_metadata(&metadata);
 
+        #[allow(deprecated)]
         let data = Metric {
             name,
             namespace,
