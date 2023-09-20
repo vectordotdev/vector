@@ -4,6 +4,7 @@
 #![deny(missing_docs)]
 #![deny(warnings)]
 
+mod common;
 pub mod decoding;
 pub mod encoding;
 pub mod gelf;

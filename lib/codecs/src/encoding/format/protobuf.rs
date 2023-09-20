@@ -1,30 +1,15 @@
+use crate::common::protobuf::get_message_descriptor;
 use crate::encoding::BuildError;
 use bytes::BytesMut;
 use prost::Message;
-use prost_reflect::{DescriptorPool, DynamicMessage, FieldDescriptor, Kind, MessageDescriptor};
-use std::path::{Path, PathBuf};
+use prost_reflect::{DynamicMessage, FieldDescriptor, Kind, MessageDescriptor};
+use std::path::PathBuf;
 use tokio_util::codec::Encoder;
 use vector_core::{
     config::DataType,
     event::{Event, Value},
     schema,
 };
-
-fn get_message_descriptor(
-    descriptor_set_path: &Path,
-    message_type: &str,
-) -> vector_common::Result<MessageDescriptor> {
-    let b = std::fs::read(descriptor_set_path).map_err(|e| {
-        format!("Failed to open protobuf desc file '{descriptor_set_path:?}': {e}",)
-    })?;
-    let pool = DescriptorPool::decode(b.as_slice()).map_err(|e| {
-        format!("Failed to parse protobuf desc file '{descriptor_set_path:?}': {e}")
-    })?;
-    pool.get_message_by_name(message_type).ok_or_else(|| {
-        format!("The message type '{message_type}' could not be found in '{descriptor_set_path:?}'")
-            .into()
-    })
-}
 
 /// Config used to build a `ProtobufSerializer`.
 #[crate::configurable_component]
