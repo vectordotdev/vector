@@ -128,6 +128,8 @@ pub use vector_core::{event, metrics, schema, tcp, tls};
 #[cfg(feature = "enterprise")]
 pub static ENTERPRISE_ENABLED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
 
+static APP_NAME_SLUG: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+
 /// The name used to identify this Vector application.
 ///
 /// This can be set at compile-time through the VECTOR_APP_NAME env variable.
@@ -152,7 +154,7 @@ pub fn get_app_name() -> &'static str {
 ///
 /// Defaults to "vector".
 pub fn get_slugified_app_name() -> String {
-   get_app_name().to_lowercase().replace(' ', "-")
+    APP_NAME_SLUG.get_or_init(|| get_app_name().to_lowercase().replace(' ', "-")).clone()
 }
 
 /// The current version of Vector in simplified format.
