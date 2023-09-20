@@ -246,7 +246,7 @@ mod tests {
 
     fn test_data_dir() -> PathBuf {
         PathBuf::from(env::var_os("CARGO_MANIFEST_DIR").unwrap())
-            .join("tests/data/decoding/protobuf")
+            .join("tests/data/protobuf")
     }
 
     fn parse_and_validate(
