@@ -37,10 +37,8 @@ pub struct ProtobufSerializerConfig {
 impl ProtobufSerializerConfig {
     /// Build the `ProtobufSerializer` from this configuration.
     pub fn build(&self) -> Result<ProtobufSerializer, BuildError> {
-        let message_descriptor = get_message_descriptor(
-            &self.protobuf.descriptor_set_path,
-            &self.protobuf.message_type,
-        )?;
+        let message_descriptor =
+            get_message_descriptor(&self.protobuf.desc_file, &self.protobuf.message_type)?;
         Ok(ProtobufSerializer { message_descriptor })
     }
 
@@ -65,7 +63,7 @@ pub struct ProtobufSerializerOptions {
     ///
     /// This file is the output of `protoc -o <path> ...`
     #[configurable(metadata(docs::examples = "/etc/vector/protobuf_descriptor_set.desc"))]
-    pub descriptor_set_path: PathBuf,
+    pub desc_file: PathBuf,
 
     /// The name of the message type to use for serializing.
     #[configurable(metadata(docs::examples = "package.Message"))]

@@ -145,7 +145,7 @@ fn deserializer_config_to_serializer(config: &DeserializerConfig) -> encoding::S
         DeserializerConfig::Protobuf(config) => {
             SerializerConfig::Protobuf(codecs::encoding::ProtobufSerializerConfig {
                 protobuf: codecs::encoding::ProtobufSerializerOptions {
-                    descriptor_set_path: config.protobuf.desc_file.clone(),
+                    desc_file: config.protobuf.desc_file.clone(),
                     message_type: config.protobuf.message_type.clone(),
                 },
             })
@@ -199,7 +199,7 @@ fn serializer_config_to_deserializer(
         SerializerConfig::Protobuf(config) => {
             DeserializerConfig::Protobuf(codecs::decoding::ProtobufDeserializerConfig {
                 protobuf: codecs::decoding::ProtobufDeserializerOptions {
-                    desc_file: config.protobuf.descriptor_set_path.clone(),
+                    desc_file: config.protobuf.desc_file.clone(),
                     message_type: config.protobuf.message_type.clone(),
                 },
             })

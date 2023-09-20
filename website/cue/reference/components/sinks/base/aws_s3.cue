@@ -505,7 +505,7 @@ base: components: sinks: aws_s3: configuration: {
 				relevant_when: "codec = \"protobuf\""
 				required:      true
 				type: object: options: {
-					descriptor_set_path: {
+					desc_file: {
 						description: """
 																The path to the protobuf descriptor set file.
 
