@@ -124,33 +124,35 @@ pub use source_sender::SourceSender;
 pub use vector_common::{shutdown, Error, Result};
 pub use vector_core::{event, metrics, schema, tcp, tls};
 
+/// Flag denoting whether or not enterprise features are enabled.
+#[cfg(feature = "enterprise")]
+pub static ENTERPRISE_ENABLED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+
 /// The name used to identify this Vector application.
 ///
 /// This can be set at compile-time through the VECTOR_APP_NAME env variable.
 /// Defaults to "Vector".
-pub fn get_app_name(#[cfg(feature = "enterprise")] enterprise_enabled: bool) -> &'static str {
+pub fn get_app_name() -> &'static str {
     #[cfg(not(feature = "enterprise"))]
-    let default_app_name = "Vector";
+    let app_name = DEFAULT_APP_NAME;
     #[cfg(feature = "enterprise")]
-    let default_app_name = if enterprise_enabled {
+    let app_name = if *ENTERPRISE_ENABLED
+        .get()
+        .unwrap_or(&false)
+    {
         "Vector Enterprise"
     } else {
         "Vector"
     };
 
-    option_env!("VECTOR_APP_NAME").unwrap_or(default_app_name)
+    option_env!("VECTOR_APP_NAME").unwrap_or(app_name)
 }
 
 /// Returns a slugified version of the name used to identify this Vector application.
 ///
 /// Defaults to "vector".
-pub fn get_slugified_app_name(#[cfg(feature = "enterprise")] enterprise_enabled: bool) -> String {
-    get_app_name(
-        #[cfg(feature = "enterprise")]
-        enterprise_enabled,
-    )
-    .to_lowercase()
-    .replace(' ', "-")
+pub fn get_slugified_app_name() -> String {
+   get_app_name().to_lowercase().replace(' ', "-")
 }
 
 /// The current version of Vector in simplified format.

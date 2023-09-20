@@ -95,7 +95,7 @@ pub struct LogApiService {
     client: HttpClient,
     uri: Uri,
     user_provided_headers: IndexMap<HeaderName, HeaderValue>,
-    default_headers: IndexMap<HeaderName, HeaderValue>,
+    dd_evp_headers: IndexMap<HeaderName, HeaderValue>,
 }
 
 impl LogApiService {
@@ -107,21 +107,19 @@ impl LogApiService {
     ) -> crate::Result<Self> {
         let user_provided_headers = validate_headers(&headers)?;
 
-        // Note that these headers cannot be overriden by the user.
-        let default_headers = &[
-            (CONTENT_TYPE.to_string(), "application/json".to_string()),
+        let dd_evp_headers = &[
             ("DD-EVP-ORIGIN".to_string(), dd_evp_origin),
             ("DD-EVP-ORIGIN-VERSION".to_string(), crate::get_version()),
         ]
         .into_iter()
         .collect();
-        let default_headers = validate_headers(default_headers)?;
+        let dd_evp_headers = validate_headers(dd_evp_headers)?;
 
         Ok(Self {
             client,
             uri,
             user_provided_headers,
-            default_headers,
+            dd_evp_headers,
         })
     }
 }
@@ -139,8 +137,9 @@ impl Service<LogApiRequest> for LogApiService {
     // Emission of Error internal event is handled upstream by the caller
     fn call(&mut self, mut request: LogApiRequest) -> Self::Future {
         let mut client = self.client.clone();
-        let http_request =
-            Request::post(&self.uri).header("DD-API-KEY", request.api_key.to_string());
+        let http_request = Request::post(&self.uri)
+            .header(CONTENT_TYPE, "application/json")
+            .header("DD-API-KEY", request.api_key.to_string());
 
         let http_request = if let Some(ce) = request.compression.content_encoding() {
             http_request.header(CONTENT_ENCODING, ce)
@@ -159,7 +158,8 @@ impl Service<LogApiRequest> for LogApiService {
                 // Replace rather than append to any existing header values
                 headers.insert(name, value.clone());
             }
-            for (name, value) in &self.default_headers {
+            // Set DD EVP headers last so that they cannot be overridden.
+            for (name, value) in &self.dd_evp_headers {
                 headers.insert(name, value.clone());
             }
         }

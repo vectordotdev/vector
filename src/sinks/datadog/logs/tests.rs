@@ -407,7 +407,8 @@ async fn enterprise_headers_inner(api_status: ApiStatus) {
             compression = "none"
         "#})
     .unwrap();
-    cx.enterprise_enabled = true;
+    cx.app_name = "Vector Enterprise".to_string();
+    cx.app_name_slug = "vector-enterprise".to_string();
 
     let addr = next_addr();
     // Swap out the endpoint so we can force send it to our local server

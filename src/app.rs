@@ -535,6 +535,18 @@ fn build_enterprise(
     config: &mut Config,
     config_paths: Vec<ConfigPath>,
 ) -> Result<Option<EnterpriseReporter<BoxFuture<'static, ()>>>, ExitCode> {
+    use crate::ENTERPRISE_ENABLED;
+
+    ENTERPRISE_ENABLED
+        .set(
+            config
+                .enterprise
+                .as_ref()
+                .map(|e| e.enabled)
+                .unwrap_or_default(),
+        )
+        .expect("double initialization of enterprise enabled flag");
+
     match EnterpriseMetadata::try_from(&*config) {
         Ok(metadata) => {
             let enterprise = EnterpriseReporter::new();
