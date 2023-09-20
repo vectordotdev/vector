@@ -2,7 +2,8 @@ use crate::common::protobuf::get_message_descriptor;
 use crate::encoding::BuildError;
 use bytes::BytesMut;
 use prost::Message;
-use prost_reflect::{DynamicMessage, FieldDescriptor, Kind, MessageDescriptor};
+use prost_reflect::{DynamicMessage, FieldDescriptor, Kind, MapKey, MessageDescriptor};
+use std::collections::HashMap;
 use std::path::PathBuf;
 use tokio_util::codec::Encoder;
 use vector_core::{
@@ -70,6 +71,10 @@ fn convert_value_raw(
     kind: &prost_reflect::Kind,
 ) -> Result<prost_reflect::Value, vector_common::Error> {
     let kind_str = value.kind_str().to_owned();
+    eprintln!("{:?}", kind);
+    if let prost_reflect::Kind::Message(x) = kind {
+        eprintln!("{:?}", x);
+    }
     match (value, kind) {
         (Value::Boolean(b), Kind::Bool) => Ok(prost_reflect::Value::Bool(b)),
         (Value::Bytes(b), Kind::Bytes) => Ok(prost_reflect::Value::Bytes(b)),
@@ -88,9 +93,29 @@ fn convert_value_raw(
         (Value::Integer(i), Kind::Uint64) => Ok(prost_reflect::Value::U64(i as u64)),
         (Value::Integer(i), Kind::Fixed32) => Ok(prost_reflect::Value::U32(i as u32)),
         (Value::Integer(i), Kind::Fixed64) => Ok(prost_reflect::Value::U64(i as u64)),
-        (Value::Object(o), Kind::Message(message_descriptor)) => Ok(prost_reflect::Value::Message(
-            encode_message(message_descriptor, Value::Object(o))?,
-        )),
+        (Value::Object(o), Kind::Message(message_descriptor)) => {
+            if message_descriptor.is_map_entry() {
+                let value_field = message_descriptor
+                    .get_field_by_name("value")
+                    .ok_or_else(|| "Internal error with proto map processing")?;
+                let mut map: HashMap<MapKey, prost_reflect::Value> = HashMap::new();
+                for (key, val) in o.into_iter() {
+                    match convert_value(&value_field, val) {
+                        Ok(prost_val) => {
+                            map.insert(MapKey::String(key), prost_val);
+                        }
+                        Err(e) => return Err(e),
+                    }
+                }
+                Ok(prost_reflect::Value::Map(map))
+            } else {
+                // if it's not a map, it's an actual message
+                Ok(prost_reflect::Value::Message(encode_message(
+                    message_descriptor,
+                    Value::Object(o),
+                )?))
+            }
+        }
         (Value::Regex(r), Kind::String) => Ok(prost_reflect::Value::String(r.as_str().to_owned())),
         (Value::Regex(r), Kind::Bytes) => Ok(prost_reflect::Value::Bytes(r.as_bytes())),
         (Value::Timestamp(t), Kind::Int64) => Ok(prost_reflect::Value::I64(t.timestamp_micros())),
@@ -129,6 +154,11 @@ fn encode_message(
 ) -> Result<DynamicMessage, vector_common::Error> {
     let mut message = DynamicMessage::new(message_descriptor.clone());
     if let Value::Object(map) = value {
+        eprintln!(
+            "{:?} {:?}",
+            message_descriptor.is_map_entry(),
+            message_descriptor.fields().next()
+        );
         for field in message_descriptor.fields() {
             match map.get(field.name()) {
                 None | Some(Value::Null) => message.clear_field(&field),
@@ -176,7 +206,8 @@ mod tests {
     use super::*;
     use bytes::Bytes;
     use ordered_float::NotNan;
-    use std::collections::BTreeMap;
+    use prost_reflect::MapKey;
+    use std::collections::{BTreeMap, HashMap};
 
     macro_rules! mfield {
         ($m:expr, $f:expr) => {
@@ -235,6 +266,63 @@ mod tests {
         .unwrap();
         assert!(mfield!(message, "text").as_str() == Some("vector"));
         assert!(mfield!(message, "binary").as_bytes() == Some(&bytes));
+    }
+
+    #[test]
+    fn test_encode_map() {
+        let message = encode_message(
+            &test_message_descriptor("Map"),
+            Value::Object(BTreeMap::from([
+                (
+                    "names".into(),
+                    Value::Object(BTreeMap::from([
+                        ("forty-four".into(), Value::Integer(44)),
+                        ("one".into(), Value::Integer(1)),
+                    ])),
+                ),
+                (
+                    "people".into(),
+                    Value::Object(BTreeMap::from([(
+                        "mark".into(),
+                        Value::Object(BTreeMap::from([
+                            ("nickname".into(), Value::Bytes(Bytes::from("jeff"))),
+                            ("age".into(), Value::Integer(22)),
+                        ])),
+                    )])),
+                ),
+            ])),
+        )
+        .unwrap();
+        // the simpler string->primative map
+        assert_eq!(
+            Some(&HashMap::from([
+                (
+                    MapKey::String("forty-four".into()),
+                    prost_reflect::Value::I32(44),
+                ),
+                (MapKey::String("one".into()), prost_reflect::Value::I32(1),),
+            ])),
+            mfield!(message, "names").as_map()
+        );
+        // the not-simpler string->message map
+        let people = mfield!(message, "people").as_map().unwrap().to_owned();
+        assert_eq!(1, people.len());
+        assert_eq!(
+            Some("jeff"),
+            mfield!(
+                people[&MapKey::String("mark".into())].as_message().unwrap(),
+                "nickname"
+            )
+            .as_str()
+        );
+        assert_eq!(
+            Some(22),
+            mfield!(
+                people[&MapKey::String("mark".into())].as_message().unwrap(),
+                "age"
+            )
+            .as_u32()
+        );
     }
 
     #[test]

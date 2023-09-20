@@ -19,6 +19,15 @@ message Bytes {
   bytes binary = 2;
 }
 
+message Map {
+  message Person {
+    string nickname = 1;
+    uint32 age = 2;
+  };
+  map<string, int32> names = 1;
+  map<string, Person> people = 2;
+}
+
 message RepeatedPrimitive {
   repeated int64 numbers = 1;
 }
