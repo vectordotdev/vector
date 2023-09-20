@@ -134,7 +134,7 @@ pub static ENTERPRISE_ENABLED: std::sync::OnceLock<bool> = std::sync::OnceLock::
 /// Defaults to "Vector".
 pub fn get_app_name() -> &'static str {
     #[cfg(not(feature = "enterprise"))]
-    let app_name = DEFAULT_APP_NAME;
+    let app_name = "Vector";
     #[cfg(feature = "enterprise")]
     let app_name = if *ENTERPRISE_ENABLED
         .get()
