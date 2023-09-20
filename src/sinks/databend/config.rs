@@ -86,7 +86,7 @@ impl GenerateConfig for DatabendConfig {
             database = "default"
         "#,
         )
-        .unwrap()
+        .expect("valid TOML")
     }
 }
 

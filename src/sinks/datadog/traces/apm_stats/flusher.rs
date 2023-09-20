@@ -91,7 +91,7 @@ impl ApmStatsSender {
     async fn flush_apm_stats(&self, force: bool) {
         // explicit scope to minimize duration that the Aggregator is locked.
         if let Some((payload, api_key)) = {
-            let mut aggregator = self.aggregator.lock().unwrap();
+            let mut aggregator = self.aggregator.lock().expect("poisoned lock");
             let client_stats_payloads = aggregator.flush(force);
 
             if client_stats_payloads.is_empty() {

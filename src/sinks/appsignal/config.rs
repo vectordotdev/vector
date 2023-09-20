@@ -150,7 +150,9 @@ impl SinkConfig for AppsignalConfig {
 
 async fn healthcheck(uri: Uri, push_api_key: String, client: HttpClient) -> crate::Result<()> {
     let request = Request::get(uri).header(AUTHORIZATION, format!("Bearer {}", push_api_key));
-    let response = client.send(request.body(Body::empty()).unwrap()).await?;
+    let response = client
+        .send(request.body(Body::empty()).expect("valid request"))
+        .await?;
 
     match response.status() {
         status if status.is_success() => Ok(()),

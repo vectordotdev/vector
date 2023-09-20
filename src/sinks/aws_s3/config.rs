@@ -164,7 +164,7 @@ impl GenerateConfig for S3SinkConfig {
             auth: AwsAuthentication::default(),
             acknowledgements: Default::default(),
         })
-        .unwrap()
+        .expect("valid TOML")
     }
 }
 

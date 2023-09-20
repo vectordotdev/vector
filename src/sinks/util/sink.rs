@@ -319,7 +319,7 @@ where
                 if service_ready {
                     trace!("Service ready; Sending batch.");
 
-                    let batch = this.partitions.remove(partition).unwrap();
+                    let batch = this.partitions.remove(partition).expect("partition ready");
                     this.lingers.remove(partition);
 
                     let batch = batch.finish();

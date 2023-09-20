@@ -1,3 +1,5 @@
+#![deny(clippy::unwrap_used)]
+
 use gloo_utils::format::JsValueSerdeExt;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -106,6 +108,7 @@ fn compile(mut input: Input) -> Result<VrlCompileResult, VrlDiagnosticResult> {
 
 // The user-facing function
 #[wasm_bindgen]
+#[allow(clippy::unwrap_used)] // TODO: handle errors
 pub fn run_vrl(incoming: &JsValue) -> JsValue {
     let input: Input = incoming.into_serde().unwrap();
 

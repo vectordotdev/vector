@@ -152,7 +152,7 @@ impl Metric {
     fn parse_timestamp(input: &str) -> IResult<Option<i64>> {
         let input = trim_space(input);
         opt(map(recognize(pair(opt(char('-')), digit1)), |s: &str| {
-            s.parse().unwrap()
+            s.parse().expect("TODO") // I think this should return a `ParseTimestampError`?
         }))(input)
     }
 

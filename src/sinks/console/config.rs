@@ -67,7 +67,7 @@ impl GenerateConfig for ConsoleSinkConfig {
             encoding: (None::<FramingConfig>, JsonSerializerConfig::default()).into(),
             acknowledgements: Default::default(),
         })
-        .unwrap()
+        .expect("valid TOML")
     }
 }
 

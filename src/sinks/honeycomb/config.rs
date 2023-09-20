@@ -86,7 +86,7 @@ impl GenerateConfig for HoneycombConfig {
             r#"api_key = "${HONEYCOMB_API_KEY}"
             dataset = "my-honeycomb-dataset""#,
         )
-        .unwrap()
+        .expect("valid TOML")
     }
 }
 
@@ -147,7 +147,7 @@ impl HoneycombConfig {
 async fn healthcheck(uri: Uri, api_key: SensitiveString, client: HttpClient) -> crate::Result<()> {
     let request = Request::post(uri).header(HTTP_HEADER_HONEYCOMB, api_key.inner());
     let body = crate::serde::json::to_bytes(&Vec::<BoxedRawValue>::new())
-        .unwrap()
+        .expect("will always serialize")
         .freeze();
     let req: Request<Bytes> = request.body(body)?;
     let req = req.map(hyper::Body::from);

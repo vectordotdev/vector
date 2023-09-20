@@ -211,7 +211,9 @@ fn healthcheck(
 
     let uri = settings.healthcheck_uri(endpoint)?;
 
-    let request = hyper::Request::get(uri).body(hyper::Body::empty()).unwrap();
+    let request = hyper::Request::get(uri)
+        .body(hyper::Body::empty())
+        .expect("valid request");
 
     Ok(async move {
         client

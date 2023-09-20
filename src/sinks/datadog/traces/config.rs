@@ -203,7 +203,7 @@ impl DatadogTracesConfig {
 
     fn get_protocol(&self) -> String {
         build_uri(&self.get_base_uri(), "")
-            .unwrap()
+            .expect("valid URL")
             .scheme_str()
             .unwrap_or("http")
             .to_string()

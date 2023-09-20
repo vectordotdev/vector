@@ -109,7 +109,7 @@ impl GenerateConfig for PubsubConfig {
             topic = "my-topic"
             encoding.codec = "json"
         "#})
-        .unwrap()
+        .expect("valid TOML")
     }
 }
 
@@ -223,10 +223,10 @@ impl HttpSink for PubsubSink {
         let body = json!({ "messages": events });
         let body = crate::serde::json::to_bytes(&body).unwrap().freeze();
 
-        let uri = self.uri(":publish").unwrap();
+        let uri = self.uri(":publish").expect("valid URI");
         let builder = Request::post(uri).header("Content-Type", "application/json");
 
-        let mut request = builder.body(body).unwrap();
+        let mut request = builder.body(body).expect("valid request");
         self.auth.apply(&mut request);
 
         Ok(request)
@@ -234,7 +234,9 @@ impl HttpSink for PubsubSink {
 }
 
 async fn healthcheck(client: HttpClient, uri: Uri, auth: GcpAuthenticator) -> crate::Result<()> {
-    let mut request = Request::get(uri).body(Body::empty()).unwrap();
+    let mut request = Request::get(uri)
+        .body(Body::empty())
+        .expect("valid request");
     auth.apply(&mut request);
 
     let response = client.send(request).await?;

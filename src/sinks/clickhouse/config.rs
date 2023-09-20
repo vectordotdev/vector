@@ -132,7 +132,9 @@ impl SinkConfig for ClickhouseConfig {
 
 async fn healthcheck(client: HttpClient, endpoint: Uri, auth: Option<Auth>) -> crate::Result<()> {
     let uri = format!("{}/?query=SELECT%201", endpoint);
-    let mut request = Request::get(uri).body(Body::empty()).unwrap();
+    let mut request = Request::get(uri)
+        .body(Body::empty())
+        .expect("valid request");
 
     if let Some(auth) = auth {
         auth.apply(&mut request);

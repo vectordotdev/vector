@@ -6,6 +6,7 @@
 #![deny(unused_comparisons)]
 #![deny(warnings)]
 #![deny(missing_docs)]
+#![deny(missing_docs)]
 #![cfg_attr(docsrs, feature(doc_cfg), deny(rustdoc::broken_intra_doc_links))]
 #![allow(clippy::approx_constant)]
 #![allow(clippy::float_cmp)]
@@ -17,6 +18,7 @@
 #![deny(clippy::trivially_copy_pass_by_ref)]
 #![deny(clippy::disallowed_methods)] // [nursery] mark some functions as verboten
 #![deny(clippy::missing_const_for_fn)] // [nursery] valuable to the optimizer, but may produce false positives
+#![deny(clippy::unwrap_used)]
 
 //! The main library to support building Vector.
 

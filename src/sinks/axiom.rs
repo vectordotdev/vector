@@ -72,7 +72,7 @@ impl GenerateConfig for AxiomConfig {
             url = "${AXIOM_URL}"
             org_id = "${AXIOM_ORG_ID}""#,
         )
-        .unwrap()
+        .expect("valid TOML")
     }
 }
 

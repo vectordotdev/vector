@@ -118,7 +118,7 @@ async fn build_healthcheck_future(
     let request = Request::get(validate_endpoint)
         .header("DD-API-KEY", api_key)
         .body(hyper::Body::empty())
-        .unwrap();
+        .expect("valid request");
 
     let response = client.send(request).await?;
 

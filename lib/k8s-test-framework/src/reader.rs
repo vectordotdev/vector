@@ -28,7 +28,7 @@ impl Reader {
     }
 
     fn new(mut child: Child) -> Self {
-        let stdout = child.stdout.take().unwrap();
+        let stdout = child.stdout.take().expect("stdout must exist");
         let reader = BufReader::new(stdout);
         Reader { child, reader }
     }

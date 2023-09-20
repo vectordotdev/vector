@@ -1,4 +1,5 @@
 #![allow(clippy::derive_partial_eq_without_eq)]
+#![deny(clippy::unwrap_used)]
 
 pub mod stats {
     include!(concat!(env!("OUT_DIR"), "/stats.rs"));

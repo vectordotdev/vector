@@ -240,7 +240,9 @@ impl HttpSink for HttpEventSink {
             }],
         };
 
-        let body = crate::serde::json::to_bytes(&series).unwrap().freeze();
+        let body = crate::serde::json::to_bytes(&series)
+            .expect("series will serialize")
+            .freeze();
 
         let uri: Uri = format!(
             "{}/v3/projects/{}/timeSeries",

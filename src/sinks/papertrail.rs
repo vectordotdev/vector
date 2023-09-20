@@ -51,7 +51,7 @@ pub struct PapertrailConfig {
 }
 
 fn default_process() -> Template {
-    Template::try_from("vector").unwrap()
+    Template::try_from("vector").expect("valid template")
 }
 
 impl GenerateConfig for PapertrailConfig {
@@ -60,7 +60,7 @@ impl GenerateConfig for PapertrailConfig {
             r#"endpoint = "logs.papertrailapp.com:12345"
             encoding.codec = "json""#,
         )
-        .unwrap()
+        .expect("valid TOML")
     }
 }
 

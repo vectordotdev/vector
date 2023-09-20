@@ -13,7 +13,7 @@ use tracing::Instrument;
 
 use crate::{http::HttpClient, sinks::prelude::*};
 
-static LOG_TYPE_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^\w+$").unwrap());
+static LOG_TYPE_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^\w+$").expect("valid regex"));
 static LOG_TYPE_HEADER: Lazy<HeaderName> = Lazy::new(|| HeaderName::from_static("log-type"));
 static X_MS_DATE_HEADER: Lazy<HeaderName> = Lazy::new(|| HeaderName::from_static(X_MS_DATE));
 static X_MS_AZURE_RESOURCE_HEADER: Lazy<HeaderName> =

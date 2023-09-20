@@ -85,7 +85,7 @@ impl fmt::Display for UriSerde {
                     Authority::from_maybe_shared(authority).map_err(|_| std::fmt::Error)?;
                 let mut parts = self.uri.clone().into_parts();
                 parts.authority = Some(authority);
-                Uri::from_parts(parts).unwrap().fmt(f)
+                Uri::from_parts(parts).expect("valid URI").fmt(f)
             }
             _ => self.uri.fmt(f),
         }

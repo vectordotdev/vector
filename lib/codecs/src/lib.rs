@@ -3,6 +3,7 @@
 
 #![deny(missing_docs)]
 #![deny(warnings)]
+#![deny(clippy::unwrap_used)]
 
 pub mod decoding;
 pub mod encoding;

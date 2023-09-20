@@ -234,35 +234,35 @@ impl TowerRequestConfig {
                 self.timeout_secs
                     .or(defaults.timeout_secs)
                     .or(default_timeout_secs())
-                    .unwrap(),
+                    .expect("always some"),
             ),
             rate_limit_duration: Duration::from_secs(
                 self.rate_limit_duration_secs
                     .or(defaults.rate_limit_duration_secs)
                     .or(default_rate_limit_duration_secs())
-                    .unwrap(),
+                    .expect("always some"),
             ),
             rate_limit_num: self
                 .rate_limit_num
                 .or(defaults.rate_limit_num)
                 .or(default_rate_limit_num())
-                .unwrap(),
+                .expect("always some"),
             retry_attempts: self
                 .retry_attempts
                 .or(defaults.retry_attempts)
                 .or(default_retry_attempts())
-                .unwrap(),
+                .expect("always some"),
             retry_max_duration_secs: Duration::from_secs(
                 self.retry_max_duration_secs
                     .or(defaults.retry_max_duration_secs)
                     .or(default_retry_max_duration_secs())
-                    .unwrap(),
+                    .expect("always some"),
             ),
             retry_initial_backoff_secs: Duration::from_secs(
                 self.retry_initial_backoff_secs
                     .or(defaults.retry_initial_backoff_secs)
                     .or(default_retry_initial_backoff_secs())
-                    .unwrap(),
+                    .expect("always some"),
             ),
             adaptive_concurrency: self.adaptive_concurrency,
         }

@@ -69,7 +69,7 @@ pub struct AmqpSinkConfig {
 impl Default for AmqpSinkConfig {
     fn default() -> Self {
         Self {
-            exchange: Template::try_from("vector").unwrap(),
+            exchange: Template::try_from("vector").expect("valid template"),
             routing_key: None,
             properties: None,
             encoding: TextSerializerConfig::default().into(),
@@ -87,7 +87,7 @@ impl GenerateConfig for AmqpSinkConfig {
             exchange = "test"
             encoding.codec = "json""#,
         )
-        .unwrap()
+        .expect("valid TOML")
     }
 }
 

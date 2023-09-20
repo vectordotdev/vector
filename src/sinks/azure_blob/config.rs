@@ -143,7 +143,7 @@ pub struct AzureBlobSinkConfig {
 }
 
 pub fn default_blob_prefix() -> Template {
-    Template::try_from(DEFAULT_KEY_PREFIX).unwrap()
+    Template::try_from(DEFAULT_KEY_PREFIX).expect("valid template")
 }
 
 impl GenerateConfig for AzureBlobSinkConfig {
@@ -162,7 +162,7 @@ impl GenerateConfig for AzureBlobSinkConfig {
             request: TowerRequestConfig::default(),
             acknowledgements: Default::default(),
         })
-        .unwrap()
+        .expect("valid TOML")
     }
 }
 

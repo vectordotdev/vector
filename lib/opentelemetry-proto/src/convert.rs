@@ -1,3 +1,5 @@
+#![deny(clippy::unwrap_used)]
+
 use bytes::Bytes;
 use chrono::{DateTime, TimeZone, Utc};
 use lookup::path;
@@ -51,7 +53,7 @@ impl From<PBValue> for Value {
             PBValue::StringValue(v) => Value::Bytes(Bytes::from(v)),
             PBValue::BoolValue(v) => Value::Boolean(v),
             PBValue::IntValue(v) => Value::Integer(v),
-            PBValue::DoubleValue(v) => Value::Float(NotNan::new(v).unwrap()),
+            PBValue::DoubleValue(v) => Value::Float(NotNan::new(v).expect("always valid float")),
             PBValue::BytesValue(v) => Value::Bytes(Bytes::from(v)),
             PBValue::ArrayValue(arr) => Value::Array(
                 arr.values

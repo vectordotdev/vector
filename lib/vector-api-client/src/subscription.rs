@@ -106,7 +106,7 @@ impl SubscriptionClient {
                     // Break the loop if shutdown is triggered. This happens implicitly once
                     // the client goes out of scope
                     _ = &mut shutdown_rx => {
-                        let subscriptions = subscriptions_clone.lock().unwrap();
+                        let subscriptions = subscriptions_clone.lock().expect("mutex poisoned");
                         for id in subscriptions.keys() {
                             _ = tx_clone.send(Payload::stop(*id));
                         }
@@ -117,14 +117,14 @@ impl SubscriptionClient {
                     message = rx.recv() => {
                         match message {
                             Some(p) => {
-                                let subscriptions = subscriptions_clone.lock().unwrap();
+                                let subscriptions = subscriptions_clone.lock().expect("mutex poisoned");
                                 let s: Option<&Sender<Payload>> = subscriptions.get::<Uuid>(&p.id);
                                 if let Some(s) = s {
                                     _ = s.send(p);
                                 }
                             }
                             None => {
-                                subscriptions_clone.lock().unwrap().clear();
+                                subscriptions_clone.lock().expect("mutex poisoned").clear();
                                 break;
                             },
                         }
@@ -156,7 +156,10 @@ impl SubscriptionClient {
 
         let (tx, rx) = broadcast::channel::<Payload>(100);
 
-        self.subscriptions.lock().unwrap().insert(id, tx);
+        self.subscriptions
+            .lock()
+            .expect("mutex poisoned")
+            .insert(id, tx);
 
         // Initialize the connection with the relevant control messages.
         _ = self.tx.send(Payload::init(id));
@@ -165,7 +168,8 @@ impl SubscriptionClient {
         Box::pin(
             BroadcastStream::new(rx)
                 .filter(Result::is_ok)
-                .map(|p| p.unwrap().response::<T>()),
+                // non-OK values are filtered
+                .map(|p| p.expect("will always be ok").response::<T>()),
         )
     }
 }
@@ -186,7 +190,9 @@ pub async fn connect_subscription_client(
     tokio::spawn(async move {
         while let Some(p) = send_rx.recv().await {
             _ = ws_tx
-                .send(Message::Text(serde_json::to_string(&p).unwrap()))
+                .send(Message::Text(
+                    serde_json::to_string(&p).expect("serialize will never fail"),
+                ))
                 .await;
         }
     });

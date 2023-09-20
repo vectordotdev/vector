@@ -222,7 +222,7 @@ impl DatadogMetricsConfig {
     fn get_protocol(&self) -> String {
         self.get_base_agent_endpoint()
             .parse::<Uri>()
-            .unwrap()
+            .expect("valid URI")
             .scheme_str()
             .unwrap_or("http")
             .to_string()

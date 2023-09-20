@@ -6,6 +6,7 @@
     non_snake_case,
     non_upper_case_globals
 )]
+#![deny(clippy::unwrap_used)]
 
 pub mod dns_message;
 pub mod dns_message_parser;

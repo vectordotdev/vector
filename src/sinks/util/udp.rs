@@ -151,7 +151,7 @@ impl UdpConnector {
                 }
                 Err(error) => {
                     emit!(UdpSocketOutgoingConnectionError { error });
-                    sleep(backoff.next().unwrap()).await;
+                    sleep(backoff.next().expect("valid backoff")).await;
                 }
             }
         }

@@ -173,7 +173,10 @@ fn coerce_field_names_and_values(
                     if let Value::Timestamp(ts) = value {
                         let ts_millis = ts.timestamp_millis();
                         if ts_millis % 1000 != 0 {
-                            *value = Value::Float(NotNan::new(ts_millis as f64 / 1000.0).unwrap());
+                            *value = Value::Float(
+                                NotNan::new(ts_millis as f64 / 1000.0)
+                                    .expect("float should always be valid"),
+                            );
                         } else {
                             // keep full range of representable time if no milliseconds are set
                             // but still convert to numeric according to GELF protocol

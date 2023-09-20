@@ -102,7 +102,7 @@ impl UnixConnector {
                 }
                 Err(error) => {
                     emit!(UnixSocketOutgoingConnectionError { error });
-                    sleep(backoff.next().unwrap()).await;
+                    sleep(backoff.next().expect("valid backoff")).await;
                 }
             }
         }

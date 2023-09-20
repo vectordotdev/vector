@@ -152,8 +152,8 @@ impl EventEncoder {
             let key = key_template.render_string(event);
             let value = value_template.render_string(event);
 
-            if key.is_err() || value.is_err() {
-                if key.is_err() {
+            match (key, value) {
+                (Err(err), _) => {
                     emit!(TemplateRenderingError {
                         field: Some(
                             format!(
@@ -163,10 +163,10 @@ impl EventEncoder {
                             .as_str()
                         ),
                         drop_event: false,
-                        error: key.err().unwrap(),
+                        error: err,
                     });
                 }
-                if value.is_err() {
+                (_, Err(err)) => {
                     emit!(TemplateRenderingError {
                         field: Some(
                             format!(
@@ -176,49 +176,53 @@ impl EventEncoder {
                             .as_str()
                         ),
                         drop_event: false,
-                        error: value.err().unwrap(),
+                        error: err,
                     });
                 }
-                continue;
-            }
+                (Ok(key), Ok(value)) => {
+                    if let Some(opening_prefix) = key.strip_suffix('*') {
+                        let output: Result<
+                            serde_json::map::Map<String, serde_json::Value>,
+                            serde_json::Error,
+                        > = serde_json::from_str(value.clone().as_str());
 
-            let key_s = key.unwrap();
-            let value_s = value.unwrap();
-
-            if let Some(opening_prefix) = key_s.strip_suffix('*') {
-                let output: Result<
-                    serde_json::map::Map<String, serde_json::Value>,
-                    serde_json::Error,
-                > = serde_json::from_str(value_s.clone().as_str());
-
-                if output.is_err() {
-                    warn!(
-                        "Failed to expand dynamic label. value: {}, err: {}",
-                        value_s,
-                        output.err().unwrap()
-                    );
-                    continue;
-                }
-
-                // key_* -> key_one, key_two, key_three
-                // * -> one, two, three
-                for (k, v) in output.unwrap() {
-                    let key = slugify_text(format!("{}{}", opening_prefix, k));
-                    let val = Value::from(v).to_string_lossy().into_owned();
-                    if val == "<null>" {
-                        warn!("Encountered \"null\" value for dynamic label. key: {}", key);
-                        continue;
-                    }
-                    if let Some(prev) = dynamic_labels.insert(key.clone(), val.clone()) {
-                        warn!(
-                            "Encountered duplicated dynamic label. \
+                        match output {
+                            Err(err) => {
+                                warn!(
+                                    "Failed to expand dynamic label. value: {}, err: {}",
+                                    value, err
+                                );
+                                continue;
+                            }
+                            Ok(map) => {
+                                for (k, v) in map {
+                                    // key_* -> key_one, key_two, key_three
+                                    // * -> one, two, three
+                                    let key = slugify_text(format!("{}{}", opening_prefix, k));
+                                    let val = Value::from(v).to_string_lossy().into_owned();
+                                    if val == "<null>" {
+                                        warn!(
+                                            "Encountered \"null\" value for dynamic label. key: {}",
+                                            key
+                                        );
+                                        continue;
+                                    }
+                                    if let Some(prev) =
+                                        dynamic_labels.insert(key.clone(), val.clone())
+                                    {
+                                        warn!(
+                                            "Encountered duplicated dynamic label. \
                                 key: {}, value: {}, discarded value: {}",
-                            key, val, prev
-                        );
-                    };
+                                            key, val, prev
+                                        );
+                                    };
+                                }
+                            }
+                        }
+                    } else {
+                        static_labels.insert(key, value);
+                    }
                 }
-            } else {
-                static_labels.insert(key_s, value_s);
             }
         }
 

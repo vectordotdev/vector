@@ -168,14 +168,16 @@ impl GenerateConfig for HttpSinkConfig {
             r#"uri = "https://10.22.212.22:9000/endpoint"
             encoding.codec = "json""#,
         )
-        .unwrap()
+        .expect("valid TOML")
     }
 }
 
 async fn healthcheck(uri: UriSerde, auth: Option<Auth>, client: HttpClient) -> crate::Result<()> {
     let auth = auth.choose_one(&uri.auth)?;
     let uri = uri.with_default_parts();
-    let mut request = Request::head(&uri.uri).body(Body::empty()).unwrap();
+    let mut request = Request::head(&uri.uri)
+        .body(Body::empty())
+        .expect("valid request");
 
     if let Some(auth) = auth {
         auth.apply(&mut request);

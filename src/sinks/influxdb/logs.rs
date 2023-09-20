@@ -179,11 +179,10 @@ impl SinkConfig for InfluxDbLogsConfig {
         let settings = influxdb_settings(
             self.influxdb1_settings.clone(),
             self.influxdb2_settings.clone(),
-        )
-        .unwrap();
+        )?;
 
         let endpoint = self.endpoint.clone();
-        let uri = settings.write_uri(endpoint).unwrap();
+        let uri = settings.write_uri(endpoint).expect("valid URI");
 
         let token = settings.token();
         let protocol_version = settings.protocol_version();

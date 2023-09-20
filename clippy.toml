@@ -1,4 +1,5 @@
 cognitive-complexity-threshold = 75
+allow-unwrap-in-tests = true
 
 # for `disallowed_method`:
 # https://rust-lang.github.io/rust-clippy/master/index.html#disallowed_method

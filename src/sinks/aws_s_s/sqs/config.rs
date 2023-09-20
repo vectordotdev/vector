@@ -42,7 +42,7 @@ impl GenerateConfig for SqsSinkConfig {
             region = "us-east-2"
             encoding.codec = "json""#,
         )
-        .unwrap()
+        .expect("valid TOML")
     }
 }
 

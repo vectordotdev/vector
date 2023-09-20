@@ -1,4 +1,5 @@
 #![deny(warnings)]
+#![deny(clippy::unwrap_used)]
 
 use vrl::compiler::Function;
 use vrl::path::OwnedTargetPath;

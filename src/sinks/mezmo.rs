@@ -353,8 +353,7 @@ impl HttpSink for MezmoConfig {
             .uri(uri)
             .method("POST")
             .header("Content-Type", "application/json")
-            .body(body)
-            .unwrap();
+            .body(body)?;
 
         let auth = Auth::Basic {
             user: self.api_key.inner().to_string(),

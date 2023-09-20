@@ -70,16 +70,16 @@ impl Buffer {
         self.num_items += 1;
         match self.buffer() {
             InnerBuffer::Plain(inner) => {
-                inner.write_all(input).unwrap();
+                inner.write_all(input).expect("in-memory buffer");
             }
             InnerBuffer::Gzip(inner) => {
-                inner.write_all(input).unwrap();
+                inner.write_all(input).expect("in-memory buffer");
             }
             InnerBuffer::Zlib(inner) => {
-                inner.write_all(input).unwrap();
+                inner.write_all(input).expect("in-memory buffer");
             }
             InnerBuffer::Zstd(inner) => {
-                inner.write_all(input).unwrap();
+                inner.write_all(input).expect("in-memory buffer");
             }
         }
     }

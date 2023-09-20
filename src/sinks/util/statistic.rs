@@ -50,8 +50,8 @@ impl DistributionStatistic {
                     a.value.partial_cmp(&b.value).unwrap_or(Ordering::Equal)
                 });
 
-                let min = bins.first().unwrap().value;
-                let max = bins.last().unwrap().value;
+                let min = bins.first().expect("non-empty bin").value;
+                let max = bins.last().expect("non-empty bin").value;
                 let sum = bins
                     .iter()
                     .map(|sample| sample.value * sample.rate as f64)
@@ -61,7 +61,7 @@ impl DistributionStatistic {
                     bins[i].rate += bins[i - 1].rate;
                 }
 
-                let count = bins.last().unwrap().rate;
+                let count = bins.last().expect("non-empty bin").rate;
                 let avg = sum / count as f64;
 
                 let median = find_quantile(&bins, 0.5);

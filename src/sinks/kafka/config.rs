@@ -249,7 +249,9 @@ impl GenerateConfig for KafkaSinkConfig {
         toml::Value::try_from(Self {
             bootstrap_servers: "10.14.22.123:9092,10.14.23.332:9092".to_owned(),
             topic: Template::try_from("topic-1234".to_owned()).unwrap(),
-            key_field: Some(ConfigTargetPath::try_from("user_id".to_owned()).unwrap()),
+            key_field: Some(
+                ConfigTargetPath::try_from("user_id".to_owned()).expect("always valid"),
+            ),
             encoding: JsonSerializerConfig::default().into(),
             batch: Default::default(),
             compression: KafkaCompression::None,

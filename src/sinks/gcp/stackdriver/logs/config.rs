@@ -261,12 +261,14 @@ async fn healthcheck(client: HttpClient, auth: GcpAuthenticator, uri: Uri) -> cr
     let entries: Vec<BoxedRawValue> = Vec::new();
     let events = serde_json::json!({ "entries": entries });
 
-    let body = crate::serde::json::to_bytes(&events).unwrap().freeze();
+    let body = crate::serde::json::to_bytes(&events)
+        .expect("events will serialize")
+        .freeze();
 
     let mut request = Request::post(uri)
         .header("Content-Type", "application/json")
         .body(body)
-        .unwrap();
+        .expect("valid request");
 
     auth.apply(&mut request);
 

@@ -169,7 +169,7 @@ impl GenerateConfig for KinesisFirehoseSinkConfig {
             r#"stream_name = "my-stream"
             encoding.codec = "json""#,
         )
-        .unwrap()
+        .expect("valid TOML")
     }
 }
 

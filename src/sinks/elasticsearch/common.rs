@@ -66,7 +66,7 @@ impl ElasticsearchCommon {
                     password: password.clone(),
                 });
                 // basic auth must be some for now
-                let auth = auth.choose_one(&uri.auth)?.unwrap();
+                let auth = auth.choose_one(&uri.auth)?.expect("always basic auth");
                 Some(Auth::Basic(auth))
             }
             #[cfg(feature = "aws-core")]
@@ -113,7 +113,7 @@ impl ElasticsearchCommon {
             }
             format!("{}/_bulk?{}", base_url, query.finish())
         };
-        let bulk_uri = bulk_url.parse::<Uri>().unwrap();
+        let bulk_uri = bulk_url.parse::<Uri>().expect("valid URI");
 
         let tls_settings = TlsSettings::from_options(&config.tls)?;
         let config = config.clone();

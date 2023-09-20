@@ -111,7 +111,7 @@ pub(crate) fn compute_apm_stats(
     aggregator: Arc<Mutex<Aggregator>>,
     trace_events: &[TraceEvent],
 ) {
-    let mut aggregator = aggregator.lock().unwrap();
+    let mut aggregator = aggregator.lock().expect("poisoned lock");
 
     // store properties that are available only at runtime
     aggregator.update_agent_properties(key);

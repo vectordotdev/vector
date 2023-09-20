@@ -79,7 +79,7 @@ impl TableRegistry {
     ///
     /// Panics if the Mutex is poisoned.
     pub fn load(&self, mut tables: TableMap) {
-        let mut loading = self.loading.lock().unwrap();
+        let mut loading = self.loading.lock().expect("mutex poisoned");
         let existing = self.tables.load();
         if let Some(existing) = &**existing {
             // We already have some tables
@@ -106,7 +106,7 @@ impl TableRegistry {
     ///
     /// Panics if the Mutex is poisoned.
     pub fn finish_load(&self) {
-        let mut tables_lock = self.loading.lock().unwrap();
+        let mut tables_lock = self.loading.lock().expect("mutex poisoned");
         let tables = tables_lock.take();
         self.tables.swap(Arc::new(tables));
     }
@@ -120,7 +120,7 @@ impl TableRegistry {
     ///
     /// Panics if the Mutex is poisoned.
     pub fn table_ids(&self) -> Vec<String> {
-        let locked = self.loading.lock().unwrap();
+        let locked = self.loading.lock().expect("mutex poisoned");
         match *locked {
             Some(ref tables) => tables.iter().map(|(key, _)| key.clone()).collect(),
             None => Vec::new(),
@@ -140,7 +140,7 @@ impl TableRegistry {
         case: Case,
         fields: &[&str],
     ) -> Result<IndexHandle, String> {
-        let mut locked = self.loading.lock().unwrap();
+        let mut locked = self.loading.lock().expect("mutex poisoned");
 
         match *locked {
             None => Err("finish_load has been called".to_string()),

@@ -49,7 +49,7 @@ impl GenerateConfig for DatadogEventsConfig {
         toml::from_str(indoc! {r#"
             default_api_key = "${DATADOG_API_KEY_ENV_VAR}"
         "#})
-        .unwrap()
+        .expect("valid TOML")
     }
 }
 

@@ -183,7 +183,13 @@ impl DnsMessageParser {
             };
         self.raw_message_for_rdata_parsing = Some(raw_message_for_rdata_parsing_data);
 
-        BinDecoder::new(self.raw_message_for_rdata_parsing.as_ref().unwrap()).clone(index as u16)
+        // expect is safe since value is set immediately above
+        BinDecoder::new(
+            self.raw_message_for_rdata_parsing
+                .as_ref()
+                .expect("will always be set"),
+        )
+        .clone(index as u16)
     }
 
     fn parse_wks_rdata(

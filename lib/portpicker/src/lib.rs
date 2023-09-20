@@ -27,6 +27,7 @@
 // For more information, please refer to <http://unlicense.org>
 
 #![deny(warnings)]
+#![deny(clippy::unwrap_used)]
 
 use std::net::{IpAddr, SocketAddr, TcpListener, ToSocketAddrs, UdpSocket};
 

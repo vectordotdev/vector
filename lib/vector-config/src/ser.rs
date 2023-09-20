@@ -103,6 +103,6 @@ where
     Delegated<I, H>: Serialize,
 {
     fn to_value(&self) -> Value {
-        serde_json::to_value(self).unwrap()
+        serde_json::to_value(self).expect("conversion to value will never fail")
     }
 }

@@ -163,7 +163,7 @@ impl GenerateConfig for ChronicleUnstructuredConfig {
             log_type = "log_type"
             encoding.codec = "text"
         "#})
-        .unwrap()
+        .expect("valid TOML")
     }
 }
 
@@ -474,18 +474,17 @@ impl Service<ChronicleRequest> for ChronicleService {
     fn call(&mut self, request: ChronicleRequest) -> Self::Future {
         let mut builder = Request::post(&self.base_url);
         let headers = builder.headers_mut().unwrap();
-        headers.insert(
-            "content-type",
-            HeaderValue::from_str("application/json").unwrap(),
-        );
+        headers.insert("content-type", HeaderValue::from_static("application/json"));
         headers.insert(
             "content-length",
-            HeaderValue::from_str(&request.body.len().to_string()).unwrap(),
+            HeaderValue::from_str(&request.body.len().to_string()).expect("valid header value"),
         );
 
         let metadata = request.get_metadata().clone();
 
-        let mut http_request = builder.body(Body::from(request.body)).unwrap();
+        let mut http_request = builder
+            .body(Body::from(request.body))
+            .expect("valid request");
         self.creds.apply(&mut http_request);
 
         let mut client = self.client.clone();

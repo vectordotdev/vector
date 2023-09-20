@@ -1,4 +1,5 @@
 #![deny(warnings)]
+#![deny(clippy::unwrap_used)]
 
 use std::{collections::BTreeMap, convert::TryFrom};
 
@@ -334,7 +335,9 @@ impl MetricGroupSet {
                 .insert(name.into(), GroupKind::new(MetricKind::Untyped));
             name
         };
-        self.0.get_full_mut(name).unwrap()
+
+        // `name`'s existence in `self.0` is checked above via `contains_key` or by inserting
+        self.0.get_full_mut(name).expect("index will always exist")
     }
 
     fn insert_metadata(&mut self, name: String, kind: MetricKind) -> Result<(), ParserError> {

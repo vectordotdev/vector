@@ -133,7 +133,7 @@ fn encoder() -> (Transformer, Encoder<()>) {
             "title",
         ]
         .iter()
-        .map(|field| ConfigValuePath::try_from((*field).to_string()).unwrap())
+        .map(|field| ConfigValuePath::try_from((*field).to_string()).expect("valid name"))
         .collect(),
     );
     // DataDog Event API requires unix timestamp.

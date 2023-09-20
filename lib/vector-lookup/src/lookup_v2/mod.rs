@@ -40,6 +40,7 @@ impl<'a> ValuePath<'a> for &'a ConfigValuePath {
 
 #[cfg(any(test, feature = "test"))]
 impl From<&str> for ConfigValuePath {
+    #[allow(clippy::unwrap_used)] // test
     fn from(path: &str) -> Self {
         ConfigValuePath::try_from(path.to_string()).unwrap()
     }
@@ -80,6 +81,7 @@ impl<'a> TargetPath<'a> for &'a ConfigTargetPath {
 
 #[cfg(any(test, feature = "test"))]
 impl From<&str> for ConfigTargetPath {
+    #[allow(clippy::unwrap_used)] // test
     fn from(path: &str) -> Self {
         ConfigTargetPath::try_from(path.to_string()).unwrap()
     }

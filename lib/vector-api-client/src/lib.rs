@@ -11,6 +11,7 @@
 
 #![deny(warnings)]
 #![deny(missing_debug_implementations, missing_copy_implementations)]
+#![deny(clippy::unwrap_used)]
 
 mod client;
 /// GraphQL queries
