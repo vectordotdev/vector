@@ -303,17 +303,15 @@ mod tests {
         assert!(mfield!(list[2].as_message().unwrap(), "index").as_u32() == Some(1));
     }
 
-    #[test]
-    fn test_encode_decoding_protobuf_test_data() {
+    fn run_encoding_on_decoding_test_data(
+        filename: &str,
+        message_type: &str,
+    ) -> Result<DynamicMessage, vector_common::Error> {
         let test_data_dir = PathBuf::from(std::env::var_os("CARGO_MANIFEST_DIR").unwrap())
             .join("tests/data/decoding/protobuf");
-
-        // test_protobuf (proto2)
-        let descriptor_set_path = test_data_dir.join("test_protobuf.desc");
-        let message_type = "test_protobuf.Person";
+        let descriptor_set_path = test_data_dir.join(filename);
         let message_descriptor =
             get_message_descriptor(&descriptor_set_path, message_type).unwrap();
-        // just check for the side-effect of success
         encode_message(
             &message_descriptor,
             Value::Object(BTreeMap::from([
@@ -321,25 +319,16 @@ mod tests {
                 ("id".into(), Value::Integer(9271)),
             ])),
         )
-        .unwrap();
+    }
+
+    #[test]
+    fn test_encode_decoding_protobuf_test_data() {
+        // test_protobuf (proto2)
+        // just check for the side-effect of success
+        run_encoding_on_decoding_test_data("test_protobuf.desc", "test_protobuf.Person").unwrap();
 
         // test_protobuf (proto3)
-        let descriptor_set_path = test_data_dir.join("test_protobuf3.desc");
-        let message_type = "test_protobuf3.Person";
-        let message_descriptor =
-            get_message_descriptor(&descriptor_set_path, message_type).unwrap();
         // just check for the side-effect of success
-        encode_message(
-            &message_descriptor,
-            Value::Object(BTreeMap::from([
-                ("name".into(), Value::Bytes(Bytes::from("rope"))),
-                ("id".into(), Value::Integer(9271)),
-                // TODO:
-                /*("data".into(), Value::Object(BTreeMap::from([
-                    ("one".into(), Value::)
-                ])))*/
-            ])),
-        )
-        .unwrap();
+        run_encoding_on_decoding_test_data("test_protobuf3.desc", "test_protobuf3.Person").unwrap();
     }
 }
