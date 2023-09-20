@@ -133,6 +133,11 @@ fn convert_value(
     }
 }
 
+/// Convert a vector object (`Value`) into a protobuf message.
+///
+/// This function can only operate on `Value::Object`s,
+/// since they are the only field-based vector Value
+/// and protobuf messages are defined as a collection of fields and values.
 fn encode_message(
     message_descriptor: &MessageDescriptor,
     value: Value,
