@@ -1489,6 +1489,7 @@ mod integration_test {
 
     use chrono::{DateTime, SubsecRound, Utc};
     use futures::Stream;
+    use futures_util::stream::FuturesUnordered;
     use rdkafka::{
         admin::{AdminClient, AdminOptions, NewTopic, TopicReplication},
         client::DefaultClientContext,
