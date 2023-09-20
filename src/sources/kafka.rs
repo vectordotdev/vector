@@ -1991,7 +1991,7 @@ mod integration_test {
             .parse()
             .expect("Number of milliseconds before shutting down first consumer.");
 
-        let (topic, group_id, _) = send_to_test_topic(2, send_count).await;
+        let (topic, group_id, _) = send_to_test_topic(6, send_count).await;
         debug!("Topic: {}", &topic);
         debug!("Consumer group.id: {}", &group_id);
 
