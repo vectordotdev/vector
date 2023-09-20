@@ -73,7 +73,7 @@ pub struct ProtobufSerializerOptions {
 /// Serializer that converts an `Event` to bytes using the Protobuf format.
 #[derive(Debug, Clone)]
 pub struct ProtobufSerializer {
-    /// The protobuf message definition to use for serializtion.
+    /// The protobuf message definition to use for serialization.
     message_descriptor: MessageDescriptor,
 }
 
@@ -312,7 +312,7 @@ mod tests {
         encode_message(
             &message_descriptor,
             Value::Object(BTreeMap::from([
-                ("name".into(), Value::Bytes(Bytes::from("gina"))),
+                ("name".into(), Value::Bytes(Bytes::from("rope"))),
                 ("id".into(), Value::Integer(9271)),
             ])),
         )
@@ -327,7 +327,7 @@ mod tests {
         encode_message(
             &message_descriptor,
             Value::Object(BTreeMap::from([
-                ("name".into(), Value::Bytes(Bytes::from("gina"))),
+                ("name".into(), Value::Bytes(Bytes::from("rope"))),
                 ("id".into(), Value::Integer(9271)),
                 // TODO:
                 /*("data".into(), Value::Object(BTreeMap::from([
