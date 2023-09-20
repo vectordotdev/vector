@@ -490,7 +490,7 @@ check-component-docs: generate-component-docs ## Checks that the machine-generat
 ##@ Rustdoc
 build-rustdoc: ## Build Vector's Rustdocs
 	# This command is mostly intended for use by the build process in vectordotdev/vector-rustdoc
-	${MAYBE_ENVIRONMENT_EXEC} cargo doc --no-deps
+	${MAYBE_ENVIRONMENT_EXEC} cargo doc --no-deps --workspace
 
 ##@ Packaging
 
