@@ -69,6 +69,17 @@ message Value {
   }
 }
 
+message DatadogOriginMetadata {
+  optional uint32 origin_product = 1;
+  optional uint32 origin_category = 2;
+  optional uint32 origin_service = 3;
+}
+
+message Metadata {
+  Value value = 1;
+  DatadogOriginMetadata datadog_origin_metadata = 2;
+}
+
 message Metric {
   string name = 1;
   google.protobuf.Timestamp timestamp = 2;
@@ -95,7 +106,8 @@ message Metric {
   }
   string namespace = 11;
   uint32 interval_ms = 18;
-  Value metadata = 19;
+  Value metadata = 19 [deprecated = true];
+  Metadata metadata_full = 21;
 }
 
 message TagValues {
