@@ -772,7 +772,7 @@ async fn coordinate_kafka_callbacks(
             Some(callback) = callbacks.recv() => match callback {
                 KafkaCallback::PartitionsAssigned(mut assigned_partitions, done) => match consumer_state {
                     ConsumerState::Complete(_) => unreachable!("Partition assignment received after completion."),
-                    ConsumerState::Draining(_) => error!("Kafka client is draining revoked partitions, invalid assignment?"),
+                    ConsumerState::Draining(_) => error!("Partition assignment received while draining revoked partitions, invalid assignment?"),
                     ConsumerState::Consuming(ref consumer_state) => {
                         let acks = consumer.context().acknowledgements;
                         for tp in assigned_partitions.drain(0..) {
@@ -1547,7 +1547,7 @@ mod integration_test {
 
         create_topic(topic_name, partitions).await;
 
-        let writes = (0..count)
+        (0..count)
             .map(|i| async move {
                 let text = format!("{} {:03}", TEXT, i);
                 let key = format!("{} {}", KEY, i);
@@ -1559,15 +1559,13 @@ mod integration_test {
                         key: HEADER_KEY,
                         value: Some(HEADER_VALUE),
                     }));
-                producer.send(record, Timeout::Never).await
+                if let Err(error) = producer.send(record, Timeout::Never).await {
+                    panic!("Cannot send event to Kafka: {:?}", error);
+                }
             })
-            .collect::<Vec<_>>();
-
-        for res in writes {
-            if let Err(error) = res.await {
-                panic!("Cannot send event to Kafka: {:?}", error);
-            }
-        }
+            .collect::<FuturesUnordered<_>>()
+            .collect::<Vec<_>>()
+            .await;
 
         now
     }
@@ -1860,7 +1858,7 @@ mod integration_test {
 
         let (tx, rx2) = delay_pipeline(2, Duration::from_millis(DELAY), EventStatus::Delivered);
         let (trigger_shutdown2, shutdown_done2) =
-            spawn_kafka(tx, config, true, true, LogNamespace::Legacy);
+            spawn_kafka(tx, config, true, false, LogNamespace::Legacy);
         let events2 = tokio::spawn(collect_n(rx2, NEVENTS));
 
         sleep(Duration::from_secs(5)).await;
@@ -1908,7 +1906,7 @@ mod integration_test {
     async fn drains_acknowledgements_at_shutdown() {
         // 1. Send N events (if running against a pre-populated kafka topic, use send_count=0 and expect_count=expected number of messages; otherwise just set send_count)
         let send_count: usize = std::env::var("KAFKA_SEND_COUNT")
-            .unwrap_or_else(|_| "100".into())
+            .unwrap_or_else(|_| "250000".into())
             .parse()
             .expect("Number of messages to send to kafka.");
         let expect_count: usize = std::env::var("KAFKA_EXPECT_COUNT")
@@ -1916,7 +1914,7 @@ mod integration_test {
             .parse()
             .expect("Number of messages to expect consumers to process.");
         let delay_ms: u64 = std::env::var("KAFKA_SHUTDOWN_DELAY")
-            .unwrap_or_else(|_| "3000".into())
+            .unwrap_or_else(|_| "2000".into())
             .parse()
             .expect("Number of milliseconds before shutting down first consumer.");
 
@@ -1980,7 +1978,7 @@ mod integration_test {
     async fn consume_with_rebalance(rebalance_strategy: String) {
         // 1. Send N events (if running against a pre-populated kafka topic, use send_count=0 and expect_count=expected number of messages; otherwise just set send_count)
         let send_count: usize = std::env::var("KAFKA_SEND_COUNT")
-            .unwrap_or_else(|_| "100".into())
+            .unwrap_or_else(|_| "250000".into())
             .parse()
             .expect("Number of messages to send to kafka.");
         let expect_count: usize = std::env::var("KAFKA_EXPECT_COUNT")
@@ -1988,7 +1986,7 @@ mod integration_test {
             .parse()
             .expect("Number of messages to expect consumers to process.");
         let delay_ms: u64 = std::env::var("KAFKA_CONSUMER_DELAY")
-            .unwrap_or_else(|_| "3000".into())
+            .unwrap_or_else(|_| "2000".into())
             .parse()
             .expect("Number of milliseconds before shutting down first consumer.");
 
@@ -2008,19 +2006,9 @@ mod integration_test {
             LogNamespace::Legacy,
             Some(kafka_options.clone()),
         );
-        let config2 = make_config(
-            &topic,
-            &group_id,
-            LogNamespace::Legacy,
-            Some(kafka_options.clone()),
-        );
-        let config3 = make_config(
-            &topic,
-            &group_id,
-            LogNamespace::Legacy,
-            Some(kafka_options.clone()),
-        );
-        let config4 = make_config(&topic, &group_id, LogNamespace::Legacy, Some(kafka_options));
+        let config2 = config1.clone();
+        let config3 = config1.clone();
+        let config4 = config1.clone();
 
         let (events1, events2, events3) = tokio::join!(
             async move {
