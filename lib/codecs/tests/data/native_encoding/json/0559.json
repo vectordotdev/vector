@@ -1,1 +1,1 @@
-{"metric":{"name":"o","namespace":"s","interval_ms":1707475446,"kind":"incremental","counter":{"value":858368.0}}}
+{"metric":{"name":"a","tags":{"k":"o"},"interval_ms":1149122960,"kind":"absolute","counter":{"value":402048.0}}}
