@@ -124,11 +124,11 @@ pub use source_sender::SourceSender;
 pub use vector_common::{shutdown, Error, Result};
 pub use vector_core::{event, metrics, schema, tcp, tls};
 
+static APP_NAME_SLUG: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+
 /// Flag denoting whether or not enterprise features are enabled.
 #[cfg(feature = "enterprise")]
 pub static ENTERPRISE_ENABLED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-
-static APP_NAME_SLUG: std::sync::OnceLock<String> = std::sync::OnceLock::new();
 
 /// The name used to identify this Vector application.
 ///
@@ -138,10 +138,7 @@ pub fn get_app_name() -> &'static str {
     #[cfg(not(feature = "enterprise"))]
     let app_name = "Vector";
     #[cfg(feature = "enterprise")]
-    let app_name = if *ENTERPRISE_ENABLED
-        .get()
-        .unwrap_or(&false)
-    {
+    let app_name = if *ENTERPRISE_ENABLED.get().unwrap_or(&false) {
         "Vector Enterprise"
     } else {
         "Vector"
@@ -154,7 +151,9 @@ pub fn get_app_name() -> &'static str {
 ///
 /// Defaults to "vector".
 pub fn get_slugified_app_name() -> String {
-    APP_NAME_SLUG.get_or_init(|| get_app_name().to_lowercase().replace(' ', "-")).clone()
+    APP_NAME_SLUG
+        .get_or_init(|| get_app_name().to_lowercase().replace(' ', "-"))
+        .clone()
 }
 
 /// The current version of Vector in simplified format.
