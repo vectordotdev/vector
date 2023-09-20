@@ -136,7 +136,7 @@ jobs:
                 --target-name vector \
                 --target-command "/usr/bin/vector" \
                 --target-environment-variables "DD_HOSTNAME=smp-workload-checks,DD_DD_URL=http://127.0.0.1:9092,DD_API_KEY=00000001" \
-                --tags smp_status=nightly,client_team="agent",tag_date="${CURRENT_DATE}" \
+                --tags smp_status=nightly,client_team="vector",tag_date="${CURRENT_DATE}" \
                 --submission-metadata ${{ runner.temp }}/submission-metadata
 
       - uses: actions/upload-artifact@v3
