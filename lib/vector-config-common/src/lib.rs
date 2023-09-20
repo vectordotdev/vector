@@ -11,6 +11,8 @@
 // something like `#[configurable(validation(not_empty)]` is a bit more self-evident, and shorter to boot
 
 #![deny(warnings)]
+#![deny(clippy::unwrap_used)]
+
 pub mod attributes;
 pub mod constants;
 pub mod human_friendly;

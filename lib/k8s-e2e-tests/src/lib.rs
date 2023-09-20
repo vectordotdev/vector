@@ -1,4 +1,5 @@
 #![deny(warnings)]
+#![deny(clippy::unwrap_used)]
 
 use std::{collections::BTreeMap, env};
 

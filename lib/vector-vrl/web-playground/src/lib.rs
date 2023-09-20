@@ -1,3 +1,5 @@
+#![deny(clippy::unwrap_used)]
+
 use gloo_utils::format::JsValueSerdeExt;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
