@@ -242,7 +242,7 @@ base: components: sinks: nats: configuration: {
 																In some variants of CSV, quotes are escaped using a special escape character
 																like \\ (instead of escaping quotes by doubling them).
 
-																To use this `double_quotes` needs to be disabled as well otherwise it is ignored
+																To use this, `double_quotes` needs to be disabled as well otherwise it is ignored.
 																"""
 						required: false
 						type: uint: default: 34
@@ -271,18 +271,18 @@ base: components: sinks: nats: configuration: {
 						type: string: {
 							default: "necessary"
 							enum: {
-								always: "This puts quotes around every field. Always."
+								always: "Always puts quotes around every field."
 								necessary: """
-																			This puts quotes around fields only when necessary.
-																			They are necessary when fields contain a quote, delimiter or record terminator.
+																			Puts quotes around fields only when necessary.
+																			They are necessary when fields contain a quote, delimiter, or record terminator.
 																			Quotes are also necessary when writing an empty record
 																			(which is indistinguishable from a record with one empty field).
 																			"""
-								never: "This never writes quotes, even if it would produce invalid CSV data."
+								never: "Never writes quotes, even if it produces invalid CSV data."
 								non_numeric: """
-																			This puts quotes around all fields that are non-numeric.
+																			Puts quotes around all fields that are non-numeric.
 																			Namely, when writing a field that does not parse as a valid float or integer,
-																			then quotes will be used even if they aren’t strictly necessary.
+																			then quotes are used even if they aren't strictly necessary.
 																			"""
 							}
 						}

@@ -8,7 +8,7 @@ Vector provides a subcommand, [`validate`][validate], that checks the validity o
 Here's an example:
 
 ```bash
-vector validate /etc/vector/vector.toml
+vector validate /etc/vector/vector.yaml
 ```
 
 You can also check multiple files:
@@ -52,7 +52,7 @@ configured topology:
 These environment checks can be disabled using the [`--no-environment`][no_environment] flag:
 
 ```bash
-vector validate --no-environment /etc/vector/vector.toml
+vector validate --no-environment /etc/vector/vector.yaml
 ```
 
 [components]: /components

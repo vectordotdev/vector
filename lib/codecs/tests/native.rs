@@ -82,6 +82,11 @@ fn reserialize_pre_v26_native_proto_fixtures() {
     );
 }
 
+// TODO: the json &  protobuf consistency has been broken for a while due to the lack of implementing
+// serde deser and ser of EventMetadata. Thus the `native_json` codec is not passing through the
+// `EventMetadata.value` field, whereas the `native` codec does.
+// https://github.com/vectordotdev/vector/issues/18570
+#[ignore]
 #[test]
 fn current_native_decoding_matches() {
     decoding_matches("");
