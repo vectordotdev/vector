@@ -200,7 +200,8 @@ components: sources: opentelemetry: {
 			body:  """
 				Vector uses [OpenSSL](\(urls.openssl)) for TLS protocols due to OpenSSL's maturity. You can
 				enable and adjust TLS behavior via the `grpc.tls.*` and `http.tls.*` options and/or via an
-				[OpenSSL configuration file](\(urls.openssl_conf)) specified with the `OPENSSL_CONF` environment variable.
+				[OpenSSL configuration file](\(urls.openssl_conf)). The file location defaults to
+				`/usr/local/ssl/openssl.cnf` or can be specified with the `OPENSSL_CONF` environment variable.
 				"""
 		}
 	}
