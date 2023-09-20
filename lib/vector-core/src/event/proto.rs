@@ -414,7 +414,7 @@ impl From<event::Metric> for WithMetadata<Metric> {
         let name = series.name.name;
         let namespace = series.name.namespace.unwrap_or_default();
 
-        let timestamp = data.time.timestamp.map(|ts| prost_types::Timestamp {
+        let timestamp = data.time.timestamp.map(|ts| prost_wkt_types::Timestamp {
             seconds: ts.timestamp(),
             nanos: ts.timestamp_subsec_nanos() as i32,
         });
@@ -646,10 +646,12 @@ fn encode_value(value: event::Value) -> Value {
         kind: match value {
             event::Value::Bytes(b) => Some(value::Kind::RawBytes(b)),
             event::Value::Regex(regex) => Some(value::Kind::RawBytes(regex.as_bytes())),
-            event::Value::Timestamp(ts) => Some(value::Kind::Timestamp(prost_types::Timestamp {
-                seconds: ts.timestamp(),
-                nanos: ts.timestamp_subsec_nanos() as i32,
-            })),
+            event::Value::Timestamp(ts) => {
+                Some(value::Kind::Timestamp(prost_wkt_types::Timestamp {
+                    seconds: ts.timestamp(),
+                    nanos: ts.timestamp_subsec_nanos() as i32,
+                }))
+            }
             event::Value::Integer(value) => Some(value::Kind::Integer(value)),
             event::Value::Float(value) => Some(value::Kind::Float(value.into_inner())),
             event::Value::Boolean(value) => Some(value::Kind::Boolean(value)),

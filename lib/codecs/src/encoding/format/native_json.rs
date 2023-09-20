@@ -1,7 +1,7 @@
 use bytes::{BufMut, BytesMut};
 use serde::{Deserialize, Serialize};
 use tokio_util::codec::Encoder;
-use vector_core::{config::DataType, event::Event, schema};
+use vector_core::{config::DataType, event::{Event, EventArray, proto}, schema};
 
 /// Config used to build a `NativeJsonSerializer`.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
@@ -44,8 +44,10 @@ impl Encoder<Event> for NativeJsonSerializer {
     type Error = vector_common::Error;
 
     fn encode(&mut self, event: Event, buffer: &mut BytesMut) -> Result<(), Self::Error> {
+        let array = EventArray::from(event);
+        let proto = proto::EventArray::from(array);
         let writer = buffer.writer();
-        serde_json::to_writer(writer, &event).map_err(Into::into)
+        serde_json::to_writer(writer, &proto).map_err(Into::into)
     }
 }
 
