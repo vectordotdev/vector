@@ -383,7 +383,7 @@ urls: {
 	nixos:                                      "https://nixos.org/"
 	nixpkgs_9682:                               "\(github)/NixOS/nixpkgs/issues/9682"
 	openssl:                                    "https://www.openssl.org/"
-	openssl_conf:                               "https://www.openssl.org/docs/manmaster/man5/config.html"
+	openssl_conf:                               "https://www.openssl.org/docs/man3.1/man5/config.html"
 	opentelemetry:                              "https://opentelemetry.io"
 	opentelemetry_protocol:                     "\(opentelemetry)/docs/reference/specification/protocol/otlp/"
 	order_of_ops:                               "\(wikipedia)/wiki/Order_of_operations"
