@@ -84,7 +84,7 @@ fn convert_value_raw(
             if let Some(d) = descriptor.values().filter(|v| v.name() == &string).next() {
                 return Ok(prost_reflect::Value::EnumNumber(d.number()));
             }
-            // check for an enum name match while ignoring capitlization
+            // check for an enum name match while ignoring capitalization
             if let Some(d) = descriptor
                 .values()
                 .filter(|v| v.name().eq_ignore_ascii_case(&string))
@@ -318,7 +318,7 @@ mod tests {
             ])),
         )
         .unwrap();
-        // the simpler string->primative map
+        // the simpler string->primitive map
         assert_eq!(
             Some(&HashMap::from([
                 (
