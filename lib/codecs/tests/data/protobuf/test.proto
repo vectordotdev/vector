@@ -1,6 +1,11 @@
+// Remember to recompile `test.desc` when you update this file:
+// protoc -I . -o test.desc test.proto google/protobuf/timestamp.proto
+
 syntax = "proto3";
 
 package test;
+
+import "google/protobuf/timestamp.proto";
 
 message Integers {
   int32 i32 = 1;
@@ -37,6 +42,10 @@ message Enum {
   Fruit breakfast = 1;
   Fruit lunch = 2;
   Fruit dinner = 3;
+}
+
+message Timestamp {
+  google.protobuf.Timestamp morning = 1;
 }
 
 message RepeatedPrimitive {

@@ -1,6 +1,7 @@
 use crate::common::protobuf::get_message_descriptor;
 use crate::encoding::BuildError;
 use bytes::BytesMut;
+use chrono::Timelike;
 use prost::Message;
 use prost_reflect::{DynamicMessage, FieldDescriptor, Kind, MapKey, MessageDescriptor};
 use std::collections::HashMap;
@@ -138,6 +139,15 @@ fn convert_value_raw(
         (Value::Regex(r), Kind::String) => Ok(prost_reflect::Value::String(r.as_str().to_owned())),
         (Value::Regex(r), Kind::Bytes) => Ok(prost_reflect::Value::Bytes(r.as_bytes())),
         (Value::Timestamp(t), Kind::Int64) => Ok(prost_reflect::Value::I64(t.timestamp_micros())),
+        (Value::Timestamp(t), Kind::Message(descriptor))
+            if descriptor.full_name() == "google.protobuf.Timestamp" =>
+        {
+            let mut message = DynamicMessage::new(descriptor.clone());
+            message.try_set_field_by_name("seconds", prost_reflect::Value::I64(t.timestamp()))?;
+            message
+                .try_set_field_by_name("nanos", prost_reflect::Value::I32(t.nanosecond() as i32))?;
+            Ok(prost_reflect::Value::Message(message))
+        }
         _ => Err(format!("Cannot encode vector `{kind_str}` into protobuf `{kind:?}`",).into()),
     }
 }
@@ -219,6 +229,7 @@ impl Encoder<Event> for ProtobufSerializer {
 mod tests {
     use super::*;
     use bytes::Bytes;
+    use chrono::{DateTime, NaiveDateTime, Utc};
     use ordered_float::NotNan;
     use prost_reflect::MapKey;
     use std::collections::{BTreeMap, HashMap};
@@ -353,6 +364,24 @@ mod tests {
         assert_eq!(Some(2), mfield!(message, "breakfast").as_enum_number());
         assert_eq!(Some(0), mfield!(message, "lunch").as_enum_number());
         assert_eq!(Some(1), mfield!(message, "dinner").as_enum_number());
+    }
+
+    #[test]
+    fn test_encode_timestamp() {
+        let message = encode_message(
+            &test_message_descriptor("Timestamp"),
+            Value::Object(BTreeMap::from([(
+                "morning".into(),
+                Value::Timestamp(DateTime::from_naive_utc_and_offset(
+                    NaiveDateTime::from_timestamp_opt(8675, 309).unwrap(),
+                    Utc,
+                )),
+            )])),
+        )
+        .unwrap();
+        let timestamp = mfield!(message, "morning").as_message().unwrap().clone();
+        assert_eq!(Some(8675), mfield!(timestamp, "seconds").as_i64());
+        assert_eq!(Some(309), mfield!(timestamp, "nanos").as_i32());
     }
 
     #[test]
