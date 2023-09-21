@@ -601,10 +601,11 @@ components: sinks: [Name=string]: {
 								If Adaptive Request Concurrency is not for you, you can manually set static concurrency
 								limits by specifying an integer for `request.concurrency`:
 
-								```toml title="vector.toml"
-								[sinks.my-sink]
-								  request.concurrency = 10
-								```
+								```yaml title="vector.yaml"
+								sinks:
+									my-sink:
+										request:
+											concurrency: 10
 								"""
 						},
 						{
@@ -614,10 +615,12 @@ components: sinks: [Name=string]: {
 								throughput via the `request.rate_limit_duration_secs` and `request.rate_limit_num`
 								options.
 
-								```toml title="vector.toml"
-								[sinks.my-sink]
-								  request.rate_limit_duration_secs = 1
-								  request.rate_limit_num = 10
+								```yaml title="vector.yaml"
+								sinks:
+									my-sink:
+										request:
+											rate_limit_duration_secs: 1
+											rate_limit_num: 10
 								```
 
 								These will apply to both `adaptive` and fixed `request.concurrency` values.
