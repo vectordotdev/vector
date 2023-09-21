@@ -65,7 +65,9 @@ pub struct KafkaService {
 }
 
 impl KafkaService {
-    pub(crate) fn new(kafka_producer: FutureProducer<KafkaStatisticsContext>) -> KafkaService {
+    pub(crate) const fn new(
+        kafka_producer: FutureProducer<KafkaStatisticsContext>,
+    ) -> KafkaService {
         KafkaService { kafka_producer }
     }
 }
