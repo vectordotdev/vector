@@ -28,6 +28,17 @@ message Map {
   map<string, Person> people = 2;
 }
 
+message Enum {
+  enum Fruit {
+    APPLE = 0;
+    OLIVE = 1;
+    TOMATO = 2;
+  }
+  Fruit breakfast = 1;
+  Fruit lunch = 2;
+  Fruit dinner = 3;
+}
+
 message RepeatedPrimitive {
   repeated int64 numbers = 1;
 }

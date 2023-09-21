@@ -71,16 +71,34 @@ fn convert_value_raw(
     kind: &prost_reflect::Kind,
 ) -> Result<prost_reflect::Value, vector_common::Error> {
     let kind_str = value.kind_str().to_owned();
-    eprintln!("{:?}", kind);
-    if let prost_reflect::Kind::Message(x) = kind {
-        eprintln!("{:?}", x);
-    }
     match (value, kind) {
         (Value::Boolean(b), Kind::Bool) => Ok(prost_reflect::Value::Bool(b)),
         (Value::Bytes(b), Kind::Bytes) => Ok(prost_reflect::Value::Bytes(b)),
         (Value::Bytes(b), Kind::String) => Ok(prost_reflect::Value::String(
             String::from_utf8_lossy(&b).into_owned(),
         )),
+        (Value::Bytes(b), Kind::Enum(descriptor)) => {
+            let string = String::from_utf8_lossy(&b).into_owned();
+            // check for an exact enum name match
+            if let Some(d) = descriptor.values().filter(|v| v.name() == &string).next() {
+                return Ok(prost_reflect::Value::EnumNumber(d.number()));
+            }
+            // check for an enum name match while ignoring capitlization
+            if let Some(d) = descriptor
+                .values()
+                .filter(|v| v.name().eq_ignore_ascii_case(&string))
+                .next()
+            {
+                return Ok(prost_reflect::Value::EnumNumber(d.number()));
+            }
+            // give up
+            Err(format!(
+                "Enum `{}` has no value that matches string '{}'",
+                descriptor.full_name(),
+                string
+            )
+            .into())
+        }
         (Value::Float(f), Kind::Double) => Ok(prost_reflect::Value::F64(f.into_inner())),
         (Value::Float(f), Kind::Float) => Ok(prost_reflect::Value::F32(f.into_inner() as f32)),
         (Value::Integer(i), Kind::Int32) => Ok(prost_reflect::Value::I32(i as i32)),
@@ -93,6 +111,7 @@ fn convert_value_raw(
         (Value::Integer(i), Kind::Uint64) => Ok(prost_reflect::Value::U64(i as u64)),
         (Value::Integer(i), Kind::Fixed32) => Ok(prost_reflect::Value::U32(i as u32)),
         (Value::Integer(i), Kind::Fixed64) => Ok(prost_reflect::Value::U64(i as u64)),
+        (Value::Integer(i), Kind::Enum(_)) => Ok(prost_reflect::Value::EnumNumber(i as i32)),
         (Value::Object(o), Kind::Message(message_descriptor)) => {
             if message_descriptor.is_map_entry() {
                 let value_field = message_descriptor
@@ -154,11 +173,6 @@ fn encode_message(
 ) -> Result<DynamicMessage, vector_common::Error> {
     let mut message = DynamicMessage::new(message_descriptor.clone());
     if let Value::Object(map) = value {
-        eprintln!(
-            "{:?} {:?}",
-            message_descriptor.is_map_entry(),
-            message_descriptor.fields().next()
-        );
         for field in message_descriptor.fields() {
             match map.get(field.name()) {
                 None | Some(Value::Null) => message.clear_field(&field),
@@ -323,6 +337,22 @@ mod tests {
             )
             .as_u32()
         );
+    }
+
+    #[test]
+    fn test_encode_enum() {
+        let message = encode_message(
+            &test_message_descriptor("Enum"),
+            Value::Object(BTreeMap::from([
+                ("breakfast".into(), Value::Bytes(Bytes::from("tomato"))),
+                ("dinner".into(), Value::Bytes(Bytes::from("OLIVE"))),
+                ("lunch".into(), Value::Integer(0)),
+            ])),
+        )
+        .unwrap();
+        assert_eq!(Some(2), mfield!(message, "breakfast").as_enum_number());
+        assert_eq!(Some(0), mfield!(message, "lunch").as_enum_number());
+        assert_eq!(Some(1), mfield!(message, "dinner").as_enum_number());
     }
 
     #[test]
