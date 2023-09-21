@@ -1,9 +1,17 @@
-use std::io;
+use std::{io, num::NonZeroUsize};
 
 use bytes::Bytes;
 use vector_common::request_metadata::{GroupedCountByteSize, RequestMetadata};
 
 use super::{encoding::Encoder, metadata::RequestMetadataBuilder, Compression, Compressor};
+
+/// Default concurrency limit for a request builder
+const DEFAULT_REQUEST_BUILDER_CONCURRENCY_LIMIT: Option<NonZeroUsize> = NonZeroUsize::new(64);
+
+pub fn default_request_builder_concurrency_limit() -> NonZeroUsize {
+    DEFAULT_REQUEST_BUILDER_CONCURRENCY_LIMIT
+        .expect("request builder concurrency limit should be non-zero constant")
+}
 
 pub struct EncodeResult<P> {
     pub payload: P,
