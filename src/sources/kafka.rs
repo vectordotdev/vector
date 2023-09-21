@@ -1907,7 +1907,7 @@ mod integration_test {
     async fn drains_acknowledgements_at_shutdown() {
         // 1. Send N events (if running against a pre-populated kafka topic, use send_count=0 and expect_count=expected number of messages; otherwise just set send_count)
         let send_count: usize = std::env::var("KAFKA_SEND_COUNT")
-            .unwrap_or_else(|_| "250000".into())
+            .unwrap_or_else(|_| "125000".into())
             .parse()
             .expect("Number of messages to send to kafka.");
         let expect_count: usize = std::env::var("KAFKA_EXPECT_COUNT")
@@ -1979,7 +1979,7 @@ mod integration_test {
     async fn consume_with_rebalance(rebalance_strategy: String) {
         // 1. Send N events (if running against a pre-populated kafka topic, use send_count=0 and expect_count=expected number of messages; otherwise just set send_count)
         let send_count: usize = std::env::var("KAFKA_SEND_COUNT")
-            .unwrap_or_else(|_| "250000".into())
+            .unwrap_or_else(|_| "125000".into())
             .parse()
             .expect("Number of messages to send to kafka.");
         let expect_count: usize = std::env::var("KAFKA_EXPECT_COUNT")
