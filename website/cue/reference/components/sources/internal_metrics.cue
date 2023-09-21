@@ -420,7 +420,12 @@ components: sources: internal_metrics: {
 			description:       "The number of events dropped by this component."
 			type:              "counter"
 			default_namespace: "vector"
-			tags:              _component_tags
+			tags:              _component_tags & {
+				intentional: {
+					description: "True if the events were discarded intentionally, like a `filter` transform, or false if due to an error."
+					required:    true
+				}
+			}
 		}
 		component_errors_total: {
 			description:       "The total number of errors encountered by this component."
