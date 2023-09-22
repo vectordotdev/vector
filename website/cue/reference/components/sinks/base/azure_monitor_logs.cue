@@ -194,11 +194,16 @@ base: components: sinks: azure_monitor_logs: configuration: {
 				}
 			}
 			concurrency: {
-				description: "Configuration for outbound request concurrency."
-				required:    false
+				description: """
+					Configuration for outbound request concurrency.
+
+					This can be set either to one of the below enum values or to a uint, which denotes
+					a fixed amount of concurrency limit.
+					"""
+				required: false
 				type: {
 					string: {
-						default: "none"
+						default: "adaptive"
 						enum: {
 							adaptive: """
 															Concurrency will be managed by Vector's [Adaptive Request Concurrency][arc] feature.
@@ -211,8 +216,9 @@ base: components: sinks: azure_monitor_logs: configuration: {
 															Only one request can be outstanding at any given time.
 															"""
 						}
+						examples: ["none", "adaptive", 128]
 					}
-					uint: {}
+					uint: examples: ["none", "adaptive", 128]
 				}
 			}
 			rate_limit_duration_secs: {
