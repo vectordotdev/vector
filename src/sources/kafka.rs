@@ -69,6 +69,8 @@ use crate::{
 
 #[derive(Debug, Snafu)]
 enum BuildError {
+    #[snafu(display("The drain_timeout_ms ({}) must be less than session_timeout_ms ({})", value, session_timeout_ms.as_millis()))]
+    KafkaInvalidDrainTimeoutError { value: u64, session_timeout_ms: Duration },
     #[snafu(display("Could not create Kafka consumer: {}", source))]
     KafkaCreateError { source: rdkafka::error::KafkaError },
     #[snafu(display("Could not subscribe to Kafka topics: {}", source))]
@@ -327,6 +329,10 @@ impl SourceConfig for KafkaSourceConfig {
             DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace)
                 .build()?;
         let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
+
+        if let Some(d) = self.drain_timeout_ms {
+            snafu::ensure!(Duration::from_millis(d) <= self.session_timeout_ms, KafkaInvalidDrainTimeoutSnafu { value:d, session_timeout_ms: self.session_timeout_ms });
+        }
 
         let consumer = create_consumer(self, acknowledgements)?;
 
