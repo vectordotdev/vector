@@ -1,6 +1,10 @@
 use core::fmt;
 use std::collections::BTreeSet;
+use std::fmt::Debug;
+use std::num::{ParseFloatError, ParseIntError};
+use std::str::FromStr;
 
+use serde_with::{DeserializeFromStr, SerializeDisplay};
 use vector_common::byte_size_of::ByteSizeOf;
 use vector_config::configurable_component;
 
@@ -448,7 +452,7 @@ impl fmt::Display for MetricValue {
             } => {
                 write!(fmt, "count={count} sum={sum} ")?;
                 write_list(fmt, " ", buckets, |fmt, bucket| {
-                    write!(fmt, "{}@{}", bucket.count, bucket.upper_limit)
+                    fmt::Display::fmt(&bucket, fmt)
                 })
             }
             MetricValue::AggregatedSummary {
@@ -601,8 +605,8 @@ impl ByteSizeOf for Sample {
 ///
 /// Histogram buckets represent the `count` of observations where the value of the observations does
 /// not exceed the specified `upper_limit`.
-#[configurable_component]
-#[derive(Clone, Copy, Debug)]
+#[configurable_component(no_deser, no_ser)]
+#[derive(Clone, Copy, Debug, SerializeDisplay, DeserializeFromStr)]
 pub struct Bucket {
     /// The upper limit of values in the bucket.
     pub upper_limit: f64,
@@ -620,6 +624,31 @@ impl PartialEq for Bucket {
 impl ByteSizeOf for Bucket {
     fn allocated_bytes(&self) -> usize {
         0
+    }
+}
+
+impl fmt::Display for Bucket {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}@{}", self.count, self.upper_limit)
+    }
+}
+
+impl FromStr for Bucket {
+    type Err = vector_common::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let mut parts = s.split("@");
+        let count: u64 = parts
+            .next()
+            .ok_or_else(|| "Missing count".to_string())?
+            .parse()
+            .map_err(|err: ParseIntError| err.to_string())?;
+        let upper_limit: f64 = parts
+            .next()
+            .ok_or_else(|| "Missing upper limit".to_string())?
+            .parse()
+            .map_err(|err: ParseFloatError| err.to_string())?;
+        Ok(Self { upper_limit, count })
     }
 }
 
