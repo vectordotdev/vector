@@ -10,8 +10,10 @@ use vector_core::{
     event::{Event, LogEvent},
     schema,
 };
-use vrl::value::Value;
 use lookup::event_path;
+
+type VrlValue = vrl::value::Value;
+type AvroValue = apache_avro::types::Value;
 
 /// Config used to build a `AvroDeserializer`.
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -135,53 +137,53 @@ impl Deserializer for AvroDeserializer {
 }
 
 // can't use std::convert::TryFrom because of orphan rules
-pub fn try_from(value: apache_avro::types::Value) -> vector_common::Result<vrl::value::Value> {
-    // very similar to avro to json see `impl std::convert::TryFrom<apache_avro::types::Value> for serde_json::Value`
+pub fn try_from(value: AvroValue) -> vector_common::Result<VrlValue> {
+    // very similar to avro to json see `impl std::convert::TryFrom<AvroValue> for serde_json::Value`
     // LogEvent has native support for bytes, so it is used for Bytes and Fixed
     match value {
-        apache_avro::types::Value::Array(array) => {
+        AvroValue::Array(array) => {
             let mut vector = Vec::new();
             for item in array {
                 vector.push(try_from(item)?);
             }
-            Ok(Value::Array(vector))
+            Ok(VrlValue::Array(vector))
         }
-        apache_avro::types::Value::Boolean(boolean) => Ok(Value::from(boolean)),
-        apache_avro::types::Value::Bytes(bytes) => Ok(Value::from(bytes)),
-        apache_avro::types::Value::Date(d) => Ok(Value::from(d)),
-        apache_avro::types::Value::Decimal(ref d) => Ok(<Vec<u8>>::try_from(d)
-            .map(|vec| Value::Array(vec.into_iter().map(Value::from).collect()))?),
-        apache_avro::types::Value::Double(double) => Ok(Value::from(double)),
-        apache_avro::types::Value::Duration(d) => Ok(Value::Array(
-            <[u8; 12]>::from(d).into_iter().map(Value::from).collect(),
+        AvroValue::Boolean(boolean) => Ok(VrlValue::from(boolean)),
+        AvroValue::Bytes(bytes) => Ok(VrlValue::from(bytes)),
+        AvroValue::Date(d) => Ok(VrlValue::from(d)),
+        AvroValue::Decimal(ref d) => Ok(<Vec<u8>>::try_from(d)
+            .map(|vec| VrlValue::Array(vec.into_iter().map(VrlValue::from).collect()))?),
+        AvroValue::Double(double) => Ok(VrlValue::from(double)),
+        AvroValue::Duration(d) => Ok(VrlValue::Array(
+            <[u8; 12]>::from(d).into_iter().map(VrlValue::from).collect(),
         )),
-        apache_avro::types::Value::Enum(_, string) => Ok(Value::from(string)),
-        apache_avro::types::Value::Fixed(_, bytes) => Ok(Value::from(bytes)),
-        apache_avro::types::Value::Float(float) => Ok(Value::from(float as f64)),
-        apache_avro::types::Value::Int(int) => Ok(Value::from(int)),
-        apache_avro::types::Value::Long(long) => Ok(Value::from(long)),
-        apache_avro::types::Value::Map(items) => items
+        AvroValue::Enum(_, string) => Ok(VrlValue::from(string)),
+        AvroValue::Fixed(_, bytes) => Ok(VrlValue::from(bytes)),
+        AvroValue::Float(float) => Ok(VrlValue::from(float as f64)),
+        AvroValue::Int(int) => Ok(VrlValue::from(int)),
+        AvroValue::Long(long) => Ok(VrlValue::from(long)),
+        AvroValue::Map(items) => items
             .into_iter()
             .map(|(key, value)| try_from(value).map(|v| (key, v)))
             .collect::<Result<Vec<_>, _>>()
-            .map(|v| Value::Object(v.into_iter().collect())),
-        apache_avro::types::Value::Null => Ok(Value::Null),
-        apache_avro::types::Value::Record(items) => items
+            .map(|v| VrlValue::Object(v.into_iter().collect())),
+        AvroValue::Null => Ok(VrlValue::Null),
+        AvroValue::Record(items) => items
             .into_iter()
             .map(|(key, value)| try_from(value).map(|v| (key, v)))
             .collect::<Result<Vec<_>, _>>()
-            .map(|v| Value::Object(v.into_iter().collect())),
-        apache_avro::types::Value::String(string) => Ok(Value::from(string)),
-        apache_avro::types::Value::TimeMicros(time_micros) => Ok(Value::from(time_micros)),
-        apache_avro::types::Value::TimeMillis(time_millis) => Ok(Value::from(time_millis)),
-        apache_avro::types::Value::TimestampMicros(timestamp_micros) => {
-            Ok(Value::from(timestamp_micros))
+            .map(|v| VrlValue::Object(v.into_iter().collect())),
+        AvroValue::String(string) => Ok(VrlValue::from(string)),
+        AvroValue::TimeMicros(time_micros) => Ok(VrlValue::from(time_micros)),
+        AvroValue::TimeMillis(time_millis) => Ok(VrlValue::from(time_millis)),
+        AvroValue::TimestampMicros(timestamp_micros) => {
+            Ok(VrlValue::from(timestamp_micros))
         }
-        apache_avro::types::Value::TimestampMillis(timestamp_millis) => {
-            Ok(Value::from(timestamp_millis))
+        AvroValue::TimestampMillis(timestamp_millis) => {
+            Ok(VrlValue::from(timestamp_millis))
         }
-        apache_avro::types::Value::Union(_, v) => try_from(*v),
-        apache_avro::types::Value::Uuid(uuid) => Ok(Value::from(uuid.as_hyphenated().to_string())),
+        AvroValue::Union(_, v) => try_from(*v),
+        AvroValue::Uuid(uuid) => Ok(VrlValue::from(uuid.as_hyphenated().to_string())),
     }
 }
 
@@ -229,7 +231,7 @@ mod tests {
 
         assert_eq!(
             events[0].as_log().get("message").unwrap(),
-            &Value::from("hello from avro")
+            &VrlValue::from("hello from avro")
         );
     }
 
@@ -273,7 +275,7 @@ mod tests {
 
         assert_eq!(
             events[0].as_log().get("message").unwrap(),
-            &Value::from("hello from avro")
+            &VrlValue::from("hello from avro")
         );
     }
 }
