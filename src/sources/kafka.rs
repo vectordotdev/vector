@@ -128,6 +128,21 @@ pub struct KafkaSourceConfig {
     #[configurable(metadata(docs::human_name = "Session Timeout"))]
     session_timeout_ms: Duration,
 
+    /// Timeout to drain pending acknowledgements during shutdown or a Kafka
+    /// consumer group rebalance.
+    ///
+    /// When Vector shuts down or the Kafka consumer group revokes partitions from this
+    /// consumer, wait a maximum of `drain_timeout_ms` for the source to
+    /// process pending acknowledgements. Must be less than `session_timeout_ms`
+    /// to ensure the consumer is not excluded from the group during a rebalance.
+    ///
+    /// Default value is half of `session_timeout_ms`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[configurable(metadata(docs::examples = 2500, docs::examples = 5000))]
+    #[configurable(metadata(docs::advanced))]
+    #[configurable(metadata(docs::human_name = "Drain Timeout"))]
+    drain_timeout_ms: Option<u64>,
+
     /// Timeout for network requests.
     #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
     #[configurable(metadata(docs::examples = 30000, docs::examples = 60000))]
@@ -424,7 +439,10 @@ async fn kafka_source(
     let coordination_task = {
         let span = span.clone();
         let consumer = Arc::clone(&consumer);
-        let session_timeout_ms = config.session_timeout_ms;
+        let drain_timeout_ms = match config.drain_timeout_ms {
+            Some(d) => Duration::from_millis(d),
+            None => config.session_timeout_ms / 2,
+        };
         let consumer_state =
             ConsumerStateInner::<Consuming>::new(config, decoder, out, log_namespace);
         tokio::spawn(async move {
@@ -433,7 +451,7 @@ async fn kafka_source(
                 consumer,
                 callback_rx,
                 consumer_state,
-                session_timeout_ms,
+                drain_timeout_ms,
                 eof_tx,
             )
             .await;
