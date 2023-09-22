@@ -5899,7 +5899,7 @@ dependencies = [
  "prost 0.12.1",
  "prost-build 0.12.1",
  "tonic 0.10.1",
- "tonic-build 0.10.0",
+ "tonic-build 0.10.1",
  "vector-core",
  "vector-lookup",
  "vrl",
@@ -8932,9 +8932,9 @@ dependencies = [
 
 [[package]]
 name = "tonic-build"
-version = "0.10.0"
+version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8b477abbe1d18c0b08f56cd01d1bc288668c5b5cfd19b2ae1886bbf599c546f1"
+checksum = "c9d37bb15da06ae9bb945963066baca6561b505af93a52e949a85d28558459a2"
 dependencies = [
  "prettyplease 0.2.12",
  "proc-macro2 1.0.67",
@@ -9737,7 +9737,7 @@ dependencies = [
  "tokio-util",
  "toml 0.8.0",
  "tonic 0.10.1",
- "tonic-build 0.10.0",
+ "tonic-build 0.10.1",
  "tower",
  "tower-http",
  "tower-test",
