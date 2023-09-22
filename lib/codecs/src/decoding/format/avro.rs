@@ -15,6 +15,9 @@ use lookup::event_path;
 type VrlValue = vrl::value::Value;
 type AvroValue = apache_avro::types::Value;
 
+const CONFLUENT_MAGIC_BYTE: u8 = 0;
+const CONFLUENT_SCHEMA_PREFIX_LEN: usize = 5;
+
 /// Config used to build a `AvroDeserializer`.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct AvroDeserializerConfig {
@@ -74,6 +77,7 @@ pub struct AvroDeserializerOptions {
     pub schema: String,
 
     /// for avro datum encoded in kafka messages, the bytes are prefixed with the schema id.  Set this to true to strip the schema id prefix.
+    /// According to [Confluent Kafka's document](https://docs.confluent.io/platform/current/schema-registry/fundamentals/serdes-develop/index.html#wire-format)
     pub strip_schema_id_prefix: bool,
 }
 
@@ -100,8 +104,8 @@ impl AvroDeserializer {
         _log_namespace: LogNamespace,
     ) -> vector_common::Result<LogEvent> {
         let bytes = if self.strip_schema_id_prefix {
-            if bytes.len() > 4 && bytes[0] == 0 {
-                bytes.slice(5..)
+            if bytes.len() >= CONFLUENT_SCHEMA_PREFIX_LEN && bytes[0] == CONFLUENT_MAGIC_BYTE {
+                bytes.slice(CONFLUENT_SCHEMA_PREFIX_LEN..)
             } else {
                 return Err(vector_common::Error::from(
                     "Expected avro datum to be prefixed with schema id",
