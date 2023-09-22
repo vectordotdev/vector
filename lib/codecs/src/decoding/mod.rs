@@ -290,7 +290,7 @@ impl DeserializerConfig {
     pub fn build(&self) -> vector_common::Result<Deserializer> {
         match self {
             DeserializerConfig::Avro { avro } => {
-                Ok(Deserializer::Avro(AvroDeserializerConfig { avro: avro.clone() }.build()))
+                Ok(Deserializer::Avro(AvroDeserializerConfig { avro_options: avro.clone() }.build()))
             }
             DeserializerConfig::Bytes => Ok(Deserializer::Bytes(BytesDeserializerConfig.build())),
             DeserializerConfig::Json(config) => Ok(Deserializer::Json(config.build())),
@@ -326,7 +326,7 @@ impl DeserializerConfig {
     pub fn output_type(&self) -> DataType {
         match self {
             DeserializerConfig::Avro { avro } => {
-                AvroDeserializerConfig { avro: avro.clone() }.output_type()
+                AvroDeserializerConfig { avro_options: avro.clone() }.output_type()
             }
             DeserializerConfig::Bytes => BytesDeserializerConfig.output_type(),
             DeserializerConfig::Json(config) => config.output_type(),
@@ -343,7 +343,7 @@ impl DeserializerConfig {
     pub fn schema_definition(&self, log_namespace: LogNamespace) -> schema::Definition {
         match self {
             DeserializerConfig::Avro { avro } => {
-                AvroDeserializerConfig { avro: avro.clone() }.schema_definition(log_namespace)
+                AvroDeserializerConfig { avro_options: avro.clone() }.schema_definition(log_namespace)
             }
             DeserializerConfig::Bytes => BytesDeserializerConfig.schema_definition(log_namespace),
             DeserializerConfig::Json(config) => config.schema_definition(log_namespace),

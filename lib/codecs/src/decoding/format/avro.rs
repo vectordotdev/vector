@@ -17,14 +17,14 @@ use lookup::event_path;
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct AvroDeserializerConfig {
     /// Options for the Avro deserializer.
-    pub avro: AvroDeserializerOptions,
+    pub avro_options: AvroDeserializerOptions,
 }
 
 impl AvroDeserializerConfig {
     /// Creates a new `AvroDeserializerConfig`.
     pub const fn new(schema: String, strip_schema_id_prefix: bool) -> Self {
         Self {
-            avro: AvroDeserializerOptions {
+            avro_options: AvroDeserializerOptions {
                 schema,
                 strip_schema_id_prefix,
             },
@@ -33,12 +33,12 @@ impl AvroDeserializerConfig {
 
     /// Build the `AvroDeserializer` from this configuration.
     pub fn build(&self) -> AvroDeserializer {
-        let schema = apache_avro::Schema::parse_str(&self.avro.schema)
+        let schema = apache_avro::Schema::parse_str(&self.avro_options.schema)
             .map_err(|error| format!("Failed building Avro serializer: {}", error))
             .unwrap();
         AvroDeserializer {
             schema,
-            strip_schema_id_prefix: self.avro.strip_schema_id_prefix,
+            strip_schema_id_prefix: self.avro_options.strip_schema_id_prefix,
         }
     }
 
