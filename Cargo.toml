@@ -40,6 +40,10 @@ bench = false
 # compiled via the CI pipeline.
 [profile.release]
 debug = false # Do not include debug symbols in the executable.
+opt-level = 'z'
+lto = true
+codegen-units = 1
+panic = 'abort'
 
 [profile.bench]
 debug = true
