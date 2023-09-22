@@ -5,12 +5,18 @@ use vector_common::request_metadata::{GroupedCountByteSize, RequestMetadata};
 
 use super::{encoding::Encoder, metadata::RequestMetadataBuilder, Compression, Compressor};
 
-/// Default concurrency limit for a request builder
-const DEFAULT_REQUEST_BUILDER_CONCURRENCY_LIMIT: Option<NonZeroUsize> = NonZeroUsize::new(64);
-
 pub fn default_request_builder_concurrency_limit() -> NonZeroUsize {
-    DEFAULT_REQUEST_BUILDER_CONCURRENCY_LIMIT
-        .expect("request builder concurrency limit should be non-zero constant")
+    if let Some(limit) = std::env::var("VECTOR_EXPERIMENTAL_REQUEST_BUILDER_CONCURRENCY")
+        .map(|value| value.parse::<NonZeroUsize>().ok())
+        .ok()
+        .flatten()
+    {
+        return limit;
+    }
+
+    crate::app::WORKER_THREADS
+        .get()
+        .unwrap_or_else(|| NonZeroUsize::new(8).expect("static"))
 }
 
 pub struct EncodeResult<P> {
