@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use vector_config::configurable_component;
 use vector_core::{
-    config::{DataType, LogNamespace},
+    config::{log_schema, DataType, LogNamespace},
     event::{Event, LogEvent},
     schema,
 };
@@ -53,9 +53,26 @@ impl AvroDeserializerConfig {
     }
 
     /// The schema required by the serializer.
-    pub fn schema_definition(&self, _log_namespace: LogNamespace) -> schema::Definition {
-        // TODO: Convert the Avro schema to a vector schema definition.
-        schema::Definition::any()
+    pub fn schema_definition(&self, log_namespace: LogNamespace) -> schema::Definition {
+        // TODO: convert avro schema to vector schema.
+        match log_namespace {
+            LogNamespace::Legacy => {
+                let mut definition =
+                    schema::Definition::empty_legacy_namespace().unknown_fields(vrl::value::Kind::any());
+
+                if let Some(timestamp_key) = log_schema().timestamp_key() {
+                    definition = definition.try_with_field(
+                        timestamp_key,
+                        vrl::value::Kind::any().or_timestamp(),
+                        Some("timestamp"),
+                    );
+                }
+                definition
+            }
+            LogNamespace::Vector => {
+                schema::Definition::new_with_default_metadata(vrl::value::Kind::any(), [log_namespace])
+            }
+        }
     }
 }
 
