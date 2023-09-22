@@ -984,6 +984,7 @@ skywalking
 slashin
 slf
 slideover
+slugified
 smallvec
 smartphone
 Smol
