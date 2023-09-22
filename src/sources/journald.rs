@@ -359,7 +359,7 @@ impl SourceConfig for JournaldConfig {
             self.journal_namespace.clone(),
             self.current_boot_only,
             self.since_now,
-            self.extra_args.clone()
+            self.extra_args.clone(),
         );
 
         let batch_size = self.batch_size;
@@ -630,7 +630,7 @@ struct StartJournalctl {
     journal_namespace: Option<String>,
     current_boot_only: bool,
     since_now: bool,
-    extra_args: Vec<String>
+    extra_args: Vec<String>,
 }
 
 impl StartJournalctl {
@@ -640,7 +640,7 @@ impl StartJournalctl {
         journal_namespace: Option<String>,
         current_boot_only: bool,
         since_now: bool,
-        extra_args: Vec<String>
+        extra_args: Vec<String>,
     ) -> Self {
         Self {
             path,
@@ -648,7 +648,7 @@ impl StartJournalctl {
             journal_namespace,
             current_boot_only,
             since_now,
-            extra_args
+            extra_args,
         }
     }
 
@@ -1439,7 +1439,7 @@ mod tests {
             current_boot_only,
             since_now,
             cursor,
-            extra_args
+            extra_args,
         );
         let cmd_line = format!("{:?}", command);
         assert!(!cmd_line.contains("--directory="));
@@ -1459,7 +1459,7 @@ mod tests {
             current_boot_only,
             since_now,
             cursor,
-            extra_args
+            extra_args,
         );
         let cmd_line = format!("{:?}", command);
         assert!(cmd_line.contains("--since=now"));
@@ -1477,7 +1477,7 @@ mod tests {
             current_boot_only,
             since_now,
             cursor,
-            extra_args
+            extra_args,
         );
         let cmd_line = format!("{:?}", command);
         assert!(cmd_line.contains("--directory=/tmp/journal-dir"));
@@ -1494,7 +1494,7 @@ mod tests {
         current_boot_only: bool,
         since_now: bool,
         cursor: Option<&str>,
-        extra_args: Vec<String>
+        extra_args: Vec<String>,
     ) -> Command {
         StartJournalctl::new(
             path.into(),
@@ -1502,7 +1502,7 @@ mod tests {
             journal_namespace,
             current_boot_only,
             since_now,
-            extra_args
+            extra_args,
         )
         .make_command(cursor)
     }
