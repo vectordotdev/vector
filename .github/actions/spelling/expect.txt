@@ -186,6 +186,7 @@ composability
 concating
 concats
 condrestart
+conffiles
 configkey
 configmap
 confl
@@ -525,6 +526,7 @@ ingesters
 ingestor
 initdb
 initech
+installdeb
 Instrumentable
 interpolatedstring
 interpretervm
@@ -1169,6 +1171,7 @@ userpass
 uucp
 UVY
 uwtable
+Uyuni
 valfoo
 validpaths
 Varda
