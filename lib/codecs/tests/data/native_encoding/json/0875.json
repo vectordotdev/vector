@@ -1,1 +1,1 @@
-{"log":{"":null,"(¯":-8733057498271022400,"⁠":null}}
+{"metric":{"name":"a","tags":{"o":"t"},"kind":"incremental","distribution":{"samples":[{"value":-858368.0,"rate":2262122730},{"value":298816.0,"rate":3312608339},{"value":-192832.0,"rate":3214933592}],"statistic":"summary"}}}

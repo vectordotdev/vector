@@ -1,1 +1,1 @@
-{"metric":{"name":"x","tags":{"y":"n"},"kind":"incremental","counter":{"value":297.916}}}
+{"metric":{"name":"r","timestamp":"1969-12-31T16:00:16.000019225Z","interval_ms":1,"kind":"absolute","counter":{"value":753920.0}}}

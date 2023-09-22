@@ -1,1 +1,1 @@
-{"log":{"5\u0017":{"":[null]},":<":"","(£":null}}
+{"metric":{"name":"r","namespace":"b","tags":{"t":"y"},"timestamp":"1969-12-31T16:30:41.000023328Z","kind":"absolute","counter":{"value":587072.0}}}

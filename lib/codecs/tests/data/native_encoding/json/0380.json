@@ -1,1 +1,1 @@
-{"log":{"":"mª;"," ]":301312.0}}
+{"metric":{"name":"r","timestamp":"1970-01-01T07:42:04.000023089Z","interval_ms":1597751382,"kind":"incremental","distribution":{"samples":[{"value":-681088.0,"rate":1372386754},{"value":325632.0,"rate":345926452},{"value":-527552.0,"rate":1564645783},{"value":-291904.0,"rate":977171764},{"value":-471424.0,"rate":4178818712},{"value":-106752.0,"rate":3520697588}],"statistic":"histogram"}}}

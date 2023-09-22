@@ -637,7 +637,7 @@ impl FromStr for Bucket {
     type Err = vector_common::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut parts = s.split("@");
+        let mut parts = s.split('@');
         let count: u64 = parts
             .next()
             .ok_or_else(|| "Missing count".to_string())?

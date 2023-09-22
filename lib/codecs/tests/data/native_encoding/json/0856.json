@@ -1,1 +1,1 @@
-{"log":{}}
+{"metric":{"name":"m","kind":"incremental","sketch":{"sketch":{"AgentDDSketch":{"bins":{"k":[2227],"n":[1]},"count":1,"min":966080.0,"max":966080.0,"sum":762752.0,"avg":787136.0}}}}}

@@ -581,20 +581,12 @@ mod tests {
             collected,
             vec![
                 (
-                    String::from("aggregated_histogram.buckets[0].count"),
-                    &Value::from(10)
+                    String::from("aggregated_histogram.buckets[0]"),
+                    &Value::from("10@1")
                 ),
                 (
-                    String::from("aggregated_histogram.buckets[0].upper_limit"),
-                    &Value::from(1.0)
-                ),
-                (
-                    String::from("aggregated_histogram.buckets[1].count"),
-                    &Value::from(20)
-                ),
-                (
-                    String::from("aggregated_histogram.buckets[1].upper_limit"),
-                    &Value::from(2.0)
+                    String::from("aggregated_histogram.buckets[1]"),
+                    &Value::from("20@2")
                 ),
                 (String::from("aggregated_histogram.count"), &Value::from(30)),
                 (String::from("aggregated_histogram.sum"), &Value::from(50.0)),

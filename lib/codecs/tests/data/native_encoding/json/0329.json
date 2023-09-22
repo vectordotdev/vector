@@ -1,1 +1,1 @@
-{"log":{"\u0000&":[null,-380091.2581,"¢‚"]}}
+{"metric":{"name":"q","timestamp":"1969-12-31T23:19:43.000016999Z","interval_ms":4039184796,"kind":"absolute","distribution":{"samples":[{"value":367296.0,"rate":1569480621}],"statistic":"summary"}}}
