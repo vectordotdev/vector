@@ -1,10 +1,7 @@
-use std::collections::BTreeMap;
-
 use super::Deserializer;
 use crate::encoding::AvroSerializerOptions;
 use bytes::Buf;
 use bytes::Bytes;
-use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use vector_config::configurable_component;
@@ -14,7 +11,7 @@ use vector_core::{
     schema,
 };
 use vrl::value::Value;
-use lookup::{event_path, owned_value_path};
+use lookup::event_path;
 
 /// Config used to build a `AvroDeserializer`.
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -190,11 +187,8 @@ pub fn try_from(value: apache_avro::types::Value) -> vector_common::Result<vrl::
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeMap;
-
-    use apache_avro::{types::Record, Schema};
+    use apache_avro::Schema;
     use bytes::BytesMut;
-    use vector_common::btreemap;
 
     use super::*;
 
