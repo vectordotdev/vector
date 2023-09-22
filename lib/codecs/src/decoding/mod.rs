@@ -289,9 +289,12 @@ impl DeserializerConfig {
     /// Build the `Deserializer` from this configuration.
     pub fn build(&self) -> vector_common::Result<Deserializer> {
         match self {
-            DeserializerConfig::Avro { avro } => {
-                Ok(Deserializer::Avro(AvroDeserializerConfig { avro_options: avro.clone() }.build()))
-            }
+            DeserializerConfig::Avro { avro } => Ok(Deserializer::Avro(
+                AvroDeserializerConfig {
+                    avro_options: avro.clone(),
+                }
+                .build(),
+            )),
             DeserializerConfig::Bytes => Ok(Deserializer::Bytes(BytesDeserializerConfig.build())),
             DeserializerConfig::Json(config) => Ok(Deserializer::Json(config.build())),
             DeserializerConfig::Protobuf(config) => Ok(Deserializer::Protobuf(config.build()?)),
@@ -325,9 +328,10 @@ impl DeserializerConfig {
     /// Return the type of event build by this deserializer.
     pub fn output_type(&self) -> DataType {
         match self {
-            DeserializerConfig::Avro { avro } => {
-                AvroDeserializerConfig { avro_options: avro.clone() }.output_type()
+            DeserializerConfig::Avro { avro } => AvroDeserializerConfig {
+                avro_options: avro.clone(),
             }
+            .output_type(),
             DeserializerConfig::Bytes => BytesDeserializerConfig.output_type(),
             DeserializerConfig::Json(config) => config.output_type(),
             DeserializerConfig::Protobuf(config) => config.output_type(),
@@ -342,9 +346,10 @@ impl DeserializerConfig {
     /// The schema produced by the deserializer.
     pub fn schema_definition(&self, log_namespace: LogNamespace) -> schema::Definition {
         match self {
-            DeserializerConfig::Avro { avro } => {
-                AvroDeserializerConfig { avro_options: avro.clone() }.schema_definition(log_namespace)
+            DeserializerConfig::Avro { avro } => AvroDeserializerConfig {
+                avro_options: avro.clone(),
             }
+            .schema_definition(log_namespace),
             DeserializerConfig::Bytes => BytesDeserializerConfig.schema_definition(log_namespace),
             DeserializerConfig::Json(config) => config.schema_definition(log_namespace),
             DeserializerConfig::Protobuf(config) => config.schema_definition(log_namespace),

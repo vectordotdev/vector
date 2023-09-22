@@ -2,6 +2,7 @@ use super::Deserializer;
 use crate::encoding::AvroSerializerOptions;
 use bytes::Buf;
 use bytes::Bytes;
+use lookup::event_path;
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use vector_config::configurable_component;
@@ -10,7 +11,6 @@ use vector_core::{
     event::{Event, LogEvent},
     schema,
 };
-use lookup::event_path;
 
 type VrlValue = vrl::value::Value;
 type AvroValue = apache_avro::types::Value;
@@ -57,8 +57,8 @@ impl AvroDeserializerConfig {
         // TODO: convert avro schema to vector schema.
         match log_namespace {
             LogNamespace::Legacy => {
-                let mut definition =
-                    schema::Definition::empty_legacy_namespace().unknown_fields(vrl::value::Kind::any());
+                let mut definition = schema::Definition::empty_legacy_namespace()
+                    .unknown_fields(vrl::value::Kind::any());
 
                 if let Some(timestamp_key) = log_schema().timestamp_key() {
                     definition = definition.try_with_field(
@@ -69,9 +69,10 @@ impl AvroDeserializerConfig {
                 }
                 definition
             }
-            LogNamespace::Vector => {
-                schema::Definition::new_with_default_metadata(vrl::value::Kind::any(), [log_namespace])
-            }
+            LogNamespace::Vector => schema::Definition::new_with_default_metadata(
+                vrl::value::Kind::any(),
+                [log_namespace],
+            ),
         }
     }
 }
@@ -176,7 +177,10 @@ pub fn try_from(value: AvroValue) -> vector_common::Result<VrlValue> {
             .map(|vec| VrlValue::Array(vec.into_iter().map(VrlValue::from).collect()))?),
         AvroValue::Double(double) => Ok(VrlValue::from(double)),
         AvroValue::Duration(d) => Ok(VrlValue::Array(
-            <[u8; 12]>::from(d).into_iter().map(VrlValue::from).collect(),
+            <[u8; 12]>::from(d)
+                .into_iter()
+                .map(VrlValue::from)
+                .collect(),
         )),
         AvroValue::Enum(_, string) => Ok(VrlValue::from(string)),
         AvroValue::Fixed(_, bytes) => Ok(VrlValue::from(bytes)),
@@ -197,12 +201,8 @@ pub fn try_from(value: AvroValue) -> vector_common::Result<VrlValue> {
         AvroValue::String(string) => Ok(VrlValue::from(string)),
         AvroValue::TimeMicros(time_micros) => Ok(VrlValue::from(time_micros)),
         AvroValue::TimeMillis(time_millis) => Ok(VrlValue::from(time_millis)),
-        AvroValue::TimestampMicros(timestamp_micros) => {
-            Ok(VrlValue::from(timestamp_micros))
-        }
-        AvroValue::TimestampMillis(timestamp_millis) => {
-            Ok(VrlValue::from(timestamp_millis))
-        }
+        AvroValue::TimestampMicros(timestamp_micros) => Ok(VrlValue::from(timestamp_micros)),
+        AvroValue::TimestampMillis(timestamp_millis) => Ok(VrlValue::from(timestamp_millis)),
         AvroValue::Union(_, v) => try_from(*v),
         AvroValue::Uuid(uuid) => Ok(VrlValue::from(uuid.as_hyphenated().to_string())),
     }
