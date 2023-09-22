@@ -18,6 +18,9 @@ updates:
         patterns:
         - "prost"
         - "prost-*"
+      tonic:
+        - "tonic"
+        - "tonic-*"
   - package-ecosystem: "docker"
     directory: "/distribution/docker/"
     schedule:
