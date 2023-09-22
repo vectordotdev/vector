@@ -161,7 +161,7 @@ pub struct JournaldConfig {
     /// If specified, it is merged to the command line arguments as-is.
     #[serde(default)]
     #[configurable(metadata(docs::examples = "--merge"))]
-    pub extra_journalctl_args: Vec<String>,
+    pub extra_args: Vec<String>,
 
     /// The systemd journal is read in batches, and a checkpoint is set at the end of each batch.
     ///
@@ -304,7 +304,7 @@ impl Default for JournaldConfig {
             journalctl_path: None,
             journal_directory: None,
             journal_namespace: None,
-            extra_journalctl_args: vec![],
+            extra_args: vec![],
             acknowledgements: Default::default(),
             remap_priority: false,
             log_namespace: None,
@@ -359,7 +359,7 @@ impl SourceConfig for JournaldConfig {
             self.journal_namespace.clone(),
             self.current_boot_only,
             self.since_now,
-            self.extra_journalctl_args.clone()
+            self.extra_args.clone()
         );
 
         let batch_size = self.batch_size;
@@ -630,7 +630,7 @@ struct StartJournalctl {
     journal_namespace: Option<String>,
     current_boot_only: bool,
     since_now: bool,
-    extra_journalctl_args: Vec<String>
+    extra_args: Vec<String>
 }
 
 impl StartJournalctl {
@@ -640,7 +640,7 @@ impl StartJournalctl {
         journal_namespace: Option<String>,
         current_boot_only: bool,
         since_now: bool,
-        extra_journalctl_args: Vec<String>
+        extra_args: Vec<String>
     ) -> Self {
         Self {
             path,
@@ -648,7 +648,7 @@ impl StartJournalctl {
             journal_namespace,
             current_boot_only,
             since_now,
-            extra_journalctl_args
+            extra_args
         }
     }
 
@@ -681,8 +681,8 @@ impl StartJournalctl {
             command.arg("--since=2000-01-01");
         }
 
-        if !self.extra_journalctl_args.is_empty() {
-            command.args(&self.extra_journalctl_args);
+        if !self.extra_args.is_empty() {
+            command.args(&self.extra_args);
         }
 
         command
@@ -1430,7 +1430,7 @@ mod tests {
         let current_boot_only = false;
         let cursor = None;
         let since_now = false;
-        let extra_journalctl_args = vec![];
+        let extra_args = vec![];
 
         let command = create_command(
             &path,
@@ -1439,7 +1439,7 @@ mod tests {
             current_boot_only,
             since_now,
             cursor,
-            extra_journalctl_args
+            extra_args
         );
         let cmd_line = format!("{:?}", command);
         assert!(!cmd_line.contains("--directory="));
@@ -1450,7 +1450,7 @@ mod tests {
         let journal_dir = None;
         let journal_namespace = None;
         let since_now = true;
-        let extra_journalctl_args = vec![];
+        let extra_args = vec![];
 
         let command = create_command(
             &path,
@@ -1459,7 +1459,7 @@ mod tests {
             current_boot_only,
             since_now,
             cursor,
-            extra_journalctl_args
+            extra_args
         );
         let cmd_line = format!("{:?}", command);
         assert!(cmd_line.contains("--since=now"));
@@ -1468,7 +1468,7 @@ mod tests {
         let journal_namespace = Some(String::from("my_namespace"));
         let current_boot_only = true;
         let cursor = Some("2021-01-01");
-        let extra_journalctl_args = vec!["--merge".to_string()];
+        let extra_args = vec!["--merge".to_string()];
 
         let command = create_command(
             &path,
@@ -1477,7 +1477,7 @@ mod tests {
             current_boot_only,
             since_now,
             cursor,
-            extra_journalctl_args
+            extra_args
         );
         let cmd_line = format!("{:?}", command);
         assert!(cmd_line.contains("--directory=/tmp/journal-dir"));
@@ -1494,7 +1494,7 @@ mod tests {
         current_boot_only: bool,
         since_now: bool,
         cursor: Option<&str>,
-        extra_journalctl_args: Vec<String>
+        extra_args: Vec<String>
     ) -> Command {
         StartJournalctl::new(
             path.into(),
@@ -1502,7 +1502,7 @@ mod tests {
             journal_namespace,
             current_boot_only,
             since_now,
-            extra_journalctl_args
+            extra_args
         )
         .make_command(cursor)
     }
