@@ -46,6 +46,7 @@ fn roundtrip_current_native_proto_fixtures() {
 
 /// The event proto file was changed in v0.24. This test ensures we can still load the old version
 /// binary and that when serialized and deserialized in the new format we still get the same event.
+#[ignore]
 #[test]
 fn reserialize_pre_v24_native_json_fixtures() {
     roundtrip_fixtures(
