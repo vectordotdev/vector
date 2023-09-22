@@ -18,4 +18,5 @@ checks:
     bounds:
       series: cpu_percentage
       # The machine has 8 cores available.
-      upper_bound: 400
+      lower_bound: 400
+      upper_bound: 800
