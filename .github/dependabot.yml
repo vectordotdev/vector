@@ -19,6 +19,7 @@ updates:
         - "prost"
         - "prost-*"
       tonic:
+        patterns:
         - "tonic"
         - "tonic-*"
   - package-ecosystem: "docker"
