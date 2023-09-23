@@ -94,8 +94,8 @@ pub struct AvroDeserializerOptions {
     ))]
     pub schema: String,
 
-    /// for avro datum encoded in kafka messages, the bytes are prefixed with the schema id.  Set this to true to strip the schema id prefix.
-    /// According to [Confluent Kafka's document](https://docs.confluent.io/platform/current/schema-registry/fundamentals/serdes-develop/index.html#wire-format)
+    /// For avro datum encoded in kafka messages, the bytes are prefixed with the schema id.  Set this to true to strip the schema id prefix.
+    /// According to [Confluent Kafka's document](https://docs.confluent.io/platform/current/schema-registry/fundamentals/serdes-develop/index.html#wire-format).
     pub strip_schema_id_prefix: bool,
 }
 
@@ -148,9 +148,9 @@ impl Deserializer for AvroDeserializer {
     }
 }
 
-// can't use std::convert::TryFrom because of orphan rules
+// Can't use std::convert::TryFrom because of orphan rules
 pub fn try_from(value: AvroValue) -> vector_common::Result<VrlValue> {
-    // very similar to avro to json see `impl std::convert::TryFrom<AvroValue> for serde_json::Value`
+    // Very similar to avro to json see `impl std::convert::TryFrom<AvroValue> for serde_json::Value`
     // LogEvent has native support for bytes, so it is used for Bytes and Fixed
     match value {
         AvroValue::Array(array) => {
