@@ -114,13 +114,14 @@ impl AvroDeserializer {
             strip_schema_id_prefix,
         }
     }
+}
 
-    /// Deserializes the given bytes, which will always produce a single `LogEvent`.
-    pub fn parse_single(
+impl Deserializer for AvroDeserializer {
+    fn parse(
         &self,
         bytes: Bytes,
         _log_namespace: LogNamespace,
-    ) -> vector_common::Result<LogEvent> {
+    ) -> vector_common::Result<SmallVec<[Event; 1]>> {
         let bytes = if self.strip_schema_id_prefix {
             if bytes.len() >= CONFLUENT_SCHEMA_PREFIX_LEN && bytes[0] == CONFLUENT_MAGIC_BYTE {
                 bytes.slice(CONFLUENT_SCHEMA_PREFIX_LEN..)
@@ -143,17 +144,6 @@ impl AvroDeserializer {
         for (k, v) in fields {
             log.insert(event_path!(k.as_str()), try_from(v)?);
         }
-        Ok(log)
-    }
-}
-
-impl Deserializer for AvroDeserializer {
-    fn parse(
-        &self,
-        bytes: Bytes,
-        log_namespace: LogNamespace,
-    ) -> vector_common::Result<SmallVec<[Event; 1]>> {
-        let log = self.parse_single(bytes, log_namespace)?;
         Ok(smallvec![log.into()])
     }
 }
