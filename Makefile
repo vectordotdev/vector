@@ -56,6 +56,11 @@ export ENVIRONMENT_AUTOBUILD ?= true
 export ENVIRONMENT_AUTOPULL ?= true
 # Override this when appropriate to disable a TTY being available in commands with `ENVIRONMENT=true`
 export ENVIRONMENT_TTY ?= true
+# Override to specify which network the environment will be connected to (leave empty to use the container tool default)
+export ENVIRONMENT_NETWORK ?= host
+# Override to specify environment port(s) to publish to the host (leave empty to not configure any port publishing)
+# Multiple port publishing can be provided using spaces, for example: 8686:8686 8080:8080/udp
+export ENVIRONMENT_PUBLISH ?=
 
 # Set dummy AWS credentials if not present - used for AWS and ES integration tests
 export AWS_ACCESS_KEY_ID ?= "dummy"
@@ -126,12 +131,13 @@ define ENVIRONMENT_EXEC
 			--init \
 			--interactive \
 			--env INSIDE_ENVIRONMENT=true \
-			--network host \
+			$(if $(ENVIRONMENT_NETWORK),--network $(ENVIRONMENT_NETWORK),) \
 			--mount type=bind,source=${CURRENT_DIR},target=/git/vectordotdev/vector \
 			$(if $(findstring docker,$(CONTAINER_TOOL)),--mount type=bind$(COMMA)source=/var/run/docker.sock$(COMMA)target=/var/run/docker.sock,) \
 			--mount type=volume,source=vector-target,target=/git/vectordotdev/vector/target \
 			--mount type=volume,source=vector-cargo-cache,target=/root/.cargo \
 			--mount type=volume,source=vector-rustup-cache,target=/root/.rustup \
+			$(foreach publish,$(ENVIRONMENT_PUBLISH),--publish $(publish)) \
 			$(ENVIRONMENT_UPSTREAM)
 endef
 
