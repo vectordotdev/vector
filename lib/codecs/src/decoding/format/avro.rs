@@ -2,6 +2,7 @@ use super::Deserializer;
 use crate::encoding::AvroSerializerOptions;
 use bytes::Buf;
 use bytes::Bytes;
+use chrono::Utc;
 use lookup::event_path;
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
@@ -120,7 +121,7 @@ impl Deserializer for AvroDeserializer {
     fn parse(
         &self,
         bytes: Bytes,
-        _log_namespace: LogNamespace,
+        log_namespace: LogNamespace,
     ) -> vector_common::Result<SmallVec<[Event; 1]>> {
         let bytes = if self.strip_schema_id_prefix {
             if bytes.len() >= CONFLUENT_SCHEMA_PREFIX_LEN && bytes[0] == CONFLUENT_MAGIC_BYTE {
@@ -144,7 +145,22 @@ impl Deserializer for AvroDeserializer {
         for (k, v) in fields {
             log.insert(event_path!(k.as_str()), try_from(v)?);
         }
-        Ok(smallvec![log.into()])
+
+        let mut event = Event::Log(log);
+        let event = match log_namespace {
+            LogNamespace::Vector => event,
+            LogNamespace::Legacy => {
+                if let Some(timestamp_key) = log_schema().timestamp_key_target_path() {
+                    let log = event.as_mut_log();
+                    if !log.contains(timestamp_key) {
+                        let timestamp = Utc::now();
+                        log.insert(timestamp_key, timestamp);
+                    }
+                }
+                event
+            }
+        };
+        Ok(smallvec![event])
     }
 }
 
