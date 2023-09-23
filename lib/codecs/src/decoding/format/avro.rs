@@ -210,7 +210,7 @@ pub fn try_from(value: AvroValue) -> vector_common::Result<VrlValue> {
         AvroValue::TimestampMicros(timestamp_micros) => Ok(VrlValue::from(timestamp_micros)),
         AvroValue::TimestampMillis(timestamp_millis) => Ok(VrlValue::from(timestamp_millis)),
         AvroValue::Union(_, v) => try_from(*v),
-        AvroValue::Uuid(uuid) => Ok(VrlValue::from(uuid.as_hyphenated().to_string())),
+        AvroValue::Uuid(uuid) => Ok(VrlValue::from(uuid.as_bytes())),
     }
 }
 
