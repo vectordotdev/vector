@@ -143,9 +143,6 @@ This can be set either to one of the below enum values or to a uint, which denot
 a fixed concurrency limit."#,
         );
         metadata.add_custom_attribute(CustomAttribute::kv("docs::enum_tagging", "external"));
-        metadata.add_custom_attribute(CustomAttribute::kv("docs::examples", "none"));
-        metadata.add_custom_attribute(CustomAttribute::kv("docs::examples", "adaptive"));
-        metadata.add_custom_attribute(CustomAttribute::kv("docs::examples", 128));
         metadata
     }
 
