@@ -1,5 +1,3 @@
-use std::num::NonZeroUsize;
-
 use rdkafka::{
     consumer::{BaseConsumer, Consumer},
     error::KafkaError,
@@ -68,7 +66,6 @@ impl KafkaSink {
         // 64 should be plenty concurrency here, as a rdkafka send operation does not block until its underlying
         // buffer is full.
         let service = ConcurrencyLimit::new(self.service.clone(), 64);
-        let builder_limit = NonZeroUsize::new(64);
 
         let request_builder = KafkaRequestBuilder {
             key_field: self.key_field,
@@ -93,7 +90,7 @@ impl KafkaSink {
                         .map(|topic| (topic, event)),
                 )
             })
-            .request_builder(builder_limit, request_builder)
+            .request_builder(default_request_builder_concurrency_limit(), request_builder)
             .filter_map(|request| async {
                 match request {
                     Err(error) => {
@@ -104,6 +101,7 @@ impl KafkaSink {
                 }
             })
             .into_driver(service)
+            .protocol("kafka")
             .protocol("kafka")
             .run()
             .await

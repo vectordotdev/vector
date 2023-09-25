@@ -468,14 +468,14 @@ pub fn build_runtime(threads: Option<usize>, thread_name: &str) -> Result<Runtim
     rt_builder.enable_all().thread_name(thread_name);
 
     let threads = threads.unwrap_or_else(crate::num_threads);
-    if threads < 1 {
+    let threads = NonZeroUsize::new(threads).ok_or_else(|| {
         error!("The `threads` argument must be greater or equal to 1.");
-        return Err(exitcode::CONFIG);
-    }
+        exitcode::CONFIG
+    })?;
     WORKER_THREADS
-        .set(NonZeroUsize::new(threads).expect("already checked"))
+        .set(threads)
         .expect("double thread initialization");
-    rt_builder.worker_threads(threads);
+    rt_builder.worker_threads(threads.get());
 
     debug!(messaged = "Building runtime.", worker_threads = threads);
     Ok(rt_builder.build().expect("Unable to create async runtime"))
