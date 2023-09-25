@@ -1,15 +1,24 @@
+use std::fmt;
+
+use vector_common::byte_size_of::ByteSizeOf;
 use vector_core::event::Metric;
 
-use crate::sinks::{prelude::*, prometheus::PrometheusRemoteWriteAuth};
+use crate::sinks::prelude::*;
 
 use super::{
-    request_builder::{RemoteWriteEncoder, RemoteWriteRequestBuilder},
-    PrometheusMetricNormalize,
+    request_builder::{RemoteWriteEncoder, RemoteWriteRequest, RemoteWriteRequestBuilder},
+    PartitionKey, PrometheusMetricNormalize,
 };
 
 pub(super) struct RemoteWriteMetric {
     pub(super) metric: Metric,
-    tenant_id: String,
+    tenant_id: Option<String>,
+}
+
+impl Finalizable for RemoteWriteMetric {
+    fn take_finalizers(&mut self) -> EventFinalizers {
+        self.metric.take_finalizers()
+    }
 }
 
 impl GetEventCountTags for RemoteWriteMetric {
@@ -24,6 +33,12 @@ impl EstimatedJsonEncodedSizeOf for RemoteWriteMetric {
     }
 }
 
+impl ByteSizeOf for RemoteWriteMetric {
+    fn allocated_bytes(&self) -> usize {
+        self.metric.allocated_bytes()
+    }
+}
+
 #[derive(Clone, Copy, Debug, Default)]
 pub struct PrometheusRemoteWriteDefaultBatchSettings;
 
@@ -31,11 +46,12 @@ pub(super) struct PrometheusTenantIdPartitioner;
 
 impl Partitioner for PrometheusTenantIdPartitioner {
     type Item = RemoteWriteMetric;
-    type Key = String;
+    type Key = PartitionKey;
 
     fn partition(&self, item: &Self::Item) -> Self::Key {
-        // TODO do this better.
-        item.tenant_id.clone()
+        PartitionKey {
+            tenant_id: item.tenant_id.clone(),
+        }
     }
 }
 
@@ -45,103 +61,89 @@ impl SinkBatchSettings for PrometheusRemoteWriteDefaultBatchSettings {
     const TIMEOUT_SECS: f64 = 1.0;
 }
 
-pub(super) struct RemoteWriteSink {
-    tenant_id: Option<Template>,
-    batch_settings: BatcherSettings,
-    compression: super::Compression,
-    http_auth: Option<PrometheusRemoteWriteAuth>,
-    endpoint: String,
+pub(super) struct RemoteWriteSink<S> {
+    pub(super) tenant_id: Option<Template>,
+    pub(super) batch_settings: BatcherSettings,
+    pub(super) compression: super::Compression,
+    pub(super) default_namespace: Option<String>,
+    pub(super) buckets: Vec<f64>,
+    pub(super) quantiles: Vec<f64>,
+    pub(super) service: S,
 }
 
-impl RemoteWriteSink {
-    fn make_remote_write_event(&self, metric: Metric) -> Option<RemoteWriteMetric> {
-        let tenant_id = self.tenant_id.as_ref().and_then(|template| {
-            template
-                .render_string(&metric)
-                .map_err(|error| {
-                    emit!(TemplateRenderingError {
-                        error,
-                        field: Some("tenant_id"),
-                        drop_event: true,
-                    })
-                })
-                .ok()
-        })?;
-
-        Some(RemoteWriteMetric { metric, tenant_id })
-    }
-
+impl<S> RemoteWriteSink<S>
+where
+    S: Service<RemoteWriteRequest> + Send + 'static,
+    S::Future: Send + 'static,
+    S::Response: DriverResponse + Send + 'static,
+    S::Error: fmt::Debug + Into<crate::Error> + Send,
+{
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let request_builder = RemoteWriteRequestBuilder {
-            endpoint: self.endpoint.clone(),
             compression: self.compression,
-            encoder: RemoteWriteEncoder,
-            http_auth: self.http_auth,
+            encoder: RemoteWriteEncoder {
+                default_namespace: self.default_namespace.clone(),
+                buckets: self.buckets.clone(),
+                quantiles: self.quantiles.clone(),
+            },
         };
 
-        let service = RemoteWriteService {
-            default_namespace: self.default_namespace.clone(),
-            client,
-            buckets,
-            quantiles,
-            http_request_builder,
-            compression: self.compression,
-        };
-        let service = ServiceBuilder::new().service(service);
+        let batch_settings = self.batch_settings;
+        let tenant_id = self.tenant_id.clone();
+        let service = self.service;
 
         input
             .filter_map(|event| future::ready(event.try_into_metric()))
             .normalized_with_default::<PrometheusMetricNormalize>()
-            .filter_map(|event| self.make_remote_write_event(event))
-            .batched_partitioned(PrometheusTenantIdPartitioner, self.batch_settings)
-            .request_builder(request_builder)
+            .filter_map(move |event| {
+                future::ready(make_remote_write_event(tenant_id.as_ref(), event))
+            })
+            .batched_partitioned(PrometheusTenantIdPartitioner, batch_settings)
+            .request_builder(None, request_builder)
+            .filter_map(|request| async move {
+                match request {
+                    Err(e) => {
+                        error!("Failed to build Remote Write request: {:?}.", e);
+                        None
+                    }
+                    Ok(req) => Some(req),
+                }
+            })
             .into_driver(service)
-            .protocol("http")
             .run()
             .await
-
-        /*
-            let buffer = PartitionBuffer::new(MetricsBuffer::new(batch.size));
-            let mut normalizer = MetricNormalizer::<PrometheusMetricNormalize>::default();
-
-            request_settings
-                .partition_sink(HttpRetryLogic, service, buffer, batch.timeout)
-                .with_flat_map(move |event: Event| {
-                    let byte_size = event.size_of();
-                    let json_size = event.estimated_json_encoded_size_of();
-
-                    stream::iter(normalizer.normalize(event.into_metric()).map(|event| {
-                        let tenant_id = tenant_id.as_ref().and_then(|template| {
-                            template
-                                .render_string(&event)
-                                .map_err(|error| {
-                                    emit!(TemplateRenderingError {
-                                        error,
-                                        field: Some("tenant_id"),
-                                        drop_event: true,
-                                    })
-                                })
-                                .ok()
-                        });
-                        let key = PartitionKey { tenant_id };
-                        Ok(EncodedEvent::new(
-                            PartitionInnerBuffer::new(event, key),
-                            byte_size,
-                            json_size,
-                        ))
-                    }))
-                })
-                .sink_map_err(
-                    |error| error!(message = "Prometheus remote_write sink error.", %error),
-                )
-        ;
-        */
     }
 }
 
 #[async_trait]
-impl StreamSink<Event> for RemoteWriteSink {
+impl<S> StreamSink<Event> for RemoteWriteSink<S>
+where
+    S: Service<RemoteWriteRequest> + Send + 'static,
+    S::Future: Send + 'static,
+    S::Response: DriverResponse + Send + 'static,
+    S::Error: fmt::Debug + Into<crate::Error> + Send,
+{
     async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         self.run_inner(input).await
     }
+}
+
+fn make_remote_write_event(
+    tenant_id: Option<&Template>,
+    metric: Metric,
+) -> Option<RemoteWriteMetric> {
+    let tenant_id = tenant_id.and_then(|template| {
+        template
+            .render_string(&metric)
+            .map_err(|error| {
+                emit!(TemplateRenderingError {
+                    error,
+                    field: Some("tenant_id"),
+                    drop_event: true,
+                })
+            })
+            .ok()
+    });
+
+    Some(RemoteWriteMetric { metric, tenant_id })
 }

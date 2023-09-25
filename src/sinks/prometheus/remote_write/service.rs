@@ -1,49 +1,62 @@
-use std::{
-    sync::Arc,
-    task::{Context, Poll},
-};
+use std::task::{Context, Poll};
 
-use aws_sdk_cloudwatch::Region;
+#[cfg(feature = "aws-core")]
+use aws_credential_types::provider::SharedCredentialsProvider;
+#[cfg(feature = "aws-core")]
+use aws_types::region::Region;
+
 use bytes::Bytes;
-use http::StatusCode;
+use http::{StatusCode, Uri};
 
 use super::request_builder::RemoteWriteRequest;
-use crate::{http::HttpClient, sinks::prelude::*};
+use crate::{
+    http::{HttpClient, HttpError},
+    internal_events::EndpointBytesSent,
+    sinks::{prelude::*, util::auth::Auth},
+};
+
+#[derive(Debug, Default, Clone)]
+pub(super) struct RemoteWriteRetryLogic;
+
+impl RetryLogic for RemoteWriteRetryLogic {
+    type Error = HttpError;
+    type Response = RemoteWriteResponse;
+
+    fn is_retriable_error(&self, _error: &Self::Error) -> bool {
+        true
+    }
+
+    fn should_retry_response(&self, response: &Self::Response) -> RetryAction {
+        let status = response.response.status();
+
+        match status {
+            StatusCode::TOO_MANY_REQUESTS => RetryAction::Retry("too many requests".into()),
+            StatusCode::NOT_IMPLEMENTED => {
+                RetryAction::DontRetry("endpoint not implemented".into())
+            }
+            _ if status.is_server_error() => RetryAction::Retry(
+                format!(
+                    "{}: {}",
+                    status,
+                    String::from_utf8_lossy(response.response.body())
+                )
+                .into(),
+            ),
+            _ if status.is_success() => RetryAction::Successful,
+            _ => RetryAction::DontRetry(format!("response status: {}", status).into()),
+        }
+    }
+}
 
 #[derive(Clone)]
 pub(super) struct RemoteWriteService {
-    pub endpoint: Uri,
-    pub aws_region: Option<Region>,
-    pub credentials_provider: Option<SharedCredentialsProvider>,
-
-    default_namespace: Option<String>,
-    client: HttpClient,
-    buckets: Vec<f64>,
-    quantiles: Vec<f64>,
-    compression: Compression,
+    pub(super) endpoint: Uri,
+    pub(super) auth: Option<Auth>,
+    pub(super) client: HttpClient,
+    pub(super) compression: super::Compression,
 }
 
-impl RemoteWriteService {
-    // fn encode_events(&self, metrics: Vec<Metric>) -> Bytes {
-    //     let mut time_series = collector::TimeSeries::new();
-    //     for metric in metrics {
-    //         time_series.encode_metric(
-    //             self.default_namespace.as_deref(),
-    //             &self.buckets,
-    //             &self.quantiles,
-    //             &metric,
-    //         );
-    //     }
-    //     let request = time_series.finish();
-
-    //     let mut out = BytesMut::with_capacity(request.encoded_len());
-    //     request.encode(&mut out).expect("Out of memory");
-    //     out.freeze()
-    // }
-}
-
-struct RemoteWriteResponse {
-    byte_size: usize,
+pub(super) struct RemoteWriteResponse {
     json_size: GroupedCountByteSize,
     response: http::Response<Bytes>,
 }
@@ -60,14 +73,10 @@ impl DriverResponse for RemoteWriteResponse {
     fn events_sent(&self) -> &GroupedCountByteSize {
         &self.json_size
     }
-
-    fn bytes_sent(&self) -> Option<usize> {
-        Some(self.byte_size)
-    }
 }
 
 impl Service<RemoteWriteRequest> for RemoteWriteService {
-    type Response = http::Response<Bytes>;
+    type Response = RemoteWriteResponse;
     type Error = crate::Error;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
@@ -76,51 +85,103 @@ impl Service<RemoteWriteRequest> for RemoteWriteService {
     }
 
     // Emission of internal events for errors and dropped events is handled upstream by the caller.
-    fn call(&mut self, request: RemoteWriteRequest) -> Self::Future {
-        // let (events, key) = buffer.into_parts();
-        // let body = self.encode_events(events);
-        // let body = compress_block(self.compression, body);
-
+    fn call(&mut self, mut request: RemoteWriteRequest) -> Self::Future {
         let client = self.client.clone();
-        // let request_builder = Arc::clone(&self.http_request_builder);
+        let metadata = std::mem::take(request.metadata_mut());
+        let events_byte_size = metadata.into_events_estimated_json_encoded_byte_size();
+        let endpoint = self.endpoint.clone();
+        let auth = self.auth.clone();
+        let compression = self.compression;
 
         Box::pin(async move {
-            // let request = request_builder
-            //     .build_request(http::Method::POST, body, key.tenant_id)
-            //     .await?;
-
-            let metadata = std::mem::take(request.metadata_mut());
-            let mut request = request.request;
-
-            if let Some(credentials_provider) = &self.credentials_provider {
-                sign_request(&mut request, credentials_provider, &self.aws_region).await?;
-            }
+            let request = build_request(
+                http::Method::POST,
+                &endpoint,
+                compression,
+                request.request,
+                request.tenant_id.as_ref(),
+                auth,
+            )
+            .await?;
 
             let (parts, body) = request.into_parts();
-            let request: Request<hyper::Body> = hyper::Request::from_parts(parts, body.into());
+            let request: hyper::Request<hyper::Body> =
+                hyper::Request::from_parts(parts, body.into());
 
-            let (protocol, endpoint) = uri::protocol_endpoint(request.uri().clone());
-
-            let response = client.send(request).await?;
+            let response = client.send(request.map(hyper::Body::from)).await?;
             let (parts, body) = response.into_parts();
             let body = hyper::body::to_bytes(body).await?;
             let byte_size = body.len();
 
             let response = hyper::Response::from_parts(parts, body);
 
+            if response.status().is_success() {
+                // We can't rely on the framework to emit this because we need to specify the additional `endpoint` tag.
+                emit!(EndpointBytesSent {
+                    byte_size,
+                    protocol: "http",
+                    endpoint: &endpoint.to_string(),
+                });
+            }
+
             Ok(RemoteWriteResponse {
-                byte_size,
-                json_size: todo!(),
+                json_size: events_byte_size,
                 response,
             })
         })
     }
 }
 
+#[cfg(feature = "aws-core")]
 async fn sign_request(
     request: &mut http::Request<Bytes>,
     credentials_provider: &SharedCredentialsProvider,
     region: &Option<Region>,
 ) -> crate::Result<()> {
     crate::aws::sign_request("aps", request, credentials_provider, region).await
+}
+
+pub(super) async fn build_request(
+    method: http::Method,
+    endpoint: &Uri,
+    compression: super::Compression,
+    body: Bytes,
+    tenant_id: Option<&String>,
+    auth: Option<Auth>,
+) -> crate::Result<http::Request<Bytes>> {
+    let content_encoding = convert_compression_to_content_encoding(compression);
+
+    let mut builder = http::Request::builder()
+        .method(method)
+        .uri(endpoint)
+        .header("X-Prometheus-Remote-Write-Version", "0.1.0")
+        .header("Content-Encoding", content_encoding)
+        .header("Content-Type", "application/x-protobuf");
+
+    if let Some(tenant_id) = tenant_id {
+        builder = builder.header("X-Scope-OrgID", tenant_id);
+    }
+
+    let mut request = builder.body(body)?;
+
+    if let Some(auth) = auth {
+        match auth {
+            Auth::Basic(http_auth) => http_auth.apply(&mut request),
+            #[cfg(feature = "aws-core")]
+            Auth::Aws {
+                credentials_provider: provider,
+                region,
+            } => sign_request(&mut request, &provider, &Some(region.clone())).await?,
+        }
+    }
+
+    Ok(request)
+}
+
+const fn convert_compression_to_content_encoding(compression: super::Compression) -> &'static str {
+    match compression {
+        super::Compression::Snappy => "snappy",
+        super::Compression::Gzip => "gzip",
+        super::Compression::Zstd => "zstd",
+    }
 }

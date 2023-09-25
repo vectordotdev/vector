@@ -1,21 +1,22 @@
-#[cfg(feature = "aws-core")]
-use aws_credential_types::provider::SharedCredentialsProvider;
-#[cfg(feature = "aws-core")]
-use aws_types::region::Region;
+// #[cfg(feature = "aws-core")]
+// use aws_credential_types::provider::SharedCredentialsProvider;
+// #[cfg(feature = "aws-core")]
+// use aws_types::region::Region;
 use http::Uri;
 use snafu::prelude::*;
 
 use crate::{
-    aws::RegionOrEndpoint,
-    http::{Auth, HttpClient},
-    sinks::{prelude::*, prometheus::PrometheusRemoteWriteAuth, UriParseSnafu},
+    http::HttpClient,
+    sinks::{prelude::*, prometheus::PrometheusRemoteWriteAuth, util::auth::Auth, UriParseSnafu},
 };
 
 use super::{
-    request_builder::build_request,
+    service::{build_request, RemoteWriteRetryLogic, RemoteWriteService},
     sink::{PrometheusRemoteWriteDefaultBatchSettings, RemoteWriteSink},
-    Errors,
 };
+
+#[cfg(feature = "aws-core")]
+use super::Errors;
 
 /// Configuration for the `prometheus_remote_write` sink.
 #[configurable_component(sink(
@@ -81,9 +82,10 @@ pub struct RemoteWriteConfig {
     #[configurable(derived)]
     pub auth: Option<PrometheusRemoteWriteAuth>,
 
+    #[cfg(feature = "aws-config")]
     #[configurable(derived)]
     #[configurable(metadata(docs::advanced))]
-    pub aws: Option<RegionOrEndpoint>,
+    pub aws: Option<crate::aws::RegionOrEndpoint>,
 
     #[configurable(derived)]
     #[serde(
@@ -111,25 +113,26 @@ impl SinkConfig for RemoteWriteConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let endpoint = self.endpoint.parse::<Uri>().context(UriParseSnafu)?;
         let tls_settings = TlsSettings::from_options(&self.tls)?;
-        let batch = self.batch.into_batch_settings()?;
         let request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
         let buckets = self.buckets.clone();
         let quantiles = self.quantiles.clone();
+        let default_namespace = self.default_namespace.clone();
 
         let client = HttpClient::new(tls_settings, cx.proxy())?;
-        let tenant_id = self.tenant_id.clone();
 
         let auth = match &self.auth {
-            Some(PrometheusRemoteWriteAuth::Basic { user, password }) => Some(Auth::Basic {
-                user: user.clone(),
-                password: password.clone().into(),
-            }),
-
-            Some(PrometheusRemoteWriteAuth::Bearer { token }) => Some(Auth::Bearer {
-                token: token.clone(),
-            }),
-
-            #[cfg(feature = "aws_core")]
+            Some(PrometheusRemoteWriteAuth::Basic { user, password }) => {
+                Some(Auth::Basic(crate::http::Auth::Basic {
+                    user: user.clone(),
+                    password: password.clone().into(),
+                }))
+            }
+            Some(PrometheusRemoteWriteAuth::Bearer { token }) => {
+                Some(Auth::Basic(crate::http::Auth::Bearer {
+                    token: token.clone(),
+                }))
+            }
+            #[cfg(feature = "aws-core")]
             Some(PrometheusRemoteWriteAuth::Aws(aws_auth)) => {
                 let region = self
                     .aws
@@ -137,38 +140,40 @@ impl SinkConfig for RemoteWriteConfig {
                     .map(|config| config.region())
                     .ok_or(Errors::AwsRegionRequired)?
                     .ok_or(Errors::AwsRegionRequired)?;
-
                 Some(Auth::Aws {
                     credentials_provider: aws_auth.credentials_provider(region.clone()).await?,
                     region,
                 })
             }
-
             None => None,
         };
 
-        // let http_request_builder = Arc::new(RemoteWriteRequestBuilder {
-        //     endpoint: endpoint.clone(),
-        //     aws_region,
-        //     credentials_provider,
-        //     http_auth,
-        //     compression: self.compression,
-        // });
-
         let healthcheck = healthcheck(
             client.clone(),
-            endpoint,
-            self.compression.clone(),
+            endpoint.clone(),
+            self.compression,
             auth.clone(),
         )
         .boxed();
 
+        let service = RemoteWriteService {
+            endpoint,
+            client,
+            auth: auth.clone(),
+            compression: self.compression,
+        };
+        let service = ServiceBuilder::new()
+            .settings(request_settings, RemoteWriteRetryLogic)
+            .service(service);
+
         let sink = RemoteWriteSink {
             tenant_id: self.tenant_id.clone(),
-            compression: self.compression.clone(),
+            compression: self.compression,
             batch_settings: self.batch.validate()?.into_batcher_settings()?,
-            endpoint: endpoint.clone(),
-            auth,
+            buckets,
+            quantiles,
+            default_namespace,
+            service,
         };
 
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
@@ -186,17 +191,9 @@ async fn healthcheck(
     auth: Option<Auth>,
 ) -> crate::Result<()> {
     let body = bytes::Bytes::new();
-    // let request = http_request_builder.do_the_thing(http::Method::GET, body.into(), None);
-    let request = build_request(
-        http::Method::GET,
-        endpoint,
-        compression,
-        auth,
-        body.into(),
-        None,
-    );
-    // TODO Sign the request
-    let response = client.send(request).await?;
+    let request =
+        build_request(http::Method::GET, &endpoint, compression, body, None, auth).await?;
+    let response = client.send(request.map(hyper::Body::from)).await?;
 
     match response.status() {
         http::StatusCode::OK => Ok(()),

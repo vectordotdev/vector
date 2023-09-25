@@ -1,6 +1,10 @@
 use snafu::prelude::*;
+use vector_core::event::Metric;
 
-use crate::sinks::{prelude::*, util::buffer::metrics::MetricNormalize};
+use crate::sinks::{
+    prelude::*,
+    util::buffer::metrics::{MetricNormalize, MetricSet},
+};
 
 mod config;
 mod request_builder;
@@ -20,7 +24,7 @@ pub use config::RemoteWriteConfig;
 #[derive(Clone, Copy, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(rename_all = "lowercase")]
-pub(super) enum Compression {
+pub enum Compression {
     /// Snappy.
     #[derivative(Default)]
     Snappy,

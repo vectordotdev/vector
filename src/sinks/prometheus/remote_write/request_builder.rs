@@ -1,31 +1,32 @@
-use std::io;
+use std::io::{self, Read};
 
 use bytes::{Bytes, BytesMut};
-use http::{Request, Uri};
+use prost::Message;
 use vector_core::config::telemetry;
 
-use crate::{
-    http::Auth,
-    sinks::{
-        prelude::*,
-        prometheus::{collector, PrometheusRemoteWriteAuth},
-        util::PartitionInnerBuffer,
-    },
+use crate::sinks::{
+    prelude::*,
+    prometheus::{collector, collector::MetricCollector as _},
 };
 
 use super::{sink::RemoteWriteMetric, PartitionKey};
 
-pub(crate) struct RemoteWriteEncoder;
+pub(crate) struct RemoteWriteEncoder {
+    pub(super) default_namespace: Option<String>,
+    pub(super) buckets: Vec<f64>,
+    pub(super) quantiles: Vec<f64>,
+}
 
 impl encoding::Encoder<Vec<RemoteWriteMetric>> for RemoteWriteEncoder {
     fn encode_input(
         &self,
         input: Vec<RemoteWriteMetric>,
-        writer: &mut dyn std::io::Write,
-    ) -> std::io::Result<(usize, GroupedCountByteSize)> {
+        writer: &mut dyn io::Write,
+    ) -> io::Result<(usize, GroupedCountByteSize)> {
         let mut byte_size = telemetry().create_request_count_byte_size();
 
         let mut time_series = collector::TimeSeries::new();
+        let len = input.len();
         for metric in input {
             byte_size.add_event(&metric.metric, metric.estimated_json_encoded_size_of());
 
@@ -33,7 +34,7 @@ impl encoding::Encoder<Vec<RemoteWriteMetric>> for RemoteWriteEncoder {
                 self.default_namespace.as_deref(),
                 &self.buckets,
                 &self.quantiles,
-                &metric,
+                &metric.metric,
             );
         }
         let request = time_series.finish();
@@ -42,17 +43,18 @@ impl encoding::Encoder<Vec<RemoteWriteMetric>> for RemoteWriteEncoder {
         request.encode(&mut out).expect("Out of memory");
         let body = out.freeze();
 
-        write_all(writer, input.len(), body.as_ref())?;
+        write_all(writer, len, body.as_ref())?;
 
         Ok((body.len(), byte_size))
     }
 }
 
+#[derive(Clone)]
 pub(super) struct RemoteWriteRequest {
-    pub(super) request: http::Request<Bytes>,
+    pub(super) request: Bytes,
+    pub(super) tenant_id: Option<String>,
     finalizers: EventFinalizers,
     metadata: RequestMetadata,
-    tenant_id: String,
 }
 
 impl Finalizable for RemoteWriteRequest {
@@ -71,57 +73,17 @@ impl MetaDescriptive for RemoteWriteRequest {
     }
 }
 
-struct RemoteWriteMetadata {
+pub(super) struct RemoteWriteMetadata {
     finalizers: EventFinalizers,
     tenant_id: Option<String>,
 }
 
-pub struct RemoteWriteRequestBuilder {
-    pub compression: super::Compression,
-    pub encoder: RemoteWriteEncoder,
-    pub http_auth: Option<Auth>,
-    pub endpoint: String,
+pub(super) struct RemoteWriteRequestBuilder {
+    pub(super) compression: super::Compression,
+    pub(super) encoder: RemoteWriteEncoder,
 }
 
-pub fn build_request(
-    method: http::Method,
-    endpoint: Uri,
-    compression: super::Compression,
-    auth: Option<Auth>,
-    body: Vec<u8>,
-    tenant_id: Option<String>,
-) -> Request<hyper::Body> {
-    let content_encoding = convert_compression_to_content_encoding(compression);
-
-    let mut builder = http::Request::builder()
-        .method(method)
-        .uri(endpoint)
-        .header("X-Prometheus-Remote-Write-Version", "0.1.0")
-        .header("Content-Encoding", content_encoding)
-        .header("Content-Type", "application/x-protobuf");
-
-    if let Some(tenant_id) = &tenant_id {
-        builder = builder.header("X-Scope-OrgID", tenant_id);
-    }
-
-    let mut request = builder.body(body.into()).unwrap();
-    if let Some(http_auth) = &auth {
-        http_auth.apply(&mut request);
-    }
-
-    // if let Some(credentials_provider) = &self.credentials_provider {
-    //     sign_request(&mut request, credentials_provider, &self.aws_region).await?;
-    // }
-
-    // let (parts, body) = request.into_parts();
-    // let request: Request<hyper::Body> = hyper::Request::from_parts(parts, body.into());
-
-    request
-}
-
-impl RequestBuilder<PartitionInnerBuffer<Vec<RemoteWriteMetric>, PartitionKey>>
-    for RemoteWriteRequestBuilder
-{
+impl RequestBuilder<(PartitionKey, Vec<RemoteWriteMetric>)> for RemoteWriteRequestBuilder {
     type Metadata = RemoteWriteMetadata;
     type Events = Vec<RemoteWriteMetric>;
     type Encoder = RemoteWriteEncoder;
@@ -130,7 +92,9 @@ impl RequestBuilder<PartitionInnerBuffer<Vec<RemoteWriteMetric>, PartitionKey>>
     type Error = io::Error;
 
     fn compression(&self) -> Compression {
-        self.compression
+        // Since we also support Snappy which isn't handled by the main compression,
+        // we need to do this ourselves.
+        Compression::None
     }
 
     fn encoder(&self) -> &Self::Encoder {
@@ -139,16 +103,16 @@ impl RequestBuilder<PartitionInnerBuffer<Vec<RemoteWriteMetric>, PartitionKey>>
 
     fn split_input(
         &self,
-        input: PartitionInnerBuffer<Vec<RemoteWriteMetric>, PartitionKey>,
+        input: (PartitionKey, Vec<RemoteWriteMetric>),
     ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
-        let (events, key) = input.into_parts();
+        let (key, mut events) = input;
         let builder = RequestMetadataBuilder::from_events(&events);
         let metadata = RemoteWriteMetadata {
-            finalizers: input.take_finalizers(),
-            tenant_id: key,
+            finalizers: events.take_finalizers(),
+            tenant_id: key.tenant_id,
         };
 
-        (metadata, builder, input)
+        (metadata, builder, events)
     }
 
     fn build_request(
@@ -158,19 +122,13 @@ impl RequestBuilder<PartitionInnerBuffer<Vec<RemoteWriteMetric>, PartitionKey>>
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
         let body = payload.into_payload();
-        let request = build_request(
-            http::Method::POST,
-            &self.endpoint,
-            self.compression,
-            self.http_auth,
-            body,
-            metadata.tenant_id,
-        );
+        let body = compress_block(self.compression, body);
+
         RemoteWriteRequest {
-            request,
+            request: Bytes::from(body),
             finalizers: metadata.finalizers,
             tenant_id: metadata.tenant_id,
-            metadata,
+            metadata: request_metadata,
         }
     }
 }
@@ -190,13 +148,5 @@ fn compress_block(compression: super::Compression, data: Bytes) -> Vec<u8> {
         super::Compression::Zstd => {
             zstd::encode_all(data.as_ref(), 0).expect("zstd compression failed, please report")
         }
-    }
-}
-
-const fn convert_compression_to_content_encoding(compression: super::Compression) -> &'static str {
-    match compression {
-        super::Compression::Snappy => "snappy",
-        super::Compression::Gzip => "gzip",
-        super::Compression::Zstd => "zstd",
     }
 }

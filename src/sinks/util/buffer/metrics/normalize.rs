@@ -85,7 +85,7 @@ type MetricEntry = (MetricData, EventMetadata);
 ///
 /// This is primarily a wrapper around `HashMap` with convenience methods to make it easier to perform
 /// normalization-specific operations.
-#[derive(Clone, Default)]
+#[derive(Clone, Default, Debug)]
 pub struct MetricSet(HashMap<MetricSeries, MetricEntry>);
 
 impl MetricSet {
