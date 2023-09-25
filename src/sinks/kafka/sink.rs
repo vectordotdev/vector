@@ -13,6 +13,7 @@ use super::config::{KafkaRole, KafkaSinkConfig};
 use crate::{
     kafka::KafkaStatisticsContext,
     sinks::kafka::{request_builder::KafkaRequestBuilder, service::KafkaService},
+    sinks::kafka::{request_builder::KafkaRequestBuilder, service::KafkaService},
     sinks::prelude::*,
 };
 
@@ -71,6 +72,7 @@ impl KafkaSink {
             key_field: self.key_field,
             headers_key: self.headers_key,
             encoder: (self.transformer, self.encoder),
+            encoder: (self.transformer, self.encoder),
         };
 
         input
@@ -101,6 +103,7 @@ impl KafkaSink {
                 }
             })
             .into_driver(service)
+            .protocol("kafka")
             .protocol("kafka")
             .run()
             .await

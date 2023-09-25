@@ -105,7 +105,7 @@ impl Service<KafkaRequest> for KafkaService {
             match this.kafka_producer.send(record, Timeout::Never).await {
                 Ok((_partition, _offset)) => {
                     let raw_byte_size =
-                        request.body.len() + request.metadata.key.map(|x| x.len()).unwrap_or(0);
+                        request.body.len() + request.metadata.key.map_or(0, |x| x.len());
                     Ok(KafkaResponse {
                         event_byte_size,
                         raw_byte_size,
