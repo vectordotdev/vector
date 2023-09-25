@@ -216,7 +216,7 @@ base: components: sinks: datadog_logs: configuration: {
 				description: """
 					Configuration for outbound request concurrency.
 
-					This can be set either to one of the below enum values or to a uint, which denotes
+					This can be set either to one of the below enum values or to a positive integer, which denotes
 					a fixed concurrency limit.
 					"""
 				required: false
