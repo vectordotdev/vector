@@ -457,7 +457,7 @@ mod tests {
         toml::from_str::<TowerRequestConfig>(&toml).expect("Default config failed");
 
         let cfg = toml::from_str::<TowerRequestConfig>("").expect("Empty config failed");
-        assert_eq!(cfg.concurrency, Concurrency::None);
+        assert_eq!(cfg.concurrency, Concurrency::Adaptive);
 
         let cfg = toml::from_str::<TowerRequestConfig>("concurrency = 10")
             .expect("Fixed concurrency failed");
