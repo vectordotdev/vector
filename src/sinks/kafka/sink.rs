@@ -13,7 +13,6 @@ use super::config::{KafkaRole, KafkaSinkConfig};
 use crate::{
     kafka::KafkaStatisticsContext,
     sinks::kafka::{request_builder::KafkaRequestBuilder, service::KafkaService},
-    sinks::kafka::{request_builder::KafkaRequestBuilder, service::KafkaService},
     sinks::prelude::*,
 };
 
