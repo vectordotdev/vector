@@ -33,7 +33,7 @@ remap: functions: parse_aws_vpc_flow_log: {
 				"""#
 			return: {
 				"version":      2
-				"account_id":   123456789010
+				"account_id":   "123456789010"
 				"interface_id": "eni-1235b8ca123456789"
 				"srcaddr":      null
 				"dstaddr":      null

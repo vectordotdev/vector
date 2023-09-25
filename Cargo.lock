@@ -662,7 +662,7 @@ dependencies = [
  "rand 0.8.5",
  "regex",
  "ring",
- "rustls 0.21.6",
+ "rustls 0.21.7",
  "rustls-native-certs",
  "rustls-pemfile",
  "rustls-webpki",
