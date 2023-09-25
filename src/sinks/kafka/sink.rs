@@ -72,7 +72,6 @@ impl KafkaSink {
             key_field: self.key_field,
             headers_key: self.headers_key,
             encoder: (self.transformer, self.encoder),
-            encoder: (self.transformer, self.encoder),
         };
 
         input
