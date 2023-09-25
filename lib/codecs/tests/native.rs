@@ -214,12 +214,10 @@ fn roundtrip_fixtures(
 }
 
 fn load_deserialize(path: &Path, deserializer: &dyn Deserializer) -> (Bytes, Event) {
-    println!("path {:?}", path);
     let mut file = File::open(path).unwrap();
     let mut buf = Vec::new();
     file.read_to_end(&mut buf).unwrap();
     let buf = Bytes::from(buf);
-    // println!("{:#?}", buf);
     // Ensure that we can parse the json fixture successfully
     let mut events = deserializer
         .parse(buf.clone(), LogNamespace::Legacy)
