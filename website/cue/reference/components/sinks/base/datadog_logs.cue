@@ -235,9 +235,8 @@ base: components: sinks: datadog_logs: configuration: {
 															Only one request can be outstanding at any given time.
 															"""
 						}
-						examples: ["none", "adaptive", 128]
 					}
-					uint: examples: ["none", "adaptive", 128]
+					uint: {}
 				}
 			}
 			headers: {

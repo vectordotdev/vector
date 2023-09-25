@@ -748,9 +748,8 @@ base: components: sinks: aws_s3: configuration: {
 															Only one request can be outstanding at any given time.
 															"""
 						}
-						examples: ["none", "adaptive", 128]
 					}
-					uint: examples: ["none", "adaptive", 128]
+					uint: {}
 				}
 			}
 			rate_limit_duration_secs: {

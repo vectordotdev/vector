@@ -518,9 +518,8 @@ base: components: sinks: http: configuration: {
 															Only one request can be outstanding at any given time.
 															"""
 						}
-						examples: ["none", "adaptive", 128]
 					}
-					uint: examples: ["none", "adaptive", 128]
+					uint: {}
 				}
 			}
 			headers: {
