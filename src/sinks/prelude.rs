@@ -16,7 +16,7 @@ pub use crate::{
             builder::SinkBuilderExt,
             encoding::{self, write_all},
             metadata::RequestMetadataBuilder,
-            request_builder::EncodeResult,
+            request_builder::{default_request_builder_concurrency_limit, EncodeResult},
             retries::{RetryAction, RetryLogic},
             service::{ServiceBuilderExt, Svc},
             BatchConfig, Compression, Concurrency, NoDefaultsBatchSettings, RequestBuilder,
