@@ -186,7 +186,7 @@ base: components: sinks: gcp_stackdriver_metrics: configuration: {
 					Configuration for outbound request concurrency.
 
 					This can be set either to one of the below enum values or to a uint, which denotes
-					a fixed amount of concurrency limit.
+					a fixed concurrency limit.
 					"""
 				required: false
 				type: {

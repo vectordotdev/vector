@@ -19,7 +19,7 @@ use serde::{
 /// Configuration for outbound request concurrency.
 ///
 /// This can be set either to one of the below enum values or to a uint, which denotes
-/// a fixed amount of concurrency limit.
+/// a fixed concurrency limit.
 #[derive(Clone, Copy, Debug, Derivative, Eq, PartialEq)]
 pub enum Concurrency {
     /// A fixed concurrency of 1.
@@ -140,7 +140,7 @@ impl Configurable for Concurrency {
             r#"Configuration for outbound request concurrency.
 
 This can be set either to one of the below enum values or to a uint, which denotes
-a fixed amount of concurrency limit."#,
+a fixed concurrency limit."#,
         );
         metadata.add_custom_attribute(CustomAttribute::kv("docs::enum_tagging", "external"));
         metadata.add_custom_attribute(CustomAttribute::kv("docs::examples", "none"));
