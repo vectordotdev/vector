@@ -2,6 +2,7 @@ use std::{future::ready, pin::Pin};
 
 use futures::{stream, Stream, StreamExt};
 use mlua::ExternalError;
+use mlua::FromLua;
 use ordered_float::NotNan;
 use snafu::{ResultExt, Snafu};
 use vector_config::configurable_component;
@@ -104,7 +105,7 @@ impl Clone for Lua {
 
 // This wrapping structure is added in order to make it possible to have independent implementations
 // of `mlua::UserData` trait for event in version 1 and version 2 of the transform.
-#[derive(Clone)]
+#[derive(Clone, FromLua)]
 struct LuaEvent {
     inner: Event,
 }
