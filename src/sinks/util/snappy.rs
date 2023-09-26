@@ -35,7 +35,7 @@ impl<W: io::Write> SnappyEncoder<W> {
         Ok(self.writer)
     }
 
-    pub fn get_ref(&self) -> &W {
+    pub const fn get_ref(&self) -> &W {
         &self.writer
     }
 
