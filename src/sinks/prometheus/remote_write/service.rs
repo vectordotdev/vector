@@ -6,47 +6,17 @@ use aws_credential_types::provider::SharedCredentialsProvider;
 use aws_types::region::Region;
 
 use bytes::Bytes;
-use http::{StatusCode, Uri};
+use http::Uri;
 
 use super::request_builder::RemoteWriteRequest;
 use crate::{
-    http::{HttpClient, HttpError},
+    http::HttpClient,
     internal_events::EndpointBytesSent,
-    sinks::{prelude::*, util::auth::Auth},
+    sinks::{
+        prelude::*,
+        util::{auth::Auth, http::HttpResponse},
+    },
 };
-
-#[derive(Debug, Default, Clone)]
-pub(super) struct RemoteWriteRetryLogic;
-
-impl RetryLogic for RemoteWriteRetryLogic {
-    type Error = HttpError;
-    type Response = RemoteWriteResponse;
-
-    fn is_retriable_error(&self, _error: &Self::Error) -> bool {
-        true
-    }
-
-    fn should_retry_response(&self, response: &Self::Response) -> RetryAction {
-        let status = response.response.status();
-
-        match status {
-            StatusCode::TOO_MANY_REQUESTS => RetryAction::Retry("too many requests".into()),
-            StatusCode::NOT_IMPLEMENTED => {
-                RetryAction::DontRetry("endpoint not implemented".into())
-            }
-            _ if status.is_server_error() => RetryAction::Retry(
-                format!(
-                    "{}: {}",
-                    status,
-                    String::from_utf8_lossy(response.response.body())
-                )
-                .into(),
-            ),
-            _ if status.is_success() => RetryAction::Successful,
-            _ => RetryAction::DontRetry(format!("response status: {}", status).into()),
-        }
-    }
-}
 
 #[derive(Clone)]
 pub(super) struct RemoteWriteService {
@@ -56,27 +26,8 @@ pub(super) struct RemoteWriteService {
     pub(super) compression: super::Compression,
 }
 
-pub(super) struct RemoteWriteResponse {
-    json_size: GroupedCountByteSize,
-    response: http::Response<Bytes>,
-}
-
-impl DriverResponse for RemoteWriteResponse {
-    fn event_status(&self) -> EventStatus {
-        if self.response.status().is_success() {
-            EventStatus::Delivered
-        } else {
-            EventStatus::Errored
-        }
-    }
-
-    fn events_sent(&self) -> &GroupedCountByteSize {
-        &self.json_size
-    }
-}
-
 impl Service<RemoteWriteRequest> for RemoteWriteService {
-    type Response = RemoteWriteResponse;
+    type Response = HttpResponse;
     type Error = crate::Error;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
@@ -111,22 +62,22 @@ impl Service<RemoteWriteRequest> for RemoteWriteService {
             let response = client.send(request.map(hyper::Body::from)).await?;
             let (parts, body) = response.into_parts();
             let body = hyper::body::to_bytes(body).await?;
-            let byte_size = body.len();
+            let raw_byte_size = body.len();
+            let http_response = hyper::Response::from_parts(parts, body);
 
-            let response = hyper::Response::from_parts(parts, body);
-
-            if response.status().is_success() {
+            if http_response.status().is_success() {
                 // We can't rely on the framework to emit this because we need to specify the additional `endpoint` tag.
                 emit!(EndpointBytesSent {
-                    byte_size,
+                    byte_size: raw_byte_size,
                     protocol: "http",
                     endpoint: &endpoint.to_string(),
                 });
             }
 
-            Ok(RemoteWriteResponse {
-                json_size,
-                response,
+            Ok(HttpResponse {
+                events_byte_size: json_size,
+                http_response,
+                raw_byte_size,
             })
         })
     }
