@@ -10,37 +10,37 @@ remap: functions: community_id: {
 		{
 			name:        "source_ip"
 			description: "The source IP address."
-			required: true
+			required:    true
 			type: ["string"]
 		},
 		{
 			name:        "destination_ip"
 			description: "The destination IP address."
-			required: true
+			required:    true
 			type: ["string"]
 		},
 		{
 			name:        "protocol"
 			description: "The protocol number."
-			required: true
+			required:    true
 			type: ["integer"]
 		},
 		{
 			name:        "source_port"
 			description: "The source port."
-			required: false
+			required:    false
 			type: ["integer"]
 		},
 		{
 			name:        "destination_port"
 			description: "The destination port."
-			required: false
+			required:    false
 			type: ["integer"]
 		},
 		{
 			name:        "seed"
 			description: "The custom seed number."
-			required: false
+			required:    false
 			type: ["integer"]
 		},
 	]
