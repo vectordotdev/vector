@@ -18,10 +18,6 @@ on:
   workflow_dispatch:
   schedule:
     - cron: '0 4 * * *'
-  pull_request: #TODO delete this before merging
-    types:
-      - opened
-      - synchronize
 env:
   SINGLE_MACHINE_PERFORMANCE_API: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_API }}
 
