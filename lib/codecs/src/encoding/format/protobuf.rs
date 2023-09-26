@@ -467,12 +467,8 @@ mod tests {
 
     #[test]
     fn test_encode_decoding_protobuf_test_data() {
-        // test_protobuf (proto2)
         // just check for the side-effect of success
         run_encoding_on_decoding_test_data("test_protobuf.desc", "test_protobuf.Person").unwrap();
-
-        // test_protobuf (proto3)
-        // just check for the side-effect of success
         run_encoding_on_decoding_test_data("test_protobuf3.desc", "test_protobuf3.Person").unwrap();
     }
 }
