@@ -22,8 +22,17 @@ remap: functions: truncate: {
 		{
 			name: "ellipsis"
 			description: """
-				An ellipsis (`...`) is appended if this is set to `true` _and_ the `value` string ends up being
-				truncated because it's exceeded the `limit`.
+				This argument is deprecated. An ellipsis (`...`) is appended if this is set to `true` _and_ the `value` string
+				ends up being truncated because it's exceeded the `limit`.
+				"""
+			required: true
+			type: ["boolean"]
+		},
+		{
+			name: "suffix"
+			description: """
+				A custom suffix (`...`) will be appended to truncated strings.
+				This is ignored if "ellipsis" is set to true for backwards compatibility.
 				"""
 			required: true
 			type: ["boolean"]
@@ -42,9 +51,16 @@ remap: functions: truncate: {
 		{
 			title: "Truncate a string"
 			source: #"""
-				truncate("A rather long sentence.", limit: 11, ellipsis: true)
+				truncate("A rather long sentence.", limit: 11, suffix: "...")
 				"""#
 			return: "A rather lo..."
+		},
+		{
+			title: "Truncate a string"
+			source: #"""
+				truncate("A rather long sentence.", limit: 11, suffix: "[TRUNCATED]")
+				"""#
+			return: "A rather lo[TRUNCATED]"
 		},
 	]
 }
