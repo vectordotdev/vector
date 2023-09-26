@@ -256,7 +256,7 @@
     .bar = to_int!(.bar)
     .baz = to_float!(.baz)
     .bev = to_bool!(.bev)
-    .a = to_string(to_timestamp!(.a))
+    .a = to_string(parse_timestamp!(.a, "%+"))
   """
 [[tests]]
   name = "remap_coercion"
@@ -643,7 +643,7 @@
   inputs = []
   type = "remap"
   source = """
-    .a = format_timestamp!(to_timestamp!(.foo), format: "%+")
+    .a = format_timestamp!(from_unix_timestamp!(.foo), format: "%+")
   """
 [[tests]]
   name = "remap_function_format_timestamp"
@@ -1166,7 +1166,7 @@
     .boolean = tag_types_externally(true)
     .map = tag_types_externally({ "foo": "bar" })
     .array = tag_types_externally(["foo"])
-    .timestamp = tag_types_externally(to_timestamp!("2021-01-01T00:00:00.00Z"))
+    .timestamp = tag_types_externally(parse_timestamp!("2021-01-01T00:00:00.00Z", "%+"))
     .regex = tag_types_externally(r'.*')
     .null = tag_types_externally(null)
   """
@@ -1187,7 +1187,7 @@
         .boolean == { "boolean": true } &&
         .map == { "foo": { "string": "bar" } } &&
         .array == [{ "string": "foo" }] &&
-        .timestamp == { "timestamp": to_timestamp!("2021-01-01T00:00:00.00Z") } &&
+        .timestamp == { "timestamp": parse_timestamp!("2021-01-01T00:00:00.00Z", "%+") } &&
         .regex == { "regex": r'.*' } &&
         .null == null
       '''
