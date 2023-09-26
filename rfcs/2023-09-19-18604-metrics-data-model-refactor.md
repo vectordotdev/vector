@@ -20,7 +20,7 @@ as well as help future-proof it.
 ## Cross-cutting concerns
 
 - Stability / schema guarantees around `native_json` codec by basing it on the Protocol Buffers
-  schema (no overarching Github issue for this yet) and how changes proposed by this RFC would alter
+  schema (no overarching GitHub issue for this yet) and how changes proposed by this RFC would alter
   the output of that codec
 
 ## Scope
@@ -214,18 +214,20 @@ be aggregated downstream (more on that in the Drawbacks section)
 ### Refactoring `Distribution` into an enum that handled all distribution types
 
 We would refactor the `Distribution` variant to be a dedicated enum that represented all possible
-forms of a "distribution". While there are a few different forms and usaes for the word
+forms of a "distribution". While there are a few different forms and uses for the word
 "distribution," we're referring to them here as any metric that encapsulates multiple
 samples/observations. This could be the raw samples themselves, or it could be a
 compressed/condensed form such as a histogram or sketch.
 
 One key aspect here is that a distribution to meant to encompass all relevant/possible forms that
-Vector may need to handle and in a way that can be used interchangably between sources and sinks,
+Vector may need to handle and in a way that can be used interchangeably between sources and sinks,
 such as taking in a fixed-bucket histogram from the `prometheus_scrape` source and being able to get
-a DDSketch to send out from the `datadog_metrics` sink.  Said another way, the goal here is to be
-able to hand a `Distribution` metric to any metrics-capable sink and allow it to represent that
-distribution in the highest fidelity way possible, whether that's converting from one distribution
-variant to another, or downsampling it such as emitting fixed quantiles from a sketch, and so on.
+a DDSketch to send out from the `datadog_metrics` sink.
+
+Said another way, the goal here is to be able to hand a `Distribution` metric to any metrics-capable
+sink and allow it to represent that distribution in the highest fidelity way possible, whether
+that's losslessly converting from one distribution variant to another, or emitting fixed quantiles
+from a sketch, and so on.
 
 #### Raw distribution
 
@@ -376,7 +378,7 @@ to fully align Vector with OpenTelemetry, such as matching terminology (e.g. OTL
 temporality" where Vector uses "metric kind") or maintaining additional metadata, like if a metric
 was a floating-point or integer value, or handling exemplars.
 
-That said, it's not clear that there's enough value to doing this given that the RFC prosposal
+That said, it's not clear that there's enough value to doing this given that the RFC proposal
 itself is still fully compatible with OpenTelemetry, but simply lacks alignment in areas like
 terminology, etc.
 
@@ -427,14 +429,14 @@ losslessly convert one to the other.
 ## Outstanding Questions
 
 - While we ostensibly look to fully support all systems that Vector provides components for, set
-  usage in StatsD is anecdotally almost non-existent. How strong of an indicator would we want to
-  see before feeling comfortable removing support for sets entirely? This would imply not
-  aggregating them in the `statsd` source at all, as we would still remove `Set` from `MetricValue`.
+  usage in StatsD is anecdotally almost nonexistent. How strong of an indicator would we want to see
+  before feeling comfortable removing support for sets entirely? This would imply not aggregating
+  them in the `statsd` source at all, as we would still remove `Set` from `MetricValue`.
 - Would we want to go as far as marking the removed/refactored metric types as deprecated, and then
   remove support for them entirely from the Protocol Buffers schema in a future release? The
   conversion logic (for going from the Protocol Buffers representation to the native Vector
-  representation) would represent somewhat of a technical debt footgun if we did further
-  refactoring in the future.
+  representation) would represent additional technical debt that could hamper our efforts if we did
+  further refactoring in the future.
 
 ## Plan Of Attack
 
@@ -449,5 +451,5 @@ losslessly convert one to the other.
 - [ ] Update the Protocol Buffers/Vector conversion code to handle the decomposing of aggregated
   histograms
 - [ ] Refactor `Distribution` in `MetricValue` to subsume `AggregatedHistogram` and `Sketch`
-  (refactoring of `MetricValue`, updating components to use new variant/subvariants, updating
+  (refactoring of `MetricValue`, updating components to use new `Distribution` variant, updating
   Protocol Buffers/Vector conversion code)
