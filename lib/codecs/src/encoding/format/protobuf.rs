@@ -80,25 +80,20 @@ fn convert_value_raw(
         )),
         (Value::Bytes(b), Kind::Enum(descriptor)) => {
             let string = String::from_utf8_lossy(&b).into_owned();
-            // check for an exact enum name match
-            if let Some(d) = descriptor.values().filter(|v| v.name() == &string).next() {
-                return Ok(prost_reflect::Value::EnumNumber(d.number()));
-            }
-            // check for an enum name match while ignoring capitalization
             if let Some(d) = descriptor
                 .values()
                 .filter(|v| v.name().eq_ignore_ascii_case(&string))
                 .next()
             {
                 return Ok(prost_reflect::Value::EnumNumber(d.number()));
+            } else {
+                Err(format!(
+                    "Enum `{}` has no value that matches string '{}'",
+                    descriptor.full_name(),
+                    string
+                )
+                .into())
             }
-            // give up
-            Err(format!(
-                "Enum `{}` has no value that matches string '{}'",
-                descriptor.full_name(),
-                string
-            )
-            .into())
         }
         (Value::Float(f), Kind::Double) => Ok(prost_reflect::Value::F64(f.into_inner())),
         (Value::Float(f), Kind::Float) => Ok(prost_reflect::Value::F32(f.into_inner() as f32)),
