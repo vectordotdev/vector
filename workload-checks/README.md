@@ -6,4 +6,4 @@ By consistently running these checks we establish a historical baseline that we 
 
 ## Adding an Experiment
 
-You can read more about the workload requirements [here](https://github.com/DataDog/datadog-agent/blob/main/test/workload-checks/README.md).
+You can read more about the workload requirements [here](https://datadoghq.atlassian.net/wiki/spaces/SMP/pages/3183248544/Workload+Checks+-+Getting+Started).

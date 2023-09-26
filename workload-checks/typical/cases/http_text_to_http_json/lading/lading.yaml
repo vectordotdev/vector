@@ -4,7 +4,7 @@ generator:
              59, 61, 67, 71, 73, 79, 83, 89, 97, 101, 103, 107, 109, 113, 127, 131]
       headers: {}
       target_uri: "http://localhost:8282/"
-      bytes_per_second: "500 Mb"
+      bytes_per_second: "250 Mb"
       parallel_connections: 10
       method:
         post:
