@@ -99,7 +99,7 @@ to this:
 ```rust
 pub enum Distribution {
     Raw { samples: Vec<Sample> },
-    FixedHistogram { buckets: Vec<Bucket>, count: u64, sum: f64 },
+    Histogram { buckets: Vec<Bucket>, count: u64, sum: f64 },
     Sketch { sketch: MetricSketch },
 }
 
@@ -140,7 +140,7 @@ The user-visible changes would be:
   renamed to `distribution` (would map to `Distribution::Raw`, which would maintain the behavior of
   specifying `histogram`/`summary` in terms of storing the raw sample)
 - no more `AggregatedHistogram` metric type when using the `lua` transform, as it would be renamed
-  to `fixed_histogram`
+  to `histogram`
 
 ## Implementation
 
@@ -197,16 +197,16 @@ given aggregation window, was emitted as a gauge. Similarly, the Datadog Agent w
 well, emitting a gauge representing the counter of unique values seen during the aggregation window.
 
 Currently, Vector will handle sets natively, passing along the actual value seen up until it reaches
-a sink, where we either emit the metric directly (in the case of the `statsd` sink) or converting it
-to a gauge, such as in the `datadog_metrics` sink.
+a sink, where we either emit the metric directly (in the case of the `statsd` sink) or convert it to
+a gauge, such as in the `datadog_metrics` sink.
 
 With this change, we would move to aggregating set values within the `statsd` source itself and
 emitting them, as a gauge, on an interval. This would accomplish a few things:
 
-- we would remove the need to handle `Set` metrics in all metrics-capable components known that in
-  nearly all cases, they will simply be turned into a gauge before leaving Vector
+- we would remove the need to handle `Set` metrics in all metrics-capable components knowing that,
+  in nearly all cases, they will simply be turned into a gauge before leaving Vector
 - we would emulate StatsD/DogStatsD in terms of aggregation behavior, emitting the gauge directly in
-  the source, to at least maintain parity in resulting output representation of a set metric
+  the source, which would maintain parity with how StatsD/DogStatsD emit any set metrics
 
 This is not without potential caveats, namely around metric tagging and how those emitted gauges can
 be aggregated downstream (more on that in the Drawbacks section)
@@ -229,14 +229,14 @@ variant to another, or downsampling it such as emitting fixed quantiles from a s
 
 #### Raw distribution
 
-This variant would match the current shape of `Distribution` where the raw samples are stored, which
+The `Raw` variant would match the current shape of `Distribution` where the raw samples are stored, which
 includes the sample value and the sample rate. This variant is used for sources where the sample
 value comes in directly (such as StatsD histograms) or use cases like the `log_to_metric` transform,
 where the value is also coming directly from a log event.
 
-#### Fixed histograms
+#### Histograms
 
-This variant would be the spiritual successor to `AggregatedHistogram`, where we have a true
+The `Histogram` variant would be the spiritual successor to `AggregatedHistogram`, where we have a true
 histogram (bucketed values) but the number of buckets, and the bucket sizes, are fixed. While a
 DDSketch can be decomposed into its individual buckets, such that we could theoretically use a
 DDSketch to emit a Prometheus-capable aggregated histogram, we have no mechanism to store the
@@ -295,10 +295,14 @@ generally go about one of two ways: either breaking each bucket/statistic into a
 (as this RFC proposes) or by converting it into another statistical data structure, such as
 `DDSketch`.
 
-By simplifying the data model, we can remove nearly all of that boilerplate handling code and get
-the behavior for free. We would instead only need to handle the exceptions to the rule, such as
-converting them into a `DDSketch` data structure, and so on.
-
+By simplifying the data model, we can remove nearly all of that boilerplate handling code and simply
+let sinks handle each metric type in a more direct way. For counters and gauges, this is already
+taken care of as it stands today. For sinks handling either aggregated histograms, distributions, or
+sketches, they would now only need to deal with `Distribution`. Helper methods will be provided to
+convert `Distribution` into the highest fidelity form supported by the sink: a sink that supports
+sketches can ask for it to be converted to a sketch, while another sink that only supports
+histograms can ask for a histogram, since all distribution variants can be converted to either a
+histogram or sketch.
 ### Aligns more closely with other metrics systems
 
 While the current data model is more of a union of possible metric types based on the metric systems
