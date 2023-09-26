@@ -3,7 +3,7 @@
 # Runs Vector Workload Checks.
 #
 # Runs on:
-#  - scheduled daily 04:00 UTC
+#  - scheduled UTC midnight Tues-Sat
 
 # This workflow runs the collection of our workload checks, using the latest Vector nightly image,
 # which depends on when the workflow is invoked.
@@ -17,7 +17,8 @@ on:
   workflow_call:
   workflow_dispatch:
   schedule:
-    - cron: '0 4 * * *'
+    # At midnight UTC Tue-Sat
+    - cron: '0 0 * * 2-6'
 env:
   SINGLE_MACHINE_PERFORMANCE_API: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_API }}
 
