@@ -17,7 +17,7 @@ on:
   workflow_call:
   workflow_dispatch:
   schedule:
-    - cron: '0 0 * * *'
+    - cron: '0 4 * * *'
   pull_request: #TODO delete this before merging
     types:
       - opened
