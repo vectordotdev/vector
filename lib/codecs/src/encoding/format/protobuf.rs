@@ -258,10 +258,10 @@ mod tests {
             ])),
         )
         .unwrap();
-        assert!(mfield!(message, "i32").as_i32() == Some(-1234));
-        assert!(mfield!(message, "i64").as_i64() == Some(-9876));
-        assert!(mfield!(message, "u32").as_u32() == Some(1234));
-        assert!(mfield!(message, "u64").as_u64() == Some(9876));
+        assert_eq!(Some(-1234), mfield!(message, "i32").as_i32());
+        assert_eq!(Some(-9876), mfield!(message, "i64").as_i64());
+        assert_eq!(Some(1234), mfield!(message, "u32").as_u32());
+        assert_eq!(Some(9876), mfield!(message, "u64").as_u64());
     }
 
     #[test]
@@ -274,8 +274,8 @@ mod tests {
             ])),
         )
         .unwrap();
-        assert!(mfield!(message, "d").as_f64() == Some(11.0));
-        assert!(mfield!(message, "f").as_f32() == Some(2.0));
+        assert_eq!(Some(11.0), mfield!(message, "d").as_f64());
+        assert_eq!(Some(2.0), mfield!(message, "f").as_f32());
     }
 
     #[test]
@@ -289,8 +289,8 @@ mod tests {
             ])),
         )
         .unwrap();
-        assert!(mfield!(message, "text").as_str() == Some("vector"));
-        assert!(mfield!(message, "binary").as_bytes() == Some(&bytes));
+        assert_eq!(Some("vector"), mfield!(message, "text").as_str());
+        assert_eq!(Some(&bytes), mfield!(message, "binary").as_bytes());
     }
 
     #[test]
@@ -399,10 +399,10 @@ mod tests {
         )
         .unwrap();
         let list = mfield!(message, "numbers").as_list().unwrap().to_vec();
-        assert!(list.len() == 3);
-        assert!(list[0].as_i64() == Some(8));
-        assert!(list[1].as_i64() == Some(6));
-        assert!(list[2].as_i64() == Some(4));
+        assert_eq!(3, list.len());
+        assert_eq!(Some(8), list[0].as_i64());
+        assert_eq!(Some(6), list[1].as_i64());
+        assert_eq!(Some(4), list[2].as_i64());
     }
 
     #[test]
@@ -426,13 +426,25 @@ mod tests {
         )
         .unwrap();
         let list = mfield!(message, "messages").as_list().unwrap().to_vec();
-        assert!(list.len() == 3);
-        assert!(mfield!(list[0].as_message().unwrap(), "text").as_str() == Some("vector"));
+        assert_eq!(3, list.len());
+        assert_eq!(
+            Some("vector"),
+            mfield!(list[0].as_message().unwrap(), "text").as_str()
+        );
         assert!(!list[0].as_message().unwrap().has_field_by_name("index"));
         assert!(!list[1].as_message().unwrap().has_field_by_name("t4ext"));
-        assert!(mfield!(list[1].as_message().unwrap(), "index").as_u32() == Some(4444));
-        assert!(mfield!(list[2].as_message().unwrap(), "text").as_str() == Some("protobuf"));
-        assert!(mfield!(list[2].as_message().unwrap(), "index").as_u32() == Some(1));
+        assert_eq!(
+            Some(4444),
+            mfield!(list[1].as_message().unwrap(), "index").as_u32()
+        );
+        assert_eq!(
+            Some("protobuf"),
+            mfield!(list[2].as_message().unwrap(), "text").as_str()
+        );
+        assert_eq!(
+            Some(1),
+            mfield!(list[2].as_message().unwrap(), "index").as_u32()
+        );
     }
 
     fn run_encoding_on_decoding_test_data(
