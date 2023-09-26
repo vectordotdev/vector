@@ -88,7 +88,7 @@ impl Service<RemoteWriteRequest> for RemoteWriteService {
     fn call(&mut self, mut request: RemoteWriteRequest) -> Self::Future {
         let client = self.client.clone();
         let metadata = std::mem::take(request.metadata_mut());
-        let events_byte_size = metadata.into_events_estimated_json_encoded_byte_size();
+        let json_size = metadata.into_events_estimated_json_encoded_byte_size();
         let endpoint = self.endpoint.clone();
         let auth = self.auth.clone();
         let compression = self.compression;
@@ -125,7 +125,7 @@ impl Service<RemoteWriteRequest> for RemoteWriteService {
             }
 
             Ok(RemoteWriteResponse {
-                json_size: events_byte_size,
+                json_size,
                 response,
             })
         })

@@ -1,4 +1,4 @@
-use std::io::{self, Read};
+use std::io;
 
 use bytes::{Bytes, BytesMut};
 use prost::Message;
@@ -92,9 +92,7 @@ impl RequestBuilder<(PartitionKey, Vec<RemoteWriteMetric>)> for RemoteWriteReque
     type Error = io::Error;
 
     fn compression(&self) -> Compression {
-        // Since we also support Snappy which isn't handled by the main compression,
-        // we need to do this ourselves.
-        Compression::None
+        self.compression.into()
     }
 
     fn encoder(&self) -> &Self::Encoder {
@@ -121,32 +119,11 @@ impl RequestBuilder<(PartitionKey, Vec<RemoteWriteMetric>)> for RemoteWriteReque
         request_metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
-        let body = payload.into_payload();
-        let body = compress_block(self.compression, body);
-
         RemoteWriteRequest {
-            request: Bytes::from(body),
+            request: payload.into_payload(),
             finalizers: metadata.finalizers,
             tenant_id: metadata.tenant_id,
             metadata: request_metadata,
-        }
-    }
-}
-
-fn compress_block(compression: super::Compression, data: Bytes) -> Vec<u8> {
-    match compression {
-        super::Compression::Snappy => snap::raw::Encoder::new()
-            .compress_vec(&data)
-            .expect("snap compression failed, please report"),
-        super::Compression::Gzip => {
-            let mut buf = Vec::new();
-            flate2::read::GzEncoder::new(data.as_ref(), flate2::Compression::default())
-                .read_to_end(&mut buf)
-                .expect("gzip compression failed, please report");
-            buf
-        }
-        super::Compression::Zstd => {
-            zstd::encode_all(data.as_ref(), 0).expect("zstd compression failed, please report")
         }
     }
 }

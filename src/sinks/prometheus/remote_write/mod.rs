@@ -36,6 +36,16 @@ pub enum Compression {
     Zstd,
 }
 
+impl From<Compression> for crate::sinks::util::Compression {
+    fn from(value: Compression) -> Self {
+        match value {
+            Compression::Snappy => crate::sinks::util::Compression::Snappy,
+            Compression::Gzip => crate::sinks::util::Compression::Gzip(Default::default()),
+            Compression::Zstd => crate::sinks::util::Compression::Zstd(Default::default()),
+        }
+    }
+}
+
 #[derive(Debug, Snafu)]
 enum Errors {
     #[snafu(display(r#"Prometheus remote_write sink cannot accept "set" metrics"#))]
