@@ -909,7 +909,7 @@
        type = "vrl"
        source = '''
          .glog.level == "info" &&
-         .glog.timestamp == to_timestamp!("2021-01-31T14:48:54.411655Z") &&
+         .glog.timestamp == parse_timestamp!("2021-01-31T14:48:54.411655Z", "%+") &&
          .glog.id == 15520 &&
          .glog.file == "main.c++" &&
          .glog.line == 9 &&
@@ -1061,7 +1061,7 @@
      source = '''
        .a.facility == "daemon" &&
        .a.severity == "warning" &&
-       .a.timestamp == to_timestamp!("2020-05-22T17:59:09.250Z") &&
+       .a.timestamp == parse_timestamp!("2020-05-22T17:59:09.250Z", "%+") &&
        .a.hostname == "OX-XXX-MX204" &&
        .a.appname == "OX-XXX-CONTEUDO:rpd" &&
        .a.procid == 6589 &&
@@ -1131,7 +1131,7 @@
      [[tests.outputs.conditions]]
        type = "vrl"
        source = '''
-         .foo == to_timestamp!("1970-01-01T00:00:10Z")
+         .foo == parse_timestamp!("1970-01-01T00:00:10Z", "%+")
        '''
 
  [transforms.remap_function_truncate]
@@ -1139,7 +1139,7 @@
    type = "remap"
    source = """
      .foo = truncate("foobar", limit: 3)
-     .bar = truncate("foobar", limit: 4, ellipsis: true)
+     .bar = truncate("foobar", limit: 4, suffix: "...")
    """
  [[tests]]
    name = "remap_function_truncate"
@@ -1258,7 +1258,7 @@
          .common_log.host == "127.0.0.1" &&
          .common_log.identity == "bob" &&
          .common_log.user == "frank" &&
-         .common_log.timestamp == to_timestamp!("2000-10-10T20:55:36Z") &&
+         .common_log.timestamp == parse_timestamp!("2000-10-10T20:55:36Z", "%+") &&
          .common_log.message == "GET /apache_pb.gif HTTP/1.0" &&
          .common_log.method == "GET" &&
          .common_log.path == "/apache_pb.gif" &&
@@ -1268,7 +1268,7 @@
          .common_log_timestamp_format.host == "127.0.0.1" &&
          .common_log_timestamp_format.identity == "bob" &&
          .common_log_timestamp_format.user == "frank" &&
-         .common_log_timestamp_format.timestamp == to_timestamp!("2000-10-10T20:55:36Z") &&
+         .common_log_timestamp_format.timestamp == parse_timestamp!("2000-10-10T20:55:36Z", "%+") &&
          .common_log_timestamp_format.message == "GET /apache_pb.gif HTTP/1.0" &&
          .common_log_timestamp_format.method == "GET" &&
          .common_log_timestamp_format.path == "/apache_pb.gif" &&
@@ -1685,7 +1685,7 @@
        type = "vrl"
        source = '''
          .a.version == 2 &&
-         .a.account_id == 123456789010 &&
+         .a.account_id == "123456789010" &&
          .a.interface_id == "eni-1235b8ca123456789" &&
          .a.srcaddr == null &&
          .a.dstaddr == null &&
@@ -1842,7 +1842,7 @@
          .result.log_group == "" &&
          .result.log_stream == "" &&
          .result.log_events == [{ "id": "",
-                                  "timestamp": to_timestamp!("2020-09-14T19:00:03.794Z"),
+                                  "timestamp": parse_timestamp!("2020-09-14T19:00:03.794Z", "%+"),
                                   "message": "CWL CONTROL MESSAGE: Checking health of destination Firehose." }]
        '''
 
