@@ -51,7 +51,7 @@ remap: functions: truncate: {
 		{
 			title: "Truncate a string"
 			source: #"""
-				truncate("A rather long sentence.", limit: 11, ellipsis: true)
+				truncate("A rather long sentence.", limit: 11, suffix: "...")
 				"""#
 			return: "A rather lo..."
 		},
