@@ -226,6 +226,8 @@ impl<L> Controller<L> {
         // concurrency limit. Note that we only check this if we had
         // requests to go beyond the current limit to prevent
         // increasing the limit beyond what we have evidence for.
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         if inner.current_limit < super::MAX_CONCURRENCY
             && inner.reached_limit
             && !inner.had_back_pressure

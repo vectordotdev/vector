@@ -30,6 +30,10 @@ pub(crate) async fn healthcheck(
     client: HttpClient,
     credentials: Arc<NewRelicCredentials>,
 ) -> crate::Result<()> {
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     let request = Request::post(credentials.get_uri())
         .header("Api-Key", credentials.license_key.clone())
         .body(hyper::Body::empty())

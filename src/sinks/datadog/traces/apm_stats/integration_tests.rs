@@ -26,6 +26,8 @@ use crate::{
 /// The port on which the Agent will send traces to vector, and vector `datadog_agent` source will
 /// listen on
 fn vector_receive_port() -> u16 {
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     std::env::var("VECTOR_PORT")
         .unwrap_or_else(|_| "8081".to_string())
         .parse::<u16>()
@@ -34,6 +36,8 @@ fn vector_receive_port() -> u16 {
 
 /// The port for the http server to receive data from the agent
 fn server_port_for_agent() -> u16 {
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     std::env::var("AGENT_PORT")
         .unwrap_or_else(|_| "8082".to_string())
         .parse::<u16>()
@@ -79,6 +83,8 @@ async fn run_server(name: String, port: u16, tx: Sender<StatsPayload>) {
 
     info!("HTTP server for `{}` listening on {}", name, addr);
 
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     axum::Server::bind(&addr)
         .serve(app.into_make_service())
         .await
@@ -128,6 +134,8 @@ async fn process_stats(Extension(state): Extension<Arc<AppState>>, mut request: 
             gz.read_to_end(&mut decompressed_body_bytes)
                 .expect("unable to decompress gzip stats payload");
 
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             let payload: StatsPayload = rmp_serde::from_slice(&decompressed_body_bytes).unwrap();
 
             info!(
@@ -136,6 +144,8 @@ async fn process_stats(Extension(state): Extension<Arc<AppState>>, mut request: 
             );
             debug!("{:?}", payload);
 
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             state.tx.send(payload).await.unwrap();
         }
     }
@@ -190,6 +200,8 @@ async fn send_agent_traces(urls: &Vec<String>, start: i64, duration: i64, span_i
         let client = reqwest::Client::new();
 
         for url in urls {
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             let res = client
                 .post(url)
                 .header(CONTENT_TYPE, "application/json")
@@ -264,14 +276,26 @@ async fn receive_the_stats(
     );
     assert!(stats_agent_only.is_some(), "received no stats from agent");
 
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     (stats_agent_only.unwrap(), stats_agent_vector.unwrap())
 }
 
 /// Compares the stats payloads (specifically the bucket for the time window we sent events on)
 /// between the Vector and Agent for consistency.
 fn validate_stats(agent_stats: &StatsPayload, vector_stats: &StatsPayload) {
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     let agent_bucket = agent_stats.stats.first().unwrap().stats.first().unwrap();
 
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     let vector_bucket = vector_stats.stats.first().unwrap().stats.first().unwrap();
 
     // NOTE: intentionally not validating the bucket start times because due to the nature of the
@@ -286,7 +310,11 @@ fn validate_stats(agent_stats: &StatsPayload, vector_stats: &StatsPayload) {
         "vector and agent reporting different number of buckets"
     );
 
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     let agent_s = agent_bucket.stats.first().unwrap();
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     let vector_s = vector_bucket.stats.first().unwrap();
 
     info!("\nagent_stats : {:?}", agent_s);
@@ -329,6 +357,8 @@ async fn start_vector() -> (
 ) {
     let dd_agent_address = format!("0.0.0.0:{}", vector_receive_port());
 
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     let source_config = toml::from_str::<DatadogAgentConfig>(&format!(
         indoc! { r#"
             address = "{}"
@@ -356,6 +386,8 @@ async fn start_vector() -> (
     assert!(!api_key.is_empty(), "TEST_DATADOG_API_KEY required");
     let cfg = cfg.replace("atoken", &api_key);
 
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     let sink_config = toml::from_str::<DatadogTracesConfig>(&cfg).unwrap();
 
     builder.add_sink("out", &["in.traces"], sink_config);

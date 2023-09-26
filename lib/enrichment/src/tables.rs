@@ -79,6 +79,8 @@ impl TableRegistry {
     ///
     /// Panics if the Mutex is poisoned.
     pub fn load(&self, mut tables: TableMap) {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let mut loading = self.loading.lock().unwrap();
         let existing = self.tables.load();
         if let Some(existing) = &**existing {
@@ -106,6 +108,8 @@ impl TableRegistry {
     ///
     /// Panics if the Mutex is poisoned.
     pub fn finish_load(&self) {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let mut tables_lock = self.loading.lock().unwrap();
         let tables = tables_lock.take();
         self.tables.swap(Arc::new(tables));
@@ -120,6 +124,8 @@ impl TableRegistry {
     ///
     /// Panics if the Mutex is poisoned.
     pub fn table_ids(&self) -> Vec<String> {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let locked = self.loading.lock().unwrap();
         match *locked {
             Some(ref tables) => tables.iter().map(|(key, _)| key.clone()).collect(),
@@ -140,6 +146,8 @@ impl TableRegistry {
         case: Case,
         fields: &[&str],
     ) -> Result<IndexHandle, String> {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let mut locked = self.loading.lock().unwrap();
 
         match *locked {

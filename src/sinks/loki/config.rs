@@ -193,6 +193,10 @@ pub enum OutOfOrderAction {
 
 impl GenerateConfig for LokiConfig {
     fn generate_config() -> toml::Value {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         toml::from_str(
             r#"endpoint = "http://localhost:3100"
             encoding.codec = "json"

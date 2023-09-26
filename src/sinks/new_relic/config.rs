@@ -192,12 +192,20 @@ impl NewRelicCredentials {
 
         match self.api {
             NewRelicApi::Events => match self.region {
+                // TODO: https://github.com/vectordotdev/vector/issues/18682
+                #[allow(clippy::unwrap_used)]
                 NewRelicRegion::Us => format!(
                     "https://insights-collector.newrelic.com/v1/accounts/{}/events",
+                    // TODO: https://github.com/vectordotdev/vector/issues/18682
+                    #[allow(clippy::unwrap_used)]
                     self.account_id
                 )
                 .parse::<Uri>()
                 .unwrap(),
+                // TODO: https://github.com/vectordotdev/vector/issues/18682
+                #[allow(clippy::unwrap_used)]
+                // TODO: https://github.com/vectordotdev/vector/issues/18682
+                #[allow(clippy::unwrap_used)]
                 NewRelicRegion::Eu => format!(
                     "https://insights-collector.eu01.nr-data.net/v1/accounts/{}/events",
                     self.account_id

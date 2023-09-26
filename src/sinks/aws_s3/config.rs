@@ -148,6 +148,10 @@ pub(super) fn default_filename_time_format() -> String {
 
 impl GenerateConfig for S3SinkConfig {
     fn generate_config() -> toml::Value {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         toml::Value::try_from(Self {
             bucket: "".to_owned(),
             key_prefix: default_key_prefix(),

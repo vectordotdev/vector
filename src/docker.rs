@@ -125,6 +125,8 @@ async fn pull_image(docker: &Docker, image: &str, tag: &str) {
         ..Default::default()
     });
 
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     let images = docker.list_images(options).await.unwrap();
     if images.is_empty() {
         // If not found, pull it
@@ -134,6 +136,8 @@ async fn pull_image(docker: &Docker, image: &str, tag: &str) {
             ..Default::default()
         });
 
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         docker
             .create_image(options, None, None)
             .for_each(|item| async move {
@@ -192,10 +196,14 @@ impl Container {
     }
 
     pub async fn run<T>(self, doit: impl futures::Future<Output = T>) -> T {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let docker = docker(None, None).unwrap();
 
         pull_image(&docker, self.image, self.tag).await;
 
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let options = Some(CreateContainerOptions {
             name: format!("vector_test_{}", uuid::Uuid::new_v4()),
             platform: None,
@@ -213,8 +221,12 @@ impl Container {
             ..Default::default()
         };
 
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let container = docker.create_container(options, config).await.unwrap();
 
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         docker
             .start_container::<String>(&container.id, None)
             .await

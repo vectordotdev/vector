@@ -135,6 +135,10 @@ impl AwsEcsMetricsSourceConfig {
 
 impl GenerateConfig for AwsEcsMetricsSourceConfig {
     fn generate_config() -> toml::Value {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         toml::Value::try_from(Self {
             endpoint: default_endpoint(),
             version: default_version(),

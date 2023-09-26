@@ -112,17 +112,29 @@ impl Service<GcsRequest> for GcsService {
         let settings = request.settings;
         let metadata = request.metadata;
 
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let uri = format!("{}{}", self.base_url, request.key)
             .parse::<Uri>()
             .unwrap();
 
         let mut builder = Request::put(uri);
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
+        #[allow(clippy::unwrap_used)]
         let headers = builder.headers_mut().unwrap();
         headers.insert("content-type", settings.content_type);
         headers.insert(
             "content-length",
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             HeaderValue::from_str(&request.body.len().to_string()).unwrap(),
         );
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         settings
             .content_encoding
             .map(|ce| headers.insert("content-encoding", ce));
@@ -132,6 +144,10 @@ impl Service<GcsRequest> for GcsService {
             headers.insert(p, v);
         }
 
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let mut http_request = builder.body(Body::from(request.body)).unwrap();
         self.auth.apply(&mut http_request);
 

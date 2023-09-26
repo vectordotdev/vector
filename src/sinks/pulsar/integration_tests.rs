@@ -48,7 +48,11 @@ async fn pulsar_happy_reuse(mut cnf: PulsarSinkConfig) {
 
     cnf.topic = topic.clone();
 
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     let pulsar = cnf.create_pulsar_client().await.unwrap();
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     let mut consumer = pulsar
         .consumer()
         .with_topic(&topic_str)
@@ -64,6 +68,8 @@ async fn pulsar_happy_reuse(mut cnf: PulsarSinkConfig) {
         .unwrap();
 
     assert_sink_compliance(&SINK_TAGS, async move {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let sink = PulsarSink::new(pulsar, cnf).unwrap();
         let sink = VectorSink::from_event_streamsink(sink);
         sink.run(input_events).await
@@ -72,10 +78,14 @@ async fn pulsar_happy_reuse(mut cnf: PulsarSinkConfig) {
     .expect("Running sink failed");
 
     for line in input {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let msg = match consumer.next().await.unwrap() {
             Ok(msg) => msg,
             Err(error) => panic!("{:?}", error),
         };
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         consumer.ack(&msg).await.unwrap();
         assert_eq!(String::from_utf8_lossy(&msg.payload.data), line);
     }

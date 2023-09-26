@@ -154,8 +154,12 @@ impl Default for VectorConfig {
     fn default() -> Self {
         Self {
             version: None,
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             address: "0.0.0.0:6000".parse().unwrap(),
             tls: None,
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             acknowledgements: Default::default(),
             log_namespace: None,
         }
@@ -164,6 +168,10 @@ impl Default for VectorConfig {
 
 impl GenerateConfig for VectorConfig {
     fn generate_config() -> toml::Value {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         toml::Value::try_from(VectorConfig::default()).unwrap()
     }
 }

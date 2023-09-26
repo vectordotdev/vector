@@ -261,8 +261,16 @@ async fn healthcheck(client: HttpClient, auth: GcpAuthenticator, uri: Uri) -> cr
     let entries: Vec<BoxedRawValue> = Vec::new();
     let events = serde_json::json!({ "entries": entries });
 
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     let body = crate::serde::json::to_bytes(&events).unwrap().freeze();
 
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     let mut request = Request::post(uri)
         .header("Content-Type", "application/json")
         .body(body)

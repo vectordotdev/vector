@@ -67,6 +67,10 @@ pub struct WebSocketSinkConfig {
 
 impl GenerateConfig for WebSocketSinkConfig {
     fn generate_config() -> toml::Value {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         toml::Value::try_from(Self {
             uri: "ws://127.0.0.1:9000/endpoint".into(),
             tls: None,

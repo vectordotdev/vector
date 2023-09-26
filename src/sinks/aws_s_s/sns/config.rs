@@ -36,6 +36,10 @@ pub(super) struct SnsSinkConfig {
 
 impl GenerateConfig for SnsSinkConfig {
     fn generate_config() -> toml::Value {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         toml::from_str(
             r#"topic_arn = "arn:aws:sns:us-east-2:123456789012:MyTopic"
             region = "us-east-2"

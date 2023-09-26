@@ -433,6 +433,10 @@ mod integration_tests {
             tokio::spawn(async move {
                 let socket = get_socket(raw_data, query_type);
 
+                // TODO: https://github.com/vectordotdev/vector/issues/18682
+                #[allow(clippy::unwrap_used)]
+                // TODO: https://github.com/vectordotdev/vector/issues/18682
+                #[allow(clippy::unwrap_used)]
                 DnstapConfig {
                     max_frame_length: 102400,
                     host_key: Some(OptionalValuePath::from(owned_value_path!("key"))),
@@ -558,6 +562,10 @@ mod integration_tests {
         }
 
         for event in events {
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             let json = serde_json::to_value(event.as_log().all_event_fields().unwrap()).unwrap();
             match query_event {
                 "query" => {

@@ -37,6 +37,8 @@ where
 
     info!(%address, "Building gRPC server.");
 
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     Server::builder()
         .trace_fn(move |_| span.clone())
         // This layer explicitly decompresses payloads, if compressed, and reports the number of message bytes we've

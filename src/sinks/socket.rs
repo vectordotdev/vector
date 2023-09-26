@@ -81,6 +81,10 @@ pub struct UnixMode {
 
 impl GenerateConfig for SocketSinkConfig {
     fn generate_config() -> toml::Value {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         toml::from_str(
             r#"address = "92.12.333.224:5000"
             mode = "tcp"

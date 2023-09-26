@@ -80,6 +80,10 @@ pub struct DatabendConfig {
 
 impl GenerateConfig for DatabendConfig {
     fn generate_config() -> toml::Value {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         toml::from_str(
             r#"endpoint = "http://localhost:8000"
             table = "default"

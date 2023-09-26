@@ -92,6 +92,10 @@ pub struct SematextMetricsConfig {
 
 impl GenerateConfig for SematextMetricsConfig {
     fn generate_config() -> toml::Value {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         toml::from_str(indoc! {r#"
             default_namespace = "vector"
             token = "${SEMATEXT_TOKEN}"

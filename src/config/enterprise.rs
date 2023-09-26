@@ -252,6 +252,8 @@ impl ReportingRetryBackoff {
 
     /// Wait before retrying as determined by the backoff and jitter
     async fn wait(&mut self) {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let retry_backoff = self.next().unwrap();
         info!(
             "Retrying configuration reporting to {} in {} seconds.",
@@ -268,6 +270,8 @@ impl Iterator for ReportingRetryBackoff {
     fn next(&mut self) -> Option<Self::Item> {
         let jitter_milliseconds = Duration::from_millis(rand::thread_rng().gen_range(0..1000));
         Some(
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             self.backoff
                 .next()
                 .unwrap()
@@ -635,6 +639,8 @@ fn setup_metrics_reporting(
 /// Converts user configured tags to VRL source code for adding tags/fields to
 /// events
 fn convert_tags_to_vrl(tags: &IndexMap<String, String>, is_metric: bool) -> String {
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     let json_tags = serde_json::to_string(&tags).unwrap();
     if is_metric {
         format!(r#".tags = merge(.tags, {}, deep: true)"#, json_tags)

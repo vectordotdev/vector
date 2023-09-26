@@ -990,7 +990,11 @@ mod integration_tests {
     ) {
         components::init_test();
 
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let tls_settings = TlsSettings::from_options(&None).unwrap();
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let client = HttpClient::new(tls_settings, &ProxyConfig::default()).unwrap();
         let tester = Tester::new(client).await;
 
@@ -1098,6 +1102,8 @@ mod integration_tests {
                     json!({ "maxMessages": count, "returnImmediately": true }),
                 )
                 .await;
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             response
                 .get("receivedMessages")
                 .map(|rm| rm.as_array().unwrap().len())
@@ -1109,15 +1115,27 @@ mod integration_tests {
                 .replace("{topic}", &self.topic)
                 .replace("{sub}", &self.subscription);
             let uri = [PROJECT_URI.as_str(), &path].join("/");
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             let body = crate::serde::json::to_bytes(&body).unwrap().freeze();
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             let request = Request::builder()
                 .method(method)
                 .uri(uri)
                 .body(body.into())
                 .unwrap();
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             let response = self.client.send(request).await.unwrap();
             assert_eq!(response.status(), StatusCode::OK);
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             serde_json::from_str(&String::from_utf8(body.to_vec()).unwrap()).unwrap()
         }
 
@@ -1140,6 +1158,8 @@ mod integration_tests {
             attributes,
         } = test_data;
 
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let events: Vec<Event> = tokio::time::timeout(
             Duration::from_secs(1),
             test_util::collect_n_stream(rx, lines.len()),
@@ -1155,12 +1175,24 @@ mod integration_tests {
             let log = event.into_log();
             assert_eq!(log.get("message"), Some(&message.into()));
             assert_eq!(log.get("source_type"), Some(&"gcp_pubsub".into()));
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             assert!(log.get("timestamp").unwrap().as_timestamp().unwrap() >= &start);
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             assert!(log.get("timestamp").unwrap().as_timestamp().unwrap() <= &end);
             assert!(
+                // TODO: https://github.com/vectordotdev/vector/issues/18682
+                #[allow(clippy::unwrap_used)]
                 message_ids.insert(log.get("message_id").unwrap().clone().to_string()),
                 "Message contained duplicate message_id"
             );
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             let logattr = log
                 .get("attributes")
                 .expect("missing attributes")

@@ -109,10 +109,22 @@ fn compile(mut input: Input) -> Result<VrlCompileResult, VrlDiagnosticResult> {
 // The user-facing function
 #[wasm_bindgen]
 pub fn run_vrl(incoming: &JsValue) -> JsValue {
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     let input: Input = incoming.into_serde().unwrap();
 
     match compile(input) {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
+        #[allow(clippy::unwrap_used)]
         Ok(res) => JsValue::from_serde(&res).unwrap(),
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
+        #[allow(clippy::unwrap_used)]
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         Err(err) => JsValue::from_serde(&err).unwrap(),
     }
 }

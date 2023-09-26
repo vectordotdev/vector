@@ -61,6 +61,10 @@ where
     }
 
     fn finish(mut self) -> Self::Output {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let key = self.key.take().unwrap();
         let inner = self.inner.finish();
         PartitionInnerBuffer { inner, key }

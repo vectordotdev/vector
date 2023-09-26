@@ -240,6 +240,8 @@ impl mlua::UserData for LuaEvent {
                             .insert(&key_path, Value::Integer(integer));
                     }
                     Some(mlua::Value::Number(number)) if !number.is_nan() => {
+                        // TODO: https://github.com/vectordotdev/vector/issues/18682
+                        #[allow(clippy::unwrap_used)]
                         this.inner
                             .as_mut_log()
                             .insert(&key_path, Value::Float(NotNan::new(number).unwrap()));

@@ -143,11 +143,19 @@ pub struct AzureBlobSinkConfig {
 }
 
 pub fn default_blob_prefix() -> Template {
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     Template::try_from(DEFAULT_KEY_PREFIX).unwrap()
 }
+// TODO: https://github.com/vectordotdev/vector/issues/18682
+#[allow(clippy::unwrap_used)]
 
 impl GenerateConfig for AzureBlobSinkConfig {
     fn generate_config() -> toml::Value {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
+ // TODO: https://github.com/vectordotdev/vector/issues/18682
+#[allow(clippy::unwrap_used)]
         toml::Value::try_from(Self {
             connection_string: Some(String::from("DefaultEndpointsProtocol=https;AccountName=some-account-name;AccountKey=some-account-key;").into()),
             storage_account: Some(String::from("some-account-name")),

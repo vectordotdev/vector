@@ -92,6 +92,8 @@ fn merge_json(a: &mut Value, b: Value) {
 }
 
 /// Helper to sort array values.
+// TODO: https://github.com/vectordotdev/vector/issues/18682
+#[allow(clippy::unwrap_used)]
 fn sort_json_array_values(json: &mut Value) {
     match json {
         Value::Array(ref mut arr) => {

@@ -15,6 +15,8 @@ pub struct RequestLimiterPermit {
 
 impl RequestLimiterPermit {
     pub fn decoding_finished(&self, num_events: usize) {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let mut request_limiter_data = self.request_limiter_data.lock().unwrap();
         request_limiter_data.update_average(num_events);
     }
@@ -32,6 +34,10 @@ impl Drop for RequestLimiterPermit {
                     // only release the current permit (when the inner permit is dropped automatically)
                 }
                 Ordering::Less => {
+                    // TODO: https://github.com/vectordotdev/vector/issues/18682
+                    #[allow(clippy::unwrap_used)]
+                    // TODO: https://github.com/vectordotdev/vector/issues/18682
+                    #[allow(clippy::unwrap_used)]
                     let permit = self.semaphore_permit.take().unwrap();
                     request_limiter_data.decrease_permits(permit);
                 }

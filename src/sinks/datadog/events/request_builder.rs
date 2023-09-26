@@ -118,6 +118,8 @@ impl RequestBuilder<Event> for DatadogEventsRequestBuilder {
 fn encoder() -> (Transformer, Encoder<()>) {
     // DataDog Event API allows only some fields, and refuses
     // to accept event if it contains any other field.
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     let only_fields = Some(
         [
             "aggregation_key",

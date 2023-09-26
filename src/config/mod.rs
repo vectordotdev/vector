@@ -563,6 +563,8 @@ mod tests {
         match config::load_from_str(config, format) {
             Ok(c) => {
                 let diff = ConfigDiff::initial(&c);
+                // TODO: https://github.com/vectordotdev/vector/issues/18682
+                #[allow(clippy::unwrap_used)]
                 let c2 = config::load_from_str(config, format).unwrap();
                 match (
                     config::warnings(&c2),

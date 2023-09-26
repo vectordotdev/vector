@@ -13,6 +13,10 @@ use tracing::Instrument;
 
 use crate::{http::HttpClient, sinks::prelude::*};
 
+// TODO: https://github.com/vectordotdev/vector/issues/18682
+#[allow(clippy::unwrap_used)]
+// TODO: https://github.com/vectordotdev/vector/issues/18682
+#[allow(clippy::unwrap_used)]
 static LOG_TYPE_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^\w+$").unwrap());
 static LOG_TYPE_HEADER: Lazy<HeaderName> = Lazy::new(|| HeaderName::from_static("log-type"));
 static X_MS_DATE_HEADER: Lazy<HeaderName> = Lazy::new(|| HeaderName::from_static(X_MS_DATE));

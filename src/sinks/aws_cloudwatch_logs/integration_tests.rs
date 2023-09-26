@@ -459,6 +459,8 @@ async fn create_client_test() -> CloudwatchLogsClient {
     let endpoint = Some(watchlogs_address());
     let proxy = ProxyConfig::default();
 
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     create_client::<CloudwatchLogsClientBuilder>(&auth, region, endpoint, &proxy, &None, true)
         .await
         .unwrap()

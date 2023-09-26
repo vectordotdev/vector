@@ -146,6 +146,10 @@ pub fn timestamp_nanos_key() -> Option<String> {
 
 impl GenerateConfig for HumioLogsConfig {
     fn generate_config() -> toml::Value {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         toml::Value::try_from(Self {
             token: "${HUMIO_TOKEN}".to_owned().into(),
             endpoint: default_endpoint(),

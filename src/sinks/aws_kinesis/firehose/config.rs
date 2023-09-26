@@ -165,6 +165,10 @@ impl SinkConfig for KinesisFirehoseSinkConfig {
 
 impl GenerateConfig for KinesisFirehoseSinkConfig {
     fn generate_config() -> toml::Value {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         toml::from_str(
             r#"stream_name = "my-stream"
             encoding.codec = "json""#,

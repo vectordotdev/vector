@@ -131,6 +131,10 @@ impl Service<LokiRequest> for LokiService {
         }
 
         let body = hyper::Body::from(request.payload);
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let mut req = req.body(body).unwrap();
 
         if let Some(auth) = &self.endpoint.auth {

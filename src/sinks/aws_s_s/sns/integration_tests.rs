@@ -31,6 +31,8 @@ async fn create_sns_test_client() -> SnsClient {
 
     let endpoint = sns_address();
     let proxy = ProxyConfig::default();
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     create_client::<SnsClientBuilder>(
         &auth,
         Some(Region::new("localstack")),
@@ -52,6 +54,8 @@ async fn create_sqs_test_client() -> SqsClient {
 
     let endpoint = sqs_address();
     let proxy = ProxyConfig::default();
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     create_client::<SqsClientBuilder>(
         &auth,
         Some(Region::new("localstack")),
@@ -134,6 +138,10 @@ async fn ensure_topic(topic_arn: String) -> String {
 
     let attributes: Option<HashMap<String, String>> = None;
 
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     client
         .create_topic()
         .set_attributes(attributes)
@@ -150,6 +158,10 @@ fn gen_topic_name() -> String {
 }
 
 async fn ensure_queue(client: &SqsClient, queue_name: String) -> String {
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     client
         .create_queue()
         .queue_name(queue_name)
@@ -162,6 +174,12 @@ async fn ensure_queue(client: &SqsClient, queue_name: String) -> String {
 
 async fn get_queue_arn(client: &SqsClient, queue_url: String) -> String {
     let arn_attribute = QueueAttributeName::QueueArn;
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     client
         .get_queue_attributes()
         .queue_url(queue_url)
@@ -183,6 +201,8 @@ async fn subscribe_queue_to_topic(sns_client: &SnsClient, topic_arn: &str, queue
     let mut attributes = HashMap::new();
     attributes.insert("RawMessageDelivery".to_string(), "true".to_string());
 
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     sns_client
         .subscribe()
         .protocol("sqs")

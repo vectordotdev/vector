@@ -41,6 +41,8 @@ const PASSWORD: &str = "password";
 const ACK_TOKEN: &str = "ack-token";
 
 async fn recent_entries(index: Option<&str>) -> Vec<JsonValue> {
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     let client = reqwest::Client::builder()
         .danger_accept_invalid_certs(true)
         .build()
@@ -51,6 +53,8 @@ async fn recent_entries(index: Option<&str>) -> Vec<JsonValue> {
         Some(index) => format!("search index={}", index),
         None => "search index=*".into(),
     };
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     let res = client
         .post(format!(
             "{}/services/search/jobs?output_mode=json",
@@ -65,8 +69,12 @@ async fn recent_entries(index: Option<&str>) -> Vec<JsonValue> {
         .send()
         .await
         .unwrap();
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     let json: JsonValue = res.json().await.unwrap();
 
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     json["results"].as_array().unwrap().clone()
 }
 
@@ -91,6 +99,8 @@ async fn find_entries(messages: &[String]) -> bool {
     for _ in 0..20 {
         let entries = recent_entries(None).await;
 
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         found_all = messages.iter().all(|message| {
             entries
                 .iter()

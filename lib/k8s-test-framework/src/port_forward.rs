@@ -38,6 +38,8 @@ pub fn port_forward(
     command.kill_on_drop(true);
 
     let mut child = command.spawn()?;
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     let stdout = child.stdout.take().unwrap();
     let reader = BufReader::new(stdout);
 

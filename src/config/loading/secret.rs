@@ -27,8 +27,13 @@ use crate::{
 // - "SECRET[secret_name]" will not match
 // - "SECRET[.secret.name]" will not match
 pub static COLLECTOR: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"SECRET\[([[:word:]]+)\.([[:word:].]+)\]").unwrap());
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
+    #[allow(clippy::unwrap_used)]
+        Lazy::new(|| Regex::new(r"SECRET\[([[:word:]]+)\.([[:word:].]+)\]").unwrap());
 
+// TODO: https://github.com/vectordotdev/vector/issues/18682
+#[allow(clippy::unwrap_used)]
 /// Helper type for specifically deserializing secrets backends.
 #[derive(Debug, Default, Deserialize, Serialize)]
 pub(crate) struct SecretBackendOuter {
@@ -133,6 +138,10 @@ pub fn interpolate(input: &str, secrets: &HashMap<String, String>) -> Result<Str
                 .unwrap_or_else(|| {
                     errors.push(format!(
                         "Unable to find secret replacement for {}.",
+                        // TODO: https://github.com/vectordotdev/vector/issues/18682
+                        #[allow(clippy::unwrap_used)]
+                        // TODO: https://github.com/vectordotdev/vector/issues/18682
+                        #[allow(clippy::unwrap_used)]
                         caps.get(0).unwrap().as_str()
                     ));
                     "".to_string()

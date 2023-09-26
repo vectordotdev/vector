@@ -172,13 +172,17 @@ pub fn spawn_grpc_server<S>(
 
         loop {
             select! {
-                // Propagate our shutdown signal to the shutdown signal that `run_grpc_server` needs.
-                _ = shutdown_handle.wait(), if trigger_shutdown.is_some() => {
-                    trigger_shutdown.take().unwrap().cancel();
-                },
-                // TODO: Should we check the return value here to see if its an `Err`?
-                _ = &mut server => break,
-            }
+                            // Propagate our shutdown signal to the shutdown signal that `run_grpc_server` needs.
+                            _ = shutdown_handle.wait(), if trigger_shutdown.is_some() => {
+             // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
+             // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
+                                trigger_shutdown.take().unwrap().cancel();
+                            },
+                            // TODO: Should we check the return value here to see if its an `Err`?
+                            _ = &mut server => break,
+                        }
         }
 
         completed.mark_as_done();

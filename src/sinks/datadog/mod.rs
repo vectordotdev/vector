@@ -115,6 +115,10 @@ async fn build_healthcheck_future(
     validate_endpoint: Uri,
     api_key: String,
 ) -> crate::Result<()> {
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     let request = Request::get(validate_endpoint)
         .header("DD-API-KEY", api_key)
         .body(hyper::Body::empty())

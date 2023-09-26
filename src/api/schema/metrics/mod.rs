@@ -97,6 +97,8 @@ impl MetricsSubscription {
         &self,
         #[graphql(default = 1000, validator(minimum = 10, maximum = 60_000))] interval: i32,
     ) -> impl Stream<Item = Vec<ComponentReceivedEventsThroughput>> {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         component_counter_throughputs(interval, &|m| m.name() == "component_received_events_total")
             .map(|m| {
                 m.into_iter()
@@ -191,6 +193,8 @@ impl MetricsSubscription {
         &self,
         #[graphql(default = 1000, validator(minimum = 10, maximum = 60_000))] interval: i32,
     ) -> impl Stream<Item = Vec<ComponentReceivedBytesThroughput>> {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         component_counter_throughputs(interval, &|m| m.name() == "component_received_bytes_total")
             .map(|m| {
                 m.into_iter()
@@ -218,6 +222,8 @@ impl MetricsSubscription {
         &self,
         #[graphql(default = 1000, validator(minimum = 10, maximum = 60_000))] interval: i32,
     ) -> impl Stream<Item = Vec<ComponentSentBytesThroughput>> {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         component_counter_throughputs(interval, &|m| m.name() == "component_sent_bytes_total").map(
             |m| {
                 m.into_iter()

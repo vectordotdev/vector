@@ -50,6 +50,8 @@ fn prepare_config(codec: &str, compression: &str) -> (String, String, DatabendAP
     trace_init();
 
     let table = gen_table();
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     let endpoint: UriSerde = databend_endpoint().parse().unwrap();
     let auth = Some(Auth::Basic {
         user: databend_user(),
@@ -107,6 +109,8 @@ fn prepare_config(codec: &str, compression: &str) -> (String, String, DatabendAP
     }
 
     let proxy = ProxyConfig::default();
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     let http_client = HttpClient::new(None, &proxy).unwrap();
     let client = DatabendAPIClient::new(http_client, endpoint, auth);
 
@@ -118,12 +122,18 @@ async fn insert_event_with_cfg(cfg: String, table: String, client: DatabendAPICl
         "create table `{}` (host String, timestamp String, message String)",
         table
     );
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     client
         .query(DatabendHttpRequest::new(create_table_sql))
         .await
         .unwrap();
 
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     let (config, _) = load_sink::<DatabendConfig>(&cfg).unwrap();
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     let (sink, _hc) = config.build(SinkContext::default()).await.unwrap();
 
     let (input_event, mut receiver) = make_event();
@@ -135,6 +145,8 @@ async fn insert_event_with_cfg(cfg: String, table: String, client: DatabendAPICl
     .await;
 
     let select_all_sql = format!("select * from `{}`", table);
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     let resp = client
         .query(DatabendHttpRequest::new(select_all_sql))
         .await
@@ -144,8 +156,12 @@ async fn insert_event_with_cfg(cfg: String, table: String, client: DatabendAPICl
     // drop input_event after comparing with response
     {
         let log_event = input_event.into_log();
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let expected = serde_json::to_string(&log_event).unwrap();
         let resp_data = response_to_map(&resp);
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let actual = serde_json::to_string(&resp_data[0]).unwrap();
         assert_eq!(expected, actual);
     }

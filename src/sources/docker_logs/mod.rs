@@ -532,7 +532,11 @@ impl DockerLogsSource {
             .await?
             .into_iter()
             .for_each(|container| {
+                // TODO: https://github.com/vectordotdev/vector/issues/18682
+                #[allow(clippy::unwrap_used)]
                 let id = container.id.unwrap();
+                // TODO: https://github.com/vectordotdev/vector/issues/18682
+                #[allow(clippy::unwrap_used)]
                 let names = container.names.unwrap();
 
                 trace!(message = "Found already running container.", id = %id, names = ?names);
@@ -568,94 +572,102 @@ impl DockerLogsSource {
     async fn run(mut self) {
         loop {
             tokio::select! {
-                value = self.main_recv.recv() => {
-                    match value {
-                        Some(Ok(info)) => {
-                            let state = self
-                                .containers
-                                .get_mut(&info.id)
-                                .expect("Every ContainerLogInfo has it's ContainerState");
-                            if state.return_info(info) {
-                                self.esb.restart(state);
-                            }
-                        },
-                        Some(Err((id,persistence))) => {
-                            let state = self
-                                .containers
-                                .remove(&id)
-                                .expect("Every started ContainerId has it's ContainerState");
-                            match persistence{
-                                ErrorPersistence::Transient => if state.is_running() {
-                                    let backoff= Some(self.backoff_duration);
-                                    self.containers.insert(id.clone(), self.esb.start(id, backoff));
-                                }
-                                // Forget the container since the error is permanent.
-                                ErrorPersistence::Permanent => (),
-                            }
-                        }
-                        None => {
-                            error!(message = "The docker_logs source main stream has ended unexpectedly.");
-                            info!(message = "Shutting down docker_logs source.");
-                            return;
-                        }
-                    };
-                }
-                value = self.events.next() => {
-                    match value {
-                        Some(Ok(mut event)) => {
-                            let action = event.action.unwrap();
-                            let actor = event.actor.take().unwrap();
-                            let id = actor.id.unwrap();
-                            let attributes = actor.attributes.unwrap();
-
-                            emit!(DockerLogsContainerEventReceived { container_id: &id, action: &action });
-
-                            let id = ContainerId::new(id.to_owned());
-
-                            // Update container status
-                            match action.as_str() {
-                                "die" | "pause" => {
-                                    if let Some(state) = self.containers.get_mut(&id) {
-                                        state.stopped();
-                                    }
-                                }
-                                "start" | "unpause" => {
-                                    if let Some(state) = self.containers.get_mut(&id) {
-                                        state.running();
-                                        self.esb.restart(state);
-                                    } else {
-                                        let include_name =
-                                            self.esb.core.config.container_name_or_id_included(
-                                                id.as_str(),
-                                                attributes.get("name").map(|s| s.as_str()),
-                                            );
-
-                                        let exclude_self = self.exclude_self(id.as_str());
-
-                                        if include_name && !exclude_self {
-                                            self.containers.insert(id.clone(), self.esb.start(id, None));
+                            value = self.main_recv.recv() => {
+                                match value {
+                                    Some(Ok(info)) => {
+                                        let state = self
+                                            .containers
+                                            .get_mut(&info.id)
+                                            .expect("Every ContainerLogInfo has it's ContainerState");
+                                        if state.return_info(info) {
+                                            self.esb.restart(state);
+                                        }
+                                    },
+                                    Some(Err((id,persistence))) => {
+                                        let state = self
+                                            .containers
+                                            .remove(&id)
+                                            .expect("Every started ContainerId has it's ContainerState");
+                                        match persistence{
+                                            ErrorPersistence::Transient => if state.is_running() {
+                                                let backoff= Some(self.backoff_duration);
+                                                self.containers.insert(id.clone(), self.esb.start(id, backoff));
+                                            }
+                                            // Forget the container since the error is permanent.
+                                            ErrorPersistence::Permanent => (),
                                         }
                                     }
-                                }
-                                _ => {},
-                            };
-                        }
-                        Some(Err(error)) => {
-                            emit!(DockerLogsCommunicationError {
-                                error,
-                                container_id: None,
-                            });
-                            return;
-                        },
-                        None => {
-                            // TODO: this could be fixed, but should be tried with some timeoff and exponential backoff
-                            error!(message = "Docker log event stream has ended unexpectedly.");
-                            info!(message = "Shutting down docker_logs source.");
-                            return;
-                        }
-                    };
-                }
-            };
+                                    None => {
+                                        error!(message = "The docker_logs source main stream has ended unexpectedly.");
+                                        info!(message = "Shutting down docker_logs source.");
+                                        return;
+                                    }
+                                };
+                            }
+                            value = self.events.next() => {
+                                match value {
+                                    Some(Ok(mut event)) => {
+             // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
+                                        let action = event.action.unwrap();
+             // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
+                                        let actor = event.actor.take().unwrap();
+             // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
+                                        let id = actor.id.unwrap();
+             // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
+                                        let attributes = actor.attributes.unwrap();
+
+                                        emit!(DockerLogsContainerEventReceived { container_id: &id, action: &action });
+
+                                        let id = ContainerId::new(id.to_owned());
+
+                                        // Update container status
+                                        match action.as_str() {
+                                            "die" | "pause" => {
+                                                if let Some(state) = self.containers.get_mut(&id) {
+                                                    state.stopped();
+                                                }
+                                            }
+                                            "start" | "unpause" => {
+                                                if let Some(state) = self.containers.get_mut(&id) {
+                                                    state.running();
+                                                    self.esb.restart(state);
+                                                } else {
+                                                    let include_name =
+                                                        self.esb.core.config.container_name_or_id_included(
+                                                            id.as_str(),
+                                                            attributes.get("name").map(|s| s.as_str()),
+                                                        );
+
+                                                    let exclude_self = self.exclude_self(id.as_str());
+
+                                                    if include_name && !exclude_self {
+                                                        self.containers.insert(id.clone(), self.esb.start(id, None));
+                                                    }
+                                                }
+                                            }
+                                            _ => {},
+                                        };
+                                    },
+                                    Some(Err(error)) => {
+                                        emit!(DockerLogsCommunicationError {
+                                            error,
+                                            container_id: None,
+                                        });
+                                        return;
+                                    },
+                                    None => {
+                                        // TODO: this could be fixed, but should be tried with some timeoff and exponential backoff
+                                        error!(message = "Docker log event stream has ended unexpectedly.");
+                                        info!(message = "Shutting down docker_logs source.");
+                                        return;
+                                    }
+                                };
+                            }
+                        };
         }
     }
 
@@ -755,6 +767,8 @@ impl EventStreamBuilder {
         let bytes_received = register!(BytesReceived::from(Protocol::HTTP));
 
         let mut error = None;
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let events_stream = stream
             .map(|value| {
                 match value {
@@ -796,6 +810,8 @@ impl EventStreamBuilder {
             .filter_map(|v| ready(v.unwrap()))
             .take_until(self.shutdown.clone());
 
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let events_stream: Box<dyn Stream<Item = LogEvent> + Unpin + Send> =
             if let Some(ref line_agg_config) = core.line_agg_config {
                 Box::new(line_agg_adapter(
@@ -1248,12 +1264,19 @@ struct ContainerMetadata {
 
 impl ContainerMetadata {
     fn from_details(details: ContainerInspectResponse) -> Result<Self, ParseError> {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let config = details.config.unwrap();
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let name = details.name.unwrap();
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let created = details.created.unwrap();
-
         let labels = config.labels.unwrap_or_default();
 
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         Ok(ContainerMetadata {
             labels,
             name: name.as_str().trim_start_matches('/').to_owned().into(),

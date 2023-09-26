@@ -151,6 +151,10 @@ impl UdpConnector {
                 }
                 Err(error) => {
                     emit!(UdpSocketOutgoingConnectionError { error });
+                    // TODO: https://github.com/vectordotdev/vector/issues/18682
+                    #[allow(clippy::unwrap_used)]
+                    // TODO: https://github.com/vectordotdev/vector/issues/18682
+                    #[allow(clippy::unwrap_used)]
                     sleep(backoff.next().unwrap()).await;
                 }
             }

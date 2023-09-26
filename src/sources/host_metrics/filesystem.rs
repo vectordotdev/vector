@@ -34,14 +34,29 @@ pub struct FilesystemConfig {
 
 fn example_filesystems() -> FilterList {
     FilterList {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         includes: Some(vec!["ntfs".try_into().unwrap()]),
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         excludes: Some(vec!["ext*".try_into().unwrap()]),
     }
 }
-
+// TODO: https://github.com/vectordotdev/vector/issues/18682
+#[allow(clippy::unwrap_used)]
+// TODO: https://github.com/vectordotdev/vector/issues/18682
+#[allow(clippy::unwrap_used)]
 fn example_mountpoints() -> FilterList {
     FilterList {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         includes: Some(vec!["/home".try_into().unwrap()]),
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
+        #[allow(clippy::unwrap_used)]
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         excludes: Some(vec!["/raid*".try_into().unwrap()]),
     }
 }

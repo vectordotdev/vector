@@ -193,6 +193,8 @@ fn default_config(encoding: EncodingConfigWithFraming) -> GcsSinkConfig {
 
 impl GenerateConfig for GcsSinkConfig {
     fn generate_config() -> toml::Value {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         toml::from_str(indoc! {r#"
             bucket = "my-bucket"
             credentials_path = "/path/to/credentials.json"
@@ -203,6 +205,8 @@ impl GenerateConfig for GcsSinkConfig {
     }
 }
 
+// TODO: https://github.com/vectordotdev/vector/issues/18682
+#[allow(clippy::unwrap_used)]
 #[async_trait::async_trait]
 #[typetag::serde(name = "gcp_cloud_storage")]
 impl SinkConfig for GcsSinkConfig {
@@ -248,6 +252,8 @@ impl GcsSinkConfig {
 
         let partitioner = self.key_partitioner()?;
 
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let protocol = get_http_scheme_from_uri(&base_url.parse::<Uri>().unwrap());
 
         let svc = ServiceBuilder::new()
@@ -256,6 +262,8 @@ impl GcsSinkConfig {
 
         let request_settings = RequestSettings::new(self)?;
 
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let sink = GcsSink::new(svc, request_settings, partitioner, batch_settings, protocol);
 
         Ok(VectorSink::from_event_streamsink(sink))
@@ -356,15 +364,23 @@ impl RequestSettings {
         let transformer = config.encoding.transformer();
         let (framer, serializer) = config.encoding.build(SinkType::MessageBased)?;
         let encoder = Encoder::<Framer>::new(framer, serializer);
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let acl = config
             .acl
             .map(|acl| HeaderValue::from_str(&to_string(acl)).unwrap());
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let content_type = HeaderValue::from_str(encoder.content_type()).unwrap();
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let content_encoding = config
             .compression
             .content_encoding()
             .map(|ce| HeaderValue::from_str(&to_string(ce)).unwrap());
         let storage_class = config.storage_class.unwrap_or_default();
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let storage_class = HeaderValue::from_str(&to_string(storage_class)).unwrap();
         let metadata = config
             .metadata

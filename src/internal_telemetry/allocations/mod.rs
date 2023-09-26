@@ -53,6 +53,8 @@ impl GroupMemStats {
     /// Allocates a [`GroupMemStatsStorage`], and updates the global [`THREAD_LOCAL_REFS`] registry
     /// with a reference to this newly allocated memory.
     pub fn new() -> Self {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let mut mutex = THREAD_LOCAL_REFS.lock().unwrap();
         let stats_ref: &'static GroupMemStatsStorage = Box::leak(Box::new(GroupMemStatsStorage {
             allocations: arr![AtomicU64::new(0) ; 128],
@@ -63,6 +65,8 @@ impl GroupMemStats {
         group_mem_stats
     }
 }
+// TODO: https://github.com/vectordotdev/vector/issues/18682
+#[allow(clippy::unwrap_used)]
 
 thread_local! {
     static GROUP_MEM_STATS: GroupMemStats = GroupMemStats::new();
@@ -117,6 +121,8 @@ impl Tracer for MainTracer {
 /// Initializes allocation tracing.
 pub fn init_allocation_tracing() {
     for group in &GROUP_INFO {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let mut writer = group.lock().unwrap();
         *writer = GroupInfo {
             component_id: "root".to_string(),
@@ -125,16 +131,26 @@ pub fn init_allocation_tracing() {
         };
     }
     let alloc_processor = thread::Builder::new().name("vector-alloc-processor".to_string());
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
+ // TODO: https://github.com/vectordotdev/vector/issues/18682
+#[allow(clippy::unwrap_used)]
     alloc_processor
         .spawn(|| {
             without_allocation_tracing(|| loop {
                 for (group_idx, group) in GROUP_INFO.iter().enumerate() {
                     let mut allocations_diff = 0;
                     let mut deallocations_diff = 0;
+ // TODO: https://github.com/vectordotdev/vector/issues/18682
+#[allow(clippy::unwrap_used)]
+ // TODO: https://github.com/vectordotdev/vector/issues/18682
+#[allow(clippy::unwrap_used)]
                     let mutex = THREAD_LOCAL_REFS.lock().unwrap();
                     for idx in 0..mutex.len() {
                         allocations_diff +=
                             mutex[idx].allocations[group_idx].swap(0, Ordering::Relaxed);
+ // TODO: https://github.com/vectordotdev/vector/issues/18682
+#[allow(clippy::unwrap_used)]
                         deallocations_diff +=
                             mutex[idx].deallocations[group_idx].swap(0, Ordering::Relaxed);
                     }
@@ -142,8 +158,12 @@ pub fn init_allocation_tracing() {
                         continue;
                     }
                     let mem_used_diff = allocations_diff as i64 - deallocations_diff as i64;
+ // TODO: https://github.com/vectordotdev/vector/issues/18682
+#[allow(clippy::unwrap_used)]
                     let group_info = group.lock().unwrap();
                     if allocations_diff > 0 {
+ // TODO: https://github.com/vectordotdev/vector/issues/18682
+#[allow(clippy::unwrap_used)]
                         counter!(
                             "component_allocated_bytes_total",
                             allocations_diff,
@@ -198,6 +218,10 @@ pub fn acquire_allocation_group_id(
 ) -> AllocationGroupId {
     if let Some(group_id) = AllocationGroupId::register() {
         if let Some(group_lock) = GROUP_INFO.get(group_id.as_raw() as usize) {
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             let mut writer = group_lock.lock().unwrap();
             *writer = GroupInfo {
                 component_id,

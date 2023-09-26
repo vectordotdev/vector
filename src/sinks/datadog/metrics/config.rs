@@ -220,6 +220,10 @@ impl DatadogMetricsConfig {
     }
 
     fn get_protocol(&self) -> String {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         self.get_base_agent_endpoint()
             .parse::<Uri>()
             .unwrap()

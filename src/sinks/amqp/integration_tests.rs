@@ -15,6 +15,8 @@ use vector_core::config::LogNamespace;
 
 pub fn make_config() -> AmqpSinkConfig {
     let mut config = AmqpSinkConfig {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         exchange: Template::try_from("it").unwrap(),
         ..Default::default()
     };
@@ -54,14 +56,20 @@ async fn amqp_round_trip_plaintext() {
 async fn amqp_happy_path() {
     let mut config = make_config();
     let exchange = format!("test-{}-exchange", random_string(10));
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     config.exchange = Template::try_from(exchange.as_str()).unwrap();
     let queue = format!("test-{}-queue", random_string(10));
 
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     let (_conn, channel) = config.connection.connect().await.unwrap();
     let exchange_opts = lapin::options::ExchangeDeclareOptions {
         auto_delete: true,
         ..Default::default()
     };
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     channel
         .exchange_declare(
             &exchange,
@@ -73,6 +81,8 @@ async fn amqp_happy_path() {
         .unwrap();
 
     let cx = SinkContext::default();
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     let (sink, healthcheck) = config.build(cx).await.unwrap();
     healthcheck.await.expect("Health check failed");
 
@@ -81,11 +91,15 @@ async fn amqp_happy_path() {
         auto_delete: true,
         ..Default::default()
     };
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     channel
         .queue_declare(&queue, queue_opts, lapin::types::FieldTable::default())
         .await
         .unwrap();
 
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     channel
         .queue_bind(
             &queue,
@@ -98,6 +112,8 @@ async fn amqp_happy_path() {
         .unwrap();
 
     let consumer = format!("test-{}-consumer", random_string(10));
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     let mut consumer = channel
         .basic_consume(
             &queue,
@@ -119,6 +135,8 @@ async fn amqp_happy_path() {
         if let Ok(Some(try_msg)) =
             tokio::time::timeout(Duration::from_secs(10), consumer.next()).await
         {
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             let msg = try_msg.unwrap();
             let s = String::from_utf8_lossy(msg.data.as_slice()).into_owned();
             out.push(s);
@@ -138,14 +156,20 @@ async fn amqp_happy_path() {
 async fn amqp_round_trip() {
     let mut config = make_config();
     let exchange = format!("test-{}-exchange", random_string(10));
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     config.exchange = Template::try_from(exchange.as_str()).unwrap();
     let queue = format!("test-{}-queue", random_string(10));
 
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     let (_conn, channel) = config.connection.connect().await.unwrap();
     let exchange_opts = lapin::options::ExchangeDeclareOptions {
         auto_delete: true,
         ..Default::default()
     };
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     channel
         .exchange_declare(
             &exchange,
@@ -157,6 +181,8 @@ async fn amqp_round_trip() {
         .unwrap();
 
     let cx = SinkContext::default();
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     let (amqp_sink, healthcheck) = config.build(cx).await.unwrap();
     healthcheck.await.expect("Health check failed");
 
@@ -169,6 +195,8 @@ async fn amqp_round_trip() {
         ..Default::default()
     };
     let (tx, rx) = SourceSender::new_test();
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     let amqp_source = crate::sources::amqp::amqp_source(
         &source_cfg,
         ShutdownSignal::noop(),
@@ -184,11 +212,15 @@ async fn amqp_round_trip() {
         auto_delete: true,
         ..Default::default()
     };
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     channel
         .queue_declare(&queue, queue_opts, lapin::types::FieldTable::default())
         .await
         .unwrap();
 
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     channel
         .queue_bind(
             &queue,
@@ -209,6 +241,8 @@ async fn amqp_round_trip() {
         run_and_assert_sink_compliance(amqp_sink, events, &SINK_TAGS).await;
         num_events
     };
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     let nb_events_published = tokio::spawn(events_fut).await.unwrap();
     let output = crate::test_util::collect_n(rx, 1000).await;
 

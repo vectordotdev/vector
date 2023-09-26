@@ -63,6 +63,8 @@ async fn start_test(
         default_api_key = "atoken"
         default_namespace = "foo"
     "#};
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     let (mut config, cx) = load_sink::<DatadogMetricsConfig>(config).unwrap();
 
     let addr = next_addr();
@@ -71,6 +73,8 @@ async fn start_test(
     let endpoint = format!("http://{}", addr);
     config.dd_common.endpoint = Some(endpoint.clone());
 
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     let (sink, _) = config.build(cx).await.unwrap();
 
     let (rx, _trigger, server) = test_server(addr, api_status);
@@ -90,6 +94,8 @@ async fn start_test(
         .collect();
     let stream = map_event_batch_stream(stream::iter(events.clone()), Some(batch));
 
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     sink.run(stream).await.unwrap();
     assert_eq!(receiver.await, batch_status);
 
@@ -179,11 +185,17 @@ async fn run_sink() {
         default_api_key = "${TEST_DATADOG_API_KEY}"
         default_namespace = "fake.test.integration"
     "#};
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     let api_key = std::env::var("TEST_DATADOG_API_KEY").unwrap();
     assert!(!api_key.is_empty(), "$TEST_DATADOG_API_KEY required");
     let config = config.replace("${TEST_DATADOG_API_KEY}", &api_key);
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     let (config, cx) = load_sink::<DatadogMetricsConfig>(config.as_str()).unwrap();
 
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     let (sink, _) = config.build(cx).await.unwrap();
     let (batch, receiver) = BatchNotifier::new_with_receiver();
     let events: Vec<_> = (0..10)
@@ -199,6 +211,8 @@ async fn run_sink() {
         .collect();
     let stream = map_event_batch_stream(stream::iter(events.clone()), Some(batch));
 
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     sink.run(stream).await.unwrap();
     assert_eq!(receiver.await, BatchStatus::Delivered);
 }

@@ -43,7 +43,15 @@ pub mod json {
     /// Serialization can panic if `T`'s implementation of `Serialize` decides
     /// to fail, or if `T` contains a map with non-string keys.
     pub fn to_string(value: impl Serialize) -> String {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let value = serde_json::to_value(value).unwrap();
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
+        #[allow(clippy::unwrap_used)]
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         value.as_str().unwrap().into()
     }
 

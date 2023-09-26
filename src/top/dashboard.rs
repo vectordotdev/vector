@@ -384,20 +384,24 @@ pub async fn init_dashboard<'a>(
 
     loop {
         tokio::select! {
-            Some(state) = state_rx.recv() => {
-                terminal.draw(|f| widgets.draw(f, state))?;
-            },
-            k = key_press_rx.recv() => {
-                if let KeyCode::Esc | KeyCode::Char('q') = k.unwrap() {
-                    _ = key_press_kill_tx.send(());
-                    break
+                    Some(state) = state_rx.recv() => {
+                        terminal.draw(|f| widgets.draw(f, state))?;
+                    },
+                    k = key_press_rx.recv() => {
+         // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
+         // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
+                        if let KeyCode::Esc | KeyCode::Char('q') = k.unwrap() {
+                            _ = key_press_kill_tx.send(());
+                            break
+                        }
+                    }
+                    _ = &mut shutdown_rx => {
+                        _ = key_press_kill_tx.send(());
+                        break
+                    }
                 }
-            }
-            _ = &mut shutdown_rx => {
-                _ = key_press_kill_tx.send(());
-                break
-            }
-        }
     }
 
     // Clean-up terminal

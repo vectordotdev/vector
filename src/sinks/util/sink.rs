@@ -319,6 +319,10 @@ where
                 if service_ready {
                     trace!("Service ready; Sending batch.");
 
+                    // TODO: https://github.com/vectordotdev/vector/issues/18682
+                    #[allow(clippy::unwrap_used)]
+                    // TODO: https://github.com/vectordotdev/vector/issues/18682
+                    #[allow(clippy::unwrap_used)]
                     let batch = this.partitions.remove(partition).unwrap();
                     this.lingers.remove(partition);
 

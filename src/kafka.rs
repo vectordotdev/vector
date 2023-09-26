@@ -96,8 +96,12 @@ impl KafkaAuthConfig {
         client.set("security.protocol", protocol);
 
         if sasl_enabled {
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             let sasl = self.sasl.as_ref().unwrap();
             if let Some(username) = &sasl.username {
+                // TODO: https://github.com/vectordotdev/vector/issues/18682
+                #[allow(clippy::unwrap_used)]
                 client.set("sasl.username", username.as_str());
             }
             if let Some(password) = &sasl.password {
@@ -109,6 +113,10 @@ impl KafkaAuthConfig {
         }
 
         if tls_enabled {
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             let tls = self.tls.as_ref().unwrap();
 
             if let Some(path) = &tls.options.ca_file {

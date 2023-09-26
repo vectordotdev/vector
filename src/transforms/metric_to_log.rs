@@ -76,6 +76,10 @@ impl MetricToLogConfig {
 
 impl GenerateConfig for MetricToLogConfig {
     fn generate_config() -> toml::Value {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         toml::Value::try_from(Self {
             host_tag: Some("host-tag".to_string()),
             timezone: None,

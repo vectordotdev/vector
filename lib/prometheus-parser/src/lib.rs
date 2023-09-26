@@ -335,6 +335,10 @@ impl MetricGroupSet {
                 .insert(name.into(), GroupKind::new(MetricKind::Untyped));
             name
         };
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         self.0.get_full_mut(name).unwrap()
     }
 

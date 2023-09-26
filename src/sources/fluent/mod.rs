@@ -72,9 +72,17 @@ pub struct FluentConfig {
 
 impl GenerateConfig for FluentConfig {
     fn generate_config() -> toml::Value {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         toml::Value::try_from(Self {
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             address: SocketListenAddr::SocketAddr("0.0.0.0:24224".parse().unwrap()),
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             keepalive: None,
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             tls: None,
             receive_buffer_bytes: None,
             acknowledgements: Default::default(),
@@ -543,6 +551,10 @@ impl TcpSourceAcker for FluentAcker {
             if let TcpSourceAck::Ack = ack {
                 ack_map.insert("ack", chunk);
             };
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             ack_map.serialize(&mut ser).unwrap();
         }
         Some(buf.into())
@@ -1070,7 +1082,11 @@ mod integration_tests {
     const FLUENTD_TAG: &str = "v1.12";
 
     fn make_file(name: &str, content: &str) -> tempfile::TempDir {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let dir = tempfile::tempdir().unwrap();
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let mut file = File::create(dir.path().join(name)).unwrap();
         write!(&mut file, "{}", content).unwrap();
         dir
@@ -1125,6 +1141,8 @@ mod integration_tests {
                 .bind(dir.path().display(), "/fluent-bit/etc")
                 .run(async move {
                     wait_for_tcp(test_address).await;
+                    // TODO: https://github.com/vectordotdev/vector/issues/18682
+                    #[allow(clippy::unwrap_used)]
                     reqwest::Client::new()
                         .post(&format!("http://{}/", test_address))
                         .header("content-type", "application/json")
@@ -1206,6 +1224,8 @@ mod integration_tests {
                 .bind(dir.path().display(), "/fluentd/etc")
                 .run(async move {
                     wait_for_tcp(test_address).await;
+                    // TODO: https://github.com/vectordotdev/vector/issues/18682
+                    #[allow(clippy::unwrap_used)]
                     reqwest::Client::new()
                         .post(&format!("http://{}/", test_address))
                         .header("content-type", "application/json")
@@ -1231,6 +1251,10 @@ mod integration_tests {
         let (sender, recv) = SourceSender::new_test_finalize(status);
         let address = next_addr_for_ip(std::net::IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED));
         tokio::spawn(async move {
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             FluentConfig {
                 address: address.into(),
                 tls: None,

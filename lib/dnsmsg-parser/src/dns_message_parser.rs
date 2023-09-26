@@ -183,6 +183,8 @@ impl DnsMessageParser {
             };
         self.raw_message_for_rdata_parsing = Some(raw_message_for_rdata_parsing_data);
 
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         BinDecoder::new(self.raw_message_for_rdata_parsing.as_ref().unwrap()).clone(index as u16)
     }
 

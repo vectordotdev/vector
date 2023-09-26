@@ -67,6 +67,8 @@ pub struct HecAcknowledgementsConfig {
 
 impl Default for HecAcknowledgementsConfig {
     fn default() -> Self {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         Self {
             enabled: None,
             max_pending_acks: NonZeroU64::new(10_000_000).unwrap(),
@@ -207,6 +209,8 @@ impl Channel {
         tokio::spawn(async move {
             while let Some((status, ack_id)) = ack_stream.next().await {
                 if status == BatchStatus::Delivered {
+                    // TODO: https://github.com/vectordotdev/vector/issues/18682
+                    #[allow(clippy::unwrap_used)]
                     let mut ack_ids_status = finalizer_ack_ids_status.lock().unwrap();
                     ack_ids_status.insert(ack_id);
                     if ack_ids_status.len() > max_pending_acks_per_channel {
@@ -233,6 +237,8 @@ impl Channel {
 
     fn get_ack_id(&self, batch_rx: BatchStatusReceiver) -> u64 {
         {
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             let mut last_used_timestamp = self.last_used_timestamp.write().unwrap();
             *last_used_timestamp = Instant::now();
         }
@@ -245,9 +251,13 @@ impl Channel {
 
     fn get_acks_status(&self, acks: &[u64]) -> HashMap<u64, bool> {
         {
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             let mut last_used_timestamp = self.last_used_timestamp.write().unwrap();
             *last_used_timestamp = Instant::now();
         }
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let mut ack_ids_status = self.ack_ids_status.lock().unwrap();
         acks.iter()
             .map(|ack_id| (*ack_id, ack_ids_status.remove(*ack_id)))
@@ -255,11 +265,15 @@ impl Channel {
     }
 
     fn get_last_used(&self) -> Instant {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let last_used_timestamp = self.last_used_timestamp.read().unwrap();
         *last_used_timestamp
     }
 
     fn drop_oldest_pending_ack(&self) -> bool {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let mut ack_ids_status = self.ack_ids_status.lock().unwrap();
         match ack_ids_status.min() {
             Some(ack_id) => ack_ids_status.remove(ack_id),

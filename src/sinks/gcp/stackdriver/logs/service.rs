@@ -13,6 +13,10 @@ pub(super) struct StackdriverLogsServiceRequestBuilder {
 
 impl HttpServiceRequestBuilder for StackdriverLogsServiceRequestBuilder {
     fn build(&self, body: Bytes) -> Request<Bytes> {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let mut request = Request::post(self.uri.clone())
             .header("Content-Type", "application/json")
             .body(body)

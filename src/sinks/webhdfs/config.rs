@@ -77,6 +77,10 @@ pub struct WebHdfsConfig {
 
 impl GenerateConfig for WebHdfsConfig {
     fn generate_config() -> toml::Value {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         toml::Value::try_from(Self {
             root: "/".to_string(),
             prefix: "%F/".to_string(),

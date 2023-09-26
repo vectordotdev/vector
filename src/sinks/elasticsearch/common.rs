@@ -66,6 +66,8 @@ impl ElasticsearchCommon {
                     password: password.clone(),
                 });
                 // basic auth must be some for now
+                // TODO: https://github.com/vectordotdev/vector/issues/18682
+                #[allow(clippy::unwrap_used)]
                 let auth = auth.choose_one(&uri.auth)?.unwrap();
                 Some(Auth::Basic(auth))
             }
@@ -113,6 +115,10 @@ impl ElasticsearchCommon {
             }
             format!("{}/_bulk?{}", base_url, query.finish())
         };
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let bulk_uri = bulk_url.parse::<Uri>().unwrap();
 
         let tls_settings = TlsSettings::from_options(&config.tls)?;

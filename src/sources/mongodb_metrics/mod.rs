@@ -226,12 +226,16 @@ impl MongoDbMetrics {
             let node_type = self.get_node_type().await?;
             let build_info = self.get_build_info().await?;
             debug!(
-                message = "Connected to server.", endpoint = %self.endpoint, node_type = ?node_type, server_version = ?serde_json::to_string(&build_info).unwrap()
-            );
+             // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
+                            message = "Connected to server.", endpoint = %self.endpoint, node_type = ?node_type, server_version = ?serde_json::to_string(&build_info).unwrap()
+                        );
         }
 
         Ok(())
     }
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
 
     fn create_metric(&self, name: &str, value: MetricValue, tags: MetricTags) -> Metric {
         Metric::new(name, MetricKind::Absolute, value)
@@ -1014,10 +1018,14 @@ fn document_size(doc: &Document) -> usize {
 fn sanitize_endpoint(endpoint: &str, options: &ClientOptions) -> String {
     let mut endpoint = endpoint.to_owned();
     if options.credential.is_some() {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let start = endpoint.find("://").unwrap() + 3;
 
         // Split `username:password@host[:port]` and `/defaultauthdb?<options>`
         let pre_slash = match endpoint[start..].find('/') {
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             Some(index) => {
                 let mut segments = endpoint[start..].split_at(index);
                 // If we have databases and options
@@ -1033,8 +1041,12 @@ fn sanitize_endpoint(endpoint: &str, options: &ClientOptions) -> String {
                             let options = segments.1[1..]
                                 .split('&')
                                 .filter(|pair| {
+                                    // TODO: https://github.com/vectordotdev/vector/issues/18682
+                                    #[allow(clippy::unwrap_used)]
                                     let (key, _) = pair.split_at(pair.find('=').unwrap());
                                     !matches!(
+                                        // TODO: https://github.com/vectordotdev/vector/issues/18682
+                                        #[allow(clippy::unwrap_used)]
                                         key.to_lowercase().as_str(),
                                         "authsource" | "authmechanism" | "authmechanismproperties"
                                     )
@@ -1058,6 +1070,10 @@ fn sanitize_endpoint(endpoint: &str, options: &ClientOptions) -> String {
         };
 
         // Remove `username:password@`
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let end = pre_slash.rfind('@').unwrap() + 1;
         endpoint = format!("{}{}", &endpoint[0..start], &endpoint[start + end..]);
     }
@@ -1107,14 +1123,22 @@ mod integration_tests {
     }
 
     fn remove_creds(address: &str) -> String {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let mut url = url::Url::parse(address).unwrap();
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         url.set_password(None).unwrap();
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         url.set_username("").unwrap();
         url.to_string()
     }
 
     async fn test_instance(endpoint: String) {
         assert_source_compliance(&PULL_SOURCE_TAGS, async {
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             let host = ClientOptions::parse(endpoint.as_str()).await.unwrap().hosts[0].to_string();
             let namespace = "vector_mongodb";
 
@@ -1122,6 +1146,10 @@ mod integration_tests {
 
             let endpoints = vec![endpoint.clone()];
             tokio::spawn(async move {
+                // TODO: https://github.com/vectordotdev/vector/issues/18682
+                #[allow(clippy::unwrap_used)]
+                // TODO: https://github.com/vectordotdev/vector/issues/18682
+                #[allow(clippy::unwrap_used)]
                 MongoDbMetricsConfig {
                     endpoints,
                     scrape_interval_secs: Duration::from_secs(15),

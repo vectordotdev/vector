@@ -208,17 +208,29 @@ fn default_collectors() -> Option<Vec<Collector>> {
 
 fn example_devices() -> FilterList {
     FilterList {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         includes: Some(vec!["sda".try_into().unwrap()]),
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         excludes: Some(vec!["dm-*".try_into().unwrap()]),
     }
 }
 
 fn default_all_devices() -> FilterList {
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     FilterList {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         includes: Some(vec!["*".try_into().unwrap()]),
         excludes: None,
     }
 }
+// TODO: https://github.com/vectordotdev/vector/issues/18682
+#[allow(clippy::unwrap_used)]
 
 const fn default_levels() -> usize {
     100
@@ -226,7 +238,15 @@ const fn default_levels() -> usize {
 
 fn example_cgroups() -> FilterList {
     FilterList {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         includes: Some(vec!["user.slice/*".try_into().unwrap()]),
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
+        #[allow(clippy::unwrap_used)]
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         excludes: Some(vec!["*.service".try_into().unwrap()]),
     }
 }

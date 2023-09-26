@@ -138,8 +138,12 @@ impl LogplexConfig {
 impl Default for LogplexConfig {
     fn default() -> Self {
         Self {
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             address: "0.0.0.0:80".parse().unwrap(),
             query_parameters: Vec::new(),
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             tls: None,
             auth: None,
             framing: default_framing_message_based(),
@@ -152,6 +156,10 @@ impl Default for LogplexConfig {
 
 impl GenerateConfig for LogplexConfig {
     fn generate_config() -> toml::Value {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         toml::Value::try_from(LogplexConfig::default()).unwrap()
     }
 }

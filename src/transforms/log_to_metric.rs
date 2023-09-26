@@ -136,6 +136,10 @@ pub struct LogToMetric {
 
 impl GenerateConfig for LogToMetricConfig {
     fn generate_config() -> toml::Value {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         toml::Value::try_from(Self {
             metrics: vec![MetricConfig {
                 field: "field_name".try_into().expect("Fixed template"),

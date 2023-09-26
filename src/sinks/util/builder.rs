@@ -244,6 +244,8 @@ where
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let this = self.project();
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         this.st
             .poll_next(cx)
             .map(|maybe| maybe.map(|result| result.unwrap()))

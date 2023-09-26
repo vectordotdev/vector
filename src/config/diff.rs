@@ -78,7 +78,15 @@ impl Difference {
                 // to_value is used specifically (instead of string)
                 // to avoid problems comparing serialized HashMaps,
                 // which can iterate in varied orders.
+                // TODO: https://github.com/vectordotdev/vector/issues/18682
+                #[allow(clippy::unwrap_used)]
                 let old_value = serde_json::to_value(&old[n]).unwrap();
+                // TODO: https://github.com/vectordotdev/vector/issues/18682
+                // TODO: https://github.com/vectordotdev/vector/issues/18682
+                #[allow(clippy::unwrap_used)]
+                #[allow(clippy::unwrap_used)]
+                // TODO: https://github.com/vectordotdev/vector/issues/18682
+                #[allow(clippy::unwrap_used)]
                 let new_value = serde_json::to_value(&new[n]).unwrap();
                 old_value != new_value
             })

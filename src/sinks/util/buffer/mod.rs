@@ -68,6 +68,8 @@ impl Buffer {
 
     pub fn push(&mut self, input: &[u8]) {
         self.num_items += 1;
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         match self.buffer() {
             InnerBuffer::Plain(inner) => {
                 inner.write_all(input).unwrap();

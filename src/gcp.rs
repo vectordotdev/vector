@@ -157,6 +157,8 @@ impl GcpAuthenticator {
 
     pub fn apply<T>(&self, request: &mut http::Request<T>) {
         if let Some(token) = self.make_token() {
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             request
                 .headers_mut()
                 .insert(AUTHORIZATION, token.parse().unwrap());
@@ -167,6 +169,8 @@ impl GcpAuthenticator {
     pub fn apply_uri(&self, uri: &mut Uri) {
         match self {
             Self::Credentials(_) | Self::None => (),
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             Self::ApiKey(api_key) => {
                 let mut parts = uri.clone().into_parts();
                 let path = parts
@@ -194,6 +198,8 @@ impl GcpAuthenticator {
     async fn token_regenerator(self, sender: watch::Sender<()>) {
         match self {
             Self::Credentials(inner) => {
+                // TODO: https://github.com/vectordotdev/vector/issues/18682
+                #[allow(clippy::unwrap_used)]
                 let period =
                     Duration::from_secs(inner.token.read().unwrap().expires_in() as u64 / 2);
                 let mut interval = tokio::time::interval_at(Instant::now() + period, period);
@@ -227,11 +233,15 @@ impl InnerCreds {
             Some((creds, scope)) => fetch_token(creds, scope).await?,
             None => get_token_implicit().await?,
         };
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         *self.token.write().unwrap() = token;
         Ok(())
     }
 
     fn make_token(&self) -> String {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let token = self.token.read().unwrap();
         format!("{} {}", token.token_type(), token.access_token())
     }
@@ -256,6 +266,8 @@ async fn fetch_token(creds: &Credentials, scope: &Scope) -> crate::Result<Token>
 
 async fn get_token_implicit() -> Result<Token, GcpError> {
     debug!("Fetching implicit GCP authentication token.");
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     let req = http::Request::get(SERVICE_ACCOUNT_TOKEN_URL)
         .header("Metadata-Flavor", "Google")
         .body(hyper::Body::empty())

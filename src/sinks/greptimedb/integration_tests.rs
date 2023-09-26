@@ -68,6 +68,8 @@ async fn test_greptimedb_sink() {
 }
 
 fn query_client() -> reqwest::Client {
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     reqwest::Client::builder().build().unwrap()
 }
 

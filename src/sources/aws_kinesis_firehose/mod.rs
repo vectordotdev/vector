@@ -222,7 +222,15 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
 
 impl GenerateConfig for AwsKinesisFirehoseConfig {
     fn generate_config() -> toml::Value {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         toml::Value::try_from(Self {
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
+            #[allow(clippy::unwrap_used)]
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             address: "0.0.0.0:443".parse().unwrap(),
             access_key: None,
             access_keys: None,

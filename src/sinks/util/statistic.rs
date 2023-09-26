@@ -50,7 +50,11 @@ impl DistributionStatistic {
                     a.value.partial_cmp(&b.value).unwrap_or(Ordering::Equal)
                 });
 
+                // TODO: https://github.com/vectordotdev/vector/issues/18682
+                #[allow(clippy::unwrap_used)]
                 let min = bins.first().unwrap().value;
+                // TODO: https://github.com/vectordotdev/vector/issues/18682
+                #[allow(clippy::unwrap_used)]
                 let max = bins.last().unwrap().value;
                 let sum = bins
                     .iter()
@@ -61,6 +65,8 @@ impl DistributionStatistic {
                     bins[i].rate += bins[i - 1].rate;
                 }
 
+                // TODO: https://github.com/vectordotdev/vector/issues/18682
+                #[allow(clippy::unwrap_used)]
                 let count = bins.last().unwrap().rate;
                 let avg = sum / count as f64;
 

@@ -91,6 +91,10 @@ pub async fn build_healthcheck(
     let uri = build_uri(endpoint.as_str(), "/services/collector/health/1.0", None)
         .context(UriParseSnafu)?;
 
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     let request = Request::get(uri)
         .header("Authorization", format!("Splunk {}", token))
         .body(Body::empty())
@@ -476,6 +480,8 @@ pub mod integration_test_helpers {
     }
 
     pub async fn get_token() -> String {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let client = reqwest::Client::builder()
             .danger_accept_invalid_certs(true)
             .build()
@@ -496,13 +502,19 @@ pub mod integration_test_helpers {
         )
         .await;
 
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let json: JsonValue = res.json().await.unwrap();
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let entries = json["entry"].as_array().unwrap().clone();
 
         if entries.is_empty() {
             panic!("You don't have any HTTP Event Collector inputs set up in Splunk");
         }
 
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         entries[0]["content"]["token"].as_str().unwrap().to_owned()
     }
 }

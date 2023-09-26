@@ -157,6 +157,8 @@ pub struct ChronicleUnstructuredConfig {
 
 impl GenerateConfig for ChronicleUnstructuredConfig {
     fn generate_config() -> toml::Value {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         toml::from_str(indoc! {r#"
             credentials_path = "/path/to/credentials.json"
             customer_id = "customer_id"
@@ -167,6 +169,8 @@ impl GenerateConfig for ChronicleUnstructuredConfig {
     }
 }
 
+// TODO: https://github.com/vectordotdev/vector/issues/18682
+#[allow(clippy::unwrap_used)]
 pub fn build_healthcheck(
     client: HttpClient,
     base_url: &str,
@@ -332,6 +336,8 @@ impl Encoder<(String, Vec<Event>)> for ChronicleEncoder {
                 });
 
                 if let Some(ts) = timestamp {
+                    // TODO: https://github.com/vectordotdev/vector/issues/18682
+                    #[allow(clippy::unwrap_used)]
                     value.as_object_mut().unwrap().insert(
                         "ts_rfc3339".to_string(),
                         ts.to_rfc3339_opts(chrono::SecondsFormat::AutoSi, true)
@@ -473,11 +479,17 @@ impl Service<ChronicleRequest> for ChronicleService {
 
     fn call(&mut self, request: ChronicleRequest) -> Self::Future {
         let mut builder = Request::post(&self.base_url);
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let headers = builder.headers_mut().unwrap();
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         headers.insert(
             "content-type",
             HeaderValue::from_str("application/json").unwrap(),
         );
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         headers.insert(
             "content-length",
             HeaderValue::from_str(&request.body.len().to_string()).unwrap(),
@@ -485,6 +497,8 @@ impl Service<ChronicleRequest> for ChronicleService {
 
         let metadata = request.get_metadata().clone();
 
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let mut http_request = builder.body(Body::from(request.body)).unwrap();
         self.creds.apply(&mut http_request);
 
@@ -526,6 +540,8 @@ mod integration_tests {
     const ADDRESS_ENV_VAR: &str = "CHRONICLE_ADDRESS";
 
     fn config(log_type: &str, auth_path: &str) -> ChronicleUnstructuredConfig {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let address = std::env::var(ADDRESS_ENV_VAR).unwrap();
         let config = format!(
             indoc! { r#"
@@ -538,6 +554,8 @@ mod integration_tests {
             address, auth_path, log_type
         );
 
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let config: ChronicleUnstructuredConfig = toml::from_str(&config).unwrap();
         config
     }
@@ -624,6 +642,8 @@ mod integration_tests {
     }
 
     async fn request(method: Method, path: &str, log_type: &str) -> Response {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let address = std::env::var(ADDRESS_ENV_VAR).unwrap();
         let url = format!("{}/{}", address, path);
         Client::new()

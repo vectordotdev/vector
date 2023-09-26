@@ -228,6 +228,8 @@ impl TowerRequestConfig {
 
     pub fn unwrap_with(&self, defaults: &Self) -> TowerRequestSettings {
         // the unwrap() calls below are safe because the final defaults are always Some<>
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         TowerRequestSettings {
             concurrency: self.concurrency.parse_concurrency(defaults.concurrency),
             timeout: Duration::from_secs(

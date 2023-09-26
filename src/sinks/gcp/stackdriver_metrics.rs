@@ -240,6 +240,10 @@ impl HttpSink for HttpEventSink {
             }],
         };
 
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let body = crate::serde::json::to_bytes(&series).unwrap().freeze();
 
         let uri: Uri = format!(

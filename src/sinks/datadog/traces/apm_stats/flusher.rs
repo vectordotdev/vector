@@ -91,6 +91,10 @@ impl ApmStatsSender {
     async fn flush_apm_stats(&self, force: bool) {
         // explicit scope to minimize duration that the Aggregator is locked.
         if let Some((payload, api_key)) = {
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             let mut aggregator = self.aggregator.lock().unwrap();
             let client_stats_payloads = aggregator.flush(force);
 

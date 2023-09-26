@@ -78,6 +78,10 @@ pub enum LuaConfig {
 
 impl GenerateConfig for LuaConfig {
     fn generate_config() -> toml::Value {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         toml::from_str(
             r#"version = "2"
             hooks.process = """#,

@@ -131,6 +131,8 @@ fn advance_u32(b: &mut Bytes) -> Result<u32, ()> {
         return Err(());
     }
     let a = b.split_to(4);
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     Ok(u32::from_be_bytes(a[..].try_into().unwrap()))
 }
 
@@ -179,6 +181,8 @@ impl FrameStreamReader {
             ControlState::Initial => {
                 match header {
                     ControlHeader::Ready => {
+                        // TODO: https://github.com/vectordotdev/vector/issues/18682
+                        #[allow(clippy::unwrap_used)]
                         let content_type = self.process_fields(header, &mut frame)?.unwrap();
 
                         self.send_control_frame(Self::make_frame(
@@ -289,6 +293,8 @@ impl FrameStreamReader {
                         return Err(());
                     }
 
+                    // TODO: https://github.com/vectordotdev/vector/issues/18682
+                    #[allow(clippy::unwrap_used)]
                     let content_type = std::str::from_utf8(&frame[..field_len]).unwrap();
                     content_types.push(content_type.to_string());
                     frame.advance(field_len);
@@ -332,6 +338,8 @@ impl FrameStreamReader {
         let empty_frame = Bytes::from(&b""[..]); //send empty frame to say we are control frame
         let mut stream = stream::iter(vec![Ok(empty_frame), Ok(frame)]);
 
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         if let Err(e) = block_on(self.response_sink.lock().unwrap().send_all(&mut stream)) {
             error!("Encountered error '{:#?}' while sending control frame.", e);
         }
@@ -390,6 +398,8 @@ pub fn build_framestream_unix_source(
         );
         let rcv_buf_size =
             nix::sys::socket::getsockopt(listener.as_raw_fd(), nix::sys::socket::sockopt::RcvBuf);
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         info!(
             "Unix socket receive buffer size modified to {}.",
             rcv_buf_size.unwrap()
@@ -405,6 +415,8 @@ pub fn build_framestream_unix_source(
         );
         let snd_buf_size =
             nix::sys::socket::getsockopt(listener.as_raw_fd(), nix::sys::socket::sockopt::SndBuf);
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         info!(
             "Unix socket buffer send size modified to {}.",
             snd_buf_size.unwrap()

@@ -224,6 +224,8 @@ async fn splunk_insert_multiple_gauge_metrics() {
 async fn metric_dimensions_exist(metric_name: &str, expected_dimensions: &[&str]) -> bool {
     for _ in 0..20usize {
         let resp = metric_dimensions(metric_name).await;
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let actual_dimensions = resp
             .iter()
             .map(|d| d["name"].as_str().unwrap())
@@ -244,11 +246,15 @@ async fn metric_dimensions_exist(metric_name: &str, expected_dimensions: &[&str]
 }
 
 async fn metric_dimensions(metric_name: &str) -> Vec<JsonValue> {
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     let client = reqwest::Client::builder()
         .danger_accept_invalid_certs(true)
         .build()
         .unwrap();
 
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     let res = client
         .get(format!(
             "{}/services/catalog/metricstore/dimensions?output_mode=json&metric_name={}",
@@ -261,7 +267,11 @@ async fn metric_dimensions(metric_name: &str) -> Vec<JsonValue> {
         .await
         .unwrap();
 
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     let json: JsonValue = res.json().await.unwrap();
 
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     json["entry"].as_array().unwrap().clone()
 }

@@ -142,6 +142,10 @@ fn default_endpoint() -> String {
 
 impl GenerateConfig for HumioMetricsConfig {
     fn generate_config() -> toml::Value {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         toml::from_str(indoc! {r#"
                 host_key = "hostname"
                 token = "${HUMIO_TOKEN}"

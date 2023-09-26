@@ -11,6 +11,10 @@ use regex::{Captures, Regex};
 //
 // https://pubs.opengroup.org/onlinepubs/000095399/basedefs/xbd_chap08.html
 pub static ENVIRONMENT_VARIABLE_INTERPOLATION_REGEX: Lazy<Regex> = Lazy::new(|| {
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     Regex::new(
         r"(?x)
         \$\$|

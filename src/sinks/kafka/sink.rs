@@ -110,8 +110,12 @@ impl KafkaSink {
 
 pub(crate) async fn healthcheck(config: KafkaSinkConfig) -> crate::Result<()> {
     trace!("Healthcheck started.");
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     let client = config.to_rdkafka(KafkaRole::Consumer).unwrap();
     let topic = match config.topic.render_string(&LogEvent::from_str_legacy("")) {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         Ok(topic) => Some(topic),
         Err(error) => {
             warn!(
@@ -123,6 +127,10 @@ pub(crate) async fn healthcheck(config: KafkaSinkConfig) -> crate::Result<()> {
     };
 
     tokio::task::spawn_blocking(move || {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let consumer: BaseConsumer = client.create().unwrap();
         let topic = topic.as_ref().map(|topic| &topic[..]);
 

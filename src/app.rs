@@ -135,6 +135,10 @@ impl ApplicationConfig {
             ) {
                 Ok(api_server) => {
                     emit!(ApiStarted {
+                        // TODO: https://github.com/vectordotdev/vector/issues/18682
+                        #[allow(clippy::unwrap_used)]
+                        // TODO: https://github.com/vectordotdev/vector/issues/18682
+                        #[allow(clippy::unwrap_used)]
                         addr: self.api.address.unwrap(),
                         playground: self.api.playground
                     });

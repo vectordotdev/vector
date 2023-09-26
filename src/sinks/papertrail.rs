@@ -51,11 +51,19 @@ pub struct PapertrailConfig {
 }
 
 fn default_process() -> Template {
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     Template::try_from("vector").unwrap()
 }
+// TODO: https://github.com/vectordotdev/vector/issues/18682
+#[allow(clippy::unwrap_used)]
 
 impl GenerateConfig for PapertrailConfig {
     fn generate_config() -> toml::Value {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         toml::from_str(
             r#"endpoint = "logs.papertrailapp.com:12345"
             encoding.codec = "json""#,

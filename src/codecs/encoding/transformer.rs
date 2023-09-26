@@ -188,6 +188,10 @@ impl Transformer {
                             }
                         }
                         for (k, v) in unix_timestamps {
+                            // TODO: https://github.com/vectordotdev/vector/issues/18682
+                            #[allow(clippy::unwrap_used)]
+                            // TODO: https://github.com/vectordotdev/vector/issues/18682
+                            #[allow(clippy::unwrap_used)]
                             log.parse_path_and_insert(k, v).unwrap();
                         }
                     } else {

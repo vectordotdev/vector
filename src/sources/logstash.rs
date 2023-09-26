@@ -115,8 +115,12 @@ impl LogstashConfig {
 impl Default for LogstashConfig {
     fn default() -> Self {
         Self {
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             address: SocketListenAddr::SocketAddr("0.0.0.0:5044".parse().unwrap()),
             keepalive: None,
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             tls: None,
             receive_buffer_bytes: None,
             acknowledgements: Default::default(),
@@ -128,6 +132,10 @@ impl Default for LogstashConfig {
 
 impl GenerateConfig for LogstashConfig {
     fn generate_config() -> toml::Value {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         toml::Value::try_from(LogstashConfig::default()).unwrap()
     }
 }
@@ -945,6 +953,8 @@ mod integration_tests {
         tls: Option<TlsEnableableConfig>,
     ) -> impl Stream<Item = Event> + Unpin {
         let (sender, recv) = SourceSender::new_test_finalize(EventStatus::Delivered);
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let address: SocketAddr = address.parse().unwrap();
         let tls_options = match tls {
             Some(options) => options,
@@ -955,6 +965,10 @@ mod integration_tests {
             tls_config: tls_options,
         };
         tokio::spawn(async move {
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             LogstashConfig {
                 address: address.into(),
                 tls: Some(tls_config),

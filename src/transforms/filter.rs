@@ -34,6 +34,10 @@ impl From<AnyCondition> for FilterConfig {
 
 impl GenerateConfig for FilterConfig {
     fn generate_config() -> toml::Value {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         toml::from_str(r#"condition = ".message = \"value\"""#).unwrap()
     }
 }

@@ -355,6 +355,8 @@ impl Runner {
                         &input_events,
                         &output_events,
                         &telemetry_events,
+                        // TODO: https://github.com/vectordotdev/vector/issues/18682
+                        #[allow(clippy::unwrap_used)]
                         &runner_metrics.lock().unwrap(),
                     )
                 })
@@ -363,6 +365,8 @@ impl Runner {
             let test_case_result = RunnerResults {
                 test_name,
                 expectation,
+                // TODO: https://github.com/vectordotdev/vector/issues/18682
+                #[allow(clippy::unwrap_used)]
                 inputs: input_events,
                 outputs: output_events,
                 validator_results,
@@ -482,14 +486,22 @@ fn spawn_component_topology(
         test_runtime.block_on(async move {
             debug!("Building component topology...");
 
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             let pieces = topology::build_or_log_errors(&config, &config_diff, HashMap::new())
                 .await
                 .unwrap();
             let (topology, (_, mut crash_rx)) =
+ // TODO: https://github.com/vectordotdev/vector/issues/18682
+#[allow(clippy::unwrap_used)]
+ // TODO: https://github.com/vectordotdev/vector/issues/18682
+#[allow(clippy::unwrap_used)]
                 topology::start_validated(config, config_diff, pieces)
                     .await
                     .unwrap();
 
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             debug!("Component topology built and spawned.");
             topology_started.mark_as_done();
 
@@ -527,8 +539,12 @@ fn spawn_input_driver(
 
             // Update the runner metrics for the sent event. This will later
             // be used in the Validators, as the "expected" case.
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             let mut input_runner_metrics = input_runner_metrics.lock().unwrap();
 
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             if let Some(encoder) = maybe_encoder.as_mut() {
                 let mut buffer = BytesMut::new();
                 encode_test_event(encoder, &mut buffer, input_event.clone());
@@ -568,6 +584,10 @@ fn spawn_output_driver(
 
             // Update the runner metrics for the received event. This will later
             // be used in the Validators, as the "expected" case.
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             let mut output_runner_metrics = output_runner_metrics.lock().unwrap();
 
             for output_event in events {

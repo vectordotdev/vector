@@ -49,6 +49,10 @@ use vector_core::config::{log_schema, LegacyKey, LogNamespace};
 use vector_core::event::MaybeAsLogMut;
 
 static SUPPORTED_S3_EVENT_VERSION: Lazy<semver::VersionReq> =
+ // TODO: https://github.com/vectordotdev/vector/issues/18682
+#[allow(clippy::unwrap_used)]
+ // TODO: https://github.com/vectordotdev/vector/issues/18682
+#[allow(clippy::unwrap_used)]
     Lazy::new(|| semver::VersionReq::parse("~2").unwrap());
 
 /// SQS configuration options.

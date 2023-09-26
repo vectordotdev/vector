@@ -267,6 +267,10 @@ where
             self.inner.on_event(&event, ctx.clone());
         } else {
             let values = [(
+                // TODO: https://github.com/vectordotdev/vector/issues/18682
+                #[allow(clippy::unwrap_used)]
+                // TODO: https://github.com/vectordotdev/vector/issues/18682
+                #[allow(clippy::unwrap_used)]
                 &fields.field(RATE_LIMIT_FIELD).unwrap(),
                 Some(&rate_limit as &dyn Value),
             )];

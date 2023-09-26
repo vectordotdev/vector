@@ -49,6 +49,10 @@ pub struct UnitTestResult {
 impl UnitTest {
     pub async fn run(self) -> UnitTestResult {
         let diff = config::ConfigDiff::initial(&self.config);
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let (topology, _) = topology::start_validated(self.config, diff, self.pieces)
             .await
             .unwrap();

@@ -241,6 +241,10 @@ impl SimpleHttpConfig {
 impl Default for SimpleHttpConfig {
     fn default() -> Self {
         Self {
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             address: "0.0.0.0:8080".parse().unwrap(),
             encoding: None,
             headers: Vec::new(),

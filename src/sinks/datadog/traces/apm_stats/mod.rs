@@ -111,6 +111,10 @@ pub(crate) fn compute_apm_stats(
     aggregator: Arc<Mutex<Aggregator>>,
     trace_events: &[TraceEvent],
 ) {
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     let mut aggregator = aggregator.lock().unwrap();
 
     // store properties that are available only at runtime

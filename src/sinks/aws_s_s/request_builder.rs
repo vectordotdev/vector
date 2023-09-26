@@ -112,6 +112,10 @@ impl RequestBuilder<Event> for SSRequestBuilder {
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
         let payload_bytes = payload.into_payload();
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let message_body = String::from(std::str::from_utf8(&payload_bytes).unwrap());
 
         SendMessageEntry {

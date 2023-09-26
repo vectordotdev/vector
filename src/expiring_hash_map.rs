@@ -185,6 +185,10 @@ where
     /// ```
     pub async fn next_expired(&mut self) -> Option<ExpiredItem<K, V>> {
         self.expiration_queue.next().await.map(|key| {
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             let (value, _) = self.map.remove(key.get_ref()).unwrap();
             (value, key)
         })

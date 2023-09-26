@@ -94,8 +94,12 @@ impl std::fmt::Debug for UnitTestStreamSourceConfig {
 #[typetag::serde(name = "unit_test_stream")]
 impl SourceConfig for UnitTestStreamSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let stream = self.stream.lock().await.take().unwrap();
         Ok(Box::pin(async move {
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             let mut out = cx.out;
             let _shutdown = cx.shutdown;
             out.send_event_stream(stream).await.map_err(|_| ())?;
@@ -301,6 +305,10 @@ impl std::fmt::Debug for UnitTestStreamSinkConfig {
 #[typetag::serde(name = "unit_test_stream")]
 impl SinkConfig for UnitTestStreamSinkConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let sink = self.sink.lock().await.take().unwrap();
         let healthcheck = future::ok(()).boxed();
 

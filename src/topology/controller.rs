@@ -69,8 +69,12 @@ impl TopologyController {
             emit!(VectorConfigLoadError);
             return ReloadOutcome::NoConfig;
         }
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let mut new_config = new_config.unwrap();
 
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         new_config
             .healthchecks
             .set_require_healthy(self.require_healthy);
@@ -118,6 +122,10 @@ impl TopologyController {
             ) {
                 Ok(api_server) => {
                     emit!(ApiStarted {
+                        // TODO: https://github.com/vectordotdev/vector/issues/18682
+                        #[allow(clippy::unwrap_used)]
+                        // TODO: https://github.com/vectordotdev/vector/issues/18682
+                        #[allow(clippy::unwrap_used)]
                         addr: new_config.api.address.unwrap(),
                         playground: new_config.api.playground
                     });

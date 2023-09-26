@@ -65,8 +65,12 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
                 sinks,
                 enrichment_tables,
             };
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             println!("{}", serde_json::to_string(&list).unwrap());
         }
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         Format::Avro => {
             let list = EncodedList {
                 sources,
@@ -74,6 +78,10 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
                 sinks,
                 enrichment_tables,
             };
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             println!("{}", serde_json::to_string(&list).unwrap());
         }
     }

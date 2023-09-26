@@ -165,6 +165,10 @@ impl OutputFormat {
 
     fn shuffle_generate(sequence: bool, lines: &[String], n: usize) -> String {
         // unwrap can be called here because `lines` can't be empty
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let line = lines.choose(&mut rand::thread_rng()).unwrap();
 
         if sequence {

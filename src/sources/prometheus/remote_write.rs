@@ -61,7 +61,15 @@ impl PrometheusRemoteWriteConfig {
 
 impl GenerateConfig for PrometheusRemoteWriteConfig {
     fn generate_config() -> toml::Value {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         toml::Value::try_from(Self {
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
+            #[allow(clippy::unwrap_used)]
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             address: "127.0.0.1:9090".parse().unwrap(),
             tls: None,
             auth: None,
@@ -357,6 +365,8 @@ mod integration_tests {
             .unwrap_or_else(|_| "127.0.0.1:9102".into());
         // TODO: This logic should maybe be moved up into the source, and possibly into other
         // sources, wrapped in a new socket address type that does the lookup during config parsing.
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         address
             .to_socket_addrs()
             .unwrap()

@@ -236,6 +236,10 @@ pub fn num_threads() -> usize {
         Ok(count) => count,
         Err(error) => {
             warn!(message = "Failed to determine available parallelism for thread count, defaulting to 1.", %error);
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             std::num::NonZeroUsize::new(1).unwrap()
         }
     };

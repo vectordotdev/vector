@@ -104,6 +104,8 @@ fn default_endpoint() -> String {
 
 impl GenerateConfig for PubsubConfig {
     fn generate_config() -> toml::Value {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         toml::from_str(indoc! {r#"
             project = "my-project"
             topic = "my-topic"
@@ -112,7 +114,8 @@ impl GenerateConfig for PubsubConfig {
         .unwrap()
     }
 }
-
+// TODO: https://github.com/vectordotdev/vector/issues/18682
+#[allow(clippy::unwrap_used)]
 #[async_trait::async_trait]
 #[typetag::serde(name = "gcp_pubsub")]
 impl SinkConfig for PubsubConfig {
@@ -221,19 +224,33 @@ impl HttpSink for PubsubSink {
 
     async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Bytes>> {
         let body = json!({ "messages": events });
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let body = crate::serde::json::to_bytes(&body).unwrap().freeze();
 
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let uri = self.uri(":publish").unwrap();
         let builder = Request::post(uri).header("Content-Type", "application/json");
-
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
+        #[allow(clippy::unwrap_used)]
         let mut request = builder.body(body).unwrap();
         self.auth.apply(&mut request);
-
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         Ok(request)
     }
 }
 
 async fn healthcheck(client: HttpClient, uri: Uri, auth: GcpAuthenticator) -> crate::Result<()> {
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     let mut request = Request::get(uri).body(Body::empty()).unwrap();
     auth.apply(&mut request);
 

@@ -163,6 +163,8 @@ impl EventEncoder {
                             .as_str()
                         ),
                         drop_event: false,
+                        // TODO: https://github.com/vectordotdev/vector/issues/18682
+                        #[allow(clippy::unwrap_used)]
                         error: key.err().unwrap(),
                     });
                 }
@@ -175,14 +177,22 @@ impl EventEncoder {
                             )
                             .as_str()
                         ),
+                        // TODO: https://github.com/vectordotdev/vector/issues/18682
+                        #[allow(clippy::unwrap_used)]
                         drop_event: false,
+                        // TODO: https://github.com/vectordotdev/vector/issues/18682
+                        #[allow(clippy::unwrap_used)]
                         error: value.err().unwrap(),
                     });
                 }
                 continue;
             }
 
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             let key_s = key.unwrap();
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             let value_s = value.unwrap();
 
             if let Some(opening_prefix) = key_s.strip_suffix('*') {
@@ -192,6 +202,8 @@ impl EventEncoder {
                 > = serde_json::from_str(value_s.clone().as_str());
 
                 if output.is_err() {
+                    // TODO: https://github.com/vectordotdev/vector/issues/18682
+                    #[allow(clippy::unwrap_used)]
                     warn!(
                         "Failed to expand dynamic label. value: {}, err: {}",
                         value_s,
@@ -503,6 +515,10 @@ impl StreamSink<Event> for LokiSink {
     }
 }
 
+// TODO: https://github.com/vectordotdev/vector/issues/18682
+#[allow(clippy::unwrap_used)]
+// TODO: https://github.com/vectordotdev/vector/issues/18682
+#[allow(clippy::unwrap_used)]
 static RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"[^0-9A-Za-z_]").unwrap());
 
 fn slugify_text(input: String) -> String {

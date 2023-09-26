@@ -211,6 +211,10 @@ fn healthcheck(
 
     let uri = settings.healthcheck_uri(endpoint)?;
 
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     let request = hyper::Request::get(uri).body(hyper::Body::empty()).unwrap();
 
     Ok(async move {

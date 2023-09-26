@@ -150,6 +150,10 @@ impl SinkConfig for AppsignalConfig {
 
 async fn healthcheck(uri: Uri, push_api_key: String, client: HttpClient) -> crate::Result<()> {
     let request = Request::get(uri).header(AUTHORIZATION, format!("Bearer {}", push_api_key));
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     let response = client.send(request.body(Body::empty()).unwrap()).await?;
 
     match response.status() {

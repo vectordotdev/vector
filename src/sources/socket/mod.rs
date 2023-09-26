@@ -99,6 +99,10 @@ impl From<udp::UdpConfig> for SocketConfig {
 
 impl GenerateConfig for SocketConfig {
     fn generate_config() -> toml::Value {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         toml::from_str(
             r#"mode = "tcp"
             address = "0.0.0.0:9000""#,

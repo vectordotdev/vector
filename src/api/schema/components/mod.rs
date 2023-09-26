@@ -256,6 +256,8 @@ pub fn update_config(config: &Config) {
 
     // Sources
     for (component_key, source) in config.sources() {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         new_components.insert(
             component_key.clone(),
             Component::Source(source::Source(source::Data {
@@ -333,6 +335,10 @@ pub fn update_config(config: &Config) {
         .difference(&existing_component_keys)
         .for_each(|component_key| {
             _ = COMPONENT_CHANGED.send(ComponentChanged::Added(
+                // TODO: https://github.com/vectordotdev/vector/issues/18682
+                #[allow(clippy::unwrap_used)]
+                // TODO: https://github.com/vectordotdev/vector/issues/18682
+                #[allow(clippy::unwrap_used)]
                 new_components.get(component_key).unwrap().clone(),
             ));
         });

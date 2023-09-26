@@ -103,6 +103,8 @@ where
     Delegated<I, H>: Serialize,
 {
     fn to_value(&self) -> Value {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         serde_json::to_value(self).unwrap()
     }
 }

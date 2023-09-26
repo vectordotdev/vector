@@ -147,10 +147,14 @@ struct InfluxDbLogsSink {
 
 impl GenerateConfig for InfluxDbLogsConfig {
     fn generate_config() -> toml::Value {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         toml::from_str(indoc! {r#"
             endpoint = "http://localhost:8086/"
             namespace = "my-namespace"
             tags = []
+ // TODO: https://github.com/vectordotdev/vector/issues/18682
+#[allow(clippy::unwrap_used)]
             org = "my-org"
             bucket = "my-bucket"
             token = "${INFLUXDB_TOKEN}"
@@ -176,13 +180,21 @@ impl SinkConfig for InfluxDbLogsConfig {
             ..Default::default()
         });
 
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let settings = influxdb_settings(
             self.influxdb1_settings.clone(),
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             self.influxdb2_settings.clone(),
         )
         .unwrap();
 
         let endpoint = self.endpoint.clone();
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let uri = settings.write_uri(endpoint).unwrap();
 
         let token = settings.token();

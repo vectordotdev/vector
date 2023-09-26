@@ -500,6 +500,10 @@ fn network_metrics(
             name,
             namespace.clone(),
             timestamp,
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             value.unwrap(),
             tags.clone(),
         )

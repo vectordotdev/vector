@@ -238,9 +238,21 @@ impl KafkaSinkConfig {
 
 impl GenerateConfig for KafkaSinkConfig {
     fn generate_config() -> toml::Value {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         toml::Value::try_from(Self {
             bootstrap_servers: "10.14.22.123:9092,10.14.23.332:9092".to_owned(),
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             topic: Template::try_from("topic-1234".to_owned()).unwrap(),
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
+            #[allow(clippy::unwrap_used)]
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             key_field: Some(ConfigTargetPath::try_from("user_id".to_owned()).unwrap()),
             encoding: JsonSerializerConfig::default().into(),
             batch: Default::default(),

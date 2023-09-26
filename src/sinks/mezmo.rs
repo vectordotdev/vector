@@ -148,6 +148,8 @@ fn default_env() -> String {
 
 impl GenerateConfig for MezmoConfig {
     fn generate_config() -> toml::Value {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         toml::from_str(
             r#"hostname = "hostname"
             api_key = "${LOGDNA_API_KEY}""#,
@@ -341,6 +343,8 @@ impl HttpSink for MezmoConfig {
 
         let query = query.finish();
 
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let body = crate::serde::json::to_bytes(&json!({
             "lines": events,
         }))
@@ -349,6 +353,8 @@ impl HttpSink for MezmoConfig {
 
         let uri = self.build_uri(&query);
 
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let mut request = Request::builder()
             .uri(uri)
             .method("POST")
@@ -381,6 +387,10 @@ impl MezmoConfig {
 async fn healthcheck(config: MezmoConfig, client: HttpClient) -> crate::Result<()> {
     let uri = config.build_uri("");
 
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     let req = Request::post(uri).body(hyper::Body::empty()).unwrap();
 
     let res = client.send(req).await?;

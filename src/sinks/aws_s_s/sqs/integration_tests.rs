@@ -26,6 +26,8 @@ async fn create_test_client() -> SqsClient {
 
     let endpoint = sqs_address();
     let proxy = ProxyConfig::default();
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     create_client::<SqsClientBuilder>(
         &auth,
         Some(Region::new("localstack")),
@@ -122,6 +124,10 @@ async fn ensure_queue(queue_name: String) {
 async fn get_queue_url(queue_name: String) -> String {
     let client = create_test_client().await;
 
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     client
         .get_queue_url()
         .queue_name(queue_name)

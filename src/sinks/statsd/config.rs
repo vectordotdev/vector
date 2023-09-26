@@ -107,6 +107,10 @@ impl GenerateConfig for StatsdSinkConfig {
     fn generate_config() -> toml::Value {
         let address = default_address();
 
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         toml::Value::try_from(Self {
             default_namespace: None,
             mode: Mode::Udp(UdpConnectorConfig::from_address(

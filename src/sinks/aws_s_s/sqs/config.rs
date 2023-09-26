@@ -37,6 +37,10 @@ pub(super) struct SqsSinkConfig {
 
 impl GenerateConfig for SqsSinkConfig {
     fn generate_config() -> toml::Value {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         toml::from_str(
             r#"queue_url = "https://sqs.us-east-2.amazonaws.com/123456789012/MyQueue"
             region = "us-east-2"

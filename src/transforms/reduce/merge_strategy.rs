@@ -377,6 +377,8 @@ impl ReduceValueMerger for AddNumbersMerger {
             Value::Integer(i) => match self.v {
                 NumberMergerValue::Int(j) => self.v = NumberMergerValue::Int(i + j),
                 NumberMergerValue::Float(j) => {
+                    // TODO: https://github.com/vectordotdev/vector/issues/18682
+                    #[allow(clippy::unwrap_used)]
                     self.v = NumberMergerValue::Float(NotNan::new(i as f64).unwrap() + j)
                 }
             },
@@ -385,6 +387,8 @@ impl ReduceValueMerger for AddNumbersMerger {
                 NumberMergerValue::Float(j) => self.v = NumberMergerValue::Float(f + j),
             },
             _ => {
+                // TODO: https://github.com/vectordotdev/vector/issues/18682
+                #[allow(clippy::unwrap_used)]
                 return Err(format!(
                     "expected numeric value, found: '{}'",
                     v.to_string_lossy()
@@ -427,6 +431,8 @@ impl ReduceValueMerger for MaxNumberMerger {
                         }
                     }
                     NumberMergerValue::Float(f2) => {
+                        // TODO: https://github.com/vectordotdev/vector/issues/18682
+                        #[allow(clippy::unwrap_used)]
                         let f = NotNan::new(i as f64).unwrap();
                         if f > f2 {
                             self.v = NumberMergerValue::Float(f);
@@ -435,6 +441,8 @@ impl ReduceValueMerger for MaxNumberMerger {
                 };
             }
             Value::Float(f) => {
+                // TODO: https://github.com/vectordotdev/vector/issues/18682
+                #[allow(clippy::unwrap_used)]
                 let f2 = match self.v {
                     NumberMergerValue::Int(i2) => NotNan::new(i2 as f64).unwrap(),
                     NumberMergerValue::Float(f2) => f2,
@@ -486,8 +494,12 @@ impl ReduceValueMerger for MinNumberMerger {
                         }
                     }
                     NumberMergerValue::Float(f2) => {
+                        // TODO: https://github.com/vectordotdev/vector/issues/18682
+                        #[allow(clippy::unwrap_used)]
                         let f = NotNan::new(i as f64).unwrap();
                         if f < f2 {
+                            // TODO: https://github.com/vectordotdev/vector/issues/18682
+                            #[allow(clippy::unwrap_used)]
                             self.v = NumberMergerValue::Float(f);
                         }
                     }
@@ -495,6 +507,10 @@ impl ReduceValueMerger for MinNumberMerger {
             }
             Value::Float(f) => {
                 let f2 = match self.v {
+                    // TODO: https://github.com/vectordotdev/vector/issues/18682
+                    #[allow(clippy::unwrap_used)]
+                    // TODO: https://github.com/vectordotdev/vector/issues/18682
+                    #[allow(clippy::unwrap_used)]
                     NumberMergerValue::Int(i2) => NotNan::new(i2 as f64).unwrap(),
                     NumberMergerValue::Float(f2) => f2,
                 };

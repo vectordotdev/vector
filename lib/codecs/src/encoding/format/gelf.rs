@@ -172,6 +172,8 @@ fn coerce_field_names_and_values(
                     // convert a `Value::Timestamp` to a GELF specified timestamp where milliseconds are represented by the fractional part of a float.
                     if let Value::Timestamp(ts) = value {
                         let ts_millis = ts.timestamp_millis();
+                        // TODO: https://github.com/vectordotdev/vector/issues/18682
+                        #[allow(clippy::unwrap_used)]
                         if ts_millis % 1000 != 0 {
                             *value = Value::Float(NotNan::new(ts_millis as f64 / 1000.0).unwrap());
                         } else {

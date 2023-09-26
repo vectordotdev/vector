@@ -593,6 +593,10 @@ impl<'a> Builder<'a> {
                 // which will enable us to reuse rx to rebuild
                 // old configuration by passing this Arc<Mutex<Option<_>>>
                 // yet again.
+                // TODO: https://github.com/vectordotdev/vector/issues/18682
+                #[allow(clippy::unwrap_used)]
+                // TODO: https://github.com/vectordotdev/vector/issues/18682
+                #[allow(clippy::unwrap_used)]
                 let rx = rx
                     .lock()
                     .unwrap()

@@ -26,11 +26,15 @@ async fn start_test(events: Vec<Event>) -> (Vec<Event>, Receiver<(http::request:
         compression = "none"
     "#};
     let config = config.replace("${TEST_APPSIGNAL_PUSH_API_KEY}", &push_api_key());
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     let (mut config, cx) = load_sink::<AppsignalConfig>(config.as_str()).unwrap();
     let addr = next_addr();
     // Set the endpoint to a local server so we can fetch the sent events later
     config.endpoint = format!("http://{}", addr);
 
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     let (sink, _) = config.build(cx).await.unwrap();
 
     // Always return OK from server. We're not testing responses.
@@ -41,6 +45,8 @@ async fn start_test(events: Vec<Event>) -> (Vec<Event>, Receiver<(http::request:
 
     let stream = map_event_batch_stream(stream::iter(events.clone()), Some(batch));
 
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     sink.run(stream).await.unwrap();
     assert_eq!(receiver.await, BatchStatus::Delivered);
 

@@ -1011,6 +1011,8 @@ mod integration_tests {
         std::env::var("PG_SOCKET")
             .map(PathBuf::from)
             .unwrap_or_else(|_| {
+                // TODO: https://github.com/vectordotdev/vector/issues/18682
+                #[allow(clippy::unwrap_used)]
                 let current_dir = std::env::current_dir().unwrap();
                 current_dir
                     .join("tests")
@@ -1031,8 +1033,12 @@ mod integration_tests {
         exclude_databases: Option<Vec<String>>,
     ) -> Vec<Event> {
         assert_source_compliance(&PULL_SOURCE_TAGS, async move {
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             let config: Config = endpoint.parse().unwrap();
             let tags_endpoint = config_to_endpoint(&config);
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             let tags_host = match config.get_hosts().get(0).unwrap() {
                 Host::Tcp(host) => host.clone(),
                 #[cfg(unix)]
@@ -1042,6 +1048,10 @@ mod integration_tests {
             let (sender, mut recv) = SourceSender::new_test();
 
             tokio::spawn(async move {
+                // TODO: https://github.com/vectordotdev/vector/issues/18682
+                #[allow(clippy::unwrap_used)]
+                // TODO: https://github.com/vectordotdev/vector/issues/18682
+                #[allow(clippy::unwrap_used)]
                 PostgresqlMetricsConfig {
                     endpoints: vec![endpoint],
                     tls,
@@ -1073,6 +1083,8 @@ mod integration_tests {
 
             // test up metric
             assert_eq!(
+                // TODO: https://github.com/vectordotdev/vector/issues/18682
+                #[allow(clippy::unwrap_used)]
                 events
                     .iter()
                     .map(|e| e.as_metric())
@@ -1088,9 +1100,17 @@ mod integration_tests {
 
                 assert_eq!(metric.namespace(), Some("postgresql"));
                 assert_eq!(
+                    // TODO: https://github.com/vectordotdev/vector/issues/18682
+                    #[allow(clippy::unwrap_used)]
+                    // TODO: https://github.com/vectordotdev/vector/issues/18682
+                    #[allow(clippy::unwrap_used)]
                     metric.tags().unwrap().get("endpoint").unwrap(),
                     &tags_endpoint
                 );
+                // TODO: https://github.com/vectordotdev/vector/issues/18682
+                #[allow(clippy::unwrap_used)]
+                // TODO: https://github.com/vectordotdev/vector/issues/18682
+                #[allow(clippy::unwrap_used)]
                 assert_eq!(metric.tags().unwrap().get("host").unwrap(), &tags_host);
             }
 

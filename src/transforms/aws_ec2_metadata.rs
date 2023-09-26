@@ -200,6 +200,10 @@ impl TransformConfig for Ec2Metadata {
         let state = Arc::new(ArcSwap::new(Arc::new(vec![])));
 
         let keys = Keys::new(self.namespace.clone());
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let host = Uri::from_maybe_shared(self.endpoint.clone()).unwrap();
         let refresh_interval = self.refresh_interval_secs;
         let fields = self.fields.clone();

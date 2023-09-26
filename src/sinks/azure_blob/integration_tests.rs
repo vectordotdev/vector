@@ -261,6 +261,8 @@ impl AzureBlobSinkConfig {
     }
 
     pub async fn list_blobs(&self, prefix: String) -> Vec<String> {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let client = azure_common::config::build_client(
             self.connection_string.clone().map(Into::into),
             self.storage_account.clone().map(Into::into),
@@ -268,6 +270,8 @@ impl AzureBlobSinkConfig {
             self.endpoint.clone(),
         )
         .unwrap();
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let response = client
             .list_blobs()
             .prefix(prefix)
@@ -290,6 +294,8 @@ impl AzureBlobSinkConfig {
     }
 
     pub async fn get_blob(&self, blob: String) -> (Blob, Vec<String>) {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let client = azure_common::config::build_client(
             self.connection_string.clone().map(Into::into),
             self.storage_account.clone().map(Into::into),
@@ -297,6 +303,8 @@ impl AzureBlobSinkConfig {
             self.endpoint.clone(),
         )
         .unwrap();
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let response = client
             .blob_client(blob)
             .get()
@@ -307,6 +315,8 @@ impl AzureBlobSinkConfig {
             .expect("Failed to get blob")
             .unwrap();
 
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         (
             response.blob,
             self.get_blob_content(response.data.collect().await.unwrap().to_vec()),
@@ -316,6 +326,8 @@ impl AzureBlobSinkConfig {
     fn get_blob_content(&self, data: Vec<u8>) -> Vec<String> {
         let body = BytesMut::from(data.as_slice()).freeze().reader();
 
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         if self.compression == Compression::None {
             BufReader::new(body).lines().map(|l| l.unwrap()).collect()
         } else {
@@ -327,6 +339,8 @@ impl AzureBlobSinkConfig {
     }
 
     async fn ensure_container(&self) {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let client = azure_common::config::build_client(
             self.connection_string.clone().map(Into::into),
             self.storage_account.clone().map(Into::into),

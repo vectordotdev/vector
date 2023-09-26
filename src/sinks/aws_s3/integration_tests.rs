@@ -485,6 +485,8 @@ async fn client() -> S3Client {
     let region = RegionOrEndpoint::with_both("minio", s3_address());
     let proxy = ProxyConfig::default();
     let tls_options = None;
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     create_client::<S3ClientBuilder>(
         &auth,
         region.region(),
@@ -555,8 +557,12 @@ async fn create_bucket(bucket: &str, object_lock_enabled: bool) {
 }
 
 async fn list_objects(bucket: &str, prefix: String) -> Option<Vec<aws_sdk_s3::model::Object>> {
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     let prefix = prefix.split('/').next().unwrap().to_string();
 
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     client()
         .await
         .list_objects_v2()
@@ -569,6 +575,8 @@ async fn list_objects(bucket: &str, prefix: String) -> Option<Vec<aws_sdk_s3::mo
 }
 
 async fn get_keys(bucket: &str, prefix: String) -> Vec<String> {
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     list_objects(bucket, prefix)
         .await
         .unwrap()
@@ -578,6 +586,8 @@ async fn get_keys(bucket: &str, prefix: String) -> Vec<String> {
 }
 
 async fn get_object(bucket: &str, key: String) -> GetObjectOutput {
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     client()
         .await
         .get_object()
@@ -591,12 +601,16 @@ async fn get_object(bucket: &str, key: String) -> GetObjectOutput {
 async fn get_lines(obj: GetObjectOutput) -> Vec<String> {
     let body = get_object_output_body(obj).await;
     let buf_read = BufReader::new(body);
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     buf_read.lines().map(|l| l.unwrap()).collect()
 }
 
 async fn get_gzipped_lines(obj: GetObjectOutput) -> Vec<String> {
     let body = get_object_output_body(obj).await;
     let buf_read = BufReader::new(MultiGzDecoder::new(body));
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     buf_read.lines().map(|l| l.unwrap()).collect()
 }
 
@@ -604,9 +618,13 @@ async fn get_zstd_lines(obj: GetObjectOutput) -> Vec<String> {
     let body = get_object_output_body(obj).await;
     let decoder = zstd::Decoder::new(body).expect("zstd decoder initialization failed");
     let buf_read = BufReader::new(decoder);
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     buf_read.lines().map(|l| l.unwrap()).collect()
 }
 
 async fn get_object_output_body(obj: GetObjectOutput) -> impl std::io::Read {
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     obj.body.collect().await.unwrap().reader()
 }

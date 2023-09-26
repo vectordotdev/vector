@@ -337,10 +337,18 @@ pub(crate) fn generate_example(
     let file = opts.file.as_ref();
     if file.is_some() {
         #[allow(clippy::print_stdout)]
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         match write_config(file.as_ref().unwrap(), &builder) {
             Ok(_) => {
+                // TODO: https://github.com/vectordotdev/vector/issues/18682
+                #[allow(clippy::unwrap_used)]
                 println!(
                     "Config file written to {:?}",
+                    // TODO: https://github.com/vectordotdev/vector/issues/18682
+                    #[allow(clippy::unwrap_used)]
+                    // TODO: https://github.com/vectordotdev/vector/issues/18682
+                    #[allow(clippy::unwrap_used)]
                     &file.as_ref().unwrap().join("\n")
                 )
             }

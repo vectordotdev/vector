@@ -68,4 +68,8 @@ pub(crate) static GELF_TARGET_PATHS: Lazy<GelfTargetPaths> = Lazy::new(|| GelfTa
 /// Regex for matching valid field names. Must contain only word chars, periods and dashes.
 /// Additional field names must also be prefixed with an `_` , however that is intentionally
 /// omitted from this regex to be checked separately to create a specific error message.
+// TODO: https://github.com/vectordotdev/vector/issues/18682
+#[allow(clippy::unwrap_used)]
+// TODO: https://github.com/vectordotdev/vector/issues/18682
+#[allow(clippy::unwrap_used)]
 pub static VALID_FIELD_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^[\w\.\-]*$").unwrap());

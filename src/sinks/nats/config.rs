@@ -77,11 +77,19 @@ fn default_name() -> String {
 
 impl GenerateConfig for NatsSinkConfig {
     fn generate_config() -> toml::Value {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         toml::Value::try_from(Self {
             acknowledgements: Default::default(),
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             auth: None,
             connection_name: "vector".into(),
             encoding: JsonSerializerConfig::default().into(),
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             subject: Template::try_from("from.vector").unwrap(),
             tls: None,
             url: "nats://127.0.0.1:4222".into(),

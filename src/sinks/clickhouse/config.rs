@@ -132,6 +132,10 @@ impl SinkConfig for ClickhouseConfig {
 
 async fn healthcheck(client: HttpClient, endpoint: Uri, auth: Option<Auth>) -> crate::Result<()> {
     let uri = format!("{}/?query=SELECT%201", endpoint);
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     let mut request = Request::get(uri).body(Body::empty()).unwrap();
 
     if let Some(auth) = auth {

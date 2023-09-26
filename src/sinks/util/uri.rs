@@ -85,8 +85,12 @@ impl fmt::Display for UriSerde {
                     Authority::from_maybe_shared(authority).map_err(|_| std::fmt::Error)?;
                 let mut parts = self.uri.clone().into_parts();
                 parts.authority = Some(authority);
+                // TODO: https://github.com/vectordotdev/vector/issues/18682
+                #[allow(clippy::unwrap_used)]
                 Uri::from_parts(parts).unwrap().fmt(f)
             }
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             _ => self.uri.fmt(f),
         }
     }
@@ -109,6 +113,10 @@ impl From<Uri> for UriSerde {
 
                 let mut parts = uri.into_parts();
                 parts.authority = Some(authority);
+                // TODO: https://github.com/vectordotdev/vector/issues/18682
+                #[allow(clippy::unwrap_used)]
+                // TODO: https://github.com/vectordotdev/vector/issues/18682
+                #[allow(clippy::unwrap_used)]
                 let uri = Uri::from_parts(parts).unwrap();
 
                 Self { uri, auth }

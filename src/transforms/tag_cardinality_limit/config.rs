@@ -91,6 +91,10 @@ pub(crate) const fn default_cache_size() -> usize {
 
 impl GenerateConfig for TagCardinalityLimitConfig {
     fn generate_config() -> toml::Value {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         toml::Value::try_from(Self {
             mode: Mode::Exact,
             value_limit: default_value_limit(),

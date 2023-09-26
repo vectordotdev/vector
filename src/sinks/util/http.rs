@@ -194,9 +194,12 @@ where
         let mut this = self.project();
         if this.slot.is_some() {
             ready!(this.inner.as_mut().poll_ready(cx))?;
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             this.inner.as_mut().start_send(this.slot.take().unwrap())?;
         }
-
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         this.inner.poll_flush(cx)
     }
 
@@ -347,6 +350,10 @@ where
         let mut this = self.project();
         if this.slot.is_some() {
             ready!(this.inner.as_mut().poll_ready(cx))?;
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             this.inner.as_mut().start_send(this.slot.take().unwrap())?;
         }
 

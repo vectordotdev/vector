@@ -139,6 +139,10 @@ pub struct Dedupe {
 
 impl GenerateConfig for DedupeConfig {
     fn generate_config() -> toml::Value {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         toml::Value::try_from(Self {
             fields: None,
             cache: default_cache_config(),

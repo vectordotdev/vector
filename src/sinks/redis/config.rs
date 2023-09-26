@@ -111,6 +111,10 @@ pub struct RedisSinkConfig {
 
 impl GenerateConfig for RedisSinkConfig {
     fn generate_config() -> toml::Value {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         toml::from_str(
             r#"
             url = "redis://127.0.0.1:6379/0"

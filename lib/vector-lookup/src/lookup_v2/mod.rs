@@ -41,6 +41,8 @@ impl<'a> ValuePath<'a> for &'a ConfigValuePath {
 #[cfg(any(test, feature = "test"))]
 impl From<&str> for ConfigValuePath {
     fn from(path: &str) -> Self {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         ConfigValuePath::try_from(path.to_string()).unwrap()
     }
 }
@@ -81,6 +83,8 @@ impl<'a> TargetPath<'a> for &'a ConfigTargetPath {
 #[cfg(any(test, feature = "test"))]
 impl From<&str> for ConfigTargetPath {
     fn from(path: &str) -> Self {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         ConfigTargetPath::try_from(path.to_string()).unwrap()
     }
 }

@@ -82,8 +82,12 @@ impl SinkBatchSettings for HoneycombDefaultBatchSettings {
 
 impl GenerateConfig for HoneycombConfig {
     fn generate_config() -> toml::Value {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         toml::from_str(
             r#"api_key = "${HONEYCOMB_API_KEY}"
+ // TODO: https://github.com/vectordotdev/vector/issues/18682
+#[allow(clippy::unwrap_used)]
             dataset = "my-honeycomb-dataset""#,
         )
         .unwrap()
@@ -146,6 +150,10 @@ impl HoneycombConfig {
 
 async fn healthcheck(uri: Uri, api_key: SensitiveString, client: HttpClient) -> crate::Result<()> {
     let request = Request::post(uri).header(HTTP_HEADER_HONEYCOMB, api_key.inner());
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     let body = crate::serde::json::to_bytes(&Vec::<BoxedRawValue>::new())
         .unwrap()
         .freeze();

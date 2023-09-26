@@ -696,6 +696,8 @@ impl StartJournalctl {
 
         let mut child = command.spawn().context(JournalctlSpawnSnafu)?;
 
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let stream = FramedRead::new(
             child.stdout.take().unwrap(),
             CharacterDelimitedDecoder::new(b'\n'),
@@ -733,6 +735,10 @@ fn enrich_log_event(log: &mut LogEvent, log_namespace: LogNamespace) {
         .or_else(|| log.get(event_path!(RECEIVED_TIMESTAMP)))
         .filter(|&ts| ts.is_bytes())
         .and_then(|ts| {
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             String::from_utf8_lossy(ts.as_bytes().unwrap())
                 .parse::<u64>()
                 .ok()

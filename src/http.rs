@@ -165,6 +165,10 @@ pub fn build_proxy_connector(
         .context(BuildTlsConnectorSnafu)?
         .build();
     let https = build_tls_connector(tls_settings)?;
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     let mut proxy = ProxyConnector::new(https).unwrap();
     // Make proxy connector aware of user TLS settings by setting the TLS connector:
     // https://github.com/vectordotdev/vector/issues/13683

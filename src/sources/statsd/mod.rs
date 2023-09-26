@@ -131,6 +131,10 @@ const fn default_shutdown_timeout_secs() -> Duration {
 
 impl GenerateConfig for StatsdConfig {
     fn generate_config() -> toml::Value {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         toml::Value::try_from(Self::Udp(UdpConfig::from_address(
             SocketListenAddr::SocketAddr(SocketAddr::V4(SocketAddrV4::new(
                 Ipv4Addr::LOCALHOST,

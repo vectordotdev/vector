@@ -93,6 +93,8 @@ pub fn test_generate_config<T>()
 where
     for<'de> T: GenerateConfig + serde::Deserialize<'de>,
 {
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     let cfg = toml::to_string(&T::generate_config()).unwrap();
 
     toml::from_str::<T>(&cfg)
@@ -149,16 +151,24 @@ pub async fn send_encodable<I, E: From<std::io::Error> + std::fmt::Debug>(
     encoder: impl Encoder<I, Error = E>,
     lines: impl IntoIterator<Item = I>,
 ) -> Result<SocketAddr, Infallible> {
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     let stream = TcpStream::connect(&addr).await.unwrap();
 
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     let local_addr = stream.local_addr().unwrap();
 
     let mut sink = FramedWrite::new(stream, encoder);
 
     let mut lines = stream::iter(lines.into_iter()).map(Ok);
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     sink.send_all(&mut lines).await.unwrap();
 
     let stream = sink.get_mut();
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     stream.shutdown().await.unwrap();
 
     Ok(local_addr)
@@ -172,27 +182,43 @@ pub async fn send_lines_tls(
     client_cert: impl Into<Option<&Path>>,
     client_key: impl Into<Option<&Path>>,
 ) -> Result<SocketAddr, Infallible> {
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     let stream = TcpStream::connect(&addr).await.unwrap();
 
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     let local_addr = stream.local_addr().unwrap();
 
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     let mut connector = SslConnector::builder(SslMethod::tls()).unwrap();
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     if let Some(ca) = ca.into() {
         connector.set_ca_file(ca).unwrap();
     } else {
         connector.set_verify(SslVerifyMode::NONE);
     }
 
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     if let Some(cert_file) = client_cert.into() {
         connector.set_certificate_chain_file(cert_file).unwrap();
     }
 
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     if let Some(key_file) = client_key.into() {
         connector
             .set_private_key_file(key_file, SslFiletype::PEM)
             .unwrap();
     }
 
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     let ssl = connector
         .build()
         .configure()
@@ -200,14 +226,22 @@ pub async fn send_lines_tls(
         .into_ssl(&host)
         .unwrap();
 
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     let mut stream = tokio_openssl::SslStream::new(ssl, stream).unwrap();
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     Pin::new(&mut stream).connect().await.unwrap();
     let mut sink = FramedWrite::new(stream, LinesCodec::new());
 
     let mut lines = stream::iter(lines).map(Ok);
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     sink.send_all(&mut lines).await.unwrap();
 
     let stream = sink.get_mut().get_mut();
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     stream.shutdown().await.unwrap();
 
     Ok(local_addr)
@@ -233,6 +267,8 @@ pub fn map_event_batch_stream(
 }
 
 // TODO refactor to have a single implementation for `Event`, `LogEvent` and `Metric`.
+// TODO: https://github.com/vectordotdev/vector/issues/18682
+#[allow(clippy::unwrap_used)]
 fn map_batch_stream(
     stream: impl Stream<Item = LogEvent>,
     batch: Option<BatchNotifier>,
@@ -350,6 +386,8 @@ pub async fn collect_n_stream<T, S: Stream<Item = T> + Unpin>(stream: &mut S, n:
     let mut events = Vec::with_capacity(n);
 
     while events.len() < n {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let e = stream.next().await.unwrap();
         events.push(e);
     }
@@ -380,6 +418,8 @@ pub async fn collect_limited<T: Send + 'static>(mut rx: LimitedReceiver<T>) -> V
     items
 }
 
+// TODO: https://github.com/vectordotdev/vector/issues/18682
+#[allow(clippy::unwrap_used)]
 pub async fn collect_n_limited<T: Send + 'static>(mut rx: LimitedReceiver<T>, n: usize) -> Vec<T> {
     let mut items = Vec::new();
     while items.len() < n {
@@ -393,18 +433,28 @@ pub async fn collect_n_limited<T: Send + 'static>(mut rx: LimitedReceiver<T>, n:
 
 pub fn lines_from_file<P: AsRef<Path>>(path: P) -> Vec<String> {
     trace!(message = "Reading file.", path = %path.as_ref().display());
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     let mut file = File::open(path).unwrap();
     let mut output = String::new();
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     file.read_to_string(&mut output).unwrap();
     output.lines().map(|s| s.to_owned()).collect()
 }
 
 pub fn lines_from_gzip_file<P: AsRef<Path>>(path: P) -> Vec<String> {
     trace!(message = "Reading gzip file.", path = %path.as_ref().display());
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     let mut file = File::open(path).unwrap();
     let mut gzip_bytes = Vec::new();
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     file.read_to_end(&mut gzip_bytes).unwrap();
     let mut output = String::new();
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     MultiGzDecoder::new(&gzip_bytes[..])
         .read_to_string(&mut output)
         .unwrap();
@@ -416,6 +466,8 @@ pub fn lines_from_zstd_file<P: AsRef<Path>>(path: P) -> Vec<String> {
     trace!(message = "Reading zstd file.", path = %path.as_ref().display());
     let file = File::open(path).unwrap();
     let mut output = String::new();
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     ZstdDecoder::new(file)
         .unwrap()
         .read_to_string(&mut output)
@@ -424,6 +476,8 @@ pub fn lines_from_zstd_file<P: AsRef<Path>>(path: P) -> Vec<String> {
 }
 
 pub fn runtime() -> runtime::Runtime {
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     runtime::Builder::new_multi_thread()
         .enable_all()
         .build()
@@ -549,6 +603,8 @@ impl<T: Send + 'static> CountReceiver<T> {
     /// Succeeds once first connection has been made.
     pub async fn connected(&mut self) {
         if let Some(tripwire) = self.connected.take() {
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             tripwire.await.unwrap();
         }
     }
@@ -565,6 +621,8 @@ impl<T: Send + 'static> CountReceiver<T> {
         CountReceiver {
             count: Arc::clone(&count),
             trigger: Some(trigger),
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             connected: Some(connected),
             handle: tokio::spawn(make_fut(count, tripwire, trigger_connected)),
         }
@@ -598,6 +656,8 @@ impl<T> Future for CountReceiver<T> {
         }
 
         let result = ready!(this.handle.poll_unpin(cx));
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         Poll::Ready(result.unwrap())
     }
 }
@@ -605,11 +665,15 @@ impl<T> Future for CountReceiver<T> {
 impl CountReceiver<String> {
     pub fn receive_lines(addr: SocketAddr) -> CountReceiver<String> {
         CountReceiver::new(|count, tripwire, connected| async move {
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             let listener = TcpListener::bind(addr).await.unwrap();
             CountReceiver::receive_lines_stream(
                 TcpListenerStream::new(listener),
                 count,
                 tripwire,
+                // TODO: https://github.com/vectordotdev/vector/issues/18682
+                #[allow(clippy::unwrap_used)]
                 Some(connected),
             )
             .await
@@ -617,11 +681,15 @@ impl CountReceiver<String> {
     }
 
     #[cfg(unix)]
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     pub fn receive_lines_unix<P>(path: P) -> CountReceiver<String>
     where
         P: AsRef<Path> + Send + 'static,
     {
         CountReceiver::new(|count, tripwire, connected| async move {
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             let listener = tokio::net::UnixListener::bind(path).unwrap();
             CountReceiver::receive_lines_stream(
                 UnixListenerStream::new(listener),
@@ -632,6 +700,8 @@ impl CountReceiver<String> {
             .await
         })
     }
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
 
     async fn receive_lines_stream<S, T>(
         stream: S,
@@ -643,6 +713,8 @@ impl CountReceiver<String> {
         S: Stream<Item = IoResult<T>>,
         T: AsyncWrite + AsyncRead,
     {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         stream
             .take_until(tripwire)
             .map_ok(|socket| FramedRead::new(socket, LinesCodec::new()))
@@ -666,10 +738,14 @@ impl CountReceiver<Event> {
         S: Stream<Item = Event> + Send + 'static,
     {
         CountReceiver::new(|count, tripwire, connected| async move {
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             connected.send(()).unwrap();
             stream
                 .take_until(tripwire)
                 .inspect(move |_| {
+                    // TODO: https://github.com/vectordotdev/vector/issues/18682
+                    #[allow(clippy::unwrap_used)]
                     count.fetch_add(1, Ordering::Relaxed);
                 })
                 .collect::<Vec<Event>>()
@@ -690,9 +766,13 @@ pub async fn start_topology(
 ) {
     config.healthchecks.set_require_healthy(require_healthy);
     let diff = ConfigDiff::initial(&config);
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     let pieces = topology::build_or_log_errors(&config, &diff, HashMap::new())
         .await
         .unwrap();
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     topology::start_validated(config, diff, pieces)
         .await
         .unwrap()

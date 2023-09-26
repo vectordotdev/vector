@@ -28,6 +28,8 @@ impl Reader {
     }
 
     fn new(mut child: Child) -> Self {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let stdout = child.stdout.take().unwrap();
         let reader = BufReader::new(stdout);
         Reader { child, reader }

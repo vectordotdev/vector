@@ -342,6 +342,8 @@ impl RunningTopology {
             for key in &diff.sources.to_remove {
                 debug!(component = %key, "Removing source.");
 
+                // TODO: https://github.com/vectordotdev/vector/issues/18682
+                #[allow(clippy::unwrap_used)]
                 let previous = self.tasks.remove(key).unwrap();
                 drop(previous); // detach and forget
 
@@ -367,6 +369,10 @@ impl RunningTopology {
             // Final cleanup pass now that all changed/removed sources have signalled as having shutdown.
             for key in diff.sources.removed_and_changed() {
                 if let Some(task) = self.source_tasks.remove(key) {
+                    // TODO: https://github.com/vectordotdev/vector/issues/18682
+                    #[allow(clippy::unwrap_used)]
+                    // TODO: https://github.com/vectordotdev/vector/issues/18682
+                    #[allow(clippy::unwrap_used)]
                     task.await.unwrap().unwrap();
                 }
             }
@@ -382,6 +388,8 @@ impl RunningTopology {
         for key in &diff.transforms.to_remove {
             debug!(component = %key, "Removing transform.");
 
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             let previous = self.tasks.remove(key).unwrap();
             drop(previous); // detach and forget
 
@@ -390,6 +398,8 @@ impl RunningTopology {
         }
 
         for key in &diff.transforms.to_change {
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             debug!(component = %key, "Changing transform.");
 
             self.remove_inputs(key, diff, new_config).await;
@@ -401,14 +411,20 @@ impl RunningTopology {
         // At this point both the old and the new config don't have conflicts in their resource
         // usage. So if we combine their resources, all found conflicts are between to be removed
         // and to be added components.
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let remove_sink = diff
             .sinks
             .removed_and_changed()
             .map(|key| (key, self.config.sink(key).unwrap().resources(key)));
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let add_source = diff
             .sources
             .changed_and_added()
             .map(|key| (key, new_config.source(key).unwrap().inner.resources()));
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let add_sink = diff
             .sinks
             .changed_and_added()
@@ -430,6 +446,8 @@ impl RunningTopology {
             .map(|(_, key)| key.clone());
 
         // For any sink whose buffer configuration didn't change, we can reuse their buffer.
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let reuse_buffers = diff
             .sinks
             .to_change
@@ -442,6 +460,8 @@ impl RunningTopology {
 
         // For any existing sink that has a conflicting resource dependency with a changed/added
         // sink, or for any sink that we want to reuse their buffer, we need to explicit wait for
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         // them to finish processing so we can reclaim ownership of those resources/buffers.
         let wait_for_sinks = conflicting_sinks
             .chain(reuse_buffers.iter().cloned())
@@ -460,6 +480,8 @@ impl RunningTopology {
         for key in &diff.sinks.to_change {
             debug!(component = %key, "Changing sink.");
             if reuse_buffers.contains(key) {
+                // TODO: https://github.com/vectordotdev/vector/issues/18682
+                #[allow(clippy::unwrap_used)]
                 self.detach_triggers
                     .remove(key)
                     .unwrap()
@@ -471,11 +493,15 @@ impl RunningTopology {
                 //
                 // We clone instead of removing here because otherwise the input will be missing for
                 // the rest of the reload process, which violates the assumption that all previous
+                // TODO: https://github.com/vectordotdev/vector/issues/18682
+                #[allow(clippy::unwrap_used)]
                 // inputs for components not being removed are still available. It's simpler to
                 // allow the "old" input to stick around and be replaced (even though that's
                 // basically a no-op since we're reusing the same buffer) than it is to pass around
                 // info about which sinks are having their buffers reused and treat them differently
                 // at other stages.
+                // TODO: https://github.com/vectordotdev/vector/issues/18682
+                #[allow(clippy::unwrap_used)]
                 buffer_tx.insert(key.clone(), self.inputs.get(key).unwrap().clone());
             }
             self.remove_inputs(key, diff, new_config).await;
@@ -488,9 +514,13 @@ impl RunningTopology {
         // If a sink we're removing isn't tying up any resource that a changed/added sink depends
         // on, we don't bother waiting for it to shutdown.
         for key in &diff.sinks.to_remove {
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             let previous = self.tasks.remove(key).unwrap();
             if wait_for_sinks.contains(key) {
                 debug!(message = "Waiting for sink to shutdown.", %key);
+                // TODO: https://github.com/vectordotdev/vector/issues/18682
+                #[allow(clippy::unwrap_used)]
                 previous.await.unwrap().unwrap();
             } else {
                 drop(previous); // detach and forget
@@ -500,8 +530,12 @@ impl RunningTopology {
         let mut buffers = HashMap::<ComponentKey, BuiltBuffer>::new();
         for key in &diff.sinks.to_change {
             if wait_for_sinks.contains(key) {
+                // TODO: https://github.com/vectordotdev/vector/issues/18682
+                #[allow(clippy::unwrap_used)]
                 let previous = self.tasks.remove(key).unwrap();
                 debug!(message = "Waiting for sink to shutdown.", %key);
+                // TODO: https://github.com/vectordotdev/vector/issues/18682
+                #[allow(clippy::unwrap_used)]
                 let buffer = previous.await.unwrap().unwrap();
 
                 if reuse_buffers.contains(key) {
@@ -512,6 +546,8 @@ impl RunningTopology {
                     // replaced (even though that's basically a no-op since we're reusing the same
                     // buffer) than it is to pass around info about which sinks are having their
                     // buffers reused and treat them differently at other stages.
+                    // TODO: https://github.com/vectordotdev/vector/issues/18682
+                    #[allow(clippy::unwrap_used)]
                     let tx = buffer_tx.remove(key).unwrap();
                     let rx = match buffer {
                         TaskOutput::Sink(rx) => rx.into_inner(),
@@ -655,6 +691,8 @@ impl RunningTopology {
     }
 
     async fn setup_outputs(&mut self, key: &ComponentKey, new_pieces: &mut builder::Pieces) {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let outputs = new_pieces.outputs.remove(key).unwrap();
         for (port, output) in outputs {
             debug!(component = %key, output_id = ?port, "Configuring output for component.");
@@ -674,6 +712,8 @@ impl RunningTopology {
         diff: &ConfigDiff,
         new_pieces: &mut builder::Pieces,
     ) {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let (tx, inputs) = new_pieces.inputs.remove(key).unwrap();
 
         let old_inputs = self
@@ -690,6 +730,8 @@ impl RunningTopology {
         for input in inputs {
             let output = self.outputs.get_mut(&input).expect("unknown output");
 
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             if diff.contains(&input.component) || inputs_to_add.contains(&input) {
                 // If the input we're connecting to is changing, that means its outputs will have been
                 // recreated, so instead of replacing a paused sink, we have to add it to this new
@@ -771,7 +813,11 @@ impl RunningTopology {
             for output_id in changed_outputs {
                 debug!(component = %transform_key, fanout_id = %output_id.component, "Reattaching component input to fanout.");
 
+                // TODO: https://github.com/vectordotdev/vector/issues/18682
+                #[allow(clippy::unwrap_used)]
                 let input = self.inputs.get(transform_key).cloned().unwrap();
+                // TODO: https://github.com/vectordotdev/vector/issues/18682
+                #[allow(clippy::unwrap_used)]
                 let output = self.outputs.get_mut(&output_id).unwrap();
                 _ = output.send(ControlMessage::Add(transform_key.clone(), input));
             }
@@ -786,7 +832,11 @@ impl RunningTopology {
             for output_id in changed_outputs {
                 debug!(component = %sink_key, fanout_id = %output_id.component, "Reattaching component input to fanout.");
 
+                // TODO: https://github.com/vectordotdev/vector/issues/18682
+                #[allow(clippy::unwrap_used)]
                 let input = self.inputs.get(sink_key).cloned().unwrap();
+                // TODO: https://github.com/vectordotdev/vector/issues/18682
+                #[allow(clippy::unwrap_used)]
                 let output = self.outputs.get_mut(&output_id).unwrap();
                 _ = output.send(ControlMessage::Add(sink_key.clone(), input));
             }
@@ -827,15 +877,19 @@ impl RunningTopology {
     }
 
     fn spawn_sink(&mut self, key: &ComponentKey, new_pieces: &mut builder::Pieces) {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let task = new_pieces.tasks.remove(key).unwrap();
         let span = error_span!(
-            "sink",
-            component_kind = "sink",
-            component_id = %task.id(),
-            component_type = %task.typetag(),
-            // maintained for compatibility
-            component_name = %task.id(),
-        );
+                    "sink",
+                    component_kind = "sink",
+                    component_id = %task.id(),
+                    component_type = %task.typetag(),
+         // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
+                    // maintained for compatibility
+                    component_name = %task.id(),
+                );
 
         let task_span = span.or_current();
         #[cfg(feature = "allocation-tracing")]
@@ -870,15 +924,19 @@ impl RunningTopology {
     }
 
     fn spawn_transform(&mut self, key: &ComponentKey, new_pieces: &mut builder::Pieces) {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let task = new_pieces.tasks.remove(key).unwrap();
         let span = error_span!(
-            "transform",
-            component_kind = "transform",
-            component_id = %task.id(),
-            component_type = %task.typetag(),
-            // maintained for compatibility
-            component_name = %task.id(),
-        );
+                    "transform",
+                    component_kind = "transform",
+         // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
+                    component_id = %task.id(),
+                    component_type = %task.typetag(),
+                    // maintained for compatibility
+                    component_name = %task.id(),
+                );
 
         let task_span = span.or_current();
         #[cfg(feature = "allocation-tracing")]
@@ -913,15 +971,19 @@ impl RunningTopology {
     }
 
     fn spawn_source(&mut self, key: &ComponentKey, new_pieces: &mut builder::Pieces) {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let task = new_pieces.tasks.remove(key).unwrap();
         let span = error_span!(
-            "source",
-            component_kind = "source",
-            component_id = %task.id(),
-            component_type = %task.typetag(),
-            // maintained for compatibility
-            component_name = %task.id(),
-        );
+         // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
+                    "source",
+                    component_kind = "source",
+                    component_id = %task.id(),
+                    component_type = %task.typetag(),
+                    // maintained for compatibility
+                    component_name = %task.id(),
+                );
 
         let task_span = span.or_current();
         #[cfg(feature = "allocation-tracing")]
@@ -959,6 +1021,10 @@ impl RunningTopology {
             .takeover_source(key, &mut new_pieces.shutdown_coordinator);
 
         // Now spawn the actual source task.
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let source_task = new_pieces.source_tasks.remove(key).unwrap();
         let source_task = {
             let key = key.clone();

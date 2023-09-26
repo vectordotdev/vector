@@ -417,6 +417,8 @@ impl ClickhouseClient {
     }
 
     async fn create_table(&self, table: &str, schema: &str) {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let response = self
             .client
             .post(&self.host)
@@ -432,11 +434,15 @@ impl ClickhouseClient {
             .unwrap();
 
         if !response.status().is_success() {
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             panic!("create table failed: {}", response.text().await.unwrap())
         }
     }
 
     async fn select_all(&self, table: &str) -> QueryResponse {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let response = self
             .client
             .post(&self.host)
@@ -446,8 +452,12 @@ impl ClickhouseClient {
             .unwrap();
 
         if !response.status().is_success() {
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             panic!("select all failed: {}", response.text().await.unwrap())
         } else {
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             let text = response.text().await.unwrap();
             match serde_json::from_str(&text) {
                 Ok(value) => value,

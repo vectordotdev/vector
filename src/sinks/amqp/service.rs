@@ -109,6 +109,10 @@ impl Service<AmqpRequest> for AmqpService {
         let channel = Arc::clone(&self.channel);
 
         Box::pin(async move {
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             channel
                 .confirm_select(lapin::options::ConfirmSelectOptions::default())
                 .await

@@ -185,6 +185,10 @@ const fn default_suppress_timestamp() -> bool {
 
 impl GenerateConfig for PrometheusExporterConfig {
     fn generate_config() -> toml::Value {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         toml::Value::try_from(Self::default()).unwrap()
     }
 }
@@ -1369,6 +1373,8 @@ mod integration_tests {
             .body(Body::empty())
             .expect("Error creating request.");
         let proxy = ProxyConfig::default();
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let result = HttpClient::new(None, &proxy)
             .unwrap()
             .send(request)
@@ -1390,6 +1396,8 @@ mod integration_tests {
             .body(Body::empty())
             .expect("Error creating request.");
         let proxy = ProxyConfig::default();
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let result = HttpClient::new(None, &proxy)
             .unwrap()
             .send(request)
@@ -1416,10 +1424,14 @@ mod integration_tests {
         let start = Utc::now().timestamp();
 
         let config = PrometheusExporterConfig {
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             address: sink_exporter_address().parse().unwrap(),
             flush_period_secs: Duration::from_secs(2),
             ..Default::default()
         };
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let (sink, _) = config.build(SinkContext::default()).await.unwrap();
         let (name, event) = tests::create_metric_gauge(None, 123.4);
         let (_, delayed_event) = tests::create_metric_gauge(Some("delayed".to_string()), 123.4);
@@ -1448,21 +1460,29 @@ mod integration_tests {
             data["metric"]["some_tag"],
             Value::String("some_value".into())
         );
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         assert!(data["value"][0].as_f64().unwrap() >= start as f64);
         assert_eq!(data["value"][1], Value::String("123.4".into()));
     }
 
     async fn reset_on_flush_period() {
         let config = PrometheusExporterConfig {
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             address: sink_exporter_address().parse().unwrap(),
             flush_period_secs: Duration::from_secs(3),
             ..Default::default()
         };
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let (sink, _) = config.build(SinkContext::default()).await.unwrap();
         let (tx, rx) = mpsc::unbounded_channel();
         let input_events = UnboundedReceiverStream::new(rx);
 
         let input_events = input_events.map(Into::into);
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let sink_handle = tokio::spawn(async move { sink.run(input_events).await.unwrap() });
 
         // Create two sets with different names but the same size.
@@ -1506,20 +1526,28 @@ mod integration_tests {
         );
 
         drop(tx);
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         sink_handle.await.unwrap();
     }
 
     async fn expire_on_flush_period() {
         let config = PrometheusExporterConfig {
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             address: sink_exporter_address().parse().unwrap(),
             flush_period_secs: Duration::from_secs(3),
             ..Default::default()
         };
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let (sink, _) = config.build(SinkContext::default()).await.unwrap();
         let (tx, rx) = mpsc::unbounded_channel();
         let input_events = UnboundedReceiverStream::new(rx);
 
         let input_events = input_events.map(Into::into);
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let sink_handle = tokio::spawn(async move { sink.run(input_events).await.unwrap() });
 
         // metrics that will not be updated for a full flush period and therefore should expire
@@ -1552,6 +1580,8 @@ mod integration_tests {
         assert!(!body.contains(&name2));
 
         drop(tx);
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         sink_handle.await.unwrap();
     }
 }

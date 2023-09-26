@@ -401,6 +401,10 @@ impl HttpRequestBuilder {
             builder = builder.header("X-Scope-OrgID", tenant_id);
         }
 
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let mut request: Request<Bytes> = builder.body(body.into()).unwrap();
         if let Some(auth) = &self.auth {
             match auth {
@@ -721,11 +725,15 @@ mod integration_tests {
             let events = create_events(0..5, |n| n * 11.0);
 
             let (sink, _) = config.build(cx).await.expect("error building config");
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             sink.run_events(events.clone()).await.unwrap();
 
             let result = query(url, &format!("show series on {}", database)).await;
 
             let values = &result["results"][0]["series"][0]["values"];
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             assert_eq!(values.as_array().unwrap().len(), 5);
 
             for event in events {
@@ -746,9 +754,13 @@ mod integration_tests {
                     }
                     _ => panic!("Unhandled metric value, fix the test"),
                 }
+                // TODO: https://github.com/vectordotdev/vector/issues/18682
+                #[allow(clippy::unwrap_used)]
                 for (tag, value) in metric.tags().unwrap().iter_single() {
                     assert_eq!(output[tag], Value::String(value.to_string()));
                 }
+                // TODO: https://github.com/vectordotdev/vector/issues/18682
+                #[allow(clippy::unwrap_used)]
                 let timestamp =
                     format_timestamp(metric.timestamp().unwrap(), chrono::SecondsFormat::Millis);
                 assert_eq!(output["time"], Value::String(timestamp));
@@ -761,6 +773,8 @@ mod integration_tests {
 
     async fn query(url: &str, query: &str) -> Value {
         let result = query_v1(url, query).await;
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         let text = result.text().await.unwrap();
         serde_json::from_str(&text).expect("error when parsing InfluxDB response JSON")
     }
@@ -768,6 +782,8 @@ mod integration_tests {
     fn decode_metrics(data: &Value) -> Vec<HashMap<String, Value>> {
         let data = data.as_object().expect("Data is not an object");
         let columns = data["columns"].as_array().expect("Columns is not an array");
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         data["values"]
             .as_array()
             .expect("Values is not an array")

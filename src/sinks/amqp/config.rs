@@ -69,8 +69,12 @@ pub struct AmqpSinkConfig {
 impl Default for AmqpSinkConfig {
     fn default() -> Self {
         Self {
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             exchange: Template::try_from("vector").unwrap(),
             routing_key: None,
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             properties: None,
             encoding: TextSerializerConfig::default().into(),
             connection: AmqpConfig::default(),
@@ -81,6 +85,10 @@ impl Default for AmqpSinkConfig {
 
 impl GenerateConfig for AmqpSinkConfig {
     fn generate_config() -> toml::Value {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         toml::from_str(
             r#"connection_string = "amqp://localhost:5672/%2f"
             routing_key = "user_id"

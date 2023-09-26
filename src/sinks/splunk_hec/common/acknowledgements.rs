@@ -57,8 +57,20 @@ impl Default for HecClientAcknowledgementsConfig {
     fn default() -> Self {
         Self {
             indexer_acknowledgements_enabled: true,
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             query_interval: NonZeroU8::new(10).unwrap(),
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             retry_limit: NonZeroU8::new(30).unwrap(),
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
+            #[allow(clippy::unwrap_used)]
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             max_pending_acks: NonZeroU64::new(1_000_000).unwrap(),
             inner: Default::default(),
         }

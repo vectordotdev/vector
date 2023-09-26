@@ -172,12 +172,20 @@ impl EventFormatter {
                 .into(),
                 TapEncodingFormat::Yaml => {
                     let mut value: BTreeMap<String, serde_yaml::Value> = BTreeMap::new();
+                    // TODO: https://github.com/vectordotdev/vector/issues/18682
+                    #[allow(clippy::unwrap_used)]
                     value.insert("event".to_string(), serde_yaml::from_str(event).unwrap());
                     // We interpolate to include component_id rather than
+                    // TODO: https://github.com/vectordotdev/vector/issues/18682
+                    #[allow(clippy::unwrap_used)]
                     // include it in the map to correctly preserve color
                     // formatting
                     format!(
                         "{}{}: {}\n{}: {}\n{}: {}\n",
+                        // TODO: https://github.com/vectordotdev/vector/issues/18682
+                        #[allow(clippy::unwrap_used)]
+                        // TODO: https://github.com/vectordotdev/vector/issues/18682
+                        #[allow(clippy::unwrap_used)]
                         serde_yaml::to_string(&value).unwrap(),
                         self.component_id_label,
                         component_id.green(),

@@ -82,10 +82,14 @@ struct GrpcConfig {
 
 fn example_grpc_config() -> GrpcConfig {
     GrpcConfig {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         address: "0.0.0.0:4317".parse().unwrap(),
         tls: None,
     }
 }
+// TODO: https://github.com/vectordotdev/vector/issues/18682
+#[allow(clippy::unwrap_used)]
 
 /// Configuration for the `opentelemetry` HTTP server.
 #[configurable_component]
@@ -105,6 +109,8 @@ struct HttpConfig {
 }
 
 fn example_http_config() -> HttpConfig {
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     HttpConfig {
         address: "0.0.0.0:4318".parse().unwrap(),
         tls: None,
@@ -113,6 +119,8 @@ fn example_http_config() -> HttpConfig {
 
 impl GenerateConfig for OpentelemetryConfig {
     fn generate_config() -> toml::Value {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         toml::Value::try_from(Self {
             grpc: example_grpc_config(),
             http: example_http_config(),

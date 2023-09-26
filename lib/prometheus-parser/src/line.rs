@@ -152,6 +152,10 @@ impl Metric {
     fn parse_timestamp(input: &str) -> IResult<Option<i64>> {
         let input = trim_space(input);
         opt(map(recognize(pair(opt(char('-')), digit1)), |s: &str| {
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
+            // TODO: https://github.com/vectordotdev/vector/issues/18682
+            #[allow(clippy::unwrap_used)]
             s.parse().unwrap()
         }))(input)
     }

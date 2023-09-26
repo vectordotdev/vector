@@ -137,8 +137,12 @@ impl Default for SyslogConfig {
     fn default() -> Self {
         Self {
             mode: Mode::Tcp {
+                // TODO: https://github.com/vectordotdev/vector/issues/18682
+                #[allow(clippy::unwrap_used)]
                 address: SocketListenAddr::SocketAddr("0.0.0.0:514".parse().unwrap()),
                 keepalive: None,
+                // TODO: https://github.com/vectordotdev/vector/issues/18682
+                #[allow(clippy::unwrap_used)]
                 tls: None,
                 receive_buffer_bytes: None,
                 connection_limit: None,
@@ -152,6 +156,10 @@ impl Default for SyslogConfig {
 
 impl GenerateConfig for SyslogConfig {
     fn generate_config() -> toml::Value {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         toml::Value::try_from(SyslogConfig::default()).unwrap()
     }
 }

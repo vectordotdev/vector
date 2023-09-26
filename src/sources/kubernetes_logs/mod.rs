@@ -243,6 +243,10 @@ const fn default_read_from() -> ReadFromConfig {
 
 impl GenerateConfig for Config {
     fn generate_config() -> toml::Value {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         toml::Value::try_from(Self {
             self_node_name: default_self_node_name_env_template(),
             auto_partial_merge: true,

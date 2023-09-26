@@ -44,6 +44,10 @@ pub fn default_address() -> Option<SocketAddr> {
 
 /// Default GraphQL API address
 pub fn default_graphql_url() -> Url {
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
+    // TODO: https://github.com/vectordotdev/vector/issues/18682
+    #[allow(clippy::unwrap_used)]
     let addr = default_address().unwrap();
     Url::parse(&format!("http://{}/graphql", addr))
         .expect("Couldn't parse default API URL. Please report this.")

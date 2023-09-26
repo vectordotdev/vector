@@ -103,33 +103,39 @@ impl SubscriptionClient {
         tokio::spawn(async move {
             loop {
                 tokio::select! {
-                    // Break the loop if shutdown is triggered. This happens implicitly once
-                    // the client goes out of scope
-                    _ = &mut shutdown_rx => {
-                        let subscriptions = subscriptions_clone.lock().unwrap();
-                        for id in subscriptions.keys() {
-                            _ = tx_clone.send(Payload::stop(*id));
-                        }
-                        break
-                    },
+                                    // Break the loop if shutdown is triggered. This happens implicitly once
+                                    // the client goes out of scope
+                                    _ = &mut shutdown_rx => {
+                 // TODO: https://github.com/vectordotdev/vector/issues/18682
+                #[allow(clippy::unwrap_used)]
+                                        let subscriptions = subscriptions_clone.lock().unwrap();
+                                        for id in subscriptions.keys() {
+                                            _ = tx_clone.send(Payload::stop(*id));
+                                        }
+                                        break
+                                    },
 
-                    // Handle receiving payloads back _from_ the server
-                    message = rx.recv() => {
-                        match message {
-                            Some(p) => {
-                                let subscriptions = subscriptions_clone.lock().unwrap();
-                                let s: Option<&Sender<Payload>> = subscriptions.get::<Uuid>(&p.id);
-                                if let Some(s) = s {
-                                    _ = s.send(p);
+                                    // Handle receiving payloads back _from_ the server
+                                    message = rx.recv() => {
+                                        match message {
+                                            Some(p) => {
+                 // TODO: https://github.com/vectordotdev/vector/issues/18682
+                #[allow(clippy::unwrap_used)]
+                                                let subscriptions = subscriptions_clone.lock().unwrap();
+                                                let s: Option<&Sender<Payload>> = subscriptions.get::<Uuid>(&p.id);
+                                                if let Some(s) = s {
+                                                    _ = s.send(p);
+                                                }
+                                            }
+                                            None => {
+                 // TODO: https://github.com/vectordotdev/vector/issues/18682
+                #[allow(clippy::unwrap_used)]
+                                                subscriptions_clone.lock().unwrap().clear();
+                                                break;
+                                            },
+                                        }
+                                    }
                                 }
-                            }
-                            None => {
-                                subscriptions_clone.lock().unwrap().clear();
-                                break;
-                            },
-                        }
-                    }
-                }
             }
         });
 
@@ -156,12 +162,16 @@ impl SubscriptionClient {
 
         let (tx, rx) = broadcast::channel::<Payload>(100);
 
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         self.subscriptions.lock().unwrap().insert(id, tx);
 
         // Initialize the connection with the relevant control messages.
         _ = self.tx.send(Payload::init(id));
         _ = self.tx.send(Payload::start::<T>(id, request_body));
 
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         Box::pin(
             BroadcastStream::new(rx)
                 .filter(Result::is_ok)
@@ -184,6 +194,8 @@ pub async fn connect_subscription_client(
 
     // Forwarded received messages back upstream to the GraphQL server
     tokio::spawn(async move {
+        // TODO: https://github.com/vectordotdev/vector/issues/18682
+        #[allow(clippy::unwrap_used)]
         while let Some(p) = send_rx.recv().await {
             _ = ws_tx
                 .send(Message::Text(serde_json::to_string(&p).unwrap()))
