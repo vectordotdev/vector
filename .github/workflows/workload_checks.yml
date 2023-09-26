@@ -40,8 +40,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
-        with:
-          fetch-depth: 1000
 
       - name: Get git metadata
         id: git-metadata
