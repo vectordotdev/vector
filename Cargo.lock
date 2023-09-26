@@ -662,7 +662,7 @@ dependencies = [
  "rand 0.8.5",
  "regex",
  "ring",
- "rustls 0.21.6",
+ "rustls 0.21.7",
  "rustls-native-certs",
  "rustls-pemfile",
  "rustls-webpki",
@@ -2102,9 +2102,9 @@ dependencies = [
 
 [[package]]
 name = "clap_complete"
-version = "4.4.1"
+version = "4.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4110a1e6af615a9e6d0a36f805d5c99099f8bab9b8042f5bc1fa220a4a89e36f"
+checksum = "8baeccdb91cd69189985f87f3c7e453a3a451ab5746cf3be6acc92120bd16d24"
 dependencies = [
  "clap 4.4.3",
 ]
