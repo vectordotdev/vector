@@ -82,10 +82,9 @@ fn convert_value_raw(
             let string = String::from_utf8_lossy(&b).into_owned();
             if let Some(d) = descriptor
                 .values()
-                .filter(|v| v.name().eq_ignore_ascii_case(&string))
-                .next()
+                .find(|v| v.name().eq_ignore_ascii_case(&string))
             {
-                return Ok(prost_reflect::Value::EnumNumber(d.number()));
+                Ok(prost_reflect::Value::EnumNumber(d.number()))
             } else {
                 Err(format!(
                     "Enum `{}` has no value that matches string '{}'",
@@ -112,7 +111,7 @@ fn convert_value_raw(
             if message_descriptor.is_map_entry() {
                 let value_field = message_descriptor
                     .get_field_by_name("value")
-                    .ok_or_else(|| "Internal error with proto map processing")?;
+                    .ok_or("Internal error with proto map processing")?;
                 let mut map: HashMap<MapKey, prost_reflect::Value> = HashMap::new();
                 for (key, val) in o.into_iter() {
                     match convert_value(&value_field, val) {
