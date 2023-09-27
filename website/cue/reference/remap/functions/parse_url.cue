@@ -35,13 +35,13 @@ remap: functions: parse_url: {
 		{
 			title: "Parse URL"
 			source: #"""
-				parse_url!("ftp://foo:bar@vector.dev:4343/foobar?hello=world#123")
+				parse_url!("ftp://foo:bar@example.com:4343/foobar?hello=world#123")
 				"""#
 			return: {
 				scheme:   "ftp"
 				username: "foo"
 				password: "bar"
-				host:     "vector.dev"
+				host:     "example.com"
 				port:     4343
 				path:     "/foobar"
 				query: hello: "world"
@@ -51,13 +51,13 @@ remap: functions: parse_url: {
 		{
 			title: "Parse URL with default port"
 			source: #"""
-				parse_url!("https://vector.dev", default_known_ports: true)
+				parse_url!("https://example.com", default_known_ports: true)
 				"""#
 			return: {
 				scheme:   "https"
 				username: ""
 				password: ""
-				host:     "vector.dev"
+				host:     "example.com"
 				port:     443
 				path:     "/"
 				query: {}
