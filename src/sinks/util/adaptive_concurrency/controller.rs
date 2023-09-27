@@ -67,8 +67,7 @@ impl<L> Controller<L> {
     ) -> Self {
         // If a `concurrency` is specified, it becomes both the
         // current limit and the maximum, effectively bypassing all the
-        // mechanisms. Otherwise, the current limit is set to 1 and the
-        // maximum to MAX_CONCURRENCY.
+        // mechanisms. Otherwise, the current limit is set to 1.
         let current_limit = concurrency.unwrap_or(settings.initial_concurrency);
         Self {
             semaphore: Arc::new(ShrinkableSemaphore::new(current_limit)),
@@ -226,8 +225,7 @@ impl<L> Controller<L> {
         // concurrency limit. Note that we only check this if we had
         // requests to go beyond the current limit to prevent
         // increasing the limit beyond what we have evidence for.
-        if inner.current_limit < super::MAX_CONCURRENCY
-            && inner.reached_limit
+        if inner.reached_limit
             && !inner.had_back_pressure
             && current_rtt.is_some()
             && current_rtt.unwrap() <= past_rtt.mean

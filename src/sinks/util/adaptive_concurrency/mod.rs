@@ -9,10 +9,6 @@ mod service;
 #[cfg(test)]
 pub mod tests;
 
-// Make sure to update the max range of the `AdaptiveConcurrencySettings::initial_concurrency` when changing
-// this constant.
-pub(super) const MAX_CONCURRENCY: usize = 200;
-
 pub(crate) use layer::AdaptiveConcurrencyLimitLayer;
 pub(crate) use service::AdaptiveConcurrencyLimit;
 use vector_config::configurable_component;
@@ -36,7 +32,7 @@ pub struct AdaptiveConcurrencySettings {
     /// It is recommended to set this value to your service's average limit if you're seeing that it takes a
     /// long time to ramp up adaptive concurrency after a restart. You can find this value by looking at the
     /// `adaptive_concurrency_limit` metric.
-    #[configurable(validation(range(min = 1, max = 200)))]
+    #[configurable(validation(range(min = 1)))]
     #[serde(default = "default_initial_concurrency")]
     pub(super) initial_concurrency: usize,
 
@@ -88,12 +84,6 @@ const fn default_ewma_alpha() -> f64 {
 
 const fn default_rtt_deviation_scale() -> f64 {
     2.5
-}
-
-impl AdaptiveConcurrencySettings {
-    pub const fn max_concurrency() -> usize {
-        MAX_CONCURRENCY
-    }
 }
 
 impl Default for AdaptiveConcurrencySettings {

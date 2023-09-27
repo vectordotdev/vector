@@ -25,6 +25,7 @@ use crate::{
         adaptive_concurrency::{
             AdaptiveConcurrencyLimit, AdaptiveConcurrencyLimitLayer, AdaptiveConcurrencySettings,
         },
+        request_builder::default_request_builder_concurrency_limit,
         retries::{FixedRetryPolicy, RetryLogic},
         service::map::MapLayer,
         sink::Response,
@@ -360,7 +361,7 @@ impl TowerRequestSettings {
 
         // Build services
         let open = OpenGauge::new();
-        let max_concurrency = services.len() * AdaptiveConcurrencySettings::max_concurrency();
+        let max_concurrency = services.len() * default_request_builder_concurrency_limit();
         let services = services
             .into_iter()
             .map(|(endpoint, inner)| {
