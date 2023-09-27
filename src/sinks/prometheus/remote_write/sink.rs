@@ -99,7 +99,7 @@ where
                 future::ready(make_remote_write_event(tenant_id.as_ref(), event))
             })
             .batched_partitioned(PrometheusTenantIdPartitioner, batch_settings)
-            .request_builder(None, request_builder)
+            .request_builder(default_request_builder_concurrency_limit(), request_builder)
             .filter_map(|request| async move {
                 match request {
                     Err(e) => {
