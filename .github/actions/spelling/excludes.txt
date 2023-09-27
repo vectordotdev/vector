@@ -8,6 +8,7 @@
 (?:^|/)pyproject.toml
 (?:^|/)requirements(?:-dev|-doc|-test|)\.txt$
 (?:^|/)vendor/
+(?:^|/)amplify\.yml$
 \.a$
 \.ai$
 \.all-contributorsrc$
@@ -103,3 +104,4 @@
 ^\Qwebsite/layouts/shortcodes/config/unit-tests.html\E$
 ^lib/codecs/tests/data/native_encoding/
 ignore$
+

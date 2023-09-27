@@ -11,7 +11,7 @@ pub struct Opts {
     /// Read configuration from one or more files. Wildcard paths are supported.
     /// File format is detected from the file name.
     /// If zero files are specified the default config path
-    /// `/etc/vector/vector.toml` will be targeted.
+    /// `/etc/vector/vector.yaml` will be targeted.
     #[arg(
         id = "config",
         short,

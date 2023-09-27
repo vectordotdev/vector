@@ -4,6 +4,8 @@
 mod docs;
 mod test_enrichment;
 
+use std::env;
+use std::path::PathBuf;
 use vrl::test::{get_tests_from_functions, run_tests, Test, TestConfig};
 
 use chrono_tz::Tz;
@@ -111,8 +113,15 @@ fn main() {
     );
 }
 
+pub fn test_dir() -> PathBuf {
+    PathBuf::from(env::var_os("CARGO_MANIFEST_DIR").unwrap())
+}
+
+fn test_glob_pattern() -> String {
+    test_dir().join("**/*.vrl").to_str().unwrap().to_string()
+}
 fn get_tests(cmd: &Cmd) -> Vec<Test> {
-    glob("tests/**/*.vrl")
+    glob(test_glob_pattern().as_str())
         .expect("valid pattern")
         .filter_map(|entry| {
             let path = entry.ok()?;

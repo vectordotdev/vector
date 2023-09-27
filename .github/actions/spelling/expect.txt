@@ -197,6 +197,7 @@ copypasta'd
 copypasted
 copytruncate
 corechecks
+corepack
 could've
 counteraaaaaaaaaaa
 cpf
@@ -740,6 +741,7 @@ noauth
 nocapture
 nochild
 nodebuginfo
+nodistro
 nofield
 nofree
 nomac
@@ -984,6 +986,7 @@ skywalking
 slashin
 slf
 slideover
+slugified
 smallvec
 smartphone
 Smol

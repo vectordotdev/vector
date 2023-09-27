@@ -7,6 +7,8 @@ labels: "domain: releasing"
 
 The week before the release:
 
+- [ ] Check for any outstanding deprecation actions in [DEPRECATIONS.md](docs/DEPRECATIONS.md) and
+      take them (or have someone help you take them)
 - [ ] Create a new release branch from master to freeze commits
   - `git fetch && git checkout origin/master && git checkout -b v0.<new version number> && git push -u`
 - [ ] Create a new release preparation branch from `master`

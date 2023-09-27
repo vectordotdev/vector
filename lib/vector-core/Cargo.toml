@@ -14,7 +14,7 @@ bytes = { version = "1.5.0", default-features = false, features = ["serde"] }
 chrono = { version = "0.4.19", default-features = false, features = ["serde"] }
 crossbeam-utils = { version = "0.8.16", default-features = false }
 db-key = { version = "0.0.5", default-features = false, optional = true }
-dyn-clone = { version = "1.0.13", default-features = false }
+dyn-clone = { version = "1.0.14", default-features = false }
 enrichment = { path = "../enrichment", optional = true }
 enumflags2 = { version = "0.7.8", default-features = false }
 float_eq = { version = "1.0", default-features = false }
@@ -28,10 +28,10 @@ lookup = { package = "vector-lookup", path = "../vector-lookup" }
 metrics = "0.21.1"
 metrics-tracing-context = { version = "0.14.0", default-features = false }
 metrics-util = { version = "0.15.1", default-features = false, features = ["registry"] }
-mlua = { version = "0.8.10", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
+mlua = { version = "0.9.1", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
 no-proxy = { version  = "0.3.4", default-features = false, features = ["serialize"] }
 once_cell = { version = "1.18", default-features = false }
-ordered-float = { version = "3.9.1", default-features = false }
+ordered-float = { version = "4.1.0", default-features = false }
 openssl = { version = "0.10.57", default-features = false, features = ["vendored"] }
 parking_lot = { version = "0.12.1", default-features = false }
 pin-project.workspace = true
@@ -95,7 +95,7 @@ rand = "0.8.5"
 rand_distr = "0.4.3"
 tracing-subscriber = { version = "0.3.17", default-features = false, features = ["env-filter", "fmt", "ansi", "registry"] }
 vector-common = { path = "../vector-common", default-features = false, features = ["test"] }
-vrl = { version = "0.6.0", features = ["cli", "test", "test_framework", "arbitrary"] }
+vrl = { version = "0.7.0", features = ["cli", "test", "test_framework", "arbitrary"] }
 
 [features]
 api = ["dep:async-graphql"]

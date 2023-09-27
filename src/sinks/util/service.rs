@@ -15,7 +15,7 @@ use tower::{
 use vector_config::configurable_component;
 
 pub use crate::sinks::util::service::{
-    concurrency::{concurrency_is_none, Concurrency},
+    concurrency::{concurrency_is_adaptive, Concurrency},
     health::{HealthConfig, HealthLogic, HealthService},
     map::Map,
 };
@@ -93,7 +93,7 @@ impl<L> ServiceBuilderExt<L> for ServiceBuilder<L> {
 pub struct TowerRequestConfig {
     #[configurable(derived)]
     #[serde(default = "default_concurrency")]
-    #[serde(skip_serializing_if = "concurrency_is_none")]
+    #[serde(skip_serializing_if = "concurrency_is_adaptive")]
     pub concurrency: Concurrency,
 
     /// The time a request can take before being aborted.
@@ -144,7 +144,7 @@ pub struct TowerRequestConfig {
 }
 
 const fn default_concurrency() -> Concurrency {
-    Concurrency::None
+    Concurrency::Adaptive
 }
 
 const fn default_timeout_secs() -> Option<u64> {
@@ -457,7 +457,7 @@ mod tests {
         toml::from_str::<TowerRequestConfig>(&toml).expect("Default config failed");
 
         let cfg = toml::from_str::<TowerRequestConfig>("").expect("Empty config failed");
-        assert_eq!(cfg.concurrency, Concurrency::None);
+        assert_eq!(cfg.concurrency, Concurrency::Adaptive);
 
         let cfg = toml::from_str::<TowerRequestConfig>("concurrency = 10")
             .expect("Fixed concurrency failed");

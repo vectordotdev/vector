@@ -446,7 +446,7 @@ impl LokiSink {
         // out_of_order_action's that require a complete ordering are limited to building 1 request
         // at a time
         let request_builder_concurrency = match self.out_of_order_action {
-            OutOfOrderAction::Accept => NonZeroUsize::new(50).expect("static"),
+            OutOfOrderAction::Accept => default_request_builder_concurrency_limit(),
             OutOfOrderAction::Drop | OutOfOrderAction::RewriteTimestamp => {
                 NonZeroUsize::new(1).expect("static")
             }
@@ -479,7 +479,7 @@ impl LokiSink {
                     None
                 }
             })
-            .request_builder(Some(request_builder_concurrency), self.request_builder)
+            .request_builder(request_builder_concurrency, self.request_builder)
             .filter_map(|request| async move {
                 match request {
                     Err(error) => {

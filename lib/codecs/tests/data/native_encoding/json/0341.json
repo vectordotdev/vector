@@ -1,1 +1,1 @@
-{"metric":{"name":"q","namespace":"o","interval_ms":2288512857,"kind":"absolute","distribution":{"samples":[{"value":700768.3797,"rate":3267068553},{"value":112704.0,"rate":1784913406},{"value":-688768.0,"rate":1716132181},{"value":-921728.0,"rate":3880354438},{"value":785630.2824,"rate":208647378},{"value":-420736.0,"rate":2652166070},{"value":-724160.0,"rate":0},{"value":429952.0,"rate":2045828947},{"value":3072.0,"rate":3167019057},{"value":-535552.0,"rate":2852659464},{"value":-950400.0,"rate":1868332171}],"statistic":"histogram"}}}
+{"log":{}}

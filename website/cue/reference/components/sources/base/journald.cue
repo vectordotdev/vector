@@ -82,6 +82,18 @@ base: components: sources: journald: configuration: {
 			items: type: string: examples: ["badservice", "sysinit.target"]
 		}
 	}
+	extra_args: {
+		description: """
+			A list of extra command line arguments to pass to `journalctl`.
+
+			If specified, it is merged to the command line arguments as-is.
+			"""
+		required: false
+		type: array: {
+			default: []
+			items: type: string: examples: ["--merge"]
+		}
+	}
 	include_matches: {
 		description: """
 			A list of sets of field/value pairs to monitor.

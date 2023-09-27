@@ -206,7 +206,7 @@ pub struct FileConfig {
     pub multiline: Option<MultilineConfig>,
 
     /// Max amount of bytes to read from a single file before switching over to the next file.
-    /// **Note:** This does not apply when `oldest_first` is `true.
+    /// **Note:** This does not apply when `oldest_first` is `true`.
     ///
     /// This allows distributing the reads more or less evenly across
     /// the files.
@@ -214,7 +214,7 @@ pub struct FileConfig {
     #[configurable(metadata(docs::type_unit = "bytes"))]
     pub max_read_bytes: usize,
 
-    /// Instead of balancing read capacity fairly across all watched files, prioritize draining the oldest files before moving on to read data from younger files.
+    /// Instead of balancing read capacity fairly across all watched files, prioritize draining the oldest files before moving on to read data from more recent files.
     #[serde(default)]
     pub oldest_first: bool,
 
