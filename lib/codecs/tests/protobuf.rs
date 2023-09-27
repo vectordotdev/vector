@@ -1,4 +1,4 @@
-//! Tests for the behaviour of Protobuf serializers and deserializers (together).
+//! Tests for the behaviour of Protobuf serializer and deserializer (together).
 
 use bytes::{Bytes, BytesMut};
 use std::path::{Path, PathBuf};
@@ -21,7 +21,7 @@ fn read_protobuf_bin_message(path: &Path) -> Bytes {
 }
 
 /// Build the serializer and deserializer from common settings
-fn build_rializers(
+fn build_serializer_pair(
     desc_file: PathBuf,
     message_type: String,
 ) -> (ProtobufSerializer, ProtobufDeserializer) {
@@ -49,7 +49,7 @@ fn roundtrip_coding() {
     let protobuf_message = read_protobuf_bin_message(&test_data_dir().join("person_someone.pb"));
     let desc_file = test_data_dir().join("test_protobuf.desc");
     let message_type: String = "test_protobuf.Person".into();
-    let (mut serializer, deserializer) = build_rializers(desc_file, message_type);
+    let (mut serializer, deserializer) = build_serializer_pair(desc_file, message_type);
 
     let events_original = deserializer
         .parse(protobuf_message, LogNamespace::Vector)
