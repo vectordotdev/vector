@@ -6,17 +6,20 @@ use super::*;
 
 const LOGS_ENDPOINT: &str = "/api/v2/logs";
 
-fn expected_log_events() -> u32 {
+fn expected_log_events() -> usize {
     std::env::var("EXPECTED_LOG_EVENTS")
-        .unwrap_or_else(|_| "1000".to_string())
-        .parse::<u32>()
-        .expect("EXPECTED_LOG_EVENTS should be an unsigned int")
+        .map(|n_expected| {
+            n_expected
+                .parse::<usize>()
+                .expect("EXPECTED_LOG_EVENTS should be an unsigned integer.")
+        })
+        .unwrap_or(1000)
 }
 
 // Asserts that each log event has the hostname and timestamp fields, and
 // Removes them from the log so that comparison can more easily be made.
 // @return the number of log entries in the payload.
-fn assert_timestamp_hostname(payloads: &mut Vec<Value>) -> u32 {
+fn assert_timestamp_hostname(payloads: &mut [Value]) -> usize {
     let mut n_log_events = 0;
 
     payloads.iter_mut().for_each(|payload_array| {
@@ -41,7 +44,7 @@ fn assert_timestamp_hostname(payloads: &mut Vec<Value>) -> u32 {
 
 // runs assertions that each set of payloads should be true to regardless
 // of the pipeline
-fn common_assertions(payloads: &mut Vec<Value>) {
+fn common_assertions(payloads: &mut [Value]) {
     assert!(payloads.len() > 0);
 
     let n_log_events = assert_timestamp_hostname(payloads);
