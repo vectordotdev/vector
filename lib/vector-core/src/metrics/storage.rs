@@ -114,7 +114,9 @@ impl Histogram {
             (10_f64.exp2(), AtomicU32::new(0)),
             (11_f64.exp2(), AtomicU32::new(0)),
             (12_f64.exp2(), AtomicU32::new(0)),
-            (f64::INFINITY, AtomicU32::new(0)),
+            // TODO: This would ideally be f64::INFINITY but the current implementation of JSON
+            // serialization/deserialization doesn't support special values.
+            (f64::MAX, AtomicU32::new(0)),
         ]);
         Self {
             buckets,
