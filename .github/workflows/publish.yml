@@ -563,6 +563,7 @@ jobs:
       - deb-verify
       - rpm-verify
       - macos-verify
+      - generate-sha256sum
     env:
       VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
     steps:
@@ -609,6 +610,11 @@ jobs:
         uses: actions/download-artifact@v3
         with:
           name: vector-${{ env.VECTOR_VERSION }}-armv7-unknown-linux-musleabihf
+          path: target/artifacts
+      - name: Download artifact checksums
+        uses: actions/download-artifact@v3
+        with:
+          name: vector-${{ env.VECTOR_VERSION }}-SHA256SUMS
           path: target/artifacts
       - name: Publish release to GitHub
         env:
