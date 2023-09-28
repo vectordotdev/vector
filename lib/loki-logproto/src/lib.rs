@@ -104,7 +104,7 @@ mod tests {
             .single()
             .expect("invalid timestamp");
         let entry1 = Entry(
-            ts1.timestamp_nanos_opt().expect("Invalid timestamp"),
+            ts1.timestamp_nanos_opt().expect("Timestamp out of range"),
             "hello".into(),
         );
         let ts2 = Utc
@@ -112,7 +112,7 @@ mod tests {
             .single()
             .expect("invalid timestamp");
         let entry2 = Entry(
-            ts2.timestamp_nanos_opt().expect("Invalid timestamp"),
+            ts2.timestamp_nanos_opt().expect("Timestamp out of range"),
             "world".into(),
         );
         let labels = vec![("source".into(), "protobuf-test".into())]

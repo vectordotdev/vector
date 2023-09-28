@@ -257,10 +257,10 @@ impl EventEncoder {
         self.remove_label_fields(&mut event);
 
         let timestamp = match event.as_log().get_timestamp() {
-            Some(Value::Timestamp(ts)) => ts.timestamp_nanos_opt().expect("Invalid timestamp"),
+            Some(Value::Timestamp(ts)) => ts.timestamp_nanos_opt().expect("Timestamp out of range"),
             _ => chrono::Utc::now()
                 .timestamp_nanos_opt()
-                .expect("Invalid timestamp"),
+                .expect("Timestamp out of range"),
         };
 
         if self.remove_timestamp {

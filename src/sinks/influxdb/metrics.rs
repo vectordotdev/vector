@@ -1111,7 +1111,9 @@ mod integration_tests {
 
         let metric = format!(
             "counter-{}",
-            Utc::now().timestamp_nanos_opt().expect("Invalid timestamp")
+            Utc::now()
+                .timestamp_nanos_opt()
+                .expect("Timestamp out of range")
         );
         let mut events = Vec::new();
         for i in 0..10 {

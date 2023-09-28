@@ -125,7 +125,9 @@ impl Aggregator {
         Self {
             buckets: BTreeMap::new(),
             oldest_timestamp: align_timestamp(
-                Utc::now().timestamp_nanos_opt().expect("Invalid timestamp") as u64,
+                Utc::now()
+                    .timestamp_nanos_opt()
+                    .expect("Timestamp out of range") as u64,
             ),
             default_api_key,
             // We can't know the below fields until have received a trace event
@@ -231,9 +233,11 @@ impl Aggregator {
 
         let start = match span.get("start") {
             Some(Value::Timestamp(val)) => {
-                val.timestamp_nanos_opt().expect("Invalid timestamp") as u64
+                val.timestamp_nanos_opt().expect("Timestamp out of range") as u64
             }
-            _ => Utc::now().timestamp_nanos_opt().expect("Invalid timestamp") as u64,
+            _ => Utc::now()
+                .timestamp_nanos_opt()
+                .expect("Timestamp out of range") as u64,
         };
 
         let duration = match span.get("duration") {
@@ -281,7 +285,9 @@ impl Aggregator {
         // Based on https://github.com/DataDog/datadog-agent/blob/cfa750c7412faa98e87a015f8ee670e5828bbe7f/pkg/trace/stats/concentrator.go#L38-L41
         // , and https://github.com/DataDog/datadog-agent/blob/cfa750c7412faa98e87a015f8ee670e5828bbe7f/pkg/trace/stats/concentrator.go#L195-L207
 
-        let now = Utc::now().timestamp_nanos_opt().expect("Invalid timestamp") as u64;
+        let now = Utc::now()
+            .timestamp_nanos_opt()
+            .expect("Timestamp out of range") as u64;
 
         let flush_cutoff_time = if force {
             // flush all the remaining buckets (the Vector process is exiting)

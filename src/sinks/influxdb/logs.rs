@@ -906,7 +906,7 @@ mod integration_tests {
         let now = Utc::now();
         let measure = format!(
             "vector-{}",
-            now.timestamp_nanos_opt().expect("Invalid timestamp")
+            now.timestamp_nanos_opt().expect("Timestamp out of range")
         );
 
         let cx = SinkContext::default();
