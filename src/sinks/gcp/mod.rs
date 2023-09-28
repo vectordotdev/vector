@@ -7,7 +7,6 @@ pub mod chronicle_unstructured;
 pub mod cloud_storage;
 pub mod pubsub;
 pub mod stackdriver;
-pub mod stackdriver_metrics;
 
 /// A monitored resource.
 ///
