@@ -37,7 +37,4 @@ license-files = [
 ]
 
 [advisories]
-ignore = [
-  # requires our dependencies to migrate to `rustls-webpki`
-  "RUSTSEC-2023-0052"
-]
+ignore = [ ]

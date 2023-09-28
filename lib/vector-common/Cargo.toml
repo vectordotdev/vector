@@ -42,7 +42,7 @@ tokenize = [
 
 [dependencies]
 async-stream = "0.3.5"
-bytes = { version = "1.4.0", default-features = false, optional = true }
+bytes = { version = "1.5.0", default-features = false, optional = true }
 chrono-tz = { version = "0.8.3", default-features = false, features = ["serde"] }
 chrono = { version = "0.4", default-features = false, optional = true, features = ["clock"] }
 crossbeam-utils = { version = "0.8.16", default-features = false }
@@ -55,7 +55,7 @@ ordered-float = { version = "3.9.1", default-features = false }
 paste = "1.0.14"
 pin-project.workspace = true
 ryu = { version = "1", default-features = false }
-serde_json = { version = "1.0.105", default-features = false, features = ["std", "raw_value"] }
+serde_json = { version = "1.0.107", default-features = false, features = ["std", "raw_value"] }
 serde = { version = "1.0.188", optional = true, features = ["derive"] }
 smallvec = { version = "1", default-features = false }
 snafu = { version = "0.7", optional = true }

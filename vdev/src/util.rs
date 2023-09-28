@@ -56,30 +56,6 @@ pub struct RustToolChain {
     pub channel: String,
 }
 
-/// The bits of the top-level `rust-toolchain.toml` configuration that `vdev` uses.
-#[derive(Deserialize)]
-pub struct RustToolChainToml {
-    pub toolchain: RustToolChain,
-}
-
-impl RustToolChainToml {
-    pub fn load() -> Result<RustToolChainToml> {
-        let text = fs::read_to_string("rust-toolchain.toml")
-            .context("Could not read `rust-toolchain.toml`")?;
-        toml::from_str::<RustToolChainToml>(&text)
-            .context("Invalid contents in `rust-toolchain.toml`")
-    }
-}
-
-pub fn get_rust_version() -> Result<String> {
-    RustToolChainToml::load().map(|toml| toml.toolchain.channel)
-}
-
-pub fn export_rust_version() -> Result<()> {
-    std::env::set_var("RUST_VERSION", get_rust_version()?);
-    Ok(())
-}
-
 pub fn exists(path: impl AsRef<Path> + Debug) -> Result<bool> {
     match fs::metadata(path.as_ref()) {
         Ok(_) => Ok(true),

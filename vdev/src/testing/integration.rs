@@ -10,7 +10,7 @@ use super::runner::{
 };
 use super::state::EnvsDir;
 use crate::app::CommandExt as _;
-use crate::util::export_rust_version;
+use crate::testing::config::get_rust_version;
 
 const NETWORK_ENV_VAR: &str = "VECTOR_NETWORK";
 
@@ -33,9 +33,6 @@ impl IntegrationTest {
         build_all: bool,
         retries: u8,
     ) -> Result<Self> {
-        // some tests require the rust version env var to be set
-        export_rust_version()?;
-
         let integration = integration.into();
         let environment = environment.into();
         let (test_dir, config) = IntegrationTestConfig::load(&integration)?;
@@ -249,6 +246,9 @@ impl Compose {
 
         command.env("DOCKER_SOCKET", &*DOCKER_SOCKET);
         command.env(NETWORK_ENV_VAR, &self.network);
+
+        // some services require this in order to build Vector
+        command.env("RUST_VERSION", get_rust_version());
 
         for (key, value) in &self.env {
             if let Some(value) = value {

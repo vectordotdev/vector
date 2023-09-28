@@ -53,6 +53,7 @@ autodiscovered
 autodiscovery
 autogen
 autoinstalling
+AUTOPULL
 autospawn
 autospawning
 autotools
@@ -347,6 +348,7 @@ exitcodes
 exprhere
 extendedstatus
 extendee
+extglob
 extr
 extralight
 extrepo

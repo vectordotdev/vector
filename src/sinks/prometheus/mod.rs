@@ -8,8 +8,6 @@ pub(crate) mod remote_write;
 
 use vector_config::configurable_component;
 
-use crate::aws::AwsAuthentication;
-
 /// Authentication strategies.
 #[configurable_component]
 #[derive(Clone, Debug)]
@@ -33,8 +31,9 @@ pub enum PrometheusRemoteWriteAuth {
         token: SensitiveString,
     },
 
+    #[cfg(feature = "aws-core")]
     /// Amazon Prometheus Service-specific authentication.
-    Aws(AwsAuthentication),
+    Aws(crate::aws::AwsAuthentication),
 }
 
 fn default_histogram_buckets() -> Vec<f64> {

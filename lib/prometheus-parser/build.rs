@@ -7,7 +7,6 @@ fn main() {
     // prost automatically adds them already to enums, which causes the
     // extra derives to conflict with itself.
     prost_build.type_attribute("Label", "#[derive(Eq, Hash, Ord, PartialOrd)]");
-    prost_build.type_attribute("MetricType", "#[derive(num_enum::TryFromPrimitive)]");
     prost_build
         .compile_protos(
             &["proto/prometheus-remote.proto"],

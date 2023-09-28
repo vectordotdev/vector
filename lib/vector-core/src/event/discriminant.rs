@@ -145,13 +145,13 @@ fn hash_f64<H: Hasher>(hasher: &mut H, value: f64) {
 }
 
 fn hash_array<H: Hasher>(hasher: &mut H, array: &[Value]) {
-    for val in array.iter() {
+    for val in array {
         hash_value(hasher, val);
     }
 }
 
 fn hash_map<H: Hasher>(hasher: &mut H, map: &BTreeMap<String, Value>) {
-    for (key, val) in map.iter() {
+    for (key, val) in map {
         hasher.write(key.as_bytes());
         hash_value(hasher, val);
     }

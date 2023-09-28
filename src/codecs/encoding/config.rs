@@ -228,7 +228,7 @@ mod test {
         let encoding = serde_json::from_str::<EncodingConfigWithFraming>(string).unwrap();
         let (framing, serializer) = encoding.config();
 
-        assert!(matches!(framing, None));
+        assert!(framing.is_none());
         assert!(matches!(serializer, SerializerConfig::Json(_)));
 
         let transformer = encoding.transformer();

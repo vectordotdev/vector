@@ -206,7 +206,7 @@ impl TaskTransform<Event> for Lua {
                 let mut output = Vec::with_capacity(1);
                 ready(match inner.process(event) {
                     Ok(event) => {
-                        output.extend(event.into_iter());
+                        output.extend(event);
                         Some(stream::iter(output))
                     }
                     Err(error) => {

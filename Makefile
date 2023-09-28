@@ -52,6 +52,8 @@ export ENVIRONMENT_UPSTREAM ?= docker.io/timberio/vector-dev:sha-3eadc96742a3375
 # Override to disable building the container, having it pull from the GitHub packages repo instead
 # TODO: Disable this by default. Blocked by `docker pull` from GitHub Packages requiring authenticated login
 export ENVIRONMENT_AUTOBUILD ?= true
+# Override to disable force pulling the image, leaving the container tool to pull it only when necessary instead
+export ENVIRONMENT_AUTOPULL ?= true
 # Override this when appropriate to disable a TTY being available in commands with `ENVIRONMENT=true`
 export ENVIRONMENT_TTY ?= true
 
@@ -144,8 +146,9 @@ define ENVIRONMENT_PREPARE
 		--file scripts/environment/Dockerfile \
 		.
 endef
-else
+else ifeq ($(ENVIRONMENT_AUTOPULL), true)
 define ENVIRONMENT_PREPARE
+	@echo "Pulling the environment image. (ENVIRONMENT_AUTOPULL=true)"
 	$(CONTAINER_TOOL) pull $(ENVIRONMENT_UPSTREAM)
 endef
 endif
@@ -352,7 +355,7 @@ test-integration: test-integration-databend test-integration-docker-logs test-in
 test-integration: test-integration-eventstoredb test-integration-fluent test-integration-gcp test-integration-greptimedb test-integration-humio test-integration-http-client test-integration-influxdb
 test-integration: test-integration-kafka test-integration-logstash test-integration-loki test-integration-mongodb test-integration-nats
 test-integration: test-integration-nginx test-integration-opentelemetry test-integration-postgres test-integration-prometheus test-integration-pulsar
-test-integration: test-integration-redis test-integration-splunk test-integration-dnstap test-integration-datadog-agent test-integration-datadog-logs
+test-integration: test-integration-redis test-integration-splunk test-integration-dnstap test-integration-datadog-agent test-integration-datadog-logs test-integration-datadog-e2e-logs
 test-integration: test-integration-datadog-traces test-integration-shutdown
 
 test-integration-%-cleanup:
@@ -620,6 +623,10 @@ release-s3: ## Release artifacts to S3
 .PHONY: sync-install
 sync-install: ## Sync the install.sh script for access via sh.vector.dev
 	@aws s3 cp distribution/install.sh s3://sh.vector.dev --sse --acl public-read
+
+.PHONY: sha256sum
+sha256sum: ## Generate SHA256 checksums of CI artifacts
+	scripts/checksum.sh
 
 ##@ Vector Remap Language
 

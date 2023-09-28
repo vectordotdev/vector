@@ -2,7 +2,9 @@ use std::io::Read;
 use std::sync::Arc;
 use std::task;
 
+#[cfg(feature = "aws-core")]
 use aws_credential_types::provider::SharedCredentialsProvider;
+#[cfg(feature = "aws-core")]
 use aws_types::region::Region;
 use bytes::{Bytes, BytesMut};
 use futures::{future::BoxFuture, stream, FutureExt, SinkExt};
@@ -15,15 +17,15 @@ use vector_core::{ByteSizeOf, EstimatedJsonEncodedSizeOf};
 
 use super::collector::{self, MetricCollector as _};
 use crate::{
-    aws::RegionOrEndpoint,
     config::{self, AcknowledgementsConfig, Input, SinkConfig},
     event::{Event, Metric},
-    http::{Auth, HttpClient},
+    http::HttpClient,
     internal_events::{EndpointBytesSent, TemplateRenderingError},
     sinks::{
         self,
         prometheus::PrometheusRemoteWriteAuth,
         util::{
+            auth::Auth,
             batch::BatchConfig,
             buffer::metrics::{MetricNormalize, MetricNormalizer, MetricSet, MetricsBuffer},
             http::HttpRetryLogic,
@@ -48,6 +50,7 @@ impl SinkBatchSettings for PrometheusRemoteWriteDefaultBatchSettings {
 enum Errors {
     #[snafu(display(r#"Prometheus remote_write sink cannot accept "set" metrics"#))]
     SetMetricInvalid,
+    #[cfg(feature = "aws-core")]
     #[snafu(display("aws.region required when AWS authentication is in use"))]
     AwsRegionRequired,
 }
@@ -116,9 +119,10 @@ pub struct RemoteWriteConfig {
     #[configurable(derived)]
     pub auth: Option<PrometheusRemoteWriteAuth>,
 
+    #[cfg(feature = "aws-core")]
     #[configurable(derived)]
     #[configurable(metadata(docs::advanced))]
-    pub aws: Option<RegionOrEndpoint>,
+    pub aws: Option<crate::aws::RegionOrEndpoint>,
 
     #[configurable(derived)]
     #[serde(
@@ -178,22 +182,19 @@ impl SinkConfig for RemoteWriteConfig {
         let client = HttpClient::new(tls_settings, cx.proxy())?;
         let tenant_id = self.tenant_id.clone();
 
-        let (http_auth, credentials_provider, aws_region) = match &self.auth {
-            Some(PrometheusRemoteWriteAuth::Basic { user, password }) => (
-                Some(Auth::Basic {
+        let auth = match &self.auth {
+            Some(PrometheusRemoteWriteAuth::Basic { user, password }) => {
+                Some(Auth::Basic(crate::http::Auth::Basic {
                     user: user.clone(),
                     password: password.clone().into(),
-                }),
-                None,
-                None,
-            ),
-            Some(PrometheusRemoteWriteAuth::Bearer { token }) => (
-                Some(Auth::Bearer {
+                }))
+            }
+            Some(PrometheusRemoteWriteAuth::Bearer { token }) => {
+                Some(Auth::Basic(crate::http::Auth::Bearer {
                     token: token.clone(),
-                }),
-                None,
-                None,
-            ),
+                }))
+            }
+            #[cfg(feature = "aws-core")]
             Some(PrometheusRemoteWriteAuth::Aws(aws_auth)) => {
                 let region = self
                     .aws
@@ -201,21 +202,17 @@ impl SinkConfig for RemoteWriteConfig {
                     .map(|config| config.region())
                     .ok_or(Errors::AwsRegionRequired)?
                     .ok_or(Errors::AwsRegionRequired)?;
-
-                (
-                    None,
-                    Some(aws_auth.credentials_provider(region.clone()).await?),
-                    Some(region),
-                )
+                Some(Auth::Aws {
+                    credentials_provider: aws_auth.credentials_provider(region.clone()).await?,
+                    region,
+                })
             }
-            None => (None, None, None),
+            None => None,
         };
 
         let http_request_builder = Arc::new(HttpRequestBuilder {
             endpoint: endpoint.clone(),
-            aws_region,
-            credentials_provider,
-            http_auth,
+            auth,
             compression: self.compression,
         });
 
@@ -380,9 +377,7 @@ impl Service<PartitionInnerBuffer<Vec<Metric>, PartitionKey>> for RemoteWriteSer
 
 pub struct HttpRequestBuilder {
     pub endpoint: Uri,
-    pub aws_region: Option<Region>,
-    pub http_auth: Option<Auth>,
-    pub credentials_provider: Option<SharedCredentialsProvider>,
+    pub auth: Option<Auth>,
     pub compression: Compression,
 }
 
@@ -406,13 +401,16 @@ impl HttpRequestBuilder {
             builder = builder.header("X-Scope-OrgID", tenant_id);
         }
 
-        let mut request = builder.body(body.into()).unwrap();
-        if let Some(http_auth) = &self.http_auth {
-            http_auth.apply(&mut request);
-        }
-
-        if let Some(credentials_provider) = &self.credentials_provider {
-            sign_request(&mut request, credentials_provider, &self.aws_region).await?;
+        let mut request: Request<Bytes> = builder.body(body.into()).unwrap();
+        if let Some(auth) = &self.auth {
+            match auth {
+                Auth::Basic(http_auth) => http_auth.apply(&mut request),
+                #[cfg(feature = "aws-core")]
+                Auth::Aws {
+                    credentials_provider: provider,
+                    region,
+                } => sign_request(&mut request, provider, &Some(region.clone())).await?,
+            }
         }
 
         let (parts, body) = request.into_parts();
@@ -440,6 +438,7 @@ fn compress_block(compression: Compression, data: Bytes) -> Vec<u8> {
     }
 }
 
+#[cfg(feature = "aws-core")]
 async fn sign_request(
     request: &mut http::Request<Bytes>,
     credentials_provider: &SharedCredentialsProvider,
