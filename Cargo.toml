@@ -327,7 +327,7 @@ trust-dns-proto = { version = "0.23.0", default-features = false, features = ["d
 typetag = { version = "0.2.13", default-features = false }
 url = { version = "2.4.1", default-features = false, features = ["serde"] }
 uuid = { version = "1", default-features = false, features = ["serde", "v4"] }
-warp = { version = "0.3.5", default-features = false }
+warp = { version = "0.3.6", default-features = false }
 zstd = { version = "0.12.4", default-features = false }
 arr_macro = { version = "0.2.1" }
 
