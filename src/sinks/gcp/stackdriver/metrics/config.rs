@@ -65,7 +65,7 @@ pub struct StackdriverConfig {
         deserialize_with = "crate::serde::bool_or_struct",
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
-    acknowledgements: AcknowledgementsConfig,
+    pub(super) acknowledgements: AcknowledgementsConfig,
 }
 
 fn default_metric_namespace_value() -> String {

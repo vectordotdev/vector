@@ -54,73 +54,80 @@ pub struct StackdriverMetricsEncoder {
 }
 
 impl encoding::Encoder<Vec<Metric>> for StackdriverMetricsEncoder {
+    /// Create the object defined [here][api_docs].
+    ///
+    /// [api_docs]: https://cloud.google.com/monitoring/api/ref_v3/rest/v3/projects.timeSeries/create
     fn encode_input(
         &self,
-        mut input: Vec<Metric>,
+        input: Vec<Metric>,
         writer: &mut dyn io::Write,
     ) -> io::Result<(usize, GroupedCountByteSize)> {
-        // TODO: Are we really only encoding the last event here?
-        let metric = input.pop().expect("only one metric");
-
         let mut byte_size = telemetry().create_request_count_byte_size();
-        byte_size.add_event(&metric, metric.estimated_json_encoded_size_of());
+        let time_series = input
+            .into_iter()
+            .map(|metric| {
+                byte_size.add_event(&metric, metric.estimated_json_encoded_size_of());
 
-        let (series, data, _metadata) = metric.into_parts();
-        let namespace = series
-            .name
-            .namespace
-            .unwrap_or_else(|| self.default_namespace.clone());
-        let metric_type = format!(
-            "custom.googleapis.com/{}/metrics/{}",
-            namespace, series.name.name
-        );
+                let (series, data, _metadata) = metric.into_parts();
+                let namespace = series
+                    .name
+                    .namespace
+                    .unwrap_or_else(|| self.default_namespace.clone());
+                let metric_type = format!(
+                    "custom.googleapis.com/{}/metrics/{}",
+                    namespace, series.name.name
+                );
 
-        let end_time = data.time.timestamp.unwrap_or_else(chrono::Utc::now);
+                let end_time = data.time.timestamp.unwrap_or_else(chrono::Utc::now);
 
-        let (point_value, interval, metric_kind) = match &data.value {
-            MetricValue::Counter { value } => {
-                let interval = gcp::GcpInterval {
-                    start_time: Some(self.started),
-                    end_time,
+                let (point_value, interval, metric_kind) = match &data.value {
+                    MetricValue::Counter { value } => {
+                        let interval = gcp::GcpInterval {
+                            start_time: Some(self.started),
+                            end_time,
+                        };
+
+                        (*value, interval, gcp::GcpMetricKind::Cumulative)
+                    }
+                    MetricValue::Gauge { value } => {
+                        let interval = gcp::GcpInterval {
+                            start_time: None,
+                            end_time,
+                        };
+
+                        (*value, interval, gcp::GcpMetricKind::Gauge)
+                    }
+                    _ => unreachable!(),
                 };
+                let metric_labels = series
+                    .tags
+                    .unwrap_or_default()
+                    .into_iter_single()
+                    .collect::<std::collections::HashMap<_, _>>();
 
-                (*value, interval, gcp::GcpMetricKind::Cumulative)
-            }
-            MetricValue::Gauge { value } => {
-                let interval = gcp::GcpInterval {
-                    start_time: None,
-                    end_time,
-                };
-
-                (*value, interval, gcp::GcpMetricKind::Gauge)
-            }
-            _ => unreachable!(),
-        };
-        let metric_labels = series
-            .tags
-            .unwrap_or_default()
-            .into_iter_single()
-            .collect::<std::collections::HashMap<_, _>>();
+                gcp::GcpSerie {
+                    metric: gcp::GcpMetric {
+                        r#type: metric_type,
+                        labels: metric_labels,
+                    },
+                    resource: gcp::GcpResource {
+                        r#type: self.resource.r#type.clone(),
+                        labels: self.resource.labels.clone(),
+                    },
+                    metric_kind,
+                    value_type: gcp::GcpValueType::Int64,
+                    points: vec![gcp::GcpPoint {
+                        interval,
+                        value: gcp::GcpPointValue {
+                            int64_value: Some(point_value as i64),
+                        },
+                    }],
+                }
+            })
+            .collect::<Vec<_>>();
 
         let series = gcp::GcpSeries {
-            time_series: &[gcp::GcpSerie {
-                metric: gcp::GcpMetric {
-                    r#type: metric_type,
-                    labels: metric_labels,
-                },
-                resource: gcp::GcpResource {
-                    r#type: self.resource.r#type.clone(),
-                    labels: self.resource.labels.clone(),
-                },
-                metric_kind,
-                value_type: gcp::GcpValueType::Int64,
-                points: &[gcp::GcpPoint {
-                    interval,
-                    value: gcp::GcpPointValue {
-                        int64_value: Some(point_value as i64),
-                    },
-                }],
-            }],
+            time_series: &time_series,
         };
 
         let body = crate::serde::json::to_bytes(&series).unwrap().freeze();
