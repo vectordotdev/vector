@@ -32,7 +32,7 @@ pub struct ResponseFuture<F, L> {
     // Keep this around so that it is dropped when the future completes
     _permit: OwnedSemaphorePermit,
     controller: Arc<Controller<L>>,
-    start: Instant,
+    start: Option<Instant>,
 }
 
 impl<F, L> ResponseFuture<F, L> {
@@ -45,7 +45,7 @@ impl<F, L> ResponseFuture<F, L> {
             inner,
             _permit,
             controller,
-            start: instant_now(),
+            start: None,
         }
     }
 }
@@ -60,8 +60,10 @@ where
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let future = self.project();
+
+        let start = future.start.get_or_insert_with(|| instant_now());
         let output = ready!(future.inner.poll(cx)).map_err(Into::into);
-        future.controller.adjust_to_response(*future.start, &output);
+        future.controller.adjust_to_response(*start, &output);
         Poll::Ready(output)
     }
 }
