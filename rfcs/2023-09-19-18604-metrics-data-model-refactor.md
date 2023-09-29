@@ -35,6 +35,8 @@ as well as help future-proof it.
 - Bolstering supporting for handling/manipulating metrics in a pipeline (e.g. enhancing metrics
   support in the `lua` transform).
 - Explicitly adding support for other metrics systems (e.g. OpenTelemetry).
+- Deeper changes to the metrics data model such as encoding aggregation temporality (i.e.
+  `MetricKind`) into metric types directly.
 
 ## Pain
 
@@ -78,7 +80,8 @@ We would make the following changes to the metrics data model:
 - remove `MetricValue::AggregatedSummary` and `MetricValue::Set` entirely
 - refactor `MetricValue::Distribution` into an enum with a new `Raw` variant
 - merge `MetricValue::AggregatedHistogram` into `MetricValue::Distribution` as `FixedHistogram`
-- merge `MetricValue::Sketch` into `MetricValue::Distribution`
+- merge `MetricValue::Sketch` directly into `MetricValue::Distribution`, removing `MetricSketch` and
+  supporting DDSketch directly
 
 For a more visual representation, we would refactor `MetricValue` from this:
 
@@ -100,7 +103,7 @@ to this:
 pub enum Distribution {
     Raw { samples: Vec<Sample> },
     Histogram { buckets: Vec<Bucket>, count: u64, sum: f64 },
-    Sketch { sketch: MetricSketch },
+    Sketch { sketch: AgentDDSketch },
 }
 
 pub enum MetricValue {
@@ -231,15 +234,15 @@ from a sketch, and so on.
 
 #### Raw distribution
 
-The `Raw` variant would match the current shape of `Distribution` where the raw samples are stored, which
-includes the sample value and the sample rate. This variant is used for sources where the sample
-value comes in directly (such as StatsD histograms) or use cases like the `log_to_metric` transform,
-where the value is also coming directly from a log event.
+The `Raw` variant would match the current shape of `Distribution` where the raw samples are stored,
+which includes the sample value and the sample rate. This variant is used for sources where the
+sample value comes in directly (such as StatsD histograms) or use cases like the `log_to_metric`
+transform, where the value is also coming directly from a log event.
 
 #### Histograms
 
-The `Histogram` variant would be the spiritual successor to `AggregatedHistogram`, where we have a true
-histogram (bucketed values) but the number of buckets, and the bucket sizes, are fixed. While a
+The `Histogram` variant would be the spiritual successor to `AggregatedHistogram`, where we have a
+true histogram (bucketed values) but the number of buckets, and the bucket sizes, are fixed. While a
 DDSketch can be decomposed into its individual buckets, such that we could theoretically use a
 DDSketch to emit a Prometheus-capable aggregated histogram, we have no mechanism to store the
 original buckets used from the source metric within a DDSketch. Since Prometheus' own aggregation
@@ -253,21 +256,18 @@ that distribution metric.
 
 #### Sketches
 
-This variant would be the merged version of the original `Sketch` variant, which currently only
-contains the `DDSketch` variant, mapped to the DDSketch configuration parameters used by the Datadog
-Agent.
+This variant would be an unnested version of `MetricSketch`, where we would map to `AgentDDSketch`
+directly.
 
 Similarly to aggregated histograms, this variant specifically supports the Datadog Agent use case,
 which sends distributions as a compressed/condensed data structure called `DDSketch` that allows for
 summarizing the distribution data in a space-efficient way while still providing a bound on the
 error of values estimated by the sketch.
 
-While we could additionally refactor this to only ever refer to the agent-specific configuration of
-DDSketch -- as we do not currently support any other sketch implementations/configurations of
-DDSketch -- we're leaving this as-is because the current sketch code is fairly complex and is likely
-subject to change in the future. Simplification can be done at that time, and the enum-based
-approach currently used for the particular sketch variant provides us an escape hatch for that
-future refactoring work.
+While `MetricSketch` is currently an enum, allowing for the possibility of supporting other sketch
+implementations, there has been no need or pressure to add support for other sketch types up to this
+point. As such, we want to consolidate this so we can remove that layer of indirection
+(`MetricSketch`) until there is a clear need.
 
 ### Backwards compatibility in Vector's Protocol Buffers definition
 
@@ -453,3 +453,14 @@ losslessly convert one to the other.
 - [ ] Refactor `Distribution` in `MetricValue` to subsume `AggregatedHistogram` and `Sketch`
   (refactoring of `MetricValue`, updating components to use new `Distribution` variant, updating
   Protocol Buffers/Vector conversion code)
+
+## Future Improvements
+
+- Currently, aggregation temporality (i.e. `MetricKind`) is defined at a level above the metric type
+  (`MetricValue`) which leads to all metric handling logic having to consider aggregation
+  temporality for all metric types, even if some metric types have no possible way to aggregate.
+
+  It would interesting to explore moving to a model where aggregation temporality is defined at the
+  metric type level, mirroring how OpenTelemetry approaches this. Doing so could allow us to
+  essentially make it impossible to construct metrics with a competing/invalid combination of type
+  and aggregation temporality.
