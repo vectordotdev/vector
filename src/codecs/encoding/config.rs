@@ -112,6 +112,11 @@ impl EncodingConfigWithFraming {
                 // https://github.com/Graylog2/graylog2-server/issues/1240
                 CharacterDelimitedEncoder::new(0).into()
             }
+            (None, Serializer::Protobuf(_)) => {
+                // Protobuf uses length-delimited messages, see:
+                // https://developers.google.com/protocol-buffers/docs/techniques#streaming
+                LengthDelimitedEncoder::new().into()
+            }
             (
                 None,
                 Serializer::Csv(_)
