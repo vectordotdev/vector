@@ -11,9 +11,21 @@ updates:
       prefix: "chore(deps)"
     open-pull-requests-limit: 100
     groups:
+      amq:
+        patterns:
+        - "amq-*"
+      aws:
+        patterns:
+        - "aws-*"
       azure:
         patterns:
         - "azure_*"
+      clap:
+        patterns:
+        - "clap*"
+      phf:
+        patterns:
+        - "phf*"
       prost:
         patterns:
         - "prost"
@@ -22,6 +34,12 @@ updates:
         patterns:
         - "tonic"
         - "tonic-*"
+      wasm-bindgen:
+        patterns:
+        - "wasm-bindgen-*"
+      zstd:
+        patterns:
+        - "zstd*"
   - package-ecosystem: "docker"
     directory: "/distribution/docker/"
     schedule:
