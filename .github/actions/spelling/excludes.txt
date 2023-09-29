@@ -70,6 +70,7 @@
 \.zst$
 ^\.github/actions/spelling/
 ^\Q.cargo/config.toml\E$
+^\Q.github/dependabot.yml\E$
 ^\Q.github/workflows/gardener_issue_comment.yml\E$
 ^\Q.github/workflows/spelling.yml\E$
 ^\Qbenches/codecs/moby_dick.txt\E$
