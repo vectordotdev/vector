@@ -48,6 +48,7 @@ debug = true
 name = "vector"
 section = "admin"
 maintainer-scripts = "distribution/debian/scripts/"
+conf-files = ["/etc/vector/vector.yaml", "/etc/default/vector"]
 assets = [
   ["target/release/vector", "/usr/bin/", "755"],
   ["config/vector.yaml", "/etc/vector/vector.yaml", "644"],
