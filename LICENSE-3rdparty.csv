@@ -627,7 +627,6 @@ wasm-streams,https://github.com/MattiasBuelens/wasm-streams,MIT OR Apache-2.0,Ma
 web-sys,https://github.com/rustwasm/wasm-bindgen/tree/master/crates/web-sys,MIT OR Apache-2.0,The wasm-bindgen Developers
 webbrowser,https://github.com/amodm/webbrowser-rs,MIT OR Apache-2.0,Amod Malviya @amodm
 webpki,https://github.com/briansmith/webpki,ISC,Brian Smith <brian@briansmith.org>
-webpki-roots,https://github.com/rustls/webpki-roots,MPL-2.0,Joseph Birr-Pixton <jpixton@gmail.com>
 webpki-roots,https://github.com/rustls/webpki-roots,MPL-2.0,The webpki-roots Authors
 wepoll-ffi,https://github.com/aclysma/wepoll-ffi,MIT OR Apache-2.0 OR BSD-2-Clause,Philip Degarmo <aclysma@gmail.com>
 whoami,https://github.com/ardaku/whoami,Apache-2.0 OR BSL-1.0 OR MIT,The whoami Authors
