@@ -2,15 +2,15 @@
 
 use crate::sinks::{
     prelude::*,
-    util::http::{HttpJsonBatchSizer, HttpRequest},
+    util::http::{GenericEventInputSplitter, HttpJsonBatchSizer, HttpRequest, HttpRequestBuilder},
 };
 
-use super::request_builder::HoneycombRequestBuilder;
+use super::{encoder::HoneycombEncoder, request_builder::HoneycombRequestBuilder};
 
 pub(super) struct HoneycombSink<S> {
     service: S,
     batch_settings: BatcherSettings,
-    request_builder: HoneycombRequestBuilder,
+    request_builder: HttpRequestBuilder<HoneycombEncoder, GenericEventInputSplitter>,
 }
 
 impl<S> HoneycombSink<S>
@@ -24,7 +24,7 @@ where
     pub(super) const fn new(
         service: S,
         batch_settings: BatcherSettings,
-        request_builder: HoneycombRequestBuilder,
+        request_builder: HttpRequestBuilder<HoneycombEncoder, GenericEventInputSplitter>,
     ) -> Self {
         Self {
             service,

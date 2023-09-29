@@ -18,7 +18,7 @@ use indexmap::IndexMap;
 use pin_project::pin_project;
 use snafu::{ResultExt, Snafu};
 use tower::{Service, ServiceBuilder};
-use tower_http::decompression::DecompressionLayer;
+use tower_http::decompression::{Decompression, DecompressionLayer};
 use vector_config::configurable_component;
 use vector_core::{
     stream::batcher::limiter::ItemBatchSize, ByteSizeOf, EstimatedJsonEncodedSizeOf,
@@ -609,20 +609,20 @@ pub fn validate_headers(
 /// Request type for use in the `Service` implementation of HTTP stream sinks.
 #[derive(Clone)]
 pub struct HttpRequest {
-    payload: Bytes,
-    finalizers: EventFinalizers,
-    request_metadata: RequestMetadata,
+    pub http_request: Request<Body>,
+    pub finalizers: EventFinalizers,
+    pub request_metadata: RequestMetadata,
 }
 
 impl HttpRequest {
     /// Creates a new `HttpRequest`.
     pub fn new(
-        payload: Bytes,
+        http_request: Request<Body>,
         finalizers: EventFinalizers,
         request_metadata: RequestMetadata,
     ) -> Self {
         Self {
-            payload,
+            http_request,
             finalizers,
             request_metadata,
         }
@@ -696,65 +696,56 @@ impl ItemBatchSize<Event> for HttpJsonBatchSizer {
     }
 }
 
-/// HTTP request builder for HTTP stream sinks using the generic `HttpService`
-pub trait HttpServiceRequestBuilder {
-    fn build(&self, body: Bytes) -> Request<Bytes>;
-}
-
-/// Generic 'Service' implementation for HTTP stream sinks.
+/// Generic service for sending HTTP requests.
 #[derive(Clone)]
-pub struct HttpService<B> {
-    batch_service:
-        HttpBatchService<BoxFuture<'static, Result<Request<Bytes>, crate::Error>>, HttpRequest>,
-    _phantom: PhantomData<B>,
+pub struct HttpService {
+    client: Decompression<HttpClient<Body>>,
 }
 
-impl<B> HttpService<B>
-where
-    B: HttpServiceRequestBuilder + std::marker::Sync + std::marker::Send + 'static,
-{
-    pub fn new(http_client: HttpClient<Body>, http_request_builder: B) -> Self {
-        let http_request_builder = Arc::new(http_request_builder);
+impl HttpService {
+    pub fn new(client: HttpClient<Body>) -> Self {
+        let client = ServiceBuilder::new()
+            .layer(DecompressionLayer::new())
+            .service(client);
 
-        let batch_service = HttpBatchService::new(http_client, move |req: HttpRequest| {
-            let request_builder = Arc::clone(&http_request_builder);
-
-            let fut: BoxFuture<'static, Result<http::Request<Bytes>, crate::Error>> =
-                Box::pin(async move { Ok(request_builder.build(req.payload)) });
-
-            fut
-        });
-        Self {
-            batch_service,
-            _phantom: PhantomData,
-        }
+        Self { client }
     }
 }
 
-impl<B> Service<HttpRequest> for HttpService<B>
-where
-    B: HttpServiceRequestBuilder + std::marker::Sync + std::marker::Send + 'static,
-{
+impl Service<HttpRequest> for HttpService {
     type Response = HttpResponse;
     type Error = crate::Error;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
-    fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Poll::Ready(Ok(()))
+    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.client.poll_ready(cx)
     }
 
     fn call(&mut self, mut request: HttpRequest) -> Self::Future {
-        let mut http_service = self.batch_service.clone();
-
         let raw_byte_size = request.payload.len();
 
-        // NOTE: By taking the metadata here, when passing the request to `call()` below,
-        //       that function does not have access to the metadata anymore.
         let metadata = std::mem::take(request.metadata_mut());
         let events_byte_size = metadata.into_events_estimated_json_encoded_byte_size();
 
+        let request = request.into_http_request();
+        let (protocol, endpoint) = uri::protocol_endpoint(request.uri().clone());
+
+        let fut = self.client.call(request);
+
         Box::pin(async move {
-            let http_response = http_service.call(request).await?;
+            let http_response = fut.await?;
+
+            if http_response.status().is_success() {
+                emit!(EndpointBytesSent {
+                    byte_size: raw_byte_size,
+                    protocol: &protocol,
+                    endpoint: &endpoint
+                });
+            }
+
+            let (parts, body) = http_response.into_parts();
+            let mut body = body::aggregate(body).await?;
+            let http_response = Response::from_parts(parts, body.copy_to_bytes(body.remaining()));
 
             Ok(HttpResponse {
                 http_response,
