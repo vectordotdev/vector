@@ -17,9 +17,8 @@ fn assert_roundtrip(
     serializer
         .encode(input_event.clone(), &mut bytes_mut)
         .unwrap();
-    let bytes = bytes_mut.freeze();
     let events = deserializer
-        .parse(bytes.clone(), LogNamespace::Vector)
+        .parse(bytes_mut.freeze(), LogNamespace::Vector)
         .unwrap();
     assert_eq!(events.len(), 1);
     assert_eq!(events[0], input_event);
