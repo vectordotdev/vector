@@ -821,7 +821,7 @@ jobs:
         run: |
            echo "### Workflow skipped" >> $GITHUB_STEP_SUMMARY
            echo "This workflow doesn't run on PR's automatically." >> $GITHUB_STEP_SUMMARY
-           echo "To trigger a run, leave a comment with `/ci-run-regression`" >> $GITHUB_STEP_SUMMARY
+           echo "To trigger a run, leave a comment with \`/ci-run-regression\`" >> $GITHUB_STEP_SUMMARY
 
       - name: exit
         run: |
