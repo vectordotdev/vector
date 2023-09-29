@@ -412,7 +412,7 @@ dependencies = [
  "async-lock",
  "async-task",
  "concurrent-queue 2.0.0",
- "fastrand 1.8.0",
+ "fastrand 1.9.0",
  "futures-lite",
  "slab",
 ]
@@ -997,7 +997,7 @@ dependencies = [
  "aws-types",
  "bytes 1.5.0",
  "bytes-utils",
- "fastrand 1.8.0",
+ "fastrand 1.9.0",
  "http",
  "http-body",
  "once_cell",
@@ -1183,7 +1183,7 @@ dependencies = [
  "aws-smithy-protocol-test",
  "aws-smithy-types",
  "bytes 1.5.0",
- "fastrand 1.8.0",
+ "fastrand 1.9.0",
  "http",
  "http-body",
  "hyper",
@@ -1458,13 +1458,13 @@ dependencies = [
 
 [[package]]
 name = "backon"
-version = "0.4.0"
+version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f34fac4d7cdaefa2deded0eda2d5d59dbfd43370ff3f856209e72340ae84c294"
+checksum = "0c1a6197b2120bb2185a267f6515038558b019e92b832bb0320e96d66268dcf9"
 dependencies = [
- "futures 0.3.28",
+ "fastrand 1.9.0",
+ "futures-core",
  "pin-project",
- "rand 0.8.5",
  "tokio",
 ]
 
@@ -1599,7 +1599,7 @@ dependencies = [
  "async-lock",
  "async-task",
  "atomic-waker",
- "fastrand 1.8.0",
+ "fastrand 1.9.0",
  "futures-lite",
 ]
 
@@ -3327,9 +3327,9 @@ checksum = "4443176a9f2c162692bd3d352d745ef9413eec5782a80d8fd6f8a1ac692a07f7"
 
 [[package]]
 name = "fastrand"
-version = "1.8.0"
+version = "1.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a7a407cfaa3385c4ae6b23e84623d48c2798d06e3e6a1878f7f59f17b3f86499"
+checksum = "e51093e27b0797c359783294ca4f0a911c270184cb10f85783b118614a1501be"
 dependencies = [
  "instant",
 ]
@@ -3568,7 +3568,7 @@ version = "1.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7694489acd39452c77daa48516b894c153f192c3578d5a839b62c58099fcbf48"
 dependencies = [
- "fastrand 1.8.0",
+ "fastrand 1.9.0",
  "futures-core",
  "futures-io",
  "memchr",
@@ -5826,9 +5826,9 @@ checksum = "624a8340c38c1b80fd549087862da4ba43e08858af025b236e509b6649fc13d5"
 
 [[package]]
 name = "opendal"
-version = "0.38.1"
+version = "0.40.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4df645b6012162c04c8949e9b96ae2ef002e79189cfb154e507e51ac5be76a09"
+checksum = "ddba7299bab261d3ae2f37617fb7f45b19ed872752bb4e22cf93a69d979366c5"
 dependencies = [
  "anyhow",
  "async-compat",
@@ -5847,7 +5847,7 @@ dependencies = [
  "parking_lot",
  "percent-encoding",
  "pin-project",
- "quick-xml 0.27.1",
+ "quick-xml 0.29.0",
  "reqwest",
  "serde",
  "serde_json",
@@ -6825,9 +6825,9 @@ checksum = "a1d01941d82fa2ab50be1e79e6714289dd7cde78eba4c074bc5a4374f650dfe0"
 
 [[package]]
 name = "quick-xml"
-version = "0.27.1"
+version = "0.29.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ffc053f057dd768a56f62cd7e434c42c831d296968997e9ac1f76ea7c2d14c41"
+checksum = "81b9228215d82c7b61490fec1de287136b5de6f5700f6e58ea9ad61a7964ca51"
 dependencies = [
  "memchr",
  "serde",
