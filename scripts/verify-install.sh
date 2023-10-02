@@ -10,18 +10,17 @@ set -euo pipefail
 package="${1:?must pass package as argument}"
 
 install_package () {
-  echo $1
   case "$1" in
     *.deb)
-        dpkg -i $1
+        dpkg -i "$1"
       ;;
     *.rpm)
-        rpm -i --replacepkgs $1
+        rpm -i --replacepkgs "$1"
       ;;
   esac
 }
 
-install_package $package
+install_package "$package"
 
 getent passwd vector || (echo "vector user missing" && exit 1)
 getent group vector || (echo "vector group  missing" && exit 1)
@@ -32,7 +31,7 @@ test -f /etc/vector/vector.yaml || (echo "/etc/vector/vector.yaml doesn't exist"
 echo "FOO=bar" > /etc/default/vector
 echo "foo: bar" > /etc/vector/vector.yaml
 
-install_package $package
+install_package "$package"
 
 getent passwd vector || (echo "vector user missing" && exit 1)
 getent group vector || (echo "vector group  missing" && exit 1)
