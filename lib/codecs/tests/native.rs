@@ -93,7 +93,6 @@ fn current_native_decoding_matches() {
     decoding_matches("");
 }
 
-#[ignore]
 #[test]
 fn pre_v24_native_decoding_matches() {
     decoding_matches("pre-v24");

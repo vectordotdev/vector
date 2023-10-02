@@ -1,1 +1,1 @@
-{"metric":{"name":"b","namespace":"a","timestamp":"1969-12-31T23:00:39.000003758Z","kind":"absolute","aggregated_summary":{"quantiles":[{"quantile":505472.0,"value":-589632.0},{"quantile":-336192.0,"value":560993.25},{"quantile":821120.0,"value":-405376.0},{"quantile":-659392.0,"value":78464.0}],"count":4788774180409257703,"sum":-380800.0}}}
+{"metric":{"name":"a","namespace":"n","tags":{"z":"r"},"kind":"absolute","counter":{"value":-194496.0}}}

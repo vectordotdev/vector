@@ -1,1 +1,1 @@
-{"metric":{"name":"f","kind":"incremental","counter":{"value":-738176.0}}}
+{"metric":{"name":"c","namespace":"_","interval_ms":524476118,"kind":"absolute","counter":{"value":769192.0}}}

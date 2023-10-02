@@ -1,1 +1,1 @@
-{"log":{"\u0014":"1970-01-01T06:36:47.000014467Z","23\u001e":false,"d)":-858368.0}}
+{"metric":{"name":"d","namespace":"a","interval_ms":2003880595,"kind":"absolute","gauge":{"value":550416.375}}}

@@ -25,7 +25,7 @@ directories need to be created.
 
 ```bash
     $ cd lib/vector-core
-    $ mkdir _json/ _proto/
+    $ mkdir _json/ proto/
     $ cargo test event::test::serialization::roundtrip
 ```
 

@@ -20,6 +20,9 @@ fn assert_roundtrip(
     let events = deserializer.parse(bytes, LogNamespace::Vector).unwrap();
     assert_eq!(events.len(), 1);
     assert_eq!(events[0], input_event);
+
+    let json_value = serde_json::to_value(input_event.as_metric()).unwrap();
+    assert_eq!(json_value, expected_json_value);
 }
 
 #[test]
@@ -33,6 +36,33 @@ fn histogram_metric_roundtrip() {
             buckets: buckets!(f64::NEG_INFINITY => 0 ,2.0 => 1, f64::INFINITY => 0),
         },
     ));
+
+    let expected_json_value = serde_json::from_str(
+        r#"
+        {
+            "aggregated_histogram":  {
+                "buckets": [
+                     {
+                        "count": 0,
+                        "upper_limit": -1.7976931348623157e308
+                    },
+                     {
+                        "count": 1,
+                        "upper_limit": 2.0
+                    },
+                     {
+                        "count": 0,
+                        "upper_limit": 1.7976931348623157e308
+                    }
+                ],
+                "count": 1,
+                "sum": 1.0
+            },
+            "kind": "absolute",
+            "name": "histogram"
+        }"#,
+    )
+    .unwrap();
 
     assert_roundtrip(
         histogram_event,
