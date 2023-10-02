@@ -16,7 +16,7 @@ window.addEventListener('load', function () {
         divB.style = "position:fixed; bottom:0px; right:0px; width:100%;";
         document.body.appendChild(divA);
         document.body.appendChild(divB);
-        
+
         // update Cookie link
         this.setTimeout(function () {
             const banner = document.getElementById('consent-banner');
@@ -25,7 +25,7 @@ window.addEventListener('load', function () {
             prefsElement.className = cookieLink.className;
 
             if (banner) {
-                // listen for click and remove banner to avoid interfering with 
+                // listen for click and remove banner to avoid interfering with
                 document.addEventListener('click', function (event) {
                     const targetElement = event.target;
                     if (targetElement.matches('#truste-consent-required') || targetElement.matches('#truste-consent-button')) {
