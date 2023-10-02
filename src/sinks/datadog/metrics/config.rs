@@ -42,12 +42,38 @@ impl SinkBatchSettings for DatadogMetricsDefaultBatchSettings {
     const TIMEOUT_SECS: f64 = 2.0;
 }
 
+const SERIES_V2_PATH: &str = "/api/v2/series";
+const SERIES_V1_PATH: &str = "/api/v1/series";
+const SKETCHES_PATH: &str = "/api/beta/sketches";
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[allow(dead_code)]
+pub enum SeriesApiVersion {
+    V1,
+    V2,
+}
+
+impl SeriesApiVersion {
+    pub fn get_path(&self) -> &'static str {
+        match self {
+            Self::V1 => SERIES_V1_PATH,
+            Self::V2 => SERIES_V2_PATH,
+        }
+    }
+}
+
+impl Default for SeriesApiVersion {
+    fn default() -> Self {
+        Self::V1
+    }
+}
+
 /// Various metric type-specific API types.
 ///
 /// Each of these corresponds to a specific request path when making a request to the agent API.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum DatadogMetricsEndpoint {
-    Series,
+    Series(SeriesApiVersion),
     Sketches,
 }
 
@@ -55,14 +81,19 @@ impl DatadogMetricsEndpoint {
     /// Gets the content type associated with the specific encoder for a given metric endpoint.
     pub const fn content_type(self) -> &'static str {
         match self {
-            DatadogMetricsEndpoint::Series => "application/json",
-            DatadogMetricsEndpoint::Sketches => "application/x-protobuf",
+            Self::Series(SeriesApiVersion::V1) => "application/json",
+            Self::Sketches | Self::Series(SeriesApiVersion::V2) => "application/x-protobuf",
         }
     }
 
     // Gets whether or not this is a series endpoint.
     pub const fn is_series(self) -> bool {
-        matches!(self, Self::Series)
+        matches!(self, Self::Series { .. })
+    }
+
+    // Creates an instance of the `Series` variant with the default API version.
+    pub fn series() -> Self {
+        Self::Series(SeriesApiVersion::default())
     }
 }
 
@@ -84,7 +115,7 @@ impl DatadogMetricsEndpointConfiguration {
     /// Gets the URI for the given Datadog metrics endpoint.
     pub fn get_uri_for_endpoint(&self, endpoint: DatadogMetricsEndpoint) -> Uri {
         match endpoint {
-            DatadogMetricsEndpoint::Series => self.series_endpoint.clone(),
+            DatadogMetricsEndpoint::Series { .. } => self.series_endpoint.clone(),
             DatadogMetricsEndpoint::Sketches => self.sketches_endpoint.clone(),
         }
     }
@@ -169,8 +200,8 @@ impl DatadogMetricsConfig {
         &self,
     ) -> crate::Result<DatadogMetricsEndpointConfiguration> {
         let base_uri = self.get_base_agent_endpoint();
-        let series_endpoint = build_uri(&base_uri, "/api/v1/series")?;
-        let sketches_endpoint = build_uri(&base_uri, "/api/beta/sketches")?;
+        let series_endpoint = build_uri(&base_uri, SeriesApiVersion::default().get_path())?;
+        let sketches_endpoint = build_uri(&base_uri, SKETCHES_PATH)?;
 
         Ok(DatadogMetricsEndpointConfiguration::new(
             series_endpoint,

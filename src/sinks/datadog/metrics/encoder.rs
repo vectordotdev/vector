@@ -19,7 +19,7 @@ use vector_core::{
 };
 
 use super::config::{
-    DatadogMetricsEndpoint, MAXIMUM_PAYLOAD_COMPRESSED_SIZE, MAXIMUM_PAYLOAD_SIZE,
+    DatadogMetricsEndpoint, SeriesApiVersion, MAXIMUM_PAYLOAD_COMPRESSED_SIZE, MAXIMUM_PAYLOAD_SIZE,
 };
 use crate::{
     common::datadog::{
@@ -229,8 +229,8 @@ impl DatadogMetricsEncoder {
             .add_event(&metric, metric.estimated_json_encoded_size_of());
 
         match self.endpoint {
-            // Series metrics are encoded via JSON, in an incremental fashion.
-            DatadogMetricsEndpoint::Series => {
+            // V1 Series metrics are encoded via JSON, in an incremental fashion.
+            DatadogMetricsEndpoint::Series(SeriesApiVersion::V1) => {
                 // A single `Metric` might generate multiple Datadog series metrics.
                 let all_series = generate_series_metrics(
                     &metric,
@@ -251,6 +251,9 @@ impl DatadogMetricsEncoder {
                     }
                     serde_json::to_writer(&mut self.state.buf, series)?;
                 }
+            }
+            DatadogMetricsEndpoint::Series(SeriesApiVersion::V2) => {
+                todo!()
             }
             // Sketches are encoded via ProtoBuf, also in an incremental fashion.
             DatadogMetricsEndpoint::Sketches => match metric.value() {
@@ -823,7 +826,7 @@ fn write_payload_header(
     writer: &mut dyn io::Write,
 ) -> io::Result<usize> {
     match endpoint {
-        DatadogMetricsEndpoint::Series => writer
+        DatadogMetricsEndpoint::Series(SeriesApiVersion::V1) => writer
             .write_all(SERIES_PAYLOAD_HEADER)
             .map(|_| SERIES_PAYLOAD_HEADER.len()),
         _ => Ok(0),
@@ -835,7 +838,7 @@ fn write_payload_delimiter(
     writer: &mut dyn io::Write,
 ) -> io::Result<usize> {
     match endpoint {
-        DatadogMetricsEndpoint::Series => writer
+        DatadogMetricsEndpoint::Series(SeriesApiVersion::V1) => writer
             .write_all(SERIES_PAYLOAD_DELIMITER)
             .map(|_| SERIES_PAYLOAD_DELIMITER.len()),
         _ => Ok(0),
@@ -847,7 +850,7 @@ fn write_payload_footer(
     writer: &mut dyn io::Write,
 ) -> io::Result<usize> {
     match endpoint {
-        DatadogMetricsEndpoint::Series => writer
+        DatadogMetricsEndpoint::Series(SeriesApiVersion::V1) => writer
             .write_all(SERIES_PAYLOAD_FOOTER)
             .map(|_| SERIES_PAYLOAD_FOOTER.len()),
         _ => Ok(0),
@@ -890,7 +893,7 @@ mod tests {
     use crate::{
         common::datadog::DatadogMetricType,
         sinks::datadog::metrics::{
-            config::DatadogMetricsEndpoint,
+            config::{DatadogMetricsEndpoint, SeriesApiVersion},
             encoder::{DEFAULT_DD_ORIGIN_PRODUCT_VALUE, ORIGIN_PRODUCT_VALUE},
         },
     };
@@ -923,10 +926,16 @@ mod tests {
     fn get_compressed_empty_series_payload() -> Bytes {
         let mut compressor = get_compressor();
 
-        _ = write_payload_header(DatadogMetricsEndpoint::Series, &mut compressor)
-            .expect("should not fail");
-        _ = write_payload_footer(DatadogMetricsEndpoint::Series, &mut compressor)
-            .expect("should not fail");
+        _ = write_payload_header(
+            DatadogMetricsEndpoint::Series(SeriesApiVersion::V1),
+            &mut compressor,
+        )
+        .expect("should not fail");
+        _ = write_payload_footer(
+            DatadogMetricsEndpoint::Series(SeriesApiVersion::V1),
+            &mut compressor,
+        )
+        .expect("should not fail");
 
         compressor.finish().expect("should not fail").freeze()
     }
@@ -1025,8 +1034,9 @@ mod tests {
 
         // And sketches can't go to the series endpoint.
         // Series metrics can't go to the sketches endpoint.
-        let mut series_encoder = DatadogMetricsEncoder::new(DatadogMetricsEndpoint::Series, None)
-            .expect("default payload size limits should be valid");
+        let mut series_encoder =
+            DatadogMetricsEncoder::new(DatadogMetricsEndpoint::Series(SeriesApiVersion::V1), None)
+                .expect("default payload size limits should be valid");
         let sketch_result = series_encoder.try_encode(get_simple_sketch());
         assert!(matches!(
             sketch_result.err(),
@@ -1128,8 +1138,9 @@ mod tests {
     fn encode_single_series_metric_with_default_limits() {
         // This is a simple test where we ensure that a single metric, with the default limits, can
         // be encoded without hitting any errors.
-        let mut encoder = DatadogMetricsEncoder::new(DatadogMetricsEndpoint::Series, None)
-            .expect("default payload size limits should be valid");
+        let mut encoder =
+            DatadogMetricsEncoder::new(DatadogMetricsEndpoint::Series(SeriesApiVersion::V1), None)
+                .expect("default payload size limits should be valid");
         let counter = get_simple_counter();
         let expected = counter.clone();
 
@@ -1238,13 +1249,16 @@ mod tests {
         let header_len = max_uncompressed_header_len();
 
         // This is too small.
-        let result =
-            validate_payload_size_limits(DatadogMetricsEndpoint::Series, header_len, usize::MAX);
+        let result = validate_payload_size_limits(
+            DatadogMetricsEndpoint::Series(SeriesApiVersion::V1),
+            header_len,
+            usize::MAX,
+        );
         assert_eq!(result, None);
 
         // This is just right.
         let result = validate_payload_size_limits(
-            DatadogMetricsEndpoint::Series,
+            DatadogMetricsEndpoint::Series(SeriesApiVersion::V1),
             header_len + 1,
             usize::MAX,
         );
@@ -1257,7 +1271,7 @@ mod tests {
 
         // This is too small.
         let result = validate_payload_size_limits(
-            DatadogMetricsEndpoint::Series,
+            DatadogMetricsEndpoint::Series(SeriesApiVersion::V1),
             usize::MAX,
             compression_overhead_len,
         );
@@ -1265,7 +1279,7 @@ mod tests {
 
         // This is just right.
         let result = validate_payload_size_limits(
-            DatadogMetricsEndpoint::Series,
+            DatadogMetricsEndpoint::Series(SeriesApiVersion::V1),
             usize::MAX,
             compression_overhead_len + 1,
         );
@@ -1307,7 +1321,7 @@ mod tests {
         // uncompressed payload would exceed the limit.
         let header_len = max_uncompressed_header_len();
         let mut encoder = DatadogMetricsEncoder::with_payload_limits(
-            DatadogMetricsEndpoint::Series,
+            DatadogMetricsEndpoint::Series(SeriesApiVersion::V1),
             None,
             header_len + 1,
             usize::MAX,
@@ -1383,7 +1397,7 @@ mod tests {
         let uncompressed_limit = 128;
         let compressed_limit = 32;
         let mut encoder = DatadogMetricsEncoder::with_payload_limits(
-            DatadogMetricsEndpoint::Series,
+            DatadogMetricsEndpoint::Series(SeriesApiVersion::V1),
             None,
             uncompressed_limit,
             compressed_limit,
@@ -1486,7 +1500,7 @@ mod tests {
             // We check this with targeted unit tests as well but this is some cheap insurance to
             // show that we're hopefully not missing any particular corner cases.
             let result = DatadogMetricsEncoder::with_payload_limits(
-                DatadogMetricsEndpoint::Series,
+                DatadogMetricsEndpoint::Series(SeriesApiVersion::V1),
                 None,
                 uncompressed_limit,
                 compressed_limit,

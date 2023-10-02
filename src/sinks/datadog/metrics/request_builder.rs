@@ -81,7 +81,7 @@ impl DatadogMetricsRequestBuilder {
         Ok(Self {
             endpoint_configuration,
             series_encoder: DatadogMetricsEncoder::new(
-                DatadogMetricsEndpoint::Series,
+                DatadogMetricsEndpoint::series(),
                 default_namespace.clone(),
             )?,
             sketches_encoder: DatadogMetricsEncoder::new(
@@ -93,7 +93,7 @@ impl DatadogMetricsRequestBuilder {
 
     fn get_encoder(&mut self, endpoint: DatadogMetricsEndpoint) -> &mut DatadogMetricsEncoder {
         match endpoint {
-            DatadogMetricsEndpoint::Series => &mut self.series_encoder,
+            DatadogMetricsEndpoint::Series { .. } => &mut self.series_encoder,
             DatadogMetricsEndpoint::Sketches => &mut self.sketches_encoder,
         }
     }
