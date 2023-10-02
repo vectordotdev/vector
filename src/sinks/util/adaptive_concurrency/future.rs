@@ -61,7 +61,7 @@ where
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let future = self.project();
 
-        let start = future.start.get_or_insert_with(|| instant_now());
+        let start = future.start.get_or_insert_with(instant_now);
         let output = ready!(future.inner.poll(cx)).map_err(Into::into);
         future.controller.adjust_to_response(*start, &output);
         Poll::Ready(output)
