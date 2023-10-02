@@ -87,8 +87,6 @@ main() {
         esac
     done
 
-    # Confirm with the user before proceeding to install Vector through a
-    # package manager. Otherwise, we install from an archive.
     if [ "$prompt" = "yes" ]; then
         echo "$_prompt We'll be installing Vector via a pre-built archive at https://packages.timber.io/vector/${VECTOR_VERSION}/"
         echo "$_prompt Ready to proceed? (y/n)"
