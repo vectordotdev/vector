@@ -840,6 +840,7 @@ posttrunc
 prebuild
 precpu
 preds
+prefs
 preinst
 preread
 prereqs
@@ -1074,6 +1075,7 @@ Takeaways
 targetgroup
 tarpit
 tcmalloc
+teconsent
 telecom
 templatable
 templateable
@@ -1133,6 +1135,8 @@ tripwires
 Trivago
 trivy
 Troutwine
+trustarc
+truste
 TRUSTSTORE
 TSDB
 Tsvg
@@ -1224,7 +1228,6 @@ wktpointer
 wmem
 woooooow
 woothee
-wor
 wordlist
 workdir
 workstreams

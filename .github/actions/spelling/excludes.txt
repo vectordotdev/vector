@@ -2,13 +2,13 @@
 (?:^|/)(?i)COPYRIGHT
 (?:^|/)(?i)LICEN[CS]E
 (?:^|/)3rdparty/
+(?:^|/)amplify\.yml$
 (?:^|/)go\.sum$
 (?:^|/)package(?:-lock|)\.json$
 (?:^|/)Pipfile$
 (?:^|/)pyproject.toml
 (?:^|/)requirements(?:-dev|-doc|-test|)\.txt$
 (?:^|/)vendor/
-(?:^|/)amplify\.yml$
 \.a$
 \.ai$
 \.all-contributorsrc$
@@ -77,6 +77,9 @@
 ^\Qbenches/transform/route.rs\E$
 ^\Qlib/codecs/tests/data/decoding/protobuf/test_protobuf.desc\E$
 ^\Qlib/codecs/tests/data/decoding/protobuf/test_protobuf3.desc\E$
+^\Qlib/codecs/tests/data/protobuf/test.desc\E$
+^\Qlib/codecs/tests/data/protobuf/test_protobuf.desc\E$
+^\Qlib/codecs/tests/data/protobuf/test_protobuf3.desc\E$
 ^\Qlib/dnsmsg-parser/benches/benches.rs\E$
 ^\Qlib/dnsmsg-parser/src/dns_message_parser.rs\E$
 ^\Qlib/lookup/tests/fixtures/lookup/quoted\E$
@@ -104,4 +107,3 @@
 ^\Qwebsite/layouts/shortcodes/config/unit-tests.html\E$
 ^lib/codecs/tests/data/native_encoding/
 ignore$
-
