@@ -22,6 +22,7 @@ window.addEventListener('load', function () {
             const banner = document.getElementById('consent-banner');
             const prefsElement = document.getElementById('teconsent');
             const cookieLink = document.querySelector('footer a[href*="/cookies"]');
+            prefsElement.className = cookieLink.className;
 
             if (banner) {
                 // listen for click and remove banner to avoid interfering with 
