@@ -11,19 +11,13 @@ use crate::{
     sinks::{
         prelude::*,
         util::{
-            http::{
-                http_response_retry_logic, GenericEventInputSplitter, HttpRequestBuilder,
-                HttpService, RequestBlueprint,
-            },
+            http::{http_response_retry_logic, HttpRequestBuilder, HttpService, RequestBlueprint},
             BatchConfig, BoxedRawValue,
         },
     },
 };
 
-use super::{
-    encoder::HoneycombEncoder, request_builder::HoneycombRequestBuilder,
-    service::HoneycombSvcRequestBuilder, sink::HoneycombSink,
-};
+use super::{encoder::HoneycombEncoder, sink::HoneycombSink};
 
 pub(super) const HTTP_HEADER_HONEYCOMB: &str = "X-Honeycomb-Team";
 
@@ -104,12 +98,11 @@ impl SinkConfig for HoneycombConfig {
         };
 
         let request_uri = self.build_uri()?;
-        let request_blueprint = RequestBlueprint::from_uri(request_uri)
+        let request_blueprint = RequestBlueprint::from_uri(request_uri.clone())
             .with_method(Method::POST)
-            .with_header(HTTP_HEADER_HONEYCOMB, &self.api_key)?;
-        let request_builder = HttpRequestBuilder::from_blueprint(request_blueprint)
-            .with_input_splitter(GenericEventInputSplitter::default())
-            .with_encoder(encoder);
+            .add_header(HTTP_HEADER_HONEYCOMB, self.api_key.inner())?;
+        let request_builder =
+            HttpRequestBuilder::from_blueprint(request_blueprint).with_encoder(encoder);
 
         let http_client = HttpClient::new(None, cx.proxy())?;
         let http_service = HttpService::new(http_client.clone());

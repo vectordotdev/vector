@@ -24,7 +24,7 @@ use vector_core::{
     stream::batcher::limiter::ItemBatchSize, ByteSizeOf, EstimatedJsonEncodedSizeOf,
 };
 
-use super::{
+use crate::sinks::util::{
     retries::{RetryAction, RetryLogic},
     sink::{self, Response as _},
     uri, Batch, EncodedEvent, Partition, TowerBatchedSink, TowerPartitionSink, TowerRequestConfig,
@@ -607,9 +607,8 @@ pub fn validate_headers(
 }
 
 /// Request type for use in the `Service` implementation of HTTP stream sinks.
-#[derive(Clone)]
 pub struct HttpRequest {
-    pub http_request: Request<Body>,
+    pub http_request: Request<Bytes>,
     pub finalizers: EventFinalizers,
     pub request_metadata: RequestMetadata,
 }
@@ -617,7 +616,7 @@ pub struct HttpRequest {
 impl HttpRequest {
     /// Creates a new `HttpRequest`.
     pub fn new(
-        http_request: Request<Body>,
+        http_request: Request<Bytes>,
         finalizers: EventFinalizers,
         request_metadata: RequestMetadata,
     ) -> Self {
@@ -625,6 +624,34 @@ impl HttpRequest {
             http_request,
             finalizers,
             request_metadata,
+        }
+    }
+
+    pub fn into_parts(self) -> (Request<Bytes>, EventFinalizers, RequestMetadata) {
+        (self.http_request, self.finalizers, self.request_metadata)
+    }
+}
+
+impl Clone for HttpRequest {
+    fn clone(&self) -> Self {
+        let mut request_builder = Request::builder()
+            .method(self.http_request.method().clone())
+            .uri(self.http_request.uri().clone())
+            .version(self.http_request.version());
+
+        let new_headers = request_builder
+            .headers_mut()
+            .expect("should always be present when building");
+        new_headers.extend(self.http_request.headers().clone());
+
+        let http_request = request_builder
+            .body(self.http_request.body().clone())
+            .expect("should not fail to build request built from parts of valid request");
+
+        Self {
+            http_request,
+            finalizers: self.finalizers.clone(),
+            request_metadata: self.request_metadata.clone(),
         }
     }
 }
@@ -647,7 +674,7 @@ impl MetaDescriptive for HttpRequest {
 
 impl ByteSizeOf for HttpRequest {
     fn allocated_bytes(&self) -> usize {
-        self.payload.allocated_bytes() + self.finalizers.allocated_bytes()
+        self.http_request.body().len() + self.finalizers.allocated_bytes()
     }
 }
 
@@ -718,17 +745,16 @@ impl Service<HttpRequest> for HttpService {
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.client.poll_ready(cx)
+        self.client.poll_ready(cx).map_err(|e| e.into())
     }
 
-    fn call(&mut self, mut request: HttpRequest) -> Self::Future {
-        let raw_byte_size = request.payload.len();
-
-        let metadata = std::mem::take(request.metadata_mut());
+    fn call(&mut self, request: HttpRequest) -> Self::Future {
+        let (request, _finalizers, metadata) = request.into_parts();
+        let request_bytes_sent = metadata.request_wire_size();
         let events_byte_size = metadata.into_events_estimated_json_encoded_byte_size();
 
-        let request = request.into_http_request();
         let (protocol, endpoint) = uri::protocol_endpoint(request.uri().clone());
+        let request = request.map(Body::from);
 
         let fut = self.client.call(request);
 
@@ -737,7 +763,7 @@ impl Service<HttpRequest> for HttpService {
 
             if http_response.status().is_success() {
                 emit!(EndpointBytesSent {
-                    byte_size: raw_byte_size,
+                    byte_size: request_bytes_sent,
                     protocol: &protocol,
                     endpoint: &endpoint
                 });
@@ -750,7 +776,7 @@ impl Service<HttpRequest> for HttpService {
             Ok(HttpResponse {
                 http_response,
                 events_byte_size,
-                raw_byte_size,
+                raw_byte_size: request_bytes_sent,
             })
         })
     }

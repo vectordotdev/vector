@@ -2,15 +2,15 @@
 
 use crate::sinks::{
     prelude::*,
-    util::http::{HttpJsonBatchSizer, HttpRequest},
+    util::http::{GenericEventInputSplitter, HttpJsonBatchSizer, HttpRequest, HttpRequestBuilder},
 };
 
-use super::request_builder::StackdriverLogsRequestBuilder;
+use super::encoder::StackdriverLogsEncoder;
 
 pub(super) struct StackdriverLogsSink<S> {
     service: S,
     batch_settings: BatcherSettings,
-    request_builder: StackdriverLogsRequestBuilder,
+    request_builder: HttpRequestBuilder<GenericEventInputSplitter, StackdriverLogsEncoder>,
 }
 
 impl<S> StackdriverLogsSink<S>
@@ -24,7 +24,7 @@ where
     pub(super) const fn new(
         service: S,
         batch_settings: BatcherSettings,
-        request_builder: StackdriverLogsRequestBuilder,
+        request_builder: HttpRequestBuilder<GenericEventInputSplitter, StackdriverLogsEncoder>,
     ) -> Self {
         Self {
             service,

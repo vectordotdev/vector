@@ -1,17 +1,21 @@
 use http::{HeaderMap, HeaderName, HeaderValue, Method, Request, Uri};
 
+use crate::http::Auth;
+
 pub struct RequestBlueprint {
     pub uri: Uri,
     pub method: Method,
     pub headers: HeaderMap,
+    pub auth: Option<Auth>,
 }
 
 impl RequestBlueprint {
     pub fn from_uri(uri: Uri) -> Self {
         Self {
             uri,
-            method: Method::Post,
+            method: Method::POST,
             headers: HeaderMap::new(),
+            auth: None,
         }
     }
 
@@ -20,21 +24,53 @@ impl RequestBlueprint {
         self
     }
 
-    pub fn with_headers(mut self, headers: HeaderMap) -> Self {
-        self.headers = headers;
-        self
+    pub fn add_headers<I, K, V>(mut self, headers: I) -> crate::Result<Self>
+    where
+        I: IntoIterator<Item = (K, V)>,
+        HeaderName: TryFrom<K>,
+        <HeaderName as TryFrom<K>>::Error: std::error::Error + Send + Sync + 'static,
+        HeaderValue: TryFrom<V>,
+        <HeaderValue as TryFrom<V>>::Error: std::error::Error + Send + Sync + 'static,
+    {
+        for (header_name, header_value) in headers.into_iter() {
+            self = self.add_header(header_name, header_value)?
+        }
+        Ok(self)
     }
 
-    pub fn with_header<K, V>(mut self, header_name: K, header_value: V) -> crate::Result<Self>
+    pub fn add_header<K, V>(mut self, header_name: K, header_value: V) -> crate::Result<Self>
     where
         HeaderName: TryFrom<K>,
-        <HeaderName as TryFrom<K>>::Error: Into<crate::Error>,
+        <HeaderName as TryFrom<K>>::Error: std::error::Error + Send + Sync + 'static,
         HeaderValue: TryFrom<V>,
-        <HeaderValue as TryFrom<V>>::Error: Into<crate::Error>,
+        <HeaderValue as TryFrom<V>>::Error: std::error::Error + Send + Sync + 'static,
     {
-        self.headers
-            .append(header_name.try_into()?, header_value.try_into()?);
+        let header_name: HeaderName = header_name.try_into()?;
+        self.headers.append(header_name, header_value.try_into()?);
         Ok(self)
+    }
+
+    pub fn add_header_maybe<K, V>(
+        self,
+        header_name: K,
+        maybe_header_value: Option<V>,
+    ) -> crate::Result<Self>
+    where
+        HeaderName: TryFrom<K>,
+        <HeaderName as TryFrom<K>>::Error: std::error::Error + Send + Sync + 'static,
+        HeaderValue: TryFrom<V>,
+        <HeaderValue as TryFrom<V>>::Error: std::error::Error + Send + Sync + 'static,
+    {
+        if let Some(header_value) = maybe_header_value {
+            self.add_header(header_name, header_value)
+        } else {
+            Ok(self)
+        }
+    }
+
+    pub fn add_auth_maybe(mut self, maybe_auth: Option<Auth>) -> Self {
+        self.auth = maybe_auth;
+        self
     }
 
     pub fn create_http_request<B>(&self, body: B) -> Request<B> {
@@ -50,10 +86,14 @@ impl RequestBlueprint {
             .uri(self.uri.clone())
             .method(self.method.clone());
 
-        let mut headers = builder
+        let headers = builder
             .headers_mut()
             .expect("request parts should be present");
         headers.extend(self.headers.clone());
+
+        if let Some(auth) = self.auth.as_ref() {
+            auth.apply_headers_map(headers);
+        }
 
         builder
             .body(body)

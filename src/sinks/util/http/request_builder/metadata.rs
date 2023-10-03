@@ -1,9 +1,5 @@
-use vector_common::{
-    byte_size_of::ByteSizeOf,
-    finalization::{EventFinalizers, Finalizable},
-    request_metadata::GetEventCountTags,
-};
-use vector_core::{event::Event, EstimatedJsonEncodedSizeOf};
+use vector_common::finalization::{EventFinalizers, Finalizable};
+use vector_core::event::Event;
 
 use crate::sinks::util::metadata::RequestMetadataBuilder;
 
@@ -50,29 +46,34 @@ pub trait InputSplitter<Input> {
 #[derive(Default)]
 pub struct GenericEventInputSplitter;
 
-impl<E> InputSplitter<E> for GenericEventInputSplitter
-where
-    E: ByteSizeOf + GetEventCountTags + EstimatedJsonEncodedSizeOf + Finalizable,
-{
+impl InputSplitter<Event> for GenericEventInputSplitter {
     type Metadata = ();
-    type Output = E;
+    type Output = Event;
 
-    fn split(mut input: E) -> (EventMetadata, RequestMetadataBuilder, Event) {
+    fn split(
+        mut input: Event,
+    ) -> (
+        EventMetadata<Self::Metadata>,
+        RequestMetadataBuilder,
+        Self::Output,
+    ) {
         let builder = RequestMetadataBuilder::from_event(&input);
         let finalizers = input.take_finalizers();
         (finalizers.into(), builder, input)
     }
 }
 
-impl<I, E> InputSplitter<I> for GenericEventInputSplitter
-where
-    I: AsRef<[E]> + Finalizable,
-    E: ByteSizeOf + GetEventCountTags + EstimatedJsonEncodedSizeOf,
-{
+impl InputSplitter<Vec<Event>> for GenericEventInputSplitter {
     type Metadata = ();
-    type Output = I;
+    type Output = Vec<Event>;
 
-    fn split(mut input: I) -> (EventMetadata, RequestMetadataBuilder, Event) {
+    fn split(
+        mut input: Vec<Event>,
+    ) -> (
+        EventMetadata<Self::Metadata>,
+        RequestMetadataBuilder,
+        Self::Output,
+    ) {
         let builder = RequestMetadataBuilder::from_events(input.as_ref());
         let finalizers = input.take_finalizers();
         (finalizers.into(), builder, input)

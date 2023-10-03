@@ -1,4 +1,4 @@
-use std::io;
+use std::{io, marker::PhantomData};
 
 use bytes::Bytes;
 use vector_common::request_metadata::RequestMetadata;
@@ -16,39 +16,39 @@ pub use self::metadata::*;
 
 use super::HttpRequest;
 
-pub struct HttpRequestBuilder<E = (), IS = ()> {
+pub struct HttpRequestBuilder<IS, E = ()> {
     blueprint: RequestBlueprint,
+    splitter: PhantomData<IS>,
     encoder: E,
-    splitter: IS,
     compression: Compression,
 }
 
-impl<E: Default, IS: Default> HttpRequestBuilder<E, IS> {
+impl HttpRequestBuilder<GenericEventInputSplitter> {
     pub fn from_blueprint(blueprint: RequestBlueprint) -> Self {
         Self {
             blueprint,
-            encoder: E::default(),
-            splitter: IS::default(),
+            splitter: PhantomData,
+            encoder: (),
             compression: Compression::None,
         }
     }
 }
 
-impl<E, IS> HttpRequestBuilder<E, IS> {
-    pub fn with_encoder<E2>(self, encoder: E2) -> HttpRequestBuilder<E2, IS> {
+impl<IS, E> HttpRequestBuilder<IS, E> {
+    pub fn with_encoder<E2>(self, encoder: E2) -> HttpRequestBuilder<IS, E2> {
         HttpRequestBuilder {
             blueprint: self.blueprint,
-            encoder,
             splitter: self.splitter,
+            encoder,
             compression: self.compression,
         }
     }
 
-    pub fn with_input_splitter<IS2>(self, splitter: IS2) -> HttpRequestBuilder<E, IS2> {
+    pub fn with_input_splitter<IS2>(self) -> HttpRequestBuilder<IS2, E> {
         HttpRequestBuilder {
             blueprint: self.blueprint,
+            splitter: PhantomData,
             encoder: self.encoder,
-            splitter,
             compression: self.compression,
         }
     }
@@ -57,14 +57,18 @@ impl<E, IS> HttpRequestBuilder<E, IS> {
         self.compression = compression;
         self
     }
+
+    pub fn encoder(&self) -> &E {
+        &self.encoder
+    }
 }
 
-impl<Input, E, IS> RequestBuilder<Input> for HttpRequestBuilder<E, IS>
+impl<Input, IS, E> RequestBuilder<Input> for HttpRequestBuilder<IS, E>
 where
-    E: Encoder<Input>,
     IS: InputSplitter<Input>,
+    E: Encoder<IS::Output>,
 {
-    type Metadata = IS::Metadata;
+    type Metadata = EventMetadata<IS::Metadata>;
     type Events = IS::Output;
     type Encoder = E;
     type Payload = Bytes;
@@ -91,14 +95,12 @@ where
     ) -> Self::Request {
         let (finalizers, _) = metadata.into_parts();
 
-        let http_request = self
-            .blueprint
-            .create_http_request(payload.into_payload().into());
+        let http_request = self.blueprint.create_http_request(payload.into_payload());
 
-        let mut request = HttpRequest {
+        HttpRequest {
             http_request,
             finalizers,
             request_metadata,
-        };
+        }
     }
 }
