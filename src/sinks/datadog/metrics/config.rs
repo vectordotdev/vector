@@ -42,9 +42,9 @@ impl SinkBatchSettings for DatadogMetricsDefaultBatchSettings {
     const TIMEOUT_SECS: f64 = 2.0;
 }
 
-const SERIES_V1_PATH: &str = "/api/v1/series";
-const SERIES_V2_PATH: &str = "/api/v2/series";
-const SKETCHES_PATH: &str = "/api/beta/sketches";
+pub(super) const SERIES_V1_PATH: &str = "/api/v1/series";
+pub(super) const SERIES_V2_PATH: &str = "/api/v2/series";
+pub(super) const SKETCHES_PATH: &str = "/api/beta/sketches";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[allow(dead_code)]
@@ -54,7 +54,7 @@ pub enum SeriesApiVersion {
 }
 
 impl SeriesApiVersion {
-    pub fn get_path(&self) -> &'static str {
+    pub const fn get_path(self) -> &'static str {
         match self {
             Self::V1 => SERIES_V1_PATH,
             Self::V2 => SERIES_V2_PATH,
@@ -64,7 +64,7 @@ impl SeriesApiVersion {
 
 impl Default for SeriesApiVersion {
     fn default() -> Self {
-        Self::V1
+        Self::V2
     }
 }
 

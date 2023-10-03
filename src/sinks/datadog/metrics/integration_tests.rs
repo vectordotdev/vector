@@ -2,15 +2,18 @@ use bytes::Bytes;
 use chrono::{SubsecRound, Utc};
 use flate2::read::ZlibDecoder;
 use futures::{channel::mpsc::Receiver, stream, StreamExt};
+use http::request::Parts;
 use hyper::StatusCode;
 use indoc::indoc;
+use prost::Message;
 use rand::{thread_rng, Rng};
+
 use vector_core::{
     config::{init_telemetry, Tags, Telemetry},
     event::{BatchNotifier, BatchStatus, Event, Metric, MetricKind, MetricValue},
+    metric_tags,
 };
 
-use super::DatadogMetricsConfig;
 use crate::{
     config::SinkConfig,
     sinks::util::test::{build_test_server_status, load_sink},
@@ -22,6 +25,17 @@ use crate::{
         map_event_batch_stream, next_addr,
     },
 };
+
+use super::{
+    config::{SERIES_V1_PATH, SERIES_V2_PATH},
+    encoder::{ORIGIN_CATEGORY_VALUE, ORIGIN_PRODUCT_VALUE},
+    DatadogMetricsConfig,
+};
+
+#[allow(warnings, clippy::pedantic, clippy::nursery)]
+mod ddmetric_proto {
+    include!(concat!(env!("OUT_DIR"), "/datadog.agentpayload.rs"));
+}
 
 fn generate_metric_events() -> Vec<Event> {
     let timestamp = Utc::now().trunc_subsecs(3);
@@ -36,8 +50,15 @@ fn generate_metric_events() -> Vec<Event> {
                         value: index as f64,
                     },
                 )
-                .with_timestamp(Some(ts)),
+                .with_timestamp(Some(ts))
+                .with_tags(Some(metric_tags!(
+                    "resource.device" => "a_device",
+                    "host" => "a_host",
+                    "source_type_name" => "a_name",
+                    "cool_tag_name" => "ikr",
+                ))),
             )
+            .with_source_type("a_source_like_none_other")
         })
         .collect();
 
@@ -104,16 +125,105 @@ async fn smoke() {
 
     assert!(output.len() == 1, "Should have received a response");
 
-    let val = output.first().unwrap();
+    let request = output.first().unwrap();
 
+    match request.0.uri.path() {
+        SERIES_V1_PATH => validate_json(request),
+        SERIES_V2_PATH => validate_protobuf(request),
+        _ => panic!("Unexpected request type received!"),
+    }
+}
+
+fn validate_common(request: &(Parts, Bytes)) {
+    assert_eq!(request.0.headers.get("DD-API-KEY").unwrap(), "atoken");
+    assert!(request.0.headers.contains_key("DD-Agent-Payload"));
+}
+
+fn validate_protobuf(request: &(Parts, Bytes)) {
     assert_eq!(
-        val.0.headers.get("Content-Type").unwrap(),
+        request.0.headers.get("Content-Type").unwrap(),
+        "application/x-protobuf"
+    );
+
+    validate_common(request);
+
+    let compressed_payload = request.1.to_vec();
+    let payload = decompress_payload(compressed_payload).expect("Could not decompress payload");
+    let frame = Bytes::copy_from_slice(&payload);
+
+    let payload =
+        ddmetric_proto::MetricPayload::decode(frame).expect("Could not decode protobuf frame");
+
+    let series = payload.series;
+
+    assert!(!series.is_empty());
+
+    // check metrics are sorted by name, which helps HTTP compression
+    let metric_names: Vec<String> = series.iter().map(|serie| serie.metric.clone()).collect();
+    let mut sorted_names = metric_names.clone();
+    sorted_names.sort();
+    assert_eq!(metric_names, sorted_names);
+
+    series.iter().for_each(|serie| {
+        // name
+        assert!(serie.metric.starts_with("foo.counter_"));
+
+        // type
+        assert_eq!(
+            serie.r#type(),
+            ddmetric_proto::metric_payload::MetricType::Count
+        );
+
+        // resources
+        serie
+            .resources
+            .iter()
+            .for_each(|resource| match resource.r#type.as_str() {
+                "host" => assert_eq!(resource.name.as_str(), "a_host"),
+                "device" => assert_eq!(resource.name.as_str(), "a_device"),
+                _ => panic!("Unexpected resource found!"),
+            });
+
+        // source_type_name
+        assert_eq!(serie.source_type_name, "a_name");
+
+        // tags
+        assert_eq!(serie.tags.len(), 1);
+        assert_eq!(serie.tags.first().unwrap(), "cool_tag_name:ikr");
+
+        // unit
+        assert!(serie.unit.is_empty());
+
+        // interval
+        assert_eq!(serie.interval, 0);
+
+        // metadata
+        let origin_metadata = serie.metadata.as_ref().unwrap().origin.as_ref().unwrap();
+        assert_eq!(origin_metadata.origin_product, *ORIGIN_PRODUCT_VALUE);
+        assert_eq!(origin_metadata.origin_category, ORIGIN_CATEGORY_VALUE);
+        assert_eq!(origin_metadata.origin_service, 0);
+    });
+
+    // points
+    // the input values are [0..10)
+    assert_eq!(
+        series
+            .iter()
+            .map(|serie| serie.points.iter().map(|point| point.value).sum::<f64>())
+            .sum::<f64>(),
+        45.0
+    );
+}
+
+fn validate_json(request: &(Parts, Bytes)) {
+    assert_eq!(
+        request.0.headers.get("Content-Type").unwrap(),
         "application/json"
     );
-    assert_eq!(val.0.headers.get("DD-API-KEY").unwrap(), "atoken");
-    assert!(val.0.headers.contains_key("DD-Agent-Payload"));
 
-    let compressed_payload = val.1.to_vec();
+    validate_common(request);
+
+    let compressed_payload = request.1.to_vec();
     let payload = decompress_payload(compressed_payload).unwrap();
     let payload = std::str::from_utf8(&payload).unwrap();
     let payload: serde_json::Value = serde_json::from_str(payload).unwrap();

@@ -33,11 +33,11 @@ const SERIES_PAYLOAD_HEADER: &[u8] = b"{\"series\":[";
 const SERIES_PAYLOAD_FOOTER: &[u8] = b"]}";
 const SERIES_PAYLOAD_DELIMITER: &[u8] = b",";
 
-const ORIGIN_CATEGORY_VALUE: u32 = 11;
+pub(super) const ORIGIN_CATEGORY_VALUE: u32 = 11;
 
 const DEFAULT_DD_ORIGIN_PRODUCT_VALUE: u32 = 14;
 
-static ORIGIN_PRODUCT_VALUE: Lazy<u32> = Lazy::new(|| {
+pub(super) static ORIGIN_PRODUCT_VALUE: Lazy<u32> = Lazy::new(|| {
     option_env!("DD_ORIGIN_PRODUCT")
         .map(|p| {
             p.parse::<u32>()
@@ -433,7 +433,7 @@ fn get_sketch_payload_sketches_field_number() -> u32 {
     })
 }
 
-fn generate_sketch_metadata(
+fn generate_proto_metadata(
     maybe_pass_through: Option<&DatadogMetricOriginMetadata>,
     maybe_source_type: Option<&'static str>,
     origin_product_value: u32,
@@ -488,7 +488,7 @@ fn sketch_to_proto_message(
     let n = counts.into_iter().map(Into::into).collect();
 
     let event_metadata = metric.metadata();
-    let metadata = generate_sketch_metadata(
+    let metadata = generate_proto_metadata(
         event_metadata.datadog_origin_metadata(),
         event_metadata.source_type(),
         origin_product_value,
@@ -596,7 +596,9 @@ fn series_to_proto_message(
         });
     }
 
-    if let Some(device) = tags.remove("device") {
+    // In the `datadog_agent` source, the tag is added as `device` for the V1 endoint
+    // and `resource.device` for the V2 endpoint.
+    if let Some(device) = tags.remove("device").or(tags.remove("resource.device")) {
         resources.push(ddmetric_proto::metric_payload::Resource {
             r#type: "device".to_string(),
             name: device,
@@ -608,7 +610,7 @@ fn series_to_proto_message(
     let tags = encode_tags(&tags);
 
     let event_metadata = metric.metadata();
-    let metadata = generate_sketch_metadata(
+    let metadata = generate_proto_metadata(
         event_metadata.datadog_origin_metadata(),
         event_metadata.source_type(),
         origin_product_value,
