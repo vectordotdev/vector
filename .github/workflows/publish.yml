@@ -316,14 +316,9 @@ jobs:
         with:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-gnu
           path: target/artifacts
-      - name: First install of DEB package.
+      - name: Verify install of DEB package.
         run: |
-          dpkg -i target/artifacts/vector_${{ env.VECTOR_VERSION }}-1_amd64.deb
-          ./scripts/verify-install.sh
-      - name: Second install of DEB package.
-        run: |
-          dpkg -i target/artifacts/vector_${{ env.VECTOR_VERSION }}-1_amd64.deb
-          ./scripts/verify-install.sh
+          ./scripts/verify-install.sh target/artifacts/vector_${{ env.VECTOR_VERSION }}-1_amd64.deb
 
   rpm-verify:
     name: Verify RPM Packages
@@ -372,14 +367,9 @@ jobs:
         with:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-gnu
           path: target/artifacts
-      - name: First install of RPM package.
+      - name: Verify install of RPM package.
         run: |
-          rpm -i --replacepkgs target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.x86_64.rpm
-          ./scripts/verify-install.sh
-      - name: Second install of RPM package.
-        run: |
-          rpm -i --replacepkgs target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.x86_64.rpm
-          ./scripts/verify-install.sh
+          ./scripts/verify-install.sh target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.x86_64.rpm
 
   macos-verify:
     name: Verify macOS Package
