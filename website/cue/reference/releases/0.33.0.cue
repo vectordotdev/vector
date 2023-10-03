@@ -25,7 +25,9 @@ releases: "0.33.0": {
 
 		"""
 
-	known_issues: []
+	known_issues: [
+		"The Debian package installer will overwrite existing `/etc/default/vector` and `/etc/vector/vector.yaml` files. This will be fixed in v0.33.1.",
+	]
 
 	changelog: [
 		{
