@@ -232,6 +232,7 @@ pub fn try_from(value: AvroValue) -> vector_common::Result<VrlValue> {
 mod tests {
     use apache_avro::Schema;
     use bytes::BytesMut;
+    use uuid::Uuid;
 
     use super::*;
 
@@ -317,6 +318,50 @@ mod tests {
         assert_eq!(
             events[0].as_log().get("message").unwrap(),
             &VrlValue::from("hello from avro")
+        );
+    }
+
+    #[test]
+    fn deserialize_avro_uuid() {
+        #[derive(Debug, Clone, Serialize, Deserialize)]
+        struct Log {
+            uuid: String,
+        }
+
+        let raw_schema = r#"
+            {
+                "type": "record",
+                "name": "log",
+                "fields": [
+                    {
+                        "name": "uuid",
+                        "type": "string",
+                        "logicalType":"uuid"
+                    }
+                ]
+            }
+        "#
+        .to_owned();
+        let schema = Schema::parse_str(&raw_schema).unwrap();
+
+        let uuid = Uuid::new_v4().hyphenated().to_string();
+        let event = Log { uuid: uuid.clone() };
+        let value = apache_avro::to_value(event).unwrap();
+        // let value = value.resolve(&schema).unwrap();
+        let datum = apache_avro::to_avro_datum(&schema, value).unwrap();
+
+        let mut bytes = BytesMut::new();
+        bytes.extend([0, 0, 0, 0, 0]); // 0 prefix + 4 byte schema id
+        bytes.extend(datum);
+
+        let deserializer = AvroDeserializer::new(schema, true);
+        let events = deserializer
+            .parse(bytes.freeze(), LogNamespace::Vector)
+            .unwrap();
+        assert_eq!(events.len(), 1);
+        assert_eq!(
+            events[0].as_log().get("uuid").unwrap(),
+            &VrlValue::from(uuid)
         );
     }
 }

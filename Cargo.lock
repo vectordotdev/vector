@@ -2166,6 +2166,7 @@ dependencies = [
  "tokio",
  "tokio-util",
  "tracing 0.1.37",
+ "uuid",
  "vector-common",
  "vector-config",
  "vector-config-common",

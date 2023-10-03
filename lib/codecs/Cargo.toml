@@ -40,6 +40,7 @@ tokio = { version = "1", features = ["test-util"] }
 similar-asserts = "1.5.0"
 vrl = { version = "0.7.0", features = ["cli", "test", "test_framework", "arbitrary"] }
 vector-core = { path = "../vector-core", default-features = false, features = ["test"] }
+uuid = { version = "1", default-features = false, features = ["serde", "v4"] }
 
 [features]
 syslog = ["dep:syslog_loose"]
