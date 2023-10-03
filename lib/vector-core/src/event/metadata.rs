@@ -1,12 +1,12 @@
 #![deny(missing_docs)]
 
-use std::{collections::BTreeMap, sync::Arc};
+use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 use vector_common::{config::ComponentKey, EventDataEq};
-use vrl::value::{Kind, Secrets, Value};
+use vrl::value::{KeyString, Kind, Secrets, Value};
 
-use super::{BatchNotifier, EventFinalizer, EventFinalizers, EventStatus};
+use super::{BatchNotifier, EventFinalizer, EventFinalizers, EventStatus, ObjectMap};
 use crate::{
     config::{LogNamespace, OutputId},
     schema, ByteSizeOf,
@@ -56,7 +56,7 @@ pub struct EventMetadata {
     /// we need to ensure it is still available later on for emitting metrics tagged by the service.
     /// This field could almost be keyed by `&'static str`, but because it needs to be deserializable
     /// we have to use `String`.
-    dropped_fields: BTreeMap<String, Value>,
+    dropped_fields: ObjectMap,
 
     /// Metadata to track the origin of metrics. This is always `None` for log and trace events.
     /// Only a small set of Vector sources and transforms explicitly set this field.
@@ -114,7 +114,7 @@ impl DatadogMetricOriginMetadata {
 }
 
 fn default_metadata_value() -> Value {
-    Value::Object(BTreeMap::new())
+    Value::Object(ObjectMap::new())
 }
 
 impl EventMetadata {
@@ -204,7 +204,7 @@ impl EventMetadata {
     /// There is currently no way to remove a field from this list, so if a field is dropped
     /// and then the field is re-added with a new value - the dropped value will still be
     /// retrieved.
-    pub fn add_dropped_field(&mut self, meaning: String, value: Value) {
+    pub fn add_dropped_field(&mut self, meaning: KeyString, value: Value) {
         self.dropped_fields.insert(meaning, value);
     }
 
@@ -222,14 +222,14 @@ impl EventMetadata {
 impl Default for EventMetadata {
     fn default() -> Self {
         Self {
-            value: Value::Object(BTreeMap::new()),
+            value: Value::Object(ObjectMap::new()),
             secrets: Secrets::new(),
             finalizers: Default::default(),
             schema_definition: default_schema_definition(),
             source_id: None,
             source_type: None,
             upstream_id: None,
-            dropped_fields: BTreeMap::new(),
+            dropped_fields: ObjectMap::new(),
             datadog_origin_metadata: None,
         }
     }

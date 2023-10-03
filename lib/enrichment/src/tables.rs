@@ -30,12 +30,12 @@
 //! can be searched.
 
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::HashMap,
     sync::{Arc, Mutex},
 };
 
 use arc_swap::ArcSwap;
-use vrl::value::Value;
+use vrl::value::ObjectMap;
 
 use super::{Condition, IndexHandle, Table};
 use crate::Case;
@@ -205,7 +205,7 @@ impl TableSearch {
         condition: &'a [Condition<'a>],
         select: Option<&[String]>,
         index: Option<IndexHandle>,
-    ) -> Result<BTreeMap<String, Value>, String> {
+    ) -> Result<ObjectMap, String> {
         let tables = self.0.load();
         if let Some(ref tables) = **tables {
             match tables.get(table) {
@@ -227,7 +227,7 @@ impl TableSearch {
         condition: &'a [Condition<'a>],
         select: Option<&[String]>,
         index: Option<IndexHandle>,
-    ) -> Result<Vec<BTreeMap<String, Value>>, String> {
+    ) -> Result<Vec<ObjectMap>, String> {
         let tables = self.0.load();
         if let Some(ref tables) = **tables {
             match tables.get(table) {
@@ -357,7 +357,7 @@ mod tests {
         registry.finish_load();
 
         assert_eq!(
-            Ok(BTreeMap::from([("field".into(), Value::from("result"))])),
+            Ok(ObjectMap::from([("field".into(), Value::from("result"))])),
             tables_search.find_table_row(
                 "dummy1",
                 Case::Sensitive,
@@ -410,8 +410,8 @@ mod tests {
         // After we finish load there are no tables in the list
         assert!(registry.table_ids().is_empty());
 
-        let mut new_data = BTreeMap::new();
-        new_data.insert("thing".to_string(), Value::Null);
+        let mut new_data = ObjectMap::new();
+        new_data.insert("thing".into(), Value::Null);
 
         let mut tables: TableMap = HashMap::new();
         tables.insert(

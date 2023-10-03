@@ -677,12 +677,12 @@ mod tests {
             let (topology, mut out) =
                 create_topology(ReceiverStream::new(rx), transform_config).await;
 
-            let mut map1: BTreeMap<String, Value> = BTreeMap::new();
+            let mut map1 = ObjectMap::new();
             map1.insert("key".into(), "123".into());
             let mut event1 = Event::Log(LogEvent::from("message"));
             event1.as_mut_log().insert("matched", map1);
 
-            let mut map2: BTreeMap<String, Value> = BTreeMap::new();
+            let mut map2 = ObjectMap::new();
             map2.insert("key".into(), 123.into());
             let mut event2 = Event::Log(LogEvent::from("message"));
             event2.as_mut_log().insert("matched", map2);

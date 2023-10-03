@@ -1,11 +1,11 @@
 use std::collections::BTreeMap;
 
-use crate::event::Value;
+use crate::event::{ObjectMap, Value};
 
 const SAMPLING_RATE_KEY: &str = "_sample_rate";
 
 /// This extracts the relative weights from the top level span (i.e. the span that does not have a parent).
-pub(crate) fn extract_weight_from_root_span(spans: &[&BTreeMap<String, Value>]) -> f64 {
+pub(crate) fn extract_weight_from_root_span(spans: &[&ObjectMap]) -> f64 {
     // Based on https://github.com/DataDog/datadog-agent/blob/cfa750c7412faa98e87a015f8ee670e5828bbe7f/pkg/trace/stats/weight.go#L17-L26.
 
     // TODO this logic likely has a bug(s) that need to be root caused. The root span is not reliably found and defaults to "1.0"

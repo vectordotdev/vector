@@ -1,18 +1,12 @@
 //! Handles enrichment tables for `type = file`.
-use std::{
-    collections::{BTreeMap, HashMap},
-    fs,
-    hash::Hasher,
-    path::PathBuf,
-    time::SystemTime,
-};
+use std::{collections::HashMap, fs, hash::Hasher, path::PathBuf, time::SystemTime};
 
 use bytes::Bytes;
 use enrichment::{Case, Condition, IndexHandle, Table};
 use tracing::trace;
 use vector_common::{conversion::Conversion, TimeZone};
 use vector_config::configurable_component;
-use vrl::value::Value;
+use vrl::value::{ObjectMap, Value};
 
 use crate::config::EnrichmentTableConfig;
 
@@ -311,7 +305,7 @@ impl File {
         })
     }
 
-    fn add_columns(&self, select: Option<&[String]>, row: &[Value]) -> BTreeMap<String, Value> {
+    fn add_columns(&self, select: Option<&[String]>, row: &[Value]) -> ObjectMap {
         self.headers
             .iter()
             .zip(row)
@@ -321,7 +315,7 @@ impl File {
                     // If no select is passed, we assume all columns are included
                     .unwrap_or(true)
             })
-            .map(|(header, col)| (header.clone(), col.clone()))
+            .map(|(header, col)| (header.as_str().into(), col.clone()))
             .collect()
     }
 
@@ -399,7 +393,7 @@ impl File {
         case: Case,
         condition: &'a [Condition<'a>],
         select: Option<&'a [String]>,
-    ) -> impl Iterator<Item = BTreeMap<String, Value>> + 'a
+    ) -> impl Iterator<Item = ObjectMap> + 'a
     where
         I: Iterator<Item = &'a Vec<Value>> + 'a,
     {
@@ -484,7 +478,7 @@ impl Table for File {
         condition: &'a [Condition<'a>],
         select: Option<&'a [String]>,
         index: Option<IndexHandle>,
-    ) -> Result<BTreeMap<String, Value>, String> {
+    ) -> Result<ObjectMap, String> {
         match index {
             None => {
                 // No index has been passed so we need to do a Sequential Scan.
@@ -509,7 +503,7 @@ impl Table for File {
         condition: &'a [Condition<'a>],
         select: Option<&'a [String]>,
         index: Option<IndexHandle>,
-    ) -> Result<Vec<BTreeMap<String, Value>>, String> {
+    ) -> Result<Vec<ObjectMap>, String> {
         match index {
             None => {
                 // No index has been passed so we need to do a Sequential Scan.
@@ -717,9 +711,9 @@ mod tests {
         };
 
         assert_eq!(
-            Ok(BTreeMap::from([
-                (String::from("field1"), Value::from("zirp")),
-                (String::from("field2"), Value::from("zurp")),
+            Ok(ObjectMap::from([
+                ("field1".into(), Value::from("zirp")),
+                ("field2".into(), Value::from("zurp")),
             ])),
             file.find_table_row(Case::Sensitive, &[condition], None, None)
         );
@@ -785,9 +779,9 @@ mod tests {
         };
 
         assert_eq!(
-            Ok(BTreeMap::from([
-                (String::from("field1"), Value::from("zirp")),
-                (String::from("field2"), Value::from("zurp")),
+            Ok(ObjectMap::from([
+                ("field1".into(), Value::from("zirp")),
+                ("field2".into(), Value::from("zurp")),
             ])),
             file.find_table_row(Case::Sensitive, &[condition], None, Some(handle))
         );
@@ -810,13 +804,13 @@ mod tests {
 
         assert_eq!(
             Ok(vec![
-                BTreeMap::from([
-                    (String::from("field1"), Value::from("zip")),
-                    (String::from("field2"), Value::from("zup")),
+                ObjectMap::from([
+                    ("field1".into(), Value::from("zip")),
+                    ("field2".into(), Value::from("zup")),
                 ]),
-                BTreeMap::from([
-                    (String::from("field1"), Value::from("zip")),
-                    (String::from("field2"), Value::from("zoop")),
+                ObjectMap::from([
+                    ("field1".into(), Value::from("zip")),
+                    ("field2".into(), Value::from("zoop")),
                 ]),
             ]),
             file.find_table_rows(

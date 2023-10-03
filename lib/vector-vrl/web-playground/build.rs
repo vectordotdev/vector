@@ -53,7 +53,7 @@ fn write_build_constants(manifest: &Manifest, dest_path: &Path) -> io::Result<()
         .unwrap()
         .version
         .clone()
-        .unwrap();
+        .unwrap_or_else(|| "FIXME".into());
     let vrl_version_const = create_const_statement("VRL_VERSION", vrl_version);
     output_file
         .write_all(vrl_version_const.as_bytes())

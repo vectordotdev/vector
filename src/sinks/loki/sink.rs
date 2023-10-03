@@ -654,7 +654,7 @@ mod tests {
         	}
         }
         "#;
-        let msg: BTreeMap<String, Value> = serde_json::from_str(message)?;
+        let msg: ObjectMap = serde_json::from_str(message)?;
         let event = Event::Log(LogEvent::from(msg));
         let record = encoder.encode_event(event).unwrap();
 
@@ -699,7 +699,7 @@ mod tests {
         	}
         }
         "#;
-        let msg: BTreeMap<String, Value> = serde_json::from_str(message)?;
+        let msg: ObjectMap = serde_json::from_str(message)?;
         let event = Event::Log(LogEvent::from(msg));
         let record = encoder.encode_event(event).unwrap();
 
@@ -727,7 +727,7 @@ mod tests {
             remove_timestamp: false,
         };
 
-        let msg: BTreeMap<String, Value> = serde_json::from_str("{}")?;
+        let msg: ObjectMap = serde_json::from_str("{}")?;
         let event = Event::Log(LogEvent::from(msg));
         let record = encoder.encode_event(event).unwrap();
 

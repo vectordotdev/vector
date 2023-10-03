@@ -3,7 +3,7 @@ use std::{collections::BTreeMap, convert::TryInto};
 use chrono::{serde::ts_seconds, DateTime, TimeZone, Utc};
 use ordered_float::NotNan;
 use serde::{Deserialize, Serialize};
-use vector_core::event::Value;
+use vector_core::event::{KeyString, ObjectMap, Value};
 
 /// Fluent msgpack messages can be encoded in one of three ways, each with and
 /// without options, all using arrays to encode the top-level fields.
@@ -184,18 +184,18 @@ impl From<FluentValue> for Value {
                         .into_iter()
                         .filter_map(|(key, value)| {
                             key.as_str()
-                                .map(|k| (k.to_owned(), Value::from(FluentValue(value))))
+                                .map(|k| (k.into(), Value::from(FluentValue(value))))
                         })
                         .collect(),
                 )
             }
             rmpv::Value::Ext(code, bytes) => {
-                let mut fields = BTreeMap::new();
+                let mut fields = ObjectMap::new();
                 fields.insert(
-                    String::from("msgpack_extension_code"),
+                    KeyString::from("msgpack_extension_code"),
                     Value::Integer(code.into()),
                 );
-                fields.insert(String::from("bytes"), Value::Bytes(bytes.into()));
+                fields.insert(KeyString::from("bytes"), Value::Bytes(bytes.into()));
                 Value::Object(fields)
             }
         }

@@ -20,7 +20,7 @@ use super::{
     sink::PartitionKey,
 };
 use crate::{
-    event::{Event, TraceEvent, Value},
+    event::{Event, KeyString, ObjectMap, TraceEvent, Value},
     sinks::util::{
         metadata::RequestMetadataBuilder, Compression, Compressor, IncrementalRequestBuilder,
     },
@@ -289,7 +289,7 @@ impl DatadogTracesEncoder {
             .map(|m| {
                 m.iter()
                     .map(|(k, v)| (k.clone(), v.to_string_lossy().into_owned()))
-                    .collect::<BTreeMap<String, String>>()
+                    .collect::<BTreeMap<KeyString, String>>()
             })
             .unwrap_or_default();
 
@@ -319,7 +319,7 @@ impl DatadogTracesEncoder {
                 .and_then(|v| v.as_boolean())
                 .unwrap_or(false),
             spans,
-            tags: tags.clone(),
+            tags: to_string_map(&tags),
         };
 
         dd_proto::TracerPayload {
@@ -344,7 +344,7 @@ impl DatadogTracesEncoder {
                 .map(|v| v.to_string_lossy().into_owned())
                 .unwrap_or_default(),
             chunks: vec![chunk],
-            tags,
+            tags: into_string_map(tags),
             env: trace
                 .get(event_path!("env"))
                 .map(|v| v.to_string_lossy().into_owned())
@@ -360,7 +360,7 @@ impl DatadogTracesEncoder {
         }
     }
 
-    fn convert_span(span: &BTreeMap<String, Value>) -> dd_proto::Span {
+    fn convert_span(span: &ObjectMap) -> dd_proto::Span {
         let trace_id = match span.get("trace_id") {
             Some(Value::Integer(val)) => *val,
             _ => 0,
@@ -394,7 +394,7 @@ impl DatadogTracesEncoder {
             .map(|m| {
                 m.iter()
                     .map(|(k, v)| (k.clone(), v.to_string_lossy().into_owned()))
-                    .collect::<BTreeMap<String, String>>()
+                    .collect::<BTreeMap<KeyString, String>>()
             })
             .unwrap_or_default();
 
@@ -404,7 +404,7 @@ impl DatadogTracesEncoder {
             .map(|m| {
                 m.iter()
                     .map(|(k, v)| (k.clone(), v.coerce_to_bytes().into_iter().collect()))
-                    .collect::<BTreeMap<String, Vec<u8>>>()
+                    .collect::<BTreeMap<KeyString, Vec<u8>>>()
             })
             .unwrap_or_default();
 
@@ -420,7 +420,7 @@ impl DatadogTracesEncoder {
                             None
                         }
                     })
-                    .collect::<BTreeMap<String, f64>>()
+                    .collect::<BTreeMap<KeyString, f64>>()
             })
             .unwrap_or_default();
 
@@ -447,9 +447,19 @@ impl DatadogTracesEncoder {
             error: error as i32,
             start,
             duration,
-            meta,
-            metrics,
-            meta_struct,
+            meta: into_string_map(meta),
+            metrics: into_string_map(metrics),
+            meta_struct: into_string_map(meta_struct),
         }
     }
+}
+
+fn to_string_map<V: Clone>(map: &BTreeMap<KeyString, V>) -> BTreeMap<String, V> {
+    map.iter()
+        .map(|(k, v)| (k.to_string(), v.clone()))
+        .collect()
+}
+
+fn into_string_map<V: Clone>(map: BTreeMap<KeyString, V>) -> BTreeMap<String, V> {
+    map.into_iter().map(|(k, v)| (k.into(), v)).collect()
 }

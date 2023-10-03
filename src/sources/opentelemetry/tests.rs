@@ -300,7 +300,7 @@ fn str_into_hex_bytes(s: &str) -> Vec<u8> {
     hex::decode(s).unwrap()
 }
 
-fn vec_into_btmap(arr: Vec<(&'static str, Value)>) -> BTreeMap<String, Value> {
+fn vec_into_btmap(arr: Vec<(&'static str, Value)>) -> ObjectMap {
     BTreeMap::from_iter(
         arr.into_iter()
             .map(|(k, v)| (k.to_string(), v))

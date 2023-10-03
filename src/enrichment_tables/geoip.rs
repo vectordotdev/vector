@@ -12,7 +12,7 @@ use maxminddb::{
     MaxMindDBError, Reader,
 };
 use vector_config::configurable_component;
-use vrl::value::Value;
+use vrl::value::{ObjectMap, Value};
 
 use crate::config::{EnrichmentTableConfig, GenerateConfig};
 
@@ -132,14 +132,14 @@ impl Geoip {
         }
     }
 
-    fn lookup(&self, ip: IpAddr, select: Option<&[String]>) -> Option<BTreeMap<String, Value>> {
-        let mut map = BTreeMap::new();
+    fn lookup(&self, ip: IpAddr, select: Option<&[String]>) -> Option<ObjectMap> {
+        let mut map = ObjectMap::new();
         let mut add_field = |key: &str, value: Option<Value>| {
             if select
                 .map(|fields| fields.iter().any(|field| field == key))
                 .unwrap_or(true)
             {
-                map.insert(key.to_string(), value.unwrap_or(Value::Null));
+                map.insert(key.into(), value.unwrap_or(Value::Null));
             }
         };
 
@@ -234,7 +234,7 @@ impl Table for Geoip {
         condition: &'a [Condition<'a>],
         select: Option<&[String]>,
         index: Option<IndexHandle>,
-    ) -> Result<BTreeMap<String, Value>, String> {
+    ) -> Result<ObjectMap, String> {
         let mut rows = self.find_table_rows(case, condition, select, index)?;
 
         match rows.pop() {
@@ -253,7 +253,7 @@ impl Table for Geoip {
         condition: &'a [Condition<'a>],
         select: Option<&[String]>,
         _: Option<IndexHandle>,
-    ) -> Result<Vec<BTreeMap<String, Value>>, String> {
+    ) -> Result<Vec<ObjectMap>, String> {
         match condition.get(0) {
             Some(_) if condition.len() > 1 => Err("Only one condition is allowed".to_string()),
             Some(Condition::Equals { value, .. }) => {
@@ -315,7 +315,7 @@ mod tests {
     fn city_lookup() {
         let values = find("2.125.160.216", "tests/data/GeoIP2-City-Test.mmdb").unwrap();
 
-        let mut expected = BTreeMap::<String, Value>::new();
+        let mut expected = ObjectMap::new();
         expected.insert("city_name".to_string(), "Boxford".into());
         expected.insert("country_code".to_string(), "GB".into());
         expected.insert("continent_code".to_string(), "EU".into());
@@ -340,7 +340,7 @@ mod tests {
         )
         .unwrap();
 
-        let mut expected = BTreeMap::<String, Value>::new();
+        let mut expected = ObjectMap::new();
         expected.insert("latitude".to_string(), Value::from(51.75));
         expected.insert("longitude".to_string(), Value::from(-1.25));
 
@@ -351,7 +351,7 @@ mod tests {
     fn city_lookup_partial_results() {
         let values = find("67.43.156.9", "tests/data/GeoIP2-City-Test.mmdb").unwrap();
 
-        let mut expected = BTreeMap::<String, Value>::new();
+        let mut expected = ObjectMap::new();
         expected.insert("city_name".to_string(), Value::Null);
         expected.insert("country_code".to_string(), "BT".into());
         expected.insert("country_name".to_string(), "Bhutan".into());
@@ -378,7 +378,7 @@ mod tests {
     fn isp_lookup() {
         let values = find("208.192.1.2", "tests/data/GeoIP2-ISP-Test.mmdb").unwrap();
 
-        let mut expected = BTreeMap::<String, Value>::new();
+        let mut expected = ObjectMap::new();
         expected.insert("autonomous_system_number".to_string(), 701i64.into());
         expected.insert(
             "autonomous_system_organization".to_string(),
@@ -394,7 +394,7 @@ mod tests {
     fn isp_lookup_partial_results() {
         let values = find("2600:7000::1", "tests/data/GeoLite2-ASN-Test.mmdb").unwrap();
 
-        let mut expected = BTreeMap::<String, Value>::new();
+        let mut expected = ObjectMap::new();
         expected.insert("autonomous_system_number".to_string(), 6939i64.into());
         expected.insert(
             "autonomous_system_organization".to_string(),
@@ -421,7 +421,7 @@ mod tests {
         )
         .unwrap();
 
-        let mut expected = BTreeMap::<String, Value>::new();
+        let mut expected = ObjectMap::new();
         expected.insert("connection_type".to_string(), "Corporate".into());
 
         assert_eq!(values, expected);
@@ -434,15 +434,11 @@ mod tests {
         assert!(values.is_none());
     }
 
-    fn find(ip: &str, database: &str) -> Option<BTreeMap<String, Value>> {
+    fn find(ip: &str, database: &str) -> Option<ObjectMap> {
         find_select(ip, database, None)
     }
 
-    fn find_select(
-        ip: &str,
-        database: &str,
-        select: Option<&[String]>,
-    ) -> Option<BTreeMap<String, Value>> {
+    fn find_select(ip: &str, database: &str, select: Option<&[String]>) -> Option<ObjectMap> {
         Geoip::new(GeoipConfig {
             path: database.to_string(),
             locale: default_locale(),

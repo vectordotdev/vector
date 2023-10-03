@@ -132,7 +132,7 @@ impl Function for FindEnrichmentTableRecords {
 #[derive(Debug, Clone)]
 pub struct FindEnrichmentTableRecordsFn {
     table: String,
-    condition: BTreeMap<String, expression::Expr>,
+    condition: BTreeMap<KeyString, expression::Expr>,
     index: Option<IndexHandle>,
     select: Option<Box<dyn Expression>>,
     case_sensitive: Case,
@@ -203,7 +203,7 @@ mod tests {
         };
 
         let tz = TimeZone::default();
-        let object: Value = BTreeMap::new().into();
+        let object: Value = ObjectMap::new().into();
         let mut target = TargetValue {
             value: object,
             metadata: value!({}),

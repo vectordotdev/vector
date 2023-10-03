@@ -1,8 +1,10 @@
+use std::collections::BTreeMap;
+
 use chrono::TimeZone;
 use ordered_float::NotNan;
 
 use crate::{
-    event::{self, BTreeMap, MetricTags, WithMetadata},
+    event::{self, MetricTags, ObjectMap, WithMetadata},
     metrics::AgentDDSketch,
 };
 
@@ -98,8 +100,8 @@ impl From<Log> for event::LogEvent {
             let fields = log
                 .fields
                 .into_iter()
-                .filter_map(|(k, v)| decode_value(v).map(|value| (k, value)))
-                .collect::<BTreeMap<_, _>>();
+                .filter_map(|(k, v)| decode_value(v).map(|value| (k.into(), value)))
+                .collect::<ObjectMap>();
 
             Self::from(fields)
         };
@@ -118,8 +120,8 @@ impl From<Trace> for event::TraceEvent {
         let fields = trace
             .fields
             .into_iter()
-            .filter_map(|(k, v)| decode_value(v).map(|value| (k, value)))
-            .collect::<BTreeMap<_, _>>();
+            .filter_map(|(k, v)| decode_value(v).map(|value| (k.into(), value)))
+            .collect::<ObjectMap>();
 
         let mut log = event::LogEvent::from(fields);
         if let Some(metadata_value) = trace.metadata {
@@ -305,8 +307,8 @@ impl From<event::LogEvent> for WithMetadata<Log> {
             Log {
                 fields: fields
                     .into_iter()
-                    .map(|(k, v)| (k, encode_value(v)))
-                    .collect::<BTreeMap<_, _>>(),
+                    .map(|(k, v)| (k.into(), encode_value(v)))
+                    .collect::<BTreeMap<String, Value>>(),
                 value: None,
                 metadata: Some(encode_value(metadata.value().clone())),
             }
@@ -331,7 +333,7 @@ impl From<event::TraceEvent> for WithMetadata<Trace> {
         let (fields, metadata) = trace.into_parts();
         let fields = fields
             .into_iter()
-            .map(|(k, v)| (k, encode_value(v)))
+            .map(|(k, v)| (k.into(), encode_value(v)))
             .collect::<BTreeMap<_, _>>();
 
         let data = Trace {
@@ -613,8 +615,8 @@ fn decode_value(input: Value) -> Option<event::Value> {
 fn decode_map(fields: BTreeMap<String, Value>) -> Option<event::Value> {
     fields
         .into_iter()
-        .map(|(key, value)| decode_value(value).map(|value| (key, value)))
-        .collect::<Option<BTreeMap<_, _>>>()
+        .map(|(key, value)| decode_value(value).map(|value| (key.into(), value)))
+        .collect::<Option<ObjectMap>>()
         .map(event::Value::Object)
 }
 
@@ -660,11 +662,11 @@ fn encode_value(value: event::Value) -> Value {
     }
 }
 
-fn encode_map(fields: BTreeMap<String, event::Value>) -> ValueMap {
+fn encode_map(fields: ObjectMap) -> ValueMap {
     ValueMap {
         fields: fields
             .into_iter()
-            .map(|(key, value)| (key, encode_value(value)))
+            .map(|(key, value)| (key.into(), encode_value(value)))
             .collect(),
     }
 }

@@ -56,8 +56,8 @@ async fn start_test(
     .await
 }
 
-fn simple_span(resource: String) -> BTreeMap<String, Value> {
-    BTreeMap::<String, Value>::from([
+fn simple_span(resource: String) -> ObjectMap {
+    ObjectMap::from([
         ("service".to_string(), Value::from("a_service")),
         ("name".to_string(), Value::from("a_name")),
         ("resource".to_string(), Value::from(resource)),
@@ -73,14 +73,14 @@ fn simple_span(resource: String) -> BTreeMap<String, Value> {
         ("error".to_string(), Value::Integer(404)),
         (
             "meta".to_string(),
-            Value::Object(BTreeMap::<String, Value>::from([
+            Value::Object(ObjectMap::from([
                 ("foo".to_string(), Value::from("bar")),
                 ("bar".to_string(), Value::from("baz")),
             ])),
         ),
         (
             "metrics".to_string(),
-            Value::Object(BTreeMap::<String, Value>::from([
+            Value::Object(ObjectMap::from([
                 (
                     "a_metric".to_string(),
                     Value::Float(NotNan::new(0.577).unwrap()),

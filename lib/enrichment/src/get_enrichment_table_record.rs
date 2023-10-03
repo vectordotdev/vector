@@ -124,7 +124,7 @@ impl Function for GetEnrichmentTableRecord {
 #[derive(Debug, Clone)]
 pub struct GetEnrichmentTableRecordFn {
     table: String,
-    condition: BTreeMap<String, expression::Expr>,
+    condition: BTreeMap<KeyString, expression::Expr>,
     index: Option<IndexHandle>,
     select: Option<Box<dyn Expression>>,
     case_sensitive: Case,

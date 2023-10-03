@@ -1,4 +1,3 @@
-use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use bytes::Bytes;
@@ -14,7 +13,7 @@ use vector_core::{
     event::Event,
     schema,
 };
-use vrl::value::Kind;
+use vrl::value::{Kind, ObjectMap};
 
 use crate::common::protobuf::get_message_descriptor;
 
@@ -171,11 +170,11 @@ fn to_vrl(
             }
         }
         prost_reflect::Value::Message(v) => {
-            let mut obj_map = BTreeMap::new();
+            let mut obj_map = ObjectMap::new();
             for field_desc in v.descriptor().fields() {
                 let field_value = v.get_field(&field_desc);
                 let out = to_vrl(field_value.as_ref(), Some(&field_desc))?;
-                obj_map.insert(field_desc.name().to_string(), out);
+                obj_map.insert(field_desc.name().into(), out);
             }
             vrl::value::Value::from(obj_map)
         }
@@ -206,11 +205,11 @@ fn to_vrl(
                                             field_descriptor
                                         )
                                     })?
-                                    .to_string(),
+                                    .into(),
                                 to_vrl(kv.1, Some(&message_desc.map_entry_value_field()))?,
                             ))
                         })
-                        .collect::<vector_common::Result<BTreeMap<String, _>>>()?,
+                        .collect::<vector_common::Result<ObjectMap>>()?,
                 )
             } else {
                 Err("Expected valid field descriptor")?

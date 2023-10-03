@@ -1,5 +1,5 @@
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::HashMap,
     io::Cursor,
     sync::{Arc, OnceLock},
     time::Duration,
@@ -29,7 +29,7 @@ use vector_core::{
     config::{LegacyKey, LogNamespace},
     EstimatedJsonEncodedSizeOf,
 };
-use vrl::value::{kind::Collection, Kind};
+use vrl::value::{kind::Collection, Kind, ObjectMap};
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
@@ -543,7 +543,7 @@ impl<'a> Keys<'a> {
 struct ReceivedMessage {
     timestamp: Option<DateTime<Utc>>,
     key: Value,
-    headers: BTreeMap<String, Value>,
+    headers: ObjectMap,
     topic: String,
     partition: i32,
     offset: i64,
@@ -562,12 +562,12 @@ impl ReceivedMessage {
             .map(|key| Value::from(Bytes::from(key.to_owned())))
             .unwrap_or(Value::Null);
 
-        let mut headers_map = BTreeMap::new();
+        let mut headers_map = ObjectMap::new();
         if let Some(headers) = msg.headers() {
             for header in headers.iter() {
                 if let Some(value) = header.value {
                     headers_map.insert(
-                        header.key.to_string(),
+                        header.key.into(),
                         Value::from(Bytes::from(value.to_owned())),
                     );
                 }
@@ -898,7 +898,7 @@ mod test {
 #[cfg(feature = "kafka-integration-tests")]
 #[cfg(test)]
 mod integration_test {
-    use std::time::Duration;
+    use std::{collections::BTreeMap, time::Duration};
 
     use chrono::{DateTime, SubsecRound, Utc};
     use futures::Stream;

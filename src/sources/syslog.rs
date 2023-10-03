@@ -1442,7 +1442,7 @@ mod test {
         }
     }
 
-    fn structured_data_from_fields(fields: BTreeMap<String, Value>) -> StructuredData {
+    fn structured_data_from_fields(fields: ObjectMap) -> StructuredData {
         let mut structured_data = StructuredData::default();
 
         for (key, value) in fields.into_iter() {

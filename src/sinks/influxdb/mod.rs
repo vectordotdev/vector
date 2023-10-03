@@ -11,7 +11,7 @@ use snafu::{ResultExt, Snafu};
 use tower::Service;
 use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
-use vector_core::event::MetricTags;
+use vector_core::event::{KeyString, MetricTags};
 
 use crate::http::HttpClient;
 
@@ -232,7 +232,7 @@ pub(in crate::sinks) fn influx_line_protocol(
     protocol_version: ProtocolVersion,
     measurement: &str,
     tags: Option<MetricTags>,
-    fields: Option<HashMap<String, Field>>,
+    fields: Option<HashMap<KeyString, Field>>,
     timestamp: i64,
     line_protocol: &mut BytesMut,
 ) -> Result<(), &'static str> {
@@ -284,7 +284,7 @@ fn encode_tags(tags: MetricTags, output: &mut BytesMut) {
 
 fn encode_fields(
     protocol_version: ProtocolVersion,
-    fields: HashMap<String, Field>,
+    fields: HashMap<KeyString, Field>,
     output: &mut BytesMut,
 ) {
     let original_len = output.len();

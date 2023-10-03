@@ -68,8 +68,8 @@ fn data_stream_body(
     dtype: Option<String>,
     dataset: Option<String>,
     namespace: Option<String>,
-) -> BTreeMap<String, Value> {
-    let mut ds = BTreeMap::<String, Value>::new();
+) -> ObjectMap {
+    let mut ds = ObjectMap::new();
 
     if let Some(dtype) = dtype {
         ds.insert("type".into(), Value::from(dtype));

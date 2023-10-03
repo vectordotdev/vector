@@ -598,7 +598,7 @@ mod test {
                 "one line".into()
             );
 
-            let tls_meta: BTreeMap<String, Value> = btreemap!(
+            let tls_meta: ObjectMap = btreemap!(
                 "subject" => "CN=localhost,OU=Vector,O=Datadog,L=New York,ST=New York,C=US"
             );
 
@@ -663,7 +663,7 @@ mod test {
 
             assert_eq!(log.value(), &"one line".into());
 
-            let tls_meta: BTreeMap<String, Value> = btreemap!(
+            let tls_meta: ObjectMap = btreemap!(
                 "subject" => "CN=localhost,OU=Vector,O=Datadog,L=New York,ST=New York,C=US"
             );
 
