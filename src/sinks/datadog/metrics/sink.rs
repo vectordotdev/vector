@@ -47,6 +47,7 @@ impl Partitioner for DatadogMetricsTypePartitioner {
             MetricValue::Set { .. } => DatadogMetricsEndpoint::series(),
             MetricValue::Distribution { .. } => DatadogMetricsEndpoint::Sketches,
             MetricValue::AggregatedHistogram { .. } => DatadogMetricsEndpoint::Sketches,
+            // NOTE: AggregatedSummary will be split into counters and gauges during normalization
             MetricValue::AggregatedSummary { .. } => DatadogMetricsEndpoint::series(),
             MetricValue::Sketch { .. } => DatadogMetricsEndpoint::Sketches,
         };

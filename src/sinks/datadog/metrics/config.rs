@@ -42,8 +42,8 @@ impl SinkBatchSettings for DatadogMetricsDefaultBatchSettings {
     const TIMEOUT_SECS: f64 = 2.0;
 }
 
-const SERIES_V2_PATH: &str = "/api/v2/series";
 const SERIES_V1_PATH: &str = "/api/v1/series";
+const SERIES_V2_PATH: &str = "/api/v2/series";
 const SKETCHES_PATH: &str = "/api/beta/sketches";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

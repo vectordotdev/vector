@@ -252,9 +252,30 @@ impl DatadogMetricsEncoder {
                     serde_json::to_writer(&mut self.state.buf, series)?;
                 }
             }
-            DatadogMetricsEndpoint::Series(SeriesApiVersion::V2) => {
-                todo!()
-            }
+            // V2 Series metrics are encoded via ProtoBuf, in an incremental fashion.
+            DatadogMetricsEndpoint::Series(SeriesApiVersion::V2) => match metric.value() {
+                MetricValue::Counter { .. }
+                | MetricValue::Gauge { .. }
+                | MetricValue::Set { .. }
+                | MetricValue::AggregatedSummary { .. } => {
+                    encode_series_v2_incremental(
+                        &metric,
+                        &self.default_namespace,
+                        self.log_schema,
+                        &mut self.state.buf,
+                        self.origin_product_value,
+                    )
+                    .map_err(|_| EncoderError::ProtoEncodingFailed)?;
+                }
+                MetricValue::Distribution { .. }
+                | MetricValue::AggregatedHistogram { .. }
+                | MetricValue::Sketch { .. } => {
+                    return Err(EncoderError::InvalidMetric {
+                        expected: "series",
+                        metric_value: metric.value().as_name(),
+                    })
+                }
+            },
             // Sketches are encoded via ProtoBuf, also in an incremental fashion.
             DatadogMetricsEndpoint::Sketches => match metric.value() {
                 MetricValue::Sketch { sketch } => match sketch {
@@ -539,6 +560,160 @@ where
     }
 }
 
+fn get_series_payload_series_field_number() -> u32 {
+    static SERIES_PAYLOAD_SERIES_FIELD_NUM: OnceLock<u32> = OnceLock::new();
+    *SERIES_PAYLOAD_SERIES_FIELD_NUM.get_or_init(|| {
+        let descriptors = protobuf_descriptors();
+        let descriptor = descriptors
+            .get_message_by_name("datadog.agentpayload.MetricPayload")
+            .expect("should not fail to find `MetricPayload` message in descriptor pool");
+
+        descriptor
+            .get_field_by_name("series")
+            .map(|field| field.number())
+            .expect("`series` field must exist in `MetricPayload` message")
+    })
+}
+
+fn series_to_proto_message(
+    metric: &Metric,
+    default_namespace: &Option<Arc<str>>,
+    log_schema: &'static LogSchema,
+    origin_product_value: u32,
+) -> Option<ddmetric_proto::metric_payload::MetricSeries> {
+    let metric_name = get_namespaced_name(metric, default_namespace);
+    let mut tags = metric.tags().cloned().unwrap_or_default();
+
+    let mut resources = vec![];
+
+    if let Some(host) = log_schema
+        .host_key()
+        .map(|key| tags.remove(key.to_string().as_str()).unwrap_or_default())
+    {
+        resources.push(ddmetric_proto::metric_payload::Resource {
+            r#type: "host".to_string(),
+            name: host,
+        });
+    }
+
+    if let Some(device) = tags.remove("device") {
+        resources.push(ddmetric_proto::metric_payload::Resource {
+            r#type: "device".to_string(),
+            name: device,
+        });
+    }
+
+    let source_type_name = tags.remove("source_type_name").unwrap_or_default();
+
+    let tags = encode_tags(&tags);
+
+    let event_metadata = metric.metadata();
+    let metadata = generate_sketch_metadata(
+        event_metadata.datadog_origin_metadata(),
+        event_metadata.source_type(),
+        origin_product_value,
+    );
+    trace!(?metadata, "Generated MetricSeries metadata.");
+
+    let timestamp = encode_timestamp(metric.timestamp());
+
+    let (points, metric_type, interval) = match (metric.value(), metric.interval_ms()) {
+        (MetricValue::Counter { value }, maybe_interval_ms) => {
+            let (value, interval, metric_type) = match maybe_interval_ms {
+                None => (*value, 0, ddmetric_proto::metric_payload::MetricType::Count),
+                // When an interval is defined, it implies the value should be in a per-second form,
+                // so we need to get back to seconds from our milliseconds-based interval, and then
+                // divide our value by that amount as well.
+                Some(interval_ms) => (
+                    (*value) * 1000.0 / (interval_ms.get() as f64),
+                    interval_ms.get() as i64 / 1000,
+                    ddmetric_proto::metric_payload::MetricType::Rate,
+                ),
+            };
+            let points = vec![ddmetric_proto::metric_payload::MetricPoint { value, timestamp }];
+            (points, metric_type, interval)
+        }
+        (MetricValue::Set { values }, _) => {
+            let points = vec![ddmetric_proto::metric_payload::MetricPoint {
+                value: values.len() as f64,
+                timestamp,
+            }];
+            let metric_type = ddmetric_proto::metric_payload::MetricType::Gauge;
+            let interval = 0;
+            (points, metric_type, interval)
+        }
+        (MetricValue::Gauge { value }, _) => {
+            let points = vec![ddmetric_proto::metric_payload::MetricPoint {
+                value: *value,
+                timestamp,
+            }];
+            let metric_type = ddmetric_proto::metric_payload::MetricType::Gauge;
+            let interval = 0;
+            (points, metric_type, interval)
+        }
+        // NOTE: AggregatedSummary will have been previously split into counters and gauges during normalization
+        (value, _) => {
+            // this case will have already been surfaced by encode_single_metric() so this should never be reached
+            let metric_type = value.as_name();
+            error!(?metric_type, "Invalid metric. Expected series.");
+            return None;
+        }
+    };
+
+    Some(ddmetric_proto::metric_payload::MetricSeries {
+        resources,
+        metric: metric_name,
+        tags,
+        points,
+        r#type: metric_type.into(),
+        // unit is omitted
+        unit: "".to_string(),
+        source_type_name,
+        interval,
+        metadata,
+    })
+}
+
+fn encode_series_v2_incremental<B>(
+    metric: &Metric,
+    default_namespace: &Option<Arc<str>>,
+    log_schema: &'static LogSchema,
+    buf: &mut B,
+    origin_product_value: u32,
+) -> Result<(), prost::EncodeError>
+where
+    B: BufMut,
+{
+    // This encodes a single sketch metric incrementally, which means that we specifically write it
+    // as if we were writing a single field entry in the overall `SketchPayload` message
+    // type.
+    //
+    // By doing so, we can encode multiple sketches and concatenate all the buffers, and have the
+    // resulting buffer appear as if it's a normal `SketchPayload` message with a bunch of repeats
+    // of the `sketches` field.
+    //
+    // Crucially, this code works because `SketchPayload` has two fields -- metadata and sketches --
+    // and we never actually set the metadata field... so the resulting message generated overall
+    // for `SketchPayload` with a single sketch looks just like as if we literally wrote out a
+    // single value for the given field.
+
+    if let Some(series_proto) =
+        series_to_proto_message(metric, default_namespace, log_schema, origin_product_value)
+    {
+        // Manually write the field tag for `sketches` and then encode the sketch payload directly as a
+        // length-delimited message.
+        prost::encoding::encode_key(
+            get_series_payload_series_field_number(),
+            prost::encoding::WireType::LengthDelimited,
+            buf,
+        );
+        series_proto.encode_length_delimited(buf)
+    } else {
+        // If the sketch was empty, that's fine too
+        Ok(())
+    }
+}
+
 fn get_namespaced_name(metric: &Metric, default_namespace: &Option<Arc<str>>) -> String {
     encode_namespace(
         metric
@@ -739,6 +914,7 @@ fn generate_series_metrics(
             device,
             metadata,
         }],
+        // NOTE: AggregatedSummary will have been previously split into counters and gauges during normalization
         (value, _) => {
             return Err(EncoderError::InvalidMetric {
                 expected: "series",
