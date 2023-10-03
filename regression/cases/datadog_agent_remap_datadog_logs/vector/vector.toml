@@ -4,9 +4,6 @@ data_dir = "/var/lib/vector"
 ## Sources
 ##
 
-[api]
-    enabled = true
-
 [sources.internal_metrics]
 type = "internal_metrics"
 
