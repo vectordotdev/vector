@@ -210,7 +210,7 @@ pub fn try_from(value: AvroValue) -> vector_common::Result<VrlValue> {
         AvroValue::TimestampMicros(micros) => Ok(VrlValue::Timestamp(
             Utc.timestamp_micros(micros)
                 .single()
-                .ok_or("failed to convert LocalTimestampMillis")?,
+                .ok_or("failed to convert TimestampMicros")?,
         )),
         AvroValue::TimestampMillis(millis) => Ok(VrlValue::Timestamp(
             Utc.timestamp_millis_opt(millis)
