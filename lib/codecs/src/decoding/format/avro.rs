@@ -123,6 +123,11 @@ impl Deserializer for AvroDeserializer {
         bytes: Bytes,
         log_namespace: LogNamespace,
     ) -> vector_common::Result<SmallVec<[Event; 1]>> {
+        // Avro has a `null` type which indicates no value.
+        if bytes.is_empty() {
+            return Ok(smallvec![]);
+        }
+
         let bytes = if self.strip_schema_id_prefix {
             if bytes.len() >= CONFLUENT_SCHEMA_PREFIX_LEN && bytes[0] == CONFLUENT_MAGIC_BYTE {
                 bytes.slice(CONFLUENT_SCHEMA_PREFIX_LEN..)
