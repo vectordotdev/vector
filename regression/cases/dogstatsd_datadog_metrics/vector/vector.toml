@@ -1,0 +1,31 @@
+data_dir = "/var/lib/vector"
+
+[api]
+    enabled = true
+##
+## Sources
+##
+
+[sources.internal_metrics]
+type = "internal_metrics"
+
+[sources.statsd]
+type = "statsd"
+address = "0.0.0.0:8088"
+mode = "tcp"
+
+##
+## Sinks
+##
+
+[sinks.prometheus]
+type = "prometheus_exporter"
+inputs = ["internal_metrics"]
+address = "0.0.0.0:9090"
+
+[sinks.datadog_metrics]
+type = "datadog_metrics"
+inputs = ["statsd"]
+default_api_key = "DEADBEEF"    
+endpoint = "http://localhost:8080"
+healthcheck.enabled = false

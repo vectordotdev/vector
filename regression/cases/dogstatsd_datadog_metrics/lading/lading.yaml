@@ -1,0 +1,32 @@
+generator:
+  - tcp:
+      seed: [2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53,
+             59, 61, 67, 71, 73, 79, 83, 89, 97, 101, 103, 107, 109, 113, 127, 131]
+      addr: "0.0.0.0:8088"
+      variant:
+        dogstatsd:
+          contexts_minimum: 1000
+          contexts_maximum: 8000
+          tags_per_msg_minimum: 50
+          tags_per_msg_maximum: 71
+          multivalue_pack_probability: 0
+          # multivalue_count_minimum: 2
+          # multivalue_count_maximum: 40
+          kind_weights:
+            metric: 100
+            event: 0
+            service_check: 0
+          metric_weights:
+            count: 100
+            gauge: 0
+            timer: 0
+            distribution: 0
+            set: 0
+            histogram: 0
+      bytes_per_second: "150 Mb"
+      block_sizes: ["1Kb", "2Kb", "3Kb"]
+      maximum_prebuild_cache_size_bytes: "50 Mb"
+
+blackhole:
+  - http:
+      binding_addr: "0.0.0.0:8080"
