@@ -2296,7 +2296,7 @@ dependencies = [
  "futures-core",
  "prost 0.12.1",
  "prost-types 0.12.1",
- "tonic 0.10.2",
+ "tonic 0.10.1",
  "tracing-core 0.1.30",
 ]
 
@@ -2318,7 +2318,7 @@ dependencies = [
  "thread_local",
  "tokio",
  "tokio-stream",
- "tonic 0.10.2",
+ "tonic 0.10.1",
  "tracing 0.1.37",
  "tracing-core 0.1.30",
  "tracing-subscriber",
