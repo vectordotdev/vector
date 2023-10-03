@@ -176,6 +176,12 @@ parent = "about"
 weight = 3
 
 [[languages.en.menus.footer]]
+name = "Cookies"
+url = "https://www.datadoghq.com/legal/cookies/"
+parent = "about"
+weight = 4
+
+[[languages.en.menus.footer]]
 name = "Components"
 url = "/components"
 identifier = "components"
