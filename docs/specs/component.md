@@ -84,6 +84,22 @@ representing multiple endpoints. If a component uses multiple options to
 automatically build the endpoint, then the `endpoint(s)` option MUST
 override that process.
 
+#### `listen`
+
+When a component listens for incoming connections, it SHOULD expose a `listen` configuration option that takes
+a `string` representing an address with `<protocol>:<address>`.
+
+Options for `protocol` are:
+
+- `unix+stream`, where `address` should be a file path
+- `unix+datagram`, where `address` should be a file path
+- `unix`, same as `unix+stream`
+- `tcp`, where `address` should be `<host>:<port>`
+- `udp`, where `address` should be `<host>:<port>`
+
+Components MAY have a default protocol. For example, a `statsd` component may default the protocol
+to `udp` and only require the `<host>:<port>` to bind to.
+
 ## Instrumentation
 
 **Extends the [Instrumentation Specification].**
