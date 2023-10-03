@@ -1,4 +1,5 @@
 use bytes::Bytes;
+use chrono::{SubsecRound, Utc};
 use flate2::read::ZlibDecoder;
 use futures::{channel::mpsc::Receiver, stream, StreamExt};
 use hyper::StatusCode;
@@ -22,28 +23,25 @@ use crate::{
     },
 };
 
-enum ApiStatus {
-    OK,
-    // Forbidden,
-}
+fn generate_metric_events() -> Vec<Event> {
+    let timestamp = Utc::now().trunc_subsecs(3);
+    let events: Vec<_> = (0..10)
+        .map(|index| {
+            let ts = timestamp + (std::time::Duration::from_secs(2) * index);
+            Event::Metric(
+                Metric::new(
+                    format!("counter_{}", thread_rng().gen::<u32>()),
+                    MetricKind::Incremental,
+                    MetricValue::Counter {
+                        value: index as f64,
+                    },
+                )
+                .with_timestamp(Some(ts)),
+            )
+        })
+        .collect();
 
-fn test_server(
-    addr: std::net::SocketAddr,
-    api_status: ApiStatus,
-) -> (
-    futures::channel::mpsc::Receiver<(http::request::Parts, Bytes)>,
-    stream_cancel::Trigger,
-    impl std::future::Future<Output = Result<(), ()>>,
-) {
-    let status = match api_status {
-        ApiStatus::OK => StatusCode::OK,
-        // ApiStatus::Forbidden => StatusCode::FORBIDDEN,
-    };
-
-    // NOTE: we pass `Trigger` out to the caller even though this suite never
-    // uses it as it's being dropped cancels the stream machinery here,
-    // indicating failures that might not be valid.
-    build_test_server_status(addr, status)
+    events
 }
 
 /// Starts a test sink with random metrics running into it
@@ -55,10 +53,7 @@ fn test_server(
 /// Testers may set `http_status` and `batch_status`. The first controls what
 /// status code faked HTTP responses will have, the second acts as a check on
 /// the `Receiver`'s status before being returned to the caller.
-async fn start_test(
-    api_status: ApiStatus,
-    batch_status: BatchStatus,
-) -> (Vec<Event>, Receiver<(http::request::Parts, Bytes)>) {
+async fn start_test() -> (Vec<Event>, Receiver<(http::request::Parts, Bytes)>) {
     let config = indoc! {r#"
         default_api_key = "atoken"
         default_namespace = "foo"
@@ -73,25 +68,18 @@ async fn start_test(
 
     let (sink, _) = config.build(cx).await.unwrap();
 
-    let (rx, _trigger, server) = test_server(addr, api_status);
+    let (rx, _trigger, server) = build_test_server_status(addr, StatusCode::OK);
     tokio::spawn(server);
 
-    let (batch, receiver) = BatchNotifier::new_with_receiver();
-    let events: Vec<_> = (0..10)
-        .map(|index| {
-            Event::Metric(Metric::new(
-                format!("counter_{}", thread_rng().gen::<u32>()),
-                MetricKind::Absolute,
-                MetricValue::Counter {
-                    value: index as f64,
-                },
-            ))
-        })
-        .collect();
+    let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+
+    let events = generate_metric_events();
+
     let stream = map_event_batch_stream(stream::iter(events.clone()), Some(batch));
 
     sink.run(stream).await.unwrap();
-    assert_eq!(receiver.await, batch_status);
+
+    assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
     (events, rx)
 }
@@ -110,11 +98,13 @@ fn decompress_payload(payload: Vec<u8>) -> std::io::Result<Vec<u8>> {
 /// were delivered and then asserts that every message is able to be
 /// deserialized.
 async fn smoke() {
-    let (expected, rx) = start_test(ApiStatus::OK, BatchStatus::Delivered).await;
+    let (expected, rx) = start_test().await;
 
     let output = rx.take(expected.len()).collect::<Vec<_>>().await;
 
-    for val in output.iter() {
+    assert!(output.len() == 1);
+
+    output.first().map(|val| {
         assert_eq!(
             val.0.headers.get("Content-Type").unwrap(),
             "application/json"
@@ -155,10 +145,12 @@ async fn smoke() {
         assert_eq!(metric_names, sorted_names);
 
         let entry = series.first().unwrap().as_object().unwrap();
-        assert_eq!(
-            entry.get("metric").unwrap().as_str().unwrap(),
-            "foo.counter"
-        );
+        assert!(entry
+            .get("metric")
+            .unwrap()
+            .as_str()
+            .unwrap()
+            .starts_with("foo.counter_"),);
         assert_eq!(entry.get("type").unwrap().as_str().unwrap(), "count");
         let points = entry
             .get("points")
@@ -170,8 +162,32 @@ async fn smoke() {
             .as_array()
             .unwrap();
         assert_eq!(points.len(), 2);
-        assert_eq!(points.get(1).unwrap().as_f64().unwrap(), 1.0);
-    }
+
+        // validate that all values were received
+        let all_values: f64 = series
+            .iter()
+            .map(|entry| {
+                entry
+                    .as_object()
+                    .unwrap()
+                    .get("points")
+                    .unwrap()
+                    .as_array()
+                    .unwrap()
+                    .first()
+                    .unwrap()
+                    .as_array()
+                    .unwrap()
+                    .get(1)
+                    .unwrap()
+                    .as_f64()
+                    .unwrap()
+            })
+            .sum();
+
+        // the input values are [0..10)
+        assert_eq!(all_values, 45.0);
+    });
 }
 
 async fn run_sink() {
@@ -186,17 +202,9 @@ async fn run_sink() {
 
     let (sink, _) = config.build(cx).await.unwrap();
     let (batch, receiver) = BatchNotifier::new_with_receiver();
-    let events: Vec<_> = (0..10)
-        .map(|index| {
-            Event::Metric(Metric::new(
-                "counter",
-                MetricKind::Absolute,
-                MetricValue::Counter {
-                    value: index as f64,
-                },
-            ))
-        })
-        .collect();
+
+    let events = generate_metric_events();
+
     let stream = map_event_batch_stream(stream::iter(events.clone()), Some(batch));
 
     sink.run(stream).await.unwrap();
