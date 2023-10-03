@@ -615,7 +615,7 @@ pub struct HttpRequest {
 
 impl HttpRequest {
     /// Creates a new `HttpRequest`.
-    pub fn new(
+    pub const fn new(
         http_request: Request<Bytes>,
         finalizers: EventFinalizers,
         request_metadata: RequestMetadata,

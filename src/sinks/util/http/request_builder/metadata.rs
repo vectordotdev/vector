@@ -9,7 +9,7 @@ pub struct EventMetadata<M = ()> {
 }
 
 impl<M> EventMetadata<M> {
-    pub fn from_metadata(finalizers: EventFinalizers, metadata: M) -> Self {
+    pub const fn from_metadata(finalizers: EventFinalizers, metadata: M) -> Self {
         Self {
             finalizers,
             metadata,

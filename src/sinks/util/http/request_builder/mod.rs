@@ -24,7 +24,7 @@ pub struct HttpRequestBuilder<IS, E = ()> {
 }
 
 impl HttpRequestBuilder<GenericEventInputSplitter> {
-    pub fn from_blueprint(blueprint: RequestBlueprint) -> Self {
+    pub const fn from_blueprint(blueprint: RequestBlueprint) -> Self {
         Self {
             blueprint,
             splitter: PhantomData,
@@ -53,12 +53,12 @@ impl<IS, E> HttpRequestBuilder<IS, E> {
         }
     }
 
-    pub fn with_compression(mut self, compression: Compression) -> Self {
+    pub const fn with_compression(mut self, compression: Compression) -> Self {
         self.compression = compression;
         self
     }
 
-    pub fn encoder(&self) -> &E {
+    pub const fn encoder(&self) -> &E {
         &self.encoder
     }
 }
