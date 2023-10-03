@@ -1470,11 +1470,12 @@ mod tests {
                     default_file_key()
                         .path
                         .expect("file key to exist")
-                        .to_string(),
-                    log_schema().host_key().unwrap().to_string(),
-                    log_schema().message_key().unwrap().to_string(),
-                    log_schema().timestamp_key().unwrap().to_string(),
-                    log_schema().source_type_key().unwrap().to_string()
+                        .to_string()
+                        .into(),
+                    log_schema().host_key().unwrap().to_string().into(),
+                    log_schema().message_key().unwrap().to_string().into(),
+                    log_schema().timestamp_key().unwrap().to_string().into(),
+                    log_schema().source_type_key().unwrap().to_string().into()
                 ]
                 .into_iter()
                 .collect::<HashSet<_>>()

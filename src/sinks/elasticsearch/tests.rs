@@ -1,10 +1,10 @@
-use std::{collections::BTreeMap, convert::TryFrom};
+use std::convert::TryFrom;
 
 use vector_lib::lookup::PathPrefix;
 
 use crate::{
     codecs::Transformer,
-    event::{LogEvent, Metric, MetricKind, MetricValue, Value},
+    event::{LogEvent, Metric, MetricKind, MetricValue, ObjectMap, Value},
     sinks::{
         elasticsearch::{
             sink::process_log, BulkAction, BulkConfig, DataStreamConfig, ElasticsearchApiVersion,
@@ -67,8 +67,8 @@ fn data_stream_body(
     dtype: Option<String>,
     dataset: Option<String>,
     namespace: Option<String>,
-) -> BTreeMap<String, Value> {
-    let mut ds = BTreeMap::<String, Value>::new();
+) -> ObjectMap {
+    let mut ds = ObjectMap::new();
 
     if let Some(dtype) = dtype {
         ds.insert("type".into(), Value::from(dtype));

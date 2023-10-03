@@ -8,9 +8,7 @@ use snafu::Snafu;
 use tokio_util::codec::Encoder;
 use vector_core::{
     config::{log_schema, DataType},
-    event::Event,
-    event::LogEvent,
-    event::Value,
+    event::{Event, KeyString, LogEvent, Value},
     schema,
 };
 
@@ -26,7 +24,7 @@ use vector_core::{
 #[derive(Debug, Snafu)]
 pub enum GelfSerializerError {
     #[snafu(display(r#"LogEvent does not contain required field: "{}""#, field))]
-    MissingField { field: String },
+    MissingField { field: KeyString },
     #[snafu(display(
         r#"LogEvent contains a value with an invalid type. field = "{}" type = "{}" expected type = "{}""#,
         field,
@@ -158,7 +156,7 @@ fn coerce_field_names_and_values(
     let mut missing_prefix = vec![];
     if let Some(event_data) = log.as_map_mut() {
         for (field, value) in event_data.iter_mut() {
-            match field.as_str() {
+            match &field[..] {
                 VERSION | HOST | SHORT_MESSAGE | FULL_MESSAGE | FACILITY | FILE => {
                     if !value.is_bytes() {
                         err_invalid_type(field, "UTF-8 string", value.kind_str())?;
@@ -194,9 +192,11 @@ fn coerce_field_names_and_values(
                 _ => {
                     // additional fields must be only word chars, dashes and periods.
                     if !VALID_FIELD_REGEX.is_match(field) {
-                        return MissingFieldSnafu { field }
-                            .fail()
-                            .map_err(|e| e.to_string().into());
+                        return MissingFieldSnafu {
+                            field: field.clone(),
+                        }
+                        .fail()
+                        .map_err(|e| e.to_string().into());
                     }
 
                     // additional field values must be only strings or numbers
@@ -238,20 +238,15 @@ fn to_gelf_event(log: LogEvent) -> vector_common::Result<LogEvent> {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeMap;
-
     use crate::encoding::SerializerConfig;
 
     use super::*;
     use chrono::NaiveDateTime;
     use vector_core::event::{Event, EventMetadata};
     use vrl::btreemap;
-    use vrl::value::Value;
+    use vrl::value::{ObjectMap, Value};
 
-    fn do_serialize(
-        expect_success: bool,
-        event_fields: BTreeMap<String, Value>,
-    ) -> Option<serde_json::Value> {
+    fn do_serialize(expect_success: bool, event_fields: ObjectMap) -> Option<serde_json::Value> {
         let config = GelfSerializerConfig::new();
         let mut serializer = config.build();
         let event: Event = LogEvent::from_map(event_fields, EventMetadata::default()).into();

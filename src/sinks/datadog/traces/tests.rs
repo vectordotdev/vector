@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, sync::Arc};
+use std::sync::Arc;
 
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
@@ -15,7 +15,7 @@ use super::{apm_stats::StatsPayload, dd_proto, ddsketch_full, DatadogTracesConfi
 
 use crate::{
     config::SinkConfig,
-    event::{TraceEvent, Value},
+    event::{ObjectMap, TraceEvent, Value},
     sinks::util::test::{build_test_server_status, load_sink},
     test_util::{
         components::{assert_sink_compliance, SINK_TAGS},
@@ -56,39 +56,33 @@ async fn start_test(
     .await
 }
 
-fn simple_span(resource: String) -> BTreeMap<String, Value> {
-    BTreeMap::<String, Value>::from([
-        ("service".to_string(), Value::from("a_service")),
-        ("name".to_string(), Value::from("a_name")),
-        ("resource".to_string(), Value::from(resource)),
-        ("type".to_string(), Value::from("a_type")),
-        ("trace_id".to_string(), Value::Integer(123)),
-        ("span_id".to_string(), Value::Integer(456)),
-        ("parent_id".to_string(), Value::Integer(789)),
+fn simple_span(resource: String) -> ObjectMap {
+    ObjectMap::from([
+        ("service".into(), Value::from("a_service")),
+        ("name".into(), Value::from("a_name")),
+        ("resource".into(), Value::from(resource)),
+        ("type".into(), Value::from("a_type")),
+        ("trace_id".into(), Value::Integer(123)),
+        ("span_id".into(), Value::Integer(456)),
+        ("parent_id".into(), Value::Integer(789)),
         (
-            "start".to_string(),
+            "start".into(),
             Value::from(Utc.timestamp_nanos(1_431_648_000_000_001i64)),
         ),
-        ("duration".to_string(), Value::Integer(1_000_000)),
-        ("error".to_string(), Value::Integer(404)),
+        ("duration".into(), Value::Integer(1_000_000)),
+        ("error".into(), Value::Integer(404)),
         (
-            "meta".to_string(),
-            Value::Object(BTreeMap::<String, Value>::from([
-                ("foo".to_string(), Value::from("bar")),
-                ("bar".to_string(), Value::from("baz")),
+            "meta".into(),
+            Value::Object(ObjectMap::from([
+                ("foo".into(), Value::from("bar")),
+                ("bar".into(), Value::from("baz")),
             ])),
         ),
         (
-            "metrics".to_string(),
-            Value::Object(BTreeMap::<String, Value>::from([
-                (
-                    "a_metric".to_string(),
-                    Value::Float(NotNan::new(0.577).unwrap()),
-                ),
-                (
-                    "_top_level".to_string(),
-                    Value::Float(NotNan::new(1.0).unwrap()),
-                ),
+            "metrics".into(),
+            Value::Object(ObjectMap::from([
+                ("a_metric".into(), Value::Float(NotNan::new(0.577).unwrap())),
+                ("_top_level".into(), Value::Float(NotNan::new(1.0).unwrap())),
             ])),
         ),
     ])
