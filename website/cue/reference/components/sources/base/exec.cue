@@ -1,6 +1,11 @@
 package metadata
 
 base: components: sources: exec: configuration: {
+	clear_environment: {
+		description: "Whether or not to clear the environment before setting custom environment variables."
+		required:    false
+		type: bool: default: false
+	}
 	command: {
 		description: "The command to run, plus any arguments required."
 		required:    true
@@ -28,7 +33,7 @@ base: components: sources: exec: configuration: {
 															[json]: https://www.json.org/
 															"""
 						native: """
-															Decodes the raw bytes as Vector’s [native Protocol Buffers format][vector_native_protobuf].
+															Decodes the raw bytes as [native Protocol Buffers format][vector_native_protobuf].
 
 															This codec is **[experimental][experimental]**.
 
@@ -36,7 +41,7 @@ base: components: sources: exec: configuration: {
 															[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
 															"""
 						native_json: """
-															Decodes the raw bytes as Vector’s [native JSON format][vector_native_json].
+															Decodes the raw bytes as [native JSON format][vector_native_json].
 
 															This codec is **[experimental][experimental]**.
 
@@ -140,6 +145,25 @@ base: components: sources: exec: configuration: {
 					required: false
 					type: bool: default: true
 				}
+			}
+		}
+	}
+	environment: {
+		description: """
+			Custom environment variables to set or update when running the command.
+			If a variable name already exists in the environment, its value is replaced.
+			"""
+		required: false
+		type: object: {
+			examples: [{
+				LANG: "es_ES.UTF-8"
+				PATH: "/bin:/usr/bin:/usr/local/bin"
+				TZ:   "Etc/UTC"
+			}]
+			options: "*": {
+				description: "An environment variable."
+				required:    true
+				type: string: {}
 			}
 		}
 	}

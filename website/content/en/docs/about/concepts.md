@@ -80,8 +80,8 @@ View the full configuration options for buffers [here](/docs/reference/configura
 
 If a sink's buffer fills up and is configured to provide backpressure, that backpressure will propagate to any connected
 transforms, which will also propagate to the sources. The sources attempt to propagate backpressure to
-whichever system is providing data. The exact mechanism varies with the source. For example, HTTP sources may
-reject requests with an HTTP 429 error (Too Many Requests), or pull-based sources such as Kafka may slow down fetching new events.
+whichever system is providing data. The exact mechanism varies with the source. For example, HTTP sources _may_
+reject requests with an HTTP 429 error (Too Many Requests), or pull-based sources such as Kafka _may_ slow down fetching new events.
 
 Since Vector allows configuring components as a directed acyclic graph, understanding how backpressure works when there
 are multiple sinks or sources involved is important.

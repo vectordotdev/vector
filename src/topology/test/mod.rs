@@ -29,7 +29,6 @@ use tokio::{
 use vector_buffers::{BufferConfig, BufferType, WhenFull};
 use vector_common::config::ComponentKey;
 use vector_core::config::OutputId;
-use vrl::path::PathPrefix;
 
 mod backpressure;
 mod compliance;
@@ -68,10 +67,12 @@ fn basic_config_with_sink_failing_healthcheck() -> Config {
 }
 
 fn into_message(event: Event) -> String {
-    let message_key = crate::config::log_schema().message_key().unwrap();
+    let message_key = crate::config::log_schema()
+        .message_key_target_path()
+        .unwrap();
     event
         .as_log()
-        .get((PathPrefix::Event, message_key))
+        .get(message_key)
         .unwrap()
         .to_string_lossy()
         .into_owned()

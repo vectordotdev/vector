@@ -163,7 +163,8 @@ impl SourceConfig for LogplexConfig {
         let log_namespace = cx.log_namespace(self.log_namespace);
 
         let decoder =
-            DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace).build();
+            DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace)
+                .build()?;
 
         let source = LogplexSource {
             query_parameters: self.query_parameters.clone(),
@@ -175,6 +176,7 @@ impl SourceConfig for LogplexConfig {
             self.address,
             "events",
             HttpMethod::Post,
+            StatusCode::OK,
             true,
             &self.tls,
             &self.auth,
@@ -521,7 +523,7 @@ mod tests {
             let log = event.as_log();
 
             assert_eq!(
-                log[log_schema().message_key().unwrap().to_string()],
+                *log.get_message().unwrap(),
                 r#"at=info method=GET path="/cart_link" host=lumberjack-store.timber.io request_id=05726858-c44e-4f94-9a20-37df73be9006 fwd="73.75.38.87" dyno=web.1 connect=1ms service=22ms status=304 bytes=656 protocol=http"#.into()
             );
             assert_eq!(
@@ -531,8 +533,8 @@ mod tests {
                     .unwrap()
                     .into()
             );
-            assert_eq!(log[log_schema().host_key().unwrap().to_string()], "host".into());
-            assert_eq!(log[log_schema().source_type_key().unwrap().to_string()], "heroku_logs".into());
+            assert_eq!(*log.get_host().unwrap(), "host".into());
+            assert_eq!(*log.get_source_type().unwrap(), "heroku_logs".into());
             assert_eq!(log["appname"], "lumberjack-store".into());
             assert_eq!(log["absent"], Value::Null);
         }).await;
@@ -606,10 +608,7 @@ mod tests {
         let events = super::line_to_events(Default::default(), log_namespace, body.into());
         let log = events[0].as_log();
 
-        assert_eq!(
-            log[log_schema().message_key().unwrap().to_string()],
-            "foo bar baz".into()
-        );
+        assert_eq!(*log.get_message().unwrap(), "foo bar baz".into());
         assert_eq!(
             log[log_schema().timestamp_key().unwrap().to_string()],
             "2020-01-08T22:33:57.353034+00:00"
@@ -617,14 +616,8 @@ mod tests {
                 .unwrap()
                 .into()
         );
-        assert_eq!(
-            log[log_schema().host_key().unwrap().to_string().as_str()],
-            "host".into()
-        );
-        assert_eq!(
-            log[log_schema().source_type_key().unwrap().to_string()],
-            "heroku_logs".into()
-        );
+        assert_eq!(*log.get_host().unwrap(), "host".into());
+        assert_eq!(*log.get_source_type().unwrap(), "heroku_logs".into());
     }
 
     #[test]
@@ -634,20 +627,9 @@ mod tests {
         let events = super::line_to_events(Default::default(), log_namespace, body.into());
         let log = events[0].as_log();
 
-        assert_eq!(
-            log[log_schema().message_key().unwrap().to_string()],
-            "what am i doing here".into()
-        );
-        assert!(log
-            .get((
-                lookup::PathPrefix::Event,
-                log_schema().timestamp_key().unwrap()
-            ))
-            .is_some());
-        assert_eq!(
-            log[log_schema().source_type_key().unwrap().to_string()],
-            "heroku_logs".into()
-        );
+        assert_eq!(*log.get_message().unwrap(), "what am i doing here".into());
+        assert!(log.get_timestamp().is_some());
+        assert_eq!(*log.get_source_type().unwrap(), "heroku_logs".into());
     }
 
     #[test]
@@ -657,10 +639,7 @@ mod tests {
         let events = super::line_to_events(Default::default(), log_namespace, body.into());
         let log = events[0].as_log();
 
-        assert_eq!(
-            log[log_schema().message_key().unwrap().to_string()],
-            "i'm not that long".into()
-        );
+        assert_eq!(*log.get_message().unwrap(), "i'm not that long".into());
         assert_eq!(
             log[log_schema().timestamp_key().unwrap().to_string()],
             "2020-01-08T22:33:57.353034+00:00"
@@ -668,14 +647,8 @@ mod tests {
                 .unwrap()
                 .into()
         );
-        assert_eq!(
-            log[log_schema().host_key().unwrap().to_string().as_str()],
-            "host".into()
-        );
-        assert_eq!(
-            log[log_schema().source_type_key().unwrap().to_string()],
-            "heroku_logs".into()
-        );
+        assert_eq!(*log.get_host().unwrap(), "host".into());
+        assert_eq!(*log.get_source_type().unwrap(), "heroku_logs".into());
     }
 
     #[test]

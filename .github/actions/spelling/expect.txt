@@ -37,7 +37,6 @@ asdf
 asdfasdf
 assertverify
 Asterix
-asynk
 atag
 atx
 aty
@@ -54,6 +53,7 @@ autodiscovered
 autodiscovery
 autogen
 autoinstalling
+AUTOPULL
 autospawn
 autospawning
 autotools
@@ -186,6 +186,7 @@ composability
 concating
 concats
 condrestart
+conffiles
 configkey
 configmap
 confl
@@ -197,6 +198,7 @@ copypasta'd
 copypasted
 copytruncate
 corechecks
+corepack
 could've
 counteraaaaaaaaaaa
 cpf
@@ -231,6 +233,7 @@ datname
 dbkind
 dbreader
 DBserver
+DCMAKE
 ddagent
 ddev
 ddmetric
@@ -347,6 +350,7 @@ exitcodes
 exprhere
 extendedstatus
 extendee
+extglob
 extr
 extralight
 extrepo
@@ -459,6 +463,7 @@ gty
 Guangzhou
 guenter
 gzip'ed
+hadolint
 halfsies
 hannes
 Hashbang
@@ -521,6 +526,7 @@ ingesters
 ingestor
 initdb
 initech
+installdeb
 Instrumentable
 interpolatedstring
 interpretervm
@@ -568,7 +574,6 @@ kernelmode
 keybase
 keyclock
 keyid
-keypair
 keyxxxxx
 khvzak
 kib
@@ -738,6 +743,7 @@ noauth
 nocapture
 nochild
 nodebuginfo
+nodistro
 nofield
 nofree
 nomac
@@ -834,6 +840,7 @@ posttrunc
 prebuild
 precpu
 preds
+prefs
 preinst
 preread
 prereqs
@@ -869,6 +876,7 @@ qwe
 raboof
 rande
 RANDFILE
+ratatui
 rawconfig
 rawstring
 rdkafka
@@ -981,6 +989,7 @@ skywalking
 slashin
 slf
 slideover
+slugified
 smallvec
 smartphone
 Smol
@@ -1066,6 +1075,7 @@ Takeaways
 targetgroup
 tarpit
 tcmalloc
+teconsent
 telecom
 templatable
 templateable
@@ -1125,6 +1135,8 @@ tripwires
 Trivago
 trivy
 Troutwine
+trustarc
+truste
 TRUSTSTORE
 TSDB
 Tsvg
@@ -1163,6 +1175,7 @@ userpass
 uucp
 UVY
 uwtable
+Uyuni
 valfoo
 validpaths
 Varda
@@ -1215,7 +1228,6 @@ wktpointer
 wmem
 woooooow
 woothee
-wor
 wordlist
 workdir
 workstreams

@@ -9,6 +9,7 @@ use std::{
 };
 
 use indexmap::IndexMap;
+use serde::Serialize;
 pub use vector_config::component::{GenerateConfig, SinkDescription, TransformDescription};
 use vector_config::configurable_component;
 pub use vector_core::config::{
@@ -100,7 +101,7 @@ impl ConfigPath {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Serialize)]
 pub struct Config {
     #[cfg(feature = "api")]
     pub api: api::Options,

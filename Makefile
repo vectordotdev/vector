@@ -52,8 +52,15 @@ export ENVIRONMENT_UPSTREAM ?= docker.io/timberio/vector-dev:sha-3eadc96742a3375
 # Override to disable building the container, having it pull from the GitHub packages repo instead
 # TODO: Disable this by default. Blocked by `docker pull` from GitHub Packages requiring authenticated login
 export ENVIRONMENT_AUTOBUILD ?= true
+# Override to disable force pulling the image, leaving the container tool to pull it only when necessary instead
+export ENVIRONMENT_AUTOPULL ?= true
 # Override this when appropriate to disable a TTY being available in commands with `ENVIRONMENT=true`
 export ENVIRONMENT_TTY ?= true
+# Override to specify which network the environment will be connected to (leave empty to use the container tool default)
+export ENVIRONMENT_NETWORK ?= host
+# Override to specify environment port(s) to publish to the host (leave empty to not configure any port publishing)
+# Multiple port publishing can be provided using spaces, for example: 8686:8686 8080:8080/udp
+export ENVIRONMENT_PUBLISH ?=
 
 # Set dummy AWS credentials if not present - used for AWS and ES integration tests
 export AWS_ACCESS_KEY_ID ?= "dummy"
@@ -124,12 +131,13 @@ define ENVIRONMENT_EXEC
 			--init \
 			--interactive \
 			--env INSIDE_ENVIRONMENT=true \
-			--network host \
+			$(if $(ENVIRONMENT_NETWORK),--network $(ENVIRONMENT_NETWORK),) \
 			--mount type=bind,source=${CURRENT_DIR},target=/git/vectordotdev/vector \
 			$(if $(findstring docker,$(CONTAINER_TOOL)),--mount type=bind$(COMMA)source=/var/run/docker.sock$(COMMA)target=/var/run/docker.sock,) \
 			--mount type=volume,source=vector-target,target=/git/vectordotdev/vector/target \
 			--mount type=volume,source=vector-cargo-cache,target=/root/.cargo \
 			--mount type=volume,source=vector-rustup-cache,target=/root/.rustup \
+			$(foreach publish,$(ENVIRONMENT_PUBLISH),--publish $(publish)) \
 			$(ENVIRONMENT_UPSTREAM)
 endef
 
@@ -144,8 +152,9 @@ define ENVIRONMENT_PREPARE
 		--file scripts/environment/Dockerfile \
 		.
 endef
-else
+else ifeq ($(ENVIRONMENT_AUTOPULL), true)
 define ENVIRONMENT_PREPARE
+	@echo "Pulling the environment image. (ENVIRONMENT_AUTOPULL=true)"
 	$(CONTAINER_TOOL) pull $(ENVIRONMENT_UPSTREAM)
 endef
 endif
@@ -221,7 +230,7 @@ build-graphql-schema: ## Generate the `schema.json` for Vector's GraphQL API
 .PHONY: check-build-tools
 check-build-tools:
 ifneq ($(ENVIRONMENT), true)
-ifeq (, $(shell command -v cargo))
+ifeq ($(shell command -v cargo >/dev/null || echo not-found), not-found)
 	$(error "Please install Rust: https://www.rust-lang.org/tools/install")
 endif
 endif
@@ -487,7 +496,7 @@ check-component-docs: generate-component-docs ## Checks that the machine-generat
 ##@ Rustdoc
 build-rustdoc: ## Build Vector's Rustdocs
 	# This command is mostly intended for use by the build process in vectordotdev/vector-rustdoc
-	${MAYBE_ENVIRONMENT_EXEC} cargo doc --no-deps
+	${MAYBE_ENVIRONMENT_EXEC} cargo doc --no-deps --workspace
 
 ##@ Packaging
 
@@ -518,7 +527,7 @@ package-aarch64-unknown-linux-musl-all: package-aarch64-unknown-linux-musl # Bui
 package-aarch64-unknown-linux-gnu-all: package-aarch64-unknown-linux-gnu package-deb-aarch64 package-rpm-aarch64 # Build all aarch64 GNU packages
 
 .PHONY: package-armv7-unknown-linux-gnueabihf-all
-package-armv7-unknown-linux-gnueabihf-all: package-armv7-unknown-linux-gnueabihf package-deb-armv7-gnu package-rpm-armv7-gnu  # Build all armv7-unknown-linux-gnueabihf MUSL packages
+package-armv7-unknown-linux-gnueabihf-all: package-armv7-unknown-linux-gnueabihf package-deb-armv7-gnu package-rpm-armv7hl-gnu package-rpm-armv7-gnu  # Build all armv7-unknown-linux-gnueabihf MUSL packages
 
 .PHONY: package-x86_64-unknown-linux-gnu
 package-x86_64-unknown-linux-gnu: target/artifacts/vector-${VERSION}-x86_64-unknown-linux-gnu.tar.gz ## Build an archive suitable for the `x86_64-unknown-linux-gnu` triple.
@@ -580,6 +589,10 @@ package-rpm-aarch64: package-aarch64-unknown-linux-gnu ## Build the aarch64 rpm 
 package-rpm-armv7-gnu: package-armv7-unknown-linux-gnueabihf ## Build the armv7-unknown-linux-gnueabihf rpm package
 	$(CONTAINER_TOOL) run -v  $(PWD):/git/vectordotdev/vector/ -e TARGET=armv7-unknown-linux-gnueabihf -e VECTOR_VERSION $(ENVIRONMENT_UPSTREAM) cargo vdev package rpm
 
+.PHONY: package-rpm-armv7hl-gnu
+package-rpm-armv7hl-gnu: package-armv7-unknown-linux-gnueabihf ## Build the armv7hl-unknown-linux-gnueabihf rpm package
+	$(CONTAINER_TOOL) run -v  $(PWD):/git/vectordotdev/vector/ -e TARGET=armv7-unknown-linux-gnueabihf -e ARCH=armv7hl -e VECTOR_VERSION $(ENVIRONMENT_UPSTREAM) cargo vdev package rpm
+
 ##@ Releasing
 
 .PHONY: release
@@ -616,6 +629,10 @@ release-s3: ## Release artifacts to S3
 .PHONY: sync-install
 sync-install: ## Sync the install.sh script for access via sh.vector.dev
 	@aws s3 cp distribution/install.sh s3://sh.vector.dev --sse --acl public-read
+
+.PHONY: sha256sum
+sha256sum: ## Generate SHA256 checksums of CI artifacts
+	scripts/checksum.sh
 
 ##@ Vector Remap Language
 

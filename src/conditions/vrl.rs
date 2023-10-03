@@ -43,7 +43,7 @@ impl ConditionalConfig for VrlConfig {
 
         let functions = vrl::stdlib::all()
             .into_iter()
-            .chain(enrichment::vrl_functions().into_iter())
+            .chain(enrichment::vrl_functions())
             .chain(vector_vrl_functions::all())
             .collect::<Vec<_>>();
 
@@ -113,7 +113,7 @@ impl Conditional for Vrl {
         let result = result
             .map(|value| match value {
                 Value::Boolean(boolean) => boolean,
-                _ => false,
+                _ => panic!("VRL condition did not return a boolean type"),
             })
             .unwrap_or_else(|err| {
                 emit!(VrlConditionExecutionError {

@@ -121,7 +121,7 @@ impl Default for SplunkConfig {
 }
 
 fn default_socket_address() -> SocketAddr {
-    SocketAddr::new(Ipv4Addr::new(0, 0, 0, 0).into(), 8088)
+    SocketAddr::new(Ipv4Addr::UNSPECIFIED.into(), 8088)
 }
 
 #[async_trait::async_trait]
@@ -676,25 +676,26 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
         self.log_namespace.insert_vector_metadata(
             &mut log,
             log_schema().source_type_key(),
-            lookup::path!("source_type"),
+            &owned_value_path!("source_type"),
             SplunkConfig::NAME,
         );
 
         // Process channel field
+        let channel_path = owned_value_path!(CHANNEL);
         if let Some(JsonValue::String(guid)) = json.get_mut("channel").map(JsonValue::take) {
             self.log_namespace.insert_source_metadata(
                 SplunkConfig::NAME,
                 &mut log,
-                Some(LegacyKey::Overwrite(CHANNEL)),
-                CHANNEL,
+                Some(LegacyKey::Overwrite(&channel_path)),
+                lookup::path!(CHANNEL),
                 guid,
             );
         } else if let Some(guid) = self.channel.as_ref() {
             self.log_namespace.insert_source_metadata(
                 SplunkConfig::NAME,
                 &mut log,
-                Some(LegacyKey::Overwrite(CHANNEL)),
-                CHANNEL,
+                Some(LegacyKey::Overwrite(&channel_path)),
+                lookup::path!(CHANNEL),
                 guid.clone(),
             );
         }
@@ -705,8 +706,8 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
                 self.log_namespace.insert_source_metadata(
                     SplunkConfig::NAME,
                     &mut log,
-                    Some(LegacyKey::Overwrite(key.as_str())),
-                    key.as_str(),
+                    Some(LegacyKey::Overwrite(&owned_value_path!(key.as_str()))),
+                    lookup::path!(key.as_str()),
                     value,
                 );
             }
@@ -753,7 +754,7 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
             SplunkConfig::NAME,
             &mut log,
             log_schema().timestamp_key().map(LegacyKey::Overwrite),
-            "timestamp",
+            lookup::path!("timestamp"),
             timestamp,
         );
 
@@ -823,7 +824,7 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
                         match line {
                             // This don't quite fit the meaning of a event::schema().message_key
                             JsonValue::Array(_) | JsonValue::Object(_) => {
-                                log.insert("line", line);
+                                log.insert(event_path!("line"), line);
                             }
                             _ => {
                                 log.maybe_insert(log_schema().message_key_target_path(), line);
@@ -1009,8 +1010,8 @@ fn raw_event(
     log_namespace.insert_source_metadata(
         SplunkConfig::NAME,
         &mut log,
-        Some(LegacyKey::Overwrite(CHANNEL)),
-        CHANNEL,
+        Some(LegacyKey::Overwrite(&owned_value_path!(CHANNEL))),
+        lookup::path!(CHANNEL),
         channel,
     );
 
@@ -1028,7 +1029,7 @@ fn raw_event(
             SplunkConfig::NAME,
             &mut log,
             log_schema().host_key().map(LegacyKey::InsertIfEmpty),
-            "host",
+            lookup::path!("host"),
             host,
         );
     }
@@ -1434,13 +1435,7 @@ mod tests {
             event.as_log()[log_schema().message_key().unwrap().to_string()],
             message.into()
         );
-        assert!(event
-            .as_log()
-            .get((
-                lookup::PathPrefix::Event,
-                log_schema().timestamp_key().unwrap()
-            ))
-            .is_some());
+        assert!(event.as_log().get_timestamp().is_some());
         assert_eq!(
             event.as_log()[log_schema().source_type_key().unwrap().to_string()],
             "splunk_hec".into()
@@ -1464,13 +1459,7 @@ mod tests {
             event.as_log()[log_schema().message_key().unwrap().to_string()],
             message.into()
         );
-        assert!(event
-            .as_log()
-            .get((
-                lookup::PathPrefix::Event,
-                log_schema().timestamp_key().unwrap()
-            ))
-            .is_some());
+        assert!(event.as_log().get_timestamp().is_some());
         assert_eq!(
             event.as_log()[log_schema().source_type_key().unwrap().to_string()],
             "splunk_hec".into()
@@ -1498,13 +1487,7 @@ mod tests {
                 event.as_log()[log_schema().message_key().unwrap().to_string()],
                 msg.into()
             );
-            assert!(event
-                .as_log()
-                .get((
-                    lookup::PathPrefix::Event,
-                    log_schema().timestamp_key().unwrap()
-                ))
-                .is_some());
+            assert!(event.as_log().get_timestamp().is_some());
             assert_eq!(
                 event.as_log()[log_schema().source_type_key().unwrap().to_string()],
                 "splunk_hec".into()
@@ -1529,13 +1512,7 @@ mod tests {
             event.as_log()[log_schema().message_key().unwrap().to_string()],
             message.into()
         );
-        assert!(event
-            .as_log()
-            .get((
-                lookup::PathPrefix::Event,
-                log_schema().timestamp_key().unwrap()
-            ))
-            .is_some());
+        assert!(event.as_log().get_timestamp().is_some());
         assert_eq!(
             event.as_log()[log_schema().source_type_key().unwrap().to_string()],
             "splunk_hec".into()
@@ -1563,13 +1540,7 @@ mod tests {
                 event.as_log()[log_schema().message_key().unwrap().to_string()],
                 msg.into()
             );
-            assert!(event
-                .as_log()
-                .get((
-                    lookup::PathPrefix::Event,
-                    log_schema().timestamp_key().unwrap()
-                ))
-                .is_some());
+            assert!(event.as_log().get_timestamp().is_some());
             assert_eq!(
                 event.as_log()[log_schema().source_type_key().unwrap().to_string()],
                 "splunk_hec".into()
@@ -1595,12 +1566,7 @@ mod tests {
         let event = collect_n(source, 1).await.remove(0).into_log();
         assert_eq!(event["greeting"], "hello".into());
         assert_eq!(event["name"], "bob".into());
-        assert!(event
-            .get((
-                lookup::PathPrefix::Event,
-                log_schema().timestamp_key().unwrap()
-            ))
-            .is_some());
+        assert!(event.get_timestamp().is_some());
         assert_eq!(
             event[log_schema().source_type_key().unwrap().to_string()],
             "splunk_hec".into()
@@ -1665,13 +1631,7 @@ mod tests {
                 message.into()
             );
             assert_eq!(event.as_log()[&super::CHANNEL], "channel".into());
-            assert!(event
-                .as_log()
-                .get((
-                    lookup::PathPrefix::Event,
-                    log_schema().timestamp_key().unwrap()
-                ))
-                .is_some());
+            assert!(event.as_log().get_timestamp().is_some());
             assert_eq!(
                 event.as_log()[log_schema().source_type_key().unwrap().to_string()],
                 "splunk_hec".into()
@@ -1695,13 +1655,7 @@ mod tests {
                 "root".into()
             );
             assert_eq!(event.as_log()[&super::CHANNEL], "channel".into());
-            assert!(event
-                .as_log()
-                .get((
-                    lookup::PathPrefix::Event,
-                    log_schema().timestamp_key().unwrap()
-                ))
-                .is_some());
+            assert!(event.as_log().get_timestamp().is_some());
             assert_eq!(
                 event.as_log()[log_schema().source_type_key().unwrap().to_string()],
                 "splunk_hec".into()
@@ -1949,13 +1903,7 @@ mod tests {
                 message.into()
             );
             assert_eq!(event.as_log()[&super::CHANNEL], "channel".into());
-            assert!(event
-                .as_log()
-                .get((
-                    lookup::PathPrefix::Event,
-                    log_schema().timestamp_key().unwrap()
-                ))
-                .is_some());
+            assert!(event.as_log().get_timestamp().is_some());
             assert_eq!(
                 event.as_log()[log_schema().source_type_key().unwrap().to_string()],
                 "splunk_hec".into()
@@ -2035,13 +1983,7 @@ mod tests {
                 event.as_log()[log_schema().message_key().unwrap().to_string()],
                 "first".into()
             );
-            assert!(event
-                .as_log()
-                .get((
-                    lookup::PathPrefix::Event,
-                    log_schema().timestamp_key().unwrap()
-                ))
-                .is_some());
+            assert!(event.as_log().get_timestamp().is_some());
             assert_eq!(
                 event.as_log()[log_schema().source_type_key().unwrap().to_string()],
                 "splunk_hec".into()
@@ -2068,13 +2010,7 @@ mod tests {
                 event.as_log()[log_schema().message_key().unwrap().to_string()],
                 "first".into()
             );
-            assert!(event
-                .as_log()
-                .get((
-                    lookup::PathPrefix::Event,
-                    log_schema().timestamp_key().unwrap()
-                ))
-                .is_some());
+            assert!(event.as_log().get_timestamp().is_some());
             assert_eq!(
                 event.as_log()[log_schema().source_type_key().unwrap().to_string()],
                 "splunk_hec".into()
@@ -2099,13 +2035,7 @@ mod tests {
                 event.as_log()[log_schema().message_key().unwrap().to_string()],
                 "first".into()
             );
-            assert!(event
-                .as_log()
-                .get((
-                    lookup::PathPrefix::Event,
-                    log_schema().timestamp_key().unwrap()
-                ))
-                .is_some());
+            assert!(event.as_log().get_timestamp().is_some());
             assert_eq!(
                 event.as_log()[log_schema().source_type_key().unwrap().to_string()],
                 "splunk_hec".into()
@@ -2193,7 +2123,7 @@ mod tests {
         for case in cases {
             let sec = case.timestamp();
             let millis = case.timestamp_millis();
-            let nano = case.timestamp_nanos();
+            let nano = case.timestamp_nanos_opt().expect("Timestamp out of range");
 
             assert_eq!(parse_timestamp(sec).unwrap().timestamp(), case.timestamp());
             assert_eq!(
@@ -2201,8 +2131,11 @@ mod tests {
                 case.timestamp_millis()
             );
             assert_eq!(
-                parse_timestamp(nano).unwrap().timestamp_nanos(),
-                case.timestamp_nanos()
+                parse_timestamp(nano)
+                    .unwrap()
+                    .timestamp_nanos_opt()
+                    .unwrap(),
+                case.timestamp_nanos_opt().expect("Timestamp out of range")
             );
         }
 

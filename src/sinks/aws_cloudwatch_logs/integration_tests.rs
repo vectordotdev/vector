@@ -188,10 +188,7 @@ async fn cloudwatch_insert_out_of_range_timestamp() {
         let line = input_lines.next().unwrap();
         let mut event = LogEvent::from(line.clone());
         event.insert(
-            (
-                lookup::PathPrefix::Event,
-                log_schema().timestamp_key().unwrap(),
-            ),
+            log_schema().timestamp_key_target_path().unwrap(),
             now + offset,
         );
         events.push(Event::Log(event));

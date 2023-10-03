@@ -1,6 +1,7 @@
 use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
-use vrl::event_path;
+use vector_core::config::{LegacyKey, LogNamespace};
+use vrl::value::Kind;
+use vrl::{event_path, owned_value_path};
 
 use crate::{
     conditions::{AnyCondition, Condition},
@@ -85,7 +86,18 @@ impl TransformConfig for SampleConfig {
             DataType::Log | DataType::Trace,
             input_definitions
                 .iter()
-                .map(|(output, definition)| (output.clone(), definition.clone()))
+                .map(|(output, definition)| {
+                    (
+                        output.clone(),
+                        definition.clone().with_source_metadata(
+                            SampleConfig::NAME,
+                            Some(LegacyKey::Overwrite(owned_value_path!("sample_rate"))),
+                            &owned_value_path!("sample_rate"),
+                            Kind::bytes(),
+                            None,
+                        ),
+                    )
+                })
                 .collect(),
         )]
     }
@@ -130,8 +142,14 @@ impl FunctionTransform for Sample {
             .key_field
             .as_ref()
             .and_then(|key_field| match &event {
-                Event::Log(event) => event.get(key_field.as_str()),
-                Event::Trace(event) => event.get(key_field.as_str()),
+                Event::Log(event) => event
+                    .parse_path_and_get_value(key_field.as_str())
+                    .ok()
+                    .flatten(),
+                Event::Trace(event) => event
+                    .parse_path_and_get_value(key_field.as_str())
+                    .ok()
+                    .flatten(),
                 Event::Metric(_) => panic!("component can never receive metric events"),
             })
             .map(|v| v.to_string_lossy());
@@ -147,10 +165,16 @@ impl FunctionTransform for Sample {
         if num % self.rate == 0 {
             match event {
                 Event::Log(ref mut event) => {
-                    event.insert(event_path!("sample_rate"), self.rate.to_string())
+                    event.namespace().insert_source_metadata(
+                        SampleConfig::NAME,
+                        event,
+                        Some(LegacyKey::Overwrite(vrl::path!("sample_rate"))),
+                        vrl::path!("sample_rate"),
+                        self.rate.to_string(),
+                    );
                 }
                 Event::Trace(ref mut event) => {
-                    event.insert(event_path!("sample_rate"), self.rate.to_string())
+                    event.insert(event_path!("sample_rate"), self.rate.to_string());
                 }
                 Event::Metric(_) => panic!("component can never receive metric events"),
             };

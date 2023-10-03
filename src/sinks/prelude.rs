@@ -3,19 +3,24 @@
 
 pub use crate::{
     codecs::{Encoder, EncodingConfig, Transformer},
+    components::validation::{
+        ExternalResource, HttpResourceConfig, ResourceDirection, ValidatableComponent,
+        ValidationConfiguration,
+    },
     config::{DataType, GenerateConfig, SinkConfig, SinkContext},
     event::{Event, LogEvent},
     internal_events::{SinkRequestBuildError, TemplateRenderingError},
-    sinks::util::retries::RetryLogic,
+    register_validatable_component,
     sinks::{
         util::{
             builder::SinkBuilderExt,
             encoding::{self, write_all},
             metadata::RequestMetadataBuilder,
-            request_builder::EncodeResult,
+            request_builder::{default_request_builder_concurrency_limit, EncodeResult},
+            retries::{RetryAction, RetryLogic},
             service::{ServiceBuilderExt, Svc},
-            BatchConfig, Compression, NoDefaultsBatchSettings, RequestBuilder, SinkBatchSettings,
-            TowerRequestConfig,
+            BatchConfig, Compression, Concurrency, NoDefaultsBatchSettings, RequestBuilder,
+            SinkBatchSettings, TowerRequestConfig,
         },
         Healthcheck, HealthcheckError,
     },
@@ -33,8 +38,9 @@ pub use vector_common::{
     request_metadata::{GetEventCountTags, GroupedCountByteSize, MetaDescriptive, RequestMetadata},
 };
 pub use vector_config::configurable_component;
+
 pub use vector_core::{
-    config::{AcknowledgementsConfig, Input},
+    config::{telemetry, AcknowledgementsConfig, Input},
     event::Value,
     partition::Partitioner,
     schema::Requirement,

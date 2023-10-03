@@ -133,7 +133,7 @@ where
                 // We've got an input batch to process and the service is ready to accept a request.
                 maybe_ready = poll_fn(|cx| service.poll_ready(cx)), if next_batch.is_some() => {
                     let mut batch = next_batch.take()
-                        .expect("batch should be populated");
+                        .unwrap_or_else(|| unreachable!("batch should be populated"));
 
                     let mut maybe_ready = Some(maybe_ready);
                     while !batch.is_empty() {
@@ -155,7 +155,7 @@ where
                             },
                         };
 
-                        let mut req = batch.pop_front().expect("batch should not be empty");
+                        let mut req = batch.pop_front().unwrap_or_else(|| unreachable!("batch should not be empty"));
                         seq_num += 1;
                         let request_id = seq_num;
 

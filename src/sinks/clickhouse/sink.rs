@@ -49,7 +49,7 @@ impl ClickhouseSink {
             )
             .filter_map(|(key, batch)| async move { key.map(move |k| (k, batch)) })
             .request_builder(
-                None,
+                default_request_builder_concurrency_limit(),
                 ClickhouseRequestBuilder {
                     compression: self.compression,
                     encoding: self.encoding,

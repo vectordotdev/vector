@@ -701,7 +701,7 @@ configuration: {
 		formats: {
 			title: "Formats"
 			body:  """
-				Vector supports [TOML](\(urls.toml)), [YAML](\(urls.yaml)), and [JSON](\(urls.json)) to
+				Vector supports [YAML](\(urls.yaml)), [TOML](\(urls.toml)), and [JSON](\(urls.json)) to
 				ensure Vector fits into your workflow. A side benefit of supporting YAML and JSON is that they
 				enable you to use data templating languages such as [ytt](\(urls.ytt)), [Jsonnet](\(urls.jsonnet)) and
 				[Cue](\(urls.cue)).
@@ -711,7 +711,8 @@ configuration: {
 			title: "Location"
 			body: """
 				The location of your Vector configuration file depends on your installation method. For most Linux
-				based systems, the file can be found at `/etc/vector/vector.toml`.
+				based systems, the file can be found at `/etc/vector/vector.toml`. And if the aforementioned file does
+				not exist, then `/etc/vector/vector.yaml` will be used.
 
 				All files in `/etc/vector` are user configuration files and can be safely overridden to craft your
 				desired Vector configuration.

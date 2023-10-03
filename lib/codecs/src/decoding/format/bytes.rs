@@ -89,10 +89,8 @@ impl Deserializer for BytesDeserializer {
 
 #[cfg(test)]
 mod tests {
-    use vector_core::config::log_schema;
-    use vrl::value::Value;
-
     use super::*;
+    use vrl::value::Value;
 
     #[test]
     fn deserialize_bytes_legacy_namespace() {
@@ -105,10 +103,7 @@ mod tests {
         {
             let event = events.next().unwrap();
             let log = event.as_log();
-            assert_eq!(
-                log[log_schema().message_key().unwrap().to_string()],
-                "foo".into()
-            );
+            assert_eq!(*log.get_message().unwrap(), "foo".into());
         }
 
         assert_eq!(events.next(), None);

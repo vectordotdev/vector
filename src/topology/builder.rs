@@ -248,6 +248,7 @@ impl<'a> Builder<'a> {
                 let mut rx = builder.add_source_output(output.clone(), key.clone());
 
                 let (mut fanout, control) = Fanout::new();
+                let source_type = source.inner.get_component_name();
                 let source = Arc::new(key.clone());
 
                 let pump = async move {
@@ -255,6 +256,7 @@ impl<'a> Builder<'a> {
 
                     while let Some(mut array) = rx.next().await {
                         array.set_output_id(&source);
+                        array.set_source_type(source_type);
                         fanout.send(array).await.map_err(|e| {
                             debug!("Source pump finished with an error.");
                             TaskError::wrapped(e)
@@ -568,6 +570,8 @@ impl<'a> Builder<'a> {
                 globals: self.config.global.clone(),
                 proxy: ProxyConfig::merge_with_env(&self.config.global.proxy, sink.proxy()),
                 schema: self.config.schema,
+                app_name: crate::get_app_name().to_string(),
+                app_name_slug: crate::get_slugified_app_name(),
             };
 
             let (sink, healthcheck) = match sink.inner.build(cx).await {

@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use vector_common::config::ComponentKey;
 use vector_core::config::OutputId;
+use vector_core::event::EventMetadata;
 use vector_core::metric_tags;
 
 use super::*;
@@ -24,11 +25,14 @@ fn generate_config() {
 }
 
 fn make_metric(tags: MetricTags) -> Event {
+    let event_metadata = EventMetadata::default().with_source_type("unit_test_stream");
+
     Event::Metric(
-        Metric::new(
+        Metric::new_with_metadata(
             "event",
             metric::MetricKind::Incremental,
             metric::MetricValue::Counter { value: 1.0 },
+            event_metadata,
         )
         .with_tags(Some(tags)),
     )

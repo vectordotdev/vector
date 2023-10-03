@@ -8,7 +8,11 @@ use serde::{Deserialize, Serialize};
 use warp::{filters::BoxedFilter, path, path::FullPath, reply::Response, Filter};
 
 use vector_common::internal_event::{CountByteSize, InternalEventHandle as _, Registered};
-use vector_core::{metrics::AgentDDSketch, EstimatedJsonEncodedSizeOf};
+use vector_core::{
+    event::{DatadogMetricOriginMetadata, EventMetadata},
+    metrics::AgentDDSketch,
+    EstimatedJsonEncodedSizeOf,
+};
 
 use crate::{
     common::datadog::{DatadogMetricType, DatadogSeriesMetric},
@@ -21,7 +25,7 @@ use crate::{
     schema,
     sources::{
         datadog_agent::{
-            ddmetric_proto::{metric_payload, MetricPayload, SketchPayload},
+            ddmetric_proto::{metric_payload, Metadata, MetricPayload, SketchPayload},
             handle_request, ApiKeyQueryParams, DatadogAgentSource,
         },
         util::{extract_tag_key_and_value, ErrorMessage},
@@ -228,6 +232,27 @@ fn decode_datadog_series_v2(
     Ok(metrics)
 }
 
+/// Builds Vector's `EventMetadata` from the received metadata. Currently this is only
+/// utilized for passing through origin metadata set by the Agent.
+fn get_event_metadata(metadata: Option<&Metadata>) -> EventMetadata {
+    metadata
+        .and_then(|metadata| metadata.origin.as_ref())
+        .map_or_else(EventMetadata::default, |origin| {
+            trace!(
+                "Deserialized origin_product: `{}` origin_category: `{}` origin_service: `{}`.",
+                origin.origin_product,
+                origin.origin_category,
+                origin.origin_service,
+            );
+            EventMetadata::default().with_origin_metadata(
+                DatadogMetricOriginMetadata::default()
+                    .with_product(origin.origin_product)
+                    .with_category(origin.origin_category)
+                    .with_service(origin.origin_service),
+            )
+        })
+}
+
 pub(crate) fn decode_ddseries_v2(
     frame: Bytes,
     api_key: &Option<Arc<str>>,
@@ -239,6 +264,8 @@ pub(crate) fn decode_ddseries_v2(
         .flat_map(|serie| {
             let (namespace, name) = namespace_name_from_dd_metric(&serie.metric);
             let mut tags = into_metric_tags(serie.tags);
+
+            let event_metadata = get_event_metadata(serie.metadata.as_ref());
 
             serie.resources.into_iter().for_each(|r| {
                 // As per https://github.com/DataDog/datadog-agent/blob/a62ac9fb13e1e5060b89e731b8355b2b20a07c5b/pkg/serializer/internal/metrics/iterable_series.go#L180-L189
@@ -256,17 +283,18 @@ pub(crate) fn decode_ddseries_v2(
                 .then(|| tags.replace("source_type_name".into(), serie.source_type_name));
             // As per https://github.com/DataDog/datadog-agent/blob/a62ac9fb13e1e5060b89e731b8355b2b20a07c5b/pkg/serializer/internal/metrics/iterable_series.go#L224
             // serie.unit is omitted
-            match metric_payload::MetricType::from_i32(serie.r#type) {
-                Some(metric_payload::MetricType::Count) => serie
+            match metric_payload::MetricType::try_from(serie.r#type) {
+                Ok(metric_payload::MetricType::Count) => serie
                     .points
                     .iter()
                     .map(|dd_point| {
-                        Metric::new(
+                        Metric::new_with_metadata(
                             name.to_string(),
                             MetricKind::Incremental,
                             MetricValue::Counter {
                                 value: dd_point.value,
                             },
+                            event_metadata.clone(),
                         )
                         .with_timestamp(Some(
                             Utc.timestamp_opt(dd_point.timestamp, 0)
@@ -277,16 +305,17 @@ pub(crate) fn decode_ddseries_v2(
                         .with_namespace(namespace)
                     })
                     .collect::<Vec<_>>(),
-                Some(metric_payload::MetricType::Gauge) => serie
+                Ok(metric_payload::MetricType::Gauge) => serie
                     .points
                     .iter()
                     .map(|dd_point| {
-                        Metric::new(
+                        Metric::new_with_metadata(
                             name.to_string(),
                             MetricKind::Absolute,
                             MetricValue::Gauge {
                                 value: dd_point.value,
                             },
+                            event_metadata.clone(),
                         )
                         .with_timestamp(Some(
                             Utc.timestamp_opt(dd_point.timestamp, 0)
@@ -297,7 +326,7 @@ pub(crate) fn decode_ddseries_v2(
                         .with_namespace(namespace)
                     })
                     .collect::<Vec<_>>(),
-                Some(metric_payload::MetricType::Rate) => serie
+                Ok(metric_payload::MetricType::Rate) => serie
                     .points
                     .iter()
                     .map(|dd_point| {
@@ -305,12 +334,13 @@ pub(crate) fn decode_ddseries_v2(
                             .filter(|v| *v != 0)
                             .map(|v| v as u32)
                             .unwrap_or(1);
-                        Metric::new(
+                        Metric::new_with_metadata(
                             name.to_string(),
                             MetricKind::Incremental,
                             MetricValue::Counter {
                                 value: dd_point.value * (i as f64),
                             },
+                            event_metadata.clone(),
                         )
                         .with_timestamp(Some(
                             Utc.timestamp_opt(dd_point.timestamp, 0)
@@ -323,7 +353,7 @@ pub(crate) fn decode_ddseries_v2(
                         .with_namespace(namespace)
                     })
                     .collect::<Vec<_>>(),
-                Some(metric_payload::MetricType::Unspecified) | None => {
+                Ok(metric_payload::MetricType::Unspecified) | Err(_) => {
                     warn!("Unspecified metric type ({}).", serie.r#type);
                     Vec::new()
                 }
@@ -333,7 +363,6 @@ pub(crate) fn decode_ddseries_v2(
             if let Some(k) = &api_key {
                 metric.metadata_mut().set_datadog_api_key(Arc::clone(k));
             }
-
             metric.into()
         })
         .collect();
@@ -507,6 +536,8 @@ pub(crate) fn decode_ddsketch(
                 .host_key()
                 .and_then(|key| tags.replace(key.to_string(), sketch_series.host.clone()));
 
+            let event_metadata = get_event_metadata(sketch_series.metadata.as_ref());
+
             sketch_series.dogsketches.into_iter().map(move |sketch| {
                 let k: Vec<i16> = sketch.k.iter().map(|k| *k as i16).collect();
                 let n: Vec<u16> = sketch.n.iter().map(|n| *n as u16).collect();
@@ -523,14 +554,19 @@ pub(crate) fn decode_ddsketch(
                     .unwrap_or_else(AgentDDSketch::with_agent_defaults),
                 );
                 let (namespace, name) = namespace_name_from_dd_metric(&sketch_series.metric);
-                let mut metric = Metric::new(name.to_string(), MetricKind::Incremental, val)
-                    .with_tags(Some(tags.clone()))
-                    .with_timestamp(Some(
-                        Utc.timestamp_opt(sketch.ts, 0)
-                            .single()
-                            .expect("invalid timestamp"),
-                    ))
-                    .with_namespace(namespace);
+                let mut metric = Metric::new_with_metadata(
+                    name.to_string(),
+                    MetricKind::Incremental,
+                    val,
+                    event_metadata.clone(),
+                )
+                .with_tags(Some(tags.clone()))
+                .with_timestamp(Some(
+                    Utc.timestamp_opt(sketch.ts, 0)
+                        .single()
+                        .expect("invalid timestamp"),
+                ))
+                .with_namespace(namespace);
                 if let Some(k) = &api_key {
                     metric.metadata_mut().set_datadog_api_key(Arc::clone(k));
                 }

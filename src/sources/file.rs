@@ -205,12 +205,16 @@ pub struct FileConfig {
     #[serde(default)]
     pub multiline: Option<MultilineConfig>,
 
-    /// An approximate limit on the amount of data read from a single file at a given time.
+    /// Max amount of bytes to read from a single file before switching over to the next file.
+    /// **Note:** This does not apply when `oldest_first` is `true`.
+    ///
+    /// This allows distributing the reads more or less evenly across
+    /// the files.
     #[serde(default = "default_max_read_bytes")]
     #[configurable(metadata(docs::type_unit = "bytes"))]
     pub max_read_bytes: usize,
 
-    /// Instead of balancing read capacity fairly across all watched files, prioritize draining the oldest files before moving on to read data from younger files.
+    /// Instead of balancing read capacity fairly across all watched files, prioritize draining the oldest files before moving on to read data from more recent files.
     #[serde(default)]
     pub oldest_first: bool,
 
@@ -1036,14 +1040,8 @@ mod tests {
         assert_eq!(log["file"], "some_file.rs".into());
         assert_eq!(log["host"], "Some.Machine".into());
         assert_eq!(log["offset"], 0.into());
-        assert_eq!(
-            log[log_schema().message_key().unwrap().to_string()],
-            "hello world".into()
-        );
-        assert_eq!(
-            log[log_schema().source_type_key().unwrap().to_string()],
-            "file".into()
-        );
+        assert_eq!(*log.get_message().unwrap(), "hello world".into());
+        assert_eq!(*log.get_source_type().unwrap(), "file".into());
         assert!(log[log_schema().timestamp_key().unwrap().to_string()].is_timestamp());
     }
 
@@ -1064,14 +1062,8 @@ mod tests {
         assert_eq!(log["file_path"], "some_file.rs".into());
         assert_eq!(log["hostname"], "Some.Machine".into());
         assert_eq!(log["off"], 0.into());
-        assert_eq!(
-            log[log_schema().message_key().unwrap().to_string()],
-            "hello world".into()
-        );
-        assert_eq!(
-            log[log_schema().source_type_key().unwrap().to_string()],
-            "file".into()
-        );
+        assert_eq!(*log.get_message().unwrap(), "hello world".into());
+        assert_eq!(*log.get_source_type().unwrap(), "file".into());
         assert!(log[log_schema().timestamp_key().unwrap().to_string()].is_timestamp());
     }
 
@@ -2336,11 +2328,7 @@ mod tests {
         received
             .into_iter()
             .map(Event::into_log)
-            .map(|log| {
-                log[log_schema().message_key().unwrap().to_string()]
-                    .to_string_lossy()
-                    .into_owned()
-            })
+            .map(|log| log.get_message().unwrap().to_string_lossy().into_owned())
             .collect()
     }
 
@@ -2348,7 +2336,7 @@ mod tests {
         received
             .into_iter()
             .map(Event::into_log)
-            .map(|log| log[log_schema().message_key().unwrap().to_string()].clone())
+            .map(|log| log.get_message().unwrap().clone())
             .collect()
     }
 }

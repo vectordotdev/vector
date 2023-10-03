@@ -191,7 +191,7 @@ impl Runner {
         }
     }
 
-    pub async fn run_validation(self) -> Result<Vec<RunnerResults>, String> {
+    pub async fn run_validation(self) -> Result<Vec<RunnerResults>, vector_common::Error> {
         // Initialize our test environment.
         initialize_test_environment();
 
@@ -251,7 +251,7 @@ impl Runner {
                 &self.configuration,
                 &input_task_coordinator,
                 &output_task_coordinator,
-            );
+            )?;
             let input_tx = runner_input.into_sender(controlled_edges.input);
             let output_rx = runner_output.into_receiver(controlled_edges.output);
             debug!("External resource (if any) and controlled edges built and spawned.");
@@ -413,7 +413,7 @@ fn build_external_resource(
     configuration: &ValidationConfiguration,
     input_task_coordinator: &TaskCoordinator<Configuring>,
     output_task_coordinator: &TaskCoordinator<Configuring>,
-) -> (RunnerInput, RunnerOutput, Option<Encoder<encoding::Framer>>) {
+) -> Result<(RunnerInput, RunnerOutput, Option<Encoder<encoding::Framer>>), vector_common::Error> {
     let component_type = configuration.component_type();
     let maybe_external_resource = configuration.external_resource();
     let maybe_encoder = maybe_external_resource
@@ -430,15 +430,15 @@ fn build_external_resource(
                 maybe_external_resource.expect("a source must always have an external resource");
             resource.spawn_as_input(rx, input_task_coordinator);
 
-            (
+            Ok((
                 RunnerInput::External(tx),
                 RunnerOutput::Controlled,
                 maybe_encoder,
-            )
+            ))
         }
         ComponentType::Transform => {
             // Transforms have no external resources.
-            (RunnerInput::Controlled, RunnerOutput::Controlled, None)
+            Ok((RunnerInput::Controlled, RunnerOutput::Controlled, None))
         }
         ComponentType::Sink => {
             // As an external resource for a sink, we create a channel that the validation runner
@@ -448,13 +448,13 @@ fn build_external_resource(
             let (tx, rx) = mpsc::channel(1024);
             let resource =
                 maybe_external_resource.expect("a sink must always have an external resource");
-            resource.spawn_as_output(tx, output_task_coordinator);
+            resource.spawn_as_output(tx, output_task_coordinator)?;
 
-            (
+            Ok((
                 RunnerInput::Controlled,
                 RunnerOutput::External(rx),
                 maybe_encoder,
-            )
+            ))
         }
     }
 }

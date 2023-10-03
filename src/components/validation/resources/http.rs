@@ -62,12 +62,15 @@ impl HttpResourceConfig {
         codec: ResourceCodec,
         output_tx: mpsc::Sender<Vec<Event>>,
         task_coordinator: &TaskCoordinator<Configuring>,
-    ) {
+    ) -> vector_common::Result<()> {
         match direction {
             // We'll pull data from the sink.
-            ResourceDirection::Pull => {
-                spawn_output_http_client(self, codec, output_tx, task_coordinator)
-            }
+            ResourceDirection::Pull => Ok(spawn_output_http_client(
+                self,
+                codec,
+                output_tx,
+                task_coordinator,
+            )),
             // The sink will push data to us.
             ResourceDirection::Push => {
                 spawn_output_http_server(self, codec, output_tx, task_coordinator)
@@ -227,12 +230,12 @@ fn spawn_output_http_server(
     codec: ResourceCodec,
     output_tx: mpsc::Sender<Vec<Event>>,
     task_coordinator: &TaskCoordinator<Configuring>,
-) {
+) -> vector_common::Result<()> {
     // This HTTP server will wait for events to be sent by a sink, and collect them and send them on
     // via an output sender. We accept/collect events until we're told to shutdown.
 
     // First, we'll build and spawn our HTTP server.
-    let decoder = codec.into_decoder();
+    let decoder = codec.into_decoder()?;
 
     let (_, http_server_shutdown_tx) =
         spawn_http_server(task_coordinator, &config, move |request| {
@@ -276,6 +279,7 @@ fn spawn_output_http_server(
 
         debug!("HTTP server external output resource completed.");
     });
+    Ok(())
 }
 
 /// Spawns an HTTP client that pulls events by making requests to an HTTP server driven by a sink.

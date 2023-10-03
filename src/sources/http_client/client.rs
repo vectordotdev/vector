@@ -124,37 +124,31 @@ const fn default_http_method() -> HttpMethod {
 }
 
 fn query_examples() -> HashMap<String, Vec<String>> {
-    HashMap::<_, _>::from_iter(
-        [
-            ("field".to_owned(), vec!["value".to_owned()]),
-            (
-                "fruit".to_owned(),
-                vec!["mango".to_owned(), "papaya".to_owned(), "kiwi".to_owned()],
-            ),
-        ]
-        .into_iter(),
-    )
+    HashMap::<_, _>::from_iter([
+        ("field".to_owned(), vec!["value".to_owned()]),
+        (
+            "fruit".to_owned(),
+            vec!["mango".to_owned(), "papaya".to_owned(), "kiwi".to_owned()],
+        ),
+    ])
 }
 
 fn headers_examples() -> HashMap<String, Vec<String>> {
-    HashMap::<_, _>::from_iter(
-        [
-            (
-                "Accept".to_owned(),
-                vec!["text/plain".to_owned(), "text/html".to_owned()],
-            ),
-            (
-                "X-My-Custom-Header".to_owned(),
-                vec![
-                    "a".to_owned(),
-                    "vector".to_owned(),
-                    "of".to_owned(),
-                    "values".to_owned(),
-                ],
-            ),
-        ]
-        .into_iter(),
-    )
+    HashMap::<_, _>::from_iter([
+        (
+            "Accept".to_owned(),
+            vec!["text/plain".to_owned(), "text/html".to_owned()],
+        ),
+        (
+            "X-My-Custom-Header".to_owned(),
+            vec![
+                "a".to_owned(),
+                "vector".to_owned(),
+                "of".to_owned(),
+                "values".to_owned(),
+            ],
+        ),
+    ])
 }
 
 impl Default for HttpClientConfig {
@@ -194,7 +188,7 @@ impl SourceConfig for HttpClientConfig {
         let log_namespace = cx.log_namespace(self.log_namespace);
 
         // build the decoder
-        let decoder = self.get_decoding_config(Some(log_namespace)).build();
+        let decoder = self.get_decoding_config(Some(log_namespace)).build()?;
 
         let content_type = self.decoding.content_type(&self.framing).to_string();
 
@@ -290,7 +284,7 @@ impl HttpClientContext {
         loop {
             match self.decoder.decode_eof(buf) {
                 Ok(Some((next, _))) => {
-                    events.extend(next.into_iter());
+                    events.extend(next);
                 }
                 Ok(None) => break,
                 Err(error) => {

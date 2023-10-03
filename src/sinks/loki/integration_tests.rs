@@ -210,7 +210,12 @@ async fn namespaced_timestamp() {
 
         // The timestamp of the event needs to be the timestamp set in the `norknork`
         // field since that was given the meaning of `timestamp`.
-        assert_eq!(timestamp.timestamp_nanos(), timestamps[i]);
+        assert_eq!(
+            timestamp
+                .timestamp_nanos_opt()
+                .expect("Timestamp out of range"),
+            timestamps[i]
+        );
     }
 }
 
@@ -675,7 +680,12 @@ async fn test_out_of_order_events(
         )
     }
     for (i, ts) in timestamps.iter().enumerate() {
-        assert_eq!(get_timestamp(&expected[i]).timestamp_nanos(), *ts);
+        assert_eq!(
+            get_timestamp(&expected[i])
+                .timestamp_nanos_opt()
+                .expect("Timestamp out of range"),
+            *ts
+        );
     }
 }
 

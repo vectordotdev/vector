@@ -1,1 +1,1 @@
-{"metric":{"name":"d","namespace":"f","timestamp":"1970-01-01T07:53:40.000023295Z","interval_ms":4294967295,"kind":"absolute","distribution":{"samples":[{"value":869632.0,"rate":3363800278},{"value":131840.0,"rate":903015618},{"value":202304.0,"rate":865358291},{"value":-458944.0,"rate":2655101164},{"value":858368.0,"rate":968614306}],"statistic":"summary"}}}
+{"log":{}}

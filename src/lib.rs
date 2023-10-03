@@ -67,6 +67,7 @@ pub mod aws;
 #[allow(unreachable_pub)]
 pub mod codecs;
 pub(crate) mod common;
+mod convert_config;
 pub mod encoding_transcode;
 pub mod enrichment_tables;
 #[cfg(feature = "gcp")]
@@ -101,12 +102,12 @@ pub mod sources;
 pub mod stats;
 #[cfg(feature = "api-client")]
 #[allow(unreachable_pub)]
-mod tap;
+pub mod tap;
 pub mod template;
 pub mod test_util;
 #[cfg(feature = "api-client")]
 #[allow(unreachable_pub)]
-pub(crate) mod top;
+pub mod top;
 #[allow(unreachable_pub)]
 pub mod topology;
 pub mod trace;
@@ -122,6 +123,38 @@ pub mod vector_windows;
 pub use source_sender::SourceSender;
 pub use vector_common::{shutdown, Error, Result};
 pub use vector_core::{event, metrics, schema, tcp, tls};
+
+static APP_NAME_SLUG: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+
+/// Flag denoting whether or not enterprise features are enabled.
+#[cfg(feature = "enterprise")]
+pub static ENTERPRISE_ENABLED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+
+/// The name used to identify this Vector application.
+///
+/// This can be set at compile-time through the VECTOR_APP_NAME env variable.
+/// Defaults to "Vector".
+pub fn get_app_name() -> &'static str {
+    #[cfg(not(feature = "enterprise"))]
+    let app_name = "Vector";
+    #[cfg(feature = "enterprise")]
+    let app_name = if *ENTERPRISE_ENABLED.get().unwrap_or(&false) {
+        "Vector Enterprise"
+    } else {
+        "Vector"
+    };
+
+    option_env!("VECTOR_APP_NAME").unwrap_or(app_name)
+}
+
+/// Returns a slugified version of the name used to identify this Vector application.
+///
+/// Defaults to "vector".
+pub fn get_slugified_app_name() -> String {
+    APP_NAME_SLUG
+        .get_or_init(|| get_app_name().to_lowercase().replace(' ', "-"))
+        .clone()
+}
 
 /// The current version of Vector in simplified format.
 /// `<version-number>-nightly`.

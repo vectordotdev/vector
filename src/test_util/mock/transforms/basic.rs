@@ -12,7 +12,6 @@ use vector_core::{
     schema,
     transform::{FunctionTransform, OutputBuffer, Transform},
 };
-use vrl::path::PathPrefix;
 use vrl::value::Value;
 
 use crate::config::{OutputId, TransformConfig, TransformContext};
@@ -76,11 +75,10 @@ impl FunctionTransform for BasicTransform {
     fn transform(&mut self, output: &mut OutputBuffer, mut event: Event) {
         match &mut event {
             Event::Log(log) => {
-                if let Some(message_key) = crate::config::log_schema().message_key() {
-                    let target_path = (PathPrefix::Event, message_key);
-                    let mut v = log.get(target_path).unwrap().to_string_lossy().into_owned();
+                if let Some(message_key) = crate::config::log_schema().message_key_target_path() {
+                    let mut v = log.get(message_key).unwrap().to_string_lossy().into_owned();
                     v.push_str(&self.suffix);
-                    log.insert(target_path, Value::from(v));
+                    log.insert(message_key, Value::from(v));
                 }
             }
             Event::Metric(metric) => {

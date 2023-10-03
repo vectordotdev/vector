@@ -37,10 +37,4 @@ license-files = [
 ]
 
 [advisories]
-ignore = [
-    # The NATS official Rust clients are vulnerable to MitM when using TLS
-    #
-    # Will be resolved when we switch to `async_nats` crate
-    # https://github.com/vectordotdev/vector/pull/15533
-    "RUSTSEC-2023-0029",
-]
+ignore = [ ]

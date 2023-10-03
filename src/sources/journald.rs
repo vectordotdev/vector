@@ -40,6 +40,7 @@ use vector_core::{
     schema::Definition,
     EstimatedJsonEncodedSizeOf,
 };
+use vrl::event_path;
 use vrl::value::{kind::Collection, Kind, Value};
 
 use crate::{
@@ -155,6 +156,13 @@ pub struct JournaldConfig {
     #[configurable(metadata(docs::human_name = "Data Directory"))]
     pub data_dir: Option<PathBuf>,
 
+    /// A list of extra command line arguments to pass to `journalctl`.
+    ///
+    /// If specified, it is merged to the command line arguments as-is.
+    #[serde(default)]
+    #[configurable(metadata(docs::examples = "--merge"))]
+    pub extra_args: Vec<String>,
+
     /// The systemd journal is read in batches, and a checkpoint is set at the end of each batch.
     ///
     /// This option limits the size of the batch.
@@ -208,16 +216,13 @@ const fn default_batch_size() -> usize {
 }
 
 fn matches_examples() -> HashMap<String, Vec<String>> {
-    HashMap::<_, _>::from_iter(
-        [
-            (
-                "_SYSTEMD_UNIT".to_owned(),
-                vec!["sshd.service".to_owned(), "ntpd.service".to_owned()],
-            ),
-            ("_TRANSPORT".to_owned(), vec!["kernel".to_owned()]),
-        ]
-        .into_iter(),
-    )
+    HashMap::<_, _>::from_iter([
+        (
+            "_SYSTEMD_UNIT".to_owned(),
+            vec!["sshd.service".to_owned(), "ntpd.service".to_owned()],
+        ),
+        ("_TRANSPORT".to_owned(), vec!["kernel".to_owned()]),
+    ])
 }
 
 impl JournaldConfig {
@@ -299,6 +304,7 @@ impl Default for JournaldConfig {
             journalctl_path: None,
             journal_directory: None,
             journal_namespace: None,
+            extra_args: vec![],
             acknowledgements: Default::default(),
             remap_priority: false,
             log_namespace: None,
@@ -353,6 +359,7 @@ impl SourceConfig for JournaldConfig {
             self.journal_namespace.clone(),
             self.current_boot_only,
             self.since_now,
+            self.extra_args.clone(),
         );
 
         let batch_size = self.batch_size;
@@ -623,6 +630,7 @@ struct StartJournalctl {
     journal_namespace: Option<String>,
     current_boot_only: bool,
     since_now: bool,
+    extra_args: Vec<String>,
 }
 
 impl StartJournalctl {
@@ -632,6 +640,7 @@ impl StartJournalctl {
         journal_namespace: Option<String>,
         current_boot_only: bool,
         since_now: bool,
+        extra_args: Vec<String>,
     ) -> Self {
         Self {
             path,
@@ -639,6 +648,7 @@ impl StartJournalctl {
             journal_namespace,
             current_boot_only,
             since_now,
+            extra_args,
         }
     }
 
@@ -669,6 +679,10 @@ impl StartJournalctl {
         } else {
             // journalctl --follow only outputs a few lines without a starting point
             command.arg("--since=2000-01-01");
+        }
+
+        if !self.extra_args.is_empty() {
+            command.args(&self.extra_args);
         }
 
         command
@@ -703,7 +717,7 @@ impl Drop for RunningJournalctl {
 }
 
 fn enrich_log_event(log: &mut LogEvent, log_namespace: LogNamespace) {
-    if let Some(host) = log.remove(HOSTNAME) {
+    if let Some(host) = log.remove(event_path!(HOSTNAME)) {
         log_namespace.insert_source_metadata(
             JournaldConfig::NAME,
             log,
@@ -715,8 +729,8 @@ fn enrich_log_event(log: &mut LogEvent, log_namespace: LogNamespace) {
 
     // Create a Utc timestamp from an existing log field if present.
     let timestamp = log
-        .get(SOURCE_TIMESTAMP)
-        .or_else(|| log.get(RECEIVED_TIMESTAMP))
+        .get(event_path!(SOURCE_TIMESTAMP))
+        .or_else(|| log.get(event_path!(RECEIVED_TIMESTAMP)))
         .filter(|&ts| ts.is_bytes())
         .and_then(|ts| {
             String::from_utf8_lossy(ts.as_bytes().unwrap())
@@ -781,7 +795,7 @@ fn create_log_event_from_record(
         LogNamespace::Legacy => {
             let mut log = LogEvent::from_iter(record).with_batch_notifier_option(batch);
 
-            if let Some(message) = log.remove(MESSAGE) {
+            if let Some(message) = log.remove(event_path!(MESSAGE)) {
                 log.maybe_insert(log_schema().message_key_target_path(), message);
             }
 
@@ -1416,6 +1430,7 @@ mod tests {
         let current_boot_only = false;
         let cursor = None;
         let since_now = false;
+        let extra_args = vec![];
 
         let command = create_command(
             &path,
@@ -1424,6 +1439,7 @@ mod tests {
             current_boot_only,
             since_now,
             cursor,
+            extra_args,
         );
         let cmd_line = format!("{:?}", command);
         assert!(!cmd_line.contains("--directory="));
@@ -1434,6 +1450,7 @@ mod tests {
         let journal_dir = None;
         let journal_namespace = None;
         let since_now = true;
+        let extra_args = vec![];
 
         let command = create_command(
             &path,
@@ -1442,6 +1459,7 @@ mod tests {
             current_boot_only,
             since_now,
             cursor,
+            extra_args,
         );
         let cmd_line = format!("{:?}", command);
         assert!(cmd_line.contains("--since=now"));
@@ -1450,6 +1468,7 @@ mod tests {
         let journal_namespace = Some(String::from("my_namespace"));
         let current_boot_only = true;
         let cursor = Some("2021-01-01");
+        let extra_args = vec!["--merge".to_string()];
 
         let command = create_command(
             &path,
@@ -1458,12 +1477,14 @@ mod tests {
             current_boot_only,
             since_now,
             cursor,
+            extra_args,
         );
         let cmd_line = format!("{:?}", command);
         assert!(cmd_line.contains("--directory=/tmp/journal-dir"));
         assert!(cmd_line.contains("--namespace=my_namespace"));
         assert!(cmd_line.contains("--boot"));
         assert!(cmd_line.contains("--after-cursor="));
+        assert!(cmd_line.contains("--merge"));
     }
 
     fn create_command(
@@ -1473,6 +1494,7 @@ mod tests {
         current_boot_only: bool,
         since_now: bool,
         cursor: Option<&str>,
+        extra_args: Vec<String>,
     ) -> Command {
         StartJournalctl::new(
             path.into(),
@@ -1480,6 +1502,7 @@ mod tests {
             journal_namespace,
             current_boot_only,
             since_now,
+            extra_args,
         )
         .make_command(cursor)
     }

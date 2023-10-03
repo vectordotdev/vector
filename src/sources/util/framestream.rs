@@ -330,7 +330,7 @@ impl FrameStreamReader {
 
     fn send_control_frame(&mut self, frame: Bytes) {
         let empty_frame = Bytes::from(&b""[..]); //send empty frame to say we are control frame
-        let mut stream = stream::iter(vec![Ok(empty_frame), Ok(frame)].into_iter());
+        let mut stream = stream::iter(vec![Ok(empty_frame), Ok(frame)]);
 
         if let Err(e) = block_on(self.response_sink.lock().unwrap().send_all(&mut stream)) {
             error!("Encountered error '{:#?}' while sending control frame.", e);
@@ -666,7 +666,7 @@ mod test {
             let mut log_event = LogEvent::from(frame);
 
             log_event.insert(
-                log_schema().source_type_key().unwrap().to_string().as_str(),
+                log_schema().source_type_key_target_path().unwrap(),
                 "framestream",
             );
             if let Some(host) = received_from {

@@ -183,6 +183,8 @@ impl<T: Bufferable> TopologyBuilder<T> {
     /// This is a convenience method for `vector` as it is used for inter-transform channels, and we
     /// can simplifying needing to require callers to do all the boilerplate to create the builder,
     /// create the stage, installing buffer usage metrics that aren't required, and so on.
+    ///
+    #[allow(clippy::print_stderr)]
     pub async fn standalone_memory(
         max_events: NonZeroUsize,
         when_full: WhenFull,
@@ -193,7 +195,7 @@ impl<T: Bufferable> TopologyBuilder<T> {
         let (sender, receiver) = memory_buffer
             .into_buffer_parts(usage_handle.clone())
             .await
-            .expect("should not fail to directly create a memory buffer");
+            .unwrap_or_else(|_| unreachable!("should not fail to directly create a memory buffer"));
 
         let mode = match when_full {
             WhenFull::Overflow => WhenFull::Block,
@@ -228,7 +230,7 @@ impl<T: Bufferable> TopologyBuilder<T> {
         let (sender, receiver) = memory_buffer
             .into_buffer_parts(usage_handle.clone())
             .await
-            .expect("should not fail to directly create a memory buffer");
+            .unwrap_or_else(|_| unreachable!("should not fail to directly create a memory buffer"));
 
         let mode = match when_full {
             WhenFull::Overflow => WhenFull::Block,

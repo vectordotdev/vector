@@ -420,7 +420,12 @@ components: sources: internal_metrics: {
 			description:       "The number of events dropped by this component."
 			type:              "counter"
 			default_namespace: "vector"
-			tags:              _component_tags
+			tags:              _component_tags & {
+				intentional: {
+					description: "True if the events were discarded intentionally, like a `filter` transform, or false if due to an error."
+					required:    true
+				}
+			}
 		}
 		component_errors_total: {
 			description:       "The total number of errors encountered by this component."
@@ -728,6 +733,14 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags & {
 				status: _status
+			}
+		}
+		http_client_requests_sent_total: {
+			description:       "The total number of sent HTTP requests, tagged with the request method."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags & {
+				method: _method
 			}
 		}
 		http_client_responses_total: {
@@ -1181,6 +1194,10 @@ components: sources: internal_metrics: {
 		}
 		_status: {
 			description: "The HTTP status code of the request."
+			required:    false
+		}
+		_method: {
+			description: "The HTTP method of the request."
 			required:    false
 		}
 		_path: {

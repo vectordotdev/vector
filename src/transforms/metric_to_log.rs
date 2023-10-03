@@ -313,7 +313,7 @@ impl MetricToLog {
 
                         if let Some(host_tag) = &self.host_tag {
                             if let Some(host_value) =
-                                log.remove_prune(host_tag.to_string().as_str(), true)
+                                log.remove_prune((PathPrefix::Event, host_tag), true)
                             {
                                 log.maybe_insert(log_schema().host_key_target_path(), host_value);
                             }
@@ -354,7 +354,7 @@ mod tests {
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
     use vector_common::config::ComponentKey;
-    use vector_core::metric_tags;
+    use vector_core::{event::EventMetadata, metric_tags};
 
     use super::*;
     use crate::event::{
@@ -408,12 +408,17 @@ mod tests {
         }
     }
 
+    fn event_metadata() -> EventMetadata {
+        EventMetadata::default().with_source_type("unit_test_stream")
+    }
+
     #[tokio::test]
     async fn transform_counter() {
-        let counter = Metric::new(
+        let counter = Metric::new_with_metadata(
             "counter",
             MetricKind::Absolute,
             MetricValue::Counter { value: 1.0 },
+            event_metadata(),
         )
         .with_tags(Some(tags()))
         .with_timestamp(Some(ts()));
@@ -423,7 +428,7 @@ mod tests {
         metadata.set_schema_definition(&Arc::new(schema_definition(LogNamespace::Legacy)));
 
         let log = do_transform(counter).await.unwrap();
-        let collected: Vec<_> = log.all_fields().unwrap().collect();
+        let collected: Vec<_> = log.all_event_fields().unwrap().collect();
 
         assert_eq!(
             collected,
@@ -441,10 +446,11 @@ mod tests {
 
     #[tokio::test]
     async fn transform_gauge() {
-        let gauge = Metric::new(
+        let gauge = Metric::new_with_metadata(
             "gauge",
             MetricKind::Absolute,
             MetricValue::Gauge { value: 1.0 },
+            event_metadata(),
         )
         .with_timestamp(Some(ts()));
         let mut metadata = gauge.metadata().clone();
@@ -453,7 +459,7 @@ mod tests {
         metadata.set_schema_definition(&Arc::new(schema_definition(LogNamespace::Legacy)));
 
         let log = do_transform(gauge).await.unwrap();
-        let collected: Vec<_> = log.all_fields().unwrap().collect();
+        let collected: Vec<_> = log.all_event_fields().unwrap().collect();
 
         assert_eq!(
             collected,
@@ -469,12 +475,13 @@ mod tests {
 
     #[tokio::test]
     async fn transform_set() {
-        let set = Metric::new(
+        let set = Metric::new_with_metadata(
             "set",
             MetricKind::Absolute,
             MetricValue::Set {
                 values: vec!["one".into(), "two".into()].into_iter().collect(),
             },
+            event_metadata(),
         )
         .with_timestamp(Some(ts()));
         let mut metadata = set.metadata().clone();
@@ -483,7 +490,7 @@ mod tests {
         metadata.set_schema_definition(&Arc::new(schema_definition(LogNamespace::Legacy)));
 
         let log = do_transform(set).await.unwrap();
-        let collected: Vec<_> = log.all_fields().unwrap().collect();
+        let collected: Vec<_> = log.all_event_fields().unwrap().collect();
 
         assert_eq!(
             collected,
@@ -500,13 +507,14 @@ mod tests {
 
     #[tokio::test]
     async fn transform_distribution() {
-        let distro = Metric::new(
+        let distro = Metric::new_with_metadata(
             "distro",
             MetricKind::Absolute,
             MetricValue::Distribution {
                 samples: vector_core::samples![1.0 => 10, 2.0 => 20],
                 statistic: StatisticKind::Histogram,
             },
+            event_metadata(),
         )
         .with_timestamp(Some(ts()));
         let mut metadata = distro.metadata().clone();
@@ -515,7 +523,7 @@ mod tests {
         metadata.set_schema_definition(&Arc::new(schema_definition(LogNamespace::Legacy)));
 
         let log = do_transform(distro).await.unwrap();
-        let collected: Vec<_> = log.all_fields().unwrap().collect();
+        let collected: Vec<_> = log.all_event_fields().unwrap().collect();
 
         assert_eq!(
             collected,
@@ -550,7 +558,7 @@ mod tests {
 
     #[tokio::test]
     async fn transform_histogram() {
-        let histo = Metric::new(
+        let histo = Metric::new_with_metadata(
             "histo",
             MetricKind::Absolute,
             MetricValue::AggregatedHistogram {
@@ -558,6 +566,7 @@ mod tests {
                 count: 30,
                 sum: 50.0,
             },
+            event_metadata(),
         )
         .with_timestamp(Some(ts()));
         let mut metadata = histo.metadata().clone();
@@ -566,7 +575,7 @@ mod tests {
         metadata.set_schema_definition(&Arc::new(schema_definition(LogNamespace::Legacy)));
 
         let log = do_transform(histo).await.unwrap();
-        let collected: Vec<_> = log.all_fields().unwrap().collect();
+        let collected: Vec<_> = log.all_event_fields().unwrap().collect();
 
         assert_eq!(
             collected,
@@ -599,7 +608,7 @@ mod tests {
 
     #[tokio::test]
     async fn transform_summary() {
-        let summary = Metric::new(
+        let summary = Metric::new_with_metadata(
             "summary",
             MetricKind::Absolute,
             MetricValue::AggregatedSummary {
@@ -607,6 +616,7 @@ mod tests {
                 count: 30,
                 sum: 50.0,
             },
+            event_metadata(),
         )
         .with_timestamp(Some(ts()));
         let mut metadata = summary.metadata().clone();
@@ -615,7 +625,7 @@ mod tests {
         metadata.set_schema_definition(&Arc::new(schema_definition(LogNamespace::Legacy)));
 
         let log = do_transform(summary).await.unwrap();
-        let collected: Vec<_> = log.all_fields().unwrap().collect();
+        let collected: Vec<_> = log.all_event_fields().unwrap().collect();
 
         assert_eq!(
             collected,

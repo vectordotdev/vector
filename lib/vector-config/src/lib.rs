@@ -117,6 +117,7 @@ pub use self::configurable::{Configurable, ConfigurableRef, ToValue};
 mod errors;
 pub use self::errors::{BoundDirection, GenerateError};
 mod external;
+mod http;
 mod metadata;
 pub use self::metadata::Metadata;
 mod named;
