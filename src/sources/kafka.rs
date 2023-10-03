@@ -435,20 +435,12 @@ async fn kafka_source(
         .expect("Error setting up consumer callback channel.");
 
     // EOF signal allowing the coordination task to tell the kafka client task when all partitions have reached EOF
-    let (eof_tx, eof_rx) = if eof {
-        let (tx, rx) = oneshot::channel::<()>();
-        (Some(tx), Some(rx))
-    } else {
-        (None, None)
-    };
+    let (eof_tx, eof_rx) = eof.then(|| oneshot::channel::<()>()).unzip();
 
     let coordination_task = {
         let span = span.clone();
         let consumer = Arc::clone(&consumer);
-        let drain_timeout_ms = match config.drain_timeout_ms {
-            Some(d) => Duration::from_millis(d),
-            None => config.session_timeout_ms / 2,
-        };
+        let drain_timeout_ms = config.drain_timeout_ms.map_or(config.session_timeout_ms / 2, Duration::from_millis);
         let consumer_state =
             ConsumerStateInner::<Consuming>::new(config, decoder, out, log_namespace);
         tokio::spawn(async move {
@@ -796,7 +788,7 @@ async fn coordinate_kafka_callbacks(
             Some(callback) = callbacks.recv() => match callback {
                 KafkaCallback::PartitionsAssigned(mut assigned_partitions, done) => match consumer_state {
                     ConsumerState::Complete(_) => unreachable!("Partition assignment received after completion."),
-                    ConsumerState::Draining(_) => error!("Partition assignment received while draining revoked partitions, invalid assignment?"),
+                    ConsumerState::Draining(_) => error!("Partition assignment received while draining revoked partitions, maybe an invalid assignment."),
                     ConsumerState::Consuming(ref consumer_state) => {
                         let acks = consumer.context().acknowledgements;
                         for tp in assigned_partitions.drain(0..) {
