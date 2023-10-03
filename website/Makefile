@@ -94,3 +94,13 @@ local-preview-build: clean setup structured-data preview-build run-link-checker
 # Generate Lighthouse scores locally
 lighthouse-report:
 	yarn lighthouse
+
+# Hot reload dev environment for the website
+local-server:
+	hugo server \
+	--disableFastRender \
+	 -verbose \
+	 --debug
+
+# local dev environment with hot reload
+local-dev: clean structured-data local-server
