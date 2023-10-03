@@ -2,7 +2,7 @@ use super::Deserializer;
 use crate::encoding::AvroSerializerOptions;
 use bytes::Buf;
 use bytes::Bytes;
-use chrono::Utc;
+use chrono::{TimeZone, Utc};
 use lookup::event_path;
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
@@ -207,10 +207,19 @@ pub fn try_from(value: AvroValue) -> vector_common::Result<VrlValue> {
         AvroValue::String(string) => Ok(VrlValue::from(string)),
         AvroValue::TimeMicros(time_micros) => Ok(VrlValue::from(time_micros)),
         AvroValue::TimeMillis(time_millis) => Ok(VrlValue::from(time_millis)),
-        AvroValue::TimestampMicros(timestamp_micros) => Ok(VrlValue::from(timestamp_micros)),
-        AvroValue::TimestampMillis(timestamp_millis) => Ok(VrlValue::from(timestamp_millis)),
+        AvroValue::TimestampMicros(micros) => Ok(VrlValue::Timestamp(
+            Utc.timestamp_micros(micros)
+                .single()
+                .ok_or("failed to convert LocalTimestampMillis")?,
+        )),
+        AvroValue::TimestampMillis(millis) => Ok(VrlValue::Timestamp(
+            Utc.timestamp_millis_opt(millis)
+                .single()
+                .ok_or("failed to convert TimestampMillis")?,
+        )),
         AvroValue::Union(_, v) => try_from(*v),
         AvroValue::Uuid(uuid) => Ok(VrlValue::from(uuid.as_bytes())),
+        AvroValue::LocalTimestampMillis(_) | AvroValue::LocalTimestampMicros(_) => unimplemented!(),
     }
 }
 
