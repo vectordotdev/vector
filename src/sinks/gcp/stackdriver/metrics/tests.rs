@@ -262,3 +262,120 @@ async fn aggregates_metrics() {
         event[0]
     );
 }
+
+#[tokio::test]
+async fn aggregates_metrics_batch_size() {
+    let in_addr = next_addr();
+    let mut batch = BatchConfig::default();
+
+    // We specify a batch size of 2.
+    batch.max_events = Some(2);
+
+    let config = StackdriverConfig {
+        endpoint: format!("http://{in_addr}"),
+        auth: GcpAuthConfig {
+            api_key: None,
+            credentials_path: None,
+            skip_authentication: true,
+        },
+        batch,
+        ..Default::default()
+    };
+    let (rx, trigger, server) = build_test_server(in_addr);
+    tokio::spawn(server);
+
+    let context = SinkContext::default();
+    let (sink, _healthcheck) = config.build(context).await.unwrap();
+
+    let timestamp1 = Utc::now();
+    let timestamp2 = Utc::now();
+    let timestamp3 = Utc::now();
+    let timestamp4 = Utc::now();
+
+    let event = vec![
+        Event::Metric(
+            Metric::new(
+                "gauge",
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: 1_f64 },
+            )
+            .with_timestamp(Some(timestamp1)),
+        ),
+        Event::Metric(
+            Metric::new(
+                "gauge",
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: 5_f64 },
+            )
+            .with_timestamp(Some(timestamp2)),
+        ),
+        Event::Metric(
+            Metric::new(
+                "gauge",
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: 7_f64 },
+            )
+            .with_timestamp(Some(timestamp3)),
+        ),
+        Event::Metric(
+            Metric::new(
+                "gauge",
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: 10_f64 },
+            )
+            .with_timestamp(Some(timestamp4)),
+        ),
+    ];
+    run_and_assert_sink_compliance(sink, stream::iter(event), &SINK_TAGS).await;
+
+    drop(trigger);
+
+    let event = rx
+        .take(2)
+        .map(|(_, bytes)| serde_json::from_slice::<serde_json::Value>(&bytes).unwrap())
+        .collect::<Vec<_>>()
+        .await;
+
+    // Whilst the batch size was set to 2, we actually get two batches with a single metric in them. This is because
+    // batches are counted by the number of incoming events. In this case 2 metrics were aggregated down to one, hence
+    // each batch being output with a single event.
+    assert_eq!(
+        serde_json::json! ({
+        "timeSeries":[
+            {
+                "metric":{
+                    "type":"custom.googleapis.com//metrics/gauge",
+                    "labels":{}
+                },
+                "resource":{"type":"","labels":{}},
+                "metricKind":"GAUGE",
+                "valueType":"INT64",
+                "points":[{
+                    "interval":{"endTime":timestamp2.to_rfc3339_opts(chrono::SecondsFormat::Nanos, true)},
+                    "value":{"int64Value":"5"}
+                }]
+            }]
+        }),
+        event[0]
+    );
+
+    assert_eq!(
+        serde_json::json! ({
+        "timeSeries":[
+            {
+                "metric":{
+                    "type":"custom.googleapis.com//metrics/gauge",
+                    "labels":{}
+                },
+                "resource":{"type":"","labels":{}},
+                "metricKind":"GAUGE",
+                "valueType":"INT64",
+                "points":[{
+                    "interval":{"endTime":timestamp4.to_rfc3339_opts(chrono::SecondsFormat::Nanos, true)},
+                    "value":{"int64Value":"10"}
+                }]
+            }]
+        }),
+        event[1]
+    );
+}

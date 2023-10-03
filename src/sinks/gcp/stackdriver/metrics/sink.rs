@@ -1,8 +1,47 @@
-use vector_core::event::MetricValue;
+use vector_core::event::{Metric, MetricValue};
 
-use crate::sinks::{prelude::*, util::http::HttpRequest};
+use crate::sinks::{
+    prelude::*,
+    util::{
+        buffer::metrics::{MetricNormalize, MetricSet},
+        http::HttpRequest,
+    },
+};
 
 use super::request_builder::StackdriverMetricsRequestBuilder;
+
+#[derive(Clone, Debug, Default)]
+struct StackdriverMetricsNormalize;
+
+impl MetricNormalize for StackdriverMetricsNormalize {
+    fn normalize(&mut self, state: &mut MetricSet, metric: Metric) -> Option<Metric> {
+        match (metric.kind(), &metric.value()) {
+            (_, MetricValue::Counter { .. }) => state.make_absolute(metric),
+            (_, MetricValue::Gauge { .. }) => state.make_absolute(metric),
+            // All others are left as-is
+            _ => Some(metric),
+        }
+    }
+}
+
+#[derive(Clone)]
+pub(super) struct EventCollection {
+    pub(super) finalizers: EventFinalizers,
+    pub(super) events: MetricSet,
+    pub(super) events_byte_size: usize,
+    pub(super) events_json_byte_size: GroupedCountByteSize,
+}
+
+impl Default for EventCollection {
+    fn default() -> Self {
+        Self {
+            finalizers: Default::default(),
+            events: Default::default(),
+            events_byte_size: Default::default(),
+            events_json_byte_size: telemetry().create_request_count_byte_size(),
+        }
+    }
+}
 
 pub(super) struct StackdriverMetricsSink<S> {
     service: S,
@@ -45,8 +84,20 @@ where
                     }
                 })
             })
-            // TODO Add some kind of normalizer
-            .batched(self.batch_settings.into_byte_size_config())
+            .normalized_with_default::<StackdriverMetricsNormalize>()
+            .batched(self.batch_settings.into_reducer_config(
+                |data: &Metric| data.size_of(),
+                |event_collection: &mut EventCollection, mut item: Metric| {
+                    event_collection
+                        .finalizers
+                        .merge(item.metadata_mut().take_finalizers());
+                    event_collection.events_byte_size += item.size_of();
+                    event_collection
+                        .events_json_byte_size
+                        .add_event(&item, item.estimated_json_encoded_size_of());
+                    event_collection.events.insert_update(item);
+                },
+            ))
             .request_builder(
                 default_request_builder_concurrency_limit(),
                 self.request_builder,

@@ -6,12 +6,14 @@ use vector_core::event::{Metric, MetricValue};
 
 use crate::sinks::{gcp, prelude::*, util::http::HttpRequest};
 
+use super::sink::EventCollection;
+
 #[derive(Clone, Debug)]
 pub(super) struct StackdriverMetricsRequestBuilder {
     pub(super) encoder: StackdriverMetricsEncoder,
 }
 
-impl RequestBuilder<Vec<Metric>> for StackdriverMetricsRequestBuilder {
+impl RequestBuilder<EventCollection> for StackdriverMetricsRequestBuilder {
     type Metadata = EventFinalizers;
     type Events = Vec<Metric>;
     type Encoder = StackdriverMetricsEncoder;
@@ -29,9 +31,10 @@ impl RequestBuilder<Vec<Metric>> for StackdriverMetricsRequestBuilder {
 
     fn split_input(
         &self,
-        mut events: Vec<Metric>,
+        events: EventCollection,
     ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
-        let finalizers = events.take_finalizers();
+        let finalizers = events.finalizers;
+        let events = events.events.into_metrics();
         let builder = RequestMetadataBuilder::from_events(&events);
         (finalizers, builder, events)
     }
