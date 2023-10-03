@@ -94,16 +94,15 @@ pub trait SinkBuilderExt: Stream {
     /// Constructs a [`Stream`] which transforms the input into a request suitable for sending to
     /// downstream services.
     ///
-    /// Each input is transformed concurrently, up to the given limit.  A limit of `None` is
-    /// self-describing, as it imposes no concurrency limit, and `Some(n)` limits this stage to `n`
-    /// concurrent operations at any given time.
+    /// Each input is transformed concurrently, up to the given limit.  A limit of `n` limits
+    /// this stage to `n` concurrent operations at any given time.
     ///
     /// Encoding and compression are handled internally, deferring to the builder at the necessary
     /// checkpoints for adjusting the event before encoding/compression, as well as generating the
     /// correct request object with the result of encoding/compressing the events.
     fn request_builder<B>(
         self,
-        limit: Option<NonZeroUsize>,
+        limit: NonZeroUsize,
         builder: B,
     ) -> ConcurrentMap<Self, Result<B::Request, B::Error>>
     where
@@ -115,7 +114,7 @@ pub trait SinkBuilderExt: Stream {
     {
         let builder = Arc::new(builder);
 
-        self.concurrent_map(limit, move |input| {
+        self.concurrent_map(Some(limit), move |input| {
             let builder = Arc::clone(&builder);
 
             Box::pin(async move {

@@ -12,7 +12,7 @@ pub use format::{
     GelfDeserializerConfig, GelfDeserializerOptions, JsonDeserializer, JsonDeserializerConfig,
     JsonDeserializerOptions, NativeDeserializer, NativeDeserializerConfig, NativeJsonDeserializer,
     NativeJsonDeserializerConfig, NativeJsonDeserializerOptions, ProtobufDeserializer,
-    ProtobufDeserializerConfig,
+    ProtobufDeserializerConfig, ProtobufDeserializerOptions,
 };
 #[cfg(feature = "syslog")]
 pub use format::{SyslogDeserializer, SyslogDeserializerConfig, SyslogDeserializerOptions};

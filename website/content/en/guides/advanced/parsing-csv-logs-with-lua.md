@@ -241,7 +241,6 @@ built-in functions, such as [`tonumber`][urls.lua_tonumber]. Alternatively, it i
 [docs.sinks.console]: /docs/reference/configuration/sinks/console/
 [docs.sources.file#multiline]: /docs/reference/configuration/sources/file/#multiline
 [docs.sources.file]: /docs/reference/configuration/sources/file/
-[docs.transforms.coercer#timestamps]: /docs/reference/vrl/functions/#to_timestamp
 [docs.transforms.coercer]: /docs/reference/vrl/functions/#coerce-functions
 [docs.transforms.lua#data-types]: /docs/reference/configuration/transforms/lua/#event-data-model
 [docs.transforms.lua#process]: /docs/reference/configuration/transforms/lua/#hooks.process
