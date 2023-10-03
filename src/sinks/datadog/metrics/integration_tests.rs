@@ -102,92 +102,92 @@ async fn smoke() {
 
     let output = rx.take(expected.len()).collect::<Vec<_>>().await;
 
-    assert!(output.len() == 1);
+    assert!(output.len() == 1, "Should have received a response");
 
-    output.first().map(|val| {
-        assert_eq!(
-            val.0.headers.get("Content-Type").unwrap(),
-            "application/json"
-        );
-        assert_eq!(val.0.headers.get("DD-API-KEY").unwrap(), "atoken");
-        assert!(val.0.headers.contains_key("DD-Agent-Payload"));
+    let val = output.first().unwrap();
 
-        let compressed_payload = val.1.to_vec();
-        let payload = decompress_payload(compressed_payload).unwrap();
-        let payload = std::str::from_utf8(&payload).unwrap();
-        let payload: serde_json::Value = serde_json::from_str(payload).unwrap();
+    assert_eq!(
+        val.0.headers.get("Content-Type").unwrap(),
+        "application/json"
+    );
+    assert_eq!(val.0.headers.get("DD-API-KEY").unwrap(), "atoken");
+    assert!(val.0.headers.contains_key("DD-Agent-Payload"));
 
-        let series = payload
-            .as_object()
-            .unwrap()
-            .get("series")
-            .unwrap()
-            .as_array()
-            .unwrap();
-        assert!(!series.is_empty());
+    let compressed_payload = val.1.to_vec();
+    let payload = decompress_payload(compressed_payload).unwrap();
+    let payload = std::str::from_utf8(&payload).unwrap();
+    let payload: serde_json::Value = serde_json::from_str(payload).unwrap();
 
-        // check metrics are sorted by name, which helps HTTP compression
-        let metric_names: Vec<String> = series
-            .iter()
-            .map(|value| {
-                value
-                    .as_object()
-                    .unwrap()
-                    .get("metric")
-                    .unwrap()
-                    .as_str()
-                    .unwrap()
-                    .to_string()
-            })
-            .collect();
-        let mut sorted_names = metric_names.clone();
-        sorted_names.sort();
-        assert_eq!(metric_names, sorted_names);
+    let series = payload
+        .as_object()
+        .unwrap()
+        .get("series")
+        .unwrap()
+        .as_array()
+        .unwrap();
+    assert!(!series.is_empty());
 
-        let entry = series.first().unwrap().as_object().unwrap();
-        assert!(entry
-            .get("metric")
-            .unwrap()
-            .as_str()
-            .unwrap()
-            .starts_with("foo.counter_"),);
-        assert_eq!(entry.get("type").unwrap().as_str().unwrap(), "count");
-        let points = entry
-            .get("points")
-            .unwrap()
-            .as_array()
-            .unwrap()
-            .first()
-            .unwrap()
-            .as_array()
-            .unwrap();
-        assert_eq!(points.len(), 2);
+    // check metrics are sorted by name, which helps HTTP compression
+    let metric_names: Vec<String> = series
+        .iter()
+        .map(|value| {
+            value
+                .as_object()
+                .unwrap()
+                .get("metric")
+                .unwrap()
+                .as_str()
+                .unwrap()
+                .to_string()
+        })
+        .collect();
+    let mut sorted_names = metric_names.clone();
+    sorted_names.sort();
+    assert_eq!(metric_names, sorted_names);
 
-        // validate that all values were received
-        let all_values: f64 = series
-            .iter()
-            .map(|entry| {
-                entry
-                    .as_object()
-                    .unwrap()
-                    .get("points")
-                    .unwrap()
-                    .as_array()
-                    .unwrap()
-                    .first()
-                    .unwrap()
-                    .as_array()
-                    .unwrap()
-                    .get(1)
-                    .unwrap()
-                    .as_f64()
-                    .unwrap()
-            })
-            .sum();
+    let entry = series.first().unwrap().as_object().unwrap();
+    assert!(entry
+        .get("metric")
+        .unwrap()
+        .as_str()
+        .unwrap()
+        .starts_with("foo.counter_"),);
+    assert_eq!(entry.get("type").unwrap().as_str().unwrap(), "count");
+    let points = entry
+        .get("points")
+        .unwrap()
+        .as_array()
+        .unwrap()
+        .first()
+        .unwrap()
+        .as_array()
+        .unwrap();
+    assert_eq!(points.len(), 2);
 
-        // the input values are [0..10)
-        assert_eq!(all_values, 45.0);
-    });
+    // validate that all values were received
+    let all_values: f64 = series
+        .iter()
+        .map(|entry| {
+            entry
+                .as_object()
+                .unwrap()
+                .get("points")
+                .unwrap()
+                .as_array()
+                .unwrap()
+                .first()
+                .unwrap()
+                .as_array()
+                .unwrap()
+                .get(1)
+                .unwrap()
+                .as_f64()
+                .unwrap()
+        })
+        .sum();
+
+    // the input values are [0..10)
+    assert_eq!(all_values, 45.0);
 }
 
 async fn run_sink() {
