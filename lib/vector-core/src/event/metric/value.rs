@@ -607,8 +607,10 @@ fn serialize_f64<S>(value: &f64, serializer: S) -> Result<S::Ok, S::Error>
 where
     S: Serializer,
 {
-    if value.is_infinite() || value.is_nan() {
-        serializer.serialize_str(&format!("{value}"))
+    if value.is_infinite() {
+        serializer.serialize_str(if value > 0 { "inf" } else { "-inf" })
+    } else if value.is_nan() {
+        serializer.serialize_str("NaN")
     } else {
         serializer.serialize_f64(*value)
     }
