@@ -585,8 +585,7 @@ impl ConsumerStateInner<Consuming> {
         acknowledgements: bool,
         exit_eof: bool,
     ) -> (oneshot::Sender<()>, tokio::task::AbortHandle) {
-        // TODO there's probably a better way to pass the keys() config around than cloning the entire config object? But they are tied to the lifetime of the config object, so..this avoids lifetime messes for now
-        let conf = self.config.clone();
+        let keys = self.config.keys();
         let decoder = self.decoder.clone();
         let log_namespace = self.log_namespace;
         let mut out = self.out.clone();
@@ -627,7 +626,7 @@ impl ConsumerStateInner<Consuming> {
                                 topic: msg.topic(),
                                 partition: msg.partition(),
                             });
-                            parse_message(msg, decoder.clone(), conf.keys(), &mut out, acknowledgements, &finalizer, log_namespace).await;
+                            parse_message(msg, decoder.clone(), &keys, &mut out, acknowledgements, &finalizer, log_namespace).await;
                         }
                     },
 
@@ -938,7 +937,7 @@ fn drive_kafka_consumer(
 async fn parse_message(
     msg: BorrowedMessage<'_>,
     decoder: Decoder,
-    keys: Keys<'_>,
+    keys: &'_ Keys,
     out: &mut SourceSender,
     acknowledgements: bool,
     finalizer: &Option<OrderedFinalizer<FinalizerEntry>>,
@@ -976,7 +975,7 @@ async fn parse_message(
 fn parse_stream<'a>(
     msg: &BorrowedMessage<'a>,
     decoder: Decoder,
-    keys: Keys<'a>,
+    keys: &'a Keys,
     log_namespace: LogNamespace,
 ) -> Option<(usize, impl Stream<Item = Event> + 'a)> {
     let payload = msg.payload()?; // skip messages with empty payload
@@ -1017,24 +1016,24 @@ fn parse_stream<'a>(
 }
 
 #[derive(Clone, Debug)]
-struct Keys<'a> {
+struct Keys {
     timestamp: Option<OwnedValuePath>,
-    key_field: &'a Option<OwnedValuePath>,
-    topic: &'a Option<OwnedValuePath>,
-    partition: &'a Option<OwnedValuePath>,
-    offset: &'a Option<OwnedValuePath>,
-    headers: &'a Option<OwnedValuePath>,
+    key_field: Option<OwnedValuePath>,
+    topic: Option<OwnedValuePath>,
+    partition: Option<OwnedValuePath>,
+    offset: Option<OwnedValuePath>,
+    headers: Option<OwnedValuePath>,
 }
 
-impl<'a> Keys<'a> {
-    fn from(schema: &'a LogSchema, config: &'a KafkaSourceConfig) -> Self {
+impl Keys {
+    fn from(schema: &LogSchema, config: &KafkaSourceConfig) -> Self {
         Self {
             timestamp: schema.timestamp_key().cloned(),
-            key_field: &config.key_field.path,
-            topic: &config.topic_key.path,
-            partition: &config.partition_key.path,
-            offset: &config.offset_key.path,
-            headers: &config.headers_key.path,
+            key_field: config.key_field.path.clone(),
+            topic: config.topic_key.path.clone(),
+            partition: config.partition_key.path.clone(),
+            offset: config.offset_key.path.clone(),
+            headers: config.headers_key.path.clone(),
         }
     }
 }
@@ -1083,7 +1082,7 @@ impl ReceivedMessage {
         }
     }
 
-    fn apply(&self, keys: &Keys<'_>, event: &mut Event, log_namespace: LogNamespace) {
+    fn apply(&self, keys: &Keys, event: &mut Event, log_namespace: LogNamespace) {
         if let Event::Log(ref mut log) = event {
             match log_namespace {
                 LogNamespace::Vector => {
