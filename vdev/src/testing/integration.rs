@@ -79,7 +79,6 @@ impl IntegrationTest {
         }
 
         env_vars.insert("TEST_LOG".to_string(), Some("info".into()));
-
         let mut args = self.config.args.clone().unwrap_or_default();
 
         args.push("--features".to_string());

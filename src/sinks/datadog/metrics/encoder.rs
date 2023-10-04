@@ -1368,7 +1368,7 @@ mod tests {
                         }
                     }
                 },
-                _ => panic!("should be sketch"),
+                _ => panic!("should be a sketch"),
             }
         }
 
