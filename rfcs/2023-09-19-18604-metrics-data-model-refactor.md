@@ -116,8 +116,7 @@ pub enum MetricValue {
 ### Removal of `AggregatedSummary`
 
 We would remove `AggregatedSummary` entirely, opting to handle them by decomposing them into
-individual metrics when received, and reassembling them (if need be) back into a single metric when
-shipping them out.
+individual metrics when received.
 
 Users would no longer be able to create metrics of this type in the `lua` transform.
 
@@ -150,43 +149,65 @@ The user-visible changes would be:
 ### Removal of `AggregatedSummary`
 
 We would entirely remove the `AggregatedSummary` variant from `MetricValue`. In order to still be
-able to handle aggregated summaries coming in and going out via the various Prometheus-specific
-sources and sinks, we would take an approach of separating (and combining) them into their
-individual values.
+able to handle aggregated summaries coming in via the Prometheus-specific sources, we would take an
+approach of separating them into their individual metrics.
 
 For example, an aggregated summary is represented as the total count of samples, the total sum of
 the samples, and a count of samples within a given quantile. For the count, sum, and each quantile's
 count, we can represent those values as individual gauges. For count and sum, this is
-straightforward, and merely requires appending a suffix to the metric name to individual which value
+straightforward, and merely requires appending a suffix to the metric name to indicate which value
 is which. For each quantile's count, a tag would be added that mimics the tagging structure used by
-Prometheus itself, such that the tag value is the bucket's upper bound.
+Prometheus itself, such that the tag value is the quantile value.
 
 #### Prometheus-specific sources
 
-For Prometheus-specific sources, aggregated summaries would be separated based on the logic that is
-otherwise used to emit them in a sink. As mentioned above, for ingesting these aggregated summaries,
-we would emit as multiple metrics: one for count, one for sum, and one for each bucket or quantile.
-For the bucket or quantile metrics, they would have the relevant tag that would be used if emitting
-the original aggregated metric in the Prometheus exposition format.
+As mentioned above, for ingesting these aggregated summaries, Prometheus-specific sources would
+instead emit individual metrics: one for count, one for sum, and one for each quantile. For the
+quantile metrics, they would have the relevant tag that would be used if emitting the original
+aggregated metric in the Prometheus exposition format. If we observe an aggregated summary being
+exported via a Prometheus scrape endpoint, it looks like this:
 
-#### Prometheus-specific sinks
+```
+# TYPE telemetry_requests_metrics_latency_microseconds summary
+telemetry_requests_metrics_latency_microseconds{quantile="0.01"} 3102
+telemetry_requests_metrics_latency_microseconds{quantile="0.05"} 3272
+telemetry_requests_metrics_latency_microseconds{quantile="0.5"} 4773
+telemetry_requests_metrics_latency_microseconds{quantile="0.9"} 9001
+telemetry_requests_metrics_latency_microseconds{quantile="0.99"} 76656
+telemetry_requests_metrics_latency_microseconds_sum 1.7560473e+07
+telemetry_requests_metrics_latency_microseconds_count 2693
+```
 
-For Prometheus-specific sinks, aggregated summaries would be recomposed/grouped based on both their
-series name as well as tags.
+After splitting aggregated summaries into their individual metrics, the individual metrics would be
+emitted from a Prometheus scrape endpoint like this instead:
 
-In the Prometheus exposition format, an aggregated summary might have a series name of `foo`. For
-both the count and sum of that aggregated metric, the series name for those values would be
-`foo_count` and `foo`. For the quantiles, multiple `foo` series would be emitted, each with the tag
-for the quantile, such as `foo{quantile="0.99"}`.
+```
+# TYPE telemetry_requests_metrics_latency_microseconds gauge
+telemetry_requests_metrics_latency_microseconds{quantile="0.01"} 3102
+telemetry_requests_metrics_latency_microseconds{quantile="0.05"} 3272
+telemetry_requests_metrics_latency_microseconds{quantile="0.5"} 4773
+telemetry_requests_metrics_latency_microseconds{quantile="0.9"} 9001
+telemetry_requests_metrics_latency_microseconds{quantile="0.99"} 76656
 
-In this way, the logic to group these decomposed metrics together is primarily based on prefix, but
-there is no specific marker to know if an individual metric itself should trigger such grouping
-logic. One approach could be to check each metric being processed to see if it was named in such a
-way as to represent the count or sum of an aggregated summary, or if it contained a tag that would
-represent a quantile. For metrics that matched this heuristic, they could be stored off to the side
-temporarily based on their "true" series name, and other metrics could then be processed, which
-would either lead to the remaining individual metrics being recombined or not. For any metrics
-falsely captured by this heuristic, they would simply be handled as-is at the end of processing.
+# TYPE telemetry_requests_metrics_latency_microseconds_sum gauge
+telemetry_requests_metrics_latency_microseconds_sum 1.7560473e+07
+
+# TYPE telemetry_requests_metrics_latency_microseconds_count gauge
+telemetry_requests_metrics_latency_microseconds_count 2693
+```
+
+#### Handling in sinks
+
+No changes are required to any sinks to support this change.
+
+All sinks besides the Prometheus-specific ones already convert aggregated summaries into their
+individual metrics, emitting gauges instead. This means that doing so directly when ingesting
+aggregated summaries has no functional change but allows us to clean up those sinks.
+
+For Prometheus-specific sinks, they would similarly take advantage of this work. Crucially,
+Prometheus itself stores aggregated summaries as their individual metrics already. When we emit
+gauges that match the same series -- name and tags -- as if we were handling aggregated summaries
+directly, the same data makes it to Prometheus.
 
 ### Removal of `Set`
 
@@ -305,6 +326,7 @@ convert `Distribution` into the highest fidelity form supported by the sink: a s
 sketches can ask for it to be converted to a sketch, while another sink that only supports
 histograms can ask for a histogram, since all distribution variants can be converted to either a
 histogram or sketch.
+
 ### Aligns more closely with other metrics systems
 
 While the current data model is more of a union of possible metric types based on the metric systems
@@ -318,28 +340,6 @@ meters, we can simplify our underlying data model both for our own benefit, as w
 of interoperability.
 
 ## Drawbacks
-
-### Reassembling decomposed metrics for correct handling
-
-The main drawback would be the complexity required to handle the "recomposing" of individual metrics
-where an aggregated summary could otherwise be handled.
-
-For Prometheus-specific sinks, this would entail grouping the metrics together. This is trivial to
-do in the naive sense of, say, sorting them so that they're all adjacent in the sink output.
-However, the trickier part would be the logic to essentially "find" them and determine that they're
-the decomposed pieces of an aggregated histogram, rather than simply uncorrelated metrics. This is
-import for the ability to properly tag the metrics as being part of an aggregated histogram or
-summary.
-
-In general, there are other facets that would add risk to this recomposing logic, such as mutation
-of the metrics in a topology (tag governance/cost control modifications leading to missing
-individual metrics) or batching in time and/or space that leads to metrics losing their natural
-grouping.
-
-Some of these risks are greater than others: tag governance/cost control techniques in topologies
-are very common, but events being split out of their original batch is very rare. However, the risks
-are still real and ultimately depend on the specifics of a given configuration, or could be
-influenced by unrelated changes to Vector internals.
 
 ### Large number of distribution types
 
@@ -440,10 +440,10 @@ losslessly convert one to the other.
 
 ## Plan Of Attack
 
-- [ ] Update the Protocol Buffers/Vector conversion code to handle the decomposing/recomposing of
-  aggregated summaries
-- [ ] Update the Prometheus sources/sinks to handle the decomposing/recomposing of aggregated
-  summaries
+- [ ] Update the Protocol Buffers/Vector conversion code to handle the decomposing of aggregated
+  summaries into their individual metrics
+- [ ] Update the Prometheus sources to handle decomposing aggregated summaries into their individual
+  metrics
 - [ ] Remove `AggregatedSummary` from `MetricValue`
 - [ ] Add support to `statsd` source to aggregate sets directly (still an outstanding question that
   would change whether or not this happens)
