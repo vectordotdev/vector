@@ -1,7 +1,7 @@
 use core::fmt;
 use std::collections::BTreeSet;
 
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 
 use vector_common::byte_size_of::ByteSizeOf;
 use vector_config::configurable_component;
@@ -9,6 +9,10 @@ use vector_config::configurable_component;
 use crate::{float_eq, metrics::AgentDDSketch};
 
 use super::{samples_to_buckets, write_list, write_word};
+
+const INFINITY: &str = "inf";
+const NEG_INFINITY: &str = "-inf";
+const NAN: &str = "NaN";
 
 /// Metric value.
 #[configurable_component]
@@ -608,9 +612,9 @@ where
     S: Serializer,
 {
     if value.is_infinite() {
-        serializer.serialize_str(if value > 0 { "inf" } else { "-inf" })
+        serializer.serialize_str(if *value > 0.0 { INFINITY } else { NEG_INFINITY })
     } else if value.is_nan() {
-        serializer.serialize_str("NaN")
+        serializer.serialize_str(NAN)
     } else {
         serializer.serialize_f64(*value)
     }
@@ -621,19 +625,30 @@ fn deserialize_f64<'de, D>(deserializer: D) -> Result<f64, D::Error>
 where
     D: Deserializer<'de>,
 {
-    let value: serde_json::Value = Deserialize::deserialize(deserializer)?;
-    match value {
-        serde_json::Value::Number(num) => num
-            .as_f64()
-            .ok_or_else(|| serde::de::Error::custom("Invalid f64 number")),
-        serde_json::Value::String(s) => match s.as_str() {
-            "NaN" => Ok(f64::NAN),
-            "inf" => Ok(f64::INFINITY),
-            "-inf" => Ok(f64::NEG_INFINITY),
-            _ => Err(serde::de::Error::custom("Invalid value")),
-        },
-        _ => Err(serde::de::Error::custom("Invalid value")),
+    struct UpperLimitVisitor;
+
+    impl<'de> de::Visitor<'de> for UpperLimitVisitor {
+        type Value = f64;
+
+        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+            formatter.write_str("a number or a special string value")
+        }
+
+        fn visit_f64<E: de::Error>(self, value: f64) -> Result<Self::Value, E> {
+            Ok(value)
+        }
+
+        fn visit_str<E: de::Error>(self, value: &str) -> Result<Self::Value, E> {
+            match value {
+                NAN => Ok(f64::NAN),
+                INFINITY => Ok(f64::INFINITY),
+                NEG_INFINITY => Ok(f64::NEG_INFINITY),
+                _ => Err(E::custom("unsupported string value")),
+            }
+        }
     }
+
+    deserializer.deserialize_any(UpperLimitVisitor)
 }
 
 /// A histogram bucket.
