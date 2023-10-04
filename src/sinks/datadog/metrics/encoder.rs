@@ -8,7 +8,6 @@ use std::{
 use bytes::{BufMut, Bytes};
 use chrono::{DateTime, Utc};
 use once_cell::sync::Lazy;
-use prost::Message;
 use snafu::{ResultExt, Snafu};
 use vector_common::request_metadata::GroupedCountByteSize;
 use vector_core::{
@@ -228,6 +227,21 @@ impl DatadogMetricsEncoder {
             .byte_size
             .add_event(&metric, metric.estimated_json_encoded_size_of());
 
+        // For V2 Series metrics, and Sketches: We encode a single Series or Sketch metric incrementally,
+        // which means that we specifically write it as if we were writing a single field entry in the
+        // overall `SketchPayload` message or `MetricPayload` type.
+        //
+        // By doing so, we can encode multiple metrics and concatenate all the buffers, and have the
+        // resulting buffer appear as if it's a normal `<>Payload` message with a bunch of repeats
+        // of the `sketches` / `series` field.
+        //
+        // Crucially, this code works because `SketchPayload` has two fields -- metadata and sketches --
+        // and we never actually set the metadata field... so the resulting message generated overall
+        // for `SketchPayload` with a single sketch looks just like as if we literally wrote out a
+        // single value for the given field.
+        //
+        // Similary, `MetricPayload` has a single repeated `series` field.
+
         match self.endpoint {
             // V1 Series metrics are encoded via JSON, in an incremental fashion.
             DatadogMetricsEndpoint::Series(SeriesApiVersion::V1) => {
@@ -258,21 +272,23 @@ impl DatadogMetricsEncoder {
                 | MetricValue::Gauge { .. }
                 | MetricValue::Set { .. }
                 | MetricValue::AggregatedSummary { .. } => {
-                    encode_series_v2_incremental(
+                    let series_proto = series_to_proto_message(
                         &metric,
                         &self.default_namespace,
                         self.log_schema,
-                        &mut self.state.buf,
                         self.origin_product_value,
-                    )
-                    .map_err(|_| EncoderError::ProtoEncodingFailed)?;
+                    )?;
+
+                    encode_proto_key_and_message(
+                        series_proto,
+                        get_series_payload_series_field_number(),
+                        &mut self.state.buf,
+                    )?;
                 }
-                MetricValue::Distribution { .. }
-                | MetricValue::AggregatedHistogram { .. }
-                | MetricValue::Sketch { .. } => {
+                value => {
                     return Err(EncoderError::InvalidMetric {
                         expected: "series",
-                        metric_value: metric.value().as_name(),
+                        metric_value: value.as_name(),
                     })
                 }
             },
@@ -280,15 +296,21 @@ impl DatadogMetricsEncoder {
             DatadogMetricsEndpoint::Sketches => match metric.value() {
                 MetricValue::Sketch { sketch } => match sketch {
                     MetricSketch::AgentDDSketch(ddsketch) => {
-                        encode_sketch_incremental(
+                        if let Some(sketch_proto) = sketch_to_proto_message(
                             &metric,
                             ddsketch,
                             &self.default_namespace,
                             self.log_schema,
-                            &mut self.state.buf,
                             self.origin_product_value,
-                        )
-                        .map_err(|_| EncoderError::ProtoEncodingFailed)?;
+                        ) {
+                            encode_proto_key_and_message(
+                                sketch_proto,
+                                get_sketch_payload_sketches_field_number(),
+                                &mut self.state.buf,
+                            )?;
+                        } else {
+                            // If the sketch was empty, that's fine too
+                        }
                     }
                 },
                 value => {
@@ -418,6 +440,22 @@ impl DatadogMetricsEncoder {
     }
 }
 
+fn generate_proto_metadata(
+    maybe_pass_through: Option<&DatadogMetricOriginMetadata>,
+    maybe_source_type: Option<&'static str>,
+    origin_product_value: u32,
+) -> Option<ddmetric_proto::Metadata> {
+    generate_origin_metadata(maybe_pass_through, maybe_source_type, origin_product_value).map(
+        |origin| ddmetric_proto::Metadata {
+            origin: Some(ddmetric_proto::Origin {
+                origin_product: origin.product().expect("OriginProduct should be set"),
+                origin_category: origin.category().expect("OriginCategory should be set"),
+                origin_service: origin.service().expect("OriginService should be set"),
+            }),
+        },
+    )
+}
+
 fn get_sketch_payload_sketches_field_number() -> u32 {
     static SKETCH_PAYLOAD_SKETCHES_FIELD_NUM: OnceLock<u32> = OnceLock::new();
     *SKETCH_PAYLOAD_SKETCHES_FIELD_NUM.get_or_init(|| {
@@ -433,20 +471,19 @@ fn get_sketch_payload_sketches_field_number() -> u32 {
     })
 }
 
-fn generate_proto_metadata(
-    maybe_pass_through: Option<&DatadogMetricOriginMetadata>,
-    maybe_source_type: Option<&'static str>,
-    origin_product_value: u32,
-) -> Option<ddmetric_proto::Metadata> {
-    generate_origin_metadata(maybe_pass_through, maybe_source_type, origin_product_value).map(
-        |origin| ddmetric_proto::Metadata {
-            origin: Some(ddmetric_proto::Origin {
-                origin_product: origin.product().expect("OriginProduct should be set"),
-                origin_category: origin.category().expect("OriginCategory should be set"),
-                origin_service: origin.service().expect("OriginService should be set"),
-            }),
-        },
-    )
+fn get_series_payload_series_field_number() -> u32 {
+    static SERIES_PAYLOAD_SERIES_FIELD_NUM: OnceLock<u32> = OnceLock::new();
+    *SERIES_PAYLOAD_SERIES_FIELD_NUM.get_or_init(|| {
+        let descriptors = protobuf_descriptors();
+        let descriptor = descriptors
+            .get_message_by_name("datadog.agentpayload.MetricPayload")
+            .expect("should not fail to find `MetricPayload` message in descriptor pool");
+
+        descriptor
+            .get_field_by_name("series")
+            .map(|field| field.number())
+            .expect("`series` field must exist in `MetricPayload` message")
+    })
 }
 
 fn sketch_to_proto_message(
@@ -515,72 +552,12 @@ fn sketch_to_proto_message(
     })
 }
 
-fn encode_sketch_incremental<B>(
-    metric: &Metric,
-    ddsketch: &AgentDDSketch,
-    default_namespace: &Option<Arc<str>>,
-    log_schema: &'static LogSchema,
-    buf: &mut B,
-    origin_product_value: u32,
-) -> Result<(), prost::EncodeError>
-where
-    B: BufMut,
-{
-    // This encodes a single sketch metric incrementally, which means that we specifically write it
-    // as if we were writing a single field entry in the overall `SketchPayload` message
-    // type.
-    //
-    // By doing so, we can encode multiple sketches and concatenate all the buffers, and have the
-    // resulting buffer appear as if it's a normal `SketchPayload` message with a bunch of repeats
-    // of the `sketches` field.
-    //
-    // Crucially, this code works because `SketchPayload` has two fields -- metadata and sketches --
-    // and we never actually set the metadata field... so the resulting message generated overall
-    // for `SketchPayload` with a single sketch looks just like as if we literally wrote out a
-    // single value for the given field.
-
-    if let Some(sketch_proto) = sketch_to_proto_message(
-        metric,
-        ddsketch,
-        default_namespace,
-        log_schema,
-        origin_product_value,
-    ) {
-        // Manually write the field tag for `sketches` and then encode the sketch payload directly as a
-        // length-delimited message.
-        prost::encoding::encode_key(
-            get_sketch_payload_sketches_field_number(),
-            prost::encoding::WireType::LengthDelimited,
-            buf,
-        );
-        sketch_proto.encode_length_delimited(buf)
-    } else {
-        // If the sketch was empty, that's fine too
-        Ok(())
-    }
-}
-
-fn get_series_payload_series_field_number() -> u32 {
-    static SERIES_PAYLOAD_SERIES_FIELD_NUM: OnceLock<u32> = OnceLock::new();
-    *SERIES_PAYLOAD_SERIES_FIELD_NUM.get_or_init(|| {
-        let descriptors = protobuf_descriptors();
-        let descriptor = descriptors
-            .get_message_by_name("datadog.agentpayload.MetricPayload")
-            .expect("should not fail to find `MetricPayload` message in descriptor pool");
-
-        descriptor
-            .get_field_by_name("series")
-            .map(|field| field.number())
-            .expect("`series` field must exist in `MetricPayload` message")
-    })
-}
-
 fn series_to_proto_message(
     metric: &Metric,
     default_namespace: &Option<Arc<str>>,
     log_schema: &'static LogSchema,
     origin_product_value: u32,
-) -> Option<ddmetric_proto::metric_payload::MetricSeries> {
+) -> Result<ddmetric_proto::metric_payload::MetricSeries, EncoderError> {
     let metric_name = get_namespaced_name(metric, default_namespace);
     let mut tags = metric.tags().cloned().unwrap_or_default();
 
@@ -596,7 +573,7 @@ fn series_to_proto_message(
         });
     }
 
-    // In the `datadog_agent` source, the tag is added as `device` for the V1 endoint
+    // In the `datadog_agent` source, the tag is added as `device` for the V1 endpoint
     // and `resource.device` for the V2 endpoint.
     if let Some(device) = tags.remove("device").or(tags.remove("resource.device")) {
         resources.push(ddmetric_proto::metric_payload::Resource {
@@ -655,14 +632,15 @@ fn series_to_proto_message(
         }
         // NOTE: AggregatedSummary will have been previously split into counters and gauges during normalization
         (value, _) => {
-            // this case will have already been surfaced by encode_single_metric() so this should never be reached
-            let metric_type = value.as_name();
-            error!(?metric_type, "Invalid metric. Expected series.");
-            return None;
+            // this case should have already been surfaced by encode_single_metric() so this should never be reached
+            return Err(EncoderError::InvalidMetric {
+                expected: "series",
+                metric_value: value.as_name(),
+            });
         }
     };
 
-    Some(ddmetric_proto::metric_payload::MetricSeries {
+    Ok(ddmetric_proto::metric_payload::MetricSeries {
         resources,
         metric: metric_name,
         tags,
@@ -676,44 +654,16 @@ fn series_to_proto_message(
     })
 }
 
-fn encode_series_v2_incremental<B>(
-    metric: &Metric,
-    default_namespace: &Option<Arc<str>>,
-    log_schema: &'static LogSchema,
-    buf: &mut B,
-    origin_product_value: u32,
-) -> Result<(), prost::EncodeError>
+// Manually write the field tag and then encode the Message payload directly as a length-delimited message.
+fn encode_proto_key_and_message<T, B>(msg: T, tag: u32, buf: &mut B) -> Result<(), EncoderError>
 where
+    T: prost::Message,
     B: BufMut,
 {
-    // This encodes a single sketch metric incrementally, which means that we specifically write it
-    // as if we were writing a single field entry in the overall `SketchPayload` message
-    // type.
-    //
-    // By doing so, we can encode multiple sketches and concatenate all the buffers, and have the
-    // resulting buffer appear as if it's a normal `SketchPayload` message with a bunch of repeats
-    // of the `sketches` field.
-    //
-    // Crucially, this code works because `SketchPayload` has two fields -- metadata and sketches --
-    // and we never actually set the metadata field... so the resulting message generated overall
-    // for `SketchPayload` with a single sketch looks just like as if we literally wrote out a
-    // single value for the given field.
+    prost::encoding::encode_key(tag, prost::encoding::WireType::LengthDelimited, buf);
 
-    if let Some(series_proto) =
-        series_to_proto_message(metric, default_namespace, log_schema, origin_product_value)
-    {
-        // Manually write the field tag for `sketches` and then encode the sketch payload directly as a
-        // length-delimited message.
-        prost::encoding::encode_key(
-            get_series_payload_series_field_number(),
-            prost::encoding::WireType::LengthDelimited,
-            buf,
-        );
-        series_proto.encode_length_delimited(buf)
-    } else {
-        // If the sketch was empty, that's fine too
-        Ok(())
-    }
+    msg.encode_length_delimited(buf)
+        .map_err(|_| EncoderError::ProtoEncodingFailed)
 }
 
 fn get_namespaced_name(metric: &Metric, default_namespace: &Option<Arc<str>>) -> String {
@@ -1063,10 +1013,11 @@ mod tests {
     };
 
     use super::{
-        ddmetric_proto, encode_sketch_incremental, encode_tags, encode_timestamp,
-        generate_series_metrics, get_compressor, max_compression_overhead_len,
-        max_uncompressed_header_len, sketch_to_proto_message, validate_payload_size_limits,
-        write_payload_footer, write_payload_header, DatadogMetricsEncoder, EncoderError,
+        ddmetric_proto, encode_proto_key_and_message, encode_tags, encode_timestamp,
+        generate_series_metrics, get_compressor, get_sketch_payload_sketches_field_number,
+        max_compression_overhead_len, max_uncompressed_header_len, sketch_to_proto_message,
+        validate_payload_size_limits, write_payload_footer, write_payload_header,
+        DatadogMetricsEncoder, EncoderError,
     };
     use crate::{
         common::datadog::DatadogMetricType,
@@ -1404,17 +1355,20 @@ mod tests {
         for metric in &metrics {
             match metric.value() {
                 MetricValue::Sketch { sketch } => match sketch {
-                    MetricSketch::AgentDDSketch(ddsketch) => encode_sketch_incremental(
-                        metric,
-                        ddsketch,
-                        &None,
-                        log_schema(),
-                        &mut incremental_buf,
-                        14,
-                    )
-                    .unwrap(),
+                    MetricSketch::AgentDDSketch(ddsketch) => {
+                        if let Some(sketch_proto) =
+                            sketch_to_proto_message(&metric, ddsketch, &None, log_schema(), 14)
+                        {
+                            encode_proto_key_and_message(
+                                sketch_proto,
+                                get_sketch_payload_sketches_field_number(),
+                                &mut incremental_buf,
+                            )
+                            .unwrap();
+                        }
+                    }
                 },
-                _ => panic!("should be a sketch"),
+                _ => panic!("should be sketch"),
             }
         }
 

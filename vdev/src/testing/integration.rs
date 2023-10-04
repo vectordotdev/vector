@@ -78,7 +78,7 @@ impl IntegrationTest {
             env_vars.insert(key, Some(value));
         }
 
-        env_vars.insert("TEST_LOG".to_string(), Some("debug".into()));
+        env_vars.insert("TEST_LOG".to_string(), Some("info".into()));
 
         let mut args = self.config.args.clone().unwrap_or_default();
 

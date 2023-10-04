@@ -55,9 +55,10 @@ fn generate_metric_events() -> Vec<Event> {
                     "resource.device" => "a_device",
                     "host" => "a_host",
                     "source_type_name" => "a_name",
-                    "cool_tag_name" => "ikr",
+                    "cool_tag_name" => "i_know_right",
                 ))),
             )
+            // this ensures we get Origin Metadata, with an undefined service but that's ok.
             .with_source_type("a_source_like_none_other")
         })
         .collect();
@@ -189,7 +190,7 @@ fn validate_protobuf(request: &(Parts, Bytes)) {
 
         // tags
         assert_eq!(serie.tags.len(), 1);
-        assert_eq!(serie.tags.first().unwrap(), "cool_tag_name:ikr");
+        assert_eq!(serie.tags.first().unwrap(), "cool_tag_name:i_know_right");
 
         // unit
         assert!(serie.unit.is_empty());
