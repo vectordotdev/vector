@@ -1354,9 +1354,9 @@ dependencies = [
 
 [[package]]
 name = "azure_core"
-version = "0.15.0"
+version = "0.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1f20eb684aea745292c540173304383c9cba9697d1c31d307620a57d6f878fa9"
+checksum = "8e29286b9edfdd6f2c7e9d970bb5b015df8621258acab9ecfcea09b2d7692467"
 dependencies = [
  "async-trait",
  "base64 0.21.4",
@@ -1381,14 +1381,13 @@ dependencies = [
 
 [[package]]
 name = "azure_identity"
-version = "0.15.0"
+version = "0.16.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e15ab021e72fa7196fa8406951f7e85a3476e4968568b2ce3866d2ceed831655"
+checksum = "923d9f616e6ea055e6f66dd3d8b29b841afa42370a135807a245d51cfbc4a332"
 dependencies = [
  "async-lock",
  "async-trait",
  "azure_core",
- "fix-hidden-lifetime-bug",
  "futures 0.3.28",
  "log",
  "oauth2",
@@ -1396,15 +1395,16 @@ dependencies = [
  "serde",
  "serde_json",
  "time",
+ "tz-rs",
  "url",
  "uuid",
 ]
 
 [[package]]
 name = "azure_storage"
-version = "0.15.0"
+version = "0.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bf64f9d78e573f64e189fa7188c4e6a0f605e27740105a8d32038b3ba8c913be"
+checksum = "bed0ccefde57930b2886fd4aed1f70ac469c197b8c2e94828290d71bcbdb5d97"
 dependencies = [
  "RustyXML",
  "async-trait",
@@ -1413,7 +1413,6 @@ dependencies = [
  "futures 0.3.28",
  "hmac",
  "log",
- "once_cell",
  "serde",
  "serde_derive",
  "serde_json",
@@ -1425,9 +1424,9 @@ dependencies = [
 
 [[package]]
 name = "azure_storage_blobs"
-version = "0.15.0"
+version = "0.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a61299a8b65b88acba1a079a0b5e8a39970a12cb53e35ada2641687edb022d5a"
+checksum = "f91a52da2d192cfe43759f61e8bb31a5969f1722d5b85ac89627f356ad674ab4"
 dependencies = [
  "RustyXML",
  "azure_core",
@@ -2329,6 +2328,12 @@ name = "const-oid"
 version = "0.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "28c122c3980598d243d63d9a704629a2d748d101f278052ff068be5a4423ab6f"
+
+[[package]]
+name = "const_fn"
+version = "0.4.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fbdcdcb6d86f71c5e97409ad45898af11cbc995b4ee8112d59095a28d376c935"
 
 [[package]]
 name = "convert_case"
@@ -3399,26 +3404,6 @@ dependencies = [
  "libc",
  "redox_syscall 0.3.5",
  "windows-sys 0.48.0",
-]
-
-[[package]]
-name = "fix-hidden-lifetime-bug"
-version = "0.2.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d4ae9c2016a663983d4e40a9ff967d6dcac59819672f0b47f2b17574e99c33c8"
-dependencies = [
- "fix-hidden-lifetime-bug-proc_macros",
-]
-
-[[package]]
-name = "fix-hidden-lifetime-bug-proc_macros"
-version = "0.2.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e4c81935e123ab0741c4c4f0d9b8377e5fb21d3de7e062fa4b1263b1fbcba1ea"
-dependencies = [
- "proc-macro2 1.0.67",
- "quote 1.0.33",
- "syn 1.0.109",
 ]
 
 [[package]]
@@ -8626,6 +8611,7 @@ checksum = "17f6bb557fd245c28e6411aa56b6403c689ad95061f50e4be16c274e70a17e48"
 dependencies = [
  "deranged",
  "itoa",
+ "js-sys",
  "libc",
  "num_threads",
  "serde",
@@ -9390,6 +9376,15 @@ dependencies = [
  "proc-macro2 1.0.67",
  "quote 1.0.33",
  "syn 2.0.37",
+]
+
+[[package]]
+name = "tz-rs"
+version = "0.6.14"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "33851b15c848fad2cf4b105c6bb66eb9512b6f6c44a4b13f57c53c73c707e2b4"
+dependencies = [
+ "const_fn",
 ]
 
 [[package]]
