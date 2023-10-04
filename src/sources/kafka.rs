@@ -70,7 +70,10 @@ use crate::{
 #[derive(Debug, Snafu)]
 enum BuildError {
     #[snafu(display("The drain_timeout_ms ({}) must be less than session_timeout_ms ({})", value, session_timeout_ms.as_millis()))]
-    KafkaInvalidDrainTimeoutError { value: u64, session_timeout_ms: Duration },
+    KafkaInvalidDrainTimeoutError {
+        value: u64,
+        session_timeout_ms: Duration,
+    },
     #[snafu(display("Could not create Kafka consumer: {}", source))]
     KafkaCreateError { source: rdkafka::error::KafkaError },
     #[snafu(display("Could not subscribe to Kafka topics: {}", source))]
@@ -331,14 +334,21 @@ impl SourceConfig for KafkaSourceConfig {
         let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
 
         if let Some(d) = self.drain_timeout_ms {
-            snafu::ensure!(Duration::from_millis(d) <= self.session_timeout_ms, KafkaInvalidDrainTimeoutSnafu { value:d, session_timeout_ms: self.session_timeout_ms });
+            snafu::ensure!(
+                Duration::from_millis(d) <= self.session_timeout_ms,
+                KafkaInvalidDrainTimeoutSnafu {
+                    value: d,
+                    session_timeout_ms: self.session_timeout_ms
+                }
+            );
         }
 
-        let consumer = create_consumer(self, acknowledgements)?;
+        let (consumer, callback_rx) = create_consumer(self, acknowledgements)?;
 
         Ok(Box::pin(kafka_source(
             self.clone(),
             consumer,
+            callback_rx,
             decoder,
             cx.out,
             cx.shutdown,
@@ -412,6 +422,7 @@ impl SourceConfig for KafkaSourceConfig {
 async fn kafka_source(
     config: KafkaSourceConfig,
     consumer: StreamConsumer<KafkaSourceContext>,
+    callback_rx: UnboundedReceiver<KafkaCallback>,
     decoder: Decoder,
     out: SourceSender,
     shutdown: ShutdownSignal,
@@ -427,12 +438,6 @@ async fn kafka_source(
         .set(Arc::downgrade(&consumer))
         .expect("Error setting up consumer context.");
 
-    let (callback_sender, callback_rx) = mpsc::unbounded_channel();
-    consumer
-        .context()
-        .callbacks
-        .set(callback_sender)
-        .expect("Error setting up consumer callback channel.");
 
     // EOF signal allowing the coordination task to tell the kafka client task when all partitions have reached EOF
     let (eof_tx, eof_rx) = eof.then(|| oneshot::channel::<()>()).unzip();
@@ -440,7 +445,9 @@ async fn kafka_source(
     let coordination_task = {
         let span = span.clone();
         let consumer = Arc::clone(&consumer);
-        let drain_timeout_ms = config.drain_timeout_ms.map_or(config.session_timeout_ms / 2, Duration::from_millis);
+        let drain_timeout_ms = config
+            .drain_timeout_ms
+            .map_or(config.session_timeout_ms / 2, Duration::from_millis);
         let consumer_state =
             ConsumerStateInner::<Consuming>::new(config, decoder, out, log_namespace);
         tokio::spawn(async move {
@@ -497,6 +504,10 @@ struct ConsumerStateInner<S> {
 struct Consuming;
 struct Complete;
 struct Draining {
+    /// The rendezvous channel sender from the revoke or shutdown callback. Sending on this channel
+    /// indicates to the kafka client task that one or more partitions have been drained, while
+    /// closing this channel indicates that all expected partitions have drained, or the drain
+    /// timeout has been reached.
     signal: SyncSender<()>,
 
     /// The set of topic-partition tasks that are required to complete during
@@ -532,7 +543,7 @@ impl Draining {
 }
 
 impl<C> ConsumerStateInner<C> {
-    pub fn complete(self, _deadline: OptionDeadline) -> (OptionDeadline, ConsumerState) {
+    fn complete(self, _deadline: OptionDeadline) -> (OptionDeadline, ConsumerState) {
         (
             None.into(),
             ConsumerState::Complete(ConsumerStateInner {
@@ -595,6 +606,7 @@ impl ConsumerStateInner<Consuming> {
 
             loop {
                 tokio::select!(
+                    // is_some() checks prevent polling end_signal after it completes
                     _ = &mut end_signal, if finalizer.is_some() => {
                         finalizer.take();
                     },
@@ -644,7 +656,7 @@ impl ConsumerStateInner<Consuming> {
 
     /// Consume self, and return a "Draining" ConsumerState, along with a Future
     /// representing a drain deadline, based on max_drain_ms
-    pub fn begin_drain(
+    fn begin_drain(
         self,
         max_drain_ms: Duration,
         sig: SyncSender<()>,
@@ -671,7 +683,7 @@ impl ConsumerStateInner<Consuming> {
 impl ConsumerStateInner<Draining> {
     /// Mark the given TopicPartition as being revoked, adding it to the set of
     /// partitions expected to drain
-    pub fn revoke_partition(&mut self, tp: TopicPartition, end_signal: oneshot::Sender<()>) {
+    fn revoke_partition(&mut self, tp: TopicPartition, end_signal: oneshot::Sender<()>) {
         // Note that if this send() returns Err, it means the task has already
         // ended, but the completion has not been processed yet (otherwise we wouldn't have access to the end_signal),
         // so we should still add it to the "expect to drain" set
@@ -682,19 +694,21 @@ impl ConsumerStateInner<Draining> {
     /// Add the given TopicPartition to the set of known "drained" partitions,
     /// i.e. the consumer has drained the acknowledgement channel. A signal is
     /// sent on the signal channel, indicating to the client that offsets may be committed
-    pub fn partition_drained(&mut self, tp: TopicPartition) {
+    fn partition_drained(&mut self, tp: TopicPartition) {
+        // This send() will only return Err if the receiver has already been disconnected (i.e. the
+        // kafka client task is no longer running)
         _ = self.consumer_state.signal.send(());
         self.consumer_state.expect_drain.remove(&tp);
     }
 
     /// Return true if all expected partitions have drained
-    pub fn is_drain_complete(&self) -> bool {
+    fn is_drain_complete(&self) -> bool {
         self.consumer_state.is_complete()
     }
 
     /// Finish partition drain mode. Consumes self and the drain deadline
     /// future, and returns a "Consuming" or "Complete" ConsumerState
-    pub fn finish_drain(self, deadline: OptionDeadline) -> (OptionDeadline, ConsumerState) {
+    fn finish_drain(self, deadline: OptionDeadline) -> (OptionDeadline, ConsumerState) {
         if self.consumer_state.shutdown {
             self.complete(deadline)
         } else {
@@ -773,16 +787,13 @@ async fn coordinate_kafka_callbacks(
                     },
                 };
 
-                match status {
-                    // PartitionConsumerStatus differentiates between a task that exited after
-                    // being signaled to end, and one that reached the end of its partition and
-                    // was configured to exit. After the last such task ends, we signal the kafka
-                    // driver task to shut down the main consumer too. Note this is only used in tests.
-                    PartitionConsumerStatus::PartitionEOF if exit_eof && partition_consumers.is_empty() => {
-                        debug!("All partitions have exited or reached EOF.");
-                        let _ = eof.take().map(|e| e.send(()));
-                    },
-                    _ => {}
+                // PartitionConsumerStatus differentiates between a task that exited after
+                // being signaled to end, and one that reached the end of its partition and
+                // was configured to exit. After the last such task ends, we signal the kafka
+                // driver task to shut down the main consumer too. Note this is only used in tests.
+                if exit_eof && status == PartitionConsumerStatus::PartitionEOF && partition_consumers.is_empty() {
+                    debug!("All partitions have exited or reached EOF.");
+                    let _ = eof.take().map(|e| e.send(()));
                 }
             },
             Some(callback) = callbacks.recv() => match callback {
@@ -794,13 +805,14 @@ async fn coordinate_kafka_callbacks(
                         for tp in assigned_partitions.drain(0..) {
                             let topic = tp.0.as_str();
                             let partition = tp.1;
-                            // It _should_ be impossible for this expect() to panic, since we receive the topic/partition pair from the rebalance callback
-                            let pq = consumer.split_partition_queue(topic, partition).expect("Failed to get partition queue: invalid topic or partition.");
-
-                            debug!("Consuming partition {}:{}.", &tp.0, tp.1);
-                            let (end_tx, handle) = consumer_state.consume_partition(&mut partition_consumers, tp.clone(), Arc::clone(&consumer), pq, acks, exit_eof);
-                            abort_handles.insert(tp.clone(), handle);
-                            end_signals.insert(tp, end_tx);
+                            if let Some(pq) = consumer.split_partition_queue(topic, partition) {
+                                debug!("Consuming partition {}:{}.", &tp.0, tp.1);
+                                let (end_tx, handle) = consumer_state.consume_partition(&mut partition_consumers, tp.clone(), Arc::clone(&consumer), pq, acks, exit_eof);
+                                abort_handles.insert(tp.clone(), handle);
+                                end_signals.insert(tp, end_tx);
+                            } else {
+                                warn!("Failed to get queue for assigned partition {}:{}.", &tp.0, tp.1);
+                            }
                         }
                         // ensure this is retained until all individual queues are set up
                         drop(done);
@@ -1163,7 +1175,7 @@ impl<'a> From<BorrowedMessage<'a>> for FinalizerEntry {
 fn create_consumer(
     config: &KafkaSourceConfig,
     acknowledgements: bool,
-) -> crate::Result<StreamConsumer<KafkaSourceContext>> {
+) -> crate::Result<(StreamConsumer<KafkaSourceContext>, UnboundedReceiver<KafkaCallback>)> {
     let mut client_config = ClientConfig::new();
     client_config
         .set("group.id", &config.group_id)
@@ -1199,16 +1211,18 @@ fn create_consumer(
         }
     }
 
+    let (callbacks, callback_rx) = mpsc::unbounded_channel();
     let consumer = client_config
         .create_with_context::<_, StreamConsumer<_>>(KafkaSourceContext::new(
             config.metrics.topic_lag_metric,
             acknowledgements,
+            callbacks,
         ))
         .context(KafkaCreateSnafu)?;
     let topics: Vec<&str> = config.topics.iter().map(|s| s.as_str()).collect();
     consumer.subscribe(&topics).context(KafkaSubscribeSnafu)?;
 
-    Ok(consumer)
+    Ok((consumer, callback_rx))
 }
 
 type TopicPartition = (String, i32);
@@ -1216,6 +1230,7 @@ type TopicPartition = (String, i32);
 /// Status returned by partition consumer tasks, allowing the coordination task
 /// to differentiate between a consumer exiting normally (after receiving an end
 /// signal) and exiting when it reaches the end of a partition
+#[derive(PartialEq)]
 enum PartitionConsumerStatus {
     NormalExit,
     PartitionEOF,
@@ -1232,29 +1247,27 @@ struct KafkaSourceContext {
     stats: kafka::KafkaStatisticsContext,
 
     /// A callback channel used to coordinate between the main consumer task and the acknowledgement task
-    callbacks: OnceLock<UnboundedSender<KafkaCallback>>,
+    callbacks: UnboundedSender<KafkaCallback>,
 
     /// A weak reference to the consumer, so that we can commit offsets during a rebalance operation
     consumer: OnceLock<Weak<StreamConsumer<KafkaSourceContext>>>,
 }
 
 impl KafkaSourceContext {
-    fn new(expose_lag_metrics: bool, acknowledgements: bool) -> Self {
+    fn new(expose_lag_metrics: bool, acknowledgements: bool, callbacks: UnboundedSender<KafkaCallback>) -> Self {
         Self {
             stats: kafka::KafkaStatisticsContext { expose_lag_metrics },
             acknowledgements,
-            callbacks: OnceLock::default(),
             consumer: OnceLock::default(),
+            callbacks,
         }
     }
 
-    pub fn shutdown(&self) {
-        if let Some(tx) = self.callbacks.get() {
-            let (send, rendezvous) = sync_channel(0);
-            if tx.send(KafkaCallback::ShuttingDown(send)).is_ok() {
-                while rendezvous.recv().is_ok() {
-                    self.commit_consumer_state();
-                }
+    fn shutdown(&self) {
+        let (send, rendezvous) = sync_channel(0);
+        if self.callbacks.send(KafkaCallback::ShuttingDown(send)).is_ok() {
+            while rendezvous.recv().is_ok() {
+                self.commit_consumer_state();
             }
         }
     }
@@ -1264,13 +1277,8 @@ impl KafkaSourceContext {
     /// each topic-partition has been set up. This function blocks until the
     /// rendezvous channel sender is dropped by the callback handler.
     fn consume_partitions(&self, tpl: &TopicPartitionList) {
-        let callbacks = self
-            .callbacks
-            .get()
-            .expect("Callbacks handler was not initialized.");
-
         let (send, rendezvous) = sync_channel(0);
-        let _ = callbacks.send(KafkaCallback::PartitionsAssigned(
+        let _ = self.callbacks.send(KafkaCallback::PartitionsAssigned(
             tpl.elements()
                 .iter()
                 .map(|tp| (tp.topic().into(), tp.partition()))
@@ -1289,13 +1297,8 @@ impl KafkaSourceContext {
     /// signal individual partitions completing. This function blocks until the
     /// sender is dropped by the callback handler.
     fn revoke_partitions(&self, tpl: &TopicPartitionList) {
-        let callbacks = self
-            .callbacks
-            .get()
-            .expect("Callbacks handler was not initialized.");
-
         let (send, rendezvous) = sync_channel(0);
-        let _ = callbacks.send(KafkaCallback::PartitionsRevoked(
+        let _ = self.callbacks.send(KafkaCallback::PartitionsRevoked(
             tpl.elements()
                 .iter()
                 .map(|tp| (tp.topic().into(), tp.partition()))
@@ -1781,11 +1784,12 @@ mod integration_test {
         .build()
         .unwrap();
 
-        let consumer = create_consumer(&config, acknowledgements).unwrap();
+        let (consumer, callback_rx) = create_consumer(&config, acknowledgements).unwrap();
 
         tokio::spawn(kafka_source(
             config,
             consumer,
+            callback_rx,
             decoder,
             out,
             shutdown,
