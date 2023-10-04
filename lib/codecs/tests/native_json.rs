@@ -1,5 +1,4 @@
 use bytes::BytesMut;
-
 use codecs::decoding::format::Deserializer;
 use codecs::encoding::format::Serializer;
 use codecs::{NativeJsonDeserializerConfig, NativeJsonSerializerConfig};
@@ -35,7 +34,11 @@ fn histogram_metric_roundtrip() {
         MetricValue::AggregatedHistogram {
             count: 1,
             sum: 1.0,
-            buckets: buckets!(f64::NEG_INFINITY => 10 , f64::MIN => 10, 1.5 => 10, f64::MAX => 10, f64::INFINITY => 10),
+            buckets: buckets!(
+                f64::NEG_INFINITY => 10 ,
+                f64::MIN => 10, 1.5 => 10,
+                f64::MAX => 10,
+                f64::INFINITY => 10),
         },
     ));
 

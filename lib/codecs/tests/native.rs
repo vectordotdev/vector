@@ -46,7 +46,6 @@ fn roundtrip_current_native_proto_fixtures() {
 
 /// The event proto file was changed in v0.24. This test ensures we can still load the old version
 /// binary and that when serialized and deserialized in the new format we still get the same event.
-#[ignore]
 #[test]
 fn reserialize_pre_v24_native_json_fixtures() {
     roundtrip_fixtures(
@@ -217,6 +216,7 @@ fn load_deserialize(path: &Path, deserializer: &dyn Deserializer) -> (Bytes, Eve
     let mut buf = Vec::new();
     file.read_to_end(&mut buf).unwrap();
     let buf = Bytes::from(buf);
+
     // Ensure that we can parse the json fixture successfully
     let mut events = deserializer
         .parse(buf.clone(), LogNamespace::Legacy)

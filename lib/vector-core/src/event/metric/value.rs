@@ -1,8 +1,5 @@
 use core::fmt;
 use std::collections::BTreeSet;
-use std::fmt::Debug;
-use std::num::{ParseFloatError, ParseIntError};
-use std::str::FromStr;
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
@@ -454,7 +451,7 @@ impl fmt::Display for MetricValue {
             } => {
                 write!(fmt, "count={count} sum={sum} ")?;
                 write_list(fmt, " ", buckets, |fmt, bucket| {
-                    fmt::Display::fmt(&bucket, fmt)
+                    write!(fmt, "{}@{}", bucket.count, bucket.upper_limit)
                 })
             }
             MetricValue::AggregatedSummary {
@@ -603,6 +600,40 @@ impl ByteSizeOf for Sample {
     }
 }
 
+/// Custom serialization function which converts special `f64` values to strings.
+/// Non-special values are serialized as numbers.
+#[allow(clippy::trivially_copy_pass_by_ref)]
+fn serialize_f64<S>(value: &f64, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    if value.is_infinite() || value.is_nan() {
+        serializer.serialize_str(&format!("{value}"))
+    } else {
+        serializer.serialize_f64(*value)
+    }
+}
+
+/// Custom deserialization function for handling special f64 values.
+fn deserialize_f64<'de, D>(deserializer: D) -> Result<f64, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let value: serde_json::Value = Deserialize::deserialize(deserializer)?;
+    match value {
+        serde_json::Value::Number(num) => num
+            .as_f64()
+            .ok_or_else(|| serde::de::Error::custom("Invalid f64 number")),
+        serde_json::Value::String(s) => match s.as_str() {
+            "NaN" => Ok(f64::NAN),
+            "inf" => Ok(f64::INFINITY),
+            "-inf" => Ok(f64::NEG_INFINITY),
+            _ => Err(serde::de::Error::custom("Invalid value")),
+        },
+        _ => Err(serde::de::Error::custom("Invalid value")),
+    }
+}
+
 /// A histogram bucket.
 ///
 /// Histogram buckets represent the `count` of observations where the value of the observations does
@@ -618,38 +649,6 @@ pub struct Bucket {
     pub count: u64,
 }
 
-fn serialize_f64<S>(value: &f64, serializer: S) -> Result<S::Ok, S::Error>
-where
-    S: Serializer,
-{
-    //println!("serializing {}", value);
-    if value.is_infinite() || value.is_nan() {
-        serializer.serialize_str(&format!("{}", value))
-    } else {
-        serializer.serialize_f64(*value)
-    }
-}
-
-fn deserialize_f64<'de, D>(deserializer: D) -> Result<f64, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let value: serde_json::Value = Deserialize::deserialize(deserializer)?;
-    //println!("deserializing {}", value);
-    match value {
-        serde_json::Value::Number(num) => num
-            .as_f64()
-            .ok_or_else(|| serde::de::Error::custom("Invalid f64 number")),
-        serde_json::Value::String(s) => match s.as_str() {
-            "NaN" => Ok(f64::NAN),
-            "inf" => Ok(f64::INFINITY),
-            "-inf" => Ok(f64::NEG_INFINITY),
-            _ => Err(serde::de::Error::custom("Invalid value")),
-        },
-        _ => Err(serde::de::Error::custom("Invalid value")),
-    }
-}
-
 impl PartialEq for Bucket {
     fn eq(&self, other: &Self) -> bool {
         self.count == other.count && float_eq(self.upper_limit, other.upper_limit)
@@ -659,31 +658,6 @@ impl PartialEq for Bucket {
 impl ByteSizeOf for Bucket {
     fn allocated_bytes(&self) -> usize {
         0
-    }
-}
-
-impl fmt::Display for Bucket {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}@{}", self.count, self.upper_limit)
-    }
-}
-
-impl FromStr for Bucket {
-    type Err = vector_common::Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut parts = s.split('@');
-        let count: u64 = parts
-            .next()
-            .ok_or_else(|| "Missing count".to_string())?
-            .parse()
-            .map_err(|err: ParseIntError| err.to_string())?;
-        let upper_limit: f64 = parts
-            .next()
-            .ok_or_else(|| "Missing upper limit".to_string())?
-            .parse()
-            .map_err(|err: ParseFloatError| err.to_string())?;
-        Ok(Self { upper_limit, count })
     }
 }
 
