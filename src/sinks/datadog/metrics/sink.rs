@@ -23,6 +23,7 @@ use crate::{
     internal_events::DatadogMetricsEncodingError,
     sinks::util::{
         buffer::metrics::{AggregatedSummarySplitter, MetricSplitter},
+        request_builder::default_request_builder_concurrency_limit,
         SinkBuilderExt,
     },
 };
@@ -103,10 +104,16 @@ where
             // last-write-wins situation when they hit the DD metrics intake.
             //
             // This also sorts metrics by name, which significantly improves HTTP compression.
-            .map(|((api_key, endpoint), metrics)| {
-                let collapsed_metrics = sort_and_collapse_counters_by_series_and_timestamp(metrics);
-                ((api_key, endpoint), collapsed_metrics)
-            })
+            .concurrent_map(
+                default_request_builder_concurrency_limit(),
+                |((api_key, endpoint), metrics)| {
+                    Box::pin(async move {
+                        let collapsed_metrics =
+                            sort_and_collapse_counters_by_series_and_timestamp(metrics);
+                        ((api_key, endpoint), collapsed_metrics)
+                    })
+                },
+            )
             // We build our requests "incrementally", which means that for a single batch of metrics, we might generate
             // N requests to send them all, as Datadog has API-level limits on payload size, so we keep adding metrics
             // to a request until we reach the limit, and then create a new request, and so on and so forth, until all
@@ -158,7 +165,7 @@ where
 /// The return value is sorted by metric series, which is desirable for compression. A sorted vector
 /// tends to compress better than a random ordering by 2-3x (JSON encoded, deflate algorithm).
 ///
-/// Note that the time complexity of this function is O(nlogn) and the space complexity is O(1).
+/// Note that the time complexity of this function is O(n log n) and the space complexity is O(1).
 /// If needed, we can trade space for time by using a HashMap, which would be O(n) time and O(n) space.
 fn sort_and_collapse_counters_by_series_and_timestamp(mut metrics: Vec<Metric>) -> Vec<Metric> {
     let now_ts = Utc::now().timestamp();
@@ -314,22 +321,22 @@ mod tests {
         let gauge_value = 1.0;
         let counter_value = 42.0;
         let input = vec![
-            create_counter("gauge", gauge_value),
+            create_gauge("gauge", gauge_value),
             create_counter("basic", counter_value),
             create_counter("basic", counter_value),
             create_counter("basic", counter_value),
-            create_counter("gauge", gauge_value),
+            create_gauge("gauge", gauge_value),
             create_counter("basic", counter_value),
             create_counter("basic", counter_value),
             create_counter("basic", counter_value),
             create_counter("basic", counter_value),
         ];
 
-        let expected_counter_value = input.len() as f64 * counter_value;
+        let expected_counter_value = (input.len() - 2) as f64 * counter_value;
         let expected = vec![
             create_counter("basic", expected_counter_value),
-            create_counter("gauge", gauge_value),
-            create_counter("gauge", gauge_value),
+            create_gauge("gauge", gauge_value),
+            create_gauge("gauge", gauge_value),
         ];
         let actual = sort_and_collapse_counters_by_series_and_timestamp(input);
 
