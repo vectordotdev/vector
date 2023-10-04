@@ -1,4 +1,5 @@
 use bytes::BytesMut;
+
 use codecs::decoding::format::Deserializer;
 use codecs::encoding::format::Serializer;
 use codecs::{NativeJsonDeserializerConfig, NativeJsonSerializerConfig};
@@ -11,6 +12,7 @@ fn assert_roundtrip(
     input_event: Event,
     serializer: &mut dyn Serializer<Error = vector_common::Error>,
     deserializer: &dyn Deserializer,
+    expected_json_value: serde_json::Value,
 ) {
     let mut bytes_mut = BytesMut::new();
     serializer
@@ -33,7 +35,7 @@ fn histogram_metric_roundtrip() {
         MetricValue::AggregatedHistogram {
             count: 1,
             sum: 1.0,
-            buckets: buckets!(f64::NEG_INFINITY => 0 ,2.0 => 1, f64::INFINITY => 0),
+            buckets: buckets!(f64::NEG_INFINITY => 10 , f64::MIN => 10, 1.5 => 10, f64::MAX => 10, f64::INFINITY => 10),
         },
     ));
 
@@ -43,16 +45,24 @@ fn histogram_metric_roundtrip() {
             "aggregated_histogram":  {
                 "buckets": [
                      {
-                        "count": 0,
+                        "count": 10,
+                        "upper_limit": "-inf"
+                    },
+                    {
+                        "count": 10,
                         "upper_limit": -1.7976931348623157e308
                     },
-                     {
-                        "count": 1,
-                        "upper_limit": 2.0
+                    {
+                        "count": 10,
+                        "upper_limit": 1.5
+                    },
+                    {
+                        "count": 10,
+                        "upper_limit": 1.7976931348623157e308
                     },
                      {
-                        "count": 0,
-                        "upper_limit": 1.7976931348623157e308
+                        "count": 10,
+                        "upper_limit": "inf"
                     }
                 ],
                 "count": 1,
@@ -68,5 +78,6 @@ fn histogram_metric_roundtrip() {
         histogram_event,
         &mut NativeJsonSerializerConfig.build(),
         &NativeJsonDeserializerConfig::default().build(),
+        expected_json_value,
     )
 }

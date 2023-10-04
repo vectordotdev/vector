@@ -4,12 +4,14 @@ use std::fmt::Debug;
 use std::num::{ParseFloatError, ParseIntError};
 use std::str::FromStr;
 
-use serde_with::{DeserializeFromStr, SerializeDisplay};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
 use vector_common::byte_size_of::ByteSizeOf;
 use vector_config::configurable_component;
 
-use super::{samples_to_buckets, write_list, write_word};
 use crate::{float_eq, metrics::AgentDDSketch};
+
+use super::{samples_to_buckets, write_list, write_word};
 
 /// Metric value.
 #[configurable_component]
@@ -606,13 +608,46 @@ impl ByteSizeOf for Sample {
 /// Histogram buckets represent the `count` of observations where the value of the observations does
 /// not exceed the specified `upper_limit`.
 #[configurable_component(no_deser, no_ser)]
-#[derive(Clone, Copy, Debug, SerializeDisplay, DeserializeFromStr)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub struct Bucket {
     /// The upper limit of values in the bucket.
+    #[serde(serialize_with = "serialize_f64", deserialize_with = "deserialize_f64")]
     pub upper_limit: f64,
 
     /// The number of values tracked in this bucket.
     pub count: u64,
+}
+
+fn serialize_f64<S>(value: &f64, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    //println!("serializing {}", value);
+    if value.is_infinite() || value.is_nan() {
+        serializer.serialize_str(&format!("{}", value))
+    } else {
+        serializer.serialize_f64(*value)
+    }
+}
+
+fn deserialize_f64<'de, D>(deserializer: D) -> Result<f64, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let value: serde_json::Value = Deserialize::deserialize(deserializer)?;
+    //println!("deserializing {}", value);
+    match value {
+        serde_json::Value::Number(num) => num
+            .as_f64()
+            .ok_or_else(|| serde::de::Error::custom("Invalid f64 number")),
+        serde_json::Value::String(s) => match s.as_str() {
+            "NaN" => Ok(f64::NAN),
+            "inf" => Ok(f64::INFINITY),
+            "-inf" => Ok(f64::NEG_INFINITY),
+            _ => Err(serde::de::Error::custom("Invalid value")),
+        },
+        _ => Err(serde::de::Error::custom("Invalid value")),
+    }
 }
 
 impl PartialEq for Bucket {

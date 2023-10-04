@@ -1,14 +1,16 @@
-use chrono::Utc;
-use codecs::MetricTagValues;
-use lookup::{event_path, owned_value_path, path, PathPrefix};
-use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
-use vector_common::TimeZone;
-use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
+
+use chrono::Utc;
+use serde_json::Value;
 use vrl::path::OwnedValuePath;
 use vrl::value::kind::Collection;
 use vrl::value::Kind;
+
+use codecs::MetricTagValues;
+use lookup::{event_path, owned_value_path, path, PathPrefix};
+use vector_common::TimeZone;
+use vector_config::configurable_component;
+use vector_core::config::LogNamespace;
 
 use crate::config::OutputId;
 use crate::{
@@ -353,16 +355,18 @@ mod tests {
     use similar_asserts::assert_eq;
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
+
     use vector_common::config::ComponentKey;
     use vector_core::{event::EventMetadata, metric_tags};
 
-    use super::*;
     use crate::event::{
         metric::{MetricKind, MetricTags, MetricValue, StatisticKind, TagValue, TagValueSet},
         Metric, Value,
     };
     use crate::test_util::{components::assert_transform_compliance, random_string};
     use crate::transforms::test::create_topology;
+
+    use super::*;
 
     #[test]
     fn generate_config() {
@@ -581,12 +585,20 @@ mod tests {
             collected,
             vec![
                 (
-                    String::from("aggregated_histogram.buckets[0]"),
-                    &Value::from("10@1")
+                    String::from("aggregated_histogram.buckets[0].count"),
+                    &Value::from(10)
                 ),
                 (
-                    String::from("aggregated_histogram.buckets[1]"),
-                    &Value::from("20@2")
+                    String::from("aggregated_histogram.buckets[0].upper_limit"),
+                    &Value::from(1.0)
+                ),
+                (
+                    String::from("aggregated_histogram.buckets[1].count"),
+                    &Value::from(20)
+                ),
+                (
+                    String::from("aggregated_histogram.buckets[1].upper_limit"),
+                    &Value::from(2.0)
                 ),
                 (String::from("aggregated_histogram.count"), &Value::from(30)),
                 (String::from("aggregated_histogram.sum"), &Value::from(50.0)),
