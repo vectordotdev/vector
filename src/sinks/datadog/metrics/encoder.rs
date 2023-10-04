@@ -1357,7 +1357,7 @@ mod tests {
                 MetricValue::Sketch { sketch } => match sketch {
                     MetricSketch::AgentDDSketch(ddsketch) => {
                         if let Some(sketch_proto) =
-                            sketch_to_proto_message(&metric, ddsketch, &None, log_schema(), 14)
+                            sketch_to_proto_message(metric, ddsketch, &None, log_schema(), 14)
                         {
                             encode_proto_key_and_message(
                                 sketch_proto,
