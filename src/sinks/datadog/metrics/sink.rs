@@ -172,6 +172,7 @@ fn sort_and_collapse_counters_by_series_and_timestamp(mut metrics: Vec<Metric>) 
 
     // Sort by series and timestamp which is required for the below dedupe to behave as desired.
     // This also tends to compress better than a random ordering by 2-3x (JSON encoded, deflate algorithm).
+    // Note that `sort_unstable_by_key` would be simpler but results in lifetime errors without cloning.
     metrics.sort_unstable_by(|a, b| {
         (
             a.series(),
@@ -183,14 +184,8 @@ fn sort_and_collapse_counters_by_series_and_timestamp(mut metrics: Vec<Metric>) 
             ))
     });
 
+    // Aggregate counters that share the same series and timestamp.
     metrics.dedup_by(|left, right| {
-        // Only aggregate counters. All other types can be skipped.
-        let MetricValue::Counter { value: left_value } = left.value() else {
-            return false;
-        };
-        if !matches!(right.value(), MetricValue::Counter { .. }) {
-            return false;
-        }
         if left.series() != right.series() {
             return false;
         }
@@ -201,18 +196,23 @@ fn sort_and_collapse_counters_by_series_and_timestamp(mut metrics: Vec<Metric>) 
             return false;
         }
 
-        // If we reach this point, the counters are for the same series and have the same timestamp.
-        let MetricValue::Counter { value: right_value } = right.value_mut() else {
-            return false;
-        };
-        // NOTE: The docs for `dedup_by` specify that if `left`/`right` are equal, then
-        // `left` is the element that gets removed.
-        *right_value += left_value;
-        right
-            .metadata_mut()
-            .merge_finalizers(left.metadata_mut().take_finalizers());
+        // Only aggregate counters. All other types can be skipped.
+        if let (
+            MetricValue::Counter { value: left_value },
+            MetricValue::Counter { value: right_value },
+        ) = (left.value(), right.value_mut())
+        {
+            // NOTE: The docs for `dedup_by` specify that if `left`/`right` are equal, then
+            // `left` is the element that gets removed.
+            *right_value += left_value;
+            right
+                .metadata_mut()
+                .merge_finalizers(left.metadata_mut().take_finalizers());
 
-        true
+            true
+        } else {
+            false
+        }
     });
 
     metrics
@@ -224,7 +224,10 @@ mod tests {
 
     use chrono::{DateTime, Utc};
     use proptest::prelude::*;
-    use vector_core::event::{Metric, MetricKind, MetricValue};
+    use vector_core::{
+        event::{Metric, MetricKind, MetricValue},
+        metric_tags,
+    };
 
     use super::sort_and_collapse_counters_by_series_and_timestamp;
 
@@ -362,6 +365,38 @@ mod tests {
             create_counter("basic", counter_value * 2.).with_timestamp(Some(ts_2)),
             create_counter("basic", counter_value * 2.).with_timestamp(Some(ts_1)),
             create_counter("basic", counter_value * 3.),
+        ];
+        let actual = sort_and_collapse_counters_by_series_and_timestamp(input);
+
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn collapse_identical_metrics_with_tags() {
+        let counter_value = 42.0;
+        let input = vec![
+            create_counter("basic", counter_value).with_tags(Some(metric_tags!("a" => "a"))),
+            create_counter("basic", counter_value).with_tags(Some(metric_tags!(
+                "a" => "a",
+                "b" => "b",
+            ))),
+            create_counter("basic", counter_value),
+            create_counter("basic", counter_value).with_tags(Some(metric_tags!(
+                "b" => "b",
+                "a" => "a",
+            ))),
+            create_counter("basic", counter_value),
+            create_counter("basic", counter_value),
+            create_counter("basic", counter_value).with_tags(Some(metric_tags!("a" => "a"))),
+        ];
+
+        let expected = vec![
+            create_counter("basic", counter_value * 3.),
+            create_counter("basic", counter_value * 2.).with_tags(Some(metric_tags!("a" => "a"))),
+            create_counter("basic", counter_value * 2.).with_tags(Some(metric_tags!(
+                "a" => "a",
+                "b" => "b",
+            ))),
         ];
         let actual = sort_and_collapse_counters_by_series_and_timestamp(input);
 
