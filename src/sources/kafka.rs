@@ -70,14 +70,14 @@ use crate::{
 #[derive(Debug, Snafu)]
 enum BuildError {
     #[snafu(display("The drain_timeout_ms ({}) must be less than session_timeout_ms ({})", value, session_timeout_ms.as_millis()))]
-    KafkaInvalidDrainTimeoutError {
+    InvalidDrainTimeout {
         value: u64,
         session_timeout_ms: Duration,
     },
     #[snafu(display("Could not create Kafka consumer: {}", source))]
-    KafkaCreateError { source: rdkafka::error::KafkaError },
+    CreateError { source: rdkafka::error::KafkaError },
     #[snafu(display("Could not subscribe to Kafka topics: {}", source))]
-    KafkaSubscribeError { source: rdkafka::error::KafkaError },
+    SubscribeError { source: rdkafka::error::KafkaError },
 }
 
 /// Metrics configuration.
@@ -336,7 +336,7 @@ impl SourceConfig for KafkaSourceConfig {
         if let Some(d) = self.drain_timeout_ms {
             snafu::ensure!(
                 Duration::from_millis(d) <= self.session_timeout_ms,
-                KafkaInvalidDrainTimeoutSnafu {
+                InvalidDrainTimeoutSnafu {
                     value: d,
                     session_timeout_ms: self.session_timeout_ms
                 }
@@ -419,6 +419,7 @@ impl SourceConfig for KafkaSourceConfig {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn kafka_source(
     config: KafkaSourceConfig,
     consumer: StreamConsumer<KafkaSourceContext>,
@@ -438,9 +439,8 @@ async fn kafka_source(
         .set(Arc::downgrade(&consumer))
         .expect("Error setting up consumer context.");
 
-
     // EOF signal allowing the coordination task to tell the kafka client task when all partitions have reached EOF
-    let (eof_tx, eof_rx) = eof.then(|| oneshot::channel::<()>()).unzip();
+    let (eof_tx, eof_rx) = eof.then(oneshot::channel::<()>).unzip();
 
     let coordination_task = {
         let span = span.clone();
@@ -997,7 +997,7 @@ fn parse_stream<'a>(
                         partition: rmsg.partition,
                     });
                     for mut event in events {
-                        rmsg.apply(&keys, &mut event, log_namespace);
+                        rmsg.apply(keys, &mut event, log_namespace);
                         yield event;
                     }
                 },
@@ -1174,7 +1174,10 @@ impl<'a> From<BorrowedMessage<'a>> for FinalizerEntry {
 fn create_consumer(
     config: &KafkaSourceConfig,
     acknowledgements: bool,
-) -> crate::Result<(StreamConsumer<KafkaSourceContext>, UnboundedReceiver<KafkaCallback>)> {
+) -> crate::Result<(
+    StreamConsumer<KafkaSourceContext>,
+    UnboundedReceiver<KafkaCallback>,
+)> {
     let mut client_config = ClientConfig::new();
     client_config
         .set("group.id", &config.group_id)
@@ -1217,9 +1220,9 @@ fn create_consumer(
             acknowledgements,
             callbacks,
         ))
-        .context(KafkaCreateSnafu)?;
+        .context(CreateSnafu)?;
     let topics: Vec<&str> = config.topics.iter().map(|s| s.as_str()).collect();
-    consumer.subscribe(&topics).context(KafkaSubscribeSnafu)?;
+    consumer.subscribe(&topics).context(SubscribeSnafu)?;
 
     Ok((consumer, callback_rx))
 }
@@ -1253,7 +1256,11 @@ struct KafkaSourceContext {
 }
 
 impl KafkaSourceContext {
-    fn new(expose_lag_metrics: bool, acknowledgements: bool, callbacks: UnboundedSender<KafkaCallback>) -> Self {
+    fn new(
+        expose_lag_metrics: bool,
+        acknowledgements: bool,
+        callbacks: UnboundedSender<KafkaCallback>,
+    ) -> Self {
         Self {
             stats: kafka::KafkaStatisticsContext { expose_lag_metrics },
             acknowledgements,
@@ -1264,7 +1271,11 @@ impl KafkaSourceContext {
 
     fn shutdown(&self) {
         let (send, rendezvous) = sync_channel(0);
-        if self.callbacks.send(KafkaCallback::ShuttingDown(send)).is_ok() {
+        if self
+            .callbacks
+            .send(KafkaCallback::ShuttingDown(send))
+            .is_ok()
+        {
             while rendezvous.recv().is_ok() {
                 self.commit_consumer_state();
             }
