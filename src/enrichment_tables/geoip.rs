@@ -186,13 +186,15 @@ impl Geoip {
                     "latitude",
                     location
                         .and_then(|location| location.latitude)
-                        .map(|latitude| Value::Float(NotNan::new(latitude).unwrap()))
+                        .map(|latitude| Value::Float(
+                            NotNan::new(latitude).expect("latitude cannot be Nan")
+                        ))
                 );
                 add_field!(
                     "longitude",
                     location
                         .and_then(|location| location.longitude)
-                        .map(|longitude| NotNan::new(longitude).unwrap())
+                        .map(|longitude| NotNan::new(longitude).expect("longitude cannot be Nan"))
                 );
                 add_field!(
                     "metro_code",

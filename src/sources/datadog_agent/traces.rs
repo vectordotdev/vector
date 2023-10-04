@@ -153,11 +153,11 @@ fn handle_dd_trace_payload_v1(
             trace_event.insert(event_path!("agent_version"), agent_version.clone());
             trace_event.insert(
                 event_path!("target_tps"),
-                Value::Float(NotNan::new(target_tps).unwrap()),
+                Value::Float(NotNan::new(target_tps).expect("target_tps cannot be Nan")),
             );
             trace_event.insert(
                 event_path!("error_tps"),
-                Value::Float(NotNan::new(error_tps).unwrap()),
+                Value::Float(NotNan::new(error_tps).expect("error_tps cannot be Nan")),
             );
             if let Some(Value::Object(span_tags)) = trace_event.get_mut(event_path!("tags")) {
                 span_tags.extend(tags.clone());
