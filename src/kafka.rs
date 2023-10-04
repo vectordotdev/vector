@@ -10,6 +10,9 @@ use crate::{
     internal_events::KafkaStatisticsReceived, tls::TlsEnableableConfig, tls::PEM_START_MARKER,
 };
 
+pub const KAFKA_DEFAULT_QUEUE_MESSAGES_MAX: &str = "100000";
+pub const KAFKA_DEFAULT_QUEUE_BYTES_MAX: &str = "1048576";
+
 #[derive(Debug, Snafu)]
 enum KafkaError {
     #[snafu(display("invalid path: {:?}", path))]

@@ -11,7 +11,9 @@ use vrl::path::OwnedTargetPath;
 
 use super::config::{KafkaRole, KafkaSinkConfig};
 use crate::{
-    kafka::KafkaStatisticsContext,
+    kafka::{
+        KafkaStatisticsContext, KAFKA_DEFAULT_QUEUE_BYTES_MAX, KAFKA_DEFAULT_QUEUE_MESSAGES_MAX,
+    },
     sinks::kafka::{request_builder::KafkaRequestBuilder, service::KafkaService},
     sinks::prelude::*,
 };
@@ -45,6 +47,17 @@ pub(crate) fn create_producer(
 
 impl KafkaSink {
     pub(crate) fn new(config: KafkaSinkConfig) -> crate::Result<Self> {
+        let queue_messages_max = config
+            .librdkafka_options
+            .get("queue.buffering.max.messages")
+            .map_or(KAFKA_DEFAULT_QUEUE_MESSAGES_MAX, |v| v.as_str())
+            .parse()?;
+        let queue_bytes_max = config
+            .librdkafka_options
+            .get("queue.buffering.max.bytes")
+            .map_or(KAFKA_DEFAULT_QUEUE_BYTES_MAX, |v| v.as_str())
+            .parse()?;
+
         let producer_config = config.to_rdkafka(KafkaRole::Producer)?;
         let producer = create_producer(producer_config)?;
         let transformer = config.encoding.transformer();
@@ -55,18 +68,13 @@ impl KafkaSink {
             headers_key: config.headers_key.map(|key| key.0),
             transformer,
             encoder,
-            service: KafkaService::new(producer),
+            service: KafkaService::new(producer, queue_messages_max, queue_bytes_max),
             topic: config.topic,
             key_field: config.key_field.map(|key| key.0),
         })
     }
 
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
-        // rdkafka will internally retry forever, so we need some limit to prevent this from overflowing.
-        // 64 should be plenty concurrency here, as a rdkafka send operation does not block until its underlying
-        // buffer is full.
-        let service = ConcurrencyLimit::new(self.service.clone(), 64);
-
         let request_builder = KafkaRequestBuilder {
             key_field: self.key_field,
             headers_key: self.headers_key,
