@@ -6,10 +6,11 @@ use futures::future;
 use http::StatusCode;
 use ordered_float::NotNan;
 use prost::Message;
-use vector_common::internal_event::{CountByteSize, InternalEventHandle as _};
-use vector_core::EstimatedJsonEncodedSizeOf;
 use vrl::event_path;
 use warp::{filters::BoxedFilter, path, path::FullPath, reply::Response, Filter, Rejection, Reply};
+
+use vector_common::internal_event::{CountByteSize, InternalEventHandle as _};
+use vector_core::EstimatedJsonEncodedSizeOf;
 
 use crate::{
     event::{Event, TraceEvent, Value},
@@ -150,8 +151,14 @@ fn handle_dd_trace_payload_v1(
             trace_event.insert(&source.log_schema_host_key, hostname.clone());
             trace_event.insert(event_path!("env"), env.clone());
             trace_event.insert(event_path!("agent_version"), agent_version.clone());
-            trace_event.insert(event_path!("target_tps"), target_tps);
-            trace_event.insert(event_path!("error_tps"), error_tps);
+            trace_event.insert(
+                event_path!("target_tps"),
+                Value::Float(NotNan::new(target_tps).expect("target_tps cannot be Nan")),
+            );
+            trace_event.insert(
+                event_path!("error_tps"),
+                Value::Float(NotNan::new(error_tps).expect("error_tps cannot be Nan")),
+            );
             if let Some(Value::Object(span_tags)) = trace_event.get_mut(event_path!("tags")) {
                 span_tags.extend(tags.clone());
             } else {
