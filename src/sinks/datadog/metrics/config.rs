@@ -1,3 +1,5 @@
+use std::sync::OnceLock;
+
 use http::Uri;
 use snafu::ResultExt;
 use tower::ServiceBuilder;
@@ -46,6 +48,9 @@ pub(super) const SERIES_V1_PATH: &str = "/api/v1/series";
 pub(super) const SERIES_V2_PATH: &str = "/api/v2/series";
 pub(super) const SKETCHES_PATH: &str = "/api/beta/sketches";
 
+// TODO: the series V1 endpoint support is considered deprecated and should be removed in a future release.
+// At that time when the V1 support is removed, the SeriesApiVersion stops being useful and can be removed.
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[allow(dead_code)]
 pub enum SeriesApiVersion {
@@ -60,11 +65,14 @@ impl SeriesApiVersion {
             Self::V2 => SERIES_V2_PATH,
         }
     }
-}
-
-impl Default for SeriesApiVersion {
-    fn default() -> Self {
-        Self::V2
+    fn get_api_version_backwards_compatible() -> Self {
+        static API_VERSION: OnceLock<SeriesApiVersion> = OnceLock::new();
+        *API_VERSION.get_or_init(
+            || match option_env!("VECTOR_TEMP_USE_DD_METRICS_SERIES_V1_API") {
+                Some(_) => Self::V1,
+                None => Self::V2,
+            },
+        )
     }
 }
 
@@ -93,7 +101,7 @@ impl DatadogMetricsEndpoint {
 
     // Creates an instance of the `Series` variant with the default API version.
     pub fn series() -> Self {
-        Self::Series(SeriesApiVersion::default())
+        Self::Series(SeriesApiVersion::get_api_version_backwards_compatible())
     }
 }
 
@@ -200,7 +208,13 @@ impl DatadogMetricsConfig {
         &self,
     ) -> crate::Result<DatadogMetricsEndpointConfiguration> {
         let base_uri = self.get_base_agent_endpoint();
-        let series_endpoint = build_uri(&base_uri, SeriesApiVersion::default().get_path())?;
+
+        // TODO: the V1 endpoint support is considered deprecated and should be removed in a future release.
+        // At that time, the get_api_version_backwards_compatible() should be replaced with statically using the v2.
+        let series_endpoint = build_uri(
+            &base_uri,
+            SeriesApiVersion::get_api_version_backwards_compatible().get_path(),
+        )?;
         let sketches_endpoint = build_uri(&base_uri, SKETCHES_PATH)?;
 
         Ok(DatadogMetricsEndpointConfiguration::new(

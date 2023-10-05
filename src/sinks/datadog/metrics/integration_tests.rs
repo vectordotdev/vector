@@ -157,7 +157,11 @@ async fn all_series_metric_types() {
 
     let request = output.first().unwrap();
 
-    validate_protobuf_counter_gauge_set(request);
+    match request.0.uri.path() {
+        SERIES_V1_PATH => warn!("Deprecated endpoint used!"),
+        SERIES_V2_PATH => validate_protobuf_set_gauge_rate(request),
+        _ => panic!("Unexpected request type received!"),
+    }
 }
 
 #[tokio::test]
@@ -268,7 +272,7 @@ fn validate_protobuf_counters(request: &(Parts, Bytes)) {
     );
 }
 
-fn validate_protobuf_counter_gauge_set(request: &(Parts, Bytes)) {
+fn validate_protobuf_set_gauge_rate(request: &(Parts, Bytes)) {
     assert_eq!(
         request.0.headers.get("Content-Type").unwrap(),
         "application/x-protobuf"
