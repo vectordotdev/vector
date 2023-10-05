@@ -22,7 +22,7 @@ remap: functions: parse_linux_authorization: {
 		},
 	]
 	internal_failure_reasons: [
-		"`value` isn't a properly formatted Syslog message",
+		"`value` is not a properly formatted Syslog message.",
 	]
 	return: types: ["object"]
 

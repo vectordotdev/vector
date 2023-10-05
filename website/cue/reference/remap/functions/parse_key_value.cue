@@ -48,14 +48,14 @@ remap: functions: parse_key_value: {
 		},
 		{
 			name:        "accept_standalone_key"
-			description: "Whether a standalone key should be accepted, the resulting object will associate such keys with boolean value `true`"
+			description: "Whether a standalone key should be accepted, the resulting object associates such keys with the boolean value `true`."
 			required:    false
 			type: ["boolean"]
 			default: true
 		},
 	]
 	internal_failure_reasons: [
-		"`value` isn't a properly formatted key/value string",
+		"`value` is not a properly formatted key/value string.",
 	]
 	return: types: ["object"]
 

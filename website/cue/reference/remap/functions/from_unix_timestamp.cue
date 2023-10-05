@@ -5,8 +5,8 @@ remap: functions: from_unix_timestamp: {
 	description: """
 		Converts the `value` integer from a [Unix timestamp](\(urls.unix_timestamp)) to a VRL `timestamp`.
 
-		Converts from the number of seconds since the Unix epoch by default, but milliseconds or nanoseconds can also be
-		specified by `unit`.
+		Converts from the number of seconds since the Unix epoch by default, but `milliseconds` or `nanoseconds` can also be
+		specified with the `unit` argument.
 		"""
 
 	arguments: [

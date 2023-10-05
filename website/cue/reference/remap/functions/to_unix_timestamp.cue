@@ -5,14 +5,14 @@ remap: functions: to_unix_timestamp: {
 	description: """
 		Converts the `value` timestamp into a [Unix timestamp](\(urls.unix_timestamp)).
 
-		Returns the number of seconds since the Unix epoch by default, but milliseconds or nanoseconds can also be
-		specified by `unit`.
+		Returns the number of seconds since the Unix epoch by default, but `milliseconds` or `nanoseconds` can also be
+		specified with the `unit` argument.
 		"""
 
 	arguments: [
 		{
 			name:        "value"
-			description: "The timestamp to convert to Unix."
+			description: "The timestamp to convert into a Unix timestamp."
 			required:    true
 			type: ["timestamp"]
 		},

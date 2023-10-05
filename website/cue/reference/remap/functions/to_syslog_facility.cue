@@ -4,7 +4,7 @@ remap: functions: to_syslog_facility: {
 	category:    "Convert"
 	description: """
 		Converts the `value`, a Syslog [facility code](\(urls.syslog_facility)), into its corresponding
-		Syslog keyword. i.e. 0 into `"kern"`, 1 into `"user"`, etc.
+		Syslog keyword. For example, `0` into `"kern"`, `1` into `"user"`, etc.
 		"""
 
 	arguments: [
@@ -16,7 +16,7 @@ remap: functions: to_syslog_facility: {
 		},
 	]
 	internal_failure_reasons: [
-		"`value` isn't a valid Syslog [facility code](\(urls.syslog_facility)).",
+		"`value` is not a valid Syslog [facility code](\(urls.syslog_facility)).",
 	]
 	return: types: ["string"]
 

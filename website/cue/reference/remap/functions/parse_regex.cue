@@ -3,7 +3,7 @@ package metadata
 remap: functions: parse_regex: {
 	category:    "Parse"
 	description: """
-		Parses the `value` via the provided [Regex](\(urls.regex)) `pattern`.
+		Parses the `value` using the provided [Regex](\(urls.regex)) `pattern`.
 
 		This function differs from the `parse_regex_all` function in that it returns only the first match.
 		"""
@@ -35,8 +35,8 @@ remap: functions: parse_regex: {
 		{
 			name: "numeric_groups"
 			description: """
-				If true, the index of each group in the regular expression is also captured. The 0th index
-				will contain the whole match.
+				If true, the index of each group in the regular expression is also captured. Index `0`
+				contains the whole match.
 				"""
 			required: false
 			default:  false
@@ -44,7 +44,7 @@ remap: functions: parse_regex: {
 		},
 	]
 	internal_failure_reasons: [
-		"`value` fails to parse using the provided `pattern`",
+		"`value` fails to parse using the provided `pattern`.",
 	]
 	return: {
 		types: ["object"]

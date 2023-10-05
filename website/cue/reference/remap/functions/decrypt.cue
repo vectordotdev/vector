@@ -33,7 +33,7 @@ remap: functions: decrypt: {
 	arguments: [
 		{
 			name:        "ciphertext"
-			description: "The string to decrypt. The should be raw bytes (not encoded)."
+			description: "The string to decrypt. This should be the raw bytes (not encoded)."
 			required:    true
 			type: ["string"]
 		},
@@ -45,14 +45,14 @@ remap: functions: decrypt: {
 		},
 		{
 			name:        "key"
-			description: "The key for decryption. The should be raw bytes of the key (not encoded). The length must match the algorithm requested."
+			description: "The key for decryption. This should be the raw bytes of the key (not encoded). The length must match the algorithm requested."
 			required:    true
 			type: ["string"]
 		},
 		{
 			name: "iv"
 			description: #"""
-				The IV for decryption. The should be raw bytes of the IV (not encoded). The length must match the algorithm requested.
+				The IV for decryption. This should be the raw bytes of the IV (not encoded). The length must match the algorithm requested.
 				A new IV should be generated for every message. You can use `random_bytes` to generate a cryptographically secure random value.
 				The value should match the one used during encryption.
 				"""#
@@ -61,9 +61,9 @@ remap: functions: decrypt: {
 		},
 	]
 	internal_failure_reasons: [
-		"`algorithm` isn't a supported algorithm",
-		"`key` length doesn't match the key size required for the algorithm specified",
-		"`iv` length doesn't match the iv size required for the algorithm specified",
+		"`algorithm` is not a supported algorithm.",
+		"`key` length does not match the key size required for the algorithm specified.",
+		"`iv` length does not match the `iv` size required for the algorithm specified.",
 	]
 	return: types: ["string"]
 

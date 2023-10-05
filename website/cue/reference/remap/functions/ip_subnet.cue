@@ -30,8 +30,8 @@ remap: functions: ip_subnet: {
 		},
 	]
 	internal_failure_reasons: [
-		"`ip` isn't a valid IP address",
-		"`subnet` isn't a valid subnet.",
+		"`ip` is not a valid IP address.",
+		"`subnet` is not a valid subnet.",
 	]
 	return: types: ["string"]
 
