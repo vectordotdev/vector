@@ -3,7 +3,7 @@ package metadata
 remap: functions: parse_grok: {
 	category:    "Parse"
 	description: """
-		Parses the `value` using the [`grok`](https://github.com/daschl/grok/tree/master/patterns) format. All patterns [listed here](\(urls.grok_patterns))
+		Parses the `value` using the [`grok`](\(urls.grok)) format. All patterns [listed here](\(urls.grok_patterns))
 		are supported.
 		"""
 	notices: [

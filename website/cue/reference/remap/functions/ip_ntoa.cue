@@ -18,7 +18,7 @@ remap: functions: ip_ntoa: {
 		},
 	]
 	internal_failure_reasons: [
-		"`value` cannot fit in u32.",
+		"`value` cannot fit in an unsigned 32-bit integer.",
 	]
 	return: types: ["string"]
 
