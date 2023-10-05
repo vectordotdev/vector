@@ -104,7 +104,7 @@ remap: {
 		* Connection-Type databases:
 			* `connection_type`
 
-		To use this function, you need to update your Vector configuration to
+		To use this function, you need to update your configuration to
 		include an
 		[`enrichment_tables`](\(urls.vector_configuration_global)/#enrichment_tables)
 		parameter.

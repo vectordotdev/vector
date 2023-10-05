@@ -6,13 +6,15 @@
 //! [geolite]: https://dev.maxmind.com/geoip/geoip2/geolite2/#Download_Access
 use std::{collections::BTreeMap, fs, net::IpAddr, sync::Arc, time::SystemTime};
 
-use enrichment::{Case, Condition, IndexHandle, Table};
 use maxminddb::{
     geoip2::{City, ConnectionType, Isp},
     MaxMindDBError, Reader,
 };
-use vector_config::configurable_component;
+use ordered_float::NotNan;
 use vrl::value::Value;
+
+use enrichment::{Case, Condition, IndexHandle, Table};
+use vector_config::configurable_component;
 
 use crate::config::{EnrichmentTableConfig, GenerateConfig};
 
@@ -180,10 +182,19 @@ impl Geoip {
 
                 let location = data.location.as_ref();
                 add_field!("timezone", location.and_then(|location| location.time_zone));
-                add_field!("latitude", location.and_then(|location| location.latitude));
+                add_field!(
+                    "latitude",
+                    location
+                        .and_then(|location| location.latitude)
+                        .map(|latitude| Value::Float(
+                            NotNan::new(latitude).expect("latitude cannot be Nan")
+                        ))
+                );
                 add_field!(
                     "longitude",
-                    location.and_then(|location| location.longitude)
+                    location
+                        .and_then(|location| location.longitude)
+                        .map(|longitude| NotNan::new(longitude).expect("longitude cannot be Nan"))
                 );
                 add_field!(
                     "metro_code",

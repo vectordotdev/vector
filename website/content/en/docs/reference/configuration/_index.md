@@ -213,7 +213,7 @@ vector --config /etc/vector/vector.yaml
 {{< tab title="TOML" >}}
 
 ```shell
-vector --config /etc/vector/vector.toml
+vector --config /etc/vector/vector.yaml
 ```
 
 {{< /tab >}}
@@ -295,7 +295,7 @@ data templating languages such as [ytt], [Jsonnet] and [Cue].
 
 The location of your Vector configuration file depends on your installation
 method. For most Linux-based systems, the file can be found at
-`/etc/vector/vector.toml`.
+`/etc/vector/vector.yaml`.
 
 ### Multiple files
 

@@ -1,4 +1,4 @@
-use std::{borrow::Cow, fmt::Debug, marker::PhantomData, num::NonZeroUsize};
+use std::{borrow::Cow, fmt::Debug, marker::PhantomData};
 
 use lookup::lookup_v2::ConfigValuePath;
 use rand::random;
@@ -42,8 +42,6 @@ where
     R: Record + Send + Sync + Unpin + Clone + 'static,
 {
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
-        let request_builder_concurrency_limit = NonZeroUsize::new(50);
-
         input
             .filter_map(|event| {
                 // Panic: This sink only accepts Logs, so this should never panic
@@ -52,7 +50,10 @@ where
 
                 future::ready(processed)
             })
-            .request_builder(request_builder_concurrency_limit, self.request_builder)
+            .request_builder(
+                default_request_builder_concurrency_limit(),
+                self.request_builder,
+            )
             .filter_map(|request| async move {
                 match request {
                     Err(error) => {

@@ -104,8 +104,9 @@ base: components: sinks: datadog_traces: configuration: {
 		description: """
 			The endpoint to send observability data to.
 
-			The endpoint must contain an HTTP scheme, and may specify a
-			hostname or IP address and port.
+			The endpoint must contain an HTTP scheme, and may specify a hostname or IP
+			address and port. The API path should NOT be specified as this is handled by
+			the sink.
 
 			If set, overrides the `site` option.
 			"""
@@ -182,11 +183,16 @@ base: components: sinks: datadog_traces: configuration: {
 				}
 			}
 			concurrency: {
-				description: "Configuration for outbound request concurrency."
-				required:    false
+				description: """
+					Configuration for outbound request concurrency.
+
+					This can be set either to one of the below enum values or to a positive integer, which denotes
+					a fixed concurrency limit.
+					"""
+				required: false
 				type: {
 					string: {
-						default: "none"
+						default: "adaptive"
 						enum: {
 							adaptive: """
 															Concurrency will be managed by Vector's [Adaptive Request Concurrency][arc] feature.

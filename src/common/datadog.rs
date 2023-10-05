@@ -4,6 +4,7 @@
 #![allow(unreachable_pub)]
 use serde::{Deserialize, Serialize};
 use vector_config::configurable_component;
+use vector_core::event::DatadogMetricOriginMetadata;
 
 pub const DD_US_SITE: &str = "datadoghq.com";
 pub const DD_EU_SITE: &str = "datadoghq.eu";
@@ -21,6 +22,14 @@ pub(crate) struct DatadogSeriesMetric {
     pub(crate) source_type_name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) device: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) metadata: Option<DatadogSeriesMetricMetadata>,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub(crate) struct DatadogSeriesMetricMetadata {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) origin: Option<DatadogMetricOriginMetadata>,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]

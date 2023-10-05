@@ -33,6 +33,9 @@ pub struct EventMetadata {
     /// The id of the source
     source_id: Option<Arc<ComponentKey>>,
 
+    /// The type of the source
+    source_type: Option<&'static str>,
+
     /// The id of the component this event originated from. This is used to
     /// determine which schema definition to attach to an event in transforms.
     /// This should always have a value set for events in transforms. It will always be `None`
@@ -54,6 +57,60 @@ pub struct EventMetadata {
     /// This field could almost be keyed by `&'static str`, but because it needs to be deserializable
     /// we have to use `String`.
     dropped_fields: BTreeMap<String, Value>,
+
+    /// Metadata to track the origin of metrics. This is always `None` for log and trace events.
+    /// Only a small set of Vector sources and transforms explicitly set this field.
+    #[serde(default)]
+    datadog_origin_metadata: Option<DatadogMetricOriginMetadata>,
+}
+
+/// Metric Origin metadata for submission to Datadog.
+#[derive(Clone, Default, Debug, Deserialize, PartialEq, Serialize)]
+pub struct DatadogMetricOriginMetadata {
+    /// OriginProduct
+    product: Option<u32>,
+    /// OriginCategory
+    category: Option<u32>,
+    /// OriginService
+    service: Option<u32>,
+}
+
+impl DatadogMetricOriginMetadata {
+    /// Replaces the `OriginProduct`.
+    #[must_use]
+    pub fn with_product(mut self, product: u32) -> Self {
+        self.product = Some(product);
+        self
+    }
+
+    /// Replaces the `OriginCategory`.
+    #[must_use]
+    pub fn with_category(mut self, category: u32) -> Self {
+        self.category = Some(category);
+        self
+    }
+
+    /// Replaces the `OriginService`.
+    #[must_use]
+    pub fn with_service(mut self, service: u32) -> Self {
+        self.service = Some(service);
+        self
+    }
+
+    /// Returns a reference to the `OriginProduct`
+    pub fn product(&self) -> Option<u32> {
+        self.product
+    }
+
+    /// Returns a reference to the `OriginCategory`
+    pub fn category(&self) -> Option<u32> {
+        self.category
+    }
+
+    /// Returns a reference to the `OriginService`
+    pub fn service(&self) -> Option<u32> {
+        self.service
+    }
 }
 
 fn default_metadata_value() -> Value {
@@ -95,6 +152,12 @@ impl EventMetadata {
         self.source_id.as_ref()
     }
 
+    /// Returns a reference to the metadata source type.
+    #[must_use]
+    pub fn source_type(&self) -> Option<&'static str> {
+        self.source_type
+    }
+
     /// Returns a reference to the metadata parent id. This is the `OutputId`
     /// of the previous component the event was sent through (if any).
     #[must_use]
@@ -105,6 +168,11 @@ impl EventMetadata {
     /// Sets the `source_id` in the metadata to the provided value.
     pub fn set_source_id(&mut self, source_id: Arc<ComponentKey>) {
         self.source_id = Some(source_id);
+    }
+
+    /// Sets the `source_type` in the metadata to the provided value.
+    pub fn set_source_type(&mut self, source_type: &'static str) {
+        self.source_type = Some(source_type);
     }
 
     /// Sets the `upstream_id` in the metadata to the provided value.
@@ -144,6 +212,11 @@ impl EventMetadata {
     pub fn dropped_field(&self, meaning: impl AsRef<str>) -> Option<&Value> {
         self.dropped_fields.get(meaning.as_ref())
     }
+
+    /// Returns a reference to the `DatadogMetricOriginMetadata`.
+    pub fn datadog_origin_metadata(&self) -> Option<&DatadogMetricOriginMetadata> {
+        self.datadog_origin_metadata.as_ref()
+    }
 }
 
 impl Default for EventMetadata {
@@ -154,8 +227,10 @@ impl Default for EventMetadata {
             finalizers: Default::default(),
             schema_definition: default_schema_definition(),
             source_id: None,
+            source_type: None,
             upstream_id: None,
             dropped_fields: BTreeMap::new(),
+            datadog_origin_metadata: None,
         }
     }
 }
@@ -210,6 +285,20 @@ impl EventMetadata {
     #[must_use]
     pub fn with_schema_definition(mut self, schema_definition: &Arc<schema::Definition>) -> Self {
         self.schema_definition = Arc::clone(schema_definition);
+        self
+    }
+
+    /// Replaces the existing `source_type` with the given one.
+    #[must_use]
+    pub fn with_source_type(mut self, source_type: &'static str) -> Self {
+        self.source_type = Some(source_type);
+        self
+    }
+
+    /// Replaces the existing `DatadogMetricOriginMetadata` with the given one.
+    #[must_use]
+    pub fn with_origin_metadata(mut self, origin_metadata: DatadogMetricOriginMetadata) -> Self {
+        self.datadog_origin_metadata = Some(origin_metadata);
         self
     }
 

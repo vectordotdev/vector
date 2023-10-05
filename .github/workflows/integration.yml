@@ -60,7 +60,10 @@ jobs:
             || needs.changes.outputs.azure == 'true'
             || needs.changes.outputs.clickhouse == 'true'
             || needs.changes.outputs.databend == 'true'
-            || needs.changes.outputs.datadog == 'true'
+            || needs.changes.outputs.datadog-agent == 'true'
+            || needs.changes.outputs.datadog-logs == 'true'
+            || needs.changes.outputs.datadog-metrics == 'true'
+            || needs.changes.outputs.datadog-traces == 'true'
             || needs.changes.outputs.dnstap == 'true'
             || needs.changes.outputs.docker-logs == 'true'
             || needs.changes.outputs.elasticsearch == 'true'
@@ -166,7 +169,7 @@ jobs:
           max_attempts: 3
           command: bash scripts/ci-integration-test.sh  databend
 
-      - if: (github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.datadog == 'true') &&
+      - if: (github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.datadog-agent == 'true') &&
           (github.event_name != 'pull_request' || env.PR_HAS_ACCESS_TO_SECRETS == 'true')
         name: datadog-agent
         uses: nick-fields/retry@v2
@@ -175,7 +178,7 @@ jobs:
           max_attempts: 3
           command: bash scripts/ci-integration-test.sh  datadog-agent
 
-      - if: (github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.datadog == 'true') &&
+      - if: (github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.datadog-logs == 'true') &&
           (github.event_name != 'pull_request' || env.PR_HAS_ACCESS_TO_SECRETS == 'true')
         name: datadog-logs
         uses: nick-fields/retry@v2
@@ -184,7 +187,7 @@ jobs:
           max_attempts: 3
           command: bash scripts/ci-integration-test.sh  datadog-logs
 
-      - if: (github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.datadog == 'true') &&
+      - if: (github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.datadog-metrics == 'true') &&
           (github.event_name != 'pull_request' || env.PR_HAS_ACCESS_TO_SECRETS == 'true')
         name: datadog-metrics
         uses: nick-fields/retry@v2
@@ -193,7 +196,7 @@ jobs:
           max_attempts: 3
           command: bash scripts/ci-integration-test.sh  datadog-metrics
 
-      - if: (github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.datadog == 'true') &&
+      - if: (github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.datadog-traces == 'true') &&
           (github.event_name != 'pull_request' || env.PR_HAS_ACCESS_TO_SECRETS == 'true')
         name: datadog-traces
         uses: nick-fields/retry@v2

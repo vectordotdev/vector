@@ -91,30 +91,29 @@ impl DatadogLogsConfig {
     // TODO: We should probably hoist this type of base URI generation so that all DD sinks can
     // utilize it, since it all follows the same pattern.
     fn get_uri(&self) -> http::Uri {
-        let endpoint = self
-            .dd_common
-            .endpoint
-            .clone()
-            .or_else(|| {
-                Some(format!(
-                    "https://http-intake.logs.{}/api/v2/logs",
-                    self.dd_common.site
-                ))
-            })
-            .unwrap_or_else(|| match self.region {
-                Some(Region::Eu) => "https://http-intake.logs.datadoghq.eu/api/v2/logs".to_string(),
-                None | Some(Region::Us) => {
-                    "https://http-intake.logs.datadoghq.com/api/v2/logs".to_string()
+        let base_url = self.dd_common.endpoint.clone().unwrap_or_else(|| {
+            if let Some(region) = self.region {
+                match region {
+                    Region::Eu => "https://http-intake.logs.datadoghq.eu".to_string(),
+                    Region::Us => "https://http-intake.logs.datadoghq.com".to_string(),
                 }
-            });
-        http::Uri::try_from(endpoint).expect("URI not valid")
+            } else {
+                format!("https://http-intake.logs.{}", self.dd_common.site)
+            }
+        });
+
+        http::Uri::try_from(format!("{}/api/v2/logs", base_url)).expect("URI not valid")
     }
 
     fn get_protocol(&self) -> String {
         self.get_uri().scheme_str().unwrap_or("http").to_string()
     }
 
-    pub fn build_processor(&self, client: HttpClient) -> crate::Result<VectorSink> {
+    pub fn build_processor(
+        &self,
+        client: HttpClient,
+        dd_evp_origin: String,
+    ) -> crate::Result<VectorSink> {
         let default_api_key: Arc<str> = Arc::from(self.dd_common.default_api_key.inner());
         let request_limits = self.request.tower.unwrap_with(&Default::default());
 
@@ -133,6 +132,7 @@ impl DatadogLogsConfig {
                 client,
                 self.get_uri(),
                 self.request.headers.clone(),
+                dd_evp_origin,
             )?);
 
         let encoding = self.encoding.clone();
@@ -169,7 +169,7 @@ impl SinkConfig for DatadogLogsConfig {
             .dd_common
             .build_healthcheck(client.clone(), self.region.as_ref())?;
 
-        let sink = self.build_processor(client)?;
+        let sink = self.build_processor(client, cx.app_name_slug)?;
 
         Ok((sink, healthcheck))
     }
