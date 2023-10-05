@@ -16,7 +16,7 @@ remap: functions: encode_logfmt: {
 		},
 		{
 			name:        "fields_ordering"
-			description: "The ordering of fields to preserve. Any fields not in this list appears unordered, after any ordered fields."
+			description: "The ordering of fields to preserve. Any fields not in this list are listed unordered, after all ordered fields."
 			required:    false
 			type: ["array"]
 		},

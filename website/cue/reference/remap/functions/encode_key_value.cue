@@ -3,7 +3,7 @@ package metadata
 remap: functions: encode_key_value: {
 	category:    "Codec"
 	description: """
-		Encodes the `value` into key/value format with customizable delimiters. Default delimiters match
+		Encodes the `value` into key-value format with customizable delimiters. Default delimiters match
 		the [logfmt](\(urls.logfmt)) format.
 		"""
 	notices: [
@@ -21,7 +21,7 @@ remap: functions: encode_key_value: {
 		},
 		{
 			name:        "fields_ordering"
-			description: "The ordering of fields to preserve. Any fields not in this list appears unordered, after any ordered fields."
+			description: "The ordering of fields to preserve. Any fields not in this list are listed unordered, after all ordered fields."
 			required:    false
 			type: ["array"]
 		},
@@ -34,14 +34,14 @@ remap: functions: encode_key_value: {
 		},
 		{
 			name:        "field_delimiter"
-			description: "The string that separates each key/value pair."
+			description: "The string that separates each key-value pair."
 			required:    false
 			default:     " "
 			type: ["string"]
 		},
 		{
 			name:        "flatten_boolean"
-			description: "Whether to encode key/value with a boolean value as a standalone key if `true` and nothing if `false`."
+			description: "Whether to encode key-value with a boolean value as a standalone key if `true` and nothing if `false`."
 			required:    false
 			type: ["boolean"]
 			default: false

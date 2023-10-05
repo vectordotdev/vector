@@ -20,7 +20,7 @@ remap: functions: unnest: {
 		},
 	]
 	internal_failure_reasons: [
-		"Field path refers to is not an array.",
+		"The field path referred to is not an array.",
 	]
 	notices: []
 	return: {

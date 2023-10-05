@@ -7,8 +7,8 @@ remap: functions: filter: {
 
 		This function currently *does not* support recursive iteration.
 
-		The function uses the "function closure syntax" to allow reading
-		the key/value or index/value combination for each item in the
+		The function uses the function closure syntax to allow reading
+		the key-value or index-value combination for each item in the
 		collection.
 
 		The same scoping rules apply to closure blocks as they do for

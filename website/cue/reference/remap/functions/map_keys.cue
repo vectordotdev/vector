@@ -24,7 +24,7 @@ remap: functions: map_keys: {
 		`recursive` enabled finds *all* keys in the target,
 		regardless of whether nested objects are nested inside arrays.
 
-		The function uses the "function closure syntax" to allow reading
+		The function uses the function closure syntax to allow reading
 		the key for each item in the object.
 
 		The same scoping rules apply to closure blocks as they do for

@@ -37,7 +37,7 @@ remap: functions: get_enrichment_table_record: {
 		},
 		{
 			name:        "case_sensitive"
-			description: "Whether text fields match case exactly."
+			description: "Whether the text fields match the case exactly."
 			required:    false
 			type: ["boolean"]
 			default: true

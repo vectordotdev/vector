@@ -54,14 +54,14 @@ remap: functions: encrypt: {
 		},
 		{
 			name:        "key"
-			description: "The key for encryption. This should be the raw bytes of the key (not encoded). The length must match the algorithm requested."
+			description: "The key in raw bytes (not encoded) for encryption. The length must match the algorithm requested."
 			required:    true
 			type: ["string"]
 		},
 		{
 			name: "iv"
 			description: #"""
-				The IV for encryption. This should be the raw bytes of the IV (not encoded). The length must match the algorithm requested.
+				The IV in raw bytes (not encoded) for encryption. The length must match the algorithm requested.
 				A new IV should be generated for every message. You can use `random_bytes` to generate a cryptographically secure random value.
 				"""#
 			required: true

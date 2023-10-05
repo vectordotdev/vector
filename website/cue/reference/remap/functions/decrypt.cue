@@ -33,7 +33,7 @@ remap: functions: decrypt: {
 	arguments: [
 		{
 			name:        "ciphertext"
-			description: "The string to decrypt. This should be the raw bytes (not encoded)."
+			description: "The string in raw bytes (not encoded) to decrypt."
 			required:    true
 			type: ["string"]
 		},
@@ -45,14 +45,14 @@ remap: functions: decrypt: {
 		},
 		{
 			name:        "key"
-			description: "The key for decryption. This should be the raw bytes of the key (not encoded). The length must match the algorithm requested."
+			description: "The key in raw bytes (not encoded) for decryption. The length must match the algorithm requested."
 			required:    true
 			type: ["string"]
 		},
 		{
 			name: "iv"
 			description: #"""
-				The IV for decryption. This should be the raw bytes of the IV (not encoded). The length must match the algorithm requested.
+				The IV in raw bytes (not encoded) for decryption. The length must match the algorithm requested.
 				A new IV should be generated for every message. You can use `random_bytes` to generate a cryptographically secure random value.
 				The value should match the one used during encryption.
 				"""#
