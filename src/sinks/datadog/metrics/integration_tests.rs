@@ -1,3 +1,5 @@
+use std::num::NonZeroU32;
+
 use bytes::Bytes;
 use chrono::{SubsecRound, Utc};
 use flate2::read::ZlibDecoder;
@@ -37,7 +39,7 @@ mod ddmetric_proto {
     include!(concat!(env!("OUT_DIR"), "/datadog.agentpayload.rs"));
 }
 
-fn generate_metric_events() -> Vec<Event> {
+fn generate_counters() -> Vec<Event> {
     let timestamp = Utc::now().trunc_subsecs(3);
     let events: Vec<_> = (0..10)
         .map(|index| {
@@ -66,6 +68,38 @@ fn generate_metric_events() -> Vec<Event> {
     events
 }
 
+fn generate_counter_gauge_set() -> Vec<Event> {
+    let ts = Utc::now().trunc_subsecs(3);
+    let events = vec![
+        // gauge
+        Event::Metric(Metric::new(
+            "gauge",
+            MetricKind::Incremental,
+            MetricValue::Gauge { value: 5678.0 },
+        )),
+        // counter with interval
+        Event::Metric(
+            Metric::new(
+                "counter_with_interval",
+                MetricKind::Incremental,
+                MetricValue::Counter { value: 1234.0 },
+            )
+            .with_interval_ms(NonZeroU32::new(2000))
+            .with_timestamp(Some(ts)),
+        ),
+        // set
+        Event::Metric(Metric::new(
+            "set",
+            MetricKind::Incremental,
+            MetricValue::Set {
+                values: vec!["zorp".into(), "zork".into()].into_iter().collect(),
+            },
+        )),
+    ];
+
+    events
+}
+
 /// Starts a test sink with random metrics running into it
 ///
 /// This function starts a Datadog Metrics sink with a simplistic configuration and
@@ -75,7 +109,7 @@ fn generate_metric_events() -> Vec<Event> {
 /// Testers may set `http_status` and `batch_status`. The first controls what
 /// status code faked HTTP responses will have, the second acts as a check on
 /// the `Receiver`'s status before being returned to the caller.
-async fn start_test() -> (Vec<Event>, Receiver<(http::request::Parts, Bytes)>) {
+async fn start_test(events: Vec<Event>) -> (Vec<Event>, Receiver<(http::request::Parts, Bytes)>) {
     let config = indoc! {r#"
         default_api_key = "atoken"
         default_namespace = "foo"
@@ -95,8 +129,6 @@ async fn start_test() -> (Vec<Event>, Receiver<(http::request::Parts, Bytes)>) {
 
     let (batch, mut receiver) = BatchNotifier::new_with_receiver();
 
-    let events = generate_metric_events();
-
     let stream = map_event_batch_stream(stream::iter(events.clone()), Some(batch));
 
     sink.run(stream).await.unwrap();
@@ -114,13 +146,33 @@ fn decompress_payload(payload: Vec<u8>) -> std::io::Result<Vec<u8>> {
 }
 
 #[tokio::test]
-/// Assert the basic functionality of the sink in good conditions
+/// Assert proper handling of different metric types
+async fn all_series_metric_types() {
+    let metrics = generate_counter_gauge_set();
+    let (expected, rx) = start_test(metrics).await;
+
+    let output = rx.take(expected.len()).collect::<Vec<_>>().await;
+
+    assert!(output.len() == 1, "Should have received a response");
+
+    let request = output.first().unwrap();
+
+    validate_protobuf_counter_gauge_set(request);
+}
+
+#[tokio::test]
+/// Assert the basic functionality of the sink in good conditions with
+/// a small batch of counters.
 ///
 /// This test rigs the sink to return OK to responses, checks that all batches
 /// were delivered and then asserts that every message is able to be
 /// deserialized.
+///
+/// In addition to validating the counter values, we also validate the various
+/// fields such as the Resources, handling of tags, and the Metadata.
 async fn smoke() {
-    let (expected, rx) = start_test().await;
+    let counters = generate_counters();
+    let (expected, rx) = start_test(counters).await;
 
     let output = rx.take(expected.len()).collect::<Vec<_>>().await;
 
@@ -129,8 +181,8 @@ async fn smoke() {
     let request = output.first().unwrap();
 
     match request.0.uri.path() {
-        SERIES_V1_PATH => validate_json(request),
-        SERIES_V2_PATH => validate_protobuf(request),
+        SERIES_V1_PATH => validate_json_counters(request),
+        SERIES_V2_PATH => validate_protobuf_counters(request),
         _ => panic!("Unexpected request type received!"),
     }
 }
@@ -140,7 +192,7 @@ fn validate_common(request: &(Parts, Bytes)) {
     assert!(request.0.headers.contains_key("DD-Agent-Payload"));
 }
 
-fn validate_protobuf(request: &(Parts, Bytes)) {
+fn validate_protobuf_counters(request: &(Parts, Bytes)) {
     assert_eq!(
         request.0.headers.get("Content-Type").unwrap(),
         "application/x-protobuf"
@@ -210,7 +262,64 @@ fn validate_protobuf(request: &(Parts, Bytes)) {
     );
 }
 
-fn validate_json(request: &(Parts, Bytes)) {
+fn validate_protobuf_counter_gauge_set(request: &(Parts, Bytes)) {
+    assert_eq!(
+        request.0.headers.get("Content-Type").unwrap(),
+        "application/x-protobuf"
+    );
+
+    validate_common(request);
+
+    let compressed_payload = request.1.to_vec();
+    let payload = decompress_payload(compressed_payload).expect("Could not decompress payload");
+    let frame = Bytes::copy_from_slice(&payload);
+
+    let payload =
+        ddmetric_proto::MetricPayload::decode(frame).expect("Could not decode protobuf frame");
+
+    let mut series = payload.series;
+
+    assert_eq!(series.len(), 3);
+
+    // Note the below evaluation implies validation of sorting the metrics by name to improve HTTP compression
+
+    // validate set (gauge)
+    {
+        let gauge = series.pop().unwrap();
+        assert_eq!(
+            gauge.r#type(),
+            ddmetric_proto::metric_payload::MetricType::Gauge
+        );
+        assert_eq!(gauge.interval, 0);
+        assert_eq!(gauge.points[0].value, 2_f64);
+    }
+
+    // validate gauge
+    {
+        let gauge = series.pop().unwrap();
+        assert_eq!(
+            gauge.r#type(),
+            ddmetric_proto::metric_payload::MetricType::Gauge
+        );
+        assert_eq!(gauge.points[0].value, 5678.0);
+        assert_eq!(gauge.interval, 0);
+    }
+
+    // validate counter w interval = rate
+    {
+        let count = series.pop().unwrap();
+        assert_eq!(
+            count.r#type(),
+            ddmetric_proto::metric_payload::MetricType::Rate
+        );
+        assert_eq!(count.interval, 2);
+
+        assert_eq!(count.points.len(), 1);
+        assert_eq!(count.points[0].value, 1234.0 / count.interval as f64);
+    }
+}
+
+fn validate_json_counters(request: &(Parts, Bytes)) {
     assert_eq!(
         request.0.headers.get("Content-Type").unwrap(),
         "application/json"
@@ -308,7 +417,7 @@ async fn run_sink() {
     let (sink, _) = config.build(cx).await.unwrap();
     let (batch, receiver) = BatchNotifier::new_with_receiver();
 
-    let events = generate_metric_events();
+    let events = generate_counters();
 
     let stream = map_event_batch_stream(stream::iter(events.clone()), Some(batch));
 
