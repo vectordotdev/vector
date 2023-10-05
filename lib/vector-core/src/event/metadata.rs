@@ -79,7 +79,7 @@ impl DatadogMetricOriginMetadata {
     /// Creates a new `DatadogMetricOriginMetadata`.
     /// When Vector sends out metrics containing the Origin metadata, it should do so with
     /// all of the fields defined.
-    /// The edge case where the Orign metadata is created within a component and does not
+    /// The edge case where the Origin metadata is created within a component and does not
     /// initially contain all of the metadata fields, is in the `log_to_metric` transform.
     #[must_use]
     pub fn new(product: Option<u32>, category: Option<u32>, service: Option<u32>) -> Self {
