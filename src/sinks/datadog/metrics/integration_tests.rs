@@ -287,7 +287,13 @@ fn validate_protobuf_counter_gauge_set(request: &(Parts, Bytes)) {
 
     assert_eq!(series.len(), 3);
 
-    // Note the below evaluation implies validation of sorting the metrics by name to improve HTTP compression
+    // The below evaluation of each metric type implies validation of sorting the metrics
+    // by name to improve HTTP compression due to the order they are defined vs processed.
+    // However just to be safe we will also validate explicitly.
+    let metric_names: Vec<String> = series.iter().map(|serie| serie.metric.clone()).collect();
+    let mut sorted_names = metric_names.clone();
+    sorted_names.sort();
+    assert_eq!(metric_names, sorted_names);
 
     // validate set (gauge)
     {
