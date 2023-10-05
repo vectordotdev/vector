@@ -158,7 +158,7 @@ async fn all_series_metric_types() {
     let request = output.first().unwrap();
 
     match request.0.uri.path() {
-        SERIES_V1_PATH => warn!("Deprecated endpoint used!"),
+        SERIES_V1_PATH => warn!("Deprecated endpoint used."),
         SERIES_V2_PATH => validate_protobuf_set_gauge_rate(request),
         _ => panic!("Unexpected request type received!"),
     }
