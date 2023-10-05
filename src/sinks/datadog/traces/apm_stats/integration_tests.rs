@@ -417,7 +417,9 @@ async fn apm_stats_e2e_test_dd_agent_to_vector_correctness() {
     // the URLs of the Agent trace endpoints that traces will be sent to
     let urls = vec![trace_agent_only_url(), trace_agent_to_vector_url()];
 
-    let start = Utc::now().timestamp_nanos();
+    let start = Utc::now()
+        .timestamp_nanos_opt()
+        .expect("Timestamp out of range");
     let duration = 1;
     let span_id = 3;
 

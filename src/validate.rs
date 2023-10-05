@@ -54,7 +54,8 @@ pub struct Opts {
     /// Any number of Vector config files to validate.
     /// Format is detected from the file name.
     /// If none are specified the default config path `/etc/vector/vector.toml`
-    /// will be targeted.
+    /// will be targeted. And if the aforementioned file does not exist,
+    //  then `/etc/vector/vector.yaml` will be used.
     #[arg(env = "VECTOR_CONFIG", value_delimiter(','))]
     pub paths: Vec<PathBuf>,
 

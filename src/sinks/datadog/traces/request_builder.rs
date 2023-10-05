@@ -382,7 +382,9 @@ impl DatadogTracesEncoder {
             _ => 0,
         };
         let start = match span.get("start") {
-            Some(Value::Timestamp(val)) => val.timestamp_nanos(),
+            Some(Value::Timestamp(val)) => {
+                val.timestamp_nanos_opt().expect("Timestamp out of range")
+            }
             _ => 0,
         };
 

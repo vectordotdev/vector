@@ -7,9 +7,6 @@ use rdkafka::{
     producer::{FutureProducer, FutureRecord},
     util::Timeout,
 };
-use vector_core::internal_event::{
-    ByteSize, BytesSent, InternalEventHandle as _, Protocol, Registered,
-};
 
 use crate::{kafka::KafkaStatisticsContext, sinks::prelude::*};
 
@@ -29,6 +26,7 @@ pub struct KafkaRequestMetadata {
 
 pub struct KafkaResponse {
     event_byte_size: GroupedCountByteSize,
+    raw_byte_size: usize,
 }
 
 impl DriverResponse for KafkaResponse {
@@ -38,6 +36,10 @@ impl DriverResponse for KafkaResponse {
 
     fn events_sent(&self) -> &GroupedCountByteSize {
         &self.event_byte_size
+    }
+
+    fn bytes_sent(&self) -> Option<usize> {
+        Some(self.raw_byte_size)
     }
 }
 
@@ -60,15 +62,13 @@ impl MetaDescriptive for KafkaRequest {
 #[derive(Clone)]
 pub struct KafkaService {
     kafka_producer: FutureProducer<KafkaStatisticsContext>,
-    bytes_sent: Registered<BytesSent>,
 }
 
 impl KafkaService {
-    pub(crate) fn new(kafka_producer: FutureProducer<KafkaStatisticsContext>) -> KafkaService {
-        KafkaService {
-            kafka_producer,
-            bytes_sent: register!(BytesSent::from(Protocol("kafka".into()))),
-        }
+    pub(crate) const fn new(
+        kafka_producer: FutureProducer<KafkaStatisticsContext>,
+    ) -> KafkaService {
+        KafkaService { kafka_producer }
     }
 }
 
@@ -104,10 +104,12 @@ impl Service<KafkaRequest> for KafkaService {
             // rdkafka will internally retry forever if the queue is full
             match this.kafka_producer.send(record, Timeout::Never).await {
                 Ok((_partition, _offset)) => {
-                    this.bytes_sent.emit(ByteSize(
-                        request.body.len() + request.metadata.key.map(|x| x.len()).unwrap_or(0),
-                    ));
-                    Ok(KafkaResponse { event_byte_size })
+                    let raw_byte_size =
+                        request.body.len() + request.metadata.key.map_or(0, |x| x.len());
+                    Ok(KafkaResponse {
+                        event_byte_size,
+                        raw_byte_size,
+                    })
                 }
                 Err((kafka_err, _original_record)) => Err(kafka_err),
             }

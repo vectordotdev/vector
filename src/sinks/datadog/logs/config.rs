@@ -109,7 +109,11 @@ impl DatadogLogsConfig {
         self.get_uri().scheme_str().unwrap_or("http").to_string()
     }
 
-    pub fn build_processor(&self, client: HttpClient) -> crate::Result<VectorSink> {
+    pub fn build_processor(
+        &self,
+        client: HttpClient,
+        dd_evp_origin: String,
+    ) -> crate::Result<VectorSink> {
         let default_api_key: Arc<str> = Arc::from(self.dd_common.default_api_key.inner());
         let request_limits = self.request.tower.unwrap_with(&Default::default());
 
@@ -128,6 +132,7 @@ impl DatadogLogsConfig {
                 client,
                 self.get_uri(),
                 self.request.headers.clone(),
+                dd_evp_origin,
             )?);
 
         let encoding = self.encoding.clone();
@@ -164,7 +169,7 @@ impl SinkConfig for DatadogLogsConfig {
             .dd_common
             .build_healthcheck(client.clone(), self.region.as_ref())?;
 
-        let sink = self.build_processor(client)?;
+        let sink = self.build_processor(client, cx.app_name_slug)?;
 
         Ok((sink, healthcheck))
     }

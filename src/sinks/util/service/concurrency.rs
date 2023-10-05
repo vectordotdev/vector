@@ -17,6 +17,9 @@ use serde::{
 };
 
 /// Configuration for outbound request concurrency.
+///
+/// This can be set either to one of the below enum values or to a positive integer, which denotes
+/// a fixed concurrency limit.
 #[derive(Clone, Copy, Debug, Derivative, Eq, PartialEq)]
 pub enum Concurrency {
     /// A fixed concurrency of 1.
@@ -48,28 +51,29 @@ impl Serialize for Concurrency {
 
 impl Default for Concurrency {
     fn default() -> Self {
-        Self::None
+        Self::Adaptive
     }
 }
 
 impl Concurrency {
-    pub const fn if_none(self, other: Self) -> Self {
+    const fn if_adaptive(self, other: Self) -> Self {
         match self {
-            Self::None => other,
+            Self::Adaptive => other,
             _ => self,
         }
     }
 
-    pub const fn parse_concurrency(&self, default: Self) -> Option<usize> {
-        match self.if_none(default) {
-            Concurrency::None | Concurrency::Adaptive => None,
+    pub const fn parse_concurrency(&self, other: Self) -> Option<usize> {
+        match self.if_adaptive(other) {
+            Concurrency::None => Some(1),
+            Concurrency::Adaptive => None,
             Concurrency::Fixed(limit) => Some(limit),
         }
     }
 }
 
-pub const fn concurrency_is_none(concurrency: &Concurrency) -> bool {
-    matches!(concurrency, Concurrency::None)
+pub const fn concurrency_is_adaptive(concurrency: &Concurrency) -> bool {
+    matches!(concurrency, Concurrency::Adaptive)
 }
 
 impl<'de> Deserialize<'de> for Concurrency {
@@ -93,7 +97,7 @@ impl<'de> Deserialize<'de> for Concurrency {
                 } else if value == "none" {
                     Ok(Concurrency::None)
                 } else {
-                    Err(de::Error::unknown_variant(value, &["adaptive"]))
+                    Err(de::Error::unknown_variant(value, &["adaptive", "none"]))
                 }
             }
 
@@ -132,7 +136,12 @@ impl Configurable for Concurrency {
 
     fn metadata() -> Metadata {
         let mut metadata = Metadata::default();
-        metadata.set_description("Configuration for outbound request concurrency.");
+        metadata.set_description(
+            r#"Configuration for outbound request concurrency.
+
+This can be set either to one of the below enum values or to a positive integer, which denotes
+a fixed concurrency limit."#,
+        );
         metadata.add_custom_attribute(CustomAttribute::kv("docs::enum_tagging", "external"));
         metadata
     }

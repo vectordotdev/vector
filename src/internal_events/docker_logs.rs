@@ -186,28 +186,3 @@ impl InternalEvent for DockerLogsLoggingDriverUnsupportedError<'_> {
         counter!("logging_driver_errors_total", 1);
     }
 }
-
-#[derive(Debug)]
-pub struct DockerLogsReceivedOutOfOrderError<'a> {
-    pub timestamp_str: &'a str,
-    pub container_id: &'a str,
-}
-
-impl InternalEvent for DockerLogsReceivedOutOfOrderError<'_> {
-    fn emit(self) {
-        error!(
-            message = "Received out of order log message.",
-            error_type = error_type::CONDITION_FAILED,
-            stage = error_stage::RECEIVING,
-            container_id = ?self.container_id,
-            timestamp = ?self.timestamp_str,
-            internal_log_rate_limit = true,
-        );
-        counter!(
-            "component_errors_total", 1,
-            "error_type" => error_type::CONDITION_FAILED,
-            "stage" => error_stage::RECEIVING,
-            "container_id" => self.container_id.to_owned(),
-        );
-    }
-}

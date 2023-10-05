@@ -9,7 +9,7 @@ pub use finalization::{
     Finalizable,
 };
 pub use log_event::LogEvent;
-pub use metadata::{EventMetadata, WithMetadata};
+pub use metadata::{DatadogMetricOriginMetadata, EventMetadata, WithMetadata};
 pub use metric::{Metric, MetricKind, MetricTags, MetricValue, StatisticKind};
 pub use r#ref::{EventMutRef, EventRef};
 use serde::{Deserialize, Serialize};
@@ -305,6 +305,11 @@ impl Event {
     /// Sets the `upstream_id` in the event metadata to the provided value.
     pub fn set_upstream_id(&mut self, upstream_id: Arc<OutputId>) {
         self.metadata_mut().set_upstream_id(upstream_id);
+    }
+
+    /// Sets the `source_type` in the event metadata to the provided value.
+    pub fn set_source_type(&mut self, source_type: &'static str) {
+        self.metadata_mut().set_source_type(source_type);
     }
 
     /// Sets the `source_id` in the event metadata to the provided value.

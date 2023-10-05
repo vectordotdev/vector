@@ -1,4 +1,3 @@
-use futures::future;
 use rdkafka::{
     consumer::{BaseConsumer, Consumer},
     error::KafkaError,
@@ -13,9 +12,7 @@ use vrl::path::OwnedTargetPath;
 use super::config::{KafkaRole, KafkaSinkConfig};
 use crate::{
     kafka::KafkaStatisticsContext,
-    sinks::kafka::{
-        config::QUEUED_MIN_MESSAGES, request_builder::KafkaRequestBuilder, service::KafkaService,
-    },
+    sinks::kafka::{request_builder::KafkaRequestBuilder, service::KafkaService},
     sinks::prelude::*,
 };
 
@@ -65,22 +62,47 @@ impl KafkaSink {
     }
 
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
-        // rdkafka will internally retry forever, so we need some limit to prevent this from overflowing
-        let service = ConcurrencyLimit::new(self.service, QUEUED_MIN_MESSAGES as usize);
-        let mut request_builder = KafkaRequestBuilder {
+        // rdkafka will internally retry forever, so we need some limit to prevent this from overflowing.
+        // 64 should be plenty concurrency here, as a rdkafka send operation does not block until its underlying
+        // buffer is full.
+        let service = ConcurrencyLimit::new(self.service.clone(), 64);
+
+        let request_builder = KafkaRequestBuilder {
             key_field: self.key_field,
             headers_key: self.headers_key,
-            topic_template: self.topic,
-            transformer: self.transformer,
-            encoder: self.encoder,
+            encoder: (self.transformer, self.encoder),
         };
 
         input
-            .filter_map(|event|
-                // request_builder is fallible but the places it can fail are emitting
-                // `Error` and `DroppedEvent` internal events appropriately so no need to here.
-                future::ready(request_builder.build_request(event)))
+            .filter_map(|event| {
+                // Compute the topic.
+                future::ready(
+                    self.topic
+                        .render_string(&event)
+                        .map_err(|error| {
+                            emit!(TemplateRenderingError {
+                                field: None,
+                                drop_event: true,
+                                error,
+                            });
+                        })
+                        .ok()
+                        .map(|topic| (topic, event)),
+                )
+            })
+            .request_builder(default_request_builder_concurrency_limit(), request_builder)
+            .filter_map(|request| async {
+                match request {
+                    Err(error) => {
+                        emit!(SinkRequestBuildError { error });
+                        None
+                    }
+                    Ok(req) => Some(req),
+                }
+            })
             .into_driver(service)
+            .protocol("kafka")
+            .protocol("kafka")
             .run()
             .await
     }
