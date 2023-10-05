@@ -69,6 +69,7 @@ badunit
 bak
 barfoo
 barieom
+basearch
 baseof
 basevalue
 baskinc
@@ -449,6 +450,8 @@ gogoproto
 goldberg
 goldmark
 GPB
+gpgcheck
+gpgkey
 gqlgen
 graphqlconfig
 grault
@@ -574,6 +577,7 @@ kernelmode
 keybase
 keyclock
 keyid
+keyring
 keyxxxxx
 khvzak
 kib
@@ -899,6 +903,7 @@ reparse
 replacepkgs
 replicaset
 replset
+repodata
 reqwest
 rereleased
 reserialize
@@ -1002,7 +1007,9 @@ somehost
 somejob
 sourced
 sourcedir
+sourcelist
 sourcenetworkbytesreceived
+sourceparts
 sourceproject
 sourceroot
 sourcetype
@@ -1055,6 +1062,7 @@ SUIDSGID
 summ
 Supercalifragilisticexpialidocious
 supertrait
+suse
 suser
 sustainability
 svalue
