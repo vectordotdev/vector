@@ -6,7 +6,7 @@ edition = "2021"
 publish = false
 
 [build-dependencies]
-prost-build = { version = "0.12", default-features = false}
+prost-build = { version = "0.12.1", default-features = false}
 tonic-build = { version = "0.10", default-features = false, features = ["prost", "transport"] }
 
 [dependencies]
