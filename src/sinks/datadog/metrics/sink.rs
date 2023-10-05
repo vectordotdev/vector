@@ -185,6 +185,9 @@ fn sort_and_collapse_counters_by_series_and_timestamp(mut metrics: Vec<Metric>) 
     });
 
     // Aggregate counters that share the same series and timestamp.
+    // While `coalesce` is semantically more fitting here than `dedupe_by`, we opt for the latter because
+    // they share the same functionality and `dedupe_by`'s implementation is more optimized, doing the
+    // operation in place.
     metrics.dedup_by(|left, right| {
         if left.series() != right.series() {
             return false;
