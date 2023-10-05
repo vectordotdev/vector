@@ -247,7 +247,12 @@ mod tests {
                     let name = format!("{}-{}", value.as_name(), id);
                     Metric::new(name, MetricKind::Incremental, value).with_timestamp(Some(ts))
                 })
-                .filter(|metric| unique_metrics.insert(metric.series().clone())) // Filter out duplicates
+                // Filter out duplicates other than counters. We do this to prevent false positives. False positives would occur
+                // because we don't collapse other metric types and we can't sort metrics by their values.
+                .filter(|metric| {
+                    matches!(metric.value(), MetricValue::Counter { .. })
+                        || unique_metrics.insert(metric.series().clone())
+                })
                 .collect()
         })
     }
