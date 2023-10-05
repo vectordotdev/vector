@@ -5000,8 +5000,8 @@ dependencies = [
  "bytes 1.5.0",
  "chrono",
  "prost 0.12.1",
- "prost-build 0.12.0",
- "prost-types 0.12.0",
+ "prost-build 0.12.1",
+ "prost-types 0.12.1",
  "snap",
 ]
 
@@ -6606,8 +6606,8 @@ dependencies = [
  "nom",
  "num_enum 0.7.0",
  "prost 0.12.1",
- "prost-build 0.12.0",
- "prost-types 0.12.0",
+ "prost-build 0.12.1",
+ "prost-types 0.12.1",
  "snafu",
  "vector-common",
 ]
@@ -6676,9 +6676,9 @@ dependencies = [
 
 [[package]]
 name = "prost-build"
-version = "0.12.0"
+version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "30d3e647e9eb04ddfef78dfee2d5b3fefdf94821c84b710a3d8ebc89ede8b164"
+checksum = "8bdf592881d821b83d471f8af290226c8d51402259e9bb5be7f9f8bdebbb11ac"
 dependencies = [
  "bytes 1.5.0",
  "heck 0.4.1",
@@ -6689,7 +6689,7 @@ dependencies = [
  "petgraph",
  "prettyplease 0.2.12",
  "prost 0.12.1",
- "prost-types 0.12.0",
+ "prost-types 0.12.1",
  "regex",
  "syn 2.0.37",
  "tempfile",
@@ -6731,7 +6731,7 @@ dependencies = [
  "base64 0.21.4",
  "once_cell",
  "prost 0.12.1",
- "prost-types 0.12.0",
+ "prost-types 0.12.1",
  "serde",
  "serde-value",
 ]
@@ -6747,9 +6747,9 @@ dependencies = [
 
 [[package]]
 name = "prost-types"
-version = "0.12.0"
+version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cebe0a918c97f86c217b0f76fd754e966f8b9f41595095cf7d74cb4e59d730f6"
+checksum = "e081b29f63d83a4bc75cfc9f3fe424f9156cf92d8a4f0c9407cce9a1b67327cf"
 dependencies = [
  "prost 0.12.1",
 ]
@@ -6757,7 +6757,7 @@ dependencies = [
 [[package]]
 name = "prost-wkt"
 version = "0.5.0"
-source = "git+https://github.com/dragonnn/prost-wkt?branch=master#75fc0a62b920692e2c904e46e10dee2e695344c9"
+source = "git+https://github.com/fdeantoni/prost-wkt?branch=master#6dfb1b2704da2af75507ee63f119a680a54d658a"
 dependencies = [
  "chrono",
  "inventory",
@@ -6771,24 +6771,24 @@ dependencies = [
 [[package]]
 name = "prost-wkt-build"
 version = "0.5.0"
-source = "git+https://github.com/dragonnn/prost-wkt?branch=master#75fc0a62b920692e2c904e46e10dee2e695344c9"
+source = "git+https://github.com/fdeantoni/prost-wkt?branch=master#6dfb1b2704da2af75507ee63f119a680a54d658a"
 dependencies = [
  "heck 0.4.1",
  "prost 0.12.1",
- "prost-build 0.12.0",
- "prost-types 0.12.0",
+ "prost-build 0.12.1",
+ "prost-types 0.12.1",
  "quote 1.0.33",
 ]
 
 [[package]]
 name = "prost-wkt-types"
 version = "0.5.0"
-source = "git+https://github.com/dragonnn/prost-wkt?branch=master#75fc0a62b920692e2c904e46e10dee2e695344c9"
+source = "git+https://github.com/fdeantoni/prost-wkt?branch=master#6dfb1b2704da2af75507ee63f119a680a54d658a"
 dependencies = [
  "chrono",
  "prost 0.12.1",
- "prost-build 0.12.0",
- "prost-types 0.12.0",
+ "prost-build 0.12.1",
+ "prost-types 0.12.1",
  "prost-wkt",
  "prost-wkt-build",
  "regex",
@@ -9037,7 +9037,7 @@ checksum = "9d021fc044c18582b9a2408cd0dd05b1596e3ecdb5c4df822bb0183545683889"
 dependencies = [
  "prettyplease 0.2.12",
  "proc-macro2 1.0.67",
- "prost-build 0.12.0",
+ "prost-build 0.12.1",
  "quote 1.0.33",
  "syn 2.0.37",
 ]
@@ -9780,9 +9780,9 @@ dependencies = [
  "prometheus-parser",
  "proptest",
  "prost 0.12.1",
- "prost-build 0.12.0",
+ "prost-build 0.12.1",
  "prost-reflect",
- "prost-types 0.12.0",
+ "prost-types 0.12.1",
  "pulsar",
  "quickcheck",
  "rand 0.8.5",
@@ -10050,8 +10050,8 @@ dependencies = [
  "pin-project",
  "proptest",
  "prost 0.12.1",
- "prost-build 0.12.0",
- "prost-types 0.12.0",
+ "prost-build 0.12.1",
+ "prost-types 0.12.1",
  "prost-wkt",
  "prost-wkt-build",
  "prost-wkt-types",

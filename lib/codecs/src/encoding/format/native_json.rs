@@ -1,7 +1,11 @@
 use bytes::{BufMut, BytesMut};
 use serde::{Deserialize, Serialize};
 use tokio_util::codec::Encoder;
-use vector_core::{config::DataType, event::{Event, EventArray, proto}, schema};
+use vector_core::{
+    config::DataType,
+    event::{proto, Event, EventArray},
+    schema,
+};
 
 /// Config used to build a `NativeJsonSerializer`.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
