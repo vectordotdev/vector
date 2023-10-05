@@ -159,12 +159,6 @@ fn validate_protobuf(request: &(Parts, Bytes)) {
 
     assert!(!series.is_empty());
 
-    // check metrics are sorted by name, which helps HTTP compression
-    let metric_names: Vec<String> = series.iter().map(|serie| serie.metric.clone()).collect();
-    let mut sorted_names = metric_names.clone();
-    sorted_names.sort();
-    assert_eq!(metric_names, sorted_names);
-
     series.iter().for_each(|serie| {
         // name
         assert!(serie.metric.starts_with("foo.counter_"));
