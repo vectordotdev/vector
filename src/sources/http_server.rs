@@ -1,7 +1,7 @@
 use std::{collections::HashMap, net::SocketAddr};
 
 use bytes::{Bytes, BytesMut};
-use chrono::{DateTime, Utc};
+use chrono::Utc;
 use http::{StatusCode, Uri};
 use http_serde;
 use tokio_util::codec::Decoder as _;
@@ -15,7 +15,6 @@ use codecs::{
 };
 use lookup::{lookup_v2::OptionalValuePath, owned_value_path, path};
 use vector_config::configurable_component;
-use vector_core::event::LogEvent;
 use vector_core::{
     config::{DataType, LegacyKey, LogNamespace},
     schema::Definition,
@@ -386,39 +385,8 @@ struct SimpleHttpSource {
 }
 
 impl HttpSource for SimpleHttpSource {
-    fn enrich_log(
-        &self,
-        log: &mut LogEvent,
-        now: DateTime<Utc>,
-        request_path: &str,
-        headers_config: &HeaderMap,
-    ) {
-        // add request_path to each event
-        self.log_namespace.insert_source_metadata(
-            SimpleHttpConfig::NAME,
-            log,
-            self.path_key.path.as_ref().map(LegacyKey::InsertIfEmpty),
-            path!("path"),
-            request_path.to_owned(),
-        );
-
-        // add each header to each event
-        for header_name in &self.headers {
-            let value = headers_config.get(header_name).map(HeaderValue::as_bytes);
-
-            self.log_namespace.insert_source_metadata(
-                SimpleHttpConfig::NAME,
-                log,
-                Some(LegacyKey::InsertIfEmpty(path!(header_name))),
-                path!("headers", header_name),
-                Value::from(value.map(Bytes::copy_from_slice)),
-            );
-        }
-
-        self.log_namespace
-            .insert_standard_vector_source_metadata(log, SimpleHttpConfig::NAME, now);
-    }
-    /// Enriches the passed in events with metadata for the `request_path` and for each of the headers.
+    /// Enriches the log events with metadata for the `request_path` and for each of the headers.
+    /// Non-log events are skipped.
     fn enrich_events(
         &self,
         events: &mut [Event],
@@ -429,14 +397,36 @@ impl HttpSource for SimpleHttpSource {
         let now = Utc::now();
         for event in events.iter_mut() {
             match event {
-                Event::Log(log_event) => {
-                    self.enrich_log(log_event, now, request_path, headers_config);
+                Event::Log(log) => {
+                    // add request_path to each event
+                    self.log_namespace.insert_source_metadata(
+                        SimpleHttpConfig::NAME,
+                        log,
+                        self.path_key.path.as_ref().map(LegacyKey::InsertIfEmpty),
+                        path!("path"),
+                        request_path.to_owned(),
+                    );
+
+                    // add each header to each event
+                    for header_name in &self.headers {
+                        let value = headers_config.get(header_name).map(HeaderValue::as_bytes);
+
+                        self.log_namespace.insert_source_metadata(
+                            SimpleHttpConfig::NAME,
+                            log,
+                            Some(LegacyKey::InsertIfEmpty(path!(header_name))),
+                            path!("headers", header_name),
+                            Value::from(value.map(Bytes::copy_from_slice)),
+                        );
+                    }
+
+                    self.log_namespace.insert_standard_vector_source_metadata(
+                        log,
+                        SimpleHttpConfig::NAME,
+                        now,
+                    );
                 }
-                Event::Metric(_) => {
-                    // TODO discuss with reviewer what we want to do for metric and trace events
-                    continue;
-                }
-                Event::Trace(_) => {
+                _ => {
                     continue;
                 }
             }
