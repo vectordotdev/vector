@@ -386,6 +386,9 @@ nix = { git = "https://github.com/vectordotdev/nix.git", branch = "memfd/gnu/mus
 # The `heim` crates depend on `ntapi` 0.3.7 on Windows, but that version has an
 # unaligned access bug fixed in the following revision.
 ntapi = { git = "https://github.com/MSxDOS/ntapi.git", rev = "24fc1e47677fc9f6e38e5f154e6011dc9b270da6" }
+prost-wkt = { git = "https://github.com/fdeantoni/prost-wkt", branch = "master" }
+prost-wkt-types = { git = "https://github.com/fdeantoni/prost-wkt", branch = "master" }
+prost-wkt-build = { git = "https://github.com/fdeantoni/prost-wkt", branch = "master" }
 
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin
