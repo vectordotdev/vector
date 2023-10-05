@@ -225,7 +225,7 @@ fn sort_and_collapse_counters_by_series_and_timestamp(mut metrics: Vec<Metric>) 
 
 #[cfg(test)]
 mod tests {
-    use std::time::Duration;
+    use std::{collections::HashSet, time::Duration};
 
     use chrono::{DateTime, Utc};
     use proptest::prelude::*;
@@ -240,12 +240,14 @@ mod tests {
         let ts = Utc::now();
 
         any::<Vec<(u16, MetricValue)>>().prop_map(move |values| {
+            let mut unique_metrics = HashSet::new();
             values
                 .into_iter()
                 .map(|(id, value)| {
                     let name = format!("{}-{}", value.as_name(), id);
                     Metric::new(name, MetricKind::Incremental, value).with_timestamp(Some(ts))
                 })
+                .filter(|metric| unique_metrics.insert(metric.series().clone())) // Filter out duplicates
                 .collect()
         })
     }
