@@ -175,10 +175,12 @@ fn sort_and_collapse_counters_by_series_and_timestamp(mut metrics: Vec<Metric>) 
     // Note that `sort_unstable_by_key` would be simpler but results in lifetime errors without cloning.
     metrics.sort_unstable_by(|a, b| {
         (
+            a.value().as_name(),
             a.series(),
             a.timestamp().map(|dt| dt.timestamp()).unwrap_or(now_ts),
         )
             .cmp(&(
+                a.value().as_name(),
                 b.series(),
                 b.timestamp().map(|dt| dt.timestamp()).unwrap_or(now_ts),
             ))
