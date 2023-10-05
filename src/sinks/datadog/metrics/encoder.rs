@@ -1015,9 +1015,9 @@ mod tests {
     use super::{
         ddmetric_proto, encode_proto_key_and_message, encode_tags, encode_timestamp,
         generate_series_metrics, get_compressor, get_sketch_payload_sketches_field_number,
-        max_compression_overhead_len, max_uncompressed_header_len, sketch_to_proto_message,
-        validate_payload_size_limits, write_payload_footer, write_payload_header,
-        DatadogMetricsEncoder, EncoderError,
+        max_compression_overhead_len, max_uncompressed_header_len, series_to_proto_message,
+        sketch_to_proto_message, validate_payload_size_limits, write_payload_footer,
+        write_payload_header, DatadogMetricsEncoder, EncoderError,
     };
     use crate::{
         common::datadog::DatadogMetricType,
@@ -1162,11 +1162,19 @@ mod tests {
         ));
 
         // And sketches can't go to the series endpoint.
-        // Series metrics can't go to the sketches endpoint.
-        let mut series_encoder =
+        let mut series_v1_encoder =
             DatadogMetricsEncoder::new(DatadogMetricsEndpoint::Series(SeriesApiVersion::V1), None)
                 .expect("default payload size limits should be valid");
-        let sketch_result = series_encoder.try_encode(get_simple_sketch());
+        let sketch_result = series_v1_encoder.try_encode(get_simple_sketch());
+        assert!(matches!(
+            sketch_result.err(),
+            Some(EncoderError::InvalidMetric { .. })
+        ));
+
+        let mut series_v2_encoder =
+            DatadogMetricsEncoder::new(DatadogMetricsEndpoint::Series(SeriesApiVersion::V2), None)
+                .expect("default payload size limits should be valid");
+        let sketch_result = series_v2_encoder.try_encode(get_simple_sketch());
         assert!(matches!(
             sketch_result.err(),
             Some(EncoderError::InvalidMetric { .. })
@@ -1186,23 +1194,41 @@ mod tests {
         let expected_value = value / (interval_ms / 1000) as f64;
         let expected_interval = interval_ms / 1000;
 
-        // Encode the metric and make sure we did the rate conversion correctly.
-        let result = generate_series_metrics(
-            &rate_counter,
-            &None,
-            log_schema(),
-            DEFAULT_DD_ORIGIN_PRODUCT_VALUE,
-        );
-        assert!(result.is_ok());
+        // series v1
+        {
+            // Encode the metric and make sure we did the rate conversion correctly.
+            let result = generate_series_metrics(
+                &rate_counter,
+                &None,
+                log_schema(),
+                DEFAULT_DD_ORIGIN_PRODUCT_VALUE,
+            );
+            assert!(result.is_ok());
 
-        let metrics = result.unwrap();
-        assert_eq!(metrics.len(), 1);
+            let metrics = result.unwrap();
+            assert_eq!(metrics.len(), 1);
 
-        let actual = &metrics[0];
-        assert_eq!(actual.r#type, DatadogMetricType::Rate);
-        assert_eq!(actual.interval, Some(expected_interval));
-        assert_eq!(actual.points.len(), 1);
-        assert_eq!(actual.points[0].1, expected_value);
+            let actual = &metrics[0];
+            assert_eq!(actual.r#type, DatadogMetricType::Rate);
+            assert_eq!(actual.interval, Some(expected_interval));
+            assert_eq!(actual.points.len(), 1);
+            assert_eq!(actual.points[0].1, expected_value);
+        }
+
+        // series v2
+        {
+            let series_proto = series_to_proto_message(
+                &rate_counter,
+                &None,
+                log_schema(),
+                DEFAULT_DD_ORIGIN_PRODUCT_VALUE,
+            )
+            .unwrap();
+            assert_eq!(series_proto.r#type, 2);
+            assert_eq!(series_proto.interval, expected_interval as i64);
+            assert_eq!(series_proto.points.len(), 1);
+            assert_eq!(series_proto.points[0].value, expected_value);
+        }
     }
 
     #[test]
@@ -1219,23 +1245,41 @@ mod tests {
         );
         let counter = get_simple_counter_with_metadata(event_metadata);
 
-        let result = generate_series_metrics(
-            &counter,
-            &None,
-            log_schema(),
-            DEFAULT_DD_ORIGIN_PRODUCT_VALUE,
-        );
-        assert!(result.is_ok());
+        // series v1
+        {
+            let result = generate_series_metrics(
+                &counter,
+                &None,
+                log_schema(),
+                DEFAULT_DD_ORIGIN_PRODUCT_VALUE,
+            );
+            assert!(result.is_ok());
 
-        let metrics = result.unwrap();
-        assert_eq!(metrics.len(), 1);
+            let metrics = result.unwrap();
+            assert_eq!(metrics.len(), 1);
 
-        let actual = &metrics[0];
-        let generated_origin = actual.metadata.as_ref().unwrap().origin.as_ref().unwrap();
+            let actual = &metrics[0];
+            let generated_origin = actual.metadata.as_ref().unwrap().origin.as_ref().unwrap();
 
-        assert_eq!(generated_origin.product().unwrap(), product);
-        assert_eq!(generated_origin.category().unwrap(), category);
-        assert_eq!(generated_origin.service().unwrap(), service);
+            assert_eq!(generated_origin.product().unwrap(), product);
+            assert_eq!(generated_origin.category().unwrap(), category);
+            assert_eq!(generated_origin.service().unwrap(), service);
+        }
+        // series v2
+        {
+            let series_proto = series_to_proto_message(
+                &counter,
+                &None,
+                log_schema(),
+                DEFAULT_DD_ORIGIN_PRODUCT_VALUE,
+            )
+            .unwrap();
+
+            let generated_origin = series_proto.metadata.unwrap().origin.unwrap();
+            assert_eq!(generated_origin.origin_product, product);
+            assert_eq!(generated_origin.origin_category, category);
+            assert_eq!(generated_origin.origin_service, service);
+        }
     }
 
     #[test]
@@ -1249,26 +1293,68 @@ mod tests {
 
         counter.metadata_mut().set_source_type("statsd");
 
-        let result = generate_series_metrics(&counter, &None, log_schema(), product);
-        assert!(result.is_ok());
+        // series v1
+        {
+            let result = generate_series_metrics(&counter, &None, log_schema(), product);
+            assert!(result.is_ok());
 
-        let metrics = result.unwrap();
-        assert_eq!(metrics.len(), 1);
+            let metrics = result.unwrap();
+            assert_eq!(metrics.len(), 1);
 
-        let actual = &metrics[0];
-        let generated_origin = actual.metadata.as_ref().unwrap().origin.as_ref().unwrap();
+            let actual = &metrics[0];
+            let generated_origin = actual.metadata.as_ref().unwrap().origin.as_ref().unwrap();
 
-        assert_eq!(generated_origin.product().unwrap(), product);
-        assert_eq!(generated_origin.category().unwrap(), category);
-        assert_eq!(generated_origin.service().unwrap(), service);
+            assert_eq!(generated_origin.product().unwrap(), product);
+            assert_eq!(generated_origin.category().unwrap(), category);
+            assert_eq!(generated_origin.service().unwrap(), service);
+        }
+        // series v2
+        {
+            let series_proto = series_to_proto_message(
+                &counter,
+                &None,
+                log_schema(),
+                DEFAULT_DD_ORIGIN_PRODUCT_VALUE,
+            )
+            .unwrap();
+
+            let generated_origin = series_proto.metadata.unwrap().origin.unwrap();
+            assert_eq!(generated_origin.origin_product, product);
+            assert_eq!(generated_origin.origin_category, category);
+            assert_eq!(generated_origin.origin_service, service);
+        }
     }
 
     #[test]
-    fn encode_single_series_metric_with_default_limits() {
+    fn encode_single_series_v1_metric_with_default_limits() {
         // This is a simple test where we ensure that a single metric, with the default limits, can
         // be encoded without hitting any errors.
         let mut encoder =
             DatadogMetricsEncoder::new(DatadogMetricsEndpoint::Series(SeriesApiVersion::V1), None)
+                .expect("default payload size limits should be valid");
+        let counter = get_simple_counter();
+        let expected = counter.clone();
+
+        // Encode the counter.
+        let result = encoder.try_encode(counter);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), None);
+
+        // Finish the payload, make sure we got what we came for.
+        let result = encoder.finish();
+        assert!(result.is_ok());
+
+        let (_payload, mut processed) = result.unwrap();
+        assert_eq!(processed.len(), 1);
+        assert_eq!(expected, processed.pop().unwrap());
+    }
+
+    #[test]
+    fn encode_single_series_v2_metric_with_default_limits() {
+        // This is a simple test where we ensure that a single metric, with the default limits, can
+        // be encoded without hitting any errors.
+        let mut encoder =
+            DatadogMetricsEncoder::new(DatadogMetricsEndpoint::Series(SeriesApiVersion::V2), None)
                 .expect("default payload size limits should be valid");
         let counter = get_simple_counter();
         let expected = counter.clone();
@@ -1382,7 +1468,7 @@ mod tests {
 
         // This is too small.
         let result = validate_payload_size_limits(
-            DatadogMetricsEndpoint::Series(SeriesApiVersion::V1),
+            DatadogMetricsEndpoint::Series(SeriesApiVersion::V2),
             header_len,
             usize::MAX,
         );
@@ -1390,7 +1476,7 @@ mod tests {
 
         // This is just right.
         let result = validate_payload_size_limits(
-            DatadogMetricsEndpoint::Series(SeriesApiVersion::V1),
+            DatadogMetricsEndpoint::Series(SeriesApiVersion::V2),
             header_len + 1,
             usize::MAX,
         );
@@ -1403,7 +1489,7 @@ mod tests {
 
         // This is too small.
         let result = validate_payload_size_limits(
-            DatadogMetricsEndpoint::Series(SeriesApiVersion::V1),
+            DatadogMetricsEndpoint::Series(SeriesApiVersion::V2),
             usize::MAX,
             compression_overhead_len,
         );
@@ -1411,7 +1497,7 @@ mod tests {
 
         // This is just right.
         let result = validate_payload_size_limits(
-            DatadogMetricsEndpoint::Series(SeriesApiVersion::V1),
+            DatadogMetricsEndpoint::Series(SeriesApiVersion::V2),
             usize::MAX,
             compression_overhead_len + 1,
         );
@@ -1632,7 +1718,7 @@ mod tests {
             // We check this with targeted unit tests as well but this is some cheap insurance to
             // show that we're hopefully not missing any particular corner cases.
             let result = DatadogMetricsEncoder::with_payload_limits(
-                DatadogMetricsEndpoint::Series(SeriesApiVersion::V1),
+                DatadogMetricsEndpoint::Series(SeriesApiVersion::V2),
                 None,
                 uncompressed_limit,
                 compressed_limit,
