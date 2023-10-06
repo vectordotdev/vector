@@ -261,8 +261,12 @@ where
         let default_api_key = Arc::clone(&self.default_api_key);
 
         let partitioner = EventPartitioner;
+        let batch_settings = self.batch_settings.clone();
 
-        let input = input.batched_partitioned(partitioner, self.batch_settings);
+        let input = input.batched_partitioned(
+            partitioner,
+            Box::new(move || batch_settings.clone().into_byte_size_config()),
+        );
         input
             .request_builder(
                 default_request_builder_concurrency_limit(),

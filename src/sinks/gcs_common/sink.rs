@@ -45,7 +45,10 @@ where
         let request_builder = self.request_builder;
 
         input
-            .batched_partitioned(partitioner, settings)
+            .batched_partitioned(
+                partitioner,
+                Box::new(move || settings.clone().into_byte_size_config()),
+            )
             .filter_map(|(key, batch)| async move {
                 // A `TemplateRenderingError` will have been emitted by `KeyPartitioner` if the key here is `None`,
                 // thus no further `EventsDropped` event needs emitting at this stage.

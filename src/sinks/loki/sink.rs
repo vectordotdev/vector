@@ -453,12 +453,16 @@ impl LokiSink {
                 NonZeroUsize::new(1).expect("static")
             }
         };
+        let batch_settings = self.batch_settings.clone();
 
         input
             .map(|event| encoder.encode_event(event))
             .filter_map(|event| async { event })
             .map(|record| filter.filter_record(record))
-            .batched_partitioned(RecordPartitioner, self.batch_settings)
+            .batched_partitioned(
+                RecordPartitioner,
+                Box::new(move || batch_settings.clone().into_byte_size_config()),
+            )
             .filter_map(|(partition, batch)| async {
                 if let Some(partition) = partition {
                     let mut count: usize = 0;

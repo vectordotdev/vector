@@ -61,6 +61,7 @@ where
             timestamp_key: self.timestamp_key.clone(),
             endpoint_target: self.endpoint_target,
         };
+        let batch_settings = self.batch_settings.clone();
 
         input
             .map(move |event| process_log(event, &data))
@@ -77,7 +78,7 @@ where
                 } else {
                     EventPartitioner::new(None, None, None, None)
                 },
-                self.batch_settings,
+                Box::new(move || batch_settings.clone().into_byte_size_config()),
             )
             .request_builder(
                 default_request_builder_concurrency_limit(),
