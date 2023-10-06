@@ -416,7 +416,9 @@ fn generate_sketch_metadata(
 ) -> Option<ddmetric_proto::Metadata> {
     generate_origin_metadata(maybe_pass_through, maybe_source_type, origin_product_value).map(
         |origin| {
-            if origin.product().is_none() | origin.category().is_none() | origin.service().is_none()
+            if origin.product().is_none()
+                || origin.category().is_none()
+                || origin.service().is_none()
             {
                 warn!(
                     message = "Generated sketch origin metadata should have each field set.",
@@ -427,9 +429,9 @@ fn generate_sketch_metadata(
             }
             ddmetric_proto::Metadata {
                 origin: Some(ddmetric_proto::Origin {
-                    origin_product: origin.product().expect("OriginProduct should be set"),
-                    origin_category: origin.category().expect("OriginCategory should be set"),
-                    origin_service: origin.service().expect("OriginService should be set"),
+                    origin_product: origin.product().unwrap_or_default(),
+                    origin_category: origin.category().unwrap_or_default(),
+                    origin_service: origin.service().unwrap_or_default(),
                 }),
             }
         },
