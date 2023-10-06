@@ -82,13 +82,13 @@ pub trait SinkBuilderExt: Stream {
     ///
     /// If the spawned future panics, the panic will be carried through and resumed on the task
     /// calling the stream.
-    fn concurrent_map<F, T>(self, limit: Option<NonZeroUsize>, f: F) -> ConcurrentMap<Self, T>
+    fn concurrent_map<F, T>(self, limit: NonZeroUsize, f: F) -> ConcurrentMap<Self, T>
     where
         Self: Sized,
         F: Fn(Self::Item) -> Pin<Box<dyn Future<Output = T> + Send + 'static>> + Send + 'static,
         T: Send + 'static,
     {
-        ConcurrentMap::new(self, limit, f)
+        ConcurrentMap::new(self, Some(limit), f)
     }
 
     /// Constructs a [`Stream`] which transforms the input into a request suitable for sending to
@@ -114,7 +114,7 @@ pub trait SinkBuilderExt: Stream {
     {
         let builder = Arc::new(builder);
 
-        self.concurrent_map(Some(limit), move |input| {
+        self.concurrent_map(limit, move |input| {
             let builder = Arc::clone(&builder);
 
             Box::pin(async move {
