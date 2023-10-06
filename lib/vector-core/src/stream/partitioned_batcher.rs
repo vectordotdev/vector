@@ -323,13 +323,14 @@ where
 
                     // Insert the item into the batch.
                     batch.push(item, metadata);
-                    this.timer.insert(item_key.clone());
                     if batch.is_batch_full() {
                         // If the insertion means the batch is now full, we clear out the batch and
                         // remove it from the list.
                         this.closed_batches
                             .push((item_key.clone(), batch.take_batch()));
                         this.batches.remove(&item_key);
+                    } else {
+                        this.timer.insert(item_key.clone());
                     }
                 }
             }
