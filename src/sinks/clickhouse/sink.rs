@@ -47,7 +47,7 @@ impl ClickhouseSink {
         input
             .batched_partitioned(
                 KeyPartitioner::new(self.database, self.table),
-                Box::new(move || batch_settings.clone().into_byte_size_config()),
+                Box::new(move || batch_settings.as_byte_size_config()),
             )
             .filter_map(|(key, batch)| async move { key.map(move |k| (k, batch)) })
             .request_builder(

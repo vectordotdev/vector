@@ -461,7 +461,7 @@ impl LokiSink {
             .map(|record| filter.filter_record(record))
             .batched_partitioned(
                 RecordPartitioner,
-                Box::new(move || batch_settings.clone().into_byte_size_config()),
+                Box::new(move || batch_settings.as_byte_size_config()),
             )
             .filter_map(|(partition, batch)| async {
                 if let Some(partition) = partition {

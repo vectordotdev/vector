@@ -101,7 +101,7 @@ where
             // distributions, aggregated histograms, and sketches.
             .batched_partitioned(
                 DatadogMetricsTypePartitioner,
-                Box::new(move || batch_settings.clone().into_byte_size_config()),
+                Box::new(move || batch_settings.as_byte_size_config()),
             )
             // Aggregate counters with identical timestamps, otherwise identical counters (same
             // series and same timestamp, when rounded to whole seconds) will be dropped in a

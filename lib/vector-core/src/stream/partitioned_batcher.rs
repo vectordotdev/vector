@@ -129,15 +129,15 @@ impl BatcherSettings {
 
     /// A batcher config using the `ByteSizeOf` trait to determine batch sizes.
     /// The output is a  `Vec<T>`.
-    pub fn into_byte_size_config<T: ByteSizeOf>(
-        self,
+    pub fn as_byte_size_config<T: ByteSizeOf>(
+        &self,
     ) -> BatchConfigParts<SizeLimit<ByteSizeOfItemSize>, Vec<T>> {
-        self.into_item_size_config(ByteSizeOfItemSize)
+        self.as_item_size_config(ByteSizeOfItemSize)
     }
 
     /// A batcher config using the `ItemBatchSize` trait to determine batch sizes.
     /// The output is a `Vec<T>`.
-    pub fn into_item_size_config<T, I>(self, item_size: I) -> BatchConfigParts<SizeLimit<I>, Vec<T>>
+    pub fn as_item_size_config<T, I>(&self, item_size: I) -> BatchConfigParts<SizeLimit<I>, Vec<T>>
     where
         I: ItemBatchSize<T>,
     {
@@ -472,7 +472,7 @@ mod test {
             let batch_settings = BatcherSettings::new(Duration::from_secs(1), allocation_limit, item_limit);
 
             let batcher = PartitionedBatcher::with_timer(&mut stream, partitioner, timer,
-                                              Box::new(move || batch_settings.into_byte_size_config()));
+                                              Box::new(move || batch_settings.as_byte_size_config()));
             let batcher_size_hint = batcher.size_hint();
 
             assert_eq!(stream_size_hint, batcher_size_hint);
@@ -496,7 +496,7 @@ mod test {
             let allocation_limit = NonZeroUsize::new(allocation_limit as usize).unwrap();
             let batch_settings = BatcherSettings::new(Duration::from_secs(1), allocation_limit, item_limit);
             let mut batcher = PartitionedBatcher::with_timer(&mut stream, partitioner,
-                                                  timer, Box::new(move || batch_settings.into_byte_size_config()));
+                                                  timer, Box::new(move || batch_settings.as_byte_size_config()));
             let mut batcher = Pin::new(&mut batcher);
 
             loop {
@@ -567,7 +567,7 @@ mod test {
             let allocation_limit = NonZeroUsize::new(allocation_limit as usize).unwrap();
             let batch_settings = BatcherSettings::new(Duration::from_secs(1), allocation_limit, item_limit);
             let mut batcher = PartitionedBatcher::with_timer(&mut stream, partitioner,
-                                                  timer, Box::new(move || batch_settings.clone().into_byte_size_config()));
+                                                  timer, Box::new(move || batch_settings.as_byte_size_config()));
             let mut batcher = Pin::new(&mut batcher);
 
             loop {
@@ -614,9 +614,7 @@ mod test {
             let allocation_limit = NonZeroUsize::new(allocation_limit as usize).unwrap();
             let batch_settings = BatcherSettings::new(Duration::from_secs(1), allocation_limit, item_limit);
             let mut batcher = PartitionedBatcher::with_timer(&mut stream, partitioner,
-                                                  timer, Box::new(move || batch_settings.clone().into_byte_size_config()));
-            // let mut batcher = PartitionedBatcher::new(&mut stream, partitioner,
-            //                                        Box::new(move || batch_settings.clone().into_byte_size_config()));
+                                                  timer, Box::new(move || batch_settings.as_byte_size_config()));
             let mut batcher = Pin::new(&mut batcher);
 
             let mut observed_items = 0;

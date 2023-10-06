@@ -80,7 +80,7 @@ where
         input
             .batched_partitioned(
                 partitioner,
-                Box::new(move || settings.clone().into_byte_size_config()),
+                Box::new(move || settings.as_byte_size_config()),
             )
             .filter_map(|(key, batch)| async move {
                 // We don't need to emit an error here if the event is dropped since this will occur if the template

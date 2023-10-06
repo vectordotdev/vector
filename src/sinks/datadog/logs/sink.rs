@@ -265,7 +265,7 @@ where
 
         let input = input.batched_partitioned(
             partitioner,
-            Box::new(move || batch_settings.clone().into_byte_size_config()),
+            Box::new(move || batch_settings.as_byte_size_config()),
         );
         input
             .request_builder(

@@ -51,7 +51,7 @@ where
             })
             .batched_partitioned(
                 CloudwatchPartitioner,
-                Box::new(move || batcher_settings.clone().into_byte_size_config()),
+                Box::new(move || batcher_settings.as_byte_size_config()),
             )
             .map(|(key, events)| {
                 let metadata = RequestMetadata::from_batch(

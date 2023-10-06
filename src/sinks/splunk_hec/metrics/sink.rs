@@ -56,7 +56,7 @@ where
             })
             .batched_partitioned(
                 EventPartitioner,
-                Box::new(move || batch_settings.clone().into_byte_size_config()),
+                Box::new(move || batch_settings.as_byte_size_config()),
             )
             .request_builder(
                 default_request_builder_concurrency_limit(),

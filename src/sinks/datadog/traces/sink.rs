@@ -113,7 +113,7 @@ where
         input
             .batched_partitioned(
                 EventPartitioner,
-                Box::new(move || batch_settings.clone().into_byte_size_config()),
+                Box::new(move || batch_settings.as_byte_size_config()),
             )
             .incremental_request_builder(self.request_builder)
             .flat_map(stream::iter)

@@ -47,7 +47,7 @@ where
         input
             .batched_partitioned(
                 partitioner,
-                Box::new(move || settings.clone().into_byte_size_config()),
+                Box::new(move || settings.as_byte_size_config()),
             )
             .filter_map(|(key, batch)| async move {
                 // A `TemplateRenderingError` will have been emitted by `KeyPartitioner` if the key here is `None`,
