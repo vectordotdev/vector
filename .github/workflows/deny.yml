@@ -1,3 +1,12 @@
+# Deny - Linux
+#
+# Checks for security vulnerabilities or license incompatibilities
+#
+# Runs on:
+#  - scheduled UTC midnight
+#  - on PR comment (see comment-trigger.yml)
+#  - on demand from github actions UI
+
 name: Deny - Linux
 
 on:
@@ -8,8 +17,8 @@ on:
     - cron: '0 0 * * *'
 
 jobs:
-  test-misc:
-    runs-on: [linux, ubuntu-20.04-4core]
+  test-deny:
+    runs-on: ubuntu-latest
     env:
       CARGO_INCREMENTAL: 0
     steps:
