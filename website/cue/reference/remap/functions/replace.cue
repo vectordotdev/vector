@@ -62,7 +62,14 @@ remap: functions: replace: {
 			return: "Pineapples and Bananas"
 		},
 		{
-			title: "Replace with capture groups"
+			title: "Replace with capture groups when not in configuration file"
+			source: #"""
+				replace("foo123bar", r'foo(?P<num>\d+)bar', "$num")
+				"""#
+			return: "123"
+		},
+		{
+			title: "Replace with capture groups only in configuration file"
 			source: #"""
 				replace("foo123bar", r'foo(?P<num>\d+)bar', "$$num")
 				"""#
