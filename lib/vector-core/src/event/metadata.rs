@@ -76,38 +76,31 @@ pub struct DatadogMetricOriginMetadata {
 }
 
 impl DatadogMetricOriginMetadata {
-    /// Replaces the `OriginProduct`.
+    /// Creates a new `DatadogMetricOriginMetadata`.
+    /// When Vector sends out metrics containing the Origin metadata, it should do so with
+    /// all of the fields defined.
+    /// The edge case where the Origin metadata is created within a component and does not
+    /// initially contain all of the metadata fields, is in the `log_to_metric` transform.
     #[must_use]
-    pub fn with_product(mut self, product: u32) -> Self {
-        self.product = Some(product);
-        self
+    pub fn new(product: Option<u32>, category: Option<u32>, service: Option<u32>) -> Self {
+        Self {
+            product,
+            category,
+            service,
+        }
     }
 
-    /// Replaces the `OriginCategory`.
-    #[must_use]
-    pub fn with_category(mut self, category: u32) -> Self {
-        self.category = Some(category);
-        self
-    }
-
-    /// Replaces the `OriginService`.
-    #[must_use]
-    pub fn with_service(mut self, service: u32) -> Self {
-        self.service = Some(service);
-        self
-    }
-
-    /// Returns a reference to the `OriginProduct`
+    /// Returns a reference to the `OriginProduct`.
     pub fn product(&self) -> Option<u32> {
         self.product
     }
 
-    /// Returns a reference to the `OriginCategory`
+    /// Returns a reference to the `OriginCategory`.
     pub fn category(&self) -> Option<u32> {
         self.category
     }
 
-    /// Returns a reference to the `OriginService`
+    /// Returns a reference to the `OriginService`.
     pub fn service(&self) -> Option<u32> {
         self.service
     }
