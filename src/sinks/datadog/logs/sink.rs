@@ -261,7 +261,7 @@ where
         let default_api_key = Arc::clone(&self.default_api_key);
 
         let partitioner = EventPartitioner;
-        let batch_settings = self.batch_settings.clone();
+        let batch_settings = self.batch_settings;
 
         let input = input.batched_partitioned(partitioner, || batch_settings.as_byte_size_config());
         input

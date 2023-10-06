@@ -39,7 +39,7 @@ where
         let index = self.index.as_ref();
         let host_key = self.host_key.as_ref();
         let default_namespace = self.default_namespace.as_deref();
-        let batch_settings = self.batch_settings.clone();
+        let batch_settings = self.batch_settings;
 
         input
             .map(|event| (event.size_of(), event.into_metric()))

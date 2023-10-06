@@ -42,7 +42,7 @@ where
     R: Record + Send + Sync + Unpin + Clone + 'static,
 {
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
-        let batch_settings = self.batch_settings.clone();
+        let batch_settings = self.batch_settings;
 
         input
             .filter_map(|event| {

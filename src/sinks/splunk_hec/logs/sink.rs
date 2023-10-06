@@ -61,7 +61,7 @@ where
             timestamp_key: self.timestamp_key.clone(),
             endpoint_target: self.endpoint_target,
         };
-        let batch_settings = self.batch_settings.clone();
+        let batch_settings = self.batch_settings;
 
         input
             .map(move |event| process_log(event, &data))

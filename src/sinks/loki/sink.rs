@@ -453,7 +453,7 @@ impl LokiSink {
                 NonZeroUsize::new(1).expect("static")
             }
         };
-        let batch_settings = self.batch_settings.clone();
+        let batch_settings = self.batch_settings;
 
         input
             .map(|event| encoder.encode_event(event))

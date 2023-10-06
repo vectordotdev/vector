@@ -42,7 +42,7 @@ impl ClickhouseSink {
     }
 
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
-        let batch_settings = self.batch_settings.clone();
+        let batch_settings = self.batch_settings;
 
         input
             .batched_partitioned(KeyPartitioner::new(self.database, self.table), || {

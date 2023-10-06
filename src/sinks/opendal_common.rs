@@ -73,7 +73,7 @@ where
 {
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let partitioner = self.partitioner;
-        let settings = self.batcher_settings.clone();
+        let settings = self.batcher_settings;
 
         let request_builder = self.request_builder;
 

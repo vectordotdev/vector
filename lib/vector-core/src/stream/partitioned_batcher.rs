@@ -302,15 +302,14 @@ where
                     let item_key = this.partitioner.partition(&item);
 
                     // Get the batch for this partition, or create a new one.
-                    let batch = match this.batches.get_mut(&item_key) {
-                        Some(batch) => batch,
-                        None => {
-                            let batch = (this.state)();
-                            this.batches.insert(item_key.clone(), batch);
-                            this.batches
-                                .get_mut(&item_key)
-                                .expect("batch has just been inserted so should exist")
-                        }
+                    let batch = if let Some(batch) = this.batches.get_mut(&item_key) {
+                        batch
+                    } else {
+                        let batch = (this.state)();
+                        this.batches.insert(item_key.clone(), batch);
+                        this.batches
+                            .get_mut(&item_key)
+                            .expect("batch has just been inserted so should exist")
                     };
 
                     let (fits, metadata) = batch.item_fits_in_batch(&item);
@@ -578,9 +577,6 @@ mod test {
                         let expected_partition = partitions
                             .get_mut(&key)
                             .expect("impossible situation");
-
-                        dbg!(&actual_batch);
-                        dbg!(&expected_partition);
 
                         for item in actual_batch {
                             assert_eq!(item, expected_partition.pop().unwrap());
