@@ -183,7 +183,7 @@ pub struct PartitionedBatcher<St, Prt, KT, C>
 where
     Prt: Partitioner,
 {
-    /// A closure that retrievs a new `BatchConfig` when needed to batch a
+    /// A closure that retrieves a new [`BatchConfig`] when needed to batch a
     /// new partition.
     state: Box<dyn Fn() -> C + Send>,
     /// The store of live batches. Note that the key here is an option type,
