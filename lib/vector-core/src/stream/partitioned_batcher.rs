@@ -86,6 +86,10 @@ where
         }
     }
 
+    fn remove(&mut self, item_key: &K) {
+        self.expiration_map.remove(item_key);
+    }
+
     fn poll_expired(&mut self, cx: &mut Context) -> Poll<Option<K>> {
         match ready!(self.expirations.poll_expired(cx)) {
             // No expirations yet.
@@ -329,8 +333,9 @@ where
                         this.closed_batches
                             .push((item_key.clone(), batch.take_batch()));
                         this.batches.remove(&item_key);
+                        this.timer.remove(&item_key);
                     } else {
-                        this.timer.insert(item_key.clone());
+                        this.timer.insert(item_key);
                     }
                 }
             }
@@ -390,6 +395,10 @@ mod test {
 
         fn insert(&mut self, item_key: u8) {
             self.valid_keys.insert(item_key);
+        }
+
+        fn remove(&mut self, item_key: &u8) {
+            self.valid_keys.remove(item_key);
         }
 
         fn poll_expired(&mut self, _cx: &mut Context) -> Poll<Option<u8>> {
