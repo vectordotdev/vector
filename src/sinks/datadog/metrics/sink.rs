@@ -85,6 +85,7 @@ where
 
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let mut splitter: MetricSplitter<AggregatedSummarySplitter> = MetricSplitter::default();
+        let batch_settings = self.batch_settings.clone();
 
         input
             // Convert `Event` to `Metric` so we don't have to deal with constant conversions.
@@ -99,7 +100,10 @@ where
             .normalized_with_default::<DatadogMetricsNormalizer>()
             // We batch metrics by their endpoint: series endpoint for counters, gauge, and sets vs sketch endpoint for
             // distributions, aggregated histograms, and sketches.
-            .batched_partitioned(DatadogMetricsTypePartitioner, self.batch_settings)
+            .batched_partitioned(
+                DatadogMetricsTypePartitioner,
+                Box::new(move || batch_settings.clone().into_byte_size_config()),
+            )
             // Aggregate counters with identical timestamps, otherwise identical counters (same
             // series and same timestamp, when rounded to whole seconds) will be dropped in a
             // last-write-wins situation when they hit the DD metrics intake.

@@ -17,8 +17,7 @@ use vector_core::{
     partition::Partitioner,
     stream::{
         batcher::{config::BatchConfig, Batcher},
-        BatcherSettings, ConcurrentMap, Driver, DriverResponse, ExpirationQueue,
-        PartitionedBatcher,
+        ConcurrentMap, Driver, DriverResponse, ExpirationQueue, PartitionedBatcher,
     },
     ByteSizeOf,
 };
@@ -45,16 +44,17 @@ pub trait SinkBuilderExt: Stream {
     /// The stream will yield batches of events, with their partition key, when either a batch fills
     /// up or times out. [`Partitioner`] operates on a per-event basis, and has access to the event
     /// itself, and so can access any and all fields of an event.
-    fn batched_partitioned<P>(
+    fn batched_partitioned<P, C>(
         self,
         partitioner: P,
-        settings: BatcherSettings,
-    ) -> PartitionedBatcher<Self, P, ExpirationQueue<P::Key>>
+        settings: Box<dyn Fn() -> C + Send>,
+    ) -> PartitionedBatcher<Self, P, ExpirationQueue<P::Key>, C>
     where
         Self: Stream<Item = P::Item> + Sized,
         P: Partitioner + Unpin,
         P::Key: Eq + Hash + Clone,
         P::Item: ByteSizeOf,
+        C: BatchConfig<P::Item>,
     {
         PartitionedBatcher::new(self, partitioner, settings)
     }

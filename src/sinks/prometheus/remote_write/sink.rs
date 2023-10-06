@@ -98,7 +98,23 @@ where
             .filter_map(move |event| {
                 future::ready(make_remote_write_event(tenant_id.as_ref(), event))
             })
-            .batched_partitioned(PrometheusTenantIdPartitioner, batch_settings)
+            .batched_partitioned(
+                PrometheusTenantIdPartitioner,
+                Box::new(move || batch_settings.clone().into_byte_size_config()),
+            )
+            // .batched(self.batch_settings.into_reducer_config(
+            //     |data: &Metric| data.size_of(),
+            //     |event_collection: &mut EventCollection, mut item: Metric| {
+            //         event_collection
+            //             .finalizers
+            //             .merge(item.metadata_mut().take_finalizers());
+            //         event_collection.events_byte_size += item.size_of();
+            //         event_collection
+            //             .events_json_byte_size
+            //             .add_event(&item, item.estimated_json_encoded_size_of());
+            //         event_collection.events.insert_update(item);
+            //     },
+            // ))
             .request_builder(default_request_builder_concurrency_limit(), request_builder)
             .filter_map(|request| async move {
                 match request {
