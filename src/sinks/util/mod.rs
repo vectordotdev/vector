@@ -54,6 +54,8 @@ pub use uri::UriSerde;
 use vector_common::json_size::JsonSize;
 
 use crate::event::EventFinalizers;
+use vector_common::TimeZone;
+use chrono::{Utc, Offset, FixedOffset};
 
 #[derive(Debug, Snafu)]
 enum SinkBuildError {
@@ -131,5 +133,12 @@ pub trait ElementCount {
 impl<T> ElementCount for Vec<T> {
     fn element_count(&self) -> usize {
         self.len()
+    }
+}
+
+pub fn timezone_to_offset(tz: TimeZone) -> Option<FixedOffset> {
+    match tz {
+        TimeZone::Local => Some(*Utc::now().with_timezone(&chrono::Local).offset()),
+        TimeZone::Named(tz) => Some(Utc::now().with_timezone(&tz).offset().fix()),
     }
 }

@@ -4,7 +4,6 @@ use std::time::{Duration, Instant};
 use async_compression::tokio::write::{GzipEncoder, ZstdEncoder};
 use async_trait::async_trait;
 use bytes::{Bytes, BytesMut};
-use chrono::{Utc, Offset};
 use codecs::{
     encoding::{Framer, FramingConfig},
     TextSerializerConfig,
@@ -33,14 +32,14 @@ use crate::{
     event::{Event, EventStatus, Finalizable},
     expiring_hash_map::ExpiringHashMap,
     internal_events::{FileBytesSent, FileIoError, FileOpen, TemplateRenderingError},
-    sinks::util::StreamSink,
+    sinks::util::{StreamSink, timezone_to_offset},
     template::Template,
 };
 
 mod bytes_path;
 
 use bytes_path::BytesPath;
-use vrl::compiler::TimeZone;
+use vector_common::TimeZone;
 
 /// Configuration for the `file` sink.
 #[serde_as]
@@ -226,15 +225,7 @@ impl FileSink {
         let (framer, serializer) = config.encoding.build(SinkType::StreamBased)?;
         let encoder = Encoder::<Framer>::new(framer, serializer);
 
-        let offset = match config.timezone {
-            Some(TimeZone::Local) => {
-                Some(*Utc::now().with_timezone(&chrono::Local).offset())
-            },
-            Some(TimeZone::Named(tz)) => {
-                Some(Utc::now().with_timezone(&tz).offset().fix())
-            },
-            None => None
-        };
+        let offset = config.timezone.and_then(timezone_to_offset);
 
         Ok(Self {
             path: config.path.clone().with_tz_offset(offset),

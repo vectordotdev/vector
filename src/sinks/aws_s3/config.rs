@@ -1,7 +1,6 @@
 use std::convert::TryInto;
 
 use aws_sdk_s3::Client as S3Client;
-use chrono::{Utc, Offset};
 use codecs::{
     encoding::{Framer, FramingConfig},
     TextSerializerConfig,
@@ -25,7 +24,7 @@ use crate::{
         },
         util::{
             BatchConfig, BulkSizeBasedDefaultBatchSettings, Compression, ServiceBuilderExt,
-            TowerRequestConfig,
+            TowerRequestConfig, timezone_to_offset,
         },
         Healthcheck,
     },
@@ -206,13 +205,7 @@ impl S3SinkConfig {
             .settings(request_limits, S3RetryLogic)
             .service(service);
 
-        let timezone = self.timezone.or(cx.globals.timezone);
-
-        let offset = match timezone {
-            Some(TimeZone::Local) => Some(*Utc::now().with_timezone(&chrono::Local).offset()),
-            Some(TimeZone::Named(tz)) => Some(Utc::now().with_timezone(&tz).offset().fix()),
-            None => None
-        };
+        let offset = self.timezone.or(cx.globals.timezone).and_then(timezone_to_offset);
 
         // Configure our partitioning/batching.
         let batch_settings = self.batch.into_batcher_settings()?;

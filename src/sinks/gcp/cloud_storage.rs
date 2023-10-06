@@ -1,7 +1,7 @@
 use std::{collections::HashMap, convert::TryFrom, io};
 
 use bytes::Bytes;
-use chrono::{Utc, Offset, FixedOffset};
+use chrono::{Utc, FixedOffset};
 use codecs::encoding::Framer;
 use http::header::{HeaderName, HeaderValue};
 use http::Uri;
@@ -34,7 +34,7 @@ use crate::{
         util::{
             batch::BatchConfig, partitioner::KeyPartitioner, request_builder::EncodeResult,
             BulkSizeBasedDefaultBatchSettings, Compression, RequestBuilder, ServiceBuilderExt,
-            TowerRequestConfig,
+            TowerRequestConfig, timezone_to_offset
         },
         Healthcheck, VectorSink,
     },
@@ -394,17 +394,8 @@ impl RequestSettings {
             .unwrap_or_else(|| config.compression.extension().into());
         let time_format = config.filename_time_format.clone();
         let append_uuid = config.filename_append_uuid;
-        let timezone = config.timezone.or(cx.globals.timezone);
+        let offset = config.timezone.or(cx.globals.timezone).and_then(timezone_to_offset);
 
-        let offset = match timezone {
-            Some(TimeZone::Local) => {
-                Some(*Utc::now().with_timezone(&chrono::Local).offset())
-            },
-            Some(TimeZone::Named(tz)) => {
-                Some(Utc::now().with_timezone(&tz).offset().fix())
-            },
-            None => None
-        };
         Ok(Self {
             acl,
             content_type,
