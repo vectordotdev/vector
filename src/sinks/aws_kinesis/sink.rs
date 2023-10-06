@@ -69,7 +69,7 @@ where
                 KinesisPartitioner {
                     _phantom: PhantomData,
                 },
-                Box::new(move || batch_settings.as_byte_size_config()),
+                || batch_settings.as_byte_size_config(),
             )
             .map(|(key, events)| {
                 let metadata = RequestMetadata::from_batch(

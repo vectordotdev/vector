@@ -179,13 +179,13 @@ impl BatcherSettings {
 }
 
 #[pin_project]
-pub struct PartitionedBatcher<St, Prt, KT, C>
+pub struct PartitionedBatcher<St, Prt, KT, C, F>
 where
     Prt: Partitioner,
 {
     /// A closure that retrieves a new [`BatchConfig`] when needed to batch a
     /// new partition.
-    state: Box<dyn Fn() -> C + Send>,
+    state: F,
     /// The store of live batches. Note that the key here is an option type,
     /// on account of the interface of `Prt`.
     batches: HashMap<Prt::Key, C, BuildHasherDefault<XxHash64>>,
@@ -202,15 +202,16 @@ where
     stream: Fuse<St>,
 }
 
-impl<St, Prt, C> PartitionedBatcher<St, Prt, ExpirationQueue<Prt::Key>, C>
+impl<St, Prt, C, F> PartitionedBatcher<St, Prt, ExpirationQueue<Prt::Key>, C, F>
 where
     St: Stream<Item = Prt::Item>,
     Prt: Partitioner + Unpin,
     Prt::Key: Eq + Hash + Clone,
     Prt::Item: ByteSizeOf,
     C: BatchConfig<Prt::Item>,
+    F: Fn() -> C + Send,
 {
-    pub fn new(stream: St, partitioner: Prt, settings: Box<dyn Fn() -> C + Send>) -> Self {
+    pub fn new(stream: St, partitioner: Prt, settings: F) -> Self {
         let timeout = settings().timeout();
         Self {
             state: settings,
@@ -224,20 +225,16 @@ where
 }
 
 #[cfg(test)]
-impl<St, Prt, KT, C> PartitionedBatcher<St, Prt, KT, C>
+impl<St, Prt, KT, C, F> PartitionedBatcher<St, Prt, KT, C, F>
 where
     St: Stream<Item = Prt::Item>,
     Prt: Partitioner + Unpin,
     Prt::Key: Eq + Hash + Clone,
     Prt::Item: ByteSizeOf,
     C: BatchConfig<Prt::Item>,
+    F: Fn() -> C + Send,
 {
-    pub fn with_timer(
-        stream: St,
-        partitioner: Prt,
-        timer: KT,
-        settings: Box<dyn Fn() -> C + Send>,
-    ) -> Self {
+    pub fn with_timer(stream: St, partitioner: Prt, timer: KT, settings: F) -> Self {
         Self {
             state: settings,
             batches: HashMap::default(),
@@ -249,7 +246,7 @@ where
     }
 }
 
-impl<St, Prt, KT, C> Stream for PartitionedBatcher<St, Prt, KT, C>
+impl<St, Prt, KT, C, F> Stream for PartitionedBatcher<St, Prt, KT, C, F>
 where
     St: Stream<Item = Prt::Item>,
     Prt: Partitioner + Unpin,
@@ -257,6 +254,7 @@ where
     Prt::Item: ByteSizeOf,
     KT: KeyedTimer<Prt::Key>,
     C: BatchConfig<Prt::Item, Batch = Vec<Prt::Item>>,
+    F: Fn() -> C + Send,
 {
     type Item = (Prt::Key, Vec<Prt::Item>);
 

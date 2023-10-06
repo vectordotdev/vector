@@ -263,10 +263,7 @@ where
         let partitioner = EventPartitioner;
         let batch_settings = self.batch_settings.clone();
 
-        let input = input.batched_partitioned(
-            partitioner,
-            Box::new(move || batch_settings.as_byte_size_config()),
-        );
+        let input = input.batched_partitioned(partitioner, || batch_settings.as_byte_size_config());
         input
             .request_builder(
                 default_request_builder_concurrency_limit(),

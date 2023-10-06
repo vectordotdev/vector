@@ -44,10 +44,7 @@ where
         let request_builder = self.request_builder;
 
         input
-            .batched_partitioned(
-                partitioner,
-                Box::new(move || settings.as_byte_size_config()),
-            )
+            .batched_partitioned(partitioner, || settings.as_byte_size_config())
             .filter_map(|(key, batch)| async move { key.map(move |k| (k, batch)) })
             .request_builder(default_request_builder_concurrency_limit(), request_builder)
             .filter_map(|request| async move {

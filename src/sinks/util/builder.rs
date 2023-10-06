@@ -44,17 +44,18 @@ pub trait SinkBuilderExt: Stream {
     /// The stream will yield batches of events, with their partition key, when either a batch fills
     /// up or times out. [`Partitioner`] operates on a per-event basis, and has access to the event
     /// itself, and so can access any and all fields of an event.
-    fn batched_partitioned<P, C>(
+    fn batched_partitioned<P, C, F>(
         self,
         partitioner: P,
-        settings: Box<dyn Fn() -> C + Send>,
-    ) -> PartitionedBatcher<Self, P, ExpirationQueue<P::Key>, C>
+        settings: F,
+    ) -> PartitionedBatcher<Self, P, ExpirationQueue<P::Key>, C, F>
     where
         Self: Stream<Item = P::Item> + Sized,
         P: Partitioner + Unpin,
         P::Key: Eq + Hash + Clone,
         P::Item: ByteSizeOf,
         C: BatchConfig<P::Item>,
+        F: Fn() -> C + Send,
     {
         PartitionedBatcher::new(self, partitioner, settings)
     }

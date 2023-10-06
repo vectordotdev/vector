@@ -99,10 +99,9 @@ where
             .normalized_with_default::<DatadogMetricsNormalizer>()
             // We batch metrics by their endpoint: series endpoint for counters, gauge, and sets vs sketch endpoint for
             // distributions, aggregated histograms, and sketches.
-            .batched_partitioned(
-                DatadogMetricsTypePartitioner,
-                Box::new(move || batch_settings.as_byte_size_config()),
-            )
+            .batched_partitioned(DatadogMetricsTypePartitioner, || {
+                batch_settings.as_byte_size_config()
+            })
             // Aggregate counters with identical timestamps, otherwise identical counters (same
             // series and same timestamp, when rounded to whole seconds) will be dropped in a
             // last-write-wins situation when they hit the DD metrics intake.
