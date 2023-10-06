@@ -539,6 +539,7 @@ syn,https://github.com/dtolnay/syn,MIT OR Apache-2.0,David Tolnay <dtolnay@gmail
 sync_wrapper,https://github.com/Actyx/sync_wrapper,Apache-2.0,Actyx AG <developer@actyx.io>
 syslog,https://github.com/Geal/rust-syslog,MIT,contact@geoffroycouprie.com
 syslog_loose,https://github.com/FungusHumungus/syslog-loose,MIT,Stephen Wakely <fungus.humungus@gmail.com>
+system-configuration,https://github.com/mullvad/system-configuration-rs,MIT OR Apache-2.0,Mullvad VPN
 take_mut,https://github.com/Sgeo/take_mut,MIT,Sgeo <sgeoster@gmail.com>
 tap,https://github.com/myrrlyn/tap,MIT,"Elliott Linder <elliott.darfink@gmail.com>, myrrlyn <self@myrrlyn.dev>"
 tcp-stream,https://github.com/amqp-rs/tcp-stream,BSD-2-Clause,Marc-Antoine Perennou <Marc-Antoine@Perennou.com>
