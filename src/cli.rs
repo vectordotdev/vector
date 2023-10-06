@@ -1,4 +1,5 @@
 #![allow(missing_docs)]
+
 use std::{num::NonZeroU64, path::PathBuf};
 
 use clap::{ArgAction, CommandFactory, FromArgMatches, Parser};
@@ -64,9 +65,7 @@ pub struct RootOpts {
     /// Read configuration from one or more files. Wildcard paths are supported.
     /// File format is detected from the file name.
     /// If zero files are specified the deprecated default config path
-    /// `/etc/vector/vector.toml` will be targeted.
-    /// And if the aforementioned file does not exist,
-    /// then `/etc/vector/vector.yaml` will be used.
+    /// `/etc/vector/vector.yaml` will be targeted.
     #[arg(
         id = "config",
         short,
