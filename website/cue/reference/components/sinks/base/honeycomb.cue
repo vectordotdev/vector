@@ -89,6 +89,10 @@ base: components: sinks: honeycomb: configuration: {
 				type: string: enum: {
 					rfc3339: "Represent the timestamp as a RFC 3339 timestamp."
 					unix:    "Represent the timestamp as a Unix timestamp."
+					unix_ms: "Represent the timestamp as a Unix timestamp in milliseconds."
+					unix_us: "Represent the timestamp as a Unix timestamp in microseconds."
+					unix_ns: "Represent the timestamp as a Unix timestamp in nanoseconds."
+					unix_float: "Represent the timestamp as a Unix timestamp in floating point."
 				}
 			}
 		}
