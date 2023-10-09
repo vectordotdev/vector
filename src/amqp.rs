@@ -34,6 +34,29 @@ impl Default for AmqpConfig {
     }
 }
 
+/// Polls the connection until a connection can be made.
+/// Gives up after 5 attempts.
+#[cfg(test)]
+pub(crate) async fn await_connection(connection: &AmqpConfig) {
+    let mut pause = tokio::time::Duration::from_secs(1);
+    let mut attempts = 0;
+
+    loop {
+        let connection = connection.clone();
+        if connection.connect().await.is_ok() {
+            return;
+        }
+        attempts += 1;
+
+        if attempts == 5 {
+            return;
+        }
+
+        tokio::time::sleep(pause).await;
+        pause *= 2;
+    }
+}
+
 impl AmqpConfig {
     pub(crate) async fn connect(
         &self,

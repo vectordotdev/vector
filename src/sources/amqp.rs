@@ -615,6 +615,7 @@ mod integration_test {
     use super::test::*;
     use super::*;
     use crate::{
+        amqp::await_connection,
         shutdown::ShutdownSignal,
         test_util::{
             components::{run_and_assert_source_compliance, SOURCE_TAGS},
@@ -774,27 +775,5 @@ mod integration_test {
         let config = make_tls_config();
         await_connection(&config.connection).await;
         source_consume_event(config).await;
-    }
-
-    /// Polls the connection until a connection can be made.
-    /// Gives up after 5 attempts.
-    async fn await_connection(connection: &AmqpConfig) {
-        let mut pause = Duration::from_secs(1);
-        let mut attempts = 0;
-
-        loop {
-            let connection = connection.clone();
-            if connection.connect().await.is_ok() {
-                return;
-            }
-            attempts += 1;
-
-            if attempts == 5 {
-                return;
-            }
-
-            tokio::time::sleep(pause).await;
-            pause *= 2;
-        }
     }
 }
