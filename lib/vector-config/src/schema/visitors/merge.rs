@@ -95,7 +95,7 @@ impl Mergeable for serde_json::Map<String, Value> {
 
 impl<K, V> Mergeable for Map<K, V>
 where
-    K: std::hash::Hash + Eq + Clone,
+    K: Clone + Eq + Ord,
     V: Clone + Mergeable,
 {
     fn merge(&mut self, other: &Self) {
@@ -128,11 +128,7 @@ fn merge_schema_instance_type(
     source: Option<&SingleOrVec<InstanceType>>,
 ) {
     merge_optional_with(destination, source, |existing, new| {
-        let mut deduped = existing
-            .into_iter()
-            .chain(new.into_iter())
-            .cloned()
-            .collect::<Vec<_>>();
+        let mut deduped = existing.into_iter().chain(new).cloned().collect::<Vec<_>>();
         deduped.dedup();
 
         *existing = deduped.into();
@@ -261,7 +257,7 @@ where
 
 fn merge_map<K, V>(destination: &mut Map<K, V>, source: &Map<K, V>)
 where
-    K: std::hash::Hash + Eq + Clone,
+    K: Clone + Eq + Ord,
     V: Clone + Mergeable,
 {
     destination.merge(source);

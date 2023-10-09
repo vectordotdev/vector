@@ -14,7 +14,7 @@ use vector_core::EstimatedJsonEncodedSizeOf;
 
 use self::types::Stats;
 use crate::{
-    config::{self, Output, SourceConfig, SourceContext},
+    config::{SourceConfig, SourceContext, SourceOutput},
     http::HttpClient,
     internal_events::{
         EventStoreDbMetricsHttpError, EventStoreDbStatsParsingError, EventsReceived,
@@ -41,6 +41,7 @@ pub struct EventStoreDbConfig {
     /// The interval between scrapes, in seconds.
     #[serde(default = "default_scrape_interval_secs")]
     #[serde_as(as = "serde_with::DurationSeconds<u64>")]
+    #[configurable(metadata(docs::human_name = "Scrape Interval"))]
     scrape_interval_secs: Duration,
 
     /// Overrides the default namespace for the metrics emitted by the source.
@@ -72,8 +73,8 @@ impl SourceConfig for EventStoreDbConfig {
         )
     }
 
-    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
-        vec![Output::default(config::DataType::Metric)]
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
+        vec![SourceOutput::new_metrics()]
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -136,8 +137,8 @@ fn eventstoredb(
 
                                 events_received.emit(CountByteSize(count, byte_size));
 
-                                if let Err(error) = cx.out.send_batch(metrics).await {
-                                    emit!(StreamClosedError { count, error });
+                                if (cx.out.send_batch(metrics).await).is_err() {
+                                    emit!(StreamClosedError { count });
                                     break;
                                 }
                             }

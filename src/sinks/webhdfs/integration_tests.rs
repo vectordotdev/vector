@@ -24,7 +24,7 @@ async fn hdfs_healthchecks_invalid_node_node() {
     // Point to an invalid endpoint
     let config = config("http://127.0.0.1:1", 10);
     let (_, health_check) = config
-        .build(SinkContext::new_test())
+        .build(SinkContext::default())
         .await
         .expect("config build must with success");
     let result = health_check.await;
@@ -36,7 +36,7 @@ async fn hdfs_healthchecks_invalid_node_node() {
 async fn hdfs_healthchecks_valid_node_node() {
     let config = config(&webhdfs_endpoint(), 10);
     let (_, health_check) = config
-        .build(SinkContext::new_test())
+        .build(SinkContext::default())
         .await
         .expect("config build must with success");
     let result = health_check.await;

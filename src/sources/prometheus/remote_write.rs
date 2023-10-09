@@ -10,7 +10,7 @@ use warp::http::{HeaderMap, StatusCode};
 use super::parser;
 use crate::{
     config::{
-        self, GenerateConfig, Output, SourceAcknowledgementsConfig, SourceConfig, SourceContext,
+        GenerateConfig, SourceAcknowledgementsConfig, SourceConfig, SourceContext, SourceOutput,
     },
     event::Event,
     internal_events::PrometheusRemoteWriteParseError,
@@ -80,6 +80,7 @@ impl SourceConfig for PrometheusRemoteWriteConfig {
             self.address,
             "",
             HttpMethod::Post,
+            StatusCode::OK,
             true,
             &self.tls,
             &self.auth,
@@ -88,8 +89,8 @@ impl SourceConfig for PrometheusRemoteWriteConfig {
         )
     }
 
-    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
-        vec![Output::default(config::DataType::Metric)]
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
+        vec![SourceOutput::new_metrics()]
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -205,7 +206,7 @@ mod test {
                 ..Default::default()
             };
             let (sink, _) = sink
-                .build(SinkContext::new_test())
+                .build(SinkContext::default())
                 .await
                 .expect("Error building config.");
 
@@ -299,7 +300,7 @@ mod test {
                 ..Default::default()
             };
             let (sink, _) = sink
-                .build(SinkContext::new_test())
+                .build(SinkContext::default())
                 .await
                 .expect("Error building config.");
 

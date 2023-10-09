@@ -143,8 +143,13 @@ weight = 5
 
 [[languages.en.menus.navbar]]
 name = "Support"
-url = "https://www.datadoghq.com/product/observability-pipelines"
+url = "/community"
 weight = 6
+
+[[languages.en.menus.navbar]]
+name = "Enterprise"
+url = "https://www.datadoghq.com/product/observability-pipelines"
+weight = 7
 
 # Footer menu
 [[languages.en.menus.footer]]
@@ -169,6 +174,12 @@ name = "Privacy"
 url = "https://www.datadoghq.com/legal/privacy/"
 parent = "about"
 weight = 3
+
+[[languages.en.menus.footer]]
+name = "Cookies"
+url = "https://www.datadoghq.com/legal/cookies/"
+parent = "about"
+weight = 4
 
 [[languages.en.menus.footer]]
 name = "Components"

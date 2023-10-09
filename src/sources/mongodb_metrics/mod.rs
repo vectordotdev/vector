@@ -19,7 +19,7 @@ use vector_config::configurable_component;
 use vector_core::{metric_tags, ByteSizeOf, EstimatedJsonEncodedSizeOf};
 
 use crate::{
-    config::{self, Output, SourceConfig, SourceContext},
+    config::{SourceConfig, SourceContext, SourceOutput},
     event::metric::{Metric, MetricKind, MetricTags, MetricValue},
     internal_events::{
         CollectionCompleted, EndpointBytesReceived, MongoDbMetricsBsonParseError,
@@ -89,6 +89,7 @@ pub struct MongoDbMetricsConfig {
     /// The interval between scrapes, in seconds.
     #[serde(default = "default_scrape_interval_secs")]
     #[serde_as(as = "serde_with::DurationSeconds<u64>")]
+    #[configurable(metadata(docs::human_name = "Scrape Interval"))]
     scrape_interval_secs: Duration,
 
     /// Overrides the default namespace for the metrics emitted by the source.
@@ -146,8 +147,8 @@ impl SourceConfig for MongoDbMetricsConfig {
 
                 let metrics = metrics.into_iter().flatten();
 
-                if let Err(error) = cx.out.send_batch(metrics).await {
-                    emit!(StreamClosedError { error, count });
+                if (cx.out.send_batch(metrics).await).is_err() {
+                    emit!(StreamClosedError { count });
                     return Err(());
                 }
             }
@@ -156,8 +157,8 @@ impl SourceConfig for MongoDbMetricsConfig {
         }))
     }
 
-    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
-        vec![Output::default(config::DataType::Metric)]
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
+        vec![SourceOutput::new_metrics()]
     }
 
     fn can_acknowledge(&self) -> bool {

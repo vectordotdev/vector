@@ -42,19 +42,13 @@ force = true
 
 [[redirects]]
 from = "https://chat.vector.dev/*"
-to = "https://discord.gg/dX3bdkF"
+to = "https://discord.gg/ptvgXhUF2m"
 status = 302
 force = true
 
 [[redirects]]
 from = "https://discussions.vector.dev/*"
 to = "https://github.com/vectordotdev/vector/discussions"
-status = 302
-force = true
-
-[[redirects]]
-from = "https://roadmap.vector.dev/*"
-to = "https://airtable.com/shriTZW5LeOE4cIyJ"
 status = 302
 force = true
 

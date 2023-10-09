@@ -3,9 +3,11 @@ use aws_sdk_kinesis::{
     types::SdkError,
 };
 use futures::FutureExt;
+use lookup::lookup_v2::ConfigValuePath;
 use snafu::Snafu;
 use vector_config::{component::GenerateConfig, configurable_component};
 
+use crate::sinks::util::retries::RetryAction;
 use crate::{
     aws::{create_client, is_retriable_error, ClientBuilder},
     config::{AcknowledgementsConfig, Input, ProxyConfig, SinkConfig, SinkContext},
@@ -66,7 +68,10 @@ impl SinkBatchSettings for KinesisDefaultBatchSettings {
 }
 
 /// Configuration for the `aws_kinesis_streams` sink.
-#[configurable_component(sink("aws_kinesis_streams"))]
+#[configurable_component(sink(
+    "aws_kinesis_streams",
+    "Publish logs to AWS Kinesis Streams topics."
+))]
 #[derive(Clone, Debug)]
 pub struct KinesisStreamsSinkConfig {
     #[serde(flatten)]
@@ -76,7 +81,7 @@ pub struct KinesisStreamsSinkConfig {
     ///
     /// If not specified, a unique partition key is generated for each Kinesis record.
     #[configurable(metadata(docs::examples = "user_id"))]
-    pub partition_key_field: Option<String>,
+    pub partition_key_field: Option<ConfigValuePath>,
 
     #[configurable(derived)]
     #[serde(default)]
@@ -115,7 +120,7 @@ impl KinesisStreamsSinkConfig {
         create_client::<KinesisClientBuilder>(
             &self.base.auth,
             self.base.region.region(),
-            self.base.region.endpoint()?,
+            self.base.region.endpoint(),
             proxy,
             &self.base.tls,
             true,
@@ -125,6 +130,7 @@ impl KinesisStreamsSinkConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "aws_kinesis_streams")]
 impl SinkConfig for KinesisStreamsSinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let client = self.create_client(&cx.proxy).await?;
@@ -148,8 +154,10 @@ impl SinkConfig for KinesisStreamsSinkConfig {
             self.partition_key_field.clone(),
             batch_settings,
             KinesisStreamClient { client },
-        )
-        .await?;
+            KinesisRetryLogic {
+                retry_partial: self.base.request_retry_partial,
+            },
+        )?;
 
         Ok((sink, healthcheck))
     }
@@ -174,25 +182,37 @@ impl GenerateConfig for KinesisStreamsSinkConfig {
     }
 }
 #[derive(Default, Clone)]
-struct KinesisRetryLogic;
+struct KinesisRetryLogic {
+    retry_partial: bool,
+}
 
 impl RetryLogic for KinesisRetryLogic {
     type Error = SdkError<KinesisError>;
     type Response = KinesisResponse;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
-        if let SdkError::ServiceError { err, raw: _ } = error {
+        if let SdkError::ServiceError(inner) = error {
             // Note that if the request partially fails (records sent to one
             // partition fail but the others do not, for example), Vector
             // does not retry. This line only covers a failure for the entire
             // request.
             //
             // https://github.com/vectordotdev/vector/issues/359
-            if let PutRecordsErrorKind::ProvisionedThroughputExceededException(_) = err.kind {
+            if let PutRecordsErrorKind::ProvisionedThroughputExceededException(_) = inner.err().kind
+            {
                 return true;
             }
         }
         is_retriable_error(error)
+    }
+
+    fn should_retry_response(&self, response: &Self::Response) -> RetryAction {
+        if response.failure_count > 0 && self.retry_partial {
+            let msg = format!("partial error count {}", response.failure_count);
+            RetryAction::Retry(msg.into())
+        } else {
+            RetryAction::Successful
+        }
     }
 }
 

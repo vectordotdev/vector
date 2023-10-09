@@ -43,8 +43,6 @@ impl InternalEvent for LuaScriptError {
             count: 1,
             reason: "Error in lua script.",
         });
-        // deprecated
-        counter!("processing_errors_total", 1);
     }
 }
 
@@ -70,12 +68,6 @@ impl InternalEvent for LuaBuildError {
             "error_type" => error_type::SCRIPT_FAILED,
             "stage" => error_stage:: PROCESSING,
         );
-        emit!(ComponentEventsDropped::<UNINTENTIONAL> {
-            count: 1,
-            reason: "Error in lua build.",
-        });
-        // deprecated
-        counter!("processing_errors_total", 1);
 
         emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason })
     }
@@ -90,7 +82,6 @@ const fn mlua_error_code(err: &mlua::Error) -> &'static str {
         MemoryError(_) => "memory_error",
         SafetyError(_) => "memory_safety_error",
         MemoryLimitNotAvailable => "memory_limit_not_available",
-        MainThreadNotAvailable => "main_thread_not_available",
         RecursiveMutCallback => "mutable_callback_called_recursively",
         CallbackDestructed => "callback_destructed",
         StackError => "out_of_stack",

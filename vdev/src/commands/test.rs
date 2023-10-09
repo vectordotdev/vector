@@ -38,13 +38,14 @@ impl Cli {
         let runner = get_agent_test_runner(self.container)?;
 
         let mut args = vec!["--workspace".to_string()];
-        if let Some(extra_args) = &self.args {
-            args.extend(extra_args.clone());
 
-            if !(self.container || extra_args.contains(&"--features".to_string())) {
-                let features = platform::default_features();
-                args.extend(["--features".to_string(), features.to_string()]);
-            }
+        if let Some(mut extra_args) = self.args {
+            args.append(&mut extra_args);
+        }
+
+        if !args.contains(&"--features".to_string()) {
+            let features = platform::default_features();
+            args.extend(["--features".to_string(), features.to_string()]);
         }
 
         runner.test(

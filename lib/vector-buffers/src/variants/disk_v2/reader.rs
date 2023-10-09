@@ -855,7 +855,7 @@ where
                         // If there's an error decoding the item, just fall back to the slow path,
                         // because this file might actually be where we left off, so we don't want
                         // to incorrectly skip ahead or anything.
-                        break
+                        break;
                     };
 
                     // We have to remove 1 from the event count here because otherwise the ID would
@@ -901,12 +901,8 @@ where
         while self.last_reader_record_id < ledger_last {
             match self.next().await {
                 Ok(maybe_record) => {
-                    if maybe_record.is_none() && self.last_reader_record_id == 0 {
-                        // We've hit a point where there's no more data to read.  If our "last reader record
-                        // ID" hasn't moved at all, that means the buffer was already empty and we're caught
-                        // up, so we just pin ourselves to where the ledger says we left off, and we're good
-                        // to go.
-                        self.last_reader_record_id = ledger_last;
+                    if maybe_record.is_none() {
+                        // We've hit the end of the current data file so we've gone as far as we can.
                         break;
                     }
                 }

@@ -82,6 +82,18 @@ base: components: sources: journald: configuration: {
 			items: type: string: examples: ["badservice", "sysinit.target"]
 		}
 	}
+	extra_args: {
+		description: """
+			A list of extra command line arguments to pass to `journalctl`.
+
+			If specified, it is merged to the command line arguments as-is.
+			"""
+		required: false
+		type: array: {
+			default: []
+			items: type: string: examples: ["--merge"]
+		}
+	}
 	include_matches: {
 		description: """
 			A list of sets of field/value pairs to monitor.
@@ -122,6 +134,19 @@ base: components: sources: journald: configuration: {
 			The full path of the journal directory.
 
 			If not set, `journalctl` uses the default system journal path.
+			"""
+		required: false
+		type: string: {}
+	}
+	journal_namespace: {
+		description: """
+			The [journal namespace][journal-namespace].
+
+			This value is passed to `journalctl` through the [`--namespace` option][journalctl-namespace-option].
+			If not set, `journalctl` uses the default namespace.
+
+			[journal-namespace]: https://www.freedesktop.org/software/systemd/man/systemd-journald.service.html#Journal%20Namespaces
+			[journalctl-namespace-option]: https://www.freedesktop.org/software/systemd/man/journalctl.html#--namespace=NAMESPACE
 			"""
 		required: false
 		type: string: {}

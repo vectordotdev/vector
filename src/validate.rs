@@ -54,7 +54,8 @@ pub struct Opts {
     /// Any number of Vector config files to validate.
     /// Format is detected from the file name.
     /// If none are specified the default config path `/etc/vector/vector.toml`
-    /// will be targeted.
+    /// will be targeted. And if the aforementioned file does not exist,
+    //  then `/etc/vector/vector.yaml` will be used.
     #[arg(env = "VECTOR_CONFIG", value_delimiter(','))]
     pub paths: Vec<PathBuf>,
 
@@ -135,10 +136,12 @@ pub fn validate_config(opts: &Opts, fmt: &mut Formatter) -> Option<Config> {
         fmt.title(format!("Failed to load {:?}", &paths_list));
         fmt.sub_error(errors);
     };
+    config::init_log_schema(&paths, true)
+        .map_err(&mut report_error)
+        .ok()?;
     let (builder, load_warnings) = config::load_builder_from_paths(&paths)
         .map_err(&mut report_error)
         .ok()?;
-    config::init_log_schema(builder.global.log_schema.clone(), true);
 
     // Build
     let (config, build_warnings) = builder
@@ -401,7 +404,7 @@ impl Formatter {
             .as_ref()
             .lines()
             .map(|line| {
-                String::from_utf8_lossy(&strip_ansi_escapes::strip(line).unwrap())
+                String::from_utf8_lossy(&strip_ansi_escapes::strip(line))
                     .chars()
                     .count()
             })

@@ -10,6 +10,7 @@ use prost::Message;
 use snafu::Snafu;
 use vector_common::request_metadata::RequestMetadata;
 use vector_core::event::{EventFinalizers, Finalizable};
+use vrl::event_path;
 
 use super::{
     apm_stats::{compute_apm_stats, Aggregator},
@@ -133,17 +134,14 @@ impl IncrementalRequestBuilder<(PartitionKey, Vec<Event>)> for DatadogTracesRequ
                         content_type: "application/x-protobuf".to_string(),
                     };
 
+                    // build RequestMetadata
+                    let builder = RequestMetadataBuilder::from_events(&processed);
+
                     let mut compressor = Compressor::from(self.compression);
                     match compressor.write_all(&payload) {
                         Ok(()) => {
                             let bytes = compressor.into_inner().freeze();
 
-                            // build RequestMetadata
-                            let builder = RequestMetadataBuilder::new(
-                                n,
-                                uncompressed_size,
-                                uncompressed_size,
-                            );
                             let bytes_len = NonZeroUsize::new(bytes.len())
                                 .expect("payload should never be zero length");
                             let request_metadata = builder.with_request_size(bytes_len);
@@ -286,7 +284,7 @@ impl DatadogTracesEncoder {
 
     fn vector_trace_into_dd_tracer_payload(trace: &TraceEvent) -> dd_proto::TracerPayload {
         let tags = trace
-            .get("tags")
+            .get(event_path!("tags"))
             .and_then(|m| m.as_object())
             .map(|m| {
                 m.iter()
@@ -295,7 +293,7 @@ impl DatadogTracesEncoder {
             })
             .unwrap_or_default();
 
-        let spans = match trace.get("spans") {
+        let spans = match trace.get(event_path!("spans")) {
             Some(Value::Array(v)) => v
                 .iter()
                 .filter_map(|s| s.as_object().map(DatadogTracesEncoder::convert_span))
@@ -305,7 +303,7 @@ impl DatadogTracesEncoder {
 
         let chunk = dd_proto::TraceChunk {
             priority: trace
-                .get("priority")
+                .get(event_path!("priority"))
                 .and_then(|v| v.as_integer().map(|v| v as i32))
                 // This should not happen for Datadog originated traces, but in case this field is not populated
                 // we default to 1 (https://github.com/DataDog/datadog-agent/blob/eac2327/pkg/trace/sampler/sampler.go#L54-L55),
@@ -313,11 +311,11 @@ impl DatadogTracesEncoder {
                 // https://github.com/DataDog/datadog-agent/blob/3ea2eb4/pkg/trace/api/otlp.go#L309.
                 .unwrap_or(1i32),
             origin: trace
-                .get("origin")
+                .get(event_path!("origin"))
                 .map(|v| v.to_string_lossy().into_owned())
                 .unwrap_or_default(),
             dropped_trace: trace
-                .get("dropped")
+                .get(event_path!("dropped"))
                 .and_then(|v| v.as_boolean())
                 .unwrap_or(false),
             spans,
@@ -326,37 +324,37 @@ impl DatadogTracesEncoder {
 
         dd_proto::TracerPayload {
             container_id: trace
-                .get("container_id")
+                .get(event_path!("container_id"))
                 .map(|v| v.to_string_lossy().into_owned())
                 .unwrap_or_default(),
             language_name: trace
-                .get("language_name")
+                .get(event_path!("language_name"))
                 .map(|v| v.to_string_lossy().into_owned())
                 .unwrap_or_default(),
             language_version: trace
-                .get("language_version")
+                .get(event_path!("language_version"))
                 .map(|v| v.to_string_lossy().into_owned())
                 .unwrap_or_default(),
             tracer_version: trace
-                .get("tracer_version")
+                .get(event_path!("tracer_version"))
                 .map(|v| v.to_string_lossy().into_owned())
                 .unwrap_or_default(),
             runtime_id: trace
-                .get("runtime_id")
+                .get(event_path!("runtime_id"))
                 .map(|v| v.to_string_lossy().into_owned())
                 .unwrap_or_default(),
             chunks: vec![chunk],
             tags,
             env: trace
-                .get("env")
+                .get(event_path!("env"))
                 .map(|v| v.to_string_lossy().into_owned())
                 .unwrap_or_default(),
             hostname: trace
-                .get("hostname")
+                .get(event_path!("hostname"))
                 .map(|v| v.to_string_lossy().into_owned())
                 .unwrap_or_default(),
             app_version: trace
-                .get("app_version")
+                .get(event_path!("app_version"))
                 .map(|v| v.to_string_lossy().into_owned())
                 .unwrap_or_default(),
         }
@@ -384,7 +382,9 @@ impl DatadogTracesEncoder {
             _ => 0,
         };
         let start = match span.get("start") {
-            Some(Value::Timestamp(val)) => val.timestamp_nanos(),
+            Some(Value::Timestamp(val)) => {
+                val.timestamp_nanos_opt().expect("Timestamp out of range")
+            }
             _ => 0,
         };
 

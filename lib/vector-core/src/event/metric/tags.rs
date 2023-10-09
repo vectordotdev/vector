@@ -11,7 +11,6 @@ use indexmap::IndexSet;
 use serde::{ser::SerializeSeq, Deserialize, Deserializer, Serialize, Serializer};
 use vector_common::byte_size_of::ByteSizeOf;
 use vector_config::{configurable_component, Configurable};
-use vrl_lib::prelude::fmt::Formatter;
 
 /// A single tag value, either a bare tag or a value.
 #[derive(Clone, Configurable, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
@@ -117,7 +116,7 @@ impl Default for TagValueSet {
 }
 
 impl Display for TagValueSet {
-    fn fmt(&self, f: &mut Formatter<'_>) -> vrl_lib::prelude::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for (i, value) in self.iter().enumerate() {
             if i != 0 {
                 write!(f, ", ")?;

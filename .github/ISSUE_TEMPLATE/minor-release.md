@@ -7,10 +7,14 @@ labels: "domain: releasing"
 
 The week before the release:
 
+- [ ] Check for any outstanding deprecation actions in [DEPRECATIONS.md](docs/DEPRECATIONS.md) and
+      take them (or have someone help you take them)
 - [ ] Create a new release branch from master to freeze commits
   - `git fetch && git checkout origin/master && git checkout -b v0.<new version number> && git push -u`
 - [ ] Create a new release preparation branch from `master`
   - `git checkout -b prepare-v0.<new version number> && git push -u`
+- [ ] Check if there is a newer version of Alpine or Debian available to update the release images
+      in `distribution/docker/`. Update if so.
 - [ ] Run `cargo vdev build release-cue` to generate a new cue file for the release
 - [ ] Add `changelog` key to generated cue file
   - [ ] `git log --no-merges --cherry-pick --right-only <last release tag>...`
@@ -39,8 +43,8 @@ On the day of release:
 - [ ] Merge release preparation branch into the release branch
     - `git co v0.<new version number> && git merge --ff-only prepare-v0.<new version number>`
 - [ ] Tag new release
-  - [ ] `git tag v0.<minor>.0 -a -m v0.<minor>.0``
-  - [ ] `git push origin v0.<minor>.0
+  - [ ] `git tag v0.<minor>.0 -a -m v0.<minor>.0`
+  - [ ] `git push origin v0.<minor>.0`
 - [ ] Wait for release workflow to complete
   - Discoverable via [https://github.com/timberio/vector/actions/workflows/release.yml](https://github.com/timberio/vector/actions/workflows/release.yml)
 - [ ] Release updated Helm chart. See [releasing Helm chart](https://github.com/vectordotdev/helm-charts#releasing).

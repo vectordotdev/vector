@@ -1,5 +1,9 @@
 #[cfg(feature = "vrl")]
 use std::convert::TryFrom;
+
+#[cfg(feature = "vrl")]
+use vrl::compiler::value::VrlValueConvert;
+
 use std::{
     convert::AsRef,
     fmt::{self, Display, Formatter},
@@ -7,12 +11,16 @@ use std::{
 };
 
 use chrono::{DateTime, Utc};
-use vector_common::EventDataEq;
+use vector_common::{
+    internal_event::{OptionalTag, TaggedEventsSent},
+    json_size::JsonSize,
+    request_metadata::GetEventCountTags,
+    EventDataEq,
+};
 use vector_config::configurable_component;
-#[cfg(feature = "vrl")]
-use vrl_lib::prelude::VrlValueConvert;
 
 use crate::{
+    config::telemetry,
     event::{
         estimated_json_encoded_size_of::EstimatedJsonEncodedSizeOf, BatchNotifier, EventFinalizer,
         EventFinalizers, EventMetadata, Finalizable,
@@ -428,7 +436,7 @@ impl Display for Metric {
     ///
     /// example:
     /// ```text
-    /// 2020-08-12T20:23:37.248661343Z vector_processed_bytes_total{component_kind="sink",component_type="blackhole"} = 6391
+    /// 2020-08-12T20:23:37.248661343Z vector_received_bytes_total{component_kind="sink",component_type="blackhole"} = 6391
     /// ```
     fn fmt(&self, fmt: &mut Formatter<'_>) -> Result<(), fmt::Error> {
         if let Some(timestamp) = &self.data.time.timestamp {
@@ -461,16 +469,38 @@ impl ByteSizeOf for Metric {
 }
 
 impl EstimatedJsonEncodedSizeOf for Metric {
-    fn estimated_json_encoded_size_of(&self) -> usize {
+    fn estimated_json_encoded_size_of(&self) -> JsonSize {
         // TODO: For now we're using the in-memory representation of the metric, but we'll convert
         // this to actually calculate the JSON encoded size in the near future.
-        self.size_of()
+        self.size_of().into()
     }
 }
 
 impl Finalizable for Metric {
     fn take_finalizers(&mut self) -> EventFinalizers {
         self.metadata.take_finalizers()
+    }
+}
+
+impl GetEventCountTags for Metric {
+    fn get_tags(&self) -> TaggedEventsSent {
+        let source = if telemetry().tags().emit_source {
+            self.metadata().source_id().cloned().into()
+        } else {
+            OptionalTag::Ignored
+        };
+
+        // Currently there is no way to specify a tag that means the service,
+        // so we will be hardcoding it to "service".
+        let service = if telemetry().tags().emit_service {
+            self.tags()
+                .and_then(|tags| tags.get("service").map(ToString::to_string))
+                .into()
+        } else {
+            OptionalTag::Ignored
+        };
+
+        TaggedEventsSent { source, service }
     }
 }
 
@@ -495,10 +525,10 @@ pub enum MetricKind {
 }
 
 #[cfg(feature = "vrl")]
-impl TryFrom<::value::Value> for MetricKind {
+impl TryFrom<vrl::value::Value> for MetricKind {
     type Error = String;
 
-    fn try_from(value: ::value::Value) -> Result<Self, Self::Error> {
+    fn try_from(value: vrl::value::Value) -> Result<Self, Self::Error> {
         let value = value.try_bytes().map_err(|e| e.to_string())?;
         match std::str::from_utf8(&value).map_err(|e| e.to_string())? {
             "incremental" => Ok(Self::Incremental),
@@ -511,7 +541,7 @@ impl TryFrom<::value::Value> for MetricKind {
 }
 
 #[cfg(feature = "vrl")]
-impl From<MetricKind> for ::value::Value {
+impl From<MetricKind> for vrl::value::Value {
     fn from(kind: MetricKind) -> Self {
         match kind {
             MetricKind::Incremental => "incremental".into(),
@@ -548,7 +578,7 @@ pub(crate) fn zip_samples(
 ) -> Vec<Sample> {
     values
         .into_iter()
-        .zip(rates.into_iter())
+        .zip(rates)
         .map(|(value, rate)| Sample { value, rate })
         .collect()
 }
@@ -560,7 +590,7 @@ pub(crate) fn zip_buckets(
 ) -> Vec<Bucket> {
     limits
         .into_iter()
-        .zip(counts.into_iter())
+        .zip(counts)
         .map(|(upper_limit, count)| Bucket { upper_limit, count })
         .collect()
 }
@@ -572,7 +602,7 @@ pub(crate) fn zip_quantiles(
 ) -> Vec<Quantile> {
     quantiles
         .into_iter()
-        .zip(values.into_iter())
+        .zip(values)
         .map(|(quantile, value)| Quantile { quantile, value })
         .collect()
 }

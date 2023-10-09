@@ -27,7 +27,13 @@ impl Discriminant {
     pub fn from_log_event(event: &LogEvent, discriminant_fields: &[impl AsRef<str>]) -> Self {
         let values: Vec<Option<Value>> = discriminant_fields
             .iter()
-            .map(|discriminant_field| event.get(discriminant_field.as_ref()).cloned())
+            .map(|discriminant_field| {
+                event
+                    .parse_path_and_get_value(discriminant_field.as_ref())
+                    .ok()
+                    .flatten()
+                    .cloned()
+            })
             .collect();
         Self { values }
     }
@@ -139,13 +145,13 @@ fn hash_f64<H: Hasher>(hasher: &mut H, value: f64) {
 }
 
 fn hash_array<H: Hasher>(hasher: &mut H, array: &[Value]) {
-    for val in array.iter() {
+    for val in array {
         hash_value(hasher, val);
     }
 }
 
 fn hash_map<H: Hasher>(hasher: &mut H, map: &BTreeMap<String, Value>) {
-    for (key, val) in map.iter() {
+    for (key, val) in map {
         hasher.write(key.as_bytes());
         hash_value(hasher, val);
     }

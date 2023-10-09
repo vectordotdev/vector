@@ -10,10 +10,10 @@ use crate::{
 mod proto_event {
     include!(concat!(env!("OUT_DIR"), "/event.rs"));
 }
-pub use proto_event::*;
-
 pub use event_wrapper::Event;
 pub use metric::Value as MetricValue;
+pub use proto_event::*;
+use vrl::value::Value as VrlValue;
 
 use super::{array, metric::MetricSketch};
 
@@ -92,7 +92,7 @@ impl From<Trace> for Event {
 impl From<Log> for event::LogEvent {
     fn from(log: Log) -> Self {
         let mut event_log = if let Some(value) = log.value {
-            Self::from(decode_value(value).unwrap_or(::value::Value::Null))
+            Self::from(decode_value(value).unwrap_or(VrlValue::Null))
         } else {
             // This is for backwards compatibility. Only `value` should be set
             let fields = log
@@ -229,15 +229,30 @@ impl From<Metric> for event::Metric {
         // The current Vector encoding includes copies of the "single" values of tags in `tags_v2`
         // above. This `extend` will re-add those values, forcing them to become the last added in
         // the value set.
-        tags.extend(metric.tags_v1.into_iter());
+        tags.extend(metric.tags_v1);
         let tags = (!tags.is_empty()).then_some(tags);
 
         let value = event::MetricValue::from(metric.value.unwrap());
 
         let mut metadata = event::EventMetadata::default();
+
+        #[allow(deprecated)]
         if let Some(metadata_value) = metric.metadata {
-            if let Some(decoded_value) = decode_value(metadata_value) {
-                *metadata.value_mut() = decoded_value;
+            if let Some(value) = decode_value(metadata_value) {
+                *metadata.value_mut() = value;
+            }
+        }
+
+        if let Some(received_metadata) = metric.metadata_full {
+            let (maybe_metadata_value, maybe_origin_metadata) = decode_metadata(received_metadata);
+
+            if let Some(origin_metadata) = maybe_origin_metadata {
+                metadata = metadata.with_origin_metadata(origin_metadata);
+            }
+
+            // if both the deprecated and this one are specified, use the non-deprecated
+            if let Some(value) = maybe_metadata_value {
+                *metadata.value_mut() = value;
             }
         }
 
@@ -285,7 +300,7 @@ impl From<event::LogEvent> for WithMetadata<Log> {
         // Once this backwards compatibility is no longer required, "fields" can
         // be entirely removed from the Log object
 
-        let data = if let ::value::Value::Object(fields) = value {
+        let data = if let VrlValue::Object(fields) = value {
             // using only "fields" to prevent having to use the dummy value
             Log {
                 fields: fields
@@ -299,7 +314,7 @@ impl From<event::LogEvent> for WithMetadata<Log> {
             let mut dummy = BTreeMap::new();
             // must insert at least 1 field, otherwise it is emitted entirely.
             // this value is ignored in the decoding step (since value is provided)
-            dummy.insert(".".to_owned(), encode_value(::value::Value::Null));
+            dummy.insert(".".to_owned(), encode_value(VrlValue::Null));
             Log {
                 fields: dummy,
                 value: Some(encode_value(value)),
@@ -442,6 +457,9 @@ impl From<event::Metric> for WithMetadata<Metric> {
             })
             .collect();
 
+        let encoded_metadata = encode_metadata(&metadata);
+
+        #[allow(deprecated)]
         let data = Metric {
             name,
             namespace,
@@ -452,6 +470,7 @@ impl From<event::Metric> for WithMetadata<Metric> {
             interval_ms,
             value: Some(metric),
             metadata: Some(encode_value(metadata.value().clone())),
+            metadata_full: Some(encoded_metadata),
         };
         Self { data, metadata }
     }
@@ -537,6 +556,25 @@ impl From<sketch::AgentDdSketch> for MetricSketch {
     }
 }
 
+fn decode_metadata(
+    input: Metadata,
+) -> (
+    Option<event::Value>,
+    Option<super::DatadogMetricOriginMetadata>,
+) {
+    let value = input.value.and_then(decode_value);
+
+    let datadog_origin_metadata = input.datadog_origin_metadata.as_ref().map(|input| {
+        super::DatadogMetricOriginMetadata::new(
+            input.origin_product,
+            input.origin_category,
+            input.origin_service,
+        )
+    });
+
+    (value, datadog_origin_metadata)
+}
+
 fn decode_value(input: Value) -> Option<event::Value> {
     match input.kind {
         Some(value::Kind::RawBytes(data)) => Some(event::Value::Bytes(data)),
@@ -573,6 +611,21 @@ fn decode_array(items: Vec<Value>) -> Option<event::Value> {
         .map(decode_value)
         .collect::<Option<Vec<_>>>()
         .map(event::Value::Array)
+}
+
+fn encode_metadata(metadata: &event::EventMetadata) -> Metadata {
+    let datadog_origin_metadata =
+        metadata
+            .datadog_origin_metadata()
+            .map(|om| DatadogOriginMetadata {
+                origin_product: om.product(),
+                origin_category: om.category(),
+                origin_service: om.service(),
+            });
+    Metadata {
+        value: Some(encode_value(metadata.value().clone())),
+        datadog_origin_metadata,
+    }
 }
 
 fn encode_value(value: event::Value) -> Value {

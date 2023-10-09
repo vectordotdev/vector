@@ -1,32 +1,19 @@
-use std::{fmt, num::NonZeroUsize, sync::Arc};
+use std::{fmt, sync::Arc};
 
-use async_trait::async_trait;
-use futures_util::{stream::BoxStream, StreamExt};
 use serde::Serialize;
-use tower::Service;
-use vector_buffers::EventCount;
-use vector_core::{
-    event::{Event, LogEvent, Value},
-    partition::Partitioner,
-    sink::StreamSink,
-    stream::{BatcherSettings, DriverResponse},
-    ByteSizeOf,
-};
 
 use super::request_builder::HecLogsRequestBuilder;
 use crate::{
-    config::SinkContext,
     internal_events::SplunkEventTimestampInvalidType,
     internal_events::SplunkEventTimestampMissing,
-    internal_events::TemplateRenderingError,
     sinks::{
+        prelude::*,
         splunk_hec::common::{
             render_template_string, request::HecRequest, EndpointTarget, INDEX_FIELD,
             SOURCETYPE_FIELD, SOURCE_FIELD,
         },
-        util::{processed_event::ProcessedEvent, SinkBuilderExt},
+        util::processed_event::ProcessedEvent,
     },
-    template::Template,
 };
 use lookup::{event_path, OwnedValuePath, PathPrefix};
 
@@ -38,8 +25,8 @@ pub struct HecLogsSink<S> {
     pub sourcetype: Option<Template>,
     pub source: Option<Template>,
     pub index: Option<Template>,
-    pub indexed_fields: Vec<String>,
-    pub host: String,
+    pub indexed_fields: Vec<OwnedValuePath>,
+    pub host_key: Option<OwnedValuePath>,
     pub timestamp_nanos_key: Option<String>,
     pub timestamp_key: Option<OwnedValuePath>,
     pub endpoint_target: EndpointTarget,
@@ -49,8 +36,8 @@ pub struct HecLogData<'a> {
     pub sourcetype: Option<&'a Template>,
     pub source: Option<&'a Template>,
     pub index: Option<&'a Template>,
-    pub indexed_fields: &'a [String],
-    pub host_key: &'a str,
+    pub indexed_fields: &'a [OwnedValuePath],
+    pub host_key: Option<OwnedValuePath>,
     pub timestamp_nanos_key: Option<&'a String>,
     pub timestamp_key: Option<OwnedValuePath>,
     pub endpoint_target: EndpointTarget,
@@ -64,14 +51,12 @@ where
     S::Error: fmt::Debug + Into<crate::Error> + Send,
 {
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
-        let builder_limit = NonZeroUsize::new(64);
-
         let data = HecLogData {
             sourcetype: self.sourcetype.as_ref(),
             source: self.source.as_ref(),
             index: self.index.as_ref(),
             indexed_fields: self.indexed_fields.as_slice(),
-            host_key: self.host.as_ref(),
+            host_key: self.host_key.clone(),
             timestamp_nanos_key: self.timestamp_nanos_key.as_ref(),
             timestamp_key: self.timestamp_key.clone(),
             endpoint_target: self.endpoint_target,
@@ -87,14 +72,17 @@ where
                         self.sourcetype.clone(),
                         self.source.clone(),
                         self.index.clone(),
-                        Some(self.host.clone()),
+                        self.host_key.clone(),
                     )
                 } else {
                     EventPartitioner::new(None, None, None, None)
                 },
                 self.batch_settings,
             )
-            .request_builder(builder_limit, self.request_builder)
+            .request_builder(
+                default_request_builder_concurrency_limit(),
+                self.request_builder,
+            )
             .filter_map(|request| async move {
                 match request {
                     Err(e) => {
@@ -137,7 +125,7 @@ struct EventPartitioner {
     pub sourcetype: Option<Template>,
     pub source: Option<Template>,
     pub index: Option<Template>,
-    pub host_key: Option<String>,
+    pub host_key: Option<OwnedValuePath>,
 }
 
 impl EventPartitioner {
@@ -145,7 +133,7 @@ impl EventPartitioner {
         sourcetype: Option<Template>,
         source: Option<Template>,
         index: Option<Template>,
-        host_key: Option<String>,
+        host_key: Option<OwnedValuePath>,
     ) -> Self {
         Self {
             sourcetype,
@@ -193,7 +181,7 @@ impl Partitioner for EventPartitioner {
         let host = self
             .host_key
             .as_ref()
-            .and_then(|host_key| item.event.get(host_key.as_str()))
+            .and_then(|host_key| item.event.get((PathPrefix::Event, host_key)))
             .and_then(|value| value.as_str().map(|s| s.to_string()));
 
         Some(Partitioned {
@@ -246,7 +234,11 @@ pub fn process_log(event: Event, data: &HecLogData) -> HecProcessedEvent {
         .index
         .and_then(|index| render_template_string(index, &log, INDEX_FIELD));
 
-    let host = log.get(data.host_key).cloned();
+    let host = data
+        .host_key
+        .as_ref()
+        .and_then(|key| log.get((PathPrefix::Event, key)))
+        .cloned();
 
     let timestamp = data.timestamp_key.as_ref().and_then(|timestamp_key| {
         match log.remove((PathPrefix::Event, timestamp_key)) {
@@ -273,7 +265,10 @@ pub fn process_log(event: Event, data: &HecLogData) -> HecProcessedEvent {
     let fields = data
         .indexed_fields
         .iter()
-        .filter_map(|field| log.get(field.as_str()).map(|value| (field, value.clone())))
+        .filter_map(|field| {
+            log.get((PathPrefix::Event, field))
+                .map(|value| (field.to_string(), value.clone()))
+        })
         .collect::<LogEvent>();
 
     let metadata = HecLogsProcessedEventMetadata {

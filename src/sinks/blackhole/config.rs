@@ -15,7 +15,10 @@ const fn default_print_interval_secs() -> Duration {
 
 /// Configuration for the `blackhole` sink.
 #[serde_as]
-#[configurable_component(sink("blackhole"))]
+#[configurable_component(sink(
+    "blackhole",
+    "Send observability events nowhere, which can be useful for debugging purposes."
+))]
 #[derive(Clone, Debug, Derivative)]
 #[serde(deny_unknown_fields, default)]
 #[derivative(Default)]
@@ -26,6 +29,7 @@ pub struct BlackholeConfig {
     #[derivative(Default(value = "default_print_interval_secs()"))]
     #[serde(default = "default_print_interval_secs")]
     #[serde_as(as = "serde_with::DurationSeconds<u64>")]
+    #[configurable(metadata(docs::human_name = "Print Interval"))]
     #[configurable(metadata(docs::examples = 10))]
     pub print_interval_secs: Duration,
 
@@ -45,6 +49,7 @@ pub struct BlackholeConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "blackhole")]
 impl SinkConfig for BlackholeConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let sink = BlackholeSink::new(self.clone());

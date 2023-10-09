@@ -1,15 +1,16 @@
 #![deny(missing_docs)]
 
-use std::collections::BTreeMap;
-use std::sync::Arc;
+use std::{collections::BTreeMap, sync::Arc};
 
 use serde::{Deserialize, Serialize};
-use value::{Kind, Secrets, Value};
-use vector_common::EventDataEq;
+use vector_common::{config::ComponentKey, EventDataEq};
+use vrl::value::{Kind, Secrets, Value};
 
 use super::{BatchNotifier, EventFinalizer, EventFinalizers, EventStatus};
-use crate::config::LogNamespace;
-use crate::{schema, ByteSizeOf};
+use crate::{
+    config::{LogNamespace, OutputId},
+    schema, ByteSizeOf,
+};
 
 const DATADOG_API_KEY: &str = "datadog_api_key";
 const SPLUNK_HEC_TOKEN: &str = "splunk_hec_token";
@@ -29,12 +30,80 @@ pub struct EventMetadata {
     #[serde(default, skip)]
     finalizers: EventFinalizers,
 
+    /// The id of the source
+    source_id: Option<Arc<ComponentKey>>,
+
+    /// The type of the source
+    source_type: Option<&'static str>,
+
+    /// The id of the component this event originated from. This is used to
+    /// determine which schema definition to attach to an event in transforms.
+    /// This should always have a value set for events in transforms. It will always be `None`
+    /// in a source, and there is currently no use-case for reading the value in a sink.
+    upstream_id: Option<Arc<OutputId>>,
+
     /// An identifier for a globally registered schema definition which provides information about
     /// the event shape (type information, and semantic meaning of fields).
+    /// This definition is only currently valid for logs, and shouldn't be used for other event types.
     ///
     /// TODO(Jean): must not skip serialization to track schemas across restarts.
     #[serde(default = "default_schema_definition", skip)]
     schema_definition: Arc<schema::Definition>,
+
+    /// A store of values that may be dropped during the encoding process but may be needed
+    /// later on. The map is indexed by meaning.
+    /// Currently this is just used for the `service`. If the service field is dropped by `only_fields`
+    /// we need to ensure it is still available later on for emitting metrics tagged by the service.
+    /// This field could almost be keyed by `&'static str`, but because it needs to be deserializable
+    /// we have to use `String`.
+    dropped_fields: BTreeMap<String, Value>,
+
+    /// Metadata to track the origin of metrics. This is always `None` for log and trace events.
+    /// Only a small set of Vector sources and transforms explicitly set this field.
+    #[serde(default)]
+    datadog_origin_metadata: Option<DatadogMetricOriginMetadata>,
+}
+
+/// Metric Origin metadata for submission to Datadog.
+#[derive(Clone, Default, Debug, Deserialize, PartialEq, Serialize)]
+pub struct DatadogMetricOriginMetadata {
+    /// OriginProduct
+    product: Option<u32>,
+    /// OriginCategory
+    category: Option<u32>,
+    /// OriginService
+    service: Option<u32>,
+}
+
+impl DatadogMetricOriginMetadata {
+    /// Creates a new `DatadogMetricOriginMetadata`.
+    /// When Vector sends out metrics containing the Origin metadata, it should do so with
+    /// all of the fields defined.
+    /// The edge case where the Origin metadata is created within a component and does not
+    /// initially contain all of the metadata fields, is in the `log_to_metric` transform.
+    #[must_use]
+    pub fn new(product: Option<u32>, category: Option<u32>, service: Option<u32>) -> Self {
+        Self {
+            product,
+            category,
+            service,
+        }
+    }
+
+    /// Returns a reference to the `OriginProduct`.
+    pub fn product(&self) -> Option<u32> {
+        self.product
+    }
+
+    /// Returns a reference to the `OriginCategory`.
+    pub fn category(&self) -> Option<u32> {
+        self.category
+    }
+
+    /// Returns a reference to the `OriginService`.
+    pub fn service(&self) -> Option<u32> {
+        self.service
+    }
 }
 
 fn default_metadata_value() -> Value {
@@ -70,6 +139,40 @@ impl EventMetadata {
         &mut self.secrets
     }
 
+    /// Returns a reference to the metadata source id.
+    #[must_use]
+    pub fn source_id(&self) -> Option<&Arc<ComponentKey>> {
+        self.source_id.as_ref()
+    }
+
+    /// Returns a reference to the metadata source type.
+    #[must_use]
+    pub fn source_type(&self) -> Option<&'static str> {
+        self.source_type
+    }
+
+    /// Returns a reference to the metadata parent id. This is the `OutputId`
+    /// of the previous component the event was sent through (if any).
+    #[must_use]
+    pub fn upstream_id(&self) -> Option<&OutputId> {
+        self.upstream_id.as_deref()
+    }
+
+    /// Sets the `source_id` in the metadata to the provided value.
+    pub fn set_source_id(&mut self, source_id: Arc<ComponentKey>) {
+        self.source_id = Some(source_id);
+    }
+
+    /// Sets the `source_type` in the metadata to the provided value.
+    pub fn set_source_type(&mut self, source_type: &'static str) {
+        self.source_type = Some(source_type);
+    }
+
+    /// Sets the `upstream_id` in the metadata to the provided value.
+    pub fn set_upstream_id(&mut self, upstream_id: Arc<OutputId>) {
+        self.upstream_id = Some(upstream_id);
+    }
+
     /// Return the datadog API key, if it exists
     pub fn datadog_api_key(&self) -> Option<Arc<str>> {
         self.secrets.get(DATADOG_API_KEY).cloned()
@@ -89,6 +192,24 @@ impl EventMetadata {
     pub fn set_splunk_hec_token(&mut self, secret: Arc<str>) {
         self.secrets.insert(SPLUNK_HEC_TOKEN, secret);
     }
+
+    /// Adds the value to the dropped fields list.
+    /// There is currently no way to remove a field from this list, so if a field is dropped
+    /// and then the field is re-added with a new value - the dropped value will still be
+    /// retrieved.
+    pub fn add_dropped_field(&mut self, meaning: String, value: Value) {
+        self.dropped_fields.insert(meaning, value);
+    }
+
+    /// Fetches the dropped field by meaning.
+    pub fn dropped_field(&self, meaning: impl AsRef<str>) -> Option<&Value> {
+        self.dropped_fields.get(meaning.as_ref())
+    }
+
+    /// Returns a reference to the `DatadogMetricOriginMetadata`.
+    pub fn datadog_origin_metadata(&self) -> Option<&DatadogMetricOriginMetadata> {
+        self.datadog_origin_metadata.as_ref()
+    }
 }
 
 impl Default for EventMetadata {
@@ -98,6 +219,11 @@ impl Default for EventMetadata {
             secrets: Secrets::new(),
             finalizers: Default::default(),
             schema_definition: default_schema_definition(),
+            source_id: None,
+            source_type: None,
+            upstream_id: None,
+            dropped_fields: BTreeMap::new(),
+            datadog_origin_metadata: None,
         }
     }
 }
@@ -152,6 +278,20 @@ impl EventMetadata {
     #[must_use]
     pub fn with_schema_definition(mut self, schema_definition: &Arc<schema::Definition>) -> Self {
         self.schema_definition = Arc::clone(schema_definition);
+        self
+    }
+
+    /// Replaces the existing `source_type` with the given one.
+    #[must_use]
+    pub fn with_source_type(mut self, source_type: &'static str) -> Self {
+        self.source_type = Some(source_type);
+        self
+    }
+
+    /// Replaces the existing `DatadogMetricOriginMetadata` with the given one.
+    #[must_use]
+    pub fn with_origin_metadata(mut self, origin_metadata: DatadogMetricOriginMetadata) -> Self {
+        self.datadog_origin_metadata = Some(origin_metadata);
         self
     }
 

@@ -35,7 +35,7 @@ use std::{
 };
 
 use arc_swap::ArcSwap;
-use value::Value;
+use vrl::value::Value;
 
 use super::{Condition, IndexHandle, Table};
 use crate::Case;
@@ -272,10 +272,9 @@ fn fmt_enrichment_table(
 
 #[cfg(test)]
 mod tests {
-    use value::Value;
-
     use super::*;
     use crate::test_util::DummyEnrichmentTable;
+    use vrl::value::Value;
 
     #[test]
     fn tables_loaded() {

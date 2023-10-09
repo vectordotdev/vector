@@ -1,44 +1,26 @@
 use std::{collections::HashMap, num::NonZeroUsize};
 
 use bytes::{Bytes, BytesMut};
-use futures::{stream::BoxStream, StreamExt};
 use once_cell::sync::Lazy;
 use regex::Regex;
 use snafu::Snafu;
 use tokio_util::codec::Encoder as _;
-use vector_common::request_metadata::RequestMetadata;
-use vector_core::{
-    event::{Event, EventFinalizers, Finalizable, Value},
-    partition::Partitioner,
-    sink::StreamSink,
-    stream::BatcherSettings,
-    ByteSizeOf,
-};
+use vrl::path::parse_target_path;
 
 use super::{
     config::{LokiConfig, OutOfOrderAction},
     event::{LokiBatchEncoder, LokiEvent, LokiRecord, PartitionKey},
     service::{LokiRequest, LokiRetryLogic, LokiService},
 };
+use crate::sinks::loki::config::{CompressionConfigAdapter, ExtendedCompression};
 use crate::sinks::loki::event::LokiBatchEncoding;
-use crate::sinks::{
-    loki::config::{CompressionConfigAdapter, ExtendedCompression},
-    util::metadata::RequestMetadataBuilder,
-};
 use crate::{
-    codecs::{Encoder, Transformer},
     http::{get_http_scheme_from_uri, HttpClient},
     internal_events::{
-        LokiEventUnlabeled, LokiOutOfOrderEventDropped, LokiOutOfOrderEventRewritten,
-        SinkRequestBuildError, TemplateRenderingError,
+        LokiEventUnlabeledError, LokiOutOfOrderEventDroppedError, LokiOutOfOrderEventRewritten,
+        SinkRequestBuildError,
     },
-    sinks::util::{
-        builder::SinkBuilderExt,
-        request_builder::EncodeResult,
-        service::{ServiceBuilderExt, Svc},
-        Compression, RequestBuilder,
-    },
-    template::Template,
+    sinks::prelude::*,
 };
 
 #[derive(Clone)]
@@ -258,7 +240,9 @@ impl EventEncoder {
             for template in self.labels.values() {
                 if let Some(fields) = template.get_fields() {
                     for field in fields {
-                        event.as_mut_log().remove(field.as_str());
+                        if let Ok(path) = parse_target_path(field.as_str()) {
+                            event.as_mut_log().remove(&path);
+                        }
                     }
                 }
             }
@@ -268,17 +252,22 @@ impl EventEncoder {
     pub(super) fn encode_event(&mut self, mut event: Event) -> Option<LokiRecord> {
         let tenant_id = self.key_partitioner.partition(&event);
         let finalizers = event.take_finalizers();
+        let json_byte_size = event.estimated_json_encoded_size_of();
         let mut labels = self.build_labels(&event);
         self.remove_label_fields(&mut event);
 
         let timestamp = match event.as_log().get_timestamp() {
-            Some(Value::Timestamp(ts)) => ts.timestamp_nanos(),
-            _ => chrono::Utc::now().timestamp_nanos(),
+            Some(Value::Timestamp(ts)) => ts.timestamp_nanos_opt().expect("Timestamp out of range"),
+            _ => chrono::Utc::now()
+                .timestamp_nanos_opt()
+                .expect("Timestamp out of range"),
         };
 
         if self.remove_timestamp {
             event.as_mut_log().remove_timestamp();
         }
+
+        let event_count_tags = event.get_tags();
 
         self.transformer.transform(&mut event);
         let mut bytes = BytesMut::new();
@@ -288,7 +277,7 @@ impl EventEncoder {
         // `{agent="vector"}` label. This can happen if the only
         // label is a templatable one but the event doesn't match.
         if labels.is_empty() {
-            emit!(LokiEventUnlabeled);
+            emit!(LokiEventUnlabeledError);
             labels = vec![("agent".to_string(), "vector".to_string())]
         }
 
@@ -302,6 +291,8 @@ impl EventEncoder {
             },
             partition,
             finalizers,
+            json_byte_size,
+            event_count_tags,
         })
     }
 }
@@ -457,7 +448,7 @@ impl LokiSink {
         // out_of_order_action's that require a complete ordering are limited to building 1 request
         // at a time
         let request_builder_concurrency = match self.out_of_order_action {
-            OutOfOrderAction::Accept => NonZeroUsize::new(50).expect("static"),
+            OutOfOrderAction::Accept => default_request_builder_concurrency_limit(),
             OutOfOrderAction::Drop | OutOfOrderAction::RewriteTimestamp => {
                 NonZeroUsize::new(1).expect("static")
             }
@@ -467,7 +458,7 @@ impl LokiSink {
             .map(|event| encoder.encode_event(event))
             .filter_map(|event| async { event })
             .map(|record| filter.filter_record(record))
-            .batched_partitioned(RecordPartitioner::default(), self.batch_settings)
+            .batched_partitioned(RecordPartitioner, self.batch_settings)
             .filter_map(|(partition, batch)| async {
                 if let Some(partition) = partition {
                     let mut count: usize = 0;
@@ -486,11 +477,11 @@ impl LokiSink {
                     }
                     Some((partition, result))
                 } else {
-                    emit!(LokiOutOfOrderEventDropped { count: batch.len() });
+                    emit!(LokiOutOfOrderEventDroppedError { count: batch.len() });
                     None
                 }
             })
-            .request_builder(Some(request_builder_concurrency), self.request_builder)
+            .request_builder(request_builder_concurrency, self.request_builder)
             .filter_map(|request| async move {
                 match request {
                     Err(error) => {
@@ -648,7 +639,7 @@ mod tests {
             remove_timestamp: false,
         };
 
-        let message = r###"
+        let message = r#"
         {
         	"kubernetes": {
         		"pod_labels": {
@@ -662,7 +653,7 @@ mod tests {
         		"cluster_version": "1.2.3"
         	}
         }
-        "###;
+        "#;
         let msg: BTreeMap<String, Value> = serde_json::from_str(message)?;
         let event = Event::Log(LogEvent::from(msg));
         let record = encoder.encode_event(event).unwrap();
@@ -698,7 +689,7 @@ mod tests {
             remove_timestamp: false,
         };
 
-        let message = r###"
+        let message = r#"
         {
         	"map1": {
         		"key1": "val1"
@@ -707,7 +698,7 @@ mod tests {
         		"l1_key1": "val2"
         	}
         }
-        "###;
+        "#;
         let msg: BTreeMap<String, Value> = serde_json::from_str(message)?;
         let event = Event::Log(LogEvent::from(msg));
         let record = encoder.encode_event(event).unwrap();
@@ -715,7 +706,7 @@ mod tests {
         assert_eq!(record.labels.len(), 1);
         let labels: HashMap<String, String> = record.labels.into_iter().collect();
         // EventEncoder.labels is type HashMap (unordered) -> both values can be valid
-        assert!(vec!["val1".to_string(), "val2".to_string()].contains(&labels["l1_key1"]));
+        assert!(["val1".to_string(), "val2".to_string()].contains(&labels["l1_key1"]));
         Ok(())
     }
 

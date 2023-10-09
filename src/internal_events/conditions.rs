@@ -22,7 +22,5 @@ impl<'a> InternalEvent for VrlConditionExecutionError<'a> {
             "error_type" => error_type::SCRIPT_FAILED,
             "stage" => error_stage::PROCESSING,
         );
-        // deprecated
-        counter!("processing_errors_total", 1);
     }
 }

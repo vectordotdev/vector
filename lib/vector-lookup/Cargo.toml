@@ -7,10 +7,10 @@ publish = false
 license = "MPL-2.0"
 
 [dependencies]
-serde = { version = "1.0.159", default-features = false, features = ["derive", "alloc"] }
+serde = { version = "1.0.188", default-features = false, features = ["derive", "alloc"] }
 vector-config = { path = "../vector-config" }
 vector-config-macros = { path = "../vector-config-macros" }
-lookup = { package = "lookup", git = "https://github.com/vectordotdev/vrl", rev = "v0.2.0", default-features = false }
+vrl.workspace = true
 
 [features]
-arbitrary = ["lookup/arbitrary"]
+test = []

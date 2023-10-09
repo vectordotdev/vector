@@ -116,7 +116,7 @@ uri = "http://{address2}/"
 
     // The expected flow is this:
     // 0. Nothing is ready to continue.
-    assert!(matches!(rx_server.try_recv(), Err(_)));
+    assert!(rx_server.try_recv().is_err());
 
     // 1. We send an event to the HTTP source server.
     let (mut rx_client, sender) = http_client(address1, "test");
@@ -126,11 +126,11 @@ uri = "http://{address2}/"
         .await
         .expect("Timed out waiting to receive event from HTTP sink")
         .expect("Error receiving event from HTTP sink");
-    assert!(matches!(rx_client.try_recv(), Err(_)));
+    assert!(rx_client.try_recv().is_err());
 
     // 3. Our test HTTP server waits for the mutex lock.
     drop(pause);
-    assert!(matches!(rx_server.try_recv(), Err(_)));
+    assert!(rx_server.try_recv().is_err());
 
     // 4. Our test HTTP server responds.
     // 5. The acknowledgement is returned to the source.

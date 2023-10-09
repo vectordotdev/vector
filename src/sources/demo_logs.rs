@@ -5,6 +5,7 @@ use codecs::{
 };
 use fakedata::logs::*;
 use futures::StreamExt;
+use lookup::{owned_value_path, path};
 use rand::seq::SliceRandom;
 use serde_with::serde_as;
 use snafu::Snafu;
@@ -15,11 +16,15 @@ use vector_common::internal_event::{
     ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol,
 };
 use vector_config::configurable_component;
-use vector_core::{config::LogNamespace, EstimatedJsonEncodedSizeOf};
+use vector_core::{
+    config::{LegacyKey, LogNamespace},
+    EstimatedJsonEncodedSizeOf,
+};
+use vrl::value::Kind;
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
-    config::{Output, SourceConfig, SourceContext},
+    config::{SourceConfig, SourceContext, SourceOutput},
     internal_events::{DemoLogsEventProcessed, EventsReceived, StreamClosedError},
     serde::{default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
@@ -43,7 +48,7 @@ pub struct DemoLogsConfig {
     #[derivative(Default(value = "default_interval()"))]
     #[serde(default = "default_interval")]
     #[configurable(metadata(docs::examples = 1.0, docs::examples = 0.1, docs::examples = 0.01,))]
-    #[serde_as(as = "serde_with::DurationSeconds<f64>")]
+    #[serde_as(as = "serde_with::DurationSecondsWithFrac<f64>")]
     pub interval: Duration,
 
     /// The total number of lines to output.
@@ -249,11 +254,18 @@ async fn demo_logs_source(
                             DemoLogsConfig::NAME,
                             now,
                         );
+                        log_namespace.insert_source_metadata(
+                            DemoLogsConfig::NAME,
+                            log,
+                            Some(LegacyKey::InsertIfEmpty(path!("service"))),
+                            path!("service"),
+                            "vector",
+                        );
 
                         event
                     });
-                    out.send_batch(events).await.map_err(|error| {
-                        emit!(StreamClosedError { error, count });
+                    out.send_batch(events).await.map_err(|_| {
+                        emit!(StreamClosedError { count });
                     })?;
                 }
                 Err(error) => {
@@ -280,7 +292,8 @@ impl SourceConfig for DemoLogsConfig {
 
         self.format.validate()?;
         let decoder =
-            DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace).build();
+            DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace)
+                .build()?;
         Ok(Box::pin(demo_logs_source(
             self.interval,
             self.count,
@@ -292,7 +305,7 @@ impl SourceConfig for DemoLogsConfig {
         )))
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         // There is a global and per-source `log_namespace` config. The source config overrides the global setting,
         // and is merged here.
         let log_namespace = global_log_namespace.merge(self.log_namespace);
@@ -300,9 +313,19 @@ impl SourceConfig for DemoLogsConfig {
         let schema_definition = self
             .decoding
             .schema_definition(log_namespace)
-            .with_standard_vector_source_metadata();
+            .with_standard_vector_source_metadata()
+            .with_source_metadata(
+                DemoLogsConfig::NAME,
+                Some(LegacyKey::InsertIfEmpty(owned_value_path!("service"))),
+                &owned_value_path!("service"),
+                Kind::bytes(),
+                Some("service"),
+            );
 
-        vec![Output::default(self.decoding.output_type()).with_schema_definition(schema_definition)]
+        vec![SourceOutput::new_logs(
+            self.decoding.output_type(),
+            schema_definition,
+        )]
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -339,7 +362,8 @@ mod tests {
                 default_decoding(),
                 LogNamespace::Legacy,
             )
-            .build();
+            .build()
+            .unwrap();
             demo_logs_source(
                 config.interval,
                 config.count,
@@ -377,7 +401,7 @@ mod tests {
 
     #[tokio::test]
     async fn shuffle_demo_logs_copies_lines() {
-        let message_key = log_schema().message_key();
+        let message_key = log_schema().message_key().unwrap().to_string();
         let mut rx = runit(
             r#"format = "shuffle"
                lines = ["one", "two", "three", "four"]
@@ -417,7 +441,7 @@ mod tests {
 
     #[tokio::test]
     async fn shuffle_demo_logs_adds_sequence() {
-        let message_key = log_schema().message_key();
+        let message_key = log_schema().message_key().unwrap().to_string();
         let mut rx = runit(
             r#"format = "shuffle"
                lines = ["one", "two"]
@@ -517,7 +541,7 @@ mod tests {
 
     #[tokio::test]
     async fn json_format_generates_output() {
-        let message_key = log_schema().message_key();
+        let message_key = log_schema().message_key().unwrap().to_string();
         let mut rx = runit(
             r#"format = "json"
             count = 5"#,

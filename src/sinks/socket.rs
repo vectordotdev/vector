@@ -13,7 +13,7 @@ use crate::{
 };
 
 /// Configuration for the `socket` sink.
-#[configurable_component(sink("socket"))]
+#[configurable_component(sink("socket", "Deliver logs to a remote socket endpoint."))]
 #[derive(Clone, Debug)]
 pub struct SocketSinkConfig {
     #[serde(flatten)]
@@ -113,6 +113,7 @@ impl SocketSinkConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "socket")]
 impl SinkConfig for SocketSinkConfig {
     async fn build(
         &self,
@@ -200,7 +201,7 @@ mod test {
             acknowledgements: Default::default(),
         };
 
-        let context = SinkContext::new_test();
+        let context = SinkContext::default();
         assert_sink_compliance(&SINK_TAGS, async move {
             let (sink, _healthcheck) = config.build(context).await.unwrap();
 
@@ -255,7 +256,7 @@ mod test {
         let (lines, events) = random_lines_with_stream(10, 100, None);
 
         assert_sink_compliance(&SINK_TAGS, async move {
-            let context = SinkContext::new_test();
+            let context = SinkContext::default();
             let (sink, _healthcheck) = config.build(context).await.unwrap();
 
             sink.run(events).await
@@ -332,7 +333,7 @@ mod test {
             }),
             acknowledgements: Default::default(),
         };
-        let context = SinkContext::new_test();
+        let context = SinkContext::default();
         let (sink, _healthcheck) = config.build(context).await.unwrap();
         let (mut sender, receiver) = mpsc::channel::<Option<EventArray>>(0);
         let jh1 = tokio::spawn(async move {
@@ -452,7 +453,7 @@ mod test {
             acknowledgements: Default::default(),
         };
 
-        let context = SinkContext::new_test();
+        let context = SinkContext::default();
         let (sink, _healthcheck) = config.build(context).await.unwrap();
 
         let (_, events) = random_lines_with_stream(1000, 10000, None);

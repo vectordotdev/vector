@@ -113,7 +113,7 @@ impl Encoder<Framer> {
                 Serializer::Gelf(_) | Serializer::Json(_) | Serializer::NativeJson(_),
                 Framer::CharacterDelimited(CharacterDelimitedEncoder { delimiter: b',' }),
             ) => "application/json",
-            (Serializer::Native(_), _) => "application/octet-stream",
+            (Serializer::Native(_), _) | (Serializer::Protobuf(_), _) => "application/octet-stream",
             (
                 Serializer::Avro(_)
                 | Serializer::Csv(_)

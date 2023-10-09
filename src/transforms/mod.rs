@@ -12,6 +12,7 @@ pub mod aws_ec2_metadata;
 pub mod dedupe;
 #[cfg(feature = "transforms-filter")]
 pub mod filter;
+#[cfg(feature = "transforms-log_to_metric")]
 pub mod log_to_metric;
 #[cfg(feature = "transforms-lua")]
 pub mod lua;
@@ -90,6 +91,7 @@ mod test {
 
         let (tx, rx) = mpsc::channel(1);
 
+        // TODO: Use non-hard-coded names to improve tests.
         builder.add_source("in", UnitTestStreamSourceConfig::new(events));
         builder.add_transform("transform", &["in"], transform_config);
         builder.add_sink(

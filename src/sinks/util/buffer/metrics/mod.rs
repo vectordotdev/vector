@@ -1,5 +1,3 @@
-pub mod sort;
-
 use std::cmp::Ordering;
 
 use vector_core::event::metric::{Metric, MetricValue, Sample};
@@ -125,7 +123,7 @@ pub fn compress_distribution(samples: &mut Vec<Sample>) -> Vec<Sample> {
 }
 
 #[cfg(test)]
-pub(self) mod tests {
+mod tests {
     use similar_asserts::assert_eq;
     use vector_core::event::metric::{MetricKind, MetricKind::*, MetricValue, StatisticKind};
     use vector_core::metric_tags;

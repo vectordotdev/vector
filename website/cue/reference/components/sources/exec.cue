@@ -7,7 +7,7 @@ components: sources: exec: {
 		commonly_used: false
 		delivery:      "at_least_once"
 		deployment_roles: ["sidecar"]
-		development:   "beta"
+		development:   "stable"
 		egress_method: "stream"
 		stateful:      false
 	}
@@ -117,7 +117,8 @@ components: sources: exec: {
 
 				On *nix platforms, Vector will issue a SIGTERM to the child process, allowing it to
 				gracefully shutdown, and the source will continue reading until the process exits or
-				Vector's shutdown grace period expires.
+				Vector's shutdown grace period expires. The duration of the grace period can be
+				configured using `--graceful-shutdown-limit-secs`.
 
 				On Windows, the subprocess will be issued a SIGKILL and terminate abruptly. In the
 				future we hope to support graceful shutdown of Windows processes as well.
@@ -126,15 +127,7 @@ components: sources: exec: {
 	}
 
 	telemetry: metrics: {
-		command_executed_total:               components.sources.internal_metrics.output.metrics.command_executed_total
-		command_execution_duration_seconds:   components.sources.internal_metrics.output.metrics.command_execution_duration_seconds
-		events_in_total:                      components.sources.internal_metrics.output.metrics.events_in_total
-		processed_bytes_total:                components.sources.internal_metrics.output.metrics.processed_bytes_total
-		processed_events_total:               components.sources.internal_metrics.output.metrics.processed_events_total
-		processing_errors_total:              components.sources.internal_metrics.output.metrics.processing_errors_total
-		component_discarded_events_total:     components.sources.internal_metrics.output.metrics.component_discarded_events_total
-		component_errors_total:               components.sources.internal_metrics.output.metrics.component_errors_total
-		component_received_events_total:      components.sources.internal_metrics.output.metrics.component_received_events_total
-		component_received_event_bytes_total: components.sources.internal_metrics.output.metrics.component_received_event_bytes_total
+		command_executed_total:             components.sources.internal_metrics.output.metrics.command_executed_total
+		command_execution_duration_seconds: components.sources.internal_metrics.output.metrics.command_execution_duration_seconds
 	}
 }

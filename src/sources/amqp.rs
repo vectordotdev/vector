@@ -3,7 +3,7 @@
 use crate::{
     amqp::AmqpConfig,
     codecs::{Decoder, DecodingConfig},
-    config::{Output, SourceConfig, SourceContext},
+    config::{SourceConfig, SourceContext, SourceOutput},
     event::{BatchNotifier, BatchStatus},
     internal_events::{
         source::{AmqpAckError, AmqpBytesReceived, AmqpEventError, AmqpRejectError},
@@ -20,11 +20,10 @@ use codecs::decoding::{DeserializerConfig, FramingConfig};
 use futures::{FutureExt, StreamExt};
 use futures_util::Stream;
 use lapin::{acker::Acker, message::Delivery, Channel};
-use lookup::{lookup_v2::OptionalValuePath, metadata_path, owned_value_path, path, PathPrefix};
+use lookup::{lookup_v2::OptionalValuePath, metadata_path, owned_value_path, path};
 use snafu::Snafu;
 use std::{io::Cursor, pin::Pin};
 use tokio_util::codec::FramedRead;
-use value::Kind;
 use vector_common::{
     finalizer::UnorderedFinalizer,
     internal_event::{CountByteSize, EventsReceived, InternalEventHandle as _},
@@ -35,6 +34,7 @@ use vector_core::{
     event::Event,
     EstimatedJsonEncodedSizeOf,
 };
+use vrl::value::Kind;
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -127,7 +127,7 @@ fn default_offset_key() -> OptionalValuePath {
 impl_generate_config_from_default!(AmqpSourceConfig);
 
 impl AmqpSourceConfig {
-    fn decoder(&self, log_namespace: LogNamespace) -> Decoder {
+    fn decoder(&self, log_namespace: LogNamespace) -> vector_common::Result<Decoder> {
         DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace).build()
     }
 }
@@ -142,7 +142,7 @@ impl SourceConfig for AmqpSourceConfig {
         amqp_source(self, cx.shutdown, cx.out, log_namespace, acknowledgements).await
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
         let schema_definition = self
             .decoding
@@ -180,7 +180,10 @@ impl SourceConfig for AmqpSourceConfig {
                 None,
             );
 
-        vec![Output::default(self.decoding.output_type()).with_schema_definition(schema_definition)]
+        vec![SourceOutput::new_logs(
+            self.decoding.output_type(),
+            schema_definition,
+        )]
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -209,11 +212,14 @@ pub(crate) async fn amqp_source(
     acknowledgements: bool,
 ) -> crate::Result<super::Source> {
     let config = config.clone();
-    let (_conn, channel) = config
-        .connection
-        .connect()
-        .await
-        .map_err(|source| BuildError::AmqpCreateError { source })?;
+    let (_conn, channel) =
+        config
+            .connection
+            .connect()
+            .await
+            .map_err(|source| BuildError::AmqpCreateError {
+                source: dbg!(source),
+            })?;
 
     Ok(Box::pin(run_amqp_source(
         config,
@@ -250,7 +256,7 @@ fn populate_event(
             .path
             .as_ref()
             .map(LegacyKey::InsertIfEmpty),
-        "routing",
+        path!("routing"),
         keys.routing.to_string(),
     );
 
@@ -261,7 +267,7 @@ fn populate_event(
             .path
             .as_ref()
             .map(LegacyKey::InsertIfEmpty),
-        "exchange",
+        path!("exchange"),
         keys.exchange.to_string(),
     );
 
@@ -269,13 +275,13 @@ fn populate_event(
         AmqpSourceConfig::NAME,
         log,
         keys.offset_key.path.as_ref().map(LegacyKey::InsertIfEmpty),
-        "offset",
+        path!("offset"),
         keys.delivery_tag,
     );
 
     log_namespace.insert_vector_metadata(
         log,
-        Some(log_schema().source_type_key()),
+        log_schema().source_type_key(),
         path!("source_type"),
         Bytes::from_static(AmqpSourceConfig::NAME.as_bytes()),
     );
@@ -295,11 +301,8 @@ fn populate_event(
             log.insert(metadata_path!("vector", "ingest_timestamp"), Utc::now());
         }
         LogNamespace::Legacy => {
-            if let Some(timestamp_key) = log_schema().timestamp_key() {
-                log.try_insert(
-                    (PathPrefix::Event, timestamp_key),
-                    timestamp.unwrap_or_else(Utc::now),
-                );
+            if let Some(timestamp_key) = log_schema().timestamp_key_target_path() {
+                log.try_insert(timestamp_key, timestamp.unwrap_or_else(Utc::now));
             }
         }
     };
@@ -314,7 +317,8 @@ async fn receive_event(
     msg: Delivery,
 ) -> Result<(), ()> {
     let payload = Cursor::new(Bytes::copy_from_slice(&msg.data));
-    let mut stream = FramedRead::new(payload, config.decoder(log_namespace));
+    let decoder = config.decoder(log_namespace).map_err(|_e| ())?;
+    let mut stream = FramedRead::new(payload, decoder);
 
     // Extract timestamp from AMQP message
     let timestamp = msg
@@ -389,8 +393,8 @@ async fn finalize_event_stream(
             let mut stream = stream.map(|event| event.with_batch_notifier(&batch));
 
             match out.send_event_stream(&mut stream).await {
-                Err(error) => {
-                    emit!(StreamClosedError { error, count: 1 });
+                Err(_) => {
+                    emit!(StreamClosedError { count: 1 });
                 }
                 Ok(_) => {
                     finalizer.add(msg.into(), receiver);
@@ -398,8 +402,8 @@ async fn finalize_event_stream(
             }
         }
         None => match out.send_event_stream(&mut stream).await {
-            Err(error) => {
-                emit!(StreamClosedError { error, count: 1 });
+            Err(_) => {
+                emit!(StreamClosedError { count: 1 });
             }
             Ok(_) => {
                 let ack_options = lapin::options::BasicAckOptions::default();
@@ -492,9 +496,9 @@ async fn handle_ack(status: BatchStatus, entry: FinalizerEntry) {
 #[cfg(test)]
 pub mod test {
     use lookup::OwnedTargetPath;
-    use value::kind::Collection;
     use vector_core::schema::Definition;
     use vector_core::tls::TlsConfig;
+    use vrl::value::kind::Collection;
 
     use super::*;
 
@@ -514,6 +518,7 @@ pub mod test {
         let vhost = std::env::var("AMQP_VHOST").unwrap_or_else(|_| "%2f".to_string());
         config.connection.connection_string =
             format!("amqp://{}:{}@{}:5672/{}", user, pass, host, vhost);
+
         config
     }
 
@@ -545,10 +550,10 @@ pub mod test {
             ..Default::default()
         };
 
-        let definition = config.outputs(LogNamespace::Vector)[0]
-            .clone()
-            .log_schema_definition
-            .unwrap();
+        let definition = config
+            .outputs(LogNamespace::Vector)
+            .remove(0)
+            .schema_definition(true);
 
         let expected_definition =
             Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
@@ -572,17 +577,17 @@ pub mod test {
                 .with_metadata_field(&owned_value_path!("amqp", "exchange"), Kind::bytes(), None)
                 .with_metadata_field(&owned_value_path!("amqp", "offset"), Kind::integer(), None);
 
-        assert_eq!(definition, expected_definition);
+        assert_eq!(definition, Some(expected_definition));
     }
 
     #[test]
     fn output_schema_definition_legacy_namespace() {
         let config = AmqpSourceConfig::default();
 
-        let definition = config.outputs(LogNamespace::Legacy)[0]
-            .clone()
-            .log_schema_definition
-            .unwrap();
+        let definition = config
+            .outputs(LogNamespace::Legacy)
+            .remove(0)
+            .schema_definition(true);
 
         let expected_definition = Definition::new_with_default_metadata(
             Kind::object(Collection::empty()),
@@ -599,7 +604,7 @@ pub mod test {
         .with_event_field(&owned_value_path!("exchange"), Kind::bytes(), None)
         .with_event_field(&owned_value_path!("offset"), Kind::integer(), None);
 
-        assert_eq!(definition, expected_definition);
+        assert_eq!(definition, Some(expected_definition));
     }
 }
 
@@ -626,6 +631,7 @@ mod integration_test {
     #[tokio::test]
     async fn amqp_source_create_ok() {
         let config = make_config();
+        await_connection(&config.connection).await;
         assert!(amqp_source(
             &config,
             ShutdownSignal::noop(),
@@ -640,6 +646,8 @@ mod integration_test {
     #[tokio::test]
     async fn amqp_tls_source_create_ok() {
         let config = make_tls_config();
+        await_connection(&config.connection).await;
+
         assert!(amqp_source(
             &config,
             ShutdownSignal::noop(),
@@ -744,9 +752,9 @@ mod integration_test {
 
         let log = events[0].as_log();
         trace!("{:?}", log);
-        assert_eq!(log[log_schema().message_key()], "my message".into());
+        assert_eq!(*log.get_message().unwrap(), "my message".into());
         assert_eq!(log["routing"], routing_key.into());
-        assert_eq!(log[log_schema().source_type_key()], "amqp".into());
+        assert_eq!(*log.get_source_type().unwrap(), "amqp".into());
         let log_ts = log[log_schema().timestamp_key().unwrap().to_string()]
             .as_timestamp()
             .unwrap();
@@ -757,12 +765,36 @@ mod integration_test {
     #[tokio::test]
     async fn amqp_source_consume_event() {
         let config = make_config();
+        await_connection(&config.connection).await;
         source_consume_event(config).await;
     }
 
     #[tokio::test]
     async fn amqp_tls_source_consume_event() {
         let config = make_tls_config();
+        await_connection(&config.connection).await;
         source_consume_event(config).await;
+    }
+
+    /// Polls the connection until a connection can be made.
+    /// Gives up after 5 attempts.
+    async fn await_connection(connection: &AmqpConfig) {
+        let mut pause = Duration::from_secs(1);
+        let mut attempts = 0;
+
+        loop {
+            let connection = connection.clone();
+            if connection.connect().await.is_ok() {
+                return;
+            }
+            attempts += 1;
+
+            if attempts == 5 {
+                return;
+            }
+
+            tokio::time::sleep(pause).await;
+            pause *= 2;
+        }
     }
 }

@@ -24,6 +24,7 @@ remap: {
 		}
 		internal_failure_reasons: [...string]
 		examples?: [remap.#Example, ...remap.#Example]
+		deprecated: bool | *false
 	}
 
 	#FunctionCategory: "Array" | "Codec" | "Coerce" | "Convert" | "Debug" | "Enrichment" | "Enumerate" | "Event" | "Path" | "Cryptography" | "IP" | "Number" | "Object" | "Parse" | "Random" | "String" | "System" | "Timestamp" | "Type"
@@ -103,7 +104,7 @@ remap: {
 		* Connection-Type databases:
 			* `connection_type`
 
-		To use this function, you need to update your Vector configuration to
+		To use this function, you need to update your configuration to
 		include an
 		[`enrichment_tables`](\(urls.vector_configuration_global)/#enrichment_tables)
 		parameter.

@@ -34,8 +34,6 @@ impl InternalEvent for RemapMappingError {
                 reason: "Mapping failed with event.",
             });
         }
-        // deprecated
-        counter!("processing_errors_total", 1);
     }
 }
 

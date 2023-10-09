@@ -6,16 +6,16 @@ use criterion::{
     black_box, criterion_group, measurement::WallTime, BatchSize, BenchmarkGroup, BenchmarkId,
     Criterion, SamplingMode, Throughput,
 };
-use value::Value;
 use vector::transforms::{
     route::{Route, RouteConfig},
     TransformOutputsBuf,
 };
 use vector_core::{
-    config::{DataType, Output},
+    config::{DataType, TransformOutput},
     event::{Event, EventContainer, EventMetadata, LogEvent},
     transform::{SyncTransform, TransformContext},
 };
+use vrl::value::Value;
 
 #[derive(Debug)]
 struct Param {
@@ -54,10 +54,10 @@ fn route(c: &mut Criterion) {
         "bba", "bbca", "dba", "bea", "fba", "gba", "hba", "iba", "jba", "bka", "bal", "bma", "bna",
         "boa", "bpa", "bqa", "bra", "bsa", "bta", "bua", "bva", "bwa", "xba", "aby", "zba",
     ] {
-        outputs.push(Output {
+        outputs.push(TransformOutput {
             port: Some(String::from(name)),
             ty: DataType::Log,
-            log_schema_definition: None,
+            log_schema_definitions: Vec::new(),
         });
     }
     let output_buffer: TransformOutputsBuf = TransformOutputsBuf::new_with_capacity(outputs, 10);

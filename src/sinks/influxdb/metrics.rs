@@ -7,7 +7,7 @@ use tower::Service;
 use vector_config::configurable_component;
 use vector_core::{
     event::metric::{MetricSketch, MetricTags, Quantile},
-    ByteSizeOf,
+    ByteSizeOf, EstimatedJsonEncodedSizeOf,
 };
 
 use crate::{
@@ -52,7 +52,7 @@ impl SinkBatchSettings for InfluxDbDefaultBatchSettings {
 }
 
 /// Configuration for the `influxdb_metrics` sink.
-#[configurable_component(sink("influxdb_metrics"))]
+#[configurable_component(sink("influxdb_metrics", "Deliver metric event data to InfluxDB."))]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct InfluxDbConfig {
@@ -122,6 +122,7 @@ struct InfluxDbRequest {
 impl_generate_config_from_default!(InfluxDbConfig);
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "influxdb_metrics")]
 impl SinkConfig for InfluxDbConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let tls_settings = TlsSettings::from_options(&self.tls)?;
@@ -184,13 +185,16 @@ impl InfluxDbSvc {
             .with_flat_map(move |event: Event| {
                 stream::iter({
                     let byte_size = event.size_of();
+                    let json_size = event.estimated_json_encoded_size_of();
+
                     normalizer
                         .normalize(event.into_metric())
-                        .map(|metric| Ok(EncodedEvent::new(metric, byte_size)))
+                        .map(|metric| Ok(EncodedEvent::new(metric, byte_size, json_size)))
                 })
             })
             .sink_map_err(|error| error!(message = "Fatal influxdb sink error.", %error));
 
+        #[allow(deprecated)]
         Ok(VectorSink::from_event_sink(sink))
     }
 }
@@ -991,7 +995,7 @@ mod integration_tests {
         crate::test_util::trace_init();
         let database = onboarding_v1(url).await;
 
-        let cx = SinkContext::new_test();
+        let cx = SinkContext::default();
 
         let config = InfluxDbConfig {
             endpoint: url.to_string(),
@@ -1086,7 +1090,7 @@ mod integration_tests {
         let endpoint = address_v2();
         onboarding_v2(&endpoint).await;
 
-        let cx = SinkContext::new_test();
+        let cx = SinkContext::default();
 
         let config = InfluxDbConfig {
             endpoint,
@@ -1105,7 +1109,12 @@ mod integration_tests {
             acknowledgements: Default::default(),
         };
 
-        let metric = format!("counter-{}", Utc::now().timestamp_nanos());
+        let metric = format!(
+            "counter-{}",
+            Utc::now()
+                .timestamp_nanos_opt()
+                .expect("Timestamp out of range")
+        );
         let mut events = Vec::new();
         for i in 0..10 {
             let event = Event::Metric(

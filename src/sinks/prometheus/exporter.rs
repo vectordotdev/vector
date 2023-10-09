@@ -2,7 +2,7 @@ use std::{
     convert::Infallible,
     hash::Hash,
     mem::{discriminant, Discriminant},
-    net::SocketAddr,
+    net::{IpAddr, Ipv4Addr, SocketAddr},
     sync::{Arc, RwLock},
     time::{Duration, Instant},
 };
@@ -61,7 +61,10 @@ enum BuildError {
 
 /// Configuration for the `prometheus_exporter` sink.
 #[serde_as]
-#[configurable_component(sink("prometheus_exporter"))]
+#[configurable_component(sink(
+    "prometheus_exporter",
+    "Expose metric events on a Prometheus compatible endpoint."
+))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct PrometheusExporterConfig {
@@ -126,6 +129,7 @@ pub struct PrometheusExporterConfig {
     #[serde(default = "default_flush_period_secs")]
     #[serde_as(as = "serde_with::DurationSeconds<u64>")]
     #[configurable(metadata(docs::advanced))]
+    #[configurable(metadata(docs::human_name = "Flush Interval"))]
     pub flush_period_secs: Duration,
 
     /// Suppresses timestamps on the Prometheus output.
@@ -163,10 +167,8 @@ impl Default for PrometheusExporterConfig {
     }
 }
 
-fn default_address() -> SocketAddr {
-    use std::net::{IpAddr, Ipv4Addr};
-
-    SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), 9598)
+const fn default_address() -> SocketAddr {
+    SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), 9598)
 }
 
 const fn default_distributions_as_summaries() -> bool {
@@ -188,6 +190,7 @@ impl GenerateConfig for PrometheusExporterConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "prometheus_exporter")]
 impl SinkConfig for PrometheusExporterConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         if self.flush_period_secs.as_secs() < MIN_FLUSH_PERIOD_SECS {
@@ -889,7 +892,7 @@ mod tests {
         let mut receiver = BatchNotifier::apply_to(&mut events[..]);
         assert_eq!(receiver.try_recv(), Err(TryRecvError::Empty));
 
-        let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
+        let (sink, _) = config.build(SinkContext::default()).await.unwrap();
         let (_, delayed_event) = create_metric_gauge(Some("delayed".to_string()), 123.4);
         let sink_handle = tokio::spawn(run_and_assert_sink_compliance(
             sink,
@@ -953,7 +956,7 @@ mod tests {
         let mut receiver = BatchNotifier::apply_to(&mut events[..]);
         assert_eq!(receiver.try_recv(), Err(TryRecvError::Empty));
 
-        let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
+        let (sink, _) = config.build(SinkContext::default()).await.unwrap();
         let (_, delayed_event) = create_metric_gauge(Some("delayed".to_string()), 123.4);
         let sink_handle = tokio::spawn(run_and_assert_sink_compliance(
             sink,
@@ -1038,11 +1041,11 @@ mod tests {
         )
     }
 
-    pub(self) fn create_metric(name: Option<String>, value: MetricValue) -> (String, Event) {
+    fn create_metric(name: Option<String>, value: MetricValue) -> (String, Event) {
         create_metric_with_tags(name, value, Some(metric_tags!("some_tag" => "some_value")))
     }
 
-    pub(self) fn create_metric_with_tags(
+    fn create_metric_with_tags(
         name: Option<String>,
         value: MetricValue,
         tags: Option<MetricTags>,
@@ -1417,7 +1420,7 @@ mod integration_tests {
             flush_period_secs: Duration::from_secs(2),
             ..Default::default()
         };
-        let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
+        let (sink, _) = config.build(SinkContext::default()).await.unwrap();
         let (name, event) = tests::create_metric_gauge(None, 123.4);
         let (_, delayed_event) = tests::create_metric_gauge(Some("delayed".to_string()), 123.4);
 
@@ -1455,7 +1458,7 @@ mod integration_tests {
             flush_period_secs: Duration::from_secs(3),
             ..Default::default()
         };
-        let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
+        let (sink, _) = config.build(SinkContext::default()).await.unwrap();
         let (tx, rx) = mpsc::unbounded_channel();
         let input_events = UnboundedReceiverStream::new(rx);
 
@@ -1512,7 +1515,7 @@ mod integration_tests {
             flush_period_secs: Duration::from_secs(3),
             ..Default::default()
         };
-        let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
+        let (sink, _) = config.build(SinkContext::default()).await.unwrap();
         let (tx, rx) = mpsc::unbounded_channel();
         let input_events = UnboundedReceiverStream::new(rx);
 

@@ -1,24 +1,11 @@
 use async_trait::async_trait;
 use bytes::Bytes;
-use futures::{stream::BoxStream, StreamExt};
 use pulsar::{Error as PulsarError, Pulsar, TokioExecutor};
 use serde::Serialize;
 use snafu::Snafu;
 use std::collections::HashMap;
-use tower::ServiceBuilder;
 
-use crate::{
-    codecs::{Encoder, Transformer},
-    event::Event,
-    sinks::util::SinkBuilderExt,
-    template::Template,
-};
-use vector_buffers::EventCount;
-use vector_common::byte_size_of::ByteSizeOf;
-use vector_core::{
-    event::{EstimatedJsonEncodedSizeOf, LogEvent},
-    sink::StreamSink,
-};
+use crate::sinks::prelude::*;
 
 use super::{
     config::PulsarSinkConfig, encoder::PulsarEncoder, request_builder::PulsarRequestBuilder,
@@ -76,7 +63,7 @@ impl ByteSizeOf for PulsarEvent {
 }
 
 impl EstimatedJsonEncodedSizeOf for PulsarEvent {
-    fn estimated_json_encoded_size_of(&self) -> usize {
+    fn estimated_json_encoded_size_of(&self) -> JsonSize {
         self.event.estimated_json_encoded_size_of()
     }
 }
@@ -125,7 +112,7 @@ impl PulsarSink {
                     event,
                 ))
             })
-            .request_builder(None, request_builder)
+            .request_builder(default_request_builder_concurrency_limit(), request_builder)
             .filter_map(|request| async move {
                 request
                     .map_err(|e| error!("Failed to build Pulsar request: {:?}.", e))

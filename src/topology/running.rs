@@ -20,6 +20,7 @@ use crate::{
     config::{ComponentKey, Config, ConfigDiff, HealthcheckOptions, Inputs, OutputId, Resource},
     event::EventArray,
     shutdown::SourceShutdownCoordinator,
+    signal::ShutdownError,
     spawn_named,
     topology::{
         build_or_log_errors, builder,
@@ -42,19 +43,19 @@ pub struct RunningTopology {
     shutdown_coordinator: SourceShutdownCoordinator,
     detach_triggers: HashMap<ComponentKey, DisabledTrigger>,
     pub(crate) config: Config,
-    abort_tx: mpsc::UnboundedSender<()>,
+    abort_tx: mpsc::UnboundedSender<ShutdownError>,
     watch: (WatchTx, WatchRx),
     pub(crate) running: Arc<AtomicBool>,
+    graceful_shutdown_duration: Option<Duration>,
 }
 
 impl RunningTopology {
-    pub fn new(config: Config, abort_tx: mpsc::UnboundedSender<()>) -> Self {
+    pub fn new(config: Config, abort_tx: mpsc::UnboundedSender<ShutdownError>) -> Self {
         Self {
             inputs: HashMap::new(),
             inputs_tap_metadata: HashMap::new(),
             outputs: HashMap::new(),
             outputs_tap_metadata: HashMap::new(),
-            config,
             shutdown_coordinator: SourceShutdownCoordinator::default(),
             detach_triggers: HashMap::new(),
             source_tasks: HashMap::new(),
@@ -62,6 +63,8 @@ impl RunningTopology {
             abort_tx,
             watch: watch::channel(TapResource::default()),
             running: Arc::new(AtomicBool::new(true)),
+            graceful_shutdown_duration: config.graceful_shutdown_duration,
+            config,
         }
     }
 
@@ -120,30 +123,36 @@ impl RunningTopology {
             check_handles.entry(key).or_default().push(task);
         }
 
-        // If we reach this, we will forcefully shutdown the sources.
-        let deadline = Instant::now() + Duration::from_secs(60);
+        // If we reach this, we will forcefully shutdown the sources. If None, we will never force shutdown.
+        let deadline = self
+            .graceful_shutdown_duration
+            .map(|grace_period| Instant::now() + grace_period);
 
-        // If we reach the deadline, this future will print out which components
-        // won't gracefully shutdown since we will start to forcefully shutdown
-        // the sources.
-        let mut check_handles2 = check_handles.clone();
-        let timeout = async move {
-            sleep_until(deadline).await;
-            // Remove all tasks that have shutdown.
-            check_handles2.retain(|_key, handles| {
-                retain(handles, |handle| handle.peek().is_none());
-                !handles.is_empty()
-            });
-            let remaining_components = check_handles2
-                .keys()
-                .map(|item| item.to_string())
-                .collect::<Vec<_>>()
-                .join(", ");
+        let timeout = if let Some(deadline) = deadline {
+            // If we reach the deadline, this future will print out which components
+            // won't gracefully shutdown since we will start to forcefully shutdown
+            // the sources.
+            let mut check_handles2 = check_handles.clone();
+            Box::pin(async move {
+                sleep_until(deadline).await;
+                // Remove all tasks that have shutdown.
+                check_handles2.retain(|_key, handles| {
+                    retain(handles, |handle| handle.peek().is_none());
+                    !handles.is_empty()
+                });
+                let remaining_components = check_handles2
+                    .keys()
+                    .map(|item| item.to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ");
 
-            error!(
-                components = ?remaining_components,
-                "Failed to gracefully shut down in time. Killing components."
-            );
+                error!(
+                    components = ?remaining_components,
+                    "Failed to gracefully shut down in time. Killing components."
+                );
+            }) as future::BoxFuture<'static, ()>
+        } else {
+            Box::pin(future::pending()) as future::BoxFuture<'static, ()>
         };
 
         // Reports in intervals which components are still running.
@@ -163,10 +172,12 @@ impl RunningTopology {
                     .collect::<Vec<_>>()
                     .join(", ");
 
-                let time_remaining = match deadline.checked_duration_since(Instant::now()) {
-                    Some(remaining) => format!("{} seconds left", remaining.as_secs()),
-                    None => "overdue".to_string(),
-                };
+                let time_remaining = deadline
+                    .map(|d| match d.checked_duration_since(Instant::now()) {
+                        Some(remaining) => format!("{} seconds left", remaining.as_secs()),
+                        None => "overdue".to_string(),
+                    })
+                    .unwrap_or("no time limit".to_string());
 
                 info!(
                     remaining_components = ?remaining_components,
@@ -828,7 +839,7 @@ impl RunningTopology {
 
         let task_span = span.or_current();
         #[cfg(feature = "allocation-tracing")]
-        {
+        if crate::internal_telemetry::allocations::is_allocation_tracing_enabled() {
             let group_id = crate::internal_telemetry::allocations::acquire_allocation_group_id(
                 task.id().to_string(),
                 "sink".to_string(),
@@ -845,7 +856,13 @@ impl RunningTopology {
         }
 
         let task_name = format!(">> {} ({})", task.typetag(), task.id());
-        let task = handle_errors(task, self.abort_tx.clone()).instrument(task_span);
+        let task = {
+            let key = key.clone();
+            handle_errors(task, self.abort_tx.clone(), |error| {
+                ShutdownError::SinkAborted { key, error }
+            })
+        }
+        .instrument(task_span);
         let spawned = spawn_named(task, task_name.as_ref());
         if let Some(previous) = self.tasks.insert(key.clone(), spawned) {
             drop(previous); // detach and forget
@@ -865,7 +882,7 @@ impl RunningTopology {
 
         let task_span = span.or_current();
         #[cfg(feature = "allocation-tracing")]
-        {
+        if crate::internal_telemetry::allocations::is_allocation_tracing_enabled() {
             let group_id = crate::internal_telemetry::allocations::acquire_allocation_group_id(
                 task.id().to_string(),
                 "transform".to_string(),
@@ -882,7 +899,13 @@ impl RunningTopology {
         }
 
         let task_name = format!(">> {} ({}) >>", task.typetag(), task.id());
-        let task = handle_errors(task, self.abort_tx.clone()).instrument(task_span);
+        let task = {
+            let key = key.clone();
+            handle_errors(task, self.abort_tx.clone(), |error| {
+                ShutdownError::TransformAborted { key, error }
+            })
+        }
+        .instrument(task_span);
         let spawned = spawn_named(task, task_name.as_ref());
         if let Some(previous) = self.tasks.insert(key.clone(), spawned) {
             drop(previous); // detach and forget
@@ -902,7 +925,7 @@ impl RunningTopology {
 
         let task_span = span.or_current();
         #[cfg(feature = "allocation-tracing")]
-        {
+        if crate::internal_telemetry::allocations::is_allocation_tracing_enabled() {
             let group_id = crate::internal_telemetry::allocations::acquire_allocation_group_id(
                 task.id().to_string(),
                 "source".to_string(),
@@ -920,7 +943,13 @@ impl RunningTopology {
         }
 
         let task_name = format!("{} ({}) >>", task.typetag(), task.id());
-        let task = handle_errors(task, self.abort_tx.clone()).instrument(task_span.clone());
+        let task = {
+            let key = key.clone();
+            handle_errors(task, self.abort_tx.clone(), |error| {
+                ShutdownError::SourceAborted { key, error }
+            })
+        }
+        .instrument(task_span.clone());
         let spawned = spawn_named(task, task_name.as_ref());
         if let Some(previous) = self.tasks.insert(key.clone(), spawned) {
             drop(previous); // detach and forget
@@ -931,7 +960,13 @@ impl RunningTopology {
 
         // Now spawn the actual source task.
         let source_task = new_pieces.source_tasks.remove(key).unwrap();
-        let source_task = handle_errors(source_task, self.abort_tx.clone()).instrument(task_span);
+        let source_task = {
+            let key = key.clone();
+            handle_errors(source_task, self.abort_tx.clone(), |error| {
+                ShutdownError::SourceAborted { key, error }
+            })
+        }
+        .instrument(task_span);
         self.source_tasks
             .insert(key.clone(), spawn_named(source_task, task_name.as_ref()));
     }

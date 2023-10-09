@@ -15,7 +15,7 @@ use tower::{
 use vector_config::configurable_component;
 
 pub use crate::sinks::util::service::{
-    concurrency::{concurrency_is_none, Concurrency},
+    concurrency::{concurrency_is_adaptive, Concurrency},
     health::{HealthConfig, HealthLogic, HealthService},
     map::Map,
 };
@@ -35,6 +35,7 @@ use crate::{
 mod concurrency;
 mod health;
 mod map;
+pub mod net;
 
 pub type Svc<S, L> = RateLimit<AdaptiveConcurrencyLimit<Retry<FixedRetryPolicy<L>, Timeout<S>>, L>>;
 pub type TowerBatchedSink<S, B, RL> = BatchSink<Svc<S, RL>, B>;
@@ -92,7 +93,7 @@ impl<L> ServiceBuilderExt<L> for ServiceBuilder<L> {
 pub struct TowerRequestConfig {
     #[configurable(derived)]
     #[serde(default = "default_concurrency")]
-    #[serde(skip_serializing_if = "concurrency_is_none")]
+    #[serde(skip_serializing_if = "concurrency_is_adaptive")]
     pub concurrency: Concurrency,
 
     /// The time a request can take before being aborted.
@@ -101,16 +102,19 @@ pub struct TowerRequestConfig {
     /// create orphaned requests, pile on retries, and result in duplicate data downstream.
     #[configurable(metadata(docs::type_unit = "seconds"))]
     #[serde(default = "default_timeout_secs")]
+    #[configurable(metadata(docs::human_name = "Timeout"))]
     pub timeout_secs: Option<u64>,
 
     /// The time window used for the `rate_limit_num` option.
     #[configurable(metadata(docs::type_unit = "seconds"))]
     #[serde(default = "default_rate_limit_duration_secs")]
+    #[configurable(metadata(docs::human_name = "Rate Limit Duration"))]
     pub rate_limit_duration_secs: Option<u64>,
 
     /// The maximum number of requests allowed within the `rate_limit_duration_secs` time window.
     #[configurable(metadata(docs::type_unit = "requests"))]
     #[serde(default = "default_rate_limit_num")]
+    #[configurable(metadata(docs::human_name = "Rate Limit Number"))]
     pub rate_limit_num: Option<u64>,
 
     /// The maximum number of retries to make for failed requests.
@@ -123,6 +127,7 @@ pub struct TowerRequestConfig {
     /// The maximum amount of time to wait between retries.
     #[configurable(metadata(docs::type_unit = "seconds"))]
     #[serde(default = "default_retry_max_duration_secs")]
+    #[configurable(metadata(docs::human_name = "Max Retry Duration"))]
     pub retry_max_duration_secs: Option<u64>,
 
     /// The amount of time to wait before attempting the first retry for a failed request.
@@ -130,6 +135,7 @@ pub struct TowerRequestConfig {
     /// After the first retry has failed, the fibonacci sequence is used to select future backoffs.
     #[configurable(metadata(docs::type_unit = "seconds"))]
     #[serde(default = "default_retry_initial_backoff_secs")]
+    #[configurable(metadata(docs::human_name = "Retry Initial Backoff"))]
     pub retry_initial_backoff_secs: Option<u64>,
 
     #[configurable(derived)]
@@ -138,7 +144,7 @@ pub struct TowerRequestConfig {
 }
 
 const fn default_concurrency() -> Concurrency {
-    Concurrency::None
+    Concurrency::Adaptive
 }
 
 const fn default_timeout_secs() -> Option<u64> {
@@ -351,7 +357,6 @@ impl TowerRequestSettings {
         S::Future: Send + 'static,
     {
         let policy = self.retry_policy(retry_logic.clone());
-        let settings = self.clone();
 
         // Build services
         let open = OpenGauge::new();
@@ -362,16 +367,14 @@ impl TowerRequestSettings {
                 // Build individual service
                 ServiceBuilder::new()
                     .layer(AdaptiveConcurrencyLimitLayer::new(
-                        settings.concurrency,
-                        settings.adaptive_concurrency,
+                        self.concurrency,
+                        self.adaptive_concurrency,
                         retry_logic.clone(),
                     ))
                     .service(
                         health_config.build(
                             health_logic.clone(),
-                            ServiceBuilder::new()
-                                .timeout(settings.timeout)
-                                .service(inner),
+                            ServiceBuilder::new().timeout(self.timeout).service(inner),
                             open.clone(),
                             endpoint,
                         ), // NOTE: there is a version conflict for crate `tracing` between `tracing_tower` crate
@@ -437,6 +440,7 @@ mod tests {
 
     use futures::{future, stream, FutureExt, SinkExt, StreamExt};
     use tokio::time::Duration;
+    use vector_common::json_size::JsonSize;
 
     use super::*;
     use crate::sinks::util::{
@@ -453,7 +457,7 @@ mod tests {
         toml::from_str::<TowerRequestConfig>(&toml).expect("Default config failed");
 
         let cfg = toml::from_str::<TowerRequestConfig>("").expect("Empty config failed");
-        assert_eq!(cfg.concurrency, Concurrency::None);
+        assert_eq!(cfg.concurrency, Concurrency::Adaptive);
 
         let cfg = toml::from_str::<TowerRequestConfig>("concurrency = 10")
             .expect("Fixed concurrency failed");
@@ -519,7 +523,10 @@ mod tests {
 
         let input = (0..20).map(|i| PartitionInnerBuffer::new(i, 0));
         sink.sink_map_err(drop)
-            .send_all(&mut stream::iter(input).map(|item| Ok(EncodedEvent::new(item, 0))))
+            .send_all(
+                &mut stream::iter(input)
+                    .map(|item| Ok(EncodedEvent::new(item, 0, JsonSize::zero()))),
+            )
             .await
             .unwrap();
 

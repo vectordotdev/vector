@@ -30,18 +30,19 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use tracing::Span;
-use value::Kind;
 use vector_common::internal_event::{EventsReceived, Registered};
 use vector_config::configurable_component;
 use vector_core::config::{LegacyKey, LogNamespace};
 use vector_core::event::{BatchNotifier, BatchStatus};
+use vrl::path::OwnedTargetPath;
+use vrl::value::Kind;
 use warp::{filters::BoxedFilter, reject::Rejection, reply::Response, Filter, Reply};
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
     config::{
-        log_schema, DataType, GenerateConfig, Output, Resource, SourceAcknowledgementsConfig,
-        SourceConfig, SourceContext,
+        log_schema, DataType, GenerateConfig, Resource, SourceAcknowledgementsConfig, SourceConfig,
+        SourceContext, SourceOutput,
     },
     event::Event,
     internal_events::{HttpBytesReceived, HttpDecompressError, StreamClosedError},
@@ -154,15 +155,9 @@ impl SourceConfig for DatadogAgentConfig {
             .expect("registered log schema required")
             .clone();
 
-        let metrics_schema_definition = cx
-            .schema_definitions
-            .get(&Some(METRICS.to_owned()))
-            .or_else(|| cx.schema_definitions.get(&None))
-            .expect("registered metrics schema required")
-            .clone();
-
         let decoder =
-            DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace).build();
+            DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace)
+                .build()?;
 
         let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
         let source = DatadogAgentSource::new(
@@ -170,7 +165,6 @@ impl SourceConfig for DatadogAgentConfig {
             decoder,
             tls.http_protocol_name(),
             logs_schema_definition,
-            metrics_schema_definition,
             log_namespace,
         );
         let listener = tls.bind(&self.address).await?;
@@ -205,7 +199,7 @@ impl SourceConfig for DatadogAgentConfig {
         }))
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         let definition = self
             .decoding
             .schema_definition(global_log_namespace.merge(self.log_namespace))
@@ -255,14 +249,12 @@ impl SourceConfig for DatadogAgentConfig {
 
         if self.multiple_outputs {
             vec![
-                Output::default(DataType::Metric).with_port(METRICS),
-                Output::default(DataType::Log)
-                    .with_schema_definition(definition)
-                    .with_port(LOGS),
-                Output::default(DataType::Trace).with_port(TRACES),
+                SourceOutput::new_logs(DataType::Log, definition).with_port(LOGS),
+                SourceOutput::new_metrics().with_port(METRICS),
+                SourceOutput::new_traces().with_port(TRACES),
             ]
         } else {
-            vec![Output::default(DataType::all()).with_schema_definition(definition)]
+            vec![SourceOutput::new_logs(DataType::all(), definition)]
         }
     }
 
@@ -293,13 +285,12 @@ pub struct ApiKeyQueryParams {
 #[derive(Clone)]
 pub(crate) struct DatadogAgentSource {
     pub(crate) api_key_extractor: ApiKeyExtractor,
-    pub(crate) log_schema_host_key: &'static str,
-    pub(crate) log_schema_source_type_key: &'static str,
+    pub(crate) log_schema_host_key: OwnedTargetPath,
+    pub(crate) log_schema_source_type_key: OwnedTargetPath,
     pub(crate) log_namespace: LogNamespace,
     pub(crate) decoder: Decoder,
     protocol: &'static str,
     logs_schema_definition: Arc<schema::Definition>,
-    metrics_schema_definition: Arc<schema::Definition>,
     events_received: Registered<EventsReceived>,
 }
 
@@ -336,7 +327,6 @@ impl DatadogAgentSource {
         decoder: Decoder,
         protocol: &'static str,
         logs_schema_definition: schema::Definition,
-        metrics_schema_definition: schema::Definition,
         log_namespace: LogNamespace,
     ) -> Self {
         Self {
@@ -345,12 +335,17 @@ impl DatadogAgentSource {
                 matcher: Regex::new(r"^/v1/input/(?P<api_key>[[:alnum:]]{32})/??")
                     .expect("static regex always compiles"),
             },
-            log_schema_host_key: log_schema().host_key(),
-            log_schema_source_type_key: log_schema().source_type_key(),
+            log_schema_host_key: log_schema()
+                .host_key_target_path()
+                .expect("global log_schema.host_key to be valid path")
+                .clone(),
+            log_schema_source_type_key: log_schema()
+                .source_type_key_target_path()
+                .expect("global log_schema.source_type_key to be valid path")
+                .clone(),
             decoder,
             protocol,
             logs_schema_definition: Arc::new(logs_schema_definition),
-            metrics_schema_definition: Arc::new(metrics_schema_definition),
             log_namespace,
             events_received: register!(EventsReceived),
         }
@@ -456,8 +451,8 @@ pub(crate) async fn handle_request(
             } else {
                 out.send_batch(events).await
             }
-            .map_err(move |error: crate::source_sender::ClosedError| {
-                emit!(StreamClosedError { error, count });
+            .map_err(|_| {
+                emit!(StreamClosedError { count });
                 warp::reject::custom(ApiError::ServerShutdown)
             })?;
             match receiver {
