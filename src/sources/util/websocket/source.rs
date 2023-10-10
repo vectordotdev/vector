@@ -16,10 +16,7 @@ use tokio_util::codec::Decoder as DecoderTrait;
 
 use crate::{
     codecs::Decoder,
-    common::{
-        ping::PingInterval,
-        websocket::{is_closed, WebSocketConnector},
-    },
+    common::websocket::{is_closed, PingInterval, WebSocketConnector},
     config::SourceContext,
     internal_events::{
         ConnectionOpen, OpenGauge, WsBytesReceived, WsConnectionError, WsConnectionShutdown,

@@ -21,4 +21,3 @@ pub(crate) mod s3;
 pub mod websocket;
 
 pub(crate) mod backoff;
-pub(crate) mod ping;

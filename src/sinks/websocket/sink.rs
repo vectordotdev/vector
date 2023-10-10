@@ -18,10 +18,7 @@ use vector_core::{
 
 use crate::{
     codecs::{Encoder, Transformer},
-    common::{
-        ping::PingInterval,
-        websocket::{is_closed, WebSocketConnector},
-    },
+    common::websocket::{is_closed, PingInterval, WebSocketConnector},
     emit,
     event::{Event, EventStatus, Finalizable},
     internal_events::{ConnectionOpen, OpenGauge, WsConnectionError, WsConnectionShutdown},

@@ -1,4 +1,9 @@
-use std::{fmt::Debug, net::SocketAddr, time::Duration};
+use std::{
+    fmt::Debug,
+    net::SocketAddr,
+    task::{Context, Poll},
+    time::Duration,
+};
 
 use snafu::{ResultExt, Snafu};
 use tokio::{net::TcpStream, time};
@@ -148,4 +153,27 @@ pub(crate) const fn is_closed(error: &WsError) -> bool {
             | WsError::AlreadyClosed
             | WsError::Protocol(ProtocolError::ResetWithoutClosingHandshake)
     )
+}
+
+pub struct PingInterval {
+    interval: Option<time::Interval>,
+}
+
+impl PingInterval {
+    pub fn new(period: Option<u64>) -> Self {
+        Self {
+            interval: period.map(|period| time::interval(Duration::from_secs(period))),
+        }
+    }
+
+    pub fn poll_tick(&mut self, cx: &mut Context<'_>) -> Poll<time::Instant> {
+        match self.interval.as_mut() {
+            Some(interval) => interval.poll_tick(cx),
+            None => Poll::Pending,
+        }
+    }
+
+    pub async fn tick(&mut self) -> time::Instant {
+        std::future::poll_fn(|cx| self.poll_tick(cx)).await
+    }
 }
