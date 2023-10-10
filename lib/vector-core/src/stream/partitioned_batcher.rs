@@ -86,6 +86,10 @@ where
         }
     }
 
+    fn remove(&mut self, item_key: &K) {
+        self.expiration_map.remove(item_key);
+    }
+
     fn poll_expired(&mut self, cx: &mut Context) -> Poll<Option<K>> {
         match ready!(self.expirations.poll_expired(cx)) {
             // No expirations yet.
@@ -129,15 +133,15 @@ impl BatcherSettings {
 
     /// A batcher config using the `ByteSizeOf` trait to determine batch sizes.
     /// The output is a  `Vec<T>`.
-    pub fn into_byte_size_config<T: ByteSizeOf>(
-        self,
+    pub fn as_byte_size_config<T: ByteSizeOf>(
+        &self,
     ) -> BatchConfigParts<SizeLimit<ByteSizeOfItemSize>, Vec<T>> {
-        self.into_item_size_config(ByteSizeOfItemSize)
+        self.as_item_size_config(ByteSizeOfItemSize)
     }
 
     /// A batcher config using the `ItemBatchSize` trait to determine batch sizes.
     /// The output is a `Vec<T>`.
-    pub fn into_item_size_config<T, I>(self, item_size: I) -> BatchConfigParts<SizeLimit<I>, Vec<T>>
+    pub fn as_item_size_config<T, I>(&self, item_size: I) -> BatchConfigParts<SizeLimit<I>, Vec<T>>
     where
         I: ItemBatchSize<T>,
     {
@@ -162,7 +166,7 @@ impl BatcherSettings {
     ) -> BatchConfigParts<SizeLimit<I>, BatchReduce<F, S>>
     where
         I: ItemBatchSize<T>,
-        F: FnMut(&mut S, T),
+        F: FnMut(&mut S, T) + Send,
         S: Default,
     {
         BatchConfigParts {
@@ -179,13 +183,13 @@ impl BatcherSettings {
 }
 
 #[pin_project]
-pub struct PartitionedBatcher<St, Prt, KT, C>
+pub struct PartitionedBatcher<St, Prt, KT, C, F>
 where
     Prt: Partitioner,
 {
-    /// A closure that retrievs a new `BatchConfig` when needed to batch a
+    /// A closure that retrieves a new [`BatchConfig`] when needed to batch a
     /// new partition.
-    state: Box<dyn Fn() -> C + Send>,
+    state: F,
     /// The store of live batches. Note that the key here is an option type,
     /// on account of the interface of `Prt`.
     batches: HashMap<Prt::Key, C, BuildHasherDefault<XxHash64>>,
@@ -202,15 +206,16 @@ where
     stream: Fuse<St>,
 }
 
-impl<St, Prt, C> PartitionedBatcher<St, Prt, ExpirationQueue<Prt::Key>, C>
+impl<St, Prt, C, F> PartitionedBatcher<St, Prt, ExpirationQueue<Prt::Key>, C, F>
 where
     St: Stream<Item = Prt::Item>,
     Prt: Partitioner + Unpin,
     Prt::Key: Eq + Hash + Clone,
     Prt::Item: ByteSizeOf,
     C: BatchConfig<Prt::Item>,
+    F: Fn() -> C + Send,
 {
-    pub fn new(stream: St, partitioner: Prt, settings: Box<dyn Fn() -> C + Send>) -> Self {
+    pub fn new(stream: St, partitioner: Prt, settings: F) -> Self {
         let timeout = settings().timeout();
         Self {
             state: settings,
@@ -224,20 +229,16 @@ where
 }
 
 #[cfg(test)]
-impl<St, Prt, KT, C> PartitionedBatcher<St, Prt, KT, C>
+impl<St, Prt, KT, C, F> PartitionedBatcher<St, Prt, KT, C, F>
 where
     St: Stream<Item = Prt::Item>,
     Prt: Partitioner + Unpin,
     Prt::Key: Eq + Hash + Clone,
     Prt::Item: ByteSizeOf,
     C: BatchConfig<Prt::Item>,
+    F: Fn() -> C + Send,
 {
-    pub fn with_timer(
-        stream: St,
-        partitioner: Prt,
-        timer: KT,
-        settings: Box<dyn Fn() -> C + Send>,
-    ) -> Self {
+    pub fn with_timer(stream: St, partitioner: Prt, timer: KT, settings: F) -> Self {
         Self {
             state: settings,
             batches: HashMap::default(),
@@ -249,94 +250,104 @@ where
     }
 }
 
-impl<St, Prt, KT, C> Stream for PartitionedBatcher<St, Prt, KT, C>
+pub trait BatchOutput<T> {}
+
+impl<T> BatchOutput<T> for Vec<T> {}
+
+impl<St, Prt, KT, C, F, B> Stream for PartitionedBatcher<St, Prt, KT, C, F>
 where
     St: Stream<Item = Prt::Item>,
     Prt: Partitioner + Unpin,
     Prt::Key: Eq + Hash + Clone,
     Prt::Item: ByteSizeOf,
     KT: KeyedTimer<Prt::Key>,
-    C: BatchConfig<Prt::Item, Batch = Vec<Prt::Item>>,
+    C: BatchConfig<Prt::Item, Batch = B>,
+    // C: BatchConfig<Prt::Item>,
+    F: Fn() -> C + Send,
+    B: BatchOutput<Prt::Item>,
 {
-    type Item = (Prt::Key, Vec<Prt::Item>);
+    type Item = (Prt::Key, B);
 
     fn size_hint(&self) -> (usize, Option<usize>) {
         self.stream.size_hint()
     }
 
+    #[allow(warnings)]
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        let mut this = self.project();
-        loop {
-            if !this.closed_batches.is_empty() {
-                return Poll::Ready(this.closed_batches.pop());
-            }
-            match this.stream.as_mut().poll_next(cx) {
-                Poll::Pending => match this.timer.poll_expired(cx) {
-                    // Unlike normal streams, `DelayQueue` can return `None`
-                    // here but still be usable later if more entries are added.
-                    Poll::Pending | Poll::Ready(None) => return Poll::Pending,
-                    Poll::Ready(Some(item_key)) => {
-                        let mut batch = this
-                            .batches
-                            .remove(&item_key)
-                            .expect("batch should exist if it is set to expire");
-                        this.closed_batches.push((item_key, batch.take_batch()));
-                    }
-                },
-                Poll::Ready(None) => {
-                    // Now that the underlying stream is closed, we need to
-                    // clear out our batches, including all expiration
-                    // entries. If we had any batches to hand over, we have to
-                    // continue looping so the caller can drain them all before
-                    // we finish.
-                    if !this.batches.is_empty() {
-                        this.timer.clear();
-                        this.closed_batches.extend(
-                            this.batches
-                                .drain()
-                                .map(|(key, mut batch)| (key, batch.take_batch())),
-                        );
-                        continue;
-                    }
-                    return Poll::Ready(None);
-                }
-                Poll::Ready(Some(item)) => {
-                    let item_key = this.partitioner.partition(&item);
+        todo!()
+        // let mut this = self.project();
+        // loop {
+        //     if !this.closed_batches.is_empty() {
+        //         return Poll::Ready(this.closed_batches.pop());
+        //     }
+        // match this.stream.as_mut().poll_next(cx) {
+        //     Poll::Pending => match this.timer.poll_expired(cx) {
+        //         // Unlike normal streams, `DelayQueue` can return `None`
+        //         // here but still be usable later if more entries are added.
+        //         Poll::Pending | Poll::Ready(None) => return Poll::Pending,
+        //         Poll::Ready(Some(item_key)) => {
+        //             let mut batch = this
+        //                 .batches
+        //                 .remove(&item_key)
+        //                 .expect("batch should exist if it is set to expire");
+        //             this.closed_batches.push((item_key, batch.take_batch()));
+        //         }
+        //     },
+        //     Poll::Ready(None) => {
+        //         // Now that the underlying stream is closed, we need to
+        //         // clear out our batches, including all expiration
+        //         // entries. If we had any batches to hand over, we have to
+        //         // continue looping so the caller can drain them all before
+        //         // we finish.
+        //         if !this.batches.is_empty() {
+        //             this.timer.clear();
+        //             this.closed_batches.extend(
+        //                 this.batches
+        //                     .drain()
+        //                     .map(|(key, mut batch)| (key, batch.take_batch())),
+        //             );
+        //             continue;
+        //         }
+        //         return Poll::Ready(None);
+        //     }
+        //     Poll::Ready(Some(item)) => {
+        //         let item_key = this.partitioner.partition(&item);
 
-                    // Get the batch for this partition, or create a new one.
-                    let batch = match this.batches.get_mut(&item_key) {
-                        Some(batch) => batch,
-                        None => {
-                            let batch = (this.state)();
-                            this.batches.insert(item_key.clone(), batch);
-                            this.batches
-                                .get_mut(&item_key)
-                                .expect("batch has just been inserted so should exist")
-                        }
-                    };
+        //         // Get the batch for this partition, or create a new one.
+        //         let batch = if let Some(batch) = this.batches.get_mut(&item_key) {
+        //             batch
+        //         } else {
+        //             let batch = (this.state)();
+        //             this.batches.insert(item_key.clone(), batch);
+        //             this.batches
+        //                 .get_mut(&item_key)
+        //                 .expect("batch has just been inserted so should exist")
+        //         };
 
-                    let (fits, metadata) = batch.item_fits_in_batch(&item);
-                    if !fits {
-                        // This batch is too full to accept a new item, so we move the contents of
-                        // the batch into `closed_batches` to be push out of this stream on the
-                        // next iteration.
-                        this.closed_batches
-                            .push((item_key.clone(), batch.take_batch()));
-                    }
+        //         let (fits, metadata) = batch.item_fits_in_batch(&item);
+        //         if !fits {
+        //             // This batch is too full to accept a new item, so we move the contents of
+        //             // the batch into `closed_batches` to be push out of this stream on the
+        //             // next iteration.
+        //             this.closed_batches
+        //                 .push((item_key.clone(), batch.take_batch()));
+        //         }
 
-                    // Insert the item into the batch.
-                    batch.push(item, metadata);
-                    this.timer.insert(item_key.clone());
-                    if batch.is_batch_full() {
-                        // If the insertion means the batch is now full, we clear out the batch and
-                        // remove it from the list.
-                        this.closed_batches
-                            .push((item_key.clone(), batch.take_batch()));
-                        this.batches.remove(&item_key);
-                    }
-                }
-            }
-        }
+        //         // Insert the item into the batch.
+        //         batch.push(item, metadata);
+        //         if batch.is_batch_full() {
+        //             // If the insertion means the batch is now full, we clear out the batch and
+        //             // remove it from the list.
+        //             this.closed_batches
+        //                 .push((item_key.clone(), batch.take_batch()));
+        //             this.batches.remove(&item_key);
+        //             this.timer.remove(&item_key);
+        //         } else {
+        //             this.timer.insert(item_key);
+        //         }
+        //     }
+        // }
+        // }
     }
 }
 
@@ -392,6 +403,10 @@ mod test {
 
         fn insert(&mut self, item_key: u8) {
             self.valid_keys.insert(item_key);
+        }
+
+        fn remove(&mut self, item_key: &u8) {
+            self.valid_keys.remove(item_key);
         }
 
         fn poll_expired(&mut self, _cx: &mut Context) -> Poll<Option<u8>> {
@@ -472,7 +487,7 @@ mod test {
             let batch_settings = BatcherSettings::new(Duration::from_secs(1), allocation_limit, item_limit);
 
             let batcher = PartitionedBatcher::with_timer(&mut stream, partitioner, timer,
-                                              Box::new(move || batch_settings.into_byte_size_config()));
+                                              Box::new(move || batch_settings.as_byte_size_config()));
             let batcher_size_hint = batcher.size_hint();
 
             assert_eq!(stream_size_hint, batcher_size_hint);
@@ -496,7 +511,7 @@ mod test {
             let allocation_limit = NonZeroUsize::new(allocation_limit as usize).unwrap();
             let batch_settings = BatcherSettings::new(Duration::from_secs(1), allocation_limit, item_limit);
             let mut batcher = PartitionedBatcher::with_timer(&mut stream, partitioner,
-                                                  timer, Box::new(move || batch_settings.into_byte_size_config()));
+                                                  timer, Box::new(move || batch_settings.as_byte_size_config()));
             let mut batcher = Pin::new(&mut batcher);
 
             loop {
@@ -567,7 +582,7 @@ mod test {
             let allocation_limit = NonZeroUsize::new(allocation_limit as usize).unwrap();
             let batch_settings = BatcherSettings::new(Duration::from_secs(1), allocation_limit, item_limit);
             let mut batcher = PartitionedBatcher::with_timer(&mut stream, partitioner,
-                                                  timer, Box::new(move || batch_settings.clone().into_byte_size_config()));
+                                                  timer, Box::new(move || batch_settings.as_byte_size_config()));
             let mut batcher = Pin::new(&mut batcher);
 
             loop {
@@ -580,9 +595,6 @@ mod test {
                         let expected_partition = partitions
                             .get_mut(&key)
                             .expect("impossible situation");
-
-                        dbg!(&actual_batch);
-                        dbg!(&expected_partition);
 
                         for item in actual_batch {
                             assert_eq!(item, expected_partition.pop().unwrap());
@@ -642,7 +654,6 @@ mod test {
         let mut cx = Context::from_waker(&noop_waker);
 
         let mut partitions = separate_partitions(stream.clone(), &partitioner);
-        dbg!(&partitions);
 
         let mut stream = stream::iter(stream.into_iter());
         let item_limit = NonZeroUsize::new(item_limit as usize).unwrap();
@@ -654,7 +665,7 @@ mod test {
             &mut stream,
             partitioner,
             timer,
-            Box::new(move || batch_settings.clone().into_byte_size_config()),
+            Box::new(move || batch_settings.clone().as_byte_size_config()),
         );
         // let mut batcher = PartitionedBatcher::new(
         //     &mut stream,
@@ -707,9 +718,7 @@ mod test {
             let allocation_limit = NonZeroUsize::new(allocation_limit as usize).unwrap();
             let batch_settings = BatcherSettings::new(Duration::from_secs(1), allocation_limit, item_limit);
             let mut batcher = PartitionedBatcher::with_timer(&mut stream, partitioner,
-                                                  timer, Box::new(move || batch_settings.clone().into_byte_size_config()));
-            // let mut batcher = PartitionedBatcher::new(&mut stream, partitioner,
-            //                                        Box::new(move || batch_settings.clone().into_byte_size_config()));
+                                                  timer, Box::new(move || batch_settings.as_byte_size_config()));
             let mut batcher = Pin::new(&mut batcher);
 
             let mut observed_items = 0;

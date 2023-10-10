@@ -49,10 +49,9 @@ where
                 let age_range = start..end;
                 future::ready(age_range.contains(&req.timestamp))
             })
-            .batched_partitioned(
-                CloudwatchPartitioner,
-                Box::new(move || batcher_settings.clone().into_byte_size_config()),
-            )
+            .batched_partitioned(CloudwatchPartitioner, || {
+                batcher_settings.as_byte_size_config()
+            })
             .map(|(key, events)| {
                 let metadata = RequestMetadata::from_batch(
                     events.iter().map(|req| req.get_metadata().clone()),

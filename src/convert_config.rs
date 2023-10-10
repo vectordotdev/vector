@@ -201,7 +201,12 @@ fn walk_dir_and_convert(
     }
 }
 
-#[cfg(test)]
+#[cfg(all(
+    test,
+    feature = "sources-demo_logs",
+    feature = "transforms-remap",
+    feature = "sinks-console"
+))]
 mod tests {
     use crate::config::{format, ConfigBuilder, Format};
     use crate::convert_config::{check_paths, walk_dir_and_convert, Opts};

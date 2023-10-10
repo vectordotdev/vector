@@ -1,9 +1,16 @@
 use std::fmt;
 
 use vector_common::byte_size_of::ByteSizeOf;
-use vector_core::event::Metric;
+use vector_core::{
+    event::Metric,
+    stream::batcher::{
+        config::BatchConfigParts,
+        data::BatchReduce,
+        limiter::{ByteSizeOfItemSize, SizeLimit},
+    },
+};
 
-use crate::sinks::prelude::*;
+use crate::sinks::{prelude::*, util::buffer::metrics::MetricSet};
 
 use super::{
     request_builder::{RemoteWriteEncoder, RemoteWriteRequest, RemoteWriteRequestBuilder},
@@ -61,6 +68,27 @@ impl SinkBatchSettings for PrometheusRemoteWriteDefaultBatchSettings {
     const TIMEOUT_SECS: f64 = 1.0;
 }
 
+#[derive(Clone)]
+pub(super) struct EventCollection {
+    pub(super) finalizers: EventFinalizers,
+    pub(super) events: MetricSet,
+    pub(super) events_byte_size: usize,
+    pub(super) events_json_byte_size: GroupedCountByteSize,
+}
+
+impl Default for EventCollection {
+    fn default() -> Self {
+        Self {
+            finalizers: Default::default(),
+            events: Default::default(),
+            events_byte_size: Default::default(),
+            events_json_byte_size: telemetry().create_request_count_byte_size(),
+        }
+    }
+}
+
+impl<T> vector_core::stream::BatchOutput<T> for Vec<T> {}
+
 pub(super) struct RemoteWriteSink<S> {
     pub(super) tenant_id: Option<Template>,
     pub(super) batch_settings: BatcherSettings,
@@ -98,23 +126,7 @@ where
             .filter_map(move |event| {
                 future::ready(make_remote_write_event(tenant_id.as_ref(), event))
             })
-            .batched_partitioned(
-                PrometheusTenantIdPartitioner,
-                Box::new(move || batch_settings.clone().into_byte_size_config()),
-            )
-            // .batched(self.batch_settings.into_reducer_config(
-            //     |data: &Metric| data.size_of(),
-            //     |event_collection: &mut EventCollection, mut item: Metric| {
-            //         event_collection
-            //             .finalizers
-            //             .merge(item.metadata_mut().take_finalizers());
-            //         event_collection.events_byte_size += item.size_of();
-            //         event_collection
-            //             .events_json_byte_size
-            //             .add_event(&item, item.estimated_json_encoded_size_of());
-            //         event_collection.events.insert_update(item);
-            //     },
-            // ))
+            .batched_partitioned(PrometheusTenantIdPartitioner, || fun_name(batch_settings))
             .request_builder(default_request_builder_concurrency_limit(), request_builder)
             .filter_map(|request| async move {
                 match request {
@@ -129,6 +141,27 @@ where
             .run()
             .await
     }
+}
+
+fn fun_name(
+    batch_settings: BatcherSettings,
+) -> BatchConfigParts<
+    SizeLimit<ByteSizeOfItemSize>,
+    BatchReduce<impl FnMut(&mut EventCollection, RemoteWriteMetric) + Send, EventCollection>,
+> {
+    batch_settings.into_reducer_config(
+        ByteSizeOfItemSize,
+        |event_collection: &mut EventCollection, mut item: RemoteWriteMetric| {
+            event_collection
+                .finalizers
+                .merge(item.metric.metadata_mut().take_finalizers());
+            event_collection.events_byte_size += item.size_of();
+            event_collection
+                .events_json_byte_size
+                .add_event(&item.metric, item.estimated_json_encoded_size_of());
+            event_collection.events.insert_update(item.metric);
+        },
+    )
 }
 
 #[async_trait]

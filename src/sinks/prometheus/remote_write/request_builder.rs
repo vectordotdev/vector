@@ -2,14 +2,14 @@ use std::io;
 
 use bytes::{Bytes, BytesMut};
 use prost::Message;
-use vector_core::config::telemetry;
+use vector_core::{config::telemetry, event::Metric};
 
 use crate::sinks::{
     prelude::*,
     prometheus::{collector, collector::MetricCollector as _},
 };
 
-use super::{sink::RemoteWriteMetric, PartitionKey};
+use super::{sink::EventCollection, PartitionKey};
 
 pub(crate) struct RemoteWriteEncoder {
     pub(super) default_namespace: Option<String>,
@@ -17,10 +17,10 @@ pub(crate) struct RemoteWriteEncoder {
     pub(super) quantiles: Vec<f64>,
 }
 
-impl encoding::Encoder<Vec<RemoteWriteMetric>> for RemoteWriteEncoder {
+impl encoding::Encoder<Vec<Metric>> for RemoteWriteEncoder {
     fn encode_input(
         &self,
-        input: Vec<RemoteWriteMetric>,
+        input: Vec<Metric>,
         writer: &mut dyn io::Write,
     ) -> io::Result<(usize, GroupedCountByteSize)> {
         let mut byte_size = telemetry().create_request_count_byte_size();
@@ -28,13 +28,13 @@ impl encoding::Encoder<Vec<RemoteWriteMetric>> for RemoteWriteEncoder {
         let mut time_series = collector::TimeSeries::new();
         let len = input.len();
         for metric in input {
-            byte_size.add_event(&metric.metric, metric.estimated_json_encoded_size_of());
+            byte_size.add_event(&metric, metric.estimated_json_encoded_size_of());
 
             time_series.encode_metric(
                 self.default_namespace.as_deref(),
                 &self.buckets,
                 &self.quantiles,
-                &metric.metric,
+                &metric,
             );
         }
         let request = time_series.finish();
@@ -83,9 +83,9 @@ pub(super) struct RemoteWriteRequestBuilder {
     pub(super) encoder: RemoteWriteEncoder,
 }
 
-impl RequestBuilder<(PartitionKey, Vec<RemoteWriteMetric>)> for RemoteWriteRequestBuilder {
+impl RequestBuilder<(PartitionKey, EventCollection)> for RemoteWriteRequestBuilder {
     type Metadata = RemoteWriteMetadata;
-    type Events = Vec<RemoteWriteMetric>;
+    type Events = Vec<Metric>;
     type Encoder = RemoteWriteEncoder;
     type Payload = Bytes;
     type Request = RemoteWriteRequest;
@@ -101,16 +101,18 @@ impl RequestBuilder<(PartitionKey, Vec<RemoteWriteMetric>)> for RemoteWriteReque
 
     fn split_input(
         &self,
-        input: (PartitionKey, Vec<RemoteWriteMetric>),
+        input: (PartitionKey, EventCollection),
     ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
         let (key, mut events) = input;
-        let builder = RequestMetadataBuilder::from_events(&events);
+        let finalizers = events.finalizers;
+        let metrics = events.events.into_metrics();
+        let builder = RequestMetadataBuilder::from_events(&metrics);
         let metadata = RemoteWriteMetadata {
-            finalizers: events.take_finalizers(),
+            finalizers,
             tenant_id: key.tenant_id,
         };
 
-        (metadata, builder, events)
+        (metadata, builder, metrics)
     }
 
     fn build_request(

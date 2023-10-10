@@ -415,7 +415,7 @@ tags.environment = env
 name = "add_unique_id_test"
 
 [[tests.inputs]]
-insert_at = "add_unique_id_to_metric"
+insert_at = "add_env_to_metric"
 type = "metric"
 
 [tests.inputs.metric]
@@ -424,13 +424,13 @@ kind = "absolute"
 counter = { value = 1 }
 
 [[tests.outputs]]
-extract_from = "add_unique_id_to_metric"
+extract_from = "add_env_to_metric"
 
 [[tests.outputs.conditions]]
 type = "vrl"
 source = '''
 assert_eq!(.name, "website_hits")
-assert_eq!(.kind, "absolute)
+assert_eq!(.kind, "absolute")
 assert_eq!(.tags.environment, "production")
 '''
 ```

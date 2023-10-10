@@ -257,8 +257,10 @@ impl EventEncoder {
         self.remove_label_fields(&mut event);
 
         let timestamp = match event.as_log().get_timestamp() {
-            Some(Value::Timestamp(ts)) => ts.timestamp_nanos(),
-            _ => chrono::Utc::now().timestamp_nanos(),
+            Some(Value::Timestamp(ts)) => ts.timestamp_nanos_opt().expect("Timestamp out of range"),
+            _ => chrono::Utc::now()
+                .timestamp_nanos_opt()
+                .expect("Timestamp out of range"),
         };
 
         if self.remove_timestamp {
@@ -451,16 +453,13 @@ impl LokiSink {
                 NonZeroUsize::new(1).expect("static")
             }
         };
-        let batch_settings = self.batch_settings.clone();
+        let batch_settings = self.batch_settings;
 
         input
             .map(|event| encoder.encode_event(event))
             .filter_map(|event| async { event })
             .map(|record| filter.filter_record(record))
-            .batched_partitioned(
-                RecordPartitioner,
-                Box::new(move || batch_settings.clone().into_byte_size_config()),
-            )
+            .batched_partitioned(RecordPartitioner, || batch_settings.as_byte_size_config())
             .filter_map(|(partition, batch)| async {
                 if let Some(partition) = partition {
                     let mut count: usize = 0;
