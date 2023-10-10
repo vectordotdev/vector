@@ -55,7 +55,7 @@ jobs:
           private_key: ${{ secrets.GH_APP_DATADOG_VECTOR_CI_APP_PRIVATE_KEY }}
       - name: Get PR comment author
         id: comment
-        uses: tspascoal/get-user-teams-membership@v2
+        uses: tspascoal/get-user-teams-membership@v3
         with:
           username: ${{ github.actor }}
           team: 'Vector'
@@ -387,7 +387,7 @@ jobs:
           private_key: ${{ secrets.GH_APP_DATADOG_VECTOR_CI_APP_PRIVATE_KEY }}
       - name: Validate issue comment
         if: github.event_name == 'issue_comment'
-        uses: tspascoal/get-user-teams-membership@v2
+        uses: tspascoal/get-user-teams-membership@v3
         with:
           username: ${{ github.actor }}
           team: 'Vector'
