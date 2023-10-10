@@ -41,7 +41,7 @@ where
         input
             .batched(self.batch_settings.into_byte_size_config())
             .request_builder(
-                None,
+                default_request_builder_concurrency_limit(),
                 AzureMonitorLogsRequestBuilder {
                     encoding: self.encoding,
                 },

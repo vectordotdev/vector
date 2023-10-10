@@ -342,7 +342,7 @@ fn encode_string(key: &str, output: &mut BytesMut) {
 
 pub(in crate::sinks) fn encode_timestamp(timestamp: Option<DateTime<Utc>>) -> i64 {
     if let Some(ts) = timestamp {
-        ts.timestamp_nanos()
+        ts.timestamp_nanos_opt().unwrap()
     } else {
         encode_timestamp(Some(Utc::now()))
     }
@@ -390,7 +390,7 @@ pub mod test_util {
     pub(crate) const TOKEN: &str = "my-token";
 
     pub(crate) fn next_database() -> String {
-        format!("testdb{}", Utc::now().timestamp_nanos())
+        format!("testdb{}", Utc::now().timestamp_nanos_opt().unwrap())
     }
 
     pub(crate) fn ts() -> DateTime<Utc> {
@@ -834,7 +834,9 @@ mod tests {
 
     #[test]
     fn test_encode_timestamp() {
-        let start = Utc::now().timestamp_nanos();
+        let start = Utc::now()
+            .timestamp_nanos_opt()
+            .expect("Timestamp out of range");
         assert_eq!(encode_timestamp(Some(ts())), 1542182950000000011);
         assert!(encode_timestamp(None) >= start)
     }

@@ -10,7 +10,7 @@ use crate::{
     SourceSender,
 };
 use futures::StreamExt;
-use std::{sync::Arc, time::Duration};
+use std::{collections::HashSet, sync::Arc, time::Duration};
 use vector_core::config::LogNamespace;
 
 pub fn make_config() -> AmqpSinkConfig {
@@ -129,6 +129,9 @@ async fn amqp_happy_path() {
     }
 
     assert_eq!(out.len(), input.len());
+
+    let input: HashSet<String> = HashSet::from_iter(input);
+    let out: HashSet<String> = HashSet::from_iter(out);
     assert_eq!(out, input);
 }
 

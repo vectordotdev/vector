@@ -41,7 +41,10 @@ where
                     .into_item_size_config(HttpJsonBatchSizer),
             )
             // Build requests with no concurrency limit.
-            .request_builder(None, self.request_builder)
+            .request_builder(
+                default_request_builder_concurrency_limit(),
+                self.request_builder,
+            )
             // Filter out any errors that occurred in the request building.
             .filter_map(|request| async move {
                 match request {

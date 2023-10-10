@@ -42,7 +42,7 @@ force = true
 
 [[redirects]]
 from = "https://chat.vector.dev/*"
-to = "https://discord.gg/dX3bdkF"
+to = "https://discord.gg/ptvgXhUF2m"
 status = 302
 force = true
 
