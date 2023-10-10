@@ -56,8 +56,14 @@ on:
         value: ${{ jobs.int_tests.outputs.clickhouse }}
       databend:
         value: ${{ jobs.int_tests.outputs.databend }}
-      datadog:
-        value: ${{ jobs.int_tests.outputs.datadog }}
+      datadog-agent:
+        value: ${{ jobs.int_tests.outputs.datadog-agent }}
+      datadog-logs:
+        value: ${{ jobs.int_tests.outputs.datadog-logs }}
+      datadog-metrics:
+        value: ${{ jobs.int_tests.outputs.datadog-metrics }}
+      datadog-traces:
+        value: ${{ jobs.int_tests.outputs.datadog-traces }}
       dnstap:
         value: ${{ jobs.int_tests.outputs.dnstap }}
       docker-logs:
@@ -143,9 +149,6 @@ jobs:
             - "Makefile"
             - "rust-toolchain.toml"
             - "vdev/**"
-          deny:
-            - 'deny.toml'
-            - "vdev/**"
           dependencies:
             - ".cargo/**"
             - 'Cargo.toml'
@@ -189,7 +192,10 @@ jobs:
       azure: ${{ steps.filter.outputs.azure }}
       clickhouse: ${{ steps.filter.outputs.clickhouse }}
       databend: ${{ steps.filter.outputs.databend }}
-      datadog: ${{ steps.filter.outputs.datadog }}
+      datadog-agent: ${{ steps.filter.outputs.datadog-agent }}
+      datadog-logs: ${{ steps.filter.outputs.datadog-logs }}
+      datadog-metrics: ${{ steps.filter.outputs.datadog-metrics }}
+      datadog-traces: ${{ steps.filter.outputs.datadog-traces }}
       dnstap: ${{ steps.filter.outputs.dnstap }}
       docker-logs: ${{ steps.filter.outputs.docker-logs }}
       elasticsearch: ${{ steps.filter.outputs.elasticsearch }}

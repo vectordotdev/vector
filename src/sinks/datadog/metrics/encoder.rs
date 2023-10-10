@@ -415,12 +415,25 @@ fn generate_sketch_metadata(
     origin_product_value: u32,
 ) -> Option<ddmetric_proto::Metadata> {
     generate_origin_metadata(maybe_pass_through, maybe_source_type, origin_product_value).map(
-        |origin| ddmetric_proto::Metadata {
-            origin: Some(ddmetric_proto::Origin {
-                origin_product: origin.product().expect("OriginProduct should be set"),
-                origin_category: origin.category().expect("OriginCategory should be set"),
-                origin_service: origin.service().expect("OriginService should be set"),
-            }),
+        |origin| {
+            if origin.product().is_none()
+                || origin.category().is_none()
+                || origin.service().is_none()
+            {
+                warn!(
+                    message = "Generated sketch origin metadata should have each field set.",
+                    product = origin.product(),
+                    category = origin.category(),
+                    service = origin.service()
+                );
+            }
+            ddmetric_proto::Metadata {
+                origin: Some(ddmetric_proto::Origin {
+                    origin_product: origin.product().unwrap_or_default(),
+                    origin_category: origin.category().unwrap_or_default(),
+                    origin_service: origin.service().unwrap_or_default(),
+                }),
+            }
         },
     )
 }
@@ -626,12 +639,11 @@ fn generate_origin_metadata(
     //     - `log_to_metric` transform set the OriginService in the EventMetadata when it creates
     //        the new metric.
     if let Some(pass_through) = maybe_pass_through {
-        Some(
-            DatadogMetricOriginMetadata::default()
-                .with_product(pass_through.product().unwrap_or(origin_product_value))
-                .with_category(pass_through.category().unwrap_or(ORIGIN_CATEGORY_VALUE))
-                .with_service(pass_through.service().unwrap_or(no_value)),
-        )
+        Some(DatadogMetricOriginMetadata::new(
+            pass_through.product().or(Some(origin_product_value)),
+            pass_through.category().or(Some(ORIGIN_CATEGORY_VALUE)),
+            pass_through.service().or(Some(no_value)),
+        ))
 
     // No metadata has been set upstream
     } else {
@@ -640,10 +652,11 @@ fn generate_origin_metadata(
             // In order to preserve consistent behavior, we intentionally don't set origin metadata
             // for the case where the Datadog Agent did not set it.
             source_type_to_service(source_type).map(|origin_service_value| {
-                DatadogMetricOriginMetadata::default()
-                    .with_product(origin_product_value)
-                    .with_category(ORIGIN_CATEGORY_VALUE)
-                    .with_service(origin_service_value)
+                DatadogMetricOriginMetadata::new(
+                    Some(origin_product_value),
+                    Some(ORIGIN_CATEGORY_VALUE),
+                    Some(origin_service_value),
+                )
             })
         })
     }
@@ -1073,10 +1086,7 @@ mod tests {
         let service = 9;
 
         let event_metadata = EventMetadata::default().with_origin_metadata(
-            DatadogMetricOriginMetadata::default()
-                .with_product(product)
-                .with_category(category)
-                .with_service(service),
+            DatadogMetricOriginMetadata::new(Some(product), Some(category), Some(service)),
         );
         let counter = get_simple_counter_with_metadata(event_metadata);
 
