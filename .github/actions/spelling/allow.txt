@@ -45,9 +45,10 @@ Comcast
 Consolas
 Coolpad
 DEBHELPER
-DOOV
 Danew
+dkr
 Dockerfiles
+DOOV
 Douban
 Enot
 Evercoss
@@ -409,7 +410,9 @@ rpms
 rstest
 rsyslog
 rsyslogd
+security-tab
 servlet
+sublocation
 snyk
 socketaddr
 solarwinds

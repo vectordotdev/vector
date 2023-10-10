@@ -281,7 +281,7 @@ cli: {
 				paths: _paths_arg & {
 					description: """
 						Any number of Vector config files to test. If none are specified
-						the default config path `/etc/vector/vector.toml` will be targeted
+						the default config path `/etc/vector/vector.yaml` will be targeted
 						"""
 				}
 			}
@@ -443,7 +443,7 @@ cli: {
 				paths: _paths_arg & {
 					description: """
 						Any number of Vector config files to validate. If none are specified
-						the default config path `/etc/vector/vector.toml` will be targeted
+						the default config path `/etc/vector/vector.yaml` will be targeted
 						"""
 				}
 			}
@@ -535,13 +535,13 @@ cli: {
 		VECTOR_CONFIG: {
 			description: """
 				Read configuration from one or more files. Wildcard paths are supported. If no files are
-				specified the default config path `/etc/vector/vector.toml` is targeted. TOML, YAML and
+				specified the default config path `/etc/vector/vector.yaml` is targeted. TOML, YAML and
 				JSON file formats are supported. The format to interpret the file with is determined from
 				the file extension (`.yaml`, `.toml`, `.json`). Vector falls back to YAML if it can't
 				detect a supported format.
 				"""
 			type: string: {
-				default: "/etc/vector/vector.toml"
+				default: "/etc/vector/vector.yaml"
 			}
 		}
 		VECTOR_CONFIG_DIR: {
@@ -634,7 +634,7 @@ cli: {
 		}
 		VECTOR_OPENSSL_LEGACY_PROVIDER: {
 			description: "Load the OpenSSL legacy provider."
-			type: bool: default: true
+			type: bool: default: false
 		}
 		VECTOR_OPENSSL_NO_PROBE: {
 			description: """
@@ -649,6 +649,6 @@ cli: {
 	// Helpers
 	_paths_arg: {
 		type:    "list"
-		default: "/etc/vector/vector.toml"
+		default: "/etc/vector/vector.yaml"
 	}
 }

@@ -1,0 +1,7 @@
+description: >
+  An ‘average’ customer server on which vector runs alongside user
+  software. This is equivalent to an AWS c5.2xlarge with 4Gb of system memory
+  held back for system processes.
+name: typical
+cpu: 8
+memory: 12Gb

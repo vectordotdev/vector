@@ -56,7 +56,7 @@ mkdir -p %{buildroot}%{_datadir}/%{_name}
 mkdir -p %{buildroot}%{_unitdir}
 
 cp -a %{_builddir}/bin/vector %{buildroot}%{_bindir}
-cp -a %{_builddir}/config/vector.toml %{buildroot}%{_sysconfdir}/%{_name}/vector.toml
+cp -a %{_builddir}/config/vector.yaml %{buildroot}%{_sysconfdir}/%{_name}/vector.yaml
 cp -a %{_builddir}/config/examples/. %{buildroot}%{_sysconfdir}/%{_name}/examples
 cp -a %{_builddir}/systemd/vector.service %{buildroot}%{_unitdir}/vector.service
 cp -a %{_builddir}/systemd/vector.default %{buildroot}%{_sysconfdir}/default/vector
@@ -79,7 +79,7 @@ rm -rf %{buildroot}
 %defattr(-,root,root,-)
 %{_bindir}/*
 %{_unitdir}/vector.service
-%config(noreplace) %{_sysconfdir}/%{_name}/vector.toml
+%config(noreplace) %{_sysconfdir}/%{_name}/vector.yaml
 %config(noreplace) %{_sysconfdir}/default/vector
 %config %{_sysconfdir}/%{_name}/examples/*
 %dir %{_sharedstatedir}/%{_name}

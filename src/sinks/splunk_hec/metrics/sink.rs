@@ -1,28 +1,17 @@
-use std::{fmt, num::NonZeroUsize, sync::Arc};
+use std::{fmt, sync::Arc};
 
-use async_trait::async_trait;
-use futures_util::{future, stream::BoxStream, StreamExt};
 use serde::Serialize;
-use tower::Service;
-use vector_buffers::EventCount;
-use vector_core::{
-    event::{Event, Metric, MetricValue},
-    partition::Partitioner,
-    sink::StreamSink,
-    stream::{BatcherSettings, DriverResponse},
-    ByteSizeOf,
-};
+use vector_core::event::{Metric, MetricValue};
 use vrl::path::OwnedValuePath;
 
 use super::request_builder::HecMetricsRequestBuilder;
 use crate::{
-    config::SinkContext,
     internal_events::SplunkInvalidMetricReceivedError,
     sinks::{
+        prelude::*,
         splunk_hec::common::{render_template_string, request::HecRequest},
-        util::{encode_namespace, processed_event::ProcessedEvent, SinkBuilderExt},
+        util::{encode_namespace, processed_event::ProcessedEvent},
     },
-    template::Template,
 };
 
 pub struct HecMetricsSink<S> {
@@ -51,7 +40,6 @@ where
         let host_key = self.host_key.as_ref();
         let default_namespace = self.default_namespace.as_deref();
 
-        let builder_limit = NonZeroUsize::new(64);
         input
             .map(|event| (event.size_of(), event.into_metric()))
             .filter_map(move |(event_byte_size, metric)| {
@@ -66,7 +54,10 @@ where
                 ))
             })
             .batched_partitioned(EventPartitioner, self.batch_settings)
-            .request_builder(builder_limit, self.request_builder)
+            .request_builder(
+                default_request_builder_concurrency_limit(),
+                self.request_builder,
+            )
             .filter_map(|request| async move {
                 match request {
                     Err(e) => {

@@ -82,28 +82,27 @@ pub trait SinkBuilderExt: Stream {
     ///
     /// If the spawned future panics, the panic will be carried through and resumed on the task
     /// calling the stream.
-    fn concurrent_map<F, T>(self, limit: Option<NonZeroUsize>, f: F) -> ConcurrentMap<Self, T>
+    fn concurrent_map<F, T>(self, limit: NonZeroUsize, f: F) -> ConcurrentMap<Self, T>
     where
         Self: Sized,
         F: Fn(Self::Item) -> Pin<Box<dyn Future<Output = T> + Send + 'static>> + Send + 'static,
         T: Send + 'static,
     {
-        ConcurrentMap::new(self, limit, f)
+        ConcurrentMap::new(self, Some(limit), f)
     }
 
     /// Constructs a [`Stream`] which transforms the input into a request suitable for sending to
     /// downstream services.
     ///
-    /// Each input is transformed concurrently, up to the given limit.  A limit of `None` is
-    /// self-describing, as it imposes no concurrency limit, and `Some(n)` limits this stage to `n`
-    /// concurrent operations at any given time.
+    /// Each input is transformed concurrently, up to the given limit.  A limit of `n` limits
+    /// this stage to `n` concurrent operations at any given time.
     ///
     /// Encoding and compression are handled internally, deferring to the builder at the necessary
     /// checkpoints for adjusting the event before encoding/compression, as well as generating the
     /// correct request object with the result of encoding/compressing the events.
     fn request_builder<B>(
         self,
-        limit: Option<NonZeroUsize>,
+        limit: NonZeroUsize,
         builder: B,
     ) -> ConcurrentMap<Self, Result<B::Request, B::Error>>
     where
