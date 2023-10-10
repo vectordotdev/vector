@@ -10,7 +10,7 @@ runner:
     EXPECTED_LOG_EVENTS: '1000'
     VECTOR_RECEIVE_PORT: '8081'
     FAKE_INTAKE_AGENT_ENDPOINT: 'http://fakeintake-agent:80'
-    FAKE_INTAKE_VECTOR_ENDPOINT: 'http://fakeintake-agent-vector:80'
+    FAKE_INTAKE_VECTOR_ENDPOINT: 'http://fakeintake-vector:80'
 
 matrix:
   version: [latest]

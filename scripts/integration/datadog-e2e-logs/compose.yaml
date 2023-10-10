@@ -17,16 +17,16 @@ services:
       - log_path:/var/log/
 
   # Receives log data from the `datadog-agent-vector` service and sends
-  # to the `fakeintake-agent-vector` service.
+  # to the `fakeintake-vector` service.
   vector:
     depends_on:
-      - fakeintake-agent-vector
+      - fakeintake-vector
     build:
       context: ${PWD}
       dockerfile: tests/data/e2e/datadog/Dockerfile
       args:
         - RUST_VERSION=${RUST_VERSION}
-        - FEATURES=sources-datadog_agent,sinks-datadog_logs
+        - FEATURES=e2e-tests-datadog
     working_dir: /home/vector
     network_mode: host
     command:
@@ -35,7 +35,6 @@ services:
       - "/home/vector/tests/data/e2e/datadog/logs/vector.toml"
     volumes:
       - ${PWD}:/home/vector
-      - target:/home/vector/target
 
   # Tails a custom log created by `log_generator` and sends log data to
   # the `fakeintake-agent` service
@@ -86,7 +85,7 @@ services:
 
   # Receives log data from the `datadog-agent-vector` service. Is queried by the test runner
   # which does the validation of consistency with the other fakeintake service.
-  fakeintake-agent-vector:
+  fakeintake-vector:
     image: docker.io/datadog/fakeintake:${CONFIG_VERSION}
 
 networks:

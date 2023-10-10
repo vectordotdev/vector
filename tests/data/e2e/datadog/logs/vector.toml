@@ -11,7 +11,7 @@ store_api_key = false
 [sinks.dd]
 inputs = [ "agent.logs" ]
 type = "datadog_logs"
-default_api_key="unused"
-endpoint = "http://fakeintake-agent-vector:80"
+default_api_key = "unused"
+endpoint = "http://fakeintake-vector:80"
 batch.timeout_secs = 1
 compression = "gzip"
