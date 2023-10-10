@@ -564,28 +564,15 @@ fn decode_metadata(
 ) {
     let value = input.value.and_then(decode_value);
 
-    let datadog_origin_metadata = input
-        .datadog_origin_metadata
-        .as_ref()
-        .map(decode_origin_metadata);
+    let datadog_origin_metadata = input.datadog_origin_metadata.as_ref().map(|input| {
+        super::DatadogMetricOriginMetadata::new(
+            input.origin_product,
+            input.origin_category,
+            input.origin_service,
+        )
+    });
 
     (value, datadog_origin_metadata)
-}
-
-fn decode_origin_metadata(input: &DatadogOriginMetadata) -> super::DatadogMetricOriginMetadata {
-    let mut origin = super::DatadogMetricOriginMetadata::default();
-
-    if let Some(product) = input.origin_product {
-        origin = origin.with_product(product);
-    }
-    if let Some(category) = input.origin_category {
-        origin = origin.with_category(category);
-    }
-    if let Some(service) = input.origin_service {
-        origin = origin.with_service(service);
-    }
-
-    origin
 }
 
 fn decode_value(input: Value) -> Option<event::Value> {
