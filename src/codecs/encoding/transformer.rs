@@ -186,7 +186,7 @@ impl Transformer {
             let mut unix_timestamps = Vec::new();
             for (k, v) in log.all_event_fields().expect("must be an object") {
                 if let Value::Timestamp(ts) = v {
-                    unix_timestamps.push((k.clone(), extract(&ts).into()));
+                    unix_timestamps.push((k.clone(), extract(ts).into()));
                 }
             }
             for (k, v) in unix_timestamps {
@@ -195,7 +195,7 @@ impl Transformer {
         } else {
             // root is not an object
             let timestamp = if let Value::Timestamp(ts) = log.value() {
-                Some(extract(&ts))
+                Some(extract(ts))
             } else {
                 None
             };
