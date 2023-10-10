@@ -69,7 +69,7 @@ remap: functions: replace: {
 			return: "123"
 		},
 		{
-			title: "Replace with capture groups only in configuration file (requires escaping `$`)"
+			title: "Replace with capture groups only when set in the configuration file (requires escaping the `$` character)"
 			source: #"""
 				replace("foo123bar", r'foo(?P<num>\d+)bar', "$$num")
 				"""#
