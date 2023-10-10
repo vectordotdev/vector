@@ -319,6 +319,13 @@ impl Event {
         self
     }
 
+    /// Sets the `source_type` in the event metadata to the provided value.
+    #[must_use]
+    pub fn with_source_type(mut self, source_type: &'static str) -> Self {
+        self.metadata_mut().set_source_type(source_type);
+        self
+    }
+
     /// Sets the `upstream_id` in the event metadata to the provided value.
     #[must_use]
     pub fn with_upstream_id(mut self, upstream_id: Arc<OutputId>) -> Self {
