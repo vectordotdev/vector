@@ -27,6 +27,7 @@ use crate::{
     tls::{MaybeTlsSettings, MaybeTlsStream, TlsError},
 };
 
+#[allow(unreachable_pub)]
 #[derive(Debug, Snafu)]
 #[snafu(visibility(pub))]
 pub enum WebSocketError {
@@ -155,25 +156,25 @@ pub(crate) const fn is_closed(error: &WsError) -> bool {
     )
 }
 
-pub struct PingInterval {
+pub(crate) struct PingInterval {
     interval: Option<time::Interval>,
 }
 
 impl PingInterval {
-    pub fn new(period: Option<u64>) -> Self {
+    pub(crate) fn new(period: Option<u64>) -> Self {
         Self {
             interval: period.map(|period| time::interval(Duration::from_secs(period))),
         }
     }
 
-    pub fn poll_tick(&mut self, cx: &mut Context<'_>) -> Poll<time::Instant> {
+    pub(crate) fn poll_tick(&mut self, cx: &mut Context<'_>) -> Poll<time::Instant> {
         match self.interval.as_mut() {
             Some(interval) => interval.poll_tick(cx),
             None => Poll::Pending,
         }
     }
 
-    pub async fn tick(&mut self) -> time::Instant {
+    pub(crate) async fn tick(&mut self) -> time::Instant {
         std::future::poll_fn(|cx| self.poll_tick(cx)).await
     }
 }
