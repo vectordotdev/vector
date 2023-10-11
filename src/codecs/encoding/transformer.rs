@@ -6,6 +6,7 @@ use std::collections::BTreeMap;
 
 use lookup::lookup_v2::ConfigValuePath;
 use lookup::{event_path, PathPrefix};
+use ordered_float::NotNan;
 use serde::{Deserialize, Deserializer};
 use vector_config::configurable_component;
 use vector_core::event::{LogEvent, MaybeAsLogMut};
@@ -214,9 +215,9 @@ impl Transformer {
                 TimestampFormat::UnixNs => self.format_timestamps(log, |ts| {
                     ts.timestamp_nanos_opt().expect("Timestamp out of range")
                 }),
-                TimestampFormat::UnixFloat => {
-                    self.format_timestamps(log, |ts| ts.timestamp_micros() as f64 / 1e6)
-                }
+                TimestampFormat::UnixFloat => self.format_timestamps(log, |ts| {
+                    NotNan::new(ts.timestamp_micros() as f64 / 1e6).unwrap()
+                }),
                 // RFC3339 is the default serialization of a timestamp.
                 TimestampFormat::Rfc3339 => (),
             }
