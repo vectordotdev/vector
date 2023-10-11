@@ -100,7 +100,7 @@ remap: functions: parse_nginx_log: {
 			title: "Parse via Nginx log format (ingress_upstreaminfo)"
 			source: #"""
 				parse_nginx_log!(
-                    s'0.0.0.0 - bob [18/Mar/2023:15:00:00 +0000] "GET /some/path HTTP/2.0" 200 12312 "https://10.0.0.1/some/referer" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36" 462 0.050 [some-upstream-service-9000] [some-other-upstream-5000] 10.0.50.80:9000 19437 0.049 200 752178adb17130b291aefd8c386279e7',
+				    s'0.0.0.0 - bob [18/Mar/2023:15:00:00 +0000] "GET /some/path HTTP/2.0" 200 12312 "https://10.0.0.1/some/referer" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36" 462 0.050 [some-upstream-service-9000] [some-other-upstream-5000] 10.0.50.80:9000 19437 0.049 200 752178adb17130b291aefd8c386279e7',
 				    "ingress_upstreaminfo"
 				)
 				"""#
