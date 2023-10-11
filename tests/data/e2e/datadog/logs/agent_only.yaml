@@ -5,6 +5,7 @@ log_level: 'debug'
 inventories_configuration_enabled: false
 enable_metadata_collection: false
 enable_gohai: false
+cloud_provider_metadata: []
 
 apm_config:
   enabled: false

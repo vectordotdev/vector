@@ -59,12 +59,12 @@ async fn validate() {
     trace_init();
 
     println!("getting log payloads from agent-only pipeline");
-    let mut agent_payloads = get_payloads_agent(LOGS_ENDPOINT).await;
+    let mut agent_payloads = get_payloads_agent_json(LOGS_ENDPOINT).await;
 
     common_assertions(&mut agent_payloads);
 
     println!("getting log payloads from agent-vector pipeline");
-    let mut vector_payloads = get_payloads_vector(LOGS_ENDPOINT).await;
+    let mut vector_payloads = get_payloads_vector_json(LOGS_ENDPOINT).await;
 
     common_assertions(&mut vector_payloads);
 

@@ -1,10 +1,17 @@
 api_key: DEADBEEF
-log_level: 'debug'
+log_level: 'warn'
 
 # disable bunch of stuff we don't need
 inventories_configuration_enabled: false
-enable_metadata_collection: false
+# enable_metadata_collection: false
 enable_gohai: false
+cloud_provider_metadata: []
+
+# enable_payloads:
+    # series: false
+    # events: false
+    # service_checks: false
+    # sketches: false
 
 apm_config:
   enabled: false
@@ -20,6 +27,7 @@ logs_enabled: false
 
 # configure dogstatsd
 use_dogstatsd: true
+dogstatsd_non_local_traffic: true
 
 # configure metrics
 dd_url: http://fakeintake-agent:80

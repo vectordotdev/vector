@@ -15,7 +15,21 @@ fn fake_intake_agent_endpoint() -> String {
         .unwrap_or_else(|_| "http://127.0.0.1:8083".to_string())
 }
 
-// Fakeintake response
+// Fakeintake JSON response
+#[derive(Deserialize, Debug)]
+struct FakeIntakeJsonResponse {
+    payloads: Vec<FakeIntakeJsonPayload>,
+}
+
+#[allow(dead_code)]
+#[derive(Deserialize, Debug)]
+struct FakeIntakeJsonPayload {
+    data: Value,
+    encoding: String,
+    timestamp: String,
+}
+
+// Fakeintake raw response
 #[derive(Deserialize, Debug)]
 struct FakeIntakeResponse {
     payloads: Vec<FakeIntakePayload>,
@@ -24,12 +38,13 @@ struct FakeIntakeResponse {
 #[allow(dead_code)]
 #[derive(Deserialize, Debug)]
 struct FakeIntakePayload {
-    data: Value,
+    // base64 encoded
+    data: String,
     encoding: String,
     timestamp: String,
 }
 
-async fn get_fakeintake_payloads(base: &str, endpoint: &str) -> FakeIntakeResponse {
+async fn get_fakeintake_json_payloads(base: &str, endpoint: &str) -> FakeIntakeJsonResponse {
     let url = format!(
         "{}/fakeintake/payloads?endpoint={}&format=json",
         base, endpoint,
@@ -40,13 +55,13 @@ async fn get_fakeintake_payloads(base: &str, endpoint: &str) -> FakeIntakeRespon
         .send()
         .await
         .unwrap_or_else(|_| panic!("Sending GET request to {} failed", &url))
-        .json::<FakeIntakeResponse>()
+        .json::<FakeIntakeJsonResponse>()
         .await
         .expect("Parsing fakeintake payloads failed")
 }
 
-async fn get_payloads_agent(endpoint: &str) -> Vec<Value> {
-    let mut raw_payloads = get_fakeintake_payloads(&fake_intake_agent_endpoint(), endpoint)
+async fn get_payloads_agent_json(endpoint: &str) -> Vec<Value> {
+    let mut raw_payloads = get_fakeintake_json_payloads(&fake_intake_agent_endpoint(), endpoint)
         .await
         .payloads;
 
@@ -60,11 +75,36 @@ async fn get_payloads_agent(endpoint: &str) -> Vec<Value> {
     raw_payloads.into_iter().map(|raw| raw.data).collect()
 }
 
-async fn get_payloads_vector(endpoint: &str) -> Vec<Value> {
-    get_fakeintake_payloads(&fake_intake_vector_endpoint(), endpoint)
+async fn get_payloads_vector_json(endpoint: &str) -> Vec<Value> {
+    get_fakeintake_json_payloads(&fake_intake_vector_endpoint(), endpoint)
         .await
         .payloads
         .into_iter()
         .map(|raw| raw.data)
         .collect()
+}
+
+async fn get_fakeintake_payloads(base: &str, endpoint: &str) -> FakeIntakeResponse {
+    let url = format!("{}/fakeintake/payloads?endpoint={}", base, endpoint,);
+
+    Client::new()
+        .request(Method::GET, &url)
+        .send()
+        .await
+        .unwrap_or_else(|_| panic!("Sending GET request to {} failed", &url))
+        .json::<FakeIntakeResponse>()
+        .await
+        .expect("Parsing fakeintake payloads failed")
+}
+
+async fn get_payloads_agent(endpoint: &str) -> Vec<FakeIntakePayload> {
+    get_fakeintake_payloads(&fake_intake_agent_endpoint(), endpoint)
+        .await
+        .payloads
+}
+
+async fn get_payloads_vector(endpoint: &str) -> Vec<FakeIntakePayload> {
+    get_fakeintake_payloads(&fake_intake_vector_endpoint(), endpoint)
+        .await
+        .payloads
 }

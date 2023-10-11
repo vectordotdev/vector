@@ -2,6 +2,7 @@ version: '3'
 
 services:
 
+  # Emits metrics to the Agent only path
   dogstatsd-client-agent:
     build: ./dogstatsd_client
     environment:
@@ -9,41 +10,36 @@ services:
     depends_on:
       - datadog-agent
 
-  dogstatsd-client-agent-vector:
+  # Emits metrics to the Agent-Vector path
+  dogstatsd-client-vector:
     build: ./dogstatsd_client
     environment:
     - STATSD_HOST=datadog-agent-vector
     depends_on:
       - datadog-agent-vector
 
-  # and sends metric data to
-  # the `fakeintake-agent` service
+  # Sends metric data received from the Emitter to the `fakeintake-agent` service
   datadog-agent:
     image: docker.io/datadog/agent:${CONFIG_VERSION}
     depends_on:
       - fakeintake-agent
     environment:
     - DD_API_KEY=${TEST_DATADOG_API_KEY:?TEST_DATADOG_API_KEY required}
+    # - DD_API_KEY=DEADBEEF
     - DD_HOSTNAME=datadog-agent
-    - DD_ENABLE_PAYLOADS_EVENTS=false
-    - DD_ENABLE_PAYLOADS_SERVICE_CHECKS=false
-    - DD_CONTAINER_EXCLUDE="name:.*"
     volumes:
     # The Agent config file
     - ../../../tests/data/e2e/datadog/metrics/agent_only.yaml:/etc/datadog-agent/datadog.yaml
 
-  # and sends metric data to
-  # the `vector` service
+  # Sends metric data received from the Emitter to the `vector` service
   datadog-agent-vector:
     image: docker.io/datadog/agent:${CONFIG_VERSION}
     depends_on:
       - vector
     environment:
     - DD_API_KEY=${TEST_DATADOG_API_KEY:?TEST_DATADOG_API_KEY required}
+    # - DD_API_KEY=DEADBEEF
     - DD_HOSTNAME=datadog-agent-vector
-    - DD_ENABLE_PAYLOADS_EVENTS=false
-    - DD_ENABLE_PAYLOADS_SERVICE_CHECKS=false
-    - DD_CONTAINER_EXCLUDE="name:.*"
     volumes:
     # The Agent config file
     - ../../../tests/data/e2e/datadog/metrics/agent_vector.yaml:/etc/datadog-agent/datadog.yaml
