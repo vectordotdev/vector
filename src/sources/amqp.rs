@@ -218,7 +218,7 @@ pub(crate) async fn amqp_source(
             .connect()
             .await
             .map_err(|source| BuildError::AmqpCreateError {
-                source: dbg!(source),
+                source,
             })?;
 
     Ok(Box::pin(run_amqp_source(
