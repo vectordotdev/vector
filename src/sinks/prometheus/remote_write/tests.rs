@@ -150,8 +150,6 @@ async fn retains_state_between_requests() {
     )
     .await;
 
-    dbg!(&outputs);
-
     assert_eq!(outputs.len(), 3);
 
     let check_output = |index: usize, name: &str, value: f64| {

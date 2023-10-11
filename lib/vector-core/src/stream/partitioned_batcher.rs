@@ -183,7 +183,7 @@ impl BatcherSettings {
 }
 
 #[pin_project]
-pub struct PartitionedBatcher<St, Prt, KT, C, F>
+pub struct PartitionedBatcher<St, Prt, KT, C, F, B>
 where
     Prt: Partitioner,
 {
@@ -196,7 +196,7 @@ where
     /// The store of 'closed' batches. When this is not empty it will be
     /// preferentially flushed prior to consuming any new items from the
     /// underlying stream.
-    closed_batches: Vec<(Prt::Key, Vec<Prt::Item>)>,
+    closed_batches: Vec<(Prt::Key, B)>,
     /// The queue of pending batch expirations
     timer: KT,
     /// The partitioner for this `Batcher`
@@ -206,7 +206,7 @@ where
     stream: Fuse<St>,
 }
 
-impl<St, Prt, C, F> PartitionedBatcher<St, Prt, ExpirationQueue<Prt::Key>, C, F>
+impl<St, Prt, C, F, B> PartitionedBatcher<St, Prt, ExpirationQueue<Prt::Key>, C, F, B>
 where
     St: Stream<Item = Prt::Item>,
     Prt: Partitioner + Unpin,
@@ -229,7 +229,7 @@ where
 }
 
 #[cfg(test)]
-impl<St, Prt, KT, C, F> PartitionedBatcher<St, Prt, KT, C, F>
+impl<St, Prt, KT, C, F, B> PartitionedBatcher<St, Prt, KT, C, F, B>
 where
     St: Stream<Item = Prt::Item>,
     Prt: Partitioner + Unpin,
@@ -250,11 +250,7 @@ where
     }
 }
 
-pub trait BatchOutput<T> {}
-
-impl<T> BatchOutput<T> for Vec<T> {}
-
-impl<St, Prt, KT, C, F, B> Stream for PartitionedBatcher<St, Prt, KT, C, F>
+impl<St, Prt, KT, C, F, B> Stream for PartitionedBatcher<St, Prt, KT, C, F, B>
 where
     St: Stream<Item = Prt::Item>,
     Prt: Partitioner + Unpin,
@@ -262,9 +258,7 @@ where
     Prt::Item: ByteSizeOf,
     KT: KeyedTimer<Prt::Key>,
     C: BatchConfig<Prt::Item, Batch = B>,
-    // C: BatchConfig<Prt::Item>,
     F: Fn() -> C + Send,
-    B: BatchOutput<Prt::Item>,
 {
     type Item = (Prt::Key, B);
 
@@ -272,82 +266,80 @@ where
         self.stream.size_hint()
     }
 
-    #[allow(warnings)]
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        todo!()
-        // let mut this = self.project();
-        // loop {
-        //     if !this.closed_batches.is_empty() {
-        //         return Poll::Ready(this.closed_batches.pop());
-        //     }
-        // match this.stream.as_mut().poll_next(cx) {
-        //     Poll::Pending => match this.timer.poll_expired(cx) {
-        //         // Unlike normal streams, `DelayQueue` can return `None`
-        //         // here but still be usable later if more entries are added.
-        //         Poll::Pending | Poll::Ready(None) => return Poll::Pending,
-        //         Poll::Ready(Some(item_key)) => {
-        //             let mut batch = this
-        //                 .batches
-        //                 .remove(&item_key)
-        //                 .expect("batch should exist if it is set to expire");
-        //             this.closed_batches.push((item_key, batch.take_batch()));
-        //         }
-        //     },
-        //     Poll::Ready(None) => {
-        //         // Now that the underlying stream is closed, we need to
-        //         // clear out our batches, including all expiration
-        //         // entries. If we had any batches to hand over, we have to
-        //         // continue looping so the caller can drain them all before
-        //         // we finish.
-        //         if !this.batches.is_empty() {
-        //             this.timer.clear();
-        //             this.closed_batches.extend(
-        //                 this.batches
-        //                     .drain()
-        //                     .map(|(key, mut batch)| (key, batch.take_batch())),
-        //             );
-        //             continue;
-        //         }
-        //         return Poll::Ready(None);
-        //     }
-        //     Poll::Ready(Some(item)) => {
-        //         let item_key = this.partitioner.partition(&item);
+        let mut this = self.project();
+        loop {
+            if !this.closed_batches.is_empty() {
+                return Poll::Ready(this.closed_batches.pop());
+            }
+            match this.stream.as_mut().poll_next(cx) {
+                Poll::Pending => match this.timer.poll_expired(cx) {
+                    // Unlike normal streams, `DelayQueue` can return `None`
+                    // here but still be usable later if more entries are added.
+                    Poll::Pending | Poll::Ready(None) => return Poll::Pending,
+                    Poll::Ready(Some(item_key)) => {
+                        let mut batch = this
+                            .batches
+                            .remove(&item_key)
+                            .expect("batch should exist if it is set to expire");
+                        this.closed_batches.push((item_key, batch.take_batch()));
+                    }
+                },
+                Poll::Ready(None) => {
+                    // Now that the underlying stream is closed, we need to
+                    // clear out our batches, including all expiration
+                    // entries. If we had any batches to hand over, we have to
+                    // continue looping so the caller can drain them all before
+                    // we finish.
+                    if !this.batches.is_empty() {
+                        this.timer.clear();
+                        this.closed_batches.extend(
+                            this.batches
+                                .drain()
+                                .map(|(key, mut batch)| (key, batch.take_batch())),
+                        );
+                        continue;
+                    }
+                    return Poll::Ready(None);
+                }
+                Poll::Ready(Some(item)) => {
+                    let item_key = this.partitioner.partition(&item);
 
-        //         // Get the batch for this partition, or create a new one.
-        //         let batch = if let Some(batch) = this.batches.get_mut(&item_key) {
-        //             batch
-        //         } else {
-        //             let batch = (this.state)();
-        //             this.batches.insert(item_key.clone(), batch);
-        //             this.batches
-        //                 .get_mut(&item_key)
-        //                 .expect("batch has just been inserted so should exist")
-        //         };
+                    // Get the batch for this partition, or create a new one.
+                    let batch = if let Some(batch) = this.batches.get_mut(&item_key) {
+                        batch
+                    } else {
+                        let batch = (this.state)();
+                        this.batches.insert(item_key.clone(), batch);
+                        this.batches
+                            .get_mut(&item_key)
+                            .expect("batch has just been inserted so should exist")
+                    };
 
-        //         let (fits, metadata) = batch.item_fits_in_batch(&item);
-        //         if !fits {
-        //             // This batch is too full to accept a new item, so we move the contents of
-        //             // the batch into `closed_batches` to be push out of this stream on the
-        //             // next iteration.
-        //             this.closed_batches
-        //                 .push((item_key.clone(), batch.take_batch()));
-        //         }
+                    let (fits, metadata) = batch.item_fits_in_batch(&item);
+                    if !fits {
+                        // This batch is too full to accept a new item, so we move the contents of
+                        // the batch into `closed_batches` to be push out of this stream on the
+                        // next iteration.
+                        this.closed_batches
+                            .push((item_key.clone(), batch.take_batch()));
+                    }
 
-        //         // Insert the item into the batch.
-        //         batch.push(item, metadata);
-        //         if batch.is_batch_full() {
-        //             // If the insertion means the batch is now full, we clear out the batch and
-        //             // remove it from the list.
-        //             this.closed_batches
-        //                 .push((item_key.clone(), batch.take_batch()));
-        //             this.batches.remove(&item_key);
-        //             this.timer.remove(&item_key);
-        //         } else {
-        //             this.timer.insert(item_key);
-        //         }
-        //     }
-        // }
-        // }
+                    // Insert the item into the batch.
+                    batch.push(item, metadata);
+                    if batch.is_batch_full() {
+                        // If the insertion means the batch is now full, we clear out the batch and
+                        // remove it from the list.
+                        this.closed_batches
+                            .push((item_key.clone(), batch.take_batch()));
+                        this.batches.remove(&item_key);
+                        this.timer.remove(&item_key);
+                    } else {
+                        this.timer.insert(item_key);
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -606,98 +598,6 @@ mod test {
                 assert!(v.is_empty());
             }
         }
-    }
-
-    #[tokio::test]
-    async fn zorkwonk() {
-        // let stream = (0..20).collect::<Vec<_>>();
-        // let stream = vec![
-        //     7037641852729981347,
-        //     8644263311095074276,
-        //     4920834891500558744,
-        //     15150872024001141310,
-        //     12803461249171200340,
-        // ];
-        let stream = vec![
-            7037641852729981347,
-            8644263311095074276,
-            4920834891500558744,
-            15150872024001141310,
-            12803461249171200340,
-        ];
-        let item_limit = 1;
-        let allocation_limit = 8;
-        let partitioner = TestPartitioner {
-            key_space: NonZeroU8::new(23).unwrap(),
-        };
-        let mut count = 0;
-        let timer = TestTimer::new(
-            std::iter::from_fn(move || {
-                if count > 254 {
-                    None
-                } else {
-                    count += 1;
-                    if count % 5 == 0 {
-                        Some(Poll::Ready(Some(count)))
-                    } else {
-                        Some(Poll::Ready(None))
-                    }
-                }
-            })
-            .collect(),
-        );
-
-        // Asserts that for every received batch received the elements in
-        // the batch are not reordered within a batch. No claim is made on
-        // when batches themselves will issue, batch sizes etc.
-        let noop_waker = futures::task::noop_waker();
-        let mut cx = Context::from_waker(&noop_waker);
-
-        let mut partitions = separate_partitions(stream.clone(), &partitioner);
-
-        let mut stream = stream::iter(stream.into_iter());
-        let item_limit = NonZeroUsize::new(item_limit as usize).unwrap();
-        let allocation_limit = NonZeroUsize::new(allocation_limit as usize).unwrap();
-        let batch_settings =
-            BatcherSettings::new(Duration::from_secs(1), allocation_limit, item_limit);
-
-        let mut batcher = PartitionedBatcher::with_timer(
-            &mut stream,
-            partitioner,
-            timer,
-            Box::new(move || batch_settings.clone().as_byte_size_config()),
-        );
-        // let mut batcher = PartitionedBatcher::new(
-        //     &mut stream,
-        //     partitioner,
-        //     // timer,
-        //     Box::new(move || batch_settings.clone().into_byte_size_config()),
-        // );
-        let mut batcher = Pin::new(&mut batcher);
-
-        loop {
-            match batcher.as_mut().poll_next(&mut cx) {
-                Poll::Pending => {}
-                Poll::Ready(None) => {
-                    break;
-                }
-                Poll::Ready(Some((key, actual_batch))) => {
-                    let expected_partition =
-                        partitions.get_mut(&key).expect("impossible situation");
-
-                    dbg!(&actual_batch);
-                    dbg!(&expected_partition);
-
-                    for item in actual_batch {
-                        assert_eq!(item, expected_partition.pop().unwrap());
-                    }
-                }
-            }
-        }
-        for v in partitions.values() {
-            assert!(v.is_empty());
-        }
-        // panic!();
     }
 
     proptest! {

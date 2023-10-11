@@ -8,4 +8,4 @@ mod partitioned_batcher;
 pub use concurrent_map::ConcurrentMap;
 pub use driver::{Driver, DriverResponse};
 use futures_unordered_count::FuturesUnorderedCount;
-pub use partitioned_batcher::{BatchOutput, BatcherSettings, ExpirationQueue, PartitionedBatcher};
+pub use partitioned_batcher::{BatcherSettings, ExpirationQueue, PartitionedBatcher};

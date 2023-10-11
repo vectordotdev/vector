@@ -103,7 +103,7 @@ impl RequestBuilder<(PartitionKey, EventCollection)> for RemoteWriteRequestBuild
         &self,
         input: (PartitionKey, EventCollection),
     ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
-        let (key, mut events) = input;
+        let (key, events) = input;
         let finalizers = events.finalizers;
         let metrics = events.events.into_metrics();
         let builder = RequestMetadataBuilder::from_events(&metrics);

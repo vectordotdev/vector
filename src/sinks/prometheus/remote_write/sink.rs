@@ -87,8 +87,6 @@ impl Default for EventCollection {
     }
 }
 
-impl<T> vector_core::stream::BatchOutput<T> for Vec<T> {}
-
 pub(super) struct RemoteWriteSink<S> {
     pub(super) tenant_id: Option<Template>,
     pub(super) batch_settings: BatcherSettings,
@@ -126,7 +124,7 @@ where
             .filter_map(move |event| {
                 future::ready(make_remote_write_event(tenant_id.as_ref(), event))
             })
-            .batched_partitioned(PrometheusTenantIdPartitioner, || fun_name(batch_settings))
+            .batched_partitioned(PrometheusTenantIdPartitioner, || reducer(batch_settings))
             .request_builder(default_request_builder_concurrency_limit(), request_builder)
             .filter_map(|request| async move {
                 match request {
@@ -143,7 +141,8 @@ where
     }
 }
 
-fn fun_name(
+/// Create a reducer from the batch settings.
+fn reducer(
     batch_settings: BatcherSettings,
 ) -> BatchConfigParts<
     SizeLimit<ByteSizeOfItemSize>,
