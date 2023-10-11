@@ -202,7 +202,7 @@ tower = { version = "0.4.13", default-features = false, features = ["buffer", "l
 tower-http = { version = "0.4.4", default-features = false, features = ["decompression-gzip"]}
 # Serde
 serde = { version = "1.0.188", default-features = false, features = ["derive"] }
-serde-toml-merge = { version = "0.3.2", default-features = false }
+serde-toml-merge = { version = "0.3.3", default-features = false }
 serde_bytes = { version = "0.11.12", default-features = false, features = ["std"], optional = true }
 serde_json = { version = "1.0.107", default-features = false, features = ["raw_value"] }
 serde_with = { version = "3.3.0", default-features = false, features = ["macros", "std"] }
