@@ -1,0 +1,36 @@
+data_dir: "/var/lib/vector"
+
+##
+## Sources
+##
+
+sources:
+  internal_metrics:
+    type: "internal_metrics"
+
+  http_source:
+    type:             "http"
+    acknowledgements: true
+    address:          "0.0.0.0:8282"
+
+##
+## Sinks
+##
+
+sinks:
+  prometheus:
+    type:    "prometheus_exporter"
+    inputs: [ "internal_metrics" ]
+    address: "0.0.0.0:9090"
+
+  http_sink:
+    type: "http"
+    inputs: [ "http_source" ]
+    uri:  "http://localhost:8080"
+    encoding:
+      codec: "text"
+    healthcheck:
+      enabled: false
+    buffer:
+      type:       "memory"
+      max_events: 50000  # buffer 50 payloads at a time
