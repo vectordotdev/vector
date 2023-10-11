@@ -10,15 +10,10 @@ sources:
 
   opentelemetry:
     type: "opentelemetry"
-
-  opentelemetry.http:
-    address: "127.0.0.1:4318"
-
-  opentelemetry.grpc:
-    address: "127.0.0.1:4317"
-
-  opentelemetry.logs:  # Please replace this with the actual structure based on your configuration
-  # ...
+    http:
+      address: "127.0.0.1:4318"
+    grpc:
+      address: "127.0.0.1:4317"
 
 ##
 ## Sinks
@@ -32,7 +27,7 @@ sinks:
 
   socket_sink:
     type:    "socket"
-    inputs: [ "opentelemetry.logs" ]  # Please replace this with the actual structure based on your configuration
+    inputs: [ "opentelemetry.logs" ]
     mode:    "tcp"
     address: "127.0.0.1:15400"
     encoding:

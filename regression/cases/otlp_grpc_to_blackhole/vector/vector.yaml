@@ -10,12 +10,10 @@ sources:
 
   opentelemetry:
     type: "opentelemetry"
-
-  opentelemetry.http:
-    address: "127.0.0.1:4318"
-
-  opentelemetry.grpc:
-    address: "127.0.0.1:4317"
+    http:
+      address: "127.0.0.1:4318"
+    grpc:
+      address: "127.0.0.1:4317"
 
 ##
 ## Sinks

@@ -20,10 +20,9 @@ transforms:
   container_type:
     type: "route"
     inputs: [ "splunk" ]
-
-  container_type.route:
-    service: '.attrs.c2cContainerType == "service"'
-    sidecar: '.attrs.c2cContainerType != "service"'
+    route:
+      service: '.attrs.c2cContainerType == "service"'
+      sidecar: '.attrs.c2cContainerType != "service"'
 
 ##
 ## Sinks

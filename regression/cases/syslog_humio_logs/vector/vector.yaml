@@ -11,7 +11,7 @@ sources:
   syslog:
     type:       "syslog"
     address:    "0.0.0.0:8282"
-    max_length: 1_500_000
+    max_length: 1500000
     mode:       "tcp"
 
 ##

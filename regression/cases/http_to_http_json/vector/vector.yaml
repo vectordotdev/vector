@@ -10,7 +10,7 @@ sources:
 
   http_source:
     type:             "http"
-    acknowledgements: true
+    acknowledgements: false
     address:          "0.0.0.0:8282"
 
 ##
