@@ -23,7 +23,7 @@ transforms:
     inputs: [ "datadog_agent" ]
     source: |
             .hostname = "vector"
-            
+
             if .status == "warning" {
               .thing = upcase(.hostname)
             } else if .status == "notice" {
@@ -31,7 +31,7 @@ transforms:
             } else {
               .nong = upcase(.hostname)
             }
-            
+
             .matches = { "name": .message, "num": "2" }
             .origin, .err = .hostname + "/" + .matches.name + "/" + .matches.num
 
