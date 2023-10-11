@@ -97,7 +97,9 @@ impl encoding::Encoder<Vec<Metric>> for StackdriverMetricsEncoder {
 
                         (*value, interval, gcp::GcpMetricKind::Gauge)
                     }
-                    _ => unreachable!(),
+                    _ => {
+                        unreachable!("sink has filtered out all metrics that aren't counter or gauge by this point")
+                    },
                 };
                 let metric_labels = series
                     .tags

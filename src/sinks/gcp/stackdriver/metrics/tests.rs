@@ -3,11 +3,11 @@ use futures::{future::ready, stream};
 use serde::Deserialize;
 use vector_core::event::{Metric, MetricKind, MetricValue};
 
-use super::{config::StackdriverConfig, *};
+use super::config::StackdriverConfig;
 use crate::{
     config::SinkContext,
     gcp::GcpAuthConfig,
-    sinks::util::test::build_test_server,
+    sinks::{prelude::*, util::test::build_test_server},
     test_util::{
         components::{run_and_assert_sink_compliance, SINK_TAGS},
         http::{always_200_response, spawn_blackhole_http_server},

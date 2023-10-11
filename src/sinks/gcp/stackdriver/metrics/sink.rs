@@ -37,7 +37,7 @@ where
     S::Response: DriverResponse + Send + 'static,
     S::Error: std::fmt::Debug + Into<crate::Error> + Send,
 {
-    /// Creates a new `StackdriverLogsSink`.
+    /// Creates a new `StackdriverMetricsSink`.
     pub(super) const fn new(
         service: S,
         batch_settings: BatcherSettings,

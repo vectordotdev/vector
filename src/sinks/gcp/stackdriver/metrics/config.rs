@@ -15,7 +15,6 @@ use crate::{
 use super::{
     request_builder::{StackdriverMetricsEncoder, StackdriverMetricsRequestBuilder},
     sink::StackdriverMetricsSink,
-    StackdriverMetricsDefaultBatchSettings,
 };
 
 /// Configuration for the `gcp_stackdriver_metrics` sink.
@@ -113,10 +112,10 @@ impl SinkConfig for StackdriverConfig {
 
         auth.spawn_regenerate_token();
 
-        let stackdriver_logs_service_request_builder =
+        let stackdriver_metrics_service_request_builder =
             StackdriverMetricsServiceRequestBuilder { uri, auth };
 
-        let service = HttpService::new(client, stackdriver_logs_service_request_builder);
+        let service = HttpService::new(client, stackdriver_metrics_service_request_builder);
 
         let service = ServiceBuilder::new()
             .settings(request_limits, http_response_retry_logic())
@@ -134,6 +133,15 @@ impl SinkConfig for StackdriverConfig {
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
     }
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+pub struct StackdriverMetricsDefaultBatchSettings;
+
+impl SinkBatchSettings for StackdriverMetricsDefaultBatchSettings {
+    const MAX_EVENTS: Option<usize> = Some(1);
+    const MAX_BYTES: Option<usize> = None;
+    const TIMEOUT_SECS: f64 = 1.0;
 }
 
 #[derive(Debug, Clone)]
