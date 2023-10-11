@@ -5,7 +5,7 @@ on:
 
 jobs:
   unit-mac:
-    runs-on: macos-11
+    runs-on: macos-13
     env:
       CARGO_INCREMENTAL: 0
     steps:
