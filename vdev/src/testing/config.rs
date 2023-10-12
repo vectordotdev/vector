@@ -167,20 +167,28 @@ impl IntegrationTestConfig {
     }
 
     pub fn load(integration: &str) -> Result<(PathBuf, Self)> {
-        let test_dir: PathBuf = [app::path(), "scripts", "integration", integration]
+        let mut test_dir: PathBuf = [app::path(), "scripts", "integration", integration]
             .iter()
             .collect();
         if !test_dir.is_dir() {
-            bail!("unknown integration: {}", integration);
+            // try the e2e dir now
+
+            // TODO: This is a temporary solution, looking in both dirs. When this GH issue
+            // https://github.com/vectordotdev/vector/issues/18829 , is worked, we will refactor
+            // to have a separate e2e subcommand that both int and e2e will leverage.
+            test_dir = [app::path(), "scripts", "e2e", integration]
+                .iter()
+                .collect();
+            if !test_dir.is_dir() {
+                bail!("unknown integration: {}", integration);
+            }
         }
 
         let config = Self::parse_file(&test_dir.join(FILE_NAME))?;
         Ok((test_dir, config))
     }
 
-    pub fn collect_all() -> Result<BTreeMap<String, Self>> {
-        let mut configs = BTreeMap::new();
-        let tests_dir: PathBuf = [app::path(), "scripts", "integration"].iter().collect();
+    fn collect_all_dir(tests_dir: &Path, configs: &mut BTreeMap<String, Self>) -> Result<()> {
         for entry in tests_dir.read_dir()? {
             let entry = entry?;
             if entry.path().is_dir() {
@@ -192,6 +200,20 @@ impl IntegrationTestConfig {
                 }
             }
         }
+        Ok(())
+    }
+
+    pub fn collect_all() -> Result<BTreeMap<String, Self>> {
+        let mut configs = BTreeMap::new();
+
+        // TODO: This is a temporary solution, looking in both dirs. When this GH issue
+        // https://github.com/vectordotdev/vector/issues/18829 , is worked, we will refactor
+        // to have a separate e2e subcommand that both int and e2e will leverage.
+        let int_tests_dir: PathBuf = [app::path(), "scripts", "integration"].iter().collect();
+        let e2e_tests_dir: PathBuf = [app::path(), "scripts", "e2e"].iter().collect();
+
+        Self::collect_all_dir(&int_tests_dir, &mut configs)?;
+        Self::collect_all_dir(&e2e_tests_dir, &mut configs)?;
 
         Ok(configs)
     }

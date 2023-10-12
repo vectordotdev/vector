@@ -192,6 +192,21 @@ base: components: sources: kafka: configuration: {
 			}
 		}
 	}
+	drain_timeout_ms: {
+		description: """
+			Timeout to drain pending acknowledgements during shutdown or a Kafka
+			consumer group rebalance.
+
+			When Vector shuts down or the Kafka consumer group revokes partitions from this
+			consumer, wait a maximum of `drain_timeout_ms` for the source to
+			process pending acknowledgements. Must be less than `session_timeout_ms`
+			to ensure the consumer is not excluded from the group during a rebalance.
+
+			Default value is half of `session_timeout_ms`.
+			"""
+		required: false
+		type: uint: examples: [2500, 5000]
+	}
 	fetch_wait_max_ms: {
 		description: "Maximum time the broker may wait to fill the response."
 		required:    false
