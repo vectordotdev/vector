@@ -164,6 +164,32 @@ async fn retains_state_between_requests() {
     check_output(2, "counter-1", 26.0);
 }
 
+#[tokio::test]
+async fn aggregates_batches() {
+    let outputs = send_request(
+        r#"batch.max_events = 2"#,
+        vec![
+            create_inc_event("counter-1".into(), 12.0),
+            create_inc_event("counter-2".into(), 13.0),
+            create_inc_event("counter-1".into(), 14.0),
+            create_inc_event("counter-2".into(), 14.0),
+        ],
+    )
+    .await;
+
+    assert_eq!(outputs.len(), 1);
+
+    let (_, req) = &outputs[0];
+    assert_eq!(req.timeseries.len(), 2);
+    assert_eq!(req.timeseries[0].labels, labels!("__name__" => "counter-1"));
+    assert_eq!(req.timeseries[0].samples.len(), 1);
+    assert_eq!(req.timeseries[0].samples[0].value, 26.0);
+
+    assert_eq!(req.timeseries[1].labels, labels!("__name__" => "counter-2"));
+    assert_eq!(req.timeseries[1].samples.len(), 1);
+    assert_eq!(req.timeseries[1].samples[0].value, 27.0);
+}
+
 async fn send_request(config: &str, events: Vec<Event>) -> Vec<(HeaderMap, proto::WriteRequest)> {
     assert_sink_compliance(&HTTP_SINK_TAGS, async {
         let addr = test_util::next_addr();
