@@ -64,8 +64,8 @@ on:
         value: ${{ jobs.int_tests.outputs.datadog-metrics }}
       datadog-traces:
         value: ${{ jobs.int_tests.outputs.datadog-traces }}
-      datadog-e2e-logs:
-        value: ${{ jobs.int_tests.outputs.datadog-e2e-logs }}
+      e2e-datadog-logs:
+        value: ${{ jobs.int_tests.outputs.e2e-datadog-logs }}
       dnstap:
         value: ${{ jobs.int_tests.outputs.dnstap }}
       docker-logs:
@@ -198,7 +198,7 @@ jobs:
       datadog-logs: ${{ steps.filter.outputs.datadog-logs }}
       datadog-metrics: ${{ steps.filter.outputs.datadog-metrics }}
       datadog-traces: ${{ steps.filter.outputs.datadog-traces }}
-      datadog-e2e-logs: ${{ steps.filter.outputs.datadog-e2e-logs }}
+      e2e-datadog-logs: ${{ steps.filter.outputs.e2e-datadog-logs }}
       dnstap: ${{ steps.filter.outputs.dnstap }}
       docker-logs: ${{ steps.filter.outputs.docker-logs }}
       elasticsearch: ${{ steps.filter.outputs.elasticsearch }}
