@@ -30,7 +30,6 @@ pub mod unix;
 mod unix_datagram;
 #[cfg(all(unix, feature = "sources-utils-net-unix"))]
 mod unix_stream;
-pub mod websocket;
 mod wrappers;
 
 #[cfg(feature = "sources-file")]

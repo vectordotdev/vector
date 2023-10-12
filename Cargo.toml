@@ -495,6 +495,7 @@ sources-logs = [
   "sources-stdin",
   "sources-syslog",
   "sources-vector",
+  "sources-websocket",
 ]
 sources-metrics = [
   "sources-apache_metrics",
@@ -508,6 +509,7 @@ sources-metrics = [
   "sources-prometheus",
   "sources-statsd",
   "sources-vector",
+  "sources-websocket",
 ]
 
 sources-amqp = ["lapin"]
@@ -559,6 +561,7 @@ sources-utils-net = ["sources-utils-net-tcp", "sources-utils-net-udp", "sources-
 sources-utils-net-tcp = ["listenfd"]
 sources-utils-net-udp = ["listenfd"]
 sources-utils-net-unix = []
+sources-websocket = []
 
 sources-vector = ["dep:tonic", "protobuf-build"]
 
