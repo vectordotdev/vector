@@ -64,14 +64,14 @@ on:
         value: ${{ jobs.int_tests.outputs.datadog-metrics }}
       datadog-traces:
         value: ${{ jobs.int_tests.outputs.datadog-traces }}
-      e2e-datadog-logs:
-        value: ${{ jobs.int_tests.outputs.e2e-datadog-logs }}
-      datadog-e2e-metrics:
-        value: ${{ jobs.int_tests.outputs.datadog-e2e-metrics }}
       dnstap:
         value: ${{ jobs.int_tests.outputs.dnstap }}
       docker-logs:
         value: ${{ jobs.int_tests.outputs.docker-logs }}
+      e2e-datadog-logs:
+        value: ${{ jobs.int_tests.outputs.e2e-datadog-logs }}
+      e2e-datadog-metrics:
+        value: ${{ jobs.int_tests.outputs.e2e-datadog-metrics }}
       elasticsearch:
         value: ${{ jobs.int_tests.outputs.elasticsearch }}
       eventstoredb:
@@ -200,10 +200,13 @@ jobs:
       datadog-logs: ${{ steps.filter.outputs.datadog-logs }}
       datadog-metrics: ${{ steps.filter.outputs.datadog-metrics }}
       datadog-traces: ${{ steps.filter.outputs.datadog-traces }}
-      e2e-datadog-logs: ${{ steps.filter.outputs.e2e-datadog-logs }}
-      datadog-e2e-metrics: ${{ steps.filter.outputs.datadog-e2e-metrics }}
       dnstap: ${{ steps.filter.outputs.dnstap }}
       docker-logs: ${{ steps.filter.outputs.docker-logs }}
+
+      # TODO: when https://github.com/vectordotdev/vector/issues/18829 is undertaken,
+      # part of that will involve updating this job to also run `cargo vdev e2e ci-paths`
+      e2e-datadog-logs: ${{ steps.filter.outputs.e2e-datadog-logs }}
+      e2e-datadog-metrics: ${{ steps.filter.outputs.e2e-datadog-metrics }}
       elasticsearch: ${{ steps.filter.outputs.elasticsearch }}
       eventstoredb: ${{ steps.filter.outputs.eventstoredb }}
       fluent: ${{ steps.filter.outputs.fluent }}

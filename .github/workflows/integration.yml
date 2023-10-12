@@ -64,10 +64,10 @@ jobs:
             || needs.changes.outputs.datadog-logs == 'true'
             || needs.changes.outputs.datadog-metrics == 'true'
             || needs.changes.outputs.datadog-traces == 'true'
-            || needs.changes.outputs.e2e-datadog-logs == 'true'
-            || needs.changes.outputs.datadog-e2e-metrics == 'true'
             || needs.changes.outputs.dnstap == 'true'
             || needs.changes.outputs.docker-logs == 'true'
+            || needs.changes.outputs.e2e-datadog-logs == 'true'
+            || needs.changes.outputs.e2e-datadog-metrics == 'true'
             || needs.changes.outputs.elasticsearch == 'true'
             || needs.changes.outputs.eventstoredb == 'true'
             || needs.changes.outputs.fluent == 'true'
@@ -216,14 +216,14 @@ jobs:
           max_attempts: 3
           command: bash scripts/ci-integration-test.sh  e2e-datadog-logs
 
-      - if: (github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.datadog-e2e-metrics == 'true') &&
+      - if: (github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.e2e-datadog-metrics == 'true') &&
           (github.event_name != 'pull_request' || env.PR_HAS_ACCESS_TO_SECRETS == 'true')
-        name: datadog-e2e-metrics
+        name: e2e-datadog-metrics
         uses: nick-fields/retry@v2
         with:
           timeout_minutes: 60
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh  datadog-e2e-metrics
+          command: bash scripts/ci-integration-test.sh  e2e-datadog-metrics
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.dnstap == 'true' }}
         name: dnstap
