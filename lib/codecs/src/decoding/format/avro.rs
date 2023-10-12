@@ -223,7 +223,7 @@ pub fn try_from(value: AvroValue) -> vector_common::Result<VrlValue> {
                 .ok_or("failed to convert TimestampMillis")?,
         )),
         AvroValue::Union(_, v) => try_from(*v),
-        AvroValue::Uuid(uuid) => Ok(VrlValue::from(uuid.as_bytes())),
+        AvroValue::Uuid(uuid) => Ok(VrlValue::from(uuid.as_hyphenated().to_string())),
         AvroValue::LocalTimestampMillis(_) | AvroValue::LocalTimestampMicros(_) => unimplemented!(),
     }
 }
