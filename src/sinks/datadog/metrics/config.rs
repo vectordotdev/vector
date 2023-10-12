@@ -52,7 +52,6 @@ pub(super) const SKETCHES_PATH: &str = "/api/beta/sketches";
 // At that time when the V1 support is removed, the SeriesApiVersion stops being useful and can be removed.
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[allow(dead_code)]
 pub enum SeriesApiVersion {
     V1,
     V2,
