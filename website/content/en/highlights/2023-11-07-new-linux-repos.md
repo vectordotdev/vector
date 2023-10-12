@@ -71,7 +71,7 @@ curl https://keys.datadoghq.com/DATADOG_APT_KEY_C0962C7D.public | sudo gpg --no-
 
 ```sh
 sudo apt-get update
-sudo apt-get install vector datadog-signing-keys
+sudo apt-get install vector
 ```
 
 </details>
