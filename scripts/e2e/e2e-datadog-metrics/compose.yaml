@@ -67,12 +67,12 @@ services:
   # Receives metric data from the `datadog-agent` service. Is queried by the test runner
   # which does the validation of consistency with the other fakeintake service.
   fakeintake-agent:
-    image: docker.io/datadog/fakeintake:${CONFIG_VERSION}
+    image: docker.io/datadog/fakeintake:latest
 
   # Receives metric data from the `datadog-agent-vector` service. Is queried by the test runner
   # which does the validation of consistency with the other fakeintake service.
   fakeintake-vector:
-    image: docker.io/datadog/fakeintake:${CONFIG_VERSION}
+    image: docker.io/datadog/fakeintake:latest
 
 networks:
   default:

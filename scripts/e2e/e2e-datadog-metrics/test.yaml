@@ -13,6 +13,9 @@ runner:
 
 matrix:
   version: [latest]
+  # TODO use below when not debugging
+  # validate against the latest nightly and also stable v6 and v7
+  # version: ['latest', '6', '7']
 
 # changes to these files/paths will invoke the integration test in CI
 # expressions are evaluated using https://github.com/micromatch/picomatch

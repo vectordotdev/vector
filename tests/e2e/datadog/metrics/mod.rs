@@ -45,10 +45,18 @@ fn unpack_payloads_series_v2(
     out_payloads
 }
 
+#[derive(Clone, Debug, Eq, Hash, PartialEq, PartialOrd, Ord)]
+struct Context {
+    metric_name: String,
+    tags: Vec<String>,
+    r#type: i32,
+}
+
 // Sums up the metrics in each series by name.
-fn aggregate_series_metrics(
+fn aggregate_normalize_series_metrics(
     payloads: &Vec<ddmetric_proto::MetricPayload>,
-) -> BTreeMap<String, f64> {
+    // ) -> Vec<ddmetric_proto::metric_payload::MetricSeries> {
+) -> BTreeMap<Context, ddmetric_proto::metric_payload::MetricSeries> {
     let mut aggregate = BTreeMap::new();
 
     for metric_payload in payloads {
@@ -58,66 +66,43 @@ fn aggregate_series_metrics(
                 continue;
             }
 
-            // TODO expand on this
+            let ctx = Context {
+                metric_name: serie.metric.clone(),
+                tags: serie.tags.clone(),
+                r#type: serie.r#type,
+            };
 
-            let interval = serie.interval as f64;
-            match serie.r#type() {
-                ddmetric_proto::metric_payload::MetricType::Unspecified => {
-                    panic!("unspecified metric type")
-                }
-                ddmetric_proto::metric_payload::MetricType::Count => {
-                    if let Some((t, v)) = aggregate.get_mut(&serie.metric) {
-                        for point in &serie.points {
-                            *t = point.timestamp;
-                            *v += point.value;
-                        }
-                    } else {
-                        for point in &serie.points {
-                            aggregate.insert(serie.metric.clone(), (point.timestamp, point.value));
-                        }
-                    }
-                }
-                ddmetric_proto::metric_payload::MetricType::Rate => {
-                    if let Some((t, v)) = aggregate.get_mut(&serie.metric) {
-                        for point in &serie.points {
-                            *v += point.value * interval;
-                            *t = point.timestamp;
-                        }
-                    } else {
-                        for (idx, point) in serie.points.iter().enumerate() {
-                            if idx == 0 {
-                                aggregate.insert(
-                                    serie.metric.clone(),
-                                    (point.timestamp, point.value * interval),
-                                );
-                            } else {
-                                if let Some((t, v)) = aggregate.get_mut(&serie.metric) {
-                                    *v += point.value * interval;
-                                    *t = point.timestamp;
-                                }
-                            }
-                        }
-                    }
-                }
-                ddmetric_proto::metric_payload::MetricType::Gauge => {
-                    // last one wins
-                    if let Some(point) = serie.points.last() {
-                        if let Some((t, v)) = aggregate.get_mut(&serie.metric) {
-                            if point.timestamp > *t {
-                                *t = point.timestamp;
-                                *v = point.value;
-                            }
-                        } else {
-                            aggregate.insert(serie.metric.clone(), (point.timestamp, point.value));
-                        }
-                    }
-                }
+            if !aggregate.contains_key(&ctx) {
+                aggregate.insert(ctx, serie.clone());
+                continue;
             }
+
+            let existing = aggregate.get_mut(&ctx).unwrap();
+
+            existing.points.extend_from_slice(&serie.points);
         }
     }
 
-    // remove the timestamps
-    let aggregate = aggregate.into_iter().map(|(k, v)| (k, v.1)).collect();
+    // remove the timestamps and sum the points and normalize the other metadata
+    for (_ctx, series) in &mut aggregate {
+        let mut value = 0.0;
+        for point in &mut series.points {
+            point.timestamp = 0;
+            value += point.value;
+        }
+        series.points[0].value = value;
+
+        for resource in &mut series.resources {
+            if resource.r#type == "host" {
+                if resource.name.ends_with("-vector") {
+                    resource
+                        .name
+                        .truncate(resource.name.len() - "-vector".len());
+                }
+            }
+        }
+        // println!("{:?} {:?}", _ctx, series);
+    }
 
     aggregate
 }
@@ -144,7 +129,7 @@ async fn validate() {
     common_assertions(&agent_payloads);
 
     println!("aggregating payloads from agent-only pipeline");
-    let agent_payloads = aggregate_series_metrics(&agent_payloads);
+    let agent_payloads = aggregate_normalize_series_metrics(&agent_payloads);
 
     println!("{:?}", agent_payloads.keys());
 
@@ -159,7 +144,7 @@ async fn validate() {
     common_assertions(&vector_payloads);
 
     println!("aggregating payloads from agent-vector pipeline");
-    let vector_payloads = aggregate_series_metrics(&vector_payloads);
+    let vector_payloads = aggregate_normalize_series_metrics(&vector_payloads);
     println!("{:?}", vector_payloads.keys());
 
     assert_eq!(agent_payloads, vector_payloads);
