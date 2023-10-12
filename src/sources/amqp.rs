@@ -212,14 +212,11 @@ pub(crate) async fn amqp_source(
     acknowledgements: bool,
 ) -> crate::Result<super::Source> {
     let config = config.clone();
-    let (_conn, channel) =
-        config
-            .connection
-            .connect()
-            .await
-            .map_err(|source| BuildError::AmqpCreateError {
-                source,
-            })?;
+    let (_conn, channel) = config
+        .connection
+        .connect()
+        .await
+        .map_err(|source| BuildError::AmqpCreateError { source })?;
 
     Ok(Box::pin(run_amqp_source(
         config,

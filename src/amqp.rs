@@ -36,9 +36,10 @@ impl Default for AmqpConfig {
 
 /// Polls the connection until a connection can be made.
 /// Gives up after 5 attempts.
+#[cfg(feature = "amqp-integration-tests")]
 #[cfg(test)]
 pub(crate) async fn await_connection(connection: &AmqpConfig) {
-    let mut pause = tokio::time::Duration::from_secs(1);
+    let mut pause = tokio::time::Duration::from_millis(1);
     let mut attempts = 0;
 
     loop {
