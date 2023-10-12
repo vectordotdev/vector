@@ -1,6 +1,6 @@
 ---
 date: "2023-11-07"
-title: "A new home for Linux packages"
+title: "A New Home for Linux Packages"
 description: ""
 authors: ["spencergilbert"]
 pr_numbers: []
@@ -15,20 +15,20 @@ a new home at `vector.dev` courtesy of Datadog. We'll continue to publish
 packages to both the new and existing locations through the end of **2023**.
 
 {{< warning >}}
-Starting in **2024** we'll stop using `timber.io` and exclusively publish packages
+Starting in **2024**, we will stop using `timber.io` and exclusively publish packages
 to `vector.dev`.
 {{< /warning >}}
 
-We aim to make this a seamless transition by providing plenty of time to switch
-repositories, as well as publishing previous versions of Vector to have the new
-repository be a drop in replacement - without updating your Vector version.
+We aim to make this a seamless transition by providing plenty of time for you to switch
+repositories, as well as by publishing previous versions of Vector with the new
+repository as a drop-in replacement, so you don't have to update your Vector version.
 
 If you have any questions or concerns don't hesitate to reach out on [Discord]
 or [Discussions]!
 
 ## Migration guide
 
-The following command will **remove** the existing repository and configure the
+The following command **removes** the existing repository and configures the
 new repository.
 
 ```sh
@@ -38,7 +38,7 @@ CSM_MIGRATE=true bash -c "$(curl -L https://s3.amazonaws.com/dd-agent/scripts/in
 Alternatively, `CSM_MIGRATE` may be left unset to leave the removal of the
 existing repository to your discretion.
 
-### Manual step by step instructions
+### Manual step-by-step instructions
 
 <details>
   <summary>APT</summary>
@@ -117,7 +117,7 @@ sudo yum install vector
 * While the existing packages were migrated without rebuilding them, the RPM
 packages _were_ re-signed with a Datadog GPG key. This will cause checksums
 to not match between equivalent packages from `vector.dev` and `timber.io`.
-* Once packages are only released to `vector.dev` APT packages will be signed
+* Once packages are released only to `vector.dev`, APT packages will be signed
 by a Datadog GPG key. This update will be announced in advance.
 
 [Discord]: https://chat.vector.dev/
