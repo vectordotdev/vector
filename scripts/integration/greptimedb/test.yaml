@@ -9,4 +9,6 @@ runner:
     GREPTIMEDB_HTTP: http://greptimedb:4000
 
 matrix:
-  version: ['latest']
+  # Temporarily pegging to the latest known stable release
+  # since using `latest` is failing consistenly.
+  version: [v0.4.0]
