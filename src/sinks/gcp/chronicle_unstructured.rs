@@ -248,7 +248,7 @@ impl ChronicleUnstructuredConfig {
             .settings(request, GcsRetryLogic)
             .service(ChronicleService::new(client, base_url, creds));
 
-        let request_settings = RequestSettings::new(self)?;
+        let request_settings = ChronicleRequestBuilder::new(self)?;
 
         let sink = GcsSink::new(svc, request_settings, partitioner, batch_settings, "http");
 
@@ -362,7 +362,7 @@ impl Encoder<(String, Vec<Event>)> for ChronicleEncoder {
 // request. All possible values are pre-computed for direct use in
 // producing a request.
 #[derive(Clone, Debug)]
-struct RequestSettings {
+struct ChronicleRequestBuilder {
     encoder: ChronicleEncoder,
 }
 
@@ -382,7 +382,7 @@ impl AsRef<[u8]> for ChronicleRequestPayload {
     }
 }
 
-impl RequestBuilder<(String, Vec<Event>)> for RequestSettings {
+impl RequestBuilder<(String, Vec<Event>)> for ChronicleRequestBuilder {
     type Metadata = EventFinalizers;
     type Events = (String, Vec<Event>);
     type Encoder = ChronicleEncoder;
@@ -423,7 +423,7 @@ impl RequestBuilder<(String, Vec<Event>)> for RequestSettings {
     }
 }
 
-impl RequestSettings {
+impl ChronicleRequestBuilder {
     fn new(config: &ChronicleUnstructuredConfig) -> crate::Result<Self> {
         let transformer = config.encoding.transformer();
         let serializer = config.encoding.config().build()?;
