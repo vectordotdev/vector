@@ -12,3 +12,9 @@ matrix:
   # Temporarily pegging to the latest known stable release
   # since using `latest` is failing consistenly.
   version: [v0.4.0]
+
+# changes to these files/paths will invoke the integration test in CI
+# expressions are evaluated using https://github.com/micromatch/picomatch
+paths:
+- "src/sinks/greptimedb/**"
+- "scripts/integration/greptimedb/**"
