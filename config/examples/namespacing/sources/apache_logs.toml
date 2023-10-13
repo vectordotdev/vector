@@ -1,5 +1,0 @@
-# Ingest data by tailing one or more files
-type         = "file"
-include      = ["/var/log/apache2/*.log"]    # supports globbing
-ignore_older = 86400                         # 1 day
-

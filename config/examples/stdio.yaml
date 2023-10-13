@@ -5,10 +5,13 @@
 #
 # https://vector.dev/guides/getting-started
 
-[sources.in]
-    type = "stdin"
+sources:
+  in:
+    type: "stdin"
 
-[sinks.out]
-    inputs = ["in"]
-    type = "console"
-    encoding.codec = "text"
+sinks:
+  out:
+    inputs: [ "in" ]
+    type: "console"
+    encoding:
+      codec: "text"
