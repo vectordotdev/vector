@@ -4,7 +4,11 @@
 #
 # Runs on:
 #  - scheduled UTC midnight Tues-Sat
-
+#  - on demand by a PR comment matching either of:
+#    - '/ci-run-regression'
+#    - '/ci-run-all'
+#    (the comment issuer must be a member of the Vector GH team)
+#
 # This workflow runs the collection of our workload checks, using the latest Vector nightly image,
 # which depends on when the workflow is invoked.
 #
