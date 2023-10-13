@@ -39,7 +39,7 @@ for i in range(50):
     print("rate")
     statsd.increment('foo_metric.rate', tags=['a_tag:1'])
 
-    print("guage")
+    print("gauge")
     statsd.gauge('foo_metric.gauge', i, tags=["a_tag:2"])
 
     print("set")
