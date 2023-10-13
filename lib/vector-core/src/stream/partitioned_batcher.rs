@@ -16,14 +16,13 @@ use crate::{
     partition::Partitioner,
     stream::batcher::{
         config::BatchConfigParts,
-        data::BatchReduce,
         limiter::{ByteSizeOfItemSize, ItemBatchSize, SizeLimit},
     },
     time::KeyedTimer,
     ByteSizeOf,
 };
 
-use super::batcher::BatchConfig;
+use super::batcher::{data::BatchData, BatchConfig};
 
 /// A `KeyedTimer` based on `DelayQueue`.
 pub struct ExpirationQueue<K> {
@@ -158,16 +157,15 @@ impl BatcherSettings {
     }
 
     /// A batcher config using the `ItemBatchSize` trait to determine batch sizes.
-    /// The output is built with the supplied reducer function.
-    pub fn into_reducer_config<I, T, F, S>(
-        self,
+    /// The output is built with the supplied object implementing [`BatchData`].
+    pub fn as_reducer_config<I, T, B>(
+        &self,
         item_size: I,
-        reducer: F,
-    ) -> BatchConfigParts<SizeLimit<I>, BatchReduce<F, S>>
+        reducer: B,
+    ) -> BatchConfigParts<SizeLimit<I>, B>
     where
         I: ItemBatchSize<T>,
-        F: FnMut(&mut S, T) + Send,
-        S: Default,
+        B: BatchData<T>,
     {
         BatchConfigParts {
             batch_limiter: SizeLimit {
@@ -176,7 +174,7 @@ impl BatcherSettings {
                 current_size: 0,
                 item_size_calculator: item_size,
             },
-            batch_data: BatchReduce::new(reducer),
+            batch_data: reducer,
             timeout: self.timeout,
         }
     }

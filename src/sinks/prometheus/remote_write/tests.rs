@@ -167,11 +167,11 @@ async fn retains_state_between_requests() {
 #[tokio::test]
 async fn aggregates_batches() {
     let outputs = send_request(
-        r#"batch.max_events = 2"#,
+        r#"batch.max_events = 3"#,
         vec![
             create_inc_event("counter-1".into(), 12.0),
-            create_inc_event("counter-2".into(), 13.0),
             create_inc_event("counter-1".into(), 14.0),
+            create_inc_event("counter-2".into(), 13.0),
             create_inc_event("counter-2".into(), 14.0),
         ],
     )

@@ -3,11 +3,7 @@ use std::fmt;
 use vector_common::byte_size_of::ByteSizeOf;
 use vector_core::{
     event::Metric,
-    stream::batcher::{
-        config::BatchConfigParts,
-        data::BatchReduce,
-        limiter::{ByteSizeOfItemSize, SizeLimit},
-    },
+    stream::batcher::{data::BatchData, limiter::ByteSizeOfItemSize},
 };
 
 use crate::sinks::{prelude::*, util::buffer::metrics::MetricSet};
@@ -87,6 +83,27 @@ impl Default for EventCollection {
     }
 }
 
+impl BatchData<RemoteWriteMetric> for EventCollection {
+    type Batch = Self;
+
+    fn len(&self) -> usize {
+        self.events.len()
+    }
+
+    fn take_batch(&mut self) -> Self::Batch {
+        std::mem::take(self)
+    }
+
+    fn push_item(&mut self, mut item: RemoteWriteMetric) {
+        self.finalizers
+            .merge(item.metric.metadata_mut().take_finalizers());
+        self.events_byte_size += item.size_of();
+        self.events_json_byte_size
+            .add_event(&item.metric, item.estimated_json_encoded_size_of());
+        self.events.insert_update(item.metric);
+    }
+}
+
 pub(super) struct RemoteWriteSink<S> {
     pub(super) tenant_id: Option<Template>,
     pub(super) batch_settings: BatcherSettings,
@@ -124,7 +141,9 @@ where
             .filter_map(move |event| {
                 future::ready(make_remote_write_event(tenant_id.as_ref(), event))
             })
-            .batched_partitioned(PrometheusTenantIdPartitioner, || reducer(batch_settings))
+            .batched_partitioned(PrometheusTenantIdPartitioner, || {
+                batch_settings.as_reducer_config(ByteSizeOfItemSize, EventCollection::default())
+            })
             .request_builder(default_request_builder_concurrency_limit(), request_builder)
             .filter_map(|request| async move {
                 match request {
@@ -139,28 +158,6 @@ where
             .run()
             .await
     }
-}
-
-/// Create a reducer from the batch settings.
-fn reducer(
-    batch_settings: BatcherSettings,
-) -> BatchConfigParts<
-    SizeLimit<ByteSizeOfItemSize>,
-    BatchReduce<impl FnMut(&mut EventCollection, RemoteWriteMetric) + Send, EventCollection>,
-> {
-    batch_settings.into_reducer_config(
-        ByteSizeOfItemSize,
-        |event_collection: &mut EventCollection, mut item: RemoteWriteMetric| {
-            event_collection
-                .finalizers
-                .merge(item.metric.metadata_mut().take_finalizers());
-            event_collection.events_byte_size += item.size_of();
-            event_collection
-                .events_json_byte_size
-                .add_event(&item.metric, item.estimated_json_encoded_size_of());
-            event_collection.events.insert_update(item.metric);
-        },
-    )
 }
 
 #[async_trait]
