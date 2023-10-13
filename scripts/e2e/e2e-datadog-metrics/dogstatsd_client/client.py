@@ -14,6 +14,9 @@ options = {
 
 initialize(**options)
 
+# Give the Agent time to actually spin up.
+# The container may return "ready" but the
+# Agent process is still booting.
 time.sleep(10)
 
 hist_data = [
