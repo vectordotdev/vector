@@ -55,7 +55,6 @@ impl AvroDeserializerConfig {
 
     /// The schema required by the serializer.
     pub fn schema_definition(&self, log_namespace: LogNamespace) -> schema::Definition {
-        // TODO: convert avro schema to vector schema.
         match log_namespace {
             LogNamespace::Legacy => {
                 let mut definition = schema::Definition::empty_legacy_namespace()
