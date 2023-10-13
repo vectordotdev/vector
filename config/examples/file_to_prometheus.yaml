@@ -1,0 +1,64 @@
+# Prometheus sink example
+# ----------------------------------------------------
+# Parsing logs as metrics and exposing into Prometheus
+data_dir: "/var/lib/vector"
+
+# Ingest
+sources:
+  file:
+    type: "file"
+    include: [ "sample.log" ]
+    start_at_beginning: true
+
+# Structure and parse the data
+transforms:
+  remap:
+    inputs: [ "file" ]
+    type: "remap"
+    drop_on_error: false
+    source: '''
+    . |= parse_apache_log!(string!(.message), "common")
+    '''
+
+  # Transform into metrics
+  log_to_metric:
+    inputs: [ "remap" ]
+    type: "log_to_metric"
+    metrics:
+      - type: "counter"
+        field: "message"
+
+      - type: "counter"
+        increment_by_value: true
+        field: "bytes_out"
+        name: "bytes_out_total"
+
+      - type: "gauge"
+        field: "bytes_out"
+
+      - type: "set"
+        field: "user"
+
+      - type: "histogram"
+        field: "bytes_out"
+        name: "bytes_out_histogram"
+
+# Output data
+sinks:
+  console_metrics:
+    inputs: [ "log_to_metric" ]
+    type: "console"
+    encoding:
+      codec: "json"
+
+  console_logs:
+    inputs: [ "remap" ]
+    type: "console"
+    encoding:
+      codec: "text"
+
+  prometheus:
+    inputs: [ "log_to_metric" ]
+    type: "prometheus_exporter"
+    default_namespace: "vector"
+    buckets: [ 0.0, 10.0, 100.0, 1000.0, 10000.0, 100001.0 ]

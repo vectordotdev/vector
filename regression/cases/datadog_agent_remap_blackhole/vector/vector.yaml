@@ -1,0 +1,51 @@
+data_dir: "/var/lib/vector"
+
+##
+## Sources
+##
+
+sources:
+  internal_metrics:
+    type: "internal_metrics"
+
+  datadog_agent:
+    type:             "datadog_agent"
+    acknowledgements: false
+    address:          "0.0.0.0:8282"
+
+##
+## Transforms
+##
+
+transforms:
+  remap:
+    type:   "remap"
+    inputs: [ "datadog_agent" ]
+    source: |
+            .hostname = "vector"
+
+            if .status == "warning" {
+              .thing = upcase(.hostname)
+            } else if .status == "notice" {
+              .thung = downcase(.hostname)
+            } else {
+              .nong = upcase(.hostname)
+            }
+
+            .matches = { "name": .message, "num": "2" }
+            .origin, .err = .hostname + "/" + .matches.name + "/" + .matches.num
+
+##
+## Sinks
+##
+
+sinks:
+  prometheus:
+    type:    "prometheus_exporter"
+    inputs: [ "internal_metrics" ]
+    address: "0.0.0.0:9090"
+
+  blackhole:
+    type:                "blackhole"
+    print_interval_secs: 0
+    inputs: [ "remap" ]
