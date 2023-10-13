@@ -24,11 +24,11 @@ fn decompress_payload(payload: Vec<u8>) -> std::io::Result<Vec<u8>> {
 }
 
 fn unpack_payloads_series_v2(
-    in_payloads: &Vec<FakeIntakePayload>,
+    in_payloads: &FakeIntakeResponseRaw,
 ) -> Vec<ddmetric_proto::MetricPayload> {
     let mut out_payloads = vec![];
 
-    in_payloads.iter().for_each(|payload| {
+    in_payloads.payloads.iter().for_each(|payload| {
         // decode base64
         let payload = BASE64_STANDARD
             .decode(&payload.data)
@@ -101,6 +101,16 @@ fn aggregate_normalize_series_metrics(
                 }
             }
         }
+
+        if series.r#type() != ddmetric_proto::metric_payload::MetricType::Rate
+            && series.interval != 0
+        {
+            println!(
+                "serie {:?} non-rate metric has interval set. Setting to zero.",
+                _ctx
+            );
+            series.interval = 0;
+        }
         // println!("{:?} {:?}", _ctx, series);
     }
 
@@ -109,9 +119,29 @@ fn aggregate_normalize_series_metrics(
 
 // runs assertions that each set of payloads should be true to regardless
 // of the pipeline
-fn common_assertions(payloads: &Vec<ddmetric_proto::MetricPayload>) {
-    assert!(payloads.len() > 0);
-    println!("metric payloads received: {}", payloads.len());
+fn common_assertions(series: &BTreeMap<Context, ddmetric_proto::metric_payload::MetricSeries>) {
+    assert!(series.len() > 0);
+    println!("metric series received: {}", series.len());
+}
+
+async fn get_series_from_pipeline(
+    address: String,
+) -> BTreeMap<Context, ddmetric_proto::metric_payload::MetricSeries> {
+    println!("getting payloads");
+    let payloads =
+        get_fakeintake_payloads::<FakeIntakeResponseRaw>(&address, SERIES_ENDPOINT).await;
+
+    println!("unpacking payloads");
+    let payloads = unpack_payloads_series_v2(&payloads);
+
+    println!("aggregating payloads");
+    let series = aggregate_normalize_series_metrics(&payloads);
+
+    common_assertions(&series);
+
+    println!("{:?}", series.keys());
+
+    series
 }
 
 #[tokio::test]
@@ -121,33 +151,13 @@ async fn validate() {
     // TODO need to see if can configure the agent flush interval
     std::thread::sleep(std::time::Duration::from_secs(30));
 
-    println!("getting payloads from agent-only pipeline");
-    let agent_payloads = get_payloads_agent(SERIES_ENDPOINT).await;
+    println!("==== getting series data from agent-only pipeline ==== ");
+    let agent_series = get_series_from_pipeline(fake_intake_agent_address()).await;
 
-    println!("unpacking payloads from agent-only pipeline");
-    let agent_payloads = unpack_payloads_series_v2(&agent_payloads);
-    common_assertions(&agent_payloads);
+    println!("==== getting series data from agent-vector pipeline ====");
+    let vector_series = get_series_from_pipeline(fake_intake_vector_address()).await;
 
-    println!("aggregating payloads from agent-only pipeline");
-    let agent_payloads = aggregate_normalize_series_metrics(&agent_payloads);
-
-    println!("{:?}", agent_payloads.keys());
-
-    // let foo_rate_agent = agent_payloads.get("foo_metric.rate");
-    // println!("AGENT RATE AGGREGATE: {:?}", foo_rate_agent);
-
-    println!("getting log payloads from agent-vector pipeline");
-    let vector_payloads = get_payloads_vector(SERIES_ENDPOINT).await;
-
-    println!("unpacking payloads from agent-vector pipeline");
-    let vector_payloads = unpack_payloads_series_v2(&vector_payloads);
-    common_assertions(&vector_payloads);
-
-    println!("aggregating payloads from agent-vector pipeline");
-    let vector_payloads = aggregate_normalize_series_metrics(&vector_payloads);
-    println!("{:?}", vector_payloads.keys());
-
-    assert_eq!(agent_payloads, vector_payloads);
+    assert_eq!(agent_series, vector_series);
 
     // std::thread::sleep(std::time::Duration::from_secs(90));
 }
