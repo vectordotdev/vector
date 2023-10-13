@@ -1,0 +1,67 @@
+data_dir: "/var/lib/vector"
+
+##
+## Sources
+##
+
+sources:
+  internal_metrics:
+    type: "internal_metrics"
+
+  splunk:
+    address: "0.0.0.0:8282"
+    type:    "splunk_hec"
+
+##
+## Transforms
+##
+
+transforms:
+  container_type:
+    type: "route"
+    inputs: [ "splunk" ]
+    route:
+      service: '.attrs.c2cContainerType == "service"'
+      sidecar: '.attrs.c2cContainerType != "service"'
+
+##
+## Sinks
+##
+
+sinks:
+  prometheus:
+    type:    "prometheus_exporter"
+    inputs: [ "internal_metrics" ]
+    address: "0.0.0.0:9090"
+
+  s3_sidecar:
+    type:       "aws_s3"
+    inputs: [ "container_type.sidecar" ]
+    region:     "us-west-2"
+    endpoint:   "http://localhost:8080"
+    bucket:     "vector-soak-sidecar"
+    framing:
+      method: "newline_delimited"
+    encoding:
+      codec: "json"
+      except_fields: [ "timestamp" ]
+    key_prefix: "v1/source_type/sidecar/aws_account_id/{{attrs.aws_account}}/system_id/{{attrs.systemid}}/service/{{attrs.c2cService}}/partition/{{attrs.c2cPartition}}/stage/{{attrs.c2cStage}}/year/%Y/month/%m/day/%d/hour/%H"
+    auth:
+      access_key_id:     "BADDCAFE"
+      secret_access_key: "BADDCAFE"
+
+  s3_service:
+    type:       "aws_s3"
+    inputs: [ "container_type.service" ]
+    region:     "us-west-2"
+    endpoint:   "http://localhost:8080"
+    bucket:     "vector-soak-service"
+    framing:
+      method: "newline_delimited"
+    encoding:
+      codec: "json"
+      except_fields: [ "timestamp" ]
+    key_prefix: "v1/source_type/app/system_id/{{attrs.systemid}}/service/{{attrs.c2cService}}/partition/{{attrs.c2cPartition}}/stage/{{attrs.c2cStage}}/year/%Y/month/%m/day/%d/hour/%H"
+    auth:
+      access_key_id:     "BADDCAFE"
+      secret_access_key: "BADDCAFE"
