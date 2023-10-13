@@ -329,7 +329,7 @@ typetag = { version = "0.2.13", default-features = false }
 url = { version = "2.4.1", default-features = false, features = ["serde"] }
 uuid = { version = "1", default-features = false, features = ["serde", "v4"] }
 warp = { version = "0.3.6", default-features = false }
-zstd = { version = "0.12.4", default-features = false }
+zstd = { version = "0.13.0", default-features = false }
 arr_macro = { version = "0.2.1" }
 
 # depending on fork for bumped nix dependency
@@ -377,7 +377,7 @@ vector-core = { path = "lib/vector-core", default-features = false, features = [
 vrl = { version = "0.7.0", features = ["cli", "test", "test_framework", "arbitrary"] }
 
 wiremock = "0.5.19"
-zstd = { version = "0.12.4", default-features = false }
+zstd = { version = "0.13.0", default-features = false }
 
 [patch.crates-io]
 # The upgrade for `tokio-util` >= 0.6.9 is blocked on https://github.com/vectordotdev/vector/issues/11257.

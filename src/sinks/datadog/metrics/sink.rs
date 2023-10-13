@@ -41,12 +41,13 @@ impl Partitioner for DatadogMetricsTypePartitioner {
 
     fn partition(&self, item: &Self::Item) -> Self::Key {
         let endpoint = match item.data().value() {
-            MetricValue::Counter { .. } => DatadogMetricsEndpoint::Series,
-            MetricValue::Gauge { .. } => DatadogMetricsEndpoint::Series,
-            MetricValue::Set { .. } => DatadogMetricsEndpoint::Series,
+            MetricValue::Counter { .. } => DatadogMetricsEndpoint::series(),
+            MetricValue::Gauge { .. } => DatadogMetricsEndpoint::series(),
+            MetricValue::Set { .. } => DatadogMetricsEndpoint::series(),
             MetricValue::Distribution { .. } => DatadogMetricsEndpoint::Sketches,
             MetricValue::AggregatedHistogram { .. } => DatadogMetricsEndpoint::Sketches,
-            MetricValue::AggregatedSummary { .. } => DatadogMetricsEndpoint::Series,
+            // NOTE: AggregatedSummary will be split into counters and gauges during normalization
+            MetricValue::AggregatedSummary { .. } => DatadogMetricsEndpoint::series(),
             MetricValue::Sketch { .. } => DatadogMetricsEndpoint::Sketches,
         };
         (item.metadata().datadog_api_key(), endpoint)
