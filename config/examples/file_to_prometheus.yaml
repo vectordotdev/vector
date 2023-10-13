@@ -1,5 +1,5 @@
 # Prometheus sink example
-# ------------------------------------------------------------------------------
+# ----------------------------------------------------
 # Parsing logs as metrics and exposing into Prometheus
 data_dir: "/var/lib/vector"
 
@@ -50,7 +50,7 @@ sinks:
     type: "console"
     encoding:
       codec: "json"
-  
+
   console_logs:
     inputs: [ "remap" ]
     type: "console"

@@ -13,15 +13,15 @@ data_dir: "/var/lib/vector"
 sources:
   apache_logs:
     type: "file"
-    include: ["/var/log/apache2/*.log"]
+    include: [ "/var/log/apache2/*.log" ]
     # ignore files older than 1 day
-    ignore_older: 86400 
+    ignore_older: 86400
 
 # Add a field based on the value of the HOSTNAME env var
 # Docs: https://vector.dev/docs/reference/transforms/remap
 transforms:
   add_host:
-    inputs: ["apache_logs"]
+    inputs: [ "apache_logs" ]
     type: "remap"
     source: |
       '''
@@ -32,7 +32,7 @@ transforms:
 # Docs: https://vector.dev/docs/reference/sinks/console
 sinks:
   out:
-    inputs: ["add_host"]
+    inputs: [ "add_host" ]
     type: "console"
     encoding:
       codec: "json"

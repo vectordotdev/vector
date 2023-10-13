@@ -6,12 +6,12 @@
 # https://vector.dev/guides/getting-started
 
 sources:
-  in: 
+  in:
     type: "stdin"
 
-sinks: 
+sinks:
   out:
-    inputs: ["in"]
+    inputs: [ "in" ]
     type: "console"
-    encoding: 
+    encoding:
       codec: "text"
