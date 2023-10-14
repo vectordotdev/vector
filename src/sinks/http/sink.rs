@@ -1,13 +1,16 @@
 //! Implementation of the `http` sink.
 
-use crate::sinks::{prelude::*, util::http::HttpRequest};
+use crate::sinks::{
+    prelude::*,
+    util::http::{GenericEventInputSplitter, HttpRequest, HttpRequestBuilder},
+};
 
-use super::{batch::HttpBatchSizer, request_builder::HttpRequestBuilder};
+use super::{batch::HttpBatchSizer, encoder::HttpEncoder};
 
 pub(super) struct HttpSink<S> {
     service: S,
     batch_settings: BatcherSettings,
-    request_builder: HttpRequestBuilder,
+    request_builder: HttpRequestBuilder<GenericEventInputSplitter, HttpEncoder>,
 }
 
 impl<S> HttpSink<S>
@@ -21,7 +24,7 @@ where
     pub(super) const fn new(
         service: S,
         batch_settings: BatcherSettings,
-        request_builder: HttpRequestBuilder,
+        request_builder: HttpRequestBuilder<GenericEventInputSplitter, HttpEncoder>,
     ) -> Self {
         Self {
             service,
@@ -34,7 +37,7 @@ where
         input
             // Batch the input stream with size calculation based on the configured codec
             .batched(self.batch_settings.into_item_size_config(HttpBatchSizer {
-                encoder: self.request_builder.encoder.encoder.clone(),
+                encoder: self.request_builder.encoder().encoder.clone(),
             }))
             // Build requests with default concurrency limit.
             .request_builder(

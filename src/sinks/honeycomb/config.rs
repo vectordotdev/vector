@@ -2,7 +2,7 @@
 
 use bytes::Bytes;
 use futures::FutureExt;
-use http::{Request, StatusCode, Uri};
+use http::{Method, Request, StatusCode, Uri};
 use vector_common::sensitive_string::SensitiveString;
 use vrl::value::Kind;
 
@@ -11,16 +11,13 @@ use crate::{
     sinks::{
         prelude::*,
         util::{
-            http::{http_response_retry_logic, HttpService},
+            http::{http_response_retry_logic, HttpRequestBuilder, HttpService, RequestBlueprint},
             BatchConfig, BoxedRawValue,
         },
     },
 };
 
-use super::{
-    encoder::HoneycombEncoder, request_builder::HoneycombRequestBuilder,
-    service::HoneycombSvcRequestBuilder, sink::HoneycombSink,
-};
+use super::{encoder::HoneycombEncoder, sink::HoneycombSink};
 
 pub(super) const HTTP_HEADER_HONEYCOMB: &str = "X-Honeycomb-Team";
 
@@ -96,32 +93,29 @@ impl SinkConfig for HoneycombConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let batch_settings = self.batch.validate()?.into_batcher_settings()?;
 
-        let request_builder = HoneycombRequestBuilder {
-            encoder: HoneycombEncoder {
-                transformer: self.encoding.clone(),
-            },
+        let encoder = HoneycombEncoder {
+            transformer: self.encoding.clone(),
         };
 
-        let uri = self.build_uri()?;
+        let request_uri = self.build_uri()?;
+        let request_blueprint = RequestBlueprint::from_uri(request_uri.clone())
+            .with_method(Method::POST)
+            .add_header(HTTP_HEADER_HONEYCOMB, self.api_key.inner())?;
+        let request_builder =
+            HttpRequestBuilder::from_blueprint(request_blueprint).with_encoder(encoder);
 
-        let honeycomb_service_request_builder = HoneycombSvcRequestBuilder {
-            uri: uri.clone(),
-            api_key: self.api_key.clone(),
-        };
-
-        let client = HttpClient::new(None, cx.proxy())?;
-
-        let service = HttpService::new(client.clone(), honeycomb_service_request_builder);
+        let http_client = HttpClient::new(None, cx.proxy())?;
+        let http_service = HttpService::new(http_client.clone());
 
         let request_limits = self.request.unwrap_with(&TowerRequestConfig::default());
 
         let service = ServiceBuilder::new()
             .settings(request_limits, http_response_retry_logic())
-            .service(service);
+            .service(http_service);
 
         let sink = HoneycombSink::new(service, batch_settings, request_builder);
 
-        let healthcheck = healthcheck(uri, self.api_key.clone(), client).boxed();
+        let healthcheck = healthcheck(request_uri, self.api_key.clone(), http_client).boxed();
 
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }

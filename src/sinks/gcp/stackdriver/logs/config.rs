@@ -8,22 +8,19 @@ use crate::{
         gcs_common::config::healthcheck_response,
         prelude::*,
         util::{
-            http::{http_response_retry_logic, HttpService},
+            http::{http_response_retry_logic, HttpRequestBuilder, HttpService, RequestBlueprint},
             BoxedRawValue, RealtimeSizeBasedDefaultBatchSettings,
         },
     },
 };
-use http::{Request, Uri};
+use http::{header::CONTENT_TYPE, Method, Request, Uri};
 use hyper::Body;
 use lookup::lookup_v2::ConfigValuePath;
 use snafu::Snafu;
 use std::collections::HashMap;
 use vrl::value::Kind;
 
-use super::{
-    encoder::StackdriverLogsEncoder, request_builder::StackdriverLogsRequestBuilder,
-    service::StackdriverLogsServiceRequestBuilder, sink::StackdriverLogsSink,
-};
+use super::{encoder::StackdriverLogsEncoder, sink::StackdriverLogsSink};
 
 #[derive(Debug, Snafu)]
 enum HealthcheckError {
@@ -198,16 +195,6 @@ impl SinkConfig for StackdriverConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let auth = self.auth.build(Scope::LoggingWrite).await?;
 
-        let request_builder = StackdriverLogsRequestBuilder {
-            encoder: StackdriverLogsEncoder::new(
-                self.encoding.clone(),
-                self.log_id.clone(),
-                self.log_name.clone(),
-                self.resource.clone(),
-                self.severity_key.clone(),
-            ),
-        };
-
         let batch_settings = self
             .batch
             .validate()?
@@ -220,25 +207,32 @@ impl SinkConfig for StackdriverConfig {
                 .rate_limit_num(1000),
         );
 
+        let encoder = StackdriverLogsEncoder::new(
+            self.encoding.clone(),
+            self.log_id.clone(),
+            self.log_name.clone(),
+            self.resource.clone(),
+            self.severity_key.clone(),
+        );
+
+        let request_uri: Uri = self.endpoint.parse()?;
+        let request_blueprint = RequestBlueprint::from_uri(request_uri.clone())
+            .with_method(Method::POST)
+            .add_header(CONTENT_TYPE, "application/json")?;
+        let request_builder =
+            HttpRequestBuilder::from_blueprint(request_blueprint).with_encoder(encoder);
+
         let tls_settings = TlsSettings::from_options(&self.tls)?;
-        let client = HttpClient::new(tls_settings, cx.proxy())?;
-
-        let uri: Uri = self.endpoint.parse()?;
-
-        let stackdriver_logs_service_request_builder = StackdriverLogsServiceRequestBuilder {
-            uri: uri.clone(),
-            auth: auth.clone(),
-        };
-
-        let service = HttpService::new(client.clone(), stackdriver_logs_service_request_builder);
+        let http_client = HttpClient::new(tls_settings, cx.proxy())?;
+        let http_service = HttpService::new(http_client.clone());
 
         let service = ServiceBuilder::new()
             .settings(request_limits, http_response_retry_logic())
-            .service(service);
+            .service(http_service);
 
         let sink = StackdriverLogsSink::new(service, batch_settings, request_builder);
 
-        let healthcheck = healthcheck(client, auth.clone(), uri).boxed();
+        let healthcheck = healthcheck(http_client, auth.clone(), request_uri).boxed();
 
         auth.spawn_regenerate_token();
 

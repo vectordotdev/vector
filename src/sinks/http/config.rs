@@ -4,7 +4,10 @@ use codecs::{
     encoding::{Framer, Serializer},
     CharacterDelimitedEncoder,
 };
-use http::{header::AUTHORIZATION, HeaderName, HeaderValue, Method, Request, StatusCode};
+use http::{
+    header::{AUTHORIZATION, CONTENT_ENCODING, CONTENT_TYPE},
+    HeaderName, HeaderValue, Method, Request, StatusCode,
+};
 use hyper::Body;
 use indexmap::IndexMap;
 
@@ -14,16 +17,16 @@ use crate::{
     sinks::{
         prelude::*,
         util::{
-            http::{http_response_retry_logic, HttpService, RequestConfig},
+            http::{
+                http_response_retry_logic, GenericEventInputSplitter, HttpRequestBuilder,
+                HttpService, RequestBlueprint, RequestConfig,
+            },
             RealtimeSizeBasedDefaultBatchSettings, UriSerde,
         },
     },
 };
 
-use super::{
-    encoder::HttpEncoder, request_builder::HttpRequestBuilder, service::HttpSinkRequestBuilder,
-    sink::HttpSink,
-};
+use super::{encoder::HttpEncoder, sink::HttpSink};
 
 const CONTENT_TYPE_TEXT: &str = "text/plain";
 const CONTENT_TYPE_NDJSON: &str = "application/x-ndjson";
@@ -230,69 +233,67 @@ impl SinkConfig for HttpSinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let batch_settings = self.batch.validate()?.into_batcher_settings()?;
 
-        let encoder = self.build_encoder()?;
-        let transformer = self.encoding.transformer();
-
         let mut request = self.request.clone();
         request.add_old_option(self.headers.clone());
 
         let headers = validate_headers(&request.headers, self.auth.is_some())?;
 
+        let encoder = self.build_encoder()?;
+        let transformer = self.encoding.transformer();
         let (payload_prefix, payload_suffix) =
             validate_payload_wrapper(&self.payload_prefix, &self.payload_suffix, &encoder)?;
 
-        let client = self.build_http_client(&cx)?;
-
-        let healthcheck = match cx.healthcheck.uri {
-            Some(healthcheck_uri) => {
-                healthcheck(healthcheck_uri, self.auth.clone(), client.clone()).boxed()
+        let maybe_content_type = match (encoder.serializer(), encoder.framer()) {
+            (Serializer::RawMessage(_) | Serializer::Text(_), _) => {
+                Some(CONTENT_TYPE_TEXT.to_owned())
             }
-            None => future::ok(()).boxed(),
-        };
-
-        let content_type = {
-            use Framer::*;
-            use Serializer::*;
-            match (encoder.serializer(), encoder.framer()) {
-                (RawMessage(_) | Text(_), _) => Some(CONTENT_TYPE_TEXT.to_owned()),
-                (Json(_), NewlineDelimited(_)) => Some(CONTENT_TYPE_NDJSON.to_owned()),
-                (Json(_), CharacterDelimited(CharacterDelimitedEncoder { delimiter: b',' })) => {
-                    Some(CONTENT_TYPE_JSON.to_owned())
-                }
-                _ => None,
+            (Serializer::Json(_), Framer::NewlineDelimited(_)) => {
+                Some(CONTENT_TYPE_NDJSON.to_owned())
             }
+            (
+                Serializer::Json(_),
+                Framer::CharacterDelimited(CharacterDelimitedEncoder { delimiter: b',' }),
+            ) => Some(CONTENT_TYPE_JSON.to_owned()),
+            _ => None,
         };
 
-        let request_builder = HttpRequestBuilder {
-            encoder: HttpEncoder::new(encoder, transformer, payload_prefix, payload_suffix),
-            compression: self.compression,
-        };
-
-        let content_encoding = self.compression.is_compressed().then(|| {
+        let maybe_content_encoding = self.compression.is_compressed().then(|| {
             self.compression
                 .content_encoding()
                 .expect("Encoding should be specified for compression.")
                 .to_string()
         });
 
-        let http_sink_request_builder = HttpSinkRequestBuilder::new(
-            self.uri.with_default_parts(),
-            self.method,
-            self.auth.choose_one(&self.uri.auth)?,
-            headers,
-            content_type,
-            content_encoding,
-        );
+        let request_uri = self.uri.uri.clone();
+        let request_blueprint = RequestBlueprint::from_uri(request_uri)
+            .with_method(self.method.into())
+            .add_headers(headers)?
+            .add_header_maybe(CONTENT_TYPE, maybe_content_type)?
+            .add_header_maybe(CONTENT_ENCODING, maybe_content_encoding)?
+            .add_auth_maybe(self.auth.choose_one(&self.uri.auth)?);
 
-        let service = HttpService::new(client, http_sink_request_builder);
+        let http_encoder = HttpEncoder::new(encoder, transformer, payload_prefix, payload_suffix);
+        let request_builder = HttpRequestBuilder::from_blueprint(request_blueprint)
+            .with_input_splitter::<GenericEventInputSplitter>()
+            .with_encoder(http_encoder);
+
+        let http_client = self.build_http_client(&cx)?;
+        let http_service = HttpService::new(http_client.clone());
 
         let request_limits = self.request.tower.unwrap_with(&Default::default());
 
         let service = ServiceBuilder::new()
             .settings(request_limits, http_response_retry_logic())
-            .service(service);
+            .service(http_service);
 
         let sink = HttpSink::new(service, batch_settings, request_builder);
+
+        let healthcheck = match cx.healthcheck.uri {
+            Some(healthcheck_uri) => {
+                healthcheck(healthcheck_uri, self.auth.clone(), http_client).boxed()
+            }
+            None => future::ok(()).boxed(),
+        };
 
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }
