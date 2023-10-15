@@ -378,6 +378,7 @@ filecontents
 filterlist
 finalizable
 fingerprinter
+fipsmodule
 fizzaxbbuzz
 fizzbuzz
 fkn
@@ -797,6 +798,7 @@ opinsights
 oplog
 optimizable
 orgid
+OSSL
 ostype
 otel
 otelcol
