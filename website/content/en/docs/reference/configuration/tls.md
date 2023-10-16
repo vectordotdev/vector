@@ -20,7 +20,7 @@ Trusted certificates (also called certificate authorities) are used for client a
 
 By default, OpenSSL and Vector will look for trusted certificates in the following locations:
 
-* A file single containing several certificates specified by the `SSL_CERT_FILE` environment variable.
+* A single file containing several certificates specified by the `SSL_CERT_FILE` environment variable.
 * A directory containing multiple certificate files specified by the `SSL_CERT_DIR` environment variable.
 * Probing of common default locations widely used by current operating systems.
   * This probing functionality is provided to Vector by the [`openssl-probe`][openssl-probe] Rust crate.
