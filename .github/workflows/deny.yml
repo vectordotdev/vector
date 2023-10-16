@@ -1,15 +1,27 @@
-name: Unit - Mac
+# Deny - Linux
+#
+# Checks for security vulnerabilities or license incompatibilities
+#
+# Runs on:
+#  - scheduled UTC midnight
+#  - on PR comment (see comment-trigger.yml)
+#  - on demand from github actions UI
+
+name: Deny - Linux
 
 on:
   workflow_call:
+  workflow_dispatch:
+  schedule:
+    # At midnight UTC
+    - cron: '0 0 * * *'
 
 jobs:
-  unit-mac:
-    runs-on: macos-13
+  test-deny:
+    runs-on: ubuntu-latest
     env:
       CARGO_INCREMENTAL: 0
     steps:
-
       - name: (PR comment) Get PR branch
         if: ${{ github.event_name == 'issue_comment' }}
         uses: xt0rted/pull-request-comment-branch@v2
@@ -21,7 +33,7 @@ jobs:
         with:
           sha: ${{ steps.comment-branch.outputs.head_sha }}
           token: ${{ secrets.GITHUB_TOKEN }}
-          context: Unit - Mac
+          context: Deny - Linux
           status: pending
 
       - name: (PR comment) Checkout PR branch
@@ -46,11 +58,11 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-
 
-      - run: bash scripts/environment/bootstrap-macos-10.sh
+      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: echo "::add-matcher::.github/matchers/rust.json"
-      - run: make test
-      - run: make test-behavior
+      - name: Check cargo deny advisories/licenses
+        run: make check-deny
 
       - name: (PR comment) Set latest commit status as ${{ job.status }}
         uses: myrotvorets/set-commit-status-action@v2.0.0
@@ -58,5 +70,5 @@ jobs:
         with:
           sha: ${{ steps.comment-branch.outputs.head_sha }}
           token: ${{ secrets.GITHUB_TOKEN }}
-          context: Unit - Mac
+          context: Deny - Linux
           status: ${{ job.status }}

@@ -244,12 +244,11 @@ fn get_event_metadata(metadata: Option<&Metadata>) -> EventMetadata {
                 origin.origin_category,
                 origin.origin_service,
             );
-            EventMetadata::default().with_origin_metadata(
-                DatadogMetricOriginMetadata::default()
-                    .with_product(origin.origin_product)
-                    .with_category(origin.origin_category)
-                    .with_service(origin.origin_service),
-            )
+            EventMetadata::default().with_origin_metadata(DatadogMetricOriginMetadata::new(
+                Some(origin.origin_product),
+                Some(origin.origin_category),
+                Some(origin.origin_service),
+            ))
         })
 }
 
