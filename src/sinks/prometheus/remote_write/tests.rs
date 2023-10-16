@@ -190,6 +190,45 @@ async fn aggregates_batches() {
     assert_eq!(req.timeseries[1].samples[0].value, 27.0);
 }
 
+#[tokio::test]
+async fn doesnt_aggregate_batches() {
+    let outputs = send_request(
+        indoc! {
+            r#"
+            batch.max_events = 3
+            batch.aggregate = false
+            "#
+        },
+        vec![
+            create_inc_event("counter-1".into(), 12.0),
+            create_inc_event("counter-1".into(), 14.0),
+            create_inc_event("counter-2".into(), 13.0),
+            create_inc_event("counter-2".into(), 14.0),
+        ],
+    )
+    .await;
+
+    assert_eq!(outputs.len(), 2);
+
+    // The first three metrics are in the first batch.
+    let (_, req) = &outputs[0];
+    assert_eq!(req.timeseries.len(), 2);
+    assert_eq!(req.timeseries[0].labels, labels!("__name__" => "counter-1"));
+    assert_eq!(req.timeseries[0].samples.len(), 2);
+    assert_eq!(req.timeseries[0].samples[0].value, 12.0);
+    assert_eq!(req.timeseries[0].samples[1].value, 26.0);
+
+    assert_eq!(req.timeseries[1].labels, labels!("__name__" => "counter-2"));
+    assert_eq!(req.timeseries[1].samples.len(), 1);
+    assert_eq!(req.timeseries[1].samples[0].value, 13.0);
+
+    // The last metric is in the last batch.
+    let (_, req) = &outputs[1];
+    assert_eq!(req.timeseries[0].labels, labels!("__name__" => "counter-2"));
+    assert_eq!(req.timeseries[0].samples.len(), 1);
+    assert_eq!(req.timeseries[0].samples[0].value, 27.0);
+}
+
 async fn send_request(config: &str, events: Vec<Event>) -> Vec<(HeaderMap, proto::WriteRequest)> {
     assert_sink_compliance(&HTTP_SINK_TAGS, async {
         let addr = test_util::next_addr();

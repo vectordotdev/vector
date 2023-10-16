@@ -115,7 +115,7 @@ impl EventCollection {
         }
     }
 
-    fn is_aggregated(&self) -> bool {
+    const fn is_aggregated(&self) -> bool {
         matches!(self.events, BatchedMetrics::Aggregated(_))
     }
 }
