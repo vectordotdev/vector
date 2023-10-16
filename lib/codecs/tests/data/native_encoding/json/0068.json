@@ -1,1 +1,1 @@
-{"log":{"\t":[]}}
+{"metric":{"name":"q","namespace":"e","kind":"incremental","distribution":{"samples":[{"value":235200.0,"rate":637884736}],"statistic":"summary"}}}

@@ -1,1 +1,1 @@
-{"log":{}}
+{"metric":{"name":"j","tags":{"r":"v"},"kind":"incremental","gauge":{"value":13568.0}}}

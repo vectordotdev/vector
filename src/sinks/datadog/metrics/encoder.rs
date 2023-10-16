@@ -442,7 +442,7 @@ impl DatadogMetricsEncoder {
 
 fn generate_proto_metadata(
     maybe_pass_through: Option<&DatadogMetricOriginMetadata>,
-    maybe_source_type: Option<&'static str>,
+    maybe_source_type: Option<&str>,
     origin_product_value: u32,
 ) -> Option<ddmetric_proto::Metadata> {
     generate_origin_metadata(maybe_pass_through, maybe_source_type, origin_product_value).map(
@@ -710,7 +710,7 @@ fn encode_timestamp(timestamp: Option<DateTime<Utc>>) -> i64 {
 }
 
 // Given the vector source type, return the OriginService value associated with that integration, if any.
-fn source_type_to_service(source_type: &'static str) -> Option<u32> {
+fn source_type_to_service(source_type: &str) -> Option<u32> {
     match source_type {
         // In order to preserve consistent behavior, we intentionally don't set origin metadata
         // for the case where the Datadog Agent did not set it.
@@ -755,7 +755,7 @@ fn source_type_to_service(source_type: &'static str) -> Option<u32> {
 /// the result appropriately for the given protocol they operate on.
 fn generate_origin_metadata(
     maybe_pass_through: Option<&DatadogMetricOriginMetadata>,
-    maybe_source_type: Option<&'static str>,
+    maybe_source_type: Option<&str>,
     origin_product_value: u32,
 ) -> Option<DatadogMetricOriginMetadata> {
     let no_value = 0;
@@ -794,7 +794,7 @@ fn generate_origin_metadata(
 
 fn generate_series_metadata(
     maybe_pass_through: Option<&DatadogMetricOriginMetadata>,
-    maybe_source_type: Option<&'static str>,
+    maybe_source_type: Option<&str>,
     origin_product_value: u32,
 ) -> Option<DatadogSeriesMetricMetadata> {
     generate_origin_metadata(maybe_pass_through, maybe_source_type, origin_product_value).map(
