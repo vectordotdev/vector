@@ -42,11 +42,12 @@ impl ClickhouseSink {
     }
 
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
+        let batch_settings = self.batch_settings;
+
         input
-            .batched_partitioned(
-                KeyPartitioner::new(self.database, self.table),
-                self.batch_settings,
-            )
+            .batched_partitioned(KeyPartitioner::new(self.database, self.table), || {
+                batch_settings.as_byte_size_config()
+            })
             .filter_map(|(key, batch)| async move { key.map(move |k| (k, batch)) })
             .request_builder(
                 default_request_builder_concurrency_limit(),

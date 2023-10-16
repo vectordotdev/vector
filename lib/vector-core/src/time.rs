@@ -21,6 +21,9 @@ pub trait KeyedTimer<K> {
     /// If the given key already exists in the timer, the underlying subtimer is reset.
     fn insert(&mut self, item_key: K);
 
+    /// Removes a subtimer from the list.
+    fn remove(&mut self, item_key: &K);
+
     /// Attempts to pull out the next expired subtimer in the queue.
     ///
     /// The key of the subtimer is returned if it has expired, otherwise, returns `None` if the
