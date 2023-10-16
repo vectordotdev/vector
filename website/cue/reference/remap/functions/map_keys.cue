@@ -29,7 +29,7 @@ remap: functions: map_keys: {
 
 		The same scoping rules apply to closure blocks as they do for
 		regular blocks. This means that any variable defined in parent scopes
-		are accessible, and mutations to those variables are preserved,
+		is accessible, and mutations to those variables are preserved,
 		but any new variables instantiated in the closure block are
 		unavailable outside of the block.
 

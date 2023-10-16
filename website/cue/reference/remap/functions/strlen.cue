@@ -6,8 +6,8 @@ remap: functions: strlen: {
 		Returns the number of UTF-8 characters in `value`. This differs from
 		`length` which counts the number of bytes of a string.
 
-		**Note**: This is the count of [unicode scalar values](https://www.unicode.org/glossary/#unicode_scalar_value)
-		which can sometimes differ from [unicode code points](https://www.unicode.org/glossary/#code_point).
+		**Note**: This is the count of [Unicode scalar values](https://www.unicode.org/glossary/#unicode_scalar_value)
+		which can sometimes differ from [Unicode code points](https://www.unicode.org/glossary/#code_point).
 		"""
 
 	arguments: [
