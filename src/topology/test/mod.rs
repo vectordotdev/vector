@@ -629,7 +629,9 @@ async fn topology_swap_transform_is_atomic() {
         }
     };
     let input = async move {
-        in1.send_batch(iter::from_fn(events)).await.unwrap();
+        in1.send_event_stream(stream::iter(iter::from_fn(events)))
+            .await
+            .unwrap();
     };
     let output = out1.for_each(move |_| {
         recv_counter.fetch_add(1, Ordering::Release);
