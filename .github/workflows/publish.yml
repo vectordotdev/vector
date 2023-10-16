@@ -731,19 +731,6 @@ jobs:
           release: "any-version"
           republish: "true"
           file: "target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.aarch64.rpm"
-      - name: Push armv7-gnu RPM
-        id: push-rpm-armv7-gnu
-        uses: cloudsmith-io/action@v0.5.3
-        with:
-          api-key: ${{ secrets.CLOUDSMITH_API_KEY }}
-          command: "push"
-          format: "rpm"
-          owner: "timber"
-          repo: ${{ env.CLOUDSMITH_REPO }}
-          distro: "any-distro"
-          release: "any-version"
-          republish: "true"
-          file: "target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.armv7.rpm"
       - name: Push armv7hl-gnu RPM
         id: push-rpm-armv7hl-gnu
         uses: cloudsmith-io/action@v0.5.3
