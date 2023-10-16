@@ -3026,7 +3026,7 @@ dependencies = [
  "criterion",
  "data-encoding",
  "thiserror",
- "trust-dns-proto 0.23.0",
+ "trust-dns-proto 0.23.1",
 ]
 
 [[package]]
@@ -9314,9 +9314,9 @@ dependencies = [
 
 [[package]]
 name = "trust-dns-proto"
-version = "0.23.0"
+version = "0.23.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0dc775440033cb114085f6f2437682b194fa7546466024b1037e82a48a052a69"
+checksum = "559ac980345f7f5020883dd3bcacf176355225e01916f8c2efecad7534f682c6"
 dependencies = [
  "async-trait",
  "cfg-if",
@@ -9854,7 +9854,7 @@ dependencies = [
  "tracing-limit",
  "tracing-subscriber",
  "tracing-tower",
- "trust-dns-proto 0.23.0",
+ "trust-dns-proto 0.23.1",
  "typetag",
  "url",
  "uuid",
