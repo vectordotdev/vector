@@ -19,6 +19,19 @@ use super::{
 #[cfg(feature = "aws-core")]
 use super::Errors;
 
+/// The batch config for remote write.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct RemoteWriteBatchConfig {
+    #[configurable(derived)]
+    #[serde(flatten)]
+    pub batch_settings: BatchConfig<PrometheusRemoteWriteDefaultBatchSettings>,
+
+    /// Set to true if incremental metrics within the batch should be aggregated.
+    #[serde(default = "crate::serde::default_true")]
+    pub aggregate: bool,
+}
+
 /// Configuration for the `prometheus_remote_write` sink.
 #[configurable_component(sink(
     "prometheus_remote_write",
@@ -61,7 +74,7 @@ pub struct RemoteWriteConfig {
 
     #[configurable(derived)]
     #[serde(default)]
-    pub batch: BatchConfig<PrometheusRemoteWriteDefaultBatchSettings>,
+    pub batch: RemoteWriteBatchConfig,
 
     #[configurable(derived)]
     #[serde(default)]
@@ -170,7 +183,12 @@ impl SinkConfig for RemoteWriteConfig {
         let sink = RemoteWriteSink {
             tenant_id: self.tenant_id.clone(),
             compression: self.compression,
-            batch_settings: self.batch.validate()?.into_batcher_settings()?,
+            aggregate: self.batch.aggregate,
+            batch_settings: self
+                .batch
+                .batch_settings
+                .validate()?
+                .into_batcher_settings()?,
             buckets,
             quantiles,
             default_namespace,

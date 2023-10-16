@@ -64,22 +64,59 @@ impl SinkBatchSettings for PrometheusRemoteWriteDefaultBatchSettings {
     const TIMEOUT_SECS: f64 = 1.0;
 }
 
-#[derive(Clone)]
+pub(super) enum BatchedMetrics {
+    Aggregated(MetricSet),
+    All(Vec<Metric>),
+}
+
+impl BatchedMetrics {
+    pub(super) fn into_metrics(self) -> Vec<Metric> {
+        match self {
+            BatchedMetrics::Aggregated(metrics) => metrics.into_metrics(),
+            BatchedMetrics::All(metrics) => metrics,
+        }
+    }
+
+    pub(super) fn insert_update(&mut self, metric: Metric) {
+        match self {
+            BatchedMetrics::Aggregated(metrics) => metrics.insert_update(metric),
+            BatchedMetrics::All(metrics) => metrics.push(metric),
+        }
+    }
+
+    pub(super) fn len(&self) -> usize {
+        match self {
+            BatchedMetrics::Aggregated(metrics) => metrics.len(),
+            BatchedMetrics::All(metrics) => metrics.len(),
+        }
+    }
+}
+
 pub(super) struct EventCollection {
     pub(super) finalizers: EventFinalizers,
-    pub(super) events: MetricSet,
+    pub(super) events: BatchedMetrics,
     pub(super) events_byte_size: usize,
     pub(super) events_json_byte_size: GroupedCountByteSize,
 }
 
-impl Default for EventCollection {
-    fn default() -> Self {
+impl EventCollection {
+    /// Creates a new event collection that will either aggregate the incremental metrics
+    /// or store all the metrics, depending on the value of the `aggregate` parameter.
+    fn new(aggregate: bool) -> Self {
         Self {
             finalizers: Default::default(),
-            events: Default::default(),
+            events: if aggregate {
+                BatchedMetrics::Aggregated(Default::default())
+            } else {
+                BatchedMetrics::All(Default::default())
+            },
             events_byte_size: Default::default(),
             events_json_byte_size: telemetry().create_request_count_byte_size(),
         }
+    }
+
+    fn is_aggregated(&self) -> bool {
+        matches!(self.events, BatchedMetrics::Aggregated(_))
     }
 }
 
@@ -91,7 +128,9 @@ impl BatchData<RemoteWriteMetric> for EventCollection {
     }
 
     fn take_batch(&mut self) -> Self::Batch {
-        std::mem::take(self)
+        let mut new = Self::new(self.is_aggregated());
+        std::mem::swap(self, &mut new);
+        new
     }
 
     fn push_item(&mut self, mut item: RemoteWriteMetric) {
@@ -107,6 +146,7 @@ impl BatchData<RemoteWriteMetric> for EventCollection {
 pub(super) struct RemoteWriteSink<S> {
     pub(super) tenant_id: Option<Template>,
     pub(super) batch_settings: BatcherSettings,
+    pub(super) aggregate: bool,
     pub(super) compression: super::Compression,
     pub(super) default_namespace: Option<String>,
     pub(super) buckets: Vec<f64>,
@@ -142,7 +182,8 @@ where
                 future::ready(make_remote_write_event(tenant_id.as_ref(), event))
             })
             .batched_partitioned(PrometheusTenantIdPartitioner, || {
-                batch_settings.as_reducer_config(ByteSizeOfItemSize, EventCollection::default())
+                batch_settings
+                    .as_reducer_config(ByteSizeOfItemSize, EventCollection::new(self.aggregate))
             })
             .request_builder(default_request_builder_concurrency_limit(), request_builder)
             .filter_map(|request| async move {

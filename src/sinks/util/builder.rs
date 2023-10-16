@@ -56,7 +56,6 @@ pub trait SinkBuilderExt: Stream {
         P::Item: ByteSizeOf,
         C: BatchConfig<P::Item>,
         F: Fn() -> C + Send,
-        // B: BatchOutput<P::Item>,
     {
         PartitionedBatcher::new(self, partitioner, settings)
     }
