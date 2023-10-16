@@ -185,7 +185,7 @@ pub fn try_from(value: AvroValue) -> vector_common::Result<VrlValue> {
         AvroValue::Date(d) => Ok(VrlValue::from(d)),
         AvroValue::Decimal(ref d) => Ok(<Vec<u8>>::try_from(d)
             .map(|vec| VrlValue::Array(vec.into_iter().map(VrlValue::from).collect()))?),
-        AvroValue::Double(double) => Ok(VrlValue::from(double)),
+        AvroValue::Double(double) => Ok(VrlValue::from_f64_or_zero(double)),
         AvroValue::Duration(d) => Ok(VrlValue::Array(
             <[u8; 12]>::from(d)
                 .into_iter()
@@ -194,7 +194,7 @@ pub fn try_from(value: AvroValue) -> vector_common::Result<VrlValue> {
         )),
         AvroValue::Enum(_, string) => Ok(VrlValue::from(string)),
         AvroValue::Fixed(_, bytes) => Ok(VrlValue::from(bytes)),
-        AvroValue::Float(float) => Ok(VrlValue::from(float as f64)),
+        AvroValue::Float(float) => Ok(VrlValue::from_f64_or_zero(float as f64)),
         AvroValue::Int(int) => Ok(VrlValue::from(int)),
         AvroValue::Long(long) => Ok(VrlValue::from(long)),
         AvroValue::Map(items) => items
