@@ -1,7 +1,7 @@
 package metadata
 
 remap: functions: for_each: {
-	category:    "Enumerate"
+	category: "Enumerate"
 	description: """
 		Iterate over a collection.
 

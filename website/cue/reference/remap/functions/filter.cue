@@ -1,7 +1,7 @@
 package metadata
 
 remap: functions: filter: {
-	category:    "Enumerate"
+	category: "Enumerate"
 	description: """
 		Filter elements from a collection.
 
