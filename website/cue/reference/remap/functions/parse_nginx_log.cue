@@ -4,7 +4,7 @@ remap: functions: parse_nginx_log: {
 	category:    "Parse"
 	description: """
       Parses Nginx access and error log lines. Lines can be in [`combined`](\(urls.nginx_combined)),
-      [`ingress_upstreaminfo`](\(urls.nginx_ingress_upstreaminfo)) or [`error`](\(urls.nginx_error)) format.
+      [`ingress_upstreaminfo`](\(urls.nginx_ingress_upstreaminfo)), or [`error`](\(urls.nginx_error)) format.
       """
 	notices: [
 		"""
@@ -45,9 +45,9 @@ remap: functions: parse_nginx_log: {
 	]
 
 	internal_failure_reasons: [
-		"`value` doesn't match the specified format",
-		"`timestamp_format` isn't a valid format string",
-		"The timestamp in `value` fails to parse using the provided `timestamp_format`",
+		"`value` does not match the specified format.",
+		"`timestamp_format` is not a valid format string.",
+		"The timestamp in `value` fails to parse using the provided `timestamp_format`.",
 	]
 	return: types: ["object"]
 
