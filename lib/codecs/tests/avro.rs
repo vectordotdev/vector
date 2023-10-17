@@ -18,7 +18,7 @@ use vector_core::{config::LogNamespace, event::Event};
 fn roundtrip_avro_fixtures2(
     #[files("tests/data/avro/avro/*.avro")]
     #[exclude(
-        ".*(date|decimal_var|duration|fixed|map|timemillis|timestampmicros|timestampmillis).avro"
+        ".*(date|decimal_var|duration|fixed|map|time_millis|timestamp_micros|timestamp_millis).avro"
     )]
     path: PathBuf,
 ) {
@@ -32,7 +32,7 @@ fn roundtrip_avro_fixtures2(
 fn roundtrip_avro_fixtures_reverse2(
     #[files("tests/data/avro/avro/*.avro")]
     #[exclude(
-        ".*(date|decimal_var|duration|fixed|timemillis|timestampmicros|timestampmillis).avro"
+        ".*(date|decimal_var|duration|fixed|time_millis|timestamp_micros|timestamp_millis).avro"
     )]
     path: PathBuf,
 ) {
