@@ -1,18 +1,18 @@
 diff --git a/lib/codecs/Cargo.toml b/lib/codecs/Cargo.toml
-index 1044244082..3023194ce8 100644
+index 1044244082..1728ccb881 100644
 --- a/lib/codecs/Cargo.toml
 +++ b/lib/codecs/Cargo.toml
-@@ -42,6 +42,7 @@ vrl = { version = "0.7.0", features = ["cli", "test", "test_framework", "arbitra
- vector-core = { path = "../vector-core", default-features = false, features = ["test"] }
+@@ -43,5 +43,7 @@ vector-core = { path = "../vector-core", default-features = false, features = ["
  uuid = { version = "1", default-features = false, features = ["serde", "v4"] }
  rstest = "0.18.2"
-+num-bigint = "0.4.4"
  
++num-bigint = "0.4.4"
++
  [features]
  syslog = ["dep:syslog_loose"]
 diff --git a/lib/codecs/tests/avro_generate_test_case.rs b/lib/codecs/tests/avro_generate_test_case.rs
 new file mode 100644
-index 0000000000..9fb9d65201
+index 0000000000..354900603b
 --- /dev/null
 +++ b/lib/codecs/tests/avro_generate_test_case.rs
 @@ -0,0 +1,483 @@
@@ -351,87 +351,87 @@ index 0000000000..9fb9d65201
 +}
 +
 +#[test]
-+fn generate_avro_test_case_timemillis() {
++fn generate_avro_test_case_time_millis() {
 +    let schema = r#"
 +    {
 +        "type": "record",
 +        "name": "test",
 +        "fields": [
-+            {"name": "timemillis_field", "type": "int", "logicalType": "time-millis"}
++            {"name": "time_millis_field", "type": "int", "logicalType": "time-millis"}
 +        ]
 +    }
 +    "#;
 +    #[derive(Debug, Serialize, Deserialize, Clone)]
 +    struct Test {
-+        timemillis_field: i32,
++        time_millis_field: i32,
 +    }
 +    let value = Test {
-+        timemillis_field: 59820123,
++        time_millis_field: 59820123,
 +    };
-+    generate_test_case(schema, value, "timemillis");
++    generate_test_case(schema, value, "time_millis");
 +}
 +
 +#[test]
-+fn generate_avro_test_case_timemicros() {
++fn generate_avro_test_case_time_micros() {
 +    let schema = r#"
 +    {
 +        "type": "record",
 +        "name": "test",
 +        "fields": [
-+            {"name": "timemicros_field", "type": "long", "logicalType": "time-micros"}
++            {"name": "time_micros_field", "type": "long", "logicalType": "time-micros"}
 +        ]
 +    }
 +    "#;
 +    #[derive(Debug, Serialize, Deserialize, Clone)]
 +    struct Test {
-+        timemicros_field: i64,
++        time_micros_field: i64,
 +    }
-+    let value = Test {
-+        timemicros_field: 59820123456i64,
++    let value: Test = Test {
++        time_micros_field: 59820123456i64,
 +    };
-+    generate_test_case(schema, value, "timemicros");
++    generate_test_case(schema, value, "time_micros");
 +}
 +
 +#[test]
-+fn generate_avro_test_case_timestampmillis() {
++fn generate_avro_test_case_timestamp_millis() {
 +    let schema = r#"
 +    {
 +        "type": "record",
 +        "name": "test",
 +        "fields": [
-+            {"name": "timestampmillis_field", "type": "long", "logicalType": "timestamp-millis"}
++            {"name": "timestamp_millis_field", "type": "long", "logicalType": "timestamp-millis"}
 +        ]
 +    }
 +    "#;
 +    #[derive(Debug, Serialize, Deserialize, Clone)]
 +    struct Test {
-+        timestampmillis_field: i64,
++        timestamp_millis_field: i64,
 +    }
 +    let value = Test {
-+        timestampmillis_field: 1697445291056i64,
++        timestamp_millis_field: 1697445291056i64,
 +    };
-+    generate_test_case(schema, value, "timestampmillis");
++    generate_test_case(schema, value, "timestamp_millis");
 +}
 +
 +#[test]
-+fn generate_avro_test_case_timestampmicros() {
++fn generate_avro_test_case_timestamp_micros() {
 +    let schema = r#"
 +    {
 +        "type": "record",
 +        "name": "test",
 +        "fields": [
-+            {"name": "timestampmicros_field", "type": "long", "logicalType": "timestamp-micros"}
++            {"name": "timestamp_micros_field", "type": "long", "logicalType": "timestamp-micros"}
 +        ]
 +    }
 +    "#;
 +    #[derive(Debug, Serialize, Deserialize, Clone)]
 +    struct Test {
-+        timestampmicros_field: i64,
++        timestamp_micros_field: i64,
 +    }
 +    let value = Test {
-+        timestampmicros_field: 1697445291056567i64,
++        timestamp_micros_field: 1697445291056567i64,
 +    };
-+    generate_test_case(schema, value, "timestampmicros");
++    generate_test_case(schema, value, "timestamp_micros");
 +}
 +
 +#[test]
