@@ -210,7 +210,7 @@ impl SourceSender {
 
     /// Send an event to the default output.
     ///
-    /// This internally handles emitting [ComponentEventsSent] and [ComponentEventsDropped] events.
+    /// This internally handles emitting [EventsSent] and [ComponentEventsDropped] events.
     pub async fn send_event(&mut self, event: impl Into<EventArray>) -> Result<(), ClosedError> {
         self.inner
             .as_mut()
@@ -221,7 +221,7 @@ impl SourceSender {
 
     /// Send a stream of events to the default output.
     ///
-    /// This internally handles emitting [ComponentEventsSent] and [ComponentEventsDropped] events.
+    /// This internally handles emitting [EventsSent] and [ComponentEventsDropped] events.
     pub async fn send_event_stream<S, E>(&mut self, events: S) -> Result<(), ClosedError>
     where
         S: Stream<Item = E> + Unpin,
@@ -236,7 +236,7 @@ impl SourceSender {
 
     /// Send a batch of events to the default output.
     ///
-    /// This internally handles emitting [ComponentEventsSent] and [ComponentEventsDropped] events.
+    /// This internally handles emitting [EventsSent] and [ComponentEventsDropped] events.
     pub async fn send_batch<I, E>(&mut self, events: I) -> Result<(), ClosedError>
     where
         E: Into<Event> + ByteSizeOf,
@@ -252,7 +252,7 @@ impl SourceSender {
 
     /// Send a batch of events event to a named output.
     ///
-    /// This internally handles emitting [ComponentEventsSent] and [ComponentEventsDropped] events.
+    /// This internally handles emitting [EventsSent] and [ComponentEventsDropped] events.
     pub async fn send_batch_named<I, E>(&mut self, name: &str, events: I) -> Result<(), ClosedError>
     where
         E: Into<Event> + ByteSizeOf,
@@ -381,7 +381,7 @@ impl Inner {
     async fn send_event(&mut self, event: impl Into<EventArray>) -> Result<(), ClosedError> {
         let event: EventArray = event.into();
         // It's possible that the caller stops polling this future while it is blocked waiting
-        // on `self.send()`. When that happens, we use `UnsentEventCount` to correctly emit 
+        // on `self.send()`. When that happens, we use `UnsentEventCount` to correctly emit
         // `ComponentEventsDropped` events.
         let count = event.len();
         let mut unsent_event_count = UnsentEventCount::new(count);
@@ -409,7 +409,7 @@ impl Inner {
         <I as IntoIterator>::IntoIter: ExactSizeIterator,
     {
         // It's possible that the caller stops polling this future while it is blocked waiting
-        // on `self.send()`. When that happens, we use `UnsentEventCount` to correctly emit 
+        // on `self.send()`. When that happens, we use `UnsentEventCount` to correctly emit
         // `ComponentEventsDropped` events.
         let events = events.into_iter().map(Into::into);
         let mut unsent_event_count = UnsentEventCount::new(events.len());
