@@ -9,7 +9,7 @@ use lookup::lookup_v2::OptionalValuePath;
 use openssl::{
     pkcs12::{ParsedPkcs12_2, Pkcs12},
     pkey::{PKey, Private},
-    ssl::{AlpnError, ConnectConfiguration, SslContextBuilder, SslVerifyMode, select_next_proto},
+    ssl::{select_next_proto, AlpnError, ConnectConfiguration, SslContextBuilder, SslVerifyMode},
     stack::Stack,
     x509::{store::X509StoreBuilder, X509},
 };
@@ -271,7 +271,11 @@ impl TlsSettings {
         self.apply_context_base(context, false)
     }
 
-    pub(super) fn apply_context_base(&self, context: &mut SslContextBuilder, for_server: bool) -> Result<()> {
+    pub(super) fn apply_context_base(
+        &self,
+        context: &mut SslContextBuilder,
+        for_server: bool,
+    ) -> Result<()> {
         context.set_verify(if self.verify_certificate {
             SslVerifyMode::PEER | SslVerifyMode::FAIL_IF_NO_PEER_CERT
         } else {
@@ -318,13 +322,11 @@ impl TlsSettings {
                 context
                     .set_alpn_protos(alpn.as_slice())
                     .context(SetAlpnProtocolsSnafu)?;
-            }
-            else {
+            } else {
                 let server_proto = alpn.clone();
-                context
-                    .set_alpn_select_callback(move |_, client_proto| {
-                        select_next_proto(server_proto.as_slice(), client_proto).ok_or(AlpnError::NOACK)
-                     })
+                context.set_alpn_select_callback(move |_, client_proto| {
+                    select_next_proto(server_proto.as_slice(), client_proto).ok_or(AlpnError::NOACK)
+                })
             }
         }
 
