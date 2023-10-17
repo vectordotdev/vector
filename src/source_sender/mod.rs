@@ -380,6 +380,9 @@ impl Inner {
 
     async fn send_event(&mut self, event: impl Into<EventArray>) -> Result<(), ClosedError> {
         let event: EventArray = event.into();
+        // It's possible that the caller stops polling this future while it is blocked waiting
+        // on `self.send()`. When that happens, we use `UnsentEventCount` to correctly emit 
+        // `ComponentEventsDropped` events.
         let count = event.len();
         let mut unsent_event_count = UnsentEventCount::new(count);
         let res = self.send(event).await;
@@ -405,11 +408,16 @@ impl Inner {
         I: IntoIterator<Item = E>,
         <I as IntoIterator>::IntoIter: ExactSizeIterator,
     {
+        // It's possible that the caller stops polling this future while it is blocked waiting
+        // on `self.send()`. When that happens, we use `UnsentEventCount` to correctly emit 
+        // `ComponentEventsDropped` events.
         let events = events.into_iter().map(Into::into);
         let mut unsent_event_count = UnsentEventCount::new(events.len());
         for events in array::events_into_arrays(events, Some(CHUNK_SIZE)) {
             let count = events.len();
             self.send(events).await.map_err(|err| {
+                // The unsent event count is discarded here because the caller emits the
+                // `StreamClosedError`.
                 unsent_event_count.discard();
                 err
             })?;
