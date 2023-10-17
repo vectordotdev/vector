@@ -15,31 +15,20 @@ use tokio_util::codec::Encoder;
 use vector_core::{config::LogNamespace, event::Event};
 
 #[rstest]
-fn roundtrip_avro_fixtures2(
+#[case(true)]
+#[case(false)]
+fn roundtrip_avro_fixtures(
     #[files("tests/data/avro/generated/*.avro")]
     #[exclude(
         ".*(date|decimal_var|duration|fixed|map|time_millis|timestamp_micros|timestamp_millis).avro"
     )]
     path: PathBuf,
+    #[case] reserialize: bool,
 ) {
     let schema_path = path.as_path().with_extension("avsc");
     assert!(schema_path.exists());
 
-    roundtrip_avro(path, schema_path, false);
-}
-
-#[rstest]
-fn roundtrip_avro_fixtures_reverse2(
-    #[files("tests/data/avro/generated/*.avro")]
-    #[exclude(
-        ".*(date|decimal_var|duration|fixed|time_millis|timestamp_micros|timestamp_millis).avro"
-    )]
-    path: PathBuf,
-) {
-    let schema_path = path.as_path().with_extension("avsc");
-    assert!(schema_path.exists());
-
-    roundtrip_avro(path, schema_path, true);
+    roundtrip_avro(path, schema_path, reserialize);
 }
 
 fn roundtrip_avro(data_path: PathBuf, schema_path: PathBuf, reserialize: bool) {
