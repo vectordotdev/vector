@@ -42,6 +42,8 @@ vrl = { version = "0.7.0", features = ["cli", "test", "test_framework", "arbitra
 vector-core = { path = "../vector-core", default-features = false, features = ["test"] }
 uuid = { version = "1", default-features = false, features = ["serde", "v4"] }
 rstest = "0.18.2"
+num-bigint = "0.4.4"
 
 [features]
 syslog = ["dep:syslog_loose"]
+generate-avro-fixtures = []
