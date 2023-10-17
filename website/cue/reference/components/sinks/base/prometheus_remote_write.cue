@@ -190,9 +190,14 @@ base: components: sinks: prometheus_remote_write: configuration: {
 		}
 	}
 	batch: {
-		description: "Event batching behavior."
+		description: "The batch config for remote write."
 		required:    false
 		type: object: options: {
+			aggregate: {
+				description: "Set to true if incremental metrics within the batch should be aggregated."
+				required:    false
+				type: bool: default: false
+			}
 			max_bytes: {
 				description: """
 					The maximum size of a batch that is processed by a sink.
