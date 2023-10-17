@@ -25,7 +25,7 @@ Asus
 Atlassian
 Attab
 Audiosonic
-avro
+avsc
 Axioo
 Azend
 Bedove
