@@ -221,8 +221,3 @@ k8s
 
 # ignore specific user:password string containing special chars for unit testing
 user:P@ssw0rd
-
-# patch hunk comments
-^\@\@ -\d+(?:,\d+|) \+\d+(?:,\d+|) \@\@ .*
-# git index header
-index [0-9a-z]{7,40}\.\.[0-9a-z]{7,40}
