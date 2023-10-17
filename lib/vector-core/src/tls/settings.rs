@@ -318,15 +318,15 @@ impl TlsSettings {
         }
 
         if let Some(alpn) = &self.alpn_protocols {
-            if !for_server {
-                context
-                    .set_alpn_protos(alpn.as_slice())
-                    .context(SetAlpnProtocolsSnafu)?;
-            } else {
+            if for_server {
                 let server_proto = alpn.clone();
                 context.set_alpn_select_callback(move |_, client_proto| {
                     select_next_proto(server_proto.as_slice(), client_proto).ok_or(AlpnError::NOACK)
-                })
+                });
+            } else {
+                context
+                    .set_alpn_protos(alpn.as_slice())
+                    .context(SetAlpnProtocolsSnafu)?;
             }
         }
 
