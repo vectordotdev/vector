@@ -1,0 +1,501 @@
+diff --git a/lib/codecs/Cargo.toml b/lib/codecs/Cargo.toml
+index 1044244082..3023194ce8 100644
+--- a/lib/codecs/Cargo.toml
++++ b/lib/codecs/Cargo.toml
+@@ -42,6 +42,7 @@ vrl = { version = "0.7.0", features = ["cli", "test", "test_framework", "arbitra
+ vector-core = { path = "../vector-core", default-features = false, features = ["test"] }
+ uuid = { version = "1", default-features = false, features = ["serde", "v4"] }
+ rstest = "0.18.2"
++num-bigint = "0.4.4"
+ 
+ [features]
+ syslog = ["dep:syslog_loose"]
+diff --git a/lib/codecs/tests/avro_generate_test_case.rs b/lib/codecs/tests/avro_generate_test_case.rs
+new file mode 100644
+index 0000000000..9fb9d65201
+--- /dev/null
++++ b/lib/codecs/tests/avro_generate_test_case.rs
+@@ -0,0 +1,483 @@
++use apache_avro::{types::Value, Days, Decimal, Duration, Millis, Months, Schema};
++use num_bigint::ToBigInt;
++use serde::{Deserialize, Serialize};
++use std::fs::File;
++use std::io::Write;
++use uuid::Uuid;
++
++#[test]
++fn generate_avro_test_case_boolean() {
++    let schema = r#"
++    {
++        "type": "record",
++        "name": "test",
++        "fields": [
++            {"name": "bool_field", "type": "boolean", "default": false}
++        ]
++    }
++    "#;
++    #[derive(Debug, Serialize, Deserialize, Clone)]
++    struct Test {
++        bool_field: bool,
++    }
++    let value = Test { bool_field: true };
++    generate_test_case(schema, value, "boolean");
++}
++
++#[test]
++fn generate_avro_test_case_int() {
++    let schema = r#"
++    {
++        "type": "record",
++        "name": "test",
++        "fields": [
++            {"name": "int_field", "type": "int", "default": 0}
++        ]
++    }
++    "#;
++    #[derive(Debug, Serialize, Deserialize, Clone)]
++    struct Test {
++        int_field: i32,
++    }
++    let value = Test { int_field: 1234 };
++    generate_test_case(schema, value, "int");
++}
++
++#[test]
++fn generate_avro_test_case_long() {
++    let schema = r#"
++    {
++        "type": "record",
++        "name": "test",
++        "fields": [
++            {"name": "long_field", "type": "long", "default": 0}
++        ]
++    }
++    "#;
++    #[derive(Debug, Serialize, Deserialize, Clone)]
++    struct Test {
++        long_field: i64,
++    }
++    let value = Test {
++        long_field: 42949672960i64,
++    };
++    generate_test_case(schema, value, "long");
++}
++
++#[test]
++fn generate_avro_test_case_float() {
++    let schema = r#"
++    {
++        "type": "record",
++        "name": "test",
++        "fields": [
++            {"name": "float_field", "type": "float", "default": 0}
++        ]
++    }
++    "#;
++    #[derive(Debug, Serialize, Deserialize, Clone)]
++    struct Test {
++        float_field: f32,
++    }
++    let value = Test {
++        float_field: 123.456,
++    };
++    generate_test_case(schema, value, "float");
++}
++
++#[test]
++fn generate_avro_test_case_double() {
++    let schema = r#"
++    {
++        "type": "record",
++        "name": "test",
++        "fields": [
++            {"name": "double_field", "type": "double", "default": 0}
++        ]
++    }
++    "#;
++    #[derive(Debug, Serialize, Deserialize, Clone)]
++    struct Test {
++        double_field: f64,
++    }
++    let value = Test {
++        double_field: 123.456f64,
++    };
++    generate_test_case(schema, value, "double");
++}
++
++#[test]
++fn generate_avro_test_case_bytes() {
++    let schema = r#"
++    {
++        "type": "record",
++        "name": "test",
++        "fields": [
++            {"name": "bytes_field", "type": "bytes"}
++        ]
++    }
++    "#;
++    #[derive(Debug, Serialize, Deserialize, Clone)]
++    struct Test {
++        bytes_field: Vec<u8>,
++    }
++    let value = Test {
++        bytes_field: vec![1, 2, 3, 4, 5, 6, 6, 7],
++    };
++    generate_test_case(schema, value, "bytes");
++}
++
++#[test]
++fn generate_avro_test_case_string() {
++    let schema = r#"
++    {
++        "type": "record",
++        "name": "test",
++        "fields": [
++            {"name": "string_field", "type": "string"}
++        ]
++    }
++    "#;
++    #[derive(Debug, Serialize, Deserialize, Clone)]
++    struct Test {
++        string_field: String,
++    }
++    let value = Test {
++        string_field: "hello world!".to_string(),
++    };
++    generate_test_case(schema, value, "string");
++}
++
++#[test]
++fn generate_avro_test_case_fixed() {
++    let schema = r#"
++    {
++        "type": "record",
++        "name": "test",
++        "fields": [
++            {"name": "fixed_field", "type":"fixed", "size": 16}
++        ]
++    }
++    "#;
++    let record = Value::Record(vec![(
++        "fixed_field".into(),
++        Value::Fixed(16, b"1019181716151413".to_vec()),
++    )]);
++    generate_test_case_from_value(schema, record, "fixed");
++}
++
++#[test]
++fn generate_avro_test_case_enum() {
++    let schema = r#"
++    {
++        "type": "record",
++        "name": "test",
++        "fields": [
++            {"name": "enum_field", "type": "enum", "symbols" : ["SPADES", "HEARTS", "DIAMONDS", "CLUBS"]}
++        ]
++    }
++    "#;
++    #[derive(Debug, Serialize, Deserialize, Clone)]
++    enum Value {
++        SPADES,
++        HEARTS,
++        DIAMONDS,
++        CLUBS,
++    }
++    #[derive(Debug, Serialize, Deserialize, Clone)]
++    struct Test {
++        enum_field: Value,
++    }
++    let value = Test {
++        enum_field: Value::HEARTS,
++    };
++    generate_test_case(schema, value, "enum");
++}
++
++#[test]
++fn generate_avro_test_case_union() {
++    let schema = r#"
++    {
++        "type": "record",
++        "name": "test",
++        "fields": [
++            {"name": "union_field", "type": [
++                "string",
++                "int"
++                ]
++            }
++        ]
++    }
++    "#;
++    #[derive(Debug, Serialize, Deserialize, Clone)]
++    struct Test {
++        union_field: i32,
++    }
++    let value = Test {
++        union_field: 123456,
++    };
++    generate_test_case(schema, value, "union");
++}
++
++#[test]
++fn generate_avro_test_case_array() {
++    let schema = r#"
++    {
++        "type": "record",
++        "name": "test",
++        "fields": [
++            {"name": "array_field", "type": "array", "items" : "string"}
++        ]
++    }
++    "#;
++    #[derive(Debug, Serialize, Deserialize, Clone)]
++    struct Test {
++        array_field: Vec<String>,
++    }
++    let value = Test {
++        array_field: vec![
++            "hello".to_string(),
++            "vector".to_string(),
++            "avro".to_string(),
++            "codec".to_string(),
++        ],
++    };
++    generate_test_case(schema, value, "array");
++}
++
++#[test]
++fn generate_avro_test_case_map() {
++    let schema = r#"
++    {
++        "type": "record",
++        "name": "test",
++        "fields": [
++            {"name": "map_field", "type": "map", "values" : "long","default": {}}
++        ]
++    }
++    "#;
++    use std::collections::HashMap;
++    #[derive(Debug, Serialize, Deserialize, Clone)]
++    struct Test {
++        map_field: HashMap<String, i64>,
++    }
++    let mut scores = HashMap::new();
++    scores.insert(String::from("Blue"), 10i64);
++    scores.insert(String::from("Yellow"), 50i64);
++    let value = Test { map_field: scores };
++    generate_test_case(schema, value, "map");
++}
++
++#[test]
++fn generate_avro_test_case_record() {
++    let schema = r#"
++    {
++        "type": "record",
++        "name": "test",
++        "fields": [
++            {"name": "name", "type": "string"},
++            {"name": "age", "type": "int"}
++        ]
++    }
++    "#;
++    #[derive(Debug, Serialize, Deserialize, Clone)]
++    struct Test {
++        name: String,
++        age: i32,
++    }
++    let value = Test {
++        name: "John".to_string(),
++        age: 23,
++    };
++    generate_test_case(schema, value, "record");
++}
++
++#[test]
++fn generate_avro_test_case_date() {
++    let schema = r#"
++    {
++        "type": "record",
++        "name": "test",
++        "fields": [
++            {"name": "date_field", "type": "int", "logicalType": "date"}
++        ]
++    }
++    "#;
++    #[derive(Debug, Serialize, Deserialize, Clone)]
++    struct Test {
++        date_field: i32,
++    }
++    let value = Test { date_field: 19646 };
++    generate_test_case(schema, value, "date");
++}
++
++#[test]
++fn generate_avro_test_case_decimal_var() {
++    let schema = r#"
++    {
++        "type": "record",
++        "name": "test",
++        "fields": [
++            {"name": "decimal_var_field", "type": "bytes", "logicalType": "decimal","precision": 10,"scale": 3}
++        ]
++    }
++    "#;
++
++    let record = Value::Record(vec![(
++        "decimal_var_field".into(),
++        Value::Decimal(Decimal::from(
++            (-32442432423442364362343i128.to_bigint().unwrap()).to_signed_bytes_be(),
++        )),
++    )]);
++    generate_test_case_from_value(schema, record, "decimal_var");
++}
++
++#[test]
++fn generate_avro_test_case_timemillis() {
++    let schema = r#"
++    {
++        "type": "record",
++        "name": "test",
++        "fields": [
++            {"name": "timemillis_field", "type": "int", "logicalType": "time-millis"}
++        ]
++    }
++    "#;
++    #[derive(Debug, Serialize, Deserialize, Clone)]
++    struct Test {
++        timemillis_field: i32,
++    }
++    let value = Test {
++        timemillis_field: 59820123,
++    };
++    generate_test_case(schema, value, "timemillis");
++}
++
++#[test]
++fn generate_avro_test_case_timemicros() {
++    let schema = r#"
++    {
++        "type": "record",
++        "name": "test",
++        "fields": [
++            {"name": "timemicros_field", "type": "long", "logicalType": "time-micros"}
++        ]
++    }
++    "#;
++    #[derive(Debug, Serialize, Deserialize, Clone)]
++    struct Test {
++        timemicros_field: i64,
++    }
++    let value = Test {
++        timemicros_field: 59820123456i64,
++    };
++    generate_test_case(schema, value, "timemicros");
++}
++
++#[test]
++fn generate_avro_test_case_timestampmillis() {
++    let schema = r#"
++    {
++        "type": "record",
++        "name": "test",
++        "fields": [
++            {"name": "timestampmillis_field", "type": "long", "logicalType": "timestamp-millis"}
++        ]
++    }
++    "#;
++    #[derive(Debug, Serialize, Deserialize, Clone)]
++    struct Test {
++        timestampmillis_field: i64,
++    }
++    let value = Test {
++        timestampmillis_field: 1697445291056i64,
++    };
++    generate_test_case(schema, value, "timestampmillis");
++}
++
++#[test]
++fn generate_avro_test_case_timestampmicros() {
++    let schema = r#"
++    {
++        "type": "record",
++        "name": "test",
++        "fields": [
++            {"name": "timestampmicros_field", "type": "long", "logicalType": "timestamp-micros"}
++        ]
++    }
++    "#;
++    #[derive(Debug, Serialize, Deserialize, Clone)]
++    struct Test {
++        timestampmicros_field: i64,
++    }
++    let value = Test {
++        timestampmicros_field: 1697445291056567i64,
++    };
++    generate_test_case(schema, value, "timestampmicros");
++}
++
++#[test]
++fn generate_avro_test_case_duration() {
++    let schema = r#"
++    {
++        "type": "record",
++        "name": "test",
++        "fields": [
++            {"name": "duration_field", "type": {
++                "type": "fixed",
++                "size": 12,
++                "name": "duration"
++              }, 
++              "logicalType": "duration"
++            }
++        ]
++    }
++    "#;
++    let record = Value::Record(vec![(
++        "duration_field".into(),
++        Value::Duration(Duration::new(Months::new(6), Days::new(7), Millis::new(8))),
++    )]);
++    generate_test_case_from_value(schema, record, "duration");
++}
++
++#[test]
++fn generate_avro_test_case_uuid() {
++    let schema = r#"
++    {
++        "type": "record",
++        "name": "test",
++        "fields": [
++            {"name": "uuid_field", "type": "string", 
++              "logicalType": "uuid"
++            }
++        ]
++    }
++    "#;
++    #[derive(Debug, Serialize, Deserialize, Clone)]
++    struct Test {
++        uuid_field: Uuid,
++    }
++    let value = Test {
++        uuid_field: uuid::Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap(),
++    };
++    generate_test_case(schema, value, "uuid");
++}
++
++fn generate_test_case<S: Serialize>(schema: &str, value: S, filename: &str) {
++    let value = apache_avro::to_value(value).unwrap();
++    generate_test_case_from_value(schema, value, filename);
++}
++
++fn generate_test_case_from_value(schema: &str, value: Value, filename: &str) {
++    let schema = Schema::parse_str(schema).unwrap();
++
++    let value = value.resolve(&schema).unwrap();
++    let bytes = apache_avro::to_avro_datum(&schema, value).unwrap();
++
++    let mut schema_file = File::create(format!("_avro/{filename}.avsc")).unwrap();
++    let mut avro_file = File::create(format!("_avro/{filename}.avro")).unwrap();
++    schema_file
++        .write_all(schema.canonical_form().as_bytes())
++        .unwrap();
++    avro_file.write_all(&bytes).unwrap();
++}
