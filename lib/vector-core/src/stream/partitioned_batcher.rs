@@ -86,7 +86,9 @@ where
     }
 
     fn remove(&mut self, item_key: &K) {
-        self.expiration_map.remove(item_key);
+        if let Some(expiration_key) = self.expiration_map.remove(item_key) {
+            self.expirations.remove(&expiration_key);
+        }
     }
 
     fn poll_expired(&mut self, cx: &mut Context) -> Poll<Option<K>> {
@@ -309,6 +311,7 @@ where
                     } else {
                         let batch = (this.state)();
                         this.batches.insert(item_key.clone(), batch);
+                        this.timer.insert(item_key.clone());
                         this.batches
                             .get_mut(&item_key)
                             .expect("batch has just been inserted so should exist")
@@ -321,6 +324,11 @@ where
                         // next iteration.
                         this.closed_batches
                             .push((item_key.clone(), batch.take_batch()));
+
+                        // The batch for this partition key was set to
+                        // expire, but now it's overflowed and must be
+                        // pushed out, so now we reset the batch timeout.
+                        this.timer.insert(item_key.clone());
                     }
 
                     // Insert the item into the batch.
@@ -332,8 +340,6 @@ where
                             .push((item_key.clone(), batch.take_batch()));
                         this.batches.remove(&item_key);
                         this.timer.remove(&item_key);
-                    } else {
-                        this.timer.insert(item_key);
                     }
                 }
             }
