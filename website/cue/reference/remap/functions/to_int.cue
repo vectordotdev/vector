@@ -17,8 +17,8 @@ remap: functions: to_int: {
 		},
 	]
 	internal_failure_reasons: [
-		"`value` is a string but the text is not an integer",
-		"`value` is not a string, int, or timestamp",
+		"`value` is a string but the text is not an integer.",
+		"`value` is not a string, int, or timestamp.",
 	]
 	return: {
 		types: ["integer"]

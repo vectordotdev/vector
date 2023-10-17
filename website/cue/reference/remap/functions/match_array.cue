@@ -3,7 +3,7 @@ package metadata
 remap: functions: match_array: {
 	category: "Enumerate"
 	description: """
-		Determines whether the elements in the `value` array matches the `pattern` - by default it checks at least one element matches, but can be set to determine if all the elements match.
+		Determines whether the elements in the `value` array matches the `pattern`. By default, it checks that at least one element matches, but can be set to determine if all the elements match.
 		"""
 
 	arguments: [
