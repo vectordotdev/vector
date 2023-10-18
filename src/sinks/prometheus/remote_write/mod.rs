@@ -55,8 +55,6 @@ impl From<Compression> for crate::sinks::util::Compression {
 
 #[derive(Debug, Snafu)]
 enum Errors {
-    #[snafu(display(r#"Prometheus remote_write sink cannot accept "set" metrics"#))]
-    SetMetricInvalid,
     #[cfg(feature = "aws-core")]
     #[snafu(display("aws.region required when AWS authentication is in use"))]
     AwsRegionRequired,

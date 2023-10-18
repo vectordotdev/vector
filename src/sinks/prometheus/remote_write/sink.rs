@@ -45,6 +45,12 @@ impl ByteSizeOf for RemoteWriteMetric {
 #[derive(Clone, Copy, Debug, Default)]
 pub struct PrometheusRemoteWriteDefaultBatchSettings;
 
+impl SinkBatchSettings for PrometheusRemoteWriteDefaultBatchSettings {
+    const MAX_EVENTS: Option<usize> = Some(1_000);
+    const MAX_BYTES: Option<usize> = None;
+    const TIMEOUT_SECS: f64 = 1.0;
+}
+
 pub(super) struct PrometheusTenantIdPartitioner;
 
 impl Partitioner for PrometheusTenantIdPartitioner {
@@ -58,36 +64,30 @@ impl Partitioner for PrometheusTenantIdPartitioner {
     }
 }
 
-impl SinkBatchSettings for PrometheusRemoteWriteDefaultBatchSettings {
-    const MAX_EVENTS: Option<usize> = Some(1_000);
-    const MAX_BYTES: Option<usize> = None;
-    const TIMEOUT_SECS: f64 = 1.0;
-}
-
 pub(super) enum BatchedMetrics {
     Aggregated(MetricSet),
-    All(Vec<Metric>),
+    Unaggregated(Vec<Metric>),
 }
 
 impl BatchedMetrics {
     pub(super) fn into_metrics(self) -> Vec<Metric> {
         match self {
             BatchedMetrics::Aggregated(metrics) => metrics.into_metrics(),
-            BatchedMetrics::All(metrics) => metrics,
+            BatchedMetrics::Unaggregated(metrics) => metrics,
         }
     }
 
     pub(super) fn insert_update(&mut self, metric: Metric) {
         match self {
             BatchedMetrics::Aggregated(metrics) => metrics.insert_update(metric),
-            BatchedMetrics::All(metrics) => metrics.push(metric),
+            BatchedMetrics::Unaggregated(metrics) => metrics.push(metric),
         }
     }
 
     pub(super) fn len(&self) -> usize {
         match self {
             BatchedMetrics::Aggregated(metrics) => metrics.len(),
-            BatchedMetrics::All(metrics) => metrics.len(),
+            BatchedMetrics::Unaggregated(metrics) => metrics.len(),
         }
     }
 }
@@ -108,7 +108,7 @@ impl EventCollection {
             events: if aggregate {
                 BatchedMetrics::Aggregated(Default::default())
             } else {
-                BatchedMetrics::All(Default::default())
+                BatchedMetrics::Unaggregated(Default::default())
             },
             events_byte_size: Default::default(),
             events_json_byte_size: telemetry().create_request_count_byte_size(),

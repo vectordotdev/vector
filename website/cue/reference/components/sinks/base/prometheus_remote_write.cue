@@ -196,7 +196,7 @@ base: components: sinks: prometheus_remote_write: configuration: {
 			aggregate: {
 				description: "Set to true if incremental metrics within the batch should be aggregated."
 				required:    false
-				type: bool: default: false
+				type: bool: default: true
 			}
 			max_bytes: {
 				description: """

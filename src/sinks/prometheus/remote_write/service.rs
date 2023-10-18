@@ -18,6 +18,17 @@ use crate::{
     },
 };
 
+/// Constants for header strings.
+mod headers {
+    pub(super) const X_PROMETHEUS_REMOTE_WRITE_VERSION: &str = "X-Prometheus-Remote-Write-Version";
+    pub(super) const CONTENT_ENCODING: &str = "Content-Encoding";
+    pub(super) const CONTENT_TYPE: &str = "Content-Type";
+    pub(super) const X_SCOPE_ORGID: &str = "X-Scope-OrgID";
+
+    pub(super) const VERSION: &str = "0.1.0";
+    pub(super) const APPLICATION_X_PROTOBUF: &str = "application/x-protobuf";
+}
+
 #[derive(Clone)]
 pub(super) struct RemoteWriteService {
     pub(super) endpoint: Uri,
@@ -38,14 +49,16 @@ impl Service<RemoteWriteRequest> for RemoteWriteService {
     // Emission of internal events for errors and dropped events is handled upstream by the caller.
     fn call(&mut self, mut request: RemoteWriteRequest) -> Self::Future {
         let client = self.client.clone();
-        let metadata = std::mem::take(request.metadata_mut());
-        let json_size = metadata.into_events_estimated_json_encoded_byte_size();
         let endpoint = self.endpoint.clone();
         let auth = self.auth.clone();
         let compression = self.compression;
 
         Box::pin(async move {
-            let request = build_request(
+            let metadata = std::mem::take(request.metadata_mut());
+            let json_size = metadata.into_events_estimated_json_encoded_byte_size();
+            let raw_byte_size = request.request.len();
+
+            let http_request = build_request(
                 http::Method::POST,
                 &endpoint,
                 compression,
@@ -55,14 +68,9 @@ impl Service<RemoteWriteRequest> for RemoteWriteService {
             )
             .await?;
 
-            let (parts, body) = request.into_parts();
-            let request: hyper::Request<hyper::Body> =
-                hyper::Request::from_parts(parts, body.into());
-
-            let response = client.send(request.map(hyper::Body::from)).await?;
+            let response = client.send(http_request).await?;
             let (parts, body) = response.into_parts();
             let body = hyper::body::to_bytes(body).await?;
-            let raw_byte_size = body.len();
             let http_response = hyper::Response::from_parts(parts, body);
 
             if http_response.status().is_success() {
@@ -99,18 +107,18 @@ pub(super) async fn build_request(
     body: Bytes,
     tenant_id: Option<&String>,
     auth: Option<Auth>,
-) -> crate::Result<http::Request<Bytes>> {
+) -> crate::Result<http::Request<hyper::Body>> {
     let content_encoding = convert_compression_to_content_encoding(compression);
 
     let mut builder = http::Request::builder()
         .method(method)
         .uri(endpoint)
-        .header("X-Prometheus-Remote-Write-Version", "0.1.0")
-        .header("Content-Encoding", content_encoding)
-        .header("Content-Type", "application/x-protobuf");
+        .header(headers::X_PROMETHEUS_REMOTE_WRITE_VERSION, headers::VERSION)
+        .header(headers::CONTENT_ENCODING, content_encoding)
+        .header(headers::CONTENT_TYPE, headers::APPLICATION_X_PROTOBUF);
 
     if let Some(tenant_id) = tenant_id {
-        builder = builder.header("X-Scope-OrgID", tenant_id);
+        builder = builder.header(headers::X_SCOPE_ORGID, tenant_id);
     }
 
     let mut request = builder.body(body)?;
@@ -126,7 +134,7 @@ pub(super) async fn build_request(
         }
     }
 
-    Ok(request)
+    Ok(request.map(hyper::Body::from))
 }
 
 const fn convert_compression_to_content_encoding(compression: super::Compression) -> &'static str {

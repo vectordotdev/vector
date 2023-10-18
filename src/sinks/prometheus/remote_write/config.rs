@@ -21,15 +21,24 @@ use super::Errors;
 
 /// The batch config for remote write.
 #[configurable_component]
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug)]
 pub struct RemoteWriteBatchConfig {
     #[configurable(derived)]
     #[serde(flatten)]
     pub batch_settings: BatchConfig<PrometheusRemoteWriteDefaultBatchSettings>,
 
-    /// Set to true if incremental metrics within the batch should be aggregated.
+    /// Whether or not to aggregate metrics within a batch.
     #[serde(default = "crate::serde::default_true")]
     pub aggregate: bool,
+}
+
+impl Default for RemoteWriteBatchConfig {
+    fn default() -> Self {
+        Self {
+            batch_settings: Default::default(),
+            aggregate: true,
+        }
+    }
 }
 
 /// Configuration for the `prometheus_remote_write` sink.
@@ -212,7 +221,7 @@ async fn healthcheck(
     let body = bytes::Bytes::new();
     let request =
         build_request(http::Method::GET, &endpoint, compression, body, None, auth).await?;
-    let response = client.send(request.map(hyper::Body::from)).await?;
+    let response = client.send(request).await?;
 
     match response.status() {
         http::StatusCode::OK => Ok(()),
