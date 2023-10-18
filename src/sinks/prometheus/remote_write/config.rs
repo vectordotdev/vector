@@ -121,7 +121,7 @@ pub struct RemoteWriteConfig {
     #[configurable(derived)]
     #[configurable(metadata(docs::advanced))]
     #[serde(default)]
-    pub compression: super::Compression,
+    pub compression: Compression,
 }
 
 impl_generate_config_from_default!(RemoteWriteConfig);
@@ -215,7 +215,7 @@ impl SinkConfig for RemoteWriteConfig {
 async fn healthcheck(
     client: HttpClient,
     endpoint: Uri,
-    compression: super::Compression,
+    compression: Compression,
     auth: Option<Auth>,
 ) -> crate::Result<()> {
     let body = bytes::Bytes::new();

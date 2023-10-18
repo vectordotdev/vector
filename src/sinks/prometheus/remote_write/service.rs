@@ -103,19 +103,20 @@ async fn sign_request(
 pub(super) async fn build_request(
     method: http::Method,
     endpoint: &Uri,
-    compression: super::Compression,
+    compression: Compression,
     body: Bytes,
     tenant_id: Option<&String>,
     auth: Option<Auth>,
 ) -> crate::Result<http::Request<hyper::Body>> {
-    let content_encoding = convert_compression_to_content_encoding(compression);
-
     let mut builder = http::Request::builder()
         .method(method)
         .uri(endpoint)
         .header(headers::X_PROMETHEUS_REMOTE_WRITE_VERSION, headers::VERSION)
-        .header(headers::CONTENT_ENCODING, content_encoding)
         .header(headers::CONTENT_TYPE, headers::APPLICATION_X_PROTOBUF);
+
+    if let Some(content_encoding) = compression.content_encoding() {
+        builder = builder.header(headers::CONTENT_ENCODING, content_encoding);
+    }
 
     if let Some(tenant_id) = tenant_id {
         builder = builder.header(headers::X_SCOPE_ORGID, tenant_id);
@@ -135,12 +136,4 @@ pub(super) async fn build_request(
     }
 
     Ok(request.map(hyper::Body::from))
-}
-
-const fn convert_compression_to_content_encoding(compression: super::Compression) -> &'static str {
-    match compression {
-        super::Compression::Snappy => "snappy",
-        super::Compression::Gzip => "gzip",
-        super::Compression::Zstd => "zstd",
-    }
 }

@@ -79,7 +79,7 @@ pub(super) struct RemoteWriteMetadata {
 }
 
 pub(super) struct RemoteWriteRequestBuilder {
-    pub(super) compression: super::Compression,
+    pub(super) compression: Compression,
     pub(super) encoder: RemoteWriteEncoder,
 }
 
@@ -92,7 +92,7 @@ impl RequestBuilder<(PartitionKey, EventCollection)> for RemoteWriteRequestBuild
     type Error = io::Error;
 
     fn compression(&self) -> Compression {
-        self.compression.into()
+        self.compression
     }
 
     fn encoder(&self) -> &Self::Encoder {

@@ -194,7 +194,7 @@ base: components: sinks: prometheus_remote_write: configuration: {
 		required:    false
 		type: object: options: {
 			aggregate: {
-				description: "Set to true if incremental metrics within the batch should be aggregated."
+				description: "Whether or not to aggregate metrics within a batch."
 				required:    false
 				type: bool: default: true
 			}
@@ -239,14 +239,31 @@ base: components: sinks: prometheus_remote_write: configuration: {
 		}
 	}
 	compression: {
-		description: "Supported compression types for Prometheus Remote Write."
-		required:    false
+		description: """
+			Compression configuration.
+
+			All compression algorithms use the default compression level unless otherwise specified.
+			"""
+		required: false
 		type: string: {
-			default: "snappy"
+			default: "none"
 			enum: {
-				gzip:   "Gzip."
-				snappy: "Snappy."
-				zstd:   "Zstandard."
+				gzip: """
+					[Gzip][gzip] compression.
+
+					[gzip]: https://www.gzip.org/
+					"""
+				none: "No compression."
+				zlib: """
+					[Zlib][zlib] compression.
+
+					[zlib]: https://zlib.net/
+					"""
+				zstd: """
+					[Zstandard][zstd] compression.
+
+					[zstd]: https://facebook.github.io/zstd/
+					"""
 			}
 		}
 	}

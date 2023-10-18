@@ -26,33 +26,6 @@ mod integration_tests;
 
 pub use config::RemoteWriteConfig;
 
-/// Supported compression types for Prometheus Remote Write.
-#[configurable_component]
-#[derive(Clone, Copy, Debug, Derivative)]
-#[derivative(Default)]
-#[serde(rename_all = "lowercase")]
-pub enum Compression {
-    /// Snappy.
-    #[derivative(Default)]
-    Snappy,
-
-    /// Gzip.
-    Gzip,
-
-    /// Zstandard.
-    Zstd,
-}
-
-impl From<Compression> for crate::sinks::util::Compression {
-    fn from(value: Compression) -> Self {
-        match value {
-            Compression::Snappy => crate::sinks::util::Compression::Snappy,
-            Compression::Gzip => crate::sinks::util::Compression::Gzip(Default::default()),
-            Compression::Zstd => crate::sinks::util::Compression::Zstd(Default::default()),
-        }
-    }
-}
-
 #[derive(Debug, Snafu)]
 enum Errors {
     #[cfg(feature = "aws-core")]
