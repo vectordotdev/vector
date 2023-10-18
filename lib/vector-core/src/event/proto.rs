@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use chrono::TimeZone;
 use ordered_float::NotNan;
 
@@ -15,7 +17,7 @@ pub use metric::Value as MetricValue;
 pub use proto_event::*;
 use vrl::value::Value as VrlValue;
 
-use super::{array, metric::MetricSketch};
+use super::{array, metric::MetricSketch, EventMetadata};
 
 impl event_array::Events {
     // We can't use the standard `From` traits here because the actual
@@ -91,8 +93,19 @@ impl From<Trace> for Event {
 
 impl From<Log> for event::LogEvent {
     fn from(log: Log) -> Self {
-        let mut event_log = if let Some(value) = log.value {
-            Self::from(decode_value(value).unwrap_or(VrlValue::Null))
+        #[allow(deprecated)]
+        let metadata = log
+            .metadata_full
+            .map(Into::into)
+            .or_else(|| {
+                log.metadata
+                    .and_then(decode_value)
+                    .map(EventMetadata::default_with_value)
+            })
+            .unwrap_or_default();
+
+        if let Some(value) = log.value {
+            Self::from_parts(decode_value(value).unwrap_or(VrlValue::Null), metadata)
         } else {
             // This is for backwards compatibility. Only `value` should be set
             let fields = log
@@ -101,34 +114,32 @@ impl From<Log> for event::LogEvent {
                 .filter_map(|(k, v)| decode_value(v).map(|value| (k, value)))
                 .collect::<BTreeMap<_, _>>();
 
-            Self::from(fields)
-        };
-
-        if let Some(metadata_value) = log.metadata {
-            if let Some(decoded_value) = decode_value(metadata_value) {
-                *event_log.metadata_mut().value_mut() = decoded_value;
-            }
+            Self::from_map(fields, metadata)
         }
-        event_log
     }
 }
 
 impl From<Trace> for event::TraceEvent {
     fn from(trace: Trace) -> Self {
+        #[allow(deprecated)]
+        let metadata = trace
+            .metadata_full
+            .map(Into::into)
+            .or_else(|| {
+                trace
+                    .metadata
+                    .and_then(decode_value)
+                    .map(EventMetadata::default_with_value)
+            })
+            .unwrap_or_default();
+
         let fields = trace
             .fields
             .into_iter()
             .filter_map(|(k, v)| decode_value(v).map(|value| (k, value)))
             .collect::<BTreeMap<_, _>>();
 
-        let mut log = event::LogEvent::from(fields);
-        if let Some(metadata_value) = trace.metadata {
-            if let Some(decoded_value) = decode_value(metadata_value) {
-                *log.metadata_mut().value_mut() = decoded_value;
-            }
-        }
-
-        Self::from(log)
+        Self::from(event::LogEvent::from_map(fields, metadata))
     }
 }
 
@@ -234,27 +245,17 @@ impl From<Metric> for event::Metric {
 
         let value = event::MetricValue::from(metric.value.unwrap());
 
-        let mut metadata = event::EventMetadata::default();
-
         #[allow(deprecated)]
-        if let Some(metadata_value) = metric.metadata {
-            if let Some(value) = decode_value(metadata_value) {
-                *metadata.value_mut() = value;
-            }
-        }
-
-        if let Some(received_metadata) = metric.metadata_full {
-            let (maybe_metadata_value, maybe_origin_metadata) = decode_metadata(received_metadata);
-
-            if let Some(origin_metadata) = maybe_origin_metadata {
-                metadata = metadata.with_origin_metadata(origin_metadata);
-            }
-
-            // if both the deprecated and this one are specified, use the non-deprecated
-            if let Some(value) = maybe_metadata_value {
-                *metadata.value_mut() = value;
-            }
-        }
+        let metadata = metric
+            .metadata_full
+            .map(Into::into)
+            .or_else(|| {
+                metric
+                    .metadata
+                    .and_then(decode_value)
+                    .map(EventMetadata::default_with_value)
+            })
+            .unwrap_or_default();
 
         Self::new_with_metadata(name, kind, value, metadata)
             .with_namespace(namespace)
@@ -299,27 +300,30 @@ impl From<event::LogEvent> for WithMetadata<Log> {
         // from a dummy value, it is only used when the root value type is not an object.
         // Once this backwards compatibility is no longer required, "fields" can
         // be entirely removed from the Log object
-
-        let data = if let VrlValue::Object(fields) = value {
+        let (fields, value) = if let VrlValue::Object(fields) = value {
             // using only "fields" to prevent having to use the dummy value
-            Log {
-                fields: fields
-                    .into_iter()
-                    .map(|(k, v)| (k, encode_value(v)))
-                    .collect::<BTreeMap<_, _>>(),
-                value: None,
-                metadata: Some(encode_value(metadata.value().clone())),
-            }
+            let fields = fields
+                .into_iter()
+                .map(|(k, v)| (k, encode_value(v)))
+                .collect::<BTreeMap<_, _>>();
+
+            (fields, None)
         } else {
-            let mut dummy = BTreeMap::new();
-            // must insert at least 1 field, otherwise it is emitted entirely.
-            // this value is ignored in the decoding step (since value is provided)
-            dummy.insert(".".to_owned(), encode_value(VrlValue::Null));
-            Log {
-                fields: dummy,
-                value: Some(encode_value(value)),
-                metadata: Some(encode_value(metadata.value().clone())),
-            }
+            // Must insert at least one field, otherwise the field is omitted entirely on the
+            // Protocol Buffers side. The dummy field value is ultimately ignored in the decoding
+            // step since `value` is provided.
+            let mut dummy_fields = BTreeMap::new();
+            dummy_fields.insert(".".to_owned(), encode_value(VrlValue::Null));
+
+            (dummy_fields, Some(encode_value(value)))
+        };
+
+        #[allow(deprecated)]
+        let data = Log {
+            fields,
+            value,
+            metadata: Some(encode_value(metadata.value().clone())),
+            metadata_full: Some(metadata.clone().into()),
         };
 
         Self { data, metadata }
@@ -334,10 +338,13 @@ impl From<event::TraceEvent> for WithMetadata<Trace> {
             .map(|(k, v)| (k, encode_value(v)))
             .collect::<BTreeMap<_, _>>();
 
+        #[allow(deprecated)]
         let data = Trace {
             fields,
             metadata: Some(encode_value(metadata.value().clone())),
+            metadata_full: Some(metadata.clone().into()),
         };
+
         Self { data, metadata }
     }
 }
@@ -457,8 +464,6 @@ impl From<event::Metric> for WithMetadata<Metric> {
             })
             .collect();
 
-        let encoded_metadata = encode_metadata(&metadata);
-
         #[allow(deprecated)]
         let data = Metric {
             name,
@@ -470,8 +475,9 @@ impl From<event::Metric> for WithMetadata<Metric> {
             interval_ms,
             value: Some(metric),
             metadata: Some(encode_value(metadata.value().clone())),
-            metadata_full: Some(encoded_metadata),
+            metadata_full: Some(metadata.clone().into()),
         };
+
         Self { data, metadata }
     }
 }
@@ -556,36 +562,119 @@ impl From<sketch::AgentDdSketch> for MetricSketch {
     }
 }
 
-fn decode_metadata(
-    input: Metadata,
-) -> (
-    Option<event::Value>,
-    Option<super::DatadogMetricOriginMetadata>,
-) {
-    let value = input.value.and_then(decode_value);
-
-    let datadog_origin_metadata = input
-        .datadog_origin_metadata
-        .as_ref()
-        .map(decode_origin_metadata);
-
-    (value, datadog_origin_metadata)
+impl From<event::metadata::Secrets> for Secrets {
+    fn from(value: event::metadata::Secrets) -> Self {
+        Self {
+            entries: value.into_iter().map(|(k, v)| (k, v.to_string())).collect(),
+        }
+    }
 }
 
-fn decode_origin_metadata(input: &DatadogOriginMetadata) -> super::DatadogMetricOriginMetadata {
-    let mut origin = super::DatadogMetricOriginMetadata::default();
+impl From<Secrets> for event::metadata::Secrets {
+    fn from(value: Secrets) -> Self {
+        let mut secrets = Self::new();
+        for (k, v) in value.entries {
+            secrets.insert(k, v);
+        }
 
-    if let Some(product) = input.origin_product {
-        origin = origin.with_product(product);
+        secrets
     }
-    if let Some(category) = input.origin_category {
-        origin = origin.with_category(category);
-    }
-    if let Some(service) = input.origin_service {
-        origin = origin.with_service(service);
-    }
+}
 
-    origin
+impl From<event::DatadogMetricOriginMetadata> for DatadogOriginMetadata {
+    fn from(value: event::DatadogMetricOriginMetadata) -> Self {
+        Self {
+            origin_product: value.product(),
+            origin_category: value.category(),
+            origin_service: value.service(),
+        }
+    }
+}
+
+impl From<DatadogOriginMetadata> for event::DatadogMetricOriginMetadata {
+    fn from(value: DatadogOriginMetadata) -> Self {
+        Self::new(
+            value.origin_product,
+            value.origin_category,
+            value.origin_service,
+        )
+    }
+}
+
+impl From<crate::config::OutputId> for OutputId {
+    fn from(value: crate::config::OutputId) -> Self {
+        Self {
+            component: value.component.into_id(),
+            port: value.port,
+        }
+    }
+}
+
+impl From<OutputId> for crate::config::OutputId {
+    fn from(value: OutputId) -> Self {
+        Self::from((value.component, value.port))
+    }
+}
+
+impl From<EventMetadata> for Metadata {
+    fn from(value: EventMetadata) -> Self {
+        let EventMetadata {
+            value,
+            secrets,
+            source_id,
+            source_type,
+            upstream_id,
+            datadog_origin_metadata,
+            ..
+        } = value;
+
+        let secrets = if secrets.is_empty() {
+            None
+        } else {
+            Some(secrets.into())
+        };
+
+        Self {
+            value: Some(encode_value(value)),
+            datadog_origin_metadata: datadog_origin_metadata.map(Into::into),
+            source_id: source_id.map(|s| s.to_string()),
+            source_type: source_type.map(|s| s.to_string()),
+            upstream_id: upstream_id.map(|id| id.as_ref().clone()).map(Into::into),
+            secrets,
+        }
+    }
+}
+
+impl From<Metadata> for EventMetadata {
+    fn from(value: Metadata) -> Self {
+        let mut metadata = EventMetadata::default();
+
+        if let Some(value) = value.value.and_then(decode_value) {
+            *metadata.value_mut() = value;
+        }
+
+        if let Some(source_id) = value.source_id {
+            metadata.set_source_id(Arc::new(source_id.into()));
+        }
+
+        if let Some(source_type) = value.source_type {
+            metadata.set_source_type(source_type);
+        }
+
+        if let Some(upstream_id) = value.upstream_id {
+            metadata.set_upstream_id(Arc::new(upstream_id.into()));
+        }
+
+        if let Some(secrets) = value.secrets {
+            metadata.secrets_mut().merge(secrets.into());
+        }
+
+        if let Some(origin_metadata) = value.datadog_origin_metadata {
+            metadata = metadata.with_origin_metadata(origin_metadata.into());
+        }
+
+        metadata
+    }
 }
 
 fn decode_value(input: Value) -> Option<event::Value> {
@@ -624,21 +713,6 @@ fn decode_array(items: Vec<Value>) -> Option<event::Value> {
         .map(decode_value)
         .collect::<Option<Vec<_>>>()
         .map(event::Value::Array)
-}
-
-fn encode_metadata(metadata: &event::EventMetadata) -> Metadata {
-    let datadog_origin_metadata =
-        metadata
-            .datadog_origin_metadata()
-            .map(|om| DatadogOriginMetadata {
-                origin_product: om.product(),
-                origin_category: om.category(),
-                origin_service: om.service(),
-            });
-    Metadata {
-        value: Some(encode_value(metadata.value().clone())),
-        datadog_origin_metadata,
-    }
 }
 
 fn encode_value(value: event::Value) -> Value {

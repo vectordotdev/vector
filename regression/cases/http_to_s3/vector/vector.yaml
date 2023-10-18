@@ -1,0 +1,40 @@
+data_dir: "/var/lib/vector"
+
+##
+## Sources
+##
+
+sources:
+  internal_metrics:
+    type: "internal_metrics"
+
+  http_source:
+    type:             "http"
+    acknowledgements: false
+    address:          "0.0.0.0:8282"
+    decoding:
+      codec: "json"
+
+##
+## Sinks
+##
+
+sinks:
+  prometheus:
+    type:    "prometheus_exporter"
+    inputs: [ "internal_metrics" ]
+    address: "0.0.0.0:9090"
+
+  s3_service:
+    type:     "aws_s3"
+    inputs: [ "http_source" ]
+    region:   "us-west-2"
+    endpoint: "http://localhost:8080"
+    bucket:   "vector-soak-service"
+    framing:
+      method: "newline_delimited"
+    encoding:
+      codec: "json"
+    auth:
+      access_key_id:     "BADDCAFE"
+      secret_access_key: "BADDCAFE"

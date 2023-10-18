@@ -10,8 +10,8 @@ remap: functions: hmac: {
 		string using either [encode_base16](\(urls.vrl_functions)/#encode_base16) or
 		[encode_base64](\(urls.vrl_functions)/#encode_base64).
 
-		This function is infallible if either the default `algorithm` value, or a recognized-valid compile-time
-		`algorithm` string literal is used. Otherwise it is fallible.
+		This function is infallible if either the default `algorithm` value or a recognized-valid compile-time
+		`algorithm` string literal is used. Otherwise, it is fallible.
 		"""
 
 	arguments: [

@@ -149,9 +149,6 @@ jobs:
             - "Makefile"
             - "rust-toolchain.toml"
             - "vdev/**"
-          deny:
-            - 'deny.toml'
-            - "vdev/**"
           dependencies:
             - ".cargo/**"
             - 'Cargo.toml'

@@ -75,6 +75,15 @@ impl From<(&ComponentKey, String)> for OutputId {
     }
 }
 
+impl From<(String, Option<String>)> for OutputId {
+    fn from((component, port): (String, Option<String>)) -> Self {
+        Self {
+            component: component.into(),
+            port,
+        }
+    }
+}
+
 // This panicking implementation is convenient for testing, but should never be enabled for use
 // outside of tests.
 #[cfg(any(test, feature = "test"))]
