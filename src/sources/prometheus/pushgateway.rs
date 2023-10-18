@@ -78,6 +78,7 @@ impl SourceConfig for PrometheusPushgatewayConfig {
             self.address,
             "",
             HttpMethod::Post,
+            http::StatusCode::OK,
             false,
             &self.tls,
             &self.auth,
