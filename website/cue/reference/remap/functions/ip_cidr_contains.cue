@@ -21,8 +21,8 @@ remap: functions: ip_cidr_contains: {
 		},
 	]
 	internal_failure_reasons: [
-		"`cidr` isn't a valid CIDR",
-		"`ip` isn't a valid IP address",
+		"`cidr` is not a valid CIDR.",
+		"`ip` is not a valid IP address.",
 	]
 	return: types: ["boolean"]
 

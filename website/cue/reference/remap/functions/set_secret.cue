@@ -26,7 +26,7 @@ remap: functions: set_secret: {
 
 	examples: [
 		{
-			title: "Set the Datadog API key to the given value."
+			title: "Set the Datadog API key to the given value"
 			source: #"""
 				set_secret("datadog_api_key", "abc122")
 				"""#

@@ -4,7 +4,7 @@ remap: functions: ip_ntoa: {
 	category:    "IP"
 	description: """
 		Converts numeric representation of IPv4 address in network-order bytes
-		to numbers-and-dots notation..
+		to numbers-and-dots notation.
 
 		This behavior mimics [inet_ntoa](\(urls.ip_ntoa)).
 		"""
@@ -18,7 +18,7 @@ remap: functions: ip_ntoa: {
 		},
 	]
 	internal_failure_reasons: [
-		"`value` cannot fit in u32",
+		"`value` cannot fit in an unsigned 32-bit integer.",
 	]
 	return: types: ["string"]
 

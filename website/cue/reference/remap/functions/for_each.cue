@@ -1,27 +1,23 @@
 package metadata
 
 remap: functions: for_each: {
-	category:    "Enumerate"
+	category: "Enumerate"
 	description: """
 		Iterate over a collection.
 
 		This function currently *does not* support recursive iteration.
-		If you have a need for recursive iteration using `for_each`,
-		which can't be solved using the `map_keys` or `map_values`
-		enumeration functions (which *do* support recursion), then
-		[please let us know](\(urls.new_feature_request))!
 
 		The function uses the "function closure syntax" to allow reading
 		the key/value or index/value combination for each item in the
 		collection.
 
 		The same scoping rules apply to closure blocks as they do for
-		regular blocks, meaning, any variable defined in parent scopes
-		are accessible, and mutations to those variables are preserved,
+		regular blocks. This means that any variable defined in parent scopes
+		is accessible, and mutations to those variables are preserved,
 		but any new variables instantiated in the closure block are
 		unavailable outside of the block.
 
-		Check out the examples below to learn about the closure syntax.
+		See the examples below to learn about the closure syntax.
 		"""
 
 	arguments: [

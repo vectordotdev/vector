@@ -1,0 +1,1 @@
+{"metric":{"name":"z","namespace":"y","tags":{"c":"k","j":"g","n":"i"},"interval_ms":1919799358,"kind":"absolute","aggregated_histogram":{"buckets":[{"upper_limit":125888.0,"count":17242545700780805233},{"upper_limit":-858688.0,"count":4683071892901517358}],"count":12568910103502785188,"sum":-489728.0}}}

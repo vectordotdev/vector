@@ -316,14 +316,9 @@ jobs:
         with:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-gnu
           path: target/artifacts
-      - name: First install of DEB package.
+      - name: Verify install of DEB package.
         run: |
-          dpkg -i target/artifacts/vector_${{ env.VECTOR_VERSION }}-1_amd64.deb
-          ./scripts/verify-install.sh
-      - name: Second install of DEB package.
-        run: |
-          dpkg -i target/artifacts/vector_${{ env.VECTOR_VERSION }}-1_amd64.deb
-          ./scripts/verify-install.sh
+          ./scripts/verify-install.sh target/artifacts/vector_${{ env.VECTOR_VERSION }}-1_amd64.deb
 
   rpm-verify:
     name: Verify RPM Packages
@@ -372,14 +367,9 @@ jobs:
         with:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-gnu
           path: target/artifacts
-      - name: First install of RPM package.
+      - name: Verify install of RPM package.
         run: |
-          rpm -i --replacepkgs target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.x86_64.rpm
-          ./scripts/verify-install.sh
-      - name: Second install of RPM package.
-        run: |
-          rpm -i --replacepkgs target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.x86_64.rpm
-          ./scripts/verify-install.sh
+          ./scripts/verify-install.sh target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.x86_64.rpm
 
   macos-verify:
     name: Verify macOS Package
@@ -741,19 +731,6 @@ jobs:
           release: "any-version"
           republish: "true"
           file: "target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.aarch64.rpm"
-      - name: Push armv7-gnu RPM
-        id: push-rpm-armv7-gnu
-        uses: cloudsmith-io/action@v0.5.3
-        with:
-          api-key: ${{ secrets.CLOUDSMITH_API_KEY }}
-          command: "push"
-          format: "rpm"
-          owner: "timber"
-          repo: ${{ env.CLOUDSMITH_REPO }}
-          distro: "any-distro"
-          release: "any-version"
-          republish: "true"
-          file: "target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.armv7.rpm"
       - name: Push armv7hl-gnu RPM
         id: push-rpm-armv7hl-gnu
         uses: cloudsmith-io/action@v0.5.3

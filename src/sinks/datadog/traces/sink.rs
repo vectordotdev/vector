@@ -108,8 +108,10 @@ where
     }
 
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
+        let batch_settings = self.batch_settings;
+
         input
-            .batched_partitioned(EventPartitioner, self.batch_settings)
+            .batched_partitioned(EventPartitioner, || batch_settings.as_byte_size_config())
             .incremental_request_builder(self.request_builder)
             .flat_map(stream::iter)
             .filter_map(|request| async move {

@@ -129,10 +129,7 @@ mod test {
             NonZeroUsize::new(10000).unwrap(),
             NonZeroUsize::new(2).unwrap(),
         );
-        let batcher = Batcher::new(
-            stream,
-            settings.into_item_size_config(|x: &u32| *x as usize),
-        );
+        let batcher = Batcher::new(stream, settings.as_item_size_config(|x: &u32| *x as usize));
         let batches: Vec<_> = batcher.collect().await;
         assert_eq!(batches, vec![vec![1, 2], vec![3],]);
     }
@@ -146,7 +143,7 @@ mod test {
                 NonZeroUsize::new(5).unwrap(),
                 NonZeroUsize::new(100).unwrap(),
             )
-            .into_item_size_config(|x: &u32| *x as usize),
+            .as_item_size_config(|x: &u32| *x as usize),
         );
         let batches: Vec<_> = batcher.collect().await;
         assert_eq!(
@@ -176,7 +173,7 @@ mod test {
                 NonZeroUsize::new(5).unwrap(),
                 NonZeroUsize::new(100).unwrap(),
             )
-            .into_item_size_config(|x: &u32| *x as usize),
+            .as_item_size_config(|x: &u32| *x as usize),
         );
 
         tokio::pin!(batcher);

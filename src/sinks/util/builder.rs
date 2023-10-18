@@ -17,8 +17,7 @@ use vector_core::{
     partition::Partitioner,
     stream::{
         batcher::{config::BatchConfig, Batcher},
-        BatcherSettings, ConcurrentMap, Driver, DriverResponse, ExpirationQueue,
-        PartitionedBatcher,
+        ConcurrentMap, Driver, DriverResponse, ExpirationQueue, PartitionedBatcher,
     },
     ByteSizeOf,
 };
@@ -45,16 +44,18 @@ pub trait SinkBuilderExt: Stream {
     /// The stream will yield batches of events, with their partition key, when either a batch fills
     /// up or times out. [`Partitioner`] operates on a per-event basis, and has access to the event
     /// itself, and so can access any and all fields of an event.
-    fn batched_partitioned<P>(
+    fn batched_partitioned<P, C, F>(
         self,
         partitioner: P,
-        settings: BatcherSettings,
-    ) -> PartitionedBatcher<Self, P, ExpirationQueue<P::Key>>
+        settings: F,
+    ) -> PartitionedBatcher<Self, P, ExpirationQueue<P::Key>, C, F>
     where
         Self: Stream<Item = P::Item> + Sized,
         P: Partitioner + Unpin,
         P::Key: Eq + Hash + Clone,
         P::Item: ByteSizeOf,
+        C: BatchConfig<P::Item>,
+        F: Fn() -> C + Send,
     {
         PartitionedBatcher::new(self, partitioner, settings)
     }
@@ -82,13 +83,13 @@ pub trait SinkBuilderExt: Stream {
     ///
     /// If the spawned future panics, the panic will be carried through and resumed on the task
     /// calling the stream.
-    fn concurrent_map<F, T>(self, limit: Option<NonZeroUsize>, f: F) -> ConcurrentMap<Self, T>
+    fn concurrent_map<F, T>(self, limit: NonZeroUsize, f: F) -> ConcurrentMap<Self, T>
     where
         Self: Sized,
         F: Fn(Self::Item) -> Pin<Box<dyn Future<Output = T> + Send + 'static>> + Send + 'static,
         T: Send + 'static,
     {
-        ConcurrentMap::new(self, limit, f)
+        ConcurrentMap::new(self, Some(limit), f)
     }
 
     /// Constructs a [`Stream`] which transforms the input into a request suitable for sending to
@@ -114,7 +115,7 @@ pub trait SinkBuilderExt: Stream {
     {
         let builder = Arc::new(builder);
 
-        self.concurrent_map(Some(limit), move |input| {
+        self.concurrent_map(limit, move |input| {
             let builder = Arc::clone(&builder);
 
             Box::pin(async move {

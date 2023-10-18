@@ -3,7 +3,7 @@ package metadata
 remap: functions: chunks: {
 	category: "Array"
 	description: """
-		Chunks `value` into slices of length `chunk_size` bytes
+		Chunks `value` into slices of length `chunk_size` bytes.
 		"""
 
 	arguments: [
@@ -21,8 +21,8 @@ remap: functions: chunks: {
 		},
 	]
 	internal_failure_reasons: [
-		"`chunk_size` must be at least 1 byte",
-		"`chunk_size` is too large",
+		"`chunk_size` must be at least 1 byte.",
+		"`chunk_size` is too large.",
 	]
 	return: {
 		types: ["array"]

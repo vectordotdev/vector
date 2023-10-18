@@ -1,11 +1,18 @@
 use core::fmt;
 use std::collections::BTreeSet;
 
+use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
+
 use vector_common::byte_size_of::ByteSizeOf;
 use vector_config::configurable_component;
 
-use super::{samples_to_buckets, write_list, write_word};
 use crate::{float_eq, metrics::AgentDDSketch};
+
+use super::{samples_to_buckets, write_list, write_word};
+
+const INFINITY: &str = "inf";
+const NEG_INFINITY: &str = "-inf";
+const NAN: &str = "NaN";
 
 /// Metric value.
 #[configurable_component]
@@ -597,14 +604,62 @@ impl ByteSizeOf for Sample {
     }
 }
 
+/// Custom serialization function which converts special `f64` values to strings.
+/// Non-special values are serialized as numbers.
+#[allow(clippy::trivially_copy_pass_by_ref)]
+fn serialize_f64<S>(value: &f64, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    if value.is_infinite() {
+        serializer.serialize_str(if *value > 0.0 { INFINITY } else { NEG_INFINITY })
+    } else if value.is_nan() {
+        serializer.serialize_str(NAN)
+    } else {
+        serializer.serialize_f64(*value)
+    }
+}
+
+/// Custom deserialization function for handling special f64 values.
+fn deserialize_f64<'de, D>(deserializer: D) -> Result<f64, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    struct UpperLimitVisitor;
+
+    impl<'de> de::Visitor<'de> for UpperLimitVisitor {
+        type Value = f64;
+
+        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+            formatter.write_str("a number or a special string value")
+        }
+
+        fn visit_f64<E: de::Error>(self, value: f64) -> Result<Self::Value, E> {
+            Ok(value)
+        }
+
+        fn visit_str<E: de::Error>(self, value: &str) -> Result<Self::Value, E> {
+            match value {
+                NAN => Ok(f64::NAN),
+                INFINITY => Ok(f64::INFINITY),
+                NEG_INFINITY => Ok(f64::NEG_INFINITY),
+                _ => Err(E::custom("unsupported string value")),
+            }
+        }
+    }
+
+    deserializer.deserialize_any(UpperLimitVisitor)
+}
+
 /// A histogram bucket.
 ///
 /// Histogram buckets represent the `count` of observations where the value of the observations does
 /// not exceed the specified `upper_limit`.
-#[configurable_component]
-#[derive(Clone, Copy, Debug)]
+#[configurable_component(no_deser, no_ser)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub struct Bucket {
     /// The upper limit of values in the bucket.
+    #[serde(serialize_with = "serialize_f64", deserialize_with = "deserialize_f64")]
     pub upper_limit: f64,
 
     /// The number of values tracked in this bucket.

@@ -69,7 +69,7 @@ remap: functions: parse_xml: {
 		},
 	]
 	internal_failure_reasons: [
-		"`value` isn't a valid XML document",
+		"`value` is not a valid XML document.",
 	]
 	return: types: ["object"]
 

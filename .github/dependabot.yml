@@ -23,6 +23,9 @@ updates:
       clap:
         patterns:
         - "clap*"
+      csv:
+        patterns:
+        - "csv*"
       phf:
         patterns:
         - "phf*"
