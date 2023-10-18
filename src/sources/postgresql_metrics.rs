@@ -220,13 +220,14 @@ impl SourceConfig for PostgresqlMetricsConfig {
             while interval.next().await.is_some() {
                 let start = Instant::now();
                 let metrics = join_all(sources.iter_mut().map(|source| source.collect())).await;
-                let count = metrics.len();
                 emit!(CollectionCompleted {
                     start,
                     end: Instant::now()
                 });
 
-                let metrics = metrics.into_iter().flatten();
+                let metrics: Vec<Metric> = metrics.into_iter().flatten().collect();
+                let count = metrics.len();
+
                 if (cx.out.send_batch(metrics).await).is_err() {
                     emit!(StreamClosedError { count });
                     return Err(());
