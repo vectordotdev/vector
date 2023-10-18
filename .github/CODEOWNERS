@@ -1,4 +1,5 @@
 docs/ @vectordotdev/ux-team
+lib/dnsmsg-parser/ @vectordotdev/integrations-team
 lib/file-source/ @vectordotdev/integrations-team
 lib/k8s-e2e-tests/ @vectordotdev/integrations-team
 lib/k8s-test-framework/ @vectordotdev/integrations-team
