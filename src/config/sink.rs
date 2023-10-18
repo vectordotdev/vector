@@ -14,6 +14,7 @@ use vector_core::{
     sink::VectorSink,
 };
 
+use super::datadog;
 use super::{id::Inputs, schema, ComponentKey, ProxyConfig, Resource};
 use crate::sinks::{util::UriSerde, Healthcheck};
 
@@ -239,6 +240,12 @@ dyn_clone::clone_trait_object!(SinkConfig);
 pub struct SinkContext {
     pub healthcheck: SinkHealthcheckOptions,
     pub globals: GlobalOptions,
+    #[cfg(any(
+        feature = "sinks-datadog_logs",
+        feature = "sinks-datadog_metrics",
+        feature = "sinks-datadog_traces",
+    ))]
+    pub datadog: datadog::Options,
     pub proxy: ProxyConfig,
     pub schema: schema::Options,
     pub app_name: String,
@@ -250,6 +257,7 @@ impl Default for SinkContext {
         Self {
             healthcheck: Default::default(),
             globals: Default::default(),
+            datadog: Default::default(),
             proxy: Default::default(),
             schema: Default::default(),
             app_name: crate::get_app_name().to_string(),

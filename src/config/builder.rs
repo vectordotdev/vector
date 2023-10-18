@@ -12,6 +12,13 @@ use crate::{enrichment_tables::EnrichmentTables, providers::Providers, secrets::
 
 #[cfg(feature = "api")]
 use super::api;
+#[cfg(any(
+    feature = "sources-datadog_agent",
+    feature = "sinks-datadog_logs",
+    feature = "sinks-datadog_metrics",
+    feature = "sinks-datadog_traces",
+))]
+use super::datadog;
 #[cfg(feature = "enterprise")]
 use super::enterprise;
 use super::{
@@ -32,6 +39,14 @@ pub struct ConfigBuilder {
     #[configurable(derived)]
     #[serde(default)]
     pub api: api::Options,
+
+    #[cfg(any(
+        feature = "sinks-datadog_logs",
+        feature = "sinks-datadog_metrics",
+        feature = "sinks-datadog_traces",
+    ))]
+    #[configurable(derived)]
+    pub datadog: datadog::Options,
 
     #[configurable(derived)]
     #[configurable(metadata(docs::hidden))]
@@ -92,6 +107,13 @@ struct ConfigBuilderHash<'a> {
     #[cfg(feature = "api")]
     api: &'a api::Options,
     schema: &'a schema::Options,
+    #[cfg(any(
+        feature = "sources-datadog_agent",
+        feature = "sinks-datadog_logs",
+        feature = "sinks-datadog_metrics",
+        feature = "sinks-datadog_traces",
+    ))]
+    datadog: &'a datadog::Options,
     global: &'a GlobalOptions,
     healthchecks: &'a HealthcheckOptions,
     enrichment_tables: BTreeMap<&'a ComponentKey, &'a EnrichmentTableOuter>,
@@ -171,6 +193,13 @@ impl<'a> From<&'a ConfigBuilder> for ConfigBuilderHash<'a> {
             #[cfg(feature = "api")]
             api: &value.api,
             schema: &value.schema,
+            #[cfg(any(
+                feature = "sources-datadog_agent",
+                feature = "sinks-datadog_logs",
+                feature = "sinks-datadog_metrics",
+                feature = "sinks-datadog_traces",
+            ))]
+            datadog: &value.datadog,
             global: &value.global,
             healthchecks: &value.healthchecks,
             enrichment_tables: value.enrichment_tables.iter().collect(),
@@ -190,6 +219,13 @@ impl From<Config> for ConfigBuilder {
             global,
             #[cfg(feature = "api")]
             api,
+            #[cfg(any(
+                feature = "sources-datadog_agent",
+                feature = "sinks-datadog_logs",
+                feature = "sinks-datadog_metrics",
+                feature = "sinks-datadog_traces",
+            ))]
+            datadog,
             schema,
             #[cfg(feature = "enterprise")]
             enterprise,
@@ -220,6 +256,13 @@ impl From<Config> for ConfigBuilder {
             global,
             #[cfg(feature = "api")]
             api,
+            #[cfg(any(
+                feature = "sources-datadog_agent",
+                feature = "sinks-datadog_logs",
+                feature = "sinks-datadog_metrics",
+                feature = "sinks-datadog_traces",
+            ))]
+            datadog,
             schema,
             #[cfg(feature = "enterprise")]
             enterprise,

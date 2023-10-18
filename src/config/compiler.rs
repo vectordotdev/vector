@@ -45,6 +45,12 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
         global,
         #[cfg(feature = "api")]
         api,
+        #[cfg(any(
+            feature = "sinks-datadog_logs",
+            feature = "sinks-datadog_metrics",
+            feature = "sinks-datadog_traces",
+        ))]
+        datadog,
         schema,
         #[cfg(feature = "enterprise")]
         enterprise,
@@ -102,6 +108,12 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
             #[cfg(feature = "api")]
             api,
             schema,
+            #[cfg(any(
+                feature = "sinks-datadog_logs",
+                feature = "sinks-datadog_metrics",
+                feature = "sinks-datadog_traces",
+            ))]
+            datadog,
             #[cfg(feature = "enterprise")]
             enterprise,
             hash,
