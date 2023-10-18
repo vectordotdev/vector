@@ -335,9 +335,9 @@ base: components: sinks: file: configuration: {
 	}
 	timezone: {
 		description: """
-			Timezone reference.
+			Timezone to use for any date specifiers in template strings.
 
-			This can refer to any valid timezone as defined in the [TZ database][tzdb], or "local" which refers to the system local timezone.
+			This can refer to any valid timezone as defined in the [TZ database][tzdb], or "local" which refers to the system local timezone. It will default to the [globally configured timezone](https://vector.dev/docs/reference/configuration/global-options/#timezone).
 
 			[tzdb]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
 			"""
