@@ -266,6 +266,22 @@ pub(crate) fn decode_ddseries_v2(
 
             let event_metadata = get_event_metadata(serie.metadata.as_ref());
 
+            // The Agent can send non-rate metrics with an interval, and that is used in the Datadog UI,
+            // thus we pass through the interval regardless of metric type, if it is set. This happens
+            // in the case of DogstatsD. Critically, the only time a Count metric type is emitted by Dogstatsd,
+            // is in the Sketch endpoint. Because Vector does not yet have a specific Metric type to handle Rate,
+            // we are distinguishing Rate from Count by setting an interval to Rate but not Count.
+            //
+            // In theory we should be safe to set this non-rate-interval to Count metrics below, but to be safe,
+            // we will only set it for Rate and Guage. This matches the behavior of dogstatsd<->Agent<->Datadog.
+            //
+            // Ultimately we should have a unique internal representation of a Rate metric type.
+            let non_rate_interval = if serie.interval.is_positive() {
+                NonZeroU32::new(serie.interval as u32 * 1000) // incoming is seconds, convert to milliseconds
+            } else {
+                None
+            };
+
             serie.resources.into_iter().for_each(|r| {
                 // As per https://github.com/DataDog/datadog-agent/blob/a62ac9fb13e1e5060b89e731b8355b2b20a07c5b/pkg/serializer/internal/metrics/iterable_series.go#L180-L189
                 // the hostname can be found in MetricSeries::resources and that is the only value stored there.
@@ -323,6 +339,7 @@ pub(crate) fn decode_ddseries_v2(
                         ))
                         .with_tags(Some(tags.clone()))
                         .with_namespace(namespace)
+                        .with_interval_ms(non_rate_interval)
                     })
                     .collect::<Vec<_>>(),
                 Ok(metric_payload::MetricType::Rate) => serie
