@@ -21,7 +21,8 @@ use super::Errors;
 
 /// The batch config for remote write.
 #[configurable_component]
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Derivative)]
+#[derivative(Default)]
 pub struct RemoteWriteBatchConfig {
     #[configurable(derived)]
     #[serde(flatten)]
@@ -29,16 +30,8 @@ pub struct RemoteWriteBatchConfig {
 
     /// Whether or not to aggregate metrics within a batch.
     #[serde(default = "crate::serde::default_true")]
+    #[derivative(Default(value = "true"))]
     pub aggregate: bool,
-}
-
-impl Default for RemoteWriteBatchConfig {
-    fn default() -> Self {
-        Self {
-            batch_settings: Default::default(),
-            aggregate: true,
-        }
-    }
 }
 
 /// Configuration for the `prometheus_remote_write` sink.
@@ -46,7 +39,8 @@ impl Default for RemoteWriteBatchConfig {
     "prometheus_remote_write",
     "Deliver metric data to a Prometheus remote write endpoint."
 ))]
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Derivative)]
+#[derivative(Default)]
 #[serde(deny_unknown_fields)]
 pub struct RemoteWriteConfig {
     /// The endpoint to send data to.
@@ -120,8 +114,13 @@ pub struct RemoteWriteConfig {
 
     #[configurable(derived)]
     #[configurable(metadata(docs::advanced))]
-    #[serde(default)]
+    #[serde(default = "default_compression")]
+    #[derivative(Default(value = "default_compression()"))]
     pub compression: Compression,
+}
+
+const fn default_compression() -> Compression {
+    Compression::Snappy
 }
 
 impl_generate_config_from_default!(RemoteWriteConfig);
