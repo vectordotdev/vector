@@ -33,14 +33,14 @@ Note that it is possible to use specific trusted certificates only for Vector vi
 
 The OpenSSL library in Vector can be configured using a [configuration file][openssl-config].
 
-By default, OpenSSL will look for a configuration file in the following locations:
+By default, OpenSSL looks for a configuration file in the following locations:
 
 * A configuration file specified by the `OPENSSL_CONF` environment variable.
 * The predefined `/usr/local/ssl/openssl.cnf` configuration file.
 
-Note that it is possible to use specific OpenSSL configurations only for Vector via `OPENSSL_CONF`.
+**Note**: It is possible to use specific OpenSSL configurations only for Vector using the `OPENSSL_CONF` variable.
 
-## OpenSSL Implementation Providers
+## OpenSSL implementation providers
 
 In OpenSSL, a [provider][openssl-providers] is a code module that provides one or more implementations
 for various operations and algorithms used for cryptography and secure communication.
@@ -86,11 +86,11 @@ OPENSSL_CONF=/path/to/openssl-legacy.cnf \
     vector --config /path/to/vector.yaml
 ```
 
-Note that if the above configuration file is saved in `/usr/local/ssl/openssl.cnf` Vector will automatically
-find it without using `OPENSSL_CONF`. However, this approach is not recommended because other applications
+**Note**: If the above configuration file is saved in `/usr/local/ssl/openssl.cnf` Vector automatically
+finds it without using `OPENSSL_CONF`. However, this approach is not recommended because other applications
 in the running system may also use this file and unintentionally switch to the legacy provider.
 
-### FIPS Provider Example
+### FIPS provider example
 
 To use the _FIPS_ provider in Vector, the [OpenSSL FIPS module][openssl-fips-module] must be installed
 and [configured][openssl-fips-module]. This is beyond the scope of this document, however
@@ -133,8 +133,8 @@ OPENSSL_MODULES=/path/to/fips-modules \
     vector --config /path/to/vector.yaml
 ```
 
-Note that if the running system already has a system-wide OpenSSL FIPS installation and an OpenSSL
-configuration file for it, Vector can also use them directly via the above environment variables.
+**Note**: If the running system already has a system-wide OpenSSL FIPS installation and an OpenSSL
+configuration file for it, Vector can also use them directly with the above environment variables.
 
 [cli]: /docs/reference/cli
 [fips-140-2]: https://en.wikipedia.org/wiki/FIPS_140-2
