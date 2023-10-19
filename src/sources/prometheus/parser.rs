@@ -134,7 +134,8 @@ fn reparse_groups(
                     result.push(
                         Metric::new(
                             group.name.clone(),
-                            metric_kind,
+                            // Summaries are always absolute: aggregating them makes no sense
+                            MetricKind::Absolute,
                             MetricValue::AggregatedSummary {
                                 quantiles: metric
                                     .quantiles
