@@ -14,7 +14,7 @@ In particular, the official Vector binaries are statically linked against OpenSS
 
 **Note**: OpenSSL recognizes a number of [environment variables][openssl-env] independently of Vector.
 
-## Trusted Certificates
+## Trusted certificates
 
 Trusted certificates (also called certificate authorities) are used for client and server verification.
 
