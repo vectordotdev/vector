@@ -268,7 +268,7 @@ pub(crate) fn decode_ddseries_v2(
 
             // The Agent can send non-rate metrics with an interval, and that is used in the Datadog UI,
             // thus we pass through the interval regardless of metric type, if it is set. This happens
-            // in the case of DogstatsD. Critically, the only time a Count metric type is emitted by Dogstatsd,
+            // in the case of DogStatsD. Critically, the only time a Count metric type is emitted by DogStatsD,
             // is in the Sketch endpoint. Because Vector does not yet have a specific Metric type to handle Rate,
             // we are distinguishing Rate from Count by setting an interval to Rate but not Count.
             //
