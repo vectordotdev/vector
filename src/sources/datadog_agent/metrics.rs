@@ -273,7 +273,7 @@ pub(crate) fn decode_ddseries_v2(
             // we are distinguishing Rate from Count by setting an interval to Rate but not Count.
             //
             // In theory we should be safe to set this non-rate-interval to Count metrics below, but to be safe,
-            // we will only set it for Rate and Guage. This matches the behavior of dogstatsd<->Agent<->Datadog.
+            // we will only set it for Rate and Gauge. This matches the behavior of dogstatsd<->Agent<->Datadog.
             //
             // Ultimately we should have a unique internal representation of a Rate metric type.
             let non_rate_interval = if serie.interval.is_positive() {

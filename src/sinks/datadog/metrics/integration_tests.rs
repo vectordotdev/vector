@@ -78,7 +78,7 @@ fn generate_counter_gauge_set() -> Vec<Event> {
                 MetricKind::Incremental,
                 MetricValue::Gauge { value: 5678.0 },
             )
-            // Dogstatsd outputs guages with an interval
+            // Dogstatsd outputs gauges with an interval
             .with_interval_ms(NonZeroU32::new(10000)),
         ),
         // counter with interval
