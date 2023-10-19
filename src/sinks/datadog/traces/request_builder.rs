@@ -453,3 +453,56 @@ impl DatadogTracesEncoder {
         }
     }
 }
+
+#[cfg(test)]
+mod test {
+    use vrl::event_path;
+
+    use super::{DatadogTracesEncoder, PartitionKey};
+    use crate::event::{LogEvent, TraceEvent};
+
+    #[test]
+    fn successfully_encode_payloads_smaller_than_max_size() {
+        let max_size = 1024;
+
+        let encoder = DatadogTracesEncoder { max_size };
+        let key = PartitionKey {
+            api_key: Some("x".repeat(128).into()),
+            env: Some("production".into()),
+            hostname: Some("foo.bar.baz.local".into()),
+            agent_version: Some("1.2.3.4.5".into()),
+            target_tps: None,
+            error_tps: None,
+        };
+
+        // We only care about the size of the incoming traces, so just populate a single tag field
+        // that will be copied into the protobuf representation.
+        let traces = vec![
+            "x".repeat(256),
+            "x".repeat(256),
+            "x".repeat(256),
+            "x".repeat(256),
+            "x".repeat(256),
+            "x".repeat(256),
+        ]
+        .into_iter()
+        .map(|s| {
+            let mut log = LogEvent::default();
+            log.insert(event_path!("tags", "foo"), s);
+            TraceEvent::from(log)
+        })
+        .collect();
+
+        for result in encoder.encode_trace(&key, traces) {
+            assert!(result.is_ok());
+            let (encoded, _processed) = result.unwrap();
+
+            assert!(
+                encoded.len() <= max_size,
+                "encoded len {} longer than max size {}",
+                encoded.len(),
+                max_size
+            );
+        }
+    }
+}
