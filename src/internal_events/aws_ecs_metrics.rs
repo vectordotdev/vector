@@ -84,7 +84,6 @@ impl InternalEvent for AwsEcsMetricsResponseError<'_> {
             endpoint = %self.endpoint,
             internal_log_rate_limit = true,
         );
-        counter!("http_error_response_total", 1);
         counter!(
             "component_errors_total", 1,
             "stage" => error_stage::RECEIVING,
@@ -112,7 +111,6 @@ impl InternalEvent for AwsEcsMetricsHttpError<'_> {
             endpoint = %self.endpoint,
             internal_log_rate_limit = true,
         );
-        counter!("http_request_errors_total", 1);
         counter!(
             "component_errors_total", 1,
             "stage" => error_stage::RECEIVING,

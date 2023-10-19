@@ -29,8 +29,6 @@ impl<E: std::error::Error> InternalEvent for UdpSocketOutgoingConnectionError<E>
         // ## skip check-duplicate-events ##
         // ## skip check-validity-events ##
         emit!(SocketOutgoingConnectionError { error: self.error });
-        // deprecated
-        counter!("connection_failed_total", 1, "mode" => "udp");
     }
 }
 

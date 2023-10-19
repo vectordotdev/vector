@@ -469,7 +469,6 @@ components: sources: kubernetes_logs: {
 	telemetry: metrics: {
 		k8s_format_picker_edge_cases_total:     components.sources.internal_metrics.output.metrics.k8s_format_picker_edge_cases_total
 		k8s_docker_format_parse_failures_total: components.sources.internal_metrics.output.metrics.k8s_docker_format_parse_failures_total
-		k8s_event_annotation_failures_total:    components.sources.internal_metrics.output.metrics.k8s_event_annotation_failures_total
 		k8s_reflector_desyncs_total:            components.sources.internal_metrics.output.metrics.k8s_reflector_desyncs_total
 		k8s_state_ops_total:                    components.sources.internal_metrics.output.metrics.k8s_state_ops_total
 		k8s_stream_chunks_processed_total:      components.sources.internal_metrics.output.metrics.k8s_stream_chunks_processed_total

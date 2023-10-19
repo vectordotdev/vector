@@ -124,12 +124,11 @@ impl<'a> InternalEvent for HttpBadRequest<'a> {
         );
         counter!(
             "component_errors_total", 1,
+            // TODO(NOW): what is the cardinality of this?
             "error_code" => self.error_code,
             "error_type" => error_type::REQUEST_FAILED,
             "error_stage" => error_stage::RECEIVING,
         );
-        // deprecated
-        counter!("http_bad_requests_total", 1);
     }
 }
 
@@ -156,8 +155,6 @@ impl<'a> InternalEvent for HttpDecompressError<'a> {
             "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::RECEIVING,
         );
-        // deprecated
-        counter!("parse_errors_total", 1);
     }
 }
 

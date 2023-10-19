@@ -1,4 +1,4 @@
-use std::{env, time::Duration, time::Instant};
+use std::{env, time::Duration};
 
 use futures::StreamExt;
 use hyper::{Body, Client, Request};
@@ -13,7 +13,7 @@ use crate::{
     config::{GenerateConfig, SourceConfig, SourceContext, SourceOutput},
     internal_events::{
         AwsEcsMetricsEventsReceived, AwsEcsMetricsHttpError, AwsEcsMetricsParseError,
-        AwsEcsMetricsResponseError, RequestCompleted, StreamClosedError,
+        AwsEcsMetricsResponseError, StreamClosedError,
     },
     shutdown::ShutdownSignal,
     SourceSender,
@@ -186,16 +186,10 @@ async fn aws_ecs_metrics(
             .expect("error creating request");
         let uri = request.uri().clone();
 
-        let start = Instant::now();
         match client.request(request).await {
             Ok(response) if response.status() == hyper::StatusCode::OK => {
                 match hyper::body::to_bytes(response).await {
                     Ok(body) => {
-                        emit!(RequestCompleted {
-                            start,
-                            end: Instant::now()
-                        });
-
                         bytes_received.emit(ByteSize(body.len()));
 
                         match parser::parse(body.as_ref(), namespace.clone()) {

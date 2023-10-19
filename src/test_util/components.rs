@@ -42,7 +42,7 @@ pub const HTTP_PULL_SOURCE_TAGS: [&str; 2] = ["endpoint", "protocol"];
 pub const HTTP_PUSH_SOURCE_TAGS: [&str; 2] = ["http_path", "protocol"];
 
 /// The standard set of tags for all generic socket-based sources that accept connections i.e. `TcpSource`.
-pub const SOCKET_PUSH_SOURCE_TAGS: [&str; 2] = ["peer_addr", "protocol"];
+pub const SOCKET_PUSH_SOURCE_TAGS: [&str; 1] = ["protocol"];
 
 /// The standard set of tags for all generic socket-based sources that accept connections i.e. `TcpSource`, but
 /// specifically sources that experience high cardinality i.e. many many clients, where emitting metrics with the peer

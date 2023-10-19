@@ -1,7 +1,4 @@
-use std::{
-    future::ready,
-    time::{Duration, Instant},
-};
+use std::{future::ready, time::Duration};
 
 use chrono::Utc;
 use futures::{stream, FutureExt, StreamExt, TryFutureExt};
@@ -19,7 +16,7 @@ use crate::{
     http::HttpClient,
     internal_events::{
         ApacheMetricsEventsReceived, ApacheMetricsHttpError, ApacheMetricsParseError,
-        ApacheMetricsResponseError, EndpointBytesReceived, RequestCompleted, StreamClosedError,
+        ApacheMetricsResponseError, EndpointBytesReceived, StreamClosedError,
     },
     shutdown::ShutdownSignal,
     SourceSender,
@@ -171,7 +168,6 @@ fn apache_metrics(
                     "host" => url.sanitized_authority(),
                 };
 
-                let start = Instant::now();
                 let namespace = namespace.clone();
                 client
                     .send(request)
@@ -185,11 +181,6 @@ fn apache_metrics(
                     .filter_map(move |response| {
                         ready(match response {
                             Ok((header, body)) if header.status == hyper::StatusCode::OK => {
-                                emit!(RequestCompleted {
-                                    start,
-                                    end: Instant::now()
-                                });
-
                                 let byte_size = body.len();
                                 let body = String::from_utf8_lossy(&body);
                                 emit!(EndpointBytesReceived {

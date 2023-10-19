@@ -38,7 +38,7 @@ use crate::{
         Event, EventStatus, Finalizable,
     },
     http::{build_http_trace_layer, Auth},
-    internal_events::{PrometheusNormalizationError, PrometheusServerRequestComplete},
+    internal_events::PrometheusNormalizationError,
     sinks::{
         util::{
             buffer::metrics::{MetricNormalize, MetricNormalizer, MetricSet},
@@ -487,12 +487,8 @@ impl PrometheusExporter {
             let handler = handler.clone();
 
             let inner = service_fn(move |req| {
+                // TODO: Log errors?
                 let response = handler.handle(req, &metrics);
-
-                emit!(PrometheusServerRequestComplete {
-                    status_code: response.status(),
-                });
-
                 future::ok::<_, Infallible>(response)
             });
 

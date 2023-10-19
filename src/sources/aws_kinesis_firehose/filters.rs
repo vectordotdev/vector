@@ -14,11 +14,7 @@ use super::{
     models::{FirehoseRequest, FirehoseResponse},
     Compression,
 };
-use crate::{
-    codecs,
-    internal_events::{AwsKinesisFirehoseRequestError, AwsKinesisFirehoseRequestReceived},
-    SourceSender,
-};
+use crate::{codecs, internal_events::AwsKinesisFirehoseRequestError, SourceSender};
 
 /// Handles routing of incoming HTTP requests from AWS Kinesis Firehose
 pub fn firehose(
@@ -41,7 +37,6 @@ pub fn firehose(
         log_namespace,
     };
     warp::post()
-        .and(emit_received())
         .and(authenticate(access_keys))
         .and(warp::header("X-Amz-Firehose-Request-Id"))
         .and(warp::header("X-Amz-Firehose-Source-Arn"))
@@ -95,19 +90,6 @@ fn parse_body() -> impl Filter<Extract = (FirehoseRequest,), Error = warp::rejec
                 })
             },
         )
-}
-
-fn emit_received() -> impl Filter<Extract = (), Error = warp::reject::Rejection> + Clone {
-    warp::any()
-        .and(warp::header::optional("X-Amz-Firehose-Request-Id"))
-        .and(warp::header::optional("X-Amz-Firehose-Source-Arn"))
-        .map(|request_id: Option<String>, source_arn: Option<String>| {
-            emit!(AwsKinesisFirehoseRequestReceived {
-                request_id: request_id.as_deref(),
-                source_arn: source_arn.as_deref(),
-            });
-        })
-        .untuple_one()
 }
 
 /// If there is a configured access key, validate that the request key matches it

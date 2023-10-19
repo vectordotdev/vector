@@ -87,7 +87,6 @@ components: sources: kafka: {
 	}
 
 	telemetry: metrics: {
-		consumer_offset_updates_failed_total: components.sources.internal_metrics.output.metrics.consumer_offset_updates_failed_total
 		kafka_queue_messages:                 components.sources.internal_metrics.output.metrics.kafka_queue_messages
 		kafka_queue_messages_bytes:           components.sources.internal_metrics.output.metrics.kafka_queue_messages_bytes
 		kafka_requests_total:                 components.sources.internal_metrics.output.metrics.kafka_requests_total

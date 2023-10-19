@@ -54,8 +54,6 @@ impl<'a> InternalEvent for MongoDbMetricsRequestError<'a> {
             "error_type" => error_type::REQUEST_FAILED,
             "stage" => error_stage::RECEIVING,
         );
-        // deprecated
-        counter!("request_errors_total", 1);
     }
 }
 
@@ -80,7 +78,5 @@ impl<'a> InternalEvent for MongoDbMetricsBsonParseError<'a> {
             "stage" => error_stage::RECEIVING,
             "endpoint" => self.endpoint.to_owned(),
         );
-        // deprecated
-        counter!("parse_errors_total", 1);
     }
 }

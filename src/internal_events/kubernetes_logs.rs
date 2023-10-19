@@ -71,7 +71,6 @@ impl InternalEvent for KubernetesLogsEventAnnotationError<'_> {
             "error_type" => error_type::READER_FAILED,
             "stage" => error_stage::PROCESSING,
         );
-        counter!("k8s_event_annotation_failures_total", 1);
     }
 }
 

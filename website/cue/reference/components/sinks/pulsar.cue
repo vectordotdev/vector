@@ -63,8 +63,4 @@ components: sinks: pulsar: {
 		metrics: null
 		traces:  false
 	}
-
-	telemetry: metrics: {
-		encode_errors_total: components.sources.internal_metrics.output.metrics.encode_errors_total
-	}
 }

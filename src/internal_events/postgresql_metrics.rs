@@ -24,7 +24,5 @@ impl<'a> InternalEvent for PostgresqlMetricsCollectError<'a> {
             "error_type" => error_type::REQUEST_FAILED,
             "stage" => error_stage::RECEIVING,
         );
-        // deprecated
-        counter!("request_errors_total", 1);
     }
 }

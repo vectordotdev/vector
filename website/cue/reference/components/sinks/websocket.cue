@@ -82,8 +82,6 @@ components: sinks: websocket: {
 	telemetry: metrics: {
 		open_connections:             components.sources.internal_metrics.output.metrics.open_connections
 		connection_established_total: components.sources.internal_metrics.output.metrics.connection_established_total
-		connection_failed_total:      components.sources.internal_metrics.output.metrics.connection_failed_total
 		connection_shutdown_total:    components.sources.internal_metrics.output.metrics.connection_shutdown_total
-		connection_errors_total:      components.sources.internal_metrics.output.metrics.connection_errors_total
 	}
 }

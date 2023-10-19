@@ -71,7 +71,6 @@ impl<const DROP_EVENT: bool> InternalEvent for ParserMissingFieldError<'_, DROP_
             "error_code" => "field_not_found",
             "error_type" => error_type::CONDITION_FAILED,
             "stage" => error_stage::PROCESSING,
-            "field" => self.field.to_string(),
         );
 
         if DROP_EVENT {
@@ -102,7 +101,6 @@ impl<'a> InternalEvent for ParserConversionError<'a> {
             "error_code" => "type_conversion",
             "error_type" => error_type::CONVERSION_FAILED,
             "stage" => error_stage::PROCESSING,
-            "name" => self.name.to_string(),
         );
     }
 }

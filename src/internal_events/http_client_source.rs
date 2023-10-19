@@ -51,13 +51,10 @@ impl InternalEvent for HttpClientHttpResponseError {
         );
         counter!(
             "component_errors_total", 1,
-            "url" => self.url,
             "stage" => error_stage::RECEIVING,
             "error_type" => error_type::REQUEST_FAILED,
             "error_code" => http_error_code(self.code.as_u16()),
         );
-        // deprecated
-        counter!("http_error_response_total", 1);
     }
 }
 
@@ -79,11 +76,8 @@ impl InternalEvent for HttpClientHttpError {
         );
         counter!(
             "component_errors_total", 1,
-            "url" => self.url,
             "error_type" => error_type::REQUEST_FAILED,
             "stage" => error_stage::RECEIVING,
         );
-        // deprecated
-        counter!("http_request_errors_total", 1);
     }
 }

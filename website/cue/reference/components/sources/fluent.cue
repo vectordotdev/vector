@@ -175,8 +175,4 @@ components: sources: fluent: {
 				"""
 		}
 	}
-
-	telemetry: metrics: {
-		decode_errors_total: components.sources.internal_metrics.output.metrics.decode_errors_total
-	}
 }

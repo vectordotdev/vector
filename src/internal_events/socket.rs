@@ -127,8 +127,6 @@ impl<E: std::fmt::Display> InternalEvent for SocketBindError<E> {
             "stage" => error_stage::RECEIVING,
             "mode" => mode,
         );
-        // deprecated
-        counter!("connection_errors_total", 1, "mode" => mode);
     }
 }
 
@@ -157,8 +155,6 @@ impl<E: std::fmt::Display> InternalEvent for SocketReceiveError<E> {
             "stage" => error_stage::RECEIVING,
             "mode" => mode,
         );
-        // deprecated
-        counter!("connection_errors_total", 1, "mode" => mode);
     }
 }
 
@@ -188,8 +184,6 @@ impl<E: std::fmt::Display> InternalEvent for SocketSendError<E> {
             "stage" => error_stage::SENDING,
             "mode" => mode,
         );
-        // deprecated
-        counter!("connection_errors_total", 1, "mode" => mode);
 
         emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
     }

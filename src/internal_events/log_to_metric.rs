@@ -28,7 +28,6 @@ impl<'a> InternalEvent for LogToMetricFieldNullError<'a> {
             "error_code" => "field_null",
             "error_type" => error_type::CONDITION_FAILED,
             "stage" => error_stage::PROCESSING,
-            "null_field" => self.field.to_string(),
         );
 
         emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason })
@@ -57,7 +56,6 @@ impl<'a> InternalEvent for LogToMetricParseFloatError<'a> {
             "error_code" => "failed_parsing_float",
             "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::PROCESSING,
-            "field" => self.field.to_string(),
         );
 
         emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason })

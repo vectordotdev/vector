@@ -30,7 +30,7 @@ use crate::{
         SourceContext, SourceOutput,
     },
     event::{Event, LogEvent},
-    internal_events::{HerokuLogplexRequestReadError, HerokuLogplexRequestReceived},
+    internal_events::HerokuLogplexRequestReadError,
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
     sources::util::{
         http::{add_query_parameters, HttpMethod},
@@ -222,14 +222,6 @@ impl LogplexSource {
             Ok(v) => v,
             Err(e) => return Err(header_error_message("Logplex-Msg-Count", &e.to_string())),
         };
-        let frame_id = get_header(header_map, "Logplex-Frame-Id")?;
-        let drain_token = get_header(header_map, "Logplex-Drain-Token")?;
-
-        emit!(HerokuLogplexRequestReceived {
-            msg_count,
-            frame_id,
-            drain_token
-        });
 
         // Deal with body
         let events = self.body_to_events(body);

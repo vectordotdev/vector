@@ -107,7 +107,5 @@ impl<'a> InternalEvent for WindowsServiceDoesNotExistError<'a> {
             "error_type" => error_type::CONDITION_FAILED,
             "stage" => error_stage::PROCESSING,
         );
-        // deprecated
-        counter!("windows_service_does_not_exist_total", 1,);
     }
 }

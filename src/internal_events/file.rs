@@ -180,12 +180,6 @@ mod source {
                 "error_code" => "reading_fingerprint",
                 "error_type" => error_type::READER_FAILED,
                 "stage" => error_stage::RECEIVING,
-                "file" => self.file.to_string_lossy().into_owned(),
-            );
-            // deprecated
-            counter!(
-                "fingerprint_read_errors_total", 1,
-                "file" => self.file.to_string_lossy().into_owned(),
             );
         }
     }
@@ -211,15 +205,9 @@ mod source {
             );
             counter!(
                 "component_errors_total", 1,
-                "file" => self.file.to_string_lossy().into_owned(),
                 "error_code" => DELETION_FAILED,
                 "error_type" => error_type::COMMAND_FAILED,
                 "stage" => error_stage::RECEIVING,
-            );
-            // deprecated
-            counter!(
-                "file_delete_errors_total", 1,
-                "file" => self.file.to_string_lossy().into_owned(),
             );
         }
     }
@@ -235,10 +223,7 @@ mod source {
                 message = "File deleted.",
                 file = %self.file.display(),
             );
-            counter!(
-                "files_deleted_total", 1,
-                "file" => self.file.to_string_lossy().into_owned(),
-            );
+            counter!("files_deleted_total", 1,);
         }
     }
 
@@ -253,10 +238,7 @@ mod source {
                 message = "Stopped watching file.",
                 file = %self.file.display(),
             );
-            counter!(
-                "files_unwatched_total", 1,
-                "file" => self.file.to_string_lossy().into_owned(),
-            );
+            counter!("files_unwatched_total", 1,);
         }
     }
 
@@ -282,12 +264,6 @@ mod source {
                 "error_code" => "watching",
                 "error_type" => error_type::COMMAND_FAILED,
                 "stage" => error_stage::RECEIVING,
-                "file" => self.file.to_string_lossy().into_owned(),
-            );
-            // deprecated
-            counter!(
-                "file_watch_errors_total", 1,
-                "file" => self.file.to_string_lossy().into_owned(),
             );
         }
     }
@@ -305,10 +281,7 @@ mod source {
                 file = %self.file.display(),
                 file_position = %self.file_position
             );
-            counter!(
-                "files_resumed_total", 1,
-                "file" => self.file.to_string_lossy().into_owned(),
-            );
+            counter!("files_resumed_total", 1,);
         }
     }
 
@@ -323,10 +296,7 @@ mod source {
                 message = "Found new file to watch.",
                 file = %self.file.display(),
             );
-            counter!(
-                "files_added_total", 1,
-                "file" => self.file.to_string_lossy().into_owned(),
-            );
+            counter!("files_added_total", 1,);
         }
     }
 
@@ -362,7 +332,6 @@ mod source {
                 stage = error_stage::RECEIVING,
                 internal_log_rate_limit = true,
             );
-            counter!("checkpoint_write_errors_total", 1);
             counter!(
                 "component_errors_total", 1,
                 "error_code" => "writing_checkpoints",
@@ -394,12 +363,6 @@ mod source {
                 "error_code" => "globbing",
                 "error_type" => error_type::READER_FAILED,
                 "stage" => error_stage::RECEIVING,
-                "path" => self.path.to_string_lossy().into_owned(),
-            );
-            // deprecated
-            counter!(
-                "glob_errors_total", 1,
-                "path" => self.path.to_string_lossy().into_owned(),
             );
         }
     }

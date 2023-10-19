@@ -204,22 +204,6 @@ mod source {
     use vector_common::internal_event::{error_stage, error_type};
 
     #[derive(Debug)]
-    pub struct SplunkHecRequestReceived<'a> {
-        pub path: &'a str,
-    }
-
-    impl<'a> InternalEvent for SplunkHecRequestReceived<'a> {
-        fn emit(self) {
-            debug!(
-                message = "Received one request.",
-                path = %self.path,
-                internal_log_rate_limit = true
-            );
-            counter!("requests_received_total", 1);
-        }
-    }
-
-    #[derive(Debug)]
     pub struct SplunkHecRequestBodyInvalidError {
         pub error: std::io::Error,
     }
@@ -262,8 +246,6 @@ mod source {
                 "error_type" => error_type::REQUEST_FAILED,
                 "stage" => error_stage::RECEIVING,
             );
-            // deprecated
-            counter!("http_request_errors_total", 1);
         }
     }
 }
