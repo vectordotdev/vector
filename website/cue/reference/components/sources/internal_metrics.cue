@@ -793,19 +793,19 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
-		http_server_requests_received_total {
+		http_server_requests_received_total: {
 			description:       "The total number of HTTP requests received."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _component_tags & _grpc_method & _grpc_service
 		}
-		http_server_responses_sent_total {
+		http_server_responses_sent_total: {
 			description:       "The total number of HTTP responses sent."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _component_tags & _grpc_method & _grpc_service & _grpc_status
 		}
-		http_server_handler_latency_seconds {
+		http_server_handler_latency_seconds: {
 			description:       "The duration spent handling a HTTP request."
 			type:              "histogram"
 			default_namespace: "vector"
