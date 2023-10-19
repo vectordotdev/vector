@@ -12,7 +12,7 @@ Vector implements cryptography and secure communication using the [OpenSSL][open
 In particular, the official Vector binaries are statically linked against OpenSSL version
 {{< param openssl_version >}} and do not use any OpenSSL library installed on the running system.
 
-Note that OpenSSL recognizes a number of [environment variables][openssl-env] independently of Vector.
+**Note**: OpenSSL recognizes a number of [environment variables][openssl-env] independently of Vector.
 
 ## Trusted Certificates
 
