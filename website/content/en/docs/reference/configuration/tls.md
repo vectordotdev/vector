@@ -29,7 +29,7 @@ By default, OpenSSL and Vector will look for trusted certificates in the followi
 
 Note that it is possible to use specific trusted certificates only for Vector via `SSL_CERT_FILE` or `SSL_CERT_DIR`.
 
-## OpenSSL Configuration
+## OpenSSL configuration
 
 The OpenSSL library in Vector can be configured using a [configuration file][openssl-config].
 
