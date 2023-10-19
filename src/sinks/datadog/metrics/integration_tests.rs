@@ -310,7 +310,7 @@ fn validate_protobuf_set_gauge_rate(request: &(Parts, Bytes)) {
             gauge.r#type(),
             ddmetric_proto::metric_payload::MetricType::Gauge
         );
-        assert_eq!(gauge.interval, 10);
+        assert_eq!(gauge.interval, 0);
         assert_eq!(gauge.points[0].value, 2_f64);
     }
 
@@ -322,7 +322,7 @@ fn validate_protobuf_set_gauge_rate(request: &(Parts, Bytes)) {
             ddmetric_proto::metric_payload::MetricType::Gauge
         );
         assert_eq!(gauge.points[0].value, 5678.0);
-        assert_eq!(gauge.interval, 0);
+        assert_eq!(gauge.interval, 10);
     }
 
     // validate counter w interval = rate
