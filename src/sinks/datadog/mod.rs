@@ -7,7 +7,8 @@ use vector_config::configurable_component;
 use vector_core::{config::AcknowledgementsConfig, tls::TlsEnableableConfig};
 
 use crate::{
-    common::datadog::{get_api_base_endpoint, get_base_domain_region, Region, DD_US_SITE},
+    common::datadog::{get_api_base_endpoint, get_base_domain_region, Region},
+    config::datadog,
     http::{HttpClient, HttpError},
     sinks::HealthcheckError,
 };
@@ -23,15 +24,10 @@ pub mod metrics;
 #[cfg(feature = "sinks-datadog_traces")]
 pub mod traces;
 
-/// Get the default Datadog site, which is the US site.
-pub(crate) fn default_site() -> String {
-    DD_US_SITE.to_owned()
-}
-
 /// Shared configuration for Datadog sinks.
 /// Contains the maximum set of common settings that applies to all DD sink components.
 #[configurable_component]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct DatadogCommonConfig {
     /// The endpoint to send observability data to.
@@ -52,8 +48,7 @@ pub struct DatadogCommonConfig {
     /// [dd_site]: https://docs.datadoghq.com/getting_started/site
     #[configurable(metadata(docs::examples = "us3.datadoghq.com"))]
     #[configurable(metadata(docs::examples = "datadoghq.eu"))]
-    #[serde(default = "default_site")]
-    pub site: String,
+    site: Option<String>,
 
     /// The default Datadog [API key][api_key] to use in authentication of HTTP requests.
     ///
@@ -63,7 +58,7 @@ pub struct DatadogCommonConfig {
     /// [api_key]: https://docs.datadoghq.com/api/?lang=bash#authentication
     #[configurable(metadata(docs::examples = "${DATADOG_API_KEY_ENV_VAR}"))]
     #[configurable(metadata(docs::examples = "ef8d5de700e7989468166c40fc8a0ccd"))]
-    pub default_api_key: SensitiveString,
+    default_api_key: Option<SensitiveString>,
 
     #[configurable(derived)]
     #[serde(default)]
@@ -78,34 +73,47 @@ pub struct DatadogCommonConfig {
     pub acknowledgements: AcknowledgementsConfig,
 }
 
-impl Default for DatadogCommonConfig {
-    fn default() -> Self {
+impl DatadogCommonConfig {
+    pub fn new(
+        endpoint: Option<String>,
+        site: Option<String>,
+        default_api_key: Option<SensitiveString>,
+    ) -> Self {
         Self {
-            endpoint: None,
-            site: default_site(),
-            default_api_key: SensitiveString::default(),
-            tls: None,
-            acknowledgements: AcknowledgementsConfig::default(),
+            endpoint,
+            site,
+            default_api_key,
+            ..Default::default()
         }
     }
-}
 
-impl DatadogCommonConfig {
     /// Returns a `Healthcheck` which is a future that will be used to ensure the
     /// `<site>/api/v1/validate` endpoint is reachable.
     fn build_healthcheck(
         &self,
+        global: &datadog::Options,
         client: HttpClient,
         region: Option<&Region>,
     ) -> crate::Result<Healthcheck> {
         let validate_endpoint = get_api_validate_endpoint(
             self.endpoint.as_ref(),
-            get_base_domain_region(self.site.as_str(), region),
+            get_base_domain_region(self.site(global), region),
         )?;
 
-        let api_key: String = self.default_api_key.clone().into();
+        let api_key: String = self.default_api_key(global).clone().into();
 
         Ok(build_healthcheck_future(client, validate_endpoint, api_key).boxed())
+    }
+
+    pub fn site<'a>(&'a self, config: &'a datadog::Options) -> &'a str {
+        self.site.as_ref().unwrap_or(&config.site).as_str()
+    }
+
+    pub fn default_api_key(&self, config: &datadog::Options) -> SensitiveString {
+        self.default_api_key
+            .clone()
+            .or(config.api_key.clone())
+            .unwrap_or_default()
     }
 }
 

@@ -17,18 +17,15 @@ use url::{ParseError, Url};
 use vector_core::config::proxy::ProxyConfig;
 
 use super::{
-    load_source_from_paths, process_paths, ComponentKey, Config, ConfigPath, OutputId, SinkOuter,
-    SourceOuter, TransformOuter,
+    datadog::default_site, load_source_from_paths, process_paths, ComponentKey, Config, ConfigPath,
+    OutputId, SinkOuter, SourceOuter, TransformOuter,
 };
 use crate::{
     common::datadog::{get_api_base_endpoint, get_base_domain_region, Region},
     conditions::AnyCondition,
     http::{HttpClient, HttpError},
     sinks::{
-        datadog::{
-            default_site, logs::DatadogLogsConfig, metrics::DatadogMetricsConfig,
-            DatadogCommonConfig,
-        },
+        datadog::{logs::DatadogLogsConfig, metrics::DatadogMetricsConfig, DatadogCommonConfig},
         util::{http::RequestConfig, retries::ExponentialBackoff},
     },
     sources::{
@@ -481,12 +478,11 @@ fn setup_logs_reporting(
 
     // Create a Datadog logs sink to consume and emit internal logs.
     let datadog_logs = DatadogLogsConfig {
-        dd_common: DatadogCommonConfig {
-            endpoint: datadog.endpoint.clone(),
-            site: datadog.site.clone(),
-            default_api_key: api_key.into(),
-            ..Default::default()
-        },
+        dd_common: DatadogCommonConfig::new(
+            datadog.endpoint.clone(),
+            Some(datadog.site.clone()),
+            Some(api_key.into()),
+        ),
         region: datadog.region,
         request: RequestConfig {
             headers: IndexMap::from([(
@@ -589,12 +585,11 @@ fn setup_metrics_reporting(
 
     // Create a Datadog metrics sink to consume and emit internal + host metrics.
     let datadog_metrics = DatadogMetricsConfig {
-        dd_common: DatadogCommonConfig {
-            endpoint: datadog.endpoint.clone(),
-            site: datadog.site.clone(),
-            default_api_key: api_key.into(),
-            ..Default::default()
-        },
+        dd_common: DatadogCommonConfig::new(
+            datadog.endpoint.clone(),
+            Some(datadog.site.clone()),
+            Some(api_key.into()),
+        ),
         region: datadog.region,
         ..Default::default()
     };

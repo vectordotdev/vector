@@ -7,7 +7,7 @@ use vrl::value::Kind;
 
 use crate::{
     common::datadog::{get_base_domain_region, Region},
-    config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
+    config::{datadog, AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     http::HttpClient,
     sinks::{
         datadog::{
@@ -54,10 +54,10 @@ impl GenerateConfig for DatadogEventsConfig {
 }
 
 impl DatadogEventsConfig {
-    fn get_api_events_endpoint(&self) -> http::Uri {
+    fn get_api_events_endpoint(&self, global: &datadog::Options) -> http::Uri {
         let api_base_endpoint = get_api_base_endpoint(
             self.dd_common.endpoint.as_ref(),
-            get_base_domain_region(self.dd_common.site.as_str(), self.region.as_ref()),
+            get_base_domain_region(self.dd_common.site(global), self.region.as_ref()),
         );
 
         // We know this URI will be valid since we have just built it up ourselves.
@@ -70,10 +70,14 @@ impl DatadogEventsConfig {
         Ok(client)
     }
 
-    fn build_sink(&self, client: HttpClient) -> crate::Result<VectorSink> {
+    fn build_sink(
+        &self,
+        global: &datadog::Options,
+        client: HttpClient,
+    ) -> crate::Result<VectorSink> {
         let service = DatadogEventsService::new(
-            self.get_api_events_endpoint(),
-            self.dd_common.default_api_key.clone().into(),
+            self.get_api_events_endpoint(global),
+            self.dd_common.default_api_key(global),
             client,
         );
 
@@ -96,10 +100,10 @@ impl DatadogEventsConfig {
 impl SinkConfig for DatadogEventsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let client = self.build_client(cx.proxy())?;
-        let healthcheck = self
-            .dd_common
-            .build_healthcheck(client.clone(), self.region.as_ref())?;
-        let sink = self.build_sink(client)?;
+        let healthcheck =
+            self.dd_common
+                .build_healthcheck(&cx.datadog, client.clone(), self.region.as_ref())?;
+        let sink = self.build_sink(&cx.datadog, client)?;
 
         Ok((sink, healthcheck))
     }

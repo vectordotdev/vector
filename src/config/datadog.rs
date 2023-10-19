@@ -1,6 +1,12 @@
+//! Datadog global options.
+//! This is used to allow settings (api_key and site) to be specified in the configuration file
+//! globally which will apply to all datadog components. Each component can override the settings
+//! specified here if necessary.
+//!
+use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 
-use crate::sinks::util::UriSerde;
+use crate::common::datadog::DD_US_SITE;
 
 /// Default settings to use for Datadog components.
 #[configurable_component]
@@ -11,17 +17,22 @@ pub struct Options {
     /// Default Datadog API key to use for Datadog components.
     #[serde(default = "default_api_key")]
     #[derivative(Default(value = "default_api_key()"))]
-    pub api_key: Option<String>,
+    #[configurable(metadata(docs::examples = "${DATADOG_API_KEY_ENV_VAR}"))]
+    #[configurable(metadata(docs::examples = "ef8d5de700e7989468166c40fc8a0ccd"))]
+    pub api_key: Option<SensitiveString>,
+
     /// Default site to use for DataDog components.
     #[serde(default = "default_site")]
     #[derivative(Default(value = "default_site()"))]
-    pub site: Option<UriSerde>,
+    #[configurable(metadata(docs::examples = "us3.datadoghq.com"))]
+    #[configurable(metadata(docs::examples = "datadoghq.eu"))]
+    pub site: String,
 }
 
-fn default_api_key() -> Option<String> {
-    std::env::var("DD_API_KEY").ok().map(|s| s.to_string())
+fn default_api_key() -> Option<SensitiveString> {
+    std::env::var("DD_API_KEY").ok().map(Into::into)
 }
 
-fn default_site() -> Option<UriSerde> {
-    std::env::var("DD_SITE").ok().and_then(|s| s.parse().ok())
+pub fn default_site() -> String {
+    std::env::var("DD_SITE").unwrap_or(DD_US_SITE.to_string())
 }
