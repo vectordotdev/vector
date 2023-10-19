@@ -246,7 +246,7 @@ base: components: sinks: prometheus_remote_write: configuration: {
 			"""
 		required: false
 		type: string: {
-			default: "none"
+			default: "snappy"
 			enum: {
 				gzip: """
 					[Gzip][gzip] compression.
