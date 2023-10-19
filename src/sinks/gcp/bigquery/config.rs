@@ -10,12 +10,12 @@ use super::request_builder::{BigqueryRequestBuilder, MAX_BATCH_PAYLOAD_SIZE};
 use super::service::{AuthInterceptor, BigqueryService};
 use super::sink::BigquerySink;
 use crate::config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext};
-use crate::gcp::{GcpAuthConfig, GcpAuthenticator, Scope, BIGQUERYSTORAGE_URL};
+use crate::gcp::{GcpAuthConfig, GcpAuthenticator, Scope, BIGQUERY_STORAGE_URL};
 use crate::sinks::util::{BatchConfig, SinkBatchSettings, TowerRequestConfig};
 use crate::sinks::{Healthcheck, VectorSink};
 
 fn default_endpoint() -> String {
-    BIGQUERYSTORAGE_URL.to_string()
+    BIGQUERY_STORAGE_URL.to_string()
 }
 
 #[derive(Clone, Copy, Debug, Default)]
