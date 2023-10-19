@@ -1,10 +1,12 @@
 #![deny(missing_docs)]
 
+use chrono::{DateTime, Utc};
 use core::fmt::Debug;
 use std::collections::BTreeMap;
 
 use lookup::lookup_v2::ConfigValuePath;
 use lookup::{event_path, PathPrefix};
+use ordered_float::NotNan;
 use serde::{Deserialize, Deserializer};
 use vector_config::configurable_component;
 use vector_core::event::{LogEvent, MaybeAsLogMut};
@@ -176,32 +178,46 @@ impl Transformer {
         }
     }
 
+    fn format_timestamps<F, T>(&self, log: &mut LogEvent, extract: F)
+    where
+        F: Fn(&DateTime<Utc>) -> T,
+        T: Into<Value>,
+    {
+        if log.value().is_object() {
+            let mut unix_timestamps = Vec::new();
+            for (k, v) in log.all_event_fields().expect("must be an object") {
+                if let Value::Timestamp(ts) = v {
+                    unix_timestamps.push((k.clone(), extract(ts).into()));
+                }
+            }
+            for (k, v) in unix_timestamps {
+                log.parse_path_and_insert(k, v).unwrap();
+            }
+        } else {
+            // root is not an object
+            let timestamp = if let Value::Timestamp(ts) = log.value() {
+                Some(extract(ts))
+            } else {
+                None
+            };
+            if let Some(ts) = timestamp {
+                log.insert(event_path!(), ts.into());
+            }
+        }
+    }
+
     fn apply_timestamp_format(&self, log: &mut LogEvent) {
         if let Some(timestamp_format) = self.timestamp_format.as_ref() {
             match timestamp_format {
-                TimestampFormat::Unix => {
-                    if log.value().is_object() {
-                        let mut unix_timestamps = Vec::new();
-                        for (k, v) in log.all_event_fields().expect("must be an object") {
-                            if let Value::Timestamp(ts) = v {
-                                unix_timestamps.push((k.clone(), Value::Integer(ts.timestamp())));
-                            }
-                        }
-                        for (k, v) in unix_timestamps {
-                            log.parse_path_and_insert(k, v).unwrap();
-                        }
-                    } else {
-                        // root is not an object
-                        let timestamp = if let Value::Timestamp(ts) = log.value() {
-                            Some(ts.timestamp())
-                        } else {
-                            None
-                        };
-                        if let Some(ts) = timestamp {
-                            log.insert(event_path!(), Value::Integer(ts));
-                        }
-                    }
-                }
+                TimestampFormat::Unix => self.format_timestamps(log, |ts| ts.timestamp()),
+                TimestampFormat::UnixMs => self.format_timestamps(log, |ts| ts.timestamp_millis()),
+                TimestampFormat::UnixUs => self.format_timestamps(log, |ts| ts.timestamp_micros()),
+                TimestampFormat::UnixNs => self.format_timestamps(log, |ts| {
+                    ts.timestamp_nanos_opt().expect("Timestamp out of range")
+                }),
+                TimestampFormat::UnixFloat => self.format_timestamps(log, |ts| {
+                    NotNan::new(ts.timestamp_micros() as f64 / 1e6).unwrap()
+                }),
                 // RFC3339 is the default serialization of a timestamp.
                 TimestampFormat::Rfc3339 => (),
             }
@@ -225,7 +241,7 @@ impl Transformer {
 
 #[configurable_component]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-#[serde(rename_all = "lowercase")]
+#[serde(rename_all = "snake_case")]
 /// The format in which a timestamp should be represented.
 pub enum TimestampFormat {
     /// Represent the timestamp as a Unix timestamp.
@@ -233,6 +249,18 @@ pub enum TimestampFormat {
 
     /// Represent the timestamp as a RFC 3339 timestamp.
     Rfc3339,
+
+    /// Represent the timestamp as a Unix timestamp in milliseconds.
+    UnixMs,
+
+    /// Represent the timestamp as a Unix timestamp in microseconds
+    UnixUs,
+
+    /// Represent the timestamp as a Unix timestamp in nanoseconds.
+    UnixNs,
+
+    /// Represent the timestamp as a Unix timestamp in floating point.
+    UnixFloat,
 }
 
 #[cfg(test)]
@@ -344,9 +372,8 @@ mod tests {
 
     #[test]
     fn deserialize_and_transform_timestamp() {
-        let transformer: Transformer = toml::from_str(r#"timestamp_format = "unix""#).unwrap();
-        let mut event = Event::Log(LogEvent::from("Demo"));
-        let timestamp = event
+        let mut base = Event::Log(LogEvent::from("Demo"));
+        let timestamp = base
             .as_mut_log()
             .get((
                 lookup::PathPrefix::Event,
@@ -355,32 +382,44 @@ mod tests {
             .unwrap()
             .clone();
         let timestamp = timestamp.as_timestamp().unwrap();
-        event
-            .as_mut_log()
+        base.as_mut_log()
             .insert("another", Value::Timestamp(*timestamp));
 
-        transformer.transform(&mut event);
+        let cases = [
+            ("unix", Value::from(timestamp.timestamp())),
+            ("unix_ms", Value::from(timestamp.timestamp_millis())),
+            ("unix_us", Value::from(timestamp.timestamp_micros())),
+            (
+                "unix_ns",
+                Value::from(timestamp.timestamp_nanos_opt().unwrap()),
+            ),
+            (
+                "unix_float",
+                Value::from(timestamp.timestamp_micros() as f64 / 1e6),
+            ),
+        ];
+        for (fmt, expected) in cases {
+            let config: String = format!(r#"timestamp_format = "{}""#, fmt);
+            let transformer: Transformer = toml::from_str(&config).unwrap();
+            let mut event = base.clone();
+            transformer.transform(&mut event);
+            let log = event.as_mut_log();
 
-        match event
-            .as_mut_log()
-            .get((
-                lookup::PathPrefix::Event,
-                log_schema().timestamp_key().unwrap(),
-            ))
-            .unwrap()
-        {
-            Value::Integer(_) => {}
-            e => panic!(
-                "Timestamp was not transformed into a Unix timestamp. Was {:?}",
-                e
-            ),
-        }
-        match event.as_mut_log().get("another").unwrap() {
-            Value::Integer(_) => {}
-            e => panic!(
-                "Timestamp was not transformed into a Unix timestamp. Was {:?}",
-                e
-            ),
+            for actual in [
+                // original key
+                log.get((
+                    lookup::PathPrefix::Event,
+                    log_schema().timestamp_key().unwrap(),
+                ))
+                .unwrap(),
+                // second key
+                log.get("another").unwrap(),
+            ] {
+                // type matches
+                assert_eq!(expected.kind_str(), actual.kind_str());
+                // value matches
+                assert_eq!(&expected, actual);
+            }
         }
     }
 
