@@ -177,3 +177,28 @@ fn decode_label_pair(k: &str, v: &str) -> Result<(String, String), ErrorMessage>
 
     Ok((k.to_owned(), decoded))
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_parse_simple_path() {
+        let path = "/metrics/job/foo/instance/bar";
+        let expected: Vec<_>= vec![("job", "foo"), ("instance", "bar")].into_iter().
+            map(|(k,v)| (k.to_owned(), v.to_owned())).collect();
+        let actual = parse_path_labels(path);
+
+        assert!(actual.is_ok());
+        assert_eq!(actual.unwrap(), expected);
+    }
+
+    #[test]
+    fn test_parse_path_wrong_number_of_segments() {
+        let path = "/metrics/job/foo/instance";
+        let res = parse_path_labels(path);
+
+        assert!(res.is_err());
+        assert!(res.unwrap_err().message().contains("number of segments"));
+    }
+}
