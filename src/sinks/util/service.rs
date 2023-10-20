@@ -360,7 +360,6 @@ impl TowerRequestSettings {
 
         // Build services
         let open = OpenGauge::new();
-        let max_concurrency = services.len() * AdaptiveConcurrencySettings::max_concurrency();
         let services = services
             .into_iter()
             .map(|(endpoint, inner)| {
@@ -390,7 +389,7 @@ impl TowerRequestSettings {
         ServiceBuilder::new()
             .rate_limit(self.rate_limit_num, self.rate_limit_duration)
             .retry(policy)
-            .layer(BufferLayer::new(max_concurrency))
+            .layer(BufferLayer::new(1))
             .service(Balance::new(Box::pin(stream::iter(services)) as Pin<Box<_>>))
     }
 }
