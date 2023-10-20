@@ -12,8 +12,8 @@ use vector_core::{
     event::{Event, Metric, MetricValue},
     partition::Partitioner,
     sink::StreamSink,
-    stream::{BatcherSettings, DriverResponse},
 };
+use vector_stream::{BatcherSettings, DriverResponse};
 
 use super::{
     config::DatadogMetricsEndpoint, normalizer::DatadogMetricsNormalizer,

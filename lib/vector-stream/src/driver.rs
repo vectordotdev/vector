@@ -9,12 +9,12 @@ use vector_common::internal_event::{
     RegisteredEventCache, SharedString, TaggedEventsSent,
 };
 use vector_common::request_metadata::{GroupedCountByteSize, MetaDescriptive};
-
-use super::FuturesUnorderedCount;
-use crate::{
+use vector_core::{
     event::{EventFinalizers, EventStatus, Finalizable},
     internal_event::emit,
 };
+
+use super::FuturesUnorderedCount;
 
 pub trait DriverResponse {
     fn event_status(&self) -> EventStatus;

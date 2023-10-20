@@ -11,19 +11,14 @@ use futures::stream::{Fuse, Stream, StreamExt};
 use pin_project::pin_project;
 use tokio_util::time::{delay_queue::Key, DelayQueue};
 use twox_hash::XxHash64;
+use vector_core::{partition::Partitioner, time::KeyedTimer, ByteSizeOf};
 
-use crate::{
-    partition::Partitioner,
-    stream::batcher::{
-        config::BatchConfigParts,
-        data::BatchReduce,
-        limiter::{ByteSizeOfItemSize, ItemBatchSize, SizeLimit},
-    },
-    time::KeyedTimer,
-    ByteSizeOf,
+use crate::batcher::{
+    config::BatchConfigParts,
+    data::BatchReduce,
+    limiter::{ByteSizeOfItemSize, ItemBatchSize, SizeLimit},
+    BatchConfig,
 };
-
-use super::batcher::BatchConfig;
 
 /// A `KeyedTimer` based on `DelayQueue`.
 pub struct ExpirationQueue<K> {

@@ -6,7 +6,7 @@ use vector_common::{
     finalization::{EventFinalizers, EventStatus, Finalizable},
     request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata},
 };
-use vector_core::stream::DriverResponse;
+use vector_stream::DriverResponse;
 
 /// Generalized request for sending metrics to a StatsD endpoint.
 #[derive(Clone, Debug)]

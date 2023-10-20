@@ -15,10 +15,8 @@ use indexmap::IndexMap;
 use tower::Service;
 use tracing::Instrument;
 use vector_common::request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata};
-use vector_core::{
-    event::{EventFinalizers, EventStatus, Finalizable},
-    stream::DriverResponse,
-};
+use vector_core::event::{EventFinalizers, EventStatus, Finalizable};
+use vector_stream::DriverResponse;
 
 use crate::{
     http::HttpClient,

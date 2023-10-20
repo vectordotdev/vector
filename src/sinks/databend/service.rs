@@ -10,7 +10,7 @@ use snafu::Snafu;
 use tower::Service;
 use vector_common::finalization::{EventFinalizers, EventStatus, Finalizable};
 use vector_common::request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata};
-use vector_core::stream::DriverResponse;
+use vector_stream::DriverResponse;
 
 use crate::{internal_events::EndpointBytesSent, sinks::util::retries::RetryLogic};
 

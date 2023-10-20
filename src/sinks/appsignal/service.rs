@@ -13,7 +13,7 @@ use vector_common::{
     finalization::EventStatus, request_metadata::GroupedCountByteSize,
     request_metadata::MetaDescriptive, sensitive_string::SensitiveString,
 };
-use vector_core::stream::DriverResponse;
+use vector_stream::DriverResponse;
 
 use crate::{
     http::HttpClient,

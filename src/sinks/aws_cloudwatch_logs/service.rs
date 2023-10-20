@@ -26,7 +26,7 @@ use vector_common::{
     finalization::EventStatus,
     request_metadata::{GroupedCountByteSize, MetaDescriptive},
 };
-use vector_core::stream::DriverResponse;
+use vector_stream::DriverResponse;
 
 use crate::sinks::{
     aws_cloudwatch_logs::{
