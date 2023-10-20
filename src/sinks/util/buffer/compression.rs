@@ -330,11 +330,18 @@ impl Configurable for Compression {
             "[zstd]: https://facebook.github.io/zstd/",
         );
 
+        let snappy_string_subschema = generate_string_schema(
+            "Snappy",
+            Some("[Snappy][snappy] compression."),
+            "[snappy]: https://github.com/google/snappy/blob/main/docs/README.md",
+        );
+
         let mut all_string_oneof_subschema = generate_one_of_schema(&[
             none_string_subschema,
             gzip_string_subschema,
             zlib_string_subschema,
             zstd_string_subschema,
+            snappy_string_subschema,
         ]);
         apply_base_metadata(&mut all_string_oneof_subschema, string_metadata);
 
