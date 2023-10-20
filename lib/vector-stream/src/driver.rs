@@ -293,7 +293,7 @@ mod tests {
     }
 
     impl Finalizable for DelayRequest {
-        fn take_finalizers(&mut self) -> crate::event::EventFinalizers {
+        fn take_finalizers(&mut self) -> vector_core::event::EventFinalizers {
             std::mem::take(&mut self.1)
         }
     }
@@ -365,6 +365,7 @@ mod tests {
             let upper = self.upper_bound_us;
 
             // Generate a value between 10ms and 500ms, with a long tail shape to the distribution.
+            #[allow(clippy::cast_sign_loss)] // Value will be positive anyways
             self.jitter
                 .sample_iter(&mut self.jitter_gen)
                 .map(|n| n * lower as f64)

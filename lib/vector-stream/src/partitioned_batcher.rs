@@ -346,6 +346,7 @@ where
     }
 }
 
+#[allow(clippy::cast_sign_loss)]
 #[cfg(test)]
 mod test {
     use std::{
@@ -360,14 +361,11 @@ mod test {
     use pin_project::pin_project;
     use proptest::prelude::*;
     use tokio::{pin, time::advance};
+    use vector_core::{partition::Partitioner, time::KeyedTimer};
 
     use crate::{
-        partition::Partitioner,
-        stream::{
-            partitioned_batcher::{ExpirationQueue, PartitionedBatcher},
-            BatcherSettings,
-        },
-        time::KeyedTimer,
+        partitioned_batcher::{ExpirationQueue, PartitionedBatcher},
+        BatcherSettings,
     };
 
     #[derive(Debug)]

@@ -119,7 +119,7 @@ mod test {
     use futures::stream;
 
     use super::*;
-    use crate::stream::BatcherSettings;
+    use crate::BatcherSettings;
 
     #[tokio::test]
     async fn item_limit() {
