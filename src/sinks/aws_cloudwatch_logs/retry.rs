@@ -45,7 +45,7 @@ impl<T: Send + Sync + 'static> RetryLogic for CloudwatchRetryLogic<T> {
                 }
                 is_retriable_error(err)
             }
-            CloudwatchError::Describe(err) => {
+            CloudwatchError::DescribeLogStreams(err) => {
                 if let SdkError::ServiceError(inner) = err {
                     let err = inner.err();
                     if let DescribeLogStreamsErrorKind::ServiceUnavailableException(_) = err.kind {

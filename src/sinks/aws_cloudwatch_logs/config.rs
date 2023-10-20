@@ -2,6 +2,7 @@ use aws_sdk_cloudwatchlogs::Client as CloudwatchLogsClient;
 use aws_smithy_types::retry::RetryConfig;
 use codecs::JsonSerializerConfig;
 use futures::FutureExt;
+use serde::{de, Deserialize, Deserializer};
 use tower::ServiceBuilder;
 use vector_config::configurable_component;
 use vector_core::schema;
@@ -45,6 +46,43 @@ impl ClientBuilder for CloudwatchLogsClientBuilder {
 
     fn build(client: aws_smithy_client::Client, config: &aws_types::SdkConfig) -> Self::Client {
         aws_sdk_cloudwatchlogs::client::Client::with_config(client, config.into())
+    }
+}
+
+#[configurable_component]
+#[derive(Clone, Debug, Default)]
+/// Retention policy configuration for AWS Cloudwatch Log Group
+pub struct Retention {
+    #[configurable(derived)]
+    pub enabled: bool,
+
+    #[configurable(derived)]
+    #[serde(
+        default,
+        deserialize_with = "retention_days",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    pub days: i32,
+}
+
+fn retention_days<'de, D>(deserializer: D) -> Result<i32, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let days: i32 = Deserialize::deserialize(deserializer)?;
+    const ALLOWED_VALUES: &[i32] = &[
+        1, 3, 5, 7, 14, 30, 60, 90, 120, 150, 180, 365, 400, 545, 731, 1096, 1827, 2192, 2557,
+        2922, 3288, 3653,
+    ];
+    if ALLOWED_VALUES.contains(&days) {
+        Ok(days)
+    } else {
+        let msg = format!("one of allowed values: {:?}", ALLOWED_VALUES).to_owned();
+        let expected: &str = &msg[..];
+        Err(de::Error::invalid_value(
+            de::Unexpected::Signed(days.into()),
+            &expected,
+        ))
     }
 }
 
@@ -95,6 +133,9 @@ pub struct CloudwatchLogsSinkConfig {
     /// [log_stream]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html
     #[serde(default = "crate::serde::default_true")]
     pub create_missing_stream: bool,
+
+    #[configurable(derived)]
+    pub retention: Retention,
 
     #[configurable(derived)]
     pub encoding: EncodingConfig,
@@ -227,6 +268,7 @@ fn default_config(encoding: EncodingConfig) -> CloudwatchLogsSinkConfig {
         region: Default::default(),
         create_missing_group: true,
         create_missing_stream: true,
+        retention: Default::default(),
         compression: Default::default(),
         batch: Default::default(),
         request: Default::default(),
