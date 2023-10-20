@@ -30,7 +30,7 @@ In addition, Vector also looks for trusted certificates in the following locatio
   * Trusted certificate location probing can be disabled by using the `--openssl-no-probe` command line
     flag or the `VECTOR_OPENSSL_NO_PROBE` environment variable (refer to the [CLI][cli] documentation).
 
-**Note:** It is possible to use specific trusted certificates only for Vector via `SSL_CERT_FILE` or `SSL_CERT_DIR`.
+**Note:** It is possible to use specific trusted certificates only for Vector using `SSL_CERT_FILE` or `SSL_CERT_DIR`.
 
 ## OpenSSL configuration
 
