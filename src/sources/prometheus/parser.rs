@@ -24,6 +24,8 @@ pub(super) fn parse_text(packet: &str) -> Result<Vec<Event>, ParserError> {
     prometheus_parser::parse_text(packet).map(|group| reparse_groups(group, vec![], false))
 }
 
+// TODO: Add tests for overrides and aggregation on/off
+#[cfg(any(test, feature = "sources-prometheus-pushgateway"))]
 pub(super) fn parse_text_with_overrides(
     packet: &str,
     tag_overrides: impl IntoIterator<Item = (String, String)> + Clone,

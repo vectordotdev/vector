@@ -130,6 +130,7 @@ impl HttpSource for PushgatewaySource {
     }
 }
 
+// TODO: Test this
 fn parse_path_labels(path: &str) -> Result<Vec<(String, String)>, ErrorMessage> {
     path.split('/')
         // Skip the first two segments as they're the empty string and
