@@ -66,6 +66,7 @@ older and more insecure algorithms are still in use.
 ### Legacy Provider Example
 
 To use the _legacy_ provider in Vector, first create an OpenSSL configuration file as follows:
+
 ```ini
 openssl_conf = openssl_init
 
@@ -84,6 +85,7 @@ activate = 1
 ```
 
 Then, run Vector with `OPENSSL_CONF` set to the path where the file above can be found:
+
 ```sh
 OPENSSL_CONF=/path/to/openssl-legacy.cnf \
     vector --config /path/to/vector.yaml
@@ -107,6 +109,7 @@ Once the FIPS module is installed and configured, a `fips.so` (on Unix) or `fips
 module file, and a `fipsmodule.cnf` configuration file should be available to use in Vector.
 
 An OpenSSL configuration file must be then created as follows:
+
 ```ini
 config_diagnostics = 1
 openssl_conf = openssl_init
@@ -130,6 +133,7 @@ default_properties = fips=yes
 
 Then, run Vector with `OPENSSL_CONF` set to the path where the file above can be found and
 `OPENSSL_MODULES` set to the path where the FIPS module files are installed:
+
 ```sh
 OPENSSL_CONF=/path/to/openssl-fips.cnf \
 OPENSSL_MODULES=/path/to/fips-modules \
