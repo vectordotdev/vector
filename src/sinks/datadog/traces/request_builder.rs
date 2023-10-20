@@ -208,29 +208,36 @@ fn encode_traces(
     let mut results = Vec::new();
     let mut processed = Vec::new();
     let mut payload = build_empty_payload(key);
+
     for trace in trace_events {
-        let proto = encode_trace(&trace);
+        let mut proto = encode_trace(&trace);
 
-        if proto.encoded_len() >= max_size {
-            results.push(Err(RequestBuilderError::FailedToBuild {
-                message: "Dropped trace event",
-                reason: "Trace is larger than allowed payload size".into(),
-                dropped_events: 1,
-            }));
+        loop {
+            payload.tracer_payloads.push(proto);
+            if payload.encoded_len() >= max_size {
+                if payload.tracer_payloads.len() == 1 {
+                    // this individual trace is too big
+                    results.push(Err(RequestBuilderError::FailedToBuild {
+                        message: "Dropped trace event",
+                        reason: "Trace is larger than allowed payload size".into(),
+                        dropped_events: 1,
+                    }));
 
-            continue;
+                    break;
+                } else {
+                    // try with a fresh payload
+                    proto = payload.tracer_payloads.pop().expect("just pushed");
+                    results.push(Ok((
+                        payload.encode_to_vec(),
+                        std::mem::take(&mut processed),
+                    )));
+                    payload = build_empty_payload(key);
+                }
+            } else {
+                processed.push(trace);
+                break;
+            }
         }
-
-        if payload.encoded_len() + proto.encoded_len() >= max_size {
-            results.push(Ok((
-                payload.encode_to_vec(),
-                std::mem::take(&mut processed),
-            )));
-            payload = build_empty_payload(key);
-        }
-
-        payload.tracer_payloads.push(proto);
-        processed.push(trace);
     }
     results.push(Ok((
         payload.encode_to_vec(),
@@ -425,52 +432,51 @@ fn convert_span(span: &BTreeMap<String, Value>) -> dd_proto::Span {
 
 #[cfg(test)]
 mod test {
+    use proptest::prelude::*;
     use vrl::event_path;
 
     use super::{encode_traces, PartitionKey};
     use crate::event::{LogEvent, TraceEvent};
 
-    #[test]
-    fn successfully_encode_payloads_smaller_than_max_size() {
-        let max_size = 1024;
+    proptest! {
+        #[test]
+        fn successfully_encode_payloads_smaller_than_max_size(
+            // 476 is the experimentally determined size that will fill a payload after encoding and overhead
+            lengths in proptest::collection::vec(16usize..476, 1usize..256),
+        ) {
+            let max_size = 1024;
 
-        let key = PartitionKey {
-            api_key: Some("x".repeat(128).into()),
-            env: Some("production".into()),
-            hostname: Some("foo.bar.baz.local".into()),
-            agent_version: Some("1.2.3.4.5".into()),
-            target_tps: None,
-            error_tps: None,
-        };
+            let key = PartitionKey {
+                api_key: Some("x".repeat(128).into()),
+                env: Some("production".into()),
+                hostname: Some("foo.bar.baz.local".into()),
+                agent_version: Some("1.2.3.4.5".into()),
+                target_tps: None,
+                error_tps: None,
+            };
 
-        // We only care about the size of the incoming traces, so just populate a single tag field
-        // that will be copied into the protobuf representation.
-        let traces = vec![
-            "x".repeat(256),
-            "x".repeat(256),
-            "x".repeat(256),
-            "x".repeat(256),
-            "x".repeat(256),
-            "x".repeat(256),
-        ]
-        .into_iter()
-        .map(|s| {
-            let mut log = LogEvent::default();
-            log.insert(event_path!("tags", "foo"), s);
-            TraceEvent::from(log)
-        })
-        .collect();
+            // We only care about the size of the incoming traces, so just populate a single tag field
+            // that will be copied into the protobuf representation.
+            let traces = lengths
+                .into_iter()
+                .map(|n| {
+                    let mut log = LogEvent::default();
+                    log.insert(event_path!("tags", "foo"), "x".repeat(n));
+                    TraceEvent::from(log)
+                })
+                .collect();
 
-        for result in encode_traces(&key, traces, max_size) {
-            assert!(result.is_ok());
-            let (encoded, _processed) = result.unwrap();
+            for result in encode_traces(&key, traces, max_size) {
+                prop_assert!(result.is_ok());
+                let (encoded, _processed) = result.unwrap();
 
-            assert!(
-                encoded.len() <= max_size,
-                "encoded len {} longer than max size {}",
-                encoded.len(),
-                max_size
-            );
+                prop_assert!(
+                    encoded.len() <= max_size,
+                    "encoded len {} longer than max size {}",
+                    encoded.len(),
+                    max_size
+                );
+            }
         }
     }
 }
