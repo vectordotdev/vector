@@ -3,7 +3,7 @@ use std::{io, path::Path};
 use async_trait::async_trait;
 use tokio::io::{AsyncRead, AsyncWrite};
 
-const FILE_MODE_OWNER_RW_ONLY: u32 = 0o600;
+const FILE_MODE_OWNER_RW_GROUP_RO: u32 = 0o640;
 
 /// File metadata.
 pub struct Metadata {
@@ -176,7 +176,7 @@ impl Filesystem for ProductionFilesystem {
 
 #[cfg(unix)]
 fn configure_file_open_options_for_write(open_options: &mut tokio::fs::OpenOptions) {
-    open_options.mode(FILE_MODE_OWNER_RW_ONLY);
+    open_options.mode(FILE_MODE_OWNER_RW_GROUP_RO);
 }
 
 #[cfg(not(unix))]
