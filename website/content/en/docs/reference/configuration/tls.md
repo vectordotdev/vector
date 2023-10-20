@@ -22,12 +22,15 @@ By default, OpenSSL looks for trusted certificates in the following locations:
 
 * A single file containing several certificates specified by the `SSL_CERT_FILE` environment variable.
 * A directory containing multiple certificate files specified by the `SSL_CERT_DIR` environment variable.
+
+In addition, Vector also looks for trusted certificates in the following locations:
+
 * Probing of common default locations widely used by current operating systems.
   * This probing functionality is provided to Vector by the [`openssl-probe`][openssl-probe] Rust crate.
   * Trusted certificate location probing can be disabled by using the `--openssl-no-probe` command line
     flag or the `VECTOR_OPENSSL_NO_PROBE` environment variable (refer to the [CLI][cli] documentation).
 
-Note that it is possible to use specific trusted certificates only for Vector via `SSL_CERT_FILE` or `SSL_CERT_DIR`.
+**Note:** It is possible to use specific trusted certificates only for Vector via `SSL_CERT_FILE` or `SSL_CERT_DIR`.
 
 ## OpenSSL configuration
 
