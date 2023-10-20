@@ -210,7 +210,10 @@ pub struct JournaldConfig {
     #[serde(default)]
     log_namespace: Option<bool>,
 
-    /// Whether to emit the __CURSOR field
+    /// Whether to emit the [__CURSOR field][cursor]. See also [sd_journal_get_cursor][get_curor].
+    ///
+    /// [cursor]: https://www.freedesktop.org/software/systemd/man/latest/systemd.journal-fields.html#Address%20Fields
+    /// [get_cursor]: https://www.freedesktop.org/software/systemd/man/latest/sd_journal_get_cursor.html
     #[serde(default = "crate::serde::default_false")]
     emit_cursor: bool,
 }
