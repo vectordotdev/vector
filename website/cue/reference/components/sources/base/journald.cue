@@ -51,7 +51,7 @@ base: components: sources: journald: configuration: {
 	}
 	emit_cursor: {
 		description: """
-			Whether to emit the [__CURSOR field][cursor]. See also [sd_journal_get_cursor][get_curor].
+			Whether to emit the [__CURSOR field][cursor]. See also [sd_journal_get_cursor][get_cursor].
 
 			[cursor]: https://www.freedesktop.org/software/systemd/man/latest/systemd.journal-fields.html#Address%20Fields
 			[get_cursor]: https://www.freedesktop.org/software/systemd/man/latest/sd_journal_get_cursor.html
