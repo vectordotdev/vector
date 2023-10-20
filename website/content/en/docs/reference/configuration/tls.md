@@ -18,7 +18,7 @@ In particular, the official Vector binaries are statically linked against OpenSS
 
 Trusted certificates (also called certificate authorities) are used for client and server verification.
 
-By default, OpenSSL and Vector will look for trusted certificates in the following locations:
+By default, OpenSSL and Vector look for trusted certificates in the following locations:
 
 * A single file containing several certificates specified by the `SSL_CERT_FILE` environment variable.
 * A directory containing multiple certificate files specified by the `SSL_CERT_DIR` environment variable.
