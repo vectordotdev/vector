@@ -722,19 +722,19 @@ components: sources: internal_metrics: {
 			}
 		}
 		grpc_server_messages_received_total: {
-			description:       "The total number of GRPC messages received."
+			description:       "The total number of gRPC messages received."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _component_tags & _method & _path
 		}
 		grpc_server_messages_sent_total: {
-			description:       "The total number of GRPC messages sent."
+			description:       "The total number of gRPC messages sent."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _component_tags & _method & _path
 		}
-		grpc_server_handler_latency_seconds: {
-			description:       "The duration spent handling a GRPC request."
+		grpc_server_handler_duration_seconds: {
+			description:       "The duration spent handling a gRPC request."
 			type:              "histogram"
 			default_namespace: "vector"
 			tags:              _component_tags & _method & _path & _status	
@@ -805,7 +805,7 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags & _grpc_method & _grpc_service & _grpc_status
 		}
-		http_server_handler_latency_seconds: {
+		http_server_handler_duration_seconds: {
 			description:       "The duration spent handling a HTTP request."
 			type:              "histogram"
 			default_namespace: "vector"

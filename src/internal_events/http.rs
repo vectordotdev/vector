@@ -33,7 +33,7 @@ impl<'a, B> InternalEvent for HttpServerResponseSent<'a, B> {
             self.response.status().as_u16().to_string(),
         )];
         counter!("http_server_responses_sent_total", 1, labels);
-        histogram!("http_server_handler_latency_seconds", self.latency, labels);
+        histogram!("http_server_handler_duration_seconds", self.latency, labels);
     }
 }
 

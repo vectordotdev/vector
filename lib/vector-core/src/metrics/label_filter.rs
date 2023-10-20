@@ -13,7 +13,7 @@ impl LabelFilter for VectorLabelFilter {
         {
             return true;
         }
-        // GRPC Server-specific labels
+        // gRPC Server-specific labels
         if metric_key.as_str().starts_with("grpc_server_")
             && (label_key == "grpc_method" || label_key == "grpc_service")
         {

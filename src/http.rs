@@ -346,6 +346,8 @@ pub fn get_http_scheme_from_uri(uri: &Uri) -> &'static str {
 }
 
 /// Builds a [TraceLayer] configured for a HTTP server.
+///
+/// This layer emits HTTP specific telemetry for requests received, responses sent, and handler duration.
 pub fn build_http_trace_layer(
     span: Span,
 ) -> TraceLayer<

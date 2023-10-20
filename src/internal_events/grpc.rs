@@ -35,7 +35,7 @@ impl<'a, B> InternalEvent for GrpcServerResponseSent<'a, B> {
 
         let labels = &[(GRPC_STATUS_LABEL, grpc_code)];
         counter!("grpc_server_messages_sent_total", 1, labels);
-        histogram!("grpc_server_handler_latency_seconds", self.latency, labels);
+        histogram!("grpc_server_handler_duration_seconds", self.latency, labels);
     }
 }
 
