@@ -107,7 +107,7 @@ impl Service<KafkaRequest> for KafkaService {
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
     fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        // The Kafka service is unavailable if any records are currently blocked from being enqueued
+        // The Kafka service is at capacity if any records are currently blocked from being enqueued
         // on the producer.
         if self.records_blocked.load(Ordering::Relaxed) > 0 {
             Poll::Pending
@@ -143,7 +143,7 @@ impl Service<KafkaRequest> for KafkaService {
             let mut blocked_state: Option<BlockedRecordState> = None;
             loop {
                 match this.kafka_producer.send_result(record) {
-                    // Record was successully enqueued on the producer.
+                    // Record was successfully enqueued on the producer.
                     Ok(fut) => {
                         // Drop the blocked state (if any), as the producer is no longer blocked.
                         drop(blocked_state.take());
