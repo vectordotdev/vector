@@ -6,7 +6,7 @@ use tonic::Code;
 use vector_common::internal_event::{error_stage, error_type};
 use vector_core::internal_event::InternalEvent;
 
-const GRPC_STATUS_LABEL: &'static str = "grpc_status";
+const GRPC_STATUS_LABEL: &str = "grpc_status";
 
 #[derive(Debug)]
 pub struct GrpcServerRequestReceived;
@@ -86,7 +86,7 @@ where
     }
 }
 
-fn grpc_code_to_name(code: Code) -> &'static str {
+const fn grpc_code_to_name(code: Code) -> &'static str {
     match code {
         Code::Ok => "Ok",
         Code::Cancelled => "Cancelled",

@@ -9,7 +9,7 @@ use vector_common::{
     json_size::JsonSize,
 };
 
-const HTTP_STATUS_LABEL: &'static str = "status";
+const HTTP_STATUS_LABEL: &str = "status";
 
 #[derive(Debug)]
 pub struct HttpServerRequestReceived;

@@ -204,7 +204,6 @@ impl SourceConfig for DatadogAgentConfig {
                 .await
                 .map_err(|err| {
                     error!("An error occurred: {:?}.", err);
-                    ()
                 })?;
 
             Ok(())

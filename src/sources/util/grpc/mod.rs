@@ -77,7 +77,7 @@ pub fn build_grpc_trace_layer(
     TraceLayer::new_for_grpc()
         .make_span_with(move |request: &Request<Body>| {
             // The path is defined as “/” {service name} “/” {method name}.
-            let mut path = request.uri().path().split("/");
+            let mut path = request.uri().path().split('/');
             let service = path.nth(1).unwrap_or("_unknown");
             let method = path.next().unwrap_or("_unknown");
 

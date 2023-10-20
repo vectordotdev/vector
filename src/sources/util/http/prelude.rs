@@ -190,7 +190,6 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
 
             let listener = tls.bind(&address).await.map_err(|err| {
                 error!("An error occurred: {:?}.", err);
-                ()
             })?;
 
             Server::builder(hyper::server::accept::from_stream(listener.accept_stream()))
@@ -199,7 +198,6 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                 .await
                 .map_err(|err| {
                     error!("An error occurred: {:?}.", err);
-                    ()
                 })?;
 
             Ok(())

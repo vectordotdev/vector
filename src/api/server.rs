@@ -70,7 +70,6 @@ impl Server {
                 .await
                 .map_err(|err| {
                     error!("An error occurred: {:?}.", err);
-                    ()
                 })
         };
 

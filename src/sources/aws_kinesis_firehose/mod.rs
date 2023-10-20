@@ -190,7 +190,6 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
                 .await
                 .map_err(|err| {
                     error!("An error occurred: {:?}.", err);
-                    ()
                 })?;
 
             Ok(())
