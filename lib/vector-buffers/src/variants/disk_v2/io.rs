@@ -3,6 +3,8 @@ use std::{io, path::Path};
 use async_trait::async_trait;
 use tokio::io::{AsyncRead, AsyncWrite};
 
+const FILE_MODE_OWNER_RW_ONLY: u32 = 0o600;
+
 /// File metadata.
 pub struct Metadata {
     pub(crate) len: u64,
@@ -129,21 +131,21 @@ impl Filesystem for ProductionFilesystem {
     type MutableMemoryMap = memmap2::MmapMut;
 
     async fn open_file_writable(&self, path: &Path) -> io::Result<Self::File> {
-        tokio::fs::OpenOptions::new()
-            .append(true)
-            .read(true)
-            .create(true)
-            .open(path)
-            .await
+        let mut open_options = tokio::fs::OpenOptions::new();
+        open_options.append(true).read(true).create(true);
+
+        configure_file_open_options_for_write(&mut open_options);
+
+        open_options.open(path).await
     }
 
     async fn open_file_writable_atomic(&self, path: &Path) -> io::Result<Self::File> {
-        tokio::fs::OpenOptions::new()
-            .append(true)
-            .read(true)
-            .create_new(true)
-            .open(path)
-            .await
+        let mut open_options = tokio::fs::OpenOptions::new();
+        open_options.append(true).read(true).create_new(true);
+
+        configure_file_open_options_for_write(&mut open_options);
+
+        open_options.open(path).await
     }
 
     async fn open_file_readable(&self, path: &Path) -> io::Result<Self::File> {
@@ -157,11 +159,12 @@ impl Filesystem for ProductionFilesystem {
     }
 
     async fn open_mmap_writable(&self, path: &Path) -> io::Result<Self::MutableMemoryMap> {
-        let file = tokio::fs::OpenOptions::new()
-            .read(true)
-            .write(true)
-            .open(path)
-            .await?;
+        let mut open_options = tokio::fs::OpenOptions::new();
+        open_options.read(true).write(true);
+
+        configure_file_open_options_for_write(&mut open_options);
+
+        let file = open_options.open(path).await?;
         let std_file = file.into_std().await;
         unsafe { memmap2::MmapMut::map_mut(&std_file) }
     }
@@ -170,6 +173,14 @@ impl Filesystem for ProductionFilesystem {
         tokio::fs::remove_file(path).await
     }
 }
+
+#[cfg(unix)]
+fn configure_file_open_options_for_write(open_options: &mut tokio::fs::OpenOptions) {
+    open_options.mode(FILE_MODE_OWNER_RW_ONLY);
+}
+
+#[cfg(not(unix))]
+fn configure_file_open_options_for_write(_open_options: &mut tokio::fs::OpenOptions) {}
 
 #[async_trait]
 impl AsyncFile for tokio::fs::File {
