@@ -100,7 +100,7 @@ pub struct NatsSourceConfig {
 
     /// The buffer capacity of the underlying NATS subscriber.
     ///
-    /// This value determines how many messages the NATS subscriber will buffer
+    /// This value determines how many messages the NATS subscriber buffers
     /// before incoming messages are dropped.
     ///
     /// See the [async_nats documentation][async_nats_subscription_capacity] for more information.
@@ -115,7 +115,7 @@ fn default_subject_key_field() -> OptionalValuePath {
     OptionalValuePath::from(owned_value_path!("subject"))
 }
 
-fn default_subscription_capacity() -> usize {
+const fn default_subscription_capacity() -> usize {
     4096
 }
 
@@ -432,6 +432,7 @@ mod integration_tests {
             auth: None,
             log_namespace: None,
             subject_key_field: default_subject_key_field(),
+            ..Default::default()
         };
 
         let r = publish_and_check(conf).await;
@@ -464,6 +465,7 @@ mod integration_tests {
             }),
             log_namespace: None,
             subject_key_field: default_subject_key_field(),
+            ..Default::default()
         };
 
         let r = publish_and_check(conf).await;
@@ -496,6 +498,7 @@ mod integration_tests {
             }),
             log_namespace: None,
             subject_key_field: default_subject_key_field(),
+            ..Default::default()
         };
 
         let r = publish_and_check(conf).await;
@@ -527,6 +530,7 @@ mod integration_tests {
             }),
             log_namespace: None,
             subject_key_field: default_subject_key_field(),
+            ..Default::default()
         };
 
         let r = publish_and_check(conf).await;
@@ -558,6 +562,7 @@ mod integration_tests {
             }),
             log_namespace: None,
             subject_key_field: default_subject_key_field(),
+            ..Default::default()
         };
 
         let r = publish_and_check(conf).await;
@@ -590,6 +595,7 @@ mod integration_tests {
             }),
             log_namespace: None,
             subject_key_field: default_subject_key_field(),
+            ..Default::default()
         };
 
         let r = publish_and_check(conf).await;
@@ -622,6 +628,7 @@ mod integration_tests {
             }),
             log_namespace: None,
             subject_key_field: default_subject_key_field(),
+            ..Default::default()
         };
 
         let r = publish_and_check(conf).await;
@@ -655,6 +662,7 @@ mod integration_tests {
             auth: None,
             log_namespace: None,
             subject_key_field: default_subject_key_field(),
+            ..Default::default()
         };
 
         let r = publish_and_check(conf).await;
@@ -682,6 +690,7 @@ mod integration_tests {
             auth: None,
             log_namespace: None,
             subject_key_field: default_subject_key_field(),
+            ..Default::default()
         };
 
         let r = publish_and_check(conf).await;
@@ -717,6 +726,7 @@ mod integration_tests {
             auth: None,
             log_namespace: None,
             subject_key_field: default_subject_key_field(),
+            ..Default::default()
         };
 
         let r = publish_and_check(conf).await;
@@ -750,6 +760,7 @@ mod integration_tests {
             auth: None,
             log_namespace: None,
             subject_key_field: default_subject_key_field(),
+            ..Default::default()
         };
 
         let r = publish_and_check(conf).await;
@@ -787,6 +798,7 @@ mod integration_tests {
             }),
             log_namespace: None,
             subject_key_field: default_subject_key_field(),
+            ..Default::default()
         };
 
         let r = publish_and_check(conf).await;
@@ -824,6 +836,7 @@ mod integration_tests {
             }),
             log_namespace: None,
             subject_key_field: default_subject_key_field(),
+            ..Default::default()
         };
 
         let r = publish_and_check(conf).await;

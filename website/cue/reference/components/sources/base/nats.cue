@@ -349,7 +349,7 @@ base: components: sources: nats: configuration: {
 		description: """
 			The buffer capacity of the underlying NATS subscriber.
 
-			This value determines how many messages the NATS subscriber will buffer
+			This value determines how many messages the NATS subscriber buffers
 			before incoming messages are dropped.
 
 			See the [async_nats documentation][async_nats_subscription_capacity] for more information.
