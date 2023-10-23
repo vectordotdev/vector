@@ -157,6 +157,18 @@ impl ApplicationConfig {
     }
 }
 
+const INTERNAL_CONFIG: &str = r#"
+sources:
+  _internal_metrics:
+    type: internal_metrics
+sinks:
+  _internal_console:
+    type: console
+    inputs: [_internal_metrics]
+    encoding:
+      codec: text
+"#;
+
 impl Application {
     pub fn run() -> ExitStatus {
         let (runtime, app) = Self::prepare_start().unwrap_or_else(|code| std::process::exit(code));
@@ -165,8 +177,12 @@ impl Application {
     }
 
     pub fn prepare_start() -> Result<(Runtime, StartedApplication), ExitCode> {
-        Self::prepare()
-            .and_then(|(runtime, app)| app.start(runtime.handle()).map(|app| (runtime, app)))
+        Self::prepare().and_then(|(runtime, mut app)| {
+            let config = config::load_from_str(INTERNAL_CONFIG, config::Format::Yaml)
+                .expect("Invalid internal config");
+            runtime.block_on(app.config.add_internal_config(config))?;
+            app.start(runtime.handle()).map(|app| (runtime, app))
+        })
     }
 
     pub fn prepare() -> Result<(Runtime, Self), ExitCode> {
