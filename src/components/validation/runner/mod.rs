@@ -25,7 +25,7 @@ use crate::{
     codecs::Encoder,
     components::validation::{RunnerMetrics, TestCase},
     config::{ConfigBuilder, ConfigDiff},
-    topology::{self, RunningTopology},
+    topology::{RunningTopology, TopologyPieces},
 };
 
 use super::{
@@ -482,7 +482,7 @@ fn spawn_component_topology(
         test_runtime.block_on(async move {
             debug!("Building component topology...");
 
-            let pieces = topology::build_or_log_errors(&config, &config_diff, HashMap::new())
+            let pieces = TopologyPieces::build_or_log_errors(&config, &config_diff, HashMap::new())
                 .await
                 .unwrap();
             let (topology, (_, mut crash_rx)) =

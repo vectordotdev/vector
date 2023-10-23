@@ -75,22 +75,6 @@ pub struct TapResource {
 type WatchTx = watch::Sender<TapResource>;
 pub type WatchRx = watch::Receiver<TapResource>;
 
-pub async fn build_or_log_errors(
-    config: &Config,
-    diff: &ConfigDiff,
-    buffers: HashMap<ComponentKey, BuiltBuffer>,
-) -> Option<TopologyPieces> {
-    match TopologyPieces::build(config, diff, buffers).await {
-        Err(errors) => {
-            for error in errors {
-                error!(message = "Configuration error.", %error);
-            }
-            None
-        }
-        Ok(new_pieces) => Some(new_pieces),
-    }
-}
-
 pub(super) fn take_healthchecks(
     diff: &ConfigDiff,
     pieces: &mut TopologyPieces,

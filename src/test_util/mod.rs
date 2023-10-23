@@ -42,7 +42,7 @@ use zstd::Decoder as ZstdDecoder;
 use crate::{
     config::{Config, ConfigDiff, GenerateConfig},
     signal::ShutdownError,
-    topology::{self, RunningTopology},
+    topology::{RunningTopology, TopologyPieces},
     trace,
 };
 
@@ -690,7 +690,7 @@ pub async fn start_topology(
 ) {
     config.healthchecks.set_require_healthy(require_healthy);
     let diff = ConfigDiff::initial(&config);
-    let pieces = topology::build_or_log_errors(&config, &diff, HashMap::new())
+    let pieces = TopologyPieces::build_or_log_errors(&config, &diff, HashMap::new())
         .await
         .unwrap();
     RunningTopology::start_validated(config, diff, pieces)

@@ -10,10 +10,10 @@ use tokio::{
     time::{timeout, Duration},
 };
 
-use super::RunningTopology;
+use super::{RunningTopology, TopologyPieces};
 use crate::{
     config::{self, ConfigDiff, Format},
-    test_util, topology, Error,
+    test_util, Error,
 };
 
 type Lock = Arc<Mutex<()>>;
@@ -103,7 +103,7 @@ uri = "http://{address2}/"
     )
     .unwrap();
     let diff = ConfigDiff::initial(&config);
-    let pieces = topology::build_or_log_errors(&config, &diff, HashMap::new())
+    let pieces = TopologyPieces::build_or_log_errors(&config, &diff, HashMap::new())
         .await
         .unwrap();
     let (_topology, _) = RunningTopology::start_validated(config, diff, pieces)

@@ -16,7 +16,7 @@ use vector_buffers::topology::channel::BufferSender;
 use vector_common::trigger::DisabledTrigger;
 
 use super::{
-    build_or_log_errors, builder,
+    builder,
     builder::TopologyPieces,
     fanout::{ControlChannel, ControlMessage},
     handle_errors, retain, take_healthchecks,
@@ -247,7 +247,8 @@ impl RunningTopology {
         // Try to build all of the new components coming from the new configuration.  If we can
         // successfully build them, we'll attempt to connect them up to the topology and spawn their
         // respective component tasks.
-        if let Some(mut new_pieces) = build_or_log_errors(&new_config, &diff, buffers.clone()).await
+        if let Some(mut new_pieces) =
+            TopologyPieces::build_or_log_errors(&new_config, &diff, buffers.clone()).await
         {
             // If healthchecks are configured for any of the changing/new components, try running
             // them before moving forward with connecting and spawning.  In some cases, healthchecks
@@ -272,7 +273,9 @@ impl RunningTopology {
         warn!("Failed to completely load new configuration. Restoring old configuration.");
 
         let diff = diff.flip();
-        if let Some(mut new_pieces) = build_or_log_errors(&self.config, &diff, buffers).await {
+        if let Some(mut new_pieces) =
+            TopologyPieces::build_or_log_errors(&self.config, &diff, buffers).await
+        {
             if self
                 .run_healthchecks(&diff, &mut new_pieces, self.config.healthchecks)
                 .await

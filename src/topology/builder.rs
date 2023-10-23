@@ -41,8 +41,8 @@ use super::{
 };
 use crate::{
     config::{
-        ComponentKey, DataType, EnrichmentTableConfig, Input, Inputs, OutputId, ProxyConfig,
-        SinkContext, SourceContext, TransformContext, TransformOuter, TransformOutput,
+        ComponentKey, Config, DataType, EnrichmentTableConfig, Input, Inputs, OutputId,
+        ProxyConfig, SinkContext, SourceContext, TransformContext, TransformOuter, TransformOutput,
     },
     event::{EventArray, EventContainer},
     internal_events::EventsReceived,
@@ -679,6 +679,22 @@ pub struct TopologyPieces {
 }
 
 impl TopologyPieces {
+    pub async fn build_or_log_errors(
+        config: &Config,
+        diff: &ConfigDiff,
+        buffers: HashMap<ComponentKey, BuiltBuffer>,
+    ) -> Option<Self> {
+        match TopologyPieces::build(config, diff, buffers).await {
+            Err(errors) => {
+                for error in errors {
+                    error!(message = "Configuration error.", %error);
+                }
+                None
+            }
+            Ok(new_pieces) => Some(new_pieces),
+        }
+    }
+
     /// Builds only the new pieces, and doesn't check their topology.
     pub async fn build(
         config: &super::Config,

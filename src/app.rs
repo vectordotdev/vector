@@ -30,7 +30,8 @@ use crate::{
     heartbeat,
     signal::{ShutdownError, SignalHandler, SignalPair, SignalRx, SignalTo},
     topology::{
-        self, ReloadOutcome, RunningTopology, SharedTopologyController, TopologyController,
+        ReloadOutcome, RunningTopology, SharedTopologyController, TopologyController,
+        TopologyPieces,
     },
     trace,
 };
@@ -100,7 +101,7 @@ impl ApplicationConfig {
         let enterprise = build_enterprise(&mut config, config_paths.clone())?;
 
         let diff = config::ConfigDiff::initial(&config);
-        let pieces = topology::build_or_log_errors(&config, &diff, HashMap::new())
+        let pieces = TopologyPieces::build_or_log_errors(&config, &diff, HashMap::new())
             .await
             .ok_or(exitcode::CONFIG)?;
 
