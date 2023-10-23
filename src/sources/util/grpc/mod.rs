@@ -64,7 +64,7 @@ where
 }
 
 /// Builds a [TraceLayer] configured for a gRPC server.
-/// 
+///
 /// This layer emits gPRC specific telemetry for messages received/sent and handler duration.
 pub fn build_grpc_trace_layer(
     span: Span,
