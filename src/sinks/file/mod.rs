@@ -183,16 +183,15 @@ impl SinkConfig for FileSinkConfig {
         &self,
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        let timezone = self.timezone.or(cx.globals.timezone);
         let config = Self {
             path: self.path.clone(),
             idle_timeout: self.idle_timeout,
             encoding: self.encoding.clone(),
             compression: self.compression,
             acknowledgements: self.acknowledgements,
-            timezone,
+            timezone: self.timezone,
         };
-        let sink = FileSink::new(&config)?;
+        let sink = FileSink::new(&config, cx)?;
         Ok((
             super::VectorSink::from_event_streamsink(sink),
             future::ok(()).boxed(),
@@ -219,12 +218,12 @@ pub struct FileSink {
 }
 
 impl FileSink {
-    pub fn new(config: &FileSinkConfig) -> crate::Result<Self> {
+    pub fn new(config: &FileSinkConfig, cx: SinkContext) -> crate::Result<Self> {
         let transformer = config.encoding.transformer();
         let (framer, serializer) = config.encoding.build(SinkType::StreamBased)?;
         let encoder = Encoder::<Framer>::new(framer, serializer);
 
-        let offset = config.timezone.and_then(timezone_to_offset);
+        let offset = config.timezone.or(cx.globals.timezone).and_then(timezone_to_offset);
 
         Ok(Self {
             path: config.path.clone().with_tz_offset(offset),
