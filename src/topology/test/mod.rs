@@ -19,7 +19,7 @@ use crate::{
         },
         start_topology, trace_init,
     },
-    topology::{self, builder},
+    topology::{self, builder, RunningTopology},
 };
 use futures::{future, stream, StreamExt};
 use tokio::{
@@ -789,7 +789,7 @@ async fn topology_required_healthcheck_fails_start() {
         .await
         .unwrap();
 
-    assert!(topology::start_validated(config, diff, pieces)
+    assert!(RunningTopology::start_validated(config, diff, pieces)
         .await
         .is_none());
 }
@@ -801,7 +801,7 @@ async fn topology_optional_healthcheck_does_not_fail_start() {
     let pieces = topology::build_or_log_errors(&config, &diff, HashMap::new())
         .await
         .unwrap();
-    assert!(topology::start_validated(config, diff, pieces)
+    assert!(RunningTopology::start_validated(config, diff, pieces)
         .await
         .is_some());
 }

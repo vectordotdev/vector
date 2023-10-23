@@ -15,21 +15,20 @@ use tracing::Instrument;
 use vector_buffers::topology::channel::BufferSender;
 use vector_common::trigger::DisabledTrigger;
 
-use super::{TapOutput, TapResource};
+use super::{
+    build_or_log_errors, builder,
+    builder::TopologyPieces,
+    fanout::{ControlChannel, ControlMessage},
+    handle_errors, retain, take_healthchecks,
+    task::TaskOutput,
+    BuiltBuffer, TapOutput, TapResource, TaskHandle, WatchRx, WatchTx,
+};
 use crate::{
     config::{ComponentKey, Config, ConfigDiff, HealthcheckOptions, Inputs, OutputId, Resource},
     event::EventArray,
     shutdown::SourceShutdownCoordinator,
     signal::ShutdownError,
     spawn_named,
-    topology::{
-        build_or_log_errors, builder,
-        builder::TopologyPieces,
-        fanout::{ControlChannel, ControlMessage},
-        handle_errors, retain, take_healthchecks,
-        task::TaskOutput,
-        BuiltBuffer, TaskHandle, WatchRx, WatchTx,
-    },
 };
 
 #[allow(dead_code)]
@@ -977,6 +976,58 @@ impl RunningTopology {
         .instrument(task_span);
         self.source_tasks
             .insert(key.clone(), spawn_named(source_task, task_name.as_ref()));
+    }
+
+    pub async fn start_validated(
+        config: Config,
+        diff: ConfigDiff,
+        mut pieces: TopologyPieces,
+    ) -> Option<(
+        Self,
+        (
+            mpsc::UnboundedSender<ShutdownError>,
+            mpsc::UnboundedReceiver<ShutdownError>,
+        ),
+    )> {
+        let (abort_tx, abort_rx) = mpsc::unbounded_channel();
+
+        let expire_metrics = match (
+            config.global.expire_metrics,
+            config.global.expire_metrics_secs,
+        ) {
+            (Some(e), None) => {
+                warn!(
+                "DEPRECATED: `expire_metrics` setting is deprecated and will be removed in a future version. Use `expire_metrics_secs` instead."
+            );
+                Some(e.as_secs_f64())
+            }
+            (Some(_), Some(_)) => {
+                error!("Cannot set both `expire_metrics` and `expire_metrics_secs`.");
+                return None;
+            }
+            (None, e) => e,
+        };
+
+        if let Err(error) = crate::metrics::Controller::get()
+            .expect("Metrics must be initialized")
+            .set_expiry(expire_metrics)
+        {
+            error!(message = "Invalid metrics expiry.", %error);
+            return None;
+        }
+
+        let mut running_topology = Self::new(config, abort_tx.clone());
+
+        if !running_topology
+            .run_healthchecks(&diff, &mut pieces, running_topology.config.healthchecks)
+            .await
+        {
+            return None;
+        }
+        running_topology.connect_diff(&diff, &mut pieces).await;
+        running_topology.spawn_diff(&diff, pieces);
+
+        Some((running_topology, (abort_tx, abort_rx)))
     }
 }
 

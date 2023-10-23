@@ -107,7 +107,7 @@ impl ApplicationConfig {
         #[cfg(feature = "api")]
         let api = config.api;
 
-        let result = topology::start_validated(config, diff, pieces).await;
+        let result = RunningTopology::start_validated(config, diff, pieces).await;
         let (topology, (graceful_crash_sender, graceful_crash_receiver)) =
             result.ok_or(exitcode::CONFIG)?;
 

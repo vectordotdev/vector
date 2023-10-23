@@ -30,7 +30,7 @@ use tokio::sync::{mpsc, watch};
 use vector_buffers::topology::channel::{BufferReceiverStream, BufferSender};
 
 pub use self::controller::{ReloadOutcome, SharedTopologyController, TopologyController};
-pub(super) use self::running::RunningTopology;
+pub use self::running::RunningTopology;
 
 use self::builder::TopologyPieces;
 use self::task::{Task, TaskError, TaskResult};
@@ -74,58 +74,6 @@ pub struct TapResource {
 // Watcher types for topology changes.
 type WatchTx = watch::Sender<TapResource>;
 pub type WatchRx = watch::Receiver<TapResource>;
-
-pub async fn start_validated(
-    config: Config,
-    diff: ConfigDiff,
-    mut pieces: TopologyPieces,
-) -> Option<(
-    RunningTopology,
-    (
-        mpsc::UnboundedSender<ShutdownError>,
-        mpsc::UnboundedReceiver<ShutdownError>,
-    ),
-)> {
-    let (abort_tx, abort_rx) = mpsc::unbounded_channel();
-
-    let expire_metrics = match (
-        config.global.expire_metrics,
-        config.global.expire_metrics_secs,
-    ) {
-        (Some(e), None) => {
-            warn!(
-                "DEPRECATED: `expire_metrics` setting is deprecated and will be removed in a future version. Use `expire_metrics_secs` instead."
-            );
-            Some(e.as_secs_f64())
-        }
-        (Some(_), Some(_)) => {
-            error!("Cannot set both `expire_metrics` and `expire_metrics_secs`.");
-            return None;
-        }
-        (None, e) => e,
-    };
-
-    if let Err(error) = crate::metrics::Controller::get()
-        .expect("Metrics must be initialized")
-        .set_expiry(expire_metrics)
-    {
-        error!(message = "Invalid metrics expiry.", %error);
-        return None;
-    }
-
-    let mut running_topology = RunningTopology::new(config, abort_tx.clone());
-
-    if !running_topology
-        .run_healthchecks(&diff, &mut pieces, running_topology.config.healthchecks)
-        .await
-    {
-        return None;
-    }
-    running_topology.connect_diff(&diff, &mut pieces).await;
-    running_topology.spawn_diff(&diff, pieces);
-
-    Some((running_topology, (abort_tx, abort_rx)))
-}
 
 pub async fn build_or_log_errors(
     config: &Config,

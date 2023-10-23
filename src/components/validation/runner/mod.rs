@@ -25,7 +25,7 @@ use crate::{
     codecs::Encoder,
     components::validation::{RunnerMetrics, TestCase},
     config::{ConfigBuilder, ConfigDiff},
-    topology,
+    topology::{self, RunningTopology},
 };
 
 use super::{
@@ -486,7 +486,7 @@ fn spawn_component_topology(
                 .await
                 .unwrap();
             let (topology, (_, mut crash_rx)) =
-                topology::start_validated(config, config_diff, pieces)
+                RunningTopology::start_validated(config, config_diff, pieces)
                     .await
                     .unwrap();
 

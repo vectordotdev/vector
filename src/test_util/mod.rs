@@ -693,7 +693,7 @@ pub async fn start_topology(
     let pieces = topology::build_or_log_errors(&config, &diff, HashMap::new())
         .await
         .unwrap();
-    topology::start_validated(config, diff, pieces)
+    RunningTopology::start_validated(config, diff, pieces)
         .await
         .unwrap()
 }

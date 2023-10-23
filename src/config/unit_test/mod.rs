@@ -30,8 +30,8 @@ use crate::{
     event::{Event, LogEvent, Value},
     signal,
     topology::{
-        self,
         builder::{self, TopologyPieces},
+        RunningTopology,
     },
 };
 
@@ -49,7 +49,7 @@ pub struct UnitTestResult {
 impl UnitTest {
     pub async fn run(self) -> UnitTestResult {
         let diff = config::ConfigDiff::initial(&self.config);
-        let (topology, _) = topology::start_validated(self.config, diff, self.pieces)
+        let (topology, _) = RunningTopology::start_validated(self.config, diff, self.pieces)
             .await
             .unwrap();
         topology.sources_finished().await;
