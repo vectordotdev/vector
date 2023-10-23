@@ -189,10 +189,10 @@ aws-smithy-http-tower = { git = "https://github.com/vectordotdev/aws-sdk-rust", 
 aws-smithy-types = { git = "https://github.com/vectordotdev/aws-sdk-rust", rev = "3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670", default-features = false, optional = true }
 
 # Azure
-azure_core = { version = "0.15", default-features = false, features = ["enable_reqwest"], optional = true }
-azure_identity = { version = "0.15", default-features = false, features = ["enable_reqwest"], optional = true }
-azure_storage = { version = "0.15", default-features = false, optional = true }
-azure_storage_blobs = { version = "0.15", default-features = false, optional = true }
+azure_core = { version = "0.16", default-features = false, features = ["enable_reqwest"], optional = true }
+azure_identity = { version = "0.16", default-features = false, features = ["enable_reqwest"], optional = true }
+azure_storage = { version = "0.16", default-features = false, optional = true }
+azure_storage_blobs = { version = "0.16", default-features = false, optional = true }
 
 # OpenDAL
 opendal = {version = "0.38", default-features = false, features = ["native-tls", "services-webhdfs"], optional = true}
@@ -205,7 +205,7 @@ serde = { version = "1.0.189", default-features = false, features = ["derive"] }
 serde-toml-merge = { version = "0.3.3", default-features = false }
 serde_bytes = { version = "0.11.12", default-features = false, features = ["std"], optional = true }
 serde_json = { version = "1.0.107", default-features = false, features = ["raw_value"] }
-serde_with = { version = "3.3.0", default-features = false, features = ["macros", "std"] }
+serde_with = { version = "3.4.0", default-features = false, features = ["macros", "std"] }
 serde_yaml = { version = "0.9.25", default-features = false }
 
 # Messagepack
@@ -218,8 +218,8 @@ prost-reflect = { version = "0.12", default-features = false, optional = true }
 prost-types = { version = "0.12", default-features = false, optional = true }
 
 # GCP
-goauth = { version = "0.13.1", optional = true }
-smpl_jwt = { version = "0.7.1", default-features = false, optional = true }
+goauth = { version = "0.14.0", optional = true }
+smpl_jwt = { version = "0.8.0", default-features = false, optional = true }
 
 # AMQP
 lapin = { version = "2.3.1", default-features = false, features = ["native-tls"], optional = true }
@@ -272,7 +272,7 @@ governor = { version = "0.6.0", default-features = false, features = ["dashmap",
 grok = { version = "2.0.0", default-features = false, optional = true }
 h2 = { version = "0.3.21", default-features = false, optional = true }
 hash_hasher = { version = "2.0.0", default-features = false }
-hashbrown = { version = "0.14.1", default-features = false, optional = true, features = ["ahash"] }
+hashbrown = { version = "0.14.2", default-features = false, optional = true, features = ["ahash"] }
 headers = { version = "0.3.9", default-features = false }
 hostname = { version = "0.3.1", default-features = false }
 http = { version = "0.2.9", default-features = false }
@@ -316,7 +316,7 @@ semver = { version = "1.0.20", default-features = false, features = ["serde", "s
 smallvec = { version = "1", default-features = false, features = ["union", "serde"] }
 snafu = { version = "0.7.5", default-features = false, features = ["futures"] }
 snap = { version = "1.1.0", default-features = false, optional = true }
-socket2 = { version = "0.5.4", default-features = false }
+socket2 = { version = "0.5.5", default-features = false }
 stream-cancel = { version = "0.8.1", default-features = false }
 strip-ansi-escapes = { version = "0.2.0", default-features = false }
 syslog = { version = "6.1.0", default-features = false, optional = true }
@@ -355,10 +355,10 @@ openssl-src = { version = "300", default-features = false, features = ["force-en
 [dev-dependencies]
 approx = "0.5.1"
 assert_cmd = { version = "2.0.12", default-features = false }
-azure_core = { version = "0.15", default-features = false, features = ["enable_reqwest", "azurite_workaround"] }
-azure_identity = { version = "0.15", default-features = false, features = ["enable_reqwest"] }
-azure_storage_blobs = { version = "0.15", default-features = false, features = ["azurite_workaround"] }
-azure_storage = { version = "0.15", default-features = false }
+azure_core = { version = "0.16", default-features = false, features = ["enable_reqwest", "azurite_workaround"] }
+azure_identity = { version = "0.16", default-features = false, features = ["enable_reqwest"] }
+azure_storage_blobs = { version = "0.16", default-features = false, features = ["azurite_workaround"] }
+azure_storage = { version = "0.16", default-features = false }
 base64 = "0.21.4"
 criterion = { version = "0.5.1", features = ["html_reports", "async_tokio"] }
 itertools = { version = "0.11.0", default-features = false, features = ["use_alloc"] }
