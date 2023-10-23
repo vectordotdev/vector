@@ -47,6 +47,7 @@ pub struct ApplicationConfig {
     pub config_paths: Vec<config::ConfigPath>,
     pub topology: RunningTopology,
     pub graceful_crash_receiver: ShutdownErrorReceiver,
+    pub internal_topologies: Vec<RunningTopology>,
     #[cfg(feature = "api")]
     pub api: config::api::Options,
     #[cfg(feature = "enterprise")]
@@ -105,11 +106,20 @@ impl ApplicationConfig {
             config_paths,
             topology,
             graceful_crash_receiver,
+            internal_topologies: Vec::new(),
             #[cfg(feature = "api")]
             api,
             #[cfg(feature = "enterprise")]
             enterprise,
         })
+    }
+
+    pub async fn add_internal_config(&mut self, config: Config) -> Result<(), ExitCode> {
+        let Some((topology, _)) = RunningTopology::start_init_validated(config).await else {
+            return Err(exitcode::CONFIG);
+        };
+        self.internal_topologies.push(topology);
+        Ok(())
     }
 
     /// Configure the API server, if applicable
@@ -244,6 +254,7 @@ impl Application {
 
         Ok(StartedApplication {
             config_paths: config.config_paths,
+            internal_topologies: config.internal_topologies,
             graceful_crash_receiver: config.graceful_crash_receiver,
             signals,
             topology_controller,
@@ -254,6 +265,7 @@ impl Application {
 
 pub struct StartedApplication {
     pub config_paths: Vec<ConfigPath>,
+    pub internal_topologies: Vec<RunningTopology>,
     pub graceful_crash_receiver: ShutdownErrorReceiver,
     pub signals: SignalPair,
     pub topology_controller: SharedTopologyController,
@@ -272,6 +284,7 @@ impl StartedApplication {
             signals,
             topology_controller,
             openssl_providers,
+            internal_topologies,
         } = self;
 
         let mut graceful_crash = UnboundedReceiverStream::new(graceful_crash_receiver);
@@ -304,6 +317,7 @@ impl StartedApplication {
             signal_rx,
             topology_controller,
             openssl_providers,
+            internal_topologies,
         }
     }
 }
@@ -359,6 +373,7 @@ pub struct FinishedApplication {
     pub signal_rx: SignalRx,
     pub topology_controller: SharedTopologyController,
     pub openssl_providers: Option<Vec<Provider>>,
+    pub internal_topologies: Vec<RunningTopology>,
 }
 
 impl FinishedApplication {
@@ -368,6 +383,7 @@ impl FinishedApplication {
             signal_rx,
             topology_controller,
             openssl_providers,
+            internal_topologies,
         } = self;
 
         // At this point, we'll have the only reference to the shared topology controller and can
@@ -382,6 +398,11 @@ impl FinishedApplication {
             SignalTo::Quit => Self::quit(),
             _ => unreachable!(),
         };
+
+        for topology in internal_topologies {
+            topology.stop().await;
+        }
+
         drop(openssl_providers);
         status
     }
