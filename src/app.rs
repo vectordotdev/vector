@@ -7,10 +7,7 @@ use futures::StreamExt;
 use futures_util::future::BoxFuture;
 use once_cell::race::OnceNonZeroUsize;
 use openssl::provider::Provider;
-use tokio::{
-    runtime::{self, Runtime},
-    sync::mpsc,
-};
+use tokio::runtime::{self, Runtime};
 use tokio_stream::wrappers::UnboundedReceiverStream;
 
 #[cfg(feature = "enterprise")]
@@ -26,8 +23,11 @@ use crate::{
     cli::{handle_config_errors, LogFormat, Opts, RootOpts},
     config::{self, Config, ConfigPath},
     heartbeat,
-    signal::{ShutdownError, SignalHandler, SignalPair, SignalRx, SignalTo},
-    topology::{ReloadOutcome, RunningTopology, SharedTopologyController, TopologyController},
+    signal::{SignalHandler, SignalPair, SignalRx, SignalTo},
+    topology::{
+        ReloadOutcome, RunningTopology, SharedTopologyController, ShutdownErrorReceiver,
+        TopologyController,
+    },
     trace,
 };
 
@@ -46,8 +46,7 @@ use tokio::sync::broadcast::error::RecvError;
 pub struct ApplicationConfig {
     pub config_paths: Vec<config::ConfigPath>,
     pub topology: RunningTopology,
-    pub graceful_crash_sender: mpsc::UnboundedSender<ShutdownError>,
-    pub graceful_crash_receiver: mpsc::UnboundedReceiver<ShutdownError>,
+    pub graceful_crash_receiver: ShutdownErrorReceiver,
     #[cfg(feature = "api")]
     pub api: config::api::Options,
     #[cfg(feature = "enterprise")]
@@ -98,15 +97,13 @@ impl ApplicationConfig {
         #[cfg(feature = "api")]
         let api = config.api;
 
-        let (topology, (graceful_crash_sender, graceful_crash_receiver)) =
-            RunningTopology::start_init_validated(config)
-                .await
-                .ok_or(exitcode::CONFIG)?;
+        let (topology, graceful_crash_receiver) = RunningTopology::start_init_validated(config)
+            .await
+            .ok_or(exitcode::CONFIG)?;
 
         Ok(Self {
             config_paths,
             topology,
-            graceful_crash_sender,
             graceful_crash_receiver,
             #[cfg(feature = "api")]
             api,
@@ -137,8 +134,9 @@ impl ApplicationConfig {
                     let error = error.to_string();
                     error!("An error occurred that Vector couldn't handle: {}.", error);
                     _ = self
-                        .graceful_crash_sender
-                        .send(ShutdownError::ApiFailed { error });
+                        .topology
+                        .abort_tx
+                        .send(crate::signal::ShutdownError::ApiFailed { error });
                     None
                 }
             }
@@ -256,7 +254,7 @@ impl Application {
 
 pub struct StartedApplication {
     pub config_paths: Vec<ConfigPath>,
-    pub graceful_crash_receiver: mpsc::UnboundedReceiver<ShutdownError>,
+    pub graceful_crash_receiver: ShutdownErrorReceiver,
     pub signals: SignalPair,
     pub topology_controller: SharedTopologyController,
     pub openssl_providers: Option<Vec<Provider>>,

@@ -41,7 +41,7 @@ use zstd::Decoder as ZstdDecoder;
 
 use crate::{
     config::{Config, GenerateConfig},
-    topology::{RunningTopology, ShutdownErrorPair},
+    topology::{RunningTopology, ShutdownErrorReceiver},
     trace,
 };
 
@@ -680,7 +680,7 @@ impl CountReceiver<Event> {
 pub async fn start_topology(
     mut config: Config,
     require_healthy: impl Into<Option<bool>>,
-) -> (RunningTopology, ShutdownErrorPair) {
+) -> (RunningTopology, ShutdownErrorReceiver) {
     config.healthchecks.set_require_healthy(require_healthy);
     RunningTopology::start_init_validated(config).await.unwrap()
 }

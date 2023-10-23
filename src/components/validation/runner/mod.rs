@@ -481,7 +481,7 @@ fn spawn_component_topology(
         test_runtime.block_on(async move {
             debug!("Building component topology...");
 
-            let (topology, (_, mut crash_rx)) =
+            let (topology, mut crash_rx) =
                 RunningTopology::start_init_validated(config).await.unwrap();
 
             debug!("Component topology built and spawned.");

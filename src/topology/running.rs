@@ -31,10 +31,7 @@ use crate::{
     spawn_named,
 };
 
-pub type ShutdownErrorPair = (
-    mpsc::UnboundedSender<ShutdownError>,
-    mpsc::UnboundedReceiver<ShutdownError>,
-);
+pub type ShutdownErrorReceiver = mpsc::UnboundedReceiver<ShutdownError>;
 
 #[allow(dead_code)]
 pub struct RunningTopology {
@@ -47,7 +44,7 @@ pub struct RunningTopology {
     shutdown_coordinator: SourceShutdownCoordinator,
     detach_triggers: HashMap<ComponentKey, DisabledTrigger>,
     pub(crate) config: Config,
-    abort_tx: mpsc::UnboundedSender<ShutdownError>,
+    pub(crate) abort_tx: mpsc::UnboundedSender<ShutdownError>,
     watch: (WatchTx, WatchRx),
     pub(crate) running: Arc<AtomicBool>,
     graceful_shutdown_duration: Option<Duration>,
@@ -986,7 +983,7 @@ impl RunningTopology {
             .insert(key.clone(), spawn_named(source_task, task_name.as_ref()));
     }
 
-    pub async fn start_init_validated(config: Config) -> Option<(Self, ShutdownErrorPair)> {
+    pub async fn start_init_validated(config: Config) -> Option<(Self, ShutdownErrorReceiver)> {
         let diff = ConfigDiff::initial(&config);
         let pieces = TopologyPieces::build_or_log_errors(&config, &diff, HashMap::new()).await?;
         Self::start_validated(config, diff, pieces).await
@@ -996,7 +993,7 @@ impl RunningTopology {
         config: Config,
         diff: ConfigDiff,
         mut pieces: TopologyPieces,
-    ) -> Option<(Self, ShutdownErrorPair)> {
+    ) -> Option<(Self, ShutdownErrorReceiver)> {
         let (abort_tx, abort_rx) = mpsc::unbounded_channel();
 
         let expire_metrics = match (
@@ -1024,7 +1021,7 @@ impl RunningTopology {
             return None;
         }
 
-        let mut running_topology = Self::new(config, abort_tx.clone());
+        let mut running_topology = Self::new(config, abort_tx);
 
         if !running_topology
             .run_healthchecks(&diff, &mut pieces, running_topology.config.healthchecks)
@@ -1035,7 +1032,7 @@ impl RunningTopology {
         running_topology.connect_diff(&diff, &mut pieces).await;
         running_topology.spawn_diff(&diff, pieces);
 
-        Some((running_topology, (abort_tx, abort_rx)))
+        Some((running_topology, abort_rx))
     }
 }
 
