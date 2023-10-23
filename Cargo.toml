@@ -348,6 +348,7 @@ nix = { version = "0.26.2", default-features = false, features = ["socket", "sig
 [build-dependencies]
 prost-build = { version = "0.12", default-features = false, optional = true }
 tonic-build = { version = "0.10", default-features = false, features = ["transport", "prost"], optional = true }
+# update 'openssl_version' in website/config.toml whenever <major.minor> version changes
 openssl-src = { version = "300", default-features = false, features = ["force-engine", "legacy"] }
 
 [dev-dependencies]
