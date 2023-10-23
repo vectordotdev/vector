@@ -9872,6 +9872,7 @@ dependencies = [
  "vector-config-macros",
  "vector-core",
  "vector-lookup",
+ "vector-stream",
  "vector-vrl-functions",
  "vrl",
  "warp",
@@ -10038,7 +10039,6 @@ name = "vector-core"
 version = "0.1.0"
 dependencies = [
  "async-graphql 5.0.10",
- "async-stream",
  "async-trait",
  "base64 0.21.5",
  "bitmask-enum",
@@ -10099,12 +10099,10 @@ dependencies = [
  "tokio-util",
  "toml 0.8.3",
  "tonic 0.10.2",
- "tower",
  "tracing 0.1.37",
  "tracing-core 0.1.30",
  "tracing-log",
  "tracing-subscriber",
- "twox-hash",
  "typetag",
  "url",
  "vector-buffers",
@@ -10124,6 +10122,26 @@ dependencies = [
  "vector-config",
  "vector-config-macros",
  "vrl",
+]
+
+[[package]]
+name = "vector-stream"
+version = "0.1.0"
+dependencies = [
+ "async-stream",
+ "futures 0.3.28",
+ "futures-util",
+ "pin-project",
+ "proptest",
+ "rand 0.8.5",
+ "rand_distr",
+ "tokio",
+ "tokio-util",
+ "tower",
+ "tracing 0.1.37",
+ "twox-hash",
+ "vector-common",
+ "vector-core",
 ]
 
 [[package]]
