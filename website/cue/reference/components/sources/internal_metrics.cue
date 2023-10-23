@@ -737,7 +737,7 @@ components: sources: internal_metrics: {
 			description:       "The duration spent handling a gRPC request."
 			type:              "histogram"
 			default_namespace: "vector"
-			tags:              _component_tags & _method & _path & _status	
+			tags:              _component_tags & _method & _path & _status
 		}
 		http_bad_requests_total: {
 			description:       "The total number of HTTP `400 Bad Request` errors encountered."
