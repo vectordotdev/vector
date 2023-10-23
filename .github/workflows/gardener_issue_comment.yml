@@ -31,11 +31,8 @@ jobs:
           team: 'Vector'
           GITHUB_TOKEN: ${{ steps.generate_token.outputs.token }}
 
-      - name: Exit if author is team member
-        if: steps.comment.outputs.isTeamMember == 'true'
-        run: exit 0
-
       - name: Move issue back to Triage if status is Blocked/Waiting
+        if: steps.comment.outputs.isTeamMember == 'false'
         env:
           GH_TOKEN: ${{ secrets.GH_PROJECT_PAT }}
         run: |
