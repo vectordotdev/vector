@@ -56,7 +56,7 @@ tonic = { version = "0.10", default-features = false, features = ["transport"] }
 tower = { version = "0.4", default-features = false, features = ["util"] }
 tracing = { version = "0.1.34", default-features = false }
 tracing-core = { version = "0.1.26", default-features = false }
-tracing-log = { version = "0.1.3", default-features = false }
+tracing-log = { version = "0.1.4", default-features = false }
 tracing-subscriber = { version = "0.3.17", default-features = false, features = ["std"] }
 typetag = { version = "0.2.13", default-features = false }
 twox-hash = { version = "1.6.3", default-features = false }
