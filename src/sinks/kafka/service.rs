@@ -163,7 +163,7 @@ impl Service<KafkaRequest> for KafkaService {
                     )) => {
                         if blocked_state.is_none() {
                             blocked_state =
-                                Some(BlockedRecordState::new(this.records_blocked.clone()));
+                                Some(BlockedRecordState::new(Arc::clone(&this.records_blocked)));
                         }
                         record = original_record;
                         tokio::time::sleep(Duration::from_millis(100)).await;
