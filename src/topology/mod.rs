@@ -31,7 +31,7 @@ use vector_buffers::topology::channel::{BufferReceiverStream, BufferSender};
 
 pub use self::builder::TopologyPieces;
 pub use self::controller::{ReloadOutcome, SharedTopologyController, TopologyController};
-pub use self::running::RunningTopology;
+pub use self::running::{RunningTopology, ShutdownErrorPair};
 
 use self::task::{Task, TaskError, TaskResult};
 use crate::{

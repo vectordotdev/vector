@@ -784,12 +784,7 @@ async fn topology_rebuild_connected_transform() {
 async fn topology_required_healthcheck_fails_start() {
     let mut config = basic_config_with_sink_failing_healthcheck();
     config.healthchecks.require_healthy = true;
-    let diff = ConfigDiff::initial(&config);
-    let pieces = TopologyPieces::build_or_log_errors(&config, &diff, HashMap::new())
-        .await
-        .unwrap();
-
-    assert!(RunningTopology::start_validated(config, diff, pieces)
+    assert!(RunningTopology::start_init_validated(config)
         .await
         .is_none());
 }
@@ -797,11 +792,7 @@ async fn topology_required_healthcheck_fails_start() {
 #[tokio::test]
 async fn topology_optional_healthcheck_does_not_fail_start() {
     let config = basic_config_with_sink_failing_healthcheck();
-    let diff = ConfigDiff::initial(&config);
-    let pieces = TopologyPieces::build_or_log_errors(&config, &diff, HashMap::new())
-        .await
-        .unwrap();
-    assert!(RunningTopology::start_validated(config, diff, pieces)
+    assert!(RunningTopology::start_init_validated(config)
         .await
         .is_some());
 }

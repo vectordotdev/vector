@@ -40,9 +40,8 @@ use vector_core::event::{BatchNotifier, Event, EventArray, LogEvent};
 use zstd::Decoder as ZstdDecoder;
 
 use crate::{
-    config::{Config, ConfigDiff, GenerateConfig},
-    signal::ShutdownError,
-    topology::{RunningTopology, TopologyPieces},
+    config::{Config, GenerateConfig},
+    topology::{RunningTopology, ShutdownErrorPair},
     trace,
 };
 
@@ -681,21 +680,9 @@ impl CountReceiver<Event> {
 pub async fn start_topology(
     mut config: Config,
     require_healthy: impl Into<Option<bool>>,
-) -> (
-    RunningTopology,
-    (
-        tokio::sync::mpsc::UnboundedSender<ShutdownError>,
-        tokio::sync::mpsc::UnboundedReceiver<ShutdownError>,
-    ),
-) {
+) -> (RunningTopology, ShutdownErrorPair) {
     config.healthchecks.set_require_healthy(require_healthy);
-    let diff = ConfigDiff::initial(&config);
-    let pieces = TopologyPieces::build_or_log_errors(&config, &diff, HashMap::new())
-        .await
-        .unwrap();
-    RunningTopology::start_validated(config, diff, pieces)
-        .await
-        .unwrap()
+    RunningTopology::start_init_validated(config).await.unwrap()
 }
 
 /// Collect the first `n` events from a stream while a future is spawned

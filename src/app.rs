@@ -1,7 +1,5 @@
 #![allow(missing_docs)]
-use std::{
-    collections::HashMap, num::NonZeroUsize, path::PathBuf, process::ExitStatus, time::Duration,
-};
+use std::{num::NonZeroUsize, path::PathBuf, process::ExitStatus, time::Duration};
 
 use exitcode::ExitCode;
 use futures::StreamExt;
@@ -29,10 +27,7 @@ use crate::{
     config::{self, Config, ConfigPath},
     heartbeat,
     signal::{ShutdownError, SignalHandler, SignalPair, SignalRx, SignalTo},
-    topology::{
-        ReloadOutcome, RunningTopology, SharedTopologyController, TopologyController,
-        TopologyPieces,
-    },
+    topology::{ReloadOutcome, RunningTopology, SharedTopologyController, TopologyController},
     trace,
 };
 
@@ -100,17 +95,13 @@ impl ApplicationConfig {
         #[cfg(feature = "enterprise")]
         let enterprise = build_enterprise(&mut config, config_paths.clone())?;
 
-        let diff = config::ConfigDiff::initial(&config);
-        let pieces = TopologyPieces::build_or_log_errors(&config, &diff, HashMap::new())
-            .await
-            .ok_or(exitcode::CONFIG)?;
-
         #[cfg(feature = "api")]
         let api = config.api;
 
-        let result = RunningTopology::start_validated(config, diff, pieces).await;
         let (topology, (graceful_crash_sender, graceful_crash_receiver)) =
-            result.ok_or(exitcode::CONFIG)?;
+            RunningTopology::start_init_validated(config)
+                .await
+                .ok_or(exitcode::CONFIG)?;
 
         Ok(Self {
             config_paths,

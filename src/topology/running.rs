@@ -31,6 +31,11 @@ use crate::{
     spawn_named,
 };
 
+pub type ShutdownErrorPair = (
+    mpsc::UnboundedSender<ShutdownError>,
+    mpsc::UnboundedReceiver<ShutdownError>,
+);
+
 #[allow(dead_code)]
 pub struct RunningTopology {
     inputs: HashMap<ComponentKey, BufferSender<EventArray>>,
@@ -981,17 +986,17 @@ impl RunningTopology {
             .insert(key.clone(), spawn_named(source_task, task_name.as_ref()));
     }
 
+    pub async fn start_init_validated(config: Config) -> Option<(Self, ShutdownErrorPair)> {
+        let diff = ConfigDiff::initial(&config);
+        let pieces = TopologyPieces::build_or_log_errors(&config, &diff, HashMap::new()).await?;
+        Self::start_validated(config, diff, pieces).await
+    }
+
     pub async fn start_validated(
         config: Config,
         diff: ConfigDiff,
         mut pieces: TopologyPieces,
-    ) -> Option<(
-        Self,
-        (
-            mpsc::UnboundedSender<ShutdownError>,
-            mpsc::UnboundedReceiver<ShutdownError>,
-        ),
-    )> {
+    ) -> Option<(Self, ShutdownErrorPair)> {
         let (abort_tx, abort_rx) = mpsc::unbounded_channel();
 
         let expire_metrics = match (
