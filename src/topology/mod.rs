@@ -29,10 +29,10 @@ use futures::{Future, FutureExt};
 use tokio::sync::{mpsc, watch};
 use vector_buffers::topology::channel::{BufferReceiverStream, BufferSender};
 
+pub use self::builder::TopologyPieces;
 pub use self::controller::{ReloadOutcome, SharedTopologyController, TopologyController};
 pub use self::running::RunningTopology;
 
-use self::builder::TopologyPieces;
 use self::task::{Task, TaskError, TaskResult};
 use crate::{
     config::{ComponentKey, Config, ConfigDiff, Inputs, OutputId},
@@ -80,7 +80,7 @@ pub async fn build_or_log_errors(
     diff: &ConfigDiff,
     buffers: HashMap<ComponentKey, BuiltBuffer>,
 ) -> Option<TopologyPieces> {
-    match builder::build_pieces(config, diff, buffers).await {
+    match TopologyPieces::build(config, diff, buffers).await {
         Err(errors) => {
             for error in errors {
                 error!(message = "Configuration error.", %error);

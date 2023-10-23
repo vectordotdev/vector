@@ -19,7 +19,7 @@ use crate::{
         },
         start_topology, trace_init,
     },
-    topology::{self, builder, RunningTopology},
+    topology::{self, RunningTopology, TopologyPieces},
 };
 use futures::{future, stream, StreamExt};
 use tokio::{
@@ -915,7 +915,7 @@ async fn topology_transform_error_definition() {
 
     let config = config.build().unwrap();
     let diff = ConfigDiff::initial(&config);
-    let errors = match builder::build_pieces(&config, &diff, HashMap::new()).await {
+    let errors = match TopologyPieces::build(&config, &diff, HashMap::new()).await {
         Ok(_) => panic!("build pieces should not succeed"),
         Err(err) => err,
     };

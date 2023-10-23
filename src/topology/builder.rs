@@ -73,15 +73,6 @@ static TRANSFORM_CONCURRENCY_LIMIT: Lazy<usize> = Lazy::new(|| {
 
 const INTERNAL_SOURCES: [&str; 2] = ["internal_logs", "internal_metrics"];
 
-/// Builds only the new pieces, and doesn't check their topology.
-pub async fn build_pieces(
-    config: &super::Config,
-    diff: &ConfigDiff,
-    buffers: HashMap<ComponentKey, BuiltBuffer>,
-) -> Result<TopologyPieces, Vec<String>> {
-    Builder::new(config, diff, buffers).build().await
-}
-
 struct Builder<'a> {
     config: &'a super::Config,
     diff: &'a ConfigDiff,
@@ -685,6 +676,17 @@ pub struct TopologyPieces {
     pub(super) healthchecks: HashMap<ComponentKey, Task>,
     pub(crate) shutdown_coordinator: SourceShutdownCoordinator,
     pub(crate) detach_triggers: HashMap<ComponentKey, Trigger>,
+}
+
+impl TopologyPieces {
+    /// Builds only the new pieces, and doesn't check their topology.
+    pub async fn build(
+        config: &super::Config,
+        diff: &ConfigDiff,
+        buffers: HashMap<ComponentKey, BuiltBuffer>,
+    ) -> Result<Self, Vec<String>> {
+        Builder::new(config, diff, buffers).build().await
+    }
 }
 
 const fn filter_events_type(events: &EventArray, data_type: DataType) -> bool {
