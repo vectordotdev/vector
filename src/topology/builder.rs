@@ -78,7 +78,7 @@ pub async fn build_pieces(
     config: &super::Config,
     diff: &ConfigDiff,
     buffers: HashMap<ComponentKey, BuiltBuffer>,
-) -> Result<Pieces, Vec<String>> {
+) -> Result<TopologyPieces, Vec<String>> {
     Builder::new(config, diff, buffers).build().await
 }
 
@@ -116,7 +116,7 @@ impl<'a> Builder<'a> {
     }
 
     /// Builds the new pieces of the topology found in `self.diff`.
-    async fn build(mut self) -> Result<Pieces, Vec<String>> {
+    async fn build(mut self) -> Result<TopologyPieces, Vec<String>> {
         let enrichment_tables = self.load_enrichment_tables().await;
         let source_tasks = self.build_sources().await;
         self.build_transforms(enrichment_tables).await;
@@ -127,7 +127,7 @@ impl<'a> Builder<'a> {
         enrichment_tables.finish_load();
 
         if self.errors.is_empty() {
-            Ok(Pieces {
+            Ok(TopologyPieces {
                 inputs: self.inputs,
                 outputs: Self::finalize_outputs(self.outputs),
                 tasks: self.tasks,
@@ -677,7 +677,7 @@ impl<'a> Builder<'a> {
     }
 }
 
-pub struct Pieces {
+pub struct TopologyPieces {
     pub(super) inputs: HashMap<ComponentKey, (BufferSender<EventArray>, Inputs<OutputId>)>,
     pub(crate) outputs: HashMap<ComponentKey, HashMap<Option<String>, fanout::ControlChannel>>,
     pub(super) tasks: HashMap<ComponentKey, Task>,

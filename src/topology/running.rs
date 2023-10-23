@@ -24,7 +24,7 @@ use crate::{
     spawn_named,
     topology::{
         build_or_log_errors, builder,
-        builder::Pieces,
+        builder::TopologyPieces,
         fanout::{ControlChannel, ControlMessage},
         handle_errors, retain, take_healthchecks,
         task::TaskOutput,
@@ -295,7 +295,7 @@ impl RunningTopology {
     pub(crate) async fn run_healthchecks(
         &mut self,
         diff: &ConfigDiff,
-        pieces: &mut Pieces,
+        pieces: &mut TopologyPieces,
         options: HealthcheckOptions,
     ) -> bool {
         if options.enabled {
@@ -527,7 +527,11 @@ impl RunningTopology {
     }
 
     /// Connects all changed/added components in the given configuration diff.
-    pub(crate) async fn connect_diff(&mut self, diff: &ConfigDiff, new_pieces: &mut Pieces) {
+    pub(crate) async fn connect_diff(
+        &mut self,
+        diff: &ConfigDiff,
+        new_pieces: &mut TopologyPieces,
+    ) {
         debug!("Connecting changed/added component(s).");
 
         // Update tap metadata
@@ -654,7 +658,11 @@ impl RunningTopology {
         }
     }
 
-    async fn setup_outputs(&mut self, key: &ComponentKey, new_pieces: &mut builder::Pieces) {
+    async fn setup_outputs(
+        &mut self,
+        key: &ComponentKey,
+        new_pieces: &mut builder::TopologyPieces,
+    ) {
         let outputs = new_pieces.outputs.remove(key).unwrap();
         for (port, output) in outputs {
             debug!(component = %key, output_id = ?port, "Configuring output for component.");
@@ -672,7 +680,7 @@ impl RunningTopology {
         &mut self,
         key: &ComponentKey,
         diff: &ConfigDiff,
-        new_pieces: &mut builder::Pieces,
+        new_pieces: &mut builder::TopologyPieces,
     ) {
         let (tx, inputs) = new_pieces.inputs.remove(key).unwrap();
 
@@ -794,7 +802,7 @@ impl RunningTopology {
     }
 
     /// Starts any new or changed components in the given configuration diff.
-    pub(crate) fn spawn_diff(&mut self, diff: &ConfigDiff, mut new_pieces: Pieces) {
+    pub(crate) fn spawn_diff(&mut self, diff: &ConfigDiff, mut new_pieces: TopologyPieces) {
         for key in &diff.sources.to_change {
             debug!(message = "Spawning changed source.", key = %key);
             self.spawn_source(key, &mut new_pieces);
@@ -826,7 +834,7 @@ impl RunningTopology {
         }
     }
 
-    fn spawn_sink(&mut self, key: &ComponentKey, new_pieces: &mut builder::Pieces) {
+    fn spawn_sink(&mut self, key: &ComponentKey, new_pieces: &mut builder::TopologyPieces) {
         let task = new_pieces.tasks.remove(key).unwrap();
         let span = error_span!(
             "sink",
@@ -869,7 +877,7 @@ impl RunningTopology {
         }
     }
 
-    fn spawn_transform(&mut self, key: &ComponentKey, new_pieces: &mut builder::Pieces) {
+    fn spawn_transform(&mut self, key: &ComponentKey, new_pieces: &mut builder::TopologyPieces) {
         let task = new_pieces.tasks.remove(key).unwrap();
         let span = error_span!(
             "transform",
@@ -912,7 +920,7 @@ impl RunningTopology {
         }
     }
 
-    fn spawn_source(&mut self, key: &ComponentKey, new_pieces: &mut builder::Pieces) {
+    fn spawn_source(&mut self, key: &ComponentKey, new_pieces: &mut builder::TopologyPieces) {
         let task = new_pieces.tasks.remove(key).unwrap();
         let span = error_span!(
             "source",

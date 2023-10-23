@@ -31,14 +31,14 @@ use crate::{
     signal,
     topology::{
         self,
-        builder::{self, Pieces},
+        builder::{self, TopologyPieces},
     },
 };
 
 pub struct UnitTest {
     pub name: String,
     config: Config,
-    pieces: Pieces,
+    pieces: TopologyPieces,
     test_result_rxs: Vec<Receiver<UnitTestSinkResult>>,
 }
 

@@ -25,20 +25,20 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-pub use controller::{ReloadOutcome, SharedTopologyController, TopologyController};
 use futures::{Future, FutureExt};
-pub(super) use running::RunningTopology;
 use tokio::sync::{mpsc, watch};
 use vector_buffers::topology::channel::{BufferReceiverStream, BufferSender};
 
+pub use self::controller::{ReloadOutcome, SharedTopologyController, TopologyController};
+pub(super) use self::running::RunningTopology;
+
+use self::builder::TopologyPieces;
+use self::task::{Task, TaskError, TaskResult};
 use crate::{
     config::{ComponentKey, Config, ConfigDiff, Inputs, OutputId},
     event::EventArray,
     signal::ShutdownError,
-    topology::{builder::Pieces, task::Task},
 };
-
-use self::task::{TaskError, TaskResult};
 
 type TaskHandle = tokio::task::JoinHandle<TaskResult>;
 
@@ -78,7 +78,7 @@ pub type WatchRx = watch::Receiver<TapResource>;
 pub async fn start_validated(
     config: Config,
     diff: ConfigDiff,
-    mut pieces: Pieces,
+    mut pieces: TopologyPieces,
 ) -> Option<(
     RunningTopology,
     (
@@ -131,7 +131,7 @@ pub async fn build_or_log_errors(
     config: &Config,
     diff: &ConfigDiff,
     buffers: HashMap<ComponentKey, BuiltBuffer>,
-) -> Option<Pieces> {
+) -> Option<TopologyPieces> {
     match builder::build_pieces(config, diff, buffers).await {
         Err(errors) => {
             for error in errors {
@@ -145,7 +145,7 @@ pub async fn build_or_log_errors(
 
 pub(super) fn take_healthchecks(
     diff: &ConfigDiff,
-    pieces: &mut Pieces,
+    pieces: &mut TopologyPieces,
 ) -> Vec<(ComponentKey, Task)> {
     (&diff.sinks.to_change | &diff.sinks.to_add)
         .into_iter()
