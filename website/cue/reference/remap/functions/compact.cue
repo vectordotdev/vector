@@ -3,7 +3,7 @@ package metadata
 remap: functions: compact: {
 	category: "Enumerate"
 	description: """
-		Compacts the `value` by removing "empty" values, where emptiness is defined using the
+		Compacts the `value` by removing empty values, where empty values are defined using the
 		available parameters.
 		"""
 

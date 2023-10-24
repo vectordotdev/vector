@@ -11,18 +11,14 @@ use futures::stream::{Fuse, Stream, StreamExt};
 use pin_project::pin_project;
 use tokio_util::time::{delay_queue::Key, DelayQueue};
 use twox_hash::XxHash64;
+use vector_core::{partition::Partitioner, time::KeyedTimer, ByteSizeOf};
 
-use crate::{
-    partition::Partitioner,
-    stream::batcher::{
-        config::BatchConfigParts,
-        limiter::{ByteSizeOfItemSize, ItemBatchSize, SizeLimit},
-    },
-    time::KeyedTimer,
-    ByteSizeOf,
+use crate::batcher::{
+    config::BatchConfigParts,
+    data::BatchData,
+    limiter::{ByteSizeOfItemSize, ItemBatchSize, SizeLimit},
+    BatchConfig,
 };
-
-use super::batcher::{data::BatchData, BatchConfig};
 
 /// A `KeyedTimer` based on `DelayQueue`.
 pub struct ExpirationQueue<K> {
@@ -347,6 +343,7 @@ where
     }
 }
 
+#[allow(clippy::cast_sign_loss)]
 #[cfg(test)]
 mod test {
     use std::{
@@ -361,14 +358,11 @@ mod test {
     use pin_project::pin_project;
     use proptest::prelude::*;
     use tokio::{pin, time::advance};
+    use vector_core::{partition::Partitioner, time::KeyedTimer};
 
     use crate::{
-        partition::Partitioner,
-        stream::{
-            partitioned_batcher::{ExpirationQueue, PartitionedBatcher},
-            BatcherSettings,
-        },
-        time::KeyedTimer,
+        partitioned_batcher::{ExpirationQueue, PartitionedBatcher},
+        BatcherSettings,
     };
 
     #[derive(Debug)]

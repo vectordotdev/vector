@@ -37,4 +37,4 @@ serde_json = "1.0.107"
 serde_yaml = "0.9.25"
 sha2 = "0.10.8"
 tempfile = "3.8.0"
-toml = { version = "0.8.2", default-features = false, features = ["parse"] }
+toml = { version = "0.8.3", default-features = false, features = ["parse"] }

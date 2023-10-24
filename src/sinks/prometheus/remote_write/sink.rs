@@ -1,10 +1,8 @@
 use std::fmt;
 
 use vector_common::byte_size_of::ByteSizeOf;
-use vector_core::{
-    event::Metric,
-    stream::batcher::{data::BatchData, limiter::ByteSizeOfItemSize},
-};
+use vector_core::event::Metric;
+use vector_stream::batcher::{data::BatchData, limiter::ByteSizeOfItemSize};
 
 use crate::sinks::{prelude::*, util::buffer::metrics::MetricSet};
 

@@ -14,12 +14,12 @@ remap: functions: parse_klog: {
 		},
 	]
 	internal_failure_reasons: [
-		"`value` doesn't match the `klog` format",
+		"`value` does not match the `klog` format.",
 	]
 	return: types: ["object"]
 	examples: [
 		{
-			title: "Parse via klog"
+			title: "Parse using klog"
 			source: #"""
 				parse_klog!("I0505 17:59:40.692994   28133 klog.go:70] hello from klog")
 				"""#

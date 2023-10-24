@@ -15,11 +15,11 @@ use tower::Service;
 use vector_core::{
     event::{Finalizable, Metric},
     partition::Partitioner,
-    stream::{
-        batcher::{config::BatchConfig, Batcher},
-        ConcurrentMap, Driver, DriverResponse, ExpirationQueue, PartitionedBatcher,
-    },
     ByteSizeOf,
+};
+use vector_stream::{
+    batcher::{config::BatchConfig, Batcher},
+    ConcurrentMap, Driver, DriverResponse, ExpirationQueue, PartitionedBatcher,
 };
 
 use super::{

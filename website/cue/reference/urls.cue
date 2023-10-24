@@ -239,7 +239,7 @@ urls: {
 	greptimecloud:                              "https://greptime.cloud"
 	greptimedb:                                 "https://github.com/greptimeteam/greptimedb"
 	greptimedb_grpc:                            "https://docs.greptime.com/"
-	grok:                                       "https://grokdebug.herokuapp.com/"
+	grok:                                       "https://github.com/daschl/grok/tree/master/patterns"
 	grok_debugger:                              "https://grokdebug.herokuapp.com/"
 	grok_patterns:                              "\(github)/daschl/grok/tree/master/patterns"
 	gzip:                                       "https://www.gzip.org/"
