@@ -1,6 +1,6 @@
 use std::fmt;
 
-use vector_core::event::Metric;
+use vector_lib::event::Metric;
 use vector_lib::byte_size_of::ByteSizeOf;
 use vector_stream::batcher::{data::BatchData, limiter::ByteSizeOfItemSize};
 

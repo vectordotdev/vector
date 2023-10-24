@@ -7,3 +7,4 @@ publish = false
 
 [dependencies]
 vector-common = { path = "../vector-common", default-features = false }
+vector-core = { path = "../vector-core", default-features = false }

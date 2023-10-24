@@ -8,7 +8,7 @@ use chrono::{DateTime, TimeZone, Utc};
 use futures::{FutureExt, StreamExt};
 use tokio::{pin, select};
 use tracing_futures::Instrument;
-use vector_core::config::LogNamespace;
+use vector_lib::config::LogNamespace;
 use vector_lib::finalizer::UnorderedFinalizer;
 use vector_lib::internal_event::{EventsReceived, Registered};
 

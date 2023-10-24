@@ -6,7 +6,7 @@ use futures_util::StreamExt;
 use lookup::lookup_v2::OptionalValuePath;
 use lookup::{OwnedValuePath, PathPrefix};
 use serde::Deserialize;
-use vector_core::{
+use vector_lib::{
     config::log_schema,
     event::{Event, LogEvent, Value},
 };

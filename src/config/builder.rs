@@ -6,7 +6,7 @@ use indexmap::IndexMap;
 #[cfg(feature = "enterprise")]
 use serde_json::Value;
 use vector_config::configurable_component;
-use vector_core::config::GlobalOptions;
+use vector_lib::config::GlobalOptions;
 
 use crate::{enrichment_tables::EnrichmentTables, providers::Providers, secrets::SecretBackends};
 

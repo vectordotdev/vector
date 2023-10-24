@@ -144,7 +144,6 @@ vector-buffers = { path = "lib/vector-buffers", default-features = false }
 vector-config = { path = "lib/vector-config" }
 vector-config-common = { path = "lib/vector-config-common" }
 vector-config-macros = { path = "lib/vector-config-macros" }
-vector-core = { path = "lib/vector-core", default-features = false, features = ["vrl"] }
 vector-lib = { path = "lib/vector-lib", default-features = false }
 vector-stream = { path = "lib/vector-stream" }
 vector-vrl-functions = { path = "lib/vector-vrl/functions" }

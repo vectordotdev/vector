@@ -1,5 +1,5 @@
 use bytes::Bytes;
-use vector_core::EstimatedJsonEncodedSizeOf;
+use vector_lib::EstimatedJsonEncodedSizeOf;
 use vector_lib::{json_size::JsonSize, request_metadata::RequestMetadata};
 
 use crate::{

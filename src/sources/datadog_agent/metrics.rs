@@ -7,12 +7,12 @@ use prost::Message;
 use serde::{Deserialize, Serialize};
 use warp::{filters::BoxedFilter, path, path::FullPath, reply::Response, Filter};
 
-use vector_core::{
+use vector_lib::internal_event::{CountByteSize, InternalEventHandle as _, Registered};
+use vector_lib::{
     event::{DatadogMetricOriginMetadata, EventMetadata},
     metrics::AgentDDSketch,
     EstimatedJsonEncodedSizeOf,
 };
-use vector_lib::internal_event::{CountByteSize, InternalEventHandle as _, Registered};
 
 use crate::{
     common::datadog::{DatadogMetricType, DatadogSeriesMetric},

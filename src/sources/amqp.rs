@@ -25,7 +25,7 @@ use snafu::Snafu;
 use std::{io::Cursor, pin::Pin};
 use tokio_util::codec::FramedRead;
 use vector_config::configurable_component;
-use vector_core::{
+use vector_lib::{
     config::{log_schema, LegacyKey, LogNamespace, SourceAcknowledgementsConfig},
     event::Event,
     EstimatedJsonEncodedSizeOf,
@@ -493,8 +493,8 @@ async fn handle_ack(status: BatchStatus, entry: FinalizerEntry) {
 #[cfg(test)]
 pub mod test {
     use lookup::OwnedTargetPath;
-    use vector_core::schema::Definition;
-    use vector_core::tls::TlsConfig;
+    use vector_lib::schema::Definition;
+    use vector_lib::tls::TlsConfig;
     use vrl::value::kind::Collection;
 
     use super::*;
@@ -624,7 +624,7 @@ mod integration_test {
     use lapin::options::*;
     use lapin::BasicProperties;
     use tokio::time::Duration;
-    use vector_core::config::log_schema;
+    use vector_lib::config::log_schema;
 
     #[tokio::test]
     async fn amqp_source_create_ok() {

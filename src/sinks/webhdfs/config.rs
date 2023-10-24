@@ -2,7 +2,7 @@ use codecs::{encoding::Framer, JsonSerializerConfig, NewlineDelimitedEncoderConf
 use opendal::{layers::LoggingLayer, services::Webhdfs, Operator};
 use tower::ServiceBuilder;
 use vector_config::configurable_component;
-use vector_core::{
+use vector_lib::{
     config::{AcknowledgementsConfig, DataType, Input},
     sink::VectorSink,
 };

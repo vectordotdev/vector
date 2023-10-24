@@ -35,7 +35,7 @@ use tokio_stream::wrappers::TcpListenerStream;
 use tokio_stream::wrappers::UnixListenerStream;
 use tokio_util::codec::{Encoder, FramedRead, FramedWrite, LinesCodec};
 use vector_buffers::topology::channel::LimitedReceiver;
-use vector_core::event::{BatchNotifier, Event, EventArray, LogEvent};
+use vector_lib::event::{BatchNotifier, Event, EventArray, LogEvent};
 #[cfg(test)]
 use zstd::Decoder as ZstdDecoder;
 
@@ -133,7 +133,7 @@ pub fn trace_init() {
     trace::init(color, false, &levels, 10);
 
     // Initialize metrics as well
-    vector_core::metrics::init_test();
+    vector_lib::metrics::init_test();
 }
 
 pub async fn send_lines(

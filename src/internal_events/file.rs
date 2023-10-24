@@ -1,6 +1,6 @@
 use metrics::{counter, gauge};
 use std::borrow::Cow;
-use vector_core::internal_event::{ComponentEventsDropped, InternalEvent, UNINTENTIONAL};
+use vector_lib::internal_event::{ComponentEventsDropped, InternalEvent, UNINTENTIONAL};
 
 use crate::emit;
 

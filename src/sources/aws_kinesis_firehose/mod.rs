@@ -5,7 +5,7 @@ use futures::FutureExt;
 use lookup::owned_value_path;
 use tracing::Span;
 use vector_config::configurable_component;
-use vector_core::config::{LegacyKey, LogNamespace};
+use vector_lib::config::{LegacyKey, LogNamespace};
 use vector_lib::sensitive_string::SensitiveString;
 use vrl::value::Kind;
 use warp::Filter;

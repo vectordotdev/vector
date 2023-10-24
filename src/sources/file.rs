@@ -17,11 +17,11 @@ use snafu::{ResultExt, Snafu};
 use tokio::{sync::oneshot, task::spawn_blocking};
 use tracing::{Instrument, Span};
 use vector_config::configurable_component;
-use vector_core::{
+use vector_lib::finalizer::OrderedFinalizer;
+use vector_lib::{
     config::{LegacyKey, LogNamespace},
     EstimatedJsonEncodedSizeOf,
 };
-use vector_lib::finalizer::OrderedFinalizer;
 use vrl::value::Kind;
 
 use super::util::{EncodingConfig, MultilineConfig};
@@ -818,7 +818,7 @@ mod tests {
     use similar_asserts::assert_eq;
     use tempfile::tempdir;
     use tokio::time::{sleep, timeout, Duration};
-    use vector_core::schema::Definition;
+    use vector_lib::schema::Definition;
     use vrl::value::kind::Collection;
 
     use super::*;

@@ -29,7 +29,7 @@ use tokio::{
 };
 use tokio_util::codec::FramedRead;
 use vector_config::configurable_component;
-use vector_core::{
+use vector_lib::{
     config::{LegacyKey, LogNamespace},
     schema::Definition,
     EstimatedJsonEncodedSizeOf,

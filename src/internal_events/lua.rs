@@ -1,5 +1,5 @@
 use metrics::{counter, gauge};
-use vector_core::internal_event::InternalEvent;
+use vector_lib::internal_event::InternalEvent;
 
 use crate::emit;
 use crate::transforms::lua::v2::BuildError;

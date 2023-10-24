@@ -21,7 +21,7 @@ use tokio::{
 use tokio_util::codec::Decoder;
 
 use crate::components::validation::sync::{Configuring, TaskCoordinator};
-use vector_core::event::Event;
+use vector_lib::event::Event;
 
 use super::{encode_test_event, ResourceCodec, ResourceDirection, TestEvent};
 

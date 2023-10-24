@@ -8,7 +8,7 @@ use futures::StreamExt;
 use tokio::time::sleep;
 use tokio_stream::wrappers::UnboundedReceiverStream;
 use vector_buffers::{BufferConfig, BufferType, WhenFull};
-use vector_core::config::ComponentKey;
+use vector_lib::config::ComponentKey;
 
 use crate::{
     config::Config,

@@ -27,8 +27,8 @@ use tokio::{
     time::{sleep, Duration},
 };
 use vector_buffers::{BufferConfig, BufferType, WhenFull};
-use vector_core::config::OutputId;
 use vector_lib::config::ComponentKey;
+use vector_lib::config::OutputId;
 
 mod backpressure;
 mod compliance;

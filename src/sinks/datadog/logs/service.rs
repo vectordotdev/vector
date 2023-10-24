@@ -14,7 +14,7 @@ use hyper::Body;
 use indexmap::IndexMap;
 use tower::Service;
 use tracing::Instrument;
-use vector_core::event::{EventFinalizers, EventStatus, Finalizable};
+use vector_lib::event::{EventFinalizers, EventStatus, Finalizable};
 use vector_lib::request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata};
 use vector_stream::DriverResponse;
 

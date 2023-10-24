@@ -3,11 +3,11 @@ use std::num::NonZeroUsize;
 use bytes::BytesMut;
 use chrono::Utc;
 use tokio_util::codec::Encoder as _;
-use vector_core::{
+use vector_lib::request_metadata::{MetaDescriptive, RequestMetadata};
+use vector_lib::{
     event::{EventFinalizers, Finalizable},
     ByteSizeOf,
 };
-use vector_lib::request_metadata::{MetaDescriptive, RequestMetadata};
 
 use super::TemplateRenderingError;
 use crate::{
@@ -138,8 +138,8 @@ impl ByteSizeOf for CloudwatchRequest {
 #[cfg(test)]
 mod tests {
     use chrono::Utc;
-    use vector_core::config::log_schema;
-    use vector_core::event::LogEvent;
+    use vector_lib::config::log_schema;
+    use vector_lib::event::LogEvent;
 
     use super::CloudwatchRequestBuilder;
 

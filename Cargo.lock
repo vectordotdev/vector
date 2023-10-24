@@ -10119,6 +10119,7 @@ name = "vector-lib"
 version = "0.1.0"
 dependencies = [
  "vector-common",
+ "vector-core",
 ]
 
 [[package]]

@@ -1,6 +1,6 @@
 mod sources;
 
-use vector_core::event::{Event, Metric};
+use vector_lib::event::{Event, Metric};
 
 use crate::components::validation::{ComponentType, RunnerMetrics, TestCaseExpectation, TestEvent};
 
@@ -124,7 +124,7 @@ fn filter_events_by_metric_and_component<'a>(
     let metrics: Vec<&Metric> = telemetry_events
         .iter()
         .flat_map(|e| {
-            if let vector_core::event::Event::Metric(m) = e {
+            if let vector_lib::event::Event::Metric(m) = e {
                 Some(m)
             } else {
                 None

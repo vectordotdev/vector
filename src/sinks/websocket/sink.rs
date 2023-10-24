@@ -24,7 +24,7 @@ use tokio_tungstenite::{
     WebSocketStream as WsStream,
 };
 use tokio_util::codec::Encoder as _;
-use vector_core::{
+use vector_lib::{
     internal_event::{
         ByteSize, BytesSent, CountByteSize, EventsSent, InternalEventHandle as _, Output, Protocol,
     },

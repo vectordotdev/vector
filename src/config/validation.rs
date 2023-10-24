@@ -3,7 +3,7 @@ use futures_util::{stream, FutureExt, StreamExt, TryFutureExt, TryStreamExt};
 use heim::{disk::Partition, units::information::byte};
 use indexmap::IndexMap;
 use std::{collections::HashMap, path::PathBuf};
-use vector_core::internal_event::DEFAULT_OUTPUT;
+use vector_lib::internal_event::DEFAULT_OUTPUT;
 
 use super::{
     builder::ConfigBuilder, transform::get_transform_output_ids, ComponentKey, Config, OutputId,

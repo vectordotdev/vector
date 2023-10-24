@@ -522,7 +522,7 @@ mod tests {
 
     use codecs::JsonSerializerConfig;
     use futures::stream::StreamExt;
-    use vector_core::event::{Event, LogEvent, Value};
+    use vector_lib::event::{Event, LogEvent, Value};
 
     use super::{EventEncoder, KeyPartitioner, RecordFilter};
     use crate::{
