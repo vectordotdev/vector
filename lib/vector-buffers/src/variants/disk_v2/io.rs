@@ -1,7 +1,10 @@
 use std::{io, path::Path};
 
 use async_trait::async_trait;
-use tokio::io::{AsyncRead, AsyncWrite};
+use tokio::{
+    fs::OpenOptions,
+    io::{AsyncRead, AsyncWrite},
+};
 
 const FILE_MODE_OWNER_RW_GROUP_RO: u32 = 0o640;
 
@@ -131,40 +134,32 @@ impl Filesystem for ProductionFilesystem {
     type MutableMemoryMap = memmap2::MmapMut;
 
     async fn open_file_writable(&self, path: &Path) -> io::Result<Self::File> {
-        let mut open_options = tokio::fs::OpenOptions::new();
-        open_options.append(true).read(true).create(true);
-
-        configure_file_open_options_for_write(&mut open_options);
-
-        open_options.open(path).await
+        create_writable_file_options(false)
+            .append(true)
+            .open(path)
+            .await
     }
 
     async fn open_file_writable_atomic(&self, path: &Path) -> io::Result<Self::File> {
-        let mut open_options = tokio::fs::OpenOptions::new();
-        open_options.append(true).read(true).create_new(true);
-
-        configure_file_open_options_for_write(&mut open_options);
-
-        open_options.open(path).await
+        create_writable_file_options(true)
+            .append(true)
+            .open(path)
+            .await
     }
 
     async fn open_file_readable(&self, path: &Path) -> io::Result<Self::File> {
-        tokio::fs::OpenOptions::new().read(true).open(path).await
+        open_readable_file_options().open(path).await
     }
 
     async fn open_mmap_readable(&self, path: &Path) -> io::Result<Self::MemoryMap> {
-        let file = tokio::fs::OpenOptions::new().read(true).open(path).await?;
+        let file = open_readable_file_options().open(path).await?;
         let std_file = file.into_std().await;
         unsafe { memmap2::Mmap::map(&std_file) }
     }
 
     async fn open_mmap_writable(&self, path: &Path) -> io::Result<Self::MutableMemoryMap> {
-        let mut open_options = tokio::fs::OpenOptions::new();
-        open_options.read(true).write(true);
+        let file = open_writable_file_options().open(path).await?;
 
-        configure_file_open_options_for_write(&mut open_options);
-
-        let file = open_options.open(path).await?;
         let std_file = file.into_std().await;
         unsafe { memmap2::MmapMut::map_mut(&std_file) }
     }
@@ -174,13 +169,52 @@ impl Filesystem for ProductionFilesystem {
     }
 }
 
-#[cfg(unix)]
-fn configure_file_open_options_for_write(open_options: &mut tokio::fs::OpenOptions) {
-    open_options.mode(FILE_MODE_OWNER_RW_GROUP_RO);
+/// Builds a set of `OpenOptions` for opening a file as readable/writable.
+fn open_writable_file_options() -> OpenOptions {
+    let mut open_options = OpenOptions::new();
+    open_options.read(true).write(true);
+
+    #[cfg(unix)]
+    {
+        open_options.mode(FILE_MODE_OWNER_RW_GROUP_RO);
+    }
+
+    open_options
 }
 
-#[cfg(not(unix))]
-fn configure_file_open_options_for_write(_open_options: &mut tokio::fs::OpenOptions) {}
+/// Builds a set of `OpenOptions` for opening a file as readable/writable, creating it if it does
+/// not already exist.
+///
+/// When `create_atomic` is set to `true`, this ensures that the operation only succeeds if the
+/// subsequent call to `open` is able to create the file, ensuring that another process did not
+/// create it before us. Otherwise, the normal create mode is configured, which creates the file if
+/// it does not exist but does not throw an error if it already did.
+///
+/// On Unix platforms, file permissions will be set so that only the owning user of the file can
+/// write to it, the owning group can read it, and the file is inaccessible otherwise.
+fn create_writable_file_options(create_atomic: bool) -> OpenOptions {
+    let mut open_options = open_writable_file_options();
+
+    #[cfg(unix)]
+    {
+        open_options.mode(FILE_MODE_OWNER_RW_GROUP_RO);
+    }
+
+    if create_atomic {
+        open_options.create_new(true);
+    } else {
+        open_options.create(true);
+    }
+
+    open_options
+}
+
+/// Builds a set of `OpenOptions` for opening a file as readable.
+fn open_readable_file_options() -> OpenOptions {
+    let mut open_options = OpenOptions::new();
+    open_options.read(true);
+    open_options
+}
 
 #[async_trait]
 impl AsyncFile for tokio::fs::File {
