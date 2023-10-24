@@ -1,0 +1,53 @@
+name: Deploy VRL Playground Preview Site
+
+on:
+  pull_request:
+    types: [opened, reopened]
+
+jobs:
+  deploy_preview_site:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Check out repository
+      uses: actions/checkout@v3
+
+    # Create the HMAC key
+    - name: Start Amplify Build
+      id: hmac_runner
+      env:
+        REQUEST_TOKEN: ${{ secrets.REQUEST_TOKEN }}
+        REQUEST_MESSAGE: ${{ secrets.REQUEST_MESSAGE }}
+        ENDPOINT: ${{ secrets.BUILDER_ENDPOINT }}
+      run: |
+        HMAC_KEY=$(echo -n $REQUEST_MESSAGE | openssl dgst -sha256 -hmac "$REQUEST_TOKEN" -binary | od -An -tx1 | tr -d ' \n'; echo)
+        SIGNATURE="sha256=$HMAC_KEY"
+
+        RESPONSE_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
+             -H "Content-Type: application/json" \
+             -H "X-Hub-Signature: $SIGNATURE" \
+             -d "{\"app_id\": \"d2lr4eds605rpz\", \"branch_name\": \"${{ github.head_ref }}\"}" \
+          "$ENDPOINT")
+
+        # check the response code and fail if not 200
+        if [ "$RESPONSE_CODE" != "200" ]; then
+          echo "Request failed with response code $RESPONSE_CODE"
+          exit 1
+        fi
+
+    # Add preview link to comment
+    - name: Comment Preview Link
+      if: success()
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        URLIZED_BRANCH=$(echo "${{ github.head_ref }}" | tr './' '--')
+        COMMENT_URL="https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments"
+        COMMENT_CONTENT="Your preview site for the **Vector VRL Playground** will be ready in a few minutes, please allow time for it to build. \n \n Here's your [preview link](https://$URLIZED_BRANCH.d2lr4eds605rpz.amplifyapp.com)."
+
+        curl -sSL \
+             -H "Authorization: token $GITHUB_TOKEN" \
+             -H "Content-Type: application/json" \
+             -X POST \
+             -d "{\"body\": \"$COMMENT_CONTENT\"}" \
+             $COMMENT_URL
