@@ -9,7 +9,7 @@ use prost::Message;
 use tonic::{body::BoxBody, IntoRequest};
 use tower::Service;
 use vector_lib::request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata};
-use vector_stream::DriverResponse;
+use vector_lib::stream::DriverResponse;
 
 use super::VectorSinkError;
 use crate::{

@@ -13,7 +13,7 @@ use tower::Service;
 use tracing::Instrument;
 use vector_lib::event::{EventFinalizers, EventStatus, Finalizable};
 use vector_lib::request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata};
-use vector_stream::DriverResponse;
+use vector_lib::stream::DriverResponse;
 
 use super::config::S3Options;
 use super::partitioner::S3PartitionKey;

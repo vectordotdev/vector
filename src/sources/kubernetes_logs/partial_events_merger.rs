@@ -6,7 +6,7 @@ use lookup::OwnedTargetPath;
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 use vector_lib::config::LogNamespace;
-use vector_stream::expiration_map::{map_with_expiration, Emitter};
+use vector_lib::stream::expiration_map::{map_with_expiration, Emitter};
 use vrl::owned_value_path;
 
 use crate::event;

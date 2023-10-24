@@ -9,7 +9,7 @@ use http::{
 use hyper::Body;
 use tower::Service;
 use vector_lib::request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata};
-use vector_stream::DriverResponse;
+use vector_lib::stream::DriverResponse;
 
 use crate::{
     event::{EventFinalizers, EventStatus, Finalizable},

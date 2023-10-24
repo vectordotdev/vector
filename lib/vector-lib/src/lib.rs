@@ -14,6 +14,7 @@ pub use vector_core::{
     samples, schema, serde, sink, source, tcp, tls, transform, update_counter,
     EstimatedJsonEncodedSizeOf,
 };
+pub use vector_stream as stream;
 
 pub mod config {
     pub use vector_common::config::ComponentKey;

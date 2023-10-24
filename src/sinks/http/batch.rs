@@ -1,8 +1,8 @@
 //! Batch settings for the `http` sink.
 
 use codecs::encoding::Framer;
+use vector_lib::stream::batcher::limiter::ItemBatchSize;
 use vector_lib::{event::Event, ByteSizeOf, EstimatedJsonEncodedSizeOf};
-use vector_stream::batcher::limiter::ItemBatchSize;
 
 use crate::codecs::Encoder;
 
