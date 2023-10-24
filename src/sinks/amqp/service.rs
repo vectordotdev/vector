@@ -127,10 +127,7 @@ impl Service<AmqpRequest> for AmqpService {
                 Ok(result) => match result.await {
                     Ok(lapin::publisher_confirm::Confirmation::Nack(_)) => {
                         emit!(AmqpNackError);
-                        Ok(AmqpResponse {
-                            json_size: req.metadata.into_events_estimated_json_encoded_byte_size(),
-                            byte_size,
-                        })
+                        Err(AmqpError::AmqpNack)
                     }
                     Err(error) => {
                         // TODO: In due course the caller could emit these on error.
