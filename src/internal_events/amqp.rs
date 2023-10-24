@@ -151,4 +151,28 @@ pub mod sink {
             });
         }
     }
+
+    #[derive(Debug)]
+    pub struct AmqpNackError;
+
+    impl InternalEvent for AmqpNackError {
+        fn emit(self) {
+            let deliver_reason = "Received Negative Acknowledgement from AMQP broker.";
+            error!(
+                message = deliver_reason,
+                error_type = error_type::ACKNOWLEDGMENT_FAILED,
+                stage = error_stage::SENDING,
+                internal_log_rate_limit = true,
+            );
+            counter!(
+                "component_errors_total", 1,
+                "error_type" => error_type::ACKNOWLEDGMENT_FAILED,
+                "stage" => error_stage::SENDING,
+            );
+            emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+                count: 1,
+                reason: deliver_reason
+            });
+        }
+    }
 }

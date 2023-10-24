@@ -1,7 +1,7 @@
 //! The main tower service that takes the request created by the request builder
 //! and sends it to `AMQP`.
 use crate::{
-    internal_events::sink::{AmqpAcknowledgementError, AmqpDeliveryError},
+    internal_events::sink::{AmqpAcknowledgementError, AmqpDeliveryError, AmqpNackError},
     sinks::prelude::*,
 };
 use bytes::Bytes;
@@ -92,6 +92,9 @@ pub(super) enum AmqpError {
 
     #[snafu(display("Failed AMQP request: {}", error))]
     AmqpDeliveryFailed { error: lapin::Error },
+
+    #[snafu(display("Recieved Negative Acknowledgement from AMQP broker."))]
+    AmqpNack,
 }
 
 impl Service<AmqpRequest> for AmqpService {
@@ -109,11 +112,6 @@ impl Service<AmqpRequest> for AmqpService {
         let channel = Arc::clone(&self.channel);
 
         Box::pin(async move {
-            channel
-                .confirm_select(lapin::options::ConfirmSelectOptions::default())
-                .await
-                .unwrap();
-
             let byte_size = req.body.len();
             let fut = channel
                 .basic_publish(
@@ -128,7 +126,7 @@ impl Service<AmqpRequest> for AmqpService {
             match fut {
                 Ok(result) => match result.await {
                     Ok(lapin::publisher_confirm::Confirmation::Nack(_)) => {
-                        warn!("Received Negative Acknowledgement from AMQP server.");
+                        emit!(AmqpNackError);
                         Ok(AmqpResponse {
                             json_size: req.metadata.into_events_estimated_json_encoded_byte_size(),
                             byte_size,
