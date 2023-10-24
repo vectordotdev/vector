@@ -215,7 +215,9 @@ fn encode_traces(
         loop {
             payload.tracer_payloads.push(proto);
             if payload.encoded_len() >= max_size {
-                if payload.tracer_payloads.len() == 1 {
+                // take it back out
+                proto = payload.tracer_payloads.pop().expect("just pushed");
+                if payload.tracer_payloads.is_empty() {
                     // this individual trace is too big
                     results.push(Err(RequestBuilderError::FailedToBuild {
                         message: "Dropped trace event",
@@ -226,7 +228,6 @@ fn encode_traces(
                     break;
                 } else {
                     // try with a fresh payload
-                    proto = payload.tracer_payloads.pop().expect("just pushed");
                     results.push(Ok((
                         payload.encode_to_vec(),
                         std::mem::take(&mut processed),
@@ -477,6 +478,57 @@ mod test {
                     max_size
                 );
             }
+        }
+    }
+
+    #[test]
+    fn handles_too_large_events() {
+        let max_size = 1024;
+        // 476 is experimentally determined to be too big to fit into a <1024 byte proto
+        let lengths = [128, 476, 128];
+
+        let key = PartitionKey {
+            api_key: Some("x".repeat(128).into()),
+            env: Some("production".into()),
+            hostname: Some("foo.bar.baz.local".into()),
+            agent_version: Some("1.2.3.4.5".into()),
+            target_tps: None,
+            error_tps: None,
+        };
+
+        // We only care about the size of the incoming traces, so just populate a single tag field
+        // that will be copied into the protobuf representation.
+        let traces = lengths
+            .into_iter()
+            .map(|n| {
+                let mut log = LogEvent::default();
+                log.insert(event_path!("tags", "foo"), "x".repeat(n));
+                TraceEvent::from(log)
+            })
+            .collect();
+
+        let mut results = encode_traces(&key, traces, max_size);
+        assert_eq!(3, results.len());
+
+        match &mut results[..] {
+            [Ok(one), Err(_two), Ok(three)] => {
+                for (encoded, processed) in [one, three] {
+                    assert_eq!(1, processed.len());
+                    assert!(
+                        encoded.len() <= max_size,
+                        "encoded len {} longer than max size {}",
+                        encoded.len(),
+                        max_size
+                    );
+                }
+            }
+            _ => panic!(
+                "unexpected output {:?}",
+                results
+                    .iter()
+                    .map(|r| r.as_ref().map(|(_, p)| p.len()))
+                    .collect::<Vec<_>>()
+            ),
         }
     }
 }
