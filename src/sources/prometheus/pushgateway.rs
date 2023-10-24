@@ -175,6 +175,13 @@ fn decode_label_pair(k: &str, v: &str) -> Result<(String, String), ErrorMessage>
         )
     })?;
 
+    if k == "job@base64" && decoded.len() == 0 {
+        return Err(ErrorMessage::new(
+            http::StatusCode::BAD_REQUEST,
+            "Job must not have an empty value".to_owned(),
+        ))
+    }
+
     // We should never return the default here as we already returned from the function
     // if the key doesn't end with "@base64", but we need to satisfy the compiler
     let stripped_key = k.strip_suffix("@base64").unwrap_or(k);
@@ -215,5 +222,13 @@ mod test {
 
         assert!(actual.is_ok());
         assert_eq!(actual.unwrap(), expected);
+    }
+
+    #[test]
+    fn test_parse_path_empty_job_name_invalid() {
+        let path = "/metrics/job@base64/=";
+        let result = parse_path_labels(path);
+
+        assert!(result.is_err());
     }
 }
