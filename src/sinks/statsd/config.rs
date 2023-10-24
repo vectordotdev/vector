@@ -1,12 +1,12 @@
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
 use async_trait::async_trait;
-use vector_common::internal_event::Protocol;
 use vector_config::{component::GenerateConfig, configurable_component};
 use vector_core::{
     config::{AcknowledgementsConfig, Input},
     sink::VectorSink,
 };
+use vector_lib::internal_event::Protocol;
 
 use crate::{
     config::{SinkConfig, SinkContext},

@@ -6,9 +6,9 @@ use http::{StatusCode, Uri};
 use hyper::{Body, Request};
 use indoc::indoc;
 use tower::Service;
-use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 use vector_core::{ByteSizeOf, EstimatedJsonEncodedSizeOf};
+use vector_lib::sensitive_string::SensitiveString;
 
 use super::Region;
 use crate::{

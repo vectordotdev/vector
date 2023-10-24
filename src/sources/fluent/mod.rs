@@ -638,8 +638,8 @@ mod tests {
         time::{error::Elapsed, timeout, Duration},
     };
     use tokio_util::codec::Decoder;
-    use vector_common::assert_event_data_eq;
     use vector_core::{event::Value, schema::Definition};
+    use vector_lib::assert_event_data_eq;
     use vrl::value::kind::Collection;
 
     use super::{message::FluentMessageOptions, *};

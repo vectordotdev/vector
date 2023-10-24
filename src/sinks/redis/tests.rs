@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
 use codecs::{JsonSerializerConfig, TextSerializerConfig};
-use vector_common::request_metadata::GroupedCountByteSize;
 use vector_core::event::LogEvent;
+use vector_lib::request_metadata::GroupedCountByteSize;
 
 use super::{config::RedisSinkConfig, request_builder::encode_event};
 use crate::{

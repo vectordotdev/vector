@@ -10,14 +10,14 @@ use codecs::{
 use futures::{channel::mpsc, executor, SinkExt, StreamExt};
 use lookup::{lookup_v2::OptionalValuePath, owned_value_path, path, OwnedValuePath};
 use tokio_util::{codec::FramedRead, io::StreamReader};
-use vector_common::internal_event::{
-    ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol,
-};
 use vector_config::NamedComponent;
 use vector_core::{
     config::{LegacyKey, LogNamespace},
     event::Event,
     EstimatedJsonEncodedSizeOf,
+};
+use vector_lib::internal_event::{
+    ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol,
 };
 use vrl::value::Kind;
 

@@ -14,8 +14,8 @@ use aws_credential_types::{
 };
 use aws_types::region::Region;
 use serde_with::serde_as;
-use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
+use vector_lib::sensitive_string::SensitiveString;
 
 // matches default load timeout from the SDK as of 0.10.1, but lets us confidently document the
 // default rather than relying on the SDK default to not change

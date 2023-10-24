@@ -276,7 +276,7 @@ pub use self::{
 #[macro_export]
 macro_rules! emit {
     ($event:expr) => {
-        vector_common::internal_event::emit(vector_common::internal_event::DefaultName {
+        vector_lib::internal_event::emit(vector_lib::internal_event::DefaultName {
             event: $event,
             name: stringify!($event),
         })
@@ -287,7 +287,7 @@ macro_rules! emit {
 #[macro_export]
 macro_rules! emit {
     ($event:expr) => {
-        vector_common::internal_event::emit($event)
+        vector_lib::internal_event::emit($event)
     };
 }
 
@@ -295,7 +295,7 @@ macro_rules! emit {
 #[macro_export]
 macro_rules! register {
     ($event:expr) => {
-        vector_common::internal_event::register(vector_common::internal_event::DefaultName {
+        vector_lib::internal_event::register(vector_lib::internal_event::DefaultName {
             event: $event,
             name: stringify!($event),
         })
@@ -306,6 +306,6 @@ macro_rules! register {
 #[macro_export]
 macro_rules! register {
     ($event:expr) => {
-        vector_common::internal_event::register($event)
+        vector_lib::internal_event::register($event)
     };
 }

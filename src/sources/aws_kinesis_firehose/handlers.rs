@@ -9,16 +9,16 @@ use futures::StreamExt;
 use lookup::{metadata_path, path, PathPrefix};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
-use vector_common::{
-    finalization::AddBatchNotifier,
-    internal_event::{
-        ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Registered,
-    },
-};
 use vector_core::{
     config::{LegacyKey, LogNamespace},
     event::BatchNotifier,
     EstimatedJsonEncodedSizeOf,
+};
+use vector_lib::{
+    finalization::AddBatchNotifier,
+    internal_event::{
+        ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Registered,
+    },
 };
 use vrl::compiler::SecretTarget;
 use warp::reject;

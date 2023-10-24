@@ -1,7 +1,7 @@
 use std::{io, num::NonZeroUsize};
 
 use bytes::Bytes;
-use vector_common::request_metadata::{GroupedCountByteSize, RequestMetadata};
+use vector_lib::request_metadata::{GroupedCountByteSize, RequestMetadata};
 
 use super::{encoding::Encoder, metadata::RequestMetadataBuilder, Compression, Compressor};
 

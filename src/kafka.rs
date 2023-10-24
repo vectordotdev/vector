@@ -3,8 +3,8 @@ use std::path::{Path, PathBuf};
 
 use rdkafka::{consumer::ConsumerContext, ClientConfig, ClientContext, Statistics};
 use snafu::Snafu;
-use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
+use vector_lib::sensitive_string::SensitiveString;
 
 use crate::{
     internal_events::KafkaStatisticsReceived, tls::TlsEnableableConfig, tls::PEM_START_MARKER,

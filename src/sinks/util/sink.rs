@@ -48,7 +48,7 @@ use tokio::{
 };
 use tower::{Service, ServiceBuilder};
 use tracing::Instrument;
-use vector_common::internal_event::{
+use vector_lib::internal_event::{
     CallError, CountByteSize, EventsSent, InternalEventHandle as _, Output,
 };
 // === StreamSink<Event> ===
@@ -576,7 +576,7 @@ mod tests {
     use bytes::Bytes;
     use futures::{future, stream, task::noop_waker_ref, SinkExt, StreamExt};
     use tokio::{task::yield_now, time::Instant};
-    use vector_common::{
+    use vector_lib::{
         finalization::{BatchNotifier, BatchStatus, EventFinalizer, EventFinalizers},
         json_size::JsonSize,
     };

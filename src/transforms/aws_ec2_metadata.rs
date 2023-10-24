@@ -761,7 +761,7 @@ mod integration_tests {
         transforms::test::create_topology,
     };
     use std::collections::BTreeMap;
-    use vector_common::assert_event_data_eq;
+    use vector_lib::assert_event_data_eq;
     use vrl::value::Value;
     use warp::Filter;
 

@@ -7,7 +7,6 @@ use futures::{Stream, StreamExt};
 use metrics::{register_histogram, Histogram};
 use tracing::Span;
 use vector_buffers::topology::channel::{self, LimitedReceiver, LimitedSender};
-use vector_common::internal_event::{ComponentEventsDropped, UNINTENTIONAL};
 #[cfg(test)]
 use vector_core::event::{into_event_stream, EventStatus};
 use vector_core::{
@@ -18,6 +17,7 @@ use vector_core::{
     },
     ByteSizeOf, EstimatedJsonEncodedSizeOf,
 };
+use vector_lib::internal_event::{ComponentEventsDropped, UNINTENTIONAL};
 use vrl::value::Value;
 
 mod errors;

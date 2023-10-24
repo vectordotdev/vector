@@ -220,7 +220,7 @@ mod test {
         // put them back into order before comparing.
         output.sort_unstable_by_key(|event| event.as_metric().name().to_owned());
 
-        vector_common::assert_event_data_eq!(events, output);
+        vector_lib::assert_event_data_eq!(events, output);
     }
 
     fn make_events() -> Vec<Event> {
@@ -330,7 +330,7 @@ mod test {
         )
         .await;
 
-        vector_common::assert_event_data_eq!(expected, output);
+        vector_lib::assert_event_data_eq!(expected, output);
     }
 }
 

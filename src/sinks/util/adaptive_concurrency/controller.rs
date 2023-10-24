@@ -6,7 +6,7 @@ use std::{
 
 use tokio::sync::OwnedSemaphorePermit;
 use tower::timeout::error::Elapsed;
-use vector_common::internal_event::{InternalEventHandle as _, Registered};
+use vector_lib::internal_event::{InternalEventHandle as _, Registered};
 
 use super::{instant_now, semaphore::ShrinkableSemaphore, AdaptiveConcurrencySettings};
 #[cfg(test)]

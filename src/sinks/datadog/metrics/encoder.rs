@@ -9,13 +9,13 @@ use bytes::{BufMut, Bytes};
 use chrono::{DateTime, Utc};
 use once_cell::sync::Lazy;
 use snafu::{ResultExt, Snafu};
-use vector_common::request_metadata::GroupedCountByteSize;
 use vector_core::{
     config::{log_schema, telemetry, LogSchema},
     event::{metric::MetricSketch, DatadogMetricOriginMetadata, Metric, MetricTags, MetricValue},
     metrics::AgentDDSketch,
     EstimatedJsonEncodedSizeOf,
 };
+use vector_lib::request_metadata::GroupedCountByteSize;
 
 use super::config::{
     DatadogMetricsEndpoint, SeriesApiVersion, MAXIMUM_PAYLOAD_COMPRESSED_SIZE, MAXIMUM_PAYLOAD_SIZE,

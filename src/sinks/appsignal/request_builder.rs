@@ -1,11 +1,11 @@
 use bytes::Bytes;
 
-use vector_common::{
+use vector_core::event::Event;
+use vector_lib::{
     byte_size_of::ByteSizeOf,
     finalization::{EventFinalizers, Finalizable},
     request_metadata::{MetaDescriptive, RequestMetadata},
 };
-use vector_core::event::Event;
 
 use crate::sinks::util::{
     metadata::RequestMetadataBuilder, request_builder::EncodeResult, Compression, RequestBuilder,

@@ -11,8 +11,8 @@ use tokio::{
 use tokio_stream::wrappers::UnixListenerStream;
 use tokio_util::codec::FramedRead;
 use tracing::{field, Instrument};
-use vector_common::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
 use vector_core::EstimatedJsonEncodedSizeOf;
+use vector_lib::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
 
 use super::AfterReadExt;
 use crate::{

@@ -1,11 +1,11 @@
 use std::borrow::Cow;
 
 use metrics::counter;
-use vector_common::{
+use vector_core::internal_event::InternalEvent;
+use vector_lib::{
     internal_event::{error_stage, error_type},
     json_size::JsonSize,
 };
-use vector_core::internal_event::InternalEvent;
 
 use super::prelude::{http_error_code, hyper_error_code};
 

@@ -14,8 +14,8 @@ use hyper::Body;
 use indexmap::IndexMap;
 use tower::Service;
 use tracing::Instrument;
-use vector_common::request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata};
 use vector_core::event::{EventFinalizers, EventStatus, Finalizable};
+use vector_lib::request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata};
 use vector_stream::DriverResponse;
 
 use crate::{

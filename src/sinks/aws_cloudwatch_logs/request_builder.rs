@@ -3,11 +3,11 @@ use std::num::NonZeroUsize;
 use bytes::BytesMut;
 use chrono::Utc;
 use tokio_util::codec::Encoder as _;
-use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
 use vector_core::{
     event::{EventFinalizers, Finalizable},
     ByteSizeOf,
 };
+use vector_lib::request_metadata::{MetaDescriptive, RequestMetadata};
 
 use super::TemplateRenderingError;
 use crate::{
