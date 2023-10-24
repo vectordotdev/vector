@@ -725,19 +725,30 @@ components: sources: internal_metrics: {
 			description:       "The total number of gRPC messages received."
 			type:              "counter"
 			default_namespace: "vector"
-			tags:              _component_tags & _method & _path
+			tags:              _component_tags & {
+				grpc_method:  _grpc_method
+				grpc_service: _grpc_service
+			}
 		}
 		grpc_server_messages_sent_total: {
 			description:       "The total number of gRPC messages sent."
 			type:              "counter"
 			default_namespace: "vector"
-			tags:              _component_tags & _method & _path
+			tags:              _component_tags & {
+				grpc_method:  _grpc_method
+				grpc_service: _grpc_service
+				grpc_status:  _grpc_status
+			}
 		}
 		grpc_server_handler_duration_seconds: {
 			description:       "The duration spent handling a gRPC request."
 			type:              "histogram"
 			default_namespace: "vector"
-			tags:              _component_tags & _method & _path & _status
+			tags:              _component_tags & {
+				grpc_method:  _grpc_method
+				grpc_service: _grpc_service
+				grpc_status:  _grpc_status
+			}
 		}
 		http_bad_requests_total: {
 			description:       "The total number of HTTP `400 Bad Request` errors encountered."
@@ -797,19 +808,30 @@ components: sources: internal_metrics: {
 			description:       "The total number of HTTP requests received."
 			type:              "counter"
 			default_namespace: "vector"
-			tags:              _component_tags & _grpc_method & _grpc_service
+			tags:              _component_tags & {
+				method: _method
+				path:   _path
+			}
 		}
 		http_server_responses_sent_total: {
 			description:       "The total number of HTTP responses sent."
 			type:              "counter"
 			default_namespace: "vector"
-			tags:              _component_tags & _grpc_method & _grpc_service & _grpc_status
+			tags:              _component_tags & {
+				method: _method
+				path:   _path
+				status: _status
+			}
 		}
 		http_server_handler_duration_seconds: {
 			description:       "The duration spent handling a HTTP request."
 			type:              "histogram"
 			default_namespace: "vector"
-			tags:              _component_tags & _grpc_method & _grpc_service & _grpc_status
+			tags:              _component_tags & {
+				method: _method
+				path:   _path
+				status: _status
+			}
 		}
 		invalid_record_total: {
 			description:       "The total number of invalid records that have been discarded."
