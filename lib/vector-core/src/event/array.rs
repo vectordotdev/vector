@@ -9,6 +9,7 @@ use futures::{stream, Stream};
 use quickcheck::{Arbitrary, Gen};
 use vector_buffers::EventCount;
 use vector_common::{
+    byte_size_of::ByteSizeOf,
     config::ComponentKey,
     finalization::{AddBatchNotifier, BatchNotifier, EventFinalizers, Finalizable},
     json_size::JsonSize,
@@ -18,7 +19,6 @@ use super::{
     EstimatedJsonEncodedSizeOf, Event, EventDataEq, EventFinalizer, EventMutRef, EventRef,
     LogEvent, Metric, TraceEvent,
 };
-use crate::ByteSizeOf;
 
 /// The type alias for an array of `LogEvent` elements.
 pub type LogArray = Vec<LogEvent>;

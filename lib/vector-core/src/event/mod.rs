@@ -1,7 +1,5 @@
 use std::{collections::BTreeMap, convert::TryInto, fmt::Debug, sync::Arc};
 
-use crate::config::LogNamespace;
-use crate::{config::OutputId, ByteSizeOf};
 pub use array::{into_event_stream, EventArray, EventContainer, LogArray, MetricArray, TraceArray};
 pub use estimated_json_encoded_size_of::EstimatedJsonEncodedSizeOf;
 pub use finalization::{
@@ -22,6 +20,9 @@ use vector_common::{
 pub use vrl::value::Value;
 #[cfg(feature = "vrl")]
 pub use vrl_target::{TargetEvents, VrlTarget};
+
+use crate::config::LogNamespace;
+use crate::{config::OutputId, ByteSizeOf};
 
 pub mod array;
 pub mod discriminant;

@@ -4,8 +4,8 @@ use lookup::lookup_v2::TargetPath;
 use serde::{Deserialize, Serialize};
 use vector_buffers::EventCount;
 use vector_common::{
-    internal_event::TaggedEventsSent, json_size::JsonSize, request_metadata::GetEventCountTags,
-    EventDataEq,
+    byte_size_of::ByteSizeOf, internal_event::TaggedEventsSent, json_size::JsonSize,
+    request_metadata::GetEventCountTags, EventDataEq,
 };
 use vrl::path::PathParseError;
 
@@ -13,7 +13,6 @@ use super::{
     BatchNotifier, EstimatedJsonEncodedSizeOf, EventFinalizer, EventFinalizers, EventMetadata,
     Finalizable, LogEvent, Value,
 };
-use crate::ByteSizeOf;
 
 /// Traces are a newtype of `LogEvent`
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
