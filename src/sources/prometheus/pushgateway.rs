@@ -175,7 +175,11 @@ fn decode_label_pair(k: &str, v: &str) -> Result<(String, String), ErrorMessage>
         )
     })?;
 
-    Ok((k.to_owned(), decoded))
+    // We should never return the default here as we already returned from the function
+    // if the key doesn't end with "@base64", but we need to satisfy the compiler
+    let stripped_key = k.strip_suffix("@base64").unwrap_or(k);
+
+    Ok((stripped_key.to_owned(), decoded))
 }
 
 #[cfg(test)]
@@ -200,5 +204,16 @@ mod test {
 
         assert!(res.is_err());
         assert!(res.unwrap_err().message().contains("number of segments"));
+    }
+
+    #[test]
+    fn test_parse_path_with_base64_segment() {
+        let path = "/metrics/job/foo/instance@base64/YmFyL2Jheg==";
+        let expected: Vec<_>= vec![("job", "foo"), ("instance", "bar/baz")].into_iter().
+            map(|(k,v)| (k.to_owned(), v.to_owned())).collect();
+        let actual = parse_path_labels(path);
+
+        assert!(actual.is_ok());
+        assert_eq!(actual.unwrap(), expected);
     }
 }
