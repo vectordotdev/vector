@@ -105,9 +105,9 @@ pub mod sink {
 
     impl InternalEvent for AmqpDeliveryError<'_> {
         fn emit(self) {
-            let deliver_reason = "Unable to deliver.";
+            const DELIVER_REASON: &str = "Unable to deliver.";
 
-            error!(message = deliver_reason,
+            error!(message = DELIVER_REASON,
                    error = ?self.error,
                    error_type = error_type::REQUEST_FAILED,
                    stage = error_stage::SENDING,
@@ -120,7 +120,7 @@ pub mod sink {
             );
             emit!(ComponentEventsDropped::<UNINTENTIONAL> {
                 count: 1,
-                reason: deliver_reason
+                reason: DELIVER_REASON
             });
         }
     }
@@ -132,9 +132,9 @@ pub mod sink {
 
     impl InternalEvent for AmqpAcknowledgementError<'_> {
         fn emit(self) {
-            let ack_reason = "Acknowledgement failed.";
+            const ACK_REASON: &str = "Acknowledgement failed.";
 
-            error!(message = ack_reason,
+            error!(message = ACK_REASON,
                    error = ?self.error,
                    error_type = error_type::REQUEST_FAILED,
                    stage = error_stage::SENDING,
@@ -147,7 +147,7 @@ pub mod sink {
             );
             emit!(ComponentEventsDropped::<UNINTENTIONAL> {
                 count: 1,
-                reason: ack_reason
+                reason: ACK_REASON
             });
         }
     }
@@ -157,9 +157,9 @@ pub mod sink {
 
     impl InternalEvent for AmqpNackError {
         fn emit(self) {
-            let deliver_reason = "Received Negative Acknowledgement from AMQP broker.";
+            const DELIVER_REASON: &str = "Received Negative Acknowledgement from AMQP broker.";
             error!(
-                message = deliver_reason,
+                message = DELIVER_REASON,
                 error_type = error_type::ACKNOWLEDGMENT_FAILED,
                 stage = error_stage::SENDING,
                 internal_log_rate_limit = true,
@@ -171,7 +171,7 @@ pub mod sink {
             );
             emit!(ComponentEventsDropped::<UNINTENTIONAL> {
                 count: 1,
-                reason: deliver_reason
+                reason: DELIVER_REASON
             });
         }
     }
