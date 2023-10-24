@@ -9,7 +9,7 @@ use tower::ServiceBuilder;
 use vector_config::configurable_component;
 use vector_core::sink::VectorSink;
 
-use super::sink::S3RequestOptions;
+use super::sink::{NewS3Sink, S3RequestOptions};
 use crate::{
     aws::{AwsAuthentication, RegionOrEndpoint},
     codecs::{Encoder, EncodingConfigWithFraming, SinkType},
@@ -20,7 +20,6 @@ use crate::{
             config::{S3Options, S3RetryLogic},
             partitioner::S3KeyPartitioner,
             service::S3Service,
-            sink::S3Sink,
         },
         util::{
             BatchConfig, BulkSizeBasedDefaultBatchSettings, Compression, ServiceBuilderExt,
@@ -199,7 +198,7 @@ impl S3SinkConfig {
             .service(service);
 
         // Configure our partitioning/batching.
-        let batch_settings = self.batch.into_batcher_settings()?;
+        let batcher_settings = self.batch.into_batcher_settings()?;
         let key_prefix = self.key_prefix.clone().try_into()?;
         let ssekms_key_id = self
             .options
@@ -212,7 +211,7 @@ impl S3SinkConfig {
 
         let transformer = self.encoding.transformer();
         let (framer, serializer) = self.encoding.build(SinkType::MessageBased)?;
-        let encoder = Encoder::<Framer>::new(framer, serializer);
+        let encoder = Encoder::<Framer>::new(framer.clone(), serializer.clone());
 
         let request_options = S3RequestOptions {
             bucket: self.bucket.clone(),
@@ -220,11 +219,19 @@ impl S3SinkConfig {
             filename_extension: self.filename_extension.clone(),
             filename_time_format: self.filename_time_format.clone(),
             filename_append_uuid: self.filename_append_uuid,
-            encoder: (transformer, encoder),
+            encoder: (transformer.clone(), encoder),
             compression: self.compression,
         };
 
-        let sink = S3Sink::new(service, request_options, partitioner, batch_settings);
+        let sink = NewS3Sink {
+            service,
+            partitioner,
+            transformer,
+            framer,
+            serializer,
+            batcher_settings,
+            options: request_options,
+        };
 
         Ok(VectorSink::from_event_streamsink(sink))
     }
