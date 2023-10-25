@@ -19,9 +19,7 @@ Our APT repositories are provided by [Cloudsmith] and you can find [instructions
 First, add the Vector repo:
 
 ```shell
-curl -1sLf \
-  'https://repositories.timber.io/public/vector/cfg/setup/bash.deb.sh' \
-| sudo -E bash
+bash -c "$(curl -L https://setup.vector.dev)"
 ```
 
 Then you can install the `vector` package:

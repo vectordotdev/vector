@@ -82,6 +82,12 @@ to = "https://www.datadoghq.com/product/observability-pipelines"
 status = 301
 force = true
 
+[[redirects]]
+from = "https://setup.vector.dev/*"
+to = "https://s3.amazonaws.com/dd-agent/scripts/install_script_vector0.sh"
+status = 302
+force = true
+
 # Removed pages redirects
 [[redirects]]
 from = "/docs/reference/configuration/field-path-notation/"
