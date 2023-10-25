@@ -6,7 +6,10 @@ edition = "2021"
 publish = false
 
 [dependencies]
-vector-common = { path = "../vector-common", default-features = false }
+vector-common = { path = "../vector-common" }
+vector-config = { path = "../vector-config" }
+vector-config-common = { path = "../vector-config-common" }
+vector-config-macros = { path = "../vector-config-macros" }
 vector-core = { path = "../vector-core", default-features = false }
 
 [features]

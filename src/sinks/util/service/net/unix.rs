@@ -10,7 +10,7 @@ use tokio::{
     net::{UnixDatagram, UnixStream},
 };
 
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 
 use crate::net;
 

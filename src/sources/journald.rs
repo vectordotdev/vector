@@ -28,7 +28,7 @@ use tokio::{
     time::sleep,
 };
 use tokio_util::codec::FramedRead;
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 use vector_lib::{
     config::{LegacyKey, LogNamespace},
     schema::Definition,

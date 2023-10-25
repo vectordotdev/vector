@@ -3,7 +3,7 @@
 #![allow(dead_code)]
 #![allow(unreachable_pub)]
 use serde::{Deserialize, Serialize};
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 use vector_lib::event::DatadogMetricOriginMetadata;
 
 pub const DD_US_SITE: &str = "datadoghq.com";

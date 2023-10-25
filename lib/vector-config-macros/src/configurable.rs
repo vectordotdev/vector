@@ -647,10 +647,10 @@ fn get_metadata_custom_attributes(
     let mapped_custom_attributes = custom_attributes
         .map(|attr| match attr {
             LazyCustomAttribute::Flag(key) => quote! {
-                #meta_ident.add_custom_attribute(::vector_config_common::attributes::CustomAttribute::flag(#key));
+                #meta_ident.add_custom_attribute(::vector_config::attributes::CustomAttribute::flag(#key));
             },
             LazyCustomAttribute::KeyValue { key, value } => quote! {
-                #meta_ident.add_custom_attribute(::vector_config_common::attributes::CustomAttribute::kv(
+                #meta_ident.add_custom_attribute(::vector_config::attributes::CustomAttribute::kv(
                     #key, #value
                 ));
             },

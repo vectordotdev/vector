@@ -2,7 +2,7 @@ use futures::FutureExt;
 use http::{StatusCode, Uri};
 use hyper::Body;
 use snafu::Snafu;
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 
 use crate::{
     gcp::{GcpAuthenticator, GcpError},

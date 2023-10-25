@@ -3,7 +3,7 @@ use codecs::{
     encoding::{Framer, FramingConfig, Serializer, SerializerConfig},
     CharacterDelimitedEncoder, LengthDelimitedEncoder, NewlineDelimitedEncoder,
 };
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 
 /// Encoding configuration.
 #[configurable_component]

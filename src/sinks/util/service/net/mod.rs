@@ -44,7 +44,7 @@ use tokio::{
     time::sleep,
 };
 use tower::Service;
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 use vector_lib::tls::{MaybeTlsStream, TlsError};
 
 /// Hostname and port tuple.

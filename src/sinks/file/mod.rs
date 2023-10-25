@@ -19,7 +19,7 @@ use tokio::{
     io::AsyncWriteExt,
 };
 use tokio_util::codec::Encoder as _;
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 use vector_lib::{
     internal_event::{CountByteSize, EventsSent, InternalEventHandle as _, Output, Registered},
     EstimatedJsonEncodedSizeOf,

@@ -2,7 +2,7 @@ use futures_util::FutureExt;
 use http::{Request, StatusCode, Uri};
 use hyper::body::Body;
 use snafu::Snafu;
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 use vector_lib::sensitive_string::SensitiveString;
 use vector_lib::{config::AcknowledgementsConfig, tls::TlsEnableableConfig};
 

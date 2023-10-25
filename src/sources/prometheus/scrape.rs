@@ -6,7 +6,7 @@ use futures_util::FutureExt;
 use http::{response::Parts, Uri};
 use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 use vector_lib::{config::LogNamespace, event::Event};
 
 use super::parser;

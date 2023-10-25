@@ -21,7 +21,7 @@ use tokio::{
 };
 use tokio_stream::wrappers::IntervalStream;
 use tokio_util::codec::FramedRead;
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 use vector_lib::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
 use vector_lib::{config::LegacyKey, EstimatedJsonEncodedSizeOf};
 use vrl::path::OwnedValuePath;

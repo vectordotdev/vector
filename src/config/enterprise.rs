@@ -38,7 +38,7 @@ use crate::{
     },
     transforms::{filter::FilterConfig, remap::RemapConfig},
 };
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 
 static HOST_METRICS_KEY: &str = "_datadog_host_metrics";
 static TAG_METRICS_KEY: &str = "_datadog_tag_metrics";

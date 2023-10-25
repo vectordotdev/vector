@@ -4,8 +4,8 @@ use bytes::Bytes;
 use futures::{Stream, StreamExt};
 use lookup::lookup_v2::ConfigTargetPath;
 use lru::LruCache;
-use vector_config::configurable_component;
 use vector_lib::config::{clone_input_definitions, LogNamespace};
+use vector_lib::configurable::configurable_component;
 use vrl::path::OwnedTargetPath;
 
 use crate::{

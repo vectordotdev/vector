@@ -3,7 +3,7 @@ use std::{path::PathBuf, sync::Arc, time::Duration};
 use codecs::MetricTagValues;
 use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 pub use vector_lib::event::lua;
 use vector_lib::transform::runtime_transform::{RuntimeTransform, Timer};
 

@@ -131,11 +131,11 @@ impl TypedComponent {
         let helper_attr = get_named_component_helper_ident(self.component_type);
         match self.component_name.as_ref() {
             None => quote_spanned! {self.span=>
-                #[derive(::vector_config_macros::NamedComponent)]
+                #[derive(::vector_config::NamedComponent)]
                 #[#helper_attr]
             },
             Some(component_name) => quote_spanned! {self.span=>
-                #[derive(::vector_config_macros::NamedComponent)]
+                #[derive(::vector_config::NamedComponent)]
                 #[#helper_attr(#component_name)]
             },
         }
@@ -307,7 +307,7 @@ pub fn configurable_component_impl(args: TokenStream, item: TokenStream) -> Toke
     // Generate and apply all of the necessary derives.
     let mut derives = Punctuated::<Path, Comma>::new();
     derives.push(parse_quote_spanned! {input.ident.span()=>
-        ::vector_config_macros::Configurable
+        ::vector_config::Configurable
     });
 
     if !options.skip_derive_ser() {

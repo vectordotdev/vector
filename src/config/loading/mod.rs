@@ -18,7 +18,7 @@ use loader::process::Process;
 pub use loader::*;
 pub use secret::*;
 pub use source::*;
-use vector_config::NamedComponent;
+use vector_lib::configurable::NamedComponent;
 
 use super::{
     builder::ConfigBuilder, format, validation, vars, Config, ConfigPath, Format, FormatHint,

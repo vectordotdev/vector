@@ -3,11 +3,11 @@ use std::collections::HashMap;
 
 use async_trait::async_trait;
 use dyn_clone::DynClone;
-use vector_config::{
+use vector_lib::configurable::attributes::CustomAttribute;
+use vector_lib::configurable::schema::{SchemaGenerator, SchemaObject};
+use vector_lib::configurable::{
     configurable_component, Configurable, GenerateError, Metadata, NamedComponent,
 };
-use vector_config_common::attributes::CustomAttribute;
-use vector_config_common::schema::{SchemaGenerator, SchemaObject};
 use vector_lib::{
     config::{
         AcknowledgementsConfig, GlobalOptions, LogNamespace, SourceAcknowledgementsConfig,
@@ -35,7 +35,7 @@ impl Configurable for BoxedSource {
     }
 
     fn generate_schema(gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
-        vector_config::component::SourceDescription::generate_schemas(gen)
+        vector_lib::configurable::component::SourceDescription::generate_schemas(gen)
     }
 }
 

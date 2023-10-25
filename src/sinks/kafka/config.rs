@@ -5,7 +5,7 @@ use futures::FutureExt;
 use lookup::lookup_v2::ConfigTargetPath;
 use rdkafka::ClientConfig;
 use serde_with::serde_as;
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 use vrl::value::Kind;
 
 use crate::{

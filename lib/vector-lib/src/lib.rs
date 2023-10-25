@@ -23,3 +23,12 @@ pub mod config {
         MEMORY_BUFFER_DEFAULT_MAX_EVENTS,
     };
 }
+
+pub mod configurable {
+    pub use vector_config::{
+        component, configurable_component, schema, Configurable, ConfigurableString, GenerateError,
+        Metadata, NamedComponent, ToValue,
+    };
+    pub use vector_config_common::{attributes, validation};
+    pub use vector_config_macros::*;
+}
