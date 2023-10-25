@@ -4,10 +4,14 @@ pub use vector_common::{
     registered_event, request_metadata, sensitive_string, shutdown, trigger, Error, Result,
     TimeZone,
 };
+#[cfg(feature = "vrl")]
+pub use vector_core::compile_vrl;
+#[cfg(feature = "test")]
+pub use vector_core::event_test_util;
 pub use vector_core::{
-    buckets, buffers, compile_vrl, default_data_dir, event, event_test_util, fanout, metric_tags,
-    metrics, partition, quantiles, samples, schema, serde, sink, source, tcp, tls, transform,
-    update_counter, EstimatedJsonEncodedSizeOf,
+    buckets, buffers, default_data_dir, event, fanout, metric_tags, metrics, partition, quantiles,
+    samples, schema, serde, sink, source, tcp, tls, transform, update_counter,
+    EstimatedJsonEncodedSizeOf,
 };
 
 pub mod config {

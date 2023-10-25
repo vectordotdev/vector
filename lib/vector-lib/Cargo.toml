@@ -8,3 +8,9 @@ publish = false
 [dependencies]
 vector-common = { path = "../vector-common", default-features = false }
 vector-core = { path = "../vector-core", default-features = false }
+
+[features]
+api = ["vector-core/api"]
+lua = ["vector-core/lua"]
+test = ["vector-core/test"]
+vrl = ["vector-core/vrl"]

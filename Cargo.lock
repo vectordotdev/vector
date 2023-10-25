@@ -9869,7 +9869,6 @@ dependencies = [
  "vector-config",
  "vector-config-common",
  "vector-config-macros",
- "vector-core",
  "vector-lib",
  "vector-lookup",
  "vector-stream",

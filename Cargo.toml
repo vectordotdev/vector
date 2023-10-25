@@ -144,7 +144,7 @@ vector-buffers = { path = "lib/vector-buffers", default-features = false }
 vector-config = { path = "lib/vector-config" }
 vector-config-common = { path = "lib/vector-config-common" }
 vector-config-macros = { path = "lib/vector-config-macros" }
-vector-lib = { path = "lib/vector-lib", default-features = false }
+vector-lib = { path = "lib/vector-lib", default-features = false, features = ["vrl"] }
 vector-stream = { path = "lib/vector-stream" }
 vector-vrl-functions = { path = "lib/vector-vrl/functions" }
 loki-logproto = { path = "lib/loki-logproto", optional = true }
@@ -376,7 +376,7 @@ test-generator = "0.3.1"
 tokio = { version = "1.33.0", features = ["test-util"] }
 tokio-test = "0.4.3"
 tower-test = "0.4.0"
-vector-core = { path = "lib/vector-core", default-features = false, features = ["vrl", "test"] }
+vector-lib = { path = "lib/vector-lib", default-features = false, features = ["vrl", "test"] }
 vrl = { version = "0.7.0", features = ["cli", "test", "test_framework", "arbitrary"] }
 
 wiremock = "0.5.19"
@@ -437,7 +437,7 @@ api = [
   "dep:async-graphql",
   "dep:async-graphql-warp",
   "dep:base64",
-  "vector-core/api",
+  "vector-lib/api",
 ]
 
 # API client
@@ -446,7 +446,7 @@ api-client = [
   "dep:num-format",
   "dep:number_prefix",
   "dep:ratatui",
-  "vector-core/api",
+  "vector-lib/api",
   "dep:vector-api-client",
 ]
 
@@ -607,7 +607,7 @@ transforms-aws_ec2_metadata = ["dep:arc-swap"]
 transforms-dedupe = ["dep:lru"]
 transforms-filter = []
 transforms-log_to_metric = []
-transforms-lua = ["dep:mlua", "vector-core/lua"]
+transforms-lua = ["dep:mlua", "vector-lib/lua"]
 transforms-metric_to_log = []
 transforms-pipelines = ["transforms-filter", "transforms-route"]
 transforms-reduce = []
