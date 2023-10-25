@@ -1,80 +1,24 @@
-name: Deploy Vector Website Preview Sites
+name: Deploy Vector Preview Sites
 
 on:
   pull_request:
     types: [opened, reopened, syncronize]
 
 jobs:
-  deploy_preview_site:
-    runs-on: ubuntu-latest
-    env:
-      VECTOR_WEBSITE_APP_ID: "d1a7j77663uxsc"
-      VECTOR_RUSTDOC_APP_ID: "d1hoyoksbulg25"
-      VECTOR_PLAYGROUND_APP_ID: "d2lr4eds605rpz"
+  deploy_vecotr_preview_site:
+    uses: .github/workflows/create_preview_sites.yml@master
+    with:
+      APP_ID: "d1a7j77663uxsc"
+      APP_NAME: "vector.dev"
 
-    steps:
-    # Create the HMAC key
-    - name: Start Amplify Builds
-      env:
-        REQUEST_TOKEN: ${{ secrets.REQUEST_TOKEN }}
-        REQUEST_MESSAGE: ${{ secrets.REQUEST_MESSAGE }}
-        ENDPOINT: ${{ secrets.BUILDER_ENDPOINT }}
-      run: |
-        HMAC_KEY=$(echo -n $REQUEST_MESSAGE | openssl dgst -sha256 -hmac "$REQUEST_TOKEN" -binary | od -An -tx1 | tr -d ' \n'; echo)
-        SIGNATURE="sha256=$HMAC_KEY"
+  deploy_rust_doc_preview_site:
+    uses: .github/workflows/create_preview_sites.yml@master
+    with:
+      APP_ID: "d1hoyoksbulg25"
+      APP_NAME: "Rust Doc"
 
-        # Vector.dev
-        WEBSITE_RESPONSE_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
-             -H "Content-Type: application/json" \
-             -H "X-Hub-Signature: $SIGNATURE" \
-             -d "{\"app_id\": \"$VECTOR_WEBSITE_APP_ID\", \"branch_name\": \"${{ github.head_ref }}\"}" \
-          "$ENDPOINT")
-
-        # check the response code and fail if not 200
-        if [ "$WEBSITE_RESPONSE_CODE" != "200" ]; then
-          echo "Request failed with response code $RESPONSE_CODE"
-          exit 1
-        fi
-
-        # Rust Doc
-        RUSTDOC_RESPONSE_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
-             -H "Content-Type: application/json" \
-             -H "X-Hub-Signature: $SIGNATURE" \
-             -d "{\"app_id\": \"$VECTOR_RUSTDOC_APP_ID\", \"branch_name\": \"${{ github.head_ref }}\"}" \
-          "$ENDPOINT")
-
-        # check the response code and fail if not 200
-        if [ "$RUSTDOC_RESPONSE_CODE" != "200" ]; then
-          echo "Request failed with response code $RESPONSE_CODE"
-          exit 1
-        fi
-
-        # VRL Playground
-        PLAYGROUND_RESPONSE_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
-             -H "Content-Type: application/json" \
-             -H "X-Hub-Signature: $SIGNATURE" \
-             -d "{\"app_id\": \"$VECTOR_PLAYGROUND_APP_ID\", \"branch_name\": \"${{ github.head_ref }}\"}" \
-          "$ENDPOINT")
-
-        # check the response code and fail if not 200
-        if [ "$WEBSITE_RESPONSE_CODE" != "200" ]; then
-          echo "Request failed with response code $RESPONSE_CODE"
-          exit 1
-        fi
-
-    # Add preview link to comment if all 3 sites successfully start
-    - name: Comment Preview Link
-      if: success()
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: |
-        URLIZED_BRANCH=$(echo "${{ github.head_ref }}" | tr './' '--')
-        COMMENT_URL="https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments"
-        COMMENT_CONTENT="Your preview site for the **Vector Website** will be ready in a few minutes, please allow time for it to build. \n \n Here's your links: \n [vector.dev](https://$URLIZED_BRANCH.$VECTOR_WEBSITE_APP_ID.amplifyapp.com) \n [Rust Doc](https://$URLIZED_BRANCH.$VECTOR_RUSTDOC_APP_ID.amplifyapp.com). \n [VRL Playground](https://$URLIZED_BRANCH.$VECTOR_PLAYGROUND_APP_ID.amplifyapp.com))"
-
-        curl -sSL \
-             -H "Authorization: token $GITHUB_TOKEN" \
-             -H "Content-Type: application/json" \
-             -X POST \
-             -d "{\"body\": \"$COMMENT_CONTENT\"}" \
-             $COMMENT_URL
+  deploy_vrl_playground_preview_site:
+    uses: .github/workflows/create_preview_sites.yml@master
+    with:
+      APP_ID: "d2lr4eds605rpz"
+      APP_NAME: "VRL Playground"

@@ -1,0 +1,43 @@
+name: Create Preview Sites
+
+on:
+  workflow_call:
+    inputs:
+      APP_ID:
+        description: "App ID for the associated website"
+        required: true
+        type: string
+      APP_NAME:
+        description: "Application name for the comment"
+        required: true
+        type: string
+
+jobs:
+  create_preview_site:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Deploy Site
+      run: |
+        RESPONSE_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
+             -H "Content-Type: application/json" \
+             -H "X-Hub-Signature: $SIGNATURE" \
+             -d "{\"app_id\": \"$APP_ID\", \"branch_name\": \"${{ github.head_ref }}\"}" \
+          "$ENDPOINT")
+
+        # check the response code and fail if not 200
+        if [ "$RESPONSE_CODE" != "200" ]; then
+          echo "Request failed with response code $RESPONSE_CODE"
+          exit 1
+        fi
+
+    # Add preview link to comment if all 3 sites successfully start
+    - name: Comment Preview Link
+      if: success()
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        URLIZED_BRANCH=$(echo "${{ github.head_ref }}" | tr './' '--')
+        COMMENT_URL="https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments"
+        COMMENT_CONTENT="Your preview site for the **$APP_NAME** will be ready in a few minutes, please allow time for it to build. \n \n Here's your link: \n [$APP_NAME preview](https://$URLIZED_BRANCH.$APP_ID.amplifyapp.com)"
+
+
