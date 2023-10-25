@@ -130,7 +130,6 @@ impl HttpSource for PushgatewaySource {
     }
 }
 
-// TODO: Test this
 fn parse_path_labels(path: &str) -> Result<Vec<(String, String)>, ErrorMessage> {
     if !path.starts_with("/metrics/job") {
         return Err(ErrorMessage::new(
