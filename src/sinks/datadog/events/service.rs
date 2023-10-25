@@ -12,7 +12,7 @@ use vector_common::{
     request_metadata::{GroupedCountByteSize, MetaDescriptive},
     sensitive_string::SensitiveString,
 };
-use vector_core::stream::DriverResponse;
+use vector_stream::DriverResponse;
 
 use crate::{
     event::EventStatus,

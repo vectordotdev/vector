@@ -3,7 +3,7 @@ package metadata
 remap: functions: unique: {
 	category: "Enumerate"
 	description: #"""
-		Returns unique values for an array.
+		Returns the unique values for an array.
 
 		The first occurrence of each element is kept.
 		"""#

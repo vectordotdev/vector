@@ -13,8 +13,10 @@ use vector_common::{
     json_size::JsonSize,
     request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata},
 };
-use vector_core::{stream::DriverResponse, ByteSizeOf};
+use vector_core::ByteSizeOf;
+use vector_stream::DriverResponse;
 
+use super::{ElasticsearchCommon, ElasticsearchConfig};
 use crate::{
     event::{EventFinalizers, EventStatus, Finalizable},
     http::HttpClient,
@@ -24,8 +26,6 @@ use crate::{
         Compression, ElementCount,
     },
 };
-
-use super::{ElasticsearchCommon, ElasticsearchConfig};
 
 #[derive(Clone, Debug)]
 pub struct ElasticsearchRequest {

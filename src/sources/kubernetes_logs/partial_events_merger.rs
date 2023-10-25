@@ -1,9 +1,12 @@
 #![deny(missing_docs)]
 
+use bytes::BytesMut;
 use futures::{Stream, StreamExt};
+use lookup::OwnedTargetPath;
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 use vector_core::config::LogNamespace;
+use vector_stream::expiration_map::{map_with_expiration, Emitter};
 use vrl::owned_value_path;
 
 use crate::event;
@@ -14,10 +17,6 @@ use crate::sources::kubernetes_logs::transform_utils::get_message_path;
 const FILE_KEY: &str = "file";
 
 const EXPIRATION_TIME: Duration = Duration::from_secs(30);
-
-use bytes::BytesMut;
-use lookup::OwnedTargetPath;
-use vector_core::stream::expiration_map::{map_with_expiration, Emitter};
 
 struct PartialEventMergeState {
     buckets: HashMap<String, Bucket>,

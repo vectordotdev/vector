@@ -28,7 +28,7 @@ use crate::config::schema::Definition;
 use crate::event::Value;
 pub use merge_strategy::*;
 use vector_core::config::LogNamespace;
-use vector_core::stream::expiration_map::{map_with_expiration, Emitter};
+use vector_stream::expiration_map::{map_with_expiration, Emitter};
 use vrl::value::kind::Collection;
 use vrl::value::Kind;
 

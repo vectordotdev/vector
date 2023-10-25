@@ -11,10 +11,8 @@ use hyper::Body;
 use snafu::ResultExt;
 use tower::Service;
 use vector_common::request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata};
-use vector_core::{
-    event::{EventFinalizers, EventStatus, Finalizable},
-    stream::DriverResponse,
-};
+use vector_core::event::{EventFinalizers, EventStatus, Finalizable};
+use vector_stream::DriverResponse;
 
 use crate::{
     http::{BuildRequestSnafu, CallRequestSnafu, HttpClient},

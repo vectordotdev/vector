@@ -15,11 +15,11 @@ use tower::Service;
 use vector_core::{
     event::{Finalizable, Metric},
     partition::Partitioner,
-    stream::{
-        batcher::{config::BatchConfig, Batcher},
-        ConcurrentMap, Driver, DriverResponse, ExpirationQueue, PartitionedBatcher,
-    },
     ByteSizeOf,
+};
+use vector_stream::{
+    batcher::{config::BatchConfig, Batcher},
+    ConcurrentMap, Driver, DriverResponse, ExpirationQueue, PartitionedBatcher,
 };
 
 use super::{
@@ -44,11 +44,11 @@ pub trait SinkBuilderExt: Stream {
     /// The stream will yield batches of events, with their partition key, when either a batch fills
     /// up or times out. [`Partitioner`] operates on a per-event basis, and has access to the event
     /// itself, and so can access any and all fields of an event.
-    fn batched_partitioned<P, C, F>(
+    fn batched_partitioned<P, C, F, B>(
         self,
         partitioner: P,
         settings: F,
-    ) -> PartitionedBatcher<Self, P, ExpirationQueue<P::Key>, C, F>
+    ) -> PartitionedBatcher<Self, P, ExpirationQueue<P::Key>, C, F, B>
     where
         Self: Stream<Item = P::Item> + Sized,
         P: Partitioner + Unpin,

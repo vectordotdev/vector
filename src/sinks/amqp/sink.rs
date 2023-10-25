@@ -43,6 +43,7 @@ impl AmqpSink {
             .await
             .map_err(|e| BuildError::AmqpCreateFailed { source: e })?;
 
+        // Enable confirmations on the channel.
         channel
             .confirm_select(ConfirmSelectOptions::default())
             .await

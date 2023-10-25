@@ -137,6 +137,7 @@ community-id,https://github.com/traceflight/rs-community-id,MIT OR Apache-2.0,Ju
 concurrent-queue,https://github.com/smol-rs/concurrent-queue,Apache-2.0 OR MIT,Stjepan Glavina <stjepang@gmail.com>
 concurrent-queue,https://github.com/smol-rs/concurrent-queue,Apache-2.0 OR MIT,"Stjepan Glavina <stjepang@gmail.com>, Taiki Endo <te316e89@gmail.com>, John Nunley <jtnunley01@gmail.com>"
 const-oid,https://github.com/RustCrypto/formats/tree/master/const-oid,Apache-2.0 OR MIT,RustCrypto Developers
+const_fn,https://github.com/taiki-e/const_fn,Apache-2.0 OR MIT,The const_fn Authors
 convert_case,https://github.com/rutrum/convert-case,MIT,David Purdum <purdum41@gmail.com>
 convert_case,https://github.com/rutrum/convert-case,MIT,Rutrum <dave@rutrum.net>
 cookie-factory,https://github.com/rust-bakery/cookie-factory,MIT,"Geoffroy Couprie <geo.couprie@gmail.com>, Pierre Chifflier <chifflier@wzdftpd.net>"
@@ -206,8 +207,6 @@ fallible-iterator,https://github.com/sfackler/rust-fallible-iterator,MIT OR Apac
 fastrand,https://github.com/smol-rs/fastrand,Apache-2.0 OR MIT,Stjepan Glavina <stjepang@gmail.com>
 fiat-crypto,https://github.com/mit-plv/fiat-crypto,MIT OR Apache-2.0 OR BSD-1-Clause,Fiat Crypto library authors <jgross@mit.edu>
 filetime,https://github.com/alexcrichton/filetime,MIT OR Apache-2.0,Alex Crichton <alex@alexcrichton.com>
-fix-hidden-lifetime-bug,https://github.com/danielhenrymantilla/fix-hidden-lifetime-bug.rs,Zlib OR MIT OR Apache-2.0,Daniel Henry-Mantilla <daniel.henry.mantilla@gmail.com>
-fix-hidden-lifetime-bug-proc_macros,https://github.com/danielhenrymantilla/fix-hidden-lifetime-bug.rs,Zlib OR MIT OR Apache-2.0,Daniel Henry-Mantilla <daniel.henry.mantilla@gmail.com>
 flagset,https://github.com/enarx/flagset,Apache-2.0,Nathaniel McCallum <nathaniel@profian.com>
 flate2,https://github.com/rust-lang/flate2-rs,MIT OR Apache-2.0,"Alex Crichton <alex@alexcrichton.com>, Josh Triplett <josh@joshtriplett.org>"
 float_eq,https://github.com/jtempest/float_eq-rs,MIT OR Apache-2.0,jtempest
@@ -386,6 +385,7 @@ overload,https://github.com/danaugrs/overload,MIT,Daniel Salvadori <danaugrs@gma
 pad,https://github.com/ogham/rust-pad,MIT,Ben S <ogham@bsago.me>
 parking,https://github.com/stjepang/parking,Apache-2.0 OR MIT,"Stjepan Glavina <stjepang@gmail.com>, The Rust Project Developers"
 parking_lot,https://github.com/Amanieu/parking_lot,MIT OR Apache-2.0,Amanieu d'Antras <amanieu@gmail.com>
+passt,https://github.com/kevingimbel/passt,MIT OR Apache-2.0,Kevin Gimbel <hallo@kevingimbel.com>
 paste,https://github.com/dtolnay/paste,MIT OR Apache-2.0,David Tolnay <dtolnay@gmail.com>
 pbkdf2,https://github.com/RustCrypto/password-hashes/tree/master/pbkdf2,MIT OR Apache-2.0,RustCrypto Developers
 peeking_take_while,https://github.com/fitzgen/peeking_take_while,MIT OR Apache-2.0,Nick Fitzgerald <fitzgen@gmail.com>
@@ -588,6 +588,7 @@ twox-hash,https://github.com/shepmaster/twox-hash,MIT,Jake Goulding <jake.gouldi
 typed-builder,https://github.com/idanarye/rust-typed-builder,MIT OR Apache-2.0,"IdanArye <idanarye@gmail.com>, Chris Morgan <me@chrismorgan.info>"
 typenum,https://github.com/paholg/typenum,MIT OR Apache-2.0,"Paho Lurie-Gregg <paho@paholg.com>, Andre Bogus <bogusandre@gmail.com>"
 typetag,https://github.com/dtolnay/typetag,MIT OR Apache-2.0,David Tolnay <dtolnay@gmail.com>
+tz-rs,https://github.com/x-hgg-x/tz-rs,MIT OR Apache-2.0,x-hgg-x
 uaparser,https://github.com/davidarmstronglewis/uap-rs,MIT,David Lewis
 ucd-trie,https://github.com/BurntSushi/ucd-generate,MIT OR Apache-2.0,Andrew Gallant <jamslam@gmail.com>
 unarray,https://github.com/cameron1024/unarray,MIT OR Apache-2.0,The unarray Authors
