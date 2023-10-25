@@ -1,9 +1,6 @@
 //! The main tower service that takes the request created by the request builder
 //! and sends it to `AMQP`.
-use crate::{
-    internal_events::sink::{AmqpAcknowledgementError, AmqpDeliveryError, AmqpNackError},
-    sinks::prelude::*,
-};
+use crate::sinks::prelude::*;
 use bytes::Bytes;
 use futures::future::BoxFuture;
 use lapin::{options::BasicPublishOptions, BasicProperties};
@@ -125,25 +122,14 @@ impl Service<AmqpRequest> for AmqpService {
 
             match fut {
                 Ok(result) => match result.await {
-                    Ok(lapin::publisher_confirm::Confirmation::Nack(_)) => {
-                        emit!(AmqpNackError);
-                        Err(AmqpError::Nack)
-                    }
-                    Err(error) => {
-                        // TODO: In due course the caller could emit these on error.
-                        emit!(AmqpAcknowledgementError { error: &error });
-                        Err(AmqpError::AcknowledgementFailed { error })
-                    }
+                    Ok(lapin::publisher_confirm::Confirmation::Nack(_)) => Err(AmqpError::Nack),
+                    Err(error) => Err(AmqpError::AcknowledgementFailed { error }),
                     Ok(_) => Ok(AmqpResponse {
                         json_size: req.metadata.into_events_estimated_json_encoded_byte_size(),
                         byte_size,
                     }),
                 },
-                Err(error) => {
-                    // TODO: In due course the caller could emit these on error.
-                    emit!(AmqpDeliveryError { error: &error });
-                    Err(AmqpError::DeliveryFailed { error })
-                }
+                Err(error) => Err(AmqpError::DeliveryFailed { error }),
             }
         })
     }
