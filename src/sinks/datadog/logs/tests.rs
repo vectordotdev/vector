@@ -540,7 +540,7 @@ async fn global_options() {
             compression = "none"
         "#};
     let mut cx = SinkContext::default();
-    cx.datadog.api_key = Some("globalkey".to_string().into());
+    cx.datadog.api_key = Some("global-key".to_string().into());
     let (mut config, cx) = load_sink_with_context::<DatadogLogsConfig>(config, cx).unwrap();
 
     let addr = next_addr();
@@ -569,19 +569,19 @@ async fn global_options() {
 
     assert!(keys
         .iter()
-        .all(|value| value.to_str().unwrap() == "globalkey"));
+        .all(|value| value.to_str().unwrap() == "global-key"));
 }
 
 #[tokio::test]
 async fn override_global_options() {
     let config = indoc! {r#"
-            default_api_key = "localkey"
+            default_api_key = "local-key"
             compression = "none"
         "#};
 
     // Set a global key option, which should be overridden by the option in the component configuration.
     let mut cx = SinkContext::default();
-    cx.datadog.api_key = Some("globalkey".to_string().into());
+    cx.datadog.api_key = Some("global-key".to_string().into());
     let (mut config, cx) = load_sink_with_context::<DatadogLogsConfig>(config, cx).unwrap();
 
     let addr = next_addr();
@@ -610,5 +610,5 @@ async fn override_global_options() {
 
     assert!(keys
         .iter()
-        .all(|value| value.to_str().unwrap() == "localkey"));
+        .all(|value| value.to_str().unwrap() == "local-key"));
 }
