@@ -12,7 +12,7 @@ use indexmap::IndexMap;
 use serde::Serialize;
 pub use vector_config::component::{GenerateConfig, SinkDescription, TransformDescription};
 use vector_config::configurable_component;
-pub use vector_core::config::{
+pub use vector_lib::config::{
     AcknowledgementsConfig, DataType, GlobalOptions, Input, LogNamespace,
     SourceAcknowledgementsConfig, SourceOutput, TransformOutput,
 };
@@ -63,7 +63,7 @@ pub use transform::{
 pub use unit_test::{build_unit_tests, build_unit_tests_main, UnitTestResult};
 pub use validation::warnings;
 pub use vars::{interpolate, ENVIRONMENT_VARIABLE_INTERPOLATION_REGEX};
-pub use vector_core::config::{
+pub use vector_lib::config::{
     init_telemetry, log_schema, proxy::ProxyConfig, telemetry, LogSchema, OutputId,
 };
 
@@ -73,7 +73,7 @@ pub use vector_core::config::{
 /// If deny is set, will panic if schema has already been set.
 pub fn init_log_schema(config_paths: &[ConfigPath], deny_if_set: bool) -> Result<(), Vec<String>> {
     let (builder, _) = load_builder_from_paths(config_paths)?;
-    vector_core::config::init_log_schema(builder.global.log_schema, deny_if_set);
+    vector_lib::config::init_log_schema(builder.global.log_schema, deny_if_set);
     Ok(())
 }
 

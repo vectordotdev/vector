@@ -2,7 +2,7 @@ use async_trait::async_trait;
 
 use futures::StreamExt;
 use futures_util::stream::BoxStream;
-use vector_core::event::{Metric, MetricValue};
+use vector_lib::event::{Metric, MetricValue};
 
 use crate::sinks::prelude::*;
 use crate::sinks::util::buffer::metrics::MetricNormalize;

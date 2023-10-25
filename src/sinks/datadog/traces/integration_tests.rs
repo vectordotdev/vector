@@ -13,7 +13,7 @@ use crate::{
         map_event_batch_stream,
     },
 };
-use vector_core::event::{BatchNotifier, BatchStatus};
+use vector_lib::event::{BatchNotifier, BatchStatus};
 
 #[tokio::test]
 async fn to_real_traces_endpoint() {

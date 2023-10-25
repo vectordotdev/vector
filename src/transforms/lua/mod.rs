@@ -2,7 +2,7 @@ pub mod v1;
 pub mod v2;
 
 use vector_config::configurable_component;
-use vector_core::config::{ComponentKey, LogNamespace};
+use vector_lib::config::{ComponentKey, LogNamespace};
 
 use crate::{
     config::{GenerateConfig, Input, OutputId, TransformConfig, TransformContext, TransformOutput},

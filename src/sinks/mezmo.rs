@@ -402,7 +402,7 @@ mod tests {
     use futures_util::stream;
     use http::{request::Parts, StatusCode};
     use serde_json::json;
-    use vector_core::event::{BatchNotifier, BatchStatus, Event, LogEvent};
+    use vector_lib::event::{BatchNotifier, BatchStatus, Event, LogEvent};
 
     use super::*;
     use crate::{

@@ -1,6 +1,6 @@
 use bytes::Bytes;
-use vector_core::ByteSizeOf;
 use vector_lib::request_metadata::{MetaDescriptive, RequestMetadata};
+use vector_lib::ByteSizeOf;
 
 use crate::codecs::EncodingConfig;
 use crate::{

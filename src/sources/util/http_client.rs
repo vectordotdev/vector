@@ -27,8 +27,8 @@ use crate::{
     tls::TlsSettings,
     SourceSender,
 };
-use vector_core::{config::proxy::ProxyConfig, event::Event, EstimatedJsonEncodedSizeOf};
 use vector_lib::shutdown::ShutdownSignal;
+use vector_lib::{config::proxy::ProxyConfig, event::Event, EstimatedJsonEncodedSizeOf};
 
 /// Contains the inputs generic to any http client.
 pub(crate) struct GenericHttpClientInputs {

@@ -1,7 +1,7 @@
 #[cfg(feature = "sources-amqp")]
 pub mod source {
     use metrics::counter;
-    use vector_core::internal_event::InternalEvent;
+    use vector_lib::internal_event::InternalEvent;
     use vector_lib::internal_event::{error_stage, error_type};
 
     #[derive(Debug)]

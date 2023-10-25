@@ -1,5 +1,5 @@
 use serde::Serialize;
-use vector_core::{
+use vector_lib::{
     event::{EventFinalizers, Finalizable, LogEvent, MaybeAsLogMut},
     ByteSizeOf, EstimatedJsonEncodedSizeOf,
 };

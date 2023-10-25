@@ -12,7 +12,7 @@ use std::{
 use futures_util::{stream::Map, Stream, StreamExt};
 use pin_project::pin_project;
 use tower::Service;
-use vector_core::{
+use vector_lib::{
     event::{Finalizable, Metric},
     partition::Partitioner,
     ByteSizeOf,

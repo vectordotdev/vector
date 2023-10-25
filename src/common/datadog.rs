@@ -4,7 +4,7 @@
 #![allow(unreachable_pub)]
 use serde::{Deserialize, Serialize};
 use vector_config::configurable_component;
-use vector_core::event::DatadogMetricOriginMetadata;
+use vector_lib::event::DatadogMetricOriginMetadata;
 
 pub const DD_US_SITE: &str = "datadoghq.com";
 pub const DD_EU_SITE: &str = "datadoghq.eu";

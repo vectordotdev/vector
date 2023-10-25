@@ -1,11 +1,11 @@
 use std::{collections::HashMap, convert::TryFrom, fmt, net::SocketAddr};
-use vector_core::EstimatedJsonEncodedSizeOf;
+use vector_lib::EstimatedJsonEncodedSizeOf;
 
 use async_trait::async_trait;
 use bytes::Bytes;
 use futures::{FutureExt, TryFutureExt};
 use tracing::Span;
-use vector_core::{
+use vector_lib::{
     config::SourceAcknowledgementsConfig,
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event},
 };
