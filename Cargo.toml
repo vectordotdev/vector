@@ -130,7 +130,6 @@ pin-project.workspace = true
 
 # Internal libs
 dnsmsg-parser = { path = "lib/dnsmsg-parser", optional = true }
-enrichment = { path = "lib/enrichment" }
 fakedata = { path = "lib/fakedata", optional = true }
 file-source = { path = "lib/file-source", optional = true }
 lookup = { package = "vector-lookup", path = "lib/vector-lookup" }

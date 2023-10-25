@@ -116,7 +116,10 @@ pub enum ConditionConfig {
 }
 
 impl ConditionConfig {
-    pub fn build(&self, enrichment_tables: &enrichment::TableRegistry) -> crate::Result<Condition> {
+    pub fn build(
+        &self,
+        enrichment_tables: &vector_lib::enrichment::TableRegistry,
+    ) -> crate::Result<Condition> {
         match self {
             ConditionConfig::IsLog => Ok(Condition::IsLog),
             ConditionConfig::IsMetric => Ok(Condition::IsMetric),
@@ -148,7 +151,10 @@ pub trait Conditional: std::fmt::Debug {
 }
 
 pub trait ConditionalConfig: std::fmt::Debug + Send + Sync + dyn_clone::DynClone {
-    fn build(&self, enrichment_tables: &enrichment::TableRegistry) -> crate::Result<Condition>;
+    fn build(
+        &self,
+        enrichment_tables: &vector_lib::enrichment::TableRegistry,
+    ) -> crate::Result<Condition>;
 }
 
 dyn_clone::clone_trait_object!(ConditionalConfig);
@@ -184,7 +190,10 @@ pub enum AnyCondition {
 }
 
 impl AnyCondition {
-    pub fn build(&self, enrichment_tables: &enrichment::TableRegistry) -> crate::Result<Condition> {
+    pub fn build(
+        &self,
+        enrichment_tables: &vector_lib::enrichment::TableRegistry,
+    ) -> crate::Result<Condition> {
         match self {
             AnyCondition::String(s) => {
                 let vrl_config = VrlConfig {

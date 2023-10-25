@@ -13,8 +13,8 @@ use maxminddb::{
 use ordered_float::NotNan;
 use vrl::value::Value;
 
-use enrichment::{Case, Condition, IndexHandle, Table};
 use vector_lib::configurable::configurable_component;
+use vector_lib::enrichment::{Case, Condition, IndexHandle, Table};
 
 use crate::config::{EnrichmentTableConfig, GenerateConfig};
 
@@ -101,7 +101,7 @@ impl EnrichmentTableConfig for GeoipConfig {
 }
 
 #[derive(Clone)]
-/// A struct that implements [enrichment::Table] to handle loading enrichment data from a GeoIP database.
+/// A struct that implements [vector_lib::enrichment::Table] to handle loading enrichment data from a GeoIP database.
 pub struct Geoip {
     config: GeoipConfig,
     dbreader: Arc<maxminddb::Reader<Vec<u8>>>,

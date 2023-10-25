@@ -7,6 +7,7 @@ publish = false
 
 [dependencies]
 codecs = { path = "../codecs", default-features = false }
+enrichment = { path = "../enrichment" }
 vector-buffers = { path = "../vector-buffers", default-features = false }
 vector-common = { path = "../vector-common" }
 vector-config = { path = "../vector-config" }
