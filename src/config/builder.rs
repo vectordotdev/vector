@@ -13,7 +13,6 @@ use crate::{enrichment_tables::EnrichmentTables, providers::Providers, secrets::
 #[cfg(feature = "api")]
 use super::api;
 #[cfg(any(
-    feature = "sources-datadog_agent",
     feature = "sinks-datadog_logs",
     feature = "sinks-datadog_metrics",
     feature = "sinks-datadog_traces",
@@ -109,7 +108,6 @@ struct ConfigBuilderHash<'a> {
     api: &'a api::Options,
     schema: &'a schema::Options,
     #[cfg(any(
-        feature = "sources-datadog_agent",
         feature = "sinks-datadog_logs",
         feature = "sinks-datadog_metrics",
         feature = "sinks-datadog_traces",
