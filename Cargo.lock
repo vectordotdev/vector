@@ -10100,7 +10100,6 @@ dependencies = [
  "tonic 0.10.2",
  "tracing 0.1.37",
  "tracing-core 0.1.30",
- "tracing-log",
  "tracing-subscriber",
  "typetag",
  "url",
