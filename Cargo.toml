@@ -131,7 +131,6 @@ pin-project.workspace = true
 # Internal libs
 dnsmsg-parser = { path = "lib/dnsmsg-parser", optional = true }
 fakedata = { path = "lib/fakedata", optional = true }
-file-source = { path = "lib/file-source", optional = true }
 lookup = { package = "vector-lookup", path = "lib/vector-lookup" }
 portpicker = { path = "lib/portpicker" }
 prometheus-parser = { path = "lib/prometheus-parser", optional = true }
@@ -525,7 +524,7 @@ sources-dnstap = ["dep:base64", "dep:trust-dns-proto", "dep:dnsmsg-parser", "pro
 sources-docker_logs = ["docker"]
 sources-eventstoredb_metrics = []
 sources-exec = []
-sources-file = ["dep:file-source"]
+sources-file = ["vector-lib/file-source"]
 sources-file-descriptor = ["tokio-util/io"]
 sources-fluent = ["dep:base64", "sources-utils-net-tcp", "tokio-util/net", "dep:rmpv", "dep:rmp-serde", "dep:serde_bytes"]
 sources-gcp_pubsub = ["gcp", "dep:h2", "dep:prost-types", "protobuf-build", "dep:tonic"]
@@ -537,7 +536,7 @@ sources-internal_logs = []
 sources-internal_metrics = []
 sources-journald = []
 sources-kafka = ["dep:rdkafka"]
-sources-kubernetes_logs = ["dep:file-source", "kubernetes", "transforms-reduce"]
+sources-kubernetes_logs = ["vector-lib/file-source", "kubernetes", "transforms-reduce"]
 sources-logstash = ["sources-utils-net-tcp", "tokio-util/net"]
 sources-mongodb_metrics = ["dep:mongodb"]
 sources-nats = ["dep:async-nats", "dep:nkeys"]

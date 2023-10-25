@@ -9749,7 +9749,6 @@ dependencies = [
  "enum_dispatch",
  "exitcode",
  "fakedata",
- "file-source",
  "flate2",
  "futures 0.3.29",
  "futures-util",
@@ -10120,6 +10119,7 @@ version = "0.1.0"
 dependencies = [
  "codecs",
  "enrichment",
+ "file-source",
  "vector-buffers",
  "vector-common",
  "vector-config",

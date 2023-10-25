@@ -8,10 +8,6 @@ use std::{path::PathBuf, time::Duration};
 
 use bytes::Bytes;
 use chrono::Utc;
-use file_source::{
-    calculate_ignore_before, Checkpointer, FileServer, FileServerShutdown, FingerprintStrategy,
-    Fingerprinter, Line, ReadFrom, ReadFromConfig,
-};
 use futures::{future::FutureExt, stream::StreamExt};
 use futures_util::Stream;
 use k8s_openapi::api::core::v1::{Namespace, Node, Pod};
@@ -27,6 +23,10 @@ use lookup::{lookup_v2::OptionalTargetPath, owned_value_path, path, OwnedTargetP
 use serde_with::serde_as;
 use vector_lib::codecs::{BytesDeserializer, BytesDeserializerConfig};
 use vector_lib::configurable::configurable_component;
+use vector_lib::file_source::{
+    calculate_ignore_before, Checkpointer, FileServer, FileServerShutdown, FingerprintStrategy,
+    Fingerprinter, Line, ReadFrom, ReadFromConfig,
+};
 use vector_lib::{config::LegacyKey, config::LogNamespace, EstimatedJsonEncodedSizeOf};
 use vector_lib::{
     internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol},
