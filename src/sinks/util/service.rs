@@ -440,7 +440,7 @@ mod tests {
 
     use futures::{future, stream, FutureExt, SinkExt, StreamExt};
     use tokio::time::Duration;
-    use vector_common::json_size::JsonSize;
+    use vector_lib::json_size::JsonSize;
 
     use super::*;
     use crate::sinks::util::{

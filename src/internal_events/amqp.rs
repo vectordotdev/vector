@@ -1,8 +1,8 @@
 #[cfg(feature = "sources-amqp")]
 pub mod source {
     use metrics::counter;
-    use vector_common::internal_event::{error_stage, error_type};
     use vector_core::internal_event::InternalEvent;
+    use vector_lib::internal_event::{error_stage, error_type};
 
     #[derive(Debug)]
     pub struct AmqpBytesReceived {
@@ -93,10 +93,10 @@ pub mod source {
 pub mod sink {
     use crate::emit;
     use metrics::counter;
-    use vector_common::internal_event::{
+    use vector_core::internal_event::InternalEvent;
+    use vector_lib::internal_event::{
         error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL,
     };
-    use vector_core::internal_event::InternalEvent;
 
     #[derive(Debug)]
     pub struct AmqpDeliveryError<'a> {
@@ -105,9 +105,9 @@ pub mod sink {
 
     impl InternalEvent for AmqpDeliveryError<'_> {
         fn emit(self) {
-            let deliver_reason = "Unable to deliver.";
+            const DELIVER_REASON: &str = "Unable to deliver.";
 
-            error!(message = deliver_reason,
+            error!(message = DELIVER_REASON,
                    error = ?self.error,
                    error_type = error_type::REQUEST_FAILED,
                    stage = error_stage::SENDING,
@@ -120,7 +120,7 @@ pub mod sink {
             );
             emit!(ComponentEventsDropped::<UNINTENTIONAL> {
                 count: 1,
-                reason: deliver_reason
+                reason: DELIVER_REASON
             });
         }
     }
@@ -132,9 +132,9 @@ pub mod sink {
 
     impl InternalEvent for AmqpAcknowledgementError<'_> {
         fn emit(self) {
-            let ack_reason = "Acknowledgement failed.";
+            const ACK_REASON: &str = "Acknowledgement failed.";
 
-            error!(message = ack_reason,
+            error!(message = ACK_REASON,
                    error = ?self.error,
                    error_type = error_type::REQUEST_FAILED,
                    stage = error_stage::SENDING,
@@ -147,7 +147,31 @@ pub mod sink {
             );
             emit!(ComponentEventsDropped::<UNINTENTIONAL> {
                 count: 1,
-                reason: ack_reason
+                reason: ACK_REASON
+            });
+        }
+    }
+
+    #[derive(Debug)]
+    pub struct AmqpNackError;
+
+    impl InternalEvent for AmqpNackError {
+        fn emit(self) {
+            const DELIVER_REASON: &str = "Received Negative Acknowledgement from AMQP broker.";
+            error!(
+                message = DELIVER_REASON,
+                error_type = error_type::ACKNOWLEDGMENT_FAILED,
+                stage = error_stage::SENDING,
+                internal_log_rate_limit = true,
+            );
+            counter!(
+                "component_errors_total", 1,
+                "error_type" => error_type::ACKNOWLEDGMENT_FAILED,
+                "stage" => error_stage::SENDING,
+            );
+            emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+                count: 1,
+                reason: DELIVER_REASON
             });
         }
     }

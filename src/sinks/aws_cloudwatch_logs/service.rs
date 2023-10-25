@@ -22,11 +22,11 @@ use tower::{
     timeout::Timeout,
     Service, ServiceBuilder, ServiceExt,
 };
-use vector_common::{
+use vector_lib::{
     finalization::EventStatus,
     request_metadata::{GroupedCountByteSize, MetaDescriptive},
 };
-use vector_core::stream::DriverResponse;
+use vector_stream::DriverResponse;
 
 use crate::sinks::{
     aws_cloudwatch_logs::{

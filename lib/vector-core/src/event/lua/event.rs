@@ -1,7 +1,7 @@
 use mlua::prelude::*;
 
-use crate::event::lua::metric::LuaMetric;
-use crate::event::{Event, LogEvent, Metric};
+use super::super::{Event, LogEvent, Metric};
+use super::metric::LuaMetric;
 
 pub struct LuaEvent {
     pub event: Event,

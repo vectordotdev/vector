@@ -560,8 +560,8 @@ pub(super) fn parse(
 #[cfg(test)]
 mod test {
     use chrono::{offset::TimeZone, DateTime, Timelike, Utc};
-    use vector_common::assert_event_data_eq;
     use vector_core::metric_tags;
+    use vector_lib::assert_event_data_eq;
 
     use super::parse;
     use crate::event::metric::{Metric, MetricKind, MetricValue};

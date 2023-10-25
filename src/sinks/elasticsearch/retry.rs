@@ -160,7 +160,7 @@ mod tests {
     use bytes::Bytes;
     use http::Response;
     use similar_asserts::assert_eq;
-    use vector_common::{internal_event::CountByteSize, json_size::JsonSize};
+    use vector_lib::{internal_event::CountByteSize, json_size::JsonSize};
 
     use super::*;
     use crate::event::EventStatus;

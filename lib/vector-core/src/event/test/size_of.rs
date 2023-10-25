@@ -2,9 +2,10 @@ use std::mem;
 
 use lookup::{path, PathPrefix};
 use quickcheck::{Arbitrary, Gen, QuickCheck, TestResult};
+use vector_common::byte_size_of::ByteSizeOf;
 
+use super::common::Name;
 use super::*;
-use crate::{event::test::common::Name, ByteSizeOf};
 
 #[test]
 fn at_least_wrapper_size() {

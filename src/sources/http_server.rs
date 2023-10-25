@@ -52,7 +52,7 @@ impl GenerateConfig for HttpConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "http")]
 impl SourceConfig for HttpConfig {
-    async fn build(&self, cx: SourceContext) -> vector_common::Result<super::Source> {
+    async fn build(&self, cx: SourceContext) -> vector_lib::Result<super::Source> {
         self.0.build(cx).await
     }
 

@@ -1,6 +1,6 @@
 use bytes::Bytes;
-use vector_common::{json_size::JsonSize, request_metadata::RequestMetadata};
 use vector_core::EstimatedJsonEncodedSizeOf;
+use vector_lib::{json_size::JsonSize, request_metadata::RequestMetadata};
 
 use crate::{
     event::{EventFinalizers, Finalizable},

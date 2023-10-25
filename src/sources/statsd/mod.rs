@@ -13,9 +13,9 @@ use listenfd::ListenFd;
 use serde_with::serde_as;
 use smallvec::{smallvec, SmallVec};
 use tokio_util::udp::UdpFramed;
-use vector_common::internal_event::{CountByteSize, InternalEventHandle as _, Registered};
 use vector_config::configurable_component;
 use vector_core::EstimatedJsonEncodedSizeOf;
+use vector_lib::internal_event::{CountByteSize, InternalEventHandle as _, Registered};
 
 use self::parser::ParseError;
 use super::util::net::{try_bind_udp_socket, SocketListenAddr, TcpNullAcker, TcpSource};

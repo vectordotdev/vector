@@ -12,7 +12,6 @@ use snafu::Snafu;
 use std::io;
 use tokio_util::codec::Encoder as _;
 use tower::{Service, ServiceBuilder};
-use vector_common::request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata};
 use vector_config::configurable_component;
 use vector_core::{
     config::{telemetry, AcknowledgementsConfig, Input},
@@ -20,6 +19,7 @@ use vector_core::{
     sink::VectorSink,
     EstimatedJsonEncodedSizeOf,
 };
+use vector_lib::request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata};
 use vrl::value::Kind;
 
 use crate::{

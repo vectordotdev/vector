@@ -16,12 +16,12 @@ use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
 use tokio::{sync::oneshot, task::spawn_blocking};
 use tracing::{Instrument, Span};
-use vector_common::finalizer::OrderedFinalizer;
 use vector_config::configurable_component;
 use vector_core::{
     config::{LegacyKey, LogNamespace},
     EstimatedJsonEncodedSizeOf,
 };
+use vector_lib::finalizer::OrderedFinalizer;
 use vrl::value::Kind;
 
 use super::util::{EncodingConfig, MultilineConfig};

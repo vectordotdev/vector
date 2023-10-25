@@ -3,8 +3,8 @@ use std::borrow::Cow;
 use bytes::BytesMut;
 use serde::Serialize;
 use tokio_util::codec::Encoder as _;
-use vector_common::request_metadata::GroupedCountByteSize;
 use vector_core::{config::telemetry, EstimatedJsonEncodedSizeOf};
+use vector_lib::request_metadata::GroupedCountByteSize;
 
 use super::sink::HecProcessedEvent;
 use crate::{

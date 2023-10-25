@@ -4,8 +4,8 @@ use bytes::Bytes;
 use futures::{FutureExt, SinkExt};
 use http::{Request, StatusCode, Uri};
 use serde_json::json;
-use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
+use vector_lib::sensitive_string::SensitiveString;
 use vrl::event_path;
 use vrl::value::{Kind, Value};
 

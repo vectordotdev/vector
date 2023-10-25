@@ -24,8 +24,8 @@ use vector_core::{event::Event, EstimatedJsonEncodedSizeOf};
 use crate::{
     codecs::Encoder,
     components::validation::{RunnerMetrics, TestCase},
-    config::{ConfigBuilder, ConfigDiff},
-    topology,
+    config::ConfigBuilder,
+    topology::RunningTopology,
 };
 
 use super::{
@@ -191,7 +191,7 @@ impl Runner {
         }
     }
 
-    pub async fn run_validation(self) -> Result<Vec<RunnerResults>, vector_common::Error> {
+    pub async fn run_validation(self) -> Result<Vec<RunnerResults>, vector_lib::Error> {
         // Initialize our test environment.
         initialize_test_environment();
 
@@ -413,7 +413,7 @@ fn build_external_resource(
     configuration: &ValidationConfiguration,
     input_task_coordinator: &TaskCoordinator<Configuring>,
     output_task_coordinator: &TaskCoordinator<Configuring>,
-) -> Result<(RunnerInput, RunnerOutput, Option<Encoder<encoding::Framer>>), vector_common::Error> {
+) -> Result<(RunnerInput, RunnerOutput, Option<Encoder<encoding::Framer>>), vector_lib::Error> {
     let component_type = configuration.component_type();
     let maybe_external_resource = configuration.external_resource();
     let maybe_encoder = maybe_external_resource
@@ -471,7 +471,6 @@ fn spawn_component_topology(
         .build()
         .expect("config should not have any errors");
     config.healthchecks.set_require_healthy(Some(true));
-    let config_diff = ConfigDiff::initial(&config);
 
     _ = std::thread::spawn(move || {
         let test_runtime = Builder::new_current_thread()
@@ -482,13 +481,8 @@ fn spawn_component_topology(
         test_runtime.block_on(async move {
             debug!("Building component topology...");
 
-            let pieces = topology::build_or_log_errors(&config, &config_diff, HashMap::new())
-                .await
-                .unwrap();
-            let (topology, (_, mut crash_rx)) =
-                topology::start_validated(config, config_diff, pieces)
-                    .await
-                    .unwrap();
+            let (topology, mut crash_rx) =
+                RunningTopology::start_init_validated(config).await.unwrap();
 
             debug!("Component topology built and spawned.");
             topology_started.mark_as_done();

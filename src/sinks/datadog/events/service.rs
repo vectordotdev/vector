@@ -8,8 +8,8 @@ use futures::{
 use http::Request;
 use hyper::Body;
 use tower::{Service, ServiceExt};
-use vector_common::request_metadata::{GroupedCountByteSize, MetaDescriptive};
-use vector_core::stream::DriverResponse;
+use vector_lib::request_metadata::{GroupedCountByteSize, MetaDescriptive};
+use vector_stream::DriverResponse;
 
 use crate::{
     event::EventStatus,

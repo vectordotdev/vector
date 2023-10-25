@@ -2,9 +2,9 @@ use std::io;
 
 use bytes::Bytes;
 use codecs::encoding::Framer;
-use vector_common::finalization::{EventFinalizers, Finalizable};
-use vector_common::request_metadata::RequestMetadata;
 use vector_core::event::Event;
+use vector_lib::finalization::{EventFinalizers, Finalizable};
+use vector_lib::request_metadata::RequestMetadata;
 
 use crate::sinks::util::Compression;
 use crate::{

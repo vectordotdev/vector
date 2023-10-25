@@ -1,6 +1,6 @@
-use vector_common::TimeZone;
 use vector_config::configurable_component;
 use vector_core::compile_vrl;
+use vector_lib::TimeZone;
 use vrl::compiler::runtime::{Runtime, RuntimeResult, Terminate};
 use vrl::compiler::{CompilationResult, CompileConfig, Program, TypeState, VrlRuntime};
 use vrl::diagnostic::Formatter;

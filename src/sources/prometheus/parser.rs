@@ -137,8 +137,8 @@ mod test {
     use chrono::{TimeZone, Timelike, Utc};
     use once_cell::sync::Lazy;
     use similar_asserts::assert_eq;
-    use vector_common::assert_event_data_eq;
     use vector_core::metric_tags;
+    use vector_lib::assert_event_data_eq;
 
     use super::*;
     use crate::event::metric::{Metric, MetricKind, MetricValue};

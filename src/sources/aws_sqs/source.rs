@@ -8,9 +8,9 @@ use chrono::{DateTime, TimeZone, Utc};
 use futures::{FutureExt, StreamExt};
 use tokio::{pin, select};
 use tracing_futures::Instrument;
-use vector_common::finalizer::UnorderedFinalizer;
-use vector_common::internal_event::{EventsReceived, Registered};
 use vector_core::config::LogNamespace;
+use vector_lib::finalizer::UnorderedFinalizer;
+use vector_lib::internal_event::{EventsReceived, Registered};
 
 use crate::{
     codecs::Decoder,

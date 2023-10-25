@@ -21,7 +21,7 @@
 //!
 use greptimedb_client::Client;
 use snafu::Snafu;
-use vector_common::sensitive_string::SensitiveString;
+use vector_lib::sensitive_string::SensitiveString;
 
 use crate::sinks::prelude::*;
 

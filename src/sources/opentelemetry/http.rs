@@ -11,13 +11,13 @@ use prost::Message;
 use snafu::Snafu;
 use tower::ServiceBuilder;
 use tracing::Span;
-use vector_common::internal_event::{
-    ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Registered,
-};
 use vector_core::{
     config::LogNamespace,
     event::{BatchNotifier, BatchStatus},
     EstimatedJsonEncodedSizeOf,
+};
+use vector_lib::internal_event::{
+    ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Registered,
 };
 use warp::{filters::BoxedFilter, reject::Rejection, reply::Response, Filter, Reply};
 
