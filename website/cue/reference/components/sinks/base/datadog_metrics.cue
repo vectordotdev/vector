@@ -68,7 +68,7 @@ base: components: sinks: datadog_metrics: configuration: {
 
 			[api_key]: https://docs.datadoghq.com/api/?lang=bash#authentication
 			"""
-		required: true
+		required: false
 		type: string: examples: ["${DATADOG_API_KEY_ENV_VAR}", "ef8d5de700e7989468166c40fc8a0ccd"]
 	}
 	default_namespace: {
@@ -270,10 +270,7 @@ base: components: sinks: datadog_metrics: configuration: {
 			[dd_site]: https://docs.datadoghq.com/getting_started/site
 			"""
 		required: false
-		type: string: {
-			default: "datadoghq.com"
-			examples: ["us3.datadoghq.com", "datadoghq.eu"]
-		}
+		type: string: examples: ["us3.datadoghq.com", "datadoghq.eu"]
 	}
 	tls: {
 		description: "Configures the TLS options for incoming/outgoing connections."
