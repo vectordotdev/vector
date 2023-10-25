@@ -1452,8 +1452,8 @@ mod resource_config_tests {
     fn generate_component_config_schema() {
         use crate::config::{SinkOuter, SourceOuter, TransformOuter};
         use indexmap::IndexMap;
-        use vector_common::config::ComponentKey;
         use vector_config::configurable_component;
+        use vector_lib::config::ComponentKey;
 
         /// Top-level Vector configuration.
         #[configurable_component]

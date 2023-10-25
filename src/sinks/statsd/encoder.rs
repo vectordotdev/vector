@@ -241,7 +241,7 @@ mod tests {
 
         let frame = encode_metric(&input);
         let mut output = parse_encoded_metrics(&frame);
-        vector_common::assert_event_data_eq!(input, output.remove(0));
+        vector_lib::assert_event_data_eq!(input, output.remove(0));
     }
 
     #[cfg(feature = "sources-statsd")]
@@ -271,7 +271,7 @@ mod tests {
 
         let frame = encode_metric(&input);
         let mut output = parse_encoded_metrics(&frame);
-        vector_common::assert_event_data_eq!(input, output.remove(0));
+        vector_lib::assert_event_data_eq!(input, output.remove(0));
     }
 
     #[cfg(feature = "sources-statsd")]
@@ -286,7 +286,7 @@ mod tests {
 
         let frame = encode_metric(&input);
         let mut output = parse_encoded_metrics(&frame);
-        vector_common::assert_event_data_eq!(input, output.remove(0));
+        vector_lib::assert_event_data_eq!(input, output.remove(0));
     }
 
     #[cfg(feature = "sources-statsd")]
@@ -314,7 +314,7 @@ mod tests {
 
         let frame = encode_metric(&input);
         let mut output = parse_encoded_metrics(&frame);
-        vector_common::assert_event_data_eq!(expected, output.remove(0));
+        vector_lib::assert_event_data_eq!(expected, output.remove(0));
     }
 
     #[cfg(feature = "sources-statsd")]
@@ -351,8 +351,8 @@ mod tests {
 
         let frame = encode_metric(&input);
         let mut output = parse_encoded_metrics(&frame);
-        vector_common::assert_event_data_eq!(expected1, output.remove(0));
-        vector_common::assert_event_data_eq!(expected2, output.remove(0));
+        vector_lib::assert_event_data_eq!(expected1, output.remove(0));
+        vector_lib::assert_event_data_eq!(expected2, output.remove(0));
     }
 
     #[cfg(feature = "sources-statsd")]
@@ -369,6 +369,6 @@ mod tests {
 
         let frame = encode_metric(&input);
         let mut output = parse_encoded_metrics(&frame);
-        vector_common::assert_event_data_eq!(input, output.remove(0));
+        vector_lib::assert_event_data_eq!(input, output.remove(0));
     }
 }

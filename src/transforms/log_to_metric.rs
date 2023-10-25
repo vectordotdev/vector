@@ -436,8 +436,8 @@ mod tests {
     use std::time::Duration;
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
-    use vector_common::config::ComponentKey;
     use vector_core::metric_tags;
+    use vector_lib::config::ComponentKey;
 
     #[test]
     fn generate_config() {

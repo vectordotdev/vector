@@ -155,7 +155,7 @@ mod tests {
     use futures::stream;
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
-    use vector_common::config::ComponentKey;
+    use vector_lib::config::ComponentKey;
     use vrl::value::Kind;
 
     use super::*;

@@ -20,12 +20,12 @@ use tonic::{
     transport::{Certificate, ClientTlsConfig, Endpoint, Identity},
     Code, Request, Status,
 };
-use vector_common::internal_event::{
-    ByteSize, BytesReceived, EventsReceived, InternalEventHandle as _, Protocol, Registered,
-};
-use vector_common::{byte_size_of::ByteSizeOf, finalizer::UnorderedFinalizer};
 use vector_config::configurable_component;
 use vector_core::config::{LegacyKey, LogNamespace};
+use vector_lib::internal_event::{
+    ByteSize, BytesReceived, EventsReceived, InternalEventHandle as _, Protocol, Registered,
+};
+use vector_lib::{byte_size_of::ByteSizeOf, finalizer::UnorderedFinalizer};
 use vrl::path;
 use vrl::value::{kind::Collection, Kind};
 

@@ -4,8 +4,8 @@ use bytes::Bytes;
 use chrono::Utc;
 use codecs::encoding::Framer;
 use uuid::Uuid;
-use vector_common::request_metadata::RequestMetadata;
 use vector_core::event::Finalizable;
+use vector_lib::request_metadata::RequestMetadata;
 
 use crate::{
     codecs::{Encoder, Transformer},

@@ -608,13 +608,13 @@ mod tests {
     use indoc::indoc;
     use similar_asserts::assert_eq;
     use tokio::{sync::oneshot::error::TryRecvError, time};
-    use vector_common::{
-        finalization::{BatchNotifier, BatchStatus},
-        sensitive_string::SensitiveString,
-    };
     use vector_core::{
         event::{MetricTags, StatisticKind},
         metric_tags, samples,
+    };
+    use vector_lib::{
+        finalization::{BatchNotifier, BatchStatus},
+        sensitive_string::SensitiveString,
     };
 
     use super::*;

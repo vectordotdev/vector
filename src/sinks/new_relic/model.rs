@@ -8,7 +8,7 @@ use std::{
 use chrono::{DateTime, Utc};
 use ordered_float::NotNan;
 use serde::{Deserialize, Serialize};
-use vector_common::internal_event::{ComponentEventsDropped, INTENTIONAL, UNINTENTIONAL};
+use vector_lib::internal_event::{ComponentEventsDropped, INTENTIONAL, UNINTENTIONAL};
 use vrl::event_path;
 
 use super::NewRelicSinkError;

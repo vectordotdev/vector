@@ -16,13 +16,13 @@ mod sink {
         event::metric::{MetricKind, MetricValue},
         sinks::splunk_hec::common::acknowledgements::HecAckApiError,
     };
-    use vector_common::internal_event::{
+    use vector_lib::internal_event::{
         error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL,
     };
 
     #[derive(Debug)]
     pub struct SplunkEventEncodeError {
-        pub error: vector_common::Error,
+        pub error: vector_lib::Error,
     }
 
     impl InternalEvent for SplunkEventEncodeError {
@@ -201,7 +201,7 @@ mod source {
     use vector_core::internal_event::InternalEvent;
 
     use crate::sources::splunk_hec::ApiError;
-    use vector_common::internal_event::{error_stage, error_type};
+    use vector_lib::internal_event::{error_stage, error_type};
 
     #[derive(Debug)]
     pub struct SplunkHecRequestReceived<'a> {

@@ -191,7 +191,7 @@ impl Runner {
         }
     }
 
-    pub async fn run_validation(self) -> Result<Vec<RunnerResults>, vector_common::Error> {
+    pub async fn run_validation(self) -> Result<Vec<RunnerResults>, vector_lib::Error> {
         // Initialize our test environment.
         initialize_test_environment();
 
@@ -413,7 +413,7 @@ fn build_external_resource(
     configuration: &ValidationConfiguration,
     input_task_coordinator: &TaskCoordinator<Configuring>,
     output_task_coordinator: &TaskCoordinator<Configuring>,
-) -> Result<(RunnerInput, RunnerOutput, Option<Encoder<encoding::Framer>>), vector_common::Error> {
+) -> Result<(RunnerInput, RunnerOutput, Option<Encoder<encoding::Framer>>), vector_lib::Error> {
     let component_type = configuration.component_type();
     let maybe_external_resource = configuration.external_resource();
     let maybe_encoder = maybe_external_resource

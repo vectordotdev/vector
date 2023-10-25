@@ -2,12 +2,12 @@ use futures::FutureExt;
 use http::{header::AUTHORIZATION, Request, Uri};
 use hyper::Body;
 use tower::ServiceBuilder;
-use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 use vector_core::{
     config::{proxy::ProxyConfig, AcknowledgementsConfig, DataType, Input},
     tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
+use vector_lib::sensitive_string::SensitiveString;
 
 use crate::{
     codecs::Transformer,

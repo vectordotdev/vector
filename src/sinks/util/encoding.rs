@@ -4,8 +4,8 @@ use bytes::BytesMut;
 use codecs::encoding::Framer;
 use itertools::{Itertools, Position};
 use tokio_util::codec::Encoder as _;
-use vector_common::request_metadata::GroupedCountByteSize;
 use vector_core::{config::telemetry, EstimatedJsonEncodedSizeOf};
+use vector_lib::request_metadata::GroupedCountByteSize;
 
 use crate::{codecs::Transformer, event::Event, internal_events::EncoderWriteError};
 
@@ -150,8 +150,8 @@ mod tests {
         CharacterDelimitedEncoder, JsonSerializerConfig, NewlineDelimitedEncoder,
         TextSerializerConfig,
     };
-    use vector_common::{internal_event::CountByteSize, json_size::JsonSize};
     use vector_core::event::LogEvent;
+    use vector_lib::{internal_event::CountByteSize, json_size::JsonSize};
     use vrl::value::Value;
 
     use super::*;

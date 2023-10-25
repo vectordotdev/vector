@@ -448,8 +448,8 @@ mod test {
     use serde::Deserialize;
     use tokio::time::{sleep, Duration, Instant};
     use tokio_util::codec::BytesCodec;
-    use vector_common::assert_event_data_eq;
     use vector_core::{config::ComponentKey, schema::Definition};
+    use vector_lib::assert_event_data_eq;
     use vrl::value::{kind::Collection, Kind, Value};
 
     use super::*;

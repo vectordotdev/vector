@@ -1,6 +1,6 @@
-use vector_common::sensitive_string::SensitiveString;
 #[cfg(test)]
 use vector_core::event::Metric;
+use vector_lib::sensitive_string::SensitiveString;
 
 mod collector;
 pub(crate) mod exporter;

@@ -5,9 +5,9 @@ use lookup::lookup_v2::OptionalValuePath;
 use serde_with::serde_as;
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
-use vector_common::internal_event::{CountByteSize, InternalEventHandle as _};
 use vector_config::configurable_component;
 use vector_core::{config::LogNamespace, ByteSizeOf, EstimatedJsonEncodedSizeOf};
+use vector_lib::internal_event::{CountByteSize, InternalEventHandle as _};
 
 use crate::{
     config::{log_schema, SourceConfig, SourceContext, SourceOutput},

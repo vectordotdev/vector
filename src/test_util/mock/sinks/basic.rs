@@ -2,13 +2,13 @@ use async_trait::async_trait;
 use futures_util::{stream::BoxStream, FutureExt, StreamExt};
 use snafu::Snafu;
 use tokio::sync::oneshot;
-use vector_common::finalization::Finalizable;
 use vector_config::configurable_component;
 use vector_core::{
     config::{AcknowledgementsConfig, Input},
     event::Event,
     sink::{StreamSink, VectorSink},
 };
+use vector_lib::finalization::Finalizable;
 
 use crate::{
     config::{SinkConfig, SinkContext},

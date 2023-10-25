@@ -1,6 +1,6 @@
 use metrics::counter;
-use vector_common::internal_event::{error_stage, error_type};
 use vector_core::internal_event::InternalEvent;
+use vector_lib::internal_event::{error_stage, error_type};
 
 use super::prelude::{http_error_code, io_error_code};
 use crate::sources::aws_kinesis_firehose::Compression;

@@ -267,8 +267,8 @@ pub enum TimestampFormat {
 mod tests {
     use indoc::indoc;
     use lookup::path::parse_target_path;
-    use vector_common::btreemap;
     use vector_core::config::{log_schema, LogNamespace};
+    use vector_lib::btreemap;
     use vrl::value::Kind;
 
     use crate::config::schema;

@@ -3,10 +3,10 @@ use std::path::PathBuf;
 use base64::prelude::{Engine as _, BASE64_STANDARD};
 use bytes::Bytes;
 use lookup::{owned_value_path, path, OwnedValuePath};
-use vector_common::internal_event::{
+use vector_config::configurable_component;
+use vector_lib::internal_event::{
     ByteSize, BytesReceived, InternalEventHandle as _, Protocol, Registered,
 };
-use vector_config::configurable_component;
 use vrl::path::PathPrefix;
 use vrl::value::{kind::Collection, Kind};
 

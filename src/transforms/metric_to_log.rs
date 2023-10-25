@@ -3,9 +3,9 @@ use codecs::MetricTagValues;
 use lookup::{event_path, owned_value_path, path, PathPrefix};
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
-use vector_common::TimeZone;
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
+use vector_lib::TimeZone;
 use vrl::path::OwnedValuePath;
 use vrl::value::kind::Collection;
 use vrl::value::Kind;
@@ -353,8 +353,8 @@ mod tests {
     use similar_asserts::assert_eq;
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
-    use vector_common::config::ComponentKey;
     use vector_core::{event::EventMetadata, metric_tags};
+    use vector_lib::config::ComponentKey;
 
     use super::*;
     use crate::event::{

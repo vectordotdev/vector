@@ -10,8 +10,8 @@ use std::{
 use bytes::Bytes;
 use enrichment::{Case, Condition, IndexHandle, Table};
 use tracing::trace;
-use vector_common::{conversion::Conversion, TimeZone};
 use vector_config::configurable_component;
+use vector_lib::{conversion::Conversion, TimeZone};
 use vrl::value::Value;
 
 use crate::config::EnrichmentTableConfig;

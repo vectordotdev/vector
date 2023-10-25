@@ -22,10 +22,10 @@ use snafu::{ResultExt, Snafu};
 use tokio::{pin, select};
 use tokio_util::codec::FramedRead;
 use tracing::Instrument;
-use vector_common::internal_event::{
+use vector_config::configurable_component;
+use vector_lib::internal_event::{
     ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol, Registered,
 };
-use vector_config::configurable_component;
 
 use crate::codecs::Decoder;
 use crate::event::{Event, LogEvent};
