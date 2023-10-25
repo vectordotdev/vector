@@ -24,15 +24,15 @@ use lookup::{lookup_v2::OptionalValuePath, metadata_path, owned_value_path, path
 use snafu::Snafu;
 use std::{io::Cursor, pin::Pin};
 use tokio_util::codec::FramedRead;
-use vector_common::{
-    finalizer::UnorderedFinalizer,
-    internal_event::{CountByteSize, EventsReceived, InternalEventHandle as _},
-};
 use vector_config::configurable_component;
 use vector_core::{
     config::{log_schema, LegacyKey, LogNamespace, SourceAcknowledgementsConfig},
     event::Event,
     EstimatedJsonEncodedSizeOf,
+};
+use vector_lib::{
+    finalizer::UnorderedFinalizer,
+    internal_event::{CountByteSize, EventsReceived, InternalEventHandle as _},
 };
 use vrl::value::Kind;
 
@@ -127,7 +127,7 @@ fn default_offset_key() -> OptionalValuePath {
 impl_generate_config_from_default!(AmqpSourceConfig);
 
 impl AmqpSourceConfig {
-    fn decoder(&self, log_namespace: LogNamespace) -> vector_common::Result<Decoder> {
+    fn decoder(&self, log_namespace: LogNamespace) -> vector_lib::Result<Decoder> {
         DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace).build()
     }
 }

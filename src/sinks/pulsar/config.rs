@@ -17,8 +17,8 @@ use pulsar::{
 };
 use pulsar::{error::AuthenticationError, OperationRetryOptions};
 use snafu::ResultExt;
-use vector_common::sensitive_string::SensitiveString;
 use vector_core::config::DataType;
+use vector_lib::sensitive_string::SensitiveString;
 use vrl::value::Kind;
 
 /// Configuration for the `pulsar` sink.

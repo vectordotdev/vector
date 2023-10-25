@@ -26,12 +26,12 @@ use kube::{
 use lifecycle::Lifecycle;
 use lookup::{lookup_v2::OptionalTargetPath, owned_value_path, path, OwnedTargetPath};
 use serde_with::serde_as;
-use vector_common::{
+use vector_config::configurable_component;
+use vector_core::{config::LegacyKey, config::LogNamespace, EstimatedJsonEncodedSizeOf};
+use vector_lib::{
     internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol},
     TimeZone,
 };
-use vector_config::configurable_component;
-use vector_core::{config::LegacyKey, config::LogNamespace, EstimatedJsonEncodedSizeOf};
 use vrl::value::{kind::Collection, Kind};
 
 use crate::sources::kubernetes_logs::partial_events_merger::merge_partial_events;

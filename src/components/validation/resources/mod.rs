@@ -96,7 +96,7 @@ impl ResourceCodec {
     ///
     /// The decoder is generated as an inverse to the input codec: if an encoding configuration was
     /// given, we generate a decoder that satisfies that encoding configuration, and vice versa.
-    pub fn into_decoder(&self) -> vector_common::Result<Decoder> {
+    pub fn into_decoder(&self) -> vector_lib::Result<Decoder> {
         let (framer, deserializer) = match self {
             Self::Decoding(config) => return config.build(),
             Self::Encoding(config) => (
@@ -187,7 +187,7 @@ fn decoder_framing_to_encoding_framer(framing: &decoding::FramingConfig) -> enco
 
 fn serializer_config_to_deserializer(
     config: &SerializerConfig,
-) -> vector_common::Result<decoding::Deserializer> {
+) -> vector_lib::Result<decoding::Deserializer> {
     let deserializer_config = match config {
         SerializerConfig::Avro { .. } => todo!(),
         SerializerConfig::Csv { .. } => todo!(),
@@ -328,7 +328,7 @@ impl ExternalResource {
         self,
         output_tx: mpsc::Sender<Vec<Event>>,
         task_coordinator: &TaskCoordinator<Configuring>,
-    ) -> vector_common::Result<()> {
+    ) -> vector_lib::Result<()> {
         match self.definition {
             ResourceDefinition::Http(http_config) => {
                 http_config.spawn_as_output(self.direction, self.codec, output_tx, task_coordinator)

@@ -7,7 +7,7 @@ use crate::emit;
 #[cfg(any(feature = "sources-file", feature = "sources-kubernetes_logs"))]
 pub use self::source::*;
 
-use vector_common::internal_event::{error_stage, error_type};
+use vector_lib::internal_event::{error_stage, error_type};
 
 #[derive(Debug)]
 pub struct FileOpen {
@@ -87,7 +87,7 @@ mod source {
 
     use super::{FileOpen, InternalEvent};
     use crate::emit;
-    use vector_common::{
+    use vector_lib::{
         internal_event::{error_stage, error_type},
         json_size::JsonSize,
     };

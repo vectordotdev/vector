@@ -41,7 +41,7 @@ impl DecodingConfig {
     }
 
     /// Builds a `Decoder` from the provided configuration.
-    pub fn build(&self) -> vector_common::Result<Decoder> {
+    pub fn build(&self) -> vector_lib::Result<Decoder> {
         // Build the framer.
         let framer = self.framing.build();
 

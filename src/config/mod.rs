@@ -566,7 +566,7 @@ mod tests {
                 let c2 = config::load_from_str(config, format).unwrap();
                 match (
                     config::warnings(&c2),
-                    topology::builder::build_pieces(&c, &diff, HashMap::new()).await,
+                    topology::TopologyPieces::build(&c, &diff, HashMap::new()).await,
                 ) {
                     (warnings, Ok(_pieces)) => Ok(warnings),
                     (_, Err(errors)) => Err(errors),
@@ -1452,8 +1452,8 @@ mod resource_config_tests {
     fn generate_component_config_schema() {
         use crate::config::{SinkOuter, SourceOuter, TransformOuter};
         use indexmap::IndexMap;
-        use vector_common::config::ComponentKey;
         use vector_config::configurable_component;
+        use vector_lib::config::ComponentKey;
 
         /// Top-level Vector configuration.
         #[configurable_component]

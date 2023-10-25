@@ -16,8 +16,6 @@ use serde::Serialize;
 use serde_json::{de::Read as JsonRead, Deserializer, Value as JsonValue};
 use snafu::Snafu;
 use tracing::Span;
-use vector_common::internal_event::{CountByteSize, InternalEventHandle as _, Registered};
-use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 use vector_core::{
     config::{LegacyKey, LogNamespace},
@@ -25,6 +23,8 @@ use vector_core::{
     schema::meaning,
     EstimatedJsonEncodedSizeOf,
 };
+use vector_lib::internal_event::{CountByteSize, InternalEventHandle as _, Registered};
+use vector_lib::sensitive_string::SensitiveString;
 use vrl::value::{kind::Collection, Kind};
 use warp::{filters::BoxedFilter, path, reject::Rejection, reply::Response, Filter, Reply};
 
@@ -1213,8 +1213,8 @@ mod tests {
     use futures_util::Stream;
     use reqwest::{RequestBuilder, Response};
     use serde::Deserialize;
-    use vector_common::sensitive_string::SensitiveString;
     use vector_core::{event::EventStatus, schema::Definition};
+    use vector_lib::sensitive_string::SensitiveString;
     use vrl::path::PathPrefix;
 
     use super::*;

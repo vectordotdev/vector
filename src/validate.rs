@@ -8,7 +8,7 @@ use exitcode::ExitCode;
 
 use crate::{
     config::{self, Config, ConfigDiff},
-    topology::{self, builder::Pieces},
+    topology::{self, builder::TopologyPieces},
 };
 
 const TEMPORARY_DIRECTORY: &str = "validate_tmp";
@@ -185,8 +185,8 @@ async fn validate_components(
     config: &Config,
     diff: &ConfigDiff,
     fmt: &mut Formatter,
-) -> Option<Pieces> {
-    match topology::builder::build_pieces(config, diff, HashMap::new()).await {
+) -> Option<TopologyPieces> {
+    match topology::TopologyPieces::build(config, diff, HashMap::new()).await {
         Ok(pieces) => {
             fmt.success("Component configuration");
             Some(pieces)
@@ -203,7 +203,7 @@ async fn validate_healthchecks(
     opts: &Opts,
     config: &Config,
     diff: &ConfigDiff,
-    pieces: &mut Pieces,
+    pieces: &mut TopologyPieces,
     fmt: &mut Formatter,
 ) -> bool {
     if !config.healthchecks.enabled {

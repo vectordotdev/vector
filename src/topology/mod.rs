@@ -25,20 +25,20 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-pub use controller::{ReloadOutcome, SharedTopologyController, TopologyController};
 use futures::{Future, FutureExt};
-pub(super) use running::RunningTopology;
 use tokio::sync::{mpsc, watch};
 use vector_buffers::topology::channel::{BufferReceiverStream, BufferSender};
 
+pub use self::builder::TopologyPieces;
+pub use self::controller::{ReloadOutcome, SharedTopologyController, TopologyController};
+pub use self::running::{RunningTopology, ShutdownErrorReceiver};
+
+use self::task::{Task, TaskError, TaskResult};
 use crate::{
     config::{ComponentKey, Config, ConfigDiff, Inputs, OutputId},
     event::EventArray,
     signal::ShutdownError,
-    topology::{builder::Pieces, task::Task},
 };
-
-use self::task::{TaskError, TaskResult};
 
 type TaskHandle = tokio::task::JoinHandle<TaskResult>;
 
@@ -75,77 +75,9 @@ pub struct TapResource {
 type WatchTx = watch::Sender<TapResource>;
 pub type WatchRx = watch::Receiver<TapResource>;
 
-pub async fn start_validated(
-    config: Config,
-    diff: ConfigDiff,
-    mut pieces: Pieces,
-) -> Option<(
-    RunningTopology,
-    (
-        mpsc::UnboundedSender<ShutdownError>,
-        mpsc::UnboundedReceiver<ShutdownError>,
-    ),
-)> {
-    let (abort_tx, abort_rx) = mpsc::unbounded_channel();
-
-    let expire_metrics = match (
-        config.global.expire_metrics,
-        config.global.expire_metrics_secs,
-    ) {
-        (Some(e), None) => {
-            warn!(
-                "DEPRECATED: `expire_metrics` setting is deprecated and will be removed in a future version. Use `expire_metrics_secs` instead."
-            );
-            Some(e.as_secs_f64())
-        }
-        (Some(_), Some(_)) => {
-            error!("Cannot set both `expire_metrics` and `expire_metrics_secs`.");
-            return None;
-        }
-        (None, e) => e,
-    };
-
-    if let Err(error) = crate::metrics::Controller::get()
-        .expect("Metrics must be initialized")
-        .set_expiry(expire_metrics)
-    {
-        error!(message = "Invalid metrics expiry.", %error);
-        return None;
-    }
-
-    let mut running_topology = RunningTopology::new(config, abort_tx.clone());
-
-    if !running_topology
-        .run_healthchecks(&diff, &mut pieces, running_topology.config.healthchecks)
-        .await
-    {
-        return None;
-    }
-    running_topology.connect_diff(&diff, &mut pieces).await;
-    running_topology.spawn_diff(&diff, pieces);
-
-    Some((running_topology, (abort_tx, abort_rx)))
-}
-
-pub async fn build_or_log_errors(
-    config: &Config,
-    diff: &ConfigDiff,
-    buffers: HashMap<ComponentKey, BuiltBuffer>,
-) -> Option<Pieces> {
-    match builder::build_pieces(config, diff, buffers).await {
-        Err(errors) => {
-            for error in errors {
-                error!(message = "Configuration error.", %error);
-            }
-            None
-        }
-        Ok(new_pieces) => Some(new_pieces),
-    }
-}
-
 pub(super) fn take_healthchecks(
     diff: &ConfigDiff,
-    pieces: &mut Pieces,
+    pieces: &mut TopologyPieces,
 ) -> Vec<(ComponentKey, Task)> {
     (&diff.sinks.to_change | &diff.sinks.to_add)
         .into_iter()

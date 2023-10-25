@@ -5,13 +5,13 @@ use chrono::Utc;
 use codecs::NativeDeserializerConfig;
 use futures::TryFutureExt;
 use tonic::{Request, Response, Status};
-use vector_common::internal_event::{CountByteSize, InternalEventHandle as _};
 use vector_config::configurable_component;
 use vector_core::{
     config::LogNamespace,
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event},
     EstimatedJsonEncodedSizeOf,
 };
+use vector_lib::internal_event::{CountByteSize, InternalEventHandle as _};
 
 use crate::{
     config::{
@@ -281,8 +281,8 @@ mod tests {
         sinks::vector::VectorConfig as SinkConfig,
         test_util, SourceSender,
     };
-    use vector_common::assert_event_data_eq;
     use vector_core::config::log_schema;
+    use vector_lib::assert_event_data_eq;
 
     async fn run_test(vector_source_config_str: &str, addr: SocketAddr) {
         let config = format!(r#"address = "{}""#, addr);

@@ -3,11 +3,11 @@ use std::time::Duration;
 use crate::emit;
 use metrics::{counter, histogram};
 use tokio::time::error::Elapsed;
-use vector_common::{
+use vector_core::internal_event::InternalEvent;
+use vector_lib::{
     internal_event::{error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL},
     json_size::JsonSize,
 };
-use vector_core::internal_event::InternalEvent;
 
 use super::prelude::io_error_code;
 

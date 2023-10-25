@@ -13,8 +13,8 @@ use tokio::sync::{mpsc, oneshot, OwnedSemaphorePermit, Semaphore};
 use tokio_util::sync::PollSemaphore;
 use tower::Service;
 use uuid::Uuid;
-use vector_common::request_metadata::MetaDescriptive;
 use vector_core::event::EventStatus;
+use vector_lib::request_metadata::MetaDescriptive;
 
 use super::{
     acknowledgements::{run_acknowledgements, HecClientAcknowledgementsConfig},
@@ -282,11 +282,11 @@ mod tests {
     use bytes::Bytes;
     use futures_util::{poll, stream::FuturesUnordered, StreamExt};
     use tower::{util::BoxService, Service, ServiceExt};
-    use vector_common::internal_event::CountByteSize;
     use vector_core::{
         config::proxy::ProxyConfig,
         event::{EventFinalizers, EventStatus},
     };
+    use vector_lib::internal_event::CountByteSize;
     use wiremock::{
         matchers::{header, header_exists, method, path},
         Mock, MockServer, Request, Respond, ResponseTemplate,
