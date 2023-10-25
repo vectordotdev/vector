@@ -1,5 +1,5 @@
 use metrics::counter;
-use vector_core::internal_event::InternalEvent;
+use vector_lib::internal_event::InternalEvent;
 
 use crate::sources::fluent::DecodeError;
 use vector_lib::internal_event::{error_stage, error_type};

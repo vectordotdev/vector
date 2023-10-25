@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
 use tokio::sync::oneshot::{channel, Receiver};
-use vector_core::config::OutputId;
-use vector_core::event::{Event, EventArray, EventContainer, LogEvent};
 use vector_lib::config::ComponentKey;
+use vector_lib::config::OutputId;
+use vector_lib::event::{Event, EventArray, EventContainer, LogEvent};
 
 use crate::config::schema::Definition;
 use crate::{

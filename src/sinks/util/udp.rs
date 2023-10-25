@@ -11,8 +11,8 @@ use snafu::{ResultExt, Snafu};
 use tokio::{net::UdpSocket, time::sleep};
 use tokio_util::codec::Encoder;
 use vector_config::configurable_component;
-use vector_core::EstimatedJsonEncodedSizeOf;
 use vector_lib::internal_event::{ByteSize, BytesSent, InternalEventHandle, Protocol, Registered};
+use vector_lib::EstimatedJsonEncodedSizeOf;
 
 use super::SinkBuildError;
 use crate::{

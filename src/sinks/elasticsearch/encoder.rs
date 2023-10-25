@@ -2,7 +2,7 @@ use std::{io, io::Write};
 
 use serde::Serialize;
 use vector_buffers::EventCount;
-use vector_core::{config::telemetry, event::Event, ByteSizeOf, EstimatedJsonEncodedSizeOf};
+use vector_lib::{config::telemetry, event::Event, ByteSizeOf, EstimatedJsonEncodedSizeOf};
 use vector_lib::{
     internal_event::TaggedEventsSent,
     json_size::JsonSize,

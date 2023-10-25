@@ -1,4 +1,4 @@
-use vector_core::event::EventStatus;
+use vector_lib::event::EventStatus;
 use vector_lib::request_metadata::GroupedCountByteSize;
 use vector_stream::DriverResponse;
 

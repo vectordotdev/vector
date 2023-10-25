@@ -13,7 +13,7 @@ use toml::{map::Map, Value};
 use vector_config::component::{
     ExampleError, SinkDescription, SourceDescription, TransformDescription,
 };
-use vector_core::{buffers::BufferConfig, config::GlobalOptions, default_data_dir};
+use vector_lib::{buffers::BufferConfig, config::GlobalOptions, default_data_dir};
 
 use crate::config::{format, Format, SinkHealthcheckOptions};
 

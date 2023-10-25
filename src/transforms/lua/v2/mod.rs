@@ -4,8 +4,8 @@ use codecs::MetricTagValues;
 use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
 use vector_config::configurable_component;
-pub use vector_core::event::lua;
-use vector_core::transform::runtime_transform::{RuntimeTransform, Timer};
+pub use vector_lib::event::lua;
+use vector_lib::transform::runtime_transform::{RuntimeTransform, Timer};
 
 use crate::config::{ComponentKey, OutputId};
 use crate::event::lua::event::LuaEvent;

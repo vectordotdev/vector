@@ -1,7 +1,7 @@
 use bytes::Bytes;
 use snafu::Snafu;
 use std::sync::Arc;
-use vector_core::event::{EventFinalizers, Finalizable, Metric};
+use vector_lib::event::{EventFinalizers, Finalizable, Metric};
 use vector_lib::request_metadata::RequestMetadata;
 
 use super::{

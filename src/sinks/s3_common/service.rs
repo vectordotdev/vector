@@ -11,7 +11,7 @@ use futures::future::BoxFuture;
 use md5::Digest;
 use tower::Service;
 use tracing::Instrument;
-use vector_core::event::{EventFinalizers, EventStatus, Finalizable};
+use vector_lib::event::{EventFinalizers, EventStatus, Finalizable};
 use vector_lib::request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata};
 use vector_stream::DriverResponse;
 

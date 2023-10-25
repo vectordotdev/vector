@@ -10,7 +10,7 @@ use indoc::indoc;
 use prost::Message;
 use rand::{thread_rng, Rng};
 
-use vector_core::{
+use vector_lib::{
     config::{init_telemetry, Tags, Telemetry},
     event::{BatchNotifier, BatchStatus, Event, Metric, MetricKind, MetricValue},
     metric_tags,

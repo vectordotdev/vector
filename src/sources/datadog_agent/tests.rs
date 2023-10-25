@@ -19,7 +19,7 @@ use ordered_float::NotNan;
 use prost::Message;
 use quickcheck::{Arbitrary, Gen, QuickCheck, TestResult};
 use similar_asserts::assert_eq;
-use vector_core::{
+use vector_lib::{
     config::LogNamespace,
     event::{metric::TagValue, MetricTags},
     metric_tags,

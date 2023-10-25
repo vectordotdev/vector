@@ -283,7 +283,7 @@ mod tests {
     use std::num::NonZeroU64;
 
     use tokio::{time, time::sleep};
-    use vector_core::event::{BatchNotifier, EventFinalizer, EventStatus};
+    use vector_lib::event::{BatchNotifier, EventFinalizer, EventStatus};
 
     use super::{Channel, HecAcknowledgementsConfig, IndexerAcknowledgement};
     use crate::shutdown::ShutdownSignal;

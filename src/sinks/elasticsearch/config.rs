@@ -33,7 +33,7 @@ use crate::{
 };
 use lookup::event_path;
 use lookup::lookup_v2::ConfigValuePath;
-use vector_core::schema::Requirement;
+use vector_lib::schema::Requirement;
 use vrl::value::Kind;
 
 /// The field name for the timestamp required by data stream mode

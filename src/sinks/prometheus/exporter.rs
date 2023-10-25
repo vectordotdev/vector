@@ -21,7 +21,7 @@ use snafu::Snafu;
 use stream_cancel::{Trigger, Tripwire};
 use tracing::{Instrument, Span};
 use vector_config::configurable_component;
-use vector_core::{
+use vector_lib::{
     internal_event::{
         ByteSize, BytesSent, CountByteSize, EventsSent, InternalEventHandle as _, Output, Protocol,
         Registered,
@@ -608,7 +608,7 @@ mod tests {
     use indoc::indoc;
     use similar_asserts::assert_eq;
     use tokio::{sync::oneshot::error::TryRecvError, time};
-    use vector_core::{
+    use vector_lib::{
         event::{MetricTags, StatisticKind},
         metric_tags, samples,
     };

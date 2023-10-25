@@ -52,7 +52,7 @@ use vector_lib::internal_event::{
     CallError, CountByteSize, EventsSent, InternalEventHandle as _, Output,
 };
 // === StreamSink<Event> ===
-pub use vector_core::sink::StreamSink;
+pub use vector_lib::sink::StreamSink;
 
 use super::{
     batch::{Batch, EncodedBatch, FinalizersBatch, PushResult, StatefulBatch},

@@ -5,7 +5,7 @@ use hyper::StatusCode;
 use metrics::counter;
 #[cfg(feature = "sources-prometheus-scrape")]
 use prometheus_parser::ParserError;
-use vector_core::internal_event::InternalEvent;
+use vector_lib::internal_event::InternalEvent;
 
 use crate::emit;
 use vector_lib::internal_event::{error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL};

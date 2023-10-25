@@ -6,7 +6,7 @@ use governor::{clock, Quota, RateLimiter};
 use serde_with::serde_as;
 use snafu::Snafu;
 use vector_config::configurable_component;
-use vector_core::config::{clone_input_definitions, LogNamespace};
+use vector_lib::config::{clone_input_definitions, LogNamespace};
 
 use crate::{
     conditions::{AnyCondition, Condition},

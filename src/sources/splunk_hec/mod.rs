@@ -17,14 +17,14 @@ use serde_json::{de::Read as JsonRead, Deserializer, Value as JsonValue};
 use snafu::Snafu;
 use tracing::Span;
 use vector_config::configurable_component;
-use vector_core::{
+use vector_lib::internal_event::{CountByteSize, InternalEventHandle as _, Registered};
+use vector_lib::sensitive_string::SensitiveString;
+use vector_lib::{
     config::{LegacyKey, LogNamespace},
     event::BatchNotifier,
     schema::meaning,
     EstimatedJsonEncodedSizeOf,
 };
-use vector_lib::internal_event::{CountByteSize, InternalEventHandle as _, Registered};
-use vector_lib::sensitive_string::SensitiveString;
 use vrl::value::{kind::Collection, Kind};
 use warp::{filters::BoxedFilter, path, reject::Rejection, reply::Response, Filter, Reply};
 
@@ -182,7 +182,7 @@ impl SourceConfig for SplunkConfig {
 
         let schema_definition = match log_namespace {
             LogNamespace::Legacy => {
-                let definition = vector_core::schema::Definition::empty_legacy_namespace()
+                let definition = vector_lib::schema::Definition::empty_legacy_namespace()
                     .with_event_field(
                         &owned_value_path!("line"),
                         Kind::object(Collection::empty())
@@ -201,7 +201,7 @@ impl SourceConfig for SplunkConfig {
                     definition
                 }
             }
-            LogNamespace::Vector => vector_core::schema::Definition::new_with_default_metadata(
+            LogNamespace::Vector => vector_lib::schema::Definition::new_with_default_metadata(
                 Kind::bytes().or_object(Collection::empty()),
                 [log_namespace],
             ),
@@ -1213,8 +1213,8 @@ mod tests {
     use futures_util::Stream;
     use reqwest::{RequestBuilder, Response};
     use serde::Deserialize;
-    use vector_core::{event::EventStatus, schema::Definition};
     use vector_lib::sensitive_string::SensitiveString;
+    use vector_lib::{event::EventStatus, schema::Definition};
     use vrl::path::PathPrefix;
 
     use super::*;

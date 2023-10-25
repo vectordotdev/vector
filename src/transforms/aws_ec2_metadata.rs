@@ -15,7 +15,7 @@ use snafu::ResultExt as _;
 use tokio::time::{sleep, Duration, Instant};
 use tracing::Instrument;
 use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
+use vector_lib::config::LogNamespace;
 use vrl::value::kind::Collection;
 use vrl::value::Kind;
 

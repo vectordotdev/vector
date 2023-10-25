@@ -9,12 +9,12 @@ use lookup::{lookup_v2::OptionalValuePath, owned_value_path, path, OwnedValuePat
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
 use vector_config::configurable_component;
-use vector_core::{
-    config::{LegacyKey, LogNamespace},
-    EstimatedJsonEncodedSizeOf,
-};
 use vector_lib::internal_event::{
     ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol, Registered,
+};
+use vector_lib::{
+    config::{LegacyKey, LogNamespace},
+    EstimatedJsonEncodedSizeOf,
 };
 use vrl::value::Kind;
 

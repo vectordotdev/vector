@@ -16,7 +16,7 @@ use snafu::{ResultExt, Snafu};
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
 use vector_config::configurable_component;
-use vector_core::{metric_tags, ByteSizeOf, EstimatedJsonEncodedSizeOf};
+use vector_lib::{metric_tags, ByteSizeOf, EstimatedJsonEncodedSizeOf};
 
 use crate::{
     config::{SourceConfig, SourceContext, SourceOutput},
@@ -29,7 +29,7 @@ use crate::{
 
 mod types;
 use types::{CommandBuildInfo, CommandIsMaster, CommandServerStatus, NodeType};
-use vector_core::config::LogNamespace;
+use vector_lib::config::LogNamespace;
 
 macro_rules! tags {
     ($tags:expr) => { $tags.clone() };
