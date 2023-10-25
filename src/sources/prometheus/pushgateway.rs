@@ -261,4 +261,6 @@ mod test {
         assert!(result.is_err());
         assert!(result.unwrap_err().message().contains("Path must begin"));
     }
+
+    // TODO: Test duplicate grouping key labels (and match whatever the real Pushgateway does)
 }
