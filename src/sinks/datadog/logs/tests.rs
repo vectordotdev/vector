@@ -17,11 +17,11 @@ use vector_core::{
 };
 
 use crate::{
-    config::SinkConfig,
+    config::{SinkConfig, SinkContext},
     http::HttpError,
     sinks::{
         util::retries::RetryLogic,
-        util::test::{build_test_server_status, load_sink},
+        util::test::{build_test_server_status, load_sink, load_sink_with_context},
     },
     test_util::{
         components::{
@@ -534,4 +534,40 @@ async fn error_is_retriable() {
     //       the crates they originate from.
 }
 
-// #[tokio::test]
+#[tokio::test]
+async fn global_options() {
+    let config = indoc! {r#"
+            compression = "none"
+        "#};
+    let mut cx = SinkContext::default();
+    cx.datadog.api_key = Some("globalkey".to_string().into());
+    let (mut config, cx) = load_sink_with_context::<DatadogLogsConfig>(config, cx).unwrap();
+
+    let addr = next_addr();
+    // Swap out the endpoint so we can force send it
+    // to our local server
+    let endpoint = format!("http://{}", addr);
+    config.dd_common.endpoint = Some(endpoint.clone());
+
+    let (sink, _) = config.build(cx).await.unwrap();
+
+    let (rx, _trigger, server) = test_server(addr, ApiStatus::OKv1);
+    tokio::spawn(server);
+
+    let (batch, receiver) = BatchNotifier::new_with_receiver();
+    let (_expected, events) = random_lines_with_stream(100, 10, Some(batch));
+
+    run_and_assert_sink_compliance(sink, events, &SINK_TAGS).await;
+
+    assert_eq!(receiver.await, BatchStatus::Delivered);
+
+    let keys = rx
+        .take(1)
+        .map(|r| r.0.headers.get("DD-API-KEY").unwrap().clone())
+        .collect::<Vec<_>>()
+        .await;
+
+    assert!(keys
+        .iter()
+        .all(|value| value.to_str().unwrap() == "globalkey"));
+}
