@@ -6,7 +6,7 @@ pub use futures::{future, future::BoxFuture, stream::BoxStream, FutureExt, Strea
 pub use tower::{Service, ServiceBuilder};
 pub use vector_buffers::EventCount;
 pub use vector_config::configurable_component;
-pub use vector_core::{
+pub use vector_lib::{
     config::{telemetry, AcknowledgementsConfig, Input},
     event::Value,
     partition::Partitioner,

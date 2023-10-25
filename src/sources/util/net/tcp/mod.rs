@@ -17,11 +17,11 @@ use tokio::{
 };
 use tokio_util::codec::{Decoder, FramedRead};
 use tracing::Instrument;
-use vector_core::{
+use vector_lib::finalization::AddBatchNotifier;
+use vector_lib::{
     config::{LegacyKey, LogNamespace, SourceAcknowledgementsConfig},
     EstimatedJsonEncodedSizeOf,
 };
-use vector_lib::finalization::AddBatchNotifier;
 use vrl::value::Value;
 
 use self::request_limiter::RequestLimiter;

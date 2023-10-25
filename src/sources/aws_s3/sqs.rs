@@ -45,8 +45,8 @@ use crate::{
     SourceSender,
 };
 use lookup::{metadata_path, path, PathPrefix};
-use vector_core::config::{log_schema, LegacyKey, LogNamespace};
-use vector_core::event::MaybeAsLogMut;
+use vector_lib::config::{log_schema, LegacyKey, LogNamespace};
+use vector_lib::event::MaybeAsLogMut;
 
 static SUPPORTED_S3_EVENT_VERSION: Lazy<semver::VersionReq> =
     Lazy::new(|| semver::VersionReq::parse("~2").unwrap());

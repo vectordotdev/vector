@@ -3,7 +3,7 @@ use std::{collections::BTreeMap, convert::TryInto};
 use chrono::{serde::ts_seconds, DateTime, TimeZone, Utc};
 use ordered_float::NotNan;
 use serde::{Deserialize, Serialize};
-use vector_core::event::Value;
+use vector_lib::event::Value;
 
 /// Fluent msgpack messages can be encoded in one of three ways, each with and
 /// without options, all using arrays to encode the top-level fields.
@@ -229,7 +229,7 @@ mod test {
 
     use approx::assert_relative_eq;
     use quickcheck::quickcheck;
-    use vector_core::event::Value;
+    use vector_lib::event::Value;
 
     use crate::sources::fluent::message::FluentValue;
 

@@ -18,8 +18,8 @@ use tokio::{
 };
 use tokio_util::codec::Encoder;
 use vector_config::configurable_component;
-use vector_core::{ByteSizeOf, EstimatedJsonEncodedSizeOf};
 use vector_lib::json_size::JsonSize;
+use vector_lib::{ByteSizeOf, EstimatedJsonEncodedSizeOf};
 
 use crate::{
     codecs::Transformer,

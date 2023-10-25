@@ -6,7 +6,7 @@ use snafu::ResultExt;
 use tokio::sync::oneshot::{channel, Sender};
 use tower::ServiceBuilder;
 use vector_config::configurable_component;
-use vector_core::config::{proxy::ProxyConfig, AcknowledgementsConfig};
+use vector_lib::config::{proxy::ProxyConfig, AcknowledgementsConfig};
 
 use super::{
     apm_stats::{flush_apm_stats_thread, Aggregator},

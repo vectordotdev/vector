@@ -1,6 +1,6 @@
 use bytes::Bytes;
 
-use vector_core::event::Event;
+use vector_lib::event::Event;
 use vector_lib::{
     byte_size_of::ByteSizeOf,
     finalization::{EventFinalizers, Finalizable},

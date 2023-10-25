@@ -1,6 +1,6 @@
 use serde_json::{json, Value};
-use vector_core::{config::telemetry, event::Event, EstimatedJsonEncodedSizeOf};
 use vector_lib::request_metadata::GroupedCountByteSize;
+use vector_lib::{config::telemetry, event::Event, EstimatedJsonEncodedSizeOf};
 
 use crate::{
     codecs::Transformer,

@@ -272,7 +272,7 @@ mod integration_tests {
     use reqwest::{Client, Method, Response};
     use serde::{Deserialize, Serialize};
     use serde_json::{json, Value};
-    use vector_core::event::{BatchNotifier, BatchStatus};
+    use vector_lib::event::{BatchNotifier, BatchStatus};
 
     use super::*;
     use crate::gcp;

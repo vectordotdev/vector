@@ -1,7 +1,7 @@
 use chrono::Utc;
 use futures::{future::ready, stream};
 use serde::Deserialize;
-use vector_core::event::{Metric, MetricKind, MetricValue};
+use vector_lib::event::{Metric, MetricKind, MetricValue};
 
 use super::config::StackdriverConfig;
 use crate::{

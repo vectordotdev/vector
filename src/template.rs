@@ -374,7 +374,7 @@ fn render_timestamp(items: &ParsedStrftime, event: EventRef<'_>) -> String {
 mod tests {
     use chrono::TimeZone;
     use lookup::metadata_path;
-    use vector_core::metric_tags;
+    use vector_lib::metric_tags;
 
     use super::*;
     use crate::event::{Event, LogEvent, MetricKind, MetricValue};

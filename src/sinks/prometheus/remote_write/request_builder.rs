@@ -2,7 +2,7 @@ use std::io;
 
 use bytes::{Bytes, BytesMut};
 use prost::Message;
-use vector_core::{config::telemetry, event::Metric};
+use vector_lib::{config::telemetry, event::Metric};
 
 use crate::sinks::{
     prelude::*,

@@ -1,5 +1,6 @@
 use indexmap::IndexMap;
-use vector_core::event::{
+
+use vector_lib::event::{
     metric::{MetricData, MetricSeries},
     EventMetadata, Metric, MetricKind,
 };

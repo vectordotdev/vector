@@ -6,7 +6,7 @@ use std::{
 use async_trait::async_trait;
 use futures_util::{future::ok, FutureExt, Sink};
 use vector_config::configurable_component;
-use vector_core::{
+use vector_lib::{
     config::{AcknowledgementsConfig, Input},
     event::Event,
     sink::VectorSink,

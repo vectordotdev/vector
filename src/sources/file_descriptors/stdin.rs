@@ -3,7 +3,7 @@ use std::io;
 use codecs::decoding::{DeserializerConfig, FramingConfig};
 use lookup::lookup_v2::OptionalValuePath;
 use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
+use vector_lib::config::LogNamespace;
 
 use crate::{
     config::{Resource, SourceConfig, SourceContext, SourceOutput},

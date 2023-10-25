@@ -1,5 +1,5 @@
 use crate::emit;
-use vector_core::internal_event::{ComponentEventsDropped, InternalEvent, INTENTIONAL};
+use vector_lib::internal_event::{ComponentEventsDropped, InternalEvent, INTENTIONAL};
 
 #[derive(Debug)]
 pub struct DedupeEventsDropped {

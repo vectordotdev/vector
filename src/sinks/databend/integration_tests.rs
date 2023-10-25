@@ -3,8 +3,8 @@ use std::collections::BTreeMap;
 use futures::future::ready;
 use futures::stream;
 
-use vector_core::config::proxy::ProxyConfig;
-use vector_core::event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event, LogEvent};
+use vector_lib::config::proxy::ProxyConfig;
+use vector_lib::event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event, LogEvent};
 use vector_lib::sensitive_string::SensitiveString;
 
 use crate::sinks::util::test::load_sink;

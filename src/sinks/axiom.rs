@@ -145,7 +145,7 @@ mod integration_tests {
     use futures::stream;
     use serde::{Deserialize, Serialize};
     use std::env;
-    use vector_core::event::{BatchNotifier, BatchStatus, Event, LogEvent};
+    use vector_lib::event::{BatchNotifier, BatchStatus, Event, LogEvent};
 
     use super::*;
     use crate::{

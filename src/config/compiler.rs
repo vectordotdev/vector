@@ -198,7 +198,7 @@ fn expand_globs_inner(inputs: &mut Inputs<String>, id: &str, candidates: &IndexS
 mod test {
     use super::*;
     use crate::test_util::mock::{basic_sink, basic_source, basic_transform};
-    use vector_core::config::ComponentKey;
+    use vector_lib::config::ComponentKey;
 
     #[test]
     fn glob_expansion() {

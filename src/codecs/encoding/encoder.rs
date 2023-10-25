@@ -187,7 +187,7 @@ mod tests {
     use codecs::encoding::BoxedFramingError;
     use futures_util::{SinkExt, StreamExt};
     use tokio_util::codec::FramedWrite;
-    use vector_core::event::LogEvent;
+    use vector_lib::event::LogEvent;
 
     use super::*;
 

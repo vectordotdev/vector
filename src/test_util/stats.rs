@@ -7,7 +7,7 @@ use std::{
 };
 
 use ordered_float::OrderedFloat;
-use vector_core::event::metric::Bucket;
+use vector_lib::event::metric::Bucket;
 
 #[derive(Copy, Clone, Debug, Default)]
 pub struct HistogramStats {

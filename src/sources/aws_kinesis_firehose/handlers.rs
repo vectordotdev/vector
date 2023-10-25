@@ -9,7 +9,7 @@ use futures::StreamExt;
 use lookup::{metadata_path, path, PathPrefix};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
-use vector_core::{
+use vector_lib::{
     config::{LegacyKey, LogNamespace},
     event::BatchNotifier,
     EstimatedJsonEncodedSizeOf,

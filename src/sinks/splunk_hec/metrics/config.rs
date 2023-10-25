@@ -4,8 +4,8 @@ use futures_util::FutureExt;
 use lookup::lookup_v2::OptionalValuePath;
 use tower::ServiceBuilder;
 use vector_config::configurable_component;
-use vector_core::sink::VectorSink;
 use vector_lib::sensitive_string::SensitiveString;
+use vector_lib::sink::VectorSink;
 
 use super::{request_builder::HecMetricsRequestBuilder, sink::HecMetricsSink};
 use crate::{

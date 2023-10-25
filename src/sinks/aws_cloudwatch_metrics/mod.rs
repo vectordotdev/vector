@@ -15,7 +15,7 @@ use futures_util::{future, future::BoxFuture};
 use std::task::{Context, Poll};
 use tower::Service;
 use vector_config::configurable_component;
-use vector_core::{sink::VectorSink, ByteSizeOf, EstimatedJsonEncodedSizeOf};
+use vector_lib::{sink::VectorSink, ByteSizeOf, EstimatedJsonEncodedSizeOf};
 
 use crate::{
     aws::{

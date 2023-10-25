@@ -1,4 +1,4 @@
-use vector_core::event::{Metric, MetricValue};
+use vector_lib::event::{Metric, MetricValue};
 
 use crate::sinks::{
     prelude::*,

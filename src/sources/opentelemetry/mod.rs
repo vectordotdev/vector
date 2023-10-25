@@ -19,11 +19,11 @@ use opentelemetry_proto::convert::{
 
 use opentelemetry_proto::proto::collector::logs::v1::logs_service_server::LogsServiceServer;
 use vector_config::configurable_component;
-use vector_core::{
+use vector_lib::internal_event::{BytesReceived, EventsReceived, Protocol};
+use vector_lib::{
     config::{log_schema, LegacyKey, LogNamespace},
     schema::Definition,
 };
-use vector_lib::internal_event::{BytesReceived, EventsReceived, Protocol};
 use vrl::value::{kind::Collection, Kind};
 
 use self::{

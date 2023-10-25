@@ -3,12 +3,12 @@ use std::convert::Infallible;
 use bytes::BytesMut;
 use snafu::Snafu;
 use tokio_util::codec::Encoder;
-use vector_core::{
+use vector_lib::request_metadata::RequestMetadata;
+use vector_lib::{
     config::telemetry,
     event::{EventFinalizers, Finalizable, Metric},
     EstimatedJsonEncodedSizeOf,
 };
-use vector_lib::request_metadata::RequestMetadata;
 
 use super::{encoder::StatsdEncoder, service::StatsdRequest};
 use crate::{
