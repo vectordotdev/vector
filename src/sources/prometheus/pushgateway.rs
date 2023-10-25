@@ -132,6 +132,13 @@ impl HttpSource for PushgatewaySource {
 
 // TODO: Test this
 fn parse_path_labels(path: &str) -> Result<Vec<(String, String)>, ErrorMessage> {
+    if !path.starts_with("/metrics/job/") {
+        return Err(ErrorMessage::new(
+            http::StatusCode::BAD_REQUEST,
+            "Path must begin with '/metrics/job/'".to_owned(),
+        ))
+    }
+
     path.split('/')
         // Skip the first two segments as they're the empty string and
         // "metrics", which is always there as a path prefix
@@ -227,6 +234,14 @@ mod test {
     #[test]
     fn test_parse_path_empty_job_name_invalid() {
         let path = "/metrics/job@base64/=";
+        let result = parse_path_labels(path);
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_path_empty_path_invalid() {
+        let path = "/";
         let result = parse_path_labels(path);
 
         assert!(result.is_err());
