@@ -180,6 +180,7 @@ fn decode_label_pair(k: &str, v: &str) -> Result<(String, String), ErrorMessage>
     //
     // Let's handle this case manually, before handing over to the base64 decoder.
     if v.chars().all(|c| c == '=') {
+        // An empty job label isn't valid, so return an error if that's the key
         if stripped_key == "job" {
             return Err(ErrorMessage::new(
                 http::StatusCode::BAD_REQUEST,
