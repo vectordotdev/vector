@@ -29,3 +29,8 @@ pub mod config {
         MEMORY_BUFFER_DEFAULT_MAX_EVENTS,
     };
 }
+
+#[cfg(feature = "opentelemetry")]
+pub mod opentelemetry {
+    pub use opentelemetry_proto::{convert, proto};
+}
