@@ -41,8 +41,8 @@ use super::{
 };
 use crate::{
     config::{
-        ComponentKey, DataType, EnrichmentTableConfig, Input, Inputs, OutputId, ProxyConfig,
-        SinkContext, SourceContext, TransformContext, TransformOuter, TransformOutput,
+        ComponentKey, Config, DataType, EnrichmentTableConfig, Input, Inputs, OutputId,
+        ProxyConfig, SinkContext, SourceContext, TransformContext, TransformOuter, TransformOutput,
     },
     event::{EventArray, EventContainer},
     internal_events::EventsReceived,
@@ -72,15 +72,6 @@ static TRANSFORM_CONCURRENCY_LIMIT: Lazy<usize> = Lazy::new(|| {
 });
 
 const INTERNAL_SOURCES: [&str; 2] = ["internal_logs", "internal_metrics"];
-
-/// Builds only the new pieces, and doesn't check their topology.
-pub async fn build_pieces(
-    config: &super::Config,
-    diff: &ConfigDiff,
-    buffers: HashMap<ComponentKey, BuiltBuffer>,
-) -> Result<Pieces, Vec<String>> {
-    Builder::new(config, diff, buffers).build().await
-}
 
 struct Builder<'a> {
     config: &'a super::Config,
@@ -116,7 +107,7 @@ impl<'a> Builder<'a> {
     }
 
     /// Builds the new pieces of the topology found in `self.diff`.
-    async fn build(mut self) -> Result<Pieces, Vec<String>> {
+    async fn build(mut self) -> Result<TopologyPieces, Vec<String>> {
         let enrichment_tables = self.load_enrichment_tables().await;
         let source_tasks = self.build_sources().await;
         self.build_transforms(enrichment_tables).await;
@@ -127,7 +118,7 @@ impl<'a> Builder<'a> {
         enrichment_tables.finish_load();
 
         if self.errors.is_empty() {
-            Ok(Pieces {
+            Ok(TopologyPieces {
                 inputs: self.inputs,
                 outputs: Self::finalize_outputs(self.outputs),
                 tasks: self.tasks,
@@ -677,7 +668,7 @@ impl<'a> Builder<'a> {
     }
 }
 
-pub struct Pieces {
+pub struct TopologyPieces {
     pub(super) inputs: HashMap<ComponentKey, (BufferSender<EventArray>, Inputs<OutputId>)>,
     pub(crate) outputs: HashMap<ComponentKey, HashMap<Option<String>, fanout::ControlChannel>>,
     pub(super) tasks: HashMap<ComponentKey, Task>,
@@ -685,6 +676,33 @@ pub struct Pieces {
     pub(super) healthchecks: HashMap<ComponentKey, Task>,
     pub(crate) shutdown_coordinator: SourceShutdownCoordinator,
     pub(crate) detach_triggers: HashMap<ComponentKey, Trigger>,
+}
+
+impl TopologyPieces {
+    pub async fn build_or_log_errors(
+        config: &Config,
+        diff: &ConfigDiff,
+        buffers: HashMap<ComponentKey, BuiltBuffer>,
+    ) -> Option<Self> {
+        match TopologyPieces::build(config, diff, buffers).await {
+            Err(errors) => {
+                for error in errors {
+                    error!(message = "Configuration error.", %error);
+                }
+                None
+            }
+            Ok(new_pieces) => Some(new_pieces),
+        }
+    }
+
+    /// Builds only the new pieces, and doesn't check their topology.
+    pub async fn build(
+        config: &super::Config,
+        diff: &ConfigDiff,
+        buffers: HashMap<ComponentKey, BuiltBuffer>,
+    ) -> Result<Self, Vec<String>> {
+        Builder::new(config, diff, buffers).build().await
+    }
 }
 
 const fn filter_events_type(events: &EventArray, data_type: DataType) -> bool {

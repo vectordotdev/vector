@@ -19,7 +19,7 @@ use crate::{
         },
         start_topology, trace_init,
     },
-    topology::{self, builder},
+    topology::{RunningTopology, TopologyPieces},
 };
 use futures::{future, stream, StreamExt};
 use tokio::{
@@ -784,12 +784,7 @@ async fn topology_rebuild_connected_transform() {
 async fn topology_required_healthcheck_fails_start() {
     let mut config = basic_config_with_sink_failing_healthcheck();
     config.healthchecks.require_healthy = true;
-    let diff = ConfigDiff::initial(&config);
-    let pieces = topology::build_or_log_errors(&config, &diff, HashMap::new())
-        .await
-        .unwrap();
-
-    assert!(topology::start_validated(config, diff, pieces)
+    assert!(RunningTopology::start_init_validated(config)
         .await
         .is_none());
 }
@@ -797,11 +792,7 @@ async fn topology_required_healthcheck_fails_start() {
 #[tokio::test]
 async fn topology_optional_healthcheck_does_not_fail_start() {
     let config = basic_config_with_sink_failing_healthcheck();
-    let diff = ConfigDiff::initial(&config);
-    let pieces = topology::build_or_log_errors(&config, &diff, HashMap::new())
-        .await
-        .unwrap();
-    assert!(topology::start_validated(config, diff, pieces)
+    assert!(RunningTopology::start_init_validated(config)
         .await
         .is_some());
 }
@@ -915,7 +906,7 @@ async fn topology_transform_error_definition() {
 
     let config = config.build().unwrap();
     let diff = ConfigDiff::initial(&config);
-    let errors = match builder::build_pieces(&config, &diff, HashMap::new()).await {
+    let errors = match TopologyPieces::build(&config, &diff, HashMap::new()).await {
         Ok(_) => panic!("build pieces should not succeed"),
         Err(err) => err,
     };
