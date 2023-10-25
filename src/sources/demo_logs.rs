@@ -1,7 +1,6 @@
 use chrono::Utc;
 use fakedata::logs::*;
 use futures::StreamExt;
-use lookup::{owned_value_path, path};
 use rand::seq::SliceRandom;
 use serde_with::serde_as;
 use snafu::Snafu;
@@ -16,6 +15,7 @@ use vector_lib::configurable::configurable_component;
 use vector_lib::internal_event::{
     ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol,
 };
+use vector_lib::lookup::{owned_value_path, path};
 use vector_lib::{
     config::{LegacyKey, LogNamespace},
     EstimatedJsonEncodedSizeOf,

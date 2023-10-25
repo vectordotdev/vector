@@ -1,7 +1,5 @@
 use futures::Stream;
 use indexmap::IndexMap;
-use lookup::lookup_v2::parse_target_path;
-use lookup::PathPrefix;
 use serde_with::serde_as;
 use std::collections::BTreeMap;
 use std::{
@@ -11,6 +9,8 @@ use std::{
     time::{Duration, Instant},
 };
 use vector_lib::configurable::configurable_component;
+use vector_lib::lookup::lookup_v2::parse_target_path;
+use vector_lib::lookup::PathPrefix;
 
 use crate::config::OutputId;
 use crate::{
@@ -478,7 +478,7 @@ mod test {
     use crate::event::{LogEvent, Value};
     use crate::test_util::components::assert_transform_compliance;
     use crate::transforms::test::create_topology;
-    use lookup::owned_value_path;
+    use vector_lib::lookup::owned_value_path;
 
     #[test]
     fn generate_config() {

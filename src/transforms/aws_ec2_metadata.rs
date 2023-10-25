@@ -5,9 +5,6 @@ use bytes::Bytes;
 use futures::{Stream, StreamExt};
 use http::{uri::PathAndQuery, Request, StatusCode, Uri};
 use hyper::{body::to_bytes as body_to_bytes, Body};
-use lookup::lookup_v2::{OptionalTargetPath, OwnedSegment};
-use lookup::owned_value_path;
-use lookup::OwnedTargetPath;
 use once_cell::sync::Lazy;
 use serde::Deserialize;
 use serde_with::serde_as;
@@ -16,6 +13,9 @@ use tokio::time::{sleep, Duration, Instant};
 use tracing::Instrument;
 use vector_lib::config::LogNamespace;
 use vector_lib::configurable::configurable_component;
+use vector_lib::lookup::lookup_v2::{OptionalTargetPath, OwnedSegment};
+use vector_lib::lookup::owned_value_path;
+use vector_lib::lookup::OwnedTargetPath;
 use vrl::value::kind::Collection;
 use vrl::value::Kind;
 
@@ -719,8 +719,8 @@ mod test {
     use crate::config::schema::Definition;
     use crate::config::{LogNamespace, OutputId, TransformConfig};
     use crate::transforms::aws_ec2_metadata::Ec2Metadata;
-    use lookup::OwnedTargetPath;
     use vector_lib::enrichment::TableRegistry;
+    use vector_lib::lookup::OwnedTargetPath;
     use vrl::owned_value_path;
     use vrl::value::Kind;
 
@@ -749,10 +749,10 @@ mod test {
 #[cfg(feature = "aws-ec2-metadata-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
-    use lookup::lookup_v2::{OwnedSegment, OwnedValuePath};
-    use lookup::{event_path, PathPrefix};
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
+    use vector_lib::lookup::lookup_v2::{OwnedSegment, OwnedValuePath};
+    use vector_lib::lookup::{event_path, PathPrefix};
 
     use super::*;
     use crate::{

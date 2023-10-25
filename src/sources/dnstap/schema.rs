@@ -1,6 +1,6 @@
-use lookup::{owned_value_path, OwnedValuePath};
 use once_cell::sync::Lazy;
 use std::collections::BTreeMap;
+use vector_lib::lookup::{owned_value_path, OwnedValuePath};
 use vrl::btreemap;
 use vrl::value::{
     kind::{Collection, Field},

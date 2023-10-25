@@ -11,7 +11,7 @@ mod status;
 use std::net::SocketAddr;
 
 use futures::{future::join, FutureExt, TryFutureExt};
-use lookup::{owned_value_path, OwnedTargetPath};
+use vector_lib::lookup::{owned_value_path, OwnedTargetPath};
 use vector_lib::opentelemetry::convert::{
     ATTRIBUTES_KEY, DROPPED_ATTRIBUTES_COUNT_KEY, FLAGS_KEY, OBSERVED_TIMESTAMP_KEY, RESOURCE_KEY,
     SEVERITY_NUMBER_KEY, SEVERITY_TEXT_KEY, SPAN_ID_KEY, TRACE_ID_KEY,

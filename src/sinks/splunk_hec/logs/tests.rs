@@ -2,13 +2,14 @@ use std::{collections::BTreeMap, sync::Arc};
 
 use chrono::{TimeZone, Utc};
 use futures_util::StreamExt;
-use lookup::lookup_v2::OptionalValuePath;
-use lookup::{OwnedValuePath, PathPrefix};
 use serde::Deserialize;
 use vector_lib::codecs::{JsonSerializerConfig, TextSerializerConfig};
+use vector_lib::lookup::lookup_v2::OptionalValuePath;
+use vector_lib::lookup::{OwnedValuePath, PathPrefix};
 use vector_lib::{
     config::log_schema,
     event::{Event, LogEvent, Value},
+    lookup,
 };
 use vrl::owned_value_path;
 

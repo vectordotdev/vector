@@ -1,6 +1,6 @@
 use bytes::Bytes;
-use lookup::OwnedTargetPath;
 use rdkafka::message::{Header, OwnedHeaders};
+use vector_lib::lookup::OwnedTargetPath;
 
 use crate::{
     internal_events::KafkaHeaderExtractionError,

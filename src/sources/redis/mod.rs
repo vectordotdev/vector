@@ -1,7 +1,6 @@
 use bytes::Bytes;
 use chrono::Utc;
 use futures::StreamExt;
-use lookup::{lookup_v2::OptionalValuePath, owned_value_path, path, OwnedValuePath};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
 use vector_lib::codecs::{
@@ -12,6 +11,7 @@ use vector_lib::configurable::configurable_component;
 use vector_lib::internal_event::{
     ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol, Registered,
 };
+use vector_lib::lookup::{lookup_v2::OptionalValuePath, owned_value_path, path, OwnedValuePath};
 use vector_lib::{
     config::{LegacyKey, LogNamespace},
     EstimatedJsonEncodedSizeOf,

@@ -19,7 +19,6 @@ use kube::{
     Client, Config as ClientConfig,
 };
 use lifecycle::Lifecycle;
-use lookup::{lookup_v2::OptionalTargetPath, owned_value_path, path, OwnedTargetPath};
 use serde_with::serde_as;
 use vector_lib::codecs::{BytesDeserializer, BytesDeserializerConfig};
 use vector_lib::configurable::configurable_component;
@@ -27,6 +26,7 @@ use vector_lib::file_source::{
     calculate_ignore_before, Checkpointer, FileServer, FileServerShutdown, FingerprintStrategy,
     Fingerprinter, Line, ReadFrom, ReadFromConfig,
 };
+use vector_lib::lookup::{lookup_v2::OptionalTargetPath, owned_value_path, path, OwnedTargetPath};
 use vector_lib::{config::LegacyKey, config::LogNamespace, EstimatedJsonEncodedSizeOf};
 use vector_lib::{
     internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol},
@@ -1045,8 +1045,8 @@ fn prepare_label_selector(selector: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use lookup::{owned_value_path, OwnedTargetPath};
     use similar_asserts::assert_eq;
+    use vector_lib::lookup::{owned_value_path, OwnedTargetPath};
     use vector_lib::{config::LogNamespace, schema::Definition};
     use vrl::value::{kind::Collection, Kind};
 

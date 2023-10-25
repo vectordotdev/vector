@@ -1,7 +1,7 @@
 use std::{borrow::Cow, fmt::Debug, marker::PhantomData};
 
-use lookup::lookup_v2::ConfigValuePath;
 use rand::random;
+use vector_lib::lookup::lookup_v2::ConfigValuePath;
 use vrl::path::PathPrefix;
 
 use crate::{

@@ -14,7 +14,6 @@ use bytes::Bytes;
 use chrono::{DateTime, TimeZone, Utc};
 use futures::{Stream, StreamExt};
 use futures_util::future::OptionFuture;
-use lookup::{lookup_v2::OptionalValuePath, owned_value_path, path, OwnedValuePath};
 use rdkafka::{
     consumer::{
         stream_consumer::StreamPartitionQueue, CommitMode, Consumer, ConsumerContext, Rebalance,
@@ -41,6 +40,7 @@ use vector_lib::codecs::{
     decoding::{DeserializerConfig, FramingConfig},
     StreamDecodingError,
 };
+use vector_lib::lookup::{lookup_v2::OptionalValuePath, owned_value_path, path, OwnedValuePath};
 
 use vector_lib::configurable::configurable_component;
 use vector_lib::finalizer::OrderedFinalizer;
@@ -1363,7 +1363,7 @@ impl ConsumerContext for KafkaSourceContext {
 
 #[cfg(test)]
 mod test {
-    use lookup::OwnedTargetPath;
+    use vector_lib::lookup::OwnedTargetPath;
     use vector_lib::schema::Definition;
 
     use super::*;
