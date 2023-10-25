@@ -157,17 +157,29 @@ impl ApplicationConfig {
     }
 }
 
-const INTERNAL_CONFIG: &str = r#"
-sources:
-  _internal_metrics:
-    type: internal_metrics
-sinks:
-  _internal_console:
-    type: console
-    inputs: [_internal_metrics]
-    encoding:
-      codec: text
-"#;
+#[cfg(all(feature = "sources-internal_metrics", feature = "sinks-console"))]
+fn internal_config() -> Config {
+    use crate::sinks::console;
+    let mut config = crate::config::ConfigBuilder::default();
+    config.add_source(
+        "_internal_metrics",
+        crate::sources::internal_metrics::InternalMetricsConfig::default(),
+    );
+    config.add_sink(
+        "_internal_console",
+        &["_internal_metrics"],
+        console::ConsoleSinkConfig {
+            target: console::Target::Stdout,
+            encoding: crate::codecs::EncodingConfigWithFraming::new(
+                None,
+                codecs::encoding::SerializerConfig::Text(Default::default()),
+                Default::default(),
+            ),
+            acknowledgements: None.into(),
+        },
+    );
+    config.build().expect("Could not build internal config")
+}
 
 impl Application {
     pub fn run() -> ExitStatus {
@@ -177,10 +189,13 @@ impl Application {
     }
 
     pub fn prepare_start() -> Result<(Runtime, StartedApplication), ExitCode> {
+        #[allow(unused_mut)]
         Self::prepare().and_then(|(runtime, mut app)| {
-            let config = config::load_from_str(INTERNAL_CONFIG, config::Format::Yaml)
-                .expect("Invalid internal config");
-            runtime.block_on(app.config.add_internal_config(config))?;
+            #[cfg(all(feature = "sources-internal_metrics", feature = "sinks-console"))]
+            {
+                let config = internal_config();
+                runtime.block_on(app.config.add_internal_config(config))?;
+            }
             app.start(runtime.handle()).map(|app| (runtime, app))
         })
     }
