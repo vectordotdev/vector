@@ -132,10 +132,10 @@ impl HttpSource for PushgatewaySource {
 
 // TODO: Test this
 fn parse_path_labels(path: &str) -> Result<Vec<(String, String)>, ErrorMessage> {
-    if !path.starts_with("/metrics/job/") {
+    if !path.starts_with("/metrics/job") {
         return Err(ErrorMessage::new(
             http::StatusCode::BAD_REQUEST,
-            "Path must begin with '/metrics/job/'".to_owned(),
+            "Path must begin with '/metrics/job'".to_owned(),
         ))
     }
 
@@ -164,14 +164,36 @@ fn parse_path_labels(path: &str) -> Result<Vec<(String, String)>, ErrorMessage> 
 }
 
 fn decode_label_pair(k: &str, v: &str) -> Result<(String, String), ErrorMessage> {
-    if !k.ends_with("@base64") {
+    // Return early if we're not dealing with a base64-encoded label
+    let Some(stripped_key) = k.strip_suffix("@base64") else {
         return Ok((k.to_owned(), v.to_owned()));
+    };
+
+    // The Prometheus Pushgateway spec explicitly uses one or more `=` characters
+    // (the padding character in base64) to represent an empty string in a path
+    // segment:
+    //
+    // https://github.com/prometheus/pushgateway/blob/ec7afda4eef288bd9b9c43d063e4df54c8961272/README.md#url
+    //
+    // Unfortunately, the Rust base64 crate doesn't treat an encoded string that
+    // only contains padding characters as valid and returns an error.
+    //
+    // Let's handle this case manually, before handing over to the base64 decoder.
+    if v.chars().all(|c| c == '=') {
+        if stripped_key == "job" {
+            return Err(ErrorMessage::new(
+                http::StatusCode::BAD_REQUEST,
+                "Job must not have an empty value".to_owned(),
+            ))
+        }
+
+        return Ok((stripped_key.to_owned(), "".to_owned()));
     }
 
     let decoded_bytes = BASE64_URL_SAFE.decode(v).map_err(|_| {
         ErrorMessage::new(
             http::StatusCode::BAD_REQUEST,
-            format!("Invalid base64 value for key {}", k),
+            format!("Invalid base64 value for key {}: {}", k, v),
         )
     })?;
 
@@ -181,17 +203,6 @@ fn decode_label_pair(k: &str, v: &str) -> Result<(String, String), ErrorMessage>
             format!("Invalid UTF-8 in base64 value for key {}", k),
         )
     })?;
-
-    if k == "job@base64" && decoded.len() == 0 {
-        return Err(ErrorMessage::new(
-            http::StatusCode::BAD_REQUEST,
-            "Job must not have an empty value".to_owned(),
-        ))
-    }
-
-    // We should never return the default here as we already returned from the function
-    // if the key doesn't end with "@base64", but we need to satisfy the compiler
-    let stripped_key = k.strip_suffix("@base64").unwrap_or(k);
 
     Ok((stripped_key.to_owned(), decoded))
 }
@@ -214,10 +225,10 @@ mod test {
     #[test]
     fn test_parse_path_wrong_number_of_segments() {
         let path = "/metrics/job/foo/instance";
-        let res = parse_path_labels(path);
+        let result = parse_path_labels(path);
 
-        assert!(res.is_err());
-        assert!(res.unwrap_err().message().contains("number of segments"));
+        assert!(result.is_err());
+        assert!(result.unwrap_err().message().contains("number of segments"));
     }
 
     #[test]
@@ -236,7 +247,10 @@ mod test {
         let path = "/metrics/job@base64/=";
         let result = parse_path_labels(path);
 
+        println!("{:?}", result);
+
         assert!(result.is_err());
+        assert!(result.unwrap_err().message().contains("Job must not"));
     }
 
     #[test]
@@ -245,5 +259,6 @@ mod test {
         let result = parse_path_labels(path);
 
         assert!(result.is_err());
+        assert!(result.unwrap_err().message().contains("Path must begin"));
     }
 }
