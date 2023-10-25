@@ -183,15 +183,7 @@ impl SinkConfig for FileSinkConfig {
         &self,
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        let config = Self {
-            path: self.path.clone(),
-            idle_timeout: self.idle_timeout,
-            encoding: self.encoding.clone(),
-            compression: self.compression,
-            acknowledgements: self.acknowledgements,
-            timezone: self.timezone,
-        };
-        let sink = FileSink::new(&config, cx)?;
+        let sink = FileSink::new(self, cx)?;
         Ok((
             super::VectorSink::from_event_streamsink(sink),
             future::ok(()).boxed(),
