@@ -262,5 +262,15 @@ mod test {
         assert!(result.unwrap_err().message().contains("Path must begin"));
     }
 
-    // TODO: Test duplicate grouping key labels (and match whatever the real Pushgateway does)
+    // TODO: Test duplicate grouping key labels (maybe reconsider data type being passed around)
+    #[test]
+    fn test_parse_path_duplicate_labels() {
+        let path = "/metrics/job/foo/instance/bar/instance/baz";
+        let expected: Vec<_>= vec![("job", "foo"), ("instance", "bar"), ("instance", "baz")].into_iter().
+            map(|(k,v)| (k.to_owned(), v.to_owned())).collect();
+        let actual = parse_path_labels(path);
+
+        assert!(actual.is_ok());
+        assert_eq!(actual.unwrap(), expected);
+    }
 }

@@ -1067,6 +1067,7 @@ mod test {
     //
     // - Tag overrides: when none of the base labels match
     // - Tag overrides: when some of the base labels match
+    // - Tag overrides: labels (last instance should win like in real Pushgateway)
     // - Aggregation: enabled, all four metric types, only counter and histogram are incremental
     // - Aggregation: disabled, all four metric types, all types are absolute
 }
