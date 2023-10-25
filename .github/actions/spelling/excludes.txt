@@ -4,6 +4,7 @@
 (?:^|/)3rdparty/
 (?:^|/)amplify\.yml$
 (?:^|/)build_preview_sites\.yml$
+(?:^|/)create_preview_sites\.yml$
 (?:^|/)go\.sum$
 (?:^|/)package(?:-lock|)\.json$
 (?:^|/)Pipfile$
