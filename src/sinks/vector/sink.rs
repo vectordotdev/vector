@@ -5,11 +5,8 @@ use futures::{stream::BoxStream, StreamExt};
 use prost::Message;
 use tower::Service;
 use vector_common::request_metadata::GroupedCountByteSize;
-use vector_core::{
-    config::telemetry,
-    stream::{BatcherSettings, DriverResponse},
-    ByteSizeOf, EstimatedJsonEncodedSizeOf,
-};
+use vector_core::{config::telemetry, ByteSizeOf, EstimatedJsonEncodedSizeOf};
+use vector_stream::{BatcherSettings, DriverResponse};
 
 use super::service::VectorRequest;
 use crate::{

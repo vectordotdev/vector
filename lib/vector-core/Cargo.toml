@@ -7,7 +7,6 @@ publish = false
 
 [dependencies]
 async-graphql = { version = "5.0.10", default-features = false, features = ["playground" ], optional = true }
-async-stream = { version = "0.3.5", default-features = false }
 async-trait = { version = "0.1", default-features = false }
 bitmask-enum = { version = "2.2.2", default-features = false }
 bytes = { version = "1.5.0", default-features = false, features = ["serde"] }
@@ -51,15 +50,13 @@ tokio = { version = "1.33.0", default-features = false, features = ["net"] }
 tokio-openssl = { version = "0.6.3", default-features = false }
 tokio-stream = { version = "0.1", default-features = false, features = ["time"], optional = true }
 tokio-util = { version = "0.7.0", default-features = false, features = ["time"] }
-toml = { version = "0.8.2", default-features = false }
+toml = { version = "0.8.4", default-features = false }
 tonic = { version = "0.10", default-features = false, features = ["transport"] }
-tower = { version = "0.4", default-features = false, features = ["util"] }
 tracing = { version = "0.1.34", default-features = false }
 tracing-core = { version = "0.1.26", default-features = false }
-tracing-log = { version = "0.1.3", default-features = false }
+tracing-log = { version = "0.1.4", default-features = false }
 tracing-subscriber = { version = "0.3.17", default-features = false, features = ["std"] }
 typetag = { version = "0.2.13", default-features = false }
-twox-hash = { version = "1.6.3", default-features = false }
 url = { version = "2", default-features = false }
 vector-buffers = { path = "../vector-buffers", default-features = false }
 vector-common = { path = "../vector-common" }
@@ -78,7 +75,7 @@ schannel = "0.1.22"
 prost-build = "0.12"
 
 [dev-dependencies]
-base64 = "0.21.4"
+base64 = "0.21.5"
 chrono-tz = { version = "0.8.3", default-features = false }
 criterion = { version = "0.5.1", features = ["html_reports"] }
 env-test-util = "1.0.1"
@@ -87,7 +84,7 @@ quickcheck_macros = "1"
 proptest = "1.3"
 similar-asserts = "1.5.0"
 tokio-test = "0.4.3"
-toml = { version = "0.8.2", default-features = false, features = ["parse"] }
+toml = { version = "0.8.4", default-features = false, features = ["parse"] }
 ndarray = "0.15.6"
 ndarray-stats = "0.5.1"
 noisy_float = "0.2.0"
