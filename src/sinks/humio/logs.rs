@@ -1,5 +1,5 @@
-use codecs::JsonSerializerConfig;
 use lookup::lookup_v2::{ConfigValuePath, OptionalValuePath};
+use vector_lib::codecs::JsonSerializerConfig;
 use vector_lib::configurable::configurable_component;
 use vector_lib::sensitive_string::SensitiveString;
 

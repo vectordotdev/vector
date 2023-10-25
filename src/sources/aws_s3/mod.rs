@@ -2,12 +2,14 @@ use std::{convert::TryInto, io::ErrorKind};
 
 use async_compression::tokio::bufread;
 use aws_sdk_s3::types::ByteStream;
-use codecs::decoding::{DeserializerConfig, FramingConfig, NewlineDelimitedDecoderOptions};
-use codecs::NewlineDelimitedDecoderConfig;
 use futures::{stream, stream::StreamExt, TryStreamExt};
 use lookup::owned_value_path;
 use snafu::Snafu;
 use tokio_util::io::StreamReader;
+use vector_lib::codecs::decoding::{
+    DeserializerConfig, FramingConfig, NewlineDelimitedDecoderOptions,
+};
+use vector_lib::codecs::NewlineDelimitedDecoderConfig;
 use vector_lib::config::{LegacyKey, LogNamespace};
 use vector_lib::configurable::configurable_component;
 use vrl::value::{kind::Collection, Kind};
@@ -443,9 +445,9 @@ mod integration_tests {
 
     use aws_sdk_s3::{types::ByteStream, Client as S3Client};
     use aws_sdk_sqs::{model::QueueAttributeName, Client as SqsClient};
-    use codecs::{decoding::DeserializerConfig, JsonDeserializerConfig};
     use lookup::path;
     use similar_asserts::assert_eq;
+    use vector_lib::codecs::{decoding::DeserializerConfig, JsonDeserializerConfig};
     use vrl::value::Value;
 
     use super::{sqs, AwsS3Config, Compression, Strategy};

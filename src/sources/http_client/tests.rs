@@ -1,11 +1,13 @@
-use codecs::CharacterDelimitedDecoderConfig;
 use std::collections::HashMap;
 use tokio::time::Duration;
+use vector_lib::codecs::CharacterDelimitedDecoderConfig;
 use warp::{http::HeaderMap, Filter};
 
 use crate::sources::util::http::HttpMethod;
 use crate::{serde::default_decoding, serde::default_framing_message_based};
-use codecs::decoding::{CharacterDelimitedDecoderOptions, DeserializerConfig, FramingConfig};
+use vector_lib::codecs::decoding::{
+    CharacterDelimitedDecoderOptions, DeserializerConfig, FramingConfig,
+};
 use vector_lib::event::Event;
 
 use super::HttpClientConfig;

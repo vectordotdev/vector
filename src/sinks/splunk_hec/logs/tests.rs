@@ -1,11 +1,11 @@
 use std::{collections::BTreeMap, sync::Arc};
 
 use chrono::{TimeZone, Utc};
-use codecs::{JsonSerializerConfig, TextSerializerConfig};
 use futures_util::StreamExt;
 use lookup::lookup_v2::OptionalValuePath;
 use lookup::{OwnedValuePath, PathPrefix};
 use serde::Deserialize;
+use vector_lib::codecs::{JsonSerializerConfig, TextSerializerConfig};
 use vector_lib::{
     config::log_schema,
     event::{Event, LogEvent, Value},

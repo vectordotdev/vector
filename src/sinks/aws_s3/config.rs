@@ -1,11 +1,11 @@
 use std::convert::TryInto;
 
 use aws_sdk_s3::Client as S3Client;
-use codecs::{
+use tower::ServiceBuilder;
+use vector_lib::codecs::{
     encoding::{Framer, FramingConfig},
     TextSerializerConfig,
 };
-use tower::ServiceBuilder;
 use vector_lib::configurable::configurable_component;
 use vector_lib::sink::VectorSink;
 

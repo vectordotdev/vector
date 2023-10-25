@@ -81,7 +81,11 @@ impl UdpSinkConfig {
     pub fn build(
         &self,
         transformer: Transformer,
-        encoder: impl Encoder<Event, Error = codecs::encoding::Error> + Clone + Send + Sync + 'static,
+        encoder: impl Encoder<Event, Error = vector_lib::codecs::encoding::Error>
+            + Clone
+            + Send
+            + Sync
+            + 'static,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
         let connector = self.build_connector()?;
         let sink = UdpSink::new(connector.clone(), transformer, encoder);
@@ -162,7 +166,7 @@ impl UdpConnector {
 
 struct UdpSink<E>
 where
-    E: Encoder<Event, Error = codecs::encoding::Error> + Clone + Send + Sync,
+    E: Encoder<Event, Error = vector_lib::codecs::encoding::Error> + Clone + Send + Sync,
 {
     connector: UdpConnector,
     transformer: Transformer,
@@ -172,7 +176,7 @@ where
 
 impl<E> UdpSink<E>
 where
-    E: Encoder<Event, Error = codecs::encoding::Error> + Clone + Send + Sync,
+    E: Encoder<Event, Error = vector_lib::codecs::encoding::Error> + Clone + Send + Sync,
 {
     fn new(connector: UdpConnector, transformer: Transformer, encoder: E) -> Self {
         Self {
@@ -187,7 +191,7 @@ where
 #[async_trait]
 impl<E> StreamSink<Event> for UdpSink<E>
 where
-    E: Encoder<Event, Error = codecs::encoding::Error> + Clone + Send + Sync,
+    E: Encoder<Event, Error = vector_lib::codecs::encoding::Error> + Clone + Send + Sync,
 {
     async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let mut input = input.peekable();

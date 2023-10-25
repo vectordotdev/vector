@@ -1,9 +1,9 @@
 use std::{fmt, net::SocketAddr};
 
-use codecs::decoding::{DeserializerConfig, FramingConfig};
 use futures::FutureExt;
 use lookup::owned_value_path;
 use tracing::Span;
+use vector_lib::codecs::decoding::{DeserializerConfig, FramingConfig};
 use vector_lib::config::{LegacyKey, LogNamespace};
 use vector_lib::configurable::configurable_component;
 use vector_lib::sensitive_string::SensitiveString;

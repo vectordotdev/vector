@@ -12,10 +12,6 @@ use std::{
 use async_stream::stream;
 use bytes::Bytes;
 use chrono::{DateTime, TimeZone, Utc};
-use codecs::{
-    decoding::{DeserializerConfig, FramingConfig},
-    StreamDecodingError,
-};
 use futures::{Stream, StreamExt};
 use futures_util::future::OptionFuture;
 use lookup::{lookup_v2::OptionalValuePath, owned_value_path, path, OwnedValuePath};
@@ -41,6 +37,10 @@ use tokio::{
     time::Sleep,
 };
 use tokio_util::codec::FramedRead;
+use vector_lib::codecs::{
+    decoding::{DeserializerConfig, FramingConfig},
+    StreamDecodingError,
+};
 
 use vector_lib::configurable::configurable_component;
 use vector_lib::finalizer::OrderedFinalizer;

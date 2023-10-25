@@ -268,10 +268,10 @@ mod tests {
 
 #[cfg(all(test, feature = "gcp-integration-tests"))]
 mod integration_tests {
-    use codecs::JsonSerializerConfig;
     use reqwest::{Client, Method, Response};
     use serde::{Deserialize, Serialize};
     use serde_json::{json, Value};
+    use vector_lib::codecs::JsonSerializerConfig;
     use vector_lib::event::{BatchNotifier, BatchStatus};
 
     use super::*;

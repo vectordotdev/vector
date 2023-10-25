@@ -1,6 +1,6 @@
-use codecs::{encoding::Framer, JsonSerializerConfig, NewlineDelimitedEncoderConfig};
 use opendal::{layers::LoggingLayer, services::Webhdfs, Operator};
 use tower::ServiceBuilder;
+use vector_lib::codecs::{encoding::Framer, JsonSerializerConfig, NewlineDelimitedEncoderConfig};
 use vector_lib::configurable::configurable_component;
 use vector_lib::{
     config::{AcknowledgementsConfig, DataType, Input},

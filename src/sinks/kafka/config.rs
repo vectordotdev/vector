@@ -1,10 +1,10 @@
 use std::{collections::HashMap, time::Duration};
 
-use codecs::JsonSerializerConfig;
 use futures::FutureExt;
 use lookup::lookup_v2::ConfigTargetPath;
 use rdkafka::ClientConfig;
 use serde_with::serde_as;
+use vector_lib::codecs::JsonSerializerConfig;
 use vector_lib::configurable::configurable_component;
 use vrl::value::Kind;
 

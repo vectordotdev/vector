@@ -15,7 +15,7 @@ use crate::{
     tls::TlsConfig,
     SourceSender,
 };
-use codecs::decoding::DeserializerConfig;
+use vector_lib::codecs::decoding::DeserializerConfig;
 use vector_lib::config::log_schema;
 
 use super::{

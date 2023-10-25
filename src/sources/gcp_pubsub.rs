@@ -5,7 +5,6 @@ use std::{
 };
 
 use chrono::NaiveDateTime;
-use codecs::decoding::{DeserializerConfig, FramingConfig};
 use derivative::Derivative;
 use futures::{stream, stream::FuturesUnordered, FutureExt, Stream, StreamExt, TryFutureExt};
 use http::uri::{InvalidUri, Scheme, Uri};
@@ -20,6 +19,7 @@ use tonic::{
     transport::{Certificate, ClientTlsConfig, Endpoint, Identity},
     Code, Request, Status,
 };
+use vector_lib::codecs::decoding::{DeserializerConfig, FramingConfig};
 use vector_lib::config::{LegacyKey, LogNamespace};
 use vector_lib::configurable::configurable_component;
 use vector_lib::internal_event::{

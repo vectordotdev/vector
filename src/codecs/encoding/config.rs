@@ -1,5 +1,5 @@
 use crate::codecs::Transformer;
-use codecs::{
+use vector_lib::codecs::{
     encoding::{Framer, FramingConfig, Serializer, SerializerConfig},
     CharacterDelimitedEncoder, LengthDelimitedEncoder, NewlineDelimitedEncoder,
 };

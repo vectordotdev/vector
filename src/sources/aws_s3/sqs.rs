@@ -12,7 +12,6 @@ use aws_smithy_client::SdkError;
 use aws_types::region::Region;
 use bytes::Bytes;
 use chrono::{DateTime, TimeZone, Utc};
-use codecs::decoding::FramingError;
 use futures::{FutureExt, Stream, StreamExt, TryFutureExt};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -22,6 +21,7 @@ use snafu::{ResultExt, Snafu};
 use tokio::{pin, select};
 use tokio_util::codec::FramedRead;
 use tracing::Instrument;
+use vector_lib::codecs::decoding::FramingError;
 use vector_lib::configurable::configurable_component;
 use vector_lib::internal_event::{
     ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol, Registered,

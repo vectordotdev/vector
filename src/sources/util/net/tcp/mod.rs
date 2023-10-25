@@ -3,7 +3,6 @@ mod request_limiter;
 use std::{collections::BTreeMap, io, mem::drop, net::SocketAddr, time::Duration};
 
 use bytes::Bytes;
-use codecs::StreamDecodingError;
 use futures::{future::BoxFuture, FutureExt, StreamExt};
 use futures_util::future::OptionFuture;
 use listenfd::ListenFd;
@@ -17,6 +16,7 @@ use tokio::{
 };
 use tokio_util::codec::{Decoder, FramedRead};
 use tracing::Instrument;
+use vector_lib::codecs::StreamDecodingError;
 use vector_lib::finalization::AddBatchNotifier;
 use vector_lib::{
     config::{LegacyKey, LogNamespace, SourceAcknowledgementsConfig},
