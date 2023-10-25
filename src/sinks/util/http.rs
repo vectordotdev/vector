@@ -653,8 +653,8 @@ impl ByteSizeOf for HttpRequest {
 /// Response type for use in the `Service` implementation of HTTP stream sinks.
 pub struct HttpResponse {
     pub http_response: Response<Bytes>,
-    events_byte_size: GroupedCountByteSize,
-    raw_byte_size: usize,
+    pub events_byte_size: GroupedCountByteSize,
+    pub raw_byte_size: usize,
 }
 
 impl DriverResponse for HttpResponse {

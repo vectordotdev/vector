@@ -3,13 +3,14 @@ use std::io;
 use bytes::{BufMut, BytesMut};
 use flate2::write::{GzEncoder, ZlibEncoder};
 
-use super::{zstd::ZstdEncoder, Compression};
+use super::{snappy::SnappyEncoder, zstd::ZstdEncoder, Compression};
 
 enum Writer {
     Plain(bytes::buf::Writer<BytesMut>),
     Gzip(GzEncoder<bytes::buf::Writer<BytesMut>>),
     Zlib(ZlibEncoder<bytes::buf::Writer<BytesMut>>),
     Zstd(ZstdEncoder<bytes::buf::Writer<BytesMut>>),
+    Snappy(SnappyEncoder<bytes::buf::Writer<BytesMut>>),
 }
 
 impl Writer {
@@ -19,6 +20,7 @@ impl Writer {
             Writer::Gzip(inner) => inner.get_ref().get_ref(),
             Writer::Zlib(inner) => inner.get_ref().get_ref(),
             Writer::Zstd(inner) => inner.get_ref().get_ref(),
+            Writer::Snappy(inner) => inner.get_ref().get_ref(),
         }
     }
 }
@@ -35,6 +37,7 @@ impl From<Compression> for Writer {
                     .expect("Zstd encoder should not fail on init.");
                 Writer::Zstd(encoder)
             }
+            Compression::Snappy => Writer::Snappy(SnappyEncoder::new(writer)),
         }
     }
 }
@@ -47,6 +50,7 @@ impl io::Write for Writer {
             Writer::Gzip(writer) => writer.write(buf),
             Writer::Zlib(writer) => writer.write(buf),
             Writer::Zstd(writer) => writer.write(buf),
+            Writer::Snappy(writer) => writer.write(buf),
         }
     }
 
@@ -56,6 +60,7 @@ impl io::Write for Writer {
             Writer::Gzip(writer) => writer.flush(),
             Writer::Zlib(writer) => writer.flush(),
             Writer::Zstd(writer) => writer.flush(),
+            Writer::Snappy(writer) => writer.flush(),
         }
     }
 }
@@ -98,6 +103,7 @@ impl Compressor {
             Writer::Gzip(writer) => writer.finish()?,
             Writer::Zlib(writer) => writer.finish()?,
             Writer::Zstd(writer) => writer.finish()?,
+            Writer::Snappy(writer) => writer.finish()?,
         }
         .into_inner();
 
@@ -125,6 +131,9 @@ impl Compressor {
             Writer::Zstd(writer) => writer
                 .finish()
                 .expect("zstd writer should not fail to finish"),
+            Writer::Snappy(writer) => writer
+                .finish()
+                .expect("snappy writer should not fail to finish"),
         }
         .into_inner()
     }
