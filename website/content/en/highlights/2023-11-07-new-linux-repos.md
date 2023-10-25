@@ -19,7 +19,7 @@ starting with the next release, `0.35.0`. Any patch releases for `0.34.0` will
 be published to the existing repositories, as well as the new ones.
 
 {{< warning >}}
-On February 28th, the `timber.io` package repositories will be decomissioned.
+On February 28th, the `timber.io` package repositories will be decommissioned.
 All future minor releases will only be published to the new `vector.dev` package
 repositories and not to the `timber.io` repositories.
 {{< /warning >}}
