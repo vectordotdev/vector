@@ -11,17 +11,23 @@ badges:
 ---
 
 Starting with Vector's `0.34.0` release, the `deb` and `rpm` packages will have
-a new home at `vector.dev` courtesy of Datadog. We'll continue to publish
-packages to both the new and existing locations through the end of **2023**.
+a new home at `vector.dev` courtesy of Datadog.
+
+We will continue to maintain the existing `timber.io` hosting  until **February
+28th**, but we **will not** publish future minor release versions to them
+starting with the next release, `0.35.0`. Any patch releases for `0.34.0` will
+be published to the existing repositories, as well as the new ones.
 
 {{< warning >}}
-Starting in **2024**, we will stop using `timber.io` and exclusively publish packages
-to `vector.dev`.
+On February 28th, the `timber.io` package repositories will be decomissioned.
+All future minor releases will only be published to the new `vector.dev` package
+repositories and not to the `timber.io` repositories.
 {{< /warning >}}
 
-We aim to make this a seamless transition by providing plenty of time for you to switch
+We aim to make this a seamless transition by providing time for you to switch
 repositories, as well as by publishing previous versions of Vector with the new
-repository as a drop-in replacement, so you don't have to update your Vector version.
+repository as a drop-in replacement, so you don't have to update your Vector
+version at the same time.
 
 If you have any questions or concerns don't hesitate to reach out on [Discord]
 or [Discussions]!
