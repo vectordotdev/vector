@@ -7,7 +7,7 @@ use codecs::{encoding::FramingConfig, TextSerializerConfig};
 use futures::{stream, StreamExt};
 use opendal::{Entry, Metakey};
 use similar_asserts::assert_eq;
-use vector_core::event::{Event, LogEvent};
+use vector_lib::event::{Event, LogEvent};
 
 use super::WebHdfsConfig;
 use crate::{

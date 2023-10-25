@@ -6,7 +6,7 @@ use warp::{http::HeaderMap, Filter};
 use crate::sources::util::http::HttpMethod;
 use crate::{serde::default_decoding, serde::default_framing_message_based};
 use codecs::decoding::{CharacterDelimitedDecoderOptions, DeserializerConfig, FramingConfig};
-use vector_core::event::Event;
+use vector_lib::event::Event;
 
 use super::HttpClientConfig;
 use crate::test_util::{

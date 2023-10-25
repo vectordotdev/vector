@@ -10,9 +10,9 @@ use codecs::MetricTagValues;
 use lookup::{metadata_path, owned_value_path, PathPrefix};
 use snafu::{ResultExt, Snafu};
 use vector_config::configurable_component;
-use vector_core::compile_vrl;
-use vector_core::config::LogNamespace;
-use vector_core::schema::Definition;
+use vector_lib::compile_vrl;
+use vector_lib::config::LogNamespace;
+use vector_lib::schema::Definition;
 use vector_lib::TimeZone;
 use vector_vrl_functions::set_semantic_meaning::MeaningList;
 use vrl::compiler::runtime::{Runtime, Terminate};
@@ -608,7 +608,7 @@ mod tests {
     use std::sync::Arc;
 
     use indoc::{formatdoc, indoc};
-    use vector_core::{config::GlobalOptions, event::EventMetadata, metric_tags};
+    use vector_lib::{config::GlobalOptions, event::EventMetadata, metric_tags};
     use vrl::value::kind::Collection;
     use vrl::{btreemap, event_path};
 

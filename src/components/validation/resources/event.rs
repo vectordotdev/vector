@@ -8,7 +8,7 @@ use codecs::{
     encoding, JsonSerializer, LengthDelimitedEncoder, LogfmtSerializer, MetricTagValues,
     NewlineDelimitedEncoder,
 };
-use vector_core::event::{Event, LogEvent};
+use vector_lib::event::{Event, LogEvent};
 
 /// A test case event for deserialization from yaml file.
 /// This is an intermediary step to TestEvent.

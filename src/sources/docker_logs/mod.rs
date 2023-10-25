@@ -21,7 +21,7 @@ use serde_with::serde_as;
 use tokio::sync::mpsc;
 use tracing_futures::Instrument;
 use vector_config::configurable_component;
-use vector_core::config::{LegacyKey, LogNamespace};
+use vector_lib::config::{LegacyKey, LogNamespace};
 use vector_lib::internal_event::{
     ByteSize, BytesReceived, InternalEventHandle as _, Protocol, Registered,
 };

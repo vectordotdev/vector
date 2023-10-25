@@ -1,5 +1,5 @@
 use vector_config::configurable_component;
-use vector_core::config::{clone_input_definitions, LogNamespace};
+use vector_lib::config::{clone_input_definitions, LogNamespace};
 use vector_lib::internal_event::{Count, InternalEventHandle as _, Registered};
 
 use crate::{
@@ -100,8 +100,8 @@ mod test {
 
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
-    use vector_core::event::{Metric, MetricKind, MetricValue};
     use vector_lib::config::ComponentKey;
+    use vector_lib::event::{Metric, MetricKind, MetricValue};
 
     use super::*;
     use crate::config::schema::Definition;

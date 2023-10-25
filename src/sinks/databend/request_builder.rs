@@ -2,7 +2,7 @@ use std::io;
 
 use bytes::Bytes;
 use codecs::encoding::Framer;
-use vector_core::event::Event;
+use vector_lib::event::Event;
 use vector_lib::finalization::{EventFinalizers, Finalizable};
 use vector_lib::request_metadata::RequestMetadata;
 

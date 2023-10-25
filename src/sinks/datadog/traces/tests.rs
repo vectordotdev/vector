@@ -8,7 +8,7 @@ use indoc::indoc;
 use ordered_float::NotNan;
 use prost::Message;
 use rmp_serde;
-use vector_core::event::{BatchNotifier, BatchStatus, Event};
+use vector_lib::event::{BatchNotifier, BatchStatus, Event};
 use vrl::event_path;
 
 use super::{apm_stats::StatsPayload, dd_proto, ddsketch_full, DatadogTracesConfig};

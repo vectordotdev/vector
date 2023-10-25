@@ -11,10 +11,10 @@ use futures::{FutureExt, TryFutureExt};
 use hyper::{service::make_service_fn, Server};
 use tower::ServiceBuilder;
 use tracing::Span;
-use vector_core::EstimatedJsonEncodedSizeOf;
-use vector_core::{
+use vector_lib::{
     config::SourceAcknowledgementsConfig,
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event},
+    EstimatedJsonEncodedSizeOf,
 };
 use warp::{
     filters::{

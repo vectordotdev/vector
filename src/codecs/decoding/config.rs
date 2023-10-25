@@ -1,6 +1,6 @@
 use codecs::decoding::{DeserializerConfig, FramingConfig};
 use serde::{Deserialize, Serialize};
-use vector_core::config::LogNamespace;
+use vector_lib::config::LogNamespace;
 
 use crate::codecs::Decoder;
 

@@ -20,7 +20,7 @@ use snafu::{ResultExt, Snafu};
 use tower::{Service, ServiceBuilder};
 use tower_http::decompression::DecompressionLayer;
 use vector_config::configurable_component;
-use vector_core::{ByteSizeOf, EstimatedJsonEncodedSizeOf};
+use vector_lib::{ByteSizeOf, EstimatedJsonEncodedSizeOf};
 use vector_stream::batcher::limiter::ItemBatchSize;
 
 use super::{

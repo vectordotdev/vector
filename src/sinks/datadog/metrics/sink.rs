@@ -8,7 +8,7 @@ use futures_util::{
     StreamExt,
 };
 use tower::Service;
-use vector_core::{
+use vector_lib::{
     event::{Event, Metric, MetricValue},
     partition::Partitioner,
     sink::StreamSink,
@@ -233,7 +233,7 @@ mod tests {
 
     use chrono::{DateTime, Utc};
     use proptest::prelude::*;
-    use vector_core::{
+    use vector_lib::{
         event::{Metric, MetricKind, MetricValue},
         metric_tags,
     };

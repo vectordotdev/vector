@@ -1,7 +1,7 @@
 use aws_sdk_cloudwatch::types::DateTime;
 use chrono::{offset::TimeZone, Timelike, Utc};
 use similar_asserts::assert_eq;
-use vector_core::metric_tags;
+use vector_lib::metric_tags;
 
 use super::*;
 use crate::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
@@ -114,7 +114,7 @@ async fn encode_events_distribution() {
         "latency",
         MetricKind::Incremental,
         MetricValue::Distribution {
-            samples: vector_core::samples![11.0 => 100, 12.0 => 50],
+            samples: vector_lib::samples![11.0 => 100, 12.0 => 50],
             statistic: StatisticKind::Histogram,
         },
     )];

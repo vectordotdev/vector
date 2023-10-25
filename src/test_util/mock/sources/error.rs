@@ -1,9 +1,9 @@
 use async_trait::async_trait;
 use futures_util::{future::err, FutureExt};
 use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
-use vector_core::schema::Definition;
-use vector_core::{
+use vector_lib::config::LogNamespace;
+use vector_lib::schema::Definition;
+use vector_lib::{
     config::{DataType, SourceOutput},
     source::Source,
 };

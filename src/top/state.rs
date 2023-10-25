@@ -6,7 +6,7 @@ use ratatui::{
     text::Span,
 };
 use tokio::sync::mpsc;
-use vector_core::internal_event::DEFAULT_OUTPUT;
+use vector_lib::internal_event::DEFAULT_OUTPUT;
 
 use crate::config::ComponentKey;
 

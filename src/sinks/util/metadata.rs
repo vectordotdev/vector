@@ -1,7 +1,7 @@
 use std::num::NonZeroUsize;
 
-use vector_core::{config, ByteSizeOf, EstimatedJsonEncodedSizeOf};
 use vector_lib::request_metadata::{GetEventCountTags, GroupedCountByteSize, RequestMetadata};
+use vector_lib::{config, ByteSizeOf, EstimatedJsonEncodedSizeOf};
 
 use super::request_builder::EncodeResult;
 

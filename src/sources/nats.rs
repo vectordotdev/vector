@@ -5,12 +5,12 @@ use lookup::{lookup_v2::OptionalValuePath, owned_value_path};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
 use vector_config::configurable_component;
-use vector_core::{
-    config::{LegacyKey, LogNamespace},
-    EstimatedJsonEncodedSizeOf,
-};
 use vector_lib::internal_event::{
     ByteSize, BytesReceived, CountByteSize, EventsReceived, InternalEventHandle as _, Protocol,
+};
+use vector_lib::{
+    config::{LegacyKey, LogNamespace},
+    EstimatedJsonEncodedSizeOf,
 };
 use vrl::value::Kind;
 
@@ -271,7 +271,7 @@ mod tests {
     #![allow(clippy::print_stdout)] //tests
 
     use lookup::{owned_value_path, OwnedTargetPath};
-    use vector_core::schema::Definition;
+    use vector_lib::schema::Definition;
     use vrl::value::{kind::Collection, Kind};
 
     use super::*;
@@ -346,7 +346,7 @@ mod integration_tests {
     #![allow(clippy::print_stdout)] //tests
 
     use bytes::Bytes;
-    use vector_core::config::log_schema;
+    use vector_lib::config::log_schema;
 
     use super::*;
     use crate::nats::{NatsAuthCredentialsFile, NatsAuthNKey, NatsAuthToken, NatsAuthUserPassword};

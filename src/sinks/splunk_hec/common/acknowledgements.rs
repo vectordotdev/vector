@@ -9,7 +9,7 @@ use hyper::Body;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{mpsc::Receiver, oneshot::Sender};
 use vector_config::configurable_component;
-use vector_core::event::EventStatus;
+use vector_lib::event::EventStatus;
 
 use super::service::{HttpRequestBuilder, MetadataFields};
 use crate::{
@@ -287,7 +287,7 @@ mod tests {
 
     use futures_util::{stream::FuturesUnordered, StreamExt};
     use tokio::sync::oneshot::{self, Receiver};
-    use vector_core::{config::proxy::ProxyConfig, event::EventStatus};
+    use vector_lib::{config::proxy::ProxyConfig, event::EventStatus};
 
     use super::HecAckClient;
     use crate::{

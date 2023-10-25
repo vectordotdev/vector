@@ -1,7 +1,7 @@
 use indexmap::IndexMap;
 use vector_config::configurable_component;
-use vector_core::config::{clone_input_definitions, LogNamespace};
-use vector_core::transform::SyncTransform;
+use vector_lib::config::{clone_input_definitions, LogNamespace};
+use vector_lib::transform::SyncTransform;
 
 use crate::{
     conditions::{AnyCondition, Condition},
@@ -37,11 +37,7 @@ impl Route {
 }
 
 impl SyncTransform for Route {
-    fn transform(
-        &mut self,
-        event: Event,
-        output: &mut vector_core::transform::TransformOutputsBuf,
-    ) {
+    fn transform(&mut self, event: Event, output: &mut vector_lib::transform::TransformOutputsBuf) {
         let mut check_failed: usize = 0;
         for (output_name, condition) in &self.conditions {
             let (result, event) = condition.check(event.clone());
@@ -155,7 +151,7 @@ mod test {
     use std::collections::HashMap;
 
     use indoc::indoc;
-    use vector_core::transform::TransformOutputsBuf;
+    use vector_lib::transform::TransformOutputsBuf;
 
     use super::*;
     use crate::{

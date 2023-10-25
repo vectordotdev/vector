@@ -603,7 +603,7 @@ mod test {
         time::{Duration, Instant},
     };
     use tokio_util::codec::{length_delimited, Framed};
-    use vector_core::config::{LegacyKey, LogNamespace};
+    use vector_lib::config::{LegacyKey, LogNamespace};
 
     use super::{
         build_framestream_unix_source, spawn_event_handling_tasks, ControlField, ControlHeader,

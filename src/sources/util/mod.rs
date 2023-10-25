@@ -74,8 +74,8 @@ pub use self::message_decoding::decode_message;
 #[cfg(any(feature = "sources-statsd", feature = "sources-datadog_agent"))]
 pub fn extract_tag_key_and_value<S: AsRef<str>>(
     tag_chunk: S,
-) -> (String, vector_core::event::metric::TagValue) {
-    use vector_core::event::metric::TagValue;
+) -> (String, vector_lib::event::metric::TagValue) {
+    use vector_lib::event::metric::TagValue;
 
     let tag_chunk = tag_chunk.as_ref();
 

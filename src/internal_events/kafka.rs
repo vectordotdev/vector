@@ -1,5 +1,5 @@
 use metrics::{counter, gauge};
-use vector_core::{internal_event::InternalEvent, update_counter};
+use vector_lib::{internal_event::InternalEvent, update_counter};
 use vrl::path::OwnedTargetPath;
 
 use vector_lib::{

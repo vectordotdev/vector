@@ -16,9 +16,12 @@ use tokio::{
     time::{timeout, Duration},
 };
 use tracing::Instrument;
-use vector_core::config::LogNamespace;
-use vector_core::transform::update_runtime_schema_definition;
-use vector_core::{
+use vector_lib::config::LogNamespace;
+use vector_lib::internal_event::{
+    self, CountByteSize, EventsSent, InternalEventHandle as _, Registered,
+};
+use vector_lib::transform::update_runtime_schema_definition;
+use vector_lib::{
     buffers::{
         topology::{
             builder::TopologyBuilder,
@@ -28,9 +31,6 @@ use vector_core::{
     },
     schema::Definition,
     EstimatedJsonEncodedSizeOf,
-};
-use vector_lib::internal_event::{
-    self, CountByteSize, EventsSent, InternalEventHandle as _, Registered,
 };
 
 use super::{

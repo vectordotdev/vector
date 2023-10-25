@@ -5,7 +5,7 @@ use codecs::decoding::{DeserializerConfig, FramingConfig};
 use indoc::indoc;
 use lookup::lookup_v2::OptionalValuePath;
 use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
+use vector_lib::config::LogNamespace;
 
 use crate::{
     config::{GenerateConfig, Resource, SourceConfig, SourceContext, SourceOutput},

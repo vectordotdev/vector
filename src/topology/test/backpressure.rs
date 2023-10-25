@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use tokio::time::Duration;
 use vector_buffers::{BufferConfig, BufferType, WhenFull};
-use vector_core::config::MEMORY_BUFFER_DEFAULT_MAX_EVENTS;
+use vector_lib::config::MEMORY_BUFFER_DEFAULT_MAX_EVENTS;
 
 use crate::{config::Config, test_util, test_util::start_topology};
 use crate::{config::SinkOuter, test_util::mock::backpressure_source};

@@ -10,7 +10,7 @@ use vector_config::{
     Configurable, GenerateError, Metadata, NamedComponent,
 };
 use vector_config_common::attributes::CustomAttribute;
-use vector_core::{
+use vector_lib::{
     config::{GlobalOptions, Input, LogNamespace, TransformOutput},
     schema,
     transform::Transform,

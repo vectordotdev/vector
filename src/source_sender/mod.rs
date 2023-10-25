@@ -8,8 +8,9 @@ use metrics::{register_histogram, Histogram};
 use tracing::Span;
 use vector_buffers::topology::channel::{self, LimitedReceiver, LimitedSender};
 #[cfg(test)]
-use vector_core::event::{into_event_stream, EventStatus};
-use vector_core::{
+use vector_lib::event::{into_event_stream, EventStatus};
+use vector_lib::internal_event::{ComponentEventsDropped, UNINTENTIONAL};
+use vector_lib::{
     config::{log_schema, SourceOutput},
     event::{array, Event, EventArray, EventContainer, EventRef},
     internal_event::{
@@ -17,7 +18,6 @@ use vector_core::{
     },
     ByteSizeOf, EstimatedJsonEncodedSizeOf,
 };
-use vector_lib::internal_event::{ComponentEventsDropped, UNINTENTIONAL};
 use vrl::value::Value;
 
 mod errors;
@@ -472,7 +472,7 @@ mod tests {
     use chrono::{DateTime, Duration};
     use rand::{thread_rng, Rng};
     use tokio::time::timeout;
-    use vector_core::event::{LogEvent, Metric, MetricKind, MetricValue, TraceEvent};
+    use vector_lib::event::{LogEvent, Metric, MetricKind, MetricValue, TraceEvent};
     use vrl::event_path;
 
     use super::*;

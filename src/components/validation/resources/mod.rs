@@ -9,7 +9,7 @@ use codecs::{
     BytesEncoder,
 };
 use tokio::sync::mpsc;
-use vector_core::{config::DataType, event::Event};
+use vector_lib::{config::DataType, event::Event};
 
 use crate::codecs::{Decoder, DecodingConfig, Encoder, EncodingConfig, EncodingConfigWithFraming};
 

@@ -4,8 +4,8 @@ use futures::{stream, StreamExt};
 use lookup::lookup_v2::OptionalValuePath;
 use lookup::{owned_value_path, path, OwnedValuePath};
 use vector_config::configurable_component;
-use vector_core::config::log_schema;
-use vector_core::{
+use vector_lib::config::log_schema;
+use vector_lib::{
     config::{LegacyKey, LogNamespace},
     schema::Definition,
 };
@@ -206,7 +206,7 @@ mod tests {
     use futures::Stream;
     use lookup::OwnedTargetPath;
     use tokio::time::{sleep, Duration};
-    use vector_core::event::Value;
+    use vector_lib::event::Value;
     use vrl::value::kind::Collection;
 
     use super::*;
