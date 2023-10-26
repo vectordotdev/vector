@@ -35,7 +35,7 @@ pub fn configurable_package_name_hack() -> proc_macro2::TokenStream {
     // once when this macro package is built rather than when they are evaluated. This has to be
     // evaluated in the context of the package in which the macro is being expanded.
     let running_in_lib = *RUNNING_IN_LIB.get_or_init(|| {
-        let package = std::env::var("CARGO_PKG_NAME").expect("FIXME");
+        let package = std::env::var("CARGO_PKG_NAME").expect("Must be built by cargo");
         package.starts_with("vector-") || package == "file-source" || package == "codecs"
     });
     if running_in_lib {
