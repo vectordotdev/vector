@@ -11,9 +11,11 @@ use snafu::Snafu;
 use tower::ServiceBuilder;
 use uuid::Uuid;
 use vector_config::configurable_component;
-use vector_core::event::{EventFinalizers, Finalizable};
-use vector_lib::request_metadata::RequestMetadata;
-use vrl::compiler::TimeZone;
+use vector_lib::event::{EventFinalizers, Finalizable};
+use vector_lib::{
+    request_metadata::RequestMetadata,
+    TimeZone,
+};
 
 use crate::sinks::util::metadata::RequestMetadataBuilder;
 use crate::{

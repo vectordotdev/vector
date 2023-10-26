@@ -7,7 +7,9 @@ use codecs::{
 };
 use tower::ServiceBuilder;
 use vector_config::configurable_component;
-use vector_lib::sink::VectorSink;
+use vector_lib::{
+    sink::VectorSink, TimeZone
+};
 
 use super::sink::S3RequestOptions;
 use crate::{
@@ -31,8 +33,6 @@ use crate::{
     template::Template,
     tls::TlsConfig,
 };
-
-use vector_common::TimeZone;
 
 /// Configuration for the `aws_s3` sink.
 #[configurable_component(sink(

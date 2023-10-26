@@ -22,7 +22,7 @@ use tokio_util::codec::Encoder as _;
 use vector_config::configurable_component;
 use vector_lib::{
     internal_event::{CountByteSize, EventsSent, InternalEventHandle as _, Output, Registered},
-    EstimatedJsonEncodedSizeOf,
+    EstimatedJsonEncodedSizeOf, TimeZone,
 };
 
 use crate::{
@@ -38,7 +38,6 @@ use crate::{
 mod bytes_path;
 
 use bytes_path::BytesPath;
-use vector_common::TimeZone;
 
 /// Configuration for the `file` sink.
 #[serde_as]

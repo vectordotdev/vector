@@ -52,10 +52,12 @@ pub use service::{
 pub use sink::{BatchSink, PartitionBatchSink, StreamSink};
 use snafu::Snafu;
 pub use uri::UriSerde;
-use vector_lib::json_size::JsonSize;
+use vector_lib::{
+    json_size::JsonSize,
+    TimeZone,
+};
 
 use crate::event::EventFinalizers;
-use vector_common::TimeZone;
 use chrono::{Utc, Offset, FixedOffset};
 
 #[derive(Debug, Snafu)]
