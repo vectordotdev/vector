@@ -10,11 +10,11 @@ use super::{service::LogApiRetry, sink::LogSinkBuilder};
 use crate::{
     codecs::Transformer,
     common::datadog::Region,
-    config::{datadog, AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
+    config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     http::HttpClient,
     schema,
     sinks::{
-        datadog::{logs::service::LogApiService, DatadogCommonConfig},
+        datadog::{logs::service::LogApiService, DatadogCommonConfig, LocalDatadogCommonConfig},
         util::{
             http::RequestConfig, service::ServiceBuilderExt, BatchConfig, Compression,
             SinkBatchSettings,
@@ -51,7 +51,7 @@ impl SinkBatchSettings for DatadogLogsDefaultBatchSettings {
 #[serde(deny_unknown_fields)]
 pub struct DatadogLogsConfig {
     #[serde(flatten)]
-    pub dd_common: DatadogCommonConfig,
+    pub dd_common: LocalDatadogCommonConfig,
 
     /// The Datadog region to send logs to.
     #[configurable(deprecated = "This option has been deprecated, use the `site` option instead.")]
@@ -90,23 +90,23 @@ impl GenerateConfig for DatadogLogsConfig {
 impl DatadogLogsConfig {
     // TODO: We should probably hoist this type of base URI generation so that all DD sinks can
     // utilize it, since it all follows the same pattern.
-    fn get_uri(&self, global: &datadog::Options) -> http::Uri {
-        let base_url = self.dd_common.endpoint.clone().unwrap_or_else(|| {
+    fn get_uri(&self, dd_common: &DatadogCommonConfig) -> http::Uri {
+        let base_url = dd_common.endpoint.clone().unwrap_or_else(|| {
             if let Some(region) = self.region {
                 match region {
                     Region::Eu => "https://http-intake.logs.datadoghq.eu".to_string(),
                     Region::Us => "https://http-intake.logs.datadoghq.com".to_string(),
                 }
             } else {
-                format!("https://http-intake.logs.{}", self.dd_common.site(global))
+                format!("https://http-intake.logs.{}", dd_common.site)
             }
         });
 
         http::Uri::try_from(format!("{}/api/v2/logs", base_url)).expect("URI not valid")
     }
 
-    fn get_protocol(&self, global: &datadog::Options) -> String {
-        self.get_uri(global)
+    fn get_protocol(&self, dd_common: &DatadogCommonConfig) -> String {
+        self.get_uri(dd_common)
             .scheme_str()
             .unwrap_or("http")
             .to_string()
@@ -114,11 +114,11 @@ impl DatadogLogsConfig {
 
     pub fn build_processor(
         &self,
-        global: &datadog::Options,
+        dd_common: &DatadogCommonConfig,
         client: HttpClient,
         dd_evp_origin: String,
     ) -> crate::Result<VectorSink> {
-        let default_api_key: Arc<str> = Arc::from(self.dd_common.default_api_key(global).inner());
+        let default_api_key: Arc<str> = Arc::from(dd_common.default_api_key.inner());
         let request_limits = self.request.tower.unwrap_with(&Default::default());
 
         // We forcefully cap the provided batch configuration to the size/log line limits imposed by
@@ -134,13 +134,13 @@ impl DatadogLogsConfig {
             .settings(request_limits, LogApiRetry)
             .service(LogApiService::new(
                 client,
-                self.get_uri(global),
+                self.get_uri(dd_common),
                 self.request.headers.clone(),
                 dd_evp_origin,
             )?);
 
         let encoding = self.encoding.clone();
-        let protocol = self.get_protocol(global);
+        let protocol = self.get_protocol(dd_common);
 
         let sink = LogSinkBuilder::new(encoding, service, default_api_key, batch, protocol)
             .compression(self.compression.unwrap_or_default())
@@ -168,12 +168,11 @@ impl DatadogLogsConfig {
 impl SinkConfig for DatadogLogsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let client = self.create_client(&cx.proxy)?;
+        let dd_common = self.dd_common.with_globals(&cx.datadog)?;
 
-        let healthcheck =
-            self.dd_common
-                .build_healthcheck(&cx.datadog, client.clone(), self.region.as_ref())?;
+        let healthcheck = dd_common.build_healthcheck(client.clone(), self.region.as_ref())?;
 
-        let sink = self.build_processor(&cx.datadog, client, cx.app_name_slug)?;
+        let sink = self.build_processor(&dd_common, client, cx.app_name_slug)?;
 
         Ok((sink, healthcheck))
     }

@@ -13,10 +13,10 @@ use super::{
 };
 use crate::{
     common::datadog::{get_base_domain_region, Region},
-    config::{datadog, AcknowledgementsConfig, Input, SinkConfig, SinkContext},
+    config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext},
     http::HttpClient,
     sinks::{
-        datadog::DatadogCommonConfig,
+        datadog::{DatadogCommonConfig, LocalDatadogCommonConfig},
         util::{batch::BatchConfig, ServiceBuilderExt, SinkBatchSettings, TowerRequestConfig},
         Healthcheck, UriParseSnafu, VectorSink,
     },
@@ -134,7 +134,7 @@ impl DatadogMetricsEndpointConfiguration {
 #[serde(deny_unknown_fields)]
 pub struct DatadogMetricsConfig {
     #[serde(flatten)]
-    pub dd_common: DatadogCommonConfig,
+    pub dd_common: LocalDatadogCommonConfig,
 
     /// Sets the default namespace for any metrics sent.
     ///
@@ -165,10 +165,9 @@ impl_generate_config_from_default!(DatadogMetricsConfig);
 impl SinkConfig for DatadogMetricsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let client = self.build_client(&cx.proxy)?;
-        let healthcheck =
-            self.dd_common
-                .build_healthcheck(&cx.datadog, client.clone(), self.region.as_ref())?;
-        let sink = self.build_sink(&cx.datadog, client)?;
+        let dd_common = self.dd_common.with_globals(&cx.datadog)?;
+        let healthcheck = dd_common.build_healthcheck(client.clone(), self.region.as_ref())?;
+        let sink = self.build_sink(&dd_common, client)?;
 
         Ok((sink, healthcheck))
     }
@@ -191,13 +190,13 @@ impl DatadogMetricsConfig {
     /// doing something wrong, for understanding issues from the API side.
     ///
     /// The `endpoint` configuration field will be used here if it is present.
-    fn get_base_agent_endpoint(&self, global: &datadog::Options) -> String {
+    fn get_base_agent_endpoint(&self, dd_common: &DatadogCommonConfig) -> String {
         self.dd_common.endpoint.clone().unwrap_or_else(|| {
             let version = str::replace(crate::built_info::PKG_VERSION, ".", "-");
             format!(
                 "https://{}-vector.agent.{}",
                 version,
-                get_base_domain_region(self.dd_common.site(global), self.region.as_ref())
+                get_base_domain_region(&dd_common.site, self.region.as_ref())
             )
         })
     }
@@ -205,9 +204,9 @@ impl DatadogMetricsConfig {
     /// Generates the `DatadogMetricsEndpointConfiguration`, used for mapping endpoints to their URI.
     fn generate_metrics_endpoint_configuration(
         &self,
-        global: &datadog::Options,
+        dd_common: &DatadogCommonConfig,
     ) -> crate::Result<DatadogMetricsEndpointConfiguration> {
-        let base_uri = self.get_base_agent_endpoint(global);
+        let base_uri = self.get_base_agent_endpoint(dd_common);
 
         // TODO: the V1 endpoint support is considered deprecated and should be removed in a future release.
         // At that time, the get_api_version_backwards_compatible() should be replaced with statically using the v2.
@@ -239,7 +238,7 @@ impl DatadogMetricsConfig {
 
     fn build_sink(
         &self,
-        global: &datadog::Options,
+        dd_common: &DatadogCommonConfig,
         client: HttpClient,
     ) -> crate::Result<VectorSink> {
         let batcher_settings = self.batch.into_batcher_settings()?;
@@ -249,12 +248,12 @@ impl DatadogMetricsConfig {
             &TowerRequestConfig::default().retry_attempts(DEFAULT_REQUEST_RETRY_ATTEMPTS),
         );
 
-        let endpoint_configuration = self.generate_metrics_endpoint_configuration(global)?;
+        let endpoint_configuration = self.generate_metrics_endpoint_configuration(dd_common)?;
         let service = ServiceBuilder::new()
             .settings(request_limits, DatadogMetricsRetryLogic)
             .service(DatadogMetricsService::new(
                 client,
-                self.dd_common.default_api_key(global).inner(),
+                dd_common.default_api_key.inner(),
             ));
 
         let request_builder = DatadogMetricsRequestBuilder::new(
@@ -262,14 +261,14 @@ impl DatadogMetricsConfig {
             self.default_namespace.clone(),
         )?;
 
-        let protocol = self.get_protocol(global);
+        let protocol = self.get_protocol(dd_common);
         let sink = DatadogMetricsSink::new(service, request_builder, batcher_settings, protocol);
 
         Ok(VectorSink::from_event_streamsink(sink))
     }
 
-    fn get_protocol(&self, global: &datadog::Options) -> String {
-        self.get_base_agent_endpoint(global)
+    fn get_protocol(&self, dd_common: &DatadogCommonConfig) -> String {
+        self.get_base_agent_endpoint(dd_common)
             .parse::<Uri>()
             .unwrap()
             .scheme_str()

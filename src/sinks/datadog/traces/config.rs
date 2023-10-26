@@ -13,7 +13,7 @@ use super::{
     service::TraceApiRetry,
 };
 use crate::{
-    config::{datadog, GenerateConfig, Input, SinkConfig, SinkContext},
+    config::{GenerateConfig, Input, SinkConfig, SinkContext},
     http::HttpClient,
     sinks::{
         datadog::{
@@ -21,7 +21,7 @@ use crate::{
                 request_builder::DatadogTracesRequestBuilder, service::TraceApiService,
                 sink::TracesSink,
             },
-            DatadogCommonConfig,
+            DatadogCommonConfig, LocalDatadogCommonConfig,
         },
         util::{
             service::ServiceBuilderExt, BatchConfig, Compression, SinkBatchSettings,
@@ -59,7 +59,7 @@ impl SinkBatchSettings for DatadogTracesDefaultBatchSettings {
 #[serde(deny_unknown_fields)]
 pub struct DatadogTracesConfig {
     #[serde(flatten)]
-    pub dd_common: DatadogCommonConfig,
+    pub dd_common: LocalDatadogCommonConfig,
 
     #[configurable(derived)]
     #[serde(default)]
@@ -108,18 +108,18 @@ impl DatadogTracesEndpointConfiguration {
 }
 
 impl DatadogTracesConfig {
-    fn get_base_uri(&self, global: &datadog::Options) -> String {
+    fn get_base_uri(&self, dd_common: &DatadogCommonConfig) -> String {
         self.dd_common
             .endpoint
             .clone()
-            .unwrap_or_else(|| format!("https://trace.agent.{}", self.dd_common.site(global)))
+            .unwrap_or_else(|| format!("https://trace.agent.{}", dd_common.site))
     }
 
     fn generate_traces_endpoint_configuration(
         &self,
-        global: &datadog::Options,
+        dd_common: &DatadogCommonConfig,
     ) -> crate::Result<DatadogTracesEndpointConfiguration> {
-        let base_uri = self.get_base_uri(global);
+        let base_uri = self.get_base_uri(dd_common);
         let traces_endpoint = build_uri(&base_uri, "/api/v0.2/traces")?;
         let stats_endpoint = build_uri(&base_uri, "/api/v0.2/stats")?;
 
@@ -131,16 +131,16 @@ impl DatadogTracesConfig {
 
     pub fn build_sink(
         &self,
-        global: &datadog::Options,
+        dd_common: &DatadogCommonConfig,
         client: HttpClient,
     ) -> crate::Result<VectorSink> {
-        let default_api_key: Arc<str> = Arc::from(self.dd_common.default_api_key(global).inner());
+        let default_api_key: Arc<str> = Arc::from(dd_common.default_api_key.inner());
         let request_limits = self.request.unwrap_with(
             &TowerRequestConfig::default()
                 .retry_attempts(DEFAULT_REQUEST_RETRY_ATTEMPTS)
                 .retry_max_duration_secs(DEFAULT_REQUEST_RETRY_MAX_DURATION_SECS),
         );
-        let endpoints = self.generate_traces_endpoint_configuration(global)?;
+        let endpoints = self.generate_traces_endpoint_configuration(dd_common)?;
 
         let batcher_settings = self
             .batch
@@ -176,7 +176,7 @@ impl DatadogTracesConfig {
             request_builder,
             batcher_settings,
             shutdown,
-            self.get_protocol(global),
+            self.get_protocol(dd_common),
         );
 
         // Send the APM stats payloads independently of the sink framework.
@@ -206,8 +206,8 @@ impl DatadogTracesConfig {
         Ok(HttpClient::new(tls_settings, proxy)?)
     }
 
-    fn get_protocol(&self, global: &datadog::Options) -> String {
-        build_uri(&self.get_base_uri(global), "")
+    fn get_protocol(&self, dd_common: &DatadogCommonConfig) -> String {
+        build_uri(&self.get_base_uri(dd_common), "")
             .unwrap()
             .scheme_str()
             .unwrap_or("http")
@@ -220,10 +220,9 @@ impl DatadogTracesConfig {
 impl SinkConfig for DatadogTracesConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let client = self.build_client(&cx.proxy)?;
-        let healthcheck = self
-            .dd_common
-            .build_healthcheck(&cx.datadog, client.clone(), None)?;
-        let sink = self.build_sink(&cx.datadog, client)?;
+        let dd_common = self.dd_common.with_globals(&cx.datadog)?;
+        let healthcheck = dd_common.build_healthcheck(client.clone(), None)?;
+        let sink = self.build_sink(&dd_common, client)?;
 
         Ok((sink, healthcheck))
     }

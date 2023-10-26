@@ -29,7 +29,7 @@ pub mod traces;
 #[configurable_component]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
-pub struct DatadogCommonConfig {
+pub struct LocalDatadogCommonConfig {
     /// The endpoint to send observability data to.
     ///
     /// The endpoint must contain an HTTP scheme, and may specify a hostname or IP
@@ -41,7 +41,7 @@ pub struct DatadogCommonConfig {
     #[configurable(metadata(docs::examples = "http://127.0.0.1:8080"))]
     #[configurable(metadata(docs::examples = "http://example.com:12345"))]
     #[serde(default)]
-    pub endpoint: Option<String>,
+    endpoint: Option<String>,
 
     /// The Datadog [site][dd_site] to send observability data to.
     ///
@@ -68,7 +68,7 @@ pub struct DatadogCommonConfig {
 
     #[configurable(derived)]
     #[serde(default)]
-    pub tls: Option<TlsEnableableConfig>,
+    tls: Option<TlsEnableableConfig>,
 
     #[configurable(derived)]
     #[serde(
@@ -76,10 +76,10 @@ pub struct DatadogCommonConfig {
         deserialize_with = "crate::serde::bool_or_struct",
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
-    pub acknowledgements: AcknowledgementsConfig,
+    acknowledgements: AcknowledgementsConfig,
 }
 
-impl DatadogCommonConfig {
+impl LocalDatadogCommonConfig {
     pub fn new(
         endpoint: Option<String>,
         site: Option<String>,
@@ -93,33 +93,55 @@ impl DatadogCommonConfig {
         }
     }
 
+    pub fn with_globals(
+        &self,
+        config: &datadog::Options,
+    ) -> Result<DatadogCommonConfig, ConfigurationError> {
+        Ok(DatadogCommonConfig {
+            endpoint: self.endpoint.clone(),
+            site: self.site.clone().unwrap_or(config.site.clone()),
+            default_api_key: self
+                .default_api_key
+                .clone()
+                .or(config.api_key.clone())
+                .ok_or(ConfigurationError::ApiKeyRequired)?,
+            tls: self.tls.clone(),
+            acknowledgements: self.acknowledgements,
+        })
+    }
+}
+
+#[derive(Debug, Snafu)]
+pub enum ConfigurationError {
+    #[snafu(display("API Key must be specified."))]
+    ApiKeyRequired,
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct DatadogCommonConfig {
+    pub endpoint: Option<String>,
+    pub site: String,
+    pub default_api_key: SensitiveString,
+    pub tls: Option<TlsEnableableConfig>,
+    pub acknowledgements: AcknowledgementsConfig,
+}
+
+impl DatadogCommonConfig {
     /// Returns a `Healthcheck` which is a future that will be used to ensure the
     /// `<site>/api/v1/validate` endpoint is reachable.
     fn build_healthcheck(
         &self,
-        global: &datadog::Options,
         client: HttpClient,
         region: Option<&Region>,
     ) -> crate::Result<Healthcheck> {
         let validate_endpoint = get_api_validate_endpoint(
             self.endpoint.as_ref(),
-            get_base_domain_region(self.site(global), region),
+            get_base_domain_region(&self.site, region),
         )?;
 
-        let api_key: String = self.default_api_key(global).clone().into();
+        let api_key: String = self.default_api_key.clone().into();
 
         Ok(build_healthcheck_future(client, validate_endpoint, api_key).boxed())
-    }
-
-    pub fn site<'a>(&'a self, config: &'a datadog::Options) -> &'a str {
-        self.site.as_ref().unwrap_or(&config.site).as_str()
-    }
-
-    pub fn default_api_key(&self, config: &datadog::Options) -> SensitiveString {
-        self.default_api_key
-            .clone()
-            .or(config.api_key.clone())
-            .unwrap_or_default()
     }
 }
 

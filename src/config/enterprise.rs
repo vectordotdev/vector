@@ -25,7 +25,9 @@ use crate::{
     conditions::AnyCondition,
     http::{HttpClient, HttpError},
     sinks::{
-        datadog::{logs::DatadogLogsConfig, metrics::DatadogMetricsConfig, DatadogCommonConfig},
+        datadog::{
+            logs::DatadogLogsConfig, metrics::DatadogMetricsConfig, LocalDatadogCommonConfig,
+        },
         util::{http::RequestConfig, retries::ExponentialBackoff},
     },
     sources::{
@@ -478,7 +480,7 @@ fn setup_logs_reporting(
 
     // Create a Datadog logs sink to consume and emit internal logs.
     let datadog_logs = DatadogLogsConfig {
-        dd_common: DatadogCommonConfig::new(
+        dd_common: LocalDatadogCommonConfig::new(
             datadog.endpoint.clone(),
             Some(datadog.site.clone()),
             Some(api_key.into()),
@@ -585,7 +587,7 @@ fn setup_metrics_reporting(
 
     // Create a Datadog metrics sink to consume and emit internal + host metrics.
     let datadog_metrics = DatadogMetricsConfig {
-        dd_common: DatadogCommonConfig::new(
+        dd_common: LocalDatadogCommonConfig::new(
             datadog.endpoint.clone(),
             Some(datadog.site.clone()),
             Some(api_key.into()),
