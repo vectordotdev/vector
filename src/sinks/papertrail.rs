@@ -189,7 +189,7 @@ mod tests {
     use codecs::JsonSerializerConfig;
     use futures::{future::ready, stream};
     use tokio_util::codec::Encoder as _;
-    use vector_core::event::{Event, LogEvent};
+    use vector_lib::event::{Event, LogEvent};
 
     use crate::test_util::{
         components::{run_and_assert_sink_compliance, SINK_TAGS},

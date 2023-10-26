@@ -14,7 +14,7 @@ use tokio::{
     time::{sleep, Duration},
 };
 use url::{ParseError, Url};
-use vector_core::config::proxy::ProxyConfig;
+use vector_lib::config::proxy::ProxyConfig;
 
 use super::{
     datadog::default_site, load_source_from_paths, process_paths, ComponentKey, Config, ConfigPath,
@@ -829,7 +829,7 @@ mod test {
     use http::StatusCode;
     use indexmap::IndexMap;
     use tokio::time::sleep;
-    use vector_core::config::proxy::ProxyConfig;
+    use vector_lib::config::proxy::ProxyConfig;
     use vrl::btreemap;
     use vrl::compiler::state::ExternalEnv;
     use vrl::compiler::{compile, compile_with_external, CompileConfig};

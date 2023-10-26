@@ -29,16 +29,13 @@ use crate::{
     },
     event::{Event, LogEvent, Value},
     signal,
-    topology::{
-        self,
-        builder::{self, Pieces},
-    },
+    topology::{builder::TopologyPieces, RunningTopology},
 };
 
 pub struct UnitTest {
     pub name: String,
     config: Config,
-    pieces: Pieces,
+    pieces: TopologyPieces,
     test_result_rxs: Vec<Receiver<UnitTestSinkResult>>,
 }
 
@@ -49,7 +46,7 @@ pub struct UnitTestResult {
 impl UnitTest {
     pub async fn run(self) -> UnitTestResult {
         let diff = config::ConfigDiff::initial(&self.config);
-        let (topology, _) = topology::start_validated(self.config, diff, self.pieces)
+        let (topology, _) = RunningTopology::start_validated(self.config, diff, self.pieces)
             .await
             .unwrap();
         topology.sources_finished().await;
@@ -422,7 +419,7 @@ async fn build_unit_test(
     }
     let config = config_builder.build()?;
     let diff = config::ConfigDiff::initial(&config);
-    let pieces = builder::build_pieces(&config, &diff, HashMap::new()).await?;
+    let pieces = TopologyPieces::build(&config, &diff, HashMap::new()).await?;
 
     Ok(UnitTest {
         name: test.name,

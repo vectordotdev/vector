@@ -4,7 +4,7 @@ use http::Uri;
 use snafu::ResultExt;
 use tower::ServiceBuilder;
 use vector_config::configurable_component;
-use vector_core::config::proxy::ProxyConfig;
+use vector_lib::config::proxy::ProxyConfig;
 
 use super::{
     request_builder::DatadogMetricsRequestBuilder,

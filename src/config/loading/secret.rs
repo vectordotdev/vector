@@ -8,7 +8,7 @@ use once_cell::sync::Lazy;
 use regex::{Captures, Regex};
 use serde::{Deserialize, Serialize};
 use toml::value::Table;
-use vector_common::config::ComponentKey;
+use vector_lib::config::ComponentKey;
 
 use crate::{
     config::{

@@ -3,8 +3,8 @@
 //! globally which will apply to all datadog components. Each component can override the settings
 //! specified here if necessary.
 //!
-use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
+use vector_lib::sensitive_string::SensitiveString;
 
 use crate::common::datadog::DD_US_SITE;
 

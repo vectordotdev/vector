@@ -6,7 +6,7 @@
 //! [remote_write]: https://prometheus.io/docs/concepts/remote_write_spec/
 
 use snafu::prelude::*;
-use vector_core::event::Metric;
+use vector_lib::event::Metric;
 
 use crate::sinks::{
     prelude::*,

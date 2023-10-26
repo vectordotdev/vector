@@ -5,10 +5,10 @@ use chrono::{DateTime, Utc};
 use codecs::StreamDecodingError;
 use lookup::{metadata_path, path, PathPrefix};
 use tokio_util::codec::Decoder as _;
-use vector_common::internal_event::{
+use vector_lib::internal_event::{
     CountByteSize, EventsReceived, InternalEventHandle as _, Registered,
 };
-use vector_core::{config::LogNamespace, EstimatedJsonEncodedSizeOf};
+use vector_lib::{config::LogNamespace, EstimatedJsonEncodedSizeOf};
 
 use crate::{codecs::Decoder, config::log_schema, event::BatchNotifier, event::Event};
 

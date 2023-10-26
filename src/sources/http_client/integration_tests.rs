@@ -16,7 +16,7 @@ use crate::{
     SourceSender,
 };
 use codecs::decoding::DeserializerConfig;
-use vector_core::config::log_schema;
+use vector_lib::config::log_schema;
 
 use super::{
     tests::{run_compliance, INTERVAL, TIMEOUT},

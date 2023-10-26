@@ -12,8 +12,8 @@ use futures::StreamExt;
 use roaring::RoaringTreemap;
 use serde::{Deserialize, Serialize};
 use tokio::time::interval;
-use vector_common::{finalization::BatchStatusReceiver, finalizer::UnorderedFinalizer};
 use vector_config::configurable_component;
+use vector_lib::{finalization::BatchStatusReceiver, finalizer::UnorderedFinalizer};
 use warp::Rejection;
 
 use super::ApiError;
@@ -283,7 +283,7 @@ mod tests {
     use std::num::NonZeroU64;
 
     use tokio::{time, time::sleep};
-    use vector_core::event::{BatchNotifier, EventFinalizer, EventStatus};
+    use vector_lib::event::{BatchNotifier, EventFinalizer, EventStatus};
 
     use super::{Channel, HecAcknowledgementsConfig, IndexerAcknowledgement};
     use crate::shutdown::ShutdownSignal;

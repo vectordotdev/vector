@@ -1,6 +1,6 @@
-use vector_common::TimeZone;
 use vector_config::configurable_component;
-use vector_core::compile_vrl;
+use vector_lib::compile_vrl;
+use vector_lib::TimeZone;
 use vrl::compiler::runtime::{Runtime, RuntimeResult, Terminate};
 use vrl::compiler::{CompilationResult, CompileConfig, Program, TypeState, VrlRuntime};
 use vrl::diagnostic::Formatter;
@@ -170,7 +170,7 @@ impl Conditional for Vrl {
 
 #[cfg(test)]
 mod test {
-    use vector_core::metric_tags;
+    use vector_lib::metric_tags;
 
     use super::*;
     use crate::{

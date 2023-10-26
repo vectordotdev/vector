@@ -5,9 +5,9 @@ use hyper::{Body, Client, Request};
 use serde_with::serde_as;
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
-use vector_common::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
 use vector_config::configurable_component;
-use vector_core::{config::LogNamespace, EstimatedJsonEncodedSizeOf};
+use vector_lib::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
+use vector_lib::{config::LogNamespace, EstimatedJsonEncodedSizeOf};
 
 use crate::{
     config::{GenerateConfig, SourceConfig, SourceContext, SourceOutput},

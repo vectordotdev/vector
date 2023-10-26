@@ -52,7 +52,7 @@ pub use service::{
 pub use sink::{BatchSink, PartitionBatchSink, StreamSink};
 use snafu::Snafu;
 pub use uri::UriSerde;
-use vector_common::json_size::JsonSize;
+use vector_lib::json_size::JsonSize;
 
 use crate::event::EventFinalizers;
 

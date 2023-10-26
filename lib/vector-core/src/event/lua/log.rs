@@ -1,6 +1,6 @@
 use mlua::prelude::*;
 
-use crate::event::{EventMetadata, LogEvent, Value};
+use super::super::{EventMetadata, LogEvent, Value};
 
 impl<'a> IntoLua<'a> for LogEvent {
     #![allow(clippy::wrong_self_convention)] // this trait is defined by mlua

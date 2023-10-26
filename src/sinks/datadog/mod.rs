@@ -2,9 +2,10 @@ use futures_util::FutureExt;
 use http::{Request, StatusCode, Uri};
 use hyper::body::Body;
 use snafu::Snafu;
-use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
-use vector_core::{config::AcknowledgementsConfig, tls::TlsEnableableConfig};
+use vector_lib::{
+    config::AcknowledgementsConfig, sensitive_string::SensitiveString, tls::TlsEnableableConfig,
+};
 
 use crate::{
     common::datadog::{get_api_base_endpoint, get_base_domain_region, Region},

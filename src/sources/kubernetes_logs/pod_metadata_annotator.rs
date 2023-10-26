@@ -12,7 +12,7 @@ use lookup::{
     owned_value_path, path, OwnedTargetPath,
 };
 use vector_config::configurable_component;
-use vector_core::config::{LegacyKey, LogNamespace};
+use vector_lib::config::{LegacyKey, LogNamespace};
 
 use super::{
     path_helpers::{parse_log_file_path, LogFileInfo},

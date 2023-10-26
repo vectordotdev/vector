@@ -4,7 +4,7 @@ use bytes::Bytes;
 use prometheus_parser::proto;
 use prost::Message;
 use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
+use vector_lib::config::LogNamespace;
 use warp::http::{HeaderMap, StatusCode};
 
 use super::parser;
@@ -146,7 +146,7 @@ impl HttpSource for RemoteWriteSource {
 #[cfg(test)]
 mod test {
     use chrono::{SubsecRound as _, Utc};
-    use vector_core::{
+    use vector_lib::{
         event::{EventStatus, Metric, MetricKind, MetricValue},
         metric_tags,
     };
@@ -220,7 +220,7 @@ mod test {
         // put them back into order before comparing.
         output.sort_unstable_by_key(|event| event.as_metric().name().to_owned());
 
-        vector_common::assert_event_data_eq!(events, output);
+        vector_lib::assert_event_data_eq!(events, output);
     }
 
     fn make_events() -> Vec<Event> {
@@ -244,7 +244,7 @@ mod test {
                 "histogram_3",
                 MetricKind::Absolute,
                 MetricValue::AggregatedHistogram {
-                    buckets: vector_core::buckets![ 2.3 => 11, 4.2 => 85 ],
+                    buckets: vector_lib::buckets![ 2.3 => 11, 4.2 => 85 ],
                     count: 96,
                     sum: 156.2,
                 },
@@ -255,7 +255,7 @@ mod test {
                 "summary_4",
                 MetricKind::Absolute,
                 MetricValue::AggregatedSummary {
-                    quantiles: vector_core::quantiles![ 0.1 => 1.2, 0.5 => 3.6, 0.9 => 5.2 ],
+                    quantiles: vector_lib::quantiles![ 0.1 => 1.2, 0.5 => 3.6, 0.9 => 5.2 ],
                     count: 23,
                     sum: 8.6,
                 },
@@ -330,7 +330,7 @@ mod test {
         )
         .await;
 
-        vector_common::assert_event_data_eq!(expected, output);
+        vector_lib::assert_event_data_eq!(expected, output);
     }
 }
 

@@ -1,4 +1,4 @@
-use vector_core::event::Metric;
+use vector_lib::event::Metric;
 use vector_stream::batcher::limiter::ItemBatchSize;
 
 // This accounts for the separators, the metric type string, the length of the value itself. It can

@@ -25,13 +25,13 @@ use tokio_postgres::{
     Client, Config, Error as PgError, NoTls, Row,
 };
 use tokio_stream::wrappers::IntervalStream;
-use vector_common::{
+use vector_config::configurable_component;
+use vector_lib::config::LogNamespace;
+use vector_lib::{
     internal_event::{CountByteSize, InternalEventHandle as _, Registered},
     json_size::JsonSize,
 };
-use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
-use vector_core::{metric_tags, ByteSizeOf, EstimatedJsonEncodedSizeOf};
+use vector_lib::{metric_tags, ByteSizeOf, EstimatedJsonEncodedSizeOf};
 
 use crate::{
     config::{SourceConfig, SourceContext, SourceOutput},

@@ -35,7 +35,7 @@ use dnstap_proto::{
 };
 use lookup::lookup_v2::ValuePath;
 use lookup::PathPrefix;
-use vector_core::config::log_schema;
+use vector_lib::config::log_schema;
 
 use super::{
     dns_message::{

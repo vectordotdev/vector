@@ -4,7 +4,7 @@ use http::HeaderMap;
 use indoc::indoc;
 use prometheus_parser::proto;
 use prost::Message;
-use vector_core::metric_tags;
+use vector_lib::metric_tags;
 
 use super::*;
 use crate::{

@@ -9,11 +9,11 @@ use futures::future::BoxFuture;
 use http::{Response, Uri};
 use hyper::{service::Service, Body, Request};
 use tower::ServiceExt;
-use vector_common::{
+use vector_lib::ByteSizeOf;
+use vector_lib::{
     json_size::JsonSize,
     request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata},
 };
-use vector_core::ByteSizeOf;
 use vector_stream::DriverResponse;
 
 use super::{ElasticsearchCommon, ElasticsearchConfig};

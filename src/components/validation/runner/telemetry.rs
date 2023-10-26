@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use tokio::{select, sync::mpsc, task::JoinHandle};
-use vector_core::event::Event;
+use vector_lib::event::Event;
 
 use crate::{
     components::validation::{

@@ -15,7 +15,7 @@ use codecs::{
 };
 use lookup::{lookup_v2::OptionalValuePath, owned_value_path, path};
 use vector_config::configurable_component;
-use vector_core::{
+use vector_lib::{
     config::{DataType, LegacyKey, LogNamespace},
     schema::Definition,
 };
@@ -52,7 +52,7 @@ impl GenerateConfig for HttpConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "http")]
 impl SourceConfig for HttpConfig {
-    async fn build(&self, cx: SourceContext) -> vector_common::Result<super::Source> {
+    async fn build(&self, cx: SourceContext) -> vector_lib::Result<super::Source> {
         self.0.build(cx).await
     }
 
@@ -495,9 +495,9 @@ mod tests {
     };
     use lookup::lookup_v2::OptionalValuePath;
     use lookup::{event_path, owned_value_path, OwnedTargetPath};
-    use vector_core::config::LogNamespace;
-    use vector_core::event::LogEvent;
-    use vector_core::schema::Definition;
+    use vector_lib::config::LogNamespace;
+    use vector_lib::event::LogEvent;
+    use vector_lib::schema::Definition;
 
     use crate::sources::http_server::HttpMethod;
     use crate::{

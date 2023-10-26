@@ -1,4 +1,4 @@
-use vector_core::config::proxy::ProxyConfig;
+use vector_lib::config::proxy::ProxyConfig;
 
 use super::{config::LokiConfig, healthcheck::healthcheck, sink::LokiSink};
 use crate::{

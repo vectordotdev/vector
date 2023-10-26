@@ -5928,9 +5928,9 @@ checksum = "ff011a302c396a5197692431fc1948019154afc178baf7d8e37367442a4601cf"
 
 [[package]]
 name = "openssl-src"
-version = "300.1.5+3.1.3"
+version = "300.1.6+3.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "559068e4c12950d7dcaa1857a61725c0d38d4fc03ff8e070ab31a75d6e316491"
+checksum = "439fac53e092cd7442a3660c85dde4643ab3b5bd39040912388dcdabf6b88085"
 dependencies = [
  "cc",
 ]
@@ -7828,9 +7828,9 @@ dependencies = [
 
 [[package]]
 name = "serde-wasm-bindgen"
-version = "0.6.0"
+version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "30c9933e5689bd420dc6c87b7a1835701810cbc10cd86a26e4da45b73e6b1d78"
+checksum = "17ba92964781421b6cef36bf0d7da26d201e96d84e1b10e7ae6ed416e516906d"
 dependencies = [
  "js-sys",
  "serde",
@@ -9866,11 +9866,10 @@ dependencies = [
  "uuid",
  "vector-api-client",
  "vector-buffers",
- "vector-common",
  "vector-config",
  "vector-config-common",
  "vector-config-macros",
- "vector-core",
+ "vector-lib",
  "vector-lookup",
  "vector-stream",
  "vector-vrl-functions",
@@ -10101,7 +10100,6 @@ dependencies = [
  "tonic 0.10.2",
  "tracing 0.1.37",
  "tracing-core 0.1.30",
- "tracing-log",
  "tracing-subscriber",
  "typetag",
  "url",
@@ -10112,6 +10110,14 @@ dependencies = [
  "vector-config-macros",
  "vector-lookup",
  "vrl",
+]
+
+[[package]]
+name = "vector-lib"
+version = "0.1.0"
+dependencies = [
+ "vector-common",
+ "vector-core",
 ]
 
 [[package]]
