@@ -262,9 +262,11 @@ mod test {
         assert!(result.unwrap_err().message().contains("Path must begin"));
     }
 
-    // TODO: Test duplicate grouping key labels (maybe reconsider data type being passed around)
+    // This is to ensure that the last value for a given key is the one used when we
+    // pass the grouping key into the Prometheus text parser to override label values
+    // on individual metrics
     #[test]
-    fn test_parse_path_duplicate_labels() {
+    fn test_parse_path_duplicate_labels_preserves_order() {
         let path = "/metrics/job/foo/instance/bar/instance/baz";
         let expected: Vec<_>= vec![("job", "foo"), ("instance", "bar"), ("instance", "baz")].into_iter().
             map(|(k,v)| (k.to_owned(), v.to_owned())).collect();

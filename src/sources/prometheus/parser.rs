@@ -1070,4 +1070,28 @@ mod test {
     // - Tag overrides: labels (last instance should win like in real Pushgateway)
     // - Aggregation: enabled, all four metric types, only counter and histogram are incremental
     // - Aggregation: disabled, all four metric types, all types are absolute
+
+    #[test]
+    fn test_overrides_nothing_overwritten() {
+        let exp = r##"
+            # TYPE jobs_total counter
+            # HELP jobs_total Total number of jobs
+            jobs_total{type="a"} 1.0 1612411506789
+            "##;
+
+        // let actual = parse_text_with_overrides(exp, vec![], false);
+
+        assert_event_data_eq!(
+            parse_text_with_overrides(exp, vec![], false),
+            // AAAAAAAAAAAAAA: why does this one not need the `Event::Metric` wrapper?
+            // parse_text(exp),
+            Ok(vec![Event::Metric(Metric::new(
+                "jobs_total",
+                MetricKind::Absolute,
+                MetricValue::Counter { value: 1.0 },
+            )
+            .with_tags(Some(metric_tags! { "type" => "a" }))
+            .with_timestamp(Some(*TIMESTAMP)))]),
+        );
+    }
 }
