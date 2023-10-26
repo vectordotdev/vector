@@ -1094,7 +1094,6 @@ components: sources: internal_metrics: {
 		_component_tags: _internal_metrics_tags & {
 			component_kind: _component_kind
 			component_id:   _component_id
-			component_name: _component_name
 			component_type: _component_type
 		}
 
@@ -1114,11 +1113,6 @@ components: sources: internal_metrics: {
 		}
 		_component_id: {
 			description: "The Vector component ID."
-			required:    true
-			examples: ["my_source", "my_sink"]
-		}
-		_component_name: {
-			description: "Deprecated, use `component_id` instead. The value is the same as `component_id`."
 			required:    true
 			examples: ["my_source", "my_sink"]
 		}

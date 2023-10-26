@@ -181,7 +181,7 @@ impl SourceContext {
         if config.enabled() {
             warn!(
                 message = "Enabling `acknowledgements` on sources themselves is deprecated in favor of enabling them in the sink configuration, and will be removed in a future version.",
-                component_name = self.key.id(),
+                component_id = self.key.id(),
             );
         }
 
