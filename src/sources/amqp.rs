@@ -24,7 +24,7 @@ use lookup::{lookup_v2::OptionalValuePath, metadata_path, owned_value_path, path
 use snafu::Snafu;
 use std::{io::Cursor, pin::Pin};
 use tokio_util::codec::FramedRead;
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 use vector_lib::{
     config::{log_schema, LegacyKey, LogNamespace, SourceAcknowledgementsConfig},
     event::Event,

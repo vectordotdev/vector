@@ -5,7 +5,7 @@ use std::sync::{
 
 use async_trait::async_trait;
 use vector_buffers::topology::channel::{limited, LimitedReceiver};
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 use vector_lib::{config::LogNamespace, schema::Definition};
 use vector_lib::{
     config::{DataType, SourceOutput},

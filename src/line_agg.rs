@@ -15,7 +15,7 @@ use futures::{Stream, StreamExt};
 use pin_project::pin_project;
 use regex::bytes::Regex;
 use tokio_util::time::delay_queue::{DelayQueue, Key};
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 
 /// Mode of operation of the line aggregator.
 #[configurable_component]

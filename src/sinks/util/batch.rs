@@ -3,7 +3,7 @@ use std::{marker::PhantomData, num::NonZeroUsize, time::Duration};
 use derivative::Derivative;
 use serde_with::serde_as;
 use snafu::Snafu;
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 use vector_lib::json_size::JsonSize;
 use vector_stream::BatcherSettings;
 

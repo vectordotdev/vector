@@ -6,7 +6,7 @@ use codecs::{
     TextSerializerConfig,
 };
 use tower::ServiceBuilder;
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 use vector_lib::sink::VectorSink;
 
 use super::sink::S3RequestOptions;

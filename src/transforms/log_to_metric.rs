@@ -3,7 +3,7 @@ use std::{collections::HashMap, num::ParseFloatError};
 
 use chrono::Utc;
 use indexmap::IndexMap;
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 use vector_lib::{config::LogNamespace, event::DatadogMetricOriginMetadata};
 use vrl::path::parse_target_path;
 

@@ -1,6 +1,6 @@
 use futures::{future::ready, stream};
 use serde::Deserialize;
-use vector_config::component::GenerateConfig;
+use vector_lib::configurable::component::GenerateConfig;
 use vector_lib::event::{Event, LogEvent};
 
 use crate::{

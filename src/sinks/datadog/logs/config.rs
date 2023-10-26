@@ -2,7 +2,7 @@ use std::{convert::TryFrom, sync::Arc};
 
 use indoc::indoc;
 use tower::ServiceBuilder;
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 use vector_lib::{config::proxy::ProxyConfig, schema::meaning};
 use vrl::value::Kind;
 

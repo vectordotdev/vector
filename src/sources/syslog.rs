@@ -13,8 +13,8 @@ use listenfd::ListenFd;
 use lookup::{lookup_v2::OptionalValuePath, path, OwnedValuePath};
 use smallvec::SmallVec;
 use tokio_util::udp::UdpFramed;
-use vector_config::configurable_component;
 use vector_lib::config::{LegacyKey, LogNamespace};
+use vector_lib::configurable::configurable_component;
 use vrl::event_path;
 
 #[cfg(unix)]

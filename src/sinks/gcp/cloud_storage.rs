@@ -10,7 +10,7 @@ use snafu::ResultExt;
 use snafu::Snafu;
 use tower::ServiceBuilder;
 use uuid::Uuid;
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 use vector_lib::event::{EventFinalizers, Finalizable};
 use vector_lib::request_metadata::RequestMetadata;
 

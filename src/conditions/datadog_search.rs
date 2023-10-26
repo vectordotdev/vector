@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
 use bytes::Bytes;
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 use vector_lib::event::{Event, LogEvent, Value};
 use vrl::datadog_filter::{
     build_matcher,

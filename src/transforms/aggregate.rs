@@ -6,8 +6,8 @@ use std::{
 
 use async_stream::stream;
 use futures::{Stream, StreamExt};
-use vector_config::configurable_component;
 use vector_lib::config::LogNamespace;
+use vector_lib::configurable::configurable_component;
 
 use crate::{
     config::{DataType, Input, OutputId, TransformConfig, TransformContext, TransformOutput},

@@ -10,7 +10,7 @@ use codecs::{
 use futures::{channel::mpsc, executor, SinkExt, StreamExt};
 use lookup::{lookup_v2::OptionalValuePath, owned_value_path, path, OwnedValuePath};
 use tokio_util::{codec::FramedRead, io::StreamReader};
-use vector_config::NamedComponent;
+use vector_lib::configurable::NamedComponent;
 use vector_lib::internal_event::{
     ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol,
 };

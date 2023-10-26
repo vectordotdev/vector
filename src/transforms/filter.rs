@@ -1,5 +1,5 @@
-use vector_config::configurable_component;
 use vector_lib::config::{clone_input_definitions, LogNamespace};
+use vector_lib::configurable::configurable_component;
 use vector_lib::internal_event::{Count, InternalEventHandle as _, Registered};
 
 use crate::{

@@ -9866,9 +9866,6 @@ dependencies = [
  "uuid",
  "vector-api-client",
  "vector-buffers",
- "vector-config",
- "vector-config-common",
- "vector-config-macros",
  "vector-lib",
  "vector-lookup",
  "vector-stream",
@@ -10117,6 +10114,7 @@ name = "vector-lib"
 version = "0.1.0"
 dependencies = [
  "vector-common",
+ "vector-config",
  "vector-core",
 ]
 

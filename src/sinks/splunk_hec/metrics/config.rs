@@ -3,7 +3,7 @@ use std::sync::Arc;
 use futures_util::FutureExt;
 use lookup::lookup_v2::OptionalValuePath;
 use tower::ServiceBuilder;
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 use vector_lib::sensitive_string::SensitiveString;
 use vector_lib::sink::VectorSink;
 

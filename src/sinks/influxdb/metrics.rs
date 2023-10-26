@@ -4,7 +4,7 @@ use bytes::{Bytes, BytesMut};
 use futures::{future::BoxFuture, stream, SinkExt};
 use serde::Serialize;
 use tower::Service;
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 use vector_lib::{
     event::metric::{MetricSketch, MetricTags, Quantile},
     ByteSizeOf, EstimatedJsonEncodedSizeOf,

@@ -5,8 +5,8 @@ use futures::{Stream, StreamExt};
 use governor::{clock, Quota, RateLimiter};
 use serde_with::serde_as;
 use snafu::Snafu;
-use vector_config::configurable_component;
 use vector_lib::config::{clone_input_definitions, LogNamespace};
+use vector_lib::configurable::configurable_component;
 
 use crate::{
     conditions::{AnyCondition, Condition},

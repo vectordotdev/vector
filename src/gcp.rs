@@ -17,7 +17,7 @@ use once_cell::sync::Lazy;
 use smpl_jwt::Jwt;
 use snafu::{ResultExt, Snafu};
 use tokio::{sync::watch, time::Instant};
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 use vector_lib::sensitive_string::SensitiveString;
 
 use crate::{config::ProxyConfig, http::HttpClient, http::HttpError};
