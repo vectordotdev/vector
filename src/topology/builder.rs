@@ -628,8 +628,6 @@ impl<'a> Builder<'a> {
                                     component_kind = "sink",
                                     component_type = typetag,
                                     component_id = %component_key.id(),
-                                    // maintained for compatibility
-                                    component_name = %component_key.id(),
                                 );
                                 Err(TaskError::wrapped(error))
                             }
@@ -639,8 +637,6 @@ impl<'a> Builder<'a> {
                                     component_kind = "sink",
                                     component_type = typetag,
                                     component_id = %component_key.id(),
-                                    // maintained for compatibility
-                                    component_name = %component_key.id(),
                                 );
                                 Err(TaskError::wrapped(Box::new(e)))
                             }
