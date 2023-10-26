@@ -4,8 +4,8 @@ use serde::Serializer;
 use serde_json::Value;
 use vector_config::{
     schema::{
-        apply_base_metadata, generate_const_string_schema, generate_number_schema,
-        generate_one_of_schema, SchemaGenerator, SchemaObject,
+        apply_base_metadata, generate_const_string_schema, generate_one_of_schema, SchemaGenerator,
+        SchemaObject,
     },
     Configurable, GenerateError, Metadata, ToValue,
 };
@@ -164,14 +164,24 @@ a fixed concurrency limit."#,
         adaptive_metadata.add_custom_attribute(CustomAttribute::kv("docs::examples", "adaptive"));
         apply_base_metadata(&mut adaptive_schema, adaptive_metadata);
 
-        let mut fixed_schema = generate_number_schema::<usize>();
+        let mut fixed_schema = generate_const_string_schema("_POSITIVE_INTEGER_".to_string());
         let mut fixed_metadata =
             Metadata::with_description("A fixed amount of concurrency will be allowed.");
-        fixed_metadata.set_transparent();
-        fixed_metadata.add_custom_attribute(CustomAttribute::kv("docs::numeric_type", "uint"));
         fixed_metadata.add_custom_attribute(CustomAttribute::kv("logical_name", "Fixed"));
+        fixed_metadata.set_description(
+            "_POSITIVE_INTEGER_ (e.g., `32`) requests can be outstanding at any given time.",
+        );
         fixed_metadata.add_custom_attribute(CustomAttribute::kv("docs::examples", 32));
         apply_base_metadata(&mut fixed_schema, fixed_metadata);
+
+        // let mut usize_schema = generate_number_schema::<usize>();
+        // let mut fixed_metadata =
+        //     Metadata::with_description("A fixed amount of concurrency will be allowed.");
+        // fixed_metadata.set_transparent();
+        // fixed_metadata.add_custom_attribute(CustomAttribute::kv("docs::numeric_type", "uint"));
+        // fixed_metadata.add_custom_attribute(CustomAttribute::kv("logical_name", "Fixed"));
+        // fixed_metadata.add_custom_attribute(CustomAttribute::kv("docs::examples", 32));
+        // apply_base_metadata(&mut fixed_schema, fixed_metadata);
 
         Ok(generate_one_of_schema(&[
             none_schema,
