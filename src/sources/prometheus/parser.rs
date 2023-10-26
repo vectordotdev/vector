@@ -197,6 +197,15 @@ mod test {
         super::parse_text(text).map(|events| events.into_iter().map(Event::into_metric).collect())
     }
 
+    fn parse_text_with_overrides(
+        text: &str,
+        tag_overrides: impl IntoIterator<Item = (String, String)> + Clone,
+        aggregate_metrics: bool,
+    ) -> Result<Vec<Metric>, ParserError> {
+        super::parse_text_with_overrides(text, tag_overrides, aggregate_metrics)
+            .map(|events| events.into_iter().map(Event::into_metric).collect())
+    }
+
     #[test]
     fn adds_timestamp_if_missing() {
         let now = Utc::now();
@@ -1079,19 +1088,15 @@ mod test {
             jobs_total{type="a"} 1.0 1612411506789
             "##;
 
-        // let actual = parse_text_with_overrides(exp, vec![], false);
-
         assert_event_data_eq!(
             parse_text_with_overrides(exp, vec![], false),
-            // AAAAAAAAAAAAAA: why does this one not need the `Event::Metric` wrapper?
-            // parse_text(exp),
-            Ok(vec![Event::Metric(Metric::new(
+            Ok(vec![Metric::new(
                 "jobs_total",
                 MetricKind::Absolute,
                 MetricValue::Counter { value: 1.0 },
             )
             .with_tags(Some(metric_tags! { "type" => "a" }))
-            .with_timestamp(Some(*TIMESTAMP)))]),
+            .with_timestamp(Some(*TIMESTAMP))]),
         );
     }
 }
