@@ -1134,4 +1134,142 @@ mod test {
             .with_timestamp(Some(*TIMESTAMP))]),
         );
     }
+
+    #[test]
+    fn test_aggregation_enabled_only_aggregates_counter_and_histogram() {
+        let exp = r##"
+            # TYPE jobs_total counter
+            # HELP jobs_total Total number of jobs
+            jobs_total{type="a"} 1.0 1612411506789
+            # TYPE jobs_current gauge
+            # HELP jobs_current Current number of jobs
+            jobs_current{type="a"} 5.0 1612411506789
+            # TYPE jobs_distribution histogram
+            # HELP jobs_distribution Distribution of jobs
+            jobs_distribution_bucket{type="a",le="1"} 0.0 1612411506789
+            jobs_distribution_bucket{type="a",le="2.5"} 0.0 1612411506789
+            jobs_distribution_bucket{type="a",le="5"} 0.0 1612411506789
+            jobs_distribution_bucket{type="a",le="10"} 1.0 1612411506789
+            jobs_distribution_bucket{type="a",le="+Inf"} 1.0 1612411506789
+            jobs_distribution_sum{type="a"} 8.0 1612411506789
+            jobs_distribution_count{type="a"} 1.0 1612411506789
+            # TYPE jobs_summary summary
+            # HELP jobs_summary Summary of jobs
+            jobs_summary_sum{type="a"} 8.0 1612411506789
+            jobs_summary_count{type="a"} 1.0 1612411506789
+            "##;
+
+        assert_event_data_eq!(
+            events_to_metrics(parse_text_with_overrides(exp, vec![], true)),
+            Ok(vec![
+                Metric::new(
+                    "jobs_total",
+                    MetricKind::Incremental,
+                    MetricValue::Counter { value: 1.0 },
+                )
+                    .with_tags(Some(metric_tags! { "type" => "a" }))
+                    .with_timestamp(Some(*TIMESTAMP)),
+                Metric::new(
+                    "jobs_current",
+                    MetricKind::Absolute,
+                    MetricValue::Gauge { value: 5.0 },
+                )
+                    .with_tags(Some(metric_tags! { "type" => "a" }))
+                    .with_timestamp(Some(*TIMESTAMP)),
+                Metric::new(
+                    "jobs_distribution",
+                    MetricKind::Incremental,
+                    MetricValue::AggregatedHistogram {
+                        buckets: vector_core::buckets![
+                            1.0 => 0, 2.5 => 0, 5.0 => 0, 10.0 => 1
+                        ],
+                        count: 1,
+                        sum: 8.0,
+                    },
+                )
+                    .with_tags(Some(metric_tags! { "type" => "a" }))
+                    .with_timestamp(Some(*TIMESTAMP)),
+                Metric::new(
+                    "jobs_summary",
+                    MetricKind::Absolute,
+                    MetricValue::AggregatedSummary {
+                        quantiles: vector_core::quantiles![],
+                        count: 1,
+                        sum: 8.0,
+                    },
+                )
+                    .with_tags(Some(metric_tags! { "type" => "a" }))
+                    .with_timestamp(Some(*TIMESTAMP)),
+            ]),
+        );
+    }
+
+    #[test]
+    fn test_aggregation_disabled_all_absolute() {
+        let exp = r##"
+            # TYPE jobs_total counter
+            # HELP jobs_total Total number of jobs
+            jobs_total{type="a"} 1.0 1612411506789
+            # TYPE jobs_current gauge
+            # HELP jobs_current Current number of jobs
+            jobs_current{type="a"} 5.0 1612411506789
+            # TYPE jobs_distribution histogram
+            # HELP jobs_distribution Distribution of jobs
+            jobs_distribution_bucket{type="a",le="1"} 0.0 1612411506789
+            jobs_distribution_bucket{type="a",le="2.5"} 0.0 1612411506789
+            jobs_distribution_bucket{type="a",le="5"} 0.0 1612411506789
+            jobs_distribution_bucket{type="a",le="10"} 1.0 1612411506789
+            jobs_distribution_bucket{type="a",le="+Inf"} 1.0 1612411506789
+            jobs_distribution_sum{type="a"} 8.0 1612411506789
+            jobs_distribution_count{type="a"} 1.0 1612411506789
+            # TYPE jobs_summary summary
+            # HELP jobs_summary Summary of jobs
+            jobs_summary_sum{type="a"} 8.0 1612411506789
+            jobs_summary_count{type="a"} 1.0 1612411506789
+            "##;
+
+        assert_event_data_eq!(
+            events_to_metrics(parse_text_with_overrides(exp, vec![], false)),
+            Ok(vec![
+                Metric::new(
+                    "jobs_total",
+                    MetricKind::Absolute,
+                    MetricValue::Counter { value: 1.0 },
+                )
+                    .with_tags(Some(metric_tags! { "type" => "a" }))
+                    .with_timestamp(Some(*TIMESTAMP)),
+                Metric::new(
+                    "jobs_current",
+                    MetricKind::Absolute,
+                    MetricValue::Gauge { value: 5.0 },
+                )
+                    .with_tags(Some(metric_tags! { "type" => "a" }))
+                    .with_timestamp(Some(*TIMESTAMP)),
+                Metric::new(
+                    "jobs_distribution",
+                    MetricKind::Absolute,
+                    MetricValue::AggregatedHistogram {
+                        buckets: vector_core::buckets![
+                            1.0 => 0, 2.5 => 0, 5.0 => 0, 10.0 => 1
+                        ],
+                        count: 1,
+                        sum: 8.0,
+                    },
+                )
+                    .with_tags(Some(metric_tags! { "type" => "a" }))
+                    .with_timestamp(Some(*TIMESTAMP)),
+                Metric::new(
+                    "jobs_summary",
+                    MetricKind::Absolute,
+                    MetricValue::AggregatedSummary {
+                        quantiles: vector_core::quantiles![],
+                        count: 1,
+                        sum: 8.0,
+                    },
+                )
+                    .with_tags(Some(metric_tags! { "type" => "a" }))
+                    .with_timestamp(Some(*TIMESTAMP)),
+            ]),
+        );
+    }
 }
