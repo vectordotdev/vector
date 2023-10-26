@@ -9866,7 +9866,6 @@ dependencies = [
  "uuid",
  "vector-api-client",
  "vector-buffers",
- "vector-config",
  "vector-lib",
  "vector-lookup",
  "vector-stream",

@@ -29,6 +29,8 @@ pub mod configurable {
         component, configurable_component, schema, Configurable, ConfigurableString, GenerateError,
         Metadata, NamedComponent, ToValue,
     };
+    // Re-exports of other crates to avoid needing to pull them in directly as deps.
+    pub use vector_config::{indexmap, ser, serde_json};
     pub use vector_config_common::{attributes, validation};
     pub use vector_config_macros::*;
 }
