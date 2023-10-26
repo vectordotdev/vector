@@ -609,41 +609,44 @@ fn series_to_proto_message(
 
     let timestamp = encode_timestamp(metric.timestamp());
 
-    // our internal representation is in milliseconds but the output is in seconds
-    let interval = metric.interval_ms().map(|i| i.get() / 1000).unwrap_or(0) as i64;
+    // our internal representation is in milliseconds but the expected output is in seconds
+    let maybe_interval = metric.interval_ms().map(|i| i.get() / 1000);
 
     let (points, metric_type) = match metric.value() {
         MetricValue::Counter { value } => {
-            let (value, metric_type) = if interval == 0 {
-                (*value, ddmetric_proto::metric_payload::MetricType::Count)
-            } else {
+            if let Some(interval) = maybe_interval {
                 // When an interval is defined, it implies the value should be in a per-second form,
                 // so we need to get back to seconds from our milliseconds-based interval, and then
                 // divide our value by that amount as well.
+                let value = *value / (interval as f64);
                 (
-                    *value / (interval as f64),
+                    vec![ddmetric_proto::metric_payload::MetricPoint { value, timestamp }],
                     ddmetric_proto::metric_payload::MetricType::Rate,
                 )
-            };
-            let points = vec![ddmetric_proto::metric_payload::MetricPoint { value, timestamp }];
-            (points, metric_type)
+            } else {
+                (
+                    vec![ddmetric_proto::metric_payload::MetricPoint {
+                        value: *value,
+                        timestamp,
+                    }],
+                    ddmetric_proto::metric_payload::MetricType::Count,
+                )
+            }
         }
-        MetricValue::Set { values } => {
-            let points = vec![ddmetric_proto::metric_payload::MetricPoint {
+        MetricValue::Set { values } => (
+            vec![ddmetric_proto::metric_payload::MetricPoint {
                 value: values.len() as f64,
                 timestamp,
-            }];
-            let metric_type = ddmetric_proto::metric_payload::MetricType::Gauge;
-            (points, metric_type)
-        }
-        MetricValue::Gauge { value } => {
-            let points = vec![ddmetric_proto::metric_payload::MetricPoint {
+            }],
+            ddmetric_proto::metric_payload::MetricType::Gauge,
+        ),
+        MetricValue::Gauge { value } => (
+            vec![ddmetric_proto::metric_payload::MetricPoint {
                 value: *value,
                 timestamp,
-            }];
-            let metric_type = ddmetric_proto::metric_payload::MetricType::Gauge;
-            (points, metric_type)
-        }
+            }],
+            ddmetric_proto::metric_payload::MetricType::Gauge,
+        ),
         // NOTE: AggregatedSummary will have been previously split into counters and gauges during normalization
         value => {
             // this case should have already been surfaced by encode_single_metric() so this should never be reached
@@ -663,7 +666,7 @@ fn series_to_proto_message(
         // unit is omitted
         unit: "".to_string(),
         source_type_name,
-        interval,
+        interval: maybe_interval.unwrap_or(0) as i64,
         metadata,
     })
 }
@@ -823,8 +826,8 @@ fn generate_series_metrics(
     let ts = encode_timestamp(metric.timestamp());
     let tags = Some(encode_tags(&tags));
 
-    // our internal representation is in milliseconds but the output is in seconds
-    let interval = metric.interval_ms().map(|i| i.get() / 1000);
+    // our internal representation is in milliseconds but the expected output is in seconds
+    let maybe_interval = metric.interval_ms().map(|i| i.get() / 1000);
 
     let event_metadata = metric.metadata();
     let metadata = generate_series_metadata(
@@ -835,51 +838,23 @@ fn generate_series_metrics(
 
     trace!(?metadata, "Generated series metadata.");
 
-    let results = match metric.value() {
+    let (points, metric_type) = match metric.value() {
         MetricValue::Counter { value } => {
-            let (value, metric_type) = if let Some(i) = interval {
+            if let Some(interval) = maybe_interval {
                 // When an interval is defined, it implies the value should be in a per-second form,
                 // so we need to get back to seconds from our milliseconds-based interval, and then
                 // divide our value by that amount as well.
-                (*value / (i as f64), DatadogMetricType::Rate)
+                let value = *value / (interval as f64);
+                (vec![DatadogPoint(ts, value)], DatadogMetricType::Rate)
             } else {
-                (*value, DatadogMetricType::Count)
-            };
-
-            vec![DatadogSeriesMetric {
-                metric: name,
-                r#type: metric_type,
-                interval,
-                points: vec![DatadogPoint(ts, value)],
-                tags,
-                host,
-                source_type_name,
-                device,
-                metadata,
-            }]
+                (vec![DatadogPoint(ts, *value)], DatadogMetricType::Count)
+            }
         }
-        MetricValue::Set { values } => vec![DatadogSeriesMetric {
-            metric: name,
-            r#type: DatadogMetricType::Gauge,
-            interval,
-            points: vec![DatadogPoint(ts, values.len() as f64)],
-            tags,
-            host,
-            source_type_name,
-            device,
-            metadata,
-        }],
-        MetricValue::Gauge { value } => vec![DatadogSeriesMetric {
-            metric: name,
-            r#type: DatadogMetricType::Gauge,
-            interval,
-            points: vec![DatadogPoint(ts, *value)],
-            tags,
-            host,
-            source_type_name,
-            device,
-            metadata,
-        }],
+        MetricValue::Set { values } => (
+            vec![DatadogPoint(ts, values.len() as f64)],
+            DatadogMetricType::Gauge,
+        ),
+        MetricValue::Gauge { value } => (vec![DatadogPoint(ts, *value)], DatadogMetricType::Gauge),
         // NOTE: AggregatedSummary will have been previously split into counters and gauges during normalization
         value => {
             return Err(EncoderError::InvalidMetric {
@@ -889,7 +864,17 @@ fn generate_series_metrics(
         }
     };
 
-    Ok(results)
+    Ok(vec![DatadogSeriesMetric {
+        metric: name,
+        r#type: metric_type,
+        interval: maybe_interval,
+        points,
+        tags,
+        host,
+        source_type_name,
+        device,
+        metadata,
+    }])
 }
 
 fn get_compressor() -> Compressor {
