@@ -53,7 +53,7 @@ namespace: vector
 
 bases:
   # Include Vector recommended base (from git).
-  - github.com/vectordotdev/vector/distribution/kubernetes/vector-agent
+  - github.com/vectordotdev/vector/tree/master/distribution/kubernetes/vector-agent
 
 images:
   # Override the Vector image to pin the version used.
@@ -112,7 +112,7 @@ namespace: vector
 
 bases:
   # Include Vector recommended base (from git).
-  - github.com/vectordotdev/vector/distribution/kubernetes/vector-aggregator
+  - github.com/vectordotdev/vector/tree/master/distribution/kubernetes/vector-aggregator
 
 images:
   # Override the Vector image to pin the version used.
