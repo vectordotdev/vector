@@ -15,13 +15,16 @@ use crate::common::datadog::DD_US_SITE;
 #[serde(default, deny_unknown_fields)]
 pub struct Options {
     /// Default Datadog API key to use for Datadog components.
-    #[serde(default = "default_api_key")]
+    ///
+    /// This can also be specified with the `DD_API_KEY` environment variable.
     #[derivative(Default(value = "default_api_key()"))]
     #[configurable(metadata(docs::examples = "${DATADOG_API_KEY_ENV_VAR}"))]
     #[configurable(metadata(docs::examples = "ef8d5de700e7989468166c40fc8a0ccd"))]
     pub api_key: Option<SensitiveString>,
 
-    /// Default site to use for DataDog components.
+    /// Default site to use for Datadog components.
+    ///
+    /// This can also be specified with the `DD_SITE` environment variable.
     #[serde(default = "default_site")]
     #[derivative(Default(value = "default_site()"))]
     #[configurable(metadata(docs::examples = "us3.datadoghq.com"))]

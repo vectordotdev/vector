@@ -45,7 +45,10 @@ pub struct DatadogCommonConfig {
 
     /// The Datadog [site][dd_site] to send observability data to.
     ///
+    /// If not set here, the value is taken from the [global options][global_options].
+    ///
     /// [dd_site]: https://docs.datadoghq.com/getting_started/site
+    /// [global_options]: /docs/reference/configuration/global-options/#datadog
     #[configurable(metadata(docs::examples = "us3.datadoghq.com"))]
     #[configurable(metadata(docs::examples = "datadoghq.eu"))]
     site: Option<String>,
@@ -55,7 +58,10 @@ pub struct DatadogCommonConfig {
     /// If an event has a Datadog [API key][api_key] set explicitly in its metadata, it takes
     /// precedence over this setting.
     ///
+    /// If not set here, the value is taken from the [global options][global_options].
+    ///
     /// [api_key]: https://docs.datadoghq.com/api/?lang=bash#authentication
+    /// [global_options]: /docs/reference/configuration/global-options/#datadog
     #[configurable(metadata(docs::examples = "${DATADOG_API_KEY_ENV_VAR}"))]
     #[configurable(metadata(docs::examples = "ef8d5de700e7989468166c40fc8a0ccd"))]
     default_api_key: Option<SensitiveString>,
