@@ -8,7 +8,7 @@ publish = false
 [dependencies]
 async-stream = { version = "0.3.5", default-features = false }
 futures = { version = "0.3.28", default-features = false, features = ["std"] }
-futures-util = { version = "0.3.28", default-features = false, features = ["std"] }
+futures-util = { version = "0.3.29", default-features = false, features = ["std"] }
 pin-project.workspace = true
 tokio = { version = "1.33.0", default-features = false, features = ["net"] }
 tokio-util = { version = "0.7.0", default-features = false, features = ["time"] }
