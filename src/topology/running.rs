@@ -845,8 +845,6 @@ impl RunningTopology {
             component_kind = "sink",
             component_id = %task.id(),
             component_type = %task.typetag(),
-            // maintained for compatibility
-            component_name = %task.id(),
         );
 
         let task_span = span.or_current();
@@ -888,8 +886,6 @@ impl RunningTopology {
             component_kind = "transform",
             component_id = %task.id(),
             component_type = %task.typetag(),
-            // maintained for compatibility
-            component_name = %task.id(),
         );
 
         let task_span = span.or_current();
@@ -931,8 +927,6 @@ impl RunningTopology {
             component_kind = "source",
             component_id = %task.id(),
             component_type = %task.typetag(),
-            // maintained for compatibility
-            component_name = %task.id(),
         );
 
         let task_span = span.or_current();
