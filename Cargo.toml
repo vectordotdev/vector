@@ -109,6 +109,7 @@ members = [
   "lib/vector-config-common",
   "lib/vector-config-macros",
   "lib/vector-core",
+  "lib/vector-lib",
   "lib/vector-lookup",
   "lib/vector-stream",
   "lib/vector-vrl/cli",
@@ -140,11 +141,10 @@ opentelemetry-proto = { path = "lib/opentelemetry-proto", optional = true }
 tracing-limit = { path = "lib/tracing-limit" }
 vector-api-client = { path = "lib/vector-api-client", optional = true }
 vector-buffers = { path = "lib/vector-buffers", default-features = false }
-vector-common = { path = "lib/vector-common" }
 vector-config = { path = "lib/vector-config" }
 vector-config-common = { path = "lib/vector-config-common" }
 vector-config-macros = { path = "lib/vector-config-macros" }
-vector-core = { path = "lib/vector-core", default-features = false, features = ["vrl"] }
+vector-lib = { path = "lib/vector-lib", default-features = false, features = ["vrl"] }
 vector-stream = { path = "lib/vector-stream" }
 vector-vrl-functions = { path = "lib/vector-vrl/functions" }
 loki-logproto = { path = "lib/loki-logproto", optional = true }
@@ -317,7 +317,7 @@ seahash = { version = "4.1.0", default-features = false }
 semver = { version = "1.0.20", default-features = false, features = ["serde", "std"], optional = true }
 smallvec = { version = "1", default-features = false, features = ["union", "serde"] }
 snafu = { version = "0.7.5", default-features = false, features = ["futures"] }
-snap = { version = "1.1.0", default-features = false, optional = true }
+snap = { version = "1.1.0", default-features = false }
 socket2 = { version = "0.5.5", default-features = false }
 stream-cancel = { version = "0.8.1", default-features = false }
 strip-ansi-escapes = { version = "0.2.0", default-features = false }
@@ -377,7 +377,7 @@ test-generator = "0.3.1"
 tokio = { version = "1.33.0", features = ["test-util"] }
 tokio-test = "0.4.3"
 tower-test = "0.4.0"
-vector-core = { path = "lib/vector-core", default-features = false, features = ["vrl", "test"] }
+vector-lib = { path = "lib/vector-lib", default-features = false, features = ["vrl", "test"] }
 vrl = { version = "0.7.0", features = ["cli", "test", "test_framework", "arbitrary"] }
 
 wiremock = "0.5.19"
@@ -438,7 +438,7 @@ api = [
   "dep:async-graphql",
   "dep:async-graphql-warp",
   "dep:base64",
-  "vector-core/api",
+  "vector-lib/api",
 ]
 
 # API client
@@ -447,7 +447,7 @@ api-client = [
   "dep:num-format",
   "dep:number_prefix",
   "dep:ratatui",
-  "vector-core/api",
+  "vector-lib/api",
   "dep:vector-api-client",
 ]
 
@@ -561,9 +561,9 @@ sources-splunk_hec = ["dep:roaring"]
 sources-statsd = ["sources-utils-net", "tokio-util/net"]
 sources-stdin = ["tokio-util/io"]
 sources-syslog = ["codecs-syslog", "sources-utils-net", "tokio-util/net"]
-sources-utils-http = ["dep:snap", "sources-utils-http-auth", "sources-utils-http-encoding", "sources-utils-http-error", "sources-utils-http-prelude"]
+sources-utils-http = ["sources-utils-http-auth", "sources-utils-http-encoding", "sources-utils-http-error", "sources-utils-http-prelude"]
 sources-utils-http-auth = ["sources-utils-http-error"]
-sources-utils-http-encoding = ["dep:snap", "sources-utils-http-error"]
+sources-utils-http-encoding = ["sources-utils-http-error"]
 sources-utils-http-error = []
 sources-utils-http-prelude = ["sources-utils-http", "sources-utils-http-auth", "sources-utils-http-encoding", "sources-utils-http-error"]
 sources-utils-http-query = []
@@ -608,7 +608,7 @@ transforms-aws_ec2_metadata = ["dep:arc-swap"]
 transforms-dedupe = ["dep:lru"]
 transforms-filter = []
 transforms-log_to_metric = []
-transforms-lua = ["dep:mlua", "vector-core/lua"]
+transforms-lua = ["dep:mlua", "vector-lib/lua"]
 transforms-metric_to_log = []
 transforms-pipelines = ["transforms-filter", "transforms-route"]
 transforms-reduce = []
@@ -716,7 +716,7 @@ sinks-nats = ["dep:async-nats", "dep:nkeys"]
 sinks-new_relic_logs = ["sinks-http"]
 sinks-new_relic = []
 sinks-papertrail = ["dep:syslog"]
-sinks-prometheus = ["dep:base64", "dep:prometheus-parser", "dep:snap"]
+sinks-prometheus = ["dep:base64", "dep:prometheus-parser"]
 sinks-pulsar = ["dep:apache-avro", "dep:pulsar", "dep:lru"]
 sinks-redis = ["dep:redis"]
 sinks-sematext = ["sinks-elasticsearch", "sinks-influxdb"]

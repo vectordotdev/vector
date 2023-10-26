@@ -9,8 +9,8 @@ use bytes::{BufMut, Bytes};
 use chrono::{DateTime, Utc};
 use once_cell::sync::Lazy;
 use snafu::{ResultExt, Snafu};
-use vector_common::request_metadata::GroupedCountByteSize;
-use vector_core::{
+use vector_lib::request_metadata::GroupedCountByteSize;
+use vector_lib::{
     config::{log_schema, telemetry, LogSchema},
     event::{metric::MetricSketch, DatadogMetricOriginMetadata, Metric, MetricTags, MetricValue},
     metrics::AgentDDSketch,
@@ -1014,7 +1014,7 @@ mod tests {
         proptest, strategy::Strategy, string::string_regex,
     };
     use prost::Message;
-    use vector_core::{
+    use vector_lib::{
         config::{log_schema, LogSchema},
         event::{
             metric::{MetricSketch, TagValue},

@@ -8,7 +8,7 @@ use vector_config::{
 };
 use vector_config_common::attributes::CustomAttribute;
 use vector_config_common::schema::{SchemaGenerator, SchemaObject};
-use vector_core::{
+use vector_lib::{
     config::{
         AcknowledgementsConfig, GlobalOptions, LogNamespace, SourceAcknowledgementsConfig,
         SourceOutput,
@@ -53,7 +53,7 @@ pub struct SourceOuter {
     #[configurable(derived)]
     #[serde(
         default,
-        skip_serializing_if = "vector_core::serde::skip_serializing_if_default"
+        skip_serializing_if = "vector_lib::serde::skip_serializing_if_default"
     )]
     pub proxy: ProxyConfig,
 

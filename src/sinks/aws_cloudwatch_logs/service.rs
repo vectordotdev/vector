@@ -22,7 +22,7 @@ use tower::{
     timeout::Timeout,
     Service, ServiceBuilder, ServiceExt,
 };
-use vector_common::{
+use vector_lib::{
     finalization::EventStatus,
     request_metadata::{GroupedCountByteSize, MetaDescriptive},
 };

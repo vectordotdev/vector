@@ -7,7 +7,7 @@ use std::{
 use async_stream::stream;
 use futures::{Stream, StreamExt};
 use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
+use vector_lib::config::LogNamespace;
 
 use crate::{
     config::{DataType, Input, OutputId, TransformConfig, TransformContext, TransformOutput},
@@ -155,7 +155,7 @@ mod tests {
     use futures::stream;
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
-    use vector_common::config::ComponentKey;
+    use vector_lib::config::ComponentKey;
     use vrl::value::Kind;
 
     use super::*;

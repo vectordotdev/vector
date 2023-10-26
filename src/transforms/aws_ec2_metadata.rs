@@ -15,7 +15,7 @@ use snafu::ResultExt as _;
 use tokio::time::{sleep, Duration, Instant};
 use tracing::Instrument;
 use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
+use vector_lib::config::LogNamespace;
 use vrl::value::kind::Collection;
 use vrl::value::Kind;
 
@@ -761,7 +761,7 @@ mod integration_tests {
         transforms::test::create_topology,
     };
     use std::collections::BTreeMap;
-    use vector_common::assert_event_data_eq;
+    use vector_lib::assert_event_data_eq;
     use vrl::value::Value;
     use warp::Filter;
 

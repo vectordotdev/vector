@@ -15,7 +15,7 @@ use http::StatusCode;
 use serde::Deserialize;
 use serde_json::Value;
 use tokio::time::{timeout, Duration};
-use vector_core::event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event, LogEvent};
+use vector_lib::event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event, LogEvent};
 use warp::Filter;
 
 use super::*;

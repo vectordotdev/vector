@@ -8,8 +8,8 @@ use std::{
 use bytes::Bytes;
 use prost::Message;
 use snafu::Snafu;
-use vector_common::request_metadata::RequestMetadata;
-use vector_core::event::{EventFinalizers, Finalizable};
+use vector_lib::event::{EventFinalizers, Finalizable};
+use vector_lib::request_metadata::RequestMetadata;
 use vrl::event_path;
 
 use super::{

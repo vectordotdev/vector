@@ -4,7 +4,7 @@ use futures::{stream, Sink, Stream};
 use futures_util::{future, stream::BoxStream, FutureExt, StreamExt};
 use tokio::sync::{oneshot, Mutex};
 use vector_config::configurable_component;
-use vector_core::{
+use vector_lib::{
     config::{DataType, Input, LogNamespace},
     event::Event,
     schema,

@@ -3,7 +3,7 @@ use std::{collections::HashMap, convert::TryFrom, num::NonZeroU32, time::SystemT
 use chrono::{DateTime, Utc};
 use futures::{future::ready, stream};
 use serde::Deserialize;
-use vector_core::config::{init_telemetry, Tags, Telemetry};
+use vector_lib::config::{init_telemetry, Tags, Telemetry};
 
 use super::*;
 use crate::{

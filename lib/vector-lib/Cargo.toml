@@ -1,0 +1,16 @@
+[package]
+name = "vector-lib"
+version = "0.1.0"
+authors = ["Vector Contributors <vector@datadoghq.com>"]
+edition = "2021"
+publish = false
+
+[dependencies]
+vector-common = { path = "../vector-common", default-features = false }
+vector-core = { path = "../vector-core", default-features = false }
+
+[features]
+api = ["vector-core/api"]
+lua = ["vector-core/lua"]
+test = ["vector-core/test"]
+vrl = ["vector-core/vrl"]

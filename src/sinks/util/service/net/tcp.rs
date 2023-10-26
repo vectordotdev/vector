@@ -4,7 +4,7 @@ use snafu::ResultExt;
 use tokio::net::TcpStream;
 
 use vector_config::configurable_component;
-use vector_core::{
+use vector_lib::{
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsSettings, MaybeTlsStream, TlsEnableableConfig},
 };

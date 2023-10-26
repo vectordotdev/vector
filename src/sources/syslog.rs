@@ -14,7 +14,7 @@ use lookup::{lookup_v2::OptionalValuePath, path, OwnedValuePath};
 use smallvec::SmallVec;
 use tokio_util::udp::UdpFramed;
 use vector_config::configurable_component;
-use vector_core::config::{LegacyKey, LogNamespace};
+use vector_lib::config::{LegacyKey, LogNamespace};
 use vrl::event_path;
 
 #[cfg(unix)]
@@ -448,8 +448,8 @@ mod test {
     use serde::Deserialize;
     use tokio::time::{sleep, Duration, Instant};
     use tokio_util::codec::BytesCodec;
-    use vector_common::assert_event_data_eq;
-    use vector_core::{config::ComponentKey, schema::Definition};
+    use vector_lib::assert_event_data_eq;
+    use vector_lib::{config::ComponentKey, schema::Definition};
     use vrl::value::{kind::Collection, Kind, Value};
 
     use super::*;

@@ -7,7 +7,7 @@ use crate::schema;
 use crate::transforms::tag_cardinality_limit::TagCardinalityLimit;
 use crate::transforms::Transform;
 use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
+use vector_lib::config::LogNamespace;
 
 /// Configuration for the `tag_cardinality_limit` transform.
 #[configurable_component(transform(

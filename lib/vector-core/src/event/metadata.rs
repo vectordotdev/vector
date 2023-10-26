@@ -3,7 +3,7 @@
 use std::{borrow::Cow, collections::BTreeMap, fmt, sync::Arc};
 
 use serde::{Deserialize, Serialize};
-use vector_common::{config::ComponentKey, EventDataEq};
+use vector_common::{byte_size_of::ByteSizeOf, config::ComponentKey, EventDataEq};
 use vrl::{
     compiler::SecretTarget,
     value::{Kind, Value},
@@ -12,7 +12,7 @@ use vrl::{
 use super::{BatchNotifier, EventFinalizer, EventFinalizers, EventStatus};
 use crate::{
     config::{LogNamespace, OutputId},
-    schema, ByteSizeOf,
+    schema,
 };
 
 const DATADOG_API_KEY: &str = "datadog_api_key";

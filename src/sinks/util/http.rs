@@ -20,7 +20,7 @@ use snafu::{ResultExt, Snafu};
 use tower::{Service, ServiceBuilder};
 use tower_http::decompression::DecompressionLayer;
 use vector_config::configurable_component;
-use vector_core::{ByteSizeOf, EstimatedJsonEncodedSizeOf};
+use vector_lib::{ByteSizeOf, EstimatedJsonEncodedSizeOf};
 use vector_stream::batcher::limiter::ItemBatchSize;
 
 use super::{
@@ -653,8 +653,8 @@ impl ByteSizeOf for HttpRequest {
 /// Response type for use in the `Service` implementation of HTTP stream sinks.
 pub struct HttpResponse {
     pub http_response: Response<Bytes>,
-    events_byte_size: GroupedCountByteSize,
-    raw_byte_size: usize,
+    pub events_byte_size: GroupedCountByteSize,
+    pub raw_byte_size: usize,
 }
 
 impl DriverResponse for HttpResponse {

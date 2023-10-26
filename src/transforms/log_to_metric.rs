@@ -4,7 +4,7 @@ use std::{collections::HashMap, num::ParseFloatError};
 use chrono::Utc;
 use indexmap::IndexMap;
 use vector_config::configurable_component;
-use vector_core::{config::LogNamespace, event::DatadogMetricOriginMetadata};
+use vector_lib::{config::LogNamespace, event::DatadogMetricOriginMetadata};
 use vrl::path::parse_target_path;
 
 use crate::config::schema::Definition;
@@ -324,7 +324,7 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
             (
                 MetricKind::Incremental,
                 MetricValue::Distribution {
-                    samples: vector_core::samples![value => 1],
+                    samples: vector_lib::samples![value => 1],
                     statistic: StatisticKind::Histogram,
                 },
             )
@@ -340,7 +340,7 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
             (
                 MetricKind::Incremental,
                 MetricValue::Distribution {
-                    samples: vector_core::samples![value => 1],
+                    samples: vector_lib::samples![value => 1],
                     statistic: StatisticKind::Summary,
                 },
             )
@@ -436,8 +436,8 @@ mod tests {
     use std::time::Duration;
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
-    use vector_common::config::ComponentKey;
-    use vector_core::metric_tags;
+    use vector_lib::config::ComponentKey;
+    use vector_lib::metric_tags;
 
     #[test]
     fn generate_config() {
@@ -1084,7 +1084,7 @@ mod tests {
                 "response_time",
                 MetricKind::Incremental,
                 MetricValue::Distribution {
-                    samples: vector_core::samples![2.5 => 1],
+                    samples: vector_lib::samples![2.5 => 1],
                     statistic: StatisticKind::Histogram
                 },
                 metadata
@@ -1127,7 +1127,7 @@ mod tests {
                 "response_time",
                 MetricKind::Incremental,
                 MetricValue::Distribution {
-                    samples: vector_core::samples![2.5 => 1],
+                    samples: vector_lib::samples![2.5 => 1],
                     statistic: StatisticKind::Summary
                 },
                 metadata

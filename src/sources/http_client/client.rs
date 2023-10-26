@@ -33,7 +33,7 @@ use codecs::{
     StreamDecodingError,
 };
 use vector_config::configurable_component;
-use vector_core::{
+use vector_lib::{
     config::{log_schema, LogNamespace, SourceOutput},
     event::Event,
 };

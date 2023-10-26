@@ -13,7 +13,7 @@ use codecs::{
 use flate2::read::GzDecoder;
 use futures::{stream, Stream, StreamExt};
 use http::StatusCode;
-use vector_core::ByteSizeOf;
+use vector_lib::ByteSizeOf;
 
 use super::config::AzureBlobSinkConfig;
 use crate::{

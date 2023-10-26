@@ -21,7 +21,7 @@ use flate2::read::MultiGzDecoder;
 use futures::{stream, Stream};
 use similar_asserts::assert_eq;
 use tokio_stream::StreamExt;
-use vector_core::{
+use vector_lib::{
     config::proxy::ProxyConfig,
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event, EventArray, LogEvent},
 };

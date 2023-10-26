@@ -9,10 +9,10 @@ use opentelemetry_proto::proto::collector::logs::v1::{
 use prost::Message;
 use snafu::Snafu;
 use tracing::Span;
-use vector_common::internal_event::{
+use vector_lib::internal_event::{
     ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Registered,
 };
-use vector_core::{
+use vector_lib::{
     config::LogNamespace,
     event::{BatchNotifier, BatchStatus},
     EstimatedJsonEncodedSizeOf,

@@ -13,7 +13,7 @@ use futures::{stream, SinkExt, Stream, StreamExt};
 use futures_util::Future;
 use once_cell::sync::Lazy;
 use tokio::{pin, select, time::sleep};
-use vector_core::event_test_util;
+use vector_lib::event_test_util;
 
 use crate::{
     config::{SourceConfig, SourceContext},

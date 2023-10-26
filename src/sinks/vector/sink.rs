@@ -4,9 +4,9 @@ use async_trait::async_trait;
 use futures::{stream::BoxStream, StreamExt};
 use prost::Message;
 use tower::Service;
-use vector_common::request_metadata::GroupedCountByteSize;
-use vector_core::{config::telemetry, ByteSizeOf, EstimatedJsonEncodedSizeOf};
-use vector_stream::{BatcherSettings, DriverResponse};
+use vector_lib::request_metadata::GroupedCountByteSize;
+use vector_lib::{config::telemetry, ByteSizeOf, EstimatedJsonEncodedSizeOf};
+use vector_stream::{batcher::data::BatchReduce, BatcherSettings, DriverResponse};
 
 use super::service::VectorRequest;
 use crate::{
@@ -68,14 +68,14 @@ where
                     wrapper: EventWrapper::from(event),
                 }
             })
-            .batched(self.batch_settings.into_reducer_config(
+            .batched(self.batch_settings.as_reducer_config(
                 |data: &EventData| data.wrapper.encoded_len(),
-                |event_collection: &mut EventCollection, item: EventData| {
+                BatchReduce::new(|event_collection: &mut EventCollection, item: EventData| {
                     event_collection.finalizers.merge(item.finalizers);
                     event_collection.events.push(item.wrapper);
                     event_collection.events_byte_size += item.byte_size;
                     event_collection.events_json_byte_size += item.json_byte_size;
-                },
+                }),
             ))
             .map(|event_collection| {
                 let builder = RequestMetadataBuilder::new(
