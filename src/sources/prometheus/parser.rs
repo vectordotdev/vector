@@ -1090,4 +1090,48 @@ mod test {
             .with_timestamp(Some(*TIMESTAMP))]),
         );
     }
+
+    #[test]
+    fn test_overrides_label_overwritten() {
+        let exp = r##"
+            # TYPE jobs_total counter
+            # HELP jobs_total Total number of jobs
+            jobs_total{type="a"} 1.0 1612411506789
+            "##;
+
+        assert_event_data_eq!(
+            events_to_metrics(parse_text_with_overrides(exp, vec![("type".to_owned(), "b".to_owned())], false)),
+            Ok(vec![Metric::new(
+                "jobs_total",
+                MetricKind::Absolute,
+                MetricValue::Counter { value: 1.0 },
+            )
+            .with_tags(Some(metric_tags! { "type" => "b" }))
+            .with_timestamp(Some(*TIMESTAMP))]),
+        );
+    }
+
+    // This matches the behaviour of the real Prometheus Pushgateway, which I
+    // tested manually.
+    #[test]
+    fn test_overrides_last_value_preferred() {
+        let exp = r##"
+            # TYPE jobs_total counter
+            # HELP jobs_total Total number of jobs
+            jobs_total{type="a"} 1.0 1612411506789
+            "##;
+
+        assert_event_data_eq!(
+            events_to_metrics(parse_text_with_overrides(
+                exp, vec![("type".to_owned(), "b".to_owned()), ("type".to_owned(), "c".to_owned())], false)
+            ),
+            Ok(vec![Metric::new(
+                "jobs_total",
+                MetricKind::Absolute,
+                MetricValue::Counter { value: 1.0 },
+            )
+            .with_tags(Some(metric_tags! { "type" => "c" }))
+            .with_timestamp(Some(*TIMESTAMP))]),
+        );
+    }
 }
