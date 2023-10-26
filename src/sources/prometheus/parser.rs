@@ -193,17 +193,8 @@ mod test {
             .expect("invalid timestamp")
     });
 
-    fn parse_text(text: &str) -> Result<Vec<Metric>, ParserError> {
-        super::parse_text(text).map(|events| events.into_iter().map(Event::into_metric).collect())
-    }
-
-    fn parse_text_with_overrides(
-        text: &str,
-        tag_overrides: impl IntoIterator<Item = (String, String)> + Clone,
-        aggregate_metrics: bool,
-    ) -> Result<Vec<Metric>, ParserError> {
-        super::parse_text_with_overrides(text, tag_overrides, aggregate_metrics)
-            .map(|events| events.into_iter().map(Event::into_metric).collect())
+    fn events_to_metrics(events: Result<Vec<Event>, ParserError>) -> Result<Vec<Metric>, ParserError> {
+        events.map(|events| events.into_iter().map(Event::into_metric).collect())
     }
 
     #[test]
@@ -214,7 +205,7 @@ mod test {
             # TYPE count counter
             http_requests_total 1027
             "##;
-        let result = parse_text(exp).unwrap();
+        let result = events_to_metrics(parse_text(exp)).unwrap();
         assert_eq!(result.len(), 1);
         assert!(result[0].timestamp().unwrap() >= now);
     }
@@ -228,7 +219,7 @@ mod test {
             "##;
 
         assert_event_data_eq!(
-            parse_text(exp),
+            events_to_metrics(parse_text(exp)),
             Ok(vec![Metric::new(
                 "uptime",
                 MetricKind::Absolute,
@@ -245,7 +236,7 @@ mod test {
             # TYPE hidden counter
             "##;
 
-        assert_event_data_eq!(parse_text(exp), Ok(vec![]));
+        assert_event_data_eq!(events_to_metrics(parse_text(exp)), Ok(vec![]));
     }
 
     #[test]
@@ -255,7 +246,7 @@ mod test {
             name{labelname="val1",basename="basevalue"} NaN
             "#;
 
-        match parse_text(exp).unwrap()[0].value() {
+        match events_to_metrics(parse_text(exp)).unwrap()[0].value() {
             MetricValue::Counter { value } => {
                 assert!(value.is_nan());
             }
@@ -278,7 +269,7 @@ mod test {
             "#;
 
         assert_event_data_eq!(
-            parse_text(exp),
+            events_to_metrics(parse_text(exp)),
             Ok(vec![
                 Metric::new(
                     "name",
@@ -325,7 +316,7 @@ mod test {
             "#;
 
         assert_event_data_eq!(
-            parse_text(exp),
+            events_to_metrics(parse_text(exp)),
             Ok(vec![
                 Metric::new(
                     "http_requests_total",
@@ -360,7 +351,7 @@ mod test {
             "##;
 
         assert_event_data_eq!(
-            parse_text(exp),
+            events_to_metrics(parse_text(exp)),
             Ok(vec![Metric::new(
                 "latency",
                 MetricKind::Absolute,
@@ -377,7 +368,7 @@ mod test {
             "##;
 
         assert_event_data_eq!(
-            parse_text(exp),
+            events_to_metrics(parse_text(exp)),
             Ok(vec![Metric::new(
                 "metric_without_timestamp_and_labels",
                 MetricKind::Absolute,
@@ -394,7 +385,7 @@ mod test {
             "##;
 
         assert_event_data_eq!(
-            parse_text(exp),
+            events_to_metrics(parse_text(exp)),
             Ok(vec![Metric::new(
                 "no_labels",
                 MetricKind::Absolute,
@@ -411,7 +402,7 @@ mod test {
             "#;
 
         assert_event_data_eq!(
-            parse_text(exp),
+            events_to_metrics(parse_text(exp)),
             Ok(vec![Metric::new(
                 "msdos_file_access_time_seconds",
                 MetricKind::Absolute,
@@ -435,7 +426,7 @@ mod test {
             name{tag="}"} 0 1612411506789
             "#;
         assert_event_data_eq!(
-            parse_text(exp),
+            events_to_metrics(parse_text(exp)),
             Ok(vec![Metric::new(
                 "name",
                 MetricKind::Absolute,
@@ -454,7 +445,7 @@ mod test {
             name{tag="a,b"} 0 1612411506789
             "#;
         assert_event_data_eq!(
-            parse_text(exp),
+            events_to_metrics(parse_text(exp)),
             Ok(vec![Metric::new(
                 "name",
                 MetricKind::Absolute,
@@ -473,7 +464,7 @@ mod test {
             name{tag="\\n"} 0 1612411506789
             "#;
         assert_event_data_eq!(
-            parse_text(exp),
+            events_to_metrics(parse_text(exp)),
             Ok(vec![Metric::new(
                 "name",
                 MetricKind::Absolute,
@@ -492,7 +483,7 @@ mod test {
             name{tag=" * "} 0 1612411506789
             "#;
         assert_event_data_eq!(
-            parse_text(exp),
+            events_to_metrics(parse_text(exp)),
             Ok(vec![Metric::new(
                 "name",
                 MetricKind::Absolute,
@@ -510,7 +501,7 @@ mod test {
             "#;
 
         assert_event_data_eq!(
-            parse_text(exp),
+            events_to_metrics(parse_text(exp)),
             Ok(vec![Metric::new(
                 "telemetry_scrape_size_bytes_count",
                 MetricKind::Absolute,
@@ -528,7 +519,7 @@ mod test {
             telemetry_scrape_size_bytes_count{registry="default",content_type} 1890 1612411506789
             "#;
 
-        assert!(parse_text(exp).is_err());
+        assert!(events_to_metrics(parse_text(exp)).is_err());
     }
 
     #[test]
@@ -537,7 +528,7 @@ mod test {
             telemetry_scrape_size_bytes_count{registry="default",content_type=} 1890 1612411506789
             "#;
 
-        assert!(parse_text(exp).is_err());
+        assert!(events_to_metrics(parse_text(exp)).is_err());
     }
 
     #[test]
@@ -547,7 +538,7 @@ mod test {
             "#;
 
         assert_event_data_eq!(
-            parse_text(exp),
+            events_to_metrics(parse_text(exp)),
             Ok(vec![Metric::new(
                 "something_weird",
                 MetricKind::Absolute,
@@ -571,7 +562,7 @@ mod test {
             "#;
 
         assert_event_data_eq!(
-            parse_text(exp),
+            events_to_metrics(parse_text(exp)),
             Ok(vec![
                 Metric::new(
                     "latency",
@@ -603,7 +594,7 @@ mod test {
             "##;
 
         assert_event_data_eq!(
-            parse_text(exp),
+            events_to_metrics(parse_text(exp)),
             Ok(vec![
                 Metric::new(
                     "uptime",
@@ -634,7 +625,7 @@ mod test {
             latency{env="production"}
             "#;
 
-        assert!(parse_text(exp).is_err());
+        assert!(events_to_metrics(parse_text(exp)).is_err());
     }
 
     #[test]
@@ -644,7 +635,7 @@ mod test {
             123.0 1612411506789
             "##;
 
-        assert!(parse_text(exp).is_err());
+        assert!(events_to_metrics(parse_text(exp)).is_err());
     }
 
     #[test]
@@ -659,7 +650,7 @@ mod test {
             "##;
 
         assert_event_data_eq!(
-            parse_text(exp),
+            events_to_metrics(parse_text(exp)),
             Ok(vec![
                 Metric::new(
                     "uptime",
@@ -705,7 +696,7 @@ mod test {
             "#;
 
         assert_event_data_eq!(
-            parse_text(exp),
+            events_to_metrics(parse_text(exp)),
             Ok(vec![Metric::new(
                 "http_request_duration_seconds",
                 MetricKind::Absolute,
@@ -733,7 +724,7 @@ mod test {
             "#;
 
         assert_event_data_eq!(
-            parse_text(exp),
+            events_to_metrics(parse_text(exp)),
             Ok(vec![Metric::new(
                 "duration",
                 MetricKind::Absolute,
@@ -760,7 +751,7 @@ mod test {
             "#;
 
         assert_event_data_eq!(
-            parse_text(exp),
+            events_to_metrics(parse_text(exp)),
             Ok(vec![Metric::new(
                 "duration",
                 MetricKind::Absolute,
@@ -821,7 +812,7 @@ mod test {
         "#;
 
         assert_event_data_eq!(
-            parse_text(exp),
+            events_to_metrics(parse_text(exp)),
             Ok(vec![
                 Metric::new(
                     "gitlab_runner_job_duration_seconds", MetricKind::Absolute, MetricValue::AggregatedHistogram {
@@ -903,7 +894,7 @@ mod test {
             "#;
 
         assert_event_data_eq!(
-            parse_text(exp),
+            events_to_metrics(parse_text(exp)),
             Ok(vec![
                 Metric::new(
                     "rpc_duration_seconds",
@@ -965,7 +956,7 @@ mod test {
             "#;
 
         let now = Utc::now();
-        let result = parse_text(exp).expect("Parsing failed");
+        let result = events_to_metrics(parse_text(exp)).expect("Parsing failed");
         // Reset all the timestamps for comparison
         let result: Vec<_> = result
             .into_iter()
@@ -1089,7 +1080,7 @@ mod test {
             "##;
 
         assert_event_data_eq!(
-            parse_text_with_overrides(exp, vec![], false),
+            events_to_metrics(parse_text_with_overrides(exp, vec![], false)),
             Ok(vec![Metric::new(
                 "jobs_total",
                 MetricKind::Absolute,
