@@ -566,8 +566,9 @@ base: components: sinks: aws_cloudwatch_logs: configuration: {
 															Only one request can be outstanding at any given time.
 															"""
 						}
+						examples: ["none", "adaptive"]
 					}
-					uint: {}
+					uint: examples: [32]
 				}
 			}
 			headers: {

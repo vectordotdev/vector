@@ -243,8 +243,9 @@ base: components: sinks: new_relic: configuration: {
 															Only one request can be outstanding at any given time.
 															"""
 						}
+						examples: ["none", "adaptive"]
 					}
-					uint: {}
+					uint: examples: [32]
 				}
 			}
 			rate_limit_duration_secs: {
