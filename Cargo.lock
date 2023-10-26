@@ -10115,8 +10115,6 @@ version = "0.1.0"
 dependencies = [
  "vector-common",
  "vector-config",
- "vector-config-common",
- "vector-config-macros",
  "vector-core",
 ]
 

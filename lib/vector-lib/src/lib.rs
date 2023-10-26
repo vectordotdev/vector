@@ -4,6 +4,7 @@ pub use vector_common::{
     registered_event, request_metadata, sensitive_string, shutdown, trigger, Error, Result,
     TimeZone,
 };
+pub use vector_config as configurable;
 #[cfg(feature = "vrl")]
 pub use vector_core::compile_vrl;
 #[cfg(feature = "test")]
@@ -22,15 +23,4 @@ pub mod config {
         OutputId, SourceAcknowledgementsConfig, SourceOutput, Tags, Telemetry, TransformOutput,
         MEMORY_BUFFER_DEFAULT_MAX_EVENTS,
     };
-}
-
-pub mod configurable {
-    pub use vector_config::{
-        component, configurable_component, schema, Configurable, ConfigurableString, GenerateError,
-        Metadata, NamedComponent, ToValue,
-    };
-    // Re-exports of other crates to avoid needing to pull them in directly as deps.
-    pub use vector_config::{indexmap, ser, serde_json};
-    pub use vector_config_common::{attributes, validation};
-    pub use vector_config_macros::*;
 }
