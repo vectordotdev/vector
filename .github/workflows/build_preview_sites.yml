@@ -2,7 +2,7 @@ name: Deploy Vector Preview Sites
 
 on:
   workflow_run:
-    workflows: ["Call Preview Build"]
+    workflows: ["Call Build Preview"]
     types:
       - completed
 
