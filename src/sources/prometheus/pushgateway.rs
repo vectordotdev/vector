@@ -146,6 +146,10 @@ fn parse_path_labels(path: &str) -> Result<Vec<(String, String)>, ErrorMessage> 
         .into_iter()
         // If we get a chunk that only has 1 item, return an error
         // The path has to be made up of key-value pairs to be valid
+        //
+        // This includes the trailing slash case (where the single item
+        // is the empty string ("") to match the real Prometheus
+        // Pushgateway
         .map(|mut c| {
             c.next().zip(c.next()).ok_or_else(|| {
                 ErrorMessage::new(
