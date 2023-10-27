@@ -4,7 +4,7 @@ use hyper_openssl::HttpsConnector;
 use hyper_proxy::ProxyConnector;
 use tonic::body::BoxBody;
 use tower::ServiceBuilder;
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 
 use super::{
     service::{VectorResponse, VectorService},

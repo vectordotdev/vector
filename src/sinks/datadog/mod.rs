@@ -2,13 +2,13 @@ use futures_util::FutureExt;
 use http::{Request, StatusCode, Uri};
 use hyper::body::Body;
 use snafu::Snafu;
-use vector_config::configurable_component;
 use vector_lib::{
-    config::AcknowledgementsConfig, sensitive_string::SensitiveString, tls::TlsEnableableConfig,
+    config::AcknowledgementsConfig, configurable::configurable_component,
+    sensitive_string::SensitiveString, tls::TlsEnableableConfig,
 };
 
 use crate::{
-    common::datadog::{get_api_base_endpoint, get_base_domain_region, Region},
+    common::datadog::get_api_base_endpoint,
     config::datadog,
     http::{HttpClient, HttpError},
     sinks::HealthcheckError,
@@ -130,15 +130,9 @@ pub struct DatadogCommonConfig {
 impl DatadogCommonConfig {
     /// Returns a `Healthcheck` which is a future that will be used to ensure the
     /// `<site>/api/v1/validate` endpoint is reachable.
-    fn build_healthcheck(
-        &self,
-        client: HttpClient,
-        region: Option<&Region>,
-    ) -> crate::Result<Healthcheck> {
-        let validate_endpoint = get_api_validate_endpoint(
-            self.endpoint.as_ref(),
-            get_base_domain_region(&self.site, region),
-        )?;
+    fn build_healthcheck(&self, client: HttpClient) -> crate::Result<Healthcheck> {
+        let validate_endpoint =
+            get_api_validate_endpoint(self.endpoint.as_ref(), self.site.as_str())?;
 
         let api_key: String = self.default_api_key.clone().into();
 

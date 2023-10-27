@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex};
 use async_trait::async_trait;
 use futures_util::{stream::BoxStream, StreamExt};
 use tokio::sync::oneshot::Sender;
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 use vector_lib::{
     config::{AcknowledgementsConfig, Input},
     event::EventArray,

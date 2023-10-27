@@ -6,7 +6,7 @@ mod collector;
 pub(crate) mod exporter;
 pub(crate) mod remote_write;
 
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 
 /// Authentication strategies.
 #[configurable_component]

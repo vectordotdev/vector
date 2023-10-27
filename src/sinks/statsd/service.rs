@@ -2,11 +2,11 @@ use std::task::{Context, Poll};
 
 use futures_util::future::BoxFuture;
 use tower::Service;
+use vector_lib::stream::DriverResponse;
 use vector_lib::{
     finalization::{EventFinalizers, EventStatus, Finalizable},
     request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata},
 };
-use vector_stream::DriverResponse;
 
 /// Generalized request for sending metrics to a StatsD endpoint.
 #[derive(Clone, Debug)]

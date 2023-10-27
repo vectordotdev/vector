@@ -3,8 +3,8 @@ use std::sync::OnceLock;
 use http::Uri;
 use snafu::ResultExt;
 use tower::ServiceBuilder;
-use vector_config::configurable_component;
 use vector_lib::config::proxy::ProxyConfig;
+use vector_lib::configurable::configurable_component;
 
 use super::{
     request_builder::DatadogMetricsRequestBuilder,
@@ -12,7 +12,6 @@ use super::{
     sink::DatadogMetricsSink,
 };
 use crate::{
-    common::datadog::{get_base_domain_region, Region},
     config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext},
     http::HttpClient,
     sinks::{
@@ -144,11 +143,6 @@ pub struct DatadogMetricsConfig {
     #[serde(default)]
     pub default_namespace: Option<String>,
 
-    /// The Datadog region to send metrics to.
-    #[configurable(deprecated = "This option has been deprecated, use the `site` option instead.")]
-    #[serde(default)]
-    pub region: Option<Region>,
-
     #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<DatadogMetricsDefaultBatchSettings>,
@@ -166,7 +160,7 @@ impl SinkConfig for DatadogMetricsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let client = self.build_client(&cx.proxy)?;
         let dd_common = self.dd_common.with_globals(&cx.datadog)?;
-        let healthcheck = dd_common.build_healthcheck(client.clone(), self.region.as_ref())?;
+        let healthcheck = dd_common.build_healthcheck(client.clone())?;
         let sink = self.build_sink(&dd_common, client)?;
 
         Ok((sink, healthcheck))
@@ -196,7 +190,7 @@ impl DatadogMetricsConfig {
             format!(
                 "https://{}-vector.agent.{}",
                 version,
-                get_base_domain_region(&dd_common.site, self.region.as_ref())
+                dd_common.site.as_str()
             )
         })
     }

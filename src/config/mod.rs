@@ -10,12 +10,14 @@ use std::{
 
 use indexmap::IndexMap;
 use serde::Serialize;
-pub use vector_config::component::{GenerateConfig, SinkDescription, TransformDescription};
-use vector_config::configurable_component;
 pub use vector_lib::config::{
     AcknowledgementsConfig, DataType, GlobalOptions, Input, LogNamespace,
     SourceAcknowledgementsConfig, SourceOutput, TransformOutput,
 };
+pub use vector_lib::configurable::component::{
+    GenerateConfig, SinkDescription, TransformDescription,
+};
+use vector_lib::configurable::configurable_component;
 
 use crate::{conditions, event::Metric, secrets::SecretBackends, serde::OneOrMany};
 
@@ -1433,7 +1435,7 @@ mod resource_tests {
 #[cfg(all(test, feature = "sources-stdin", feature = "sinks-console"))]
 mod resource_config_tests {
     use indoc::indoc;
-    use vector_config::schema::generate_root_schema;
+    use vector_lib::configurable::schema::generate_root_schema;
 
     use super::{load_from_str, Format};
 
@@ -1464,8 +1466,8 @@ mod resource_config_tests {
     fn generate_component_config_schema() {
         use crate::config::{SinkOuter, SourceOuter, TransformOuter};
         use indexmap::IndexMap;
-        use vector_config::configurable_component;
         use vector_lib::config::ComponentKey;
+        use vector_lib::configurable::configurable_component;
 
         /// Top-level Vector configuration.
         #[configurable_component]

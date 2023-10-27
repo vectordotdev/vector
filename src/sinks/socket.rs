@@ -2,7 +2,7 @@ use codecs::{
     encoding::{Framer, FramingConfig},
     TextSerializerConfig,
 };
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 
 #[cfg(unix)]
 use crate::sinks::util::unix::UnixSinkConfig;

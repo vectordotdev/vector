@@ -7,7 +7,7 @@ use indoc::indoc;
 use serde_json::{json, Value};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::Encoder as _;
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 
 use crate::{
     codecs::{Encoder, EncodingConfig, Transformer},

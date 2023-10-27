@@ -12,7 +12,7 @@ use snafu::Snafu;
 use std::io;
 use tokio_util::codec::Encoder as _;
 use tower::{Service, ServiceBuilder};
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 use vector_lib::request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata};
 use vector_lib::{
     config::{telemetry, AcknowledgementsConfig, Input},

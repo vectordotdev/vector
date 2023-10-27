@@ -1,5 +1,5 @@
 #![allow(missing_docs)]
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 
 use crate::event::Event;
 

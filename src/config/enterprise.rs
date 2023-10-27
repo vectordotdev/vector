@@ -21,7 +21,7 @@ use super::{
     OutputId, SinkOuter, SourceOuter, TransformOuter,
 };
 use crate::{
-    common::datadog::{get_api_base_endpoint, get_base_domain_region, Region},
+    common::datadog::get_api_base_endpoint,
     conditions::AnyCondition,
     http::{HttpClient, HttpError},
     sinks::{
@@ -37,7 +37,7 @@ use crate::{
     },
     transforms::{filter::FilterConfig, remap::RemapConfig},
 };
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 
 static HOST_METRICS_KEY: &str = "_datadog_host_metrics";
 static TAG_METRICS_KEY: &str = "_datadog_tag_metrics";
@@ -78,12 +78,6 @@ pub struct Options {
     #[serde(default = "default_site")]
     site: String,
 
-    /// The Datadog region to send data to.
-    ///
-    /// This option is deprecated, and the `site` field should be used instead.
-    #[configurable(deprecated)]
-    region: Option<Region>,
-
     /// The Datadog endpoint to send data to.
     ///
     /// This is an advanced setting that is generally meant only for testing, and overrides both
@@ -98,12 +92,6 @@ pub struct Options {
     /// [api_key]: https://docs.datadoghq.com/api/?lang=bash#authentication
     #[serde(default)]
     pub api_key: Option<String>,
-
-    /// The Datadog application key.
-    ///
-    /// This is deprecated.
-    #[configurable(deprecated)]
-    pub application_key: Option<String>,
 
     /// The configuration key for Observability Pipelines.
     pub configuration_key: String,
@@ -133,10 +121,8 @@ impl Default for Options {
             enabled: default_enabled(),
             enable_logs_reporting: default_enable_logs_reporting(),
             site: default_site(),
-            region: None,
             endpoint: None,
             api_key: None,
-            application_key: None,
             configuration_key: "".to_owned(),
             reporting_interval_secs: default_reporting_interval_secs(),
             max_retries: default_max_retries(),
@@ -331,12 +317,6 @@ impl TryFrom<&Config> for EnterpriseMetadata {
             },
         };
 
-        if opts.application_key.is_some() {
-            warn!(
-                "Datadog application key is deprecated. You can safely remove `application_key` from the config."
-            );
-        }
-
         info!(
             "Datadog API key provided. Integration with {} is enabled.",
             DATADOG_REPORTING_PRODUCT
@@ -485,7 +465,6 @@ fn setup_logs_reporting(
             Some(datadog.site.clone()),
             Some(api_key.into()),
         ),
-        region: datadog.region,
         request: RequestConfig {
             headers: IndexMap::from([(
                 "DD-EVP-ORIGIN".to_string(),
@@ -592,7 +571,6 @@ fn setup_metrics_reporting(
             Some(datadog.site.clone()),
             Some(api_key.into()),
         ),
-        region: datadog.region,
         ..Default::default()
     };
 
@@ -681,7 +659,6 @@ pub(crate) fn report_configuration(
         let endpoint = get_reporting_endpoint(
             opts.endpoint.as_ref(),
             opts.site.as_str(),
-            opts.region,
             &opts.configuration_key,
         );
         // Datadog uses a JSON:API, so we'll serialize the config to a JSON
@@ -718,10 +695,9 @@ pub(crate) fn report_configuration(
 fn get_reporting_endpoint(
     endpoint: Option<&String>,
     site: &str,
-    region: Option<Region>,
     configuration_key: &str,
 ) -> String {
-    let base = get_base_domain_region(site, region.as_ref());
+    let base = site;
 
     format!(
         "{}{}/{}/versions",

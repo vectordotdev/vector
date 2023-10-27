@@ -1,7 +1,7 @@
 use std::convert::TryFrom;
 
 use headers::{Authorization, HeaderMapExt};
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 use vector_lib::sensitive_string::SensitiveString;
 use warp::http::HeaderMap;
 

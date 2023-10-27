@@ -5,8 +5,8 @@ use indoc::indoc;
 use snafu::ResultExt;
 use tokio::sync::oneshot::{channel, Sender};
 use tower::ServiceBuilder;
-use vector_config::configurable_component;
 use vector_lib::config::{proxy::ProxyConfig, AcknowledgementsConfig};
+use vector_lib::configurable::configurable_component;
 
 use super::{
     apm_stats::{flush_apm_stats_thread, Aggregator},
@@ -221,7 +221,7 @@ impl SinkConfig for DatadogTracesConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let client = self.build_client(&cx.proxy)?;
         let dd_common = self.dd_common.with_globals(&cx.datadog)?;
-        let healthcheck = dd_common.build_healthcheck(client.clone(), None)?;
+        let healthcheck = dd_common.build_healthcheck(client.clone())?;
         let sink = self.build_sink(&dd_common, client)?;
 
         Ok((sink, healthcheck))

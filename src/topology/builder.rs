@@ -219,8 +219,6 @@ impl<'a> Builder<'a> {
                 component_kind = "source",
                 component_id = %key.id(),
                 component_type = %source.inner.get_component_name(),
-                // maintained for compatibility
-                component_name = %key.id(),
             );
             let _entered_span = span.enter();
 
@@ -428,8 +426,6 @@ impl<'a> Builder<'a> {
                 component_kind = "transform",
                 component_id = %key.id(),
                 component_type = %transform.inner.get_component_name(),
-                // maintained for compatibility
-                component_name = %key.id(),
             );
 
             // Create a map of the outputs to the list of possible definitions from those outputs.
@@ -514,8 +510,6 @@ impl<'a> Builder<'a> {
                 component_kind = "sink",
                 component_id = %key.id(),
                 component_type = %sink.inner.get_component_name(),
-                // maintained for compatibility
-                component_name = %key.id(),
             );
             let _entered_span = span.enter();
 
@@ -640,8 +634,6 @@ impl<'a> Builder<'a> {
                                     component_kind = "sink",
                                     component_type = typetag,
                                     component_id = %component_key.id(),
-                                    // maintained for compatibility
-                                    component_name = %component_key.id(),
                                 );
                                 Err(TaskError::wrapped(error))
                             }
@@ -651,8 +643,6 @@ impl<'a> Builder<'a> {
                                     component_kind = "sink",
                                     component_type = typetag,
                                     component_id = %component_key.id(),
-                                    // maintained for compatibility
-                                    component_name = %component_key.id(),
                                 );
                                 Err(TaskError::wrapped(Box::new(e)))
                             }

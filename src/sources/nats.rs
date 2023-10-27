@@ -4,7 +4,7 @@ use futures::{pin_mut, StreamExt};
 use lookup::{lookup_v2::OptionalValuePath, owned_value_path};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 use vector_lib::internal_event::{
     ByteSize, BytesReceived, CountByteSize, EventsReceived, InternalEventHandle as _, Protocol,
 };
@@ -97,10 +97,26 @@ pub struct NatsSourceConfig {
     /// The `NATS` subject key.
     #[serde(default = "default_subject_key_field")]
     subject_key_field: OptionalValuePath,
+
+    /// The buffer capacity of the underlying NATS subscriber.
+    ///
+    /// This value determines how many messages the NATS subscriber buffers
+    /// before incoming messages are dropped.
+    ///
+    /// See the [async_nats documentation][async_nats_subscription_capacity] for more information.
+    ///
+    /// [async_nats_subscription_capacity]: https://docs.rs/async-nats/latest/async_nats/struct.ConnectOptions.html#method.subscription_capacity
+    #[serde(default = "default_subscription_capacity")]
+    #[derivative(Default(value = "default_subscription_capacity()"))]
+    subscriber_capacity: usize,
 }
 
 fn default_subject_key_field() -> OptionalValuePath {
     OptionalValuePath::from(owned_value_path!("subject"))
+}
+
+const fn default_subscription_capacity() -> usize {
+    4096
 }
 
 impl GenerateConfig for NatsSourceConfig {
@@ -178,6 +194,7 @@ impl TryFrom<&NatsSourceConfig> for async_nats::ConnectOptions {
 
     fn try_from(config: &NatsSourceConfig) -> Result<Self, Self::Error> {
         from_tls_auth_config(&config.connection_name, &config.auth, &config.tls)
+            .map(|options| options.subscription_capacity(config.subscriber_capacity))
     }
 }
 
@@ -415,6 +432,7 @@ mod integration_tests {
             auth: None,
             log_namespace: None,
             subject_key_field: default_subject_key_field(),
+            ..Default::default()
         };
 
         let r = publish_and_check(conf).await;
@@ -447,6 +465,7 @@ mod integration_tests {
             }),
             log_namespace: None,
             subject_key_field: default_subject_key_field(),
+            ..Default::default()
         };
 
         let r = publish_and_check(conf).await;
@@ -479,6 +498,7 @@ mod integration_tests {
             }),
             log_namespace: None,
             subject_key_field: default_subject_key_field(),
+            ..Default::default()
         };
 
         let r = publish_and_check(conf).await;
@@ -510,6 +530,7 @@ mod integration_tests {
             }),
             log_namespace: None,
             subject_key_field: default_subject_key_field(),
+            ..Default::default()
         };
 
         let r = publish_and_check(conf).await;
@@ -541,6 +562,7 @@ mod integration_tests {
             }),
             log_namespace: None,
             subject_key_field: default_subject_key_field(),
+            ..Default::default()
         };
 
         let r = publish_and_check(conf).await;
@@ -573,6 +595,7 @@ mod integration_tests {
             }),
             log_namespace: None,
             subject_key_field: default_subject_key_field(),
+            ..Default::default()
         };
 
         let r = publish_and_check(conf).await;
@@ -605,6 +628,7 @@ mod integration_tests {
             }),
             log_namespace: None,
             subject_key_field: default_subject_key_field(),
+            ..Default::default()
         };
 
         let r = publish_and_check(conf).await;
@@ -638,6 +662,7 @@ mod integration_tests {
             auth: None,
             log_namespace: None,
             subject_key_field: default_subject_key_field(),
+            ..Default::default()
         };
 
         let r = publish_and_check(conf).await;
@@ -665,6 +690,7 @@ mod integration_tests {
             auth: None,
             log_namespace: None,
             subject_key_field: default_subject_key_field(),
+            ..Default::default()
         };
 
         let r = publish_and_check(conf).await;
@@ -700,6 +726,7 @@ mod integration_tests {
             auth: None,
             log_namespace: None,
             subject_key_field: default_subject_key_field(),
+            ..Default::default()
         };
 
         let r = publish_and_check(conf).await;
@@ -733,6 +760,7 @@ mod integration_tests {
             auth: None,
             log_namespace: None,
             subject_key_field: default_subject_key_field(),
+            ..Default::default()
         };
 
         let r = publish_and_check(conf).await;
@@ -770,6 +798,7 @@ mod integration_tests {
             }),
             log_namespace: None,
             subject_key_field: default_subject_key_field(),
+            ..Default::default()
         };
 
         let r = publish_and_check(conf).await;
@@ -807,6 +836,7 @@ mod integration_tests {
             }),
             log_namespace: None,
             subject_key_field: default_subject_key_field(),
+            ..Default::default()
         };
 
         let r = publish_and_check(conf).await;

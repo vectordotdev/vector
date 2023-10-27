@@ -10,8 +10,8 @@ use vrl::value::Kind;
 
 use lookup::lookup_v2::OptionalValuePath;
 use lookup::PathPrefix;
-use vector_config::configurable_component;
 use vector_lib::config::log_schema;
+use vector_lib::configurable::configurable_component;
 use vector_lib::schema;
 
 use crate::{

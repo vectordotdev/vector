@@ -1,6 +1,6 @@
 use bytes::{BufMut, BytesMut};
 use syslog::{Facility, Formatter3164, LogFormat, Severity};
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 use vrl::value::Kind;
 
 use crate::{

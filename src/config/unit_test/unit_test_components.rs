@@ -3,7 +3,7 @@ use std::sync::Arc;
 use futures::{stream, Sink, Stream};
 use futures_util::{future, stream::BoxStream, FutureExt, StreamExt};
 use tokio::sync::{oneshot, Mutex};
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 use vector_lib::{
     config::{DataType, Input, LogNamespace},
     event::Event,

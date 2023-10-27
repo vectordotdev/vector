@@ -1,5 +1,5 @@
 use vector_lib::event::{Metric, MetricValue};
-use vector_stream::batcher::limiter::ItemBatchSize;
+use vector_lib::stream::batcher::limiter::ItemBatchSize;
 
 use super::request_builder::{
     DISTRIBUTION_QUANTILES, DISTRIBUTION_STAT_FIELD_COUNT, SUMMARY_STAT_FIELD_COUNT,
