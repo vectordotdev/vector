@@ -84,8 +84,6 @@ components: sources: prometheus_remote_write: {
 	}
 
 	telemetry: metrics: {
-		parse_errors_total:       components.sources.internal_metrics.output.metrics.parse_errors_total
-		requests_completed_total: components.sources.internal_metrics.output.metrics.requests_completed_total
 		requests_received_total:  components.sources.internal_metrics.output.metrics.requests_received_total
 		request_duration_seconds: components.sources.internal_metrics.output.metrics.request_duration_seconds
 	}

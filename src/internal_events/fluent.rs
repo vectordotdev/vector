@@ -37,7 +37,5 @@ impl<'a> InternalEvent for FluentMessageDecodeError<'a> {
             "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::PROCESSING,
         );
-        // deprecated
-        counter!("decode_errors_total", 1);
     }
 }

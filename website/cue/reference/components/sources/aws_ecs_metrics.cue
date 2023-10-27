@@ -185,9 +185,6 @@ components: sources: aws_ecs_metrics: {
 	}
 
 	telemetry: metrics: {
-		http_error_response_total: components.sources.internal_metrics.output.metrics.http_error_response_total
-		http_request_errors_total: components.sources.internal_metrics.output.metrics.http_request_errors_total
-		parse_errors_total:        components.sources.internal_metrics.output.metrics.parse_errors_total
 		requests_completed_total:  components.sources.internal_metrics.output.metrics.requests_completed_total
 		request_duration_seconds:  components.sources.internal_metrics.output.metrics.request_duration_seconds
 	}

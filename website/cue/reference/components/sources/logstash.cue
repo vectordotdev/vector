@@ -305,9 +305,6 @@ components: sources: logstash: {
 	}
 
 	telemetry: metrics: {
-		connection_errors_total:          components.sources.internal_metrics.output.metrics.connection_errors_total
-		connection_send_ack_errors_total: components.sources.internal_metrics.output.metrics.connection_send_ack_errors_total
-		decode_errors_total:              components.sources.internal_metrics.output.metrics.decode_errors_total
 		open_connections:                 components.sources.internal_metrics.output.metrics.open_connections
 	}
 }

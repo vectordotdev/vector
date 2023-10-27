@@ -177,11 +177,6 @@ components: sources: http_server: {
 		},
 	]
 
-	telemetry: metrics: {
-		http_bad_requests_total: components.sources.internal_metrics.output.metrics.http_bad_requests_total
-		parse_errors_total:      components.sources.internal_metrics.output.metrics.parse_errors_total
-	}
-
 	how_it_works: {
 		decompression: {
 			title: "Decompression"
