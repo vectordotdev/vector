@@ -368,7 +368,7 @@ quickcheck = "1.0.3"
 lookup = { package = "vector-lookup", path = "lib/vector-lookup", features = ["test"] }
 reqwest = { version = "0.11", features = ["json"] }
 rstest = {version = "0.18.2"}
-tempfile = "3.8.0"
+tempfile = "3.8.1"
 test-generator = "0.3.1"
 tokio = { version = "1.33.0", features = ["test-util"] }
 tokio-test = "0.4.3"
