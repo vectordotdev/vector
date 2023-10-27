@@ -298,7 +298,7 @@ mod test {
     }
 
     #[tokio::test]
-    async fn testk_whole_request_happy_path_http() {
+    async fn test_whole_request_happy_path_http() {
         whole_request_happy_path(None).await;
     }
 
