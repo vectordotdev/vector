@@ -9,5 +9,6 @@ jobs:
     runs-on: ubuntu-latest
 
   steps:
-    - run: echo "Workflow has been allowed to run for PR ${{ github.event.number }}"
+    - name: Check for approval
+      run: echo "Workflow has been allowed to run for PR ${{ github.event.number }}"
 
