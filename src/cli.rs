@@ -331,9 +331,10 @@ pub enum Color {
 
 impl Color {
     pub fn use_color(&self) -> bool {
+        use is_terminal::IsTerminal;
         match self {
             #[cfg(unix)]
-            Color::Auto => atty::is(atty::Stream::Stdout),
+            Color::Auto => std::io::stdout().is_terminal(),
             #[cfg(windows)]
             Color::Auto => false, // ANSI colors are not supported by cmd.exe
             Color::Always => true,

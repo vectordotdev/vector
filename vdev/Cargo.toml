@@ -9,7 +9,7 @@ publish = false
 
 [dependencies]
 anyhow = "1.0.75"
-atty = "0.2.14"
+is-terminal = { version = "0.4" }
 cached = "0.46.0"
 chrono = { version = "0.4.31", default-features = false, features = ["serde", "clock"] }
 clap = { version = "4.4.7", features = ["derive"] }

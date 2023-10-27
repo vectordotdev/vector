@@ -122,7 +122,10 @@ pub fn next_addr_v6() -> SocketAddr {
 
 pub fn trace_init() {
     #[cfg(unix)]
-    let color = atty::is(atty::Stream::Stdout);
+    let color = {
+        use is_terminal::IsTerminal;
+        std::io::stdout().is_terminal()
+    };
     // Windows: ANSI colors are not supported by cmd.exe
     // Color is false for everything except unix.
     #[cfg(not(unix))]

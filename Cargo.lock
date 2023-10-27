@@ -9646,7 +9646,6 @@ name = "vdev"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "atty",
  "cached",
  "chrono",
  "clap 4.4.7",
@@ -9659,6 +9658,7 @@ dependencies = [
  "hex",
  "indexmap 2.0.2",
  "indicatif",
+ "is-terminal",
  "itertools 0.11.0",
  "log",
  "once_cell",
@@ -9696,7 +9696,6 @@ dependencies = [
  "async-nats",
  "async-stream",
  "async-trait",
- "atty",
  "aws-config",
  "aws-credential-types",
  "aws-sdk-cloudwatch",
@@ -9768,6 +9767,7 @@ dependencies = [
  "indoc",
  "infer 0.15.0",
  "inventory",
+ "is-terminal",
  "itertools 0.11.0",
  "k8s-openapi 0.18.0",
  "kube",
