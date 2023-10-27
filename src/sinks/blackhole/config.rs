@@ -10,7 +10,7 @@ use crate::{
 };
 
 const fn default_print_interval_secs() -> Duration {
-    Duration::from_secs(1)
+    Duration::from_secs(0)
 }
 
 /// Configuration for the `blackhole` sink.
@@ -25,7 +25,7 @@ const fn default_print_interval_secs() -> Duration {
 pub struct BlackholeConfig {
     /// The interval between reporting a summary of activity.
     ///
-    /// Set to `0` to disable reporting.
+    /// Set to `0` (default) to disable reporting.
     #[derivative(Default(value = "default_print_interval_secs()"))]
     #[serde(default = "default_print_interval_secs")]
     #[serde_as(as = "serde_with::DurationSeconds<u64>")]

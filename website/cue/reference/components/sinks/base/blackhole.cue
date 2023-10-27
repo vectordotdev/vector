@@ -31,11 +31,11 @@ base: components: sinks: blackhole: configuration: {
 		description: """
 			The interval between reporting a summary of activity.
 
-			Set to `0` to disable reporting.
+			Set to `0` (default) to disable reporting.
 			"""
 		required: false
 		type: uint: {
-			default: 1
+			default: 0
 			examples: [
 				10,
 			]
