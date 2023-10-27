@@ -19,8 +19,8 @@ use tokio::{
     io::AsyncWriteExt,
 };
 use tokio_util::codec::Encoder as _;
-use vector_config::configurable_component;
-use vector_core::{
+use vector_lib::configurable::configurable_component;
+use vector_lib::{
     internal_event::{CountByteSize, EventsSent, InternalEventHandle as _, Output, Registered},
     EstimatedJsonEncodedSizeOf,
 };
@@ -427,7 +427,7 @@ mod tests {
 
     use futures::{stream, SinkExt};
     use similar_asserts::assert_eq;
-    use vector_core::{event::LogEvent, sink::VectorSink};
+    use vector_lib::{event::LogEvent, sink::VectorSink};
 
     use super::*;
     use crate::{

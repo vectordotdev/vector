@@ -3,10 +3,10 @@ use std::path::PathBuf;
 use base64::prelude::{Engine as _, BASE64_STANDARD};
 use bytes::Bytes;
 use lookup::{owned_value_path, path, OwnedValuePath};
-use vector_common::internal_event::{
+use vector_lib::configurable::configurable_component;
+use vector_lib::internal_event::{
     ByteSize, BytesReceived, InternalEventHandle as _, Protocol, Registered,
 };
-use vector_config::configurable_component;
 use vrl::path::PathPrefix;
 use vrl::value::{kind::Collection, Kind};
 
@@ -25,7 +25,7 @@ use crate::sources::dnstap::schema::DNSTAP_VALUE_PATHS;
 use dnsmsg_parser::{dns_message, dns_message_parser};
 use lookup::lookup_v2::OptionalValuePath;
 pub use schema::DnstapEventSchema;
-use vector_core::{
+use vector_lib::{
     config::{LegacyKey, LogNamespace},
     EstimatedJsonEncodedSizeOf,
 };
@@ -109,15 +109,12 @@ impl DnstapConfig {
         "protobuf:dnstap.Dnstap".to_string() //content-type for framestream
     }
 
-    pub fn schema_definition(
-        &self,
-        log_namespace: LogNamespace,
-    ) -> vector_core::schema::Definition {
+    pub fn schema_definition(&self, log_namespace: LogNamespace) -> vector_lib::schema::Definition {
         let event_schema = DnstapEventSchema;
 
         match log_namespace {
             LogNamespace::Legacy => {
-                let schema = vector_core::schema::Definition::empty_legacy_namespace();
+                let schema = vector_lib::schema::Definition::empty_legacy_namespace();
 
                 if self.raw_data_only.unwrap_or(false) {
                     if let Some(message_key) = log_schema().message_key() {
@@ -131,7 +128,7 @@ impl DnstapConfig {
                 event_schema.schema_definition(schema)
             }
             LogNamespace::Vector => {
-                let schema = vector_core::schema::Definition::new_with_default_metadata(
+                let schema = vector_lib::schema::Definition::new_with_default_metadata(
                     Kind::object(Collection::empty()),
                     [log_namespace],
                 )
@@ -397,7 +394,7 @@ mod tests {
         event.as_mut_log().insert("timestamp", chrono::Utc::now());
 
         let definition = DnstapEventSchema;
-        let schema = vector_core::schema::Definition::empty_legacy_namespace()
+        let schema = vector_lib::schema::Definition::empty_legacy_namespace()
             .with_standard_vector_source_metadata();
 
         definition

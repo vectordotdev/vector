@@ -6,7 +6,7 @@ use aws_sdk_firehose::{
 };
 use futures::FutureExt;
 use snafu::Snafu;
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 
 use crate::sinks::util::retries::RetryAction;
 use crate::{

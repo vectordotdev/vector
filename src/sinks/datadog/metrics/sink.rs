@@ -8,12 +8,12 @@ use futures_util::{
     StreamExt,
 };
 use tower::Service;
-use vector_core::{
+use vector_lib::stream::{BatcherSettings, DriverResponse};
+use vector_lib::{
     event::{Event, Metric, MetricValue},
     partition::Partitioner,
     sink::StreamSink,
 };
-use vector_stream::{BatcherSettings, DriverResponse};
 
 use super::{
     config::DatadogMetricsEndpoint, normalizer::DatadogMetricsNormalizer,
@@ -233,7 +233,7 @@ mod tests {
 
     use chrono::{DateTime, Utc};
     use proptest::prelude::*;
-    use vector_core::{
+    use vector_lib::{
         event::{Metric, MetricKind, MetricValue},
         metric_tags,
     };

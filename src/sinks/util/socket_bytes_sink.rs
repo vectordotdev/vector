@@ -10,7 +10,7 @@ use futures::Sink;
 use pin_project::{pin_project, pinned_drop};
 use tokio::io::AsyncWrite;
 use tokio_util::codec::{BytesCodec, FramedWrite};
-use vector_common::{
+use vector_lib::{
     finalization::{EventFinalizers, EventStatus},
     json_size::JsonSize,
 };

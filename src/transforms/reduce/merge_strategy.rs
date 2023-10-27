@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use bytes::{Bytes, BytesMut};
 use chrono::{DateTime, Utc};
 use ordered_float::NotNan;
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 use vrl::event_path;
 
 use crate::event::{LogEvent, Value};

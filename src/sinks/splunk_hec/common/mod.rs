@@ -5,7 +5,7 @@ pub mod service;
 pub mod util;
 
 pub use util::*;
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 
 pub(super) const SOURCE_FIELD: &str = "source";
 pub(super) const SOURCETYPE_FIELD: &str = "sourcetype";

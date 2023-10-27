@@ -10,9 +10,9 @@ use vrl::value::Kind;
 
 use lookup::lookup_v2::OptionalValuePath;
 use lookup::PathPrefix;
-use vector_config::configurable_component;
-use vector_core::config::log_schema;
-use vector_core::schema;
+use vector_lib::config::log_schema;
+use vector_lib::configurable::configurable_component;
+use vector_lib::schema;
 
 use crate::{
     codecs::Transformer,
@@ -404,7 +404,7 @@ mod tests {
     use indoc::indoc;
 
     use lookup::owned_value_path;
-    use vector_core::event::{BatchNotifier, BatchStatus, Event, LogEvent};
+    use vector_lib::event::{BatchNotifier, BatchStatus, Event, LogEvent};
 
     use crate::{
         sinks::{
@@ -883,8 +883,8 @@ mod integration_tests {
 
     use codecs::BytesDeserializerConfig;
     use lookup::{owned_value_path, path};
-    use vector_core::config::{LegacyKey, LogNamespace};
-    use vector_core::event::{BatchNotifier, BatchStatus, Event, LogEvent};
+    use vector_lib::config::{LegacyKey, LogNamespace};
+    use vector_lib::event::{BatchNotifier, BatchStatus, Event, LogEvent};
 
     use crate::{
         config::SinkContext,

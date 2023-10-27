@@ -4,9 +4,9 @@ use std::task::{Context, Poll};
 use aws_sdk_sqs::types::SdkError;
 use futures::future::BoxFuture;
 use tower::Service;
-use vector_common::request_metadata::GroupedCountByteSize;
-use vector_core::{event::EventStatus, ByteSizeOf};
-use vector_stream::DriverResponse;
+use vector_lib::request_metadata::GroupedCountByteSize;
+use vector_lib::stream::DriverResponse;
+use vector_lib::{event::EventStatus, ByteSizeOf};
 
 use super::{client::Client, request_builder::SendMessageEntry};
 

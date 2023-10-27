@@ -20,12 +20,12 @@ use tonic::{
     transport::{Certificate, ClientTlsConfig, Endpoint, Identity},
     Code, Request, Status,
 };
-use vector_common::internal_event::{
+use vector_lib::config::{LegacyKey, LogNamespace};
+use vector_lib::configurable::configurable_component;
+use vector_lib::internal_event::{
     ByteSize, BytesReceived, EventsReceived, InternalEventHandle as _, Protocol, Registered,
 };
-use vector_common::{byte_size_of::ByteSizeOf, finalizer::UnorderedFinalizer};
-use vector_config::configurable_component;
-use vector_core::config::{LegacyKey, LogNamespace};
+use vector_lib::{byte_size_of::ByteSizeOf, finalizer::UnorderedFinalizer};
 use vrl::path;
 use vrl::value::{kind::Collection, Kind};
 
@@ -68,7 +68,7 @@ type Finalizer = UnorderedFinalizer<Vec<String>>;
 mod proto {
     include!(concat!(env!("OUT_DIR"), "/google.pubsub.v1.rs"));
 
-    use vector_core::ByteSizeOf;
+    use vector_lib::ByteSizeOf;
 
     impl ByteSizeOf for StreamingPullResponse {
         fn allocated_bytes(&self) -> usize {
@@ -745,7 +745,7 @@ impl Future for Task {
 #[cfg(test)]
 mod tests {
     use lookup::OwnedTargetPath;
-    use vector_core::schema::Definition;
+    use vector_lib::schema::Definition;
 
     use super::*;
 

@@ -5,7 +5,7 @@ use crate::aws::RegionOrEndpoint;
 use crate::config::{
     AcknowledgementsConfig, DataType, GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext,
 };
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 
 use super::{
     client::SnsMessagePublisher, message_deduplication_id, message_group_id, BaseSSSinkConfig,

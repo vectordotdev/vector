@@ -5,8 +5,8 @@ use futures::{Stream, StreamExt};
 use lookup::OwnedTargetPath;
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
-use vector_core::config::LogNamespace;
-use vector_stream::expiration_map::{map_with_expiration, Emitter};
+use vector_lib::config::LogNamespace;
+use vector_lib::stream::expiration_map::{map_with_expiration, Emitter};
 use vrl::owned_value_path;
 
 use crate::event;
@@ -155,7 +155,7 @@ fn merge_partial_events_with_custom_expiration(
 #[cfg(test)]
 mod test {
     use super::*;
-    use vector_core::event::LogEvent;
+    use vector_lib::event::LogEvent;
     use vrl::value;
 
     #[tokio::test]

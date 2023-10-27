@@ -3,8 +3,8 @@ use aws_smithy_types::retry::RetryConfig;
 use codecs::JsonSerializerConfig;
 use futures::FutureExt;
 use tower::ServiceBuilder;
-use vector_config::configurable_component;
-use vector_core::schema;
+use vector_lib::configurable::configurable_component;
+use vector_lib::schema;
 use vrl::value::Kind;
 
 use crate::{

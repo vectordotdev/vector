@@ -19,7 +19,7 @@ mod integration_test {
         message::Headers,
         Message, Offset, TopicPartitionList,
     };
-    use vector_core::{
+    use vector_lib::{
         config::{init_telemetry, Tags, Telemetry},
         event::{BatchNotifier, BatchStatus},
     };

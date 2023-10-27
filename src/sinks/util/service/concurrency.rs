@@ -2,14 +2,14 @@ use std::{cell::RefCell, fmt};
 
 use serde::Serializer;
 use serde_json::Value;
-use vector_config::{
+use vector_lib::configurable::attributes::CustomAttribute;
+use vector_lib::configurable::{
     schema::{
         apply_base_metadata, generate_const_string_schema, generate_number_schema,
         generate_one_of_schema, SchemaGenerator, SchemaObject,
     },
     Configurable, GenerateError, Metadata, ToValue,
 };
-use vector_config_common::attributes::CustomAttribute;
 
 use serde::{
     de::{self, Unexpected, Visitor},

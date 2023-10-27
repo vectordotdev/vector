@@ -2,7 +2,7 @@ use std::num::NonZeroU64;
 
 use codecs::JsonSerializerConfig;
 use snafu::ResultExt;
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 
 use crate::{
     codecs::EncodingConfig,

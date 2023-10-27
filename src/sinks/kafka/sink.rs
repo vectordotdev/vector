@@ -6,7 +6,6 @@ use rdkafka::{
 };
 use snafu::{ResultExt, Snafu};
 use tokio::time::Duration;
-use tower::limit::ConcurrencyLimit;
 use vrl::path::OwnedTargetPath;
 
 use super::config::{KafkaRole, KafkaSinkConfig};
@@ -62,11 +61,6 @@ impl KafkaSink {
     }
 
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
-        // rdkafka will internally retry forever, so we need some limit to prevent this from overflowing.
-        // 64 should be plenty concurrency here, as a rdkafka send operation does not block until its underlying
-        // buffer is full.
-        let service = ConcurrencyLimit::new(self.service.clone(), 64);
-
         let request_builder = KafkaRequestBuilder {
             key_field: self.key_field,
             headers_key: self.headers_key,
@@ -100,8 +94,7 @@ impl KafkaSink {
                     Ok(req) => Some(req),
                 }
             })
-            .into_driver(service)
-            .protocol("kafka")
+            .into_driver(self.service)
             .protocol("kafka")
             .run()
             .await

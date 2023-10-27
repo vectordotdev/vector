@@ -7,8 +7,8 @@ use futures_util::{
 };
 use tokio::sync::oneshot::{channel, Sender};
 use tower::Service;
-use vector_core::{config::log_schema, event::Event, partition::Partitioner, sink::StreamSink};
-use vector_stream::{BatcherSettings, DriverResponse};
+use vector_lib::stream::{BatcherSettings, DriverResponse};
+use vector_lib::{config::log_schema, event::Event, partition::Partitioner, sink::StreamSink};
 use vrl::event_path;
 use vrl::path::PathPrefix;
 

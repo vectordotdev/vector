@@ -2,7 +2,7 @@ use codecs::JsonSerializerConfig;
 use futures::stream;
 use rand::Rng;
 use redis::AsyncCommands;
-use vector_core::{
+use vector_lib::{
     config::{init_telemetry, Tags, Telemetry},
     event::LogEvent,
 };

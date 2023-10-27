@@ -42,9 +42,9 @@ use tokio::{
 };
 use tokio_util::codec::FramedRead;
 
-use vector_common::finalizer::OrderedFinalizer;
-use vector_config::configurable_component;
-use vector_core::{
+use vector_lib::configurable::configurable_component;
+use vector_lib::finalizer::OrderedFinalizer;
+use vector_lib::{
     config::{LegacyKey, LogNamespace},
     EstimatedJsonEncodedSizeOf,
 };
@@ -1364,7 +1364,7 @@ impl ConsumerContext for KafkaSourceContext {
 #[cfg(test)]
 mod test {
     use lookup::OwnedTargetPath;
-    use vector_core::schema::Definition;
+    use vector_lib::schema::Definition;
 
     use super::*;
 
@@ -1532,7 +1532,7 @@ mod integration_test {
     use stream_cancel::{Trigger, Tripwire};
     use tokio::time::sleep;
     use vector_buffers::topology::channel::BufferReceiver;
-    use vector_core::event::EventStatus;
+    use vector_lib::event::EventStatus;
     use vrl::{event_path, value};
 
     use super::{test::*, *};

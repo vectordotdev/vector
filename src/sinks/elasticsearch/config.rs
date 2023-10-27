@@ -4,7 +4,7 @@ use std::{
 };
 
 use futures::{FutureExt, TryFutureExt};
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 
 use crate::{
     codecs::Transformer,
@@ -33,7 +33,7 @@ use crate::{
 };
 use lookup::event_path;
 use lookup::lookup_v2::ConfigValuePath;
-use vector_core::schema::Requirement;
+use vector_lib::schema::Requirement;
 use vrl::value::Kind;
 
 /// The field name for the timestamp required by data stream mode

@@ -8,8 +8,8 @@ use futures::{stream, stream::StreamExt, TryStreamExt};
 use lookup::owned_value_path;
 use snafu::Snafu;
 use tokio_util::io::StreamReader;
-use vector_config::configurable_component;
-use vector_core::config::{LegacyKey, LogNamespace};
+use vector_lib::config::{LegacyKey, LogNamespace};
+use vector_lib::configurable::configurable_component;
 use vrl::value::{kind::Collection, Kind};
 
 use super::util::MultilineConfig;

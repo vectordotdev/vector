@@ -4,13 +4,13 @@ use std::collections::{HashMap, HashSet};
 use async_trait::async_trait;
 use dyn_clone::DynClone;
 use serde::Serialize;
-use vector_config::{
+use vector_lib::configurable::attributes::CustomAttribute;
+use vector_lib::configurable::{
     configurable_component,
     schema::{SchemaGenerator, SchemaObject},
     Configurable, GenerateError, Metadata, NamedComponent,
 };
-use vector_config_common::attributes::CustomAttribute;
-use vector_core::{
+use vector_lib::{
     config::{GlobalOptions, Input, LogNamespace, TransformOutput},
     schema,
     transform::Transform,
@@ -36,7 +36,7 @@ impl Configurable for BoxedTransform {
     }
 
     fn generate_schema(gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
-        vector_config::component::TransformDescription::generate_schemas(gen)
+        vector_lib::configurable::component::TransformDescription::generate_schemas(gen)
     }
 }
 

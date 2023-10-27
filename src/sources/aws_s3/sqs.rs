@@ -22,10 +22,10 @@ use snafu::{ResultExt, Snafu};
 use tokio::{pin, select};
 use tokio_util::codec::FramedRead;
 use tracing::Instrument;
-use vector_common::internal_event::{
+use vector_lib::configurable::configurable_component;
+use vector_lib::internal_event::{
     ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol, Registered,
 };
-use vector_config::configurable_component;
 
 use crate::codecs::Decoder;
 use crate::event::{Event, LogEvent};
@@ -45,8 +45,8 @@ use crate::{
     SourceSender,
 };
 use lookup::{metadata_path, path, PathPrefix};
-use vector_core::config::{log_schema, LegacyKey, LogNamespace};
-use vector_core::event::MaybeAsLogMut;
+use vector_lib::config::{log_schema, LegacyKey, LogNamespace};
+use vector_lib::event::MaybeAsLogMut;
 
 static SUPPORTED_S3_EVENT_VERSION: Lazy<semver::VersionReq> =
     Lazy::new(|| semver::VersionReq::parse("~2").unwrap());

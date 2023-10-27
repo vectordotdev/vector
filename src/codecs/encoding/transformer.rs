@@ -8,9 +8,9 @@ use lookup::lookup_v2::ConfigValuePath;
 use lookup::{event_path, PathPrefix};
 use ordered_float::NotNan;
 use serde::{Deserialize, Deserializer};
-use vector_config::configurable_component;
-use vector_core::event::{LogEvent, MaybeAsLogMut};
-use vector_core::schema::meaning;
+use vector_lib::configurable::configurable_component;
+use vector_lib::event::{LogEvent, MaybeAsLogMut};
+use vector_lib::schema::meaning;
 use vrl::path::OwnedValuePath;
 use vrl::value::Value;
 
@@ -267,8 +267,8 @@ pub enum TimestampFormat {
 mod tests {
     use indoc::indoc;
     use lookup::path::parse_target_path;
-    use vector_common::btreemap;
-    use vector_core::config::{log_schema, LogNamespace};
+    use vector_lib::btreemap;
+    use vector_lib::config::{log_schema, LogNamespace};
     use vrl::value::Kind;
 
     use crate::config::schema;

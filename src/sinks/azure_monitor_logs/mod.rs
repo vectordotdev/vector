@@ -1,7 +1,7 @@
-//! The Azure Monitor Logs [`vector_core::sink::VectorSink`]
+//! The Azure Monitor Logs [`vector_lib::sink::VectorSink`]
 //!
-//! This module contains the [`vector_core::sink::VectorSink`] instance that is responsible for
-//! taking a stream of [`vector_core::event::Event`] instances and forwarding them to the Azure
+//! This module contains the [`vector_lib::sink::VectorSink`] instance that is responsible for
+//! taking a stream of [`vector_lib::event::Event`] instances and forwarding them to the Azure
 //! Monitor Logs service.
 
 mod config;

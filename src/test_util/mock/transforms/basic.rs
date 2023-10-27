@@ -1,9 +1,9 @@
 use std::collections::BTreeSet;
 
 use async_trait::async_trait;
-use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
-use vector_core::{
+use vector_lib::config::LogNamespace;
+use vector_lib::configurable::configurable_component;
+use vector_lib::{
     config::{DataType, Input, TransformOutput},
     event::{
         metric::{MetricData, Sample},

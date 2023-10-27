@@ -10,7 +10,7 @@ use lookup::lookup_v2::parse_target_path;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use snafu::Snafu;
-use vector_config::{configurable_component, ConfigurableString};
+use vector_lib::configurable::{configurable_component, ConfigurableString};
 
 use crate::{
     config::log_schema,
@@ -374,7 +374,7 @@ fn render_timestamp(items: &ParsedStrftime, event: EventRef<'_>) -> String {
 mod tests {
     use chrono::TimeZone;
     use lookup::metadata_path;
-    use vector_core::metric_tags;
+    use vector_lib::metric_tags;
 
     use super::*;
     use crate::event::{Event, LogEvent, MetricKind, MetricValue};
