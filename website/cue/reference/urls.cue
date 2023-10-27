@@ -240,6 +240,7 @@ urls: {
 	greptimedb:                                 "https://github.com/greptimeteam/greptimedb"
 	greptimedb_grpc:                            "https://docs.greptime.com/"
 	grok:                                       "https://grokdebug.herokuapp.com/"
+	grpc_status_code:                           "https://grpc.github.io/grpc/core/md_doc_statuscodes.html"
 	grok_debugger:                              "https://grokdebug.herokuapp.com/"
 	grok_patterns:                              "\(github)/daschl/grok/tree/master/patterns"
 	gzip:                                       "https://www.gzip.org/"
