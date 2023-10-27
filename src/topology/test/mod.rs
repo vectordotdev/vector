@@ -26,7 +26,7 @@ use tokio::{
     task::yield_now,
     time::{sleep, Duration},
 };
-use vector_buffers::{BufferConfig, BufferType, WhenFull};
+use vector_lib::buffers::{BufferConfig, BufferType, WhenFull};
 use vector_lib::config::ComponentKey;
 use vector_lib::config::OutputId;
 

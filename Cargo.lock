@@ -9873,7 +9873,6 @@ dependencies = [
  "url",
  "uuid",
  "vector-api-client",
- "vector-buffers",
  "vector-lib",
  "vector-lookup",
  "vector-vrl-functions",
@@ -10121,6 +10120,7 @@ name = "vector-lib"
 version = "0.1.0"
 dependencies = [
  "codecs",
+ "vector-buffers",
  "vector-common",
  "vector-config",
  "vector-core",

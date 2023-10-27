@@ -139,7 +139,6 @@ prometheus-parser = { path = "lib/prometheus-parser", optional = true }
 opentelemetry-proto = { path = "lib/opentelemetry-proto", optional = true }
 tracing-limit = { path = "lib/tracing-limit" }
 vector-api-client = { path = "lib/vector-api-client", optional = true }
-vector-buffers = { path = "lib/vector-buffers", default-features = false }
 vector-lib = { path = "lib/vector-lib", default-features = false, features = ["vrl"] }
 vector-vrl-functions = { path = "lib/vector-vrl/functions" }
 loki-logproto = { path = "lib/loki-logproto", optional = true }
