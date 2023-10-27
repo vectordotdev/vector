@@ -9,6 +9,7 @@ publish = false
 vector-common = { path = "../vector-common" }
 vector-config = { path = "../vector-config" }
 vector-core = { path = "../vector-core", default-features = false }
+vector-stream = { path = "../vector-stream" }
 
 [features]
 api = ["vector-core/api"]

@@ -9868,7 +9868,6 @@ dependencies = [
  "vector-buffers",
  "vector-lib",
  "vector-lookup",
- "vector-stream",
  "vector-vrl-functions",
  "vrl",
  "warp",
@@ -10116,6 +10115,7 @@ dependencies = [
  "vector-common",
  "vector-config",
  "vector-core",
+ "vector-stream",
 ]
 
 [[package]]
