@@ -24,7 +24,6 @@ pub(super) fn parse_text(packet: &str) -> Result<Vec<Event>, ParserError> {
     prometheus_parser::parse_text(packet).map(|group| reparse_groups(group, vec![], false))
 }
 
-// TODO: Add tests for overrides and aggregation on/off
 #[cfg(any(test, feature = "sources-prometheus-pushgateway"))]
 pub(super) fn parse_text_with_overrides(
     packet: &str,
@@ -1063,21 +1062,13 @@ mod test {
         );
     }
 
-    // TODO: at least these tests
-    //
-    // - Tag overrides: when none of the base labels match
-    // - Tag overrides: when some of the base labels match
-    // - Tag overrides: labels (last instance should win like in real Pushgateway)
-    // - Aggregation: enabled, all four metric types, only counter and histogram are incremental
-    // - Aggregation: disabled, all four metric types, all types are absolute
-
     #[test]
     fn test_overrides_nothing_overwritten() {
-        let exp = r##"
+        let exp = r#"
             # TYPE jobs_total counter
             # HELP jobs_total Total number of jobs
             jobs_total{type="a"} 1.0 1612411506789
-            "##;
+            "#;
 
         assert_event_data_eq!(
             events_to_metrics(parse_text_with_overrides(exp, vec![], false)),
@@ -1093,11 +1084,11 @@ mod test {
 
     #[test]
     fn test_overrides_label_overwritten() {
-        let exp = r##"
+        let exp = r#"
             # TYPE jobs_total counter
             # HELP jobs_total Total number of jobs
             jobs_total{type="a"} 1.0 1612411506789
-            "##;
+            "#;
 
         assert_event_data_eq!(
             events_to_metrics(parse_text_with_overrides(exp, vec![("type".to_owned(), "b".to_owned())], false)),
@@ -1115,11 +1106,11 @@ mod test {
     // tested manually.
     #[test]
     fn test_overrides_last_value_preferred() {
-        let exp = r##"
+        let exp = r#"
             # TYPE jobs_total counter
             # HELP jobs_total Total number of jobs
             jobs_total{type="a"} 1.0 1612411506789
-            "##;
+            "#;
 
         assert_event_data_eq!(
             events_to_metrics(parse_text_with_overrides(
@@ -1137,7 +1128,7 @@ mod test {
 
     #[test]
     fn test_aggregation_enabled_only_aggregates_counter_and_histogram() {
-        let exp = r##"
+        let exp = r#"
             # TYPE jobs_total counter
             # HELP jobs_total Total number of jobs
             jobs_total{type="a"} 1.0 1612411506789
@@ -1157,7 +1148,7 @@ mod test {
             # HELP jobs_summary Summary of jobs
             jobs_summary_sum{type="a"} 8.0 1612411506789
             jobs_summary_count{type="a"} 1.0 1612411506789
-            "##;
+            "#;
 
         assert_event_data_eq!(
             events_to_metrics(parse_text_with_overrides(exp, vec![], true)),
@@ -1206,7 +1197,7 @@ mod test {
 
     #[test]
     fn test_aggregation_disabled_all_absolute() {
-        let exp = r##"
+        let exp = r#"
             # TYPE jobs_total counter
             # HELP jobs_total Total number of jobs
             jobs_total{type="a"} 1.0 1612411506789
@@ -1226,7 +1217,7 @@ mod test {
             # HELP jobs_summary Summary of jobs
             jobs_summary_sum{type="a"} 8.0 1612411506789
             jobs_summary_count{type="a"} 1.0 1612411506789
-            "##;
+            "#;
 
         assert_event_data_eq!(
             events_to_metrics(parse_text_with_overrides(exp, vec![], false)),

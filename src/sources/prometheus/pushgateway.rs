@@ -268,8 +268,6 @@ mod test {
         let path = "/metrics/job@base64/=";
         let result = parse_path_labels(path);
 
-        println!("{:?}", result);
-
         assert!(result.is_err());
         assert!(result.unwrap_err().message().contains("Job must not"));
     }
@@ -330,7 +328,7 @@ mod test {
                 .http_protocol_name();
             let push_path = "metrics/job/async_worker";
             let push_url = format!("{}://{}:{}/{}", proto, address.ip(), address.port(), push_path);
-            let push_body = r##"
+            let push_body = r#"
                 # TYPE jobs_total counter
                 # HELP jobs_total Total number of jobs
                 jobs_total{type="a"} 1.0 1612411506789
@@ -350,7 +348,7 @@ mod test {
                 # HELP jobs_summary Summary of jobs
                 jobs_summary_sum{type="a"} 8.0 1612411506789
                 jobs_summary_count{type="a"} 1.0 1612411506789
-                "##;
+                "#;
 
             let timestamp = Utc.with_ymd_and_hms(2021, 2, 4, 4, 5, 6)
                 .single()
