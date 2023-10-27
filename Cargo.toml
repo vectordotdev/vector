@@ -134,7 +134,6 @@ fakedata = { path = "lib/fakedata", optional = true }
 lookup = { package = "vector-lookup", path = "lib/vector-lookup" }
 portpicker = { path = "lib/portpicker" }
 tracing-limit = { path = "lib/tracing-limit" }
-vector-api-client = { path = "lib/vector-api-client", optional = true }
 vector-lib = { path = "lib/vector-lib", default-features = false, features = ["vrl"] }
 vector-vrl-functions = { path = "lib/vector-vrl/functions" }
 loki-logproto = { path = "lib/loki-logproto", optional = true }
@@ -437,7 +436,7 @@ api-client = [
   "dep:number_prefix",
   "dep:ratatui",
   "vector-lib/api",
-  "dep:vector-api-client",
+  "vector-lib/api-client",
 ]
 
 aws-core = [

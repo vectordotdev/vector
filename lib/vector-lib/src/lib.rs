@@ -2,6 +2,8 @@ pub use codecs;
 pub use enrichment;
 #[cfg(feature = "file-source")]
 pub use file_source;
+#[cfg(feature = "api-client")]
+pub use vector_api_client as api_client;
 pub use vector_buffers as buffers;
 pub use vector_common::{
     assert_event_data_eq, btreemap, byte_size_of, byte_size_of::ByteSizeOf, conversion,
