@@ -6,6 +6,7 @@ use tokio::{
     io::{AsyncRead, AsyncWrite},
 };
 
+#[cfg(unix)]
 const FILE_MODE_OWNER_RW_GROUP_RO: u32 = 0o640;
 
 /// File metadata.
