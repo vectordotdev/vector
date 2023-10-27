@@ -2,7 +2,7 @@ name: Call Build Preview
 
 on:
   pull_request:
-    types: [opened, reopened, syncronize]
+    types: [opened, reopened, synchronize]
 
 jobs:
   approval_check:
