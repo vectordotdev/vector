@@ -1,8 +1,10 @@
 name: Deploy Vector Preview Sites
 
 on:
-  pull_request:
-    types: [opened, reopened, syncronize]
+  workflow_run:
+    workflows: ["Call Preview Build"]
+    types:
+      - completed
 
 jobs:
   deploy_vecotr_preview_site:

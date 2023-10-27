@@ -1,0 +1,13 @@
+name: Call Build Preview
+
+on:
+  pull_request:
+    types: [opened, reopened, syncronize]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+  steps:
+    - run: echo "Workflow has been allowed to run for PR ${{ github.event.number }}"
+
