@@ -216,6 +216,11 @@ mod test {
     use super::*;
 
     #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<PrometheusPushgatewayConfig>();
+    }
+
+    #[test]
     fn test_parse_simple_path() {
         let path = "/metrics/job/foo/instance/bar";
         let expected: Vec<_>= vec![("job", "foo"), ("instance", "bar")].into_iter().
