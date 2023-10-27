@@ -213,7 +213,19 @@ fn decode_label_pair(k: &str, v: &str) -> Result<(String, String), ErrorMessage>
 
 #[cfg(test)]
 mod test {
+    use chrono::{TimeZone, Timelike, Utc};
+    use vector_common::finalization::EventStatus;
+    use vector_core::event::{Metric, MetricKind, MetricValue};
+    use vector_core::metric_tags;
+    use vector_core::tls::MaybeTlsSettings;
+    use crate::{SourceSender, test_util};
+    use crate::test_util::components::{assert_source_compliance, HTTP_PUSH_SOURCE_TAGS};
+    use crate::test_util::wait_for_tcp;
     use super::*;
+
+    fn events_to_metrics(events: Vec<Event>) -> Vec<Metric> {
+        events.into_iter().map(Event::into_metric).collect()
+    }
 
     #[test]
     fn generate_config() {
@@ -283,5 +295,128 @@ mod test {
 
         assert!(actual.is_ok());
         assert_eq!(actual.unwrap(), expected);
+    }
+
+    #[tokio::test]
+    async fn testk_whole_request_happy_path_http() {
+        whole_request_happy_path(None).await;
+    }
+
+    #[tokio::test]
+    async fn test_whole_request_happy_path_https() {
+        whole_request_happy_path(Some(TlsEnableableConfig::test_config())).await;
+    }
+    async fn whole_request_happy_path(tls: Option<TlsEnableableConfig>) {
+        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+            let address = test_util::next_addr();
+            let (tx, rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
+
+            let source = PrometheusPushgatewayConfig {
+                address,
+                auth: None,
+                tls: tls.clone(),
+                acknowledgements: SourceAcknowledgementsConfig::default(),
+                aggregate_metrics: true,
+            };
+            let source = source
+                .build(SourceContext::new_test(tx, None))
+                .await
+                .unwrap();
+            tokio::spawn(source);
+            wait_for_tcp(address).await;
+
+            let proto = MaybeTlsSettings::from_config(&tls, true)
+                .unwrap()
+                .http_protocol_name();
+            let push_path = "metrics/job/async_worker";
+            let push_url = format!("{}://{}:{}/{}", proto, address.ip(), address.port(), push_path);
+            let push_body = r##"
+                # TYPE jobs_total counter
+                # HELP jobs_total Total number of jobs
+                jobs_total{type="a"} 1.0 1612411506789
+                # TYPE jobs_current gauge
+                # HELP jobs_current Current number of jobs
+                jobs_current{type="a"} 5.0 1612411506789
+                # TYPE jobs_distribution histogram
+                # HELP jobs_distribution Distribution of jobs
+                jobs_distribution_bucket{type="a",le="1"} 0.0 1612411506789
+                jobs_distribution_bucket{type="a",le="2.5"} 0.0 1612411506789
+                jobs_distribution_bucket{type="a",le="5"} 0.0 1612411506789
+                jobs_distribution_bucket{type="a",le="10"} 1.0 1612411506789
+                jobs_distribution_bucket{type="a",le="+Inf"} 1.0 1612411506789
+                jobs_distribution_sum{type="a"} 8.0 1612411506789
+                jobs_distribution_count{type="a"} 1.0 1612411506789
+                # TYPE jobs_summary summary
+                # HELP jobs_summary Summary of jobs
+                jobs_summary_sum{type="a"} 8.0 1612411506789
+                jobs_summary_count{type="a"} 1.0 1612411506789
+                "##;
+
+            let timestamp = Utc.with_ymd_and_hms(2021, 2, 4, 4, 5, 6)
+                .single()
+                .and_then(|t| t.with_nanosecond(789 * 1_000_000))
+                .expect("invalid timestamp");
+
+            let expected = vec![
+                Metric::new(
+                    "jobs_total",
+                    MetricKind::Incremental,
+                    MetricValue::Counter { value: 1.0 },
+                )
+                    .with_tags(Some(metric_tags! { "job" => "async_worker", "type" => "a" }))
+                    .with_timestamp(Some(timestamp)),
+                Metric::new(
+                    "jobs_current",
+                    MetricKind::Absolute,
+                    MetricValue::Gauge { value: 5.0 },
+                )
+                    .with_tags(Some(metric_tags! { "job" => "async_worker", "type" => "a" }))
+                    .with_timestamp(Some(timestamp)),
+                Metric::new(
+                    "jobs_distribution",
+                    MetricKind::Incremental,
+                    MetricValue::AggregatedHistogram {
+                        buckets: vector_core::buckets![
+                            1.0 => 0, 2.5 => 0, 5.0 => 0, 10.0 => 1
+                        ],
+                        count: 1,
+                        sum: 8.0,
+                    },
+                )
+                    .with_tags(Some(metric_tags! { "job" => "async_worker", "type" => "a" }))
+                    .with_timestamp(Some(timestamp)),
+                Metric::new(
+                    "jobs_summary",
+                    MetricKind::Absolute,
+                    MetricValue::AggregatedSummary {
+                        quantiles: vector_core::quantiles![],
+                        count: 1,
+                        sum: 8.0,
+                    },
+                )
+                    .with_tags(Some(metric_tags! { "job" => "async_worker", "type" => "a" }))
+                    .with_timestamp(Some(timestamp)),
+            ];
+
+            let output = test_util::spawn_collect_ready(
+                async move {
+                    let client = reqwest::Client::builder()
+                        .danger_accept_invalid_certs(true)
+                        .build()
+                        .unwrap();
+                    client.post(push_url)
+                        .body(push_body)
+                        .send()
+                        .await
+                        .unwrap();
+                },
+                rx,
+                1,
+            )
+                .await;
+
+            vector_common::assert_event_data_eq!(expected, events_to_metrics(output));
+        })
+            .await;
     }
 }
