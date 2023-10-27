@@ -10,7 +10,7 @@ use colored::*;
 use indexmap::IndexMap;
 use serde::Serialize;
 use toml::{map::Map, Value};
-use vector_config::component::{
+use vector_lib::configurable::component::{
     ExampleError, SinkDescription, SourceDescription, TransformDescription,
 };
 use vector_lib::{buffers::BufferConfig, config::GlobalOptions, default_data_dir};

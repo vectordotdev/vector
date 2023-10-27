@@ -5,8 +5,8 @@ use chrono::{Duration, Utc};
 use futures::{future, stream::BoxStream, StreamExt};
 use tower::Service;
 use vector_lib::request_metadata::{MetaDescriptive, RequestMetadata};
+use vector_lib::stream::{BatcherSettings, DriverResponse};
 use vector_lib::{partition::Partitioner, sink::StreamSink};
-use vector_stream::{BatcherSettings, DriverResponse};
 
 use crate::{
     event::{Event, EventFinalizers, Finalizable},

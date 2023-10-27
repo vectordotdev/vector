@@ -16,7 +16,7 @@ use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
 use tokio::{sync::oneshot, task::spawn_blocking};
 use tracing::{Instrument, Span};
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 use vector_lib::finalizer::OrderedFinalizer;
 use vector_lib::{
     config::{LegacyKey, LogNamespace},

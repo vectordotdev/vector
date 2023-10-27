@@ -141,11 +141,7 @@ opentelemetry-proto = { path = "lib/opentelemetry-proto", optional = true }
 tracing-limit = { path = "lib/tracing-limit" }
 vector-api-client = { path = "lib/vector-api-client", optional = true }
 vector-buffers = { path = "lib/vector-buffers", default-features = false }
-vector-config = { path = "lib/vector-config" }
-vector-config-common = { path = "lib/vector-config-common" }
-vector-config-macros = { path = "lib/vector-config-macros" }
 vector-lib = { path = "lib/vector-lib", default-features = false, features = ["vrl"] }
-vector-stream = { path = "lib/vector-stream" }
 vector-vrl-functions = { path = "lib/vector-vrl/functions" }
 loki-logproto = { path = "lib/loki-logproto", optional = true }
 
@@ -203,7 +199,7 @@ opendal = {version = "0.38", default-features = false, features = ["native-tls",
 tower = { version = "0.4.13", default-features = false, features = ["buffer", "limit", "retry", "timeout", "util", "balance", "discover"] }
 tower-http = { version = "0.4.4", default-features = false, features = ["decompression-gzip", "trace"]}
 # Serde
-serde = { version = "1.0.189", default-features = false, features = ["derive"] }
+serde = { version = "1.0.190", default-features = false, features = ["derive"] }
 serde-toml-merge = { version = "0.3.3", default-features = false }
 serde_bytes = { version = "0.11.12", default-features = false, features = ["std"], optional = true }
 serde_json = { version = "1.0.107", default-features = false, features = ["raw_value"] }
@@ -267,7 +263,7 @@ encoding_rs = { version = "0.8.33", default-features = false, features = ["serde
 enum_dispatch = { version = "0.3.12", default-features = false }
 exitcode = { version = "1.1.2", default-features = false }
 flate2 = { version = "1.0.28", default-features = false, features = ["default"] }
-futures-util = { version = "0.3.28", default-features = false }
+futures-util = { version = "0.3.29", default-features = false }
 glob = { version = "0.3.1", default-features = false }
 governor = { version = "0.6.0", default-features = false, features = ["dashmap", "jitter", "std"], optional = true }
 grok = { version = "2.0.0", default-features = false, optional = true }
@@ -324,7 +320,7 @@ syslog = { version = "6.1.0", default-features = false, optional = true }
 tikv-jemallocator = { version = "0.5.4", default-features = false, optional = true }
 tokio-postgres = { version = "0.7.10", default-features = false, features = ["runtime", "with-chrono-0_4"], optional = true }
 tokio-tungstenite = {version = "0.20.1", default-features = false, features = ["connect"], optional = true}
-toml = { version = "0.8.4", default-features = false, features = ["parse", "display"] }
+toml = { version = "0.8.5", default-features = false, features = ["parse", "display"] }
 tonic = { version = "0.10", optional = true, default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "gzip"] }
 trust-dns-proto = { version = "0.23.2", default-features = false, features = ["dnssec"], optional = true }
 typetag = { version = "0.2.13", default-features = false }

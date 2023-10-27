@@ -8,7 +8,7 @@ use lookup::lookup_v2::ConfigValuePath;
 use lookup::{event_path, PathPrefix};
 use ordered_float::NotNan;
 use serde::{Deserialize, Deserializer};
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 use vector_lib::event::{LogEvent, MaybeAsLogMut};
 use vector_lib::schema::meaning;
 use vrl::path::OwnedValuePath;

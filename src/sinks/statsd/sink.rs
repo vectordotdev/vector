@@ -7,8 +7,8 @@ use futures_util::{
 };
 use tower::Service;
 use vector_lib::internal_event::Protocol;
+use vector_lib::stream::{BatcherSettings, DriverResponse};
 use vector_lib::{event::Event, sink::StreamSink};
-use vector_stream::{BatcherSettings, DriverResponse};
 
 use crate::sinks::util::SinkBuilderExt;
 

@@ -17,7 +17,7 @@ use tokio_util::codec::Decoder as _;
 use vrl::value::{kind::Collection, Kind};
 use warp::http::{HeaderMap, StatusCode};
 
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 use vector_lib::{
     config::{LegacyKey, LogNamespace},
     schema::Definition,

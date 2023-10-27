@@ -11,7 +11,7 @@ use snafu::ResultExt;
 use tower::Service;
 use vector_lib::event::{EventFinalizers, EventStatus, Finalizable};
 use vector_lib::request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata};
-use vector_stream::DriverResponse;
+use vector_lib::stream::DriverResponse;
 
 use crate::{
     http::{BuildRequestSnafu, CallRequestSnafu, HttpClient, HttpError},

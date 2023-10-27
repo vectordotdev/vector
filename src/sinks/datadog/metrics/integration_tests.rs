@@ -72,11 +72,15 @@ fn generate_counter_gauge_set() -> Vec<Event> {
     let ts = Utc::now().trunc_subsecs(3);
     let events = vec![
         // gauge
-        Event::Metric(Metric::new(
-            "gauge",
-            MetricKind::Incremental,
-            MetricValue::Gauge { value: 5678.0 },
-        )),
+        Event::Metric(
+            Metric::new(
+                "gauge",
+                MetricKind::Incremental,
+                MetricValue::Gauge { value: 5678.0 },
+            )
+            // Dogstatsd outputs gauges with an interval
+            .with_interval_ms(NonZeroU32::new(10000)),
+        ),
         // counter with interval
         Event::Metric(
             Metric::new(
@@ -318,7 +322,7 @@ fn validate_protobuf_set_gauge_rate(request: &(Parts, Bytes)) {
             ddmetric_proto::metric_payload::MetricType::Gauge
         );
         assert_eq!(gauge.points[0].value, 5678.0);
-        assert_eq!(gauge.interval, 0);
+        assert_eq!(gauge.interval, 10);
     }
 
     // validate counter w interval = rate

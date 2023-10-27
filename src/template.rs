@@ -10,7 +10,7 @@ use lookup::lookup_v2::parse_target_path;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use snafu::Snafu;
-use vector_config::{configurable_component, ConfigurableString};
+use vector_lib::configurable::{configurable_component, ConfigurableString};
 
 use crate::{
     config::log_schema,

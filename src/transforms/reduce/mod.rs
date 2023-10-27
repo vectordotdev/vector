@@ -10,7 +10,7 @@ use std::{
     pin::Pin,
     time::{Duration, Instant},
 };
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 
 use crate::config::OutputId;
 use crate::{
@@ -28,7 +28,7 @@ use crate::config::schema::Definition;
 use crate::event::Value;
 pub use merge_strategy::*;
 use vector_lib::config::LogNamespace;
-use vector_stream::expiration_map::{map_with_expiration, Emitter};
+use vector_lib::stream::expiration_map::{map_with_expiration, Emitter};
 use vrl::value::kind::Collection;
 use vrl::value::Kind;
 

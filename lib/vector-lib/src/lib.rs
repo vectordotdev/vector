@@ -4,6 +4,7 @@ pub use vector_common::{
     registered_event, request_metadata, sensitive_string, shutdown, trigger, Error, Result,
     TimeZone,
 };
+pub use vector_config as configurable;
 #[cfg(feature = "vrl")]
 pub use vector_core::compile_vrl;
 #[cfg(feature = "test")]
@@ -13,6 +14,7 @@ pub use vector_core::{
     samples, schema, serde, sink, source, tcp, tls, transform, update_counter,
     EstimatedJsonEncodedSizeOf,
 };
+pub use vector_stream as stream;
 
 pub mod config {
     pub use vector_common::config::ComponentKey;

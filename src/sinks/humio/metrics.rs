@@ -4,7 +4,7 @@ use futures::StreamExt;
 use futures_util::stream::BoxStream;
 use indoc::indoc;
 use lookup::lookup_v2::{ConfigValuePath, OptionalValuePath};
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 use vector_lib::sensitive_string::SensitiveString;
 use vector_lib::sink::StreamSink;
 

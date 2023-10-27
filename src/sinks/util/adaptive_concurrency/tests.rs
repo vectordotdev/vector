@@ -25,7 +25,7 @@ use serde::Deserialize;
 use snafu::Snafu;
 use tokio::time::{self, sleep, Duration, Instant};
 use tower::Service;
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 use vector_lib::json_size::JsonSize;
 
 use super::controller::ControllerStatistics;
