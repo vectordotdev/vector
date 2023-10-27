@@ -192,7 +192,9 @@ mod test {
             .expect("invalid timestamp")
     });
 
-    fn events_to_metrics(events: Result<Vec<Event>, ParserError>) -> Result<Vec<Metric>, ParserError> {
+    fn events_to_metrics(
+        events: Result<Vec<Event>, ParserError>,
+    ) -> Result<Vec<Metric>, ParserError> {
         events.map(|events| events.into_iter().map(Event::into_metric).collect())
     }
 
@@ -1091,7 +1093,11 @@ mod test {
             "#;
 
         assert_event_data_eq!(
-            events_to_metrics(parse_text_with_overrides(exp, vec![("type".to_owned(), "b".to_owned())], false)),
+            events_to_metrics(parse_text_with_overrides(
+                exp,
+                vec![("type".to_owned(), "b".to_owned())],
+                false
+            )),
             Ok(vec![Metric::new(
                 "jobs_total",
                 MetricKind::Absolute,
@@ -1114,8 +1120,13 @@ mod test {
 
         assert_event_data_eq!(
             events_to_metrics(parse_text_with_overrides(
-                exp, vec![("type".to_owned(), "b".to_owned()), ("type".to_owned(), "c".to_owned())], false)
-            ),
+                exp,
+                vec![
+                    ("type".to_owned(), "b".to_owned()),
+                    ("type".to_owned(), "c".to_owned())
+                ],
+                false
+            )),
             Ok(vec![Metric::new(
                 "jobs_total",
                 MetricKind::Absolute,
@@ -1158,15 +1169,15 @@ mod test {
                     MetricKind::Incremental,
                     MetricValue::Counter { value: 1.0 },
                 )
-                    .with_tags(Some(metric_tags! { "type" => "a" }))
-                    .with_timestamp(Some(*TIMESTAMP)),
+                .with_tags(Some(metric_tags! { "type" => "a" }))
+                .with_timestamp(Some(*TIMESTAMP)),
                 Metric::new(
                     "jobs_current",
                     MetricKind::Absolute,
                     MetricValue::Gauge { value: 5.0 },
                 )
-                    .with_tags(Some(metric_tags! { "type" => "a" }))
-                    .with_timestamp(Some(*TIMESTAMP)),
+                .with_tags(Some(metric_tags! { "type" => "a" }))
+                .with_timestamp(Some(*TIMESTAMP)),
                 Metric::new(
                     "jobs_distribution",
                     MetricKind::Incremental,
@@ -1178,8 +1189,8 @@ mod test {
                         sum: 8.0,
                     },
                 )
-                    .with_tags(Some(metric_tags! { "type" => "a" }))
-                    .with_timestamp(Some(*TIMESTAMP)),
+                .with_tags(Some(metric_tags! { "type" => "a" }))
+                .with_timestamp(Some(*TIMESTAMP)),
                 Metric::new(
                     "jobs_summary",
                     MetricKind::Absolute,
@@ -1189,8 +1200,8 @@ mod test {
                         sum: 8.0,
                     },
                 )
-                    .with_tags(Some(metric_tags! { "type" => "a" }))
-                    .with_timestamp(Some(*TIMESTAMP)),
+                .with_tags(Some(metric_tags! { "type" => "a" }))
+                .with_timestamp(Some(*TIMESTAMP)),
             ]),
         );
     }
@@ -1227,15 +1238,15 @@ mod test {
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 1.0 },
                 )
-                    .with_tags(Some(metric_tags! { "type" => "a" }))
-                    .with_timestamp(Some(*TIMESTAMP)),
+                .with_tags(Some(metric_tags! { "type" => "a" }))
+                .with_timestamp(Some(*TIMESTAMP)),
                 Metric::new(
                     "jobs_current",
                     MetricKind::Absolute,
                     MetricValue::Gauge { value: 5.0 },
                 )
-                    .with_tags(Some(metric_tags! { "type" => "a" }))
-                    .with_timestamp(Some(*TIMESTAMP)),
+                .with_tags(Some(metric_tags! { "type" => "a" }))
+                .with_timestamp(Some(*TIMESTAMP)),
                 Metric::new(
                     "jobs_distribution",
                     MetricKind::Absolute,
@@ -1247,8 +1258,8 @@ mod test {
                         sum: 8.0,
                     },
                 )
-                    .with_tags(Some(metric_tags! { "type" => "a" }))
-                    .with_timestamp(Some(*TIMESTAMP)),
+                .with_tags(Some(metric_tags! { "type" => "a" }))
+                .with_timestamp(Some(*TIMESTAMP)),
                 Metric::new(
                     "jobs_summary",
                     MetricKind::Absolute,
@@ -1258,8 +1269,8 @@ mod test {
                         sum: 8.0,
                     },
                 )
-                    .with_tags(Some(metric_tags! { "type" => "a" }))
-                    .with_timestamp(Some(*TIMESTAMP)),
+                .with_tags(Some(metric_tags! { "type" => "a" }))
+                .with_timestamp(Some(*TIMESTAMP)),
             ]),
         );
     }

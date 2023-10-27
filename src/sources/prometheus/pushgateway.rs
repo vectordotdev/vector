@@ -135,7 +135,7 @@ fn parse_path_labels(path: &str) -> Result<Vec<(String, String)>, ErrorMessage> 
         return Err(ErrorMessage::new(
             http::StatusCode::BAD_REQUEST,
             "Path must begin with '/metrics/job'".to_owned(),
-        ))
+        ));
     }
 
     path.split('/')
@@ -188,7 +188,7 @@ fn decode_label_pair(k: &str, v: &str) -> Result<(String, String), ErrorMessage>
             return Err(ErrorMessage::new(
                 http::StatusCode::BAD_REQUEST,
                 "Job must not have an empty value".to_owned(),
-            ))
+            ));
         }
 
         return Ok((stripped_key.to_owned(), "".to_owned()));
@@ -213,15 +213,15 @@ fn decode_label_pair(k: &str, v: &str) -> Result<(String, String), ErrorMessage>
 
 #[cfg(test)]
 mod test {
+    use super::*;
+    use crate::test_util::components::{assert_source_compliance, HTTP_PUSH_SOURCE_TAGS};
+    use crate::test_util::wait_for_tcp;
+    use crate::{test_util, SourceSender};
     use chrono::{TimeZone, Timelike, Utc};
     use vector_common::finalization::EventStatus;
     use vector_core::event::{Metric, MetricKind, MetricValue};
     use vector_core::metric_tags;
     use vector_core::tls::MaybeTlsSettings;
-    use crate::{SourceSender, test_util};
-    use crate::test_util::components::{assert_source_compliance, HTTP_PUSH_SOURCE_TAGS};
-    use crate::test_util::wait_for_tcp;
-    use super::*;
 
     fn events_to_metrics(events: Vec<Event>) -> Vec<Metric> {
         events.into_iter().map(Event::into_metric).collect()
@@ -235,8 +235,10 @@ mod test {
     #[test]
     fn test_parse_simple_path() {
         let path = "/metrics/job/foo/instance/bar";
-        let expected: Vec<_>= vec![("job", "foo"), ("instance", "bar")].into_iter().
-            map(|(k,v)| (k.to_owned(), v.to_owned())).collect();
+        let expected: Vec<_> = vec![("job", "foo"), ("instance", "bar")]
+            .into_iter()
+            .map(|(k, v)| (k.to_owned(), v.to_owned()))
+            .collect();
         let actual = parse_path_labels(path);
 
         assert!(actual.is_ok());
@@ -255,8 +257,10 @@ mod test {
     #[test]
     fn test_parse_path_with_base64_segment() {
         let path = "/metrics/job/foo/instance@base64/YmFyL2Jheg==";
-        let expected: Vec<_>= vec![("job", "foo"), ("instance", "bar/baz")].into_iter().
-            map(|(k,v)| (k.to_owned(), v.to_owned())).collect();
+        let expected: Vec<_> = vec![("job", "foo"), ("instance", "bar/baz")]
+            .into_iter()
+            .map(|(k, v)| (k.to_owned(), v.to_owned()))
+            .collect();
         let actual = parse_path_labels(path);
 
         assert!(actual.is_ok());
@@ -287,8 +291,10 @@ mod test {
     #[test]
     fn test_parse_path_duplicate_labels_preserves_order() {
         let path = "/metrics/job/foo/instance/bar/instance/baz";
-        let expected: Vec<_>= vec![("job", "foo"), ("instance", "bar"), ("instance", "baz")].into_iter().
-            map(|(k,v)| (k.to_owned(), v.to_owned())).collect();
+        let expected: Vec<_> = vec![("job", "foo"), ("instance", "bar"), ("instance", "baz")]
+            .into_iter()
+            .map(|(k, v)| (k.to_owned(), v.to_owned()))
+            .collect();
         let actual = parse_path_labels(path);
 
         assert!(actual.is_ok());
@@ -327,7 +333,13 @@ mod test {
                 .unwrap()
                 .http_protocol_name();
             let push_path = "metrics/job/async_worker";
-            let push_url = format!("{}://{}:{}/{}", proto, address.ip(), address.port(), push_path);
+            let push_url = format!(
+                "{}://{}:{}/{}",
+                proto,
+                address.ip(),
+                address.port(),
+                push_path
+            );
             let push_body = r#"
                 # TYPE jobs_total counter
                 # HELP jobs_total Total number of jobs
@@ -350,7 +362,8 @@ mod test {
                 jobs_summary_count{type="a"} 1.0 1612411506789
                 "#;
 
-            let timestamp = Utc.with_ymd_and_hms(2021, 2, 4, 4, 5, 6)
+            let timestamp = Utc
+                .with_ymd_and_hms(2021, 2, 4, 4, 5, 6)
                 .single()
                 .and_then(|t| t.with_nanosecond(789 * 1_000_000))
                 .expect("invalid timestamp");
@@ -361,15 +374,19 @@ mod test {
                     MetricKind::Incremental,
                     MetricValue::Counter { value: 1.0 },
                 )
-                    .with_tags(Some(metric_tags! { "job" => "async_worker", "type" => "a" }))
-                    .with_timestamp(Some(timestamp)),
+                .with_tags(Some(
+                    metric_tags! { "job" => "async_worker", "type" => "a" },
+                ))
+                .with_timestamp(Some(timestamp)),
                 Metric::new(
                     "jobs_current",
                     MetricKind::Absolute,
                     MetricValue::Gauge { value: 5.0 },
                 )
-                    .with_tags(Some(metric_tags! { "job" => "async_worker", "type" => "a" }))
-                    .with_timestamp(Some(timestamp)),
+                .with_tags(Some(
+                    metric_tags! { "job" => "async_worker", "type" => "a" },
+                ))
+                .with_timestamp(Some(timestamp)),
                 Metric::new(
                     "jobs_distribution",
                     MetricKind::Incremental,
@@ -381,8 +398,10 @@ mod test {
                         sum: 8.0,
                     },
                 )
-                    .with_tags(Some(metric_tags! { "job" => "async_worker", "type" => "a" }))
-                    .with_timestamp(Some(timestamp)),
+                .with_tags(Some(
+                    metric_tags! { "job" => "async_worker", "type" => "a" },
+                ))
+                .with_timestamp(Some(timestamp)),
                 Metric::new(
                     "jobs_summary",
                     MetricKind::Absolute,
@@ -392,8 +411,10 @@ mod test {
                         sum: 8.0,
                     },
                 )
-                    .with_tags(Some(metric_tags! { "job" => "async_worker", "type" => "a" }))
-                    .with_timestamp(Some(timestamp)),
+                .with_tags(Some(
+                    metric_tags! { "job" => "async_worker", "type" => "a" },
+                ))
+                .with_timestamp(Some(timestamp)),
             ];
 
             let output = test_util::spawn_collect_ready(
@@ -402,19 +423,15 @@ mod test {
                         .danger_accept_invalid_certs(true)
                         .build()
                         .unwrap();
-                    client.post(push_url)
-                        .body(push_body)
-                        .send()
-                        .await
-                        .unwrap();
+                    client.post(push_url).body(push_body).send().await.unwrap();
                 },
                 rx,
                 1,
             )
-                .await;
+            .await;
 
             vector_common::assert_event_data_eq!(expected, events_to_metrics(output));
         })
-            .await;
+        .await;
     }
 }
