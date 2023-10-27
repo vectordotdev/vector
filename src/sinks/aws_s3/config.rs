@@ -6,9 +6,11 @@ use codecs::{
     TextSerializerConfig,
 };
 use tower::ServiceBuilder;
-use vector_config::configurable_component;
+//use vector_config::configurable_component;
 use vector_lib::{
-    sink::VectorSink, TimeZone
+    configurable::configurable_component,
+    sink::VectorSink,
+    TimeZone,
 };
 
 use super::sink::S3RequestOptions;
