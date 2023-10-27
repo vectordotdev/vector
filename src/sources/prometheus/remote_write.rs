@@ -1,7 +1,7 @@
 use std::{collections::HashMap, net::SocketAddr};
 
 use bytes::Bytes;
-use prometheus_parser::proto;
+use vector_lib::prometheus::parser::proto;
 use prost::Message;
 use vector_lib::config::LogNamespace;
 use vector_lib::configurable::configurable_component;

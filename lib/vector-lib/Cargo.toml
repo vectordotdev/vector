@@ -10,6 +10,7 @@ codecs = { path = "../codecs", default-features = false }
 enrichment = { path = "../enrichment" }
 file-source = { path = "../file-source", optional = true }
 opentelemetry-proto = { path = "../opentelemetry-proto", optional = true }
+prometheus-parser = { path = "../prometheus-parser", optional = true }
 vector-buffers = { path = "../vector-buffers", default-features = false }
 vector-common = { path = "../vector-common" }
 vector-config = { path = "../vector-config" }
@@ -21,6 +22,7 @@ api = ["vector-core/api"]
 lua = ["vector-core/lua"]
 file-source = ["dep:file-source"]
 opentelemetry = ["dep:opentelemetry-proto"]
+prometheus = ["dep:prometheus-parser"]
 syslog = ["codecs/syslog"]
 test = ["vector-core/test"]
 vrl = ["vector-core/vrl"]

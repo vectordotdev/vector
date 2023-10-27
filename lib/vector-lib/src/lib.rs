@@ -34,3 +34,8 @@ pub mod config {
 pub mod opentelemetry {
     pub use opentelemetry_proto::{convert, proto};
 }
+
+#[cfg(feature = "prometheus")]
+pub mod prometheus {
+    pub use prometheus_parser as parser;
+}
