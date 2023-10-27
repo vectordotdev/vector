@@ -5,11 +5,10 @@ on:
     types: [opened, reopened, syncronize]
 
 jobs:
-  build:
+  approval_check:
     runs-on: ubuntu-latest
-
-  steps:
-    - name: Check for approval
-      run: |
-        echo "Workflow has been allowed to run for PR ${{ github.event.number }}"
+    steps:
+      - name: Check for approval
+        run: |
+          echo "Workflow has been allowed to run for PR ${{ github.event.number }}"
 
