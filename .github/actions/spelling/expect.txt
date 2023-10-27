@@ -1235,6 +1235,7 @@ wktpointer
 wmem
 woooooow
 woothee
+wor
 wordlist
 workdir
 workstreams
