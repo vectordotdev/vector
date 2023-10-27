@@ -9,7 +9,7 @@ use futures::FutureExt;
 use http::{StatusCode, Uri};
 use snafu::{ResultExt, Snafu};
 use tower::Service;
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 use vector_lib::event::MetricTags;
 use vector_lib::sensitive_string::SensitiveString;
 

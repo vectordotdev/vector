@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use enum_dispatch::enum_dispatch;
-use vector_config::{configurable_component, NamedComponent};
 use vector_lib::config::GlobalOptions;
+use vector_lib::configurable::{configurable_component, NamedComponent};
 
 use crate::enrichment_tables::EnrichmentTables;
 

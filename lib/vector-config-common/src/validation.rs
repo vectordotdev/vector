@@ -4,6 +4,7 @@ use quote::{quote, ToTokens};
 use syn::{Expr, Lit, Meta};
 
 use crate::{
+    configurable_package_name_hack,
     num::{ERR_NUMERIC_OUT_OF_RANGE, NUMERIC_ENFORCED_LOWER_BOUND, NUMERIC_ENFORCED_UPPER_BOUND},
     schema::{InstanceType, SchemaObject},
 };
@@ -138,18 +139,19 @@ impl Format {
 
 impl ToTokens for Format {
     fn to_tokens(&self, tokens: &mut TokenStream) {
+        let vector_config = configurable_package_name_hack();
         let format_tokens = match self {
-            Format::Date => quote! { ::vector_config::validation::Format::Date },
-            Format::Time => quote! { ::vector_config::validation::Format::Time },
-            Format::DateTime => quote! { ::vector_config::validation::Format::DateTime },
-            Format::Duration => quote! { ::vector_config::validation::Format::Duration },
-            Format::Email => quote! { ::vector_config::validation::Format::Email },
-            Format::Hostname => quote! { ::vector_config::validation::Format::Hostname },
-            Format::Uri => quote! { ::vector_config::validation::Format::Uri },
-            Format::IPv4 => quote! { ::vector_config::validation::Format::IPv4 },
-            Format::IPv6 => quote! { ::vector_config::validation::Format::IPv6 },
-            Format::Uuid => quote! { ::vector_config::validation::Format::Uuid },
-            Format::Regex => quote! { ::vector_config::validation::Format::Regex },
+            Format::Date => quote! { #vector_config::validation::Format::Date },
+            Format::Time => quote! { #vector_config::validation::Format::Time },
+            Format::DateTime => quote! { #vector_config::validation::Format::DateTime },
+            Format::Duration => quote! { #vector_config::validation::Format::Duration },
+            Format::Email => quote! { #vector_config::validation::Format::Email },
+            Format::Hostname => quote! { #vector_config::validation::Format::Hostname },
+            Format::Uri => quote! { #vector_config::validation::Format::Uri },
+            Format::IPv4 => quote! { #vector_config::validation::Format::IPv4 },
+            Format::IPv6 => quote! { #vector_config::validation::Format::IPv6 },
+            Format::Uuid => quote! { #vector_config::validation::Format::Uuid },
+            Format::Regex => quote! { #vector_config::validation::Format::Regex },
         };
 
         tokens.extend(format_tokens);
@@ -292,24 +294,25 @@ impl Validation {
 
 impl ToTokens for Validation {
     fn to_tokens(&self, tokens: &mut TokenStream) {
+        let vector_config = configurable_package_name_hack();
         let validation_tokens = match self {
             Validation::KnownFormat(format) => {
-                quote! { ::vector_config::validation::Validation::KnownFormat(#format) }
+                quote! { #vector_config::validation::Validation::KnownFormat(#format) }
             }
             Validation::Length { minimum, maximum } => {
                 let min_tokens = option_as_token(*minimum);
                 let max_tokens = option_as_token(*maximum);
 
-                quote! { ::vector_config::validation::Validation::Length { minimum: #min_tokens, maximum: #max_tokens } }
+                quote! { #vector_config::validation::Validation::Length { minimum: #min_tokens, maximum: #max_tokens } }
             }
             Validation::Range { minimum, maximum } => {
                 let min_tokens = option_as_token(*minimum);
                 let max_tokens = option_as_token(*maximum);
 
-                quote! { ::vector_config::validation::Validation::Range { minimum: #min_tokens, maximum: #max_tokens } }
+                quote! { #vector_config::validation::Validation::Range { minimum: #min_tokens, maximum: #max_tokens } }
             }
             Validation::Pattern(pattern) => {
-                quote! { ::vector_config::validation::Validation::Pattern(#pattern.to_string()) }
+                quote! { #vector_config::validation::Validation::Pattern(#pattern.to_string()) }
             }
         };
 

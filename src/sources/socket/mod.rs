@@ -5,8 +5,8 @@ mod unix;
 
 use codecs::decoding::DeserializerConfig;
 use lookup::{lookup_v2::OptionalValuePath, owned_value_path};
-use vector_config::configurable_component;
 use vector_lib::config::{log_schema, LegacyKey, LogNamespace};
+use vector_lib::configurable::configurable_component;
 use vrl::value::{kind::Collection, Kind};
 
 #[cfg(unix)]

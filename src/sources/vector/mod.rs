@@ -5,7 +5,7 @@ use chrono::Utc;
 use codecs::NativeDeserializerConfig;
 use futures::TryFutureExt;
 use tonic::{Request, Response, Status};
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 use vector_lib::internal_event::{CountByteSize, InternalEventHandle as _};
 use vector_lib::{
     config::LogNamespace,

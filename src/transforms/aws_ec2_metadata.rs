@@ -14,8 +14,8 @@ use serde_with::serde_as;
 use snafu::ResultExt as _;
 use tokio::time::{sleep, Duration, Instant};
 use tracing::Instrument;
-use vector_config::configurable_component;
 use vector_lib::config::LogNamespace;
+use vector_lib::configurable::configurable_component;
 use vrl::value::kind::Collection;
 use vrl::value::Kind;
 

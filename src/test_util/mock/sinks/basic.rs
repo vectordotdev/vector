@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use futures_util::{stream::BoxStream, FutureExt, StreamExt};
 use snafu::Snafu;
 use tokio::sync::oneshot;
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 use vector_lib::finalization::Finalizable;
 use vector_lib::{
     config::{AcknowledgementsConfig, Input},

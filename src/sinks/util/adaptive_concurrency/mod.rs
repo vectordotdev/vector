@@ -15,7 +15,7 @@ pub(super) const MAX_CONCURRENCY: usize = 200;
 
 pub(crate) use layer::AdaptiveConcurrencyLimitLayer;
 pub(crate) use service::AdaptiveConcurrencyLimit;
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 
 fn instant_now() -> std::time::Instant {
     tokio::time::Instant::now().into()

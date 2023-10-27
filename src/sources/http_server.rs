@@ -14,7 +14,7 @@ use codecs::{
     NewlineDelimitedDecoderConfig,
 };
 use lookup::{lookup_v2::OptionalValuePath, owned_value_path, path};
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 use vector_lib::{
     config::{DataType, LegacyKey, LogNamespace},
     schema::Definition,

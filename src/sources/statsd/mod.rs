@@ -13,7 +13,7 @@ use listenfd::ListenFd;
 use serde_with::serde_as;
 use smallvec::{smallvec, SmallVec};
 use tokio_util::udp::UdpFramed;
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 use vector_lib::internal_event::{CountByteSize, InternalEventHandle as _, Registered};
 use vector_lib::EstimatedJsonEncodedSizeOf;
 

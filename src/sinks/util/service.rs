@@ -12,7 +12,7 @@ use tower::{
     timeout::Timeout,
     Service, ServiceBuilder,
 };
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 
 pub use crate::sinks::util::service::{
     concurrency::{concurrency_is_adaptive, Concurrency},

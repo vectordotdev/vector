@@ -10,7 +10,7 @@ use std::{
     pin::Pin,
     time::{Duration, Instant},
 };
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 
 use crate::config::OutputId;
 use crate::{
