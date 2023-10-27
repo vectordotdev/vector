@@ -131,6 +131,7 @@ pub fn load_from_paths(config_paths: &[ConfigPath]) -> Result<Config, Vec<String
 /// in the builder, the config is used as bootstrapping for a remote source. Otherwise,
 /// provider instantiation is skipped.
 pub async fn load_from_paths_with_provider_and_secrets(
+    datadog_options: Option<super::datadog::Options>,
     config_paths: &[ConfigPath],
     signal_handler: &mut signal::SignalHandler,
 ) -> Result<Config, Vec<String>> {
@@ -148,6 +149,10 @@ pub async fn load_from_paths_with_provider_and_secrets(
         debug!(message = "No secret placeholder found, skipping secret resolution.");
         load_builder_from_paths(config_paths)?
     };
+
+    if let Some(datadog) = datadog_options {
+        builder.datadog = datadog;
+    }
 
     validation::check_provider(&builder)?;
     signal_handler.clear();

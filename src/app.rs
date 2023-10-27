@@ -52,6 +52,7 @@ pub struct ApplicationConfig {
     pub api: config::api::Options,
     #[cfg(feature = "enterprise")]
     pub enterprise: Option<EnterpriseReporter<BoxFuture<'static, ()>>>,
+    pub datadog_options: config::datadog::Options,
 }
 
 pub struct Application {
@@ -76,6 +77,7 @@ impl ApplicationConfig {
             opts.watch_config,
             opts.require_healthy,
             graceful_shutdown_duration,
+            opts.datadog_options.clone(),
             signal_handler,
         )
         .await?;
@@ -95,6 +97,8 @@ impl ApplicationConfig {
         #[cfg(feature = "enterprise")]
         let enterprise = build_enterprise(&mut config, config_paths.clone())?;
 
+        let datadog_options = config.datadog.clone();
+
         #[cfg(feature = "api")]
         let api = config.api;
 
@@ -111,6 +115,7 @@ impl ApplicationConfig {
             api,
             #[cfg(feature = "enterprise")]
             enterprise,
+            datadog_options,
         })
     }
 
@@ -259,6 +264,7 @@ impl Application {
             signals,
             topology_controller,
             openssl_providers,
+            datadog_options: config.datadog_options,
         })
     }
 }
@@ -270,6 +276,7 @@ pub struct StartedApplication {
     pub signals: SignalPair,
     pub topology_controller: SharedTopologyController,
     pub openssl_providers: Option<Vec<Provider>>,
+    pub datadog_options: config::datadog::Options,
 }
 
 impl StartedApplication {
@@ -285,6 +292,7 @@ impl StartedApplication {
             topology_controller,
             openssl_providers,
             internal_topologies,
+            datadog_options,
         } = self;
 
         let mut graceful_crash = UnboundedReceiverStream::new(graceful_crash_receiver);
@@ -299,6 +307,7 @@ impl StartedApplication {
                     &topology_controller,
                     &config_paths,
                     &mut signal_handler,
+                    datadog_options.clone(),
                 ).await {
                     break signal;
                 },
@@ -327,6 +336,7 @@ async fn handle_signal(
     topology_controller: &SharedTopologyController,
     config_paths: &[ConfigPath],
     signal_handler: &mut SignalHandler,
+    datadog_options: config::datadog::Options,
 ) -> Option<SignalTo> {
     match signal {
         Ok(SignalTo::ReloadFromConfigBuilder(config_builder)) => {
@@ -347,6 +357,7 @@ async fn handle_signal(
 
             // Reload config
             let new_config = config::load_from_paths_with_provider_and_secrets(
+                Some(datadog_options),
                 &topology_controller.config_paths,
                 signal_handler,
             )
@@ -497,6 +508,7 @@ pub async fn load_configs(
     watch_config: bool,
     require_healthy: Option<bool>,
     graceful_shutdown_duration: Option<Duration>,
+    datadog: Option<config::datadog::Options>,
     signal_handler: &mut SignalHandler,
 ) -> Result<Config, ExitCode> {
     let config_paths = config::process_paths(config_paths).ok_or(exitcode::CONFIG)?;
@@ -521,7 +533,7 @@ pub async fn load_configs(
     config::init_log_schema(&config_paths, true).map_err(handle_config_errors)?;
 
     let mut config =
-        config::load_from_paths_with_provider_and_secrets(&config_paths, signal_handler)
+        config::load_from_paths_with_provider_and_secrets(datadog, &config_paths, signal_handler)
             .await
             .map_err(handle_config_errors)?;
 
