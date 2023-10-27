@@ -10,5 +10,6 @@ jobs:
 
   steps:
     - name: Check for approval
-      run: echo "Workflow has been allowed to run for PR ${{ github.event.number }}"
+      run: |
+        echo "Workflow has been allowed to run for PR ${{ github.event.number }}"
 
