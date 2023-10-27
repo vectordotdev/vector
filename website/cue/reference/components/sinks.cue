@@ -252,8 +252,12 @@ components: sinks: [Name=string]: {
 									type: string: {
 										default: "rfc3339"
 										enum: {
-											rfc3339: "Formats as a RFC3339 string"
-											unix:    "Formats as a unix timestamp"
+											rfc3339:    "Formats as a RFC3339 string"
+											unix:       "Formats as a unix timestamp"
+											unix_ms:    "Formats as a unix timestamp in milliseconds"
+											unix_us:    "Formats as a unix timestamp in microseconds"
+											unix_ns:    "Formats as a unix timestamp in nanoseconds"
+											unix_float: "Formats as a unix timestamp in floating point"
 										}
 									}
 								}

@@ -1,8 +1,8 @@
 use metrics::{counter, gauge};
-use vector_core::{internal_event::InternalEvent, update_counter};
+use vector_lib::{internal_event::InternalEvent, update_counter};
 use vrl::path::OwnedTargetPath;
 
-use vector_common::{
+use vector_lib::{
     internal_event::{error_stage, error_type},
     json_size::JsonSize,
 };

@@ -23,7 +23,6 @@ impl LabelFilter for VectorLabelFilter {
         label_key == "component_id"
             || label_key == "component_type"
             || label_key == "component_kind"
-            || label_key == "component_name"
             || label_key == "buffer_type"
     }
 }

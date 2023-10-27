@@ -1,7 +1,7 @@
 use bytes::Bytes;
 use codecs::{encoding::Framer, JsonSerializerConfig, NewlineDelimitedEncoderConfig};
-use vector_common::request_metadata::GroupedCountByteSize;
-use vector_core::partition::Partitioner;
+use vector_lib::partition::Partitioner;
+use vector_lib::request_metadata::GroupedCountByteSize;
 
 use super::config::WebHdfsConfig;
 use crate::{

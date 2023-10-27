@@ -5,8 +5,8 @@ mod unix;
 
 use codecs::decoding::DeserializerConfig;
 use lookup::{lookup_v2::OptionalValuePath, owned_value_path};
-use vector_config::configurable_component;
-use vector_core::config::{log_schema, LegacyKey, LogNamespace};
+use vector_lib::config::{log_schema, LegacyKey, LogNamespace};
+use vector_lib::configurable::configurable_component;
 use vrl::value::{kind::Collection, Kind};
 
 #[cfg(unix)]
@@ -343,7 +343,7 @@ mod test {
         task::JoinHandle,
         time::{timeout, Duration, Instant},
     };
-    use vector_core::event::EventContainer;
+    use vector_lib::event::EventContainer;
     use vrl::btreemap;
     use vrl::value;
     use vrl::value::Value;

@@ -1,6 +1,6 @@
 use snafu::Snafu;
 
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 
 mod config;
 mod service;
@@ -45,7 +45,7 @@ mod tests {
     use http::request::Parts;
     use hyper::Method;
     use prost::Message;
-    use vector_core::{
+    use vector_lib::{
         config::{init_telemetry, Tags, Telemetry},
         event::{BatchNotifier, BatchStatus},
     };

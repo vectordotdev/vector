@@ -31,7 +31,7 @@ pub mod tag_cardinality_limit;
 #[cfg(feature = "transforms-throttle")]
 pub mod throttle;
 
-pub use vector_core::transform::{
+pub use vector_lib::transform::{
     FunctionTransform, OutputBuffer, SyncTransform, TaskTransform, Transform, TransformOutputs,
     TransformOutputsBuf,
 };
@@ -51,7 +51,7 @@ mod test {
     use futures_util::SinkExt;
     use tokio::sync::mpsc;
     use tokio_util::sync::PollSender;
-    use vector_core::transform::FunctionTransform;
+    use vector_lib::transform::FunctionTransform;
 
     use crate::{
         config::{

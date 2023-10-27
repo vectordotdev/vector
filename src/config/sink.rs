@@ -4,12 +4,12 @@ use async_trait::async_trait;
 use dyn_clone::DynClone;
 use serde::Serialize;
 use vector_buffers::{BufferConfig, BufferType};
-use vector_config::{
+use vector_lib::configurable::attributes::CustomAttribute;
+use vector_lib::configurable::schema::{SchemaGenerator, SchemaObject};
+use vector_lib::configurable::{
     configurable_component, Configurable, GenerateError, Metadata, NamedComponent,
 };
-use vector_config_common::attributes::CustomAttribute;
-use vector_config_common::schema::{SchemaGenerator, SchemaObject};
-use vector_core::{
+use vector_lib::{
     config::{AcknowledgementsConfig, GlobalOptions, Input},
     sink::VectorSink,
 };
@@ -33,7 +33,7 @@ impl Configurable for BoxedSink {
     }
 
     fn generate_schema(gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
-        vector_config::component::SinkDescription::generate_schemas(gen)
+        vector_lib::configurable::component::SinkDescription::generate_schemas(gen)
     }
 }
 
@@ -68,14 +68,14 @@ where
     #[configurable(derived)]
     #[serde(
         default,
-        skip_serializing_if = "vector_core::serde::skip_serializing_if_default"
+        skip_serializing_if = "vector_lib::serde::skip_serializing_if_default"
     )]
     pub buffer: BufferConfig,
 
     #[configurable(derived)]
     #[serde(
         default,
-        skip_serializing_if = "vector_core::serde::skip_serializing_if_default"
+        skip_serializing_if = "vector_lib::serde::skip_serializing_if_default"
     )]
     proxy: ProxyConfig,
 

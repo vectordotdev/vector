@@ -1,5 +1,5 @@
 use metrics::counter;
-use vector_common::internal_event::InternalEvent;
+use vector_lib::internal_event::InternalEvent;
 
 pub struct AwsBytesSent {
     pub byte_size: usize,

@@ -9,11 +9,11 @@ use http::{header::AUTHORIZATION, Request, StatusCode, Uri};
 use hyper::Body;
 use tower::{Service, ServiceExt};
 
-use vector_common::{
+use vector_lib::stream::DriverResponse;
+use vector_lib::{
     finalization::EventStatus, request_metadata::GroupedCountByteSize,
     request_metadata::MetaDescriptive, sensitive_string::SensitiveString,
 };
-use vector_core::stream::DriverResponse;
 
 use crate::{
     http::HttpClient,

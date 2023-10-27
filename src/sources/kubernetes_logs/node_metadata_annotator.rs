@@ -7,8 +7,8 @@ use k8s_openapi::{api::core::v1::Node, apimachinery::pkg::apis::meta::v1::Object
 use kube::runtime::reflector::{store::Store, ObjectRef};
 use lookup::lookup_v2::OptionalTargetPath;
 use lookup::{lookup_v2::ValuePath, owned_value_path, path, OwnedTargetPath};
-use vector_config::configurable_component;
-use vector_core::config::{LegacyKey, LogNamespace};
+use vector_lib::config::{LegacyKey, LogNamespace};
+use vector_lib::configurable::configurable_component;
 
 use super::Config;
 

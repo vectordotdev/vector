@@ -5,8 +5,8 @@ use codecs::decoding::{DeserializerConfig, FramingConfig};
 use lookup::{lookup_v2::OptionalValuePath, owned_value_path, path};
 use serde_with::serde_as;
 use smallvec::SmallVec;
-use vector_config::configurable_component;
-use vector_core::config::{LegacyKey, LogNamespace};
+use vector_lib::config::{LegacyKey, LogNamespace};
+use vector_lib::configurable::configurable_component;
 
 use crate::{
     codecs::Decoder,

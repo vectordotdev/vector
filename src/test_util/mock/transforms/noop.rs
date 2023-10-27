@@ -2,9 +2,9 @@ use std::pin::Pin;
 
 use async_trait::async_trait;
 use futures_util::Stream;
-use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
-use vector_core::{
+use vector_lib::config::LogNamespace;
+use vector_lib::configurable::configurable_component;
+use vector_lib::{
     config::{DataType, Input, TransformOutput},
     event::{Event, EventContainer},
     schema::Definition,

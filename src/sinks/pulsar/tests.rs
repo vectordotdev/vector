@@ -2,7 +2,7 @@ use crate::event::Event;
 use crate::sinks::pulsar::config::PulsarSinkConfig;
 use lookup::lookup_v2::OptionalTargetPath;
 use std::collections::BTreeMap;
-use vector_config::component::GenerateConfig;
+use vector_lib::configurable::component::GenerateConfig;
 use vrl::value::Value;
 
 use bytes::Bytes;

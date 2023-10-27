@@ -3,7 +3,7 @@
 use bytes::Bytes;
 use futures::FutureExt;
 use http::{Request, StatusCode, Uri};
-use vector_common::sensitive_string::SensitiveString;
+use vector_lib::sensitive_string::SensitiveString;
 use vrl::value::Kind;
 
 use crate::{

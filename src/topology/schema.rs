@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use snafu::Snafu;
-use vector_core::config::SourceOutput;
+use vector_lib::config::SourceOutput;
 
 pub(super) use crate::schema::Definition;
 
@@ -444,7 +444,7 @@ mod tests {
     use indexmap::IndexMap;
     use lookup::owned_value_path;
     use similar_asserts::assert_eq;
-    use vector_core::config::{DataType, SourceOutput, TransformOutput};
+    use vector_lib::config::{DataType, SourceOutput, TransformOutput};
     use vrl::value::Kind;
 
     use super::*;

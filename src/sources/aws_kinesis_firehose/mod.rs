@@ -6,9 +6,9 @@ use hyper::{service::make_service_fn, Server};
 use lookup::owned_value_path;
 use tower::ServiceBuilder;
 use tracing::Span;
-use vector_common::sensitive_string::SensitiveString;
-use vector_config::configurable_component;
-use vector_core::config::{LegacyKey, LogNamespace};
+use vector_lib::config::{LegacyKey, LogNamespace};
+use vector_lib::configurable::configurable_component;
+use vector_lib::sensitive_string::SensitiveString;
 use vrl::value::Kind;
 
 use crate::{
@@ -267,7 +267,7 @@ mod tests {
     use lookup::path;
     use similar_asserts::assert_eq;
     use tokio::time::{sleep, Duration};
-    use vector_common::assert_event_data_eq;
+    use vector_lib::assert_event_data_eq;
     use vrl::value;
 
     use super::*;

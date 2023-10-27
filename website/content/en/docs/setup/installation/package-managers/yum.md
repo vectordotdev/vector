@@ -13,8 +13,7 @@ Our Yum repositories are provided by [Cloudsmith] and you can find [instructions
 Add the repo:
 
 ```shell
-curl -1sLf 'https://repositories.timber.io/public/vector/cfg/setup/bash.rpm.sh' \
-  | sudo -E bash
+bash -c "$(curl -L https://setup.vector.dev)"
 ```
 
 Then you can install Vector:

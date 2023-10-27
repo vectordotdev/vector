@@ -1,7 +1,7 @@
 use codecs::JsonSerializerConfig;
 use lookup::lookup_v2::{ConfigValuePath, OptionalValuePath};
-use vector_common::sensitive_string::SensitiveString;
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
+use vector_lib::sensitive_string::SensitiveString;
 
 use super::config_host_key;
 use crate::sinks::splunk_hec::common::config_timestamp_key;

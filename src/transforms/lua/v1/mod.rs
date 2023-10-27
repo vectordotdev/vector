@@ -5,7 +5,7 @@ use mlua::ExternalError;
 use mlua::FromLua;
 use ordered_float::NotNan;
 use snafu::{ResultExt, Snafu};
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 use vrl::path::parse_target_path;
 
 use crate::config::OutputId;

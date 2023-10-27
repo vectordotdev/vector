@@ -11,19 +11,14 @@ use futures::stream::{Fuse, Stream, StreamExt};
 use pin_project::pin_project;
 use tokio_util::time::{delay_queue::Key, DelayQueue};
 use twox_hash::XxHash64;
+use vector_core::{partition::Partitioner, time::KeyedTimer, ByteSizeOf};
 
-use crate::{
-    partition::Partitioner,
-    stream::batcher::{
-        config::BatchConfigParts,
-        data::BatchReduce,
-        limiter::{ByteSizeOfItemSize, ItemBatchSize, SizeLimit},
-    },
-    time::KeyedTimer,
-    ByteSizeOf,
+use crate::batcher::{
+    config::BatchConfigParts,
+    data::BatchData,
+    limiter::{ByteSizeOfItemSize, ItemBatchSize, SizeLimit},
+    BatchConfig,
 };
-
-use super::batcher::BatchConfig;
 
 /// A `KeyedTimer` based on `DelayQueue`.
 pub struct ExpirationQueue<K> {
@@ -160,16 +155,15 @@ impl BatcherSettings {
     }
 
     /// A batcher config using the `ItemBatchSize` trait to determine batch sizes.
-    /// The output is built with the supplied reducer function.
-    pub fn into_reducer_config<I, T, F, S>(
-        self,
+    /// The output is built with the supplied object implementing [`BatchData`].
+    pub fn as_reducer_config<I, T, B>(
+        &self,
         item_size: I,
-        reducer: F,
-    ) -> BatchConfigParts<SizeLimit<I>, BatchReduce<F, S>>
+        reducer: B,
+    ) -> BatchConfigParts<SizeLimit<I>, B>
     where
         I: ItemBatchSize<T>,
-        F: FnMut(&mut S, T),
-        S: Default,
+        B: BatchData<T>,
     {
         BatchConfigParts {
             batch_limiter: SizeLimit {
@@ -178,14 +172,14 @@ impl BatcherSettings {
                 current_size: 0,
                 item_size_calculator: item_size,
             },
-            batch_data: BatchReduce::new(reducer),
+            batch_data: reducer,
             timeout: self.timeout,
         }
     }
 }
 
 #[pin_project]
-pub struct PartitionedBatcher<St, Prt, KT, C, F>
+pub struct PartitionedBatcher<St, Prt, KT, C, F, B>
 where
     Prt: Partitioner,
 {
@@ -198,7 +192,7 @@ where
     /// The store of 'closed' batches. When this is not empty it will be
     /// preferentially flushed prior to consuming any new items from the
     /// underlying stream.
-    closed_batches: Vec<(Prt::Key, Vec<Prt::Item>)>,
+    closed_batches: Vec<(Prt::Key, B)>,
     /// The queue of pending batch expirations
     timer: KT,
     /// The partitioner for this `Batcher`
@@ -208,7 +202,7 @@ where
     stream: Fuse<St>,
 }
 
-impl<St, Prt, C, F> PartitionedBatcher<St, Prt, ExpirationQueue<Prt::Key>, C, F>
+impl<St, Prt, C, F, B> PartitionedBatcher<St, Prt, ExpirationQueue<Prt::Key>, C, F, B>
 where
     St: Stream<Item = Prt::Item>,
     Prt: Partitioner + Unpin,
@@ -231,7 +225,7 @@ where
 }
 
 #[cfg(test)]
-impl<St, Prt, KT, C, F> PartitionedBatcher<St, Prt, KT, C, F>
+impl<St, Prt, KT, C, F, B> PartitionedBatcher<St, Prt, KT, C, F, B>
 where
     St: Stream<Item = Prt::Item>,
     Prt: Partitioner + Unpin,
@@ -252,17 +246,17 @@ where
     }
 }
 
-impl<St, Prt, KT, C, F> Stream for PartitionedBatcher<St, Prt, KT, C, F>
+impl<St, Prt, KT, C, F, B> Stream for PartitionedBatcher<St, Prt, KT, C, F, B>
 where
     St: Stream<Item = Prt::Item>,
     Prt: Partitioner + Unpin,
     Prt::Key: Eq + Hash + Clone,
     Prt::Item: ByteSizeOf,
     KT: KeyedTimer<Prt::Key>,
-    C: BatchConfig<Prt::Item, Batch = Vec<Prt::Item>>,
+    C: BatchConfig<Prt::Item, Batch = B>,
     F: Fn() -> C + Send,
 {
-    type Item = (Prt::Key, Vec<Prt::Item>);
+    type Item = (Prt::Key, B);
 
     fn size_hint(&self) -> (usize, Option<usize>) {
         self.stream.size_hint()
@@ -275,20 +269,18 @@ where
                 return Poll::Ready(this.closed_batches.pop());
             }
             match this.stream.as_mut().poll_next(cx) {
-                Poll::Pending => {
-                    match this.timer.poll_expired(cx) {
-                        // Unlike normal streams, `DelayQueue` can return `None`
-                        // here but still be usable later if more entries are added.
-                        Poll::Pending | Poll::Ready(None) => return Poll::Pending,
-                        Poll::Ready(Some(item_key)) => {
-                            let mut batch = this
-                                .batches
-                                .remove(&item_key)
-                                .expect("batch should exist if it is set to expire");
-                            this.closed_batches.push((item_key, batch.take_batch()));
-                        }
+                Poll::Pending => match this.timer.poll_expired(cx) {
+                    // Unlike normal streams, `DelayQueue` can return `None`
+                    // here but still be usable later if more entries are added.
+                    Poll::Pending | Poll::Ready(None) => return Poll::Pending,
+                    Poll::Ready(Some(item_key)) => {
+                        let mut batch = this
+                            .batches
+                            .remove(&item_key)
+                            .expect("batch should exist if it is set to expire");
+                        this.closed_batches.push((item_key, batch.take_batch()));
                     }
-                }
+                },
                 Poll::Ready(None) => {
                     // Now that the underlying stream is closed, we need to
                     // clear out our batches, including all expiration
@@ -351,6 +343,7 @@ where
     }
 }
 
+#[allow(clippy::cast_sign_loss)]
 #[cfg(test)]
 mod test {
     use std::{
@@ -365,14 +358,11 @@ mod test {
     use pin_project::pin_project;
     use proptest::prelude::*;
     use tokio::{pin, time::advance};
+    use vector_core::{partition::Partitioner, time::KeyedTimer};
 
     use crate::{
-        partition::Partitioner,
-        stream::{
-            partitioned_batcher::{ExpirationQueue, PartitionedBatcher},
-            BatcherSettings,
-        },
-        time::KeyedTimer,
+        partitioned_batcher::{ExpirationQueue, PartitionedBatcher},
+        BatcherSettings,
     };
 
     #[derive(Debug)]

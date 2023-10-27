@@ -13,28 +13,29 @@ use std::{
 use crossbeam_utils::atomic::AtomicCell;
 use lookup::lookup_v2::TargetPath;
 use lookup::PathPrefix;
+use lookup::{metadata_path, path};
+use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize, Serializer};
 use vector_common::{
+    byte_size_of::ByteSizeOf,
     internal_event::{OptionalTag, TaggedEventsSent},
     json_size::{JsonSize, NonZeroJsonSize},
     request_metadata::GetEventCountTags,
     EventDataEq,
 };
 use vrl::path::{parse_target_path, OwnedTargetPath, PathParseError};
+use vrl::{event_path, owned_value_path};
 
 use super::{
     estimated_json_encoded_size_of::EstimatedJsonEncodedSizeOf,
     finalization::{BatchNotifier, EventFinalizer},
     metadata::EventMetadata,
-    util, EventFinalizers, Finalizable, Value,
+    util,
+    util::log::{all_fields, all_metadata_fields},
+    EventFinalizers, Finalizable, MaybeAsLogMut, Value,
 };
 use crate::config::LogNamespace;
 use crate::config::{log_schema, telemetry};
-use crate::event::util::log::{all_fields, all_metadata_fields};
-use crate::{event::MaybeAsLogMut, ByteSizeOf};
-use lookup::{metadata_path, path};
-use once_cell::sync::Lazy;
-use vrl::{event_path, owned_value_path};
 
 static VECTOR_SOURCE_TYPE_PATH: Lazy<Option<OwnedTargetPath>> = Lazy::new(|| {
     Some(OwnedTargetPath::metadata(owned_value_path!(

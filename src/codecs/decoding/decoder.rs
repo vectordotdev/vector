@@ -4,7 +4,7 @@ use codecs::decoding::{
     NewlineDelimitedDecoder,
 };
 use smallvec::SmallVec;
-use vector_core::config::LogNamespace;
+use vector_lib::config::LogNamespace;
 
 use crate::{
     event::Event,

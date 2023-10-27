@@ -1,12 +1,11 @@
 use indoc::indoc;
 use tower::ServiceBuilder;
-use vector_config::configurable_component;
-use vector_core::config::proxy::ProxyConfig;
-use vector_core::schema;
+use vector_lib::config::proxy::ProxyConfig;
+use vector_lib::configurable::configurable_component;
+use vector_lib::schema;
 use vrl::value::Kind;
 
 use crate::{
-    common::datadog::{get_base_domain_region, Region},
     config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     http::HttpClient,
     sinks::{
@@ -34,11 +33,6 @@ pub struct DatadogEventsConfig {
     #[serde(flatten)]
     pub dd_common: DatadogCommonConfig,
 
-    /// The Datadog region to send events to.
-    #[configurable(deprecated = "This option has been deprecated, use the `site` option instead.")]
-    #[serde(default)]
-    pub region: Option<Region>,
-
     #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
@@ -57,7 +51,7 @@ impl DatadogEventsConfig {
     fn get_api_events_endpoint(&self) -> http::Uri {
         let api_base_endpoint = get_api_base_endpoint(
             self.dd_common.endpoint.as_ref(),
-            get_base_domain_region(self.dd_common.site.as_str(), self.region.as_ref()),
+            self.dd_common.site.as_str(),
         );
 
         // We know this URI will be valid since we have just built it up ourselves.
@@ -96,9 +90,7 @@ impl DatadogEventsConfig {
 impl SinkConfig for DatadogEventsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let client = self.build_client(cx.proxy())?;
-        let healthcheck = self
-            .dd_common
-            .build_healthcheck(client.clone(), self.region.as_ref())?;
+        let healthcheck = self.dd_common.build_healthcheck(client.clone())?;
         let sink = self.build_sink(client)?;
 
         Ok((sink, healthcheck))

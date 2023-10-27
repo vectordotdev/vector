@@ -16,6 +16,7 @@ pub mod request_builder;
 pub mod retries;
 pub mod service;
 pub mod sink;
+pub mod snappy;
 pub mod socket_bytes_sink;
 pub mod statistic;
 pub mod tcp;
@@ -51,7 +52,7 @@ pub use service::{
 pub use sink::{BatchSink, PartitionBatchSink, StreamSink};
 use snafu::Snafu;
 pub use uri::UriSerde;
-use vector_common::json_size::JsonSize;
+use vector_lib::json_size::JsonSize;
 
 use crate::event::EventFinalizers;
 

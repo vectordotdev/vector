@@ -9,9 +9,9 @@ use futures::FutureExt;
 use http::{StatusCode, Uri};
 use snafu::{ResultExt, Snafu};
 use tower::Service;
-use vector_common::sensitive_string::SensitiveString;
-use vector_config::configurable_component;
-use vector_core::event::MetricTags;
+use vector_lib::configurable::configurable_component;
+use vector_lib::event::MetricTags;
+use vector_lib::sensitive_string::SensitiveString;
 
 use crate::http::HttpClient;
 
@@ -380,7 +380,7 @@ pub mod test_util {
     use std::{fs::File, io::Read};
 
     use chrono::{offset::TimeZone, DateTime, SecondsFormat, Timelike, Utc};
-    use vector_core::metric_tags;
+    use vector_lib::metric_tags;
 
     use super::*;
     use crate::tls;

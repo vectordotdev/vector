@@ -4,8 +4,8 @@ use bytes::{Buf, Bytes};
 use chrono::Utc;
 use flate2::read::MultiGzDecoder;
 use snafu::ResultExt;
-use vector_common::internal_event::{BytesReceived, Protocol};
-use vector_core::config::LogNamespace;
+use vector_lib::config::LogNamespace;
+use vector_lib::internal_event::{BytesReceived, Protocol};
 use warp::{http::StatusCode, Filter};
 
 use super::{

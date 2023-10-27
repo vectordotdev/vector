@@ -14,7 +14,7 @@ use ordered_float::NotNan;
 use vrl::value::Value;
 
 use enrichment::{Case, Condition, IndexHandle, Table};
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 
 use crate::config::{EnrichmentTableConfig, GenerateConfig};
 

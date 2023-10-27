@@ -13,9 +13,9 @@ use listenfd::ListenFd;
 use serde_with::serde_as;
 use smallvec::{smallvec, SmallVec};
 use tokio_util::udp::UdpFramed;
-use vector_common::internal_event::{CountByteSize, InternalEventHandle as _, Registered};
-use vector_config::configurable_component;
-use vector_core::EstimatedJsonEncodedSizeOf;
+use vector_lib::configurable::configurable_component;
+use vector_lib::internal_event::{CountByteSize, InternalEventHandle as _, Registered};
+use vector_lib::EstimatedJsonEncodedSizeOf;
 
 use self::parser::ParseError;
 use super::util::net::{try_bind_udp_socket, SocketListenAddr, TcpNullAcker, TcpSource};
@@ -41,7 +41,7 @@ mod unix;
 use parser::parse;
 #[cfg(unix)]
 use unix::{statsd_unix, UnixConfig};
-use vector_core::config::LogNamespace;
+use vector_lib::config::LogNamespace;
 
 /// Configuration for the `statsd` source.
 #[configurable_component(source("statsd", "Collect metrics emitted by the StatsD aggregator."))]
@@ -341,7 +341,7 @@ mod test {
         net::UdpSocket,
         time::{sleep, Duration, Instant},
     };
-    use vector_core::{
+    use vector_lib::{
         config::ComponentKey,
         event::{metric::TagValue, EventContainer},
     };

@@ -5,8 +5,8 @@ use bytes::Bytes;
 use chrono::{DateTime, Duration, Utc};
 use futures::stream;
 use lookup::owned_value_path;
-use vector_common::encode_logfmt;
-use vector_core::{
+use vector_lib::encode_logfmt;
+use vector_lib::{
     config::{init_telemetry, LogNamespace, Tags, Telemetry},
     event::{BatchNotifier, BatchStatus, Event, LogEvent},
 };

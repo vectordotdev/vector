@@ -100,7 +100,7 @@ pub mod webhdfs;
 #[cfg(feature = "sinks-websocket")]
 pub mod websocket;
 
-pub use vector_core::{config::Input, sink::VectorSink};
+pub use vector_lib::{config::Input, sink::VectorSink};
 
 pub type Healthcheck = BoxFuture<'static, crate::Result<()>>;
 

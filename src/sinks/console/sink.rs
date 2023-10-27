@@ -4,7 +4,7 @@ use codecs::encoding::Framer;
 use futures::{stream::BoxStream, StreamExt};
 use tokio::{io, io::AsyncWriteExt};
 use tokio_util::codec::Encoder as _;
-use vector_core::{
+use vector_lib::{
     internal_event::{
         ByteSize, BytesSent, CountByteSize, EventsSent, InternalEventHandle as _, Output, Protocol,
     },
@@ -68,7 +68,7 @@ mod test {
     use codecs::{JsonSerializerConfig, NewlineDelimitedEncoder};
     use futures::future::ready;
     use futures_util::stream;
-    use vector_core::sink::VectorSink;
+    use vector_lib::sink::VectorSink;
 
     use super::*;
     use crate::{

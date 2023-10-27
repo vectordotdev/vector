@@ -1,8 +1,8 @@
 use codecs::decoding::BoxedFramingError;
 use metrics::counter;
-use vector_core::internal_event::InternalEvent;
+use vector_lib::internal_event::InternalEvent;
 
-use vector_common::internal_event::{error_stage, error_type};
+use vector_lib::internal_event::{error_stage, error_type};
 
 #[derive(Debug)]
 pub struct JournaldInvalidRecordError {

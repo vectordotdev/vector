@@ -76,6 +76,11 @@ base: components: sinks: datadog_logs: configuration: {
 				[gzip]: https://www.gzip.org/
 				"""
 			none: "No compression."
+			snappy: """
+				[Snappy][snappy] compression.
+
+				[snappy]: https://github.com/google/snappy/blob/main/docs/README.md
+				"""
 			zlib: """
 				[Zlib][zlib] compression.
 
@@ -118,8 +123,12 @@ base: components: sinks: datadog_logs: configuration: {
 				description: "Format used for timestamp fields."
 				required:    false
 				type: string: enum: {
-					rfc3339: "Represent the timestamp as a RFC 3339 timestamp."
-					unix:    "Represent the timestamp as a Unix timestamp."
+					rfc3339:    "Represent the timestamp as a RFC 3339 timestamp."
+					unix:       "Represent the timestamp as a Unix timestamp."
+					unix_float: "Represent the timestamp as a Unix timestamp in floating point."
+					unix_ms:    "Represent the timestamp as a Unix timestamp in milliseconds."
+					unix_ns:    "Represent the timestamp as a Unix timestamp in nanoseconds."
+					unix_us:    "Represent the timestamp as a Unix timestamp in microseconds"
 				}
 			}
 		}
@@ -136,16 +145,6 @@ base: components: sinks: datadog_logs: configuration: {
 			"""
 		required: false
 		type: string: examples: ["http://127.0.0.1:8080", "http://example.com:12345"]
-	}
-	region: {
-		deprecated:         true
-		deprecated_message: "This option has been deprecated, use the `site` option instead."
-		description:        "The Datadog region to send logs to."
-		required:           false
-		type: string: enum: {
-			eu: "EU region."
-			us: "US region."
-		}
 	}
 	request: {
 		description: "Outbound HTTP request settings."

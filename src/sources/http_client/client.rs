@@ -32,8 +32,8 @@ use codecs::{
     decoding::{DeserializerConfig, FramingConfig},
     StreamDecodingError,
 };
-use vector_config::configurable_component;
-use vector_core::{
+use vector_lib::configurable::configurable_component;
+use vector_lib::{
     config::{log_schema, LogNamespace, SourceOutput},
     event::Event,
 };
