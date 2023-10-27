@@ -11,7 +11,6 @@ mod integration_test {
     };
 
     use bytes::Bytes;
-    use codecs::TextSerializerConfig;
     use futures::StreamExt;
     use lookup::lookup_v2::ConfigTargetPath;
     use rdkafka::{
@@ -19,6 +18,7 @@ mod integration_test {
         message::Headers,
         Message, Offset, TopicPartitionList,
     };
+    use vector_lib::codecs::TextSerializerConfig;
     use vector_lib::{
         config::{init_telemetry, Tags, Telemetry},
         event::{BatchNotifier, BatchStatus},

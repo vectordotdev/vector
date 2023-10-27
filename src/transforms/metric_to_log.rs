@@ -1,8 +1,8 @@
 use chrono::Utc;
-use codecs::MetricTagValues;
 use lookup::{event_path, owned_value_path, path, PathPrefix};
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
+use vector_lib::codecs::MetricTagValues;
 use vector_lib::config::LogNamespace;
 use vector_lib::configurable::configurable_component;
 use vector_lib::TimeZone;

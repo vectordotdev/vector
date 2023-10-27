@@ -28,7 +28,7 @@ use crate::{
     Result,
 };
 use crate::{components::validation::*, sources::util::http_client};
-use codecs::{
+use vector_lib::codecs::{
     decoding::{DeserializerConfig, FramingConfig},
     StreamDecodingError,
 };

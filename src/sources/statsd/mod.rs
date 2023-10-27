@@ -4,15 +4,15 @@ use std::{
 };
 
 use bytes::Bytes;
-use codecs::{
-    decoding::{self, Deserializer, Framer},
-    NewlineDelimitedDecoder,
-};
 use futures::{StreamExt, TryFutureExt};
 use listenfd::ListenFd;
 use serde_with::serde_as;
 use smallvec::{smallvec, SmallVec};
 use tokio_util::udp::UdpFramed;
+use vector_lib::codecs::{
+    decoding::{self, Deserializer, Framer},
+    NewlineDelimitedDecoder,
+};
 use vector_lib::configurable::configurable_component;
 use vector_lib::internal_event::{CountByteSize, InternalEventHandle as _, Registered};
 use vector_lib::EstimatedJsonEncodedSizeOf;
@@ -315,7 +315,7 @@ async fn statsd_udp(
 struct StatsdTcpSource;
 
 impl TcpSource for StatsdTcpSource {
-    type Error = codecs::decoding::Error;
+    type Error = vector_lib::codecs::decoding::Error;
     type Item = SmallVec<[Event; 1]>;
     type Decoder = Decoder;
     type Acker = TcpNullAcker;

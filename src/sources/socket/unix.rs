@@ -2,8 +2,8 @@ use std::path::PathBuf;
 
 use bytes::Bytes;
 use chrono::Utc;
-use codecs::decoding::{DeserializerConfig, FramingConfig};
 use lookup::{lookup_v2::OptionalValuePath, path};
+use vector_lib::codecs::decoding::{DeserializerConfig, FramingConfig};
 use vector_lib::config::{LegacyKey, LogNamespace};
 use vector_lib::configurable::configurable_component;
 use vector_lib::shutdown::ShutdownSignal;

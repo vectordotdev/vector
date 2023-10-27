@@ -1,9 +1,9 @@
 use bytes::BytesMut;
-use codecs::{
+use tokio_util::codec::Encoder as _;
+use vector_lib::codecs::{
     encoding::{Error, Framer, Serializer},
     CharacterDelimitedEncoder, NewlineDelimitedEncoder, TextSerializerConfig,
 };
-use tokio_util::codec::Encoder as _;
 
 use crate::{
     event::Event,
@@ -184,9 +184,9 @@ impl tokio_util::codec::Encoder<Event> for Encoder<()> {
 #[cfg(test)]
 mod tests {
     use bytes::BufMut;
-    use codecs::encoding::BoxedFramingError;
     use futures_util::{SinkExt, StreamExt};
     use tokio_util::codec::FramedWrite;
+    use vector_lib::codecs::encoding::BoxedFramingError;
     use vector_lib::event::LogEvent;
 
     use super::*;

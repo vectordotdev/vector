@@ -7,10 +7,6 @@ use std::{
 
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
-use codecs::{
-    decoding::{Deserializer, DeserializerConfig, Framer},
-    BytesDecoder, BytesDeserializer,
-};
 use futures::{Stream, StreamExt};
 use http::HeaderMap;
 use indoc::indoc;
@@ -19,6 +15,10 @@ use ordered_float::NotNan;
 use prost::Message;
 use quickcheck::{Arbitrary, Gen, QuickCheck, TestResult};
 use similar_asserts::assert_eq;
+use vector_lib::codecs::{
+    decoding::{Deserializer, DeserializerConfig, Framer},
+    BytesDecoder, BytesDeserializer,
+};
 use vector_lib::{
     config::LogNamespace,
     event::{metric::TagValue, MetricTags},

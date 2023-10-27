@@ -129,7 +129,6 @@ vrl.workspace = true
 pin-project.workspace = true
 
 # Internal libs
-codecs = { path = "lib/codecs", default-features = false }
 dnsmsg-parser = { path = "lib/dnsmsg-parser", optional = true }
 enrichment = { path = "lib/enrichment" }
 fakedata = { path = "lib/fakedata", optional = true }
@@ -468,7 +467,7 @@ enrichment-tables = ["enrichment-tables-geoip"]
 enrichment-tables-geoip = ["dep:maxminddb"]
 
 # Codecs
-codecs-syslog = ["codecs/syslog"]
+codecs-syslog = ["vector-lib/syslog"]
 
 # Sources
 sources = ["sources-logs", "sources-metrics"]

@@ -18,7 +18,7 @@ use tokio::{
 };
 use tokio_util::codec::Encoder as _;
 
-use codecs::encoding;
+use vector_lib::codecs::encoding;
 use vector_lib::{event::Event, EstimatedJsonEncodedSizeOf};
 
 use crate::{

@@ -1,8 +1,8 @@
 use chrono::Utc;
-use codecs::BytesDeserializerConfig;
 use futures::{stream, StreamExt};
 use lookup::lookup_v2::OptionalValuePath;
 use lookup::{owned_value_path, path, OwnedValuePath};
+use vector_lib::codecs::BytesDeserializerConfig;
 use vector_lib::config::log_schema;
 use vector_lib::configurable::configurable_component;
 use vector_lib::{

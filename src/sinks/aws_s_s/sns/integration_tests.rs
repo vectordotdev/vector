@@ -3,8 +3,8 @@ use std::collections::HashMap;
 use aws_sdk_sns::{Client as SnsClient, Region};
 use aws_sdk_sqs::model::QueueAttributeName;
 use aws_sdk_sqs::Client as SqsClient;
-use codecs::TextSerializerConfig;
 use tokio::time::{sleep, Duration};
+use vector_lib::codecs::TextSerializerConfig;
 
 use super::{
     config::SnsClientBuilder,

@@ -1,4 +1,4 @@
-use codecs::{
+use vector_lib::codecs::{
     encoding::{Framer, FramingConfig},
     TextSerializerConfig,
 };
@@ -164,7 +164,6 @@ mod test {
         net::{SocketAddr, UdpSocket},
     };
 
-    use codecs::JsonSerializerConfig;
     use futures::stream::StreamExt;
     use futures_util::stream;
     use serde_json::Value;
@@ -174,6 +173,7 @@ mod test {
     };
     use tokio_stream::wrappers::TcpListenerStream;
     use tokio_util::codec::{FramedRead, LinesCodec};
+    use vector_lib::codecs::JsonSerializerConfig;
 
     use super::*;
     use crate::{

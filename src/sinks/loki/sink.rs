@@ -520,8 +520,8 @@ mod tests {
         convert::TryFrom,
     };
 
-    use codecs::JsonSerializerConfig;
     use futures::stream::StreamExt;
+    use vector_lib::codecs::JsonSerializerConfig;
     use vector_lib::event::{Event, LogEvent, Value};
 
     use super::{EventEncoder, KeyPartitioner, RecordFilter};

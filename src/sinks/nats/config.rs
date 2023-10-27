@@ -1,6 +1,6 @@
-use codecs::JsonSerializerConfig;
 use futures_util::TryFutureExt;
 use snafu::ResultExt;
+use vector_lib::codecs::JsonSerializerConfig;
 use vector_lib::tls::TlsEnableableConfig;
 
 use crate::{

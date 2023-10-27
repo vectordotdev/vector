@@ -1209,10 +1209,10 @@ mod tests {
     use std::{net::SocketAddr, num::NonZeroU64};
 
     use chrono::{TimeZone, Utc};
-    use codecs::{JsonSerializerConfig, TextSerializerConfig};
     use futures_util::Stream;
     use reqwest::{RequestBuilder, Response};
     use serde::Deserialize;
+    use vector_lib::codecs::{JsonSerializerConfig, TextSerializerConfig};
     use vector_lib::sensitive_string::SensitiveString;
     use vector_lib::{event::EventStatus, schema::Definition};
     use vrl::path::PathPrefix;

@@ -1,6 +1,6 @@
 #![cfg(test)]
 
-use codecs::JsonSerializerConfig;
+use vector_lib::codecs::JsonSerializerConfig;
 
 use super::*;
 use crate::{

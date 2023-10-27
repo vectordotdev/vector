@@ -21,7 +21,6 @@ use std::{fmt::Debug, io::Read, net::SocketAddr, sync::Arc};
 
 use bytes::{Buf, Bytes};
 use chrono::{serde::ts_milliseconds, DateTime, Utc};
-use codecs::decoding::{DeserializerConfig, FramingConfig};
 use flate2::read::{MultiGzDecoder, ZlibDecoder};
 use futures::FutureExt;
 use http::StatusCode;
@@ -30,6 +29,7 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use tracing::Span;
+use vector_lib::codecs::decoding::{DeserializerConfig, FramingConfig};
 use vector_lib::config::{LegacyKey, LogNamespace};
 use vector_lib::configurable::configurable_component;
 use vector_lib::event::{BatchNotifier, BatchStatus};

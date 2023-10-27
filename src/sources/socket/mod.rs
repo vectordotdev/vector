@@ -3,8 +3,8 @@ pub mod udp;
 #[cfg(unix)]
 mod unix;
 
-use codecs::decoding::DeserializerConfig;
 use lookup::{lookup_v2::OptionalValuePath, owned_value_path};
+use vector_lib::codecs::decoding::DeserializerConfig;
 use vector_lib::config::{log_schema, LegacyKey, LogNamespace};
 use vector_lib::configurable::configurable_component;
 use vrl::value::{kind::Collection, Kind};
@@ -332,9 +332,6 @@ mod test {
     };
 
     use bytes::{BufMut, Bytes, BytesMut};
-    use codecs::NewlineDelimitedDecoderConfig;
-    #[cfg(unix)]
-    use codecs::{decoding::CharacterDelimitedDecoderOptions, CharacterDelimitedDecoderConfig};
     use futures::{stream, StreamExt};
     use lookup::{lookup_v2::OptionalValuePath, owned_value_path, path};
     use tokio::io::AsyncReadExt;
@@ -342,6 +339,11 @@ mod test {
     use tokio::{
         task::JoinHandle,
         time::{timeout, Duration, Instant},
+    };
+    use vector_lib::codecs::NewlineDelimitedDecoderConfig;
+    #[cfg(unix)]
+    use vector_lib::codecs::{
+        decoding::CharacterDelimitedDecoderOptions, CharacterDelimitedDecoderConfig,
     };
     use vector_lib::event::EventContainer;
     use vrl::btreemap;
@@ -765,7 +767,7 @@ mod test {
             bytes: Bytes,
         }
         impl tokio_util::codec::Encoder<Event> for Serializer {
-            type Error = codecs::encoding::Error;
+            type Error = vector_lib::codecs::encoding::Error;
 
             fn encode(&mut self, _: Event, buffer: &mut BytesMut) -> Result<(), Self::Error> {
                 buffer.put(self.bytes.as_ref());

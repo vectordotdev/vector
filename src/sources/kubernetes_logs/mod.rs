@@ -8,7 +8,6 @@ use std::{path::PathBuf, time::Duration};
 
 use bytes::Bytes;
 use chrono::Utc;
-use codecs::{BytesDeserializer, BytesDeserializerConfig};
 use file_source::{
     calculate_ignore_before, Checkpointer, FileServer, FileServerShutdown, FingerprintStrategy,
     Fingerprinter, Line, ReadFrom, ReadFromConfig,
@@ -26,6 +25,7 @@ use kube::{
 use lifecycle::Lifecycle;
 use lookup::{lookup_v2::OptionalTargetPath, owned_value_path, path, OwnedTargetPath};
 use serde_with::serde_as;
+use vector_lib::codecs::{BytesDeserializer, BytesDeserializerConfig};
 use vector_lib::configurable::configurable_component;
 use vector_lib::{config::LegacyKey, config::LogNamespace, EstimatedJsonEncodedSizeOf};
 use vector_lib::{
