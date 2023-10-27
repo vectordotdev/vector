@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
 use aws_sdk_sqs::{model::QueueAttributeName, Client as SqsClient, Region};
-use codecs::TextSerializerConfig;
 use tokio::time::{sleep, Duration};
+use vector_lib::codecs::TextSerializerConfig;
 
 use crate::config::{SinkConfig, SinkContext};
 use crate::sinks::aws_s_s::sqs::config::{healthcheck, SqsSinkConfig};

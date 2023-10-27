@@ -17,19 +17,23 @@ pub(crate) mod ddtrace_proto {
     include!(concat!(env!("OUT_DIR"), "/dd_trace.rs"));
 }
 
+use std::convert::Infallible;
 use std::{fmt::Debug, io::Read, net::SocketAddr, sync::Arc};
 
 use bytes::{Buf, Bytes};
 use chrono::{serde::ts_milliseconds, DateTime, Utc};
-use codecs::decoding::{DeserializerConfig, FramingConfig};
 use flate2::read::{MultiGzDecoder, ZlibDecoder};
 use futures::FutureExt;
 use http::StatusCode;
+use hyper::service::make_service_fn;
+use hyper::Server;
 use lookup::owned_value_path;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
+use tower::ServiceBuilder;
 use tracing::Span;
+use vector_lib::codecs::decoding::{DeserializerConfig, FramingConfig};
 use vector_lib::config::{LegacyKey, LogNamespace};
 use vector_lib::configurable::configurable_component;
 use vector_lib::event::{BatchNotifier, BatchStatus};
@@ -38,6 +42,7 @@ use vrl::path::OwnedTargetPath;
 use vrl::value::Kind;
 use warp::{filters::BoxedFilter, reject::Rejection, reply::Response, Filter, Reply};
 
+use crate::http::build_http_trace_layer;
 use crate::{
     codecs::{Decoder, DecodingConfig},
     config::{
@@ -175,25 +180,31 @@ impl SourceConfig for DatadogAgentConfig {
         info!(message = "Building HTTP server.", address = %self.address);
 
         Ok(Box::pin(async move {
-            let span = Span::current();
-            let routes = filters
-                .with(warp::trace(move |_info| span.clone()))
-                .recover(|r: Rejection| async move {
-                    if let Some(e_msg) = r.find::<ErrorMessage>() {
-                        let json = warp::reply::json(e_msg);
-                        Ok(warp::reply::with_status(json, e_msg.status_code()))
-                    } else {
-                        // other internal error - will return 500 internal server error
-                        Err(r)
-                    }
-                });
+            let routes = filters.recover(|r: Rejection| async move {
+                if let Some(e_msg) = r.find::<ErrorMessage>() {
+                    let json = warp::reply::json(e_msg);
+                    Ok(warp::reply::with_status(json, e_msg.status_code()))
+                } else {
+                    // other internal error - will return 500 internal server error
+                    Err(r)
+                }
+            });
 
-            warp::serve(routes)
-                .serve_incoming_with_graceful_shutdown(
-                    listener.accept_stream(),
-                    shutdown.map(|_| ()),
-                )
-                .await;
+            let span = Span::current();
+            let make_svc = make_service_fn(move |_conn| {
+                let svc = ServiceBuilder::new()
+                    .layer(build_http_trace_layer(span.clone()))
+                    .service(warp::service(routes.clone()));
+                futures_util::future::ok::<_, Infallible>(svc)
+            });
+
+            Server::builder(hyper::server::accept::from_stream(listener.accept_stream()))
+                .serve(make_svc)
+                .with_graceful_shutdown(shutdown.map(|_| ()))
+                .await
+                .map_err(|err| {
+                    error!("An error occurred: {:?}.", err);
+                })?;
 
             Ok(())
         }))

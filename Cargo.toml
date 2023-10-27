@@ -129,7 +129,6 @@ vrl.workspace = true
 pin-project.workspace = true
 
 # Internal libs
-codecs = { path = "lib/codecs", default-features = false }
 dnsmsg-parser = { path = "lib/dnsmsg-parser", optional = true }
 enrichment = { path = "lib/enrichment" }
 fakedata = { path = "lib/fakedata", optional = true }
@@ -197,7 +196,7 @@ opendal = {version = "0.38", default-features = false, features = ["native-tls",
 
 # Tower
 tower = { version = "0.4.13", default-features = false, features = ["buffer", "limit", "retry", "timeout", "util", "balance", "discover"] }
-tower-http = { version = "0.4.4", default-features = false, features = ["decompression-gzip"]}
+tower-http = { version = "0.4.4", default-features = false, features = ["decompression-gzip", "trace"]}
 # Serde
 serde = { version = "1.0.190", default-features = false, features = ["derive"] }
 serde-toml-merge = { version = "0.3.3", default-features = false }
@@ -468,7 +467,7 @@ enrichment-tables = ["enrichment-tables-geoip"]
 enrichment-tables-geoip = ["dep:maxminddb"]
 
 # Codecs
-codecs-syslog = ["codecs/syslog"]
+codecs-syslog = ["vector-lib/syslog"]
 
 # Sources
 sources = ["sources-logs", "sources-metrics"]

@@ -9727,7 +9727,6 @@ dependencies = [
  "chrono",
  "cidr-utils",
  "clap 4.4.7",
- "codecs",
  "colored",
  "console-subscriber",
  "criterion",
@@ -10112,6 +10111,7 @@ dependencies = [
 name = "vector-lib"
 version = "0.1.0"
 dependencies = [
+ "codecs",
  "vector-common",
  "vector-config",
  "vector-core",

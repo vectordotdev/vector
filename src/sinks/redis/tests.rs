@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use codecs::{JsonSerializerConfig, TextSerializerConfig};
+use vector_lib::codecs::{JsonSerializerConfig, TextSerializerConfig};
 use vector_lib::event::LogEvent;
 use vector_lib::request_metadata::GroupedCountByteSize;
 

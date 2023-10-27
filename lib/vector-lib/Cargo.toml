@@ -6,6 +6,7 @@ edition = "2021"
 publish = false
 
 [dependencies]
+codecs = { path = "../codecs", default-features = false }
 vector-common = { path = "../vector-common" }
 vector-config = { path = "../vector-config" }
 vector-core = { path = "../vector-core", default-features = false }
@@ -14,5 +15,6 @@ vector-stream = { path = "../vector-stream" }
 [features]
 api = ["vector-core/api"]
 lua = ["vector-core/lua"]
+syslog = ["codecs/syslog"]
 test = ["vector-core/test"]
 vrl = ["vector-core/vrl"]

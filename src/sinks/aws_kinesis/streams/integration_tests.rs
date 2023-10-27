@@ -5,8 +5,8 @@ use aws_sdk_kinesis::{
     model::{Record, ShardIteratorType},
     types::DateTime,
 };
-use codecs::TextSerializerConfig;
 use tokio::time::{sleep, Duration};
+use vector_lib::codecs::TextSerializerConfig;
 
 use super::{config::KinesisClientBuilder, *};
 use crate::{

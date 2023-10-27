@@ -54,7 +54,7 @@ impl<'a> InternalEvent for DecoderDeserializeError<'a> {
 
 #[derive(Debug)]
 pub struct EncoderFramingError<'a> {
-    pub error: &'a codecs::encoding::BoxedFramingError,
+    pub error: &'a vector_lib::codecs::encoding::BoxedFramingError,
 }
 
 impl<'a> InternalEvent for EncoderFramingError<'a> {

@@ -1,5 +1,5 @@
 use bytes::Bytes;
-use codecs::{encoding::Framer, JsonSerializerConfig, NewlineDelimitedEncoderConfig};
+use vector_lib::codecs::{encoding::Framer, JsonSerializerConfig, NewlineDelimitedEncoderConfig};
 
 use super::service::{ClickhouseRequest, ClickhouseRetryLogic, ClickhouseService};
 use crate::sinks::prelude::*;

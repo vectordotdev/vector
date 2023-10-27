@@ -7,13 +7,13 @@ use std::{
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use chrono::{DateTime, Utc};
-use codecs::{
-    decoding::{DeserializerConfig, FramingConfig},
-    StreamDecodingError,
-};
 use lookup::{lookup_v2::parse_value_path, owned_value_path, path};
 use smallvec::SmallVec;
 use tokio_util::codec::Decoder as _;
+use vector_lib::codecs::{
+    decoding::{DeserializerConfig, FramingConfig},
+    StreamDecodingError,
+};
 use vrl::value::{kind::Collection, Kind};
 use warp::http::{HeaderMap, StatusCode};
 

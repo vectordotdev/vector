@@ -1,14 +1,14 @@
 mod event;
 mod http;
 
-use codecs::{
+use tokio::sync::mpsc;
+use vector_lib::codecs::{
     decoding::{self, DeserializerConfig},
     encoding::{
         self, Framer, FramingConfig, JsonSerializerConfig, SerializerConfig, TextSerializerConfig,
     },
     BytesEncoder,
 };
-use tokio::sync::mpsc;
 use vector_lib::{config::DataType, event::Event};
 
 use crate::codecs::{Decoder, DecodingConfig, Encoder, EncodingConfig, EncodingConfigWithFraming};
@@ -143,8 +143,8 @@ fn deserializer_config_to_serializer(config: &DeserializerConfig) -> encoding::S
         DeserializerConfig::Bytes => SerializerConfig::Text(TextSerializerConfig::default()),
         DeserializerConfig::Json { .. } => SerializerConfig::Json(JsonSerializerConfig::default()),
         DeserializerConfig::Protobuf(config) => {
-            SerializerConfig::Protobuf(codecs::encoding::ProtobufSerializerConfig {
-                protobuf: codecs::encoding::ProtobufSerializerOptions {
+            SerializerConfig::Protobuf(vector_lib::codecs::encoding::ProtobufSerializerConfig {
+                protobuf: vector_lib::codecs::encoding::ProtobufSerializerOptions {
                     desc_file: config.protobuf.desc_file.clone(),
                     message_type: config.protobuf.message_type.clone(),
                 },
@@ -197,8 +197,8 @@ fn serializer_config_to_deserializer(
         SerializerConfig::Native => DeserializerConfig::Native,
         SerializerConfig::NativeJson => DeserializerConfig::NativeJson(Default::default()),
         SerializerConfig::Protobuf(config) => {
-            DeserializerConfig::Protobuf(codecs::decoding::ProtobufDeserializerConfig {
-                protobuf: codecs::decoding::ProtobufDeserializerOptions {
+            DeserializerConfig::Protobuf(vector_lib::codecs::decoding::ProtobufDeserializerConfig {
+                protobuf: vector_lib::codecs::decoding::ProtobufDeserializerOptions {
                     desc_file: config.protobuf.desc_file.clone(),
                     message_type: config.protobuf.message_type.clone(),
                 },

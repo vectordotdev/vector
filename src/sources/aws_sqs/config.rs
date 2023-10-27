@@ -1,7 +1,7 @@
 use std::num::NonZeroUsize;
 
-use codecs::decoding::{DeserializerConfig, FramingConfig};
 use lookup::owned_value_path;
+use vector_lib::codecs::decoding::{DeserializerConfig, FramingConfig};
 use vector_lib::config::{LegacyKey, LogNamespace};
 use vector_lib::configurable::configurable_component;
 use vrl::value::Kind;

@@ -1,8 +1,8 @@
 use aws_sdk_cloudwatchlogs::Client as CloudwatchLogsClient;
 use aws_smithy_types::retry::RetryConfig;
-use codecs::JsonSerializerConfig;
 use futures::FutureExt;
 use tower::ServiceBuilder;
+use vector_lib::codecs::JsonSerializerConfig;
 use vector_lib::configurable::configurable_component;
 use vector_lib::schema;
 use vrl::value::Kind;

@@ -1,8 +1,8 @@
 use std::collections::BTreeMap;
 
-use codecs::encoding::{Framer, FramingConfig};
 use futures::future::FutureExt;
 use tower::ServiceBuilder;
+use vector_lib::codecs::encoding::{Framer, FramingConfig};
 use vector_lib::configurable::{component::GenerateConfig, configurable_component};
 use vector_lib::tls::TlsSettings;
 

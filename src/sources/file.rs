@@ -2,7 +2,6 @@ use std::{convert::TryInto, future, path::PathBuf, time::Duration};
 
 use bytes::Bytes;
 use chrono::Utc;
-use codecs::{BytesDeserializer, BytesDeserializerConfig};
 use file_source::{
     calculate_ignore_before,
     paths_provider::glob::{Glob, MatchOptions},
@@ -16,6 +15,7 @@ use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
 use tokio::{sync::oneshot, task::spawn_blocking};
 use tracing::{Instrument, Span};
+use vector_lib::codecs::{BytesDeserializer, BytesDeserializerConfig};
 use vector_lib::configurable::configurable_component;
 use vector_lib::finalizer::OrderedFinalizer;
 use vector_lib::{
