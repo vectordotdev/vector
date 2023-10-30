@@ -87,7 +87,6 @@ components: sources: prometheus_remote_write: {
 		http_server_handler_duration_seconds: components.sources.internal_metrics.output.metrics.http_server_handler_duration_seconds
 		http_server_requests_received_total:  components.sources.internal_metrics.output.metrics.http_server_requests_received_total
 		http_server_responses_sent_total:     components.sources.internal_metrics.output.metrics.http_server_responses_sent_total
-		parse_errors_total:                   components.sources.internal_metrics.output.metrics.parse_errors_total
 		requests_completed_total:             components.sources.internal_metrics.output.metrics.requests_completed_total
 		requests_received_total:              components.sources.internal_metrics.output.metrics.requests_received_total
 		request_duration_seconds:             components.sources.internal_metrics.output.metrics.request_duration_seconds

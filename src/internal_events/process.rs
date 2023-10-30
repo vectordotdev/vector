@@ -91,8 +91,6 @@ impl InternalEvent for VectorReloadError {
             "error_type" => error_type::CONFIGURATION_FAILED,
             "stage" => error_stage::PROCESSING,
         );
-        // deprecated
-        counter!("reload_errors_total", 1);
     }
 }
 
@@ -114,8 +112,6 @@ impl InternalEvent for VectorConfigLoadError {
             "error_type" => error_type::CONFIGURATION_FAILED,
             "stage" => error_stage::PROCESSING,
         );
-        // deprecated
-        counter!("config_load_errors_total", 1);
     }
 }
 
@@ -137,7 +133,5 @@ impl InternalEvent for VectorRecoveryError {
             "error_type" => error_type::CONFIGURATION_FAILED,
             "stage" => error_stage::PROCESSING,
         );
-        // deprecated
-        counter!("recover_errors_total", 1);
     }
 }

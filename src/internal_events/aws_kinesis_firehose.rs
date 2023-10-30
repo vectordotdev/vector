@@ -57,8 +57,6 @@ impl<'a> InternalEvent for AwsKinesisFirehoseRequestError<'a> {
             "error_type" => error_type::REQUEST_FAILED,
             "error_code" => self.error_code,
         );
-        // deprecated
-        counter!("request_read_errors_total", 1);
     }
 }
 
@@ -85,7 +83,5 @@ impl InternalEvent for AwsKinesisFirehoseAutomaticRecordDecodeError {
             "error_type" => error_type::PARSER_FAILED,
             "error_code" => io_error_code(&self.error),
         );
-        // deprecated
-        counter!("request_automatic_decode_errors_total", 1);
     }
 }

@@ -45,7 +45,5 @@ impl InternalEvent for HerokuLogplexRequestReadError {
             "error_code" => io_error_code(&self.error),
             "stage" => error_stage::PROCESSING,
         );
-        // deprecated
-        counter!("request_read_errors_total", 1);
     }
 }
