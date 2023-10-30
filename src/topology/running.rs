@@ -12,7 +12,7 @@ use tokio::{
     time::{interval, sleep_until, Duration, Instant},
 };
 use tracing::Instrument;
-use vector_buffers::topology::channel::BufferSender;
+use vector_lib::buffers::topology::channel::BufferSender;
 use vector_lib::trigger::DisabledTrigger;
 
 use super::{

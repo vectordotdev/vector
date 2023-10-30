@@ -6,7 +6,7 @@ use chrono::Utc;
 use futures::{Stream, StreamExt};
 use metrics::{register_histogram, Histogram};
 use tracing::Span;
-use vector_buffers::topology::channel::{self, LimitedReceiver, LimitedSender};
+use vector_lib::buffers::topology::channel::{self, LimitedReceiver, LimitedSender};
 #[cfg(test)]
 use vector_lib::event::{into_event_stream, EventStatus};
 use vector_lib::internal_event::{ComponentEventsDropped, UNINTENTIONAL};

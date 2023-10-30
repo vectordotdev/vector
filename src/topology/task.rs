@@ -9,7 +9,7 @@ use futures::{future::BoxFuture, FutureExt};
 use pin_project::pin_project;
 use snafu::Snafu;
 use tokio::task::JoinError;
-use vector_buffers::topology::channel::BufferReceiverStream;
+use vector_lib::buffers::topology::channel::BufferReceiverStream;
 use vector_lib::event::EventArray;
 
 use crate::{config::ComponentKey, utilization::Utilization};

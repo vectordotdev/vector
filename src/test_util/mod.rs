@@ -34,7 +34,7 @@ use tokio_stream::wrappers::TcpListenerStream;
 #[cfg(unix)]
 use tokio_stream::wrappers::UnixListenerStream;
 use tokio_util::codec::{Encoder, FramedRead, FramedWrite, LinesCodec};
-use vector_buffers::topology::channel::LimitedReceiver;
+use vector_lib::buffers::topology::channel::LimitedReceiver;
 use vector_lib::event::{BatchNotifier, Event, EventArray, LogEvent};
 #[cfg(test)]
 use zstd::Decoder as ZstdDecoder;
