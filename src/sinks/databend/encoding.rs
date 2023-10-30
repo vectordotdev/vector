@@ -1,4 +1,4 @@
-use codecs::{encoding::SerializerConfig, CsvSerializerConfig, JsonSerializerConfig};
+use vector_lib::codecs::{encoding::SerializerConfig, CsvSerializerConfig, JsonSerializerConfig};
 use vector_lib::configurable::configurable_component;
 
 use crate::codecs::{EncodingConfig, Transformer};

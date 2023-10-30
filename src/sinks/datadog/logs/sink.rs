@@ -1,9 +1,9 @@
 use std::{fmt::Debug, io, sync::Arc};
 
 use bytes::Bytes;
-use codecs::{encoding::Framer, CharacterDelimitedEncoder, JsonSerializerConfig};
 use lookup::event_path;
 use snafu::Snafu;
+use vector_lib::codecs::{encoding::Framer, CharacterDelimitedEncoder, JsonSerializerConfig};
 
 use super::{config::MAX_PAYLOAD_BYTES, service::LogApiRequest};
 use crate::sinks::{

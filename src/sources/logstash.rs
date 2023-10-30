@@ -7,12 +7,12 @@ use std::{
 };
 
 use bytes::{Buf, Bytes, BytesMut};
-use codecs::{BytesDeserializerConfig, StreamDecodingError};
 use flate2::read::ZlibDecoder;
 use lookup::{event_path, metadata_path, owned_value_path, path, OwnedValuePath};
 use smallvec::{smallvec, SmallVec};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::Decoder;
+use vector_lib::codecs::{BytesDeserializerConfig, StreamDecodingError};
 use vector_lib::configurable::configurable_component;
 use vector_lib::{
     config::{LegacyKey, LogNamespace},

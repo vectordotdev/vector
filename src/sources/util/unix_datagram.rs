@@ -1,11 +1,11 @@
 use std::{fs::remove_file, path::PathBuf};
 
 use bytes::{Bytes, BytesMut};
-use codecs::StreamDecodingError;
 use futures::StreamExt;
 use tokio::net::UnixDatagram;
 use tokio_util::codec::FramedRead;
 use tracing::field;
+use vector_lib::codecs::StreamDecodingError;
 use vector_lib::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
 use vector_lib::EstimatedJsonEncodedSizeOf;
 
@@ -72,7 +72,7 @@ async fn listen(
         tokio::select! {
             recv = socket.recv_from(&mut buf) => {
                 let (byte_size, address) = recv.map_err(|error| {
-                    let error = codecs::decoding::Error::FramingError(error.into());
+                    let error = vector_lib::codecs::decoding::Error::FramingError(error.into());
                     emit!(SocketReceiveError {
                         mode: SocketMode::Unix,
                         error: &error

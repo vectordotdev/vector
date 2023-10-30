@@ -7,10 +7,6 @@ use std::{
 
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
-use codecs::{
-    decoding::{Deserializer, DeserializerConfig, Framer},
-    BytesDecoder, BytesDeserializer,
-};
 use futures::{Stream, StreamExt};
 use http::HeaderMap;
 use indoc::indoc;
@@ -19,6 +15,10 @@ use ordered_float::NotNan;
 use prost::Message;
 use quickcheck::{Arbitrary, Gen, QuickCheck, TestResult};
 use similar_asserts::assert_eq;
+use vector_lib::codecs::{
+    decoding::{Deserializer, DeserializerConfig, Framer},
+    BytesDecoder, BytesDeserializer,
+};
 use vector_lib::{
     config::LogNamespace,
     event::{metric::TagValue, MetricTags},
@@ -1902,7 +1902,7 @@ async fn decode_series_endpoint_v2() {
                 r#type: ddmetric_proto::metric_payload::MetricType::Gauge as i32,
                 unit: "".to_string(),
                 source_type_name: "a_random_source_type_name".to_string(),
-                interval: 0,
+                interval: 10, // Dogstatsd sets Gauge interval to 10 by default
                 metadata: None,
             },
             ddmetric_proto::metric_payload::MetricSeries {
@@ -1982,6 +1982,13 @@ async fn decode_series_endpoint_v2() {
                 )
             );
             assert_eq!(metric.kind(), MetricKind::Absolute);
+            assert_eq!(
+                metric
+                    .interval_ms()
+                    .expect("should have set interval")
+                    .get(),
+                10000
+            );
             assert_eq!(*metric.value(), MetricValue::Gauge { value: 3.14 });
             assert_tags(
                 metric,
@@ -2006,6 +2013,13 @@ async fn decode_series_endpoint_v2() {
             );
             assert_eq!(metric.kind(), MetricKind::Absolute);
             assert_eq!(*metric.value(), MetricValue::Gauge { value: 3.1415 });
+            assert_eq!(
+                metric
+                    .interval_ms()
+                    .expect("should have set interval")
+                    .get(),
+                10000
+            );
             assert_tags(
                 metric,
                 metric_tags!(

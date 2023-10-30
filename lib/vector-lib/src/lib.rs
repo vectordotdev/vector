@@ -1,3 +1,5 @@
+pub use codecs;
+pub use vector_buffers as buffers;
 pub use vector_common::{
     assert_event_data_eq, btreemap, byte_size_of, byte_size_of::ByteSizeOf, conversion,
     encode_logfmt, finalization, finalizer, impl_event_data_eq, internal_event, json_size,
@@ -10,10 +12,10 @@ pub use vector_core::compile_vrl;
 #[cfg(feature = "test")]
 pub use vector_core::event_test_util;
 pub use vector_core::{
-    buckets, buffers, default_data_dir, event, fanout, metric_tags, metrics, partition, quantiles,
-    samples, schema, serde, sink, source, tcp, tls, transform, update_counter,
-    EstimatedJsonEncodedSizeOf,
+    buckets, default_data_dir, event, fanout, metric_tags, metrics, partition, quantiles, samples,
+    schema, serde, sink, source, tcp, tls, transform, update_counter, EstimatedJsonEncodedSizeOf,
 };
+pub use vector_stream as stream;
 
 pub mod config {
     pub use vector_common::config::ComponentKey;

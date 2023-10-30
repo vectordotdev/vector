@@ -4,15 +4,15 @@ use std::{net::SocketAddr, time::Duration};
 
 use bytes::Bytes;
 use chrono::Utc;
-use codecs::{
-    decoding::{Deserializer, Framer},
-    BytesDecoder, OctetCountingDecoder, SyslogDeserializerConfig,
-};
 use futures::StreamExt;
 use listenfd::ListenFd;
 use lookup::{lookup_v2::OptionalValuePath, path, OwnedValuePath};
 use smallvec::SmallVec;
 use tokio_util::udp::UdpFramed;
+use vector_lib::codecs::{
+    decoding::{Deserializer, Framer},
+    BytesDecoder, OctetCountingDecoder, SyslogDeserializerConfig,
+};
 use vector_lib::config::{LegacyKey, LogNamespace};
 use vector_lib::configurable::configurable_component;
 use vrl::event_path;
@@ -271,7 +271,7 @@ struct SyslogTcpSource {
 }
 
 impl TcpSource for SyslogTcpSource {
-    type Error = codecs::decoding::Error;
+    type Error = vector_lib::codecs::decoding::Error;
     type Item = SmallVec<[Event; 1]>;
     type Decoder = Decoder;
     type Acker = TcpNullAcker;
@@ -443,12 +443,12 @@ mod test {
     };
 
     use chrono::prelude::*;
-    use codecs::decoding::format::Deserializer;
     use rand::{thread_rng, Rng};
     use serde::Deserialize;
     use tokio::time::{sleep, Duration, Instant};
     use tokio_util::codec::BytesCodec;
     use vector_lib::assert_event_data_eq;
+    use vector_lib::codecs::decoding::format::Deserializer;
     use vector_lib::{config::ComponentKey, schema::Definition};
     use vrl::value::{kind::Collection, Kind, Value};
 

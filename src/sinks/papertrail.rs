@@ -131,7 +131,7 @@ struct PapertrailEncoder {
 }
 
 impl tokio_util::codec::Encoder<Event> for PapertrailEncoder {
-    type Error = codecs::encoding::Error;
+    type Error = vector_lib::codecs::encoding::Error;
 
     fn encode(
         &mut self,
@@ -186,9 +186,9 @@ mod tests {
     use std::convert::TryFrom;
 
     use bytes::BytesMut;
-    use codecs::JsonSerializerConfig;
     use futures::{future::ready, stream};
     use tokio_util::codec::Encoder as _;
+    use vector_lib::codecs::JsonSerializerConfig;
     use vector_lib::event::{Event, LogEvent};
 
     use crate::test_util::{

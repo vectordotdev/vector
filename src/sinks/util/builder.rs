@@ -12,14 +12,14 @@ use std::{
 use futures_util::{stream::Map, Stream, StreamExt};
 use pin_project::pin_project;
 use tower::Service;
+use vector_lib::stream::{
+    batcher::{config::BatchConfig, Batcher},
+    ConcurrentMap, Driver, DriverResponse, ExpirationQueue, PartitionedBatcher,
+};
 use vector_lib::{
     event::{Finalizable, Metric},
     partition::Partitioner,
     ByteSizeOf,
-};
-use vector_stream::{
-    batcher::{config::BatchConfig, Batcher},
-    ConcurrentMap, Driver, DriverResponse, ExpirationQueue, PartitionedBatcher,
 };
 
 use super::{

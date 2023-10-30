@@ -881,8 +881,8 @@ mod integration_tests {
     use futures::stream;
     use vrl::value;
 
-    use codecs::BytesDeserializerConfig;
     use lookup::{owned_value_path, path};
+    use vector_lib::codecs::BytesDeserializerConfig;
     use vector_lib::config::{LegacyKey, LogNamespace};
     use vector_lib::event::{BatchNotifier, BatchStatus, Event, LogEvent};
 

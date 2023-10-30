@@ -1,5 +1,6 @@
 use std::{
     collections::HashMap,
+    convert::Infallible,
     io::Read,
     net::{Ipv4Addr, SocketAddr},
     sync::Arc,
@@ -10,11 +11,13 @@ use chrono::{DateTime, TimeZone, Utc};
 use flate2::read::MultiGzDecoder;
 use futures::FutureExt;
 use http::StatusCode;
+use hyper::{service::make_service_fn, Server};
 use lookup::lookup_v2::OptionalValuePath;
 use lookup::{event_path, owned_value_path};
 use serde::Serialize;
 use serde_json::{de::Read as JsonRead, Deserializer, Value as JsonValue};
 use snafu::Snafu;
+use tower::ServiceBuilder;
 use tracing::Span;
 use vector_lib::configurable::configurable_component;
 use vector_lib::internal_event::{CountByteSize, InternalEventHandle as _, Registered};
@@ -38,6 +41,7 @@ use self::{
 use crate::{
     config::{log_schema, DataType, Resource, SourceConfig, SourceContext, SourceOutput},
     event::{Event, LogEvent, Value},
+    http::build_http_trace_layer,
     internal_events::{
         EventsReceived, HttpBytesReceived, SplunkHecRequestBodyInvalidError, SplunkHecRequestError,
         SplunkHecRequestReceived,
@@ -166,12 +170,20 @@ impl SourceConfig for SplunkConfig {
 
         Ok(Box::pin(async move {
             let span = Span::current();
-            warp::serve(services.with(warp::trace(move |_info| span.clone())))
-                .serve_incoming_with_graceful_shutdown(
-                    listener.accept_stream(),
-                    shutdown.map(|_| ()),
-                )
-                .await;
+            let make_svc = make_service_fn(move |_conn| {
+                let svc = ServiceBuilder::new()
+                    .layer(build_http_trace_layer(span.clone()))
+                    .service(warp::service(services.clone()));
+                futures_util::future::ok::<_, Infallible>(svc)
+            });
+
+            Server::builder(hyper::server::accept::from_stream(listener.accept_stream()))
+                .serve(make_svc)
+                .with_graceful_shutdown(shutdown.map(|_| ()))
+                .await
+                .map_err(|err| {
+                    error!("An error occurred: {:?}.", err);
+                })?;
 
             Ok(())
         }))
@@ -1209,10 +1221,10 @@ mod tests {
     use std::{net::SocketAddr, num::NonZeroU64};
 
     use chrono::{TimeZone, Utc};
-    use codecs::{JsonSerializerConfig, TextSerializerConfig};
     use futures_util::Stream;
     use reqwest::{RequestBuilder, Response};
     use serde::Deserialize;
+    use vector_lib::codecs::{JsonSerializerConfig, TextSerializerConfig};
     use vector_lib::sensitive_string::SensitiveString;
     use vector_lib::{event::EventStatus, schema::Definition};
     use vrl::path::PathPrefix;

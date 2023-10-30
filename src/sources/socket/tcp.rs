@@ -1,10 +1,10 @@
 use std::time::Duration;
 
 use chrono::Utc;
-use codecs::decoding::{DeserializerConfig, FramingConfig};
 use lookup::{lookup_v2::OptionalValuePath, owned_value_path, path};
 use serde_with::serde_as;
 use smallvec::SmallVec;
+use vector_lib::codecs::decoding::{DeserializerConfig, FramingConfig};
 use vector_lib::config::{LegacyKey, LogNamespace};
 use vector_lib::configurable::configurable_component;
 
@@ -203,7 +203,7 @@ impl RawTcpSource {
 }
 
 impl TcpSource for RawTcpSource {
-    type Error = codecs::decoding::Error;
+    type Error = vector_lib::codecs::decoding::Error;
     type Item = SmallVec<[Event; 1]>;
     type Decoder = Decoder;
     type Acker = TcpNullAcker;

@@ -1,6 +1,6 @@
 use bytes::Bytes;
 use chrono::Utc;
-use codecs::{
+use vector_lib::codecs::{
     encoding::{Framer, FramingConfig},
     NewlineDelimitedEncoder, TextSerializerConfig,
 };

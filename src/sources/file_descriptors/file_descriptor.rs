@@ -1,9 +1,9 @@
 use std::{fs::File, io, os::unix::io::FromRawFd};
 
 use super::{outputs, FileDescriptorConfig};
-use codecs::decoding::{DeserializerConfig, FramingConfig};
 use indoc::indoc;
 use lookup::lookup_v2::OptionalValuePath;
+use vector_lib::codecs::decoding::{DeserializerConfig, FramingConfig};
 use vector_lib::config::LogNamespace;
 use vector_lib::configurable::configurable_component;
 

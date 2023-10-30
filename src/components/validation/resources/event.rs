@@ -4,7 +4,7 @@ use snafu::Snafu;
 use tokio_util::codec::Encoder as _;
 
 use crate::codecs::Encoder;
-use codecs::{
+use vector_lib::codecs::{
     encoding, JsonSerializer, LengthDelimitedEncoder, LogfmtSerializer, MetricTagValues,
     NewlineDelimitedEncoder,
 };

@@ -2,7 +2,6 @@ use std::{collections::HashMap, convert::TryFrom, io};
 
 use bytes::Bytes;
 use chrono::{Utc, FixedOffset};
-use codecs::encoding::Framer;
 use http::header::{HeaderName, HeaderValue};
 use http::Uri;
 use indoc::indoc;
@@ -10,6 +9,7 @@ use snafu::ResultExt;
 use snafu::Snafu;
 use tower::ServiceBuilder;
 use uuid::Uuid;
+use vector_lib::codecs::encoding::Framer;
 use vector_lib::configurable::configurable_component;
 use vector_lib::event::{EventFinalizers, Finalizable};
 use vector_lib::{
@@ -424,9 +424,11 @@ fn make_header((name, value): (&String, &String)) -> crate::Result<(HeaderName, 
 
 #[cfg(test)]
 mod tests {
-    use codecs::encoding::FramingConfig;
-    use codecs::{JsonSerializerConfig, NewlineDelimitedEncoderConfig, TextSerializerConfig};
     use futures_util::{future::ready, stream};
+    use vector_lib::codecs::encoding::FramingConfig;
+    use vector_lib::codecs::{
+        JsonSerializerConfig, NewlineDelimitedEncoderConfig, TextSerializerConfig,
+    };
     use vector_lib::partition::Partitioner;
     use vector_lib::request_metadata::GroupedCountByteSize;
     use vector_lib::EstimatedJsonEncodedSizeOf;

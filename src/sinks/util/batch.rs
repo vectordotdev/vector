@@ -5,7 +5,7 @@ use serde_with::serde_as;
 use snafu::Snafu;
 use vector_lib::configurable::configurable_component;
 use vector_lib::json_size::JsonSize;
-use vector_stream::BatcherSettings;
+use vector_lib::stream::BatcherSettings;
 
 use super::EncodedEvent;
 use crate::{event::EventFinalizers, internal_events::LargeEventDroppedError};

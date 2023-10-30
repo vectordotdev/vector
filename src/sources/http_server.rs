@@ -8,12 +8,12 @@ use tokio_util::codec::Decoder as _;
 use vrl::value::{kind::Collection, Kind};
 use warp::http::{HeaderMap, HeaderValue};
 
-use codecs::{
+use lookup::{lookup_v2::OptionalValuePath, owned_value_path, path};
+use vector_lib::codecs::{
     decoding::{DeserializerConfig, FramingConfig},
     BytesDecoderConfig, BytesDeserializerConfig, JsonDeserializerConfig,
     NewlineDelimitedDecoderConfig,
 };
-use lookup::{lookup_v2::OptionalValuePath, owned_value_path, path};
 use vector_lib::configurable::configurable_component;
 use vector_lib::{
     config::{DataType, LegacyKey, LogNamespace},
@@ -489,12 +489,12 @@ mod tests {
     use vrl::value::kind::Collection;
     use vrl::value::Kind;
 
-    use codecs::{
+    use lookup::lookup_v2::OptionalValuePath;
+    use lookup::{event_path, owned_value_path, OwnedTargetPath};
+    use vector_lib::codecs::{
         decoding::{DeserializerConfig, FramingConfig},
         BytesDecoderConfig, JsonDeserializerConfig,
     };
-    use lookup::lookup_v2::OptionalValuePath;
-    use lookup::{event_path, owned_value_path, OwnedTargetPath};
     use vector_lib::config::LogNamespace;
     use vector_lib::event::LogEvent;
     use vector_lib::schema::Definition;
