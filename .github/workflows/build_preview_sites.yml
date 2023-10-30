@@ -7,7 +7,7 @@ on:
       - completed
 
 jobs:
-  deploy_vecotr_preview_site:
+  deploy_vector_preview_site:
     uses: ./.github/workflows/create_preview_sites.yml
     with:
       APP_ID: "d1a7j77663uxsc"
