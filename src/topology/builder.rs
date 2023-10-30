@@ -55,8 +55,8 @@ use crate::{
     SourceSender,
 };
 
-static ENRICHMENT_TABLES: Lazy<enrichment::TableRegistry> =
-    Lazy::new(enrichment::TableRegistry::default);
+static ENRICHMENT_TABLES: Lazy<vector_lib::enrichment::TableRegistry> =
+    Lazy::new(vector_lib::enrichment::TableRegistry::default);
 
 pub(crate) static SOURCE_SENDER_BUFFER_SIZE: Lazy<usize> =
     Lazy::new(|| *TRANSFORM_CONCURRENCY_LIMIT * CHUNK_SIZE);
@@ -149,7 +149,7 @@ impl<'a> Builder<'a> {
 
     /// Loads, or reloads the enrichment tables.
     /// The tables are stored in the `ENRICHMENT_TABLES` global variable.
-    async fn load_enrichment_tables(&mut self) -> &'static enrichment::TableRegistry {
+    async fn load_enrichment_tables(&mut self) -> &'static vector_lib::enrichment::TableRegistry {
         let mut enrichment_tables = HashMap::new();
 
         // Build enrichment tables
@@ -389,7 +389,10 @@ impl<'a> Builder<'a> {
         source_tasks
     }
 
-    async fn build_transforms(&mut self, enrichment_tables: &enrichment::TableRegistry) {
+    async fn build_transforms(
+        &mut self,
+        enrichment_tables: &vector_lib::enrichment::TableRegistry,
+    ) {
         let mut definition_cache = HashMap::default();
 
         for (key, transform) in self
@@ -490,7 +493,7 @@ impl<'a> Builder<'a> {
         }
     }
 
-    async fn build_sinks(&mut self, enrichment_tables: &enrichment::TableRegistry) {
+    async fn build_sinks(&mut self, enrichment_tables: &vector_lib::enrichment::TableRegistry) {
         for (key, sink) in self
             .config
             .sinks()
@@ -716,7 +719,7 @@ struct TransformNode {
 impl TransformNode {
     pub fn from_parts(
         key: ComponentKey,
-        enrichment_tables: enrichment::TableRegistry,
+        enrichment_tables: vector_lib::enrichment::TableRegistry,
         transform: &TransformOuter<OutputId>,
         schema_definition: &[(OutputId, Definition)],
         global_log_namespace: LogNamespace,

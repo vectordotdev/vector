@@ -9746,7 +9746,6 @@ dependencies = [
  "dnsmsg-parser",
  "dyn-clone",
  "encoding_rs",
- "enrichment",
  "enum_dispatch",
  "exitcode",
  "fakedata",
@@ -10120,6 +10119,7 @@ name = "vector-lib"
 version = "0.1.0"
 dependencies = [
  "codecs",
+ "enrichment",
  "vector-buffers",
  "vector-common",
  "vector-config",
