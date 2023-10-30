@@ -128,8 +128,7 @@ impl InternalEvent for TcpBytesReceived {
         );
         counter!(
             "component_received_bytes_total", self.byte_size as u64,
-            "protocol" => "tcp",
-            "peer_addr" => self.peer_addr.to_string()
+            "protocol" => "tcp"
         );
     }
 }
