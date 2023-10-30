@@ -22,8 +22,6 @@ impl<E: std::fmt::Display> InternalEvent for DnstapParseError<E> {
             "stage" => error_stage::PROCESSING,
             "error_type" => error_type::PARSER_FAILED,
         );
-        // deprecated
-        counter!("parse_errors_total", 1);
     }
 }
 

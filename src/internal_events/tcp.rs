@@ -32,8 +32,6 @@ impl<E: std::error::Error> InternalEvent for TcpSocketOutgoingConnectionError<E>
         // ## skip check-duplicate-events ##
         // ## skip check-validity-events ##
         emit!(SocketOutgoingConnectionError { error: self.error });
-        // deprecated
-        counter!("connection_failed_total", 1, "mode" => "tcp");
     }
 }
 
@@ -77,20 +75,15 @@ impl InternalEvent for TcpSocketTlsConnectionError {
                     stage = error_stage::SENDING,
                     internal_log_rate_limit = true,
                 );
+                counter!(
+                    "component_errors_total", 1,
+                    "error_code" => "connection_failed",
+                    "error_type" => error_type::WRITER_FAILED,
+                    "stage" => error_stage::SENDING,
+                    "mode" => "tcp",
+                );
             }
         }
-        counter!(
-            "component_errors_total", 1,
-            "error_code" => "connection_failed",
-            "error_type" => error_type::WRITER_FAILED,
-            "stage" => error_stage::SENDING,
-            "mode" => "tcp",
-        );
-        // deprecated
-        counter!(
-            "connection_errors_total", 1,
-            "mode" => "tcp",
-        );
     }
 }
 
@@ -114,15 +107,6 @@ impl InternalEvent for TcpSendAckError {
             "error_code" => "ack_failed",
             "error_type" => error_type::WRITER_FAILED,
             "stage" => error_stage::SENDING,
-            "mode" => "tcp",
-        );
-        // deprecated
-        counter!(
-            "connection_errors_total", 1,
-            "mode" => "tcp",
-        );
-        counter!(
-            "connection_send_ack_errors_total", 1,
             "mode" => "tcp",
         );
     }

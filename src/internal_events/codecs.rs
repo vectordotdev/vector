@@ -11,16 +11,17 @@ pub struct DecoderFramingError<E> {
 
 impl<E: std::fmt::Display> InternalEvent for DecoderFramingError<E> {
     fn emit(self) {
-        counter!("decoder_framing_errors_total", 1);
         error!(
             message = "Failed framing bytes.",
             error = %self.error,
+            error_code = "decoder_frame",
             error_type = error_type::PARSER_FAILED,
             stage = error_stage::PROCESSING,
             internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,
+            "error_code" => "decoder_frame",
             "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::PROCESSING,
         );
@@ -34,16 +35,17 @@ pub struct DecoderDeserializeError<'a> {
 
 impl<'a> InternalEvent for DecoderDeserializeError<'a> {
     fn emit(self) {
-        counter!("decoder_deserialize_errors_total", 1);
         error!(
             message = "Failed deserializing frame.",
             error = %self.error,
+            error_code = "decoder_deserialize",
             error_type = error_type::PARSER_FAILED,
             stage = error_stage::PROCESSING,
             internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,
+            "error_code" => "decoder_deserialize",
             "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::PROCESSING,
         );
@@ -61,13 +63,14 @@ impl<'a> InternalEvent for EncoderFramingError<'a> {
         error!(
             message = reason,
             error = %self.error,
+            error_code = "encoder_frame",
             error_type = error_type::ENCODER_FAILED,
             stage = error_stage::SENDING,
             internal_log_rate_limit = true,
         );
-        counter!("encoder_framing_errors_total", 1);
         counter!(
             "component_errors_total", 1,
+            "error_code" => "encoder_frame",
             "error_type" => error_type::ENCODER_FAILED,
             "stage" => error_stage::SENDING,
         );
@@ -86,13 +89,14 @@ impl<'a> InternalEvent for EncoderSerializeError<'a> {
         error!(
             message = reason,
             error = %self.error,
+            error_code = "encoder_serialize",
             error_type = error_type::ENCODER_FAILED,
             stage = error_stage::SENDING,
             internal_log_rate_limit = true,
         );
-        counter!("encoder_serialize_errors_total", 1);
         counter!(
             "component_errors_total", 1,
+            "error_code" => "encoder_serialize",
             "error_type" => error_type::ENCODER_FAILED,
             "stage" => error_stage::SENDING,
         );

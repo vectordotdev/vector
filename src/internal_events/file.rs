@@ -182,11 +182,6 @@ mod source {
                 "stage" => error_stage::RECEIVING,
                 "file" => self.file.to_string_lossy().into_owned(),
             );
-            // deprecated
-            counter!(
-                "fingerprint_read_errors_total", 1,
-                "file" => self.file.to_string_lossy().into_owned(),
-            );
         }
     }
 
@@ -215,11 +210,6 @@ mod source {
                 "error_code" => DELETION_FAILED,
                 "error_type" => error_type::COMMAND_FAILED,
                 "stage" => error_stage::RECEIVING,
-            );
-            // deprecated
-            counter!(
-                "file_delete_errors_total", 1,
-                "file" => self.file.to_string_lossy().into_owned(),
             );
         }
     }
@@ -282,11 +272,6 @@ mod source {
                 "error_code" => "watching",
                 "error_type" => error_type::COMMAND_FAILED,
                 "stage" => error_stage::RECEIVING,
-                "file" => self.file.to_string_lossy().into_owned(),
-            );
-            // deprecated
-            counter!(
-                "file_watch_errors_total", 1,
                 "file" => self.file.to_string_lossy().into_owned(),
             );
         }
@@ -362,7 +347,6 @@ mod source {
                 stage = error_stage::RECEIVING,
                 internal_log_rate_limit = true,
             );
-            counter!("checkpoint_write_errors_total", 1);
             counter!(
                 "component_errors_total", 1,
                 "error_code" => "writing_checkpoints",
@@ -394,11 +378,6 @@ mod source {
                 "error_code" => "globbing",
                 "error_type" => error_type::READER_FAILED,
                 "stage" => error_stage::RECEIVING,
-                "path" => self.path.to_string_lossy().into_owned(),
-            );
-            // deprecated
-            counter!(
-                "glob_errors_total", 1,
                 "path" => self.path.to_string_lossy().into_owned(),
             );
         }

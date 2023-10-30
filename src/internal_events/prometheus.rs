@@ -40,8 +40,6 @@ impl<'a> InternalEvent for PrometheusParseError<'a> {
             "stage" => error_stage::PROCESSING,
             "url" => self.url.to_string(),
         );
-        // deprecated
-        counter!("parse_errors_total", 1);
     }
 }
 
@@ -64,8 +62,6 @@ impl InternalEvent for PrometheusRemoteWriteParseError {
             "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::PROCESSING,
         );
-        // deprecated
-        counter!("parse_errors_total", 1);
     }
 }
 
