@@ -54,4 +54,5 @@ sinks:
 
   blackhole
     type: "blackhole"
+    print_interval_secs: 0
     inputs: [ "cardinality_control" ]
