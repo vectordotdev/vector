@@ -305,6 +305,6 @@ components: sources: logstash: {
 	}
 
 	telemetry: metrics: {
-		open_connections:                 components.sources.internal_metrics.output.metrics.open_connections
+		open_connections: components.sources.internal_metrics.output.metrics.open_connections
 	}
 }

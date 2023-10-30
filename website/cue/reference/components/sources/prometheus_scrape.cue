@@ -97,7 +97,7 @@ components: sources: prometheus_scrape: {
 	}
 
 	telemetry: metrics: {
-		requests_completed_total:  components.sources.internal_metrics.output.metrics.requests_completed_total
-		request_duration_seconds:  components.sources.internal_metrics.output.metrics.request_duration_seconds
+		requests_completed_total: components.sources.internal_metrics.output.metrics.requests_completed_total
+		request_duration_seconds: components.sources.internal_metrics.output.metrics.request_duration_seconds
 	}
 }

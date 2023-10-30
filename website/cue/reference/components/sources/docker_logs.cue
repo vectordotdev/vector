@@ -208,8 +208,8 @@ components: sources: docker_logs: {
 	}
 
 	telemetry: metrics: {
-		container_processed_events_total:      components.sources.internal_metrics.output.metrics.container_processed_events_total
-		containers_unwatched_total:            components.sources.internal_metrics.output.metrics.containers_unwatched_total
-		containers_watched_total:              components.sources.internal_metrics.output.metrics.containers_watched_total
+		container_processed_events_total: components.sources.internal_metrics.output.metrics.container_processed_events_total
+		containers_unwatched_total:       components.sources.internal_metrics.output.metrics.containers_unwatched_total
+		containers_watched_total:         components.sources.internal_metrics.output.metrics.containers_watched_total
 	}
 }

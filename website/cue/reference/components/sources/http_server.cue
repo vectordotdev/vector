@@ -177,7 +177,6 @@ components: sources: http_server: {
 		},
 	]
 
-
 	telemetry: metrics: {
 		http_server_handler_duration_seconds: components.sources.internal_metrics.output.metrics.http_server_handler_duration_seconds
 		http_server_requests_received_total:  components.sources.internal_metrics.output.metrics.http_server_requests_received_total
