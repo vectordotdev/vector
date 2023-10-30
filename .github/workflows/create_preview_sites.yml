@@ -16,19 +16,6 @@ jobs:
   create_preview_site:
     runs-on: ubuntu-latest
     steps:
-    - name: Deploy Site
-      run: |
-        RESPONSE_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
-             -H "Content-Type: application/json" \
-             -H "X-Hub-Signature: $SIGNATURE" \
-             -d "{\"app_id\": \"$APP_ID\", \"branch_name\": \"${{ github.head_ref }}\"}" \
-          "$ENDPOINT")
-
-        # check the response code and fail if not 200
-        if [ "$RESPONSE_CODE" != "200" ]; then
-          echo "Request failed with response code $RESPONSE_CODE"
-          exit 1
-        fi
 
     # Get the artifacts with the PR number and branch name
     - name: Download artifact
@@ -50,7 +37,34 @@ jobs:
           });
           fs.writeFileSync('${{ github.workspace }}/pr.zip', Buffer.from(download.data));
 
-    - run: unzip pr.zip -d pr
+    # Extract the info from the artifact and set variables
+    - name: Extract PR info from artifact
+      run: |
+        unzip pr.zip -d pr
+        BRANCH_NAME=$(cat ./pr/PR_INFO | grep 'Branch Name' | cut -d ':' -f 2 | xargs)
+        SANITIZED_BRANCH_NAME=$(echo "$BRANCH_NAME" | sed 's/[\/\.]/-/g')
+        echo "SANITIZED_BRANCH_NAME=$SANITIZED_BRANCH_NAME" >> $GITHUB_ENV
+
+    # Kick off the job in amplify
+    - name: Deploy Site
+      env:
+        REQUEST_TOKEN: ${{ secrets.REQUEST_TOKEN }}
+        REQUEST_MESSAGE: ${{ secrets.REQUEST_MESSAGE }}
+        ENDPOINT: ${{ secrets.BUILDER_ENDPOINT }}
+      run: |
+        HMAC_KEY=$(echo -n $REQUEST_MESSAGE | openssl dgst -sha256 -hmac "$REQUEST_TOKEN" -binary | od -An -tx1 | tr -d ' \n'; echo)
+        SIGNATURE="sha256=$HMAC_KEY"
+        RESPONSE_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
+             -H "Content-Type: application/json" \
+             -H "X-Hub-Signature: $SIGNATURE" \
+             -d "{\"app_id\": \"$APP_ID\", \"branch_name\": \"$SANITIZED_BRANCH_NAME\"}" \
+          "$ENDPOINT")
+
+        # check the response code and fail if not 200
+        if [ "$RESPONSE_CODE" != "200" ]; then
+          echo "Request failed with response code $RESPONSE_CODE"
+          exit 1
+        fi
 
     # Add preview link to comment if all 3 sites successfully start
     - name: Comment Preview Link
@@ -63,8 +77,6 @@ jobs:
           const prInfo = fs.readFileSync('./pr/PR_INFO', 'utf8');
           const prInfoLines = prInfo.split('\n');
           const issueNumber = parseInt(prInfoLines[0].split(': ')[1]);
-          const branchName = prInfoLines[1].split(': ')[1];
-          const SANITIZED_BRANCH_NAME = branchName.replace(/[\/\.]/g, '-')
 
           await github.issues.createComment({
             owner: context.repo.owner,
