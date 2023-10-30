@@ -197,14 +197,14 @@ fn decode_label_pair(k: &str, v: &str) -> Result<(String, String), ErrorMessage>
     let decoded_bytes = BASE64_URL_SAFE.decode(v).map_err(|_| {
         ErrorMessage::new(
             http::StatusCode::BAD_REQUEST,
-            format!("Invalid base64 value for key {}: {}", k, v),
+            format!("Grouping key invalid - invalid base64 value for key {}: {}", k, v),
         )
     })?;
 
     let decoded = String::from_utf8(decoded_bytes).map_err(|_| {
         ErrorMessage::new(
             http::StatusCode::BAD_REQUEST,
-            format!("Invalid UTF-8 in base64 value for key {}", k),
+            format!("Grouping key invalid - invalid UTF-8 in decoded base64 value for key {}", k),
         )
     })?;
 
