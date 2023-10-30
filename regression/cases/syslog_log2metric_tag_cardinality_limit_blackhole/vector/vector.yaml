@@ -52,7 +52,7 @@ sinks:
     inputs: [ "internal_metrics" ]
     address: "0.0.0.0:9090"
 
-  blackhole
+  blackhole:
     type: "blackhole"
     print_interval_secs: 0
     inputs: [ "cardinality_control" ]
