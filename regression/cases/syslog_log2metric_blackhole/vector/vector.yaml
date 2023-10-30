@@ -35,13 +35,6 @@ transforms:
           facility: "{{ facility }}"
           severity: "{{ severity }}"
 
-  cardinality_control:
-    type: "tag_cardinality_limit"
-    inputs: [ "log2metric" ]
-    limit_exceeded_action: "drop_tag"
-    mode: "probabilistic"
-    value_limit: 100
-
 ##
 ## Sinks
 ##
@@ -55,4 +48,4 @@ sinks:
   blackhole
     type: "blackhole"
     print_interval_secs: 0
-    inputs: [ "cardinality_control" ]
+    inputs: [ "log2metric" ]
