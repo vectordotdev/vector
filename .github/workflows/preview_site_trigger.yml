@@ -8,7 +8,18 @@ jobs:
   approval_check:
     runs-on: ubuntu-latest
     steps:
-      - name: Check for approval
+      - name: Echo approval
         run: |
-          echo "Workflow has been allowed to run for PR ${{ github.event.number }}"
+          echo "Workflow has been allowed to run for PR ${{ github.event.number }}. Setting artifacts and then continuing workflow runs"
 
+      - name: Save PR number and Branch name
+        run: |
+          mkdir -p ./pr
+          echo "PR Number: ${{ github.event.number }}" > ./pr/PR_INFO
+          echo "Branch Name: ${{ github.head_ref }}" >> ./pr/PR_INFO
+
+      - name: Upload PR information artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: pr
+          path: pr/

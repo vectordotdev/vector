@@ -30,14 +30,47 @@ jobs:
           exit 1
         fi
 
+    # Get the artifacts with the PR number and branch name
+    - name: Download artifact
+      uses: actions/github-script@v3.1.0
+      with:
+        script: |
+          const fs = require('fs');
+          const artifacts = await github.actions.listWorkflowRunArtifacts({
+             owner: context.repo.owner,
+             repo: context.repo.repo,
+             run_id: ${{ github.event.workflow_run.id }},
+          });
+          const matchArtifact = artifacts.data.artifacts.filter(artifact => artifact.name == "pr")[0];
+          const download = await github.actions.downloadArtifact({
+             owner: context.repo.owner,
+             repo: context.repo.repo,
+             artifact_id: matchArtifact.id,
+             archive_format: 'zip',
+          });
+          fs.writeFileSync('${{ github.workspace }}/pr.zip', Buffer.from(download.data));
+
+    - run: unzip pr.zip -d pr
+
     # Add preview link to comment if all 3 sites successfully start
     - name: Comment Preview Link
       if: success()
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: |
-        URLIZED_BRANCH=$(echo "${{ github.head_ref }}" | tr './' '--')
-        COMMENT_URL="https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments"
-        COMMENT_CONTENT="Your preview site for the **$APP_NAME** will be ready in a few minutes, please allow time for it to build. \n \n Here's your link: \n [$APP_NAME preview](https://$URLIZED_BRANCH.$APP_ID.amplifyapp.com)"
+      uses: actions/github-script@v3
+      with:
+        script: |
+          const prInfo = fs.readFileSync('./pr/PR_INFO', 'utf8');
+          const prInfoLines = prInfo.split('\n');
+          const issueNumber = parseInt(prInfoLines[0].split(': ')[1]);
+          const branchName = prInfoLines[1].split(': ')[1];
+          const SANITIZED_BRANCH_NAME = branchName.replace(/[\/\.]/g, '-')
+
+          await github.issues.createComment({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: issue_number,
+            body: `Your preview site for the **${APP_NAME}** will be ready in a few minutes, please allow time for it to build. \n \n Heres your preview link: \n [${APP_NAME} preview](https://${SANITIZED_BRANCH_NAME}.${APP_ID}.amplifyapp.com)`
+          });
 
 
