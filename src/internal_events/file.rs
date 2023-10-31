@@ -82,8 +82,8 @@ impl<'a, P: std::fmt::Debug> InternalEvent for FileIoError<'a, P> {
 mod source {
     use std::{io::Error, path::Path, time::Duration};
 
-    use file_source::FileSourceInternalEvents;
     use metrics::counter;
+    use vector_lib::file_source::FileSourceInternalEvents;
 
     use super::{FileOpen, InternalEvent};
     use crate::emit;

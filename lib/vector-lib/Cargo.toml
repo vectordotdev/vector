@@ -8,6 +8,7 @@ publish = false
 [dependencies]
 codecs = { path = "../codecs", default-features = false }
 enrichment = { path = "../enrichment" }
+file-source = { path = "../file-source", optional = true }
 vector-buffers = { path = "../vector-buffers", default-features = false }
 vector-common = { path = "../vector-common" }
 vector-config = { path = "../vector-config" }
@@ -17,6 +18,7 @@ vector-stream = { path = "../vector-stream" }
 [features]
 api = ["vector-core/api"]
 lua = ["vector-core/lua"]
+file-source = ["dep:file-source"]
 syslog = ["codecs/syslog"]
 test = ["vector-core/test"]
 vrl = ["vector-core/vrl"]
