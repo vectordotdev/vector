@@ -10,7 +10,7 @@ releases: "0.33.1": {
 		This patch release contains fixes for regressions in 0.33.0 and fixes an issues with the Debian release artifacts.
 
 		**Note:** Please see the release notes for [`v0.33.0`](/releases/0.33.0/) for additional changes if upgrading from
-		`v0.32.X`. In particular, the upgrade guide for breaking changes.
+		`v0.32.X`. In particular, see the upgrade guide for breaking changes.
 		"""
 
 	changelog: [

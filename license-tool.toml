@@ -12,7 +12,7 @@
 "rustls-webpki-0.100.1" = { license = "ISC" }
 
 # `webpki` doesn't specify their license in the metadata, but the file contains the ISC terms.
-"webpki-0.22.4" = { license = "ISC" }
+"webpki-0.22.2" = { license = "ISC" }
 
 # `zerocopy` et al don't specify their licenses in the metadata, but the file contains the 2-clause BSD terms.
 "zerocopy-0.6.1" = { license = "BSD-2-Clause" }
