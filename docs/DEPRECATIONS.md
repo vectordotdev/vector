@@ -12,4 +12,4 @@ See [DEPRECATION.md](docs/DEPRECATION.md#process) for the process for updating t
 * armv7_rpm v0.34.0 The armv7 RPM packages should be removed (replaced by armv7hl)
 
 ### 0.35.0 
-* `requests_completed_total`, `request_duration_seconds`, and `requests_received_total` internal metrics 
+* `requests_completed_total`, `request_duration_seconds`, and `requests_received_total` internal metrics
