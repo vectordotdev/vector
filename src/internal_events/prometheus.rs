@@ -3,9 +3,9 @@ use std::borrow::Cow;
 
 use hyper::StatusCode;
 use metrics::counter;
-#[cfg(feature = "sources-prometheus-scrape")]
-use prometheus_parser::ParserError;
 use vector_lib::internal_event::InternalEvent;
+#[cfg(feature = "sources-prometheus-scrape")]
+use vector_lib::prometheus::parser::ParserError;
 
 use crate::emit;
 use vector_lib::internal_event::{error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL};
