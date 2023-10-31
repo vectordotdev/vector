@@ -10,11 +10,11 @@ administration: {
 	install_commands: [#Command, ...#Command] & [
 				{
 			title:   "For humans"
-			command: "curl --proto '=https' --tlsv1.2 -sSf https://sh.vector.dev | bash"
+			command: "curl --proto '=https' --tlsv1.2 -sSfL https://sh.vector.dev | bash"
 		},
 		{
 			title:   "For machines"
-			command: "curl --proto '=https' --tlsv1.2 -sSf https://sh.vector.dev | bash -s -- -y"
+			command: "curl --proto '=https' --tlsv1.2 -sSfL https://sh.vector.dev | bash -s -- -y"
 		},
 	]
 }
