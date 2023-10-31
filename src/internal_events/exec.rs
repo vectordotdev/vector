@@ -1,6 +1,5 @@
 use std::time::Duration;
 
-use crate::emit;
 use metrics::{counter, histogram};
 use tokio::time::error::Elapsed;
 use vector_lib::internal_event::InternalEvent;

@@ -1,7 +1,5 @@
 use vector_lib::internal_event::{ComponentEventsDropped, Count, Registered, INTENTIONAL};
 
-use crate::register;
-
 vector_lib::registered_event! (
     FilterEventsDropped => {
         events_dropped: Registered<ComponentEventsDropped<'static, INTENTIONAL>>

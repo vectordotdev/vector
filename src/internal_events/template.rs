@@ -1,7 +1,5 @@
-use crate::emit;
 use metrics::counter;
 use vector_lib::internal_event::{ComponentEventsDropped, InternalEvent, UNINTENTIONAL};
-
 use vector_lib::internal_event::{error_stage, error_type};
 
 pub struct TemplateRenderingError<'a> {

@@ -1,11 +1,11 @@
 use metrics::counter;
 use vector_lib::internal_event::InternalEvent;
-
-use crate::sources::nginx_metrics::parser::ParseError;
 use vector_lib::{
     internal_event::{error_stage, error_type},
     json_size::JsonSize,
 };
+
+use crate::sources::nginx_metrics::parser::ParseError;
 
 #[derive(Debug)]
 pub struct NginxMetricsEventsReceived<'a> {
