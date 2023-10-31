@@ -12,6 +12,7 @@ pub use vector_common::{
     TimeZone,
 };
 pub use vector_config as configurable;
+pub use vector_config::impl_generate_config_from_default;
 #[cfg(feature = "vrl")]
 pub use vector_core::compile_vrl;
 #[cfg(feature = "test")]
