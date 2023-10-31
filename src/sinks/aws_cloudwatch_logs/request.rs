@@ -244,7 +244,7 @@ impl Future for CloudwatchFuture {
 
                     info!(message = "Retention policy updated for stream.", name = %self.client.stream_name);
 
-                 self.state = State::CreateStream(self.client.create_log_stream());
+                    self.state = State::CreateStream(self.client.create_log_stream());
                 }
             }
         }
