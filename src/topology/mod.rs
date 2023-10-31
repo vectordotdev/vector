@@ -27,7 +27,7 @@ use std::{
 
 use futures::{Future, FutureExt};
 use tokio::sync::{mpsc, watch};
-use vector_buffers::topology::channel::{BufferReceiverStream, BufferSender};
+use vector_lib::buffers::topology::channel::{BufferReceiverStream, BufferSender};
 
 pub use self::builder::TopologyPieces;
 pub use self::controller::{ReloadOutcome, SharedTopologyController, TopologyController};

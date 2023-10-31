@@ -130,7 +130,6 @@ pin-project.workspace = true
 
 # Internal libs
 dnsmsg-parser = { path = "lib/dnsmsg-parser", optional = true }
-enrichment = { path = "lib/enrichment" }
 fakedata = { path = "lib/fakedata", optional = true }
 file-source = { path = "lib/file-source", optional = true }
 lookup = { package = "vector-lookup", path = "lib/vector-lookup" }
@@ -139,7 +138,6 @@ prometheus-parser = { path = "lib/prometheus-parser", optional = true }
 opentelemetry-proto = { path = "lib/opentelemetry-proto", optional = true }
 tracing-limit = { path = "lib/tracing-limit" }
 vector-api-client = { path = "lib/vector-api-client", optional = true }
-vector-buffers = { path = "lib/vector-buffers", default-features = false }
 vector-lib = { path = "lib/vector-lib", default-features = false, features = ["vrl"] }
 vector-vrl-functions = { path = "lib/vector-vrl/functions" }
 loki-logproto = { path = "lib/loki-logproto", optional = true }
@@ -147,7 +145,7 @@ loki-logproto = { path = "lib/loki-logproto", optional = true }
 # Tokio / Futures
 async-stream = { version = "0.3.5", default-features = false }
 async-trait = { version = "0.1.74", default-features = false }
-futures = { version = "0.3.28", default-features = false, features = ["compat", "io-compat"], package = "futures" }
+futures = { version = "0.3.29", default-features = false, features = ["compat", "io-compat"], package = "futures" }
 tokio = { version = "1.33.0", default-features = false, features = ["full"] }
 tokio-openssl = { version = "0.6.3", default-features = false }
 tokio-stream = { version = "0.1.14", default-features = false, features = ["net", "sync", "time"] }
@@ -203,7 +201,7 @@ serde-toml-merge = { version = "0.3.3", default-features = false }
 serde_bytes = { version = "0.11.12", default-features = false, features = ["std"], optional = true }
 serde_json = { version = "1.0.107", default-features = false, features = ["raw_value"] }
 serde_with = { version = "3.4.0", default-features = false, features = ["macros", "std"] }
-serde_yaml = { version = "0.9.25", default-features = false }
+serde_yaml = { version = "0.9.27", default-features = false }
 
 # Messagepack
 rmp-serde = { version = "1.1.2", default-features = false, optional = true }
@@ -319,7 +317,7 @@ syslog = { version = "6.1.0", default-features = false, optional = true }
 tikv-jemallocator = { version = "0.5.4", default-features = false, optional = true }
 tokio-postgres = { version = "0.7.10", default-features = false, features = ["runtime", "with-chrono-0_4"], optional = true }
 tokio-tungstenite = {version = "0.20.1", default-features = false, features = ["connect"], optional = true}
-toml = { version = "0.8.5", default-features = false, features = ["parse", "display"] }
+toml = { version = "0.8.6", default-features = false, features = ["parse", "display"] }
 tonic = { version = "0.10", optional = true, default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "gzip"] }
 trust-dns-proto = { version = "0.23.2", default-features = false, features = ["dnssec"], optional = true }
 typetag = { version = "0.2.13", default-features = false }
@@ -366,7 +364,7 @@ quickcheck = "1.0.3"
 lookup = { package = "vector-lookup", path = "lib/vector-lookup", features = ["test"] }
 reqwest = { version = "0.11", features = ["json"] }
 rstest = {version = "0.18.2"}
-tempfile = "3.8.0"
+tempfile = "3.8.1"
 test-generator = "0.3.1"
 tokio = { version = "1.33.0", features = ["test-util"] }
 tokio-test = "0.4.3"

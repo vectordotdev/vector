@@ -1190,14 +1190,14 @@ mod test {
     #[cfg(unix)]
     #[tokio::test]
     async fn test_unix_stream_syslog() {
-        use crate::test_util::components::SOCKET_HIGH_CARDINALITY_PUSH_SOURCE_TAGS;
+        use crate::test_util::components::SOCKET_PUSH_SOURCE_TAGS;
         use futures_util::{stream, SinkExt};
         use std::os::unix::net::UnixStream as StdUnixStream;
         use tokio::io::AsyncWriteExt;
         use tokio::net::UnixStream;
         use tokio_util::codec::{FramedWrite, LinesCodec};
 
-        assert_source_compliance(&SOCKET_HIGH_CARDINALITY_PUSH_SOURCE_TAGS, async {
+        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
             let num_messages: usize = 1;
             let in_path = tempfile::tempdir().unwrap().into_path().join("stream_test");
 

@@ -1531,7 +1531,7 @@ mod integration_test {
     };
     use stream_cancel::{Trigger, Tripwire};
     use tokio::time::sleep;
-    use vector_buffers::topology::channel::BufferReceiver;
+    use vector_lib::buffers::topology::channel::BufferReceiver;
     use vector_lib::event::EventStatus;
     use vrl::{event_path, value};
 

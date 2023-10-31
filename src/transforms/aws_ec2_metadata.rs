@@ -247,7 +247,7 @@ impl TransformConfig for Ec2Metadata {
 
     fn outputs(
         &self,
-        _: enrichment::TableRegistry,
+        _: vector_lib::enrichment::TableRegistry,
         input_definitions: &[(OutputId, schema::Definition)],
         _: LogNamespace,
     ) -> Vec<TransformOutput> {
@@ -719,8 +719,8 @@ mod test {
     use crate::config::schema::Definition;
     use crate::config::{LogNamespace, OutputId, TransformConfig};
     use crate::transforms::aws_ec2_metadata::Ec2Metadata;
-    use enrichment::TableRegistry;
     use lookup::OwnedTargetPath;
+    use vector_lib::enrichment::TableRegistry;
     use vrl::owned_value_path;
     use vrl::value::Kind;
 
