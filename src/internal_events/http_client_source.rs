@@ -56,8 +56,6 @@ impl InternalEvent for HttpClientHttpResponseError {
             "error_type" => error_type::REQUEST_FAILED,
             "error_code" => http_error_code(self.code.as_u16()),
         );
-        // deprecated
-        counter!("http_error_response_total", 1);
     }
 }
 
@@ -83,7 +81,5 @@ impl InternalEvent for HttpClientHttpError {
             "error_type" => error_type::REQUEST_FAILED,
             "stage" => error_stage::RECEIVING,
         );
-        // deprecated
-        counter!("http_request_errors_total", 1);
     }
 }
