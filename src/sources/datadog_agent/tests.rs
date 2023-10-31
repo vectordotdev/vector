@@ -10,7 +10,6 @@ use chrono::{TimeZone, Utc};
 use futures::{Stream, StreamExt};
 use http::HeaderMap;
 use indoc::indoc;
-use lookup::{owned_value_path, OwnedTargetPath};
 use ordered_float::NotNan;
 use prost::Message;
 use quickcheck::{Arbitrary, Gen, QuickCheck, TestResult};
@@ -19,6 +18,7 @@ use vector_lib::codecs::{
     decoding::{Deserializer, DeserializerConfig, Framer},
     BytesDecoder, BytesDeserializer,
 };
+use vector_lib::lookup::{owned_value_path, OwnedTargetPath};
 use vector_lib::{
     config::LogNamespace,
     event::{metric::TagValue, MetricTags},

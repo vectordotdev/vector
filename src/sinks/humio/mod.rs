@@ -1,4 +1,4 @@
-use lookup::lookup_v2::OptionalValuePath;
+use vector_lib::lookup::lookup_v2::OptionalValuePath;
 
 pub mod logs;
 pub mod metrics;

@@ -1,5 +1,5 @@
-use lookup::{lookup_v2::OptionalValuePath, OwnedValuePath};
 use openssl::{base64, pkey};
+use vector_lib::lookup::{lookup_v2::OptionalValuePath, OwnedValuePath};
 
 use vector_lib::configurable::configurable_component;
 use vector_lib::sensitive_string::SensitiveString;

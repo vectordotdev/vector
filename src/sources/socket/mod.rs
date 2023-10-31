@@ -3,10 +3,10 @@ pub mod udp;
 #[cfg(unix)]
 mod unix;
 
-use lookup::{lookup_v2::OptionalValuePath, owned_value_path};
 use vector_lib::codecs::decoding::DeserializerConfig;
 use vector_lib::config::{log_schema, LegacyKey, LogNamespace};
 use vector_lib::configurable::configurable_component;
+use vector_lib::lookup::{lookup_v2::OptionalValuePath, owned_value_path};
 use vrl::value::{kind::Collection, Kind};
 
 #[cfg(unix)]
@@ -333,7 +333,6 @@ mod test {
 
     use bytes::{BufMut, Bytes, BytesMut};
     use futures::{stream, StreamExt};
-    use lookup::{lookup_v2::OptionalValuePath, owned_value_path, path};
     use tokio::io::AsyncReadExt;
     use tokio::net::TcpStream;
     use tokio::{
@@ -346,6 +345,7 @@ mod test {
         decoding::CharacterDelimitedDecoderOptions, CharacterDelimitedDecoderConfig,
     };
     use vector_lib::event::EventContainer;
+    use vector_lib::lookup::{lookup_v2::OptionalValuePath, owned_value_path, path};
     use vrl::btreemap;
     use vrl::value;
     use vrl::value::Value;

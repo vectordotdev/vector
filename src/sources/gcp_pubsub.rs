@@ -8,7 +8,6 @@ use chrono::NaiveDateTime;
 use derivative::Derivative;
 use futures::{stream, stream::FuturesUnordered, FutureExt, Stream, StreamExt, TryFutureExt};
 use http::uri::{InvalidUri, Scheme, Uri};
-use lookup::owned_value_path;
 use once_cell::sync::Lazy;
 use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
@@ -25,6 +24,7 @@ use vector_lib::configurable::configurable_component;
 use vector_lib::internal_event::{
     ByteSize, BytesReceived, EventsReceived, InternalEventHandle as _, Protocol, Registered,
 };
+use vector_lib::lookup::owned_value_path;
 use vector_lib::{byte_size_of::ByteSizeOf, finalizer::UnorderedFinalizer};
 use vrl::path;
 use vrl::value::{kind::Collection, Kind};
@@ -744,7 +744,7 @@ impl Future for Task {
 
 #[cfg(test)]
 mod tests {
-    use lookup::OwnedTargetPath;
+    use vector_lib::lookup::OwnedTargetPath;
     use vector_lib::schema::Definition;
 
     use super::*;

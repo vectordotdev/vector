@@ -9798,7 +9798,6 @@ dependencies = [
  "url",
  "uuid",
  "vector-lib",
- "vector-lookup",
  "vector-vrl-functions",
  "vrl",
  "warp",
@@ -10053,6 +10052,7 @@ dependencies = [
  "vector-common",
  "vector-config",
  "vector-core",
+ "vector-lookup",
  "vector-stream",
 ]
 

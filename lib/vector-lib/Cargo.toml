@@ -16,6 +16,7 @@ vector-buffers = { path = "../vector-buffers", default-features = false }
 vector-common = { path = "../vector-common" }
 vector-config = { path = "../vector-config" }
 vector-core = { path = "../vector-core", default-features = false }
+vector-lookup = { path = "../vector-lookup", features = ["test"] }
 vector-stream = { path = "../vector-stream" }
 
 [features]

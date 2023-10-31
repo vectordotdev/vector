@@ -8,12 +8,12 @@ use std::{
 
 use bytes::{Buf, Bytes, BytesMut};
 use flate2::read::ZlibDecoder;
-use lookup::{event_path, metadata_path, owned_value_path, path, OwnedValuePath};
 use smallvec::{smallvec, SmallVec};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::Decoder;
 use vector_lib::codecs::{BytesDeserializerConfig, StreamDecodingError};
 use vector_lib::configurable::configurable_component;
+use vector_lib::lookup::{event_path, metadata_path, owned_value_path, path, OwnedValuePath};
 use vector_lib::{
     config::{LegacyKey, LogNamespace},
     schema::Definition,
@@ -679,9 +679,9 @@ impl From<LogstashEventFrame> for SmallVec<[Event; 1]> {
 #[cfg(test)]
 mod test {
     use bytes::BufMut;
-    use lookup::OwnedTargetPath;
     use rand::{thread_rng, Rng};
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    use vector_lib::lookup::OwnedTargetPath;
     use vrl::value::kind::Collection;
 
     use super::*;

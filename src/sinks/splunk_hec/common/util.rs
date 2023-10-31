@@ -4,8 +4,8 @@ use bytes::Bytes;
 use futures_util::future::BoxFuture;
 use http::{Request, StatusCode, Uri};
 use hyper::Body;
-use lookup::lookup_v2::OptionalValuePath;
 use snafu::{ResultExt, Snafu};
+use vector_lib::lookup::lookup_v2::OptionalValuePath;
 use vector_lib::{config::proxy::ProxyConfig, event::EventRef};
 
 use super::{

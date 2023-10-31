@@ -20,6 +20,7 @@ pub use vector_core::{
     buckets, default_data_dir, event, fanout, metric_tags, metrics, partition, quantiles, samples,
     schema, serde, sink, source, tcp, tls, transform, update_counter, EstimatedJsonEncodedSizeOf,
 };
+pub use vector_lookup as lookup;
 pub use vector_stream as stream;
 
 pub mod config {

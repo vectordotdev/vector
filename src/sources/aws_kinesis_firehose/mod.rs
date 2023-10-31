@@ -2,12 +2,12 @@ use std::{convert::Infallible, fmt, net::SocketAddr};
 
 use futures::FutureExt;
 use hyper::{service::make_service_fn, Server};
-use lookup::owned_value_path;
 use tower::ServiceBuilder;
 use tracing::Span;
 use vector_lib::codecs::decoding::{DeserializerConfig, FramingConfig};
 use vector_lib::config::{LegacyKey, LogNamespace};
 use vector_lib::configurable::configurable_component;
+use vector_lib::lookup::owned_value_path;
 use vector_lib::sensitive_string::SensitiveString;
 use vrl::value::Kind;
 
@@ -263,10 +263,10 @@ mod tests {
     use chrono::{DateTime, SubsecRound, Utc};
     use flate2::read::GzEncoder;
     use futures::Stream;
-    use lookup::path;
     use similar_asserts::assert_eq;
     use tokio::time::{sleep, Duration};
     use vector_lib::assert_event_data_eq;
+    use vector_lib::lookup::path;
     use vrl::value;
 
     use super::*;

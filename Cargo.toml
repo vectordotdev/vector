@@ -97,7 +97,6 @@ members = [
   "lib/k8s-e2e-tests",
   "lib/k8s-test-framework",
   "lib/loki-logproto",
-  "lib/vector-lookup",
   "lib/portpicker",
   "lib/prometheus-parser",
   "lib/opentelemetry-proto",
@@ -131,7 +130,6 @@ pin-project.workspace = true
 # Internal libs
 dnsmsg-parser = { path = "lib/dnsmsg-parser", optional = true }
 fakedata = { path = "lib/fakedata", optional = true }
-lookup = { package = "vector-lookup", path = "lib/vector-lookup" }
 portpicker = { path = "lib/portpicker" }
 tracing-limit = { path = "lib/tracing-limit" }
 vector-lib = { path = "lib/vector-lib", default-features = false, features = ["vrl"] }
@@ -357,7 +355,6 @@ libc = "0.2.149"
 similar-asserts = "1.5.0"
 proptest = "1.3"
 quickcheck = "1.0.3"
-lookup = { package = "vector-lookup", path = "lib/vector-lookup", features = ["test"] }
 reqwest = { version = "0.11", features = ["json"] }
 rstest = {version = "0.18.2"}
 tempfile = "3.8.1"

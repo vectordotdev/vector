@@ -3,7 +3,6 @@ use std::{convert::TryInto, future, path::PathBuf, time::Duration};
 use bytes::Bytes;
 use chrono::Utc;
 use futures::{FutureExt, Stream, StreamExt, TryFutureExt};
-use lookup::{lookup_v2::OptionalValuePath, owned_value_path, path, OwnedValuePath};
 use regex::bytes::Regex;
 use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
@@ -18,6 +17,7 @@ use vector_lib::file_source::{
     ReadFromConfig,
 };
 use vector_lib::finalizer::OrderedFinalizer;
+use vector_lib::lookup::{lookup_v2::OptionalValuePath, owned_value_path, path, OwnedValuePath};
 use vector_lib::{
     config::{LegacyKey, LogNamespace},
     EstimatedJsonEncodedSizeOf,
@@ -2268,7 +2268,7 @@ mod tests {
         Unfinalized, // Acknowledgement handling but no finalization
         Acks,        // Full acknowledgements and proper finalization
     }
-    use lookup::OwnedTargetPath;
+    use vector_lib::lookup::OwnedTargetPath;
     use AckingMode::*;
 
     async fn run_file_source(
