@@ -1,8 +1,8 @@
 use std::net::SocketAddr;
 
 use metrics::counter;
-use vector_common::internal_event::{error_stage, error_type};
-use vector_core::internal_event::InternalEvent;
+use vector_lib::internal_event::InternalEvent;
+use vector_lib::internal_event::{error_stage, error_type};
 
 use crate::{emit, internal_events::SocketOutgoingConnectionError, tls::TlsError};
 
@@ -32,8 +32,6 @@ impl<E: std::error::Error> InternalEvent for TcpSocketOutgoingConnectionError<E>
         // ## skip check-duplicate-events ##
         // ## skip check-validity-events ##
         emit!(SocketOutgoingConnectionError { error: self.error });
-        // deprecated
-        counter!("connection_failed_total", 1, "mode" => "tcp");
     }
 }
 
@@ -77,20 +75,15 @@ impl InternalEvent for TcpSocketTlsConnectionError {
                     stage = error_stage::SENDING,
                     internal_log_rate_limit = true,
                 );
+                counter!(
+                    "component_errors_total", 1,
+                    "error_code" => "connection_failed",
+                    "error_type" => error_type::WRITER_FAILED,
+                    "stage" => error_stage::SENDING,
+                    "mode" => "tcp",
+                );
             }
         }
-        counter!(
-            "component_errors_total", 1,
-            "error_code" => "connection_failed",
-            "error_type" => error_type::WRITER_FAILED,
-            "stage" => error_stage::SENDING,
-            "mode" => "tcp",
-        );
-        // deprecated
-        counter!(
-            "connection_errors_total", 1,
-            "mode" => "tcp",
-        );
     }
 }
 
@@ -116,15 +109,6 @@ impl InternalEvent for TcpSendAckError {
             "stage" => error_stage::SENDING,
             "mode" => "tcp",
         );
-        // deprecated
-        counter!(
-            "connection_errors_total", 1,
-            "mode" => "tcp",
-        );
-        counter!(
-            "connection_send_ack_errors_total", 1,
-            "mode" => "tcp",
-        );
     }
 }
 
@@ -144,8 +128,7 @@ impl InternalEvent for TcpBytesReceived {
         );
         counter!(
             "component_received_bytes_total", self.byte_size as u64,
-            "protocol" => "tcp",
-            "peer_addr" => self.peer_addr.to_string()
+            "protocol" => "tcp"
         );
     }
 }

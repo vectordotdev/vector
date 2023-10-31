@@ -3,7 +3,7 @@ use std::net::SocketAddr;
 use snafu::ResultExt;
 use tokio::net::UdpSocket;
 
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 
 use crate::{dns, net};
 

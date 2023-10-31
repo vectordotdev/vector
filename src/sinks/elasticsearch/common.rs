@@ -5,8 +5,8 @@ use http::{Response, StatusCode, Uri};
 use hyper::{body, Body};
 use serde::Deserialize;
 use snafu::ResultExt;
-use vector_core::config::proxy::ProxyConfig;
-use vector_core::config::LogNamespace;
+use vector_lib::config::proxy::ProxyConfig;
+use vector_lib::config::LogNamespace;
 
 use super::{
     request_builder::ElasticsearchRequestBuilder, ElasticsearchApiVersion, ElasticsearchEncoder,

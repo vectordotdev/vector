@@ -32,7 +32,7 @@ impl TlsSettings {
             Some(_) => {
                 let mut acceptor = SslAcceptor::mozilla_intermediate(SslMethod::tls())
                     .context(CreateAcceptorSnafu)?;
-                self.apply_context(&mut acceptor)?;
+                self.apply_context_base(&mut acceptor, true)?;
                 Ok(acceptor.build())
             }
         }

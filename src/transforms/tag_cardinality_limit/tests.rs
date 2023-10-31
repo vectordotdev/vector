@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
-use vector_common::config::ComponentKey;
-use vector_core::config::OutputId;
-use vector_core::event::EventMetadata;
-use vector_core::metric_tags;
+use vector_lib::config::ComponentKey;
+use vector_lib::config::OutputId;
+use vector_lib::event::EventMetadata;
+use vector_lib::metric_tags;
 
 use super::*;
 use crate::config::schema::Definition;

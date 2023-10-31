@@ -139,7 +139,7 @@ pub(crate) use mongodb_metrics::*;
 
 #[cfg(feature = "transforms-aggregate")]
 pub(crate) use self::aggregate::*;
-#[cfg(any(feature = "sources-amqp", feature = "sinks-amqp"))]
+#[cfg(feature = "sources-amqp")]
 pub(crate) use self::amqp::*;
 #[cfg(feature = "sources-apache_metrics")]
 pub(crate) use self::apache_metrics::*;
@@ -197,13 +197,6 @@ pub(crate) use self::gcp_pubsub::*;
 pub(crate) use self::grpc::*;
 #[cfg(feature = "sources-host_metrics")]
 pub(crate) use self::host_metrics::*;
-#[cfg(any(
-    feature = "sources-utils-http",
-    feature = "sources-utils-http-encoding",
-    feature = "sources-datadog_agent",
-    feature = "sources-splunk_hec",
-))]
-pub(crate) use self::http::*;
 #[cfg(feature = "sources-utils-http-client")]
 pub(crate) use self::http_client_source::*;
 #[cfg(feature = "sinks-influxdb")]
@@ -268,7 +261,7 @@ pub(crate) use self::websocket::*;
 pub(crate) use self::windows::*;
 pub use self::{
     adaptive_concurrency::*, batch::*, common::*, conditions::*, encoding_transcode::*,
-    heartbeat::*, open::*, process::*, socket::*, tcp::*, template::*, udp::*,
+    heartbeat::*, http::*, open::*, process::*, socket::*, tcp::*, template::*, udp::*,
 };
 
 // this version won't be needed once all `InternalEvent`s implement `name()`
@@ -276,7 +269,7 @@ pub use self::{
 #[macro_export]
 macro_rules! emit {
     ($event:expr) => {
-        vector_common::internal_event::emit(vector_common::internal_event::DefaultName {
+        vector_lib::internal_event::emit(vector_lib::internal_event::DefaultName {
             event: $event,
             name: stringify!($event),
         })
@@ -287,7 +280,7 @@ macro_rules! emit {
 #[macro_export]
 macro_rules! emit {
     ($event:expr) => {
-        vector_common::internal_event::emit($event)
+        vector_lib::internal_event::emit($event)
     };
 }
 
@@ -295,7 +288,7 @@ macro_rules! emit {
 #[macro_export]
 macro_rules! register {
     ($event:expr) => {
-        vector_common::internal_event::register(vector_common::internal_event::DefaultName {
+        vector_lib::internal_event::register(vector_lib::internal_event::DefaultName {
             event: $event,
             name: stringify!($event),
         })
@@ -306,6 +299,6 @@ macro_rules! register {
 #[macro_export]
 macro_rules! register {
     ($event:expr) => {
-        vector_common::internal_event::register($event)
+        vector_lib::internal_event::register($event)
     };
 }

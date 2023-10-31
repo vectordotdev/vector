@@ -18,7 +18,7 @@ use loader::process::Process;
 pub use loader::*;
 pub use secret::*;
 pub use source::*;
-use vector_config::NamedComponent;
+use vector_lib::configurable::NamedComponent;
 
 use super::{
     builder::ConfigBuilder, format, validation, vars, Config, ConfigPath, Format, FormatHint,
@@ -304,39 +304,23 @@ where
 
 #[cfg(not(windows))]
 fn default_path() -> PathBuf {
-    "/etc/vector/vector.toml".into()
+    "/etc/vector/vector.yaml".into()
 }
 
 #[cfg(windows)]
 fn default_path() -> PathBuf {
     let program_files =
         std::env::var("ProgramFiles").expect("%ProgramFiles% environment variable must be defined");
-    format!("{}\\Vector\\config\\vector.toml", program_files).into()
+    format!("{}\\Vector\\config\\vector.yaml", program_files).into()
 }
 
 fn default_config_paths() -> Vec<ConfigPath> {
     #[cfg(not(windows))]
     let default_path = default_path();
-
     #[cfg(windows)]
     let default_path = default_path();
 
-    let yaml_path = default_path.with_extension("yaml");
-    if default_path.exists() {
-        warn!("DEPRECATED Using the deprecated {:?} config path as the default config location. Vector is migrating \
-        to YAML as the default config format. Future Vector versions will use {:?} as the default config location.",
-            default_path,
-            yaml_path);
-
-        vec![ConfigPath::File(default_path, Some(Format::Toml))]
-    } else {
-        warn!(
-            "The {:?} config path does not exist. Vector will attempt to use new default {:?} instead.",
-            default_path, yaml_path
-        );
-
-        vec![ConfigPath::File(yaml_path, Some(Format::Yaml))]
-    }
+    vec![ConfigPath::File(default_path, Some(Format::Yaml))]
 }
 
 #[cfg(all(

@@ -2,12 +2,12 @@ use std::sync::Arc;
 
 use bytes::{BufMut, Bytes, BytesMut};
 use chrono::Utc;
-use codecs::StreamDecodingError;
 use http::StatusCode;
 use lookup::path;
 use tokio_util::codec::Decoder;
-use vector_common::internal_event::{CountByteSize, InternalEventHandle as _};
-use vector_core::{config::LegacyKey, EstimatedJsonEncodedSizeOf};
+use vector_lib::codecs::StreamDecodingError;
+use vector_lib::internal_event::{CountByteSize, InternalEventHandle as _};
+use vector_lib::{config::LegacyKey, EstimatedJsonEncodedSizeOf};
 use warp::{filters::BoxedFilter, path as warp_path, path::FullPath, reply::Response, Filter};
 
 use crate::{

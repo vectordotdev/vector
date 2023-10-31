@@ -7,7 +7,7 @@ use indoc::indoc;
 use serde_json::{json, Value};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::Encoder as _;
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 
 use crate::{
     codecs::{Encoder, EncodingConfig, Transformer},
@@ -268,11 +268,11 @@ mod tests {
 
 #[cfg(all(test, feature = "gcp-integration-tests"))]
 mod integration_tests {
-    use codecs::JsonSerializerConfig;
     use reqwest::{Client, Method, Response};
     use serde::{Deserialize, Serialize};
     use serde_json::{json, Value};
-    use vector_core::event::{BatchNotifier, BatchStatus};
+    use vector_lib::codecs::JsonSerializerConfig;
+    use vector_lib::event::{BatchNotifier, BatchStatus};
 
     use super::*;
     use crate::gcp;

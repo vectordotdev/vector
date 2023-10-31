@@ -1,4 +1,5 @@
 #![allow(missing_docs)]
+
 use std::{collections::HashMap, fmt, fs::remove_dir_all, path::PathBuf};
 
 use clap::Parser;
@@ -7,7 +8,7 @@ use exitcode::ExitCode;
 
 use crate::{
     config::{self, Config, ConfigDiff},
-    topology::{self, builder::Pieces},
+    topology::{self, builder::TopologyPieces},
 };
 
 const TEMPORARY_DIRECTORY: &str = "validate_tmp";
@@ -53,9 +54,8 @@ pub struct Opts {
 
     /// Any number of Vector config files to validate.
     /// Format is detected from the file name.
-    /// If none are specified the default config path `/etc/vector/vector.toml`
-    /// will be targeted. And if the aforementioned file does not exist,
-    //  then `/etc/vector/vector.yaml` will be used.
+    /// If none are specified, the default config path `/etc/vector/vector.yaml`
+    /// is targeted.
     #[arg(env = "VECTOR_CONFIG", value_delimiter(','))]
     pub paths: Vec<PathBuf>,
 
@@ -185,8 +185,8 @@ async fn validate_components(
     config: &Config,
     diff: &ConfigDiff,
     fmt: &mut Formatter,
-) -> Option<Pieces> {
-    match topology::builder::build_pieces(config, diff, HashMap::new()).await {
+) -> Option<TopologyPieces> {
+    match topology::TopologyPieces::build(config, diff, HashMap::new()).await {
         Ok(pieces) => {
             fmt.success("Component configuration");
             Some(pieces)
@@ -203,7 +203,7 @@ async fn validate_healthchecks(
     opts: &Opts,
     config: &Config,
     diff: &ConfigDiff,
-    pieces: &mut Pieces,
+    pieces: &mut TopologyPieces,
     fmt: &mut Formatter,
 ) -> bool {
     if !config.healthchecks.enabled {

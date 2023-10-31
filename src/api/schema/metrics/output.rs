@@ -1,5 +1,5 @@
 use async_graphql::Object;
-use vector_core::config::ComponentKey;
+use vector_lib::config::ComponentKey;
 
 use super::{by_component_key, sum_metrics, SentEventsTotal};
 use crate::event::Metric;

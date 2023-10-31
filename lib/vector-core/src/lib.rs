@@ -36,7 +36,6 @@ pub mod schema;
 pub mod serde;
 pub mod sink;
 pub mod source;
-pub mod stream;
 pub mod tcp;
 #[cfg(test)]
 mod test_util;
@@ -52,7 +51,6 @@ use std::path::PathBuf;
 #[cfg(feature = "vrl")]
 pub use crate::vrl::compile_vrl;
 
-pub use vector_buffers as buffers;
 #[cfg(any(test, feature = "test"))]
 pub use vector_common::event_test_util;
 pub use vector_common::{byte_size_of::ByteSizeOf, internal_event};

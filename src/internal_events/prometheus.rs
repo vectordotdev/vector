@@ -5,12 +5,10 @@ use hyper::StatusCode;
 use metrics::counter;
 #[cfg(feature = "sources-prometheus-scrape")]
 use prometheus_parser::ParserError;
-use vector_core::internal_event::InternalEvent;
+use vector_lib::internal_event::InternalEvent;
 
 use crate::emit;
-use vector_common::internal_event::{
-    error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL,
-};
+use vector_lib::internal_event::{error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL};
 
 #[cfg(feature = "sources-prometheus-scrape")]
 #[derive(Debug)]
@@ -42,8 +40,6 @@ impl<'a> InternalEvent for PrometheusParseError<'a> {
             "stage" => error_stage::PROCESSING,
             "url" => self.url.to_string(),
         );
-        // deprecated
-        counter!("parse_errors_total", 1);
     }
 }
 
@@ -66,8 +62,6 @@ impl InternalEvent for PrometheusRemoteWriteParseError {
             "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::PROCESSING,
         );
-        // deprecated
-        counter!("parse_errors_total", 1);
     }
 }
 

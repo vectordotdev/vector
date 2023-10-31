@@ -22,7 +22,7 @@ remap: functions: remove_secret: {
 
 	examples: [
 		{
-			title: "Removes the Datadog API key from the event."
+			title: "Removes the Datadog API key from the event"
 			source: #"""
 				remove_secret("datadog_api_key")
 				"""#

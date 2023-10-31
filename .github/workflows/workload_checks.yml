@@ -4,7 +4,11 @@
 #
 # Runs on:
 #  - scheduled UTC midnight Tues-Sat
-
+#  - on demand by a PR comment matching either of:
+#    - '/ci-run-regression'
+#    - '/ci-run-all'
+#    (the comment issuer must be a member of the Vector GH team)
+#
 # This workflow runs the collection of our workload checks, using the latest Vector nightly image,
 # which depends on when the workflow is invoked.
 #
@@ -60,7 +64,7 @@ jobs:
           export REPLICAS="10"
           export TOTAL_SAMPLES="600"
           export SMP_CRATE_VERSION="0.10.0"
-          export LADING_VERSION="0.18.0"
+          export LADING_VERSION="0.19.1"
 
           echo "warmup seconds: ${WARMUP_SECONDS}"
           echo "replicas: ${REPLICAS}"

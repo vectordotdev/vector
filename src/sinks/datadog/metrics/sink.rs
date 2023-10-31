@@ -8,11 +8,11 @@ use futures_util::{
     StreamExt,
 };
 use tower::Service;
-use vector_core::{
+use vector_lib::stream::{BatcherSettings, DriverResponse};
+use vector_lib::{
     event::{Event, Metric, MetricValue},
     partition::Partitioner,
     sink::StreamSink,
-    stream::{BatcherSettings, DriverResponse},
 };
 
 use super::{
@@ -41,12 +41,13 @@ impl Partitioner for DatadogMetricsTypePartitioner {
 
     fn partition(&self, item: &Self::Item) -> Self::Key {
         let endpoint = match item.data().value() {
-            MetricValue::Counter { .. } => DatadogMetricsEndpoint::Series,
-            MetricValue::Gauge { .. } => DatadogMetricsEndpoint::Series,
-            MetricValue::Set { .. } => DatadogMetricsEndpoint::Series,
+            MetricValue::Counter { .. } => DatadogMetricsEndpoint::series(),
+            MetricValue::Gauge { .. } => DatadogMetricsEndpoint::series(),
+            MetricValue::Set { .. } => DatadogMetricsEndpoint::series(),
             MetricValue::Distribution { .. } => DatadogMetricsEndpoint::Sketches,
             MetricValue::AggregatedHistogram { .. } => DatadogMetricsEndpoint::Sketches,
-            MetricValue::AggregatedSummary { .. } => DatadogMetricsEndpoint::Series,
+            // NOTE: AggregatedSummary will be split into counters and gauges during normalization
+            MetricValue::AggregatedSummary { .. } => DatadogMetricsEndpoint::series(),
             MetricValue::Sketch { .. } => DatadogMetricsEndpoint::Sketches,
         };
         (item.metadata().datadog_api_key(), endpoint)
@@ -84,6 +85,7 @@ where
 
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let mut splitter: MetricSplitter<AggregatedSummarySplitter> = MetricSplitter::default();
+        let batch_settings = self.batch_settings;
 
         input
             // Convert `Event` to `Metric` so we don't have to deal with constant conversions.
@@ -98,7 +100,9 @@ where
             .normalized_with_default::<DatadogMetricsNormalizer>()
             // We batch metrics by their endpoint: series endpoint for counters, gauge, and sets vs sketch endpoint for
             // distributions, aggregated histograms, and sketches.
-            .batched_partitioned(DatadogMetricsTypePartitioner, self.batch_settings)
+            .batched_partitioned(DatadogMetricsTypePartitioner, || {
+                batch_settings.as_byte_size_config()
+            })
             // Aggregate counters with identical timestamps, otherwise identical counters (same
             // series and same timestamp, when rounded to whole seconds) will be dropped in a
             // last-write-wins situation when they hit the DD metrics intake.
@@ -229,7 +233,7 @@ mod tests {
 
     use chrono::{DateTime, Utc};
     use proptest::prelude::*;
-    use vector_core::{
+    use vector_lib::{
         event::{Metric, MetricKind, MetricValue},
         metric_tags,
     };

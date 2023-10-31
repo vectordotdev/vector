@@ -350,6 +350,20 @@ base: components: sources: nats: configuration: {
 		required:    false
 		type: string: default: "subject"
 	}
+	subscriber_capacity: {
+		description: """
+			The buffer capacity of the underlying NATS subscriber.
+
+			This value determines how many messages the NATS subscriber buffers
+			before incoming messages are dropped.
+
+			See the [async_nats documentation][async_nats_subscription_capacity] for more information.
+
+			[async_nats_subscription_capacity]: https://docs.rs/async-nats/latest/async_nats/struct.ConnectOptions.html#method.subscription_capacity
+			"""
+		required: false
+		type: uint: default: 4096
+	}
 	tls: {
 		description: "Configures the TLS options for incoming/outgoing connections."
 		required:    false

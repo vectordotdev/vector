@@ -1,7 +1,5 @@
 use std::{collections::BTreeMap, convert::TryInto, fmt::Debug, sync::Arc};
 
-use crate::config::LogNamespace;
-use crate::{config::OutputId, ByteSizeOf};
 pub use array::{into_event_stream, EventArray, EventContainer, LogArray, MetricArray, TraceArray};
 pub use estimated_json_encoded_size_of::EstimatedJsonEncodedSizeOf;
 pub use finalization::{
@@ -22,6 +20,9 @@ use vector_common::{
 pub use vrl::value::Value;
 #[cfg(feature = "vrl")]
 pub use vrl_target::{TargetEvents, VrlTarget};
+
+use crate::config::LogNamespace;
+use crate::{config::OutputId, ByteSizeOf};
 
 pub mod array;
 pub mod discriminant;
@@ -316,6 +317,13 @@ impl Event {
     #[must_use]
     pub fn with_source_id(mut self, source_id: Arc<ComponentKey>) -> Self {
         self.metadata_mut().set_source_id(source_id);
+        self
+    }
+
+    /// Sets the `source_type` in the event metadata to the provided value.
+    #[must_use]
+    pub fn with_source_type(mut self, source_type: &'static str) -> Self {
+        self.metadata_mut().set_source_type(source_type);
         self
     }
 

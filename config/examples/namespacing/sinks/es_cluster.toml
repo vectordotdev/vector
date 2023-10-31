@@ -1,5 +1,0 @@
-# Send structured data to a short-term storage
-inputs       = ["apache_sample"]            # only take sampled data
-type         = "elasticsearch"
-endpoint     = "http://79.12.221.222:9200"   # local or external host
-bulk.index   = "vector-%Y-%m-%d"             # daily indices

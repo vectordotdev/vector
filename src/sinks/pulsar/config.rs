@@ -5,7 +5,6 @@ use crate::{
         pulsar::sink::{healthcheck, PulsarSink},
     },
 };
-use codecs::{encoding::SerializerConfig, TextSerializerConfig};
 use futures_util::FutureExt;
 use lookup::lookup_v2::OptionalTargetPath;
 use pulsar::{
@@ -17,8 +16,9 @@ use pulsar::{
 };
 use pulsar::{error::AuthenticationError, OperationRetryOptions};
 use snafu::ResultExt;
-use vector_common::sensitive_string::SensitiveString;
-use vector_core::config::DataType;
+use vector_lib::codecs::{encoding::SerializerConfig, TextSerializerConfig};
+use vector_lib::config::DataType;
+use vector_lib::sensitive_string::SensitiveString;
 use vrl::value::Kind;
 
 /// Configuration for the `pulsar` sink.

@@ -1,5 +1,6 @@
 use super::*;
 use crate::{
+    amqp::await_connection,
     config::{SinkConfig, SinkContext},
     shutdown::ShutdownSignal,
     template::Template,
@@ -11,7 +12,7 @@ use crate::{
 };
 use futures::StreamExt;
 use std::{collections::HashSet, sync::Arc, time::Duration};
-use vector_core::config::LogNamespace;
+use vector_lib::config::LogNamespace;
 
 pub fn make_config() -> AmqpSinkConfig {
     let mut config = AmqpSinkConfig {
@@ -33,6 +34,7 @@ async fn healthcheck() {
 
     let mut config = make_config();
     config.exchange = Template::try_from(exchange.as_str()).unwrap();
+    await_connection(&config.connection).await;
     let (_conn, channel) = config.connection.connect().await.unwrap();
     super::config::healthcheck(Arc::new(channel)).await.unwrap();
 }
@@ -57,6 +59,7 @@ async fn amqp_happy_path() {
     config.exchange = Template::try_from(exchange.as_str()).unwrap();
     let queue = format!("test-{}-queue", random_string(10));
 
+    await_connection(&config.connection).await;
     let (_conn, channel) = config.connection.connect().await.unwrap();
     let exchange_opts = lapin::options::ExchangeDeclareOptions {
         auto_delete: true,
@@ -141,6 +144,7 @@ async fn amqp_round_trip() {
     config.exchange = Template::try_from(exchange.as_str()).unwrap();
     let queue = format!("test-{}-queue", random_string(10));
 
+    await_connection(&config.connection).await;
     let (_conn, channel) = config.connection.connect().await.unwrap();
     let exchange_opts = lapin::options::ExchangeDeclareOptions {
         auto_delete: true,

@@ -20,10 +20,8 @@ pub struct Opts {
 
     /// Read configuration from one or more files. Wildcard paths are supported.
     /// File format is detected from the file name.
-    /// If zero files are specified the deprecated default config path
-    /// `/etc/vector/vector.toml` will be targeted.
-    /// And if the aforementioned file does not exist,
-    /// then `/etc/vector/vector.yaml` will be used.
+    /// If zero files are specified, the deprecated default config path
+    /// `/etc/vector/vector.yaml` is targeted.
     #[arg(
         id = "config",
         short,
@@ -202,7 +200,9 @@ mod tests {
         SeedableRng,
     };
     use serde_json::json;
-    use vector_config::component::{SinkDescription, SourceDescription, TransformDescription};
+    use vector_lib::configurable::component::{
+        SinkDescription, SourceDescription, TransformDescription,
+    };
 
     use crate::config::Format;
     use crate::{

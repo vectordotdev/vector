@@ -453,12 +453,13 @@ impl LokiSink {
                 NonZeroUsize::new(1).expect("static")
             }
         };
+        let batch_settings = self.batch_settings;
 
         input
             .map(|event| encoder.encode_event(event))
             .filter_map(|event| async { event })
             .map(|record| filter.filter_record(record))
-            .batched_partitioned(RecordPartitioner, self.batch_settings)
+            .batched_partitioned(RecordPartitioner, || batch_settings.as_byte_size_config())
             .filter_map(|(partition, batch)| async {
                 if let Some(partition) = partition {
                     let mut count: usize = 0;
@@ -519,9 +520,9 @@ mod tests {
         convert::TryFrom,
     };
 
-    use codecs::JsonSerializerConfig;
     use futures::stream::StreamExt;
-    use vector_core::event::{Event, LogEvent, Value};
+    use vector_lib::codecs::JsonSerializerConfig;
+    use vector_lib::event::{Event, LogEvent, Value};
 
     use super::{EventEncoder, KeyPartitioner, RecordFilter};
     use crate::{

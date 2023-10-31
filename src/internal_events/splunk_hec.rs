@@ -9,20 +9,20 @@ pub use self::source::*;
 mod sink {
     use metrics::{counter, decrement_gauge, increment_gauge};
     use serde_json::Error;
-    use vector_core::internal_event::InternalEvent;
+    use vector_lib::internal_event::InternalEvent;
 
     use crate::{
         emit,
         event::metric::{MetricKind, MetricValue},
         sinks::splunk_hec::common::acknowledgements::HecAckApiError,
     };
-    use vector_common::internal_event::{
+    use vector_lib::internal_event::{
         error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL,
     };
 
     #[derive(Debug)]
     pub struct SplunkEventEncodeError {
-        pub error: vector_common::Error,
+        pub error: vector_lib::Error,
     }
 
     impl InternalEvent for SplunkEventEncodeError {
@@ -198,10 +198,10 @@ mod sink {
 #[cfg(feature = "sources-splunk_hec")]
 mod source {
     use metrics::counter;
-    use vector_core::internal_event::InternalEvent;
+    use vector_lib::internal_event::InternalEvent;
 
     use crate::sources::splunk_hec::ApiError;
-    use vector_common::internal_event::{error_stage, error_type};
+    use vector_lib::internal_event::{error_stage, error_type};
 
     #[derive(Debug)]
     pub struct SplunkHecRequestReceived<'a> {
@@ -262,8 +262,6 @@ mod source {
                 "error_type" => error_type::REQUEST_FAILED,
                 "stage" => error_stage::RECEIVING,
             );
-            // deprecated
-            counter!("http_request_errors_total", 1);
         }
     }
 }

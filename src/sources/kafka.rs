@@ -12,10 +12,6 @@ use std::{
 use async_stream::stream;
 use bytes::Bytes;
 use chrono::{DateTime, TimeZone, Utc};
-use codecs::{
-    decoding::{DeserializerConfig, FramingConfig},
-    StreamDecodingError,
-};
 use futures::{Stream, StreamExt};
 use futures_util::future::OptionFuture;
 use lookup::{lookup_v2::OptionalValuePath, owned_value_path, path, OwnedValuePath};
@@ -41,10 +37,14 @@ use tokio::{
     time::Sleep,
 };
 use tokio_util::codec::FramedRead;
+use vector_lib::codecs::{
+    decoding::{DeserializerConfig, FramingConfig},
+    StreamDecodingError,
+};
 
-use vector_common::finalizer::OrderedFinalizer;
-use vector_config::configurable_component;
-use vector_core::{
+use vector_lib::configurable::configurable_component;
+use vector_lib::finalizer::OrderedFinalizer;
+use vector_lib::{
     config::{LegacyKey, LogNamespace},
     EstimatedJsonEncodedSizeOf,
 };
@@ -1364,7 +1364,7 @@ impl ConsumerContext for KafkaSourceContext {
 #[cfg(test)]
 mod test {
     use lookup::OwnedTargetPath;
-    use vector_core::schema::Definition;
+    use vector_lib::schema::Definition;
 
     use super::*;
 
@@ -1531,8 +1531,8 @@ mod integration_test {
     };
     use stream_cancel::{Trigger, Tripwire};
     use tokio::time::sleep;
-    use vector_buffers::topology::channel::BufferReceiver;
-    use vector_core::event::EventStatus;
+    use vector_lib::buffers::topology::channel::BufferReceiver;
+    use vector_lib::event::EventStatus;
     use vrl::{event_path, value};
 
     use super::{test::*, *};

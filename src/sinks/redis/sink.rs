@@ -86,7 +86,7 @@ impl RedisSink {
 
         let mut encoder = self.encoder.clone();
         let transformer = self.transformer.clone();
-        let batcher_settings = self.batcher_settings.into_byte_size_config();
+        let batcher_settings = self.batcher_settings.as_byte_size_config();
 
         input
             .filter_map(|event| future::ready(self.make_redis_event(event)))

@@ -3,9 +3,9 @@ use std::convert::TryFrom;
 use aws_sdk_cloudwatchlogs::Client as CloudwatchLogsClient;
 use aws_sdk_cloudwatchlogs::Region;
 use chrono::Duration;
-use codecs::TextSerializerConfig;
 use futures::{stream, StreamExt};
 use similar_asserts::assert_eq;
+use vector_lib::codecs::TextSerializerConfig;
 
 use super::*;
 use crate::aws::create_client;

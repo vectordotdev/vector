@@ -81,7 +81,7 @@ where
             .filter_map(move |log| {
                 future::ready(process_log(log, &mode, id_key_field, &transformer))
             })
-            .batched(self.batch_settings.into_byte_size_config())
+            .batched(self.batch_settings.as_byte_size_config())
             .request_builder(
                 default_request_builder_concurrency_limit(),
                 self.request_builder,

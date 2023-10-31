@@ -1,7 +1,7 @@
-use codecs::JsonSerializerConfig;
 use futures_util::TryFutureExt;
 use snafu::ResultExt;
-use vector_core::tls::TlsEnableableConfig;
+use vector_lib::codecs::JsonSerializerConfig;
+use vector_lib::tls::TlsEnableableConfig;
 
 use crate::{
     nats::{from_tls_auth_config, NatsAuthConfig, NatsConfigError},

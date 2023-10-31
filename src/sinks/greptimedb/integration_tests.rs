@@ -1,7 +1,7 @@
 use chrono::{DateTime, Duration, Utc};
 use futures::stream;
-use vector_core::event::{Event, Metric, MetricKind, MetricValue};
-use vector_core::metric_tags;
+use vector_lib::event::{Event, Metric, MetricKind, MetricValue};
+use vector_lib::metric_tags;
 
 use crate::sinks::util::test::load_sink;
 use crate::{

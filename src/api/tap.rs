@@ -10,7 +10,7 @@ use tokio::sync::{
     oneshot,
 };
 use uuid::Uuid;
-use vector_buffers::{topology::builder::TopologyBuilder, WhenFull};
+use vector_lib::buffers::{topology::builder::TopologyBuilder, WhenFull};
 
 use super::{
     schema::events::{

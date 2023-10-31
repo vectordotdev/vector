@@ -1,12 +1,12 @@
 use std::{convert::TryFrom, iter, num::NonZeroU8};
 
 use chrono::{TimeZone, Timelike, Utc};
-use codecs::{JsonSerializerConfig, TextSerializerConfig};
 use futures::{future::ready, stream};
 use lookup::lookup_v2::{ConfigValuePath, OptionalValuePath};
 use serde_json::Value as JsonValue;
 use tokio::time::{sleep, Duration};
-use vector_core::{
+use vector_lib::codecs::{JsonSerializerConfig, TextSerializerConfig};
+use vector_lib::{
     config::{init_telemetry, Tags, Telemetry},
     event::{BatchNotifier, BatchStatus, Event, LogEvent},
 };

@@ -12,7 +12,7 @@ use tower::{
     timeout::Timeout,
     Service, ServiceBuilder,
 };
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 
 pub use crate::sinks::util::service::{
     concurrency::{concurrency_is_adaptive, Concurrency},
@@ -440,7 +440,7 @@ mod tests {
 
     use futures::{future, stream, FutureExt, SinkExt, StreamExt};
     use tokio::time::Duration;
-    use vector_common::json_size::JsonSize;
+    use vector_lib::json_size::JsonSize;
 
     use super::*;
     use crate::sinks::util::{

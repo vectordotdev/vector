@@ -18,7 +18,7 @@ use std::future::Future;
 use tokio::{pin, select};
 use tonic::{body::BoxBody, metadata::AsciiMetadataValue, Status};
 use tower::{Layer, Service};
-use vector_common::internal_event::{
+use vector_lib::internal_event::{
     ByteSize, BytesReceived, InternalEventHandle as _, Protocol, Registered,
 };
 

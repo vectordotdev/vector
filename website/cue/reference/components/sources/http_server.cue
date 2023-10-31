@@ -178,8 +178,9 @@ components: sources: http_server: {
 	]
 
 	telemetry: metrics: {
-		http_bad_requests_total: components.sources.internal_metrics.output.metrics.http_bad_requests_total
-		parse_errors_total:      components.sources.internal_metrics.output.metrics.parse_errors_total
+		http_server_handler_duration_seconds: components.sources.internal_metrics.output.metrics.http_server_handler_duration_seconds
+		http_server_requests_received_total:  components.sources.internal_metrics.output.metrics.http_server_requests_received_total
+		http_server_responses_sent_total:     components.sources.internal_metrics.output.metrics.http_server_responses_sent_total
 	}
 
 	how_it_works: {

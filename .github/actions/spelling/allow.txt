@@ -45,6 +45,7 @@ Collectd
 Comcast
 Consolas
 Coolpad
+BADDCAFE
 DEBHELPER
 Danew
 dkr

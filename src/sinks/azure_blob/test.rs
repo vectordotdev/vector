@@ -1,11 +1,11 @@
 use bytes::Bytes;
 use chrono::Utc;
-use codecs::{
+use vector_lib::codecs::{
     encoding::{Framer, FramingConfig},
     NewlineDelimitedEncoder, TextSerializerConfig,
 };
-use vector_common::request_metadata::GroupedCountByteSize;
-use vector_core::{partition::Partitioner, EstimatedJsonEncodedSizeOf};
+use vector_lib::request_metadata::GroupedCountByteSize;
+use vector_lib::{partition::Partitioner, EstimatedJsonEncodedSizeOf};
 
 use super::config::AzureBlobSinkConfig;
 use super::request_builder::AzureBlobRequestOptions;

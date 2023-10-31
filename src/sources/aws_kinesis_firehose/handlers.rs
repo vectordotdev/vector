@@ -3,22 +3,22 @@ use std::io::Read;
 use base64::prelude::{Engine as _, BASE64_STANDARD};
 use bytes::Bytes;
 use chrono::Utc;
-use codecs::StreamDecodingError;
 use flate2::read::MultiGzDecoder;
 use futures::StreamExt;
 use lookup::{metadata_path, path, PathPrefix};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
-use vector_common::{
+use vector_lib::codecs::StreamDecodingError;
+use vector_lib::{
+    config::{LegacyKey, LogNamespace},
+    event::BatchNotifier,
+    EstimatedJsonEncodedSizeOf,
+};
+use vector_lib::{
     finalization::AddBatchNotifier,
     internal_event::{
         ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Registered,
     },
-};
-use vector_core::{
-    config::{LegacyKey, LogNamespace},
-    event::BatchNotifier,
-    EstimatedJsonEncodedSizeOf,
 };
 use vrl::compiler::SecretTarget;
 use warp::reject;

@@ -9,8 +9,8 @@ use prost::Message;
 use vrl::event_path;
 use warp::{filters::BoxedFilter, path, path::FullPath, reply::Response, Filter, Rejection, Reply};
 
-use vector_common::internal_event::{CountByteSize, InternalEventHandle as _};
-use vector_core::EstimatedJsonEncodedSizeOf;
+use vector_lib::internal_event::{CountByteSize, InternalEventHandle as _};
+use vector_lib::EstimatedJsonEncodedSizeOf;
 
 use crate::{
     event::{Event, TraceEvent, Value},

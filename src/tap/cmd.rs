@@ -32,7 +32,7 @@ pub(crate) async fn cmd(opts: &super::Opts, signal_rx: SignalRx) -> exitcode::Ex
 
             Have you enabled the API?
 
-            To enable the API, add the following to your `vector.toml` config file:
+            To enable the API, add the following to your Vector config file:
 
             [api]
                 enabled = true"},

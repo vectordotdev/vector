@@ -1,6 +1,6 @@
-use vector_common::TimeZone;
-use vector_config::configurable_component;
-use vector_core::compile_vrl;
+use vector_lib::compile_vrl;
+use vector_lib::configurable::configurable_component;
+use vector_lib::TimeZone;
 use vrl::compiler::runtime::{Runtime, RuntimeResult, Terminate};
 use vrl::compiler::{CompilationResult, CompileConfig, Program, TypeState, VrlRuntime};
 use vrl::diagnostic::Formatter;
@@ -30,7 +30,10 @@ pub struct VrlConfig {
 impl_generate_config_from_default!(VrlConfig);
 
 impl ConditionalConfig for VrlConfig {
-    fn build(&self, enrichment_tables: &enrichment::TableRegistry) -> crate::Result<Condition> {
+    fn build(
+        &self,
+        enrichment_tables: &vector_lib::enrichment::TableRegistry,
+    ) -> crate::Result<Condition> {
         // TODO(jean): re-add this to VRL
         // let constraint = TypeConstraint {
         //     allow_any: false,
@@ -43,7 +46,7 @@ impl ConditionalConfig for VrlConfig {
 
         let functions = vrl::stdlib::all()
             .into_iter()
-            .chain(enrichment::vrl_functions())
+            .chain(vector_lib::enrichment::vrl_functions())
             .chain(vector_vrl_functions::all())
             .collect::<Vec<_>>();
 
@@ -170,7 +173,7 @@ impl Conditional for Vrl {
 
 #[cfg(test)]
 mod test {
-    use vector_core::metric_tags;
+    use vector_lib::metric_tags;
 
     use super::*;
     use crate::{

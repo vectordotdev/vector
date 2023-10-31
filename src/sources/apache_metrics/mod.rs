@@ -10,8 +10,8 @@ use hyper::{Body, Request};
 use serde_with::serde_as;
 use snafu::ResultExt;
 use tokio_stream::wrappers::IntervalStream;
-use vector_config::configurable_component;
-use vector_core::{metric_tags, EstimatedJsonEncodedSizeOf};
+use vector_lib::configurable::configurable_component;
+use vector_lib::{metric_tags, EstimatedJsonEncodedSizeOf};
 
 use crate::{
     config::{GenerateConfig, ProxyConfig, SourceConfig, SourceContext, SourceOutput},
@@ -28,7 +28,7 @@ use crate::{
 mod parser;
 
 pub use parser::ParseError;
-use vector_core::config::LogNamespace;
+use vector_lib::config::LogNamespace;
 
 /// Configuration for the `apache_metrics` source.
 #[serde_as]

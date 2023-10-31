@@ -6,12 +6,9 @@ use futures_util::{
     StreamExt,
 };
 use tower::Service;
-use vector_common::internal_event::Protocol;
-use vector_core::{
-    event::Event,
-    sink::StreamSink,
-    stream::{BatcherSettings, DriverResponse},
-};
+use vector_lib::internal_event::Protocol;
+use vector_lib::stream::{BatcherSettings, DriverResponse};
+use vector_lib::{event::Event, sink::StreamSink};
 
 use crate::sinks::util::SinkBuilderExt;
 
@@ -58,7 +55,7 @@ where
             // other metric types in type-specific ways i.e. incremental gauge updates use a
             // different syntax, etc.
             .normalized_with_default::<StatsdNormalizer>()
-            .batched(self.batch_settings.into_item_size_config(StatsdBatchSizer))
+            .batched(self.batch_settings.as_item_size_config(StatsdBatchSizer))
             // We build our requests "incrementally", which means that for a single batch of
             // metrics, we might generate N requests to represent all of the metrics in the batch.
             //

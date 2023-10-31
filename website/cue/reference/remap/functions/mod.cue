@@ -21,9 +21,9 @@ remap: functions: mod: {
 		},
 	]
 	internal_failure_reasons: [
-		"`value` isn't an integer or float",
-		"`modulus` isn't an integer or float",
-		"`modulus` is equal to 0",
+		"`value` is not an integer or float.",
+		"`modulus` is not an integer or float.",
+		"`modulus` is equal to 0.",
 	]
 	return: types: ["string"]
 

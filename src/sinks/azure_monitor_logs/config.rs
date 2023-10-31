@@ -1,9 +1,9 @@
 use lookup::{lookup_v2::OptionalValuePath, OwnedValuePath};
 use openssl::{base64, pkey};
 
-use vector_common::sensitive_string::SensitiveString;
-use vector_config::configurable_component;
-use vector_core::{config::log_schema, schema};
+use vector_lib::configurable::configurable_component;
+use vector_lib::sensitive_string::SensitiveString;
+use vector_lib::{config::log_schema, schema};
 use vrl::value::Kind;
 
 use crate::{

@@ -16,7 +16,6 @@ use crate::{
 use async_stream::stream;
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
-use codecs::decoding::{DeserializerConfig, FramingConfig};
 use futures::{FutureExt, StreamExt};
 use futures_util::Stream;
 use lapin::{acker::Acker, message::Delivery, Channel};
@@ -24,15 +23,16 @@ use lookup::{lookup_v2::OptionalValuePath, metadata_path, owned_value_path, path
 use snafu::Snafu;
 use std::{io::Cursor, pin::Pin};
 use tokio_util::codec::FramedRead;
-use vector_common::{
-    finalizer::UnorderedFinalizer,
-    internal_event::{CountByteSize, EventsReceived, InternalEventHandle as _},
-};
-use vector_config::configurable_component;
-use vector_core::{
+use vector_lib::codecs::decoding::{DeserializerConfig, FramingConfig};
+use vector_lib::configurable::configurable_component;
+use vector_lib::{
     config::{log_schema, LegacyKey, LogNamespace, SourceAcknowledgementsConfig},
     event::Event,
     EstimatedJsonEncodedSizeOf,
+};
+use vector_lib::{
+    finalizer::UnorderedFinalizer,
+    internal_event::{CountByteSize, EventsReceived, InternalEventHandle as _},
 };
 use vrl::value::Kind;
 
@@ -127,7 +127,7 @@ fn default_offset_key() -> OptionalValuePath {
 impl_generate_config_from_default!(AmqpSourceConfig);
 
 impl AmqpSourceConfig {
-    fn decoder(&self, log_namespace: LogNamespace) -> vector_common::Result<Decoder> {
+    fn decoder(&self, log_namespace: LogNamespace) -> vector_lib::Result<Decoder> {
         DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace).build()
     }
 }
@@ -359,7 +359,7 @@ async fn receive_event(
                     }
                 }
                 Err(error) => {
-                    use codecs::StreamDecodingError as _;
+                    use vector_lib::codecs::StreamDecodingError as _;
 
                     // Error is logged by `codecs::Decoder`, no further handling
                     // is needed here.
@@ -493,7 +493,8 @@ async fn handle_ack(status: BatchStatus, entry: FinalizerEntry) {
 #[cfg(test)]
 pub mod test {
     use lookup::OwnedTargetPath;
-    use vector_core::schema::Definition;
+    use vector_lib::schema::Definition;
+    use vector_lib::tls::TlsConfig;
     use vrl::value::kind::Collection;
 
     use super::*;
@@ -510,9 +511,32 @@ pub mod test {
         };
         let user = std::env::var("AMQP_USER").unwrap_or_else(|_| "guest".to_string());
         let pass = std::env::var("AMQP_PASSWORD").unwrap_or_else(|_| "guest".to_string());
+        let host = std::env::var("AMQP_HOST").unwrap_or_else(|_| "rabbitmq".to_string());
         let vhost = std::env::var("AMQP_VHOST").unwrap_or_else(|_| "%2f".to_string());
         config.connection.connection_string =
-            format!("amqp://{}:{}@rabbitmq:5672/{}", user, pass, vhost);
+            format!("amqp://{}:{}@{}:5672/{}", user, pass, host, vhost);
+
+        config
+    }
+
+    pub fn make_tls_config() -> AmqpSourceConfig {
+        let mut config = AmqpSourceConfig {
+            queue: "it".to_string(),
+            ..Default::default()
+        };
+        let user = std::env::var("AMQP_USER").unwrap_or_else(|_| "guest".to_string());
+        let pass = std::env::var("AMQP_PASSWORD").unwrap_or_else(|_| "guest".to_string());
+        let vhost = std::env::var("AMQP_VHOST").unwrap_or_else(|_| "%2f".to_string());
+        let host = std::env::var("AMQP_HOST").unwrap_or_else(|_| "rabbitmq".to_string());
+        let ca_file =
+            std::env::var("AMQP_CA_FILE").unwrap_or_else(|_| "/certs/ca.cert.pem".to_string());
+        config.connection.connection_string =
+            format!("amqps://{}:{}@{}/{}", user, pass, host, vhost);
+        let tls = TlsConfig {
+            ca_file: Some(ca_file.as_str().into()),
+            ..Default::default()
+        };
+        config.connection.tls = Some(tls);
         config
     }
 
@@ -588,6 +612,7 @@ mod integration_test {
     use super::test::*;
     use super::*;
     use crate::{
+        amqp::await_connection,
         shutdown::ShutdownSignal,
         test_util::{
             components::{run_and_assert_source_compliance, SOURCE_TAGS},
@@ -599,11 +624,28 @@ mod integration_test {
     use lapin::options::*;
     use lapin::BasicProperties;
     use tokio::time::Duration;
-    use vector_core::config::log_schema;
+    use vector_lib::config::log_schema;
 
     #[tokio::test]
     async fn amqp_source_create_ok() {
         let config = make_config();
+        await_connection(&config.connection).await;
+        assert!(amqp_source(
+            &config,
+            ShutdownSignal::noop(),
+            SourceSender::new_test().0,
+            LogNamespace::Legacy,
+            false,
+        )
+        .await
+        .is_ok());
+    }
+
+    #[tokio::test]
+    async fn amqp_tls_source_create_ok() {
+        let config = make_tls_config();
+        await_connection(&config.connection).await;
+
         assert!(amqp_source(
             &config,
             ShutdownSignal::noop(),
@@ -640,17 +682,16 @@ mod integration_test {
             .unwrap();
     }
 
-    #[tokio::test]
-    async fn amqp_source_consume_event() {
+    async fn source_consume_event(mut config: AmqpSourceConfig) {
         let exchange = format!("test-{}-exchange", random_string(10));
         let queue = format!("test-{}-queue", random_string(10));
         let routing_key = "my_key";
         trace!("Test exchange name: {}.", exchange);
         let consumer = format!("test-consumer-{}", random_string(10));
 
-        let mut config = make_config();
         config.consumer = consumer;
         config.queue = queue;
+
         let (_conn, channel) = config.connection.connect().await.unwrap();
         let exchange_opts = lapin::options::ExchangeDeclareOptions {
             auto_delete: true,
@@ -717,5 +758,19 @@ mod integration_test {
             .unwrap();
         assert!(log_ts.signed_duration_since(now) < chrono::Duration::seconds(1));
         assert_eq!(log["exchange"], exchange.into());
+    }
+
+    #[tokio::test]
+    async fn amqp_source_consume_event() {
+        let config = make_config();
+        await_connection(&config.connection).await;
+        source_consume_event(config).await;
+    }
+
+    #[tokio::test]
+    async fn amqp_tls_source_consume_event() {
+        let config = make_tls_config();
+        await_connection(&config.connection).await;
+        source_consume_event(config).await;
     }
 }

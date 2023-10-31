@@ -10,7 +10,7 @@ use std::{
     pin::Pin,
     time::{Duration, Instant},
 };
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 
 use crate::config::OutputId;
 use crate::{
@@ -27,8 +27,8 @@ mod merge_strategy;
 use crate::config::schema::Definition;
 use crate::event::Value;
 pub use merge_strategy::*;
-use vector_core::config::LogNamespace;
-use vector_core::stream::expiration_map::{map_with_expiration, Emitter};
+use vector_lib::config::LogNamespace;
+use vector_lib::stream::expiration_map::{map_with_expiration, Emitter};
 use vrl::value::kind::Collection;
 use vrl::value::Kind;
 
@@ -129,7 +129,7 @@ impl TransformConfig for ReduceConfig {
 
     fn outputs(
         &self,
-        _: enrichment::TableRegistry,
+        _: vector_lib::enrichment::TableRegistry,
         input_definitions: &[(OutputId, schema::Definition)],
         _: LogNamespace,
     ) -> Vec<TransformOutput> {
@@ -319,7 +319,7 @@ pub struct Reduce {
 impl Reduce {
     pub fn new(
         config: &ReduceConfig,
-        enrichment_tables: &enrichment::TableRegistry,
+        enrichment_tables: &vector_lib::enrichment::TableRegistry,
     ) -> crate::Result<Self> {
         if config.ends_when.is_some() && config.starts_when.is_some() {
             return Err("only one of `ends_when` and `starts_when` can be provided".into());
@@ -466,11 +466,11 @@ impl TaskTransform<Event> for Reduce {
 
 #[cfg(test)]
 mod test {
-    use enrichment::TableRegistry;
     use serde_json::json;
     use std::sync::Arc;
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
+    use vector_lib::enrichment::TableRegistry;
     use vrl::value::Kind;
 
     use super::*;
@@ -514,7 +514,7 @@ group_by = [ "request_id" ]
                 );
             let schema_definitions = reduce_config
                 .outputs(
-                    enrichment::TableRegistry::default(),
+                    vector_lib::enrichment::TableRegistry::default(),
                     &[("test".into(), input_definition)],
                     LogNamespace::Legacy,
                 )

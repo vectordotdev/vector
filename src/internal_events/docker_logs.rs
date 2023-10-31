@@ -1,11 +1,11 @@
 use bollard::errors::Error;
 use chrono::ParseError;
 use metrics::counter;
-use vector_common::{
+use vector_lib::internal_event::InternalEvent;
+use vector_lib::{
     internal_event::{error_stage, error_type},
     json_size::JsonSize,
 };
-use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub struct DockerLogsEventsReceived<'a> {
@@ -101,8 +101,6 @@ impl InternalEvent for DockerLogsCommunicationError<'_> {
             "error_type" => error_type::CONNECTION_FAILED,
             "stage" => error_stage::RECEIVING,
         );
-        // deprecated
-        counter!("communication_errors_total", 1);
     }
 }
 
@@ -128,8 +126,6 @@ impl InternalEvent for DockerLogsContainerMetadataFetchError<'_> {
             "stage" => error_stage::RECEIVING,
             "container_id" => self.container_id.to_owned(),
         );
-        // deprecated
-        counter!("container_metadata_fetch_errors_total", 1);
     }
 }
 
@@ -155,8 +151,6 @@ impl InternalEvent for DockerLogsTimestampParseError<'_> {
             "stage" => error_stage::PROCESSING,
             "container_id" => self.container_id.to_owned(),
         );
-        // deprecated
-        counter!("timestamp_parse_errors_total", 1);
     }
 }
 
@@ -182,7 +176,5 @@ impl InternalEvent for DockerLogsLoggingDriverUnsupportedError<'_> {
             "stage" => error_stage::RECEIVING,
             "container_id" => self.container_id.to_owned(),
         );
-        // deprecated
-        counter!("logging_driver_errors_total", 1);
     }
 }

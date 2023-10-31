@@ -12,6 +12,7 @@ use std::{
 
 use chrono::{DateTime, Utc};
 use vector_common::{
+    byte_size_of::ByteSizeOf,
     internal_event::{OptionalTag, TaggedEventsSent},
     json_size::JsonSize,
     request_metadata::GetEventCountTags,
@@ -19,14 +20,11 @@ use vector_common::{
 };
 use vector_config::configurable_component;
 
-use crate::{
-    config::telemetry,
-    event::{
-        estimated_json_encoded_size_of::EstimatedJsonEncodedSizeOf, BatchNotifier, EventFinalizer,
-        EventFinalizers, EventMetadata, Finalizable,
-    },
-    ByteSizeOf,
+use super::{
+    estimated_json_encoded_size_of::EstimatedJsonEncodedSizeOf, BatchNotifier, EventFinalizer,
+    EventFinalizers, EventMetadata, Finalizable,
 };
+use crate::config::telemetry;
 
 #[cfg(any(test, feature = "test"))]
 mod arbitrary;

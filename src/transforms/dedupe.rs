@@ -4,8 +4,8 @@ use bytes::Bytes;
 use futures::{Stream, StreamExt};
 use lookup::lookup_v2::ConfigTargetPath;
 use lru::LruCache;
-use vector_config::configurable_component;
-use vector_core::config::{clone_input_definitions, LogNamespace};
+use vector_lib::config::{clone_input_definitions, LogNamespace};
+use vector_lib::configurable::configurable_component;
 use vrl::path::OwnedTargetPath;
 
 use crate::{
@@ -160,7 +160,7 @@ impl TransformConfig for DedupeConfig {
 
     fn outputs(
         &self,
-        _: enrichment::TableRegistry,
+        _: vector_lib::enrichment::TableRegistry,
         input_definitions: &[(OutputId, schema::Definition)],
         _: LogNamespace,
     ) -> Vec<TransformOutput> {
@@ -298,8 +298,8 @@ mod tests {
     use lookup::lookup_v2::ConfigTargetPath;
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
-    use vector_common::config::ComponentKey;
-    use vector_core::config::OutputId;
+    use vector_lib::config::ComponentKey;
+    use vector_lib::config::OutputId;
 
     use crate::config::schema::Definition;
     use crate::{

@@ -3,7 +3,7 @@ use std::{collections::HashMap, io};
 use crate::sinks::{prelude::*, util::encoding::Encoder};
 use bytes::Bytes;
 use serde::{ser::SerializeSeq, Serialize};
-use vector_core::config::telemetry;
+use vector_lib::config::telemetry;
 
 pub type Labels = Vec<(String, String)>;
 

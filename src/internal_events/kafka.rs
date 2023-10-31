@@ -1,8 +1,8 @@
 use metrics::{counter, gauge};
-use vector_core::{internal_event::InternalEvent, update_counter};
+use vector_lib::{internal_event::InternalEvent, update_counter};
 use vrl::path::OwnedTargetPath;
 
-use vector_common::{
+use vector_lib::{
     internal_event::{error_stage, error_type},
     json_size::JsonSize,
 };
@@ -82,8 +82,6 @@ impl InternalEvent for KafkaOffsetUpdateError {
             "error_type" => error_type::READER_FAILED,
             "stage" => error_stage::SENDING,
         );
-        // deprecated
-        counter!("consumer_offset_updates_failed_total", 1);
     }
 }
 
@@ -181,7 +179,5 @@ impl InternalEvent for KafkaHeaderExtractionError<'_> {
             "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::RECEIVING,
         );
-        // deprecated
-        counter!("kafka_header_extraction_failures_total", 1);
     }
 }

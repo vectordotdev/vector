@@ -1,8 +1,8 @@
 use std::{fmt::Debug, io};
 
 use bytes::Bytes;
-use codecs::{encoding::Framer, CharacterDelimitedEncoder, JsonSerializerConfig};
 use lookup::{OwnedValuePath, PathPrefix};
+use vector_lib::codecs::{encoding::Framer, CharacterDelimitedEncoder, JsonSerializerConfig};
 
 use crate::sinks::prelude::*;
 
@@ -39,7 +39,7 @@ where
 
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         input
-            .batched(self.batch_settings.into_byte_size_config())
+            .batched(self.batch_settings.as_byte_size_config())
             .request_builder(
                 default_request_builder_concurrency_limit(),
                 AzureMonitorLogsRequestBuilder {

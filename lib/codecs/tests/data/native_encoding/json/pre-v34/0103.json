@@ -1,0 +1,1 @@
+{"metric":{"name":"j","timestamp":"1969-12-31T16:44:26.000001054Z","interval_ms":844496857,"kind":"incremental","distribution":{"samples":[{"value":575808.0,"rate":4140733210}],"statistic":"histogram"}}}

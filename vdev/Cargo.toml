@@ -12,9 +12,9 @@ anyhow = "1.0.75"
 atty = "0.2.14"
 cached = "0.46.0"
 chrono = { version = "0.4.31", default-features = false, features = ["serde", "clock"] }
-clap = { version = "4.4.6", features = ["derive"] }
-clap-verbosity-flag = "2.0.1"
-clap_complete = "4.4.3"
+clap = { version = "4.4.7", features = ["derive"] }
+clap-verbosity-flag = "2.1.0"
+clap_complete = "4.4.4"
 confy = "0.5.1"
 directories = "5.0.1"
 # remove this when stabilized https://doc.rust-lang.org/stable/std/path/fn.absolute.html
@@ -30,11 +30,11 @@ os_info = { version = "3.7.0", default-features = false }
 # watch https://github.com/epage/anstyle for official interop with Clap
 owo-colors = { version = "3.5.0", features = ["supports-colors"] }
 paste = "1.0.14"
-regex = { version = "1.10.0", default-features = false, features = ["std", "perf"] }
+regex = { version = "1.10.2", default-features = false, features = ["std", "perf"] }
 reqwest = { version = "0.11", features = ["json", "blocking"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0.107"
-serde_yaml = "0.9.25"
+serde_yaml = "0.9.27"
 sha2 = "0.10.8"
-tempfile = "3.8.0"
-toml = { version = "0.8.2", default-features = false, features = ["parse"] }
+tempfile = "3.8.1"
+toml = { version = "0.8.6", default-features = false, features = ["parse"] }

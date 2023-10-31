@@ -1,12 +1,12 @@
 use async_trait::async_trait;
-use codecs::JsonSerializerConfig;
 use futures::StreamExt;
 use futures_util::stream::BoxStream;
 use indoc::indoc;
 use lookup::lookup_v2::{ConfigValuePath, OptionalValuePath};
-use vector_common::sensitive_string::SensitiveString;
-use vector_config::configurable_component;
-use vector_core::sink::StreamSink;
+use vector_lib::codecs::JsonSerializerConfig;
+use vector_lib::configurable::configurable_component;
+use vector_lib::sensitive_string::SensitiveString;
+use vector_lib::sink::StreamSink;
 
 use super::{
     config_host_key,
@@ -227,7 +227,7 @@ mod tests {
     use futures::stream;
     use indoc::indoc;
     use similar_asserts::assert_eq;
-    use vector_core::metric_tags;
+    use vector_lib::metric_tags;
 
     use super::*;
     use crate::{
@@ -305,7 +305,7 @@ mod tests {
                     "metric2",
                     MetricKind::Absolute,
                     MetricValue::Distribution {
-                        samples: vector_core::samples![1.0 => 100, 2.0 => 200, 3.0 => 300],
+                        samples: vector_lib::samples![1.0 => 100, 2.0 => 200, 3.0 => 300],
                         statistic: StatisticKind::Histogram,
                     },
                 )

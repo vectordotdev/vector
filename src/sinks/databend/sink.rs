@@ -24,7 +24,7 @@ impl DatabendSink {
 
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         input
-            .batched(self.batch_settings.into_byte_size_config())
+            .batched(self.batch_settings.as_byte_size_config())
             .request_builder(
                 default_request_builder_concurrency_limit(),
                 self.request_builder,

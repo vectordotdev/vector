@@ -8,10 +8,10 @@ use std::{
 };
 
 use bytes::Bytes;
-use enrichment::{Case, Condition, IndexHandle, Table};
 use tracing::trace;
-use vector_common::{conversion::Conversion, TimeZone};
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
+use vector_lib::enrichment::{Case, Condition, IndexHandle, Table};
+use vector_lib::{conversion::Conversion, TimeZone};
 use vrl::value::Value;
 
 use crate::config::EnrichmentTableConfig;
@@ -250,7 +250,7 @@ impl EnrichmentTableConfig for FileConfig {
 
 impl_generate_config_from_default!(FileConfig);
 
-/// A struct that implements [enrichment::Table] to handle loading enrichment data from a CSV file.
+/// A struct that implements [vector_lib::enrichment::Table] to handle loading enrichment data from a CSV file.
 #[derive(Clone)]
 pub struct File {
     config: FileConfig,

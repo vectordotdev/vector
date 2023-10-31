@@ -10,7 +10,6 @@ use std::{
 
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
-use codecs::{decoding::BoxedFramingError, CharacterDelimitedDecoder};
 use futures::{poll, stream::BoxStream, task::Poll, StreamExt};
 use lookup::{metadata_path, owned_value_path, path};
 use nix::{
@@ -28,17 +27,18 @@ use tokio::{
     time::sleep,
 };
 use tokio_util::codec::FramedRead;
-use vector_common::{
+use vector_lib::codecs::{decoding::BoxedFramingError, CharacterDelimitedDecoder};
+use vector_lib::configurable::configurable_component;
+use vector_lib::{
+    config::{LegacyKey, LogNamespace},
+    schema::Definition,
+    EstimatedJsonEncodedSizeOf,
+};
+use vector_lib::{
     finalizer::OrderedFinalizer,
     internal_event::{
         ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol, Registered,
     },
-};
-use vector_config::configurable_component;
-use vector_core::{
-    config::{LegacyKey, LogNamespace},
-    schema::Definition,
-    EstimatedJsonEncodedSizeOf,
 };
 use vrl::event_path;
 use vrl::value::{kind::Collection, Kind, Value};

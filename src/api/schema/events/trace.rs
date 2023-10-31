@@ -1,5 +1,5 @@
 use async_graphql::Object;
-use vector_common::encode_logfmt;
+use vector_lib::encode_logfmt;
 use vrl::event_path;
 
 use super::EventEncodingType;

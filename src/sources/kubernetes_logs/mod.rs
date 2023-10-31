@@ -8,11 +8,6 @@ use std::{path::PathBuf, time::Duration};
 
 use bytes::Bytes;
 use chrono::Utc;
-use codecs::{BytesDeserializer, BytesDeserializerConfig};
-use file_source::{
-    calculate_ignore_before, Checkpointer, FileServer, FileServerShutdown, FingerprintStrategy,
-    Fingerprinter, Line, ReadFrom, ReadFromConfig,
-};
 use futures::{future::FutureExt, stream::StreamExt};
 use futures_util::Stream;
 use k8s_openapi::api::core::v1::{Namespace, Node, Pod};
@@ -26,12 +21,17 @@ use kube::{
 use lifecycle::Lifecycle;
 use lookup::{lookup_v2::OptionalTargetPath, owned_value_path, path, OwnedTargetPath};
 use serde_with::serde_as;
-use vector_common::{
+use vector_lib::codecs::{BytesDeserializer, BytesDeserializerConfig};
+use vector_lib::configurable::configurable_component;
+use vector_lib::file_source::{
+    calculate_ignore_before, Checkpointer, FileServer, FileServerShutdown, FingerprintStrategy,
+    Fingerprinter, Line, ReadFrom, ReadFromConfig,
+};
+use vector_lib::{config::LegacyKey, config::LogNamespace, EstimatedJsonEncodedSizeOf};
+use vector_lib::{
     internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol},
     TimeZone,
 };
-use vector_config::configurable_component;
-use vector_core::{config::LegacyKey, config::LogNamespace, EstimatedJsonEncodedSizeOf};
 use vrl::value::{kind::Collection, Kind};
 
 use crate::sources::kubernetes_logs::partial_events_merger::merge_partial_events;
@@ -1047,7 +1047,7 @@ fn prepare_label_selector(selector: &str) -> String {
 mod tests {
     use lookup::{owned_value_path, OwnedTargetPath};
     use similar_asserts::assert_eq;
-    use vector_core::{config::LogNamespace, schema::Definition};
+    use vector_lib::{config::LogNamespace, schema::Definition};
     use vrl::value::{kind::Collection, Kind};
 
     use crate::config::SourceConfig;
