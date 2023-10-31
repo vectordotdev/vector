@@ -6,6 +6,7 @@ use chrono::Duration;
 use futures::{stream, StreamExt};
 use similar_asserts::assert_eq;
 use vector_lib::codecs::TextSerializerConfig;
+use vector_lib::lookup;
 
 use super::*;
 use crate::aws::create_client;

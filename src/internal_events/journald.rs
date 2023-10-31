@@ -25,8 +25,6 @@ impl InternalEvent for JournaldInvalidRecordError {
             "stage" => error_stage::PROCESSING,
             "error_type" => error_type::PARSER_FAILED,
         );
-        counter!("invalid_record_total", 1); // deprecated
-        counter!("invalid_record_bytes_total", self.text.len() as u64); // deprecated
     }
 }
 

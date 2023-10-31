@@ -1,4 +1,9 @@
 pub use codecs;
+pub use enrichment;
+#[cfg(feature = "file-source")]
+pub use file_source;
+#[cfg(feature = "api-client")]
+pub use vector_api_client as api_client;
 pub use vector_buffers as buffers;
 pub use vector_common::{
     assert_event_data_eq, btreemap, byte_size_of, byte_size_of::ByteSizeOf, conversion,
@@ -15,6 +20,7 @@ pub use vector_core::{
     buckets, default_data_dir, event, fanout, metric_tags, metrics, partition, quantiles, samples,
     schema, serde, sink, source, tcp, tls, transform, update_counter, EstimatedJsonEncodedSizeOf,
 };
+pub use vector_lookup as lookup;
 pub use vector_stream as stream;
 
 pub mod config {
@@ -25,4 +31,14 @@ pub mod config {
         OutputId, SourceAcknowledgementsConfig, SourceOutput, Tags, Telemetry, TransformOutput,
         MEMORY_BUFFER_DEFAULT_MAX_EVENTS,
     };
+}
+
+#[cfg(feature = "opentelemetry")]
+pub mod opentelemetry {
+    pub use opentelemetry_proto::{convert, proto};
+}
+
+#[cfg(feature = "prometheus")]
+pub mod prometheus {
+    pub use prometheus_parser as parser;
 }

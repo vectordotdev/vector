@@ -22,8 +22,6 @@ impl InternalEvent for EventStoreDbMetricsHttpError {
             "stage" => error_stage::RECEIVING,
             "error_type" => error_type::REQUEST_FAILED,
         );
-        // deprecated
-        counter!("http_request_errors_total", 1);
     }
 }
 
@@ -46,7 +44,5 @@ impl InternalEvent for EventStoreDbStatsParsingError {
             "stage" => error_stage::PROCESSING,
             "error_type" => error_type::PARSER_FAILED,
         );
-        // deprecated
-        counter!("parse_errors_total", 1);
     }
 }

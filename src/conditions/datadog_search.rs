@@ -38,7 +38,10 @@ impl Conditional for DatadogSearchRunner {
 }
 
 impl ConditionalConfig for DatadogSearchConfig {
-    fn build(&self, _enrichment_tables: &enrichment::TableRegistry) -> crate::Result<Condition> {
+    fn build(
+        &self,
+        _enrichment_tables: &vector_lib::enrichment::TableRegistry,
+    ) -> crate::Result<Condition> {
         let node = parse(&self.source)?;
         let matcher = as_log(build_matcher(&node, &EventFilter));
 

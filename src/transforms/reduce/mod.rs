@@ -1,7 +1,5 @@
 use futures::Stream;
 use indexmap::IndexMap;
-use lookup::lookup_v2::parse_target_path;
-use lookup::PathPrefix;
 use serde_with::serde_as;
 use std::collections::BTreeMap;
 use std::{
@@ -11,6 +9,8 @@ use std::{
     time::{Duration, Instant},
 };
 use vector_lib::configurable::configurable_component;
+use vector_lib::lookup::lookup_v2::parse_target_path;
+use vector_lib::lookup::PathPrefix;
 
 use crate::config::OutputId;
 use crate::{
@@ -129,7 +129,7 @@ impl TransformConfig for ReduceConfig {
 
     fn outputs(
         &self,
-        _: enrichment::TableRegistry,
+        _: vector_lib::enrichment::TableRegistry,
         input_definitions: &[(OutputId, schema::Definition)],
         _: LogNamespace,
     ) -> Vec<TransformOutput> {
@@ -319,7 +319,7 @@ pub struct Reduce {
 impl Reduce {
     pub fn new(
         config: &ReduceConfig,
-        enrichment_tables: &enrichment::TableRegistry,
+        enrichment_tables: &vector_lib::enrichment::TableRegistry,
     ) -> crate::Result<Self> {
         if config.ends_when.is_some() && config.starts_when.is_some() {
             return Err("only one of `ends_when` and `starts_when` can be provided".into());
@@ -466,11 +466,11 @@ impl TaskTransform<Event> for Reduce {
 
 #[cfg(test)]
 mod test {
-    use enrichment::TableRegistry;
     use serde_json::json;
     use std::sync::Arc;
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
+    use vector_lib::enrichment::TableRegistry;
     use vrl::value::Kind;
 
     use super::*;
@@ -478,7 +478,7 @@ mod test {
     use crate::event::{LogEvent, Value};
     use crate::test_util::components::assert_transform_compliance;
     use crate::transforms::test::create_topology;
-    use lookup::owned_value_path;
+    use vector_lib::lookup::owned_value_path;
 
     #[test]
     fn generate_config() {
@@ -514,7 +514,7 @@ group_by = [ "request_id" ]
                 );
             let schema_definitions = reduce_config
                 .outputs(
-                    enrichment::TableRegistry::default(),
+                    vector_lib::enrichment::TableRegistry::default(),
                     &[("test".into(), input_definition)],
                     LogNamespace::Legacy,
                 )

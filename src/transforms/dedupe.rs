@@ -2,10 +2,10 @@ use std::{future::ready, num::NonZeroUsize, pin::Pin};
 
 use bytes::Bytes;
 use futures::{Stream, StreamExt};
-use lookup::lookup_v2::ConfigTargetPath;
 use lru::LruCache;
 use vector_lib::config::{clone_input_definitions, LogNamespace};
 use vector_lib::configurable::configurable_component;
+use vector_lib::lookup::lookup_v2::ConfigTargetPath;
 use vrl::path::OwnedTargetPath;
 
 use crate::{
@@ -160,7 +160,7 @@ impl TransformConfig for DedupeConfig {
 
     fn outputs(
         &self,
-        _: enrichment::TableRegistry,
+        _: vector_lib::enrichment::TableRegistry,
         input_definitions: &[(OutputId, schema::Definition)],
         _: LogNamespace,
     ) -> Vec<TransformOutput> {
@@ -295,11 +295,11 @@ impl TaskTransform<Event> for Dedupe {
 mod tests {
     use std::{collections::BTreeMap, sync::Arc};
 
-    use lookup::lookup_v2::ConfigTargetPath;
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
     use vector_lib::config::ComponentKey;
     use vector_lib::config::OutputId;
+    use vector_lib::lookup::lookup_v2::ConfigTargetPath;
 
     use crate::config::schema::Definition;
     use crate::{

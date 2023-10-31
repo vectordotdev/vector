@@ -1,9 +1,9 @@
 use futures::TryFutureExt;
-use opentelemetry_proto::proto::collector::logs::v1::{
-    logs_service_server::LogsService, ExportLogsServiceRequest, ExportLogsServiceResponse,
-};
 use tonic::{Request, Response, Status};
 use vector_lib::internal_event::{CountByteSize, InternalEventHandle as _, Registered};
+use vector_lib::opentelemetry::proto::collector::logs::v1::{
+    logs_service_server::LogsService, ExportLogsServiceRequest, ExportLogsServiceResponse,
+};
 use vector_lib::{
     config::LogNamespace,
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event},

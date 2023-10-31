@@ -6,12 +6,12 @@ use std::{
     path::PathBuf,
 };
 
-use lookup::{metadata_path, owned_value_path, PathPrefix};
 use snafu::{ResultExt, Snafu};
 use vector_lib::codecs::MetricTagValues;
 use vector_lib::compile_vrl;
 use vector_lib::config::LogNamespace;
 use vector_lib::configurable::configurable_component;
+use vector_lib::lookup::{metadata_path, owned_value_path, PathPrefix};
 use vector_lib::schema::Definition;
 use vector_lib::TimeZone;
 use vector_vrl_functions::set_semantic_meaning::MeaningList;
@@ -140,7 +140,7 @@ pub struct RemapConfig {
 impl RemapConfig {
     fn compile_vrl_program(
         &self,
-        enrichment_tables: enrichment::TableRegistry,
+        enrichment_tables: vector_lib::enrichment::TableRegistry,
         merged_schema_definition: schema::Definition,
     ) -> Result<(Program, String, Vec<Box<dyn Function>>, CompileConfig)> {
         let source = match (&self.source, &self.file) {
@@ -159,7 +159,7 @@ impl RemapConfig {
         };
 
         let mut functions = vrl::stdlib::all();
-        functions.append(&mut enrichment::vrl_functions());
+        functions.append(&mut vector_lib::enrichment::vrl_functions());
         functions.append(&mut vector_vrl_functions::all());
 
         let state = TypeState {
@@ -222,7 +222,7 @@ impl TransformConfig for RemapConfig {
 
     fn outputs(
         &self,
-        enrichment_tables: enrichment::TableRegistry,
+        enrichment_tables: vector_lib::enrichment::TableRegistry,
         input_definitions: &[(OutputId, schema::Definition)],
         _: LogNamespace,
     ) -> Vec<TransformOutput> {
@@ -627,9 +627,9 @@ mod tests {
         transforms::OutputBuffer,
     };
     use chrono::DateTime;
-    use enrichment::TableRegistry;
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
+    use vector_lib::enrichment::TableRegistry;
 
     fn test_default_schema_definition() -> schema::Definition {
         schema::Definition::empty_legacy_namespace().with_event_field(
@@ -1443,7 +1443,7 @@ mod tests {
 
         assert_eq!(
             conf.outputs(
-                enrichment::TableRegistry::default(),
+                vector_lib::enrichment::TableRegistry::default(),
                 &[(
                     "test".into(),
                     schema::Definition::new_with_default_metadata(
@@ -1606,7 +1606,7 @@ mod tests {
             ..Default::default()
         };
 
-        let enrichment_tables = enrichment::TableRegistry::default();
+        let enrichment_tables = vector_lib::enrichment::TableRegistry::default();
 
         let outputs1 = transform1.outputs(
             enrichment_tables.clone(),
@@ -1679,7 +1679,7 @@ mod tests {
             ..Default::default()
         };
 
-        let enrichment_tables = enrichment::TableRegistry::default();
+        let enrichment_tables = vector_lib::enrichment::TableRegistry::default();
 
         let outputs1 = transform1.outputs(
             enrichment_tables.clone(),
@@ -1760,7 +1760,7 @@ mod tests {
             ..Default::default()
         };
 
-        let enrichment_tables = enrichment::TableRegistry::default();
+        let enrichment_tables = vector_lib::enrichment::TableRegistry::default();
 
         let outputs1 = transform1.outputs(
             enrichment_tables,
@@ -1803,7 +1803,7 @@ mod tests {
             ..Default::default()
         };
 
-        let enrichment_tables = enrichment::TableRegistry::default();
+        let enrichment_tables = vector_lib::enrichment::TableRegistry::default();
 
         let outputs1 = transform1.outputs(
             enrichment_tables,
@@ -1834,7 +1834,7 @@ mod tests {
             ..Default::default()
         };
 
-        let enrichment_tables = enrichment::TableRegistry::default();
+        let enrichment_tables = vector_lib::enrichment::TableRegistry::default();
 
         let outputs1 = transform1.outputs(
             enrichment_tables,
@@ -1877,7 +1877,7 @@ mod tests {
             ..Default::default()
         };
 
-        let enrichment_tables = enrichment::TableRegistry::default();
+        let enrichment_tables = vector_lib::enrichment::TableRegistry::default();
 
         let outputs1 = transform1.outputs(
             enrichment_tables,
@@ -1941,7 +1941,7 @@ mod tests {
         // Legacy namespace nests this under "message", Vector should set it as the root
         assert_eq!(result.as_log().get("."), Some(&Value::Null));
 
-        let enrichment_tables = enrichment::TableRegistry::default();
+        let enrichment_tables = vector_lib::enrichment::TableRegistry::default();
         let outputs1 = conf.outputs(
             enrichment_tables,
             &[(

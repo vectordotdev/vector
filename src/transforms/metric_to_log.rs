@@ -1,10 +1,10 @@
 use chrono::Utc;
-use lookup::{event_path, owned_value_path, path, PathPrefix};
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
 use vector_lib::codecs::MetricTagValues;
 use vector_lib::config::LogNamespace;
 use vector_lib::configurable::configurable_component;
+use vector_lib::lookup::{event_path, owned_value_path, path, PathPrefix};
 use vector_lib::TimeZone;
 use vrl::path::OwnedValuePath;
 use vrl::value::kind::Collection;
@@ -99,7 +99,7 @@ impl TransformConfig for MetricToLogConfig {
 
     fn outputs(
         &self,
-        _: enrichment::TableRegistry,
+        _: vector_lib::enrichment::TableRegistry,
         input_definitions: &[(OutputId, Definition)],
         global_log_namespace: LogNamespace,
     ) -> Vec<TransformOutput> {

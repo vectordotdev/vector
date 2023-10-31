@@ -2,11 +2,11 @@ use std::path::PathBuf;
 
 use base64::prelude::{Engine as _, BASE64_STANDARD};
 use bytes::Bytes;
-use lookup::{owned_value_path, path, OwnedValuePath};
 use vector_lib::configurable::configurable_component;
 use vector_lib::internal_event::{
     ByteSize, BytesReceived, InternalEventHandle as _, Protocol, Registered,
 };
+use vector_lib::lookup::{owned_value_path, path, OwnedValuePath};
 use vrl::path::PathPrefix;
 use vrl::value::{kind::Collection, Kind};
 
@@ -23,8 +23,8 @@ pub mod schema;
 use crate::sources::dnstap::parser::DnstapParser;
 use crate::sources::dnstap::schema::DNSTAP_VALUE_PATHS;
 use dnsmsg_parser::{dns_message, dns_message_parser};
-use lookup::lookup_v2::OptionalValuePath;
 pub use schema::DnstapEventSchema;
+use vector_lib::lookup::lookup_v2::OptionalValuePath;
 use vector_lib::{
     config::{LegacyKey, LogNamespace},
     EstimatedJsonEncodedSizeOf,

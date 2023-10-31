@@ -1,18 +1,18 @@
 use chrono::{TimeZone, Utc};
 use futures::Stream;
 use futures_util::StreamExt;
-use lookup::path;
-use opentelemetry_proto::proto::{
-    collector::logs::v1::{logs_service_client::LogsServiceClient, ExportLogsServiceRequest},
-    common::v1::{any_value, AnyValue, KeyValue},
-    logs::v1::{LogRecord, ResourceLogs, ScopeLogs},
-    resource::v1::Resource as OtelResource,
-};
 use similar_asserts::assert_eq;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 use tonic::Request;
 use vector_lib::config::LogNamespace;
+use vector_lib::lookup::path;
+use vector_lib::opentelemetry::proto::{
+    collector::logs::v1::{logs_service_client::LogsServiceClient, ExportLogsServiceRequest},
+    common::v1::{any_value, AnyValue, KeyValue},
+    logs::v1::{LogRecord, ResourceLogs, ScopeLogs},
+    resource::v1::Resource as OtelResource,
+};
 use vrl::value;
 
 use crate::config::OutputId;

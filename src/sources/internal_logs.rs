@@ -1,10 +1,10 @@
 use chrono::Utc;
 use futures::{stream, StreamExt};
-use lookup::lookup_v2::OptionalValuePath;
-use lookup::{owned_value_path, path, OwnedValuePath};
 use vector_lib::codecs::BytesDeserializerConfig;
 use vector_lib::config::log_schema;
 use vector_lib::configurable::configurable_component;
+use vector_lib::lookup::lookup_v2::OptionalValuePath;
+use vector_lib::lookup::{owned_value_path, path, OwnedValuePath};
 use vector_lib::{
     config::{LegacyKey, LogNamespace},
     schema::Definition,
@@ -204,9 +204,9 @@ async fn run(
 #[cfg(test)]
 mod tests {
     use futures::Stream;
-    use lookup::OwnedTargetPath;
     use tokio::time::{sleep, Duration};
     use vector_lib::event::Value;
+    use vector_lib::lookup::OwnedTargetPath;
     use vrl::value::kind::Collection;
 
     use super::*;

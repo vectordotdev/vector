@@ -2,9 +2,9 @@ use bytes::Bytes;
 use futures::StreamExt;
 use http::HeaderMap;
 use indoc::indoc;
-use prometheus_parser::proto;
 use prost::Message;
 use vector_lib::metric_tags;
+use vector_lib::prometheus::parser::proto;
 
 use super::*;
 use crate::{
