@@ -4,6 +4,7 @@ use bytes::Bytes;
 use snafu::Snafu;
 use vector_lib::codecs::{encoding::Framer, CharacterDelimitedEncoder, JsonSerializerConfig};
 use vector_lib::lookup::event_path;
+use vector_lib::stream::batcher::limiter::ItemBatchSize;
 
 use super::{config::MAX_PAYLOAD_BYTES, service::LogApiRequest};
 use crate::sinks::{
@@ -250,6 +251,32 @@ impl RequestBuilder<(Option<Arc<str>>, Vec<Event>)> for LogRequestBuilder {
     }
 }
 
+#[derive(Debug, Default)]
+struct NullWrite {
+    count: usize,
+}
+
+impl std::io::Write for NullWrite {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.count += buf.len();
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
+
+struct ActualJsonSize;
+
+impl ItemBatchSize<Event> for ActualJsonSize {
+    fn size(&self, item: &Event) -> usize {
+        let mut w = NullWrite::default();
+        serde_json::to_writer(&mut w, item.as_log()).expect("can't fail");
+        w.count + 1 // one for comma
+    }
+}
+
 impl<S> LogSink<S>
 where
     S: Service<LogApiRequest> + Send + 'static,
@@ -262,8 +289,8 @@ where
 
         let partitioner = EventPartitioner;
         let batch_settings = self.batch_settings;
-
-        let input = input.batched_partitioned(partitioner, || batch_settings.as_byte_size_config());
+        let input =
+            input.batched_partitioned(partitioner, || batch_settings.as_item_size_config(ActualJsonSize));
         input
             .request_builder(
                 default_request_builder_concurrency_limit(),
