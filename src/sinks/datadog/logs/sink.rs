@@ -289,8 +289,9 @@ where
 
         let partitioner = EventPartitioner;
         let batch_settings = self.batch_settings;
-        let input =
-            input.batched_partitioned(partitioner, || batch_settings.as_item_size_config(ActualJsonSize));
+        let input = input.batched_partitioned(partitioner, || {
+            batch_settings.as_item_size_config(ActualJsonSize)
+        });
         input
             .request_builder(
                 default_request_builder_concurrency_limit(),
