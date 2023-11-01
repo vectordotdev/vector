@@ -15,7 +15,7 @@ remap: functions: contains_all: {
 		},
 		{
 			name:        "substrings"
-			description: "An of substrings to search for in `value`."
+			description: "An array of substrings to search for in `value`."
 			required:    true
 			type: ["array"]
 		},
