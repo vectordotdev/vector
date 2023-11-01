@@ -21,17 +21,17 @@ remap: functions: parse_float: {
 		{
 			title:  "Parse negative integer"
 			source: #"parse_float!("-42")"#
-			return: "-42.0"
+			return: -42.0
 		},
 		{
 			title:  "Parse negative integer"
 			source: #"parse_float!("42.38")"#
-			return: "42.38"
+			return: 42.38
 		},
 		{
 			title:  "Scientific notation"
 			source: #"parse_float!("2.5e3")"#
-			return: "2500.0"
+			return: 2500.0
 		},
 	]
 
