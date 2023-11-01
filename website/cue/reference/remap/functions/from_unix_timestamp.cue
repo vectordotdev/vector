@@ -24,7 +24,7 @@ remap: functions: from_unix_timestamp: {
 				seconds:      "Express Unix time in seconds"
 				milliseconds: "Express Unix time in milliseconds"
 				nanoseconds:  "Express Unix time in nanoseconds"
-				microseconds:  "Express Unix time in microseconds"
+				microseconds: "Express Unix time in microseconds"
 			}
 			default: "seconds"
 		},
