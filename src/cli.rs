@@ -216,6 +216,13 @@ pub struct RootOpts {
     /// default inherits the environment of the Vector process.
     #[arg(long, env = "VECTOR_OPENSSL_NO_PROBE", default_value = "false")]
     pub openssl_no_probe: bool,
+
+    /// Allow the configuration to run without any components. This is useful for loading in an
+    /// empty stub config that will later be replaced with actual components. Note that this is
+    /// likely not useful without also watching for config file changes as described for
+    /// `--watch-empty`.
+    #[arg(long, env = "VECTOR_ALLOW_EMPTY", default_value = "false")]
+    pub allow_empty_config: bool,
 }
 
 impl RootOpts {
