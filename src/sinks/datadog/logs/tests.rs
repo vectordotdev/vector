@@ -533,3 +533,51 @@ async fn error_is_retriable() {
     //       but are not straightforward to instantiate due to the design of
     //       the crates they originate from.
 }
+
+#[tokio::test]
+async fn does_not_send_too_big_payloads() {
+    crate::test_util::trace_init();
+
+    let (mut config, cx) = load_sink::<DatadogLogsConfig>(indoc! {r#"
+            default_api_key = "atoken"
+            compression = "none"
+        "#})
+    .unwrap();
+
+    let addr = next_addr();
+    let endpoint = format!("http://{}", addr);
+    config.dd_common.endpoint = Some(endpoint.clone());
+
+    let (sink, _) = config.build(cx).await.unwrap();
+
+    let (mut rx, _trigger, server) = test_server(addr, ApiStatus::OKv2);
+    tokio::spawn(server);
+
+    // Generate input that will require escaping when serialized to json, and therefore grow in size
+    // between batching and encoding. This is a very specific example that will fit in a batch of
+    // <4,250,000 but serialize to >5,000,000, defeating the current 750k safety buffer.
+    let events = (0..1000).into_iter().map(|_n| {
+        let data = serde_json::json!({"a": "b"});
+        let nested = serde_json::to_string(&data).unwrap();
+        event_with_api_key(&nested.repeat(401), "foo")
+    });
+
+    sink.run_events(events).await.unwrap();
+
+    let mut sizes = Vec::new();
+    loop {
+        tokio::select! {
+            Some((_parts, body)) = rx.next() => {
+                sizes.push(body.len());
+            }
+            _ = tokio::time::sleep(std::time::Duration::from_millis(100)) => {
+                break;
+            }
+        }
+    }
+
+    assert!(!sizes.is_empty());
+    for size in sizes {
+        assert!(size < 5_000_000, "{} not less than max", size);
+    }
+}
