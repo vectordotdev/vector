@@ -6921,9 +6921,9 @@ dependencies = [
 
 [[package]]
 name = "quanta"
-version = "0.12.0"
+version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4966e46e3f559f8681bf8203b5e0e2421ebf6de5dd8b59f2ec8fa91acc028a19"
+checksum = "577c55a090a94ed7da0e6580cc38a553558e2d736398b5d8ebf81bc9880f8acd"
 dependencies = [
  "crossbeam-utils",
  "libc",
@@ -10222,7 +10222,7 @@ dependencies = [
  "prost 0.12.1",
  "prost-build 0.12.1",
  "prost-types 0.12.1",
- "quanta 0.12.0",
+ "quanta 0.12.1",
  "quickcheck",
  "quickcheck_macros",
  "rand 0.8.5",
