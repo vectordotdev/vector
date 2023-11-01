@@ -37,7 +37,7 @@ pin-project.workspace = true
 proptest = { version = "1.3", optional = true }
 prost-types = { version = "0.12", default-features = false }
 prost = { version = "0.12", default-features = false, features = ["std"] }
-quanta = { version = "0.12.0", default-features = false }
+quanta = { version = "0.12.1", default-features = false }
 regex = { version = "1.10.2", default-features = false, features = ["std", "perf"] }
 ryu = { version = "1", default-features = false }
 serde = { version = "1.0.190", default-features = false, features = ["derive", "rc"] }

@@ -333,7 +333,10 @@ impl Color {
     pub fn use_color(&self) -> bool {
         match self {
             #[cfg(unix)]
-            Color::Auto => atty::is(atty::Stream::Stdout),
+            Color::Auto => {
+                use std::io::IsTerminal;
+                std::io::stdout().is_terminal()
+            }
             #[cfg(windows)]
             Color::Auto => false, // ANSI colors are not supported by cmd.exe
             Color::Always => true,
