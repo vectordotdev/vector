@@ -6,5 +6,5 @@ See [DEPRECATION.md](docs/DEPRECATION.md#process) for the process for updating t
 
 ## To be removed
 
-* Support for `v1` series endpoint in the `datadog_metrics` sink should be removed.
+* datadog_v1_metrics v0.35.0 Support for `v1` series endpoint in the `datadog_metrics` sink should be removed.
 * armv7_rpm v0.34.0 The armv7 RPM packages should be removed (replaced by armv7hl)
