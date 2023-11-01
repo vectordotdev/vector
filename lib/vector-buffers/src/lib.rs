@@ -84,37 +84,27 @@ impl Arbitrary for WhenFull {
     }
 }
 
-/// An item that can be buffered.
+/// An item that can be buffered in memory.
 ///
-/// This supertrait serves as the base trait for any item that can be pushed into a buffer.
-pub trait Bufferable:
-    AddBatchNotifier
-    + ByteSizeOf
-    + Encodable
-    + EventCount
-    + Debug
-    + Send
-    + Sync
-    + Unpin
-    + Sized
-    + 'static
+/// This supertrait serves as the base trait for any item that can be pushed into a memory buffer.
+pub trait InMemoryBufferable:
+    AddBatchNotifier + ByteSizeOf + EventCount + Debug + Send + Sync + Unpin + Sized + 'static
 {
 }
 
 // Blanket implementation for anything that is already bufferable.
-impl<T> Bufferable for T where
-    T: AddBatchNotifier
-        + ByteSizeOf
-        + Encodable
-        + EventCount
-        + Debug
-        + Send
-        + Sync
-        + Unpin
-        + Sized
-        + 'static
+impl<T> InMemoryBufferable for T where
+    T: AddBatchNotifier + ByteSizeOf + EventCount + Debug + Send + Sync + Unpin + Sized + 'static
 {
 }
+
+/// An item that can be buffered.
+///
+/// This supertrait serves as the base trait for any item that can be pushed into a buffer.
+pub trait Bufferable: InMemoryBufferable + Encodable {}
+
+// Blanket implementation for anything that is already bufferable.
+impl<T> Bufferable for T where T: InMemoryBufferable + Encodable {}
 
 pub trait EventCount {
     fn event_count(&self) -> usize;

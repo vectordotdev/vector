@@ -1,4 +1,4 @@
-use metrics::{counter, decrement_gauge, gauge, increment_gauge};
+use metrics::{counter, decrement_gauge, gauge, histogram, increment_gauge};
 use vector_common::internal_event::{error_type, InternalEvent};
 
 pub struct BufferCreated {
@@ -110,5 +110,17 @@ impl InternalEvent for BufferReadError {
             "error_type" => "reader_failed",
             "stage" => "processing",
         );
+    }
+}
+
+/// BufferSend emits a histogram measuring the max send durations seen during each interval.
+pub struct BufferSend {
+    pub idx: usize,
+    pub max_send_duration_seconds: f64,
+}
+
+impl InternalEvent for BufferSend {
+    fn emit(self) {
+        histogram!("buffer_send_duration_max_seconds", self.max_send_duration_seconds, "stage" => self.idx.to_string());
     }
 }

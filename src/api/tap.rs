@@ -523,11 +523,11 @@ mod tests {
         );
 
         fanout
-            .send(vec![metric_event].into())
+            .send(vec![metric_event].into(), None)
             .await
             .expect("should not fail");
         fanout
-            .send(vec![log_event].into())
+            .send(vec![log_event].into(), None)
             .await
             .expect("should not fail");
 

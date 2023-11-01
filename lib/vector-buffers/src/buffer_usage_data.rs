@@ -11,7 +11,9 @@ use tracing::{Instrument, Span};
 use vector_common::internal_event::emit;
 
 use crate::{
-    internal_events::{BufferCreated, BufferEventsDropped, BufferEventsReceived, BufferEventsSent},
+    internal_events::{
+        BufferCreated, BufferEventsDropped, BufferEventsReceived, BufferEventsSent, BufferSend,
+    },
     spawn_named,
 };
 
@@ -140,6 +142,15 @@ impl BufferUsageHandle {
             self.state.dropped.increment(count, byte_size);
         }
     }
+
+    /// Record the duration of a given send operation. For efficiency, we only keep track of the
+    /// maximum duration during any given interval.
+    pub fn record_send_duration(&self, send_duration: Duration) {
+        let send_duration_seconds = send_duration.as_nanos().try_into().unwrap_or(u64::MAX);
+        self.state
+            .max_send_duration_nanoseconds
+            .fetch_max(send_duration_seconds, Ordering::AcqRel);
+    }
 }
 
 #[derive(Debug, Default)]
@@ -150,6 +161,7 @@ struct BufferUsageData {
     dropped: CategoryMetrics,
     dropped_intentional: CategoryMetrics,
     max_size: CategoryMetrics,
+    max_send_duration_nanoseconds: AtomicU64,
 }
 
 impl BufferUsageData {
@@ -181,6 +193,9 @@ impl BufferUsageData {
                 .event_count
                 .try_into()
                 .expect("should never be bigger than `usize`"),
+            max_send_duration_seconds: nanoseconds_to_seconds(
+                self.max_send_duration_nanoseconds.load(Ordering::Acquire),
+            ),
         }
     }
 }
@@ -198,6 +213,7 @@ pub struct BufferUsageSnapshot {
     pub dropped_event_byte_size_intentional: u64,
     pub max_size_bytes: u64,
     pub max_size_events: usize,
+    pub max_send_duration_seconds: f64,
 }
 
 /// Builder for tracking buffer usage metrics.
@@ -300,6 +316,18 @@ impl BufferUsage {
                             byte_size: dropped_intentional.event_byte_size,
                         });
                     }
+
+                    let max_send_duration_nanoseconds = stage
+                        .max_send_duration_nanoseconds
+                        .swap(0, Ordering::AcqRel);
+                    if max_send_duration_nanoseconds > 0 {
+                        let max_send_duration_seconds =
+                            nanoseconds_to_seconds(max_send_duration_nanoseconds);
+                        emit(BufferSend {
+                            idx: stage.idx,
+                            max_send_duration_seconds,
+                        });
+                    }
                 }
             }
         };
@@ -307,4 +335,8 @@ impl BufferUsage {
         let task_name = format!("buffer usage reporter ({buffer_id})");
         spawn_named(task.instrument(span.or_current()), task_name.as_str());
     }
+}
+
+fn nanoseconds_to_seconds(nano: u64) -> f64 {
+    nano as f64 / 1_000_000_000.0
 }

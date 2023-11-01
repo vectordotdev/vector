@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{sync::Arc, time::Instant};
 
 use async_recursion::async_recursion;
 use tokio::sync::Mutex;
@@ -181,7 +181,7 @@ impl<T: Bufferable> BufferSender<T> {
     }
 
     #[async_recursion]
-    pub async fn send(&mut self, item: T) -> crate::Result<()> {
+    pub async fn send(&mut self, item: T, send_reference: Option<Instant>) -> crate::Result<()> {
         let item_sizing = self
             .instrumentation
             .as_ref()
@@ -202,7 +202,7 @@ impl<T: Bufferable> BufferSender<T> {
                     self.overflow
                         .as_mut()
                         .unwrap_or_else(|| unreachable!("overflow must exist"))
-                        .send(item)
+                        .send(item, send_reference)
                         .await?;
                 }
             }
@@ -224,6 +224,14 @@ impl<T: Bufferable> BufferSender<T> {
                         true,
                     );
                 }
+            }
+
+            if let Some(send_reference) = send_reference {
+                let elapsed = send_reference.elapsed();
+                if elapsed > std::time::Duration::from_secs(1) {
+                    error!("Sending an event took longer than 1 second: {:?}", elapsed);
+                }
+                instrumentation.record_send_duration(send_reference.elapsed());
             }
         }
 

@@ -1,15 +1,18 @@
 #![allow(missing_docs)]
-use std::sync::Arc;
-use std::{collections::HashMap, fmt};
+use std::{collections::HashMap, fmt, sync::Arc, time::Instant};
 
 use chrono::Utc;
 use futures::{Stream, StreamExt};
 use metrics::{register_histogram, Histogram};
 use tracing::Span;
 use vector_lib::buffers::topology::channel::{self, LimitedReceiver, LimitedSender};
+use vector_lib::buffers::EventCount;
+use vector_lib::event::array::EventArrayIntoIter;
 #[cfg(test)]
 use vector_lib::event::{into_event_stream, EventStatus};
+use vector_lib::finalization::{AddBatchNotifier, BatchNotifier};
 use vector_lib::internal_event::{ComponentEventsDropped, UNINTENTIONAL};
+use vector_lib::json_size::JsonSize;
 use vector_lib::{
     config::{log_schema, SourceOutput},
     event::{array, Event, EventArray, EventContainer, EventRef},
@@ -32,6 +35,62 @@ pub(crate) const CHUNK_SIZE: usize = 1000;
 const TEST_BUFFER_SIZE: usize = 100;
 
 const LAG_TIME_NAME: &str = "source_lag_time_seconds";
+
+/// SourceSenderItem is a thin wrapper around [EventArray] used to track the send duration of a batch.
+///
+/// This is needed because the send duration is calculated as the difference between when the batch
+/// is sent from the origin component to when the batch is enqueued on the receiving component's input channel.
+/// For sources in particular, this requires the batch to be enqueued on two channels: the origin component's pump
+/// channel and the receiving component's input channel.
+#[derive(Debug)]
+pub struct SourceSenderItem {
+    /// The batch of events to send.
+    pub events: EventArray,
+    /// Reference instant used to calculate send duration.
+    pub send_reference: Instant,
+}
+
+impl AddBatchNotifier for SourceSenderItem {
+    fn add_batch_notifier(&mut self, notifier: BatchNotifier) {
+        self.events.add_batch_notifier(notifier)
+    }
+}
+
+impl ByteSizeOf for SourceSenderItem {
+    fn allocated_bytes(&self) -> usize {
+        self.events.allocated_bytes()
+    }
+}
+
+impl EventCount for SourceSenderItem {
+    fn event_count(&self) -> usize {
+        self.events.event_count()
+    }
+}
+
+impl EstimatedJsonEncodedSizeOf for SourceSenderItem {
+    fn estimated_json_encoded_size_of(&self) -> JsonSize {
+        self.events.estimated_json_encoded_size_of()
+    }
+}
+
+impl EventContainer for SourceSenderItem {
+    type IntoIter = EventArrayIntoIter;
+
+    fn len(&self) -> usize {
+        self.events.len()
+    }
+
+    fn into_events(self) -> Self::IntoIter {
+        self.events.into_events()
+    }
+}
+
+impl Into<EventArray> for SourceSenderItem {
+    fn into(self) -> EventArray {
+        self.events
+    }
+}
 
 pub struct Builder {
     buf_size: usize,
@@ -56,7 +115,7 @@ impl Builder {
         &mut self,
         output: SourceOutput,
         component_key: ComponentKey,
-    ) -> LimitedReceiver<EventArray> {
+    ) -> LimitedReceiver<SourceSenderItem> {
         let lag_time = self.lag_time.clone();
         let log_definition = output.schema_definition.clone();
         let output_id = OutputId {
@@ -116,7 +175,7 @@ impl SourceSender {
     }
 
     #[cfg(test)]
-    pub fn new_test_sender_with_buffer(n: usize) -> (Self, LimitedReceiver<EventArray>) {
+    pub fn new_test_sender_with_buffer(n: usize) -> (Self, LimitedReceiver<SourceSenderItem>) {
         let lag_time = Some(register_histogram!(LAG_TIME_NAME));
         let output_id = OutputId {
             component: "test".to_string().into(),
@@ -146,13 +205,13 @@ impl SourceSender {
         // In a source test pipeline, there is no sink to acknowledge
         // events, so we have to add a map to the receiver to handle the
         // finalization.
-        let recv = recv.into_stream().flat_map(move |mut events| {
-            events.iter_events_mut().for_each(|mut event| {
+        let recv = recv.into_stream().flat_map(move |mut item| {
+            item.events.iter_events_mut().for_each(|mut event| {
                 let metadata = event.metadata_mut();
                 metadata.update_status(status);
                 metadata.update_sources();
             });
-            into_event_stream(events)
+            into_event_stream(item)
         });
         (pipe, recv)
     }
@@ -166,19 +225,19 @@ impl SourceSender {
         // events, so we have to add a map to the receiver to handle the
         // finalization.
         let mut count: usize = 0;
-        let recv = recv.into_stream().flat_map(move |mut events| {
+        let recv = recv.into_stream().flat_map(move |mut item| {
             let status = if error_at(count) {
                 EventStatus::Errored
             } else {
                 EventStatus::Delivered
             };
             count += 1;
-            events.iter_events_mut().for_each(|mut event| {
+            item.events.iter_events_mut().for_each(|mut event| {
                 let metadata = event.metadata_mut();
                 metadata.update_status(status);
                 metadata.update_sources();
             });
-            into_event_stream(events)
+            into_event_stream(item)
         });
         (pipe, recv)
     }
@@ -188,7 +247,7 @@ impl SourceSender {
         &mut self,
         status: EventStatus,
         name: String,
-    ) -> impl Stream<Item = EventArray> + Unpin {
+    ) -> impl Stream<Item = SourceSenderItem> + Unpin {
         // The lag_time parameter here will need to be filled in if this function is ever used for
         // non-test situations.
         let output_id = OutputId {
@@ -196,13 +255,13 @@ impl SourceSender {
             port: Some(name.clone()),
         };
         let (inner, recv) = Inner::new_with_buffer(100, name.clone(), None, None, output_id);
-        let recv = recv.into_stream().map(move |mut events| {
-            events.iter_events_mut().for_each(|mut event| {
+        let recv = recv.into_stream().map(move |mut item| {
+            item.events.iter_events_mut().for_each(|mut event| {
                 let metadata = event.metadata_mut();
                 metadata.update_status(status);
                 metadata.update_sources();
             });
-            events
+            item
         });
         self.named_inners.insert(name, inner);
         recv
@@ -310,7 +369,7 @@ impl Drop for UnsentEventCount {
 
 #[derive(Clone)]
 struct Inner {
-    inner: LimitedSender<EventArray>,
+    inner: LimitedSender<SourceSenderItem>,
     output: String,
     lag_time: Option<Histogram>,
     events_sent: Registered<EventsSent>,
@@ -338,7 +397,7 @@ impl Inner {
         lag_time: Option<Histogram>,
         log_definition: Option<Arc<Definition>>,
         output_id: OutputId,
-    ) -> (Self, LimitedReceiver<EventArray>) {
+    ) -> (Self, LimitedReceiver<SourceSenderItem>) {
         let (tx, rx) = channel::limited(n);
         (
             Self {
@@ -356,6 +415,7 @@ impl Inner {
     }
 
     async fn send(&mut self, mut events: EventArray) -> Result<(), ClosedError> {
+        let send_reference = Instant::now();
         let reference = Utc::now().timestamp_millis();
         events
             .iter_events()
@@ -373,7 +433,13 @@ impl Inner {
 
         let byte_size = events.estimated_json_encoded_size_of();
         let count = events.len();
-        self.inner.send(events).await.map_err(|_| ClosedError)?;
+        self.inner
+            .send(SourceSenderItem {
+                events,
+                send_reference,
+            })
+            .await
+            .map_err(|_| ClosedError)?;
         self.events_sent.emit(CountByteSize(count, byte_size));
         Ok(())
     }
