@@ -9807,7 +9807,6 @@ name = "vdev"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "atty",
  "cached",
  "chrono",
  "clap 4.4.7",
@@ -9857,7 +9856,6 @@ dependencies = [
  "async-nats",
  "async-stream",
  "async-trait",
- "atty",
  "aws-config",
  "aws-credential-types",
  "aws-sdk-cloudwatch",
