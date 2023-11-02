@@ -638,7 +638,7 @@ mod tests {
                     tags: None,
                     metric: MetricTypeConfig::Gauge,
                 }],
-                all_metrics: false,
+                all_metrics: Some(false),
             },
         );
         config.add_sink(

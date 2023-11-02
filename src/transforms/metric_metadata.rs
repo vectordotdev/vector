@@ -802,7 +802,7 @@ mod tests {
 
         let mut metadata = log.metadata().clone();
         metadata.set_source_id(Arc::new(ComponentKey::from("in")));
-        metadata.set_upstream_id(Arc::new(OutputId::from("in")));
+        metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
 
         let metric = do_transform(log).await.unwrap();
 

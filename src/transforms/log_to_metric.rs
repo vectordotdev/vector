@@ -37,7 +37,7 @@ pub struct LogToMetricConfig {
     /// A list of metrics to generate.
     pub metrics: Vec<MetricConfig>,
     /// this flag will process all metrics to logs
-    pub all_metrics: bool,
+    pub all_metrics: Option<bool>,
 }
 
 /// Specification of a counter derived from a log event.
@@ -150,7 +150,7 @@ impl GenerateConfig for LogToMetricConfig {
                     kind: MetricKind::Incremental,
                 }),
             }],
-            all_metrics: true,
+            all_metrics: Some(true),
         })
         .unwrap()
     }
@@ -380,7 +380,7 @@ impl FunctionTransform for LogToMetric {
     fn transform(&mut self, output: &mut OutputBuffer, event: Event) {
         // Metrics are "all or none" for a specific log. If a single fails, none are produced.
         let mut buffer = Vec::with_capacity(self.config.metrics.len());
-        if self.config.all_metrics {
+        if self.config.all_metrics.is_some() {
             let mdc = metric_metadata::MetricsMetadataConfig{
                 ..Default::default()
             };
