@@ -650,7 +650,7 @@ cli: {
 		}
 		VECTOR_ALLOW_EMPTY_CONFIG: {
 			description: """
-				Allow the configuration to run without any components. This is useful for loading in an empty stub config that will later be replaced with actual components. Note that this is likely not useful without also watching for config file changes as described for `--watch-empty`.
+				Allow the configuration to run without any components. This is useful for loading in an empty stub config that will later be replaced with actual components. Note that this is likely not useful without also watching for config file changes as described in `--watch-empty`.
 				"""
 			type: bool: default: false
 		}
