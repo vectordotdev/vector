@@ -207,7 +207,6 @@ where
     St: Stream<Item = Prt::Item>,
     Prt: Partitioner + Unpin,
     Prt::Key: Eq + Hash + Clone,
-    Prt::Item: ByteSizeOf,
     C: BatchConfig<Prt::Item>,
     F: Fn() -> C + Send,
 {
@@ -230,7 +229,6 @@ where
     St: Stream<Item = Prt::Item>,
     Prt: Partitioner + Unpin,
     Prt::Key: Eq + Hash + Clone,
-    Prt::Item: ByteSizeOf,
     C: BatchConfig<Prt::Item>,
     F: Fn() -> C + Send,
 {
@@ -251,7 +249,6 @@ where
     St: Stream<Item = Prt::Item>,
     Prt: Partitioner + Unpin,
     Prt::Key: Eq + Hash + Clone,
-    Prt::Item: ByteSizeOf,
     KT: KeyedTimer<Prt::Key>,
     C: BatchConfig<Prt::Item, Batch = B>,
     F: Fn() -> C + Send,

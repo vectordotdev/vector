@@ -19,7 +19,6 @@ use vector_lib::stream::{
 use vector_lib::{
     event::{Finalizable, Metric},
     partition::Partitioner,
-    ByteSizeOf,
 };
 
 use super::{
@@ -53,7 +52,6 @@ pub trait SinkBuilderExt: Stream {
         Self: Stream<Item = P::Item> + Sized,
         P: Partitioner + Unpin,
         P::Key: Eq + Hash + Clone,
-        P::Item: ByteSizeOf,
         C: BatchConfig<P::Item>,
         F: Fn() -> C + Send,
     {
