@@ -12,7 +12,7 @@ use vector_common::internal_event::emit;
 
 use crate::{
     internal_events::{
-        BufferCreated, BufferEventsDropped, BufferEventsReceived, BufferEventsSent, BufferSend,
+        BufferCreated, BufferEventsDropped, BufferEventsReceived, BufferEventsSent, BufferSendComplete,
     },
     spawn_named,
 };
@@ -323,7 +323,7 @@ impl BufferUsage {
                     if max_send_duration_nanoseconds > 0 {
                         let max_send_duration_seconds =
                             nanoseconds_to_seconds(max_send_duration_nanoseconds);
-                        emit(BufferSend {
+                        emit(BufferSendComplete {
                             idx: stage.idx,
                             max_send_duration_seconds,
                         });

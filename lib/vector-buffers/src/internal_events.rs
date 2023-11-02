@@ -113,13 +113,13 @@ impl InternalEvent for BufferReadError {
     }
 }
 
-/// BufferSend emits a histogram measuring the max send durations seen during each interval.
-pub struct BufferSend {
+/// `BufferSendComplete` emits a histogram measuring the max send duration seen during each interval.
+pub struct BufferSendComplete {
     pub idx: usize,
     pub max_send_duration_seconds: f64,
 }
 
-impl InternalEvent for BufferSend {
+impl InternalEvent for BufferSendComplete {
     fn emit(self) {
         histogram!("buffer_send_duration_max_seconds", self.max_send_duration_seconds, "stage" => self.idx.to_string());
     }
