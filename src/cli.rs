@@ -197,18 +197,6 @@ pub struct RootOpts {
     )]
     pub allocation_tracing_reporting_interval_ms: u64,
 
-    /// Load the OpenSSL legacy provider.
-    #[arg(
-        long,
-        env = "VECTOR_OPENSSL_LEGACY_PROVIDER",
-        default_value = "false",
-        default_missing_value = "false",
-        num_args = 0..=1,
-        require_equals = true,
-        action = ArgAction::Set
-    )]
-    pub openssl_legacy_provider: bool,
-
     /// Disable probing and configuration of root certificate locations on the system for OpenSSL.
     ///
     /// The probe functionality manipulates the `SSL_CERT_FILE` and `SSL_CERT_DIR` environment variables
@@ -333,7 +321,10 @@ impl Color {
     pub fn use_color(&self) -> bool {
         match self {
             #[cfg(unix)]
-            Color::Auto => atty::is(atty::Stream::Stdout),
+            Color::Auto => {
+                use std::io::IsTerminal;
+                std::io::stdout().is_terminal()
+            }
             #[cfg(windows)]
             Color::Auto => false, // ANSI colors are not supported by cmd.exe
             Color::Always => true,
