@@ -113,10 +113,6 @@ cli: {
 			description: env_vars.VECTOR_NO_GRACEFUL_SHUTDOWN_LIMIT.description
 			env_var:     "VECTOR_NO_GRACEFUL_SHUTDOWN_LIMIT"
 		}
-		"openssl-legacy-provider": {
-			description: env_vars.VECTOR_OPENSSL_LEGACY_PROVIDER.description
-			env_var:     "VECTOR_OPENSSL_LEGACY_PROVIDER"
-		}
 		"openssl-no-probe": {
 			description: env_vars.VECTOR_OPENSSL_NO_PROBE.description
 			env_var:     "VECTOR_OPENSSL_NO_PROBE"
@@ -634,10 +630,6 @@ cli: {
 		}
 		VECTOR_NO_GRACEFUL_SHUTDOWN_LIMIT: {
 			description: "Never time out while waiting for graceful shutdown after SIGINT or SIGTERM received. This is useful when you would like for Vector to attempt to send data until terminated by a SIGKILL. Overrides/cannot be set with `--graceful-shutdown-limit-secs`."
-			type: bool: default: false
-		}
-		VECTOR_OPENSSL_LEGACY_PROVIDER: {
-			description: "Load the OpenSSL legacy provider."
 			type: bool: default: false
 		}
 		VECTOR_OPENSSL_NO_PROBE: {

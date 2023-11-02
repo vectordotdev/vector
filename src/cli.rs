@@ -197,18 +197,6 @@ pub struct RootOpts {
     )]
     pub allocation_tracing_reporting_interval_ms: u64,
 
-    /// Load the OpenSSL legacy provider.
-    #[arg(
-        long,
-        env = "VECTOR_OPENSSL_LEGACY_PROVIDER",
-        default_value = "false",
-        default_missing_value = "false",
-        num_args = 0..=1,
-        require_equals = true,
-        action = ArgAction::Set
-    )]
-    pub openssl_legacy_provider: bool,
-
     /// Disable probing and configuration of root certificate locations on the system for OpenSSL.
     ///
     /// The probe functionality manipulates the `SSL_CERT_FILE` and `SSL_CERT_DIR` environment variables
