@@ -9,6 +9,7 @@ use tokio::sync::{
     mpsc::error::{SendError, TrySendError},
     oneshot,
 };
+use tracing::{Instrument, Span};
 use uuid::Uuid;
 use vector_lib::buffers::{topology::builder::TopologyBuilder, WhenFull};
 
@@ -168,7 +169,14 @@ impl TapController {
     pub fn new(watch_rx: WatchRx, tap_tx: TapSender, patterns: TapPatterns) -> Self {
         let (_shutdown, shutdown_rx) = oneshot::channel();
 
-        tokio::spawn(tap_handler(patterns, tap_tx, watch_rx, shutdown_rx));
+        tokio::spawn(
+            tap_handler(patterns, tap_tx, watch_rx, shutdown_rx).instrument(error_span!(
+                "tap_handler",
+                component_kind = "sink",
+                component_id = "tap", // It isn't clear what the component_id should be here other than "tap"
+                component_type = "tap",
+            )),
+        );
 
         Self { _shutdown }
     }
@@ -315,7 +323,7 @@ async fn tap_handler(
                             // target for the component, and spawn our transformer task which will
                             // wrap each event payload with the necessary metadata before forwarding
                             // it to our global tap receiver.
-                            let (tap_buffer_tx, mut tap_buffer_rx) = TopologyBuilder::standalone_memory(TAP_BUFFER_SIZE, WhenFull::DropNewest).await;
+                            let (tap_buffer_tx, mut tap_buffer_rx) = TopologyBuilder::standalone_memory(TAP_BUFFER_SIZE, WhenFull::DropNewest, Span::current()).await;
                             let mut tap_transformer = TapTransformer::new(tx.clone(), output.clone());
 
                             tokio::spawn(async move {

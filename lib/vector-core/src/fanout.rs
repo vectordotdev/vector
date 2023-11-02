@@ -465,6 +465,7 @@ mod tests {
     use futures::poll;
     use tokio::sync::mpsc::UnboundedSender;
     use tokio_test::{assert_pending, assert_ready, task::spawn};
+    use tracing::Span;
     use vector_buffers::{
         topology::{
             builder::TopologyBuilder,
@@ -485,6 +486,7 @@ mod tests {
         TopologyBuilder::standalone_memory(
             NonZeroUsize::new(capacity).expect("capacity must be nonzero"),
             WhenFull::Block,
+            Span::current(),
         )
         .await
     }

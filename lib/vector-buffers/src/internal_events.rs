@@ -1,5 +1,10 @@
-use metrics::{counter, decrement_gauge, gauge, histogram, increment_gauge};
-use vector_common::internal_event::{error_type, InternalEvent};
+use std::time::Duration;
+
+use metrics::{counter, decrement_gauge, gauge, increment_gauge, register_histogram, Histogram};
+use vector_common::{
+    internal_event::{error_type, InternalEvent},
+    registered_event,
+};
 
 pub struct BufferCreated {
     pub idx: usize,
@@ -113,14 +118,14 @@ impl InternalEvent for BufferReadError {
     }
 }
 
-/// `BufferSendComplete` emits a histogram measuring the max send duration seen during each interval.
-pub struct BufferSendComplete {
-    pub idx: usize,
-    pub max_send_duration_seconds: f64,
-}
+registered_event! {
+    BufferSendDuration {
+        stage: usize,
+    } => {
+        send_duration: Histogram = register_histogram!("buffer_send_duration_seconds", "stage" => self.stage.to_string()),
+    }
 
-impl InternalEvent for BufferSendComplete {
-    fn emit(self) {
-        histogram!("buffer_send_duration_max_seconds", self.max_send_duration_seconds, "stage" => self.idx.to_string());
+    fn emit(&self, duration: Duration) {
+        self.send_duration.record(duration);
     }
 }
