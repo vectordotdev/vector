@@ -131,9 +131,11 @@ static CLIENT_ID: Lazy<String> = Lazy::new(|| uuid::Uuid::new_v4().to_string());
 #[serde(deny_unknown_fields)]
 pub struct PubsubConfig {
     /// The project name from which to pull logs.
+    #[configurable(metadata(docs::examples = "my-log-source-project"))]
     pub project: String,
 
     /// The subscription within the project which is configured to receive logs.
+    #[configurable(metadata(docs::examples = "my-vector-source-subscription"))]
     pub subscription: String,
 
     /// The endpoint from which to pull data.

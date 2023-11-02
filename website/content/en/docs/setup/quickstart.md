@@ -18,7 +18,7 @@ We can install Vector using an installation script or Docker:
 {{< tab title="Script" >}}
 
 ```shell
-curl --proto '=https' --tlsv1.2 -sSf https://sh.vector.dev | bash
+curl --proto '=https' --tlsv1.2 -sSfL https://sh.vector.dev | bash
 ```
 
 {{< /tab >}}
