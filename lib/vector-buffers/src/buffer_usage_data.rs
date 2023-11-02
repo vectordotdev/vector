@@ -338,8 +338,7 @@ impl BufferUsage {
     }
 }
 
+#[allow(clippy::cast_precision_loss)]
 fn nanoseconds_to_seconds(nano: u64) -> f64 {
-    #[allow(clippy::cast_precision_loss)]
-    nano as f64
-        / 1_000_000_000.0
+    nano as f64 / 1_000_000_000.0
 }
