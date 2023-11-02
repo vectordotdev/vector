@@ -118,7 +118,7 @@ impl<'a> InternalEvent for MetricMetadataParseArrayError<'a> {
 pub struct MetricMetadataMetricDetailsNotFoundError {
 }
 
-impl<'a> InternalEvent for MetricMetadataMetricDetailsNotFoundError {
+impl InternalEvent for MetricMetadataMetricDetailsNotFoundError {
     fn emit(self) {
         let reason = "Missing required metric details. Required one of gauge, distribution, histogram, summary, counter";
         error!(
