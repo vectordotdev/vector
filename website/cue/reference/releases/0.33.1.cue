@@ -41,9 +41,9 @@ releases: "0.33.1": {
 		},
 		{
 			type: "fix"
-			scopes: ["kafka source"]
+			scopes: ["kafka sink"]
 			description: """
-				A performance regression in the `kafka` source was corrected.
+				A performance regression in the `kafka` sink was corrected.
 				"""
 			pr_numbers: [18770]
 		},
