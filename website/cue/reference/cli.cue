@@ -121,6 +121,10 @@ cli: {
 			description: env_vars.VECTOR_OPENSSL_NO_PROBE.description
 			env_var:     "VECTOR_OPENSSL_NO_PROBE"
 		}
+		"allow-empty-config": {
+			description: env_vars.VECTOR_ALLOW_EMPTY_CONFIG.description
+			env_var:     "VECTOR_ALLOW_EMPTY_CONFIG"
+		}
 	}
 
 	_core_config_options: {
@@ -642,6 +646,12 @@ cli: {
 
 				The probe functionality manipulates the `SSL_CERT_FILE` and `SSL_CERT_DIR` environment variables in the Vector process. This behavior can be problematic for users of the `exec` source, which by default inherits the environment of the Vector process.
 				"""
+			type: bool: default: false
+		}
+		VECTOR_ALLOW_EMPTY_CONFIG: {
+			description: """
+                Allow the configuration to run without any components. This is useful for loading in an empty stub config that will later be replaced with actual components. Note that this is likely not useful without also watching for config file changes as described for `--watch-empty`.
+                """
 			type: bool: default: false
 		}
 	}

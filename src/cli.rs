@@ -221,7 +221,7 @@ pub struct RootOpts {
     /// empty stub config that will later be replaced with actual components. Note that this is
     /// likely not useful without also watching for config file changes as described for
     /// `--watch-empty`.
-    #[arg(long, env = "VECTOR_ALLOW_EMPTY", default_value = "false")]
+    #[arg(long, env = "VECTOR_ALLOW_EMPTY_CONFIG", default_value = "false")]
     pub allow_empty_config: bool,
 }
 
