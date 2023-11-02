@@ -215,6 +215,9 @@ impl<T: Bufferable> BufferSender<T> {
                         item_count as u64,
                         item_size as u64,
                     );
+                    if let Some(send_reference) = send_reference {
+                        instrumentation.record_send_duration(send_reference.elapsed());
+                    }
                 }
 
                 if was_dropped {
@@ -224,14 +227,6 @@ impl<T: Bufferable> BufferSender<T> {
                         true,
                     );
                 }
-            }
-
-            if let Some(send_reference) = send_reference {
-                let elapsed = send_reference.elapsed();
-                if elapsed > std::time::Duration::from_secs(1) {
-                    error!("Sending an event took longer than 1 second: {:?}", elapsed);
-                }
-                instrumentation.record_send_duration(send_reference.elapsed());
             }
         }
 
