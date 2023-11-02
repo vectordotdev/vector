@@ -556,7 +556,7 @@ async fn does_not_send_too_big_payloads() {
     // Generate input that will require escaping when serialized to json, and therefore grow in size
     // between batching and encoding. This is a very specific example that will fit in a batch of
     // <4,250,000 but serialize to >5,000,000, defeating the current 750k safety buffer.
-    let events = (0..1000).into_iter().map(|_n| {
+    let events = (0..1000).map(|_n| {
         let data = serde_json::json!({"a": "b"});
         let nested = serde_json::to_string(&data).unwrap();
         event_with_api_key(&nested.repeat(401), "foo")
