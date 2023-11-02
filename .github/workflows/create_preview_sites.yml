@@ -31,7 +31,7 @@ jobs:
 
     # Get the artifacts with the PR number and branch name
     - name: Download artifact
-      uses: actions/github-script@v3.1.0
+      uses: actions/github-script@v6.4.1
       with:
         script: |
           const fs = require('fs');
@@ -41,7 +41,7 @@ jobs:
              run_id: ${{ github.event.workflow_run.id }},
           });
           const matchArtifact = artifacts.data.artifacts.filter(artifact => artifact.name == "pr")[0];
-          const download = await github.actions.downloadArtifact({
+          const download = await github.rest.actions.downloadArtifact({
              owner: context.repo.owner,
              repo: context.repo.repo,
              artifact_id: matchArtifact.id,
@@ -79,13 +79,13 @@ jobs:
       if: success()
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      uses: actions/github-script@v3
+      uses: actions/github-script@v6.4.1
       with:
         script: |
           const prNumber = fs.readFileSync('./pr/number', 'utf8');
           const issueNumber = parseInt(prNumber);
 
-          await github.issues.createComment({
+          await github.rest.issues.createComment({
             owner: context.repo.owner,
             repo: context.repo.repo,
             issue_number: issue_number,
