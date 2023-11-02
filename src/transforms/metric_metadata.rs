@@ -5,6 +5,7 @@ use vector_lib::configurable::component::GenerateConfig;
 use vector_lib::{config::LogNamespace, event::{metric::Sample, StatisticKind, metric::{Bucket, Quantile}}};
 use vector_lib::event::LogEvent;
 use chrono::Utc;
+use vrl::event_path;
 
 use crate::{
     config::{
@@ -100,7 +101,7 @@ fn bytes_to_str(value: &Value) -> Option<String> {
 }
 
 fn get_str_from_log(log: &LogEvent, key: &str) -> Option<String> {
-    log.get(key).and_then(bytes_to_str)
+    log.get(event_path!(key)).and_then(bytes_to_str)
 }
 
 fn get_counter_value(log: &LogEvent) -> Result<MetricValue, TransformError> {
@@ -176,7 +177,7 @@ fn get_distribution_value(log: &LogEvent) -> Result<MetricValue, TransformError>
     }?;
 
     Ok(MetricValue::Distribution {
-        samples: samples,
+        samples,
         statistic: statistic_kind,
     })
 }
@@ -238,7 +239,7 @@ fn get_histogram_value(log: &LogEvent) -> Result<MetricValue, TransformError> {
         })?;
 
     Ok(MetricValue::AggregatedHistogram {
-        buckets: buckets,
+        buckets,
         count: count as u64,
         sum: *sum,
     })
@@ -301,7 +302,7 @@ fn get_summary_value(log: &LogEvent) -> Result<MetricValue, TransformError> {
         })?;
 
     Ok(MetricValue::AggregatedSummary {
-        quantiles: quantiles,
+        quantiles,
         count: count as u64,
         sum: *sum,
     })
@@ -314,7 +315,6 @@ fn to_metric(event: &Event) -> Result<Metric, TransformError> {
         .and_then(Value::as_timestamp)
         .cloned()
         .or_else(|| Some(Utc::now()));
-    let metadata = event.metadata().clone();
 
     let name = match get_str_from_log(&log, "name") {
         Some(n) => n,
@@ -322,8 +322,6 @@ fn to_metric(event: &Event) -> Result<Metric, TransformError> {
             field: "name".to_string()
         }),
     };
-
-    let namespace = get_str_from_log(&log, "namespace");
 
     let tags = &mut MetricTags::default();
 
@@ -365,8 +363,8 @@ fn to_metric(event: &Event) -> Result<Metric, TransformError> {
 
     let value = value.ok_or(TransformError::MetricDetailsNotFound)?;
 
-    Ok(Metric::new_with_metadata(name, kind, value, metadata)
-        .with_namespace(namespace)
+    Ok(Metric::new_with_metadata(name, kind, value, log.metadata().clone())
+        .with_namespace(get_str_from_log(log, "namespace"))
         .with_tags(tags_result)
         .with_timestamp(timestamp))
 }
@@ -428,6 +426,18 @@ mod tests {
     use vector_lib::metric_tags;
     use crate::config::ComponentKey;
 
+    fn create_log_event(json_str : &str) -> LogEvent {
+        let mut log_value: Value = serde_json::from_str(&*json_str).expect("JSON was not well-formatted");
+        log_value.insert("timestamp", ts());
+        log_value.insert("namespace", "test_namespace");
+
+        let mut metadata = EventMetadata::default();
+        metadata.set_source_id(Arc::new(ComponentKey::from("in")));
+        metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
+
+        LogEvent::from_parts(log_value, metadata.clone())
+    }
+
     async fn do_transform(log: LogEvent) -> Option<Metric> {
         assert_transform_compliance(async move {
             let config = MetricsMetadataConfig {
@@ -471,26 +481,16 @@ mod tests {
             "host": "localhost"
           }
         }"#;
+        let log = create_log_event(json_str);
 
-        let mut log_value: Value = serde_json::from_str(&*json_str).expect("JSON was not well-formatted");
-        log_value.insert("timestamp", ts());
-        log_value.insert("namespace", "test_namespace");
-
-
-        let log = LogEvent::from_parts(log_value, EventMetadata::default());
-
-        let mut metadata = log.metadata().clone();
-        metadata.set_source_id(Arc::new(ComponentKey::from("in")));
-
-        let metric = do_transform(log).await.unwrap();
-
+        let metric = do_transform(log.clone()).await.unwrap();
         assert_eq!(
             metric,
             Metric::new_with_metadata(
                 "test.transform.gauge",
                 MetricKind::Absolute,
                 MetricValue::Gauge { value: 990.0 },
-                metadata.clone(),
+                metric.metadata().clone(),
             )
                 .with_namespace(Some("test_namespace"))
                 .with_tags(Some(metric_tags!(
@@ -499,8 +499,6 @@ mod tests {
             )))
                 .with_timestamp(Some(ts()))
         );
-
-        assert_eq!(metric.metadata(), &metadata);
     }
 
     #[tokio::test]
@@ -535,19 +533,9 @@ mod tests {
             "host": "localhost"
           }
         }"#;
+        let log = create_log_event(json_str);
 
-        let mut log_value: Value = serde_json::from_str(&*json_str).expect("JSON was not well-formatted");
-        log_value.insert("timestamp", ts());
-        log_value.insert("namespace", "test_namespace");
-
-
-        let log = LogEvent::from_parts(log_value, EventMetadata::default());
-
-        let mut metadata = log.metadata().clone();
-        metadata.set_source_id(Arc::new(ComponentKey::from("in")));
-
-        let metric = do_transform(log).await.unwrap();
-
+        let metric = do_transform(log.clone()).await.unwrap();
         assert_eq!(
             metric,
             Metric::new_with_metadata(
@@ -575,7 +563,7 @@ mod tests {
                         },
                     ],
                 },
-                metadata.clone(),
+                metric.metadata().clone(),
             )
                 .with_namespace(Some("test_namespace"))
                 .with_tags(Some(metric_tags!(
@@ -584,8 +572,6 @@ mod tests {
             )))
                 .with_timestamp(Some(ts()))
         );
-
-        assert_eq!(metric.metadata(), &metadata);
     }
 
     #[tokio::test]
@@ -611,18 +597,9 @@ mod tests {
             "host": "localhost"
           }
         }"#;
+        let log = create_log_event(json_str);
 
-        let mut log_value: Value = serde_json::from_str(&*json_str).expect("JSON was not well-formatted");
-        log_value.insert("timestamp", ts());
-        log_value.insert("namespace", "test_namespace");
-
-
-        let log = LogEvent::from_parts(log_value, EventMetadata::default());
-
-        let mut metadata = log.metadata().clone();
-        metadata.set_source_id(Arc::new(ComponentKey::from("in")));
-
-        let metric = do_transform(log).await.unwrap();
+        let metric = do_transform(log.clone()).await.unwrap();
 
         assert_eq!(
             metric,
@@ -636,7 +613,7 @@ mod tests {
                     ],
                     statistic: StatisticKind::Histogram,
                 },
-                metadata.clone(),
+                metric.metadata().clone(),
             )
                 .with_namespace(Some("test_namespace"))
                 .with_tags(Some(metric_tags!(
@@ -645,8 +622,6 @@ mod tests {
             )))
                 .with_timestamp(Some(ts()))
         );
-
-        assert_eq!(metric.metadata(), &metadata);
     }
 
     #[tokio::test]
@@ -672,19 +647,9 @@ mod tests {
             "host": "localhost"
           }
         }"#;
+        let log = create_log_event(json_str);
 
-        let mut log_value: Value = serde_json::from_str(&*json_str).expect("JSON was not well-formatted");
-        log_value.insert("timestamp", ts());
-        log_value.insert("namespace", "test_namespace");
-
-
-        let log = LogEvent::from_parts(log_value, EventMetadata::default());
-
-        let mut metadata = log.metadata().clone();
-        metadata.set_source_id(Arc::new(ComponentKey::from("in")));
-
-        let metric = do_transform(log).await.unwrap();
-
+        let metric = do_transform(log.clone()).await.unwrap();
         assert_eq!(
             metric,
             Metric::new_with_metadata(
@@ -697,7 +662,7 @@ mod tests {
                     ],
                     statistic: StatisticKind::Summary,
                 },
-                metadata.clone(),
+                metric.metadata().clone(),
             )
                 .with_namespace(Some("test_namespace"))
                 .with_tags(Some(metric_tags!(
@@ -706,8 +671,6 @@ mod tests {
             )))
                 .with_timestamp(Some(ts()))
         );
-
-        assert_eq!(metric.metadata(), &metadata);
     }
 
     #[tokio::test]
@@ -734,19 +697,9 @@ mod tests {
             "host": "localhost"
           }
         }"#;
+        let log = create_log_event(json_str);
 
-        let mut log_value: Value = serde_json::from_str(&*json_str).expect("JSON was not well-formatted");
-        log_value.insert("timestamp", ts());
-        log_value.insert("namespace", "test_namespace");
-
-
-        let log = LogEvent::from_parts(log_value, EventMetadata::default());
-
-        let mut metadata = log.metadata().clone();
-        metadata.set_source_id(Arc::new(ComponentKey::from("in")));
-
-        let metric = do_transform(log).await.unwrap();
-
+        let metric = do_transform(log.clone()).await.unwrap();
         assert_eq!(
             metric,
             Metric::new_with_metadata(
@@ -766,7 +719,7 @@ mod tests {
                     count: 7,
                     sum: 100.0,
                 },
-                metadata.clone(),
+                metric.metadata().clone(),
             )
                 .with_namespace(Some("test_namespace"))
                 .with_tags(Some(metric_tags!(
@@ -775,8 +728,6 @@ mod tests {
             )))
                 .with_timestamp(Some(ts()))
         );
-
-        assert_eq!(metric.metadata(), &metadata);
     }
 
     #[tokio::test]
@@ -792,27 +743,16 @@ mod tests {
             "host": "localhost"
           }
         }"#;
+        let log = create_log_event(json_str);
 
-        let mut log_value: Value = serde_json::from_str(&*json_str).expect("JSON was not well-formatted");
-        log_value.insert("timestamp", ts());
-        log_value.insert("namespace", "test_namespace");
-
-
-        let log = LogEvent::from_parts(log_value, EventMetadata::default());
-
-        let mut metadata = log.metadata().clone();
-        metadata.set_source_id(Arc::new(ComponentKey::from("in")));
-        metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
-
-        let metric = do_transform(log).await.unwrap();
-
+        let metric = do_transform(log.clone()).await.unwrap();
         assert_eq!(
             metric,
             Metric::new_with_metadata(
                 "test.transform.counter",
                 MetricKind::Incremental,
                 MetricValue::Counter { value: 10.0 },
-                metadata.clone(),
+                metric.metadata().clone(),
             )
                 .with_namespace(Some("test_namespace"))
                 .with_tags(Some(metric_tags!(
@@ -821,7 +761,5 @@ mod tests {
             )))
                 .with_timestamp(Some(ts()))
         );
-
-        assert_eq!(metric.metadata(), &metadata);
     }
 }
