@@ -44,12 +44,14 @@ pub fn check_names<'a, I: Iterator<Item = &'a ComponentKey>>(names: I) -> Result
 pub fn check_shape(config: &ConfigBuilder) -> Result<(), Vec<String>> {
     let mut errors = vec![];
 
-    if config.sources.is_empty() {
-        errors.push("No sources defined in the config.".to_owned());
-    }
+    if !config.allow_empty {
+        if config.sources.is_empty() {
+            errors.push("No sources defined in the config.".to_owned());
+        }
 
-    if config.sinks.is_empty() {
-        errors.push("No sinks defined in the config.".to_owned());
+        if config.sinks.is_empty() {
+            errors.push("No sinks defined in the config.".to_owned());
+        }
     }
 
     // Helper for below
