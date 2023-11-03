@@ -44,7 +44,6 @@ use warp::{filters::BoxedFilter, reject::Rejection, reply::Response, Filter, Rep
 
 use crate::http::build_http_trace_layer;
 use crate::{
-    codecs::{Decoder, DecodingConfig},
     config::{
         log_schema, DataType, GenerateConfig, Resource, SourceAcknowledgementsConfig, SourceConfig,
         SourceContext, SourceOutput,
@@ -160,14 +159,9 @@ impl SourceConfig for DatadogAgentConfig {
             .expect("registered log schema required")
             .clone();
 
-        let decoder =
-            DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace)
-                .build()?;
-
         let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
         let source = DatadogAgentSource::new(
             self.store_api_key,
-            decoder,
             tls.http_protocol_name(),
             logs_schema_definition,
             log_namespace,
@@ -299,7 +293,6 @@ pub(crate) struct DatadogAgentSource {
     pub(crate) log_schema_host_key: OwnedTargetPath,
     pub(crate) log_schema_source_type_key: OwnedTargetPath,
     pub(crate) log_namespace: LogNamespace,
-    pub(crate) decoder: Decoder,
     protocol: &'static str,
     logs_schema_definition: Arc<schema::Definition>,
     events_received: Registered<EventsReceived>,
@@ -335,7 +328,6 @@ impl ApiKeyExtractor {
 impl DatadogAgentSource {
     pub(crate) fn new(
         store_api_key: bool,
-        decoder: Decoder,
         protocol: &'static str,
         logs_schema_definition: schema::Definition,
         log_namespace: LogNamespace,
@@ -354,7 +346,6 @@ impl DatadogAgentSource {
                 .source_type_key_target_path()
                 .expect("global log_schema.source_type_key to be valid path")
                 .clone(),
-            decoder,
             protocol,
             logs_schema_definition: Arc::new(logs_schema_definition),
             log_namespace,
@@ -500,7 +491,7 @@ fn handle_decode_error(encoding: &str, error: impl std::error::Error) -> ErrorMe
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct LogMsg {
-    pub message: Bytes,
+    pub message: serde_json::Value,
     pub status: Bytes,
     #[serde(
         deserialize_with = "ts_milliseconds::deserialize",

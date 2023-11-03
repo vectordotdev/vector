@@ -1,17 +1,15 @@
 use std::sync::Arc;
 
-use bytes::{BufMut, Bytes, BytesMut};
+use bytes::Bytes;
 use chrono::Utc;
 use http::StatusCode;
-use tokio_util::codec::Decoder;
-use vector_lib::codecs::StreamDecodingError;
 use vector_lib::internal_event::{CountByteSize, InternalEventHandle as _};
 use vector_lib::lookup::path;
 use vector_lib::{config::LegacyKey, EstimatedJsonEncodedSizeOf};
 use warp::{filters::BoxedFilter, path as warp_path, path::FullPath, reply::Response, Filter};
 
 use crate::{
-    event::Event,
+    event::{Event, LogEvent},
     sources::{
         datadog_agent::{
             handle_request, ApiKeyQueryParams, DatadogAgentConfig, DatadogAgentSource, LogMsg,
@@ -96,87 +94,63 @@ pub(crate) fn decode_log_body(
         ddtags,
     } in messages
     {
-        let mut decoder = source.decoder.clone();
-        let mut buffer = BytesMut::new();
-        buffer.put(message);
-        loop {
-            match decoder.decode_eof(&mut buffer) {
-                Ok(Some((events, _byte_size))) => {
-                    for mut event in events {
-                        if let Event::Log(ref mut log) = event {
-                            let namespace = &source.log_namespace;
-                            let source_name = "datadog_agent";
+        let mut log = LogEvent::from(vrl::value::Value::from(message));
+        let namespace = &source.log_namespace;
+        let source_name = "datadog_agent";
 
-                            namespace.insert_source_metadata(
-                                source_name,
-                                log,
-                                Some(LegacyKey::InsertIfEmpty(path!("status"))),
-                                path!("status"),
-                                status.clone(),
-                            );
-                            namespace.insert_source_metadata(
-                                source_name,
-                                log,
-                                Some(LegacyKey::InsertIfEmpty(path!("timestamp"))),
-                                path!("timestamp"),
-                                timestamp,
-                            );
-                            namespace.insert_source_metadata(
-                                source_name,
-                                log,
-                                Some(LegacyKey::InsertIfEmpty(path!("hostname"))),
-                                path!("hostname"),
-                                hostname.clone(),
-                            );
-                            namespace.insert_source_metadata(
-                                source_name,
-                                log,
-                                Some(LegacyKey::InsertIfEmpty(path!("service"))),
-                                path!("service"),
-                                service.clone(),
-                            );
-                            namespace.insert_source_metadata(
-                                source_name,
-                                log,
-                                Some(LegacyKey::InsertIfEmpty(path!("ddsource"))),
-                                path!("ddsource"),
-                                ddsource.clone(),
-                            );
-                            namespace.insert_source_metadata(
-                                source_name,
-                                log,
-                                Some(LegacyKey::InsertIfEmpty(path!("ddtags"))),
-                                path!("ddtags"),
-                                ddtags.clone(),
-                            );
+        namespace.insert_source_metadata(
+            source_name,
+            &mut log,
+            Some(LegacyKey::InsertIfEmpty(path!("status"))),
+            path!("status"),
+            status.clone(),
+        );
+        namespace.insert_source_metadata(
+            source_name,
+            &mut log,
+            Some(LegacyKey::InsertIfEmpty(path!("timestamp"))),
+            path!("timestamp"),
+            timestamp,
+        );
+        namespace.insert_source_metadata(
+            source_name,
+            &mut log,
+            Some(LegacyKey::InsertIfEmpty(path!("hostname"))),
+            path!("hostname"),
+            hostname.clone(),
+        );
+        namespace.insert_source_metadata(
+            source_name,
+            &mut log,
+            Some(LegacyKey::InsertIfEmpty(path!("service"))),
+            path!("service"),
+            service.clone(),
+        );
+        namespace.insert_source_metadata(
+            source_name,
+            &mut log,
+            Some(LegacyKey::InsertIfEmpty(path!("ddsource"))),
+            path!("ddsource"),
+            ddsource.clone(),
+        );
+        namespace.insert_source_metadata(
+            source_name,
+            &mut log,
+            Some(LegacyKey::InsertIfEmpty(path!("ddtags"))),
+            path!("ddtags"),
+            ddtags.clone(),
+        );
 
-                            namespace.insert_standard_vector_source_metadata(
-                                log,
-                                DatadogAgentConfig::NAME,
-                                now,
-                            );
+        namespace.insert_standard_vector_source_metadata(&mut log, DatadogAgentConfig::NAME, now);
 
-                            if let Some(k) = &api_key {
-                                log.metadata_mut().set_datadog_api_key(Arc::clone(k));
-                            }
-
-                            log.metadata_mut()
-                                .set_schema_definition(&source.logs_schema_definition);
-                        }
-
-                        decoded.push(event);
-                    }
-                }
-                Ok(None) => break,
-                Err(error) => {
-                    // Error is logged by `crate::codecs::Decoder`, no further
-                    // handling is needed here.
-                    if !error.can_continue() {
-                        break;
-                    }
-                }
-            }
+        if let Some(k) = &api_key {
+            log.metadata_mut().set_datadog_api_key(Arc::clone(k));
         }
+
+        log.metadata_mut()
+            .set_schema_definition(&source.logs_schema_definition);
+
+        decoded.push(Event::Log(log));
     }
 
     source.events_received.emit(CountByteSize(
