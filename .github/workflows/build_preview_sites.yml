@@ -16,7 +16,6 @@ jobs:
       REQUEST_TOKEN: ${{ secrets.REQUEST_TOKEN }}
       REQUEST_MESSAGE: ${{ secrets.REQUEST_MESSAGE }}
       ENDPOINT: ${{ secrets.BUILDER_ENDPOINT }}
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   deploy_rust_doc_preview_site:
     uses: ./.github/workflows/create_preview_sites.yml
@@ -27,7 +26,6 @@ jobs:
       REQUEST_TOKEN: ${{ secrets.REQUEST_TOKEN }}
       REQUEST_MESSAGE: ${{ secrets.REQUEST_MESSAGE }}
       ENDPOINT: ${{ secrets.BUILDER_ENDPOINT }}
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   deploy_vrl_playground_preview_site:
     uses: ./.github/workflows/create_preview_sites.yml
@@ -38,4 +36,4 @@ jobs:
       REQUEST_TOKEN: ${{ secrets.REQUEST_TOKEN }}
       REQUEST_MESSAGE: ${{ secrets.REQUEST_MESSAGE }}
       ENDPOINT: ${{ secrets.BUILDER_ENDPOINT }}
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
