@@ -1334,7 +1334,7 @@ dependencies = [
  "log",
  "paste",
  "pin-project",
- "quick-xml 0.30.0",
+ "quick-xml",
  "rand 0.8.5",
  "reqwest",
  "rustc_version 0.4.0",
@@ -5830,9 +5830,9 @@ checksum = "624a8340c38c1b80fd549087862da4ba43e08858af025b236e509b6649fc13d5"
 
 [[package]]
 name = "opendal"
-version = "0.38.1"
+version = "0.41.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4df645b6012162c04c8949e9b96ae2ef002e79189cfb154e507e51ac5be76a09"
+checksum = "e31b48f0af6de5b3b344c1acc1e06c4581dca3e13cd5ba05269927fc2abf953a"
 dependencies = [
  "anyhow",
  "async-compat",
@@ -5851,7 +5851,7 @@ dependencies = [
  "parking_lot",
  "percent-encoding",
  "pin-project",
- "quick-xml 0.27.1",
+ "quick-xml",
  "reqwest",
  "serde",
  "serde_json",
@@ -6940,16 +6940,6 @@ name = "quick-error"
 version = "1.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a1d01941d82fa2ab50be1e79e6714289dd7cde78eba4c074bc5a4374f650dfe0"
-
-[[package]]
-name = "quick-xml"
-version = "0.27.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ffc053f057dd768a56f62cd7e434c42c831d296968997e9ac1f76ea7c2d14c41"
-dependencies = [
- "memchr",
- "serde",
-]
 
 [[package]]
 name = "quick-xml"
