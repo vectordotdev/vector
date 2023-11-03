@@ -75,7 +75,9 @@ async fn hdfs_rotate_files_after_the_buffer_size_is_reached() {
     tokio::time::sleep(Duration::from_secs(1)).await;
 
     let mut objects: Vec<Entry> = op
-        .list_with("/").delimiter("").metakey(Metakey::Mode)
+        .list_with("/")
+        .delimiter("")
+        .metakey(Metakey::Mode)
         .await
         .unwrap();
 
