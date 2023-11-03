@@ -178,7 +178,7 @@ impl<T: Bufferable> BufferSender<T> {
     }
 
     /// Configures this sender to instrument the send duration.
-    pub fn with_send_duration_instrumentation(&mut self, stage: usize, span: Span) {
+    pub fn with_send_duration_instrumentation(&mut self, stage: usize, span: &Span) {
         let _enter = span.enter();
         self.send_duration = Some(register(BufferSendDuration { stage }));
     }
@@ -224,11 +224,10 @@ impl<T: Bufferable> BufferSender<T> {
         };
 
         if sent_to_base || was_dropped {
-            match (self.send_duration.as_ref(), send_reference) {
-                (Some(send_duration), Some(send_reference)) => {
-                    send_duration.emit(send_reference.elapsed());
-                }
-                _ => {}
+            if let (Some(send_duration), Some(send_reference)) =
+                (self.send_duration.as_ref(), send_reference)
+            {
+                send_duration.emit(send_reference.elapsed());
             }
         }
 

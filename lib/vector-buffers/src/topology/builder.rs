@@ -154,7 +154,7 @@ impl<T: Bufferable> TopologyBuilder<T> {
                 ),
             };
 
-            sender.with_send_duration_instrumentation(stage_idx, span.clone());
+            sender.with_send_duration_instrumentation(stage_idx, &span);
             if !provides_instrumentation {
                 sender.with_usage_instrumentation(usage_handle.clone());
                 receiver.with_usage_instrumentation(usage_handle);
@@ -189,7 +189,7 @@ impl<T: Bufferable> TopologyBuilder<T> {
     pub async fn standalone_memory(
         max_events: NonZeroUsize,
         when_full: WhenFull,
-        receiver_span: Span,
+        receiver_span: &Span,
     ) -> (BufferSender<T>, BufferReceiver<T>) {
         let usage_handle = BufferUsageHandle::noop();
 

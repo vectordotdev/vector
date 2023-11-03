@@ -487,7 +487,7 @@ impl<'a> Builder<'a> {
             let (input_tx, input_rx) = TopologyBuilder::standalone_memory(
                 TOPOLOGY_BUFFER_SIZE,
                 WhenFull::Block,
-                span.clone(),
+                &span,
             )
             .await;
 

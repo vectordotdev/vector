@@ -86,9 +86,9 @@ impl EventContainer for SourceSenderItem {
     }
 }
 
-impl Into<EventArray> for SourceSenderItem {
-    fn into(self) -> EventArray {
-        self.events
+impl From<SourceSenderItem> for EventArray {
+    fn from(val: SourceSenderItem) -> Self {
+        val.events
     }
 }
 

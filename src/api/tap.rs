@@ -323,7 +323,7 @@ async fn tap_handler(
                             // target for the component, and spawn our transformer task which will
                             // wrap each event payload with the necessary metadata before forwarding
                             // it to our global tap receiver.
-                            let (tap_buffer_tx, mut tap_buffer_rx) = TopologyBuilder::standalone_memory(TAP_BUFFER_SIZE, WhenFull::DropNewest, Span::current()).await;
+                            let (tap_buffer_tx, mut tap_buffer_rx) = TopologyBuilder::standalone_memory(TAP_BUFFER_SIZE, WhenFull::DropNewest, &Span::current()).await;
                             let mut tap_transformer = TapTransformer::new(tx.clone(), output.clone());
 
                             tokio::spawn(async move {
