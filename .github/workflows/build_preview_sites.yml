@@ -12,24 +12,30 @@ jobs:
     with:
       APP_ID: "d1a7j77663uxsc"
       APP_NAME: "vector.dev"
+    secrets:
       REQUEST_TOKEN: ${{ secrets.REQUEST_TOKEN }}
       REQUEST_MESSAGE: ${{ secrets.REQUEST_MESSAGE }}
       ENDPOINT: ${{ secrets.BUILDER_ENDPOINT }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   deploy_rust_doc_preview_site:
     uses: ./.github/workflows/create_preview_sites.yml
     with:
       APP_ID: "d1hoyoksbulg25"
       APP_NAME: "Rust Doc"
+    secrets:
       REQUEST_TOKEN: ${{ secrets.REQUEST_TOKEN }}
       REQUEST_MESSAGE: ${{ secrets.REQUEST_MESSAGE }}
       ENDPOINT: ${{ secrets.BUILDER_ENDPOINT }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   deploy_vrl_playground_preview_site:
     uses: ./.github/workflows/create_preview_sites.yml
     with:
       APP_ID: "d2lr4eds605rpz"
       APP_NAME: "VRL Playground"
+    secrets:
       REQUEST_TOKEN: ${{ secrets.REQUEST_TOKEN }}
       REQUEST_MESSAGE: ${{ secrets.REQUEST_MESSAGE }}
       ENDPOINT: ${{ secrets.BUILDER_ENDPOINT }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
