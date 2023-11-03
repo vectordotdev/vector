@@ -995,8 +995,7 @@ fn build_task_transform(
             for event in events.iter_events_mut() {
                 update_runtime_schema_definition(event, &output_id, &schema_definition_map);
             }
-            let send_reference = Instant::now();
-            (events, send_reference)
+            (events, Instant::now())
         })
         .inspect(move |(events, _): &(EventArray, Instant)| {
             events_sent.emit(CountByteSize(
