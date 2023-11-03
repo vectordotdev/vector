@@ -1531,7 +1531,6 @@ mod integration_test {
     };
     use stream_cancel::{Trigger, Tripwire};
     use tokio::time::sleep;
-    use vector_lib::buffers::topology::channel::BufferReceiver;
     use vector_lib::event::EventStatus;
     use vrl::{event_path, value};
 
@@ -1761,8 +1760,9 @@ mod integration_test {
         status: EventStatus,
     ) -> (SourceSender, impl Stream<Item = EventArray> + Unpin) {
         let (pipe, recv) = SourceSender::new_test_sender_with_buffer(100);
-        let recv = BufferReceiver::new(recv.into()).into_stream();
-        let recv = recv.then(move |mut events| async move {
+        let recv = recv.into_stream();
+        let recv = recv.then(move |item| async move {
+            let mut events = item.events;
             events.iter_logs_mut().for_each(|log| {
                 log.insert(event_path!("pipeline_id"), id.to_string());
             });
