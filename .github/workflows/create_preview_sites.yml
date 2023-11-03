@@ -21,9 +21,6 @@ on:
       ENDPOINT:
         description: "Request endpoint"
         required: true
-      GITHUB_TOKEN:
-        description: "GitHub Token"
-        required: true
 
 jobs:
   create_preview_site:
