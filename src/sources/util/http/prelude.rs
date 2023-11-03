@@ -130,16 +130,15 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                         debug!(message = "Handling HTTP request.", headers = ?headers);
                         let http_path = path.as_str();
 
-                        emit!(HttpBytesReceived {
-                            byte_size: body.len(),
-                            http_path,
-                            protocol,
-                        });
-
                         let events = auth
                             .is_valid(&auth_header)
                             .and_then(|()| decode(&encoding_header, body))
                             .and_then(|body| {
+                                emit!(HttpBytesReceived {
+                                    byte_size: body.len(),
+                                    http_path,
+                                    protocol,
+                                });
                                 self.build_events(body, &headers, &query_parameters, path.as_str())
                             })
                             .map(|mut events| {

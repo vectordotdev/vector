@@ -17,7 +17,7 @@ use crate::{
     serde::bool_or_struct,
     sources::{
         self,
-        util::{decode, http::HttpMethod, ErrorMessage, HttpSource, HttpSourceAuthConfig},
+        util::{http::HttpMethod, ErrorMessage, HttpSource, HttpSourceAuthConfig},
     },
     tls::TlsEnableableConfig,
 };
@@ -124,20 +124,11 @@ impl RemoteWriteSource {
 impl HttpSource for RemoteWriteSource {
     fn build_events(
         &self,
-        mut body: Bytes,
-        header_map: &HeaderMap,
+        body: Bytes,
+        _header_map: &HeaderMap,
         _query_parameters: &HashMap<String, String>,
         _full_path: &str,
     ) -> Result<Vec<Event>, ErrorMessage> {
-        // If `Content-Encoding` header isn't `snappy` HttpSource won't decode it for us
-        // se we need to.
-        if header_map
-            .get("Content-Encoding")
-            .map(|header| header.as_ref())
-            != Some(&b"snappy"[..])
-        {
-            body = decode(&Some("snappy".to_string()), body)?;
-        }
         let events = self.decode_body(body)?;
         Ok(events)
     }
