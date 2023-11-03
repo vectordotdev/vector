@@ -484,8 +484,12 @@ impl<'a> Builder<'a> {
                 Ok(transform) => transform,
             };
 
-            let (input_tx, input_rx) =
-                TopologyBuilder::standalone_memory(TOPOLOGY_BUFFER_SIZE, WhenFull::Block, span.clone()).await;
+            let (input_tx, input_rx) = TopologyBuilder::standalone_memory(
+                TOPOLOGY_BUFFER_SIZE,
+                WhenFull::Block,
+                span.clone(),
+            )
+            .await;
 
             self.inputs
                 .insert(key.clone(), (input_tx, node.inputs.clone()));

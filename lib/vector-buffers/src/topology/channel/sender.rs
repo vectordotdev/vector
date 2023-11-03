@@ -4,7 +4,7 @@ use async_recursion::async_recursion;
 use derivative::Derivative;
 use tokio::sync::Mutex;
 use tracing::Span;
-use vector_common::internal_event::{register, Registered, InternalEventHandle};
+use vector_common::internal_event::{register, InternalEventHandle, Registered};
 
 use super::limited_queue::LimitedSender;
 use crate::{
@@ -223,11 +223,13 @@ impl<T: Bufferable> BufferSender<T> {
             }
         };
 
-        match (self.send_duration.as_ref(), send_reference) {
-            (Some(send_duration), Some(send_reference)) => {
-                send_duration.emit(send_reference.elapsed());
+        if sent_to_base || was_dropped {
+            match (self.send_duration.as_ref(), send_reference) {
+                (Some(send_duration), Some(send_reference)) => {
+                    send_duration.emit(send_reference.elapsed());
+                }
+                _ => {}
             }
-            _ => {}
         }
 
         if let Some(instrumentation) = self.instrumentation.as_ref() {

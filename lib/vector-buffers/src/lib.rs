@@ -87,12 +87,14 @@ impl Arbitrary for WhenFull {
 /// An item that can be buffered in memory.
 ///
 /// This supertrait serves as the base trait for any item that can be pushed into a memory buffer.
+/// It is a relaxed version of `Bufferable` that allows for items that are not `Encodable` (e.g., `Instant`),
+/// which is an unnecessary constraint for memory buffers.
 pub trait InMemoryBufferable:
     AddBatchNotifier + ByteSizeOf + EventCount + Debug + Send + Sync + Unpin + Sized + 'static
 {
 }
 
-// Blanket implementation for anything that is already bufferable.
+// Blanket implementation for anything that is already in-memory bufferable.
 impl<T> InMemoryBufferable for T where
     T: AddBatchNotifier + ByteSizeOf + EventCount + Debug + Send + Sync + Unpin + Sized + 'static
 {

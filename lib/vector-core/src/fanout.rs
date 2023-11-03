@@ -448,8 +448,9 @@ impl Sender {
     }
 
     async fn flush(&mut self) -> crate::Result<()> {
+        let send_reference = self.send_reference.take();
         if let Some(input) = self.input.take() {
-            self.inner.send(input, self.send_reference.take()).await?;
+            self.inner.send(input, send_reference).await?;
             self.inner.flush().await?;
         }
 

@@ -173,7 +173,7 @@ impl TapController {
             tap_handler(patterns, tap_tx, watch_rx, shutdown_rx).instrument(error_span!(
                 "tap_handler",
                 component_kind = "sink",
-                component_id = "tap", // It isn't clear what the component_id should be here other than "tap"
+                component_id = "_tap", // It isn't clear what the component_id should be here other than "_tap"
                 component_type = "tap",
             )),
         );

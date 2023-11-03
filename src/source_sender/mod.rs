@@ -39,9 +39,9 @@ const LAG_TIME_NAME: &str = "source_lag_time_seconds";
 /// SourceSenderItem is a thin wrapper around [EventArray] used to track the send duration of a batch.
 ///
 /// This is needed because the send duration is calculated as the difference between when the batch
-/// is sent from the origin component to when the batch is enqueued on the receiving component's input channel.
+/// is sent from the origin component to when the batch is enqueued on the receiving component's input buffer.
 /// For sources in particular, this requires the batch to be enqueued on two channels: the origin component's pump
-/// channel and the receiving component's input channel.
+/// channel and then the receiving component's input buffer.
 #[derive(Debug)]
 pub struct SourceSenderItem {
     /// The batch of events to send.
