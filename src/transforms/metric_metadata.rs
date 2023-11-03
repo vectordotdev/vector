@@ -650,6 +650,7 @@ mod tests {
         let log = create_log_event(json_str);
 
         let metric = do_transform(log.clone()).await.unwrap();
+
         assert_eq!(
             metric,
             Metric::new_with_metadata(

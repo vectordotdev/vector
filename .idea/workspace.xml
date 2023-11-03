@@ -7,13 +7,33 @@
     <cargoProject FILE="$PROJECT_DIR$/Cargo.toml" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="9c9fe7ce-7bb2-41d9-a0d4-a59db2e2d185" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/.gitignore" beforeDir="false" />
+    <list default="true" id="bb4921f1-5f27-4fd9-951a-e62f3876fc5d" name="Changes" comment="">
+      <change afterPath="$PROJECT_DIR$/website/cue/reference/remap/functions/contains_all.cue" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/website/cue/reference/remap/functions/parse_float.cue" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/modules.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/modules.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Cargo.lock" beforeDir="false" afterPath="$PROJECT_DIR$/Cargo.lock" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/Cargo.toml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/docs/DEPRECATIONS.md" beforeDir="false" afterPath="$PROJECT_DIR$/docs/DEPRECATIONS.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/vector-core/src/event/metadata.rs" beforeDir="false" afterPath="$PROJECT_DIR$/lib/vector-core/src/event/metadata.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/internal_events/metric_metadata.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/internal_events/metric_metadata.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/codecs/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/lib/codecs/Cargo.toml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/codecs/tests/data/native_encoding/vector_generate_fixtures.patch" beforeDir="false" afterPath="$PROJECT_DIR$/lib/codecs/tests/data/native_encoding/vector_generate_fixtures.patch" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/file-source/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/lib/file-source/Cargo.toml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/prometheus-parser/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/lib/prometheus-parser/Cargo.toml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/vector-common/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/lib/vector-common/Cargo.toml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/vector-config/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/lib/vector-config/Cargo.toml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/vector-core/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/lib/vector-core/Cargo.toml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/vector-vrl/tests/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/lib/vector-vrl/tests/Cargo.toml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/app.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/app.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/cli.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/cli.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/config/builder.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/config/builder.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/config/compiler.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/config/compiler.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/config/loading/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/config/loading/mod.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/config/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/config/mod.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/config/validation.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/config/validation.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/transforms/metric_metadata.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/transforms/metric_metadata.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/website/cue/reference/cli.cue" beforeDir="false" afterPath="$PROJECT_DIR$/website/cue/reference/cli.cue" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/website/cue/reference/remap.cue" beforeDir="false" afterPath="$PROJECT_DIR$/website/cue/reference/remap.cue" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/website/cue/reference/remap/functions/from_unix_timestamp.cue" beforeDir="false" afterPath="$PROJECT_DIR$/website/cue/reference/remap/functions/from_unix_timestamp.cue" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -24,15 +44,16 @@
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
   <component name="MacroExpansionManager">
-    <option name="directoryName" value="nzkhof5s" />
+    <option name="directoryName" value="3g26puhx" />
   </component>
   <component name="MarkdownSettingsMigration">
     <option name="stateVersion" value="1" />
   </component>
   <component name="ProjectColorInfo">{
+  &quot;customColor&quot;: &quot;&quot;,
   &quot;associatedIndex&quot;: 0
 }</component>
-  <component name="ProjectId" id="2XGUvcezVjBX0xR2V5H2smmXaTC" />
+  <component name="ProjectId" id="2XdOLb1sSc7LW9s8GQvu2XkgFlc" />
   <component name="ProjectViewState">
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
@@ -43,14 +64,13 @@
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "WebServerToolWindowFactoryState": "false",
     "git-widget-placeholder": "Merging metrics-metadata",
-    "last_opened_file_path": "/Users/stephan.steward/Code/vectordotdev",
     "node.js.detected.package.eslint": "true",
     "node.js.detected.package.tslint": "true",
     "node.js.selected.package.eslint": "(autodetect)",
     "node.js.selected.package.tslint": "(autodetect)",
     "nodejs_package_manager_path": "yarn",
     "org.rust.cargo.project.model.PROJECT_DISCOVERY": "true",
-    "settings.editor.selected.configurable": "preferences.general",
+    "settings.editor.selected.configurable": "language.rust.cargo.check",
     "vue.rearranger.settings.migration": "true"
   }
 }]]></component>
@@ -75,8 +95,8 @@
         <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
       </method>
     </configuration>
-    <configuration name="Test transforms::log_to_metric::tests::count_http_status_codes" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
-      <option name="command" value="test --package vector --lib transforms::log_to_metric::tests::count_http_status_codes -- --exact" />
+    <configuration name="Test transforms::metric_metadata::tests::transform_distribution_summary" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
+      <option name="command" value="test --package vector --lib transforms::metric_metadata::tests::transform_distribution_summary -- --exact" />
       <option name="workingDirectory" value="file://$PROJECT_DIR$" />
       <option name="emulateTerminal" value="true" />
       <option name="channel" value="DEFAULT" />
@@ -95,7 +115,7 @@
     <recent_temporary>
       <list>
         <item itemvalue="Cargo.Test metric_metadata" />
-        <item itemvalue="Cargo.Test transforms::log_to_metric::tests::count_http_status_codes" />
+        <item itemvalue="Cargo.Test transforms::metric_metadata::tests::transform_distribution_summary" />
       </list>
     </recent_temporary>
   </component>
@@ -105,19 +125,29 @@
   <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
   <component name="TaskManager">
     <task active="true" id="Default" summary="Default task">
-      <changelist id="9c9fe7ce-7bb2-41d9-a0d4-a59db2e2d185" name="Changes" comment="" />
-      <created>1698255141872</created>
+      <changelist id="bb4921f1-5f27-4fd9-951a-e62f3876fc5d" name="Changes" comment="" />
+      <created>1698955434788</created>
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
-      <updated>1698255141872</updated>
-      <workItem from="1698255142939" duration="7879000" />
-      <workItem from="1698675988426" duration="25903000" />
-      <workItem from="1698876695536" duration="2561000" />
+      <updated>1698955434788</updated>
+      <workItem from="1698955436279" duration="3692000" />
+      <workItem from="1698959454881" duration="3232000" />
     </task>
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
     <option name="version" value="3" />
+  </component>
+  <component name="XDebuggerManager">
+    <breakpoint-manager>
+      <breakpoints>
+        <line-breakpoint enabled="true" type="com.jetbrains.cidr.execution.debugger.OCBreakpointType">
+          <url>file://$PROJECT_DIR$/src/transforms/metric_metadata.rs</url>
+          <line>441</line>
+          <option name="timeStamp" value="7" />
+        </line-breakpoint>
+      </breakpoints>
+    </breakpoint-manager>
   </component>
   <component name="XSLT-Support.FileAssociations.UIState">
     <expand />
