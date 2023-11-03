@@ -241,7 +241,7 @@ where
 
             let mut byte_size = telemetry().create_request_count_byte_size();
             byte_size.add_event(&event, event.estimated_json_encoded_size_of());
-            let encoded = serde_json::value::to_raw_value(&event).expect("serializing to memory");
+            let encoded = serde_json::value::to_raw_value(&event.as_log()).expect("serializing to memory");
 
             EncodedEvent {
                 original,
