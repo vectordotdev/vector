@@ -39,12 +39,12 @@ stop reading here.
 
 There are two main scenarios where a configuration might now start storing secrets in disk buffers:
 
-- using a source component which has the ability to store secrets
-- using `remap` and adding secrets directly to events
+- When you are using a source component which has the ability to store secrets
+- When you are using `remap` and adding secrets directly to events
 
 ### Source components that can store secrets
 
-Some source components will store secrets (specifically, API keys) on an event in order to
+Some source components store secrets (specifically, API keys) on an event in order to
 facilitate Vector acting similarly to a proxy, using as much of the original request/event data as
 possible. Only two sources currently provide such behavior:
 
@@ -55,17 +55,17 @@ However, for both of these sinks, this behavior can be disabled by setting `stor
 `false` for the `datadog_agent` source, or setting `store_hec_token` to `false` for the `splunk_hec`
 source.
 
-### Manually-stored secrets via `remap`
+### Manually-stored secrets using `remap`
 
 When using the `remap` transform, VRL exposes helper functions to set secrets on events. If your
-`remap` usage includes setting secrets, then those secrets would also now in scope for getting
+`remap` usage includes setting secrets, then those secrets would also now be in scope for getting
 stored in disk buffers.
 
 ## Securing disk buffers
 
 As mentioned above, secrets will now be stored in disk buffer data files, and will be
 **unencrypted**. The data directory that Vector is configured to use should be locked down as
-tightly as possible so that only the user/group that the Vector process is run as has read/write
+tightly as possible so that only the user/group that runs the Vector process has read/write
 access.
 
 By default on Unix-based platforms, Vector will attempt to set file permissions for the disk buffer
