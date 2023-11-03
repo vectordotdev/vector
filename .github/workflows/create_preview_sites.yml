@@ -11,6 +11,18 @@ on:
         description: "Application name for the comment"
         required: true
         type: string
+      REQUEST_TOKEN:
+        description: "Token for the request"
+        required: true
+        type: secret
+      REQUEST_MESSAGE:
+        description: "Message for the request"
+        required: true
+        type: secret
+      ENDPOINT:
+        description: "Request endpoint"
+        required: true
+        type: secret
 
 jobs:
   create_preview_site:
@@ -19,7 +31,7 @@ jobs:
 
     # Get the artifacts with the PR number and branch name
     - name: Download artifact
-      uses: actions/github-script@v3.1.0
+      uses: actions/github-script@v6.4.1
       with:
         script: |
           const fs = require('fs');
@@ -29,7 +41,7 @@ jobs:
              run_id: ${{ github.event.workflow_run.id }},
           });
           const matchArtifact = artifacts.data.artifacts.filter(artifact => artifact.name == "pr")[0];
-          const download = await github.actions.downloadArtifact({
+          const download = await github.rest.actions.downloadArtifact({
              owner: context.repo.owner,
              repo: context.repo.repo,
              artifact_id: matchArtifact.id,
@@ -41,16 +53,12 @@ jobs:
     - name: Extract PR info from artifact
       run: |
         unzip pr.zip -d pr
-        BRANCH_NAME=$(cat ./pr/PR_INFO | grep 'Branch Name' | cut -d ':' -f 2 | xargs)
-        SANITIZED_BRANCH_NAME=$(echo "$BRANCH_NAME" | sed 's/[\/\.]/-/g')
+        BRANCH_NAME=$(cat ./pr/branch)
+        SANITIZED_BRANCH_NAME=$(echo "$BRANCH_NAME" | sed 's/\./-/g')
         echo "SANITIZED_BRANCH_NAME=$SANITIZED_BRANCH_NAME" >> $GITHUB_ENV
 
     # Kick off the job in amplify
     - name: Deploy Site
-      env:
-        REQUEST_TOKEN: ${{ secrets.REQUEST_TOKEN }}
-        REQUEST_MESSAGE: ${{ secrets.REQUEST_MESSAGE }}
-        ENDPOINT: ${{ secrets.BUILDER_ENDPOINT }}
       run: |
         HMAC_KEY=$(echo -n $REQUEST_MESSAGE | openssl dgst -sha256 -hmac "$REQUEST_TOKEN" -binary | od -An -tx1 | tr -d ' \n'; echo)
         SIGNATURE="sha256=$HMAC_KEY"
@@ -71,14 +79,13 @@ jobs:
       if: success()
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      uses: actions/github-script@v3
+      uses: actions/github-script@v6.4.1
       with:
         script: |
-          const prInfo = fs.readFileSync('./pr/PR_INFO', 'utf8');
-          const prInfoLines = prInfo.split('\n');
-          const issueNumber = parseInt(prInfoLines[0].split(': ')[1]);
+          const prNumber = fs.readFileSync('./pr/number', 'utf8');
+          const issueNumber = parseInt(prNumber);
 
-          await github.issues.createComment({
+          await github.rest.issues.createComment({
             owner: context.repo.owner,
             repo: context.repo.repo,
             issue_number: issue_number,

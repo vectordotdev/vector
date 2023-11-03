@@ -16,12 +16,12 @@ jobs:
       - name: Save PR number and Branch name
         run: |
           mkdir -p ./pr
-          echo "PR Number: ${{ github.event.number }}" > ./pr/PR_INFO
-          echo "Branch Name: ${{ github.head_ref }}" >> ./pr/PR_INFO
+          echo "${{ github.event.number }}" > ./pr/number
+          echo "${{ github.head_ref }}" >> ./pr/branch
 
       # Upload the artifact
       - name: Upload PR information artifact
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: pr
           path: pr/
