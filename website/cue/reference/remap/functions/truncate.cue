@@ -35,7 +35,7 @@ remap: functions: truncate: {
 				This is ignored if "ellipsis" is set to true for backwards compatibility.
 				"""
 			required: true
-			type: ["boolean"]
+			type: ["string"]
 		},
 	]
 	internal_failure_reasons: []
