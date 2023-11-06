@@ -394,13 +394,8 @@ fn render_timestamp(items: &ParsedStrftime, event: EventRef<'_>, tz_offset: Opti
 
 #[cfg(test)]
 mod tests {
-<<<<<<< HEAD
     use chrono::{TimeZone, Utc};
-    use lookup::metadata_path;
-=======
-    use chrono::TimeZone;
     use vector_lib::lookup::{metadata_path, PathPrefix};
->>>>>>> master
     use vector_lib::metric_tags;
 
     use super::*;
