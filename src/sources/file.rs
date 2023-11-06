@@ -725,12 +725,14 @@ fn wrap_with_line_agg(
             logic,
         )
         .map(
-            |(filename, text, (file_id, start_offset, end_offset))| Line {
+            |(filename, text, (file_id, start_offset, initial_end), lastline_context)| Line {
                 text,
                 filename,
                 file_id,
                 start_offset,
-                end_offset,
+                end_offset: lastline_context.map_or(initial_end, |(_, _, lastline_end_offset)| {
+                    lastline_end_offset
+                }),
             },
         ),
     )
@@ -1929,6 +1931,7 @@ mod tests {
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
             include: vec![dir.path().join("*")],
+            offset_key: Some(OptionalValuePath::from(owned_value_path!("offset"))),
             multiline: Some(MultilineConfig {
                 start_pattern: "INFO".to_owned(),
                 condition_pattern: "INFO".to_owned(),
@@ -1953,6 +1956,9 @@ mod tests {
             sleep_500_millis(),
         )
         .await;
+
+        assert_eq!(received[0].as_log()["offset"], 0.into());
+
         let lines = extract_messages_string(received);
         assert_eq!(lines, vec!["INFO hello\npart of hello"]);
 
@@ -1962,6 +1968,10 @@ mod tests {
                 writeln!(&mut file, "INFO goodbye").unwrap();
             })
             .await;
+        assert_eq!(
+            received_after_restart[0].as_log()["offset"],
+            (lines[0].len() + 1).into()
+        );
         let lines = extract_messages_string(received_after_restart);
         assert_eq!(lines, vec!["INFO goodbye"]);
     }
