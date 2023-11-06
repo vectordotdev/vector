@@ -24,6 +24,8 @@
 extern crate tracing;
 #[macro_use]
 extern crate derivative;
+#[macro_use]
+extern crate vector_lib;
 
 #[cfg(all(feature = "tikv-jemallocator", not(feature = "allocation-tracing")))]
 #[global_allocator]

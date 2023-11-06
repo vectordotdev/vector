@@ -2,8 +2,6 @@ use metrics::{counter, gauge};
 use std::borrow::Cow;
 use vector_lib::internal_event::{ComponentEventsDropped, InternalEvent, UNINTENTIONAL};
 
-use crate::emit;
-
 #[cfg(any(feature = "sources-file", feature = "sources-kubernetes_logs"))]
 pub use self::source::*;
 
@@ -86,7 +84,7 @@ mod source {
     use vector_lib::file_source::FileSourceInternalEvents;
 
     use super::{FileOpen, InternalEvent};
-    use crate::emit;
+    use vector_lib::emit;
     use vector_lib::{
         internal_event::{error_stage, error_type},
         json_size::JsonSize,

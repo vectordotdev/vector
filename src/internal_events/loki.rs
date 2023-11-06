@@ -1,4 +1,3 @@
-use crate::emit;
 use metrics::counter;
 use vector_lib::internal_event::{error_stage, error_type};
 use vector_lib::internal_event::{ComponentEventsDropped, InternalEvent, INTENTIONAL};
