@@ -16,6 +16,8 @@ pub mod filter;
 pub mod log_to_metric;
 #[cfg(feature = "transforms-lua")]
 pub mod lua;
+#[cfg(feature = "transforms-metric_metadata")]
+mod metric_metadata;
 #[cfg(feature = "transforms-metric_to_log")]
 pub mod metric_to_log;
 #[cfg(feature = "transforms-reduce")]

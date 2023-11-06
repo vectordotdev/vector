@@ -25,6 +25,7 @@ use crate::{
     template::{Template, TemplateRenderingError},
     transforms::{FunctionTransform, OutputBuffer, Transform},
 };
+use crate::transforms::metric_metadata;
 
 const ORIGIN_SERVICE_VALUE: u32 = 3;
 
@@ -35,6 +36,8 @@ const ORIGIN_SERVICE_VALUE: u32 = 3;
 pub struct LogToMetricConfig {
     /// A list of metrics to generate.
     pub metrics: Vec<MetricConfig>,
+    /// this flag will process all metrics to logs
+    pub all_metrics: Option<bool>,
 }
 
 /// Specification of a counter derived from a log event.
@@ -147,6 +150,7 @@ impl GenerateConfig for LogToMetricConfig {
                     kind: MetricKind::Incremental,
                 }),
             }],
+            all_metrics: Some(true),
         })
         .unwrap()
     }
@@ -376,38 +380,45 @@ impl FunctionTransform for LogToMetric {
     fn transform(&mut self, output: &mut OutputBuffer, event: Event) {
         // Metrics are "all or none" for a specific log. If a single fails, none are produced.
         let mut buffer = Vec::with_capacity(self.config.metrics.len());
-
-        for config in self.config.metrics.iter() {
-            match to_metric(config, &event) {
-                Ok(metric) => {
-                    buffer.push(Event::Metric(metric));
-                }
-                Err(err) => {
-                    match err {
-                        TransformError::FieldNull { field } => emit!(LogToMetricFieldNullError {
+        if self.config.all_metrics.is_some() {
+            let mdc = metric_metadata::MetricsMetadataConfig{
+                ..Default::default()
+            };
+            let mmd =  &mut metric_metadata::MetricsMetadata::new(mdc);
+            metric_metadata::MetricsMetadata::transform(mmd, output, event);
+        } else {
+            for config in self.config.metrics.iter() {
+                match to_metric(config, &event) {
+                    Ok(metric) => {
+                        buffer.push(Event::Metric(metric));
+                    }
+                    Err(err) => {
+                        match err {
+                            TransformError::FieldNull { field } => emit!(LogToMetricFieldNullError {
                             field: field.as_ref()
                         }),
-                        TransformError::FieldNotFound { field } => {
-                            emit!(ParserMissingFieldError::<DROP_EVENT> {
+                            TransformError::FieldNotFound { field } => {
+                                emit!(ParserMissingFieldError::<DROP_EVENT> {
                                 field: field.as_ref()
                             })
-                        }
-                        TransformError::ParseFloatError { field, error } => {
-                            emit!(LogToMetricParseFloatError {
+                            }
+                            TransformError::ParseFloatError { field, error } => {
+                                emit!(LogToMetricParseFloatError {
                                 field: field.as_ref(),
                                 error
                             })
-                        }
-                        TransformError::TemplateRenderingError(error) => {
-                            emit!(crate::internal_events::TemplateRenderingError {
+                            }
+                            TransformError::TemplateRenderingError(error) => {
+                                emit!(crate::internal_events::TemplateRenderingError {
                                 error,
                                 drop_event: true,
                                 field: None,
                             })
-                        }
-                    };
-                    // early return to prevent the partial buffer from being sent
-                    return;
+                            }
+                        };
+                        // early return to prevent the partial buffer from being sent
+                        return;
+                    }
                 }
             }
         }
