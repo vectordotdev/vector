@@ -83,6 +83,11 @@ pub struct ConfigBuilder {
     #[serde(default, skip)]
     #[doc(hidden)]
     pub graceful_shutdown_duration: Option<Duration>,
+
+    /// Allow the configuration to be empty, resulting in a topology with no components.
+    #[serde(default, skip)]
+    #[doc(hidden)]
+    pub allow_empty: bool,
 }
 
 #[cfg(feature = "enterprise")]
@@ -232,6 +237,7 @@ impl From<Config> for ConfigBuilder {
             tests,
             secret,
             graceful_shutdown_duration,
+            allow_empty: false,
         }
     }
 }

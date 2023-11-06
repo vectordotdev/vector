@@ -127,6 +127,10 @@ impl Config {
         Default::default()
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.sources.is_empty()
+    }
+
     pub fn sources(&self) -> impl Iterator<Item = (&ComponentKey, &SourceOuter)> {
         self.sources.iter()
     }

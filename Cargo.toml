@@ -119,7 +119,7 @@ members = [
 ]
 
 [workspace.dependencies]
-vrl = { version = "0.7.0", features = ["cli"] }
+vrl = { version = "0.8.1", features = ["cli"] }
 
 pin-project = { version = "1.1.3", default-features = false }
 
@@ -184,7 +184,7 @@ azure_storage = { version = "0.16", default-features = false, optional = true }
 azure_storage_blobs = { version = "0.16", default-features = false, optional = true }
 
 # OpenDAL
-opendal = {version = "0.38", default-features = false, features = ["native-tls", "services-webhdfs"], optional = true}
+opendal = {version = "0.41", default-features = false, features = ["native-tls", "services-webhdfs"], optional = true}
 
 # Tower
 tower = { version = "0.4.13", default-features = false, features = ["buffer", "limit", "retry", "timeout", "util", "balance", "discover"] }
@@ -249,7 +249,7 @@ colored = { version = "2.0.4", default-features = false }
 csv = { version = "1.3", default-features = false }
 derivative = { version = "2.2.0", default-features = false }
 dirs-next = { version = "2.0.0", default-features = false, optional = true }
-dyn-clone = { version = "1.0.14", default-features = false }
+dyn-clone = { version = "1.0.16", default-features = false }
 encoding_rs = { version = "0.8.33", default-features = false, features = ["serde"] }
 enum_dispatch = { version = "0.3.12", default-features = false }
 exitcode = { version = "1.1.2", default-features = false }
@@ -269,7 +269,7 @@ http-body = { version = "0.4.5", default-features = false }
 hyper = { version = "0.14.27", default-features = false, features = ["client", "runtime", "http1", "http2", "server", "stream"] }
 hyper-openssl = { version = "0.9.2", default-features = false }
 hyper-proxy = { version = "0.9.1", default-features = false, features = ["openssl-tls"] }
-indexmap = { version = "~2.0.2", default-features = false, features = ["serde", "std"] }
+indexmap = { version = "2.1.0", default-features = false, features = ["serde", "std"] }
 infer = { version = "0.15.0", default-features = false, optional = true}
 indoc = { version = "2.0.4", default-features = false }
 inventory = { version = "0.3.13", default-features = false }
@@ -286,7 +286,7 @@ nkeys = { version = "0.3.1", default-features = false, optional = true }
 nom = { version = "7.1.3", default-features = false, optional = true }
 notify = { version = "6.1.1", default-features = false, features = ["macos_fsevent"] }
 once_cell = { version = "1.18", default-features = false }
-openssl = { version = "0.10.58", default-features = false, features = ["vendored"] }
+openssl = { version = "0.10.59", default-features = false, features = ["vendored"] }
 openssl-probe = { version = "0.1.5", default-features = false }
 ordered-float = { version = "4.1.1", default-features = false }
 paste = "1.0.14"
@@ -350,7 +350,7 @@ azure_storage = { version = "0.16", default-features = false }
 base64 = "0.21.5"
 criterion = { version = "0.5.1", features = ["html_reports", "async_tokio"] }
 itertools = { version = "0.11.0", default-features = false, features = ["use_alloc"] }
-libc = "0.2.149"
+libc = "0.2.150"
 similar-asserts = "1.5.0"
 proptest = "1.3"
 quickcheck = "1.0.3"
@@ -362,9 +362,9 @@ tokio = { version = "1.33.0", features = ["test-util"] }
 tokio-test = "0.4.3"
 tower-test = "0.4.0"
 vector-lib = { path = "lib/vector-lib", default-features = false, features = ["vrl", "test"] }
-vrl = { version = "0.7.0", features = ["cli", "test", "test_framework", "arbitrary"] }
+vrl = { version = "0.8.1", features = ["cli", "test", "test_framework", "arbitrary"] }
 
-wiremock = "0.5.19"
+wiremock = "0.5.21"
 zstd = { version = "0.13.0", default-features = false }
 
 [patch.crates-io]
