@@ -227,28 +227,37 @@ where
 
         let partitioner = EventPartitioner;
         let batch_settings = self.batch_settings;
-        let transformer = self.transformer;
+        let transformer = Arc::new(self.transformer);
         let builder = Arc::new(LogRequestBuilder {
             default_api_key,
             compression: self.compression,
         });
 
-        let input = input.map(|mut event| {
-            let original = event.clone();
+        let input = input
+            .ready_chunks(1024)
+            .concurrent_map(default_request_builder_concurrency_limit(), move |events| {
+                let transformer = Arc::clone(&transformer);
+                Box::pin(std::future::ready(futures::stream::iter(
+                    events.into_iter().map(move |mut event| {
+                        let original = event.clone();
 
-            map_event(&mut event);
-            transformer.transform(&mut event);
+                        map_event(&mut event);
+                        transformer.transform(&mut event);
 
-            let mut byte_size = telemetry().create_request_count_byte_size();
-            byte_size.add_event(&event, event.estimated_json_encoded_size_of());
-            let encoded = serde_json::value::to_raw_value(&event.as_log()).expect("serializing to memory");
+                        let mut byte_size = telemetry().create_request_count_byte_size();
+                        byte_size.add_event(&event, event.estimated_json_encoded_size_of());
+                        let encoded = serde_json::value::to_raw_value(&event.as_log())
+                            .expect("serializing to memory");
 
-            EncodedEvent {
-                original,
-                encoded,
-                byte_size,
-            }
-        });
+                        EncodedEvent {
+                            original,
+                            encoded,
+                            byte_size,
+                        }
+                    }),
+                )))
+            })
+            .flatten();
 
         input
             .batched_partitioned(partitioner, || {
