@@ -7,33 +7,10 @@
     <cargoProject FILE="$PROJECT_DIR$/Cargo.toml" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="bb4921f1-5f27-4fd9-951a-e62f3876fc5d" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/website/cue/reference/remap/functions/contains_all.cue" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/website/cue/reference/remap/functions/parse_float.cue" afterDir="false" />
+    <list default="true" id="869b1e39-ede3-4c68-a51f-dc22e6c2c14c" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/modules.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/modules.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Cargo.lock" beforeDir="false" afterPath="$PROJECT_DIR$/Cargo.lock" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/Cargo.toml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/docs/DEPRECATIONS.md" beforeDir="false" afterPath="$PROJECT_DIR$/docs/DEPRECATIONS.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/codecs/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/lib/codecs/Cargo.toml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/codecs/tests/data/native_encoding/vector_generate_fixtures.patch" beforeDir="false" afterPath="$PROJECT_DIR$/lib/codecs/tests/data/native_encoding/vector_generate_fixtures.patch" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/file-source/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/lib/file-source/Cargo.toml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/prometheus-parser/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/lib/prometheus-parser/Cargo.toml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/vector-common/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/lib/vector-common/Cargo.toml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/vector-config/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/lib/vector-config/Cargo.toml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/vector-core/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/lib/vector-core/Cargo.toml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/vector-vrl/tests/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/lib/vector-vrl/tests/Cargo.toml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/app.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/app.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/cli.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/cli.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/config/builder.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/config/builder.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/config/compiler.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/config/compiler.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/config/loading/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/config/loading/mod.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/config/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/config/mod.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/config/validation.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/config/validation.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/transforms/metric_metadata.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/transforms/metric_metadata.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/website/cue/reference/cli.cue" beforeDir="false" afterPath="$PROJECT_DIR$/website/cue/reference/cli.cue" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/website/cue/reference/remap.cue" beforeDir="false" afterPath="$PROJECT_DIR$/website/cue/reference/remap.cue" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/website/cue/reference/remap/functions/from_unix_timestamp.cue" beforeDir="false" afterPath="$PROJECT_DIR$/website/cue/reference/remap/functions/from_unix_timestamp.cue" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/transforms/log_to_metric.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/transforms/log_to_metric.rs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -44,16 +21,16 @@
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
   <component name="MacroExpansionManager">
-    <option name="directoryName" value="3g26puhx" />
+    <option name="directoryName" value="dmvz7lxh" />
   </component>
   <component name="MarkdownSettingsMigration">
     <option name="stateVersion" value="1" />
   </component>
-  <component name="ProjectColorInfo">{
-  &quot;customColor&quot;: &quot;&quot;,
-  &quot;associatedIndex&quot;: 0
-}</component>
-  <component name="ProjectId" id="2XdOLb1sSc7LW9s8GQvu2XkgFlc" />
+  <component name="ProjectColorInfo"><![CDATA[{
+  "customColor": "",
+  "associatedIndex": 0
+}]]></component>
+  <component name="ProjectId" id="2XoESZbuZd2UN0gL3atil0jWygO" />
   <component name="ProjectViewState">
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
@@ -63,23 +40,18 @@
     "RunOnceActivity.OpenProjectViewOnStart": "true",
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "WebServerToolWindowFactoryState": "false",
-    "git-widget-placeholder": "Merging metrics-metadata",
+    "git-widget-placeholder": "master",
     "node.js.detected.package.eslint": "true",
     "node.js.detected.package.tslint": "true",
     "node.js.selected.package.eslint": "(autodetect)",
     "node.js.selected.package.tslint": "(autodetect)",
-    "nodejs_package_manager_path": "yarn",
     "org.rust.cargo.project.model.PROJECT_DISCOVERY": "true",
-    "settings.editor.selected.configurable": "language.rust.cargo.check",
     "vue.rearranger.settings.migration": "true"
   }
 }]]></component>
-  <component name="RsExternalLinterProjectSettings">
-    <option name="runOnTheFly" value="true" />
-  </component>
-  <component name="RunManager" selected="Cargo.Test metric_metadata">
-    <configuration name="Test metric_metadata" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
-      <option name="command" value="test --package vector --lib transforms::metric_metadata" />
+  <component name="RunManager" selected="Cargo.Test log_to_metric">
+    <configuration name="Test log_to_metric" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
+      <option name="command" value="test --package vector --lib transforms::log_to_metric" />
       <option name="workingDirectory" value="file://$PROJECT_DIR$" />
       <option name="emulateTerminal" value="true" />
       <option name="channel" value="DEFAULT" />
@@ -112,9 +84,25 @@
         <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
       </method>
     </configuration>
+    <configuration default="true" type="CargoCommandRunConfiguration" factoryName="Cargo Command">
+      <option name="command" value="run" />
+      <option name="emulateTerminal" value="true" />
+      <option name="channel" value="DEFAULT" />
+      <option name="requiredFeatures" value="true" />
+      <option name="allFeatures" value="false" />
+      <option name="withSudo" value="false" />
+      <option name="buildTarget" value="REMOTE" />
+      <option name="backtrace" value="SHORT" />
+      <envs />
+      <option name="isRedirectInput" value="false" />
+      <option name="redirectInputPath" value="" />
+      <method v="2">
+        <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
+      </method>
+    </configuration>
     <recent_temporary>
       <list>
-        <item itemvalue="Cargo.Test metric_metadata" />
+        <item itemvalue="Cargo.Test log_to_metric" />
         <item itemvalue="Cargo.Test transforms::metric_metadata::tests::transform_distribution_summary" />
       </list>
     </recent_temporary>
@@ -125,32 +113,16 @@
   <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
   <component name="TaskManager">
     <task active="true" id="Default" summary="Default task">
-      <changelist id="bb4921f1-5f27-4fd9-951a-e62f3876fc5d" name="Changes" comment="" />
-      <created>1698955434788</created>
+      <changelist id="869b1e39-ede3-4c68-a51f-dc22e6c2c14c" name="Changes" comment="" />
+      <created>1699287032817</created>
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
-      <updated>1698955434788</updated>
-      <workItem from="1698955436279" duration="3692000" />
-      <workItem from="1698959454881" duration="3232000" />
+      <updated>1699287032817</updated>
+      <workItem from="1699287034218" duration="13850000" />
     </task>
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
     <option name="version" value="3" />
-  </component>
-  <component name="XDebuggerManager">
-    <breakpoint-manager>
-      <breakpoints>
-        <line-breakpoint enabled="true" type="com.jetbrains.cidr.execution.debugger.OCBreakpointType">
-          <url>file://$PROJECT_DIR$/src/transforms/metric_metadata.rs</url>
-          <line>441</line>
-          <option name="timeStamp" value="7" />
-        </line-breakpoint>
-      </breakpoints>
-    </breakpoint-manager>
-  </component>
-  <component name="XSLT-Support.FileAssociations.UIState">
-    <expand />
-    <select />
   </component>
 </project>
