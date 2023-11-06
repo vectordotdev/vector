@@ -408,7 +408,7 @@ version = "1.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4b0c4a4f319e45986f347ee47fef8bf5e81c9abc3f6f58dc2391439f30df65f0"
 dependencies = [
- "async-lock",
+ "async-lock 2.8.0",
  "async-task",
  "concurrent-queue",
  "fastrand 2.0.1",
@@ -422,7 +422,7 @@ version = "1.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "279cf904654eeebfa37ac9bb1598880884924aab82e290aa65c9e77a0e142e06"
 dependencies = [
- "async-lock",
+ "async-lock 2.8.0",
  "autocfg",
  "blocking",
  "futures-lite",
@@ -437,7 +437,7 @@ dependencies = [
  "async-channel",
  "async-executor",
  "async-io 1.13.0",
- "async-lock",
+ "async-lock 2.8.0",
  "blocking",
  "futures-lite",
  "once_cell",
@@ -544,7 +544,7 @@ version = "1.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0fc5b45d93ef0529756f812ca52e44c221b35341892d3dcc34132ac02f3dd2af"
 dependencies = [
- "async-lock",
+ "async-lock 2.8.0",
  "autocfg",
  "cfg-if",
  "concurrent-queue",
@@ -564,7 +564,7 @@ version = "2.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "10da8f3146014722c89e7859e1d7bb97873125d7346d10ca642ffab794355828"
 dependencies = [
- "async-lock",
+ "async-lock 2.8.0",
  "cfg-if",
  "concurrent-queue",
  "futures-io",
@@ -585,6 +585,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "287272293e9d8c41773cec55e365490fe034813a2f172f502d6ddcf75b2f582b"
 dependencies = [
  "event-listener 2.5.3",
+]
+
+[[package]]
+name = "async-lock"
+version = "3.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "45e900cdcd39bb94a14487d3f7ef92ca222162e6c7c3fe7cb3550ea75fb486ed"
+dependencies = [
+ "event-listener 3.0.1",
+ "event-listener-strategy",
+ "pin-project-lite",
 ]
 
 [[package]]
@@ -639,7 +650,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ea6438ba0a08d81529c69b36700fa2f95837bfe3e776ab39cde9c14d9149da88"
 dependencies = [
  "async-io 1.13.0",
- "async-lock",
+ "async-lock 2.8.0",
  "async-signal",
  "blocking",
  "cfg-if",
@@ -679,7 +690,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9e47d90f65a225c4527103a8d747001fc56e375203592b25ad103e1ca13124c5"
 dependencies = [
  "async-io 2.1.0",
- "async-lock",
+ "async-lock 2.8.0",
  "atomic-waker",
  "cfg-if",
  "futures-core",
@@ -1320,9 +1331,9 @@ dependencies = [
 
 [[package]]
 name = "azure_core"
-version = "0.16.0"
+version = "0.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8e29286b9edfdd6f2c7e9d970bb5b015df8621258acab9ecfcea09b2d7692467"
+checksum = "4ccd63c07d1fbfb3d4543d7ea800941bf5a30db1911b9b9e4db3b2c4210a434f"
 dependencies = [
  "async-trait",
  "base64 0.21.5",
@@ -1334,7 +1345,7 @@ dependencies = [
  "log",
  "paste",
  "pin-project",
- "quick-xml",
+ "quick-xml 0.31.0",
  "rand 0.8.5",
  "reqwest",
  "rustc_version 0.4.0",
@@ -1347,11 +1358,11 @@ dependencies = [
 
 [[package]]
 name = "azure_identity"
-version = "0.16.2"
+version = "0.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5b67b337346da8739e91ea1e9400a6ebc9bc54e0b2af1d23c9bcd565950588f9"
+checksum = "8bd7ea32ca7eb66ff4757f83baac702ff11d469e5de365b6bc6f79f9c25d3436"
 dependencies = [
- "async-lock",
+ "async-lock 3.0.0",
  "async-trait",
  "azure_core",
  "futures 0.3.29",
@@ -1368,9 +1379,9 @@ dependencies = [
 
 [[package]]
 name = "azure_storage"
-version = "0.16.0"
+version = "0.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bed0ccefde57930b2886fd4aed1f70ac469c197b8c2e94828290d71bcbdb5d97"
+checksum = "83ca0a07f89fd72a006da4713e93af3d6c44a693e61a1c3c2e7985de39c182e8"
 dependencies = [
  "RustyXML",
  "async-trait",
@@ -1390,9 +1401,9 @@ dependencies = [
 
 [[package]]
 name = "azure_storage_blobs"
-version = "0.16.0"
+version = "0.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f91a52da2d192cfe43759f61e8bb31a5969f1722d5b85ac89627f356ad674ab4"
+checksum = "8096c04d370118323c42b2752aa1883e4880a56ef65239f317b359f263b6e194"
 dependencies = [
  "RustyXML",
  "azure_core",
@@ -1565,7 +1576,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8c36a4d0d48574b3dd360b4b7d95cc651d2b6557b6402848a27d4b228a473e2a"
 dependencies = [
  "async-channel",
- "async-lock",
+ "async-lock 2.8.0",
  "async-task",
  "fastrand 2.0.1",
  "futures-io",
@@ -3232,6 +3243,16 @@ checksum = "01cec0252c2afff729ee6f00e903d479fba81784c8e2bd77447673471fdfaea1"
 dependencies = [
  "concurrent-queue",
  "parking",
+ "pin-project-lite",
+]
+
+[[package]]
+name = "event-listener-strategy"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d96b852f1345da36d551b9473fa1e2b1eb5c5195585c6c018118bc92a8d91160"
+dependencies = [
+ "event-listener 3.0.1",
  "pin-project-lite",
 ]
 
@@ -5851,7 +5872,7 @@ dependencies = [
  "parking_lot",
  "percent-encoding",
  "pin-project",
- "quick-xml",
+ "quick-xml 0.30.0",
  "reqwest",
  "serde",
  "serde_json",
@@ -6946,6 +6967,16 @@ name = "quick-xml"
 version = "0.30.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "eff6510e86862b57b210fd8cbe8ed3f0d7d600b9c2863cd4549a2e033c66e956"
+dependencies = [
+ "memchr",
+ "serde",
+]
+
+[[package]]
+name = "quick-xml"
+version = "0.31.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1004a344b30a54e2ee58d66a71b32d2db2feb0a31f9a2d302bf0536f15de2a33"
 dependencies = [
  "memchr",
  "serde",
@@ -8349,7 +8380,7 @@ dependencies = [
  "async-executor",
  "async-fs",
  "async-io 1.13.0",
- "async-lock",
+ "async-lock 2.8.0",
  "async-net",
  "async-process",
  "blocking",
