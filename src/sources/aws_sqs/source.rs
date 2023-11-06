@@ -224,7 +224,7 @@ mod tests {
     use crate::config::{log_schema, SourceConfig};
     use crate::sources::aws_sqs::AwsSqsConfig;
     use chrono::SecondsFormat;
-    use lookup::path;
+    use vector_lib::lookup::path;
 
     #[tokio::test]
     async fn test_decode_vector_namespace() {

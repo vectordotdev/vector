@@ -247,10 +247,12 @@ remap: #Remap & {
 				  │ │            │
 				  │ │            this expression is fallible
 				  │ │            update the expression to be infallible
+				  │ │            note if an argument type is invalid it can render a function fallible
 				  │ or change this to an infallible assignment:
 				  │ structured, err = parse_key_value(.message)
 				  │
 				  = see documentation about error handling at https://errors.vrl.dev/#handling
+				  = see functions characteristics documentation at https://vrl.dev/expressions/#function-call-characteristics
 				  = learn more about error code 103 at https://errors.vrl.dev/103
 				  = see language documentation at https://vrl.dev
 				  = try your code in the VRL REPL, learn more at https://vrl.dev/examples

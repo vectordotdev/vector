@@ -3,10 +3,10 @@ use std::sync::Arc;
 use bytes::{BufMut, Bytes, BytesMut};
 use chrono::Utc;
 use http::StatusCode;
-use lookup::path;
 use tokio_util::codec::Decoder;
 use vector_lib::codecs::StreamDecodingError;
 use vector_lib::internal_event::{CountByteSize, InternalEventHandle as _};
+use vector_lib::lookup::path;
 use vector_lib::{config::LegacyKey, EstimatedJsonEncodedSizeOf};
 use warp::{filters::BoxedFilter, path as warp_path, path::FullPath, reply::Response, Filter};
 

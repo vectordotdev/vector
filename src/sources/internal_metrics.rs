@@ -1,12 +1,12 @@
 use std::time::Duration;
 
 use futures::StreamExt;
-use lookup::lookup_v2::OptionalValuePath;
 use serde_with::serde_as;
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
 use vector_lib::configurable::configurable_component;
 use vector_lib::internal_event::{CountByteSize, InternalEventHandle as _};
+use vector_lib::lookup::lookup_v2::OptionalValuePath;
 use vector_lib::{config::LogNamespace, ByteSizeOf, EstimatedJsonEncodedSizeOf};
 
 use crate::{

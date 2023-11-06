@@ -6,7 +6,6 @@ use bytes::Bytes;
 use futures::{future::BoxFuture, FutureExt, StreamExt};
 use futures_util::future::OptionFuture;
 use listenfd::ListenFd;
-use lookup::{path, OwnedValuePath};
 use smallvec::SmallVec;
 use socket2::SockRef;
 use tokio::{
@@ -18,6 +17,7 @@ use tokio_util::codec::{Decoder, FramedRead};
 use tracing::Instrument;
 use vector_lib::codecs::StreamDecodingError;
 use vector_lib::finalization::AddBatchNotifier;
+use vector_lib::lookup::{path, OwnedValuePath};
 use vector_lib::{
     config::{LegacyKey, LogNamespace, SourceAcknowledgementsConfig},
     EstimatedJsonEncodedSizeOf,

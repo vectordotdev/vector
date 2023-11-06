@@ -8,13 +8,13 @@ use tokio_util::codec::Decoder as _;
 use vrl::value::{kind::Collection, Kind};
 use warp::http::{HeaderMap, HeaderValue};
 
-use lookup::{lookup_v2::OptionalValuePath, owned_value_path, path};
 use vector_lib::codecs::{
     decoding::{DeserializerConfig, FramingConfig},
     BytesDecoderConfig, BytesDeserializerConfig, JsonDeserializerConfig,
     NewlineDelimitedDecoderConfig,
 };
 use vector_lib::configurable::configurable_component;
+use vector_lib::lookup::{lookup_v2::OptionalValuePath, owned_value_path, path};
 use vector_lib::{
     config::{DataType, LegacyKey, LogNamespace},
     schema::Definition,
@@ -489,14 +489,14 @@ mod tests {
     use vrl::value::kind::Collection;
     use vrl::value::Kind;
 
-    use lookup::lookup_v2::OptionalValuePath;
-    use lookup::{event_path, owned_value_path, OwnedTargetPath};
     use vector_lib::codecs::{
         decoding::{DeserializerConfig, FramingConfig},
         BytesDecoderConfig, JsonDeserializerConfig,
     };
     use vector_lib::config::LogNamespace;
     use vector_lib::event::LogEvent;
+    use vector_lib::lookup::lookup_v2::OptionalValuePath;
+    use vector_lib::lookup::{event_path, owned_value_path, OwnedTargetPath, PathPrefix};
     use vector_lib::schema::Definition;
 
     use crate::sources::http_server::HttpMethod;
@@ -963,10 +963,7 @@ mod tests {
         assert!(log.get_timestamp().is_some());
 
         let source_type_key_value = log
-            .get((
-                lookup::PathPrefix::Event,
-                log_schema().source_type_key().unwrap(),
-            ))
+            .get((PathPrefix::Event, log_schema().source_type_key().unwrap()))
             .unwrap()
             .as_str()
             .unwrap();

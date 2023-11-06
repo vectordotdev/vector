@@ -39,8 +39,8 @@ use crate::{
     shutdown::ShutdownSignal,
     SourceSender,
 };
-use lookup::{owned_value_path, path};
 use vector_lib::config::{log_schema, LogNamespace};
+use vector_lib::lookup::{owned_value_path, path};
 
 #[cfg(test)]
 mod tests;

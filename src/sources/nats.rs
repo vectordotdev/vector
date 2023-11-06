@@ -1,6 +1,5 @@
 use chrono::Utc;
 use futures::{pin_mut, StreamExt};
-use lookup::{lookup_v2::OptionalValuePath, owned_value_path};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
 use vector_lib::codecs::decoding::{DeserializerConfig, FramingConfig, StreamDecodingError};
@@ -8,6 +7,7 @@ use vector_lib::configurable::configurable_component;
 use vector_lib::internal_event::{
     ByteSize, BytesReceived, CountByteSize, EventsReceived, InternalEventHandle as _, Protocol,
 };
+use vector_lib::lookup::{lookup_v2::OptionalValuePath, owned_value_path};
 use vector_lib::{
     config::{LegacyKey, LogNamespace},
     EstimatedJsonEncodedSizeOf,
@@ -287,7 +287,7 @@ async fn create_subscription(
 mod tests {
     #![allow(clippy::print_stdout)] //tests
 
-    use lookup::{owned_value_path, OwnedTargetPath};
+    use vector_lib::lookup::{owned_value_path, OwnedTargetPath};
     use vector_lib::schema::Definition;
     use vrl::value::{kind::Collection, Kind};
 

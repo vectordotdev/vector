@@ -154,7 +154,7 @@ where
 
 #[cfg(test)]
 mod test {
-    use lookup::lookup_v2::{parse_value_path, ConfigValuePath};
+    use vector_lib::lookup::lookup_v2::{parse_value_path, ConfigValuePath};
 
     use super::*;
     use crate::codecs::encoding::TimestampFormat;

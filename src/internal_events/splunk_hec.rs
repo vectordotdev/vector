@@ -262,8 +262,6 @@ mod source {
                 "error_type" => error_type::REQUEST_FAILED,
                 "stage" => error_stage::RECEIVING,
             );
-            // deprecated
-            counter!("http_request_errors_total", 1);
         }
     }
 }

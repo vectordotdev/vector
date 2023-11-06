@@ -12,8 +12,6 @@ use flate2::read::MultiGzDecoder;
 use futures::FutureExt;
 use http::StatusCode;
 use hyper::{service::make_service_fn, Server};
-use lookup::lookup_v2::OptionalValuePath;
-use lookup::{event_path, owned_value_path};
 use serde::Serialize;
 use serde_json::{de::Read as JsonRead, Deserializer, Value as JsonValue};
 use snafu::Snafu;
@@ -21,6 +19,8 @@ use tower::ServiceBuilder;
 use tracing::Span;
 use vector_lib::configurable::configurable_component;
 use vector_lib::internal_event::{CountByteSize, InternalEventHandle as _, Registered};
+use vector_lib::lookup::lookup_v2::OptionalValuePath;
+use vector_lib::lookup::{self, event_path, owned_value_path};
 use vector_lib::sensitive_string::SensitiveString;
 use vector_lib::{
     config::{LegacyKey, LogNamespace},

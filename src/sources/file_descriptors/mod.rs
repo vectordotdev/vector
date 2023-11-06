@@ -4,7 +4,6 @@ use async_stream::stream;
 use bytes::Bytes;
 use chrono::Utc;
 use futures::{channel::mpsc, executor, SinkExt, StreamExt};
-use lookup::{lookup_v2::OptionalValuePath, owned_value_path, path, OwnedValuePath};
 use tokio_util::{codec::FramedRead, io::StreamReader};
 use vector_lib::codecs::{
     decoding::{DeserializerConfig, FramingConfig},
@@ -14,6 +13,7 @@ use vector_lib::configurable::NamedComponent;
 use vector_lib::internal_event::{
     ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol,
 };
+use vector_lib::lookup::{lookup_v2::OptionalValuePath, owned_value_path, path, OwnedValuePath};
 use vector_lib::{
     config::{LegacyKey, LogNamespace},
     event::Event,

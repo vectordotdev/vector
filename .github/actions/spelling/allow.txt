@@ -113,6 +113,7 @@ Mediacom
 Medion
 Meizu
 Mertz
+metakey
 Metakey
 Micromax
 Mito

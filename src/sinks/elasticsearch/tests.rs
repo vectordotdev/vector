@@ -1,5 +1,7 @@
 use std::{collections::BTreeMap, convert::TryFrom};
 
+use vector_lib::lookup::PathPrefix;
+
 use crate::{
     codecs::Transformer,
     event::{LogEvent, Metric, MetricKind, MetricValue, Value},
@@ -37,10 +39,7 @@ async fn sets_create_action_when_configured() {
 
     let mut log = LogEvent::from("hello there");
     log.insert(
-        (
-            lookup::PathPrefix::Event,
-            log_schema().timestamp_key().unwrap(),
-        ),
+        (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
         Utc.with_ymd_and_hms(2020, 12, 1, 1, 2, 3)
             .single()
             .expect("invalid timestamp"),
@@ -106,10 +105,7 @@ async fn encode_datastream_mode() {
 
     let mut log = LogEvent::from("hello there");
     log.insert(
-        (
-            lookup::PathPrefix::Event,
-            log_schema().timestamp_key().unwrap(),
-        ),
+        (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
         Utc.with_ymd_and_hms(2020, 12, 1, 1, 2, 3)
             .single()
             .expect("invalid timestamp"),
@@ -173,10 +169,7 @@ async fn encode_datastream_mode_no_routing() {
         ),
     );
     log.insert(
-        (
-            lookup::PathPrefix::Event,
-            log_schema().timestamp_key().unwrap(),
-        ),
+        (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
         Utc.with_ymd_and_hms(2020, 12, 1, 1, 2, 3)
             .single()
             .expect("invalid timestamp"),
@@ -324,10 +317,7 @@ async fn encode_datastream_mode_no_sync() {
         ),
     );
     log.insert(
-        (
-            lookup::PathPrefix::Event,
-            log_schema().timestamp_key().unwrap(),
-        ),
+        (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
         Utc.with_ymd_and_hms(2020, 12, 1, 1, 2, 3)
             .single()
             .expect("invalid timestamp"),

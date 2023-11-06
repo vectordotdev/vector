@@ -4,15 +4,15 @@ use bytes::Bytes;
 use futures_util::FutureExt;
 use http::StatusCode;
 use hyper::{service::make_service_fn, Server};
-use opentelemetry_proto::proto::collector::logs::v1::{
-    ExportLogsServiceRequest, ExportLogsServiceResponse,
-};
 use prost::Message;
 use snafu::Snafu;
 use tower::ServiceBuilder;
 use tracing::Span;
 use vector_lib::internal_event::{
     ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Registered,
+};
+use vector_lib::opentelemetry::proto::collector::logs::v1::{
+    ExportLogsServiceRequest, ExportLogsServiceResponse,
 };
 use vector_lib::{
     config::LogNamespace,

@@ -1,12 +1,12 @@
 use std::time::Duration;
 
 use chrono::Utc;
-use lookup::{lookup_v2::OptionalValuePath, owned_value_path, path};
 use serde_with::serde_as;
 use smallvec::SmallVec;
 use vector_lib::codecs::decoding::{DeserializerConfig, FramingConfig};
 use vector_lib::config::{LegacyKey, LogNamespace};
 use vector_lib::configurable::configurable_component;
+use vector_lib::lookup::{lookup_v2::OptionalValuePath, owned_value_path, path};
 
 use crate::{
     codecs::Decoder,
