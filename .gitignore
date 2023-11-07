@@ -19,3 +19,4 @@ massif.*
 
 # tilt
 tilt_modules/
+.idea
