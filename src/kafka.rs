@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 
 use rdkafka::{consumer::ConsumerContext, ClientConfig, ClientContext, Statistics};
 use snafu::Snafu;
+use tracing::Span;
 use vector_lib::configurable::configurable_component;
 use vector_lib::sensitive_string::SensitiveString;
 
@@ -152,13 +153,14 @@ fn pathbuf_to_string(path: &Path) -> crate::Result<&str> {
         .ok_or_else(|| KafkaError::InvalidPath { path: path.into() }.into())
 }
 
-#[derive(Default)]
 pub(crate) struct KafkaStatisticsContext {
     pub(crate) expose_lag_metrics: bool,
+    pub span: Span,
 }
 
 impl ClientContext for KafkaStatisticsContext {
     fn stats(&self, statistics: Statistics) {
+        let _entered = self.span.enter();
         emit!(KafkaStatisticsReceived {
             statistics: &statistics,
             expose_lag_metrics: self.expose_lag_metrics,
