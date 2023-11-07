@@ -83,7 +83,6 @@ mod logplex;
 mod loki;
 #[cfg(feature = "transforms-lua")]
 mod lua;
-mod metric_metadata;
 #[cfg(feature = "transforms-metric_to_log")]
 mod metric_to_log;
 #[cfg(feature = "sources-mongodb_metrics")]
