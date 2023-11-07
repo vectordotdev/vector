@@ -1475,7 +1475,7 @@ mod tests {
     }
 
     //  Metric Metadata Tests
-    fn create_log_event(json_str : &str) -> LogEvent {
+    fn create_log_event(json_str : &str) -> Event {
         let mut log_value: Value = serde_json::from_str(&*json_str).expect("JSON was not well-formatted");
         log_value.insert("timestamp", ts());
         log_value.insert("namespace", "test_namespace");
@@ -1484,31 +1484,20 @@ mod tests {
         metadata.set_source_id(Arc::new(ComponentKey::from("in")));
         metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
 
-        LogEvent::from_parts(log_value, metadata.clone())
-    }
-
-    async fn do_metadata_transform(log: LogEvent) -> Option<Metric> {
-        assert_transform_compliance(async move {
-            let config = parse_config(r#""#);
-            let (tx, rx) = mpsc::channel(1);
-            let (topology, mut out) = create_topology(ReceiverStream::new(rx), config).await;
-
-            tx.send(log.into()).await.unwrap();
-
-            let result = out.recv().await;
-
-            drop(tx);
-            topology.stop().await;
-            assert_eq!(out.recv().await, None);
-
-            result
-        })
-            .await
-            .map(|e| e.into_metric())
+        Event::Log(LogEvent::from_parts(log_value, metadata.clone()))
     }
 
     #[tokio::test]
     async fn transform_gauge() {
+        let config = parse_config(
+            r#"
+            [[metrics]]
+            type = "gauge"
+            field = "value"
+            name = "test.transform.gauge"
+            "#,
+        );
+
         let json_str = r#"{
           "gauge": {
             "value": 990.0
@@ -1521,9 +1510,9 @@ mod tests {
           }
         }"#;
         let log = create_log_event(json_str);
-        let metric = do_metadata_transform(log.clone()).await.unwrap();
+        let metric = do_transform(config, log.clone()).await.unwrap();
         assert_eq!(
-            metric,
+            *metric.as_metric(),
             Metric::new_with_metadata(
                 "test.transform.gauge",
                 MetricKind::Absolute,
@@ -1541,6 +1530,11 @@ mod tests {
 
     #[tokio::test]
     async fn transform_histogram() {
+        let config = parse_config(r#"
+                metrics:
+                  all_fields: true
+                "#);
+
         let json_str = r#"{
           "histogram": {
             "sum": 18.0,
@@ -1572,9 +1566,9 @@ mod tests {
           }
         }"#;
         let log = create_log_event(json_str);
-        let metric = do_metadata_transform(log.clone()).await.unwrap();
+        let metric = do_transform(config,log.clone()).await.unwrap();
         assert_eq!(
-            metric,
+            *metric.as_metric(),
             Metric::new_with_metadata(
                 "test.transform.histogram",
                 MetricKind::Absolute,
@@ -1613,6 +1607,11 @@ mod tests {
 
     #[tokio::test]
     async fn transform_distribution_histogram() {
+        let config = parse_config(r#"
+                metrics:
+                  all_fields: true
+                "#);
+
         let json_str = r#"{
           "distribution": {
             "samples": [
@@ -1635,9 +1634,9 @@ mod tests {
           }
         }"#;
         let log = create_log_event(json_str);
-        let metric = do_metadata_transform(log.clone()).await.unwrap();
+        let metric = do_transform(config, log.clone()).await.unwrap();
         assert_eq!(
-            metric,
+            *metric.as_metric(),
             Metric::new_with_metadata(
                 "test.transform.distribution_histogram",
                 MetricKind::Absolute,
@@ -1661,6 +1660,11 @@ mod tests {
 
     #[tokio::test]
     async fn transform_distribution_summary() {
+        let config = parse_config(r#"
+                metrics:
+                  all_fields: true
+                "#);
+
         let json_str = r#"{
           "distribution": {
             "samples": [
@@ -1683,9 +1687,9 @@ mod tests {
           }
         }"#;
         let log = create_log_event(json_str);
-        let metric = do_metadata_transform(log.clone()).await.unwrap();
+        let metric = do_transform(config,log.clone()).await.unwrap();
         assert_eq!(
-            metric,
+            *metric.as_metric(),
             Metric::new_with_metadata(
                 "test.transform.distribution_summary",
                 MetricKind::Absolute,
@@ -1709,6 +1713,11 @@ mod tests {
 
     #[tokio::test]
     async fn transform_summary() {
+        let config = parse_config(r#"
+                metrics:
+                  all_fields: true
+                "#);
+
         let json_str = r#"{
           "summary": {
             "sum": 100.0,
@@ -1732,9 +1741,9 @@ mod tests {
           }
         }"#;
         let log = create_log_event(json_str);
-        let metric = do_metadata_transform(log.clone()).await.unwrap();
+        let metric = do_transform(config,log.clone()).await.unwrap();
         assert_eq!(
-            metric,
+            *metric.as_metric(),
             Metric::new_with_metadata(
                 "test.transform.histogram",
                 MetricKind::Absolute,
@@ -1765,6 +1774,11 @@ mod tests {
 
     #[tokio::test]
     async fn transform_counter() {
+        let config = parse_config(r#"
+                metrics:
+                  all_fields: true
+                "#);
+
         let json_str = r#"{
           "counter": {
             "value": 10.0
@@ -1777,9 +1791,9 @@ mod tests {
           }
         }"#;
         let log = create_log_event(json_str);
-        let metric = do_metadata_transform(log.clone()).await.unwrap();
+        let metric = do_transform(config,log.clone()).await.unwrap();
         assert_eq!(
-            metric,
+            *metric.as_metric(),
             Metric::new_with_metadata(
                 "test.transform.counter",
                 MetricKind::Incremental,
