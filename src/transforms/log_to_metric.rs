@@ -686,7 +686,7 @@ impl FunctionTransform for LogToMetric {
                         TransformError::FieldNotFound { field } => {
                             emit!(ParserMissingFieldError::<DROP_EVENT> {
                                 field: field.as_ref()
-                        })
+                            })
                         }
                         TransformError::ParseMetricFloatError { field } => {
                             emit!(MetricMetadataParseFloatError {

@@ -219,7 +219,6 @@ pub(crate) use self::logplex::*;
 pub(crate) use self::loki::*;
 #[cfg(feature = "transforms-lua")]
 pub(crate) use self::lua::*;
-pub(crate) use self::metric_metadata::*;
 #[cfg(feature = "transforms-metric_to_log")]
 pub(crate) use self::metric_to_log::*;
 #[cfg(feature = "sources-nginx_metrics")]
