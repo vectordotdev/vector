@@ -20,3 +20,4 @@ massif.*
 # tilt
 tilt_modules/
 .idea
+vector.yaml
