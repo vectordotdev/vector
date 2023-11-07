@@ -22,6 +22,12 @@ releases: "0.34.0": {
 		  change and recommended practices to either secure the disk buffers or to avoid
 		  storing secrets in events altogether.
 
+		  This release also marks the deprecation of the OS package repositories hosted at
+		  `repositories.timber.io`. Instead, packages have been moved to `apt.vector.dev` and
+		  `yum.vector.dev`. Please see the [release
+		  highlight](/highlights/2023-11-07-new-linux-repos) for details about this change and
+		  instructions on how to migrate. The repositories located at `repositories.timber.io` will
+		  be decommissioned on February 28th, 2024.
 		"""
 
 	changelog: [
