@@ -1267,7 +1267,7 @@ impl KafkaSourceContext {
         Self {
             stats: kafka::KafkaStatisticsContext {
                 expose_lag_metrics,
-                span: span,
+                span,
             },
             acknowledgements,
             consumer: OnceLock::default(),
