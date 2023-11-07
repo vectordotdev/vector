@@ -27,7 +27,7 @@ releases: "0.34.0": {
 		  `yum.vector.dev`. Please see the [release
 		  highlight](/highlights/2023-11-07-new-linux-repos) for details about this change and
 		  instructions on how to migrate. The repositories located at `repositories.timber.io` will
-		  be decomissioned on February 28th, 2024.
+		  be decommissioned on February 28th, 2024.
 		"""
 
 	changelog: [
