@@ -160,6 +160,8 @@ pub(crate) struct KafkaStatisticsContext {
 
 impl ClientContext for KafkaStatisticsContext {
     fn stats(&self, statistics: Statistics) {
+        // This callback get executed on a separate thread within the rdkafka library, so we need
+        // to propagate the span here to attach the component tags to the emitted events.
         let _entered = self.span.enter();
         emit!(KafkaStatisticsReceived {
             statistics: &statistics,
