@@ -10,14 +10,13 @@ mod sink {
     use metrics::{counter, decrement_gauge, increment_gauge};
     use serde_json::Error;
     use vector_lib::internal_event::InternalEvent;
-
-    use crate::{
-        emit,
-        event::metric::{MetricKind, MetricValue},
-        sinks::splunk_hec::common::acknowledgements::HecAckApiError,
-    };
     use vector_lib::internal_event::{
         error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL,
+    };
+
+    use crate::{
+        event::metric::{MetricKind, MetricValue},
+        sinks::splunk_hec::common::acknowledgements::HecAckApiError,
     };
 
     #[derive(Debug)]

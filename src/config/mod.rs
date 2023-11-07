@@ -247,17 +247,6 @@ impl Default for HealthcheckOptions {
     }
 }
 
-#[macro_export]
-macro_rules! impl_generate_config_from_default {
-    ($type:ty) => {
-        impl $crate::config::GenerateConfig for $type {
-            fn generate_config() -> toml::value::Value {
-                toml::value::Value::try_from(&Self::default()).unwrap()
-            }
-        }
-    };
-}
-
 /// Unique thing, like port, of which only one owner can be.
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub enum Resource {

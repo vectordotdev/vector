@@ -1,6 +1,6 @@
 [package]
 name = "vector"
-version = "0.34.0"
+version = "0.35.0"
 authors = ["Vector Contributors <vector@datadoghq.com>"]
 edition = "2021"
 description = "A lightweight and ultra-fast tool for building observability pipelines"
@@ -178,10 +178,10 @@ aws-smithy-http-tower = { git = "https://github.com/vectordotdev/aws-sdk-rust", 
 aws-smithy-types = { git = "https://github.com/vectordotdev/aws-sdk-rust", rev = "3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670", default-features = false, optional = true }
 
 # Azure
-azure_core = { version = "0.16", default-features = false, features = ["enable_reqwest"], optional = true }
-azure_identity = { version = "0.16", default-features = false, features = ["enable_reqwest"], optional = true }
-azure_storage = { version = "0.16", default-features = false, optional = true }
-azure_storage_blobs = { version = "0.16", default-features = false, optional = true }
+azure_core = { version = "0.17", default-features = false, features = ["enable_reqwest"], optional = true }
+azure_identity = { version = "0.17", default-features = false, features = ["enable_reqwest"], optional = true }
+azure_storage = { version = "0.17", default-features = false, optional = true }
+azure_storage_blobs = { version = "0.17", default-features = false, optional = true }
 
 # OpenDAL
 opendal = {version = "0.41", default-features = false, features = ["native-tls", "services-webhdfs"], optional = true}
@@ -190,7 +190,7 @@ opendal = {version = "0.41", default-features = false, features = ["native-tls",
 tower = { version = "0.4.13", default-features = false, features = ["buffer", "limit", "retry", "timeout", "util", "balance", "discover"] }
 tower-http = { version = "0.4.4", default-features = false, features = ["decompression-gzip", "trace"]}
 # Serde
-serde = { version = "1.0.190", default-features = false, features = ["derive"] }
+serde = { version = "1.0.192", default-features = false, features = ["derive"] }
 serde-toml-merge = { version = "0.3.3", default-features = false }
 serde_bytes = { version = "0.11.12", default-features = false, features = ["std"], optional = true }
 serde_json = { version = "1.0.107", default-features = false, features = ["raw_value"] }
@@ -214,7 +214,7 @@ smpl_jwt = { version = "0.8.0", default-features = false, optional = true }
 lapin = { version = "2.3.1", default-features = false, features = ["native-tls"], optional = true }
 
 # API
-async-graphql = { version = "6.0.9", default-features = false, optional = true, features = ["chrono", "playground"] }
+async-graphql = { version = "6.0.10", default-features = false, optional = true, features = ["chrono", "playground"] }
 async-graphql-warp = { version = "6.0.0", default-features = false, optional = true }
 itertools = { version = "0.11.0", default-features = false }
 
@@ -311,7 +311,7 @@ syslog = { version = "6.1.0", default-features = false, optional = true }
 tikv-jemallocator = { version = "0.5.4", default-features = false, optional = true }
 tokio-postgres = { version = "0.7.10", default-features = false, features = ["runtime", "with-chrono-0_4"], optional = true }
 tokio-tungstenite = {version = "0.20.1", default-features = false, features = ["connect"], optional = true}
-toml = { version = "0.8.6", default-features = false, features = ["parse", "display"] }
+toml = { version = "0.8.8", default-features = false, features = ["parse", "display"] }
 tonic = { version = "0.10", optional = true, default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "gzip"] }
 trust-dns-proto = { version = "0.23.2", default-features = false, features = ["dnssec"], optional = true }
 typetag = { version = "0.2.13", default-features = false }
@@ -343,10 +343,10 @@ openssl-src = { version = "300", default-features = false, features = ["force-en
 [dev-dependencies]
 approx = "0.5.1"
 assert_cmd = { version = "2.0.12", default-features = false }
-azure_core = { version = "0.16", default-features = false, features = ["enable_reqwest", "azurite_workaround"] }
-azure_identity = { version = "0.16", default-features = false, features = ["enable_reqwest"] }
-azure_storage_blobs = { version = "0.16", default-features = false, features = ["azurite_workaround"] }
-azure_storage = { version = "0.16", default-features = false }
+azure_core = { version = "0.17", default-features = false, features = ["enable_reqwest", "azurite_workaround"] }
+azure_identity = { version = "0.17", default-features = false, features = ["enable_reqwest"] }
+azure_storage_blobs = { version = "0.17", default-features = false, features = ["azurite_workaround"] }
+azure_storage = { version = "0.17", default-features = false }
 base64 = "0.21.5"
 criterion = { version = "0.5.1", features = ["html_reports", "async_tokio"] }
 itertools = { version = "0.11.0", default-features = false, features = ["use_alloc"] }

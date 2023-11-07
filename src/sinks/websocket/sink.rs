@@ -25,6 +25,7 @@ use tokio_tungstenite::{
 };
 use tokio_util::codec::Encoder as _;
 use vector_lib::{
+    emit,
     internal_event::{
         ByteSize, BytesSent, CountByteSize, EventsSent, InternalEventHandle as _, Output, Protocol,
     },
@@ -33,7 +34,7 @@ use vector_lib::{
 
 use crate::{
     codecs::{Encoder, Transformer},
-    dns, emit,
+    dns,
     event::{Event, EventStatus, Finalizable},
     http::Auth,
     internal_events::{

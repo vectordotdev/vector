@@ -196,6 +196,7 @@ errno,https://github.com/lambda-fairy/rust-errno,MIT OR Apache-2.0,Chris Wong <l
 error-chain,https://github.com/rust-lang-nursery/error-chain,MIT OR Apache-2.0,"Brian Anderson <banderson@mozilla.com>, Paul Colomiets <paul@colomiets.name>, Colin Kiegel <kiegel@gmx.de>, Yamakaky <yamakaky@yamaworld.fr>, Andrew Gauger <andygauge@gmail.com>"
 error-code,https://github.com/DoumanAsh/error-code,BSL-1.0,Douman <douman@gmx.se>
 event-listener,https://github.com/smol-rs/event-listener,Apache-2.0 OR MIT,Stjepan Glavina <stjepang@gmail.com>
+event-listener-strategy,https://github.com/smol-rs/event-listener,Apache-2.0 OR MIT,John Nunley <dev@notgull.net>
 executor-trait,https://github.com/amqp-rs/executor-trait,Apache-2.0 OR MIT,Marc-Antoine Perennou <Marc-Antoine@Perennou.com>
 exitcode,https://github.com/benwilber/exitcode,Apache-2.0,Ben Wilber <benwilber@gmail.com>
 extend,https://github.com/davidpdrsn/ext,MIT,David Pedersen <david.pdrsn@gmail.com>

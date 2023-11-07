@@ -130,8 +130,17 @@ impl SinkConfig for ClickhouseConfig {
     }
 }
 
+fn get_healthcheck_uri(endpoint: &Uri) -> String {
+    let mut uri = endpoint.to_string();
+    if !uri.ends_with('/') {
+        uri.push('/');
+    }
+    uri.push_str("?query=SELECT%201");
+    uri
+}
+
 async fn healthcheck(client: HttpClient, endpoint: Uri, auth: Option<Auth>) -> crate::Result<()> {
-    let uri = format!("{}/?query=SELECT%201", endpoint);
+    let uri = get_healthcheck_uri(&endpoint);
     let mut request = Request::get(uri).body(Body::empty()).unwrap();
 
     if let Some(auth) = auth {
@@ -153,5 +162,21 @@ mod tests {
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<ClickhouseConfig>();
+    }
+
+    #[test]
+    fn test_get_healthcheck_uri() {
+        assert_eq!(
+            get_healthcheck_uri(&"http://localhost:8123".parse().unwrap()),
+            "http://localhost:8123/?query=SELECT%201"
+        );
+        assert_eq!(
+            get_healthcheck_uri(&"http://localhost:8123/".parse().unwrap()),
+            "http://localhost:8123/?query=SELECT%201"
+        );
+        assert_eq!(
+            get_healthcheck_uri(&"http://localhost:8123/path/".parse().unwrap()),
+            "http://localhost:8123/path/?query=SELECT%201"
+        );
     }
 }
