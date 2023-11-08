@@ -13,8 +13,8 @@ use vector_lib::{
         metric::{Bucket, Quantile},
     },
 };
-use vrl::event_path;
-use vrl::path::parse_target_path;
+use vrl::path::{parse_target_path, PathParseError};
+use vrl::{event_path, path};
 
 use crate::config::schema::Definition;
 use crate::transforms::log_to_metric::TransformError::FieldNotFound;
@@ -408,13 +408,21 @@ fn bytes_to_str(value: &Value) -> Option<String> {
     }
 }
 
-fn get_str_from_log(log: &LogEvent, key: &str) -> Option<String> {
-    log.get(event_path!(key)).and_then(bytes_to_str)
+fn try_get_string_from_log(log: &LogEvent, path: &str) -> Result<Option<String>, TransformError> {
+    // TODO: update returned errors after `TransformError` is refactored.
+    let maybe_value = log.parse_path_and_get_value(path)
+        .map_err(|e| match e {
+            PathParseError::InvalidPathSyntax {path } => FieldNotFound { field: path.to_string() },
+        })?;
+    match maybe_value {
+        None => Err(FieldNotFound { field: path.to_string() }),
+        Some(v) => Ok(bytes_to_str(v)),
+    }
 }
 
 fn get_counter_value(log: &LogEvent) -> Result<MetricValue, TransformError> {
     let counter_value = log
-        .get("counter.value")
+        .get(event_path!("counter", "value"))
         .ok_or_else(|| TransformError::FieldNotFound {
             field: "counter.value".to_string(),
         })?
@@ -430,7 +438,7 @@ fn get_counter_value(log: &LogEvent) -> Result<MetricValue, TransformError> {
 
 fn get_gauge_value(log: &LogEvent) -> Result<MetricValue, TransformError> {
     let gauge_value = log
-        .get("gauge.value")
+        .get(event_path!("gauge", "value"))
         .ok_or_else(|| TransformError::FieldNotFound {
             field: "gauge.value".to_string(),
         })?
@@ -445,7 +453,7 @@ fn get_gauge_value(log: &LogEvent) -> Result<MetricValue, TransformError> {
 
 fn get_distribution_value(log: &LogEvent) -> Result<MetricValue, TransformError> {
     let event_samples = log
-        .get("distribution.samples")
+        .get(event_path!("distribution", "samples"))
         .ok_or_else(|| TransformError::FieldNotFound {
             field: "distribution.samples".to_string(),
         })?
@@ -457,7 +465,7 @@ fn get_distribution_value(log: &LogEvent) -> Result<MetricValue, TransformError>
     let mut samples: Vec<Sample> = Vec::new();
     for e_sample in event_samples {
         let value = e_sample
-            .get("value")
+            .get(path!("value"))
             .ok_or_else(|| TransformError::FieldNotFound {
                 field: "value".to_string(),
             })?
@@ -467,7 +475,7 @@ fn get_distribution_value(log: &LogEvent) -> Result<MetricValue, TransformError>
             })?;
 
         let rate = e_sample
-            .get("rate")
+            .get(path!("rate"))
             .ok_or_else(|| TransformError::FieldNotFound {
                 field: "rate".to_string(),
             })?
@@ -482,12 +490,14 @@ fn get_distribution_value(log: &LogEvent) -> Result<MetricValue, TransformError>
         });
     }
 
-    let statistic_str = get_str_from_log(&log, "distribution.statistic").ok_or_else(|| {
-        TransformError::FieldNotFound {
-            field: "distribution.statistic".to_string(),
+    let statistic_str = match try_get_string_from_log(log, "distribution.statistic")? {
+        Some(n) => n,
+        None => {
+            return Err(TransformError::FieldNotFound {
+                field: "distribution.statistic".to_string(),
+            })
         }
-    })?;
-
+    };
     let statistic_kind = match statistic_str.as_str() {
         "histogram" => Ok(StatisticKind::Histogram),
         "summary" => Ok(StatisticKind::Summary),
@@ -505,7 +515,7 @@ fn get_distribution_value(log: &LogEvent) -> Result<MetricValue, TransformError>
 
 fn get_histogram_value(log: &LogEvent) -> Result<MetricValue, TransformError> {
     let event_buckets = log
-        .get("histogram.buckets")
+        .get(event_path!("histogram", "buckets"))
         .ok_or_else(|| TransformError::FieldNotFound {
             field: "histogram.buckets".to_string(),
         })?
@@ -517,7 +527,7 @@ fn get_histogram_value(log: &LogEvent) -> Result<MetricValue, TransformError> {
     let mut buckets: Vec<Bucket> = Vec::new();
     for e_bucket in event_buckets {
         let upper_limit = e_bucket
-            .get("upper_limit")
+            .get(path!("upper_limit"))
             .ok_or_else(|| TransformError::FieldNotFound {
                 field: "histogram.buckets.upper_limit".to_string(),
             })?
@@ -527,7 +537,7 @@ fn get_histogram_value(log: &LogEvent) -> Result<MetricValue, TransformError> {
             })?;
 
         let count = e_bucket
-            .get("count")
+            .get(path!("count"))
             .ok_or_else(|| TransformError::FieldNotFound {
                 field: "histogram.buckets.count".to_string(),
             })?
@@ -543,7 +553,7 @@ fn get_histogram_value(log: &LogEvent) -> Result<MetricValue, TransformError> {
     }
 
     let count = log
-        .get("histogram.count")
+        .get(event_path!("histogram", "count"))
         .ok_or_else(|| TransformError::FieldNotFound {
             field: "histogram.count".to_string(),
         })?
@@ -553,7 +563,7 @@ fn get_histogram_value(log: &LogEvent) -> Result<MetricValue, TransformError> {
         })?;
 
     let sum = log
-        .get("histogram.sum")
+        .get(event_path!("histogram", "sum"))
         .ok_or_else(|| TransformError::FieldNotFound {
             field: "histogram.sum".to_string(),
         })?
@@ -571,7 +581,7 @@ fn get_histogram_value(log: &LogEvent) -> Result<MetricValue, TransformError> {
 
 fn get_summary_value(log: &LogEvent) -> Result<MetricValue, TransformError> {
     let event_quantiles = log
-        .get("summary.quantiles")
+        .get(event_path!("summary", "quantiles"))
         .ok_or_else(|| TransformError::FieldNotFound {
             field: "summary.quantiles".to_string(),
         })?
@@ -583,7 +593,7 @@ fn get_summary_value(log: &LogEvent) -> Result<MetricValue, TransformError> {
     let mut quantiles: Vec<Quantile> = Vec::new();
     for e_quantile in event_quantiles {
         let quantile = e_quantile
-            .get("quantile")
+            .get(path!("quantile"))
             .ok_or_else(|| TransformError::FieldNotFound {
                 field: "summary.quantiles.quantile".to_string(),
             })?
@@ -593,7 +603,7 @@ fn get_summary_value(log: &LogEvent) -> Result<MetricValue, TransformError> {
             })?;
 
         let value = e_quantile
-            .get("value")
+            .get(path!("value"))
             .ok_or_else(|| TransformError::FieldNotFound {
                 field: "summary.quantiles.value".to_string(),
             })?
@@ -609,7 +619,7 @@ fn get_summary_value(log: &LogEvent) -> Result<MetricValue, TransformError> {
     }
 
     let count = log
-        .get("summary.count")
+        .get(event_path!("summary", "count"))
         .ok_or_else(|| TransformError::FieldNotFound {
             field: "summary.count".to_string(),
         })?
@@ -619,7 +629,7 @@ fn get_summary_value(log: &LogEvent) -> Result<MetricValue, TransformError> {
         })?;
 
     let sum = log
-        .get("summary.sum")
+        .get(event_path!("summary", "sum"))
         .ok_or_else(|| TransformError::FieldNotFound {
             field: "summary.sum".to_string(),
         })?
@@ -643,7 +653,7 @@ fn to_metrics_metadata(event: &Event) -> Result<Metric, TransformError> {
         .cloned()
         .or_else(|| Some(Utc::now()));
 
-    let name = match get_str_from_log(&log, "name") {
+    let name = match try_get_string_from_log(log, "name")? {
         Some(n) => n,
         None => {
             return Err(TransformError::FieldNotFound {
@@ -654,7 +664,7 @@ fn to_metrics_metadata(event: &Event) -> Result<Metric, TransformError> {
 
     let tags = &mut MetricTags::default();
 
-    if let Some(els) = log.get("tags") {
+    if let Some(els) = log.get(event_path!("tags")) {
         if let Some(el) = els.as_object() {
             for (key, value) in el {
                 tags.insert(String::from(key).to_string(), bytes_to_str(value));
@@ -663,9 +673,15 @@ fn to_metrics_metadata(event: &Event) -> Result<Metric, TransformError> {
     }
     let tags_result = Some(tags.clone());
 
-    let kind_str = get_str_from_log(&log, "kind").ok_or_else(|| TransformError::FieldNotFound {
-        field: "kind".to_string(),
-    })?;
+    let kind_str = match try_get_string_from_log(log, "kind")? {
+        Some(n) => n,
+        None => {
+            return Err(TransformError::FieldNotFound {
+                field: "kind".to_string(),
+            })
+        }
+    };
+
     let kind = match kind_str.as_str() {
         "absolute" => Ok(MetricKind::Absolute),
         "incremental" => Ok(MetricKind::Incremental),
@@ -677,13 +693,13 @@ fn to_metrics_metadata(event: &Event) -> Result<Metric, TransformError> {
 
     let mut value: Option<MetricValue> = None;
     if let Some(root_event) = log.as_map() {
-        for (key, _v) in root_event {
+        for key in root_event.keys() {
             value = match key.as_str() {
-                "gauge" => Some(get_gauge_value(&log)?),
-                "distribution" => Some(get_distribution_value(&log)?),
-                "histogram" => Some(get_histogram_value(&log)?),
-                "summary" => Some(get_summary_value(&log)?),
-                "counter" => Some(get_counter_value(&log)?),
+                "gauge" => Some(get_gauge_value(log)?),
+                "distribution" => Some(get_distribution_value(log)?),
+                "histogram" => Some(get_histogram_value(log)?),
+                "summary" => Some(get_summary_value(log)?),
+                "counter" => Some(get_counter_value(log)?),
                 _ => None,
             };
 
@@ -697,7 +713,7 @@ fn to_metrics_metadata(event: &Event) -> Result<Metric, TransformError> {
 
     Ok(
         Metric::new_with_metadata(name, kind, value, log.metadata().clone())
-            .with_namespace(get_str_from_log(log, "namespace"))
+            .with_namespace(try_get_string_from_log(log, "namespace")?)
             .with_tags(tags_result)
             .with_timestamp(timestamp),
     )
@@ -710,7 +726,7 @@ impl FunctionTransform for LogToMetric {
         if self
             .config
             .all_metrics
-            .is_some_and(|all_metrics| all_metrics == true)
+            .is_some_and(|all_metrics| all_metrics)
         {
             match to_metrics_metadata(&event) {
                 Ok(metric) => {
@@ -1519,7 +1535,7 @@ mod tests {
     //  Metric Metadata Tests
     fn create_log_event(json_str: &str) -> Event {
         let mut log_value: Value =
-            serde_json::from_str(&*json_str).expect("JSON was not well-formatted");
+            serde_json::from_str(json_str).expect("JSON was not well-formatted");
         log_value.insert("timestamp", ts());
         log_value.insert("namespace", "test_namespace");
 
@@ -1532,12 +1548,10 @@ mod tests {
 
     #[tokio::test]
     async fn transform_gauge() {
-        let config = parse_config(
+        let config = parse_yaml_config(
             r#"
-            [[metrics]]
-            type = "gauge"
-            field = "value"
-            name = "test.transform.gauge"
+            metrics: []
+            all_metrics: true
             "#,
         );
 
@@ -1576,7 +1590,7 @@ mod tests {
         let config = parse_yaml_config(
             r#"
             metrics: []
-            all_fields: true
+            all_metrics: true
             "#,
         );
 
