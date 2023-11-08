@@ -1,23 +1,19 @@
-use std::{
-    collections::{btree_map, BTreeMap},
-    fmt::Write as _,
-    iter, slice,
-};
+use std::{collections::btree_map, fmt::Write as _, iter, slice};
 
 use serde::{Serialize, Serializer};
 use vrl::path::PathPrefix;
 
-use super::Value;
+use crate::event::{KeyString, ObjectMap, Value};
 
 /// Iterates over all paths in form `a.b[0].c[1]` in alphabetical order
 /// and their corresponding values.
-pub fn all_fields(fields: &BTreeMap<String, Value>) -> FieldsIter {
+pub fn all_fields(fields: &ObjectMap) -> FieldsIter {
     FieldsIter::new(fields)
 }
 
 /// Same functionality as `all_fields` but it prepends a character that denotes the
 /// path type.
-pub fn all_metadata_fields(fields: &BTreeMap<String, Value>) -> FieldsIter {
+pub fn all_metadata_fields(fields: &ObjectMap) -> FieldsIter {
     FieldsIter::new_with_prefix(PathPrefix::Metadata, fields)
 }
 
@@ -29,13 +25,13 @@ pub fn all_fields_non_object_root(value: &Value) -> FieldsIter {
 #[derive(Clone, Debug)]
 enum LeafIter<'a> {
     Root((&'a Value, bool)),
-    Map(btree_map::Iter<'a, String, Value>),
+    Map(btree_map::Iter<'a, KeyString, Value>),
     Array(iter::Enumerate<slice::Iter<'a, Value>>),
 }
 
 #[derive(Clone, Copy)]
 enum PathComponent<'a> {
-    Key(&'a String),
+    Key(&'a KeyString),
     Index(usize),
 }
 
@@ -54,7 +50,7 @@ pub struct FieldsIter<'a> {
 
 impl<'a> FieldsIter<'a> {
     // TODO deprecate this in favor of `new_with_prefix`.
-    fn new(fields: &'a BTreeMap<String, Value>) -> FieldsIter<'a> {
+    fn new(fields: &'a ObjectMap) -> FieldsIter<'a> {
         FieldsIter {
             path_prefix: None,
             stack: vec![LeafIter::Map(fields.iter())],
@@ -62,10 +58,7 @@ impl<'a> FieldsIter<'a> {
         }
     }
 
-    fn new_with_prefix(
-        path_prefix: PathPrefix,
-        fields: &'a BTreeMap<String, Value>,
-    ) -> FieldsIter<'a> {
+    fn new_with_prefix(path_prefix: PathPrefix, fields: &'a ObjectMap) -> FieldsIter<'a> {
         FieldsIter {
             path_prefix: Some(path_prefix),
             stack: vec![LeafIter::Map(fields.iter())],
@@ -104,7 +97,7 @@ impl<'a> FieldsIter<'a> {
         self.path.pop();
     }
 
-    fn make_path(&mut self, component: PathComponent<'a>) -> String {
+    fn make_path(&mut self, component: PathComponent<'a>) -> KeyString {
         let mut res = match self.path_prefix {
             None => String::new(),
             Some(prefix) => match prefix {
@@ -115,7 +108,7 @@ impl<'a> FieldsIter<'a> {
         let mut path_iter = self.path.iter().chain(iter::once(&component)).peekable();
         loop {
             match path_iter.next() {
-                None => return res,
+                None => break res.into(),
                 Some(PathComponent::Key(key)) => {
                     if key.contains('.') {
                         res.push_str(&key.replace('.', "\\."));
@@ -135,7 +128,7 @@ impl<'a> FieldsIter<'a> {
 }
 
 impl<'a> Iterator for FieldsIter<'a> {
-    type Item = (String, &'a Value);
+    type Item = (KeyString, &'a Value);
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
@@ -161,9 +154,9 @@ impl<'a> Iterator for FieldsIter<'a> {
                     }
                 },
                 Some(LeafIter::Root((value, visited))) => {
-                    let result = (!*visited).then(|| ("message".to_owned(), *value));
+                    let result = (!*visited).then(|| ("message".into(), *value));
                     *visited = true;
-                    return result;
+                    break result;
                 }
             };
         }
@@ -250,7 +243,7 @@ mod test {
             ("a.array[3][0]", Value::Integer(2)),
             ("a.b.c", Value::Integer(5)),
             ("a\\.b\\.c", Value::Integer(6)),
-            ("d", Value::Object(BTreeMap::new())),
+            ("d", Value::Object(ObjectMap::new())),
             ("e", Value::Array(Vec::new())),
         ]
         .into_iter()
@@ -265,7 +258,7 @@ mod test {
     fn test_non_object_root() {
         let value = Value::Integer(3);
         let collected: Vec<_> = all_fields_non_object_root(&value)
-            .map(|(k, v)| (k, v.clone()))
+            .map(|(k, v)| (k.into(), v.clone()))
             .collect();
         assert_eq!(collected, vec![("message".to_owned(), value)]);
     }

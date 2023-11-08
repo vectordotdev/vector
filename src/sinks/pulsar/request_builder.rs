@@ -2,6 +2,7 @@ use bytes::Bytes;
 use std::collections::HashMap;
 use std::io;
 
+use crate::event::KeyString;
 use crate::sinks::{
     prelude::*,
     pulsar::{encoder::PulsarEncoder, service::PulsarRequest, sink::PulsarEvent},
@@ -11,7 +12,7 @@ use crate::sinks::{
 pub(super) struct PulsarMetadata {
     pub finalizers: EventFinalizers,
     pub key: Option<Bytes>,
-    pub properties: Option<HashMap<String, Bytes>>,
+    pub properties: Option<HashMap<KeyString, Bytes>>,
     pub timestamp_millis: Option<i64>,
     pub topic: String,
 }
