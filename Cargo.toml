@@ -580,6 +580,7 @@ transforms-metrics = [
   "transforms-filter",
   "transforms-log_to_metric",
   "transforms-lua",
+  "transforms-metric_metadata",
   "transforms-metric_to_log",
   "transforms-pipelines",
   "transforms-remap",
@@ -593,6 +594,7 @@ transforms-dedupe = ["dep:lru"]
 transforms-filter = []
 transforms-log_to_metric = []
 transforms-lua = ["dep:mlua", "vector-lib/lua"]
+transforms-metric_metadata = []
 transforms-metric_to_log = []
 transforms-pipelines = ["transforms-filter", "transforms-route"]
 transforms-reduce = []

@@ -161,6 +161,12 @@ impl EventMetadata {
         self.upstream_id.as_deref()
     }
 
+    #[must_use]
+    /// Returns a reference to the dropped fields maps.
+    pub fn dropped_fields(&self) -> &BTreeMap<String, Value> {
+        &self.dropped_fields
+    }
+
     /// Sets the `source_id` in the metadata to the provided value.
     pub fn set_source_id(&mut self, source_id: Arc<ComponentKey>) {
         self.source_id = Some(source_id);
