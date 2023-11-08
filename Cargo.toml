@@ -313,7 +313,7 @@ tokio-postgres = { version = "0.7.10", default-features = false, features = ["ru
 tokio-tungstenite = {version = "0.20.1", default-features = false, features = ["connect"], optional = true}
 toml = { version = "0.8.8", default-features = false, features = ["parse", "display"] }
 tonic = { version = "0.10", optional = true, default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "gzip"] }
-trust-dns-proto = { version = "0.23.2", default-features = false, features = ["dnssec"], optional = true }
+hickory-proto = { version = "0.24.0", default-features = false, features = ["dnssec"], optional = true }
 typetag = { version = "0.2.13", default-features = false }
 url = { version = "2.4.1", default-features = false, features = ["serde"] }
 uuid = { version = "1", default-features = false, features = ["serde", "v4"] }
@@ -513,7 +513,7 @@ sources-aws_s3 = ["aws-core", "dep:aws-sdk-sqs", "dep:aws-sdk-s3", "dep:semver",
 sources-aws_sqs = ["aws-core", "dep:aws-sdk-sqs"]
 sources-datadog_agent = ["sources-utils-http-error", "protobuf-build"]
 sources-demo_logs = ["dep:fakedata"]
-sources-dnstap = ["dep:base64", "dep:trust-dns-proto", "dep:dnsmsg-parser", "protobuf-build"]
+sources-dnstap = ["dep:base64", "dep:hickory-proto", "dep:dnsmsg-parser", "protobuf-build"]
 sources-docker_logs = ["docker"]
 sources-eventstoredb_metrics = []
 sources-exec = []
