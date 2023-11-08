@@ -36,6 +36,7 @@ use tokio::{
     time::Sleep,
 };
 use tokio_util::codec::FramedRead;
+use tracing::Span;
 use vector_lib::codecs::{
     decoding::{DeserializerConfig, FramingConfig},
     StreamDecodingError,
@@ -1219,6 +1220,7 @@ fn create_consumer(
             config.metrics.topic_lag_metric,
             acknowledgements,
             callbacks,
+            Span::current(),
         ))
         .context(CreateSnafu)?;
     let topics: Vec<&str> = config.topics.iter().map(|s| s.as_str()).collect();
@@ -1260,9 +1262,13 @@ impl KafkaSourceContext {
         expose_lag_metrics: bool,
         acknowledgements: bool,
         callbacks: UnboundedSender<KafkaCallback>,
+        span: Span,
     ) -> Self {
         Self {
-            stats: kafka::KafkaStatisticsContext { expose_lag_metrics },
+            stats: kafka::KafkaStatisticsContext {
+                expose_lag_metrics,
+                span,
+            },
             acknowledgements,
             consumer: OnceLock::default(),
             callbacks,
