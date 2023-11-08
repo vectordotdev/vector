@@ -170,8 +170,7 @@ impl<'a> InternalEvent for MetricMetadataParseArrayError<'a> {
         emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason })
     }
 }
-pub struct MetricMetadataMetricDetailsNotFoundError {
-}
+pub struct MetricMetadataMetricDetailsNotFoundError {}
 
 impl InternalEvent for MetricMetadataMetricDetailsNotFoundError {
     fn emit(self) {
