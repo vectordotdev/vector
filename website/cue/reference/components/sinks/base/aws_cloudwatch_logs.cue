@@ -640,7 +640,7 @@ base: components: sinks: aws_cloudwatch_logs: configuration: {
 		}
 	}
 	retention: {
-		description: "Retention policy configuration for AWS Cloudwatch Log Group"
+		description: "Retention policy configuration for AWS CloudWatch Log Group"
 		required:    false
 		type: object: options: {
 			days: {

@@ -51,7 +51,7 @@ impl ClientBuilder for CloudwatchLogsClientBuilder {
 
 #[configurable_component]
 #[derive(Clone, Debug, Default)]
-/// Retention policy configuration for AWS Cloudwatch Log Group
+/// Retention policy configuration for AWS CloudWatch Log Group
 pub struct Retention {
     #[configurable(derived)]
     #[serde(default)]
