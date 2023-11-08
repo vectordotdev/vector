@@ -136,10 +136,7 @@ impl Future for CloudwatchFuture {
                         .log_streams
                         .ok_or(CloudwatchError::NoStreamsFound)?
                         .into_iter()
-                        .filter(|log_stream| {
-                            log_stream.log_stream_name == Some(stream_name.clone())
-                        })
-                        .next()
+                        .find(|log_stream| log_stream.log_stream_name == Some(stream_name.clone()))
                     {
                         debug!(message = "Stream found.", stream = ?stream.log_stream_name);
 
@@ -236,7 +233,7 @@ impl Future for CloudwatchFuture {
 
                 State::PutRetentionPolicy(fut) => {
                     match ready!(fut.poll_unpin(cx)) {
-                        Ok(__) => {}
+                        Ok(_) => {}
                         Err(error) => {
                             return Poll::Ready(Err(CloudwatchError::PutRetentionPolicy(error)))
                         }
@@ -340,7 +337,7 @@ impl Client {
     pub fn put_retention_policy(&self) -> ClientResult<(), PutRetentionPolicyError> {
         let client = self.client.clone();
         let group_name = self.group_name.clone();
-        let retention_days = self.retention_days.clone();
+        let retention_days = self.retention_days;
         Box::pin(async move {
             client
                 .put_retention_policy()
