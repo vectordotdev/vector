@@ -631,7 +631,6 @@ mod tests {
     use chrono::{DateTime, Utc};
     use rmp_serde::Serializer;
     use serde::Serialize;
-    use std::collections::BTreeMap;
     use tokio::{
         io::{AsyncReadExt, AsyncWriteExt},
         time::{error::Elapsed, timeout, Duration},
@@ -639,8 +638,8 @@ mod tests {
     use tokio_util::codec::Decoder;
     use vector_lib::assert_event_data_eq;
     use vector_lib::lookup::OwnedTargetPath;
-    use vector_lib::{event::Value, schema::Definition};
-    use vrl::value::kind::Collection;
+    use vector_lib::schema::Definition;
+    use vrl::value::{kind::Collection, ObjectMap, Value};
 
     use super::{message::FluentMessageOptions, *};
     use crate::{
@@ -661,15 +660,15 @@ mod tests {
     // Decode base64: https://toolslick.com/conversion/data/messagepack-to-json
 
     fn mock_event(name: &str, timestamp: &str) -> Event {
-        Event::Log(LogEvent::from(BTreeMap::from([
-            (String::from("message"), Value::from(name)),
+        Event::Log(LogEvent::from(ObjectMap::from([
+            ("message".into(), Value::from(name)),
             (
-                log_schema().source_type_key().unwrap().to_string(),
+                log_schema().source_type_key().unwrap().to_string().into(),
                 Value::from(FluentConfig::NAME),
             ),
-            (String::from("tag"), Value::from("tag.name")),
+            ("tag".into(), Value::from("tag.name")),
             (
-                String::from("timestamp"),
+                "timestamp".into(),
                 Value::Timestamp(DateTime::parse_from_rfc3339(timestamp).unwrap().into()),
             ),
         ])))
