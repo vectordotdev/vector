@@ -600,9 +600,9 @@ dependencies = [
 
 [[package]]
 name = "async-nats"
-version = "0.32.1"
+version = "0.33.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0e45b67ea596bb94741ef15ba1d90b72c92bdc07553d8033734cb620a2b39f1c"
+checksum = "dbc1f1a75fd07f0f517322d103211f12d757658e91676def9a2e688774656c60"
 dependencies = [
  "base64 0.21.5",
  "bytes 1.5.0",
@@ -614,7 +614,7 @@ dependencies = [
  "once_cell",
  "rand 0.8.5",
  "regex",
- "ring 0.16.20",
+ "ring 0.17.5",
  "rustls 0.21.8",
  "rustls-native-certs",
  "rustls-pemfile",
