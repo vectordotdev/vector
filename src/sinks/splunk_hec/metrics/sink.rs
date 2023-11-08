@@ -2,7 +2,7 @@ use std::{fmt, sync::Arc};
 
 use serde::Serialize;
 use vector_lib::event::{Metric, MetricValue};
-use vrl::path::OwnedValuePath;
+use vrl::path::OwnedTargetPath;
 
 use super::request_builder::HecMetricsRequestBuilder;
 use crate::{
@@ -22,7 +22,7 @@ pub struct HecMetricsSink<S> {
     pub sourcetype: Option<Template>,
     pub source: Option<Template>,
     pub index: Option<Template>,
-    pub host_key: Option<OwnedValuePath>,
+    pub host_key: Option<OwnedTargetPath>,
     pub default_namespace: Option<String>,
 }
 
@@ -151,7 +151,7 @@ pub fn process_metric(
     sourcetype: Option<&Template>,
     source: Option<&Template>,
     index: Option<&Template>,
-    host_key: Option<&OwnedValuePath>,
+    host_key: Option<&OwnedTargetPath>,
     default_namespace: Option<&str>,
 ) -> Option<HecProcessedEvent> {
     let templated_field_keys = [index.as_ref(), source.as_ref(), sourcetype.as_ref()]

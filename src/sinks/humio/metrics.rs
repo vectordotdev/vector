@@ -5,7 +5,7 @@ use indoc::indoc;
 use vector_lib::codecs::JsonSerializerConfig;
 use vector_lib::configurable::configurable_component;
 use vector_lib::lookup;
-use vector_lib::lookup::lookup_v2::{ConfigValuePath, OptionalValuePath};
+use vector_lib::lookup::lookup_v2::{ConfigValuePath, OptionalTargetPath};
 use vector_lib::sensitive_string::SensitiveString;
 use vector_lib::sink::StreamSink;
 
@@ -88,7 +88,7 @@ pub struct HumioMetricsConfig {
     ///
     /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
     #[serde(default = "config_host_key")]
-    host_key: OptionalValuePath,
+    host_key: OptionalTargetPath,
 
     /// Event fields to be added to Humio’s extra fields.
     ///
@@ -175,9 +175,7 @@ impl SinkConfig for HumioMetricsConfig {
             timestamp_nanos_key: None,
             acknowledgements: Default::default(),
             // hard coded as humio expects this format so no sense in making it configurable
-            timestamp_key: OptionalValuePath {
-                path: Some(lookup::owned_value_path!("timestamp")),
-            },
+            timestamp_key: OptionalTargetPath::from(vrl::path::PathPrefix::Event, Some(lookup::owned_value_path!("timestamp")))
         };
 
         let (sink, healthcheck) = sink.clone().build(cx).await?;

@@ -4,7 +4,7 @@ use futures_util::FutureExt;
 use tower::ServiceBuilder;
 use vector_lib::codecs::TextSerializerConfig;
 use vector_lib::configurable::configurable_component;
-use vector_lib::lookup::lookup_v2::{ConfigValuePath, OptionalValuePath};
+use vector_lib::lookup::lookup_v2::{ConfigValuePath, OptionalTargetPath};
 use vector_lib::sensitive_string::SensitiveString;
 use vector_lib::sink::VectorSink;
 
@@ -65,7 +65,7 @@ pub struct HecLogsSinkConfig {
     /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
     #[configurable(metadata(docs::advanced))]
     #[serde(default = "config_host_key")]
-    pub host_key: OptionalValuePath,
+    pub host_key: OptionalTargetPath,
 
     /// Fields to be [added to Splunk index][splunk_field_index_docs].
     ///
@@ -137,7 +137,7 @@ pub struct HecLogsSinkConfig {
     #[configurable(metadata(docs::advanced))]
     #[serde(default = "crate::sinks::splunk_hec::common::config_timestamp_key")]
     #[configurable(metadata(docs::examples = "timestamp", docs::examples = ""))]
-    pub timestamp_key: OptionalValuePath,
+    pub timestamp_key: OptionalTargetPath,
 
     /// Passes the `auto_extract_timestamp` option to Splunk.
     ///

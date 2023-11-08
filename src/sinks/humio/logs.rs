@@ -1,6 +1,6 @@
 use vector_lib::codecs::JsonSerializerConfig;
 use vector_lib::configurable::configurable_component;
-use vector_lib::lookup::lookup_v2::{ConfigValuePath, OptionalValuePath};
+use vector_lib::lookup::lookup_v2::{ConfigValuePath, OptionalTargetPath};
 use vector_lib::sensitive_string::SensitiveString;
 
 use super::config_host_key;
@@ -75,7 +75,7 @@ pub struct HumioLogsConfig {
     ///
     /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
     #[serde(default = "config_host_key")]
-    pub(super) host_key: OptionalValuePath,
+    pub(super) host_key: OptionalTargetPath,
 
     /// Event fields to be added to Humio’s extra fields.
     ///
@@ -133,7 +133,7 @@ pub struct HumioLogsConfig {
     ///
     /// [global_timestamp_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.timestamp_key
     #[serde(default = "config_timestamp_key")]
-    pub(super) timestamp_key: OptionalValuePath,
+    pub(super) timestamp_key: OptionalTargetPath,
 }
 
 fn default_endpoint() -> String {
@@ -380,8 +380,8 @@ mod integration_tests {
             source: None,
             encoding: JsonSerializerConfig::default().into(),
             event_type: None,
-            host_key: OptionalValuePath {
-                path: log_schema().host_key().cloned(),
+            host_key: OptionalTargetPath {
+                path: log_schema().host_key_target_path().cloned(),
             },
             indexed_fields: vec![],
             index: None,
