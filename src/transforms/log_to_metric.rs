@@ -410,12 +410,15 @@ fn bytes_to_str(value: &Value) -> Option<String> {
 
 fn try_get_string_from_log(log: &LogEvent, path: &str) -> Result<Option<String>, TransformError> {
     // TODO: update returned errors after `TransformError` is refactored.
-    let maybe_value = log.parse_path_and_get_value(path)
-        .map_err(|e| match e {
-            PathParseError::InvalidPathSyntax {path } => FieldNotFound { field: path.to_string() },
-        })?;
+    let maybe_value = log.parse_path_and_get_value(path).map_err(|e| match e {
+        PathParseError::InvalidPathSyntax { path } => FieldNotFound {
+            field: path.to_string(),
+        },
+    })?;
     match maybe_value {
-        None => Err(FieldNotFound { field: path.to_string() }),
+        None => Err(FieldNotFound {
+            field: path.to_string(),
+        }),
         Some(v) => Ok(bytes_to_str(v)),
     }
 }
