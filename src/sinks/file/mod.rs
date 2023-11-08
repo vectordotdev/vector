@@ -4,10 +4,6 @@ use std::time::{Duration, Instant};
 use async_compression::tokio::write::{GzipEncoder, ZstdEncoder};
 use async_trait::async_trait;
 use bytes::{Bytes, BytesMut};
-use codecs::{
-    encoding::{Framer, FramingConfig},
-    TextSerializerConfig,
-};
 use futures::{
     future,
     stream::{BoxStream, StreamExt},
@@ -19,8 +15,12 @@ use tokio::{
     io::AsyncWriteExt,
 };
 use tokio_util::codec::Encoder as _;
-use vector_config::configurable_component;
-use vector_core::{
+use vector_lib::codecs::{
+    encoding::{Framer, FramingConfig},
+    TextSerializerConfig,
+};
+use vector_lib::configurable::configurable_component;
+use vector_lib::{
     internal_event::{CountByteSize, EventsSent, InternalEventHandle as _, Output, Registered},
     EstimatedJsonEncodedSizeOf,
 };
@@ -427,7 +427,7 @@ mod tests {
 
     use futures::{stream, SinkExt};
     use similar_asserts::assert_eq;
-    use vector_core::{event::LogEvent, sink::VectorSink};
+    use vector_lib::{event::LogEvent, sink::VectorSink};
 
     use super::*;
     use crate::{

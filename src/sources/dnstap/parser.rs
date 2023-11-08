@@ -33,9 +33,9 @@ use dnstap_proto::{
     message::Type as DnstapMessageType, Dnstap, Message as DnstapMessage, SocketFamily,
     SocketProtocol,
 };
-use lookup::lookup_v2::ValuePath;
-use lookup::PathPrefix;
-use vector_core::config::log_schema;
+use vector_lib::config::log_schema;
+use vector_lib::lookup::lookup_v2::ValuePath;
+use vector_lib::lookup::PathPrefix;
 
 use super::{
     dns_message::{

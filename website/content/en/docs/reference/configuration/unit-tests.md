@@ -1,7 +1,7 @@
 ---
 title: Unit testing Vector configurations
 short: Unit tests
-weight: 5
+weight: 6
 aliases: [
   "/docs/reference/tests",
   "/docs/reference/configuration/tests",

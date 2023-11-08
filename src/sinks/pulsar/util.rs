@@ -3,9 +3,9 @@ use crate::sinks::pulsar::config::PulsarSinkConfig;
 use crate::sinks::pulsar::sink::PulsarEvent;
 use crate::template::Template;
 use bytes::Bytes;
-use lookup::lookup_v2::OptionalTargetPath;
 use std::collections::HashMap;
-use vector_core::event::Event;
+use vector_lib::event::Event;
+use vector_lib::lookup::lookup_v2::OptionalTargetPath;
 use vrl::value::Value;
 
 /// Transforms an event into a Pulsar event by rendering the required template fields.

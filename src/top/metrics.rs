@@ -5,7 +5,7 @@ use std::{
 
 use tokio::task::JoinHandle;
 use tokio_stream::StreamExt;
-use vector_api_client::{
+use vector_lib::api_client::{
     gql::{ComponentsQueryExt, ComponentsSubscriptionExt, MetricsSubscriptionExt},
     Client, SubscriptionClient,
 };

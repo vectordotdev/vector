@@ -5,7 +5,7 @@ use hyper::Body;
 use indexmap::IndexMap;
 use tokio::time;
 use url::Url;
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 
 use crate::{
     config::{self, provider::ProviderConfig, ProxyConfig},

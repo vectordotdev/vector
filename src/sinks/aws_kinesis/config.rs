@@ -1,7 +1,7 @@
-use lookup::lookup_v2::ConfigValuePath;
 use std::marker::PhantomData;
+use vector_lib::lookup::lookup_v2::ConfigValuePath;
 
-use vector_core::stream::BatcherSettings;
+use vector_lib::stream::BatcherSettings;
 
 use crate::{
     aws::{AwsAuthentication, RegionOrEndpoint},

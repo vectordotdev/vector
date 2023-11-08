@@ -6,12 +6,9 @@ use futures_util::{
     StreamExt,
 };
 use tower::Service;
-use vector_common::internal_event::Protocol;
-use vector_core::{
-    event::Event,
-    sink::StreamSink,
-    stream::{BatcherSettings, DriverResponse},
-};
+use vector_lib::internal_event::Protocol;
+use vector_lib::stream::{BatcherSettings, DriverResponse};
+use vector_lib::{event::Event, sink::StreamSink};
 
 use crate::sinks::util::SinkBuilderExt;
 

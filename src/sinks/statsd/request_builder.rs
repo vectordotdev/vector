@@ -3,8 +3,8 @@ use std::convert::Infallible;
 use bytes::BytesMut;
 use snafu::Snafu;
 use tokio_util::codec::Encoder;
-use vector_common::request_metadata::RequestMetadata;
-use vector_core::{
+use vector_lib::request_metadata::RequestMetadata;
+use vector_lib::{
     config::telemetry,
     event::{EventFinalizers, Finalizable, Metric},
     EstimatedJsonEncodedSizeOf,

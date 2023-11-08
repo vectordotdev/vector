@@ -1,11 +1,11 @@
 use chrono::Utc;
-use codecs::MetricTagValues;
-use lookup::{event_path, owned_value_path, path, PathPrefix};
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
-use vector_common::TimeZone;
-use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
+use vector_lib::codecs::MetricTagValues;
+use vector_lib::config::LogNamespace;
+use vector_lib::configurable::configurable_component;
+use vector_lib::lookup::{event_path, owned_value_path, path, PathPrefix};
+use vector_lib::TimeZone;
 use vrl::path::OwnedValuePath;
 use vrl::value::kind::Collection;
 use vrl::value::Kind;
@@ -99,7 +99,7 @@ impl TransformConfig for MetricToLogConfig {
 
     fn outputs(
         &self,
-        _: enrichment::TableRegistry,
+        _: vector_lib::enrichment::TableRegistry,
         input_definitions: &[(OutputId, Definition)],
         global_log_namespace: LogNamespace,
     ) -> Vec<TransformOutput> {
@@ -353,8 +353,8 @@ mod tests {
     use similar_asserts::assert_eq;
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
-    use vector_common::config::ComponentKey;
-    use vector_core::{event::EventMetadata, metric_tags};
+    use vector_lib::config::ComponentKey;
+    use vector_lib::{event::EventMetadata, metric_tags};
 
     use super::*;
     use crate::event::{
@@ -511,7 +511,7 @@ mod tests {
             "distro",
             MetricKind::Absolute,
             MetricValue::Distribution {
-                samples: vector_core::samples![1.0 => 10, 2.0 => 20],
+                samples: vector_lib::samples![1.0 => 10, 2.0 => 20],
                 statistic: StatisticKind::Histogram,
             },
             event_metadata(),
@@ -562,7 +562,7 @@ mod tests {
             "histo",
             MetricKind::Absolute,
             MetricValue::AggregatedHistogram {
-                buckets: vector_core::buckets![1.0 => 10, 2.0 => 20],
+                buckets: vector_lib::buckets![1.0 => 10, 2.0 => 20],
                 count: 30,
                 sum: 50.0,
             },
@@ -612,7 +612,7 @@ mod tests {
             "summary",
             MetricKind::Absolute,
             MetricValue::AggregatedSummary {
-                quantiles: vector_core::quantiles![50.0 => 10.0, 90.0 => 20.0],
+                quantiles: vector_lib::quantiles![50.0 => 10.0, 90.0 => 20.0],
                 count: 30,
                 sum: 50.0,
             },

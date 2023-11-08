@@ -94,16 +94,6 @@ base: components: sinks: datadog_metrics: configuration: {
 		required: false
 		type: string: examples: ["http://127.0.0.1:8080", "http://example.com:12345"]
 	}
-	region: {
-		deprecated:         true
-		deprecated_message: "This option has been deprecated, use the `site` option instead."
-		description:        "The Datadog region to send metrics to."
-		required:           false
-		type: string: enum: {
-			eu: "EU region."
-			us: "US region."
-		}
-	}
 	request: {
 		description: """
 			Middleware settings for outbound requests.

@@ -1,9 +1,9 @@
 use chrono::Utc;
 use greptimedb_client::api::v1::column::*;
 use greptimedb_client::api::v1::*;
-use vector_core::event::metric::{Bucket, MetricSketch, Quantile, Sample};
-use vector_core::event::{Metric, MetricValue};
-use vector_core::metrics::AgentDDSketch;
+use vector_lib::event::metric::{Bucket, MetricSketch, Quantile, Sample};
+use vector_lib::event::{Metric, MetricValue};
+use vector_lib::metrics::AgentDDSketch;
 
 use crate::sinks::util::statistic::DistributionStatistic;
 
@@ -253,7 +253,7 @@ mod tests {
             "cpu_seconds_total",
             MetricKind::Incremental,
             MetricValue::Distribution {
-                samples: vector_core::samples![1.0 => 2, 2.0 => 4, 3.0 => 2],
+                samples: vector_lib::samples![1.0 => 2, 2.0 => 4, 3.0 => 2],
                 statistic: StatisticKind::Histogram,
             },
         );
@@ -277,7 +277,7 @@ mod tests {
 
     #[test]
     fn test_histogram() {
-        let buckets = vector_core::buckets![1.0 => 1, 2.0 => 2, 3.0 => 1];
+        let buckets = vector_lib::buckets![1.0 => 1, 2.0 => 2, 3.0 => 1];
         let buckets_len = buckets.len();
         let metric = Metric::new(
             "cpu_seconds_total",
@@ -303,7 +303,7 @@ mod tests {
 
     #[test]
     fn test_summary() {
-        let quantiles = vector_core::quantiles![0.01 => 1.5, 0.5 => 2.0, 0.99 => 3.0];
+        let quantiles = vector_lib::quantiles![0.01 => 1.5, 0.5 => 2.0, 0.99 => 3.0];
         let quantiles_len = quantiles.len();
         let metric = Metric::new(
             "cpu_seconds_total",

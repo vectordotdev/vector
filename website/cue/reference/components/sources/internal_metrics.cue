@@ -78,38 +78,14 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags
 		}
-		config_load_errors_total: {
-			description:       "The total number of errors loading the Vector configuration."
-			type:              "counter"
-			default_namespace: "vector"
-			tags:              _internal_metrics_tags
-		}
-		connection_errors_total: {
-			description:       "The total number of connection errors for this Vector instance."
-			type:              "counter"
-			default_namespace: "vector"
-			tags:              _internal_metrics_tags
-		}
 		connection_established_total: {
 			description:       "The total number of times a connection has been established."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags
 		}
-		connection_failed_total: {
-			description:       "The total number of times a connection has failed."
-			type:              "counter"
-			default_namespace: "vector"
-			tags:              _internal_metrics_tags
-		}
 		connection_send_errors_total: {
 			description:       "The total number of errors sending data via the connection."
-			type:              "counter"
-			default_namespace: "vector"
-			tags:              _internal_metrics_tags
-		}
-		connection_send_ack_errors_total: {
-			description:       "The total number of protocol acknowledgement errors for this Vector instance for source protocols that support acknowledgements."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags
@@ -122,18 +98,6 @@ components: sources: internal_metrics: {
 		}
 		quit_total: {
 			description:       "The total number of times the Vector instance has quit."
-			type:              "counter"
-			default_namespace: "vector"
-			tags:              _internal_metrics_tags
-		}
-		recover_errors_total: {
-			description:       "The total number of errors caused by Vector failing to recover from a failed reload."
-			type:              "counter"
-			default_namespace: "vector"
-			tags:              _internal_metrics_tags
-		}
-		reload_errors_total: {
-			description:       "The total number of errors encountered when reloading Vector."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags
@@ -183,12 +147,6 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
-		checkpoint_write_errors_total: {
-			description:       "The total number of errors writing checkpoints. This metric is deprecated in favor of `component_errors_total`."
-			type:              "counter"
-			default_namespace: "vector"
-			tags:              _internal_metrics_tags
-		}
 		checkpoints_total: {
 			description:       "The total number of files checkpointed."
 			type:              "counter"
@@ -227,12 +185,6 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
-		communication_errors_total: {
-			description:       "The total number of errors stemming from communication with the Docker daemon."
-			type:              "counter"
-			default_namespace: "vector"
-			tags:              _component_tags
-		}
 		connection_read_errors_total: {
 			description:       "The total number of errors reading datagram."
 			type:              "counter"
@@ -247,20 +199,8 @@ components: sources: internal_metrics: {
 				}
 			}
 		}
-		consumer_offset_updates_failed_total: {
-			description:       "The total number of failures to update a Kafka consumer offset."
-			type:              "counter"
-			default_namespace: "vector"
-			tags:              _component_tags
-		}
 		container_processed_events_total: {
 			description:       "The total number of container events processed."
-			type:              "counter"
-			default_namespace: "vector"
-			tags:              _component_tags
-		}
-		container_metadata_fetch_errors_total: {
-			description:       "The total number of errors encountered when fetching container metadata."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _component_tags
@@ -277,12 +217,6 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
-		decode_errors_total: {
-			description:       "The total number of decode errors seen when decoding data in a source component."
-			type:              "counter"
-			default_namespace: "vector"
-			tags:              _component_tags
-		}
 		k8s_format_picker_edge_cases_total: {
 			description:       "The total number of edge cases encountered while picking format of the Kubernetes log message."
 			type:              "counter"
@@ -291,12 +225,6 @@ components: sources: internal_metrics: {
 		}
 		k8s_docker_format_parse_failures_total: {
 			description:       "The total number of failures to parse a message as a JSON object."
-			type:              "counter"
-			default_namespace: "vector"
-			tags:              _component_tags
-		}
-		k8s_event_annotation_failures_total: {
-			description:       "The total number of failures to annotate Vector events with Kubernetes Pod metadata."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _component_tags
@@ -359,12 +287,6 @@ components: sources: internal_metrics: {
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _component_tags
-		}
-		encode_errors_total: {
-			description:       "The total number of errors encountered when encoding an event."
-			type:              "counter"
-			default_namespace: "vector"
-			tags:              _internal_metrics_tags
 		}
 		events_discarded_total: {
 			description:       "The total number of events discarded by this component."
@@ -657,22 +579,6 @@ components: sources: internal_metrics: {
 				}
 			}
 		}
-		file_delete_errors_total: {
-			description:       "The total number of failures to delete a file. This metric is deprecated in favor of `component_errors_total`."
-			type:              "counter"
-			default_namespace: "vector"
-			tags:              _internal_metrics_tags & {
-				file: _file
-			}
-		}
-		file_watch_errors_total: {
-			description:       "The total number of errors encountered when watching files. This metric is deprecated in favor of `component_errors_total`."
-			type:              "counter"
-			default_namespace: "vector"
-			tags:              _internal_metrics_tags & {
-				file: _file
-			}
-		}
 		files_added_total: {
 			description:       "The total number of files Vector has found to watch."
 			type:              "counter"
@@ -705,27 +611,34 @@ components: sources: internal_metrics: {
 				file: _file
 			}
 		}
-		fingerprint_read_errors_total: {
-			description:       "The total number of times Vector failed to read a file for fingerprinting. This metric is deprecated in favor of `component_errors_total`."
+		grpc_server_messages_received_total: {
+			description:       "The total number of gRPC messages received."
 			type:              "counter"
 			default_namespace: "vector"
-			tags:              _internal_metrics_tags & {
-				file: _file
+			tags:              _component_tags & {
+				grpc_method:  _grpc_method
+				grpc_service: _grpc_service
 			}
 		}
-		glob_errors_total: {
-			description:       "The total number of errors encountered when globbing paths. This metric is deprecated in favor of `component_errors_total`."
+		grpc_server_messages_sent_total: {
+			description:       "The total number of gRPC messages sent."
 			type:              "counter"
 			default_namespace: "vector"
-			tags:              _internal_metrics_tags & {
-				path: _path
+			tags:              _component_tags & {
+				grpc_method:  _grpc_method
+				grpc_service: _grpc_service
+				grpc_status:  _grpc_status
 			}
 		}
-		http_bad_requests_total: {
-			description:       "The total number of HTTP `400 Bad Request` errors encountered."
-			type:              "counter"
+		grpc_server_handler_duration_seconds: {
+			description:       "The duration spent handling a gRPC request."
+			type:              "histogram"
 			default_namespace: "vector"
-			tags:              _internal_metrics_tags
+			tags:              _component_tags & {
+				grpc_method:  _grpc_method
+				grpc_service: _grpc_service
+				grpc_status:  _grpc_status
+			}
 		}
 		http_client_response_rtt_seconds: {
 			description:       "The round-trip time (RTT) of HTTP requests, tagged with the response code."
@@ -757,41 +670,43 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
-		http_error_response_total: {
-			description:       "The total number of HTTP error responses for this component."
-			type:              "counter"
-			default_namespace: "vector"
-			tags:              _internal_metrics_tags
-		}
-		http_request_errors_total: {
-			description:       "The total number of HTTP request errors for this component."
-			type:              "counter"
-			default_namespace: "vector"
-			tags:              _internal_metrics_tags
-		}
 		http_requests_total: {
 			description:       "The total number of HTTP requests issued by this component."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
+		http_server_requests_received_total: {
+			description:       "The total number of HTTP requests received."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags & {
+				method: _method
+				path:   _path
+			}
+		}
+		http_server_responses_sent_total: {
+			description:       "The total number of HTTP responses sent."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags & {
+				method: _method
+				path:   _path
+				status: _status
+			}
+		}
+		http_server_handler_duration_seconds: {
+			description:       "The duration spent handling a HTTP request."
+			type:              "histogram"
+			default_namespace: "vector"
+			tags:              _component_tags & {
+				method: _method
+				path:   _path
+				status: _status
+			}
+		}
 		invalid_record_total: {
 			description:       "The total number of invalid records that have been discarded."
-			type:              "counter"
-			default_namespace: "vector"
-			tags:              _component_tags
-		}
-		invalid_record_bytes_total: {
-			description:       "The total number of bytes from invalid records that have been discarded."
-			type:              "counter"
-			default_namespace: "vector"
-			tags:              _component_tags
-		}
-		logging_driver_errors_total: {
-			description: """
-				The total number of logging driver errors encountered caused by not using either
-				the `jsonfile` or `journald` driver.
-				"""
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _component_tags
@@ -820,41 +735,17 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags
 		}
-		parse_errors_total: {
-			description:       "The total number of errors parsing metrics for this component."
-			type:              "counter"
-			default_namespace: "vector"
-			tags:              _internal_metrics_tags
-		}
 		protobuf_decode_errors_total: {
 			description:       "The total number of [Protocol Buffers](\(urls.protobuf)) errors thrown during communication between Vector instances."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
-		request_errors_total: {
-			description:       "The total number of requests errors for this component."
-			type:              "counter"
-			default_namespace: "vector"
-			tags:              _internal_metrics_tags
-		}
 		request_duration_seconds: {
 			description:       "The total request duration in seconds."
 			type:              "histogram"
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags
-		}
-		request_read_errors_total: {
-			description:       "The total number of request read errors for this component."
-			type:              "counter"
-			default_namespace: "vector"
-			tags:              _component_tags
-		}
-		request_automatic_decode_errors_total: {
-			description:       "The total number of request errors for this component when it attempted to automatically discover and handle the content-encoding of incoming request data."
-			type:              "counter"
-			default_namespace: "vector"
-			tags:              _component_tags
 		}
 		requests_completed_total: {
 			description:       "The total number of requests completed by this component."
@@ -892,32 +783,14 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
-		sqs_message_delete_failed_total: {
-			description:       "The total number of failures to delete SQS messages."
-			type:              "counter"
-			default_namespace: "vector"
-			tags:              _component_tags
-		}
 		sqs_message_delete_succeeded_total: {
 			description:       "The total number of successful deletions of SQS messages."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
-		sqs_message_processing_failed_total: {
-			description:       "The total number of failures to process SQS messages."
-			type:              "counter"
-			default_namespace: "vector"
-			tags:              _component_tags
-		}
 		sqs_message_processing_succeeded_total: {
 			description:       "The total number of SQS messages successfully processed."
-			type:              "counter"
-			default_namespace: "vector"
-			tags:              _component_tags
-		}
-		sqs_message_receive_failed_total: {
-			description:       "The total number of failures to receive SQS messages."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _component_tags
@@ -1040,15 +913,6 @@ components: sources: internal_metrics: {
 		}
 
 		// Windows metrics
-		windows_service_does_not_exist_total: {
-			description: """
-				The total number of errors raised due to the Windows service not
-				existing.
-				"""
-			type:              "counter"
-			default_namespace: "vector"
-			tags:              _internal_metrics_tags
-		}
 		windows_service_install_total: {
 			description: """
 				The total number of times the Windows service has been installed.
@@ -1094,7 +958,6 @@ components: sources: internal_metrics: {
 		_component_tags: _internal_metrics_tags & {
 			component_kind: _component_kind
 			component_id:   _component_id
-			component_name: _component_name
 			component_type: _component_type
 		}
 
@@ -1114,11 +977,6 @@ components: sources: internal_metrics: {
 		}
 		_component_id: {
 			description: "The Vector component ID."
-			required:    true
-			examples: ["my_source", "my_sink"]
-		}
-		_component_name: {
-			description: "Deprecated, use `component_id` instead. The value is the same as `component_id`."
 			required:    true
 			examples: ["my_source", "my_sink"]
 		}
@@ -1164,6 +1022,18 @@ components: sources: internal_metrics: {
 		_file: {
 			description: "The file that produced the error"
 			required:    false
+		}
+		_grpc_method: {
+			description: "The name of the method called on the gRPC service."
+			required:    true
+		}
+		_grpc_service: {
+			description: "The gRPC service name."
+			required:    true
+		}
+		_grpc_status: {
+			description: "The human-readable [gRPC status code](\(urls.grpc_status_code))."
+			required:    true
 		}
 		_host: {
 			description: "The hostname of the originating system."

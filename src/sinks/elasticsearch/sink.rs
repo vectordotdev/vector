@@ -1,6 +1,6 @@
 use std::fmt;
 
-use lookup::lookup_v2::ConfigValuePath;
+use vector_lib::lookup::lookup_v2::ConfigValuePath;
 use vrl::path::PathPrefix;
 
 use crate::{

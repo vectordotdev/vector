@@ -76,6 +76,11 @@ base: components: sinks: datadog_logs: configuration: {
 				[gzip]: https://www.gzip.org/
 				"""
 			none: "No compression."
+			snappy: """
+				[Snappy][snappy] compression.
+
+				[snappy]: https://github.com/google/snappy/blob/main/docs/README.md
+				"""
 			zlib: """
 				[Zlib][zlib] compression.
 
@@ -140,16 +145,6 @@ base: components: sinks: datadog_logs: configuration: {
 			"""
 		required: false
 		type: string: examples: ["http://127.0.0.1:8080", "http://example.com:12345"]
-	}
-	region: {
-		deprecated:         true
-		deprecated_message: "This option has been deprecated, use the `site` option instead."
-		description:        "The Datadog region to send logs to."
-		required:           false
-		type: string: enum: {
-			eu: "EU region."
-			us: "US region."
-		}
 	}
 	request: {
 		description: "Outbound HTTP request settings."

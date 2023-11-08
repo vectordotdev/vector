@@ -3,8 +3,8 @@
 use std::{collections::HashMap, io};
 
 use bytes::BytesMut;
-use lookup::lookup_v2::ConfigValuePath;
 use serde_json::{json, to_vec, Map};
+use vector_lib::lookup::lookup_v2::ConfigValuePath;
 use vrl::path::PathPrefix;
 
 use crate::{

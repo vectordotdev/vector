@@ -15,7 +15,7 @@ use crate::{
         util::processed_event::ProcessedEvent,
     },
 };
-use lookup::{event_path, OwnedValuePath, PathPrefix};
+use vector_lib::lookup::{event_path, OwnedValuePath, PathPrefix};
 
 pub struct HecLogsSink<S> {
     pub context: SinkContext,

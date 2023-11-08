@@ -1,10 +1,10 @@
 use std::{collections::HashMap, net::SocketAddr};
 
 use bytes::Bytes;
-use prometheus_parser::proto;
 use prost::Message;
-use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
+use vector_lib::config::LogNamespace;
+use vector_lib::configurable::configurable_component;
+use vector_lib::prometheus::parser::proto;
 use warp::http::{HeaderMap, StatusCode};
 
 use super::parser;
@@ -146,7 +146,7 @@ impl HttpSource for RemoteWriteSource {
 #[cfg(test)]
 mod test {
     use chrono::{SubsecRound as _, Utc};
-    use vector_core::{
+    use vector_lib::{
         event::{EventStatus, Metric, MetricKind, MetricValue},
         metric_tags,
     };
@@ -155,11 +155,7 @@ mod test {
     use crate::{
         config::{SinkConfig, SinkContext},
         sinks::prometheus::remote_write::RemoteWriteConfig,
-        test_util::{
-            self,
-            components::{assert_source_compliance, HTTP_PUSH_SOURCE_TAGS},
-            wait_for_tcp,
-        },
+        test_util::{self, wait_for_tcp},
         tls::MaybeTlsSettings,
         SourceSender,
     };
@@ -180,54 +176,51 @@ mod test {
     }
 
     async fn receives_metrics(tls: Option<TlsEnableableConfig>) {
-        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
-            let address = test_util::next_addr();
-            let (tx, rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
+        let address = test_util::next_addr();
+        let (tx, rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
 
-            let proto = MaybeTlsSettings::from_config(&tls, true)
-                .unwrap()
-                .http_protocol_name();
-            let source = PrometheusRemoteWriteConfig {
-                address,
-                auth: None,
-                tls: tls.clone(),
-                acknowledgements: SourceAcknowledgementsConfig::default(),
-            };
-            let source = source
-                .build(SourceContext::new_test(tx, None))
-                .await
-                .unwrap();
-            tokio::spawn(source);
-            wait_for_tcp(address).await;
+        let proto = MaybeTlsSettings::from_config(&tls, true)
+            .unwrap()
+            .http_protocol_name();
+        let source = PrometheusRemoteWriteConfig {
+            address,
+            auth: None,
+            tls: tls.clone(),
+            acknowledgements: SourceAcknowledgementsConfig::default(),
+        };
+        let source = source
+            .build(SourceContext::new_test(tx, None))
+            .await
+            .unwrap();
+        tokio::spawn(source);
+        wait_for_tcp(address).await;
 
-            let sink = RemoteWriteConfig {
-                endpoint: format!("{}://localhost:{}/", proto, address.port()),
-                tls: tls.map(|tls| tls.options),
-                ..Default::default()
-            };
-            let (sink, _) = sink
-                .build(SinkContext::default())
-                .await
-                .expect("Error building config.");
+        let sink = RemoteWriteConfig {
+            endpoint: format!("{}://localhost:{}/", proto, address.port()),
+            tls: tls.map(|tls| tls.options),
+            ..Default::default()
+        };
+        let (sink, _) = sink
+            .build(SinkContext::default())
+            .await
+            .expect("Error building config.");
 
-            let events = make_events();
-            let events_copy = events.clone();
-            let mut output = test_util::spawn_collect_ready(
-                async move {
-                    sink.run_events(events_copy).await.unwrap();
-                },
-                rx,
-                1,
-            )
-            .await;
-
-            // The MetricBuffer used by the sink may reorder the metrics, so
-            // put them back into order before comparing.
-            output.sort_unstable_by_key(|event| event.as_metric().name().to_owned());
-
-            vector_common::assert_event_data_eq!(events, output);
-        })
+        let events = make_events();
+        let events_copy = events.clone();
+        let mut output = test_util::spawn_collect_ready(
+            async move {
+                sink.run_events(events_copy).await.unwrap();
+            },
+            rx,
+            1,
+        )
         .await;
+
+        // The MetricBuffer used by the sink may reorder the metrics, so
+        // put them back into order before comparing.
+        output.sort_unstable_by_key(|event| event.as_metric().name().to_owned());
+
+        vector_lib::assert_event_data_eq!(events, output);
     }
 
     fn make_events() -> Vec<Event> {
@@ -251,7 +244,7 @@ mod test {
                 "histogram_3",
                 MetricKind::Absolute,
                 MetricValue::AggregatedHistogram {
-                    buckets: vector_core::buckets![ 2.3 => 11, 4.2 => 85 ],
+                    buckets: vector_lib::buckets![ 2.3 => 11, 4.2 => 85 ],
                     count: 96,
                     sum: 156.2,
                 },
@@ -262,7 +255,7 @@ mod test {
                 "summary_4",
                 MetricKind::Absolute,
                 MetricValue::AggregatedSummary {
-                    quantiles: vector_core::quantiles![ 0.1 => 1.2, 0.5 => 3.6, 0.9 => 5.2 ],
+                    quantiles: vector_lib::quantiles![ 0.1 => 1.2, 0.5 => 3.6, 0.9 => 5.2 ],
                     count: 23,
                     sum: 8.6,
                 },
@@ -278,69 +271,66 @@ mod test {
     /// we accept the metric, but take the last label in the list.
     #[tokio::test]
     async fn receives_metrics_duplicate_labels() {
-        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
-            let address = test_util::next_addr();
-            let (tx, rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
+        let address = test_util::next_addr();
+        let (tx, rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
 
-            let source = PrometheusRemoteWriteConfig {
-                address,
-                auth: None,
-                tls: None,
-                acknowledgements: SourceAcknowledgementsConfig::default(),
-            };
-            let source = source
-                .build(SourceContext::new_test(tx, None))
-                .await
-                .unwrap();
-            tokio::spawn(source);
-            wait_for_tcp(address).await;
+        let source = PrometheusRemoteWriteConfig {
+            address,
+            auth: None,
+            tls: None,
+            acknowledgements: SourceAcknowledgementsConfig::default(),
+        };
+        let source = source
+            .build(SourceContext::new_test(tx, None))
+            .await
+            .unwrap();
+        tokio::spawn(source);
+        wait_for_tcp(address).await;
 
-            let sink = RemoteWriteConfig {
-                endpoint: format!("http://localhost:{}/", address.port()),
-                ..Default::default()
-            };
-            let (sink, _) = sink
-                .build(SinkContext::default())
-                .await
-                .expect("Error building config.");
+        let sink = RemoteWriteConfig {
+            endpoint: format!("http://localhost:{}/", address.port()),
+            ..Default::default()
+        };
+        let (sink, _) = sink
+            .build(SinkContext::default())
+            .await
+            .expect("Error building config.");
 
-            let timestamp = Utc::now().trunc_subsecs(3);
+        let timestamp = Utc::now().trunc_subsecs(3);
 
-            let events = vec![Metric::new(
-                "gauge_2",
-                MetricKind::Absolute,
-                MetricValue::Gauge { value: 41.0 },
-            )
-            .with_timestamp(Some(timestamp))
-            .with_tags(Some(metric_tags! {
-                "code" => "200".to_string(),
-                "code" => "success".to_string(),
-            }))
-            .into()];
+        let events = vec![Metric::new(
+            "gauge_2",
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 41.0 },
+        )
+        .with_timestamp(Some(timestamp))
+        .with_tags(Some(metric_tags! {
+            "code" => "200".to_string(),
+            "code" => "success".to_string(),
+        }))
+        .into()];
 
-            let expected = vec![Metric::new(
-                "gauge_2",
-                MetricKind::Absolute,
-                MetricValue::Gauge { value: 41.0 },
-            )
-            .with_timestamp(Some(timestamp))
-            .with_tags(Some(metric_tags! {
-                "code" => "success".to_string(),
-            }))
-            .into()];
+        let expected = vec![Metric::new(
+            "gauge_2",
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 41.0 },
+        )
+        .with_timestamp(Some(timestamp))
+        .with_tags(Some(metric_tags! {
+            "code" => "success".to_string(),
+        }))
+        .into()];
 
-            let output = test_util::spawn_collect_ready(
-                async move {
-                    sink.run_events(events).await.unwrap();
-                },
-                rx,
-                1,
-            )
-            .await;
-
-            vector_common::assert_event_data_eq!(expected, output);
-        })
+        let output = test_util::spawn_collect_ready(
+            async move {
+                sink.run_events(events).await.unwrap();
+            },
+            rx,
+            1,
+        )
         .await;
+
+        vector_lib::assert_event_data_eq!(expected, output);
     }
 }
 

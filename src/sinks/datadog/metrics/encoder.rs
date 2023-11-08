@@ -9,8 +9,8 @@ use bytes::{BufMut, Bytes};
 use chrono::{DateTime, Utc};
 use once_cell::sync::Lazy;
 use snafu::{ResultExt, Snafu};
-use vector_common::request_metadata::GroupedCountByteSize;
-use vector_core::{
+use vector_lib::request_metadata::GroupedCountByteSize;
+use vector_lib::{
     config::{log_schema, telemetry, LogSchema},
     event::{metric::MetricSketch, DatadogMetricOriginMetadata, Metric, MetricTags, MetricValue},
     metrics::AgentDDSketch,
@@ -609,42 +609,46 @@ fn series_to_proto_message(
 
     let timestamp = encode_timestamp(metric.timestamp());
 
-    let (points, metric_type, interval) = match (metric.value(), metric.interval_ms()) {
-        (MetricValue::Counter { value }, maybe_interval_ms) => {
-            let (value, interval, metric_type) = match maybe_interval_ms {
-                None => (*value, 0, ddmetric_proto::metric_payload::MetricType::Count),
+    // our internal representation is in milliseconds but the expected output is in seconds
+    let maybe_interval = metric.interval_ms().map(|i| i.get() / 1000);
+
+    let (points, metric_type) = match metric.value() {
+        MetricValue::Counter { value } => {
+            if let Some(interval) = maybe_interval {
                 // When an interval is defined, it implies the value should be in a per-second form,
                 // so we need to get back to seconds from our milliseconds-based interval, and then
                 // divide our value by that amount as well.
-                Some(interval_ms) => (
-                    (*value) * 1000.0 / (interval_ms.get() as f64),
-                    interval_ms.get() as i64 / 1000,
+                let value = *value / (interval as f64);
+                (
+                    vec![ddmetric_proto::metric_payload::MetricPoint { value, timestamp }],
                     ddmetric_proto::metric_payload::MetricType::Rate,
-                ),
-            };
-            let points = vec![ddmetric_proto::metric_payload::MetricPoint { value, timestamp }];
-            (points, metric_type, interval)
+                )
+            } else {
+                (
+                    vec![ddmetric_proto::metric_payload::MetricPoint {
+                        value: *value,
+                        timestamp,
+                    }],
+                    ddmetric_proto::metric_payload::MetricType::Count,
+                )
+            }
         }
-        (MetricValue::Set { values }, _) => {
-            let points = vec![ddmetric_proto::metric_payload::MetricPoint {
+        MetricValue::Set { values } => (
+            vec![ddmetric_proto::metric_payload::MetricPoint {
                 value: values.len() as f64,
                 timestamp,
-            }];
-            let metric_type = ddmetric_proto::metric_payload::MetricType::Gauge;
-            let interval = 0;
-            (points, metric_type, interval)
-        }
-        (MetricValue::Gauge { value }, _) => {
-            let points = vec![ddmetric_proto::metric_payload::MetricPoint {
+            }],
+            ddmetric_proto::metric_payload::MetricType::Gauge,
+        ),
+        MetricValue::Gauge { value } => (
+            vec![ddmetric_proto::metric_payload::MetricPoint {
                 value: *value,
                 timestamp,
-            }];
-            let metric_type = ddmetric_proto::metric_payload::MetricType::Gauge;
-            let interval = 0;
-            (points, metric_type, interval)
-        }
+            }],
+            ddmetric_proto::metric_payload::MetricType::Gauge,
+        ),
         // NOTE: AggregatedSummary will have been previously split into counters and gauges during normalization
-        (value, _) => {
+        value => {
             // this case should have already been surfaced by encode_single_metric() so this should never be reached
             return Err(EncoderError::InvalidMetric {
                 expected: "series",
@@ -662,7 +666,7 @@ fn series_to_proto_message(
         // unit is omitted
         unit: "".to_string(),
         source_type_name,
-        interval,
+        interval: maybe_interval.unwrap_or(0) as i64,
         metadata,
     })
 }
@@ -822,6 +826,9 @@ fn generate_series_metrics(
     let ts = encode_timestamp(metric.timestamp());
     let tags = Some(encode_tags(&tags));
 
+    // our internal representation is in milliseconds but the expected output is in seconds
+    let maybe_interval = metric.interval_ms().map(|i| i.get() / 1000);
+
     let event_metadata = metric.metadata();
     let metadata = generate_series_metadata(
         event_metadata.datadog_origin_metadata(),
@@ -831,56 +838,25 @@ fn generate_series_metrics(
 
     trace!(?metadata, "Generated series metadata.");
 
-    let results = match (metric.value(), metric.interval_ms()) {
-        (MetricValue::Counter { value }, maybe_interval_ms) => {
-            let (value, interval, metric_type) = match maybe_interval_ms {
-                None => (*value, None, DatadogMetricType::Count),
+    let (points, metric_type) = match metric.value() {
+        MetricValue::Counter { value } => {
+            if let Some(interval) = maybe_interval {
                 // When an interval is defined, it implies the value should be in a per-second form,
                 // so we need to get back to seconds from our milliseconds-based interval, and then
                 // divide our value by that amount as well.
-                Some(interval_ms) => (
-                    (*value) * 1000.0 / (interval_ms.get() as f64),
-                    Some(interval_ms.get() / 1000),
-                    DatadogMetricType::Rate,
-                ),
-            };
-
-            vec![DatadogSeriesMetric {
-                metric: name,
-                r#type: metric_type,
-                interval,
-                points: vec![DatadogPoint(ts, value)],
-                tags,
-                host,
-                source_type_name,
-                device,
-                metadata,
-            }]
+                let value = *value / (interval as f64);
+                (vec![DatadogPoint(ts, value)], DatadogMetricType::Rate)
+            } else {
+                (vec![DatadogPoint(ts, *value)], DatadogMetricType::Count)
+            }
         }
-        (MetricValue::Set { values }, _) => vec![DatadogSeriesMetric {
-            metric: name,
-            r#type: DatadogMetricType::Gauge,
-            interval: None,
-            points: vec![DatadogPoint(ts, values.len() as f64)],
-            tags,
-            host,
-            source_type_name,
-            device,
-            metadata,
-        }],
-        (MetricValue::Gauge { value }, _) => vec![DatadogSeriesMetric {
-            metric: name,
-            r#type: DatadogMetricType::Gauge,
-            interval: None,
-            points: vec![DatadogPoint(ts, *value)],
-            tags,
-            host,
-            source_type_name,
-            device,
-            metadata,
-        }],
+        MetricValue::Set { values } => (
+            vec![DatadogPoint(ts, values.len() as f64)],
+            DatadogMetricType::Gauge,
+        ),
+        MetricValue::Gauge { value } => (vec![DatadogPoint(ts, *value)], DatadogMetricType::Gauge),
         // NOTE: AggregatedSummary will have been previously split into counters and gauges during normalization
-        (value, _) => {
+        value => {
             return Err(EncoderError::InvalidMetric {
                 expected: "series",
                 metric_value: value.as_name(),
@@ -888,7 +864,17 @@ fn generate_series_metrics(
         }
     };
 
-    Ok(results)
+    Ok(vec![DatadogSeriesMetric {
+        metric: name,
+        r#type: metric_type,
+        interval: maybe_interval,
+        points,
+        tags,
+        host,
+        source_type_name,
+        device,
+        metadata,
+    }])
 }
 
 fn get_compressor() -> Compressor {
@@ -1014,7 +1000,7 @@ mod tests {
         proptest, strategy::Strategy, string::string_regex,
     };
     use prost::Message;
-    use vector_core::{
+    use vector_lib::{
         config::{log_schema, LogSchema},
         event::{
             metric::{MetricSketch, TagValue},
@@ -1238,6 +1224,63 @@ mod tests {
             )
             .unwrap();
             assert_eq!(series_proto.r#type, 2);
+            assert_eq!(series_proto.interval, expected_interval as i64);
+            assert_eq!(series_proto.points.len(), 1);
+            assert_eq!(series_proto.points[0].value, expected_value);
+        }
+    }
+
+    #[test]
+    fn encode_non_rate_metric_with_interval() {
+        // It is possible that the Agent sends Gauges with an interval set. This
+        // Occurs when the origin of the metric is Dogstatsd, where the interval
+        // is set to 10.
+
+        let value = 423.1331;
+        let interval_ms = 10000;
+
+        let gauge = Metric::new(
+            "basic_gauge",
+            MetricKind::Incremental,
+            MetricValue::Gauge { value },
+        )
+        .with_timestamp(Some(ts()))
+        .with_interval_ms(NonZeroU32::new(interval_ms));
+
+        let expected_value = value; // For gauge, the value should not be modified by interval
+        let expected_interval = interval_ms / 1000;
+
+        // series v1
+        {
+            // Encode the metric and make sure we did the rate conversion correctly.
+            let result = generate_series_metrics(
+                &gauge,
+                &None,
+                log_schema(),
+                DEFAULT_DD_ORIGIN_PRODUCT_VALUE,
+            );
+            assert!(result.is_ok());
+
+            let metrics = result.unwrap();
+            assert_eq!(metrics.len(), 1);
+
+            let actual = &metrics[0];
+            assert_eq!(actual.r#type, DatadogMetricType::Gauge);
+            assert_eq!(actual.interval, Some(expected_interval));
+            assert_eq!(actual.points.len(), 1);
+            assert_eq!(actual.points[0].1, expected_value);
+        }
+
+        // series v2
+        {
+            let series_proto = series_to_proto_message(
+                &gauge,
+                &None,
+                log_schema(),
+                DEFAULT_DD_ORIGIN_PRODUCT_VALUE,
+            )
+            .unwrap();
+            assert_eq!(series_proto.r#type, 3);
             assert_eq!(series_proto.interval, expected_interval as i64);
             assert_eq!(series_proto.points.len(), 1);
             assert_eq!(series_proto.points[0].value, expected_value);

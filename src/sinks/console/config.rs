@@ -1,10 +1,10 @@
-use codecs::{
+use futures::{future, FutureExt};
+use tokio::io;
+use vector_lib::codecs::{
     encoding::{Framer, FramingConfig},
     JsonSerializerConfig,
 };
-use futures::{future, FutureExt};
-use tokio::io;
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 
 use crate::{
     codecs::{Encoder, EncodingConfigWithFraming, SinkType},

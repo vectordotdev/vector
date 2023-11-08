@@ -9,7 +9,7 @@ use aws_smithy_client::SdkError;
 use futures::FutureExt;
 use http::StatusCode;
 use snafu::Snafu;
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 
 use super::service::{S3Response, S3Service};
 use crate::{

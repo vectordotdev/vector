@@ -1,12 +1,12 @@
 //! Configuration for the `http` sink.
 
-use codecs::{
-    encoding::{Framer, Serializer},
-    CharacterDelimitedEncoder,
-};
 use http::{header::AUTHORIZATION, HeaderName, HeaderValue, Method, Request, StatusCode};
 use hyper::Body;
 use indexmap::IndexMap;
+use vector_lib::codecs::{
+    encoding::{Framer, Serializer},
+    CharacterDelimitedEncoder,
+};
 
 use crate::{
     codecs::{EncodingConfigWithFraming, SinkType},
@@ -308,8 +308,8 @@ impl SinkConfig for HttpSinkConfig {
 
 impl ValidatableComponent for HttpSinkConfig {
     fn validation_configuration() -> ValidationConfiguration {
-        use codecs::{JsonSerializerConfig, MetricTagValues};
         use std::str::FromStr;
+        use vector_lib::codecs::{JsonSerializerConfig, MetricTagValues};
 
         let config = Self {
             uri: UriSerde::from_str("http://127.0.0.1:9000/endpoint")

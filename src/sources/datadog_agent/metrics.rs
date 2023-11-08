@@ -7,8 +7,8 @@ use prost::Message;
 use serde::{Deserialize, Serialize};
 use warp::{filters::BoxedFilter, path, path::FullPath, reply::Response, Filter};
 
-use vector_common::internal_event::{CountByteSize, InternalEventHandle as _, Registered};
-use vector_core::{
+use vector_lib::internal_event::{CountByteSize, InternalEventHandle as _, Registered};
+use vector_lib::{
     event::{DatadogMetricOriginMetadata, EventMetadata},
     metrics::AgentDDSketch,
     EstimatedJsonEncodedSizeOf,
@@ -266,6 +266,33 @@ pub(crate) fn decode_ddseries_v2(
 
             let event_metadata = get_event_metadata(serie.metadata.as_ref());
 
+            // It is possible to receive non-rate metrics from the Agent with an interval set.
+            // That interval can be applied with the `as_rate` function in the Datadog UI.
+            // The scenario this happens is when DogStatsD emits non-rate series metrics to the Agent,
+            // in which it sets an interval to 10. See
+            //    - https://github.com/DataDog/datadog-agent/blob/9f0a85c926596ec9aebe2d8e1f2a8b1af6e45635/pkg/aggregator/time_sampler.go#L49C1-L49C1
+            //    - https://github.com/DataDog/datadog-agent/blob/209b70529caff9ec1c30b6b2eed27bce725ed153/pkg/aggregator/aggregator.go#L39
+            //
+            // Note that DogStatsD is the only scenario this occurs; regular Agent checks/services do not set the
+            // interval for non-rate series metrics.
+            //
+            // Note that because Vector does not yet have a specific Metric type to handle Rate,
+            // we are distinguishing Rate from Count by setting an interval to Rate but not Count.
+            // Luckily, the only time a Count metric type is emitted by DogStatsD, is in the Sketch endpoint.
+            // (Regular Count metrics are emitted by DogStatsD as Rate metrics).
+            //
+            // In theory we should be safe to set this non-rate-interval to Count metrics below, but to be safe,
+            // we will only set it for Rate and Gauge. Since Rates already need an interval, the only "odd" case
+            // is Gauges.
+            //
+            // Ultimately if we had a unique internal representation of a Rate metric type, we wouldn't need to
+            // have special handling for the interval, we would just apply it to all metrics that it came in with.
+            let non_rate_interval = if serie.interval.is_positive() {
+                NonZeroU32::new(serie.interval as u32 * 1000) // incoming is seconds, convert to milliseconds
+            } else {
+                None
+            };
+
             serie.resources.into_iter().for_each(|r| {
                 // As per https://github.com/DataDog/datadog-agent/blob/a62ac9fb13e1e5060b89e731b8355b2b20a07c5b/pkg/serializer/internal/metrics/iterable_series.go#L180-L189
                 // the hostname can be found in MetricSeries::resources and that is the only value stored there.
@@ -323,6 +350,7 @@ pub(crate) fn decode_ddseries_v2(
                         ))
                         .with_tags(Some(tags.clone()))
                         .with_namespace(namespace)
+                        .with_interval_ms(non_rate_interval)
                     })
                     .collect::<Vec<_>>(),
                 Ok(metric_payload::MetricType::Rate) => serie

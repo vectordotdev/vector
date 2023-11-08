@@ -6,8 +6,8 @@ use futures_util::FutureExt;
 use http::{response::Parts, Uri};
 use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
-use vector_config::configurable_component;
-use vector_core::{config::LogNamespace, event::Event};
+use vector_lib::configurable::configurable_component;
+use vector_lib::{config::LogNamespace, event::Event};
 
 use super::parser;
 use crate::sources::util::http::HttpMethod;
@@ -534,7 +534,7 @@ mod test {
         .await;
         assert!(!events.is_empty());
 
-        let metrics: Vec<vector_core::event::Metric> = events
+        let metrics: Vec<vector_lib::event::Metric> = events
             .into_iter()
             .map(|event| event.into_metric())
             .collect();

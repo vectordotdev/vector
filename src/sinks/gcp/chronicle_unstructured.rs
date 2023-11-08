@@ -12,9 +12,9 @@ use snafu::Snafu;
 use std::io;
 use tokio_util::codec::Encoder as _;
 use tower::{Service, ServiceBuilder};
-use vector_common::request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata};
-use vector_config::configurable_component;
-use vector_core::{
+use vector_lib::configurable::configurable_component;
+use vector_lib::request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata};
+use vector_lib::{
     config::{telemetry, AcknowledgementsConfig, Input},
     event::{Event, EventFinalizers, Finalizable},
     sink::VectorSink,
@@ -512,7 +512,7 @@ impl Service<ChronicleRequest> for ChronicleService {
 mod integration_tests {
     use reqwest::{Client, Method, Response};
     use serde::{Deserialize, Serialize};
-    use vector_core::event::{BatchNotifier, BatchStatus};
+    use vector_lib::event::{BatchNotifier, BatchStatus};
 
     use super::*;
     use crate::test_util::{

@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use async_graphql::{Enum, Object};
 use chrono::{DateTime, Utc};
 use serde_json::Value;
-use vector_common::encode_logfmt;
+use vector_lib::encode_logfmt;
 
 use super::EventEncodingType;
 use crate::{

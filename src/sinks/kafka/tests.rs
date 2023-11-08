@@ -11,15 +11,15 @@ mod integration_test {
     };
 
     use bytes::Bytes;
-    use codecs::TextSerializerConfig;
     use futures::StreamExt;
-    use lookup::lookup_v2::ConfigTargetPath;
     use rdkafka::{
         consumer::{BaseConsumer, Consumer},
         message::Headers,
         Message, Offset, TopicPartitionList,
     };
-    use vector_core::{
+    use vector_lib::codecs::TextSerializerConfig;
+    use vector_lib::lookup::lookup_v2::ConfigTargetPath;
+    use vector_lib::{
         config::{init_telemetry, Tags, Telemetry},
         event::{BatchNotifier, BatchStatus},
     };

@@ -520,9 +520,10 @@ mod tests {
         convert::TryFrom,
     };
 
-    use codecs::JsonSerializerConfig;
     use futures::stream::StreamExt;
-    use vector_core::event::{Event, LogEvent, Value};
+    use vector_lib::codecs::JsonSerializerConfig;
+    use vector_lib::event::{Event, LogEvent, Value};
+    use vector_lib::lookup::PathPrefix;
 
     use super::{EventEncoder, KeyPartitioner, RecordFilter};
     use crate::{
@@ -543,10 +544,7 @@ mod tests {
         let mut event = Event::Log(LogEvent::from("hello world"));
         let log = event.as_mut_log();
         log.insert(
-            (
-                lookup::PathPrefix::Event,
-                log_schema().timestamp_key().unwrap(),
-            ),
+            (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
             chrono::Utc::now(),
         );
         let record = encoder.encode_event(event).unwrap();
@@ -589,10 +587,7 @@ mod tests {
         let mut event = Event::Log(LogEvent::from("hello world"));
         let log = event.as_mut_log();
         log.insert(
-            (
-                lookup::PathPrefix::Event,
-                log_schema().timestamp_key().unwrap(),
-            ),
+            (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
             chrono::Utc::now(),
         );
         log.insert("name", "foo");
@@ -751,10 +746,7 @@ mod tests {
         let mut event = Event::Log(LogEvent::from("hello world"));
         let log = event.as_mut_log();
         log.insert(
-            (
-                lookup::PathPrefix::Event,
-                log_schema().timestamp_key().unwrap(),
-            ),
+            (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
             chrono::Utc::now(),
         );
         let record = encoder.encode_event(event).unwrap();
@@ -784,10 +776,7 @@ mod tests {
         let mut event = Event::Log(LogEvent::from("hello world"));
         let log = event.as_mut_log();
         log.insert(
-            (
-                lookup::PathPrefix::Event,
-                log_schema().timestamp_key().unwrap(),
-            ),
+            (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
             chrono::Utc::now(),
         );
         log.insert("name", "foo");
@@ -819,10 +808,7 @@ mod tests {
                     base + chrono::Duration::seconds(i as i64)
                 };
                 log.insert(
-                    (
-                        lookup::PathPrefix::Event,
-                        log_schema().timestamp_key().unwrap(),
-                    ),
+                    (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
                     ts,
                 );
                 event

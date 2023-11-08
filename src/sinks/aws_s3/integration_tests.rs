@@ -16,12 +16,12 @@ use aws_sdk_s3::{
     Client as S3Client,
 };
 use bytes::Buf;
-use codecs::{encoding::FramingConfig, TextSerializerConfig};
 use flate2::read::MultiGzDecoder;
 use futures::{stream, Stream};
 use similar_asserts::assert_eq;
 use tokio_stream::StreamExt;
-use vector_core::{
+use vector_lib::codecs::{encoding::FramingConfig, TextSerializerConfig};
+use vector_lib::{
     config::proxy::ProxyConfig,
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event, EventArray, LogEvent},
 };

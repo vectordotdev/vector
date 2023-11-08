@@ -6,17 +6,15 @@ use std::{
 use chrono::{DateTime, NaiveDateTime, Utc};
 use quickcheck::{empty_shrinker, Arbitrary, Gen};
 
-use crate::{
-    event::{
-        metric::{
-            Bucket, MetricData, MetricName, MetricSeries, MetricSketch, MetricTags, MetricTime,
-            Quantile, Sample,
-        },
-        Event, EventMetadata, LogEvent, Metric, MetricKind, MetricValue, StatisticKind, TraceEvent,
-        Value,
+use super::super::{
+    metric::{
+        Bucket, MetricData, MetricName, MetricSeries, MetricSketch, MetricTags, MetricTime,
+        Quantile, Sample,
     },
-    metrics::AgentDDSketch,
+    Event, EventMetadata, LogEvent, Metric, MetricKind, MetricValue, StatisticKind, TraceEvent,
+    Value,
 };
+use crate::metrics::AgentDDSketch;
 
 const MAX_F64_SIZE: f64 = 1_000_000.0;
 const MAX_MAP_SIZE: usize = 4;

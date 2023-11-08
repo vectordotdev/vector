@@ -6,17 +6,17 @@ use std::time::Duration;
 use base64::prelude::{Engine as _, BASE64_STANDARD};
 use bytes::{Buf, Bytes, BytesMut};
 use chrono::Utc;
-use codecs::{BytesDeserializerConfig, StreamDecodingError};
 use flate2::read::MultiGzDecoder;
-use lookup::lookup_v2::parse_value_path;
-use lookup::{metadata_path, owned_value_path, path, OwnedValuePath};
 use rmp_serde::{decode, Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use tokio_util::codec::Decoder;
-use vector_config::configurable_component;
-use vector_core::config::{LegacyKey, LogNamespace};
-use vector_core::schema::Definition;
+use vector_lib::codecs::{BytesDeserializerConfig, StreamDecodingError};
+use vector_lib::config::{LegacyKey, LogNamespace};
+use vector_lib::configurable::configurable_component;
+use vector_lib::lookup::lookup_v2::parse_value_path;
+use vector_lib::lookup::{metadata_path, owned_value_path, path, OwnedValuePath};
+use vector_lib::schema::Definition;
 use vrl::value::kind::Collection;
 use vrl::value::{Kind, Value};
 
@@ -629,7 +629,6 @@ impl From<FluentEvent<'_>> for LogEvent {
 mod tests {
     use bytes::BytesMut;
     use chrono::{DateTime, Utc};
-    use lookup::OwnedTargetPath;
     use rmp_serde::Serializer;
     use serde::Serialize;
     use std::collections::BTreeMap;
@@ -638,8 +637,9 @@ mod tests {
         time::{error::Elapsed, timeout, Duration},
     };
     use tokio_util::codec::Decoder;
-    use vector_common::assert_event_data_eq;
-    use vector_core::{event::Value, schema::Definition};
+    use vector_lib::assert_event_data_eq;
+    use vector_lib::lookup::OwnedTargetPath;
+    use vector_lib::{event::Value, schema::Definition};
     use vrl::value::kind::Collection;
 
     use super::{message::FluentMessageOptions, *};
@@ -1050,7 +1050,7 @@ mod integration_tests {
 
     use futures::Stream;
     use tokio::time::sleep;
-    use vector_core::event::{Event, EventStatus};
+    use vector_lib::event::{Event, EventStatus};
 
     use crate::{
         config::{SourceConfig, SourceContext},

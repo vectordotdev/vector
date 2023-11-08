@@ -5,7 +5,7 @@ use clap::Parser;
 pub(crate) use cmd::cmd;
 pub use cmd::tap;
 use url::Url;
-use vector_api_client::gql::TapEncodingFormat;
+use vector_lib::api_client::gql::TapEncodingFormat;
 
 use crate::config::api::default_graphql_url;
 

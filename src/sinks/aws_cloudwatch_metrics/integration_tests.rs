@@ -1,6 +1,6 @@
 use chrono::{offset::TimeZone, Timelike, Utc};
 use rand::seq::SliceRandom;
-use vector_core::metric_tags;
+use vector_lib::metric_tags;
 
 use super::*;
 use crate::{
@@ -75,7 +75,7 @@ async fn cloudwatch_metrics_put_data() {
                 format!("distribution-{}", distribution_name),
                 MetricKind::Incremental,
                 MetricValue::Distribution {
-                    samples: vector_core::samples![i as f64 => 100],
+                    samples: vector_lib::samples![i as f64 => 100],
                     statistic: StatisticKind::Histogram,
                 },
             )
