@@ -6,7 +6,7 @@ use http::{StatusCode, Uri};
 use http_serde;
 use tokio_util::codec::Decoder as _;
 use vrl::value::{kind::Collection, Kind};
-use warp::http::{ HeaderMap, HeaderValue};
+use warp::http::{HeaderMap, HeaderValue};
 
 use vector_lib::codecs::{
     decoding::{DeserializerConfig, FramingConfig},
