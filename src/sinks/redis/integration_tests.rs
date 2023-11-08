@@ -44,7 +44,7 @@ async fn redis_sink_list_lpush() {
         }),
         batch: BatchConfig::default(),
         request: TowerRequestConfig {
-            rate_limit_num: Some(u64::MAX),
+            rate_limit_num: u64::MAX,
             ..Default::default()
         },
         acknowledgements: Default::default(),
@@ -108,7 +108,7 @@ async fn redis_sink_list_rpush() {
         }),
         batch: BatchConfig::default(),
         request: TowerRequestConfig {
-            rate_limit_num: Some(u64::MAX),
+            rate_limit_num: u64::MAX,
             ..Default::default()
         },
         acknowledgements: Default::default(),
@@ -186,7 +186,7 @@ async fn redis_sink_channel() {
         list_option: None,
         batch: BatchConfig::default(),
         request: TowerRequestConfig {
-            rate_limit_num: Some(u64::MAX),
+            rate_limit_num: u64::MAX,
             ..Default::default()
         },
         acknowledgements: Default::default(),
@@ -262,7 +262,7 @@ async fn redis_sink_channel_data_volume_tags() {
         list_option: None,
         batch: BatchConfig::default(),
         request: TowerRequestConfig {
-            rate_limit_num: Some(u64::MAX),
+            rate_limit_num: u64::MAX,
             ..Default::default()
         },
         acknowledgements: Default::default(),

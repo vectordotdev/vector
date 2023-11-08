@@ -113,7 +113,7 @@ impl SinkConfig for HoneycombConfig {
 
         let service = HttpService::new(client.clone(), honeycomb_service_request_builder);
 
-        let request_limits = self.request.unwrap_with(&TowerRequestConfig::default());
+        let request_limits = self.request.into_settings();
 
         let service = ServiceBuilder::new()
             .settings(request_limits, http_response_retry_logic())

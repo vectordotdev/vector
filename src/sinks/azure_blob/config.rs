@@ -7,6 +7,7 @@ use vector_lib::configurable::configurable_component;
 use vector_lib::sensitive_string::SensitiveString;
 
 use super::request_builder::AzureBlobRequestOptions;
+use crate::sinks::util::service::TowerRequestConfigDefaults;
 use crate::{
     codecs::{Encoder, EncodingConfigWithFraming, SinkType},
     config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
@@ -23,6 +24,13 @@ use crate::{
     template::Template,
     Result,
 };
+
+#[derive(Clone, Copy, Debug)]
+pub struct AzureBlobTowerRequestConfigDefaults;
+
+impl TowerRequestConfigDefaults for AzureBlobTowerRequestConfigDefaults {
+    const RATE_LIMIT_NUM: u64 = 250;
+}
 
 /// Configuration for the `azure_blob` sink.
 #[configurable_component(sink(
@@ -131,7 +139,7 @@ pub struct AzureBlobSinkConfig {
 
     #[configurable(derived)]
     #[serde(default)]
-    pub request: TowerRequestConfig,
+    pub request: TowerRequestConfig<AzureBlobTowerRequestConfigDefaults>,
 
     #[configurable(derived)]
     #[serde(
@@ -202,9 +210,7 @@ const DEFAULT_FILENAME_APPEND_UUID: bool = true;
 
 impl AzureBlobSinkConfig {
     pub fn build_processor(&self, client: Arc<ContainerClient>) -> crate::Result<VectorSink> {
-        let request_limits = self
-            .request
-            .unwrap_with(&TowerRequestConfig::default().rate_limit_num(250));
+        let request_limits = self.request.into_settings();
         let service = ServiceBuilder::new()
             .settings(request_limits, AzureBlobRetryLogic)
             .service(AzureBlobService::new(client));
