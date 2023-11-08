@@ -150,7 +150,9 @@ impl DnsMessageParser {
 
     fn parse_dns_record(&mut self, record: &Record) -> DnsParserResult<DnsRecord> {
         let record_data = match record.data() {
-            Some(RData::Unknown { code, rdata }) => self.format_unknown_rdata(*code, rdata),
+            Some(RData::Unknown { code, rdata }) => {
+                self.format_unknown_rdata((*code).into(), rdata)
+            }
             Some(rdata) => format_rdata(rdata),
             None => Ok((Some(String::from("")), None)), // NULL record
         }?;
