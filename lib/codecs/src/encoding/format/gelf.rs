@@ -156,7 +156,7 @@ fn coerce_field_names_and_values(
     let mut missing_prefix = vec![];
     if let Some(event_data) = log.as_map_mut() {
         for (field, value) in event_data.iter_mut() {
-            match &field[..] {
+            match field.as_str() {
                 VERSION | HOST | SHORT_MESSAGE | FULL_MESSAGE | FACILITY | FILE => {
                     if !value.is_bytes() {
                         err_invalid_type(field, "UTF-8 string", value.kind_str())?;
