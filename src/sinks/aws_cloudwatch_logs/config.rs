@@ -54,6 +54,7 @@ impl ClientBuilder for CloudwatchLogsClientBuilder {
 /// Retention policy configuration for AWS Cloudwatch Log Group
 pub struct Retention {
     #[configurable(derived)]
+    #[serde(default)]
     pub enabled: bool,
 
     #[configurable(derived)]
@@ -135,6 +136,7 @@ pub struct CloudwatchLogsSinkConfig {
     pub create_missing_stream: bool,
 
     #[configurable(derived)]
+    #[serde(default)]
     pub retention: Retention,
 
     #[configurable(derived)]
