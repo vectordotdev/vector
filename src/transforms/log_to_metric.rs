@@ -1530,10 +1530,10 @@ mod tests {
 
     #[tokio::test]
     async fn transform_histogram() {
-        let config = parse_config(r#"
-                metrics:
-                  all_fields: true
-                "#);
+        let config = parse_yaml_config(r#"
+            metrics: []
+            all_fields: true
+            "#);
 
         let json_str = r#"{
           "histogram": {
@@ -1607,10 +1607,9 @@ mod tests {
 
     #[tokio::test]
     async fn transform_distribution_histogram() {
-        let config = parse_config(r#"
-                metrics:
-                  all_fields: true
-                "#);
+        let config = parse_yaml_config(r#"
+            all_metrics: true
+            "#);
 
         let json_str = r#"{
           "distribution": {
@@ -1660,10 +1659,9 @@ mod tests {
 
     #[tokio::test]
     async fn transform_distribution_summary() {
-        let config = parse_config(r#"
-                metrics:
-                  all_fields: true
-                "#);
+        let config = parse_yaml_config(r#"
+            all_metrics: true
+            "#);
 
         let json_str = r#"{
           "distribution": {
@@ -1713,10 +1711,9 @@ mod tests {
 
     #[tokio::test]
     async fn transform_summary() {
-        let config = parse_config(r#"
-                metrics:
-                  all_fields: true
-                "#);
+        let config = parse_yaml_config(r#"
+            all_metrics: true
+            "#);
 
         let json_str = r#"{
           "summary": {
@@ -1774,10 +1771,9 @@ mod tests {
 
     #[tokio::test]
     async fn transform_counter() {
-        let config = parse_config(r#"
-                metrics:
-                  all_fields: true
-                "#);
+        let config = parse_yaml_config(r#"
+            all_metrics: true
+            "#);
 
         let json_str = r#"{
           "counter": {
