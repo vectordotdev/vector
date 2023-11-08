@@ -5,8 +5,7 @@ use futures::{Stream, StreamExt};
 use vector_common::internal_event::{
     self, register, CountByteSize, EventsSent, InternalEventHandle as _, Registered, DEFAULT_OUTPUT,
 };
-use vector_common::json_size::JsonSize;
-use vector_common::EventDataEq;
+use vector_common::{byte_size_of::ByteSizeOf, json_size::JsonSize, EventDataEq};
 
 use crate::config::{ComponentKey, OutputId};
 use crate::event::EventMutRef;
@@ -17,7 +16,7 @@ use crate::{
         into_event_stream, EstimatedJsonEncodedSizeOf, Event, EventArray, EventContainer, EventRef,
     },
     fanout::{self, Fanout},
-    schema, ByteSizeOf,
+    schema,
 };
 
 #[cfg(feature = "lua")]
