@@ -16,6 +16,8 @@ For example:
 
 ## To be migrated
 
+- file_metric_tag v0.36.0 The `internal_metrics.include_file_tag` should default to `false`.
+
 ## To be removed
 
 - http_internal_metrics v0.35.0 `requests_completed_total`, `request_duration_seconds`, and `requests_received_total` internal metrics should be removed.

@@ -42,7 +42,7 @@ use crate::{
     },
     event::Event,
     internal_events::{
-        FileSourceInternalEventsEmitter, KubernetesLifecycleError,
+        FileInternalMetricsConfig, FileSourceInternalEventsEmitter, KubernetesLifecycleError,
         KubernetesLogsEventAnnotationError, KubernetesLogsEventNamespaceAnnotationError,
         KubernetesLogsEventNodeAnnotationError, KubernetesLogsEventsReceived,
         KubernetesLogsPodInfo, StreamClosedError,
@@ -235,6 +235,10 @@ pub struct Config {
     #[configurable(metadata(docs::hidden))]
     #[serde(default)]
     log_namespace: Option<bool>,
+
+    #[configurable(derived)]
+    #[serde(default)]
+    internal_metrics: FileInternalMetricsConfig,
 }
 
 const fn default_read_from() -> ReadFromConfig {
@@ -278,6 +282,7 @@ impl Default for Config {
             use_apiserver_cache: false,
             delay_deletion_ms: default_delay_deletion_ms(),
             log_namespace: None,
+            internal_metrics: Default::default(),
         }
     }
 }
@@ -528,6 +533,7 @@ struct Source {
     use_apiserver_cache: bool,
     ingestion_timestamp_field: Option<OwnedTargetPath>,
     delay_deletion: Duration,
+    include_file_metric_tag: bool,
 }
 
 impl Source {
@@ -606,6 +612,7 @@ impl Source {
             use_apiserver_cache: config.use_apiserver_cache,
             ingestion_timestamp_field,
             delay_deletion,
+            include_file_metric_tag: config.internal_metrics.include_file_tag,
         })
     }
 
@@ -638,6 +645,7 @@ impl Source {
             use_apiserver_cache,
             ingestion_timestamp_field,
             delay_deletion,
+            include_file_metric_tag,
         } = self;
 
         let mut reflectors = Vec::new();
@@ -775,7 +783,9 @@ impl Source {
             // We do not remove the log files, `kubelet` is responsible for it.
             remove_after: None,
             // The standard emitter.
-            emitter: FileSourceInternalEventsEmitter,
+            emitter: FileSourceInternalEventsEmitter {
+                include_file_metric_tag,
+            },
             // A handle to the current tokio runtime
             handle: tokio::runtime::Handle::current(),
         };
