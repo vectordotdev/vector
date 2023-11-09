@@ -10,6 +10,7 @@ use std::{
 use futures::FutureExt;
 use tokio::time::{sleep, Sleep};
 use tower::{retry::Policy, timeout::error::Elapsed};
+use vector_lib::configurable::configurable_component;
 
 use crate::Error;
 
@@ -34,50 +35,87 @@ pub trait RetryLogic: Clone + Send + Sync + 'static {
     }
 }
 
+/// The jitter mode to use for retry backoff behavior.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Default)]
+pub enum JitterMode {
+    /// No jitter.
+    None,
+
+    /// Full jitter.
+    ///
+    /// The random delay is anywhere from 0 up to the maximum current delay calculated by the backoff
+    /// strategy.
+    ///
+    /// Incorporating full jitter into your backoff strategy can greatly reduce the likelihood
+    /// of creating accidental denial of service (DoS) conditions against your own systems when
+    /// many clients are recovering from a failure state.
+    #[default]
+    Full,
+}
+
 #[derive(Debug, Clone)]
-pub struct FixedRetryPolicy<L> {
+pub struct FibonacciRetryPolicy<L> {
     remaining_attempts: usize,
     previous_duration: Duration,
     current_duration: Duration,
+    jitter_mode: JitterMode,
+    current_jitter_duration: Duration,
     max_duration: Duration,
     logic: L,
 }
 
 pub struct RetryPolicyFuture<L: RetryLogic> {
     delay: Pin<Box<Sleep>>,
-    policy: FixedRetryPolicy<L>,
+    policy: FibonacciRetryPolicy<L>,
 }
 
-impl<L: RetryLogic> FixedRetryPolicy<L> {
-    pub const fn new(
+impl<L: RetryLogic> FibonacciRetryPolicy<L> {
+    pub fn new(
         remaining_attempts: usize,
         initial_backoff: Duration,
         max_duration: Duration,
         logic: L,
+        jitter_mode: JitterMode,
     ) -> Self {
-        FixedRetryPolicy {
+        FibonacciRetryPolicy {
             remaining_attempts,
             previous_duration: Duration::from_secs(0),
             current_duration: initial_backoff,
+            jitter_mode,
+            current_jitter_duration: Self::add_full_jitter(initial_backoff),
             max_duration,
             logic,
         }
     }
 
-    fn advance(&self) -> FixedRetryPolicy<L> {
-        let next_duration: Duration = self.previous_duration + self.current_duration;
+    fn add_full_jitter(d: Duration) -> Duration {
+        let jitter = rand::random::<u64>() % (d.as_millis() as u64);
+        Duration::from_millis(jitter)
+    }
 
-        FixedRetryPolicy {
+    fn advance(&self) -> FibonacciRetryPolicy<L> {
+        let next_duration: Duration = cmp::min(
+            self.previous_duration + self.current_duration,
+            self.max_duration,
+        );
+
+        FibonacciRetryPolicy {
             remaining_attempts: self.remaining_attempts - 1,
             previous_duration: self.current_duration,
-            current_duration: cmp::min(next_duration, self.max_duration),
+            current_duration: next_duration,
+            current_jitter_duration: Self::add_full_jitter(next_duration),
+            jitter_mode: self.jitter_mode,
             max_duration: self.max_duration,
             logic: self.logic.clone(),
         }
     }
 
     const fn backoff(&self) -> Duration {
-        self.current_duration
+        match self.jitter_mode {
+            JitterMode::None => self.current_duration,
+            JitterMode::Full => self.current_jitter_duration,
+        }
     }
 
     fn build_retry(&self) -> RetryPolicyFuture<L> {
@@ -89,7 +127,7 @@ impl<L: RetryLogic> FixedRetryPolicy<L> {
     }
 }
 
-impl<Req, Res, L> Policy<Req, Res, Error> for FixedRetryPolicy<L>
+impl<Req, Res, L> Policy<Req, Res, Error> for FibonacciRetryPolicy<L>
 where
     Req: Clone,
     L: RetryLogic<Response = Res>,
@@ -168,7 +206,7 @@ where
 impl<L: RetryLogic> Unpin for RetryPolicyFuture<L> {}
 
 impl<L: RetryLogic> Future for RetryPolicyFuture<L> {
-    type Output = FixedRetryPolicy<L>;
+    type Output = FibonacciRetryPolicy<L>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         std::task::ready!(self.delay.poll_unpin(cx));
@@ -288,11 +326,12 @@ mod tests {
 
         time::pause();
 
-        let policy = FixedRetryPolicy::new(
+        let policy = FibonacciRetryPolicy::new(
             5,
             Duration::from_secs(1),
             Duration::from_secs(10),
             SvcRetryLogic,
+            JitterMode::None,
         );
 
         let (mut svc, mut handle) = mock::spawn_layer(RetryLayer::new(policy));
@@ -317,11 +356,12 @@ mod tests {
     async fn service_error_no_retry() {
         trace_init();
 
-        let policy = FixedRetryPolicy::new(
+        let policy = FibonacciRetryPolicy::new(
             5,
             Duration::from_secs(1),
             Duration::from_secs(10),
             SvcRetryLogic,
+            JitterMode::None,
         );
 
         let (mut svc, mut handle) = mock::spawn_layer(RetryLayer::new(policy));
@@ -339,11 +379,12 @@ mod tests {
 
         time::pause();
 
-        let policy = FixedRetryPolicy::new(
+        let policy = FibonacciRetryPolicy::new(
             5,
             Duration::from_secs(1),
             Duration::from_secs(10),
             SvcRetryLogic,
+            JitterMode::None,
         );
 
         let (mut svc, mut handle) = mock::spawn_layer(RetryLayer::new(policy));
@@ -363,11 +404,12 @@ mod tests {
 
     #[test]
     fn backoff_grows_to_max() {
-        let mut policy = FixedRetryPolicy::new(
+        let mut policy = FibonacciRetryPolicy::new(
             10,
             Duration::from_secs(1),
             Duration::from_secs(10),
             SvcRetryLogic,
+            JitterMode::None,
         );
         assert_eq!(Duration::from_secs(1), policy.backoff());
 
