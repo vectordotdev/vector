@@ -644,11 +644,13 @@ base: components: sinks: aws_cloudwatch_logs: configuration: {
 		required:    false
 		type: object: options: {
 			days: {
-				required: false
+				description: "If retention is enabled, the number of days to retain logs for."
+				required:    false
 				type: uint: default: 0
 			}
 			enabled: {
-				required: false
+				description: "Whether or not to set a retention policy when creating a new Log Group."
+				required:    false
 				type: bool: default: false
 			}
 		}

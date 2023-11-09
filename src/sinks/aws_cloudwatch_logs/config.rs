@@ -53,13 +53,11 @@ impl ClientBuilder for CloudwatchLogsClientBuilder {
 #[derive(Clone, Debug, Default)]
 /// Retention policy configuration for AWS CloudWatch Log Group
 pub struct Retention {
-    #[configurable(derived)]
-    // Whether or not to set a retention policy when creating a new Log Group.
+    /// Whether or not to set a retention policy when creating a new Log Group.
     #[serde(default)]
     pub enabled: bool,
 
-    #[configurable(derived)]
-    // If retention is enabled, the number of days to retain logs for.
+    /// If retention is enabled, the number of days to retain logs for.
     #[serde(
         default,
         deserialize_with = "retention_days",
