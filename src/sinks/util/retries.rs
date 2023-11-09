@@ -446,7 +446,7 @@ mod tests {
             JitterMode::Full,
         );
 
-        let expected_fib = vec![1, 1, 2, 3, 5, 8];
+        let expected_fib = [1, 1, 2, 3, 5, 8];
 
         for (i, &exp_fib_secs) in expected_fib.iter().enumerate() {
             let backoff = policy.backoff();
