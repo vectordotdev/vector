@@ -17,7 +17,7 @@ use crate::{
     serde::bool_or_struct,
     sources::{
         self,
-        util::{http::HttpMethod, ErrorMessage, HttpSource, HttpSourceAuthConfig},
+        util::{decode, http::HttpMethod, ErrorMessage, HttpSource, HttpSourceAuthConfig},
     },
     tls::TlsEnableableConfig,
 };
@@ -122,6 +122,11 @@ impl RemoteWriteSource {
 }
 
 impl HttpSource for RemoteWriteSource {
+    fn decode(&self, encoding_header: Option<&str>, body: Bytes) -> Result<Bytes, ErrorMessage> {
+        // Default to snappy decoding the request body.
+        decode(encoding_header.or(Some("snappy")), body)
+    }
+
     fn build_events(
         &self,
         body: Bytes,

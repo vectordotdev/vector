@@ -65,6 +65,10 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
         path: &str,
     ) -> Result<Vec<Event>, ErrorMessage>;
 
+    fn decode(&self, encoding_header: Option<&str>, body: Bytes) -> Result<Bytes, ErrorMessage> {
+        decode(encoding_header, body)
+    }
+
     #[allow(clippy::too_many_arguments)]
     fn run(
         self,
@@ -123,7 +127,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                 .and_then(
                     move |path: FullPath,
                           auth_header,
-                          encoding_header,
+                          encoding_header: Option<String>,
                           headers: HeaderMap,
                           body: Bytes,
                           query_parameters: HashMap<String, String>| {
@@ -132,7 +136,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
 
                         let events = auth
                             .is_valid(&auth_header)
-                            .and_then(|()| decode(&encoding_header, body))
+                            .and_then(|()| self.decode(encoding_header.as_deref(), body))
                             .and_then(|body| {
                                 emit!(HttpBytesReceived {
                                     byte_size: body.len(),
