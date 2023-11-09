@@ -191,7 +191,7 @@ impl Default for TowerRequestConfig {
 }
 
 impl TowerRequestConfig {
-    pub const fn concurrnecy(mut self, concurrency: Concurrency) -> Self {
+    pub const fn concurrency(mut self, concurrency: Concurrency) -> Self {
         self.concurrency = Some(concurrency);
         self
     }
@@ -528,7 +528,7 @@ mod tests {
         // This is equivalent to the user explicitly specifying all of the values in their config.
         let cfg = TowerRequestConfig::default();
 
-        // Merge with local default overides.
+        // Merge with local default overrides.
         let settings = cfg.unwrap_with(&TowerRequestConfig {
             concurrency: Some(Concurrency::Fixed(16)),
             timeout_secs: Some(1),

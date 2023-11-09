@@ -70,7 +70,7 @@ pub struct AdaptiveConcurrencySettings {
     pub(super) rtt_deviation_scale: f64,
 
     /// The maximum concurrency limit.
-    /// 
+    ///
     /// The adaptive request concurrency limit will not go above this bound. This is put in place as a safeguard.
     #[configurable(validation(range(min = 1)))]
     #[serde(default = "default_max_concurrency_limit")]
