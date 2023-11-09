@@ -72,7 +72,8 @@ pub struct LokiConfig {
     #[serde(default = "crate::serde::default_true")]
     pub remove_timestamp: bool,
 
-    #[configurable(derived)]
+    /// Compression configuration.
+    /// Snappy compression implies sending push requests as Protocol Buffers.
     #[serde(default = "default_compression")]
     pub compression: Compression,
 
