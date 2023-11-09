@@ -20,6 +20,8 @@ use serde::{
 ///
 /// This can be set either to one of the below enum values or to a positive integer, which denotes
 /// a fixed concurrency limit.
+/// 
+/// The global default for this value is `adaptive`. However, individual components may override that default.
 #[derive(Clone, Copy, Debug, Derivative, Eq, PartialEq)]
 pub enum Concurrency {
     /// A fixed concurrency of 1.
@@ -56,24 +58,13 @@ impl Default for Concurrency {
 }
 
 impl Concurrency {
-    const fn if_adaptive(self, other: Self) -> Self {
+    pub const fn parse_concurrency(&self) -> Option<usize> {
         match self {
-            Self::Adaptive => other,
-            _ => self,
-        }
-    }
-
-    pub const fn parse_concurrency(&self, other: Self) -> Option<usize> {
-        match self.if_adaptive(other) {
             Concurrency::None => Some(1),
             Concurrency::Adaptive => None,
-            Concurrency::Fixed(limit) => Some(limit),
+            Concurrency::Fixed(limit) => Some(*limit),
         }
     }
-}
-
-pub const fn concurrency_is_adaptive(concurrency: &Concurrency) -> bool {
-    matches!(concurrency, Concurrency::Adaptive)
 }
 
 impl<'de> Deserialize<'de> for Concurrency {

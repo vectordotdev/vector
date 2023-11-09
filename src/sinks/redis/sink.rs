@@ -71,7 +71,7 @@ impl RedisSink {
 
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let request = self.request.unwrap_with(&TowerRequestConfig {
-            concurrency: Concurrency::Fixed(1),
+            concurrency: Some(Concurrency::Fixed(1)),
             ..Default::default()
         });
 
