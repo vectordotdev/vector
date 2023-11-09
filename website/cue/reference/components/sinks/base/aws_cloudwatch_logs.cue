@@ -645,7 +645,7 @@ base: components: sinks: aws_cloudwatch_logs: configuration: {
 		type: object: options: {
 			days: {
 				required: false
-				type: int: default: 0
+				type: uint: default: 0
 			}
 			enabled: {
 				required: false

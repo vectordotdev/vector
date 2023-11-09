@@ -44,7 +44,7 @@ struct Client {
     stream_name: String,
     group_name: String,
     headers: IndexMap<String, String>,
-    retention_days: i32,
+    retention_days: u32,
 }
 
 type ClientResult<T, E> = BoxFuture<'static, Result<T, SdkError<E>>>;
@@ -342,7 +342,7 @@ impl Client {
             client
                 .put_retention_policy()
                 .log_group_name(group_name)
-                .retention_in_days(retention_days)
+                .retention_in_days(retention_days.try_into().unwrap())
                 .send()
                 .await?;
             Ok(())

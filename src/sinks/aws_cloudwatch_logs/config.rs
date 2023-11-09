@@ -54,24 +54,26 @@ impl ClientBuilder for CloudwatchLogsClientBuilder {
 /// Retention policy configuration for AWS CloudWatch Log Group
 pub struct Retention {
     #[configurable(derived)]
+    // Whether or not to set a retention policy when creating a new Log Group.
     #[serde(default)]
     pub enabled: bool,
 
     #[configurable(derived)]
+    // If retention is enabled, the number of days to retain logs for.
     #[serde(
         default,
         deserialize_with = "retention_days",
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
-    pub days: i32,
+    pub days: u32,
 }
 
-fn retention_days<'de, D>(deserializer: D) -> Result<i32, D::Error>
+fn retention_days<'de, D>(deserializer: D) -> Result<u32, D::Error>
 where
     D: Deserializer<'de>,
 {
-    let days: i32 = Deserialize::deserialize(deserializer)?;
-    const ALLOWED_VALUES: &[i32] = &[
+    let days: u32 = Deserialize::deserialize(deserializer)?;
+    const ALLOWED_VALUES: &[u32] = &[
         1, 3, 5, 7, 14, 30, 60, 90, 120, 150, 180, 365, 400, 545, 731, 1096, 1827, 2192, 2557,
         2922, 3288, 3653,
     ];
