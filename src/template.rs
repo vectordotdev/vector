@@ -394,7 +394,8 @@ fn render_timestamp(items: &ParsedStrftime, event: EventRef<'_>, tz_offset: Opti
 
 #[cfg(test)]
 mod tests {
-    use chrono::{TimeZone, Utc};
+    use chrono::{TimeZone, Utc, Offset};
+    use chrono_tz::Tz;
     use vector_lib::lookup::{metadata_path, PathPrefix};
     use vector_lib::metric_tags;
 
@@ -684,13 +685,13 @@ mod tests {
         let mut event = Event::Log(LogEvent::from("hello world"));
         event.as_mut_log().insert(
             (
-                lookup::PathPrefix::Event,
+                PathPrefix::Event,
                 log_schema().timestamp_key().unwrap(),
             ),
             ts,
         );
 
-        let tz = "Asia/Singapore".parse().unwrap();
+        let tz: Tz = "Asia/Singapore".parse().unwrap();
         let offset = Some(Utc::now().with_timezone(&tz).offset().fix());
         assert_eq!(
             Ok(Bytes::from("vector-2001-02-03-12.log")),
