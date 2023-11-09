@@ -340,7 +340,7 @@ impl TowerRequestSettings {
     }
 
     /// Distributes requests to services [(Endpoint, service, healthcheck)]
-    /// 
+    ///
     /// [BufferLayer] suggests that the `buffer_bound` should be at least equal to
     /// the number of the callers of the service. For sinks, this should typically be 1.
     pub fn distributed_service<Req, RL, HL, S>(
