@@ -2,8 +2,7 @@ use std::fmt::Write as _;
 use std::str::Utf8Error;
 
 use data_encoding::{BASE32HEX_NOPAD, BASE64, HEXUPPER};
-use thiserror::Error;
-use trust_dns_proto::{
+use hickory_proto::{
     error::ProtoError,
     op::{message::Message as TrustDnsMessage, Edns, Query},
     rr::{
@@ -19,6 +18,7 @@ use trust_dns_proto::{
     },
     serialize::binary::{BinDecodable, BinDecoder},
 };
+use thiserror::Error;
 
 use super::dns_message::{
     self, DnsQueryMessage, DnsRecord, DnsUpdateMessage, EdnsOptionEntry, OptPseudoSection,
@@ -150,7 +150,9 @@ impl DnsMessageParser {
 
     fn parse_dns_record(&mut self, record: &Record) -> DnsParserResult<DnsRecord> {
         let record_data = match record.data() {
-            Some(RData::Unknown { code, rdata }) => self.format_unknown_rdata(*code, rdata),
+            Some(RData::Unknown { code, rdata }) => {
+                self.format_unknown_rdata((*code).into(), rdata)
+            }
             Some(rdata) => format_rdata(rdata),
             None => Ok((Some(String::from("")), None)), // NULL record
         }?;
@@ -1133,7 +1135,7 @@ mod tests {
         str::FromStr,
     };
 
-    use trust_dns_proto::rr::{
+    use hickory_proto::rr::{
         dnssec::{
             rdata::{
                 dnskey::DNSKEY, ds::DS, nsec::NSEC, nsec3::NSEC3, nsec3param::NSEC3PARAM, sig::SIG,
@@ -1324,7 +1326,7 @@ mod tests {
 
     #[test]
     fn test_format_rdata_for_cname_type() {
-        let rdata = RData::CNAME(trust_dns_proto::rr::rdata::CNAME(
+        let rdata = RData::CNAME(hickory_proto::rr::rdata::CNAME(
             Name::from_str("www.example.com.").unwrap(),
         ));
         let rdata_text = format_rdata(&rdata);

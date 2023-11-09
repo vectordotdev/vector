@@ -15,7 +15,7 @@ use crate::{
     config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     event::{
         metric::{Metric, MetricValue},
-        Event,
+        Event, KeyString,
     },
     http::HttpClient,
     internal_events::{SematextMetricsEncodeEventError, SematextMetricsInvalidMetricError},
@@ -299,9 +299,9 @@ fn encode_events(
     EncodedEvent::new(output.freeze(), byte_size, json_byte_size)
 }
 
-fn to_fields(label: String, value: f64) -> HashMap<String, Field> {
+fn to_fields(label: String, value: f64) -> HashMap<KeyString, Field> {
     let mut result = HashMap::new();
-    result.insert(label, Field::Float(value));
+    result.insert(label.into(), Field::Float(value));
     result
 }
 

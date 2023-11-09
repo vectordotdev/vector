@@ -309,20 +309,20 @@ mod tests {
     use chrono::DateTime;
     use ordered_float::NotNan;
     use vector_common::btreemap;
-    use vector_core::event::{LogEvent, Value};
+    use vector_core::event::{LogEvent, ObjectMap, Value};
 
     use super::*;
 
     fn make_event_with_fields(field_data: Vec<(&str, &str)>) -> (Vec<ConfigTargetPath>, Event) {
         let mut fields: Vec<ConfigTargetPath> = std::vec::Vec::new();
-        let mut tree = std::collections::BTreeMap::new();
+        let mut tree = ObjectMap::new();
 
-        for (field_name, field_value) in field_data.iter() {
-            let field = ConfigTargetPath::try_from(field_name.to_string()).unwrap();
+        for (field_name, field_value) in field_data.into_iter() {
+            let field = ConfigTargetPath::try_from(field_name.clone()).unwrap();
             fields.push(field);
 
             let field_value = Value::from(field_value.to_string());
-            tree.insert(field_name.to_string().clone(), field_value);
+            tree.insert(field_name.into(), field_value);
         }
 
         let event = Event::Log(LogEvent::from(tree));

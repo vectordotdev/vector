@@ -25,7 +25,7 @@ use vector_lib::{
     metric_tags,
 };
 use vrl::compiler::value::Collection;
-use vrl::value::Kind;
+use vrl::value::{Kind, ObjectMap};
 
 use crate::schema::Definition;
 use crate::{
@@ -118,6 +118,27 @@ fn test_decode_log_body() {
     }
 
     QuickCheck::new().quickcheck(inner as fn(Vec<LogMsg>) -> TestResult);
+}
+
+#[test]
+fn test_decode_log_body_empty_object() {
+    let body = Bytes::from("{}");
+    let api_key = None;
+    let decoder = crate::codecs::Decoder::new(
+        Framer::Bytes(BytesDecoder::new()),
+        Deserializer::Bytes(BytesDeserializer),
+    );
+
+    let source = DatadogAgentSource::new(
+        true,
+        decoder,
+        "http",
+        test_logs_schema_definition(),
+        LogNamespace::Legacy,
+    );
+
+    let events = decode_log_body(body, api_key, &source).unwrap();
+    assert_eq!(events.len(), 0);
 }
 
 #[test]
@@ -1229,12 +1250,8 @@ async fn decode_traces() {
 
             assert_eq!(
                 trace_v2.as_map()["tags"],
-                Value::Object(BTreeMap::from_iter(
-                    [
-                        ("a".to_string(), "tag".into()),
-                        ("another".to_string(), "tag".into())
-                    ]
-                    .into_iter()
+                Value::Object(ObjectMap::from_iter(
+                    [("a".into(), "tag".into()), ("another".into(), "tag".into())].into_iter()
                 ))
             );
 
