@@ -99,13 +99,10 @@ async fn kinesis_put_records_without_partition_key() {
         auth: Default::default(),
         acknowledgements: Default::default(),
         request_retry_partial: Default::default(),
+        partition_key_field: None,
     };
 
-    let config = KinesisStreamsSinkConfig {
-        partition_key_field: None,
-        batch,
-        base,
-    };
+    let config = KinesisStreamsSinkConfig { batch, base };
 
     let cx = SinkContext::default();
 

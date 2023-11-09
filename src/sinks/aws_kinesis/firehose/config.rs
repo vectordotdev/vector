@@ -143,7 +143,7 @@ impl SinkConfig for KinesisFirehoseSinkConfig {
             KinesisRetryLogic,
         >(
             &self.base,
-            None,
+            self.base.partition_key_field.clone(),
             batch_settings,
             KinesisFirehoseClient { client },
             KinesisRetryLogic {

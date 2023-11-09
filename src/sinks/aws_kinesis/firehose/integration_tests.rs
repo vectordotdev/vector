@@ -60,6 +60,7 @@ async fn firehose_put_records() {
         auth: Default::default(),
         acknowledgements: Default::default(),
         request_retry_partial: Default::default(),
+        partition_key_field: None,
     };
 
     let config = KinesisFirehoseSinkConfig { batch, base };
