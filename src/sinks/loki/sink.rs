@@ -12,7 +12,6 @@ use super::{
     event::{LokiBatchEncoder, LokiEvent, LokiRecord, PartitionKey},
     service::{LokiRequest, LokiRetryLogic, LokiService},
 };
-use crate::sinks::loki::config::{CompressionConfigAdapter, ExtendedCompression};
 use crate::sinks::loki::event::LokiBatchEncoding;
 use crate::{
     http::{get_http_scheme_from_uri, HttpClient},
@@ -65,7 +64,7 @@ impl Partitioner for RecordPartitioner {
 
 #[derive(Clone)]
 pub struct LokiRequestBuilder {
-    compression: CompressionConfigAdapter,
+    compression: Compression,
     encoder: LokiBatchEncoder,
 }
 
@@ -92,10 +91,7 @@ impl RequestBuilder<(PartitionKey, Vec<LokiRecord>)> for LokiRequestBuilder {
     type Error = RequestBuildError;
 
     fn compression(&self) -> Compression {
-        match self.compression {
-            CompressionConfigAdapter::Original(compression) => compression,
-            CompressionConfigAdapter::Extended(_) => Compression::None,
-        }
+        self.compression
     }
 
     fn encoder(&self) -> &Self::Encoder {
@@ -415,10 +411,8 @@ impl LokiSink {
         let serializer = config.encoding.build()?;
         let encoder = Encoder::<()>::new(serializer);
         let batch_encoder = match config.compression {
-            CompressionConfigAdapter::Original(_) => LokiBatchEncoder(LokiBatchEncoding::Json),
-            CompressionConfigAdapter::Extended(ExtendedCompression::Snappy) => {
-                LokiBatchEncoder(LokiBatchEncoding::Protobuf)
-            }
+            Compression::Snappy => LokiBatchEncoder(LokiBatchEncoding::Protobuf),
+            _ => LokiBatchEncoder(LokiBatchEncoding::Json),
         };
 
         Ok(Self {
