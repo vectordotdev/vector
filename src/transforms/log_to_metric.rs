@@ -1,5 +1,6 @@
 use std::sync::Arc;
 use std::{collections::HashMap, num::ParseFloatError};
+use std::fmt;
 
 use chrono::Utc;
 use indexmap::IndexMap;
@@ -30,7 +31,7 @@ use crate::{
     internal_events::{
         LogToMetricFieldNullError, LogToMetricParseFloatError,
         MetricMetadataInvalidFieldValueError, MetricMetadataMetricDetailsNotFoundError,
-        MetricMetadataParseArrayError, MetricMetadataParseFloatError, MetricMetadataParseIntError,
+        MetricMetadataParseError,
         ParserMissingFieldError, DROP_EVENT,
     },
     schema,
@@ -199,30 +200,43 @@ impl LogToMetric {
     }
 }
 
+/// Kinds of TranformError for Parsing
+#[configurable_component]
+#[derive(Clone, Debug)]
+pub enum TransformParseErrorKind {
+    ///  Error when Parsing a Float
+    FloatError,
+    ///  Error when Parsing an Int
+    IntError,
+    /// Errors when Parsing Arrays
+    ArrayError,
+}
+
+impl fmt::Display for TransformParseErrorKind {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
 enum TransformError {
     FieldNotFound {
-        field: String,
+        path: String,
     },
     FieldNull {
-        field: String,
+        path: String,
     },
     MetricDetailsNotFound,
     MetricValueError {
-        field: String,
-        field_value: String,
+        path: String,
+        path_value: String,
     },
-    ParseMetricFloatError {
-        field: String,
+    ParseError {
+        path: String,
+        kind: TransformParseErrorKind,
     },
     ParseFloatError {
-        field: String,
+        path: String,
         error: ParseFloatError,
-    },
-    ParseIntError {
-        field: String,
-    },
-    ParseArrayError {
-        field: String,
     },
     TemplateRenderingError(TemplateRenderingError),
 }
@@ -304,15 +318,15 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
         ));
 
     let field = parse_target_path(config.field()).map_err(|_e| FieldNotFound {
-        field: config.field().to_string(),
+        path: config.field().to_string(),
     })?;
 
     let value = match log.get(&field) {
         None => Err(TransformError::FieldNotFound {
-            field: field.to_string(),
+            path: field.to_string(),
         }),
         Some(Value::Null) => Err(TransformError::FieldNull {
-            field: field.to_string(),
+            path: field.to_string(),
         }),
         Some(value) => Ok(value),
     }?;
@@ -332,7 +346,7 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
             let value = if counter.increment_by_value {
                 value.to_string_lossy().parse().map_err(|error| {
                     TransformError::ParseFloatError {
-                        field: config.field.get_ref().to_owned(),
+                        path: config.field.get_ref().to_owned(),
                         error,
                     }
                 })?
@@ -345,7 +359,7 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
         MetricTypeConfig::Histogram => {
             let value = value.to_string_lossy().parse().map_err(|error| {
                 TransformError::ParseFloatError {
-                    field: field.to_string(),
+                    path: field.to_string(),
                     error,
                 }
             })?;
@@ -361,7 +375,7 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
         MetricTypeConfig::Summary => {
             let value = value.to_string_lossy().parse().map_err(|error| {
                 TransformError::ParseFloatError {
-                    field: field.to_string(),
+                    path: field.to_string(),
                     error,
                 }
             })?;
@@ -377,7 +391,7 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
         MetricTypeConfig::Gauge => {
             let value = value.to_string_lossy().parse().map_err(|error| {
                 TransformError::ParseFloatError {
-                    field: field.to_string(),
+                    path: field.to_string(),
                     error,
                 }
             })?;
@@ -412,12 +426,12 @@ fn try_get_string_from_log(log: &LogEvent, path: &str) -> Result<Option<String>,
     // TODO: update returned errors after `TransformError` is refactored.
     let maybe_value = log.parse_path_and_get_value(path).map_err(|e| match e {
         PathParseError::InvalidPathSyntax { path } => FieldNotFound {
-            field: path.to_string(),
+            path: path.to_string(),
         },
     })?;
     match maybe_value {
         None => Err(FieldNotFound {
-            field: path.to_string(),
+            path: path.to_string(),
         }),
         Some(v) => Ok(bytes_to_str(v)),
     }
@@ -427,11 +441,12 @@ fn get_counter_value(log: &LogEvent) -> Result<MetricValue, TransformError> {
     let counter_value = log
         .get(event_path!("counter", "value"))
         .ok_or_else(|| TransformError::FieldNotFound {
-            field: "counter.value".to_string(),
+            path: "counter.value".to_string(),
         })?
         .as_float()
-        .ok_or_else(|| TransformError::ParseMetricFloatError {
-            field: "counter.value".to_string(),
+        .ok_or_else(|| TransformError::ParseError {
+            path: "counter.value".to_string(),
+            kind: TransformParseErrorKind::FloatError,
         })?;
 
     Ok(MetricValue::Counter {
@@ -443,11 +458,12 @@ fn get_gauge_value(log: &LogEvent) -> Result<MetricValue, TransformError> {
     let gauge_value = log
         .get(event_path!("gauge", "value"))
         .ok_or_else(|| TransformError::FieldNotFound {
-            field: "gauge.value".to_string(),
+            path: "gauge.value".to_string(),
         })?
         .as_float()
-        .ok_or_else(|| TransformError::ParseMetricFloatError {
-            field: "gauge.value".to_string(),
+        .ok_or_else(|| TransformError::ParseError {
+            path: "gauge.value".to_string(),
+            kind: TransformParseErrorKind::FloatError,
         })?;
     Ok(MetricValue::Gauge {
         value: *gauge_value,
@@ -458,11 +474,12 @@ fn get_distribution_value(log: &LogEvent) -> Result<MetricValue, TransformError>
     let event_samples = log
         .get(event_path!("distribution", "samples"))
         .ok_or_else(|| TransformError::FieldNotFound {
-            field: "distribution.samples".to_string(),
+            path: "distribution.samples".to_string(),
         })?
         .as_array()
-        .ok_or_else(|| TransformError::ParseArrayError {
-            field: "distribution.samples".to_string(),
+        .ok_or_else(|| TransformError::ParseError {
+            path: "distribution.samples".to_string(),
+            kind: TransformParseErrorKind::ArrayError,
         })?;
 
     let mut samples: Vec<Sample> = Vec::new();
@@ -470,21 +487,23 @@ fn get_distribution_value(log: &LogEvent) -> Result<MetricValue, TransformError>
         let value = e_sample
             .get(path!("value"))
             .ok_or_else(|| TransformError::FieldNotFound {
-                field: "value".to_string(),
+                path: "value".to_string(),
             })?
             .as_float()
-            .ok_or_else(|| TransformError::ParseMetricFloatError {
-                field: "value".to_string(),
+            .ok_or_else(|| TransformError::ParseError {
+                path: "value".to_string(),
+                kind: TransformParseErrorKind::FloatError,
             })?;
 
         let rate = e_sample
             .get(path!("rate"))
             .ok_or_else(|| TransformError::FieldNotFound {
-                field: "rate".to_string(),
+                path: "rate".to_string(),
             })?
             .as_integer()
-            .ok_or_else(|| TransformError::ParseIntError {
-                field: "rate".to_string(),
+            .ok_or_else(|| TransformError::ParseError {
+                path: "rate".to_string(),
+                kind: TransformParseErrorKind::IntError,
             })?;
 
         samples.push(Sample {
@@ -497,7 +516,7 @@ fn get_distribution_value(log: &LogEvent) -> Result<MetricValue, TransformError>
         Some(n) => n,
         None => {
             return Err(TransformError::FieldNotFound {
-                field: "distribution.statistic".to_string(),
+                path: "distribution.statistic".to_string(),
             })
         }
     };
@@ -505,8 +524,8 @@ fn get_distribution_value(log: &LogEvent) -> Result<MetricValue, TransformError>
         "histogram" => Ok(StatisticKind::Histogram),
         "summary" => Ok(StatisticKind::Summary),
         _ => Err(TransformError::MetricValueError {
-            field: "distribution.statistic".to_string(),
-            field_value: statistic_str.to_string(),
+            path: "distribution.statistic".to_string(),
+            path_value: statistic_str.to_string(),
         }),
     }?;
 
@@ -520,11 +539,12 @@ fn get_histogram_value(log: &LogEvent) -> Result<MetricValue, TransformError> {
     let event_buckets = log
         .get(event_path!("histogram", "buckets"))
         .ok_or_else(|| TransformError::FieldNotFound {
-            field: "histogram.buckets".to_string(),
+            path: "histogram.buckets".to_string(),
         })?
         .as_array()
-        .ok_or_else(|| TransformError::ParseArrayError {
-            field: "histogram.buckets".to_string(),
+        .ok_or_else(|| TransformError::ParseError {
+            path: "histogram.buckets".to_string(),
+            kind: TransformParseErrorKind::ArrayError,
         })?;
 
     let mut buckets: Vec<Bucket> = Vec::new();
@@ -532,21 +552,23 @@ fn get_histogram_value(log: &LogEvent) -> Result<MetricValue, TransformError> {
         let upper_limit = e_bucket
             .get(path!("upper_limit"))
             .ok_or_else(|| TransformError::FieldNotFound {
-                field: "histogram.buckets.upper_limit".to_string(),
+                path: "histogram.buckets.upper_limit".to_string(),
             })?
             .as_float()
-            .ok_or_else(|| TransformError::ParseMetricFloatError {
-                field: "histogram.buckets.upper_limit".to_string(),
+            .ok_or_else(|| TransformError::ParseError {
+                path: "histogram.buckets.upper_limit".to_string(),
+                kind: TransformParseErrorKind::FloatError,
             })?;
 
         let count = e_bucket
             .get(path!("count"))
             .ok_or_else(|| TransformError::FieldNotFound {
-                field: "histogram.buckets.count".to_string(),
+                path: "histogram.buckets.count".to_string(),
             })?
             .as_integer()
-            .ok_or_else(|| TransformError::ParseIntError {
-                field: "histogram.buckets.count".to_string(),
+            .ok_or_else(|| TransformError::ParseError {
+                path: "histogram.buckets.count".to_string(),
+                kind: TransformParseErrorKind::IntError,
             })?;
 
         buckets.push(Bucket {
@@ -558,21 +580,23 @@ fn get_histogram_value(log: &LogEvent) -> Result<MetricValue, TransformError> {
     let count = log
         .get(event_path!("histogram", "count"))
         .ok_or_else(|| TransformError::FieldNotFound {
-            field: "histogram.count".to_string(),
+            path: "histogram.count".to_string(),
         })?
         .as_integer()
-        .ok_or_else(|| TransformError::ParseIntError {
-            field: "histogram.count".to_string(),
+        .ok_or_else(|| TransformError::ParseError {
+            path: "histogram.count".to_string(),
+            kind: TransformParseErrorKind::IntError,
         })?;
 
     let sum = log
         .get(event_path!("histogram", "sum"))
         .ok_or_else(|| TransformError::FieldNotFound {
-            field: "histogram.sum".to_string(),
+            path: "histogram.sum".to_string(),
         })?
         .as_float()
-        .ok_or_else(|| TransformError::ParseMetricFloatError {
-            field: "histogram.sum".to_string(),
+        .ok_or_else(|| TransformError::ParseError {
+            path: "histogram.sum".to_string(),
+            kind: TransformParseErrorKind::FloatError,
         })?;
 
     Ok(MetricValue::AggregatedHistogram {
@@ -586,11 +610,12 @@ fn get_summary_value(log: &LogEvent) -> Result<MetricValue, TransformError> {
     let event_quantiles = log
         .get(event_path!("summary", "quantiles"))
         .ok_or_else(|| TransformError::FieldNotFound {
-            field: "summary.quantiles".to_string(),
+            path: "summary.quantiles".to_string(),
         })?
         .as_array()
-        .ok_or_else(|| TransformError::ParseArrayError {
-            field: "summary.quantiles".to_string(),
+        .ok_or_else(|| TransformError::ParseError {
+            path: "summary.quantiles".to_string(),
+            kind: TransformParseErrorKind::ArrayError,
         })?;
 
     let mut quantiles: Vec<Quantile> = Vec::new();
@@ -598,21 +623,23 @@ fn get_summary_value(log: &LogEvent) -> Result<MetricValue, TransformError> {
         let quantile = e_quantile
             .get(path!("quantile"))
             .ok_or_else(|| TransformError::FieldNotFound {
-                field: "summary.quantiles.quantile".to_string(),
+                path: "summary.quantiles.quantile".to_string(),
             })?
             .as_float()
-            .ok_or_else(|| TransformError::ParseMetricFloatError {
-                field: "summary.quantiles.quantile".to_string(),
+            .ok_or_else(|| TransformError::ParseError {
+                path: "summary.quantiles.quantile".to_string(),
+                kind: TransformParseErrorKind::FloatError,
             })?;
 
         let value = e_quantile
             .get(path!("value"))
             .ok_or_else(|| TransformError::FieldNotFound {
-                field: "summary.quantiles.value".to_string(),
+                path: "summary.quantiles.value".to_string(),
             })?
             .as_float()
-            .ok_or_else(|| TransformError::ParseMetricFloatError {
-                field: "summary.quantiles.value".to_string(),
+            .ok_or_else(|| TransformError::ParseError {
+                path: "summary.quantiles.value".to_string(),
+                kind: TransformParseErrorKind::FloatError,
             })?;
 
         quantiles.push(Quantile {
@@ -624,21 +651,23 @@ fn get_summary_value(log: &LogEvent) -> Result<MetricValue, TransformError> {
     let count = log
         .get(event_path!("summary", "count"))
         .ok_or_else(|| TransformError::FieldNotFound {
-            field: "summary.count".to_string(),
+            path: "summary.count".to_string(),
         })?
         .as_integer()
-        .ok_or_else(|| TransformError::ParseIntError {
-            field: "summary.count".to_string(),
+        .ok_or_else(|| TransformError::ParseError {
+            path: "summary.count".to_string(),
+            kind: TransformParseErrorKind::IntError,
         })?;
 
     let sum = log
         .get(event_path!("summary", "sum"))
         .ok_or_else(|| TransformError::FieldNotFound {
-            field: "summary.sum".to_string(),
+            path: "summary.sum".to_string(),
         })?
         .as_float()
-        .ok_or_else(|| TransformError::ParseMetricFloatError {
-            field: "summary.sum".to_string(),
+        .ok_or_else(|| TransformError::ParseError {
+            path: "summary.sum".to_string(),
+            kind: TransformParseErrorKind::FloatError,
         })?;
 
     Ok(MetricValue::AggregatedSummary {
@@ -660,7 +689,7 @@ fn to_metrics_metadata(event: &Event) -> Result<Metric, TransformError> {
         Some(n) => n,
         None => {
             return Err(TransformError::FieldNotFound {
-                field: "name".to_string(),
+                path: "name".to_string(),
             })
         }
     };
@@ -680,7 +709,7 @@ fn to_metrics_metadata(event: &Event) -> Result<Metric, TransformError> {
         Some(n) => n,
         None => {
             return Err(TransformError::FieldNotFound {
-                field: "kind".to_string(),
+                path: "kind".to_string(),
             })
         }
     };
@@ -689,8 +718,8 @@ fn to_metrics_metadata(event: &Event) -> Result<Metric, TransformError> {
         "absolute" => Ok(MetricKind::Absolute),
         "incremental" => Ok(MetricKind::Incremental),
         value => Err(TransformError::MetricValueError {
-            field: "kind".to_string(),
-            field_value: value.to_string(),
+            path: "kind".to_string(),
+            path_value: value.to_string(),
         }),
     }?;
 
@@ -737,30 +766,21 @@ impl FunctionTransform for LogToMetric {
                 }
                 Err(err) => {
                     match err {
-                        TransformError::MetricValueError { field, field_value } => {
+                        TransformError::MetricValueError { path, path_value } => {
                             emit!(MetricMetadataInvalidFieldValueError {
-                                field: field.as_ref(),
-                                field_value: field_value.as_ref()
+                                field: path.as_ref(),
+                                field_value: path_value.as_ref()
                             })
                         }
-                        TransformError::FieldNotFound { field } => {
+                        TransformError::FieldNotFound { path } => {
                             emit!(ParserMissingFieldError::<DROP_EVENT> {
-                                field: field.as_ref()
+                                field: path.as_ref()
                             })
                         }
-                        TransformError::ParseMetricFloatError { field } => {
-                            emit!(MetricMetadataParseFloatError {
-                                field: field.as_ref()
-                            })
-                        }
-                        TransformError::ParseIntError { field } => {
-                            emit!(MetricMetadataParseIntError {
-                                field: field.as_ref()
-                            })
-                        }
-                        TransformError::ParseArrayError { field } => {
-                            emit!(MetricMetadataParseArrayError {
-                                field: field.as_ref()
+                        TransformError::ParseError { path, kind } => {
+                            emit!(MetricMetadataParseError {
+                                field: path.as_ref(),
+                                kind: &kind.to_string(),
                             })
                         }
                         TransformError::MetricDetailsNotFound {} => {
@@ -778,19 +798,19 @@ impl FunctionTransform for LogToMetric {
                     }
                     Err(err) => {
                         match err {
-                            TransformError::FieldNull { field } => {
+                            TransformError::FieldNull { path } => {
                                 emit!(LogToMetricFieldNullError {
-                                    field: field.as_ref()
+                                    field: path.as_ref()
                                 })
                             }
-                            TransformError::FieldNotFound { field } => {
+                            TransformError::FieldNotFound { path } => {
                                 emit!(ParserMissingFieldError::<DROP_EVENT> {
-                                    field: field.as_ref()
+                                    field: path.as_ref()
                                 })
                             }
-                            TransformError::ParseFloatError { field, error } => {
+                            TransformError::ParseFloatError { path, error } => {
                                 emit!(LogToMetricParseFloatError {
-                                    field: field.as_ref(),
+                                    field: path.as_ref(),
                                     error
                                 })
                             }
