@@ -150,7 +150,7 @@ const fn default_concurrency() -> Option<Concurrency> {
 }
 
 const fn default_timeout_secs() -> Option<u64> {
-    Some(30)
+    Some(60)
 }
 
 const fn default_rate_limit_duration_secs() -> Option<u64> {
@@ -168,7 +168,7 @@ const fn default_retry_attempts() -> Option<usize> {
 }
 
 const fn default_retry_max_duration_secs() -> Option<u64> {
-    Some(60)
+    Some(30)
 }
 
 const fn default_retry_initial_backoff_secs() -> Option<u64> {

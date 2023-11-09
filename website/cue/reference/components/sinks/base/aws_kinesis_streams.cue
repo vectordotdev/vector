@@ -617,7 +617,7 @@ base: components: sinks: aws_kinesis_streams: configuration: {
 					"""
 				required: false
 				type: uint: {
-					default: 60
+					default: 30
 					unit:    "seconds"
 				}
 			}
@@ -632,7 +632,7 @@ base: components: sinks: aws_kinesis_streams: configuration: {
 					"""
 				required: false
 				type: uint: {
-					default: 30
+					default: 60
 					unit:    "seconds"
 				}
 			}

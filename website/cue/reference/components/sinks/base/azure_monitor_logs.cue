@@ -291,7 +291,7 @@ base: components: sinks: azure_monitor_logs: configuration: {
 					"""
 				required: false
 				type: uint: {
-					default: 60
+					default: 30
 					unit:    "seconds"
 				}
 			}
@@ -306,7 +306,7 @@ base: components: sinks: azure_monitor_logs: configuration: {
 					"""
 				required: false
 				type: uint: {
-					default: 30
+					default: 60
 					unit:    "seconds"
 				}
 			}
