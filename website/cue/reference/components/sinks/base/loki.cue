@@ -112,8 +112,7 @@ base: components: sinks: loki: configuration: {
 	compression: {
 		description: """
 			Compression configuration.
-
-			All compression algorithms use the default compression level unless otherwise specified.
+			Snappy compression implies sending push requests as Protocol Buffers.
 			"""
 		required: false
 		type: string: {
