@@ -9,42 +9,8 @@ use crate::{
     sinks::{prelude::*, util::UriSerde},
 };
 
-/// Loki-specific compression.
-#[configurable_component]
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub enum ExtendedCompression {
-    /// Snappy compression.
-    ///
-    /// This implies sending push requests as Protocol Buffers.
-    #[serde(rename = "snappy")]
-    Snappy,
-}
-
-/// Compression configuration.
-#[configurable_component]
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
-#[serde(untagged)]
-pub enum CompressionConfigAdapter {
-    /// Basic compression.
-    Original(Compression),
-
-    /// Loki-specific compression.
-    Extended(ExtendedCompression),
-}
-
-impl CompressionConfigAdapter {
-    pub const fn content_encoding(self) -> Option<&'static str> {
-        match self {
-            CompressionConfigAdapter::Original(compression) => compression.content_encoding(),
-            CompressionConfigAdapter::Extended(_) => Some("snappy"),
-        }
-    }
-}
-
-impl Default for CompressionConfigAdapter {
-    fn default() -> Self {
-        CompressionConfigAdapter::Extended(ExtendedCompression::Snappy)
-    }
+const fn default_compression() -> Compression {
+    Compression::Snappy
 }
 
 fn default_loki_path() -> String {
@@ -107,8 +73,8 @@ pub struct LokiConfig {
     pub remove_timestamp: bool,
 
     #[configurable(derived)]
-    #[serde(default)]
-    pub compression: CompressionConfigAdapter,
+    #[serde(default = "default_compression")]
+    pub compression: Compression,
 
     #[configurable(derived)]
     #[serde(default)]
