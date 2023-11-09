@@ -221,10 +221,12 @@ In the `inputs` array for the test, you have these options:
 
 Parameter | Type | Description
 :---------|:-----|:-----------
+`type` | string | The type of input you're providing. [`vrl`](#logs), [`log`](#logs), [`raw`](#logs), or [`metric`](#metrics) are currently the only valid values.
 `insert_at` | string (name of transform) | The name of the transform into which the test input is inserted. This is particularly useful when you want to test only a subset of a transform pipeline.
 `value` | string (raw event value) | A raw string value to act as an input event. Use only in cases where events are raw strings and not structured objects with event fields.
 `log_fields` | object | If the transform handles [log events](#logs), these are the key/value pairs that comprise the input event.
 `metric` | object | If the transform handles [metric events](#metrics), these are the fields that comprise that metric. Subfields include `name`, `tags`, `kind`, and others.
+`source` | string (vrl program) | If the transform handles [log events](#logs), the result of the vrl program will be the input event.
 
 Here's an example `inputs` declaration:
 
@@ -364,6 +366,19 @@ To specify a raw string value for a log event, use `value`:
 [[tests.inputs]]
 insert_at = "add_metadata"
 value = "<102>1 2020-12-22T15:22:31.111Z vector-user.biz su 2666 ID389 - Something went wrong"
+```
+
+##### VRL program
+
+To specify a program to construct the log event, use `source`:
+
+```toml
+[[tests.inputs]]
+  insert_at = "canary"
+  type = "vrl"
+  source = """
+    . = {"a": {"b": "c"}, "d": now()}
+  """
 ```
 
 #### Metrics
