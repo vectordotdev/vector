@@ -666,7 +666,7 @@ impl PubsubSource {
             message
                 .attributes
                 .into_iter()
-                .map(|(key, value)| (key, Value::Bytes(value.into())))
+                .map(|(key, value)| (key.into(), Value::Bytes(value.into())))
                 .collect(),
         );
         let log_namespace = self.log_namespace;
@@ -1171,7 +1171,7 @@ mod integration_tests {
                 .clone();
             assert_eq!(logattr.len(), attributes.len());
             for (a, b) in logattr.into_iter().zip(&attributes) {
-                assert_eq!(&a.0, b.0);
+                assert_eq!(&a.0, b.0.as_str());
                 assert_eq!(a.1, b.1.clone().into());
             }
         }

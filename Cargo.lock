@@ -2940,8 +2940,8 @@ version = "0.1.0"
 dependencies = [
  "criterion",
  "data-encoding",
+ "hickory-proto",
  "thiserror",
- "trust-dns-proto 0.23.2",
 ]
 
 [[package]]
@@ -4065,6 +4065,30 @@ name = "hex"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
+
+[[package]]
+name = "hickory-proto"
+version = "0.24.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "091a6fbccf4860009355e3efc52ff4acf37a63489aad7435372d44ceeb6fbbcf"
+dependencies = [
+ "async-trait",
+ "cfg-if",
+ "data-encoding",
+ "enum-as-inner 0.6.0",
+ "futures-channel",
+ "futures-io",
+ "futures-util",
+ "idna 0.4.0",
+ "ipnet",
+ "once_cell",
+ "rand 0.8.5",
+ "thiserror",
+ "tinyvec",
+ "tokio",
+ "tracing 0.1.40",
+ "url",
+]
 
 [[package]]
 name = "hkdf"
@@ -5359,7 +5383,7 @@ dependencies = [
  "tokio",
  "tokio-rustls 0.24.1",
  "tokio-util",
- "trust-dns-proto 0.21.2",
+ "trust-dns-proto",
  "trust-dns-resolver",
  "typed-builder 0.10.0",
  "uuid",
@@ -9497,31 +9521,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "trust-dns-proto"
-version = "0.23.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3119112651c157f4488931a01e586aa459736e9d6046d3bd9105ffb69352d374"
-dependencies = [
- "async-trait",
- "cfg-if",
- "data-encoding",
- "enum-as-inner 0.6.0",
- "futures-channel",
- "futures-io",
- "futures-util",
- "idna 0.4.0",
- "ipnet",
- "once_cell",
- "rand 0.8.5",
- "smallvec",
- "thiserror",
- "tinyvec",
- "tokio",
- "tracing 0.1.40",
- "url",
-]
-
-[[package]]
 name = "trust-dns-resolver"
 version = "0.21.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9538,7 +9537,7 @@ dependencies = [
  "smallvec",
  "thiserror",
  "tokio",
- "trust-dns-proto 0.21.2",
+ "trust-dns-proto",
 ]
 
 [[package]]
@@ -9945,6 +9944,7 @@ dependencies = [
  "headers",
  "heim",
  "hex",
+ "hickory-proto",
  "hostname",
  "http",
  "http-body",
@@ -10046,7 +10046,6 @@ dependencies = [
  "tracing-limit",
  "tracing-subscriber",
  "tracing-tower",
- "trust-dns-proto 0.23.2",
  "typetag",
  "url",
  "uuid",
@@ -10405,8 +10404,7 @@ checksum = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"
 [[package]]
 name = "vrl"
 version = "0.8.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a8a93ee342590c4df0ff63961d7d76a347e0c7b6e6c0be4c001317ca1ff11b53"
+source = "git+https://github.com/vectordotdev/vrl?rev=37319dfca17dc5d7637b24455199029cc30eb128#37319dfca17dc5d7637b24455199029cc30eb128"
 dependencies = [
  "aes",
  "ansi_term",

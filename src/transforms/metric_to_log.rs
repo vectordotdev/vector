@@ -359,7 +359,7 @@ mod tests {
     use super::*;
     use crate::event::{
         metric::{MetricKind, MetricTags, MetricValue, StatisticKind, TagValue, TagValueSet},
-        Metric, Value,
+        KeyString, Metric, Value,
     };
     use crate::test_util::{components::assert_transform_compliance, random_string};
     use crate::transforms::test::create_topology;
@@ -433,12 +433,12 @@ mod tests {
         assert_eq!(
             collected,
             vec![
-                (String::from("counter.value"), &Value::from(1.0)),
-                (String::from("host"), &Value::from("localhost")),
-                (String::from("kind"), &Value::from("absolute")),
-                (String::from("name"), &Value::from("counter")),
-                (String::from("tags.some_tag"), &Value::from("some_value")),
-                (String::from("timestamp"), &Value::from(ts())),
+                (KeyString::from("counter.value"), &Value::from(1.0)),
+                (KeyString::from("host"), &Value::from("localhost")),
+                (KeyString::from("kind"), &Value::from("absolute")),
+                (KeyString::from("name"), &Value::from("counter")),
+                (KeyString::from("tags.some_tag"), &Value::from("some_value")),
+                (KeyString::from("timestamp"), &Value::from(ts())),
             ]
         );
         assert_eq!(log.metadata(), &metadata);
@@ -464,10 +464,10 @@ mod tests {
         assert_eq!(
             collected,
             vec![
-                (String::from("gauge.value"), &Value::from(1.0)),
-                (String::from("kind"), &Value::from("absolute")),
-                (String::from("name"), &Value::from("gauge")),
-                (String::from("timestamp"), &Value::from(ts())),
+                (KeyString::from("gauge.value"), &Value::from(1.0)),
+                (KeyString::from("kind"), &Value::from("absolute")),
+                (KeyString::from("name"), &Value::from("gauge")),
+                (KeyString::from("timestamp"), &Value::from(ts())),
             ]
         );
         assert_eq!(log.metadata(), &metadata);
@@ -495,11 +495,11 @@ mod tests {
         assert_eq!(
             collected,
             vec![
-                (String::from("kind"), &Value::from("absolute")),
-                (String::from("name"), &Value::from("set")),
-                (String::from("set.values[0]"), &Value::from("one")),
-                (String::from("set.values[1]"), &Value::from("two")),
-                (String::from("timestamp"), &Value::from(ts())),
+                (KeyString::from("kind"), &Value::from("absolute")),
+                (KeyString::from("name"), &Value::from("set")),
+                (KeyString::from("set.values[0]"), &Value::from("one")),
+                (KeyString::from("set.values[1]"), &Value::from("two")),
+                (KeyString::from("timestamp"), &Value::from(ts())),
             ]
         );
         assert_eq!(log.metadata(), &metadata);
@@ -529,28 +529,28 @@ mod tests {
             collected,
             vec![
                 (
-                    String::from("distribution.samples[0].rate"),
+                    KeyString::from("distribution.samples[0].rate"),
                     &Value::from(10)
                 ),
                 (
-                    String::from("distribution.samples[0].value"),
+                    KeyString::from("distribution.samples[0].value"),
                     &Value::from(1.0)
                 ),
                 (
-                    String::from("distribution.samples[1].rate"),
+                    KeyString::from("distribution.samples[1].rate"),
                     &Value::from(20)
                 ),
                 (
-                    String::from("distribution.samples[1].value"),
+                    KeyString::from("distribution.samples[1].value"),
                     &Value::from(2.0)
                 ),
                 (
-                    String::from("distribution.statistic"),
+                    KeyString::from("distribution.statistic"),
                     &Value::from("histogram")
                 ),
-                (String::from("kind"), &Value::from("absolute")),
-                (String::from("name"), &Value::from("distro")),
-                (String::from("timestamp"), &Value::from(ts())),
+                (KeyString::from("kind"), &Value::from("absolute")),
+                (KeyString::from("name"), &Value::from("distro")),
+                (KeyString::from("timestamp"), &Value::from(ts())),
             ]
         );
         assert_eq!(log.metadata(), &metadata);
@@ -581,26 +581,32 @@ mod tests {
             collected,
             vec![
                 (
-                    String::from("aggregated_histogram.buckets[0].count"),
+                    KeyString::from("aggregated_histogram.buckets[0].count"),
                     &Value::from(10)
                 ),
                 (
-                    String::from("aggregated_histogram.buckets[0].upper_limit"),
+                    KeyString::from("aggregated_histogram.buckets[0].upper_limit"),
                     &Value::from(1.0)
                 ),
                 (
-                    String::from("aggregated_histogram.buckets[1].count"),
+                    KeyString::from("aggregated_histogram.buckets[1].count"),
                     &Value::from(20)
                 ),
                 (
-                    String::from("aggregated_histogram.buckets[1].upper_limit"),
+                    KeyString::from("aggregated_histogram.buckets[1].upper_limit"),
                     &Value::from(2.0)
                 ),
-                (String::from("aggregated_histogram.count"), &Value::from(30)),
-                (String::from("aggregated_histogram.sum"), &Value::from(50.0)),
-                (String::from("kind"), &Value::from("absolute")),
-                (String::from("name"), &Value::from("histo")),
-                (String::from("timestamp"), &Value::from(ts())),
+                (
+                    KeyString::from("aggregated_histogram.count"),
+                    &Value::from(30)
+                ),
+                (
+                    KeyString::from("aggregated_histogram.sum"),
+                    &Value::from(50.0)
+                ),
+                (KeyString::from("kind"), &Value::from("absolute")),
+                (KeyString::from("name"), &Value::from("histo")),
+                (KeyString::from("timestamp"), &Value::from(ts())),
             ]
         );
         assert_eq!(log.metadata(), &metadata);
@@ -630,27 +636,33 @@ mod tests {
         assert_eq!(
             collected,
             vec![
-                (String::from("aggregated_summary.count"), &Value::from(30)),
                 (
-                    String::from("aggregated_summary.quantiles[0].quantile"),
+                    KeyString::from("aggregated_summary.count"),
+                    &Value::from(30)
+                ),
+                (
+                    KeyString::from("aggregated_summary.quantiles[0].quantile"),
                     &Value::from(50.0)
                 ),
                 (
-                    String::from("aggregated_summary.quantiles[0].value"),
+                    KeyString::from("aggregated_summary.quantiles[0].value"),
                     &Value::from(10.0)
                 ),
                 (
-                    String::from("aggregated_summary.quantiles[1].quantile"),
+                    KeyString::from("aggregated_summary.quantiles[1].quantile"),
                     &Value::from(90.0)
                 ),
                 (
-                    String::from("aggregated_summary.quantiles[1].value"),
+                    KeyString::from("aggregated_summary.quantiles[1].value"),
                     &Value::from(20.0)
                 ),
-                (String::from("aggregated_summary.sum"), &Value::from(50.0)),
-                (String::from("kind"), &Value::from("absolute")),
-                (String::from("name"), &Value::from("summary")),
-                (String::from("timestamp"), &Value::from(ts())),
+                (
+                    KeyString::from("aggregated_summary.sum"),
+                    &Value::from(50.0)
+                ),
+                (KeyString::from("kind"), &Value::from("absolute")),
+                (KeyString::from("name"), &Value::from("summary")),
+                (KeyString::from("timestamp"), &Value::from(ts())),
             ]
         );
         assert_eq!(log.metadata(), &metadata);

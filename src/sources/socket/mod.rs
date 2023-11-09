@@ -322,7 +322,7 @@ pub(crate) fn default_host_key() -> OptionalValuePath {
 mod test {
     use approx::assert_relative_eq;
     use std::{
-        collections::{BTreeMap, HashMap},
+        collections::HashMap,
         net::{SocketAddr, UdpSocket},
         sync::{
             atomic::{AtomicBool, Ordering},
@@ -346,9 +346,8 @@ mod test {
     };
     use vector_lib::event::EventContainer;
     use vector_lib::lookup::{lookup_v2::OptionalValuePath, owned_value_path, path};
-    use vrl::btreemap;
-    use vrl::value;
-    use vrl::value::Value;
+    use vrl::value::ObjectMap;
+    use vrl::{btreemap, value};
 
     #[cfg(unix)]
     use {
@@ -600,7 +599,7 @@ mod test {
                 "one line".into()
             );
 
-            let tls_meta: BTreeMap<String, Value> = btreemap!(
+            let tls_meta: ObjectMap = btreemap!(
                 "subject" => "CN=localhost,OU=Vector,O=Datadog,L=New York,ST=New York,C=US"
             );
 
@@ -665,7 +664,7 @@ mod test {
 
             assert_eq!(log.value(), &"one line".into());
 
-            let tls_meta: BTreeMap<String, Value> = btreemap!(
+            let tls_meta: ObjectMap = btreemap!(
                 "subject" => "CN=localhost,OU=Vector,O=Datadog,L=New York,ST=New York,C=US"
             );
 

@@ -1,7 +1,7 @@
 use bytes::Bytes;
 use chrono::Utc;
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::HashMap,
     convert::{TryFrom, TryInto},
     fmt::Debug,
     iter::FromIterator,
@@ -11,9 +11,7 @@ use std::{
 };
 
 use crossbeam_utils::atomic::AtomicCell;
-use lookup::lookup_v2::TargetPath;
-use lookup::PathPrefix;
-use lookup::{metadata_path, path};
+use lookup::{lookup_v2::TargetPath, metadata_path, path, PathPrefix};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize, Serializer};
 use vector_common::{
@@ -30,12 +28,12 @@ use super::{
     estimated_json_encoded_size_of::EstimatedJsonEncodedSizeOf,
     finalization::{BatchNotifier, EventFinalizer},
     metadata::EventMetadata,
-    util,
-    util::log::{all_fields, all_metadata_fields},
-    EventFinalizers, Finalizable, MaybeAsLogMut, Value,
+    util, EventFinalizers, Finalizable, KeyString, ObjectMap, Value,
 };
 use crate::config::LogNamespace;
 use crate::config::{log_schema, telemetry};
+use crate::event::util::log::{all_fields, all_metadata_fields};
+use crate::event::MaybeAsLogMut;
 
 static VECTOR_SOURCE_TYPE_PATH: Lazy<Option<OwnedTargetPath>> = Lazy::new(|| {
     Some(OwnedTargetPath::metadata(owned_value_path!(
@@ -264,8 +262,8 @@ impl LogEvent {
         }
     }
 
-    ///  Create a `LogEvent` from a `BTreeMap` and `EventMetadata`
-    pub fn from_map(map: BTreeMap<String, Value>, metadata: EventMetadata) -> Self {
+    ///  Create a `LogEvent` from an `ObjectMap` and `EventMetadata`
+    pub fn from_map(map: ObjectMap, metadata: EventMetadata) -> Self {
         let inner = Arc::new(Inner::from(Value::Object(map)));
         Self { inner, metadata }
     }
@@ -415,7 +413,7 @@ impl LogEvent {
         }
     }
 
-    pub fn keys(&self) -> Option<impl Iterator<Item = String> + '_> {
+    pub fn keys(&self) -> Option<impl Iterator<Item = KeyString> + '_> {
         match &self.inner.fields {
             Value::Object(map) => Some(util::log::keys(map)),
             _ => None,
@@ -424,7 +422,9 @@ impl LogEvent {
 
     /// If the event root value is a map, build and return an iterator to event field and value pairs.
     /// TODO: Ideally this should return target paths to be consistent with other `LogEvent` methods.
-    pub fn all_event_fields(&self) -> Option<impl Iterator<Item = (String, &Value)> + Serialize> {
+    pub fn all_event_fields(
+        &self,
+    ) -> Option<impl Iterator<Item = (KeyString, &Value)> + Serialize> {
         self.as_map().map(all_fields)
     }
 
@@ -432,7 +432,7 @@ impl LogEvent {
     /// TODO: Ideally this should return target paths to be consistent with other `LogEvent` methods.
     pub fn all_metadata_fields(
         &self,
-    ) -> Option<impl Iterator<Item = (String, &Value)> + Serialize> {
+    ) -> Option<impl Iterator<Item = (KeyString, &Value)> + Serialize> {
         match self.metadata.value() {
             Value::Object(metadata_map) => Some(metadata_map).map(all_metadata_fields),
             _ => None,
@@ -441,7 +441,7 @@ impl LogEvent {
 
     /// Returns an iterator of all fields if the value is an Object. Otherwise,
     /// a single field is returned with a "message" key
-    pub fn convert_to_fields(&self) -> impl Iterator<Item = (String, &Value)> + Serialize {
+    pub fn convert_to_fields(&self) -> impl Iterator<Item = (KeyString, &Value)> + Serialize {
         if let Some(map) = self.as_map() {
             util::log::all_fields(map)
         } else {
@@ -457,14 +457,14 @@ impl LogEvent {
         }
     }
 
-    pub fn as_map(&self) -> Option<&BTreeMap<String, Value>> {
+    pub fn as_map(&self) -> Option<&ObjectMap> {
         match self.value() {
             Value::Object(map) => Some(map),
             _ => None,
         }
     }
 
-    pub fn as_map_mut(&mut self) -> Option<&mut BTreeMap<String, Value>> {
+    pub fn as_map_mut(&mut self) -> Option<&mut ObjectMap> {
         match self.value_mut() {
             Value::Object(map) => Some(map),
             _ => None,
@@ -634,16 +634,16 @@ impl From<Value> for LogEvent {
     }
 }
 
-impl From<BTreeMap<String, Value>> for LogEvent {
-    fn from(map: BTreeMap<String, Value>) -> Self {
+impl From<ObjectMap> for LogEvent {
+    fn from(map: ObjectMap) -> Self {
         Self::from_parts(Value::Object(map), EventMetadata::default())
     }
 }
 
-impl From<HashMap<String, Value>> for LogEvent {
-    fn from(map: HashMap<String, Value>) -> Self {
+impl From<HashMap<KeyString, Value>> for LogEvent {
+    fn from(map: HashMap<KeyString, Value>) -> Self {
         Self::from_parts(
-            Value::Object(map.into_iter().collect::<BTreeMap<_, _>>()),
+            Value::Object(map.into_iter().collect::<ObjectMap>()),
             EventMetadata::default(),
         )
     }
@@ -657,8 +657,8 @@ impl TryFrom<serde_json::Value> for LogEvent {
             serde_json::Value::Object(fields) => Ok(LogEvent::from(
                 fields
                     .into_iter()
-                    .map(|(k, v)| (k, v.into()))
-                    .collect::<BTreeMap<_, _>>(),
+                    .map(|(k, v)| (k.into(), v.into()))
+                    .collect::<ObjectMap>(),
             )),
             _ => Err(crate::Error::from(
                 "Attempted to convert non-Object JSON into a LogEvent.",
@@ -1113,14 +1113,14 @@ mod test {
         log.insert("a", 0);
         log.insert("a.b", 1);
         log.insert("c", 2);
-        let actual: Vec<(String, Value)> = log
+        let actual: Vec<(KeyString, Value)> = log
             .all_event_fields()
             .unwrap()
             .map(|(s, v)| (s, v.clone()))
             .collect();
         assert_eq!(
             actual,
-            vec![("a.b".to_string(), 1.into()), ("c".to_string(), 2.into())]
+            vec![("a.b".into(), 1.into()), ("c".into(), 2.into())]
         );
     }
 
@@ -1130,14 +1130,14 @@ mod test {
         log.insert("%a", 0);
         log.insert("%a.b", 1);
         log.insert("%c", 2);
-        let actual: Vec<(String, Value)> = log
+        let actual: Vec<(KeyString, Value)> = log
             .all_metadata_fields()
             .unwrap()
             .map(|(s, v)| (s, v.clone()))
             .collect();
         assert_eq!(
             actual,
-            vec![("%a.b".to_string(), 1.into()), ("%c".to_string(), 2.into())]
+            vec![("%a.b".into(), 1.into()), ("%c".into(), 2.into())]
         );
     }
 }

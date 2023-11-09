@@ -14,6 +14,7 @@ use std::{
 use indexmap::IndexMap;
 use serde_json::{Number, Value};
 use vector_config_common::{attributes::CustomAttribute, constants, validation::Validation};
+use vrl::value::KeyString;
 
 use crate::{
     num::ConfigurableNumber,
@@ -110,6 +111,22 @@ impl Configurable for String {
 impl ToValue for String {
     fn to_value(&self) -> Value {
         Value::String(self.clone())
+    }
+}
+
+impl Configurable for KeyString {
+    fn metadata() -> Metadata {
+        Metadata::with_transparent(true)
+    }
+
+    fn generate_schema(_: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
+        Ok(generate_string_schema())
+    }
+}
+
+impl ToValue for KeyString {
+    fn to_value(&self) -> Value {
+        Value::String(self.clone().into())
     }
 }
 

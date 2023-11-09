@@ -252,6 +252,7 @@ heim,https://github.com/heim-rs/heim,Apache-2.0 OR MIT,svartalf <self@svartalf.i
 hermit-abi,https://github.com/hermitcore/hermit-rs,MIT OR Apache-2.0,Stefan Lankes
 hermit-abi,https://github.com/hermitcore/libhermit-rs,MIT OR Apache-2.0,Stefan Lankes
 hex,https://github.com/KokaKiwi/rust-hex,MIT OR Apache-2.0,KokaKiwi <kokakiwi@kokakiwi.net>
+hickory-proto,https://github.com/hickory-dns/hickory-dns,MIT OR Apache-2.0,The contributors to Hickory DNS
 hkdf,https://github.com/RustCrypto/KDFs,MIT OR Apache-2.0,RustCrypto Developers
 hmac,https://github.com/RustCrypto/MACs,MIT OR Apache-2.0,RustCrypto Developers
 home,https://github.com/rust-lang/cargo,MIT OR Apache-2.0,Brian Anderson <andersrb@gmail.com>
@@ -595,7 +596,6 @@ tracing-subscriber,https://github.com/tokio-rs/tracing,MIT,"Eliza Weisman <eliza
 tracing-tower,https://github.com/tokio-rs/tracing,MIT,Eliza Weisman <eliza@buoyant.io>
 treediff,https://github.com/Byron/treediff-rs,MIT OR Apache-2.0,Sebastian Thiel <byronimo@gmail.com>
 trust-dns-proto,https://github.com/bluejekyll/trust-dns,MIT OR Apache-2.0,Benjamin Fry <benjaminfry@me.com>
-trust-dns-proto,https://github.com/bluejekyll/trust-dns,MIT OR Apache-2.0,The contributors to Trust-DNS
 trust-dns-resolver,https://github.com/bluejekyll/trust-dns,MIT OR Apache-2.0,Benjamin Fry <benjaminfry@me.com>
 try-lock,https://github.com/seanmonstar/try-lock,MIT,Sean McArthur <sean@seanmonstar.com>
 tungstenite,https://github.com/snapview/tungstenite-rs,MIT OR Apache-2.0,"Alexey Galakhov, Daniel Abramov"
