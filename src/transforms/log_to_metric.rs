@@ -670,7 +670,7 @@ fn to_metrics_metadata(event: &Event) -> Result<Metric, TransformError> {
     if let Some(els) = log.get(event_path!("tags")) {
         if let Some(el) = els.as_object() {
             for (key, value) in el {
-                tags.insert(String::from(key).to_string(), bytes_to_str(value));
+                tags.insert(String::from(key.as_ref()).to_string(), bytes_to_str(value));
             }
         }
     }
