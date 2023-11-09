@@ -91,7 +91,13 @@ impl RequestBuilder<(PartitionKey, Vec<LokiRecord>)> for LokiRequestBuilder {
     type Error = RequestBuildError;
 
     fn compression(&self) -> Compression {
-        self.compression
+        if self.compression == Compression::Snappy {
+            // Snappy compression is applied after converting the batch to protobuf so
+            // we need to handle this separately.
+            Compression::None
+        } else {
+            self.compression
+        }
     }
 
     fn encoder(&self) -> &Self::Encoder {
