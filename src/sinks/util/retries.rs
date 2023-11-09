@@ -90,7 +90,7 @@ impl<L: RetryLogic> FibonacciRetryPolicy<L> {
     }
 
     fn add_full_jitter(d: Duration) -> Duration {
-        let jitter = rand::random::<u64>() % (d.as_millis() as u64);
+        let jitter = (rand::random::<u64>() % (d.as_millis() as u64)) + 1;
         Duration::from_millis(jitter)
     }
 
@@ -433,6 +433,49 @@ mod tests {
 
         policy = policy.advance();
         assert_eq!(Duration::from_secs(10), policy.backoff());
+    }
+
+    #[test]
+    fn backoff_grows_to_max_with_jitter() {
+        let max_duration = Duration::from_secs(10);
+        let mut policy = FibonacciRetryPolicy::new(
+            10,
+            Duration::from_secs(1),
+            max_duration,
+            SvcRetryLogic,
+            JitterMode::Full,
+        );
+
+        let expected_fib = vec![1, 1, 2, 3, 5, 8];
+
+        for (i, &exp_fib_secs) in expected_fib.iter().enumerate() {
+            let backoff = policy.backoff();
+            let upper_bound = Duration::from_secs(exp_fib_secs);
+
+            // Check if the backoff is within the expected range, considering the jitter
+            assert!(
+                !backoff.is_zero() && backoff <= upper_bound,
+                "Attempt {}: Expected backoff to be within 0 and {:?}, got {:?}",
+                i + 1,
+                upper_bound,
+                backoff
+            );
+
+            policy = policy.advance();
+        }
+
+        // Once the max backoff is reached, it should not exceed the max backoff.
+        for _ in 0..4 {
+            let backoff = policy.backoff();
+            assert!(
+                !backoff.is_zero() && backoff <= max_duration,
+                "Expected backoff to not exceed {:?}, got {:?}",
+                max_duration,
+                backoff
+            );
+
+            policy = policy.advance();
+        }
     }
 
     #[derive(Debug, Clone)]
