@@ -108,6 +108,7 @@ impl TowerRequestConfigDefaults for GlobalTowerRequestConfigDefaults {}
 pub struct TowerRequestConfig<D: TowerRequestConfigDefaults = GlobalTowerRequestConfigDefaults> {
     #[configurable(derived)]
     #[serde(default = "default_concurrency::<D>")]
+    #[serde(skip_serializing_if = "concurrency_is_default::<D>")]
     pub concurrency: Concurrency,
 
     /// The time a request can take before being aborted.
@@ -160,6 +161,10 @@ pub struct TowerRequestConfig<D: TowerRequestConfigDefaults = GlobalTowerRequest
 
 const fn default_concurrency<D: TowerRequestConfigDefaults>() -> Concurrency {
     D::CONCURRENCY
+}
+
+fn concurrency_is_default<D: TowerRequestConfigDefaults>(concurrency: &Concurrency) -> bool {
+    *concurrency == D::CONCURRENCY
 }
 
 const fn default_timeout_secs<D: TowerRequestConfigDefaults>() -> u64 {

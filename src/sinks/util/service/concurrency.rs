@@ -20,8 +20,6 @@ use serde::{
 ///
 /// This can be set either to one of the below enum values or to a positive integer, which denotes
 /// a fixed concurrency limit.
-///
-/// The global default for this value is `adaptive`. However, individual components may override that default.
 #[derive(Clone, Copy, Debug, Derivative, Eq, PartialEq)]
 pub enum Concurrency {
     /// A fixed concurrency of 1.
