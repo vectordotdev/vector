@@ -51,14 +51,19 @@ fn write_vrl_constants(manifest: &Manifest, output_file: &mut File) {
     let vrl_dep = manifest
         .dependencies
         .get("vrl")
-        .expect("missing VRL dependency").detail().expect("expected detail dependency format");
+        .expect("missing VRL dependency")
+        .detail()
+        .expect("expected detail dependency format");
 
     let (version, link) = match vrl_dep.version.clone() {
         None => {
-            let repo = vrl_dep.git.clone().expect("VRL dependency should use 'version' or 'git'");
+            let repo = vrl_dep
+                .git
+                .clone()
+                .expect("VRL dependency should use 'version' or 'git'");
             let version = vrl_dep.rev.clone().expect("VRL git revision not specified");
             (version.clone(), format!("{repo}/tree/{version}"))
-        },
+        }
         Some(v) => (v.clone(), format!("https://crates.io/crates/vrl/{v}")),
     };
 
