@@ -506,6 +506,7 @@ impl SinkConfig for ElasticsearchConfig {
             services,
             health_config,
             ElasticsearchHealthLogic,
+            1,
         );
 
         let sink = ElasticsearchSink::new(&common, self, service)?;

@@ -306,12 +306,16 @@ impl TowerRequestSettings {
     }
 
     /// Distributes requests to services [(Endpoint, service, healthcheck)]
+    ///
+    /// [BufferLayer] suggests that the `buffer_bound` should be at least equal to
+    /// the number of the callers of the service. For sinks, this should typically be 1.
     pub fn distributed_service<Req, RL, HL, S>(
         self,
         retry_logic: RL,
         services: Vec<(String, S)>,
         health_config: HealthConfig,
         health_logic: HL,
+        buffer_bound: usize,
     ) -> DistributedService<S, RL, HL, usize, Req>
     where
         Req: Clone + Send + 'static,
@@ -326,7 +330,6 @@ impl TowerRequestSettings {
 
         // Build services
         let open = OpenGauge::new();
-        let max_concurrency = services.len() * AdaptiveConcurrencySettings::max_concurrency();
         let services = services
             .into_iter()
             .map(|(endpoint, inner)| {
@@ -356,7 +359,8 @@ impl TowerRequestSettings {
         ServiceBuilder::new()
             .rate_limit(self.rate_limit_num, self.rate_limit_duration)
             .retry(policy)
-            .layer(BufferLayer::new(max_concurrency))
+            // [Balance] must be wrapped with a [BufferLayer] so that the overall service implements Clone.
+            .layer(BufferLayer::new(buffer_bound))
             .service(Balance::new(Box::pin(stream::iter(services)) as Pin<Box<_>>))
     }
 }
