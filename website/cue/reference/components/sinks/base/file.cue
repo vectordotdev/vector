@@ -325,6 +325,20 @@ base: components: sinks: file: configuration: {
 			unit: "seconds"
 		}
 	}
+	internal_metrics: {
+		description: "Configuration of internal metrics for file-based components."
+		required:    false
+		type: object: options: include_file_tag: {
+			description: """
+				Whether or not to include the "file" tag on the component's corresponding internal metrics.
+
+				This is useful for distinguishing between different files while monitoring. However, the tag's
+				cardinality is unbounded. This defaults to true for now but will default to false in a future version.
+				"""
+			required: false
+			type: bool: default: true
+		}
+	}
 	path: {
 		description: """
 			File path to write events to.

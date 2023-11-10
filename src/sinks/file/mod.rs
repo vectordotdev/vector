@@ -30,7 +30,9 @@ use crate::{
     config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
     event::{Event, EventStatus, Finalizable},
     expiring_hash_map::ExpiringHashMap,
-    internal_events::{FileBytesSent, FileIoError, FileOpen, TemplateRenderingError},
+    internal_events::{
+        FileBytesSent, FileInternalMetricsConfig, FileIoError, FileOpen, TemplateRenderingError,
+    },
     sinks::util::{StreamSink, timezone_to_offset},
     template::Template,
 };
@@ -86,6 +88,10 @@ pub struct FileSinkConfig {
     #[configurable(derived)]
     #[serde(default)]
     pub timezone: Option<TimeZone>,
+
+    #[configurable(derived)]
+    #[serde(default)]
+    internal_metrics: FileInternalMetricsConfig,
 }
 
 impl GenerateConfig for FileSinkConfig {
@@ -97,6 +103,7 @@ impl GenerateConfig for FileSinkConfig {
             compression: Default::default(),
             acknowledgements: Default::default(),
             timezone: Default::default(),
+            internal_metrics: Default::default(),
         })
         .unwrap()
     }
@@ -206,6 +213,7 @@ pub struct FileSink {
     files: ExpiringHashMap<Bytes, OutFile>,
     compression: Compression,
     events_sent: Registered<EventsSent>,
+    include_file_metric_tag: bool,
 }
 
 impl FileSink {
@@ -224,6 +232,7 @@ impl FileSink {
             files: ExpiringHashMap::default(),
             compression: config.compression,
             events_sent: register!(EventsSent::from(Output(None))),
+            include_file_metric_tag: config.internal_metrics.include_file_tag,
         })
     }
 
@@ -373,6 +382,7 @@ impl FileSink {
                 emit!(FileBytesSent {
                     byte_size,
                     file: String::from_utf8_lossy(&path),
+                    include_file_metric_tag: self.include_file_metric_tag,
                 });
             }
             Err(error) => {
@@ -463,6 +473,7 @@ mod tests {
             compression: Compression::None,
             acknowledgements: Default::default(),
             timezone: Default::default(),
+            internal_metrics: Default::default(),
         };
 
         let (input, _events) = random_lines_with_stream(100, 64, None);
@@ -486,6 +497,7 @@ mod tests {
             compression: Compression::Gzip,
             acknowledgements: Default::default(),
             timezone: Default::default(),
+            internal_metrics: Default::default(),
         };
 
         let (input, _) = random_lines_with_stream(100, 64, None);
@@ -509,6 +521,7 @@ mod tests {
             compression: Compression::Zstd,
             acknowledgements: Default::default(),
             timezone: Default::default(),
+            internal_metrics: Default::default(),
         };
 
         let (input, _) = random_lines_with_stream(100, 64, None);
@@ -537,6 +550,7 @@ mod tests {
             compression: Compression::None,
             acknowledgements: Default::default(),
             timezone: Default::default(),
+            internal_metrics: Default::default(),
         };
 
         let (mut input, _events) = random_events_with_stream(32, 8, None);
@@ -616,6 +630,7 @@ mod tests {
             compression: Compression::None,
             acknowledgements: Default::default(),
             timezone: Default::default(),
+            internal_metrics: Default::default(),
         };
 
         let (mut input, _events) = random_lines_with_stream(10, 64, None);
