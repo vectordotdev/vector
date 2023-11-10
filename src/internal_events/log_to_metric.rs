@@ -2,8 +2,6 @@ use std::num::ParseFloatError;
 
 use metrics::counter;
 use vector_lib::internal_event::InternalEvent;
-
-use crate::emit;
 use vector_lib::internal_event::{error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL};
 
 pub struct LogToMetricFieldNullError<'a> {

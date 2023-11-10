@@ -1,10 +1,8 @@
 use std::time::Instant;
 
-use crate::emit;
 use metrics::{counter, histogram};
 pub use vector_lib::internal_event::EventsReceived;
 use vector_lib::internal_event::InternalEvent;
-
 use vector_lib::internal_event::{error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL};
 
 #[derive(Debug)]

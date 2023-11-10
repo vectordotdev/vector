@@ -144,7 +144,7 @@ urls: {
 	date:                                       "https://man7.org/linux/man-pages/man1/date.1.html"
 	debian:                                     "https://www.debian.org/"
 	debian_system_groups:                       "https://wiki.debian.org/SystemGroups"
-	default_configuration:                      "\(vector_repo)/blob/master/config/vector.toml"
+	default_configuration:                      "\(vector_repo)/blob/master/config/vector.yaml"
 	dnstap:                                     "http://dnstap.info/"
 	docker:                                     "https://www.docker.com/"
 	docker_alpine:                              "\(docker_hub)/_/alpine"

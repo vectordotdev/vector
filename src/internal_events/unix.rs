@@ -1,10 +1,11 @@
 use std::{io::Error, path::Path};
 
 use metrics::counter;
-use vector_lib::internal_event::InternalEvent;
-use vector_lib::internal_event::{error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL};
+use vector_lib::internal_event::{
+    error_stage, error_type, ComponentEventsDropped, InternalEvent, UNINTENTIONAL,
+};
 
-use crate::{emit, internal_events::SocketOutgoingConnectionError};
+use crate::internal_events::SocketOutgoingConnectionError;
 
 #[derive(Debug)]
 pub struct UnixSocketConnectionEstablished<'a> {
