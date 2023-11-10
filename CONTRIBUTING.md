@@ -227,12 +227,20 @@ There are other checks that are run by CI before the PR can be merged. These sho
 first to ensure they pass.
 
 ```sh
-cargo vdev check rust # this runs the [Clippy][urls.clippy] linter to catch common mistakes.
-cargo vdev check fmt # this ensures all code is properly formatted. Code can be run through [`rustfmt`][urls.rustfmt] using `cargo fmt` to ensure it is properly formatted.
-cargo vdev check events # this ensures the internal metrics that Vector emits conform to standards.
-cargo vdev check licenses # ensures the `LICENSE-3rdparty.csv` file is up to date with the licenses each of Vector's dependencies are published under.
-make check-component-docs # Vector's documentation for each component is generated from the comments attached to the Component structs and members. Running this ensures that the generated docs are up to date.
-cd rust-doc && make docs # generates the code documentation for the Vector project. Run this to ensure the docs can be generated without errors (warnings are acceptable at the minute).
+# Run the [Clippy][urls.clippy] linter to catch common mistakes.
+cargo vdev check rust
+# Ensure all code is properly formatted. Code can be run through [`rustfmt`][urls.rustfmt] using `cargo fmt` to ensure it is properly formatted.
+cargo vdev check fmt
+# Ensure the internal metrics that Vector emits conform to standards.
+cargo vdev check events
+# Ensure the `LICENSE-3rdparty.csv` file is up to date with the licenses each of Vector's dependencies are published under.
+cargo vdev check licenses
+# Vector's documentation for each component is generated from the comments attached to the Component structs and members.
+# Running this ensures that the generated docs are up to date.
+make check-component-docs
+# Generate the code documentation for the Vector project.
+# Run this to ensure the docs can be generated without errors (warnings are acceptable at the minute).
+cd rust-doc && make docs
 ```
 
 ### Deprecations
