@@ -18,7 +18,7 @@ base: components: transforms: throttle: configuration: {
 				number of discarded events can be seen through the `component_discarded_events_total` internal
 				metric.
 
-				Note that this defaults to false becuase the `key` tag has potentially unbounded cardinality.
+				Note that this defaults to false because the `key` tag has potentially unbounded cardinality.
 				Only set this to true if you know that the number of unique keys is bounded.
 				"""
 			required: false
