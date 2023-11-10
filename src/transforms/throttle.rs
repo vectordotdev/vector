@@ -193,17 +193,10 @@ where
                                         Some(event)
                                     }
                                     _ => {
-                                        if let Some(key) = key {
-                                            emit!(ThrottleEventDiscarded{
-                                                key,
-                                                emit_events_discarded_per_key: self.internal_metrics.emit_events_discarded_per_key
-                                            });
-                                        } else {
-                                            emit!(ThrottleEventDiscarded{
-                                                key: "None".to_string(),
-                                                emit_events_discarded_per_key: self.internal_metrics.emit_events_discarded_per_key
-                                            });
-                                        }
+                                        emit!(ThrottleEventDiscarded{
+                                            key: key.unwrap_or_else(|| "None".to_string()),
+                                            emit_events_discarded_per_key: self.internal_metrics.emit_events_discarded_per_key
+                                        });
                                         None
                                     }
                                 }
