@@ -673,6 +673,22 @@ base: components: sinks: aws_cloudwatch_logs: configuration: {
 			}
 		}
 	}
+	retention: {
+		description: "Retention policy configuration for AWS CloudWatch Log Group"
+		required:    false
+		type: object: options: {
+			days: {
+				description: "If retention is enabled, the number of days to retain logs for."
+				required:    false
+				type: uint: default: 0
+			}
+			enabled: {
+				description: "Whether or not to set a retention policy when creating a new Log Group."
+				required:    false
+				type: bool: default: false
+			}
+		}
+	}
 	stream_name: {
 		description: """
 			The [stream name][stream_name] of the target CloudWatch Logs stream.

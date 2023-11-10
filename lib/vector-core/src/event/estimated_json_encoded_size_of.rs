@@ -5,7 +5,7 @@ use chrono::{DateTime, Timelike, Utc};
 use ordered_float::NotNan;
 use smallvec::SmallVec;
 use vector_common::json_size::JsonSize;
-use vrl::value::Value;
+use vrl::value::{KeyString, Value};
 
 const NULL_SIZE: JsonSize = JsonSize::new(4);
 const TRUE_SIZE: JsonSize = JsonSize::new(4);
@@ -95,6 +95,12 @@ impl EstimatedJsonEncodedSizeOf for str {
 }
 
 impl EstimatedJsonEncodedSizeOf for String {
+    fn estimated_json_encoded_size_of(&self) -> JsonSize {
+        self.as_str().estimated_json_encoded_size_of()
+    }
+}
+
+impl EstimatedJsonEncodedSizeOf for KeyString {
     fn estimated_json_encoded_size_of(&self) -> JsonSize {
         self.as_str().estimated_json_encoded_size_of()
     }

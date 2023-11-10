@@ -116,7 +116,7 @@ fn convert_value_raw(
                 for (key, val) in o.into_iter() {
                     match convert_value(&value_field, val) {
                         Ok(prost_val) => {
-                            map.insert(MapKey::String(key), prost_val);
+                            map.insert(MapKey::String(key.into()), prost_val);
                         }
                         Err(e) => return Err(e),
                     }
