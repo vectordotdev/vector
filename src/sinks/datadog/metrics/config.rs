@@ -22,21 +22,18 @@ use crate::{
     tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
 
-// This default is centered around "series" data, which should be the lion's share of what we
-// process.  Given that a single series, when encoded, is in the 150-300 byte range, we can fit a
-// lot of these into a single request, something like 150-200K series.  Simply to be a little more
-// conservative, though, we use 100K here.  This will also get a little more tricky when it comes to
-// distributions and sketches, but we're going to have to implement incremental encoding to handle
-// "we've exceeded our maximum payload size, split this batch" scenarios anyways.
-pub const MAXIMUM_PAYLOAD_COMPRESSED_SIZE: usize = 3_200_000;
-pub const MAXIMUM_PAYLOAD_SIZE: usize = 62_914_560;
-
 // TODO: revisit our concurrency and batching defaults
 const DEFAULT_REQUEST_RETRY_ATTEMPTS: usize = 5;
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct DatadogMetricsDefaultBatchSettings;
 
+// This default is centered around "series" data, which should be the lion's share of what we
+// process.  Given that a single series, when encoded, is in the 150-300 byte range, we can fit a
+// lot of these into a single request, something like 150-200K series.  Simply to be a little more
+// conservative, though, we use 100K here.  This will also get a little more tricky when it comes to
+// distributions and sketches, but we're going to have to implement incremental encoding to handle
+// "we've exceeded our maximum payload size, split this batch" scenarios anyways.
 impl SinkBatchSettings for DatadogMetricsDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = Some(100_000);
     const MAX_BYTES: Option<usize> = None;
@@ -123,6 +120,30 @@ impl DatadogMetricsEndpointConfiguration {
         match endpoint {
             DatadogMetricsEndpoint::Series { .. } => self.series_endpoint.clone(),
             DatadogMetricsEndpoint::Sketches => self.sketches_endpoint.clone(),
+        }
+    }
+}
+
+/// Payload limits for metrics are endpoint-dependent.
+pub(super) struct DatadogMetricsPayloadLimits {
+    pub(super) uncompressed: usize,
+    pub(super) compressed: usize,
+}
+
+impl From<DatadogMetricsEndpoint> for DatadogMetricsPayloadLimits {
+    fn from(endpoint: DatadogMetricsEndpoint) -> Self {
+        // from https://docs.datadoghq.com/api/latest/metrics/#submit-metrics
+        match endpoint {
+            // Sketches use the same payload size limits as v1 series
+            DatadogMetricsEndpoint::Series(SeriesApiVersion::V1)
+            | DatadogMetricsEndpoint::Sketches => Self {
+                uncompressed: 62_914_560, // 62 MB
+                compressed: 3_200_000,    // 3.2 MB
+            },
+            DatadogMetricsEndpoint::Series(SeriesApiVersion::V2) => Self {
+                uncompressed: 5_242_880, // 5 MB
+                compressed: 512_000,     // 500 KB
+            },
         }
     }
 }

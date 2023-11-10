@@ -17,9 +17,7 @@ use vector_lib::{
     EstimatedJsonEncodedSizeOf,
 };
 
-use super::config::{
-    DatadogMetricsEndpoint, SeriesApiVersion, MAXIMUM_PAYLOAD_COMPRESSED_SIZE, MAXIMUM_PAYLOAD_SIZE,
-};
+use super::config::{DatadogMetricsEndpoint, DatadogMetricsPayloadLimits, SeriesApiVersion};
 use crate::{
     common::datadog::{
         DatadogMetricType, DatadogPoint, DatadogSeriesMetric, DatadogSeriesMetricMetadata,
@@ -171,13 +169,12 @@ impl DatadogMetricsEncoder {
         endpoint: DatadogMetricsEndpoint,
         default_namespace: Option<String>,
     ) -> Result<Self, CreateError> {
-        // According to the datadog-agent code, sketches use the same payload size limits as series
-        // data. We're just gonna go with that for now.
+        let payload_limits: DatadogMetricsPayloadLimits = endpoint.into();
         Self::with_payload_limits(
             endpoint,
             default_namespace,
-            MAXIMUM_PAYLOAD_SIZE,
-            MAXIMUM_PAYLOAD_COMPRESSED_SIZE,
+            payload_limits.uncompressed,
+            payload_limits.compressed,
         )
     }
 
