@@ -73,7 +73,7 @@ impl Service<AppsignalRequest> for AppsignalService {
         Box::pin(async move {
             let metadata = std::mem::take(request.metadata_mut());
             http_service.ready().await?;
-            let bytes_sent = metadata.request_wire_size();
+            let bytes_sent = metadata.request_encoded_size();
             let event_byte_size = metadata.into_events_estimated_json_encoded_byte_size();
             let http_response = http_service.call(request).await?;
             let event_status = if http_response.is_successful() {
