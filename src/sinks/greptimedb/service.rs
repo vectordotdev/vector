@@ -93,7 +93,7 @@ impl DriverResponse for GreptimeDBBatchOutput {
     }
 
     fn bytes_sent(&self) -> Option<usize> {
-        Some(self.metadata.request_wire_size())
+        Some(self.metadata.request_encoded_size())
     }
 }
 
