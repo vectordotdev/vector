@@ -102,7 +102,7 @@ impl AppsignalConfig {
         let service = AppsignalService::new(http_client, endpoint, push_api_key, compression);
 
         let request_opts = self.request;
-        let request_settings = request_opts.unwrap_with(&TowerRequestConfig::default());
+        let request_settings = request_opts.into_settings();
         let retry_logic = HttpStatusRetryLogic::new(|req: &AppsignalResponse| req.http_status);
 
         let service = ServiceBuilder::new()

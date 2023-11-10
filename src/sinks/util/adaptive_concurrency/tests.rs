@@ -178,7 +178,7 @@ impl SinkConfig for TestConfig {
         batch_settings.size.events = 1;
         batch_settings.timeout = Duration::from_secs(9999);
 
-        let request = self.request.unwrap_with(&TowerRequestConfig::default());
+        let request = self.request.into_settings();
         let sink = request
             .batch_sink(
                 TestRetryLogic,
@@ -414,9 +414,9 @@ async fn run_test(params: TestParams) -> TestResults {
 
     let test_config = TestConfig {
         request: TowerRequestConfig {
-            concurrency: Some(params.concurrency),
-            rate_limit_num: Some(9999),
-            timeout_secs: Some(1),
+            concurrency: params.concurrency,
+            rate_limit_num: 9999,
+            timeout_secs: 1,
             ..Default::default()
         },
         params,

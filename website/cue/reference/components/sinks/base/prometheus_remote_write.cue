@@ -413,36 +413,24 @@ base: components: sinks: prometheus_remote_write: configuration: {
 				}
 			}
 			rate_limit_duration_secs: {
-				description: """
-					The time window used for the `rate_limit_num` option.
-
-					The global default for this value is 1 second. However, individual components may override that default.
-					"""
-				required: false
+				description: "The time window used for the `rate_limit_num` option."
+				required:    false
 				type: uint: {
 					default: 1
 					unit:    "seconds"
 				}
 			}
 			rate_limit_num: {
-				description: """
-					The maximum number of requests allowed within the `rate_limit_duration_secs` time window.
-
-					The global default is no limit. However, individual components may override that default.
-					"""
-				required: false
+				description: "The maximum number of requests allowed within the `rate_limit_duration_secs` time window."
+				required:    false
 				type: uint: {
 					default: 9223372036854775807
 					unit:    "requests"
 				}
 			}
 			retry_attempts: {
-				description: """
-					The maximum number of retries to make for failed requests.
-
-					The global default is no limit. However, individual components may override that default.
-					"""
-				required: false
+				description: "The maximum number of retries to make for failed requests."
+				required:    false
 				type: uint: {
 					default: 9223372036854775807
 					unit:    "retries"
@@ -453,8 +441,6 @@ base: components: sinks: prometheus_remote_write: configuration: {
 					The amount of time to wait before attempting the first retry for a failed request.
 
 					After the first retry has failed, the fibonacci sequence is used to select future backoffs.
-
-					The global default for this value is 1 second. However, individual components may override that default.
 					"""
 				required: false
 				type: uint: {
@@ -463,12 +449,8 @@ base: components: sinks: prometheus_remote_write: configuration: {
 				}
 			}
 			retry_max_duration_secs: {
-				description: """
-					The maximum amount of time to wait between retries.
-
-					The global default for this value is 30 seconds. However, individual components may override that default.
-					"""
-				required: false
+				description: "The maximum amount of time to wait between retries."
+				required:    false
 				type: uint: {
 					default: 30
 					unit:    "seconds"
@@ -480,8 +462,6 @@ base: components: sinks: prometheus_remote_write: configuration: {
 
 					Datadog highly recommends that you do not lower this value below the service's internal timeout, as this could
 					create orphaned requests, pile on retries, and result in duplicate data downstream.
-
-					The global default for this value is 60 seconds. However, individual components may override that default.
 					"""
 				required: false
 				type: uint: {

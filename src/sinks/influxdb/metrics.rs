@@ -10,6 +10,7 @@ use vector_lib::{
     ByteSizeOf, EstimatedJsonEncodedSizeOf,
 };
 
+use crate::sinks::util::service::TowerRequestConfigDefaults;
 use crate::{
     config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext},
     event::{
@@ -51,6 +52,13 @@ impl SinkBatchSettings for InfluxDbDefaultBatchSettings {
     const TIMEOUT_SECS: f64 = 1.0;
 }
 
+#[derive(Clone, Copy, Debug)]
+pub struct InfluxDbMetricsTowerRequestConfigDefaults;
+
+impl TowerRequestConfigDefaults for InfluxDbMetricsTowerRequestConfigDefaults {
+    const RETRY_ATTEMPTS: usize = 5;
+}
+
 /// Configuration for the `influxdb_metrics` sink.
 #[configurable_component(sink("influxdb_metrics", "Deliver metric event data to InfluxDB."))]
 #[derive(Clone, Debug, Default)]
@@ -82,7 +90,7 @@ pub struct InfluxDbConfig {
 
     #[configurable(derived)]
     #[serde(default)]
-    pub request: TowerRequestConfig,
+    pub request: TowerRequestConfig<InfluxDbMetricsTowerRequestConfigDefaults>,
 
     /// A map of additional tags, in the key/value pair format, to add to each measurement.
     #[configurable(metadata(docs::additional_props_description = "A tag key/value pair."))]
@@ -159,10 +167,7 @@ impl InfluxDbSvc {
         let protocol_version = settings.protocol_version();
 
         let batch = config.batch.into_batch_settings()?;
-        let request = config.request.unwrap_with(&TowerRequestConfig {
-            retry_attempts: Some(5),
-            ..Default::default()
-        });
+        let request = config.request.into_settings();
 
         let uri = settings.write_uri(endpoint)?;
 

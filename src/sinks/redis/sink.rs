@@ -2,20 +2,17 @@ use std::future;
 
 use redis::{aio::ConnectionManager, RedisError};
 
-use crate::sinks::{
-    prelude::*,
-    util::{retries::RetryAction, Concurrency},
-};
+use crate::sinks::{prelude::*, util::retries::RetryAction};
 
 use super::{
-    config::{DataTypeConfig, RedisSinkConfig},
+    config::{DataTypeConfig, RedisSinkConfig, RedisTowerRequestConfigDefaults},
     request_builder::request_builder,
     service::{RedisResponse, RedisService},
     RedisEvent,
 };
 
 pub(super) struct RedisSink {
-    request: TowerRequestConfig,
+    request: TowerRequestConfig<RedisTowerRequestConfigDefaults>,
     encoder: crate::codecs::Encoder<()>,
     transformer: crate::codecs::Transformer,
     conn: ConnectionManager,
@@ -70,10 +67,7 @@ impl RedisSink {
     }
 
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
-        let request = self.request.unwrap_with(&TowerRequestConfig {
-            concurrency: Some(Concurrency::Fixed(1)),
-            ..Default::default()
-        });
+        let request = self.request.into_settings();
 
         let service = RedisService {
             conn: self.conn.clone(),

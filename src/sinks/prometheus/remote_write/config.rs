@@ -135,7 +135,7 @@ impl SinkConfig for RemoteWriteConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let endpoint = self.endpoint.parse::<Uri>().context(UriParseSnafu)?;
         let tls_settings = TlsSettings::from_options(&self.tls)?;
-        let request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
+        let request_settings = self.request.into_settings();
         let buckets = self.buckets.clone();
         let quantiles = self.quantiles.clone();
         let default_namespace = self.default_namespace.clone();

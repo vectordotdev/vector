@@ -1,6 +1,7 @@
 use super::{client::Client, request_builder::SSRequestBuilder, service::SSService};
 use crate::sinks::aws_s_s::retry::SSRetryLogic;
 use crate::sinks::prelude::*;
+use crate::sinks::util::service::TowerRequestConfigDefaults;
 
 #[derive(Clone, Copy, Debug, Default)]
 pub(crate) struct SqsSinkDefaultBatchSettings;
@@ -11,6 +12,13 @@ impl SinkBatchSettings for SqsSinkDefaultBatchSettings {
     const TIMEOUT_SECS: f64 = 1.0;
 }
 
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct SqsTowerRequestConfigDefaults;
+
+impl TowerRequestConfigDefaults for SqsTowerRequestConfigDefaults {
+    const TIMEOUT_SECS: u64 = 30;
+}
+
 #[derive(Clone)]
 pub(super) struct SSSink<C, E>
 where
@@ -19,7 +27,7 @@ where
 {
     request_builder: SSRequestBuilder,
     service: SSService<C, E>,
-    request: TowerRequestConfig,
+    request: TowerRequestConfig<SqsTowerRequestConfigDefaults>,
 }
 
 impl<C, E> SSSink<C, E>
@@ -29,7 +37,7 @@ where
 {
     pub(super) fn new(
         request_builder: SSRequestBuilder,
-        request: TowerRequestConfig,
+        request: TowerRequestConfig<SqsTowerRequestConfigDefaults>,
         publisher: C,
     ) -> crate::Result<Self> {
         Ok(SSSink {
@@ -40,9 +48,7 @@ where
     }
 
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
-        let request = self
-            .request
-            .unwrap_with(&TowerRequestConfig::default().timeout_secs(30));
+        let request = self.request.into_settings();
         let retry_logic: SSRetryLogic<E> = super::retry::SSRetryLogic::new();
         let service = tower::ServiceBuilder::new()
             .settings(request, retry_logic)

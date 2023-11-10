@@ -27,6 +27,7 @@ use crate::{
     sinks::{
         util::{
             http::{BatchedHttpSink, HttpEventEncoder, HttpSink},
+            service::TowerRequestConfigDefaults,
             BatchConfig, Buffer, Compression, SinkBatchSettings, TowerRequestConfig,
         },
         Healthcheck, VectorSink,
@@ -41,6 +42,13 @@ impl SinkBatchSettings for InfluxDbLogsDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = None;
     const MAX_BYTES: Option<usize> = Some(1_000_000);
     const TIMEOUT_SECS: f64 = 1.0;
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct InfluxDbLogsTowerRequestConfigDefaults;
+
+impl TowerRequestConfigDefaults for InfluxDbLogsTowerRequestConfigDefaults {
+    const RETRY_ATTEMPTS: usize = 5;
 }
 
 /// Configuration for the `influxdb_logs` sink.
@@ -96,7 +104,7 @@ pub struct InfluxDbLogsConfig {
 
     #[configurable(derived)]
     #[serde(default)]
-    pub request: TowerRequestConfig,
+    pub request: TowerRequestConfig<InfluxDbLogsTowerRequestConfigDefaults>,
 
     #[configurable(derived)]
     pub tls: Option<TlsConfig>,
@@ -171,10 +179,7 @@ impl SinkConfig for InfluxDbLogsConfig {
         let healthcheck = self.healthcheck(client.clone())?;
 
         let batch = self.batch.into_batch_settings()?;
-        let request = self.request.unwrap_with(&TowerRequestConfig {
-            retry_attempts: Some(5),
-            ..Default::default()
-        });
+        let request = self.request.into_settings();
 
         let settings = influxdb_settings(
             self.influxdb1_settings.clone(),

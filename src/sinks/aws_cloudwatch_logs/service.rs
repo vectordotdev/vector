@@ -34,7 +34,7 @@ use crate::sinks::{
         config::CloudwatchLogsSinkConfig, config::Retention, request, retry::CloudwatchRetryLogic,
         sink::BatchCloudwatchRequest, CloudwatchKey,
     },
-    util::{retries::FixedRetryPolicy, EncodedLength, TowerRequestConfig, TowerRequestSettings},
+    util::{retries::FixedRetryPolicy, EncodedLength, TowerRequestSettings},
 };
 
 type Svc = Buffer<
@@ -136,10 +136,7 @@ impl CloudwatchLogsPartitionSvc {
         // https://github.com/awslabs/aws-sdk-rust/issues/537
         smithy_client: SmithyClient,
     ) -> Self {
-        let request_settings = config
-            .request
-            .tower
-            .unwrap_with(&TowerRequestConfig::default());
+        let request_settings = config.request.tower.into_settings();
 
         Self {
             config,

@@ -116,7 +116,7 @@ impl SinkConfig for DatabendConfig {
             DatabendAPIClient::new(self.build_client(&cx)?, endpoint.clone(), auth.clone());
         let healthcheck = select_one(health_client).boxed();
 
-        let request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
+        let request_settings = self.request.into_settings();
         let batch_settings = self.batch.into_batcher_settings()?;
 
         let database = config.database;

@@ -11,6 +11,7 @@ use vector_lib::sensitive_string::SensitiveString;
 use vector_lib::{ByteSizeOf, EstimatedJsonEncodedSizeOf};
 
 use super::Region;
+use crate::sinks::util::service::TowerRequestConfigDefaults;
 use crate::{
     config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     event::{
@@ -46,6 +47,13 @@ impl SinkBatchSettings for SematextMetricsDefaultBatchSettings {
     const TIMEOUT_SECS: f64 = 1.0;
 }
 
+#[derive(Clone, Copy, Debug)]
+pub struct SematextTowerRequestConfigDefaults;
+
+impl TowerRequestConfigDefaults for SematextTowerRequestConfigDefaults {
+    const RETRY_ATTEMPTS: usize = 5;
+}
+
 /// Configuration for the `sematext_metrics` sink.
 #[configurable_component(sink("sematext_metrics", "Publish metric events to Sematext."))]
 #[derive(Clone, Debug)]
@@ -79,7 +87,7 @@ pub struct SematextMetricsConfig {
 
     #[configurable(derived)]
     #[serde(default)]
-    pub request: TowerRequestConfig,
+    pub request: TowerRequestConfig<SematextTowerRequestConfigDefaults>,
 
     #[configurable(derived)]
     #[serde(
@@ -166,10 +174,7 @@ impl SematextMetricsService {
         client: HttpClient,
     ) -> Result<VectorSink> {
         let batch = config.batch.into_batch_settings()?;
-        let request = config.request.unwrap_with(&TowerRequestConfig {
-            retry_attempts: Some(5),
-            ..Default::default()
-        });
+        let request = config.request.into_settings();
         let http_service = HttpBatchService::new(client, create_build_request(endpoint));
         let sematext_service = SematextMetricsService {
             config,

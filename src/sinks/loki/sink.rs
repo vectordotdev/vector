@@ -393,9 +393,9 @@ impl LokiSink {
         // requires in-order processing for version >= 2.4, instead we just keep the static limit
         // of 1 for now.
         let request_limits = match config.out_of_order_action {
-            OutOfOrderAction::Accept => config.request.unwrap_with(&Default::default()),
+            OutOfOrderAction::Accept => config.request.into_settings(),
             OutOfOrderAction::Drop | OutOfOrderAction::RewriteTimestamp => {
-                let mut settings = config.request.unwrap_with(&Default::default());
+                let mut settings = config.request.into_settings();
                 settings.concurrency = Some(1);
                 settings
             }

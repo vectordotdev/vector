@@ -12,6 +12,7 @@ use super::{
     apm_stats::{flush_apm_stats_thread, Aggregator},
     service::TraceApiRetry,
 };
+use crate::sinks::util::service::TowerRequestConfigDefaults;
 use crate::{
     config::{GenerateConfig, Input, SinkConfig, SinkContext},
     http::HttpClient,
@@ -41,9 +42,6 @@ pub const BATCH_DEFAULT_TIMEOUT_SECS: f64 = 10.0;
 
 pub const PAYLOAD_LIMIT: usize = 3_200_000;
 
-const DEFAULT_REQUEST_RETRY_ATTEMPTS: usize = 5;
-const DEFAULT_REQUEST_RETRY_MAX_DURATION_SECS: u64 = 300;
-
 #[derive(Clone, Copy, Debug, Default)]
 pub struct DatadogTracesDefaultBatchSettings;
 
@@ -51,6 +49,13 @@ impl SinkBatchSettings for DatadogTracesDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = Some(BATCH_MAX_EVENTS);
     const MAX_BYTES: Option<usize> = Some(BATCH_GOAL_BYTES);
     const TIMEOUT_SECS: f64 = BATCH_DEFAULT_TIMEOUT_SECS;
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct DatadogTracesTowerRequestConfigDefaults;
+
+impl TowerRequestConfigDefaults for DatadogTracesTowerRequestConfigDefaults {
+    const RETRY_ATTEMPTS: usize = 5;
 }
 
 /// Configuration for the `datadog_traces` sink.
@@ -71,7 +76,7 @@ pub struct DatadogTracesConfig {
 
     #[configurable(derived)]
     #[serde(default)]
-    pub request: TowerRequestConfig,
+    pub request: TowerRequestConfig<DatadogTracesTowerRequestConfigDefaults>,
 }
 
 impl GenerateConfig for DatadogTracesConfig {
@@ -130,11 +135,7 @@ impl DatadogTracesConfig {
 
     pub fn build_sink(&self, client: HttpClient) -> crate::Result<VectorSink> {
         let default_api_key: Arc<str> = Arc::from(self.dd_common.default_api_key.inner());
-        let request_limits = self.request.unwrap_with(
-            &TowerRequestConfig::default()
-                .retry_attempts(DEFAULT_REQUEST_RETRY_ATTEMPTS)
-                .retry_max_duration_secs(DEFAULT_REQUEST_RETRY_MAX_DURATION_SECS),
-        );
+        let request_limits = self.request.into_settings();
         let endpoints = self.generate_traces_endpoint_configuration()?;
 
         let batcher_settings = self

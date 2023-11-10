@@ -16,7 +16,10 @@ use crate::{
     http::HttpClient,
     sinks::{
         datadog::DatadogCommonConfig,
-        util::{batch::BatchConfig, ServiceBuilderExt, SinkBatchSettings, TowerRequestConfig},
+        util::{
+            batch::BatchConfig, service::TowerRequestConfigDefaults, ServiceBuilderExt,
+            SinkBatchSettings, TowerRequestConfig,
+        },
         Healthcheck, UriParseSnafu, VectorSink,
     },
     tls::{MaybeTlsSettings, TlsEnableableConfig},
@@ -31,9 +34,6 @@ use crate::{
 pub const MAXIMUM_PAYLOAD_COMPRESSED_SIZE: usize = 3_200_000;
 pub const MAXIMUM_PAYLOAD_SIZE: usize = 62_914_560;
 
-// TODO: revisit our concurrency and batching defaults
-const DEFAULT_REQUEST_RETRY_ATTEMPTS: usize = 5;
-
 #[derive(Clone, Copy, Debug, Default)]
 pub struct DatadogMetricsDefaultBatchSettings;
 
@@ -41,6 +41,13 @@ impl SinkBatchSettings for DatadogMetricsDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = Some(100_000);
     const MAX_BYTES: Option<usize> = None;
     const TIMEOUT_SECS: f64 = 2.0;
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct DatadogMetricsTowerRequestConfigDefaults;
+
+impl TowerRequestConfigDefaults for DatadogMetricsTowerRequestConfigDefaults {
+    const RETRY_ATTEMPTS: usize = 5;
 }
 
 pub(super) const SERIES_V1_PATH: &str = "/api/v1/series";
@@ -149,7 +156,7 @@ pub struct DatadogMetricsConfig {
 
     #[configurable(derived)]
     #[serde(default)]
-    pub request: TowerRequestConfig,
+    pub request: TowerRequestConfig<DatadogMetricsTowerRequestConfigDefaults>,
 }
 
 impl_generate_config_from_default!(DatadogMetricsConfig);
@@ -232,9 +239,7 @@ impl DatadogMetricsConfig {
         let batcher_settings = self.batch.into_batcher_settings()?;
 
         // TODO: revisit our concurrency and batching defaults
-        let request_limits = self.request.unwrap_with(
-            &TowerRequestConfig::default().retry_attempts(DEFAULT_REQUEST_RETRY_ATTEMPTS),
-        );
+        let request_limits = self.request.into_settings();
 
         let endpoint_configuration = self.generate_metrics_endpoint_configuration()?;
         let service = ServiceBuilder::new()
