@@ -226,7 +226,7 @@ Integration tests are not run by default when running
 There are other checks that are run by CI before the PR can be merged. These should be run locally
 first to ensure they pass.
 
-- `cargo vdev check rust` - this runs the Clippy linter to catch common mistakes.
+- `cargo vdev check rust` - this runs the [Clippy][urls.clippy] linter to catch common mistakes.
 - `cargo vdev check fmt` - this ensures all code is properly formatted. Code can be run through
 [`rustfmt`][urls.rustfmt] using `cargo fmt` to ensure it is properly formatted.
 - `cargo vdev check events` - this ensures the internal metrics that Vector emits conform to standards.
@@ -282,4 +282,5 @@ This is covered by the CLA.
 [urls.new_issue]: https://github.com/vectordotdev/vector/issues/new
 [urls.submit_pr]: https://help.github.com/en/github/collaborating-with-issues-and-pull-requests/creating-a-pull-request-from-a-fork
 [urls.vector_test_harness]: https://github.com/vectordotdev/vector-test-harness/
+[urls.clippy]: https://github.com/rust-lang/rust-clippy
 [urls.rustfmt]: https://github.com/rust-lang/rustfmt
