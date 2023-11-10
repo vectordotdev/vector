@@ -1,5 +1,3 @@
-use std::collections::BTreeMap;
-
 use async_graphql::{Enum, Object};
 use chrono::{DateTime, Utc};
 use serde_json::Value;
@@ -7,7 +5,7 @@ use vector_lib::encode_logfmt;
 
 use super::EventEncodingType;
 use crate::{
-    event::{self},
+    event::{self, KeyString},
     topology::TapOutput,
 };
 
@@ -130,7 +128,7 @@ impl Metric {
                     .expect("logfmt serialization of metric event failed: conversion to serde Value failed. Please report.");
                 match json {
                     Value::Object(map) => encode_logfmt::encode_map(
-                        &map.into_iter().collect::<BTreeMap<String, Value>>(),
+                        &map.into_iter().map(|(k,v)| (KeyString::from(k), v)).collect(),
                     )
                     .expect("logfmt serialization of metric event failed. Please report."),
                     _ => panic!("logfmt serialization of metric event failed: metric converted to unexpected serde Value. Please report."),

@@ -1,4 +1,3 @@
-use crate::emit;
 use metrics::counter;
 use vector_lib::internal_event::{ComponentEventsDropped, InternalEvent, INTENTIONAL};
 

@@ -21,9 +21,6 @@ on:
       ENDPOINT:
         description: "Request endpoint"
         required: true
-      GITHUB_TOKEN:
-        description: "GitHub Token"
-        required: true
 
 jobs:
   create_preview_site:
@@ -36,7 +33,7 @@ jobs:
       with:
         script: |
           const fs = require('fs');
-          const artifacts = await github.actions.listWorkflowRunArtifacts({
+          const artifacts = await github.rest.actions.listWorkflowRunArtifacts({
              owner: context.repo.owner,
              repo: context.repo.repo,
              run_id: ${{ github.event.workflow_run.id }},

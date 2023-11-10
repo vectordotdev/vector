@@ -67,8 +67,9 @@ pub(crate) fn decode_log_body(
     api_key: Option<Arc<str>>,
     source: &DatadogAgentSource,
 ) -> Result<Vec<Event>, ErrorMessage> {
-    if body.is_empty() {
+    if body.is_empty() || body.as_ref() == b"{}" {
         // The datadog agent may send an empty payload as a keep alive
+        // https://github.com/DataDog/datadog-agent/blob/5a6c5dd75a2233fbf954e38ddcc1484df4c21a35/pkg/logs/client/http/destination.go#L52
         debug!(
             message = "Empty payload ignored.",
             internal_log_rate_limit = true

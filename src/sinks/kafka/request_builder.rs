@@ -119,20 +119,18 @@ fn get_headers(event: &Event, headers_key: Option<&OwnedTargetPath>) -> Option<O
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeMap;
-
     use bytes::Bytes;
     use rdkafka::message::Headers;
 
     use super::*;
-    use crate::event::LogEvent;
+    use crate::event::{LogEvent, ObjectMap};
 
     #[test]
     fn kafka_get_headers() {
         let headers_key = OwnedTargetPath::try_from("headers".to_string()).unwrap();
-        let mut header_values = BTreeMap::new();
-        header_values.insert("a-key".to_string(), Value::Bytes(Bytes::from("a-value")));
-        header_values.insert("b-key".to_string(), Value::Bytes(Bytes::from("b-value")));
+        let mut header_values = ObjectMap::new();
+        header_values.insert("a-key".into(), Value::Bytes(Bytes::from("a-value")));
+        header_values.insert("b-key".into(), Value::Bytes(Bytes::from("b-value")));
 
         let mut event = Event::Log(LogEvent::from("hello"));
         event.as_mut_log().insert(&headers_key, header_values);

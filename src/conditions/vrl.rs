@@ -1,6 +1,5 @@
-use vector_lib::compile_vrl;
 use vector_lib::configurable::configurable_component;
-use vector_lib::TimeZone;
+use vector_lib::{compile_vrl, emit, TimeZone};
 use vrl::compiler::runtime::{Runtime, RuntimeResult, Terminate};
 use vrl::compiler::{CompilationResult, CompileConfig, Program, TypeState, VrlRuntime};
 use vrl::diagnostic::Formatter;
@@ -10,7 +9,6 @@ use crate::config::LogNamespace;
 use crate::event::TargetEvents;
 use crate::{
     conditions::{Condition, Conditional, ConditionalConfig},
-    emit,
     event::{Event, VrlTarget},
     internal_events::VrlConditionExecutionError,
 };

@@ -152,7 +152,7 @@ mod tests {
     };
     use vector_lib::event::LogEvent;
     use vector_lib::{internal_event::CountByteSize, json_size::JsonSize};
-    use vrl::value::Value;
+    use vrl::value::{KeyString, Value};
 
     use super::*;
 
@@ -189,7 +189,7 @@ mod tests {
 
         let mut writer = Vec::new();
         let input = vec![Event::Log(LogEvent::from(BTreeMap::from([(
-            String::from("key"),
+            KeyString::from("key"),
             Value::from("value"),
         )])))];
 
@@ -217,15 +217,15 @@ mod tests {
 
         let input = vec![
             Event::Log(LogEvent::from(BTreeMap::from([(
-                String::from("key"),
+                KeyString::from("key"),
                 Value::from("value1"),
             )]))),
             Event::Log(LogEvent::from(BTreeMap::from([(
-                String::from("key"),
+                KeyString::from("key"),
                 Value::from("value2"),
             )]))),
             Event::Log(LogEvent::from(BTreeMap::from([(
-                String::from("key"),
+                KeyString::from("key"),
                 Value::from("value3"),
             )]))),
         ];
@@ -280,7 +280,7 @@ mod tests {
 
         let mut writer = Vec::new();
         let input = vec![Event::Log(LogEvent::from(BTreeMap::from([(
-            String::from("key"),
+            KeyString::from("key"),
             Value::from("value"),
         )])))];
         let input_json_size = input
@@ -308,15 +308,15 @@ mod tests {
         let mut writer = Vec::new();
         let input = vec![
             Event::Log(LogEvent::from(BTreeMap::from([(
-                String::from("key"),
+                KeyString::from("key"),
                 Value::from("value1"),
             )]))),
             Event::Log(LogEvent::from(BTreeMap::from([(
-                String::from("key"),
+                KeyString::from("key"),
                 Value::from("value2"),
             )]))),
             Event::Log(LogEvent::from(BTreeMap::from([(
-                String::from("key"),
+                KeyString::from("key"),
                 Value::from("value3"),
             )]))),
         ];
@@ -344,7 +344,7 @@ mod tests {
 
         let mut writer = Vec::new();
         let input = Event::Log(LogEvent::from(BTreeMap::from([(
-            String::from("key"),
+            KeyString::from("key"),
             Value::from("value"),
         )])));
         let input_json_size = input.estimated_json_encoded_size_of();
@@ -365,7 +365,7 @@ mod tests {
 
         let mut writer = Vec::new();
         let input = Event::Log(LogEvent::from(BTreeMap::from([(
-            String::from("message"),
+            KeyString::from("message"),
             Value::from("value"),
         )])));
         let input_json_size = input.estimated_json_encoded_size_of();

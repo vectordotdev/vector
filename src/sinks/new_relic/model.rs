@@ -12,7 +12,7 @@ use vector_lib::internal_event::{ComponentEventsDropped, INTENTIONAL, UNINTENTIO
 use vrl::event_path;
 
 use super::NewRelicSinkError;
-use crate::event::{Event, MetricKind, MetricValue, Value};
+use crate::event::{Event, KeyString, MetricKind, MetricValue, Value};
 
 #[derive(Debug)]
 pub enum NewRelicApiModel {
@@ -21,8 +21,8 @@ pub enum NewRelicApiModel {
     Logs(LogsApiModel),
 }
 
-type KeyValData = HashMap<String, Value>;
-type DataStore = HashMap<String, Vec<KeyValData>>;
+type KeyValData = HashMap<KeyString, Value>;
+type DataStore = HashMap<KeyString, Vec<KeyValData>>;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct MetricsApiModel(pub Vec<DataStore>);
@@ -30,7 +30,7 @@ pub struct MetricsApiModel(pub Vec<DataStore>);
 impl MetricsApiModel {
     pub fn new(metric_array: Vec<KeyValData>) -> Self {
         let mut metric_store = DataStore::new();
-        metric_store.insert("metrics".to_owned(), metric_array);
+        metric_store.insert("metrics".into(), metric_array);
         Self(vec![metric_store])
     }
 }
@@ -66,10 +66,8 @@ impl TryFrom<Vec<Event>> for MetricsApiModel {
                             num_missing_interval += 1;
                             return None;
                         };
-                        metric_data.insert(
-                            "interval.ms".to_owned(),
-                            Value::from(interval_ms.get() as i64),
-                        );
+                        metric_data
+                            .insert("interval.ms".into(), Value::from(interval_ms.get() as i64));
                         (value, "count")
                     }
                     (MetricValue::Counter { value }, MetricKind::Absolute) => (value, "gauge"),
@@ -82,15 +80,15 @@ impl TryFrom<Vec<Event>> for MetricsApiModel {
                 };
 
                 // Set name, type, value, timestamp, and attributes
-                metric_data.insert("name".to_owned(), Value::from(series.name.name));
-                metric_data.insert("type".to_owned(), Value::from(metric_type));
+                metric_data.insert("name".into(), Value::from(series.name.name));
+                metric_data.insert("type".into(), Value::from(metric_type));
                 let Some(value) = NotNan::new(value).ok() else {
                     num_nan_value += 1;
                     return None;
                 };
-                metric_data.insert("value".to_owned(), Value::from(value));
+                metric_data.insert("value".into(), Value::from(value));
                 metric_data.insert(
-                    "timestamp".to_owned(),
+                    "timestamp".into(),
                     Value::from(
                         data.time
                             .timestamp
@@ -100,10 +98,10 @@ impl TryFrom<Vec<Event>> for MetricsApiModel {
                 );
                 if let Some(tags) = series.tags {
                     metric_data.insert(
-                        "attributes".to_owned(),
+                        "attributes".into(),
                         Value::from(
                             tags.iter_single()
-                                .map(|(key, value)| (key.to_string(), Value::from(value)))
+                                .map(|(key, value)| (key.into(), Value::from(value)))
                                 .collect::<BTreeMap<_, _>>(),
                         ),
                     );
@@ -162,7 +160,7 @@ impl TryFrom<Vec<Event>> for EventsApiModel {
         let mut num_non_log_events = 0;
         let mut num_nan_value = 0;
 
-        let events_array: Vec<HashMap<String, Value>> = buf_events
+        let events_array: Vec<HashMap<KeyString, Value>> = buf_events
             .into_iter()
             .filter_map(|event| {
                 let Some(log) = event.try_into_log() else {
@@ -184,23 +182,23 @@ impl TryFrom<Vec<Event>> for EventsApiModel {
                         for (k, v) in json_map {
                             match v {
                                 serde_json::Value::String(s) => {
-                                    event_model.insert(k, Value::from(s));
+                                    event_model.insert(k.into(), Value::from(s));
                                 }
                                 serde_json::Value::Number(n) => {
                                     if let Some(f) = n.as_f64() {
                                         event_model.insert(
-                                            k,
+                                            k.into(),
                                             Value::from(NotNan::new(f).ok().or_else(|| {
                                                 num_nan_value += 1;
                                                 None
                                             })?),
                                         );
                                     } else {
-                                        event_model.insert(k, Value::from(n.as_i64()));
+                                        event_model.insert(k.into(), Value::from(n.as_i64()));
                                     }
                                 }
                                 serde_json::Value::Bool(b) => {
-                                    event_model.insert(k, Value::from(b));
+                                    event_model.insert(k.into(), Value::from(b));
                                 }
                                 _ => {
                                     // Note that arrays and nested objects are silently dropped.
@@ -212,8 +210,7 @@ impl TryFrom<Vec<Event>> for EventsApiModel {
                 }
 
                 if event_model.get("eventType").is_none() {
-                    event_model
-                        .insert("eventType".to_owned(), Value::from("VectorSink".to_owned()));
+                    event_model.insert("eventType".into(), Value::from("VectorSink".to_owned()));
                 }
 
                 Some(event_model)
@@ -247,7 +244,7 @@ pub struct LogsApiModel(pub Vec<DataStore>);
 impl LogsApiModel {
     pub fn new(logs_array: Vec<KeyValData>) -> Self {
         let mut logs_store = DataStore::new();
-        logs_store.insert("logs".to_owned(), logs_array);
+        logs_store.insert("logs".into(), logs_array);
         Self(vec![logs_store])
     }
 }
@@ -258,7 +255,7 @@ impl TryFrom<Vec<Event>> for LogsApiModel {
     fn try_from(buf_events: Vec<Event>) -> Result<Self, Self::Error> {
         let mut num_non_log_events = 0;
 
-        let logs_array: Vec<HashMap<String, Value>> = buf_events
+        let logs_array: Vec<HashMap<KeyString, Value>> = buf_events
             .into_iter()
             .filter_map(|event| {
                 let Some(log) = event.try_into_log() else {
@@ -271,10 +268,7 @@ impl TryFrom<Vec<Event>> for LogsApiModel {
                     log_model.insert(k, v.clone());
                 }
                 if log.get(event_path!("message")).is_none() {
-                    log_model.insert(
-                        "message".to_owned(),
-                        Value::from("log from vector".to_owned()),
-                    );
+                    log_model.insert("message".into(), Value::from("log from vector".to_owned()));
                 }
 
                 Some(log_model)
