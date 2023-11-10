@@ -84,7 +84,7 @@ pub(crate) fn build_warp_filter(
         .and(warp::header::optional::<String>("content-encoding"))
         .and(warp::body::bytes())
         .and_then(move |encoding_header: Option<String>, body: Bytes| {
-            let events = decode(&encoding_header, body).and_then(|body| {
+            let events = decode(encoding_header.as_deref(), body).and_then(|body| {
                 bytes_received.emit(ByteSize(body.len()));
                 decode_body(body, log_namespace, &events_received)
             });
