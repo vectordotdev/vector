@@ -18,7 +18,7 @@ use vrl::path::{parse_target_path, PathParseError};
 use vrl::{event_path, path};
 
 use crate::config::schema::Definition;
-use crate::transforms::log_to_metric::TransformError::FieldNotFound;
+use crate::transforms::log_to_metric::TransformError::PathNotFound;
 use crate::{
     config::{
         DataType, GenerateConfig, Input, OutputId, TransformConfig, TransformContext,
@@ -219,10 +219,10 @@ impl fmt::Display for TransformParseErrorKind {
 }
 
 enum TransformError {
-    FieldNotFound {
+    PathNotFound {
         path: String,
     },
-    FieldNull {
+    PathNull {
         path: String,
     },
     MetricDetailsNotFound,
@@ -317,15 +317,15 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
             Some(ORIGIN_SERVICE_VALUE),
         ));
 
-    let field = parse_target_path(config.field()).map_err(|_e| FieldNotFound {
+    let field = parse_target_path(config.field()).map_err(|_e| PathNotFound {
         path: config.field().to_string(),
     })?;
 
     let value = match log.get(&field) {
-        None => Err(TransformError::FieldNotFound {
+        None => Err(TransformError::PathNotFound {
             path: field.to_string(),
         }),
-        Some(Value::Null) => Err(TransformError::FieldNull {
+        Some(Value::Null) => Err(TransformError::PathNull {
             path: field.to_string(),
         }),
         Some(value) => Ok(value),
@@ -425,12 +425,12 @@ fn bytes_to_str(value: &Value) -> Option<String> {
 fn try_get_string_from_log(log: &LogEvent, path: &str) -> Result<Option<String>, TransformError> {
     // TODO: update returned errors after `TransformError` is refactored.
     let maybe_value = log.parse_path_and_get_value(path).map_err(|e| match e {
-        PathParseError::InvalidPathSyntax { path } => FieldNotFound {
+        PathParseError::InvalidPathSyntax { path } => PathNotFound {
             path: path.to_string(),
         },
     })?;
     match maybe_value {
-        None => Err(FieldNotFound {
+        None => Err(PathNotFound {
             path: path.to_string(),
         }),
         Some(v) => Ok(bytes_to_str(v)),
@@ -440,7 +440,7 @@ fn try_get_string_from_log(log: &LogEvent, path: &str) -> Result<Option<String>,
 fn get_counter_value(log: &LogEvent) -> Result<MetricValue, TransformError> {
     let counter_value = log
         .get(event_path!("counter", "value"))
-        .ok_or_else(|| TransformError::FieldNotFound {
+        .ok_or_else(|| TransformError::PathNotFound {
             path: "counter.value".to_string(),
         })?
         .as_float()
@@ -457,7 +457,7 @@ fn get_counter_value(log: &LogEvent) -> Result<MetricValue, TransformError> {
 fn get_gauge_value(log: &LogEvent) -> Result<MetricValue, TransformError> {
     let gauge_value = log
         .get(event_path!("gauge", "value"))
-        .ok_or_else(|| TransformError::FieldNotFound {
+        .ok_or_else(|| TransformError::PathNotFound {
             path: "gauge.value".to_string(),
         })?
         .as_float()
@@ -473,7 +473,7 @@ fn get_gauge_value(log: &LogEvent) -> Result<MetricValue, TransformError> {
 fn get_distribution_value(log: &LogEvent) -> Result<MetricValue, TransformError> {
     let event_samples = log
         .get(event_path!("distribution", "samples"))
-        .ok_or_else(|| TransformError::FieldNotFound {
+        .ok_or_else(|| TransformError::PathNotFound {
             path: "distribution.samples".to_string(),
         })?
         .as_array()
@@ -486,7 +486,7 @@ fn get_distribution_value(log: &LogEvent) -> Result<MetricValue, TransformError>
     for e_sample in event_samples {
         let value = e_sample
             .get(path!("value"))
-            .ok_or_else(|| TransformError::FieldNotFound {
+            .ok_or_else(|| TransformError::PathNotFound {
                 path: "value".to_string(),
             })?
             .as_float()
@@ -497,7 +497,7 @@ fn get_distribution_value(log: &LogEvent) -> Result<MetricValue, TransformError>
 
         let rate = e_sample
             .get(path!("rate"))
-            .ok_or_else(|| TransformError::FieldNotFound {
+            .ok_or_else(|| TransformError::PathNotFound {
                 path: "rate".to_string(),
             })?
             .as_integer()
@@ -515,7 +515,7 @@ fn get_distribution_value(log: &LogEvent) -> Result<MetricValue, TransformError>
     let statistic_str = match try_get_string_from_log(log, "distribution.statistic")? {
         Some(n) => n,
         None => {
-            return Err(TransformError::FieldNotFound {
+            return Err(TransformError::PathNotFound {
                 path: "distribution.statistic".to_string(),
             })
         }
@@ -538,7 +538,7 @@ fn get_distribution_value(log: &LogEvent) -> Result<MetricValue, TransformError>
 fn get_histogram_value(log: &LogEvent) -> Result<MetricValue, TransformError> {
     let event_buckets = log
         .get(event_path!("histogram", "buckets"))
-        .ok_or_else(|| TransformError::FieldNotFound {
+        .ok_or_else(|| TransformError::PathNotFound {
             path: "histogram.buckets".to_string(),
         })?
         .as_array()
@@ -551,7 +551,7 @@ fn get_histogram_value(log: &LogEvent) -> Result<MetricValue, TransformError> {
     for e_bucket in event_buckets {
         let upper_limit = e_bucket
             .get(path!("upper_limit"))
-            .ok_or_else(|| TransformError::FieldNotFound {
+            .ok_or_else(|| TransformError::PathNotFound {
                 path: "histogram.buckets.upper_limit".to_string(),
             })?
             .as_float()
@@ -562,7 +562,7 @@ fn get_histogram_value(log: &LogEvent) -> Result<MetricValue, TransformError> {
 
         let count = e_bucket
             .get(path!("count"))
-            .ok_or_else(|| TransformError::FieldNotFound {
+            .ok_or_else(|| TransformError::PathNotFound {
                 path: "histogram.buckets.count".to_string(),
             })?
             .as_integer()
@@ -579,7 +579,7 @@ fn get_histogram_value(log: &LogEvent) -> Result<MetricValue, TransformError> {
 
     let count = log
         .get(event_path!("histogram", "count"))
-        .ok_or_else(|| TransformError::FieldNotFound {
+        .ok_or_else(|| TransformError::PathNotFound {
             path: "histogram.count".to_string(),
         })?
         .as_integer()
@@ -590,7 +590,7 @@ fn get_histogram_value(log: &LogEvent) -> Result<MetricValue, TransformError> {
 
     let sum = log
         .get(event_path!("histogram", "sum"))
-        .ok_or_else(|| TransformError::FieldNotFound {
+        .ok_or_else(|| TransformError::PathNotFound {
             path: "histogram.sum".to_string(),
         })?
         .as_float()
@@ -609,7 +609,7 @@ fn get_histogram_value(log: &LogEvent) -> Result<MetricValue, TransformError> {
 fn get_summary_value(log: &LogEvent) -> Result<MetricValue, TransformError> {
     let event_quantiles = log
         .get(event_path!("summary", "quantiles"))
-        .ok_or_else(|| TransformError::FieldNotFound {
+        .ok_or_else(|| TransformError::PathNotFound {
             path: "summary.quantiles".to_string(),
         })?
         .as_array()
@@ -622,7 +622,7 @@ fn get_summary_value(log: &LogEvent) -> Result<MetricValue, TransformError> {
     for e_quantile in event_quantiles {
         let quantile = e_quantile
             .get(path!("quantile"))
-            .ok_or_else(|| TransformError::FieldNotFound {
+            .ok_or_else(|| TransformError::PathNotFound {
                 path: "summary.quantiles.quantile".to_string(),
             })?
             .as_float()
@@ -633,7 +633,7 @@ fn get_summary_value(log: &LogEvent) -> Result<MetricValue, TransformError> {
 
         let value = e_quantile
             .get(path!("value"))
-            .ok_or_else(|| TransformError::FieldNotFound {
+            .ok_or_else(|| TransformError::PathNotFound {
                 path: "summary.quantiles.value".to_string(),
             })?
             .as_float()
@@ -650,7 +650,7 @@ fn get_summary_value(log: &LogEvent) -> Result<MetricValue, TransformError> {
 
     let count = log
         .get(event_path!("summary", "count"))
-        .ok_or_else(|| TransformError::FieldNotFound {
+        .ok_or_else(|| TransformError::PathNotFound {
             path: "summary.count".to_string(),
         })?
         .as_integer()
@@ -661,7 +661,7 @@ fn get_summary_value(log: &LogEvent) -> Result<MetricValue, TransformError> {
 
     let sum = log
         .get(event_path!("summary", "sum"))
-        .ok_or_else(|| TransformError::FieldNotFound {
+        .ok_or_else(|| TransformError::PathNotFound {
             path: "summary.sum".to_string(),
         })?
         .as_float()
@@ -688,7 +688,7 @@ fn to_metrics_metadata(event: &Event) -> Result<Metric, TransformError> {
     let name = match try_get_string_from_log(log, "name")? {
         Some(n) => n,
         None => {
-            return Err(TransformError::FieldNotFound {
+            return Err(TransformError::PathNotFound {
                 path: "name".to_string(),
             })
         }
@@ -708,7 +708,7 @@ fn to_metrics_metadata(event: &Event) -> Result<Metric, TransformError> {
     let kind_str = match try_get_string_from_log(log, "kind")? {
         Some(n) => n,
         None => {
-            return Err(TransformError::FieldNotFound {
+            return Err(TransformError::PathNotFound {
                 path: "kind".to_string(),
             })
         }
@@ -772,7 +772,7 @@ impl FunctionTransform for LogToMetric {
                                 field_value: path_value.as_ref()
                             })
                         }
-                        TransformError::FieldNotFound { path } => {
+                        TransformError::PathNotFound { path } => {
                             emit!(ParserMissingFieldError::<DROP_EVENT> {
                                 field: path.as_ref()
                             })
@@ -798,12 +798,12 @@ impl FunctionTransform for LogToMetric {
                     }
                     Err(err) => {
                         match err {
-                            TransformError::FieldNull { path } => {
+                            TransformError::PathNull { path } => {
                                 emit!(LogToMetricFieldNullError {
                                     field: path.as_ref()
                                 })
                             }
-                            TransformError::FieldNotFound { path } => {
+                            TransformError::PathNotFound { path } => {
                                 emit!(ParserMissingFieldError::<DROP_EVENT> {
                                     field: path.as_ref()
                                 })
@@ -1920,7 +1920,7 @@ mod tests {
             "#,
         );
 
-        let json_str1 = r#"{
+        let json_gauge = r#"{
           "gauge": {
             "value": 990.0
           },
@@ -1931,24 +1931,48 @@ mod tests {
             "host": "localhost"
           }
         }"#;
+        let log_gauge = create_log_event(json_gauge);
 
-        let json_str2 = r#"{
-          "gauge": {
-            "value": 500.0
+        let json_histogram = r#"{
+          "histogram": {
+            "sum": 18.0,
+            "count": 5,
+            "buckets": [
+              {
+                "upper_limit": 1.0,
+                "count": 1
+              },
+              {
+                "upper_limit": 2.0,
+                "count": 2
+              },
+              {
+                "upper_limit": 5.0,
+                "count": 1
+              },
+              {
+                "upper_limit": 10.0,
+                "count": 1
+              }
+            ]
           },
           "kind": "absolute",
-          "name": "test2.transform.gauge",
+          "name": "test.transform.histogram",
           "tags": {
             "env": "test_env",
             "host": "localhost"
           }
         }"#;
+        let log_histogram = create_log_event(json_histogram);
 
+        let logs: HashMap<&str, LogEvent> =
+            [("test.transform.gauge", log_gauge.into_log()),
+            ("test.transform.histogram", log_histogram.into_log())
+        ].iter().cloned().collect();
+        let mut event = Event::Log(LogEvent::from(logs));
 
-        let log = create_log_event(json_str1);
-        let log2 = create_log_event(json_str2);
-        let mut event = Event::Log(LogEvent::from_parts(log.clone().into_log().value().clone(), log.into_metadata()));
-        event.as_mut_log().insert("test1.transform.gauge", log2.clone().into_log().value().clone());
+        // let mut event = Event::Log(LogEvent::from_parts(log_gauge.clone().into_log().value().clone(), log_gauge.clone().into_metadata()));
+        // event.as_mut_log().insert("test.transform.histogram", log_histogram.clone().into_log().value().clone());
         let output = do_transform_multiple_events(config, event, 2).await;
 
         assert_eq!(2, output.len());
