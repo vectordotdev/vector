@@ -228,8 +228,7 @@ first to ensure they pass.
 
 - `cargo vdev check rust` - this runs the Clippy linter to catch common mistakes.
 - `cargo vdev check fmt` - this ensures all code is properly formatted. Code can be run through
-[`rustfmt`][urls.rustfmt] to ensure it is properly formatted. Most editors can be configured to
-do this for you - highly recommended.
+[`rustfmt`][urls.rustfmt] using `cargo fmt` to ensure it is properly formatted.
 - `cargo vdev check events` - this ensures the internal metrics that Vector emits conform to standards.
 - `cargo vdev check licenses` - ensures the `LICENSE-3rdparty.csv` file is up to date with the licenses
 each of Vector's dependencies are published under. If this file needs updating, you can run
