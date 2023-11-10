@@ -4,15 +4,13 @@ use futures::{poll, FutureExt, Stream, StreamExt, TryFutureExt};
 use tokio::{pin, select};
 use tower::Service;
 use tracing::Instrument;
+use vector_common::internal_event::emit;
 use vector_common::internal_event::{
     register, ByteSize, BytesSent, CallError, InternalEventHandle as _, PollReadyError, Registered,
     RegisteredEventCache, SharedString, TaggedEventsSent,
 };
 use vector_common::request_metadata::{GroupedCountByteSize, MetaDescriptive};
-use vector_core::{
-    event::{EventFinalizers, EventStatus, Finalizable},
-    internal_event::emit,
-};
+use vector_core::event::{EventFinalizers, EventStatus, Finalizable};
 
 use super::FuturesUnorderedCount;
 

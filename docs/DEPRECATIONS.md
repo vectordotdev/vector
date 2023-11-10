@@ -16,6 +16,8 @@ For example:
 
 ## To be migrated
 
+- file_metric_tag v0.36.0 The `internal_metrics.include_file_tag` should default to `false`.
+
 ## To be removed
 
 - datadog_v1_metrics v0.35.0 Support for `v1` series endpoint in the `datadog_metrics` sink should be removed.

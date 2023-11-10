@@ -64,7 +64,7 @@ pub(crate) fn add_index(
     registry: &mut TableRegistry,
     tablename: &str,
     case: Case,
-    condition: &BTreeMap<String, expression::Expr>,
+    condition: &BTreeMap<KeyString, expression::Expr>,
 ) -> std::result::Result<IndexHandle, ExpressionError> {
     let fields = condition
         .iter()
@@ -112,10 +112,8 @@ mod tests {
     #[test]
     fn add_indexes() {
         let mut registry = test_util::get_table_registry();
-        let conditions = BTreeMap::from([(
-            "field".to_owned(),
-            expression::Literal::from("value").into(),
-        )]);
+        let conditions =
+            BTreeMap::from([("field".into(), expression::Literal::from("value").into())]);
         let index = add_index(&mut registry, "dummy1", Case::Insensitive, &conditions).unwrap();
 
         assert_eq!(IndexHandle(0), index);

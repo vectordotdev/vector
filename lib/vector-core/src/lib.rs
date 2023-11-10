@@ -51,10 +51,6 @@ use std::path::PathBuf;
 #[cfg(feature = "vrl")]
 pub use crate::vrl::compile_vrl;
 
-#[cfg(any(test, feature = "test"))]
-pub use vector_common::event_test_util;
-pub use vector_common::{byte_size_of::ByteSizeOf, internal_event};
-
 pub use event::EstimatedJsonEncodedSizeOf;
 
 #[macro_use]
