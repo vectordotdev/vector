@@ -227,9 +227,9 @@ There are other checks that are run by CI before the PR can be merged. These sho
 first to ensure they pass.
 
 ```sh
-# Run the [Clippy][urls.clippy] linter to catch common mistakes.
+# Run the Clippy linter to catch common mistakes.
 cargo vdev check rust
-# Ensure all code is properly formatted. Code can be run through [`rustfmt`][urls.rustfmt] using `cargo fmt` to ensure it is properly formatted.
+# Ensure all code is properly formatted. Code can be run through `rustfmt` using `cargo fmt` to ensure it is properly formatted.
 cargo vdev check fmt
 # Ensure the internal metrics that Vector emits conform to standards.
 cargo vdev check events
@@ -287,5 +287,3 @@ This is covered by the CLA.
 [urls.new_issue]: https://github.com/vectordotdev/vector/issues/new
 [urls.submit_pr]: https://help.github.com/en/github/collaborating-with-issues-and-pull-requests/creating-a-pull-request-from-a-fork
 [urls.vector_test_harness]: https://github.com/vectordotdev/vector-test-harness/
-[urls.clippy]: https://github.com/rust-lang/rust-clippy
-[urls.rustfmt]: https://github.com/rust-lang/rustfmt
