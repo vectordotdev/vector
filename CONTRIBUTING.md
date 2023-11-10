@@ -221,6 +221,23 @@ Integration tests are not run by default when running
 `cargo vdev test`. Instead, they are accessible via the integration subcommand (example:
 `cargo vdev int test aws` runs aws-related integration tests). You can find the list of available integration tests using `cargo vdev int show`. Integration tests require docker or podman to run.
 
+### Running other checks
+
+There are other checks that are run by CI before the PR can be merged. These should be run locally
+first to ensure they pass.
+
+- `cargo vdev check rust` - this runs the Clippy linter to catch common mistakes.
+- `cargo vdev check fmt` - this ensures all code is properly formatted. Code can be run through
+[`rustfmt`][urls.rustfmt] to ensure it is properly formatted. Most editors can be configured to
+do this for you - highly recommended.
+- `cargo vdev check events` - this ensures the internal metrics that Vector emits conform to standards.
+- `cargo vdev check licenses` - ensures the `LICENSE-3rdparty.csv` file is up to date with the licenses
+each of Vector's dependencies are published under. If this file needs updating, you can run
+- `make check-component-docs` - Vector's documentation for each component is generated from the comments
+attached to the Component structs and members. Running this ensures that the generated docs are up to
+date.
+- `cd rust-doc && make docs` - generates the code documentation for the Vector project. Run this to
+ensure the docs can be generated without errors (warnings are acceptable at the minute).
 
 ### Deprecations
 
@@ -266,3 +283,4 @@ This is covered by the CLA.
 [urls.new_issue]: https://github.com/vectordotdev/vector/issues/new
 [urls.submit_pr]: https://help.github.com/en/github/collaborating-with-issues-and-pull-requests/creating-a-pull-request-from-a-fork
 [urls.vector_test_harness]: https://github.com/vectordotdev/vector-test-harness/
+[urls.rustfmt]: https://github.com/rust-lang/rustfmt
