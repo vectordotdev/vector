@@ -6,6 +6,25 @@ base: components: transforms: throttle: configuration: {
 		required:    false
 		type: condition: {}
 	}
+	internal_metrics: {
+		description: "Configuration of internal metrics for the Throttle transform."
+		required:    true
+		type: object: options: emit_events_discarded_per_key: {
+			description: """
+				Whether or not to emit the `events_discarded_total` internal metric with the `key` tag.
+
+				If true, the counter will be incremented for each discarded event, including the key value
+				associated with the discarded event. If false, the counter will not be emitted. Instead, the
+				number of discarded events can be seen through the `component_discarded_events_total` internal
+				metric.
+
+				Note that this defaults to false becuase the `key` tag has potentially unbounded cardinality.
+				Only set this to true if you know that the number of unique keys is bounded.
+				"""
+			required: false
+			type: bool: default: false
+		}
+	}
 	key_field: {
 		description: """
 			The value to group events into separate buckets to be rate limited independently.

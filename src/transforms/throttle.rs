@@ -18,6 +18,24 @@ use crate::{
     transforms::{TaskTransform, Transform},
 };
 
+/// Configuration of internal metrics for the Throttle transform.
+#[configurable_component]
+#[derive(Clone, Debug, PartialEq, Eq, Default)]
+#[serde(deny_unknown_fields)]
+pub struct ThrottleInternalMetricsConfig {
+    /// Whether or not to emit the `events_discarded_total` internal metric with the `key` tag.
+    ///
+    /// If true, the counter will be incremented for each discarded event, including the key value
+    /// associated with the discarded event. If false, the counter will not be emitted. Instead, the
+    /// number of discarded events can be seen through the `component_discarded_events_total` internal
+    /// metric.
+    ///
+    /// Note that this defaults to false becuase the `key` tag has potentially unbounded cardinality.
+    /// Only set this to true if you know that the number of unique keys is bounded.
+    #[serde(default)]
+    pub emit_events_discarded_per_key: bool,
+}
+
 /// Configuration for the `throttle` transform.
 #[serde_as]
 #[configurable_component(transform("throttle", "Rate limit logs passing through a topology."))]
@@ -43,6 +61,9 @@ pub struct ThrottleConfig {
 
     /// A logical condition used to exclude events from sampling.
     exclude: Option<AnyCondition>,
+
+    #[configurable(derived)]
+    internal_metrics: ThrottleInternalMetricsConfig,
 }
 
 impl_generate_config_from_default!(ThrottleConfig);
@@ -79,6 +100,7 @@ pub struct Throttle<C: clock::Clock<Instant = I>, I: clock::Reference> {
     key_field: Option<Template>,
     exclude: Option<Condition>,
     clock: C,
+    internal_metrics: ThrottleInternalMetricsConfig,
 }
 
 impl<C, I> Throttle<C, I>
@@ -116,6 +138,7 @@ where
             flush_keys_interval,
             key_field: config.key_field.clone(),
             exclude,
+            internal_metrics: config.internal_metrics.clone(),
         })
     }
 }
@@ -171,9 +194,15 @@ where
                                     }
                                     _ => {
                                         if let Some(key) = key {
-                                            emit!(ThrottleEventDiscarded{key})
+                                            emit!(ThrottleEventDiscarded{
+                                                key,
+                                                emit_events_discarded_per_key: self.internal_metrics.emit_events_discarded_per_key
+                                            });
                                         } else {
-                                            emit!(ThrottleEventDiscarded{key: "None".to_string()})
+                                            emit!(ThrottleEventDiscarded{
+                                                key: "None".to_string(),
+                                                emit_events_discarded_per_key: self.internal_metrics.emit_events_discarded_per_key
+                                            });
                                         }
                                         None
                                     }
@@ -421,6 +450,7 @@ key_field = "{{ bucket }}"
                 window_secs: Duration::from_secs_f64(1.0),
                 key_field: None,
                 exclude: None,
+                internal_metrics: Default::default(),
             };
             let (tx, rx) = mpsc::channel(1);
             let (topology, mut out) = create_topology(ReceiverStream::new(rx), config).await;
