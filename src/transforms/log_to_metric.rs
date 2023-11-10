@@ -1910,4 +1910,78 @@ mod tests {
             .with_timestamp(Some(ts()))
         );
     }
+
+    #[tokio::test]
+    async fn multiple_metadata_metrics() {
+        let config = parse_yaml_config(
+            r#"
+            metrics: []
+            all_metrics: true
+            "#,
+        );
+
+        let json_str1 = r#"{
+          "gauge": {
+            "value": 990.0
+          },
+          "kind": "absolute",
+          "name": "test1.transform.gauge",
+          "tags": {
+            "env": "test_env",
+            "host": "localhost"
+          }
+        }"#;
+
+        let json_str2 = r#"{
+          "gauge": {
+            "value": 500.0
+          },
+          "kind": "absolute",
+          "name": "test2.transform.gauge",
+          "tags": {
+            "env": "test_env",
+            "host": "localhost"
+          }
+        }"#;
+
+
+        let log = create_log_event(json_str1);
+        let log2 = create_log_event(json_str2);
+        let mut event = Event::Log(LogEvent::from_parts(log.clone().into_log().value().clone(), log.into_metadata()));
+        event.as_mut_log().insert("test1.transform.gauge", log2.clone().into_log().value().clone());
+        let output = do_transform_multiple_events(config, event, 2).await;
+
+        assert_eq!(2, output.len());
+        assert_eq!(
+            output[0].clone().into_metric(),
+            Metric::new_with_metadata(
+                "test.transform.gauge",
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: 990.0 },
+                output[0].metadata().clone(),
+            )
+                .with_namespace(Some("test_namespace"))
+                .with_tags(Some(metric_tags!(
+                "env" => "test_env",
+                "host" => "localhost",
+            )))
+                .with_timestamp(Some(ts()))
+        );
+        assert_eq!(
+            output[1].clone().into_metric(),
+            Metric::new_with_metadata(
+                "test.transform.gauge",
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: 990.0 },
+                output[1].metadata().clone(),
+            )
+                .with_namespace(Some("test_namespace"))
+                .with_tags(Some(metric_tags!(
+                "env" => "test_env",
+                "host" => "localhost",
+            )))
+                .with_timestamp(Some(ts()))
+        );
+    }
+
 }
