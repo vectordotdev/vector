@@ -52,13 +52,10 @@ pub use service::{
 pub use sink::{BatchSink, PartitionBatchSink, StreamSink};
 use snafu::Snafu;
 pub use uri::UriSerde;
-use vector_lib::{
-    json_size::JsonSize,
-    TimeZone,
-};
+use vector_lib::{json_size::JsonSize, TimeZone};
 
 use crate::event::EventFinalizers;
-use chrono::{Utc, Offset, FixedOffset};
+use chrono::{FixedOffset, Offset, Utc};
 
 #[derive(Debug, Snafu)]
 enum SinkBuildError {

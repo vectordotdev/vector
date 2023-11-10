@@ -4,7 +4,7 @@ use std::{borrow::Cow, convert::TryFrom, fmt, hash::Hash, path::PathBuf};
 use bytes::Bytes;
 use chrono::{
     format::{strftime::StrftimeItems, Item},
-    Utc, FixedOffset,
+    FixedOffset, Utc,
 };
 use once_cell::sync::Lazy;
 use regex::Regex;
@@ -355,7 +355,11 @@ fn render_metric_field<'a>(key: &str, metric: &'a Metric) -> Option<&'a str> {
     }
 }
 
-fn render_timestamp(items: &ParsedStrftime, event: EventRef<'_>, tz_offset: Option<FixedOffset>) -> String {
+fn render_timestamp(
+    items: &ParsedStrftime,
+    event: EventRef<'_>,
+    tz_offset: Option<FixedOffset>,
+) -> String {
     let timestamp = match event {
         EventRef::Log(log) => log_schema()
             .timestamp_key_target_path()
@@ -379,22 +383,20 @@ fn render_timestamp(items: &ParsedStrftime, event: EventRef<'_>, tz_offset: Opti
     .unwrap_or_else(Utc::now);
 
     match tz_offset {
-        Some(offset) => {
-            timestamp.with_timezone(&offset)
-                .format_with_items(items.as_items())
-                .to_string()
-        },
-        None => {
-            timestamp.with_timezone(&chrono::Utc)
-                .format_with_items(items.as_items())
-                .to_string()
-        }
+        Some(offset) => timestamp
+            .with_timezone(&offset)
+            .format_with_items(items.as_items())
+            .to_string(),
+        None => timestamp
+            .with_timezone(&chrono::Utc)
+            .format_with_items(items.as_items())
+            .to_string(),
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use chrono::{TimeZone, Utc, Offset};
+    use chrono::{Offset, TimeZone, Utc};
     use chrono_tz::Tz;
     use vector_lib::lookup::{metadata_path, PathPrefix};
     use vector_lib::metric_tags;
@@ -684,10 +686,7 @@ mod tests {
         let template = Template::try_from("vector-%Y-%m-%d-%H.log").unwrap();
         let mut event = Event::Log(LogEvent::from("hello world"));
         event.as_mut_log().insert(
-            (
-                PathPrefix::Event,
-                log_schema().timestamp_key().unwrap(),
-            ),
+            (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
             ts,
         );
 

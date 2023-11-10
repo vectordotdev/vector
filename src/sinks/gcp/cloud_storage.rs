@@ -1,7 +1,7 @@
 use std::{collections::HashMap, convert::TryFrom, io};
 
 use bytes::Bytes;
-use chrono::{Utc, FixedOffset};
+use chrono::{FixedOffset, Utc};
 use http::header::{HeaderName, HeaderValue};
 use http::Uri;
 use indoc::indoc;
@@ -12,10 +12,7 @@ use uuid::Uuid;
 use vector_lib::codecs::encoding::Framer;
 use vector_lib::configurable::configurable_component;
 use vector_lib::event::{EventFinalizers, Finalizable};
-use vector_lib::{
-    request_metadata::RequestMetadata,
-    TimeZone,
-};
+use vector_lib::{request_metadata::RequestMetadata, TimeZone};
 
 use crate::sinks::util::metadata::RequestMetadataBuilder;
 use crate::{
@@ -35,8 +32,8 @@ use crate::{
         },
         util::{
             batch::BatchConfig, partitioner::KeyPartitioner, request_builder::EncodeResult,
-            BulkSizeBasedDefaultBatchSettings, Compression, RequestBuilder, ServiceBuilderExt,
-            TowerRequestConfig, timezone_to_offset
+            timezone_to_offset, BulkSizeBasedDefaultBatchSettings, Compression, RequestBuilder,
+            ServiceBuilderExt, TowerRequestConfig,
         },
         Healthcheck, VectorSink,
     },
@@ -171,7 +168,6 @@ pub struct GcsSinkConfig {
     #[configurable(derived)]
     #[serde(default)]
     pub timezone: Option<TimeZone>,
-
 }
 
 fn default_time_format() -> String {
@@ -294,7 +290,7 @@ struct RequestSettings {
     append_uuid: bool,
     encoder: (Transformer, Encoder<Framer>),
     compression: Compression,
-    tz_offset: Option<FixedOffset>
+    tz_offset: Option<FixedOffset>,
 }
 
 impl RequestBuilder<(String, Vec<Event>)> for RequestSettings {
@@ -335,7 +331,9 @@ impl RequestBuilder<(String, Vec<Event>)> for RequestSettings {
         let filename = {
             let seconds = match self.tz_offset {
                 Some(offset) => Utc::now().with_timezone(&offset).format(&self.time_format),
-                None => Utc::now().with_timezone(&chrono::Utc).format(&self.time_format)
+                None => Utc::now()
+                    .with_timezone(&chrono::Utc)
+                    .format(&self.time_format),
             };
 
             if self.append_uuid {
@@ -396,7 +394,10 @@ impl RequestSettings {
             .unwrap_or_else(|| config.compression.extension().into());
         let time_format = config.filename_time_format.clone();
         let append_uuid = config.filename_append_uuid;
-        let offset = config.timezone.or(cx.globals.timezone).and_then(timezone_to_offset);
+        let offset = config
+            .timezone
+            .or(cx.globals.timezone)
+            .and_then(timezone_to_offset);
 
         Ok(Self {
             acl,
@@ -459,7 +460,12 @@ mod tests {
         let config =
             default_config((None::<FramingConfig>, JsonSerializerConfig::default()).into());
         let sink = config
-            .build_sink(client, mock_endpoint.to_string(), GcpAuthenticator::None, context)
+            .build_sink(
+                client,
+                mock_endpoint.to_string(),
+                GcpAuthenticator::None,
+                context,
+            )
             .expect("failed to build sink");
 
         let event = Event::Log(LogEvent::from("simple message"));

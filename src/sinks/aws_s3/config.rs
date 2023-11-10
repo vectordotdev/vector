@@ -24,8 +24,8 @@ use crate::{
             sink::S3Sink,
         },
         util::{
-            BatchConfig, BulkSizeBasedDefaultBatchSettings, Compression, ServiceBuilderExt,
-            TowerRequestConfig, timezone_to_offset,
+            timezone_to_offset, BatchConfig, BulkSizeBasedDefaultBatchSettings, Compression,
+            ServiceBuilderExt, TowerRequestConfig,
         },
         Healthcheck,
     },
@@ -194,7 +194,11 @@ impl SinkConfig for S3SinkConfig {
 }
 
 impl S3SinkConfig {
-    pub fn build_processor(&self, service: S3Service, cx: SinkContext) -> crate::Result<VectorSink> {
+    pub fn build_processor(
+        &self,
+        service: S3Service,
+        cx: SinkContext,
+    ) -> crate::Result<VectorSink> {
         // Build our S3 client/service, which is what we'll ultimately feed
         // requests into in order to ship files to S3.  We build this here in
         // order to configure the client/service with retries, concurrency
@@ -204,13 +208,17 @@ impl S3SinkConfig {
             .settings(request_limits, S3RetryLogic)
             .service(service);
 
-        let offset = self.timezone.or(cx.globals.timezone).and_then(timezone_to_offset);
+        let offset = self
+            .timezone
+            .or(cx.globals.timezone)
+            .and_then(timezone_to_offset);
 
         // Configure our partitioning/batching.
         let batch_settings = self.batch.into_batcher_settings()?;
 
         let key_prefix = Template::try_from(self.key_prefix.clone())?
-            .with_tz_offset(offset).try_into()?;
+            .with_tz_offset(offset)
+            .try_into()?;
 
         let ssekms_key_id = self
             .options
@@ -225,7 +233,6 @@ impl S3SinkConfig {
         let transformer = self.encoding.transformer();
         let (framer, serializer) = self.encoding.build(SinkType::MessageBased)?;
         let encoder = Encoder::<Framer>::new(framer, serializer);
-
 
         let request_options = S3RequestOptions {
             bucket: self.bucket.clone(),

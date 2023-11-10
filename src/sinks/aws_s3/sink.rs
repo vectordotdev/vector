@@ -1,7 +1,7 @@
 use std::io;
 
 use bytes::Bytes;
-use chrono::{Utc, FixedOffset};
+use chrono::{FixedOffset, Utc};
 use uuid::Uuid;
 use vector_lib::codecs::encoding::Framer;
 use vector_lib::event::Finalizable;
@@ -78,16 +78,12 @@ impl RequestBuilder<(S3PartitionKey, Vec<Event>)> for S3RequestOptions {
     ) -> Self::Request {
         let filename = {
             let formatted_ts = match self.filename_tz_offset {
-                Some(offset) => {
-                    Utc::now()
-                        .with_timezone(&offset)
-                        .format(self.filename_time_format.as_str())
-                },
-                None => {
-                    Utc::now()
-                        .with_timezone(&chrono::Utc)
-                        .format(self.filename_time_format.as_str())
-                }
+                Some(offset) => Utc::now()
+                    .with_timezone(&offset)
+                    .format(self.filename_time_format.as_str()),
+                None => Utc::now()
+                    .with_timezone(&chrono::Utc)
+                    .format(self.filename_time_format.as_str()),
             };
 
             self.filename_append_uuid

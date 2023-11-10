@@ -33,7 +33,7 @@ use crate::{
     internal_events::{
         FileBytesSent, FileInternalMetricsConfig, FileIoError, FileOpen, TemplateRenderingError,
     },
-    sinks::util::{StreamSink, timezone_to_offset},
+    sinks::util::{timezone_to_offset, StreamSink},
     template::Template,
 };
 
@@ -222,7 +222,10 @@ impl FileSink {
         let (framer, serializer) = config.encoding.build(SinkType::StreamBased)?;
         let encoder = Encoder::<Framer>::new(framer, serializer);
 
-        let offset = config.timezone.or(cx.globals.timezone).and_then(timezone_to_offset);
+        let offset = config
+            .timezone
+            .or(cx.globals.timezone)
+            .and_then(timezone_to_offset);
 
         Ok(Self {
             path: config.path.clone().with_tz_offset(offset),
