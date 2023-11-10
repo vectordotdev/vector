@@ -226,17 +226,14 @@ Integration tests are not run by default when running
 There are other checks that are run by CI before the PR can be merged. These should be run locally
 first to ensure they pass.
 
-- `cargo vdev check rust` - this runs the [Clippy][urls.clippy] linter to catch common mistakes.
-- `cargo vdev check fmt` - this ensures all code is properly formatted. Code can be run through
-[`rustfmt`][urls.rustfmt] using `cargo fmt` to ensure it is properly formatted.
-- `cargo vdev check events` - this ensures the internal metrics that Vector emits conform to standards.
-- `cargo vdev check licenses` - ensures the `LICENSE-3rdparty.csv` file is up to date with the licenses
-each of Vector's dependencies are published under. If this file needs updating, you can run
-- `make check-component-docs` - Vector's documentation for each component is generated from the comments
-attached to the Component structs and members. Running this ensures that the generated docs are up to
-date.
-- `cd rust-doc && make docs` - generates the code documentation for the Vector project. Run this to
-ensure the docs can be generated without errors (warnings are acceptable at the minute).
+```sh
+cargo vdev check rust # this runs the [Clippy][urls.clippy] linter to catch common mistakes.
+cargo vdev check fmt # this ensures all code is properly formatted. Code can be run through [`rustfmt`][urls.rustfmt] using `cargo fmt` to ensure it is properly formatted.
+cargo vdev check events # this ensures the internal metrics that Vector emits conform to standards.
+cargo vdev check licenses # ensures the `LICENSE-3rdparty.csv` file is up to date with the licenses each of Vector's dependencies are published under.
+make check-component-docs # Vector's documentation for each component is generated from the comments attached to the Component structs and members. Running this ensures that the generated docs are up to date.
+cd rust-doc && make docs # generates the code documentation for the Vector project. Run this to ensure the docs can be generated without errors (warnings are acceptable at the minute).
+```
 
 ### Deprecations
 
