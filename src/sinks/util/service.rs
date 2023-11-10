@@ -208,7 +208,7 @@ impl<D: TowerRequestConfigDefaults> Default for TowerRequestConfig<D> {
 }
 
 impl<D: TowerRequestConfigDefaults> TowerRequestConfig<D> {
-    pub fn into_settings(&self) -> TowerRequestSettings {
+    pub const fn into_settings(&self) -> TowerRequestSettings {
         // the unwrap() calls below are safe because the final defaults are always Some<>
         TowerRequestSettings {
             concurrency: self.concurrency.parse_concurrency(),
