@@ -351,11 +351,6 @@ impl SplunkSource {
                     let mut out = out.clone();
                     let idx_ack = idx_ack.clone();
                     let events_received = events_received.clone();
-                    emit!(HttpBytesReceived {
-                        byte_size: body.len(),
-                        http_path: path.as_str(),
-                        protocol,
-                    });
 
                     async move {
                         if idx_ack.is_some() && channel.is_none() {
@@ -363,14 +358,19 @@ impl SplunkSource {
                         }
 
                         let mut data = Vec::new();
-                        let body = if gzip {
+                        let (byte_size, body) = if gzip {
                             MultiGzDecoder::new(body.reader())
                                 .read_to_end(&mut data)
                                 .map_err(|_| Rejection::from(ApiError::BadRequest))?;
-                            String::from_utf8_lossy(data.as_slice())
+                            (data.len(), String::from_utf8_lossy(data.as_slice()))
                         } else {
-                            String::from_utf8_lossy(body.as_ref())
+                            (body.len(), String::from_utf8_lossy(body.as_ref()))
                         };
+                        emit!(HttpBytesReceived {
+                            byte_size,
+                            http_path: path.as_str(),
+                            protocol,
+                        });
 
                         let (batch, receiver) =
                             BatchNotifier::maybe_new_with_receiver(idx_ack.is_some());
