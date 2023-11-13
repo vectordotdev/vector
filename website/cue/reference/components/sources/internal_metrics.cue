@@ -326,6 +326,12 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
+		buffer_send_duration_seconds: {
+			description:       "The duration spent sending a payload to this buffer."
+			type:              "histogram"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
 		buffer_sent_event_bytes_total: {
 			description:       "The number of bytes sent by this buffer."
 			type:              "counter"
