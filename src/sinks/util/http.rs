@@ -745,11 +745,10 @@ where
     fn call(&mut self, mut request: HttpRequest) -> Self::Future {
         let mut http_service = self.batch_service.clone();
 
-        let raw_byte_size = request.payload.len();
-
         // NOTE: By taking the metadata here, when passing the request to `call()` below,
         //       that function does not have access to the metadata anymore.
         let metadata = std::mem::take(request.metadata_mut());
+        let raw_byte_size = metadata.request_encoded_size();
         let events_byte_size = metadata.into_events_estimated_json_encoded_byte_size();
 
         Box::pin(async move {
