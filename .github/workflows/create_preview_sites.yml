@@ -52,8 +52,9 @@ jobs:
       run: |
         unzip pr.zip -d pr
         BRANCH_NAME=$(cat ./pr/branch)
-        SANITIZED_BRANCH_NAME=$(echo "$BRANCH_NAME" | sed 's/\./-/g')
+        SANITIZED_BRANCH_NAME=$(echo "$BRANCH_NAME" | sed 's/[\/\.]/-/g')
         echo "SANITIZED_BRANCH_NAME=$SANITIZED_BRANCH_NAME" >> $GITHUB_ENV
+        echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV
 
     # Kick off the job in amplify
     - name: Deploy Site
@@ -70,7 +71,7 @@ jobs:
         RESPONSE_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
              -H "Content-Type: application/json" \
              -H "X-Hub-Signature: $SIGNATURE" \
-             -d "{\"app_id\": \"$APP_ID\", \"branch_name\": \"$SANITIZED_BRANCH_NAME\"}" \
+             -d "{\"app_id\": \"$APP_ID\", \"branch_name\": \"$BRANCH_NAME\"}" \
           "$ENDPOINT")
 
         # check the response code and fail if not 200
