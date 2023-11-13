@@ -5,7 +5,6 @@ use http::StatusCode;
 use snafu::Snafu;
 use tracing::Instrument;
 
-use crate::sinks::loki::config::{CompressionConfigAdapter, ExtendedCompression};
 use crate::{
     http::{Auth, HttpClient},
     sinks::{prelude::*, util::UriSerde},
@@ -60,7 +59,7 @@ impl DriverResponse for LokiResponse {
 
 #[derive(Clone)]
 pub struct LokiRequest {
-    pub compression: CompressionConfigAdapter,
+    pub compression: Compression,
     pub finalizers: EventFinalizers,
     pub payload: Bytes,
     pub tenant_id: Option<String>,
@@ -113,10 +112,8 @@ impl Service<LokiRequest> for LokiService {
 
     fn call(&mut self, request: LokiRequest) -> Self::Future {
         let content_type = match request.compression {
-            CompressionConfigAdapter::Original(_) => "application/json",
-            CompressionConfigAdapter::Extended(ExtendedCompression::Snappy) => {
-                "application/x-protobuf"
-            }
+            Compression::Snappy => "application/x-protobuf",
+            _ => "application/json",
         };
         let mut req = http::Request::post(&self.endpoint.uri).header("Content-Type", content_type);
 
