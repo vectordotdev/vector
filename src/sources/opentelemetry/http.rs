@@ -6,6 +6,7 @@ use http::StatusCode;
 use hyper::{service::make_service_fn, Server};
 use prost::Message;
 use snafu::Snafu;
+use tokio::net::TcpStream;
 use tower::ServiceBuilder;
 use tracing::Span;
 use vector_lib::internal_event::{
@@ -14,6 +15,7 @@ use vector_lib::internal_event::{
 use vector_lib::opentelemetry::proto::collector::logs::v1::{
     ExportLogsServiceRequest, ExportLogsServiceResponse,
 };
+use vector_lib::tls::MaybeTlsIncomingStream;
 use vector_lib::{
     config::LogNamespace,
     event::{BatchNotifier, BatchStatus},
@@ -21,6 +23,7 @@ use vector_lib::{
 };
 use warp::{filters::BoxedFilter, reject::Rejection, reply::Response, Filter, Reply};
 
+use crate::http::{KeepaliveConfig, MaxConnectionAgeLayer};
 use crate::{
     event::Event,
     http::build_http_trace_layer,
@@ -46,6 +49,7 @@ pub(crate) async fn run_http_server(
     tls_settings: MaybeTlsSettings,
     filters: BoxedFilter<(Response,)>,
     shutdown: ShutdownSignal,
+    keepalive_settings: KeepaliveConfig,
 ) -> crate::Result<()> {
     let listener = tls_settings.bind(&address).await?;
     let routes = filters.recover(handle_rejection);
@@ -53,9 +57,14 @@ pub(crate) async fn run_http_server(
     info!(message = "Building HTTP server.", address = %address);
 
     let span = Span::current();
-    let make_svc = make_service_fn(move |_conn| {
+    let make_svc = make_service_fn(move |conn: &MaybeTlsIncomingStream<TcpStream>| {
         let svc = ServiceBuilder::new()
             .layer(build_http_trace_layer(span.clone()))
+            .layer(MaxConnectionAgeLayer::new(
+                keepalive_settings.max_connection_age,
+                keepalive_settings.max_connection_age_jitter_factor,
+                conn.peer_addr(),
+            ))
             .service(warp::service(routes.clone()));
         futures_util::future::ok::<_, Infallible>(svc)
     });

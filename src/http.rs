@@ -1,6 +1,7 @@
 #![allow(missing_docs)]
 use std::{
     fmt,
+    net::SocketAddr,
     task::{Context, Poll},
     time::Duration,
 };
@@ -17,8 +18,11 @@ use hyper::{
 };
 use hyper_openssl::HttpsConnector;
 use hyper_proxy::ProxyConnector;
+use rand::Rng;
+use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
-use tower::Service;
+use tokio::time::Instant;
+use tower::{Layer, Service};
 use tower_http::{
     classify::{ServerErrorsAsFailures, SharedClassifier},
     trace::TraceLayer,
@@ -382,8 +386,151 @@ pub fn build_http_trace_layer(
         .on_eos(())
 }
 
+/// Configuration of HTTP server keepalive parameters.
+#[serde_as]
+#[configurable_component]
+#[derive(Clone, Debug, PartialEq, Default)]
+#[serde(deny_unknown_fields)]
+pub struct KeepaliveConfig {
+    /// The maximum amount of time a connection may exist before it is closed
+    /// by sending a `Connection: close` header on the HTTP response.
+    ///
+    /// A random jitter configured by `max_connection_age_jitter_factor` is added
+    /// to the specified duration to spread out connection storms.
+    ///
+    /// A value of `0` disables this feature.
+    #[serde_as(as = "serde_with::DurationSeconds<u64>")]
+    #[serde(
+        rename = "max_connection_age_secs",
+        default = "default_max_connection_age"
+    )]
+    #[configurable(metadata(docs::examples = 600))]
+    #[configurable(metadata(docs::human_name = "Maximum Connection Age"))]
+    pub max_connection_age: Duration,
+
+    /// The factor by which to jitter the `max_connection_age_secs` value.
+    ///
+    /// A value of 0.1 means that the actual duration will be between 90% and 110% of the
+    /// specified duration.
+    #[configurable(validation(range(min = 0.0, max = 1.0)))]
+    pub max_connection_age_jitter_factor: f64,
+}
+
+const fn default_max_connection_age() -> Duration {
+    Duration::from_secs(0)
+}
+
+/// A layer that limits the maximum duration of a client connection. It does so by adding a
+/// `Connection: close` header to the response if `max_connection_duration` time has elapsed
+/// since `start_reference`.
+///
+/// Note that this layer assumes that it is instantiated once per connectin.
+
+pub struct MaxConnectionAgeLayer {
+    start_reference: Instant,
+    max_connection_age: Duration,
+    peer_addr: SocketAddr,
+}
+
+impl MaxConnectionAgeLayer {
+    pub fn new(max_connection_age: Duration, jitter_factor: f64, peer_addr: SocketAddr) -> Self {
+        Self {
+            start_reference: Instant::now(),
+            max_connection_age: Self::jittered_duration(max_connection_age, jitter_factor),
+            peer_addr,
+        }
+    }
+
+    fn jittered_duration(duration: Duration, jitter_factor: f64) -> Duration {
+        // Ensure the jitter_factor is between 0.0 and 1.0
+        let jitter_factor = jitter_factor.clamp(0.0, 1.0);
+        // Generate a random jitter factor between `1 - jitter_factor`` and `1 + jitter_factor`.
+        let mut rng = rand::thread_rng();
+        let random_jitter_factor = rng.gen_range(-jitter_factor..=jitter_factor) + 1.;
+        duration.mul_f64(random_jitter_factor)
+    }
+}
+
+impl<S> Layer<S> for MaxConnectionAgeLayer
+where
+    S: Service<Request<Body>, Response = Response<Body>> + Clone + Send + 'static,
+    S::Future: Send + 'static,
+{
+    type Service = MaxConnectionAgeService<S>;
+
+    fn layer(&self, service: S) -> Self::Service {
+        MaxConnectionAgeService {
+            service,
+            start_reference: self.start_reference.clone(),
+            max_connection_age: self.max_connection_age,
+            peer_addr: self.peer_addr,
+        }
+    }
+}
+
+/// A service that limits the maximum age of a client connection. It does so by adding a
+/// `Connection: close` header to the response if `max_connection_age` time has elapsed
+/// since `start_reference`.
+///
+/// Note that this service assumes that it is instantiated once per connectin.
+#[derive(Clone)]
+pub struct MaxConnectionAgeService<S> {
+    service: S,
+    start_reference: Instant,
+    max_connection_age: Duration,
+    peer_addr: SocketAddr,
+}
+
+impl<S, E> Service<Request<Body>> for MaxConnectionAgeService<S>
+where
+    S: Service<Request<Body>, Response = Response<Body>, Error = E> + Clone + Send + 'static,
+    S::Future: Send + 'static,
+{
+    type Response = S::Response;
+    type Error = E;
+    type Future = BoxFuture<'static, Result<Self::Response, E>>;
+
+    fn poll_ready(
+        &mut self,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Result<(), Self::Error>> {
+        self.service.poll_ready(cx)
+    }
+
+    fn call(&mut self, req: Request<Body>) -> Self::Future {
+        let start_reference = self.start_reference.clone();
+        let max_connection_age = self.max_connection_age;
+        let peer_addr = self.peer_addr;
+        let future = self.service.call(req);
+        Box::pin(async move {
+            let mut response = future.await?;
+            if !max_connection_age.is_zero() && start_reference.elapsed() >= max_connection_age {
+                debug!(
+                    message = "Closing connection due to max connection age.",
+                    ?max_connection_age,
+                    connection_age = ?start_reference.elapsed(),
+                    ?peer_addr,
+                );
+                // Tell the client to close this connection.
+                response.headers_mut().insert(
+                    hyper::header::CONNECTION,
+                    hyper::header::HeaderValue::from_static("close"),
+                );
+            }
+            Ok(response)
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use std::convert::Infallible;
+
+    use hyper::{server::conn::AddrStream, service::make_service_fn, Server};
+    use tower::ServiceBuilder;
+
+    use crate::test_util::next_addr;
+
     use super::*;
 
     #[test]
@@ -414,5 +561,162 @@ mod tests {
             request.headers().get("User-Agent"),
             Some(&HeaderValue::from_static("foo"))
         );
+    }
+
+    #[test]
+    fn test_jittered_duration() {
+        // Non-zero duration
+        let duration = Duration::from_secs(60);
+        let jitter_factor = 0.1;
+        let jittered_duration = MaxConnectionAgeLayer::jittered_duration(duration, jitter_factor);
+        assert!(jittered_duration >= Duration::from_secs(54));
+        assert!(jittered_duration <= Duration::from_secs(66));
+
+        // Zero jitter factor
+        let duration = Duration::from_secs(60);
+        let jitter_factor = 0.0;
+        let jittered_duration = MaxConnectionAgeLayer::jittered_duration(duration, jitter_factor);
+        assert_eq!(jittered_duration, Duration::from_secs(60));
+
+        // Zero duration
+        let duration = Duration::from_secs(0);
+        let jitter_factor = 0.1;
+        let jittered_duration = MaxConnectionAgeLayer::jittered_duration(duration, jitter_factor);
+        assert_eq!(jittered_duration, Duration::from_secs(0));
+    }
+
+    #[tokio::test]
+    async fn test_max_connection_age_service() {
+        tokio::time::pause();
+
+        let start_reference = Instant::now();
+        let max_connection_age = Duration::from_secs(1);
+        let mut service = MaxConnectionAgeService {
+            service: tower::service_fn(|_req: Request<Body>| async {
+                Ok::<Response<Body>, hyper::Error>(Response::new(Body::empty()))
+            }),
+            start_reference,
+            max_connection_age,
+            peer_addr: "1.2.3.4:1234".parse().unwrap(),
+        };
+
+        let req = Request::get("http://example.com")
+            .body(Body::empty())
+            .unwrap();
+        let response = service.call(req).await.unwrap();
+        assert_eq!(response.headers().get("Connection"), None);
+
+        tokio::time::advance(Duration::from_millis(500)).await;
+        let req = Request::get("http://example.com")
+            .body(Body::empty())
+            .unwrap();
+        let response = service.call(req).await.unwrap();
+        assert_eq!(response.headers().get("Connection"), None);
+
+        tokio::time::advance(Duration::from_millis(500)).await;
+        let req = Request::get("http://example.com")
+            .body(Body::empty())
+            .unwrap();
+        let response = service.call(req).await.unwrap();
+        assert_eq!(
+            response.headers().get("Connection"),
+            Some(&HeaderValue::from_static("close"))
+        );
+    }
+
+    #[tokio::test]
+    async fn test_max_connection_age_service_zero_duration() {
+        tokio::time::pause();
+
+        let start_reference = Instant::now();
+        let max_connection_age = Duration::from_millis(0);
+        let mut service = MaxConnectionAgeService {
+            service: tower::service_fn(|_req: Request<Body>| async {
+                Ok::<Response<Body>, hyper::Error>(Response::new(Body::empty()))
+            }),
+            start_reference,
+            max_connection_age,
+            peer_addr: "1.2.3.4:1234".parse().unwrap(),
+        };
+
+        let req = Request::get("http://example.com")
+            .body(Body::empty())
+            .unwrap();
+        let response = service.call(req).await.unwrap();
+        assert_eq!(response.headers().get("Connection"), None);
+
+        tokio::time::advance(Duration::from_secs(60)).await;
+        let req = Request::get("http://example.com")
+            .body(Body::empty())
+            .unwrap();
+        let response = service.call(req).await.unwrap();
+        assert_eq!(response.headers().get("Connection"), None);
+    }
+
+    // Note that we unfortunately cannot mock the time in this test because the client calls
+    // sleep internally, which advances the clock.  However, this test shouldn't be flakey given
+    // the time bounds provided.
+    #[tokio::test]
+    async fn test_max_connection_age_service_with_hyper_server() {
+        // Create a hyper server with the max connection age layer.
+        let max_connection_age = Duration::from_secs(1);
+        let addr = next_addr();
+        let make_svc = make_service_fn(move |conn: &AddrStream| {
+            let svc = ServiceBuilder::new()
+                .layer(MaxConnectionAgeLayer::new(
+                    max_connection_age,
+                    0.,
+                    conn.remote_addr(),
+                ))
+                .service(tower::service_fn(|_req: Request<Body>| async {
+                    Ok::<Response<Body>, hyper::Error>(Response::new(Body::empty()))
+                }));
+            futures_util::future::ok::<_, Infallible>(svc)
+        });
+
+        tokio::spawn(async move {
+            Server::bind(&addr).serve(make_svc).await.unwrap();
+        });
+
+        // Wait for the server to start.
+        tokio::time::sleep(Duration::from_millis(10)).await;
+
+        // Create a client, which has its own connection pool.
+        let client = HttpClient::new(None, &ProxyConfig::default()).unwrap();
+
+        // Responses generated before the client's max connection age has elapsed do not
+        // include a `Connection: close` header in the response.
+        let req = Request::get(format!("http://{}/", addr))
+            .body(Body::empty())
+            .unwrap();
+        let response = client.send(req).await.unwrap();
+        assert_eq!(response.headers().get("Connection"), None);
+
+        let req = Request::get(format!("http://{}/", addr))
+            .body(Body::empty())
+            .unwrap();
+        let response = client.send(req).await.unwrap();
+        assert_eq!(response.headers().get("Connection"), None);
+
+        // The first response generated after the client's max connection age has elapsed should
+        // include the `Connection: close` header.
+        tokio::time::sleep(Duration::from_secs(1)).await;
+        let req = Request::get(format!("http://{}/", addr))
+            .body(Body::empty())
+            .unwrap();
+        let response = client.send(req).await.unwrap();
+        assert_eq!(
+            response.headers().get("Connection"),
+            Some(&HeaderValue::from_static("close")),
+        );
+
+        // The next request should establish a new connection.
+        // Importantly, this also confirms that each connection has its own independent
+        // connection age timer.
+        let req = Request::get(format!("http://{}/", addr))
+            .body(Body::empty())
+            .unwrap();
+        let response = client.send(req).await.unwrap();
+        assert_eq!(response.headers().get("Connection"), None);
     }
 }

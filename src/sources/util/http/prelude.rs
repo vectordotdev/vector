@@ -9,6 +9,7 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use futures::{FutureExt, TryFutureExt};
 use hyper::{service::make_service_fn, Server};
+use tokio::net::TcpStream;
 use tower::ServiceBuilder;
 use tracing::Span;
 use vector_lib::{
@@ -28,12 +29,12 @@ use warp::{
 
 use crate::{
     config::SourceContext,
-    http::build_http_trace_layer,
+    http::{build_http_trace_layer, KeepaliveConfig, MaxConnectionAgeLayer},
     internal_events::{
         HttpBadRequest, HttpBytesReceived, HttpEventsReceived, HttpInternalError, StreamClosedError,
     },
     sources::util::http::HttpMethod,
-    tls::{MaybeTlsSettings, TlsEnableableConfig},
+    tls::{MaybeTlsIncomingStream, MaybeTlsSettings, TlsEnableableConfig},
     SourceSender,
 };
 
@@ -81,6 +82,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
         auth: &Option<HttpSourceAuthConfig>,
         cx: SourceContext,
         acknowledgements: SourceAcknowledgementsConfig,
+        keepalive_settings: KeepaliveConfig,
     ) -> crate::Result<crate::sources::Source> {
         let tls = MaybeTlsSettings::from_config(tls, true)?;
         let protocol = tls.http_protocol_name();
@@ -182,9 +184,14 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
             });
 
             let span = Span::current();
-            let make_svc = make_service_fn(move |_conn| {
+            let make_svc = make_service_fn(move |conn: &MaybeTlsIncomingStream<TcpStream>| {
                 let svc = ServiceBuilder::new()
                     .layer(build_http_trace_layer(span.clone()))
+                    .layer(MaxConnectionAgeLayer::new(
+                        keepalive_settings.max_connection_age,
+                        keepalive_settings.max_connection_age_jitter_factor,
+                        conn.peer_addr(),
+                    ))
                     .service(warp::service(routes.clone()));
                 futures_util::future::ok::<_, Infallible>(svc)
             });
