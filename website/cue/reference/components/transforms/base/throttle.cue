@@ -8,7 +8,7 @@ base: components: transforms: throttle: configuration: {
 	}
 	internal_metrics: {
 		description: "Configuration of internal metrics for the Throttle transform."
-		required:    true
+		required:    false
 		type: object: options: emit_events_discarded_per_key: {
 			description: """
 				Whether or not to emit the `events_discarded_total` internal metric with the `key` tag.

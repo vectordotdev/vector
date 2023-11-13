@@ -63,6 +63,7 @@ pub struct ThrottleConfig {
     exclude: Option<AnyCondition>,
 
     #[configurable(derived)]
+    #[serde(default)]
     internal_metrics: ThrottleInternalMetricsConfig,
 }
 
