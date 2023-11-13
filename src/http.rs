@@ -389,7 +389,7 @@ pub fn build_http_trace_layer(
 /// Configuration of HTTP server keepalive parameters.
 #[serde_as]
 #[configurable_component]
-#[derive(Clone, Debug, PartialEq, Default)]
+#[derive(Clone, Debug, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct KeepaliveConfig {
     /// The maximum amount of time a connection may exist before it is closed
@@ -412,6 +412,7 @@ pub struct KeepaliveConfig {
     ///
     /// A value of 0.1 means that the actual duration will be between 90% and 110% of the
     /// specified duration.
+    #[serde(default = "default_max_connection_age_jitter_factor")]
     #[configurable(validation(range(min = 0.0, max = 1.0)))]
     pub max_connection_age_jitter_factor: f64,
 }
@@ -420,11 +421,24 @@ const fn default_max_connection_age() -> Duration {
     Duration::from_secs(0)
 }
 
+const fn default_max_connection_age_jitter_factor() -> f64 {
+    0.1
+}
+
+impl Default for KeepaliveConfig {
+    fn default() -> Self {
+        Self {
+            max_connection_age: default_max_connection_age(),
+            max_connection_age_jitter_factor: default_max_connection_age_jitter_factor(),
+        }
+    }
+}
+
 /// A layer that limits the maximum duration of a client connection. It does so by adding a
 /// `Connection: close` header to the response if `max_connection_duration` time has elapsed
 /// since `start_reference`.
 ///
-/// Note that this layer assumes that it is instantiated once per connectin.
+/// Note that this layer assumes that it is instantiated once per connection.
 
 pub struct MaxConnectionAgeLayer {
     start_reference: Instant,
@@ -472,7 +486,7 @@ where
 /// `Connection: close` header to the response if `max_connection_age` time has elapsed
 /// since `start_reference`.
 ///
-/// Note that this service assumes that it is instantiated once per connectin.
+/// Note that this service assumes that it is instantiated once per connection.
 #[derive(Clone)]
 pub struct MaxConnectionAgeService<S> {
     service: S,
