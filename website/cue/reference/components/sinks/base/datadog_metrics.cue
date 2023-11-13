@@ -45,7 +45,7 @@ base: components: sinks: datadog_metrics: configuration: {
 				description: "The maximum size of a batch before it is flushed."
 				required:    false
 				type: uint: {
-					default: 100000
+					default: 1000
 					unit:    "events"
 				}
 			}

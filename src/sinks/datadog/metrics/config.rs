@@ -37,7 +37,14 @@ pub struct DatadogMetricsDefaultBatchSettings;
 // process. The value of 1k events was arrived at empirically by testing the sink's performance
 // with the v2 series endpoint.
 impl SinkBatchSettings for DatadogMetricsDefaultBatchSettings {
-    const MAX_EVENTS: Option<usize> = Some(1_000);
+    // TODO: the series V1 endpoint support is considered deprecated and should be removed in a future release.
+    // At that time when the V1 support is removed, the 1k value for max events can be used directly.
+    const MAX_EVENTS: Option<usize> = Some(
+        match option_env!("VECTOR_TEMP_USE_DD_METRICS_SERIES_V1_API") {
+            Some(_) => 100_000,
+            None => 1_000,
+        },
+    );
     const MAX_BYTES: Option<usize> = None;
     const TIMEOUT_SECS: f64 = 2.0;
 }
@@ -254,10 +261,17 @@ impl DatadogMetricsConfig {
     fn build_sink(&self, client: HttpClient) -> crate::Result<VectorSink> {
         let batcher_settings = self.batch.into_batcher_settings()?;
 
-        let request_limits = self.request.unwrap_with(
-            &TowerRequestConfig::new(Concurrency::Fixed(DEFAULT_REQUEST_FIXED_CONCURRENCY))
-                .retry_attempts(DEFAULT_REQUEST_RETRY_ATTEMPTS),
-        );
+        // TODO: the V1 endpoint support is considered deprecated and should be removed in a future release.
+        // At that time this variable can be removed and the fixed concurrency setting used directly.
+        let default_request_settings = match option_env!("VECTOR_TEMP_USE_DD_METRICS_SERIES_V1_API")
+        {
+            Some(_) => TowerRequestConfig::default(),
+            None => TowerRequestConfig::new(Concurrency::Fixed(DEFAULT_REQUEST_FIXED_CONCURRENCY)),
+        };
+
+        let request_limits = self
+            .request
+            .unwrap_with(&default_request_settings.retry_attempts(DEFAULT_REQUEST_RETRY_ATTEMPTS));
 
         let endpoint_configuration = self.generate_metrics_endpoint_configuration()?;
         let service = ServiceBuilder::new()
