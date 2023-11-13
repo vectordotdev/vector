@@ -1,6 +1,7 @@
 #![allow(missing_docs)]
 use std::{num::NonZeroUsize, path::PathBuf, process::ExitStatus, time::Duration};
 
+use anymap::AnyMap;
 use exitcode::ExitCode;
 use futures::StreamExt;
 #[cfg(feature = "enterprise")]
@@ -65,6 +66,7 @@ pub struct Application {
 impl ApplicationConfig {
     pub async fn from_opts(
         opts: &RootOpts,
+        extra_context: AnyMap,
         signal_handler: &mut SignalHandler,
     ) -> Result<Self, ExitCode> {
         let config_paths = opts.config_paths_with_formats();
@@ -72,12 +74,14 @@ impl ApplicationConfig {
         let graceful_shutdown_duration = (!opts.no_graceful_shutdown_limit)
             .then(|| Duration::from_secs(u64::from(opts.graceful_shutdown_limit_secs)));
 
+        let datadog_options = extra_context.get::<config::datadog::Options>();
+
         let config = load_configs(
             &config_paths,
             opts.watch_config,
             opts.require_healthy,
             graceful_shutdown_duration,
-            opts.datadog_options.clone(),
+            datadog_options.cloned(),
             signal_handler,
         )
         .await?;
@@ -218,6 +222,7 @@ impl Application {
 
         let config = runtime.block_on(ApplicationConfig::from_opts(
             &opts.root,
+            AnyMap::new(),
             &mut signals.handler,
         ))?;
 

@@ -216,9 +216,6 @@ pub struct RootOpts {
     /// default inherits the environment of the Vector process.
     #[arg(long, env = "VECTOR_OPENSSL_NO_PROBE", default_value = "false")]
     pub openssl_no_probe: bool,
-
-    #[clap(skip)]
-    pub datadog_options: Option<config::datadog::Options>,
 }
 
 impl RootOpts {
