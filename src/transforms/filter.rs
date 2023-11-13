@@ -53,7 +53,7 @@ impl TransformConfig for FilterConfig {
 
     fn outputs(
         &self,
-        _enrichment_tables: enrichment::TableRegistry,
+        _enrichment_tables: vector_lib::enrichment::TableRegistry,
         input_definitions: &[(OutputId, schema::Definition)],
         _: LogNamespace,
     ) -> Vec<TransformOutput> {

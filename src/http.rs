@@ -2,11 +2,14 @@
 use std::{
     fmt,
     task::{Context, Poll},
+    time::Duration,
 };
 
 use futures::future::BoxFuture;
 use headers::{Authorization, HeaderMapExt};
-use http::{header::HeaderValue, request::Builder, uri::InvalidUri, HeaderMap, Request, Uri};
+use http::{
+    header::HeaderValue, request::Builder, uri::InvalidUri, HeaderMap, Request, Response, Uri,
+};
 use hyper::{
     body::{Body, HttpBody},
     client,
@@ -16,13 +19,17 @@ use hyper_openssl::HttpsConnector;
 use hyper_proxy::ProxyConnector;
 use snafu::{ResultExt, Snafu};
 use tower::Service;
-use tracing::Instrument;
+use tower_http::{
+    classify::{ServerErrorsAsFailures, SharedClassifier},
+    trace::TraceLayer,
+};
+use tracing::{Instrument, Span};
 use vector_lib::configurable::configurable_component;
 use vector_lib::sensitive_string::SensitiveString;
 
 use crate::{
     config::ProxyConfig,
-    internal_events::http_client,
+    internal_events::{http_client, HttpServerRequestReceived, HttpServerResponseSent},
     tls::{tls_connector_builder, MaybeTlsSettings, TlsError},
 };
 
@@ -336,6 +343,43 @@ pub fn get_http_scheme_from_uri(uri: &Uri) -> &'static str {
         // client anyways.
         s => panic!("invalid URI scheme for HTTP client: {}", s),
     })
+}
+
+/// Builds a [TraceLayer] configured for a HTTP server.
+///
+/// This layer emits HTTP specific telemetry for requests received, responses sent, and handler duration.
+pub fn build_http_trace_layer(
+    span: Span,
+) -> TraceLayer<
+    SharedClassifier<ServerErrorsAsFailures>,
+    impl Fn(&Request<Body>) -> Span + Clone,
+    impl Fn(&Request<Body>, &Span) + Clone,
+    impl Fn(&Response<Body>, Duration, &Span) + Clone,
+    (),
+    (),
+    (),
+> {
+    TraceLayer::new_for_http()
+        .make_span_with(move |request: &Request<Body>| {
+            // This is an error span so that the labels are always present for metrics.
+            error_span!(
+               parent: &span,
+               "http-request",
+               method = %request.method(),
+               path = %request.uri().path(),
+            )
+        })
+        .on_request(Box::new(|_request: &Request<Body>, _span: &Span| {
+            emit!(HttpServerRequestReceived);
+        }))
+        .on_response(
+            |response: &Response<Body>, latency: Duration, _span: &Span| {
+                emit!(HttpServerResponseSent { response, latency });
+            },
+        )
+        .on_failure(())
+        .on_body_chunk(())
+        .on_eos(())
 }
 
 #[cfg(test)]

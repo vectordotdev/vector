@@ -2,11 +2,11 @@ use std::sync::Arc;
 
 use bytes::{BufMut, Bytes, BytesMut};
 use chrono::Utc;
-use codecs::StreamDecodingError;
 use http::StatusCode;
-use lookup::path;
 use tokio_util::codec::Decoder;
+use vector_lib::codecs::StreamDecodingError;
 use vector_lib::internal_event::{CountByteSize, InternalEventHandle as _};
+use vector_lib::lookup::path;
 use vector_lib::{config::LegacyKey, EstimatedJsonEncodedSizeOf};
 use warp::{filters::BoxedFilter, path as warp_path, path::FullPath, reply::Response, Filter};
 
@@ -67,8 +67,9 @@ pub(crate) fn decode_log_body(
     api_key: Option<Arc<str>>,
     source: &DatadogAgentSource,
 ) -> Result<Vec<Event>, ErrorMessage> {
-    if body.is_empty() {
+    if body.is_empty() || body.as_ref() == b"{}" {
         // The datadog agent may send an empty payload as a keep alive
+        // https://github.com/DataDog/datadog-agent/blob/5a6c5dd75a2233fbf954e38ddcc1484df4c21a35/pkg/logs/client/http/destination.go#L52
         debug!(
             message = "Empty payload ignored.",
             internal_log_rate_limit = true

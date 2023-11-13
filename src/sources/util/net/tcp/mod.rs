@@ -1,13 +1,11 @@
 mod request_limiter;
 
-use std::{collections::BTreeMap, io, mem::drop, net::SocketAddr, time::Duration};
+use std::{io, mem::drop, net::SocketAddr, time::Duration};
 
 use bytes::Bytes;
-use codecs::StreamDecodingError;
 use futures::{future::BoxFuture, FutureExt, StreamExt};
 use futures_util::future::OptionFuture;
 use listenfd::ListenFd;
-use lookup::{path, OwnedValuePath};
 use smallvec::SmallVec;
 use socket2::SockRef;
 use tokio::{
@@ -17,12 +15,14 @@ use tokio::{
 };
 use tokio_util::codec::{Decoder, FramedRead};
 use tracing::Instrument;
+use vector_lib::codecs::StreamDecodingError;
 use vector_lib::finalization::AddBatchNotifier;
+use vector_lib::lookup::{path, OwnedValuePath};
 use vector_lib::{
     config::{LegacyKey, LogNamespace, SourceAcknowledgementsConfig},
     EstimatedJsonEncodedSizeOf,
 };
-use vrl::value::Value;
+use vrl::value::ObjectMap;
 
 use self::request_limiter::RequestLimiter;
 use super::SocketListenAddr;
@@ -364,8 +364,8 @@ async fn handle_stream<T>(
 
 
                         if let Some(certificate_metadata) = &certificate_metadata {
-                            let mut metadata: BTreeMap<String, Value> = BTreeMap::new();
-                            metadata.insert("subject".to_string(), certificate_metadata.subject().into());
+                            let mut metadata = ObjectMap::new();
+                            metadata.insert("subject".into(), certificate_metadata.subject().into());
                             for event in &mut events {
                                 let log = event.as_mut_log();
 

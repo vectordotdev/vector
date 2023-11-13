@@ -2,8 +2,8 @@ use std::{collections::BTreeMap, fmt::Write as _};
 
 use chrono::Utc;
 use indexmap::map::IndexMap;
-use prometheus_parser::{proto, METRIC_NAME_LABEL};
 use vector_lib::event::metric::{samples_to_buckets, MetricSketch, MetricTags, Quantile};
+use vector_lib::prometheus::parser::{proto, METRIC_NAME_LABEL};
 
 use crate::{
     event::metric::{Metric, MetricKind, MetricValue, StatisticKind},

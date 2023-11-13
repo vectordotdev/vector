@@ -31,8 +31,8 @@ use crate::{
     tls::TlsConfig,
     transforms::metric_to_log::MetricToLogConfig,
 };
-use lookup::event_path;
-use lookup::lookup_v2::ConfigValuePath;
+use vector_lib::lookup::event_path;
+use vector_lib::lookup::lookup_v2::ConfigValuePath;
 use vector_lib::schema::Requirement;
 use vrl::value::Kind;
 
@@ -509,6 +509,7 @@ impl SinkConfig for ElasticsearchConfig {
             services,
             health_config,
             ElasticsearchHealthLogic,
+            1,
         );
 
         let sink = ElasticsearchSink::new(&common, self, service)?;

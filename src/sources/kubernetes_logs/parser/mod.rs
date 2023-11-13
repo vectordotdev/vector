@@ -79,7 +79,7 @@ impl FunctionTransform for Parser {
 #[cfg(test)]
 mod tests {
     use bytes::Bytes;
-    use lookup::event_path;
+    use vector_lib::lookup::event_path;
     use vrl::value;
 
     use super::*;

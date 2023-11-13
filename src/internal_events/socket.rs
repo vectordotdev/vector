@@ -5,8 +5,6 @@ use vector_lib::{
     json_size::JsonSize,
 };
 
-use crate::emit;
-
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 #[allow(dead_code)] // some features only use some variants
 pub enum SocketMode {
@@ -127,8 +125,6 @@ impl<E: std::fmt::Display> InternalEvent for SocketBindError<E> {
             "stage" => error_stage::RECEIVING,
             "mode" => mode,
         );
-        // deprecated
-        counter!("connection_errors_total", 1, "mode" => mode);
     }
 }
 
@@ -157,8 +153,6 @@ impl<E: std::fmt::Display> InternalEvent for SocketReceiveError<E> {
             "stage" => error_stage::RECEIVING,
             "mode" => mode,
         );
-        // deprecated
-        counter!("connection_errors_total", 1, "mode" => mode);
     }
 }
 
@@ -188,8 +182,6 @@ impl<E: std::fmt::Display> InternalEvent for SocketSendError<E> {
             "stage" => error_stage::SENDING,
             "mode" => mode,
         );
-        // deprecated
-        counter!("connection_errors_total", 1, "mode" => mode);
 
         emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
     }

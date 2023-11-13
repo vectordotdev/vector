@@ -16,7 +16,6 @@ use crate::{
     config::{
         AcknowledgementsConfig, SinkConfig, SinkContext, SourceConfig, SourceContext, SourceOutput,
     },
-    impl_generate_config_from_default,
     sinks::Healthcheck,
     sources,
 };

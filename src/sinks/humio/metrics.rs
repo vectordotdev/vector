@@ -1,10 +1,11 @@
 use async_trait::async_trait;
-use codecs::JsonSerializerConfig;
 use futures::StreamExt;
 use futures_util::stream::BoxStream;
 use indoc::indoc;
-use lookup::lookup_v2::{ConfigValuePath, OptionalValuePath};
+use vector_lib::codecs::JsonSerializerConfig;
 use vector_lib::configurable::configurable_component;
+use vector_lib::lookup;
+use vector_lib::lookup::lookup_v2::{ConfigValuePath, OptionalValuePath};
 use vector_lib::sensitive_string::SensitiveString;
 use vector_lib::sink::StreamSink;
 

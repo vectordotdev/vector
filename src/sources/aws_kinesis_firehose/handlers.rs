@@ -3,12 +3,12 @@ use std::io::Read;
 use base64::prelude::{Engine as _, BASE64_STANDARD};
 use bytes::Bytes;
 use chrono::Utc;
-use codecs::StreamDecodingError;
 use flate2::read::MultiGzDecoder;
 use futures::StreamExt;
-use lookup::{metadata_path, path, PathPrefix};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
+use vector_lib::codecs::StreamDecodingError;
+use vector_lib::lookup::{metadata_path, path, PathPrefix};
 use vector_lib::{
     config::{LegacyKey, LogNamespace},
     event::BatchNotifier,

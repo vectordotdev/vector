@@ -6,10 +6,6 @@ use std::{
 };
 
 use chrono::Utc;
-use codecs::{
-    decoding::{DeserializerConfig, FramingConfig},
-    StreamDecodingError,
-};
 use futures::StreamExt;
 use smallvec::SmallVec;
 use snafu::Snafu;
@@ -21,6 +17,10 @@ use tokio::{
 };
 use tokio_stream::wrappers::IntervalStream;
 use tokio_util::codec::FramedRead;
+use vector_lib::codecs::{
+    decoding::{DeserializerConfig, FramingConfig},
+    StreamDecodingError,
+};
 use vector_lib::configurable::configurable_component;
 use vector_lib::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
 use vector_lib::{config::LegacyKey, EstimatedJsonEncodedSizeOf};
@@ -39,8 +39,8 @@ use crate::{
     shutdown::ShutdownSignal,
     SourceSender,
 };
-use lookup::{owned_value_path, path};
 use vector_lib::config::{log_schema, LogNamespace};
+use vector_lib::lookup::{owned_value_path, path};
 
 #[cfg(test)]
 mod tests;

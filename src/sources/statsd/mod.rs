@@ -4,15 +4,15 @@ use std::{
 };
 
 use bytes::Bytes;
-use codecs::{
-    decoding::{self, Deserializer, Framer},
-    NewlineDelimitedDecoder,
-};
 use futures::{StreamExt, TryFutureExt};
 use listenfd::ListenFd;
 use serde_with::serde_as;
 use smallvec::{smallvec, SmallVec};
 use tokio_util::udp::UdpFramed;
+use vector_lib::codecs::{
+    decoding::{self, Deserializer, Framer},
+    NewlineDelimitedDecoder,
+};
 use vector_lib::configurable::configurable_component;
 use vector_lib::internal_event::{CountByteSize, InternalEventHandle as _, Registered};
 use vector_lib::EstimatedJsonEncodedSizeOf;
@@ -315,7 +315,7 @@ async fn statsd_udp(
 struct StatsdTcpSource;
 
 impl TcpSource for StatsdTcpSource {
-    type Error = codecs::decoding::Error;
+    type Error = vector_lib::codecs::decoding::Error;
     type Item = SmallVec<[Event; 1]>;
     type Decoder = Decoder;
     type Acker = TcpNullAcker;
@@ -351,7 +351,7 @@ mod test {
         collect_limited,
         components::{
             assert_source_compliance, assert_source_error, COMPONENT_ERROR_TAGS,
-            SOCKET_HIGH_CARDINALITY_PUSH_SOURCE_TAGS,
+            SOCKET_PUSH_SOURCE_TAGS,
         },
         metrics::{assert_counter, assert_distribution, assert_gauge, assert_set},
         next_addr,
@@ -365,7 +365,7 @@ mod test {
 
     #[tokio::test]
     async fn test_statsd_udp() {
-        assert_source_compliance(&SOCKET_HIGH_CARDINALITY_PUSH_SOURCE_TAGS, async move {
+        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async move {
             let in_addr = next_addr();
             let config = StatsdConfig::Udp(UdpConfig::from_address(in_addr.into()));
             let (sender, mut receiver) = mpsc::channel(200);
@@ -384,7 +384,7 @@ mod test {
 
     #[tokio::test]
     async fn test_statsd_tcp() {
-        assert_source_compliance(&SOCKET_HIGH_CARDINALITY_PUSH_SOURCE_TAGS, async move {
+        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async move {
             let in_addr = next_addr();
             let config = StatsdConfig::Tcp(TcpConfig::from_address(in_addr.into()));
             let (sender, mut receiver) = mpsc::channel(200);
@@ -427,7 +427,7 @@ mod test {
     #[cfg(unix)]
     #[tokio::test]
     async fn test_statsd_unix() {
-        assert_source_compliance(&SOCKET_HIGH_CARDINALITY_PUSH_SOURCE_TAGS, async move {
+        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async move {
             let in_path = tempfile::tempdir().unwrap().into_path().join("unix_test");
             let config = StatsdConfig::Unix(UnixConfig {
                 path: in_path.clone(),

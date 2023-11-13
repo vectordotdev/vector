@@ -1,14 +1,15 @@
-use std::{fmt, net::SocketAddr};
+use std::{convert::Infallible, fmt, net::SocketAddr};
 
-use codecs::decoding::{DeserializerConfig, FramingConfig};
 use futures::FutureExt;
-use lookup::owned_value_path;
+use hyper::{service::make_service_fn, Server};
+use tower::ServiceBuilder;
 use tracing::Span;
+use vector_lib::codecs::decoding::{DeserializerConfig, FramingConfig};
 use vector_lib::config::{LegacyKey, LogNamespace};
 use vector_lib::configurable::configurable_component;
+use vector_lib::lookup::owned_value_path;
 use vector_lib::sensitive_string::SensitiveString;
 use vrl::value::Kind;
-use warp::Filter;
 
 use crate::{
     codecs::DecodingConfig,
@@ -16,6 +17,7 @@ use crate::{
         GenerateConfig, Resource, SourceAcknowledgementsConfig, SourceConfig, SourceContext,
         SourceOutput,
     },
+    http::build_http_trace_layer,
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
     tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
@@ -175,12 +177,21 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
         let shutdown = cx.shutdown;
         Ok(Box::pin(async move {
             let span = Span::current();
-            warp::serve(svc.with(warp::trace(move |_info| span.clone())))
-                .serve_incoming_with_graceful_shutdown(
-                    listener.accept_stream(),
-                    shutdown.map(|_| ()),
-                )
-                .await;
+            let make_svc = make_service_fn(move |_conn| {
+                let svc = ServiceBuilder::new()
+                    .layer(build_http_trace_layer(span.clone()))
+                    .service(warp::service(svc.clone()));
+                futures_util::future::ok::<_, Infallible>(svc)
+            });
+
+            Server::builder(hyper::server::accept::from_stream(listener.accept_stream()))
+                .serve(make_svc)
+                .with_graceful_shutdown(shutdown.map(|_| ()))
+                .await
+                .map_err(|err| {
+                    error!("An error occurred: {:?}.", err);
+                })?;
+
             Ok(())
         }))
     }
@@ -252,10 +263,10 @@ mod tests {
     use chrono::{DateTime, SubsecRound, Utc};
     use flate2::read::GzEncoder;
     use futures::Stream;
-    use lookup::path;
     use similar_asserts::assert_eq;
     use tokio::time::{sleep, Duration};
     use vector_lib::assert_event_data_eq;
+    use vector_lib::lookup::path;
     use vrl::value;
 
     use super::*;

@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use codecs::{
+use vector_lib::codecs::{
     decoding::{Deserializer, Framer},
     NewlineDelimitedDecoder,
 };

@@ -34,7 +34,7 @@ use tokio_stream::wrappers::TcpListenerStream;
 #[cfg(unix)]
 use tokio_stream::wrappers::UnixListenerStream;
 use tokio_util::codec::{Encoder, FramedRead, FramedWrite, LinesCodec};
-use vector_buffers::topology::channel::LimitedReceiver;
+use vector_lib::buffers::topology::channel::LimitedReceiver;
 use vector_lib::event::{BatchNotifier, Event, EventArray, LogEvent};
 #[cfg(test)]
 use zstd::Decoder as ZstdDecoder;
@@ -122,7 +122,10 @@ pub fn next_addr_v6() -> SocketAddr {
 
 pub fn trace_init() {
     #[cfg(unix)]
-    let color = atty::is(atty::Stream::Stdout);
+    let color = {
+        use std::io::IsTerminal;
+        std::io::stdout().is_terminal()
+    };
     // Windows: ANSI colors are not supported by cmd.exe
     // Color is false for everything except unix.
     #[cfg(not(unix))]

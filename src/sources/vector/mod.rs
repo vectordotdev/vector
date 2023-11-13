@@ -2,9 +2,9 @@
 use std::net::SocketAddr;
 
 use chrono::Utc;
-use codecs::NativeDeserializerConfig;
 use futures::TryFutureExt;
 use tonic::{Request, Response, Status};
+use vector_lib::codecs::NativeDeserializerConfig;
 use vector_lib::configurable::configurable_component;
 use vector_lib::internal_event::{CountByteSize, InternalEventHandle as _};
 use vector_lib::{
@@ -214,7 +214,7 @@ impl SourceConfig for VectorConfig {
 
 #[cfg(test)]
 mod test {
-    use lookup::owned_value_path;
+    use vector_lib::lookup::owned_value_path;
     use vector_lib::{config::LogNamespace, schema::Definition};
     use vrl::value::{kind::Collection, Kind};
 

@@ -17,7 +17,7 @@ use crate::{
         ConnectionOpen, OpenGauge, SocketMode, UnixSocketConnectionEstablished,
         UnixSocketOutgoingConnectionError, UnixSocketSendError,
     },
-    sink::VecSinkExt,
+    sink_ext::VecSinkExt,
     sinks::{
         util::{
             retries::ExponentialBackoff,
@@ -56,7 +56,11 @@ impl UnixSinkConfig {
     pub fn build(
         &self,
         transformer: Transformer,
-        encoder: impl Encoder<Event, Error = codecs::encoding::Error> + Clone + Send + Sync + 'static,
+        encoder: impl Encoder<Event, Error = vector_lib::codecs::encoding::Error>
+            + Clone
+            + Send
+            + Sync
+            + 'static,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
         let connector = UnixConnector::new(self.path.clone());
         let sink = UnixSink::new(connector.clone(), transformer, encoder);
@@ -115,7 +119,7 @@ impl UnixConnector {
 
 struct UnixSink<E>
 where
-    E: Encoder<Event, Error = codecs::encoding::Error> + Clone + Send + Sync,
+    E: Encoder<Event, Error = vector_lib::codecs::encoding::Error> + Clone + Send + Sync,
 {
     connector: UnixConnector,
     transformer: Transformer,
@@ -124,7 +128,7 @@ where
 
 impl<E> UnixSink<E>
 where
-    E: Encoder<Event, Error = codecs::encoding::Error> + Clone + Send + Sync,
+    E: Encoder<Event, Error = vector_lib::codecs::encoding::Error> + Clone + Send + Sync,
 {
     pub const fn new(connector: UnixConnector, transformer: Transformer, encoder: E) -> Self {
         Self {
@@ -143,7 +147,7 @@ where
 #[async_trait]
 impl<E> StreamSink<Event> for UnixSink<E>
 where
-    E: Encoder<Event, Error = codecs::encoding::Error> + Clone + Send + Sync,
+    E: Encoder<Event, Error = vector_lib::codecs::encoding::Error> + Clone + Send + Sync,
 {
     // Same as TcpSink, more details there.
     async fn run(mut self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
@@ -197,8 +201,8 @@ where
 
 #[cfg(test)]
 mod tests {
-    use codecs::{encoding::Framer, NewlineDelimitedEncoder, TextSerializerConfig};
     use tokio::net::UnixListener;
+    use vector_lib::codecs::{encoding::Framer, NewlineDelimitedEncoder, TextSerializerConfig};
 
     use super::*;
     use crate::{

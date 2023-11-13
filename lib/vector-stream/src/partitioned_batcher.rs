@@ -11,7 +11,8 @@ use futures::stream::{Fuse, Stream, StreamExt};
 use pin_project::pin_project;
 use tokio_util::time::{delay_queue::Key, DelayQueue};
 use twox_hash::XxHash64;
-use vector_core::{partition::Partitioner, time::KeyedTimer, ByteSizeOf};
+use vector_common::byte_size_of::ByteSizeOf;
+use vector_core::{partition::Partitioner, time::KeyedTimer};
 
 use crate::batcher::{
     config::BatchConfigParts,

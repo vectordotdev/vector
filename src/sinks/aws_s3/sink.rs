@@ -2,8 +2,8 @@ use std::io;
 
 use bytes::Bytes;
 use chrono::Utc;
-use codecs::encoding::Framer;
 use uuid::Uuid;
+use vector_lib::codecs::encoding::Framer;
 use vector_lib::event::Finalizable;
 use vector_lib::request_metadata::RequestMetadata;
 

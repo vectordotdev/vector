@@ -38,8 +38,8 @@ futures = { version = "0.3", default-features = false }
 indoc = { version = "2", default-features = false }
 tokio = { version = "1", features = ["test-util"] }
 similar-asserts = "1.5.0"
-vrl = { version = "0.7.0", features = ["cli", "test", "test_framework", "arbitrary"] }
 vector-core = { path = "../vector-core", default-features = false, features = ["test"] }
+vrl.workspace = true
 
 [features]
 syslog = ["dep:syslog_loose"]

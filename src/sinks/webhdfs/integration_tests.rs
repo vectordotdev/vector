@@ -3,10 +3,10 @@ use std::{
     time::Duration,
 };
 
-use codecs::{encoding::FramingConfig, TextSerializerConfig};
-use futures::{stream, StreamExt};
+use futures::stream;
 use opendal::{Entry, Metakey};
 use similar_asserts::assert_eq;
+use vector_lib::codecs::{encoding::FramingConfig, TextSerializerConfig};
 use vector_lib::event::{Event, LogEvent};
 
 use super::WebHdfsConfig;
@@ -74,25 +74,12 @@ async fn hdfs_rotate_files_after_the_buffer_size_is_reached() {
     // Hard-coded sleeps are bad, but we're waiting on localstack's state to converge.
     tokio::time::sleep(Duration::from_secs(1)).await;
 
-    // blocking_scan isn't supported
-    let objects: Vec<Entry> = op
-        .scan("/")
+    let mut objects: Vec<Entry> = op
+        .list_with("/")
+        .delimiter("")
+        .metakey(Metakey::Mode)
         .await
-        .unwrap()
-        .map(|x| x.unwrap())
-        .collect()
-        .await;
-
-    let mut objects = objects
-        .into_iter()
-        .filter(|entry| {
-            op.blocking()
-                .metadata(entry, Metakey::Mode)
-                .unwrap()
-                .mode()
-                .is_file()
-        })
-        .collect::<Vec<_>>();
+        .unwrap();
 
     // Sort file path in order, because we have the event id in path.
     objects.sort_by(|l, r| l.path().cmp(r.path()));

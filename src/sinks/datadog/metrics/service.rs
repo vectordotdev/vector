@@ -142,7 +142,7 @@ impl DriverResponse for DatadogMetricsResponse {
     }
 
     fn bytes_sent(&self) -> Option<usize> {
-        Some(self.request_metadata.request_wire_size())
+        Some(self.request_metadata.request_encoded_size())
     }
 }
 

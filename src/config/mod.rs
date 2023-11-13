@@ -139,6 +139,10 @@ impl Config {
         Default::default()
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.sources.is_empty()
+    }
+
     pub fn sources(&self) -> impl Iterator<Item = (&ComponentKey, &SourceOuter)> {
         self.sources.iter()
     }
@@ -253,17 +257,6 @@ impl Default for HealthcheckOptions {
             require_healthy: false,
         }
     }
-}
-
-#[macro_export]
-macro_rules! impl_generate_config_from_default {
-    ($type:ty) => {
-        impl $crate::config::GenerateConfig for $type {
-            fn generate_config() -> toml::value::Value {
-                toml::value::Value::try_from(&Self::default()).unwrap()
-            }
-        }
-    };
 }
 
 /// Unique thing, like port, of which only one owner can be.

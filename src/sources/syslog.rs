@@ -4,17 +4,17 @@ use std::{net::SocketAddr, time::Duration};
 
 use bytes::Bytes;
 use chrono::Utc;
-use codecs::{
+use futures::StreamExt;
+use listenfd::ListenFd;
+use smallvec::SmallVec;
+use tokio_util::udp::UdpFramed;
+use vector_lib::codecs::{
     decoding::{Deserializer, Framer},
     BytesDecoder, OctetCountingDecoder, SyslogDeserializerConfig,
 };
-use futures::StreamExt;
-use listenfd::ListenFd;
-use lookup::{lookup_v2::OptionalValuePath, path, OwnedValuePath};
-use smallvec::SmallVec;
-use tokio_util::udp::UdpFramed;
 use vector_lib::config::{LegacyKey, LogNamespace};
 use vector_lib::configurable::configurable_component;
+use vector_lib::lookup::{lookup_v2::OptionalValuePath, path, OwnedValuePath};
 use vrl::event_path;
 
 #[cfg(unix)]
@@ -271,7 +271,7 @@ struct SyslogTcpSource {
 }
 
 impl TcpSource for SyslogTcpSource {
-    type Error = codecs::decoding::Error;
+    type Error = vector_lib::codecs::decoding::Error;
     type Item = SmallVec<[Event; 1]>;
     type Decoder = Decoder;
     type Acker = TcpNullAcker;
@@ -435,22 +435,19 @@ fn enrich_syslog_event(
 
 #[cfg(test)]
 mod test {
-    use lookup::{event_path, owned_value_path, OwnedTargetPath};
-    use std::{
-        collections::{BTreeMap, HashMap},
-        fmt,
-        str::FromStr,
-    };
+    use std::{collections::HashMap, fmt, str::FromStr};
+    use vector_lib::lookup::{event_path, owned_value_path, OwnedTargetPath};
 
     use chrono::prelude::*;
-    use codecs::decoding::format::Deserializer;
     use rand::{thread_rng, Rng};
     use serde::Deserialize;
     use tokio::time::{sleep, Duration, Instant};
     use tokio_util::codec::BytesCodec;
     use vector_lib::assert_event_data_eq;
+    use vector_lib::codecs::decoding::format::Deserializer;
+    use vector_lib::lookup::PathPrefix;
     use vector_lib::{config::ComponentKey, schema::Definition};
-    use vrl::value::{kind::Collection, Kind, Value};
+    use vrl::value::{kind::Collection, Kind, ObjectMap, Value};
 
     use super::*;
     use crate::{
@@ -800,10 +797,7 @@ mod test {
         {
             let expected = expected.as_mut_log();
             expected.insert(
-                (
-                    lookup::PathPrefix::Event,
-                    log_schema().timestamp_key().unwrap(),
-                ),
+                (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
                 Utc.with_ymd_and_hms(2019, 2, 13, 19, 48, 34)
                     .single()
                     .expect("invalid timestamp"),
@@ -853,10 +847,7 @@ mod test {
         {
             let expected = expected.as_mut_log();
             expected.insert(
-                (
-                    lookup::PathPrefix::Event,
-                    log_schema().timestamp_key().unwrap(),
-                ),
+                (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
                 Utc.with_ymd_and_hms(2019, 2, 13, 19, 48, 34)
                     .single()
                     .expect("invalid timestamp"),
@@ -1002,10 +993,7 @@ mod test {
                 .into();
 
             expected.insert(
-                (
-                    lookup::PathPrefix::Event,
-                    log_schema().timestamp_key().unwrap(),
-                ),
+                (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
                 expected_date,
             );
             expected.insert(
@@ -1054,10 +1042,7 @@ mod test {
                 .expect("invalid timestamp")
                 .into();
             expected.insert(
-                (
-                    lookup::PathPrefix::Event,
-                    log_schema().timestamp_key().unwrap(),
-                ),
+                (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
                 expected_date,
             );
             expected.insert(
@@ -1091,10 +1076,7 @@ mod test {
         {
             let expected = expected.as_mut_log();
             expected.insert(
-                (
-                    lookup::PathPrefix::Event,
-                    log_schema().timestamp_key().unwrap(),
-                ),
+                (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
                 Utc.with_ymd_and_hms(2019, 2, 13, 21, 53, 30)
                     .single()
                     .and_then(|t| t.with_nanosecond(605_850 * 1000))
@@ -1190,14 +1172,14 @@ mod test {
     #[cfg(unix)]
     #[tokio::test]
     async fn test_unix_stream_syslog() {
-        use crate::test_util::components::SOCKET_HIGH_CARDINALITY_PUSH_SOURCE_TAGS;
+        use crate::test_util::components::SOCKET_PUSH_SOURCE_TAGS;
         use futures_util::{stream, SinkExt};
         use std::os::unix::net::UnixStream as StdUnixStream;
         use tokio::io::AsyncWriteExt;
         use tokio::net::UnixStream;
         use tokio_util::codec::{FramedWrite, LinesCodec};
 
-        assert_source_compliance(&SOCKET_HIGH_CARDINALITY_PUSH_SOURCE_TAGS, async {
+        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
             let num_messages: usize = 1;
             let in_path = tempfile::tempdir().unwrap().into_path().join("stream_test");
 
@@ -1442,7 +1424,7 @@ mod test {
         }
     }
 
-    fn structured_data_from_fields(fields: BTreeMap<String, Value>) -> StructuredData {
+    fn structured_data_from_fields(fields: ObjectMap) -> StructuredData {
         let mut structured_data = StructuredData::default();
 
         for (key, value) in fields.into_iter() {
@@ -1450,10 +1432,10 @@ mod test {
                 .into_object()
                 .unwrap()
                 .into_iter()
-                .map(|(k, v)| (k, value_to_string(v)))
+                .map(|(k, v)| (k.into(), value_to_string(v)))
                 .collect();
 
-            structured_data.insert(key, subfields);
+            structured_data.insert(key.into(), subfields);
         }
 
         structured_data

@@ -63,6 +63,7 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
         provider: _,
         secret,
         graceful_shutdown_duration,
+        allow_empty: _,
     } = builder;
 
     let graph = match Graph::new(&sources, &transforms, &sinks, schema) {

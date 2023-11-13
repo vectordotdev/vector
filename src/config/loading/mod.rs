@@ -134,6 +134,7 @@ pub async fn load_from_paths_with_provider_and_secrets(
     datadog_options: Option<super::datadog::Options>,
     config_paths: &[ConfigPath],
     signal_handler: &mut signal::SignalHandler,
+    allow_empty: bool,
 ) -> Result<Config, Vec<String>> {
     // Load secret backends first
     let (mut secrets_backends_loader, secrets_warning) =
@@ -153,6 +154,8 @@ pub async fn load_from_paths_with_provider_and_secrets(
     if let Some(datadog) = datadog_options {
         builder.datadog = datadog;
     }
+
+    builder.allow_empty = allow_empty;
 
     validation::check_provider(&builder)?;
     signal_handler.clear();

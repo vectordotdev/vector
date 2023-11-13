@@ -3,9 +3,10 @@ use std::convert::TryFrom;
 use aws_sdk_cloudwatchlogs::Client as CloudwatchLogsClient;
 use aws_sdk_cloudwatchlogs::Region;
 use chrono::Duration;
-use codecs::TextSerializerConfig;
 use futures::{stream, StreamExt};
 use similar_asserts::assert_eq;
+use vector_lib::codecs::TextSerializerConfig;
+use vector_lib::lookup;
 
 use super::*;
 use crate::aws::create_client;
@@ -42,6 +43,7 @@ async fn cloudwatch_insert_log_event() {
         encoding: TextSerializerConfig::default().into(),
         create_missing_group: true,
         create_missing_stream: true,
+        retention: Default::default(),
         compression: Default::default(),
         batch: Default::default(),
         request: Default::default(),
@@ -92,6 +94,7 @@ async fn cloudwatch_insert_log_events_sorted() {
         encoding: TextSerializerConfig::default().into(),
         create_missing_group: true,
         create_missing_stream: true,
+        retention: Default::default(),
         compression: Default::default(),
         batch: Default::default(),
         request: Default::default(),
@@ -167,6 +170,7 @@ async fn cloudwatch_insert_out_of_range_timestamp() {
         encoding: TextSerializerConfig::default().into(),
         create_missing_group: true,
         create_missing_stream: true,
+        retention: Default::default(),
         compression: Default::default(),
         batch: Default::default(),
         request: Default::default(),
@@ -243,6 +247,7 @@ async fn cloudwatch_dynamic_group_and_stream_creation() {
         encoding: TextSerializerConfig::default().into(),
         create_missing_group: true,
         create_missing_stream: true,
+        retention: Default::default(),
         compression: Default::default(),
         batch: Default::default(),
         request: Default::default(),
@@ -298,6 +303,7 @@ async fn cloudwatch_insert_log_event_batched() {
         encoding: TextSerializerConfig::default().into(),
         create_missing_group: true,
         create_missing_stream: true,
+        retention: Default::default(),
         compression: Default::default(),
         batch,
         request: Default::default(),
@@ -348,6 +354,7 @@ async fn cloudwatch_insert_log_event_partitioned() {
         encoding: TextSerializerConfig::default().into(),
         create_missing_group: true,
         create_missing_stream: true,
+        retention: Default::default(),
         compression: Default::default(),
         batch: Default::default(),
         request: Default::default(),
@@ -440,6 +447,7 @@ async fn cloudwatch_healthcheck() {
         encoding: TextSerializerConfig::default().into(),
         create_missing_group: true,
         create_missing_stream: true,
+        retention: Default::default(),
         compression: Default::default(),
         batch: Default::default(),
         request: Default::default(),

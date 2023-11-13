@@ -3,10 +3,10 @@
 
 use aws_sdk_elasticsearch::Client as EsClient;
 use aws_sdk_firehose::model::ElasticsearchDestinationConfiguration;
-use codecs::JsonSerializerConfig;
 use futures::TryFutureExt;
 use serde_json::{json, Value};
 use tokio::time::{sleep, Duration};
+use vector_lib::codecs::JsonSerializerConfig;
 
 use super::{config::KinesisFirehoseClientBuilder, *};
 use crate::{

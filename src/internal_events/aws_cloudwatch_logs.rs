@@ -2,8 +2,6 @@ use metrics::counter;
 use vector_lib::internal_event::InternalEvent;
 use vector_lib::internal_event::{error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL};
 
-use crate::emit;
-
 #[derive(Debug)]
 pub struct AwsCloudwatchLogsMessageSizeError {
     pub size: usize,

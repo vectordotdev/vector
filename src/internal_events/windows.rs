@@ -1,6 +1,5 @@
 use metrics::counter;
 use vector_lib::internal_event::InternalEvent;
-
 use vector_lib::internal_event::{error_stage, error_type};
 
 #[derive(Debug)]
@@ -107,7 +106,5 @@ impl<'a> InternalEvent for WindowsServiceDoesNotExistError<'a> {
             "error_type" => error_type::CONDITION_FAILED,
             "stage" => error_stage::PROCESSING,
         );
-        // deprecated
-        counter!("windows_service_does_not_exist_total", 1,);
     }
 }

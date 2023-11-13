@@ -4,12 +4,12 @@ use http::{
     HeaderName, HeaderValue, Request, StatusCode, Uri,
 };
 use hyper::Body;
-use lookup::lookup_v2::OwnedValuePath;
 use once_cell::sync::Lazy;
 use openssl::{base64, hash, pkey, sign};
 use regex::Regex;
 use std::task::{Context, Poll};
 use tracing::Instrument;
+use vector_lib::lookup::lookup_v2::OwnedValuePath;
 
 use crate::{http::HttpClient, sinks::prelude::*};
 

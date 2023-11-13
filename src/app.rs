@@ -7,8 +7,8 @@ use futures::StreamExt;
 #[cfg(feature = "enterprise")]
 use futures_util::future::BoxFuture;
 use once_cell::race::OnceNonZeroUsize;
-use openssl::provider::Provider;
 use tokio::runtime::{self, Runtime};
+use tokio::sync::broadcast::error::RecvError;
 use tokio_stream::wrappers::UnboundedReceiverStream;
 
 #[cfg(feature = "enterprise")]
@@ -24,6 +24,7 @@ use crate::{
     cli::{handle_config_errors, LogFormat, Opts, RootOpts},
     config::{self, Config, ConfigPath},
     heartbeat,
+    internal_events::{VectorQuit, VectorStarted, VectorStopped},
     signal::{SignalHandler, SignalPair, SignalRx, SignalTo},
     topology::{
         ReloadOutcome, RunningTopology, SharedTopologyController, ShutdownErrorReceiver,
@@ -40,10 +41,6 @@ use tokio::runtime::Handle;
 
 pub static WORKER_THREADS: OnceNonZeroUsize = OnceNonZeroUsize::new();
 
-use crate::internal_events::{VectorQuit, VectorStarted, VectorStopped};
-
-use tokio::sync::broadcast::error::RecvError;
-
 pub struct ApplicationConfig {
     pub config_paths: Vec<config::ConfigPath>,
     pub topology: RunningTopology,
@@ -57,10 +54,9 @@ pub struct ApplicationConfig {
 }
 
 pub struct Application {
-    pub require_healthy: Option<bool>,
+    pub root_opts: RootOpts,
     pub config: ApplicationConfig,
     pub signals: SignalPair,
-    pub openssl_providers: Option<Vec<Provider>>,
 }
 
 impl ApplicationConfig {
@@ -80,6 +76,7 @@ impl ApplicationConfig {
             &config_paths,
             opts.watch_config,
             opts.require_healthy,
+            opts.allow_empty_config,
             graceful_shutdown_duration,
             datadog_options.cloned(),
             signal_handler,
@@ -205,12 +202,6 @@ impl Application {
             debug!(message = "Disabled probing and configuration of root certificate locations on the system for OpenSSL.");
         }
 
-        let openssl_providers = opts
-            .root
-            .openssl_legacy_provider
-            .then(load_openssl_legacy_providers)
-            .transpose()?;
-
         let runtime = build_runtime(opts.root.threads, "vector-worker")?;
 
         // Signal handler for OS and provider messages.
@@ -229,10 +220,9 @@ impl Application {
         Ok((
             runtime,
             Self {
-                require_healthy: opts.root.require_healthy,
+                root_opts: opts.root,
                 config,
                 signals,
-                openssl_providers,
             },
         ))
     }
@@ -246,10 +236,9 @@ impl Application {
         handle.spawn(heartbeat::heartbeat());
 
         let Self {
-            require_healthy,
+            root_opts,
             config,
             signals,
-            openssl_providers,
         } = self;
 
         let topology_controller = SharedTopologyController::new(TopologyController {
@@ -257,7 +246,7 @@ impl Application {
             api_server: config.setup_api(handle),
             topology: config.topology,
             config_paths: config.config_paths.clone(),
-            require_healthy,
+            require_healthy: root_opts.require_healthy,
             #[cfg(feature = "enterprise")]
             enterprise_reporter: config.enterprise,
         });
@@ -268,8 +257,8 @@ impl Application {
             graceful_crash_receiver: config.graceful_crash_receiver,
             signals,
             topology_controller,
-            openssl_providers,
             datadog_options: config.datadog_options,
+            allow_empty_config: root_opts.allow_empty_config,
         })
     }
 }
@@ -280,8 +269,8 @@ pub struct StartedApplication {
     pub graceful_crash_receiver: ShutdownErrorReceiver,
     pub signals: SignalPair,
     pub topology_controller: SharedTopologyController,
-    pub openssl_providers: Option<Vec<Provider>>,
     pub datadog_options: config::datadog::Options,
+    pub allow_empty_config: bool,
 }
 
 impl StartedApplication {
@@ -295,9 +284,9 @@ impl StartedApplication {
             graceful_crash_receiver,
             signals,
             topology_controller,
-            openssl_providers,
             internal_topologies,
             datadog_options,
+            allow_empty_config,
         } = self;
 
         let mut graceful_crash = UnboundedReceiverStream::new(graceful_crash_receiver);
@@ -306,6 +295,7 @@ impl StartedApplication {
         let mut signal_rx = signals.receiver;
 
         let signal = loop {
+            let has_sources = !topology_controller.lock().await.topology.config.is_empty();
             tokio::select! {
                 signal = signal_rx.recv() => if let Some(signal) = handle_signal(
                     signal,
@@ -313,12 +303,13 @@ impl StartedApplication {
                     &config_paths,
                     &mut signal_handler,
                     datadog_options.clone(),
+                    allow_empty_config,
                 ).await {
                     break signal;
                 },
                 // Trigger graceful shutdown if a component crashed, or all sources have ended.
                 error = graceful_crash.next() => break SignalTo::Shutdown(error),
-                _ = TopologyController::sources_finished(topology_controller.clone()) => {
+                _ = TopologyController::sources_finished(topology_controller.clone()), if has_sources => {
                     info!("All sources have finished.");
                     break SignalTo::Shutdown(None)
                 } ,
@@ -330,7 +321,6 @@ impl StartedApplication {
             signal,
             signal_rx,
             topology_controller,
-            openssl_providers,
             internal_topologies,
         }
     }
@@ -342,6 +332,7 @@ async fn handle_signal(
     config_paths: &[ConfigPath],
     signal_handler: &mut SignalHandler,
     datadog_options: config::datadog::Options,
+    allow_empty_config: bool,
 ) -> Option<SignalTo> {
     match signal {
         Ok(SignalTo::ReloadFromConfigBuilder(config_builder)) => {
@@ -365,6 +356,7 @@ async fn handle_signal(
                 Some(datadog_options),
                 &topology_controller.config_paths,
                 signal_handler,
+                allow_empty_config,
             )
             .await
             .map_err(handle_config_errors)
@@ -388,7 +380,6 @@ pub struct FinishedApplication {
     pub signal: SignalTo,
     pub signal_rx: SignalRx,
     pub topology_controller: SharedTopologyController,
-    pub openssl_providers: Option<Vec<Provider>>,
     pub internal_topologies: Vec<RunningTopology>,
 }
 
@@ -398,7 +389,6 @@ impl FinishedApplication {
             signal,
             signal_rx,
             topology_controller,
-            openssl_providers,
             internal_topologies,
         } = self;
 
@@ -419,7 +409,6 @@ impl FinishedApplication {
             topology.stop().await;
         }
 
-        drop(openssl_providers);
         status
     }
 
@@ -512,6 +501,7 @@ pub async fn load_configs(
     config_paths: &[ConfigPath],
     watch_config: bool,
     require_healthy: Option<bool>,
+    allow_empty_config: bool,
     graceful_shutdown_duration: Option<Duration>,
     datadog: Option<config::datadog::Options>,
     signal_handler: &mut SignalHandler,
@@ -537,10 +527,14 @@ pub async fn load_configs(
     #[cfg(not(feature = "enterprise-tests"))]
     config::init_log_schema(&config_paths, true).map_err(handle_config_errors)?;
 
-    let mut config =
-        config::load_from_paths_with_provider_and_secrets(datadog, &config_paths, signal_handler)
-            .await
-            .map_err(handle_config_errors)?;
+    let mut config = config::load_from_paths_with_provider_and_secrets(
+        datadog,
+        &config_paths,
+        signal_handler,
+        allow_empty_config,
+    )
+    .await
+    .map_err(handle_config_errors)?;
 
     config::init_telemetry(config.global.telemetry.clone(), true);
 
@@ -601,23 +595,4 @@ pub fn init_logging(color: bool, format: LogFormat, log_level: &str, rate: u64) 
         internal_log_rate_secs = rate,
     );
     info!(message = "Log level is enabled.", level = ?level);
-}
-
-/// Load the legacy OpenSSL provider.
-///
-/// The returned [Provider] must stay in scope for the entire lifetime of the application, as it
-/// will be unloaded when it is dropped.
-pub fn load_openssl_legacy_providers() -> Result<Vec<Provider>, ExitCode> {
-    warn!(message = "DEPRECATED The openssl legacy provider provides algorithms and key sizes no longer recommended for use. Set `--openssl-legacy-provider=false` or `VECTOR_OPENSSL_LEGACY_PROVIDER=false` to disable. See https://vector.dev/highlights/2023-08-15-0-32-0-upgrade-guide/#legacy-openssl for details.");
-    ["legacy", "default"].into_iter().map(|provider_name| {
-        Provider::try_load(None, provider_name, true)
-            .map(|provider| {
-                info!(message = "Loaded openssl provider.", provider = provider_name);
-                provider
-            })
-            .map_err(|error| {
-                error!(message = "Failed to load openssl provider.", provider = provider_name, %error);
-                exitcode::UNAVAILABLE
-            })
-    }).collect()
 }

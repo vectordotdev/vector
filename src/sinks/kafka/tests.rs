@@ -3,38 +3,31 @@
 #[cfg(feature = "kafka-integration-tests")]
 #[cfg(test)]
 mod integration_test {
-    use std::{
-        collections::{BTreeMap, HashMap},
-        future::ready,
-        thread,
-        time::Duration,
-    };
+    use std::{collections::HashMap, future::ready, thread, time::Duration};
 
     use bytes::Bytes;
-    use codecs::TextSerializerConfig;
     use futures::StreamExt;
-    use lookup::lookup_v2::ConfigTargetPath;
     use rdkafka::{
         consumer::{BaseConsumer, Consumer},
         message::Headers,
         Message, Offset, TopicPartitionList,
     };
+    use vector_lib::codecs::TextSerializerConfig;
+    use vector_lib::lookup::lookup_v2::ConfigTargetPath;
     use vector_lib::{
         config::{init_telemetry, Tags, Telemetry},
         event::{BatchNotifier, BatchStatus},
     };
 
+    use super::super::{
+        config::{KafkaRole, KafkaSinkConfig},
+        sink::KafkaSink,
+        *,
+    };
     use crate::{
-        event::Value,
+        event::{ObjectMap, Value},
         kafka::{KafkaAuthConfig, KafkaCompression, KafkaSaslConfig},
-        sinks::{
-            kafka::{
-                config::{KafkaRole, KafkaSinkConfig},
-                sink::KafkaSink,
-                *,
-            },
-            prelude::*,
-        },
+        sinks::prelude::*,
         test_util::{
             components::{
                 assert_data_volume_sink_compliance, assert_sink_compliance, DATA_VOLUME_SINK_TAGS,
@@ -330,9 +323,9 @@ mod integration_test {
         let header_1_value = "header-1-value";
         let input_events = events.map(move |mut events| {
             let headers_key = headers_key.clone();
-            let mut header_values = BTreeMap::new();
+            let mut header_values = ObjectMap::new();
             header_values.insert(
-                header_1_key.to_owned(),
+                header_1_key.into(),
                 Value::Bytes(Bytes::from(header_1_value)),
             );
             events.iter_logs_mut().for_each(move |log| {

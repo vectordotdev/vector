@@ -1,13 +1,20 @@
-use std::{collections::HashMap, convert::TryFrom, fmt, net::SocketAddr};
-use vector_lib::EstimatedJsonEncodedSizeOf;
+use std::{
+    collections::HashMap,
+    convert::{Infallible, TryFrom},
+    fmt,
+    net::SocketAddr,
+};
 
 use async_trait::async_trait;
 use bytes::Bytes;
 use futures::{FutureExt, TryFutureExt};
+use hyper::{service::make_service_fn, Server};
+use tower::ServiceBuilder;
 use tracing::Span;
 use vector_lib::{
     config::SourceAcknowledgementsConfig,
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event},
+    EstimatedJsonEncodedSizeOf,
 };
 use warp::{
     filters::{
@@ -21,6 +28,7 @@ use warp::{
 
 use crate::{
     config::SourceContext,
+    http::build_http_trace_layer,
     internal_events::{
         HttpBadRequest, HttpBytesReceived, HttpEventsReceived, HttpInternalError, StreamClosedError,
     },
@@ -57,6 +65,10 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
         path: &str,
     ) -> Result<Vec<Event>, ErrorMessage>;
 
+    fn decode(&self, encoding_header: Option<&str>, body: Bytes) -> Result<Bytes, ErrorMessage> {
+        decode(encoding_header, body)
+    }
+
     #[allow(clippy::too_many_arguments)]
     fn run(
         self,
@@ -76,7 +88,6 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
         let path = path.to_owned();
         let acknowledgements = cx.do_acknowledgements(acknowledgements);
         Ok(Box::pin(async move {
-            let span = Span::current();
             let mut filter: BoxedFilter<()> = match method {
                 HttpMethod::Head => warp::head().boxed(),
                 HttpMethod::Get => warp::get().boxed(),
@@ -116,23 +127,22 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                 .and_then(
                     move |path: FullPath,
                           auth_header,
-                          encoding_header,
+                          encoding_header: Option<String>,
                           headers: HeaderMap,
                           body: Bytes,
                           query_parameters: HashMap<String, String>| {
                         debug!(message = "Handling HTTP request.", headers = ?headers);
                         let http_path = path.as_str();
 
-                        emit!(HttpBytesReceived {
-                            byte_size: body.len(),
-                            http_path,
-                            protocol,
-                        });
-
                         let events = auth
                             .is_valid(&auth_header)
-                            .and_then(|()| decode(&encoding_header, body))
+                            .and_then(|()| self.decode(encoding_header.as_deref(), body))
                             .and_then(|body| {
+                                emit!(HttpBytesReceived {
+                                    byte_size: body.len(),
+                                    http_path,
+                                    protocol,
+                                });
                                 self.build_events(body, &headers, &query_parameters, path.as_str())
                             })
                             .map(|mut events| {
@@ -155,8 +165,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
 
                         handle_request(events, acknowledgements, response_code, cx.out.clone())
                     },
-                )
-                .with(warp::trace(move |_info| span.clone()));
+                );
 
             let ping = warp::get().and(warp::path("ping")).map(|| "pong");
             let routes = svc.or(ping).recover(|r: Rejection| async move {
@@ -172,22 +181,28 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                 }
             });
 
+            let span = Span::current();
+            let make_svc = make_service_fn(move |_conn| {
+                let svc = ServiceBuilder::new()
+                    .layer(build_http_trace_layer(span.clone()))
+                    .service(warp::service(routes.clone()));
+                futures_util::future::ok::<_, Infallible>(svc)
+            });
+
             info!(message = "Building HTTP server.", address = %address);
 
-            match tls.bind(&address).await {
-                Ok(listener) => {
-                    warp::serve(routes)
-                        .serve_incoming_with_graceful_shutdown(
-                            listener.accept_stream(),
-                            cx.shutdown.map(|_| ()),
-                        )
-                        .await;
-                }
-                Err(error) => {
-                    error!("An error occurred: {:?}.", error);
-                    return Err(());
-                }
-            }
+            let listener = tls.bind(&address).await.map_err(|err| {
+                error!("An error occurred: {:?}.", err);
+            })?;
+
+            Server::builder(hyper::server::accept::from_stream(listener.accept_stream()))
+                .serve(make_svc)
+                .with_graceful_shutdown(cx.shutdown.map(|_| ()))
+                .await
+                .map_err(|err| {
+                    error!("An error occurred: {:?}.", err);
+                })?;
+
             Ok(())
         }))
     }

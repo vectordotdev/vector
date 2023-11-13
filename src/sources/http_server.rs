@@ -8,13 +8,13 @@ use tokio_util::codec::Decoder as _;
 use vrl::value::{kind::Collection, Kind};
 use warp::http::{HeaderMap, HeaderValue};
 
-use codecs::{
+use vector_lib::codecs::{
     decoding::{DeserializerConfig, FramingConfig},
     BytesDecoderConfig, BytesDeserializerConfig, JsonDeserializerConfig,
     NewlineDelimitedDecoderConfig,
 };
-use lookup::{lookup_v2::OptionalValuePath, owned_value_path, path};
 use vector_lib::configurable::configurable_component;
+use vector_lib::lookup::{lookup_v2::OptionalValuePath, owned_value_path, path};
 use vector_lib::{
     config::{DataType, LegacyKey, LogNamespace},
     schema::Definition,
@@ -477,7 +477,7 @@ impl HttpSource for SimpleHttpSource {
 #[cfg(test)]
 mod tests {
     use std::str::FromStr;
-    use std::{collections::BTreeMap, io::Write, net::SocketAddr};
+    use std::{io::Write, net::SocketAddr};
 
     use flate2::{
         write::{GzEncoder, ZlibEncoder},
@@ -486,18 +486,16 @@ mod tests {
     use futures::Stream;
     use http::{HeaderMap, Method, StatusCode};
     use similar_asserts::assert_eq;
-    use vrl::value::kind::Collection;
-    use vrl::value::Kind;
-
-    use codecs::{
+    use vector_lib::codecs::{
         decoding::{DeserializerConfig, FramingConfig},
         BytesDecoderConfig, JsonDeserializerConfig,
     };
-    use lookup::lookup_v2::OptionalValuePath;
-    use lookup::{event_path, owned_value_path, OwnedTargetPath};
     use vector_lib::config::LogNamespace;
     use vector_lib::event::LogEvent;
+    use vector_lib::lookup::lookup_v2::OptionalValuePath;
+    use vector_lib::lookup::{event_path, owned_value_path, OwnedTargetPath, PathPrefix};
     use vector_lib::schema::Definition;
+    use vrl::value::{kind::Collection, Kind, ObjectMap};
 
     use crate::sources::http_server::HttpMethod;
     use crate::{
@@ -890,8 +888,8 @@ mod tests {
         {
             let event = events.remove(0);
             let log = event.as_log();
-            let mut map = BTreeMap::new();
-            map.insert("dotted.key2".to_string(), Value::from("value2"));
+            let mut map = ObjectMap::new();
+            map.insert("dotted.key2".into(), Value::from("value2"));
             assert_eq!(log["nested"], map.into());
         }
     }
@@ -963,10 +961,7 @@ mod tests {
         assert!(log.get_timestamp().is_some());
 
         let source_type_key_value = log
-            .get((
-                lookup::PathPrefix::Event,
-                log_schema().source_type_key().unwrap(),
-            ))
+            .get((PathPrefix::Event, log_schema().source_type_key().unwrap()))
             .unwrap()
             .as_str()
             .unwrap();

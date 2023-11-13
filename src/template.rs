@@ -6,11 +6,11 @@ use chrono::{
     format::{strftime::StrftimeItems, Item},
     Utc,
 };
-use lookup::lookup_v2::parse_target_path;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use snafu::Snafu;
 use vector_lib::configurable::{configurable_component, ConfigurableString};
+use vector_lib::lookup::lookup_v2::parse_target_path;
 
 use crate::{
     config::log_schema,
@@ -373,7 +373,7 @@ fn render_timestamp(items: &ParsedStrftime, event: EventRef<'_>) -> String {
 #[cfg(test)]
 mod tests {
     use chrono::TimeZone;
-    use lookup::metadata_path;
+    use vector_lib::lookup::{metadata_path, PathPrefix};
     use vector_lib::metric_tags;
 
     use super::*;
@@ -542,10 +542,7 @@ mod tests {
         let mut event = Event::Log(LogEvent::from("hello world"));
         event.as_mut_log().insert("foo", "butts");
         event.as_mut_log().insert(
-            (
-                lookup::PathPrefix::Event,
-                log_schema().timestamp_key().unwrap(),
-            ),
+            (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
             ts,
         );
 
@@ -567,10 +564,7 @@ mod tests {
         let mut event = Event::Log(LogEvent::from("hello world"));
         event.as_mut_log().insert("format", "%F");
         event.as_mut_log().insert(
-            (
-                lookup::PathPrefix::Event,
-                log_schema().timestamp_key().unwrap(),
-            ),
+            (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
             ts,
         );
 
@@ -592,10 +586,7 @@ mod tests {
         let mut event = Event::Log(LogEvent::from("hello world"));
         event.as_mut_log().insert("\"%F\"", "foo");
         event.as_mut_log().insert(
-            (
-                lookup::PathPrefix::Event,
-                log_schema().timestamp_key().unwrap(),
-            ),
+            (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
             ts,
         );
 

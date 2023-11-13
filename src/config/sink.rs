@@ -3,7 +3,7 @@ use std::cell::RefCell;
 use async_trait::async_trait;
 use dyn_clone::DynClone;
 use serde::Serialize;
-use vector_buffers::{BufferConfig, BufferType};
+use vector_lib::buffers::{BufferConfig, BufferType};
 use vector_lib::configurable::attributes::CustomAttribute;
 use vector_lib::configurable::schema::{SchemaGenerator, SchemaObject};
 use vector_lib::configurable::{

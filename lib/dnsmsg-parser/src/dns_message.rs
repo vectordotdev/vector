@@ -1,4 +1,4 @@
-use trust_dns_proto::op::ResponseCode;
+use hickory_proto::op::ResponseCode;
 
 pub(super) const RTYPE_MB: u16 = 7;
 pub(super) const RTYPE_MG: u16 = 8;

@@ -98,6 +98,11 @@ pub struct ConfigBuilder {
     #[serde(default, skip)]
     #[doc(hidden)]
     pub graceful_shutdown_duration: Option<Duration>,
+
+    /// Allow the configuration to be empty, resulting in a topology with no components.
+    #[serde(default, skip)]
+    #[doc(hidden)]
+    pub allow_empty: bool,
 }
 
 #[cfg(feature = "enterprise")]
@@ -271,6 +276,7 @@ impl From<Config> for ConfigBuilder {
             tests,
             secret,
             graceful_shutdown_duration,
+            allow_empty: false,
         }
     }
 }
@@ -507,7 +513,7 @@ mod tests {
     /// the `ConfigBuilder` has changed what it serializes, or the implementation of `serde_json` has changed.
     /// If this test fails, we should ideally be able to fix so that the original hash passes!
     fn version_hash_match() {
-        let expected_hash = "6c98bea9d9e2f3133e2d39ba04592d17f96340a9bc4c8d697b09f5af388a76bd";
+        let expected_hash = "2c0ee2dfb8789e09dd953316fdef8b30b10fce3e259d44ca9461cf84ff63d12d";
         let builder = ConfigBuilder::default();
         let mut hash_builder = ConfigBuilderHash::from(&builder);
         hash_builder.version = "1.2.3".into();

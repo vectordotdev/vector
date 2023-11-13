@@ -43,9 +43,9 @@ fn event_iteration_order() {
     assert_eq!(
         collected,
         vec![
-            (String::from("YRjhxXcg"), &Value::from("nw8iM5Jr")),
-            (String::from("lZDfzKIL"), &Value::from("tOVrjveM")),
-            (String::from("o9amkaRY"), &Value::from("pGsfG7Nr")),
+            ("YRjhxXcg".into(), &Value::from("nw8iM5Jr")),
+            ("lZDfzKIL".into(), &Value::from("tOVrjveM")),
+            ("o9amkaRY".into(), &Value::from("pGsfG7Nr")),
         ]
     );
 }
