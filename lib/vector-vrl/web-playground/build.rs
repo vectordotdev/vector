@@ -61,7 +61,10 @@ fn write_vrl_constants(manifest: &Manifest, output_file: &mut File) {
                 .git
                 .as_ref()
                 .expect("VRL dependency should use 'version' or 'git'");
-            let version = vrl_dep.rev.as_ref().expect("VRL git revision not specified");
+            let version = vrl_dep
+                .rev
+                .as_ref()
+                .expect("VRL git revision not specified");
             (version.clone(), format!("{repo}/tree/{version}"))
         }
         Some(v) => (v.clone(), format!("https://crates.io/crates/vrl/{v}")),
