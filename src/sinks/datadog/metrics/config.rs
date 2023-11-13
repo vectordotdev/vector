@@ -16,7 +16,10 @@ use crate::{
     http::HttpClient,
     sinks::{
         datadog::DatadogCommonConfig,
-        util::{batch::BatchConfig, ServiceBuilderExt, SinkBatchSettings, TowerRequestConfig},
+        util::{
+            batch::BatchConfig, Concurrency, ServiceBuilderExt, SinkBatchSettings,
+            TowerRequestConfig,
+        },
         Healthcheck, UriParseSnafu, VectorSink,
     },
     tls::{MaybeTlsSettings, TlsEnableableConfig},
@@ -25,17 +28,16 @@ use crate::{
 // TODO: revisit our concurrency and batching defaults
 const DEFAULT_REQUEST_RETRY_ATTEMPTS: usize = 5;
 
+const DEFAULT_REQUEST_FIXED_CONCURRENCY: usize = 150;
+
 #[derive(Clone, Copy, Debug, Default)]
 pub struct DatadogMetricsDefaultBatchSettings;
 
 // This default is centered around "series" data, which should be the lion's share of what we
-// process.  Given that a single series, when encoded, is in the 150-300 byte range, we can fit a
-// lot of these into a single request, something like 150-200K series.  Simply to be a little more
-// conservative, though, we use 100K here.  This will also get a little more tricky when it comes to
-// distributions and sketches, but we're going to have to implement incremental encoding to handle
-// "we've exceeded our maximum payload size, split this batch" scenarios anyways.
+// process. The value of 1k events was arrived at empirically by testing the sink's performance
+// with the v2 series endpoint.
 impl SinkBatchSettings for DatadogMetricsDefaultBatchSettings {
-    const MAX_EVENTS: Option<usize> = Some(100_000);
+    const MAX_EVENTS: Option<usize> = Some(1_000);
     const MAX_BYTES: Option<usize> = None;
     const TIMEOUT_SECS: f64 = 2.0;
 }
@@ -252,9 +254,9 @@ impl DatadogMetricsConfig {
     fn build_sink(&self, client: HttpClient) -> crate::Result<VectorSink> {
         let batcher_settings = self.batch.into_batcher_settings()?;
 
-        // TODO: revisit our concurrency and batching defaults
         let request_limits = self.request.unwrap_with(
-            &TowerRequestConfig::default().retry_attempts(DEFAULT_REQUEST_RETRY_ATTEMPTS),
+            &TowerRequestConfig::new(Concurrency::Fixed(DEFAULT_REQUEST_FIXED_CONCURRENCY))
+                .retry_attempts(DEFAULT_REQUEST_RETRY_ATTEMPTS),
         );
 
         let endpoint_configuration = self.generate_metrics_endpoint_configuration()?;
