@@ -64,6 +64,7 @@ jobs:
         REQUEST_MESSAGE: ${{ secrets.REQUEST_MESSAGE }}
         ENDPOINT: ${{ secrets.ENDPOINT }}
       run: |
+        sleep 20
         HMAC_KEY=$(echo -n $REQUEST_MESSAGE | openssl dgst -sha256 -hmac "$REQUEST_TOKEN" -binary | od -An -tx1 | tr -d ' \n'; echo)
         SIGNATURE="sha256=$HMAC_KEY"
         RESPONSE_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
