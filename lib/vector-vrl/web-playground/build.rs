@@ -28,7 +28,7 @@ fn get_git_hash() -> String {
 }
 
 fn create_const_statement(name: &str, value: &str) -> String {
-    format!("pub const {}: &str = \"{}\";\n", name, value)
+    format!("pub const {name}: &str = \"{value}\";\n")
 }
 
 fn write_vector_constants(output_file: &mut File) {
@@ -55,13 +55,13 @@ fn write_vrl_constants(manifest: &Manifest, output_file: &mut File) {
         .detail()
         .expect("expected detail dependency format");
 
-    let (version, link) = match vrl_dep.version.clone() {
+    let (version, link) = match &vrl_dep.version {
         None => {
             let repo = vrl_dep
                 .git
-                .clone()
+                .as_ref()
                 .expect("VRL dependency should use 'version' or 'git'");
-            let version = vrl_dep.rev.clone().expect("VRL git revision not specified");
+            let version = vrl_dep.rev.as_ref().expect("VRL git revision not specified");
             (version.clone(), format!("{repo}/tree/{version}"))
         }
         Some(v) => (v.clone(), format!("https://crates.io/crates/vrl/{v}")),
