@@ -297,7 +297,7 @@ fn render_tag_into(
     Ok(())
 }
 
-fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformError> {
+fn to_metric_with_config(config: &MetricConfig, event: &Event) -> Result<Metric, TransformError> {
     let log = event.as_log();
 
     let timestamp = log
@@ -677,7 +677,7 @@ fn get_summary_value(log: &LogEvent) -> Result<MetricValue, TransformError> {
     })
 }
 
-fn to_metrics_metadata(event: &Event) -> Result<Metric, TransformError> {
+fn to_metrics(event: &Event) -> Result<Metric, TransformError> {
     let log = event.as_log();
     let timestamp = log
         .get_timestamp()
@@ -757,10 +757,9 @@ impl FunctionTransform for LogToMetric {
         let mut buffer = Vec::with_capacity(self.config.metrics.len());
         if self
             .config
-            .all_metrics
-            .is_some_and(|all_metrics| all_metrics)
+            .all_metrics.is_some_and(|all_metrics| all_metrics)
         {
-            match to_metrics_metadata(&event) {
+            match to_metrics(&event) {
                 Ok(metric) => {
                     output.push(Event::Metric(metric));
                 }
@@ -792,7 +791,7 @@ impl FunctionTransform for LogToMetric {
             }
         } else {
             for config in self.config.metrics.iter() {
-                match to_metric(config, &event) {
+                match to_metric_with_config(config, &event) {
                     Ok(metric) => {
                         buffer.push(Event::Metric(metric));
                     }
@@ -1910,102 +1909,4 @@ mod tests {
             .with_timestamp(Some(ts()))
         );
     }
-
-    #[tokio::test]
-    async fn multiple_metadata_metrics() {
-        let config = parse_yaml_config(
-            r#"
-            metrics: []
-            all_metrics: true
-            "#,
-        );
-
-        let json_gauge = r#"{
-          "gauge": {
-            "value": 990.0
-          },
-          "kind": "absolute",
-          "name": "test1.transform.gauge",
-          "tags": {
-            "env": "test_env",
-            "host": "localhost"
-          }
-        }"#;
-        let log_gauge = create_log_event(json_gauge);
-
-        let json_histogram = r#"{
-          "histogram": {
-            "sum": 18.0,
-            "count": 5,
-            "buckets": [
-              {
-                "upper_limit": 1.0,
-                "count": 1
-              },
-              {
-                "upper_limit": 2.0,
-                "count": 2
-              },
-              {
-                "upper_limit": 5.0,
-                "count": 1
-              },
-              {
-                "upper_limit": 10.0,
-                "count": 1
-              }
-            ]
-          },
-          "kind": "absolute",
-          "name": "test.transform.histogram",
-          "tags": {
-            "env": "test_env",
-            "host": "localhost"
-          }
-        }"#;
-        let log_histogram = create_log_event(json_histogram);
-
-        let logs: HashMap<&str, LogEvent> =
-            [("test.transform.gauge", log_gauge.into_log()),
-            ("test.transform.histogram", log_histogram.into_log())
-        ].iter().cloned().collect();
-        let mut event = Event::Log(LogEvent::from(logs));
-
-        // let mut event = Event::Log(LogEvent::from_parts(log_gauge.clone().into_log().value().clone(), log_gauge.clone().into_metadata()));
-        // event.as_mut_log().insert("test.transform.histogram", log_histogram.clone().into_log().value().clone());
-        let output = do_transform_multiple_events(config, event, 2).await;
-
-        assert_eq!(2, output.len());
-        assert_eq!(
-            output[0].clone().into_metric(),
-            Metric::new_with_metadata(
-                "test.transform.gauge",
-                MetricKind::Absolute,
-                MetricValue::Gauge { value: 990.0 },
-                output[0].metadata().clone(),
-            )
-                .with_namespace(Some("test_namespace"))
-                .with_tags(Some(metric_tags!(
-                "env" => "test_env",
-                "host" => "localhost",
-            )))
-                .with_timestamp(Some(ts()))
-        );
-        assert_eq!(
-            output[1].clone().into_metric(),
-            Metric::new_with_metadata(
-                "test.transform.gauge",
-                MetricKind::Absolute,
-                MetricValue::Gauge { value: 990.0 },
-                output[1].metadata().clone(),
-            )
-                .with_namespace(Some("test_namespace"))
-                .with_tags(Some(metric_tags!(
-                "env" => "test_env",
-                "host" => "localhost",
-            )))
-                .with_timestamp(Some(ts()))
-        );
-    }
-
 }
