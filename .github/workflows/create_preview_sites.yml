@@ -91,6 +91,7 @@ jobs:
           const fs = require('fs');
           const prNumber = fs.readFileSync('./pr/number', 'utf8');
           const issueNumber = parseInt(prNumber);
+          const { APP_ID, APP_NAME, SANITIZED_BRANCH_NAME } = process.env
 
           await github.rest.issues.createComment({
             owner: context.repo.owner,
