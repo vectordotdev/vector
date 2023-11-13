@@ -108,7 +108,7 @@ impl<T: Bufferable> BufferReceiver<T> {
     }
 
     /// Configures this receiver to instrument the items passing through it.
-    pub fn with_instrumentation(&mut self, handle: BufferUsageHandle) {
+    pub fn with_usage_instrumentation(&mut self, handle: BufferUsageHandle) {
         self.instrumentation = Some(handle);
     }
 

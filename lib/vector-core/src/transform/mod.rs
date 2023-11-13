@@ -1,5 +1,4 @@
-use std::sync::Arc;
-use std::{collections::HashMap, error, pin::Pin};
+use std::{collections::HashMap, error, pin::Pin, sync::Arc, time::Instant};
 
 use futures::{Stream, StreamExt};
 use vector_common::internal_event::{
@@ -492,8 +491,9 @@ impl OutputBuffer {
         &mut self,
         output: &mut Fanout,
     ) -> Result<(), Box<dyn error::Error + Send + Sync>> {
+        let send_start = Some(Instant::now());
         for array in std::mem::take(&mut self.0) {
-            output.send(array).await?;
+            output.send(array, send_start).await?;
         }
 
         Ok(())

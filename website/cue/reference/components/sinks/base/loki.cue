@@ -110,8 +110,11 @@ base: components: sinks: loki: configuration: {
 		}
 	}
 	compression: {
-		description: "Compression configuration."
-		required:    false
+		description: """
+			Compression configuration.
+			Snappy compression implies sending push requests as Protocol Buffers.
+			"""
+		required: false
 		type: string: {
 			default: "snappy"
 			enum: {
@@ -122,9 +125,9 @@ base: components: sinks: loki: configuration: {
 					"""
 				none: "No compression."
 				snappy: """
-					Snappy compression.
+					[Snappy][snappy] compression.
 
-					This implies sending push requests as Protocol Buffers.
+					[snappy]: https://github.com/google/snappy/blob/main/docs/README.md
 					"""
 				zlib: """
 					[Zlib][zlib] compression.
