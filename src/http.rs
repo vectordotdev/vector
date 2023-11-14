@@ -475,7 +475,7 @@ where
     fn layer(&self, service: S) -> Self::Service {
         MaxConnectionAgeService {
             service,
-            start_reference: self.start_reference.clone(),
+            start_reference: self.start_reference,
             max_connection_age: self.max_connection_age,
             peer_addr: self.peer_addr,
         }
@@ -512,7 +512,7 @@ where
     }
 
     fn call(&mut self, req: Request<Body>) -> Self::Future {
-        let start_reference = self.start_reference.clone();
+        let start_reference = self.start_reference;
         let max_connection_age = self.max_connection_age;
         let peer_addr = self.peer_addr;
         let future = self.service.call(req);

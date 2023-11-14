@@ -374,6 +374,7 @@ mod integration_tests {
             auth: None,
             tls: None,
             acknowledgements: SourceAcknowledgementsConfig::default(),
+            keepalive: KeepaliveConfig::default(),
         };
 
         let events = run_and_assert_source_compliance(
