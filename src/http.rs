@@ -411,7 +411,7 @@ pub struct KeepaliveConfig {
     /// The factor by which to jitter the `max_connection_age_secs` value.
     ///
     /// A value of 0.1 means that the actual duration will be between 90% and 110% of the
-    /// specified duration.
+    /// specified maximum duration.
     #[serde(default = "default_max_connection_age_jitter_factor")]
     #[configurable(validation(range(min = 0.0, max = 1.0)))]
     pub max_connection_age_jitter_factor: f64,
