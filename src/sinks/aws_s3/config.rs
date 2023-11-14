@@ -1,5 +1,3 @@
-use std::convert::TryInto;
-
 use aws_sdk_s3::Client as S3Client;
 use tower::ServiceBuilder;
 use vector_lib::codecs::{
@@ -216,9 +214,7 @@ impl S3SinkConfig {
         // Configure our partitioning/batching.
         let batch_settings = self.batch.into_batcher_settings()?;
 
-        let key_prefix = Template::try_from(self.key_prefix.clone())?
-            .with_tz_offset(offset)
-            .try_into()?;
+        let key_prefix = Template::try_from(self.key_prefix.clone())?.with_tz_offset(offset);
 
         let ssekms_key_id = self
             .options
