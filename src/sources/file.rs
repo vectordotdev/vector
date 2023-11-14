@@ -859,6 +859,9 @@ mod tests {
             },
             data_dir: Some(dir.path().to_path_buf()),
             glob_minimum_cooldown_ms: Duration::from_millis(100),
+            internal_metrics: FileInternalMetricsConfig {
+                include_file_tag: true,
+            },
             ..Default::default()
         }
     }
