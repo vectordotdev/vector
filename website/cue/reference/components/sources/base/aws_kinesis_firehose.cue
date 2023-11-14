@@ -301,6 +301,7 @@ base: components: sources: aws_kinesis_firehose: configuration: {
 					"""
 				required: false
 				type: uint: {
+					default: 300
 					examples: [600]
 					unit: "seconds"
 				}

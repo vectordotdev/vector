@@ -413,7 +413,7 @@ pub struct KeepaliveConfig {
 }
 
 const fn default_max_connection_age() -> Option<u64> {
-    None
+    Some(300) // 5 minutes
 }
 
 const fn default_max_connection_age_jitter_factor() -> f64 {

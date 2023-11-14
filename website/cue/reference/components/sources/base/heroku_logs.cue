@@ -295,6 +295,7 @@ base: components: sources: heroku_logs: configuration: {
 					"""
 				required: false
 				type: uint: {
+					default: 300
 					examples: [600]
 					unit: "seconds"
 				}

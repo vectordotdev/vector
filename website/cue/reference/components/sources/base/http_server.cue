@@ -319,6 +319,7 @@ base: components: sources: http_server: configuration: {
 					"""
 				required: false
 				type: uint: {
+					default: 300
 					examples: [600]
 					unit: "seconds"
 				}

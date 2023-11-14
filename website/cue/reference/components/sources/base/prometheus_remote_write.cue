@@ -71,6 +71,7 @@ base: components: sources: prometheus_remote_write: configuration: {
 					"""
 				required: false
 				type: uint: {
+					default: 300
 					examples: [600]
 					unit: "seconds"
 				}

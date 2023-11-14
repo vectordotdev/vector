@@ -145,7 +145,7 @@ base: components: sources: opentelemetry: configuration: {
 				address: "0.0.0.0:4318"
 				keepalive: {
 					max_connection_age_jitter_factor: 0.1
-					max_connection_age_secs:          null
+					max_connection_age_secs:          300
 				}
 			}]
 			options: {
@@ -182,6 +182,7 @@ base: components: sources: opentelemetry: configuration: {
 																"""
 							required: false
 							type: uint: {
+								default: 300
 								examples: [600]
 								unit: "seconds"
 							}

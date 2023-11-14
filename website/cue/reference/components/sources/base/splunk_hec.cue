@@ -96,6 +96,7 @@ base: components: sources: splunk_hec: configuration: {
 					"""
 				required: false
 				type: uint: {
+					default: 300
 					examples: [600]
 					unit: "seconds"
 				}
