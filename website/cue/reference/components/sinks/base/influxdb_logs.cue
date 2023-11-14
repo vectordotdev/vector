@@ -256,23 +256,21 @@ base: components: sinks: influxdb_logs: configuration: {
 					a fixed concurrency limit.
 					"""
 				required: false
-				type: {
-					string: {
-						default: "adaptive"
-						enum: {
-							adaptive: """
+				type: string: {
+					default: "adaptive"
+					enum: {
+						"_POSITIVE_INTEGER_": "_POSITIVE_INTEGER_ (e.g., `32`) requests can be outstanding at any given time."
+						adaptive: """
 															Concurrency will be managed by Vector's [Adaptive Request Concurrency][arc] feature.
 
 															[arc]: https://vector.dev/docs/about/under-the-hood/networking/arc/
 															"""
-							none: """
+						none: """
 															A fixed concurrency of 1.
 
 															Only one request can be outstanding at any given time.
 															"""
-						}
 					}
-					uint: {}
 				}
 			}
 			rate_limit_duration_secs: {
