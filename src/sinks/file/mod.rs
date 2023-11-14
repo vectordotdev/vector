@@ -476,7 +476,9 @@ mod tests {
             compression: Compression::None,
             acknowledgements: Default::default(),
             timezone: Default::default(),
-            internal_metrics: Default::default(),
+            internal_metrics: FileInternalMetricsConfig {
+                include_file_tag: true,
+            },
         };
 
         let (input, _events) = random_lines_with_stream(100, 64, None);
@@ -500,7 +502,9 @@ mod tests {
             compression: Compression::Gzip,
             acknowledgements: Default::default(),
             timezone: Default::default(),
-            internal_metrics: Default::default(),
+            internal_metrics: FileInternalMetricsConfig {
+                include_file_tag: true,
+            },
         };
 
         let (input, _) = random_lines_with_stream(100, 64, None);
@@ -524,7 +528,9 @@ mod tests {
             compression: Compression::Zstd,
             acknowledgements: Default::default(),
             timezone: Default::default(),
-            internal_metrics: Default::default(),
+            internal_metrics: FileInternalMetricsConfig {
+                include_file_tag: true,
+            },
         };
 
         let (input, _) = random_lines_with_stream(100, 64, None);
@@ -553,7 +559,9 @@ mod tests {
             compression: Compression::None,
             acknowledgements: Default::default(),
             timezone: Default::default(),
-            internal_metrics: Default::default(),
+            internal_metrics: FileInternalMetricsConfig {
+                include_file_tag: true,
+            },
         };
 
         let (mut input, _events) = random_events_with_stream(32, 8, None);
@@ -633,7 +641,9 @@ mod tests {
             compression: Compression::None,
             acknowledgements: Default::default(),
             timezone: Default::default(),
-            internal_metrics: Default::default(),
+            internal_metrics: FileInternalMetricsConfig {
+                include_file_tag: true,
+            },
         };
 
         let (mut input, _events) = random_lines_with_stream(10, 64, None);

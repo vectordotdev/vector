@@ -333,10 +333,10 @@ base: components: sinks: file: configuration: {
 				Whether or not to include the "file" tag on the component's corresponding internal metrics.
 
 				This is useful for distinguishing between different files while monitoring. However, the tag's
-				cardinality is unbounded. This defaults to true for now but will default to false in a future version.
+				cardinality is unbounded.
 				"""
 			required: false
-			type: bool: default: true
+			type: bool: default: false
 		}
 	}
 	path: {
