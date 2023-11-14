@@ -2142,7 +2142,7 @@ dependencies = [
  "similar-asserts",
  "smallvec",
  "snafu",
- "syslog_loose",
+ "syslog_loose 0.21.0",
  "tokio",
  "tokio-util",
  "tracing 0.1.40",
@@ -8695,6 +8695,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "syslog_loose"
+version = "0.21.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "161028c00842709450114c39db3b29f44c898055ed8833bb9b535aba7facf30e"
+dependencies = [
+ "chrono",
+ "nom",
+]
+
+[[package]]
 name = "system-configuration"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -10472,7 +10482,7 @@ dependencies = [
  "sha3",
  "snafu",
  "strip-ansi-escapes",
- "syslog_loose",
+ "syslog_loose 0.19.0",
  "termcolor",
  "thiserror",
  "tracing 0.1.40",
