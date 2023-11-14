@@ -56,7 +56,7 @@ base: components: sources: prometheus_remote_write: configuration: {
 					The factor by which to jitter the `max_connection_age_secs` value.
 
 					A value of 0.1 means that the actual duration will be between 90% and 110% of the
-					specified duration.
+					specified maximum duration.
 					"""
 				required: false
 				type: float: default: 0.1
@@ -68,12 +68,9 @@ base: components: sources: prometheus_remote_write: configuration: {
 
 					A random jitter configured by `max_connection_age_jitter_factor` is added
 					to the specified duration to spread out connection storms.
-
-					A value of `0` disables this feature.
 					"""
 				required: false
 				type: uint: {
-					default: 0
 					examples: [600]
 					unit: "seconds"
 				}

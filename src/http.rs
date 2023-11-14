@@ -397,16 +397,11 @@ pub struct KeepaliveConfig {
     ///
     /// A random jitter configured by `max_connection_age_jitter_factor` is added
     /// to the specified duration to spread out connection storms.
-    ///
-    /// A value of `0` disables this feature.
-    #[serde_as(as = "serde_with::DurationSeconds<u64>")]
-    #[serde(
-        rename = "max_connection_age_secs",
-        default = "default_max_connection_age"
-    )]
+    #[serde(default = "default_max_connection_age")]
     #[configurable(metadata(docs::examples = 600))]
+    #[configurable(metadata(docs::type_unit = "seconds"))]
     #[configurable(metadata(docs::human_name = "Maximum Connection Age"))]
-    pub max_connection_age: Duration,
+    pub max_connection_age_secs: Option<u64>,
 
     /// The factor by which to jitter the `max_connection_age_secs` value.
     ///
@@ -417,8 +412,8 @@ pub struct KeepaliveConfig {
     pub max_connection_age_jitter_factor: f64,
 }
 
-const fn default_max_connection_age() -> Duration {
-    Duration::from_secs(0)
+const fn default_max_connection_age() -> Option<u64> {
+    None
 }
 
 const fn default_max_connection_age_jitter_factor() -> f64 {
@@ -428,7 +423,7 @@ const fn default_max_connection_age_jitter_factor() -> f64 {
 impl Default for KeepaliveConfig {
     fn default() -> Self {
         Self {
-            max_connection_age: default_max_connection_age(),
+            max_connection_age_secs: default_max_connection_age(),
             max_connection_age_jitter_factor: default_max_connection_age_jitter_factor(),
         }
     }
@@ -526,7 +521,7 @@ where
         let future = self.service.call(req);
         Box::pin(async move {
             let mut response = future.await?;
-            if !max_connection_age.is_zero() && start_reference.elapsed() >= max_connection_age {
+            if start_reference.elapsed() >= max_connection_age {
                 debug!(
                     message = "Closing connection due to max connection age.",
                     ?max_connection_age,
@@ -684,14 +679,10 @@ mod tests {
             .body(Body::empty())
             .unwrap();
         let response = service.call(req).await.unwrap();
-        assert_eq!(response.headers().get("Connection"), None);
-
-        tokio::time::advance(Duration::from_secs(60)).await;
-        let req = Request::get("http://example.com")
-            .body(Body::empty())
-            .unwrap();
-        let response = service.call(req).await.unwrap();
-        assert_eq!(response.headers().get("Connection"), None);
+        assert_eq!(
+            response.headers().get("Connection"),
+            Some(&HeaderValue::from_static("close"))
+        );
     }
 
     // Note that we unfortunately cannot mock the time in this test because the client calls

@@ -4,6 +4,7 @@ use std::{
     io::Read,
     net::{Ipv4Addr, SocketAddr},
     sync::Arc,
+    time::Duration,
 };
 
 use bytes::{Buf, Bytes};
@@ -180,11 +181,13 @@ impl SourceConfig for SplunkConfig {
             let make_svc = make_service_fn(move |conn: &MaybeTlsIncomingStream<TcpStream>| {
                 let svc = ServiceBuilder::new()
                     .layer(build_http_trace_layer(span.clone()))
-                    .layer(MaxConnectionAgeLayer::new(
-                        keepalive_settings.max_connection_age,
-                        keepalive_settings.max_connection_age_jitter_factor,
-                        conn.peer_addr(),
-                    ))
+                    .option_layer(keepalive_settings.max_connection_age_secs.map(|secs| {
+                        MaxConnectionAgeLayer::new(
+                            Duration::from_secs(secs),
+                            keepalive_settings.max_connection_age_jitter_factor,
+                            conn.peer_addr(),
+                        )
+                    }))
                     .service(warp::service(services.clone()));
                 futures_util::future::ok::<_, Infallible>(svc)
             });

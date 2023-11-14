@@ -1,3 +1,4 @@
+use std::time::Duration;
 use std::{convert::Infallible, net::SocketAddr};
 
 use bytes::Bytes;
@@ -60,11 +61,13 @@ pub(crate) async fn run_http_server(
     let make_svc = make_service_fn(move |conn: &MaybeTlsIncomingStream<TcpStream>| {
         let svc = ServiceBuilder::new()
             .layer(build_http_trace_layer(span.clone()))
-            .layer(MaxConnectionAgeLayer::new(
-                keepalive_settings.max_connection_age,
-                keepalive_settings.max_connection_age_jitter_factor,
-                conn.peer_addr(),
-            ))
+            .option_layer(keepalive_settings.max_connection_age_secs.map(|secs| {
+                MaxConnectionAgeLayer::new(
+                    Duration::from_secs(secs),
+                    keepalive_settings.max_connection_age_jitter_factor,
+                    conn.peer_addr(),
+                )
+            }))
             .service(warp::service(routes.clone()));
         futures_util::future::ok::<_, Infallible>(svc)
     });
