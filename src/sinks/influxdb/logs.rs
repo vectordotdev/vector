@@ -171,10 +171,7 @@ impl SinkConfig for InfluxDbLogsConfig {
         let healthcheck = self.healthcheck(client.clone())?;
 
         let batch = self.batch.into_batch_settings()?;
-        let request = self.request.unwrap_with(&TowerRequestConfig {
-            retry_attempts: Some(5),
-            ..Default::default()
-        });
+        let request = self.request.into_settings();
 
         let settings = influxdb_settings(
             self.influxdb1_settings.clone(),
