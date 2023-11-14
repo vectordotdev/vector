@@ -13,8 +13,6 @@ use crate::{
     tls::TlsConfig,
 };
 
-use super::sink::SqsTowerRequestConfigDefaults;
-
 #[derive(Debug, Snafu)]
 pub(super) enum BuildError {
     #[snafu(display("`message_group_id` should be defined for FIFO queue."))]
@@ -53,7 +51,7 @@ pub(super) struct BaseSSSinkConfig {
 
     #[configurable(derived)]
     #[serde(default)]
-    pub(super) request: TowerRequestConfig<SqsTowerRequestConfigDefaults>,
+    pub(super) request: TowerRequestConfig,
 
     #[configurable(derived)]
     pub(super) tls: Option<TlsConfig>,

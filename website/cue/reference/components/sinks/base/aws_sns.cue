@@ -577,7 +577,7 @@ base: components: sinks: aws_sns: configuration: {
 					"""
 				required: false
 				type: uint: {
-					default: 30
+					default: 60
 					unit:    "seconds"
 				}
 			}

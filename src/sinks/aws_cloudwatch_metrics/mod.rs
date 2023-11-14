@@ -51,7 +51,6 @@ impl SinkBatchSettings for CloudWatchMetricsDefaultBatchSettings {
 pub struct CloudWatchMetricsTowerRequestConfigDefaults;
 
 impl TowerRequestConfigDefaults for CloudWatchMetricsTowerRequestConfigDefaults {
-    const TIMEOUT_SECS: u64 = 30;
     const RATE_LIMIT_NUM: u64 = 150;
 }
 

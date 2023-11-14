@@ -11,7 +11,6 @@ use vector_lib::sensitive_string::SensitiveString;
 use vector_lib::{ByteSizeOf, EstimatedJsonEncodedSizeOf};
 
 use super::Region;
-use crate::sinks::util::service::TowerRequestConfigDefaults;
 use crate::{
     config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     event::{
@@ -47,13 +46,6 @@ impl SinkBatchSettings for SematextMetricsDefaultBatchSettings {
     const TIMEOUT_SECS: f64 = 1.0;
 }
 
-#[derive(Clone, Copy, Debug)]
-pub struct SematextTowerRequestConfigDefaults;
-
-impl TowerRequestConfigDefaults for SematextTowerRequestConfigDefaults {
-    const RETRY_ATTEMPTS: usize = 5;
-}
-
 /// Configuration for the `sematext_metrics` sink.
 #[configurable_component(sink("sematext_metrics", "Publish metric events to Sematext."))]
 #[derive(Clone, Debug)]
@@ -87,7 +79,7 @@ pub struct SematextMetricsConfig {
 
     #[configurable(derived)]
     #[serde(default)]
-    pub request: TowerRequestConfig<SematextTowerRequestConfigDefaults>,
+    pub request: TowerRequestConfig,
 
     #[configurable(derived)]
     #[serde(

@@ -258,7 +258,7 @@ base: components: sinks: influxdb_metrics: configuration: {
 				description: "The maximum number of retries to make for failed requests."
 				required:    false
 				type: uint: {
-					default: 5
+					default: 9223372036854775807
 					unit:    "retries"
 				}
 			}

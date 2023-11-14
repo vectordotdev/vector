@@ -12,7 +12,6 @@ use super::{
     apm_stats::{flush_apm_stats_thread, Aggregator},
     service::TraceApiRetry,
 };
-use crate::sinks::util::service::TowerRequestConfigDefaults;
 use crate::{
     config::{GenerateConfig, Input, SinkConfig, SinkContext},
     http::HttpClient,
@@ -50,14 +49,6 @@ impl SinkBatchSettings for DatadogTracesDefaultBatchSettings {
     const MAX_BYTES: Option<usize> = Some(BATCH_GOAL_BYTES);
     const TIMEOUT_SECS: f64 = BATCH_DEFAULT_TIMEOUT_SECS;
 }
-
-#[derive(Clone, Copy, Debug)]
-pub struct DatadogTracesTowerRequestConfigDefaults;
-
-impl TowerRequestConfigDefaults for DatadogTracesTowerRequestConfigDefaults {
-    const RETRY_ATTEMPTS: usize = 5;
-}
-
 /// Configuration for the `datadog_traces` sink.
 #[configurable_component(sink("datadog_traces", "Publish trace events to Datadog."))]
 #[derive(Clone, Debug, Default)]
@@ -76,7 +67,7 @@ pub struct DatadogTracesConfig {
 
     #[configurable(derived)]
     #[serde(default)]
-    pub request: TowerRequestConfig<DatadogTracesTowerRequestConfigDefaults>,
+    pub request: TowerRequestConfig,
 }
 
 impl GenerateConfig for DatadogTracesConfig {

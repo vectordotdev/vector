@@ -582,7 +582,7 @@ base: components: sinks: aws_sqs: configuration: {
 					"""
 				required: false
 				type: uint: {
-					default: 30
+					default: 60
 					unit:    "seconds"
 				}
 			}

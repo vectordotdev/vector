@@ -16,10 +16,7 @@ use crate::{
     http::HttpClient,
     sinks::{
         datadog::DatadogCommonConfig,
-        util::{
-            batch::BatchConfig, service::TowerRequestConfigDefaults, ServiceBuilderExt,
-            SinkBatchSettings, TowerRequestConfig,
-        },
+        util::{batch::BatchConfig, ServiceBuilderExt, SinkBatchSettings, TowerRequestConfig},
         Healthcheck, UriParseSnafu, VectorSink,
     },
     tls::{MaybeTlsSettings, TlsEnableableConfig},
@@ -41,13 +38,6 @@ impl SinkBatchSettings for DatadogMetricsDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = Some(100_000);
     const MAX_BYTES: Option<usize> = None;
     const TIMEOUT_SECS: f64 = 2.0;
-}
-
-#[derive(Clone, Copy, Debug)]
-pub struct DatadogMetricsTowerRequestConfigDefaults;
-
-impl TowerRequestConfigDefaults for DatadogMetricsTowerRequestConfigDefaults {
-    const RETRY_ATTEMPTS: usize = 5;
 }
 
 pub(super) const SERIES_V1_PATH: &str = "/api/v1/series";
@@ -156,7 +146,7 @@ pub struct DatadogMetricsConfig {
 
     #[configurable(derived)]
     #[serde(default)]
-    pub request: TowerRequestConfig<DatadogMetricsTowerRequestConfigDefaults>,
+    pub request: TowerRequestConfig,
 }
 
 impl_generate_config_from_default!(DatadogMetricsConfig);
