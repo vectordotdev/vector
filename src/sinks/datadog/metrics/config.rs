@@ -65,12 +65,12 @@ impl SeriesApiVersion {
     }
     fn get_api_version_backwards_compatible() -> Self {
         static API_VERSION: OnceLock<SeriesApiVersion> = OnceLock::new();
-        *API_VERSION.get_or_init(
-            || match option_env!("VECTOR_TEMP_USE_DD_METRICS_SERIES_V1_API") {
-                Some(_) => Self::V1,
-                None => Self::V2,
-            },
-        )
+        *API_VERSION.get_or_init(|| {
+            match std::env::var("VECTOR_TEMP_USE_DD_METRICS_SERIES_V1_API") {
+                Ok(_) => Self::V1,
+                Err(_) => Self::V2,
+            }
+        })
     }
 }
 
