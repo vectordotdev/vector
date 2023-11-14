@@ -10239,6 +10239,7 @@ dependencies = [
  "http",
  "hyper-proxy",
  "indexmap 2.1.0",
+ "memchr",
  "metrics",
  "metrics-tracing-context",
  "metrics-util",

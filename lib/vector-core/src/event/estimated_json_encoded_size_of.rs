@@ -83,15 +83,22 @@ impl EstimatedJsonEncodedSizeOf for Value {
     }
 }
 
-/// For performance reasons, strings aren't checked for the need for escape characters, nor for the
-/// need for UTF-8 replacement characters.
+/// For performance reasons, strings aren't checked for the need for UTF-8 replacement characters.
 ///
 /// This is the main reason why `EstimatedJsonEncodedSizeOf` is named as is, as most other types can
 /// be calculated exactly without a noticeable performance penalty.
 impl EstimatedJsonEncodedSizeOf for str {
     fn estimated_json_encoded_size_of(&self) -> JsonSize {
-        JsonSize::new(QUOTES_SIZE + self.len())
+        JsonSize::new(QUOTES_SIZE + self.len() + count_escapes(self.as_bytes()))
     }
+}
+
+// This is an imprecise estimate of the number of characters that will need to be escaped when
+// serializing to JSON. The goal is improve our overall accuracy in the case of relatively common
+// scenarios like strings of nested JSON, etc.
+fn count_escapes(input: &[u8]) -> usize {
+    memchr::memchr3_iter(b'"', b'\\', b'\t', input).count()
+        + memchr::memchr2_iter(b'\n', b'\r', input).count()
 }
 
 impl EstimatedJsonEncodedSizeOf for String {
@@ -108,7 +115,7 @@ impl EstimatedJsonEncodedSizeOf for KeyString {
 
 impl EstimatedJsonEncodedSizeOf for Bytes {
     fn estimated_json_encoded_size_of(&self) -> JsonSize {
-        JsonSize::new(QUOTES_SIZE + self.len())
+        JsonSize::new(QUOTES_SIZE + self.len() + count_escapes(self))
     }
 }
 
