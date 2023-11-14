@@ -35,8 +35,8 @@ use crate::{
     metrics,
     sinks::{
         util::{
-            retries::RetryLogic, BatchSettings, Concurrency, EncodedEvent, EncodedLength,
-            TowerRequestConfig, VecBuffer,
+            retries::{JitterMode, RetryLogic},
+            BatchSettings, Concurrency, EncodedEvent, EncodedLength, TowerRequestConfig, VecBuffer,
         },
         Healthcheck, VectorSink,
     },
@@ -417,6 +417,7 @@ async fn run_test(params: TestParams) -> TestResults {
             concurrency: params.concurrency,
             rate_limit_num: Some(9999),
             timeout_secs: Some(1),
+            retry_jitter_mode: JitterMode::None,
             ..Default::default()
         },
         params,
