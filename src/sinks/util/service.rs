@@ -25,7 +25,7 @@ use crate::{
         adaptive_concurrency::{
             AdaptiveConcurrencyLimit, AdaptiveConcurrencyLimitLayer, AdaptiveConcurrencySettings,
         },
-        retries::{FixedRetryPolicy, RetryLogic},
+        retries::{FibonacciRetryPolicy, JitterMode, RetryLogic},
         service::map::MapLayer,
         sink::Response,
         Batch, BatchSink, Partition, PartitionBatchSink,
@@ -37,13 +37,14 @@ mod health;
 mod map;
 pub mod net;
 
-pub type Svc<S, L> = RateLimit<AdaptiveConcurrencyLimit<Retry<FixedRetryPolicy<L>, Timeout<S>>, L>>;
+pub type Svc<S, L> =
+    RateLimit<AdaptiveConcurrencyLimit<Retry<FibonacciRetryPolicy<L>, Timeout<S>>, L>>;
 pub type TowerBatchedSink<S, B, RL> = BatchSink<Svc<S, RL>, B>;
 pub type TowerPartitionSink<S, B, RL, K> = PartitionBatchSink<Svc<S, RL>, B, K>;
 
 // Distributed service types
 pub type DistributedService<S, RL, HL, K, Req> = RateLimit<
-    Retry<FixedRetryPolicy<RL>, Buffer<Balance<DiscoveryService<S, RL, HL, K>, Req>, Req>>,
+    Retry<FibonacciRetryPolicy<RL>, Buffer<Balance<DiscoveryService<S, RL, HL, K>, Req>, Req>>,
 >;
 pub type DiscoveryService<S, RL, HL, K> =
     BoxStream<'static, Result<Change<K, SingleDistributedService<S, RL, HL>>, crate::Error>>;
@@ -85,7 +86,9 @@ impl<L> ServiceBuilderExt<L> for ServiceBuilder<L> {
 
 /// Middleware settings for outbound requests.
 ///
-/// Various settings can be configured, such as concurrency and rate limits, timeouts, etc.
+/// Various settings can be configured, such as concurrency and rate limits, timeouts, retry behavior, etc.
+///
+/// Note that the retry backoff policy follows the Fibonacci sequence.
 #[serde_as]
 #[configurable_component]
 #[configurable(metadata(docs::advanced))]
@@ -140,6 +143,10 @@ pub struct TowerRequestConfig {
 
     #[configurable(derived)]
     #[serde(default)]
+    pub retry_jitter_mode: JitterMode,
+
+    #[configurable(derived)]
+    #[serde(default)]
     pub adaptive_concurrency: AdaptiveConcurrencySettings,
 }
 
@@ -184,6 +191,7 @@ impl Default for TowerRequestConfig {
             retry_max_duration_secs: default_retry_max_duration_secs(),
             retry_initial_backoff_secs: default_retry_initial_backoff_secs(),
             adaptive_concurrency: AdaptiveConcurrencySettings::default(),
+            retry_jitter_mode: JitterMode::default(),
         }
     }
 }
@@ -265,6 +273,7 @@ impl TowerRequestConfig {
                     .unwrap(),
             ),
             adaptive_concurrency: self.adaptive_concurrency,
+            retry_jitter_mode: self.retry_jitter_mode,
         }
     }
 }
@@ -279,15 +288,17 @@ pub struct TowerRequestSettings {
     pub retry_max_duration_secs: Duration,
     pub retry_initial_backoff_secs: Duration,
     pub adaptive_concurrency: AdaptiveConcurrencySettings,
+    pub retry_jitter_mode: JitterMode,
 }
 
 impl TowerRequestSettings {
-    pub const fn retry_policy<L: RetryLogic>(&self, logic: L) -> FixedRetryPolicy<L> {
-        FixedRetryPolicy::new(
+    pub fn retry_policy<L: RetryLogic>(&self, logic: L) -> FibonacciRetryPolicy<L> {
+        FibonacciRetryPolicy::new(
             self.retry_attempts,
             self.retry_initial_backoff_secs,
             self.retry_max_duration_secs,
             logic,
+            self.retry_jitter_mode,
         )
     }
 
