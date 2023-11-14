@@ -550,6 +550,7 @@ mod tests {
     use std::convert::Infallible;
 
     use hyper::{server::conn::AddrStream, service::make_service_fn, Server};
+    use proptest::prelude::*;
     use tower::ServiceBuilder;
 
     use crate::test_util::next_addr;
@@ -586,26 +587,43 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_jittered_duration() {
-        // Non-zero duration
-        let duration = Duration::from_secs(60);
-        let jitter_factor = 0.1;
-        let jittered_duration = MaxConnectionAgeLayer::jittered_duration(duration, jitter_factor);
-        assert!(jittered_duration >= Duration::from_secs(54));
-        assert!(jittered_duration <= Duration::from_secs(66));
+    proptest! {
+        #[test]
+        fn test_jittered_duration(duration_in_secs in 0u64..120, jitter_factor in 0.0..1.0) {
+            let duration = Duration::from_secs(duration_in_secs);
+            let jittered_duration = MaxConnectionAgeLayer::jittered_duration(duration, jitter_factor);
 
-        // Zero jitter factor
-        let duration = Duration::from_secs(60);
-        let jitter_factor = 0.0;
-        let jittered_duration = MaxConnectionAgeLayer::jittered_duration(duration, jitter_factor);
-        assert_eq!(jittered_duration, Duration::from_secs(60));
-
-        // Zero duration
-        let duration = Duration::from_secs(0);
-        let jitter_factor = 0.1;
-        let jittered_duration = MaxConnectionAgeLayer::jittered_duration(duration, jitter_factor);
-        assert_eq!(jittered_duration, Duration::from_secs(0));
+            // Check properties based on the range of inputs
+            if jitter_factor == 0.0 {
+                // When jitter_factor is 0, jittered_duration should be equal to the original duration
+                prop_assert_eq!(
+                    jittered_duration,
+                    duration,
+                    "jittered_duration {:?} should be equal to duration {:?}",
+                    jittered_duration,
+                    duration,
+                );
+            } else if duration_in_secs > 0 {
+                // Check the bounds when duration is non-zero and jitter_factor is non-zero
+                let lower_bound = duration.mul_f64(1.0 - jitter_factor);
+                let upper_bound = duration.mul_f64(1.0 + jitter_factor);
+                prop_assert!(
+                    jittered_duration >= lower_bound && jittered_duration <= upper_bound,
+                    "jittered_duration {:?} should be between {:?} and {:?}",
+                    jittered_duration,
+                    lower_bound,
+                    upper_bound,
+                );
+            } else {
+                // When duration is zero, jittered_duration should also be zero
+                prop_assert_eq!(
+                    jittered_duration,
+                    Duration::from_secs(0),
+                    "jittered_duration {:?} should be equal to zero",
+                    jittered_duration,
+                );
+            }
+        }
     }
 
     #[tokio::test]
