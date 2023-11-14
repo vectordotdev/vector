@@ -8,7 +8,7 @@ use vector_lib::lookup::event_path;
 use super::{config::MAX_PAYLOAD_BYTES, service::LogApiRequest};
 use crate::sinks::{
     prelude::*,
-    util::{encoding::Encoder as _, Compressor},
+    util::{encoding::Encoder as _, Compressor, http::HttpJsonBatchSizer},
 };
 #[derive(Default)]
 struct EventPartitioner;
@@ -263,7 +263,7 @@ where
         let partitioner = EventPartitioner;
         let batch_settings = self.batch_settings;
 
-        let input = input.batched_partitioned(partitioner, || batch_settings.as_byte_size_config());
+        let input = input.batched_partitioned(partitioner, || batch_settings.as_item_size_config(HttpJsonBatchSizer));
         input
             .request_builder(
                 default_request_builder_concurrency_limit(),
