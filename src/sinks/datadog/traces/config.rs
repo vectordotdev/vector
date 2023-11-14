@@ -49,6 +49,7 @@ impl SinkBatchSettings for DatadogTracesDefaultBatchSettings {
     const MAX_BYTES: Option<usize> = Some(BATCH_GOAL_BYTES);
     const TIMEOUT_SECS: f64 = BATCH_DEFAULT_TIMEOUT_SECS;
 }
+
 /// Configuration for the `datadog_traces` sink.
 #[configurable_component(sink("datadog_traces", "Publish trace events to Datadog."))]
 #[derive(Clone, Debug, Default)]
