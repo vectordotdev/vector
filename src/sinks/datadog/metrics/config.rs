@@ -31,9 +31,6 @@ use crate::{
 pub const MAXIMUM_PAYLOAD_COMPRESSED_SIZE: usize = 3_200_000;
 pub const MAXIMUM_PAYLOAD_SIZE: usize = 62_914_560;
 
-// TODO: revisit our concurrency and batching defaults
-const DEFAULT_REQUEST_RETRY_ATTEMPTS: usize = 5;
-
 #[derive(Clone, Copy, Debug, Default)]
 pub struct DatadogMetricsDefaultBatchSettings;
 
@@ -232,9 +229,7 @@ impl DatadogMetricsConfig {
         let batcher_settings = self.batch.into_batcher_settings()?;
 
         // TODO: revisit our concurrency and batching defaults
-        let request_limits = self.request.unwrap_with(
-            &TowerRequestConfig::default().retry_attempts(DEFAULT_REQUEST_RETRY_ATTEMPTS),
-        );
+        let request_limits = self.request.into_settings();
 
         let endpoint_configuration = self.generate_metrics_endpoint_configuration()?;
         let service = ServiceBuilder::new()
