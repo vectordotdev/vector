@@ -22,7 +22,7 @@ use vector_lib::codecs::{
 use vector_lib::configurable::configurable_component;
 use vector_lib::{
     internal_event::{CountByteSize, EventsSent, InternalEventHandle as _, Output, Registered},
-    EstimatedJsonEncodedSizeOf,
+    EstimatedJsonEncodedSizeOf, TimeZone,
 };
 
 use crate::{
@@ -33,9 +33,10 @@ use crate::{
     internal_events::{
         FileBytesSent, FileInternalMetricsConfig, FileIoError, FileOpen, TemplateRenderingError,
     },
-    sinks::util::StreamSink,
+    sinks::util::{timezone_to_offset, StreamSink},
     template::Template,
 };
+
 mod bytes_path;
 
 use bytes_path::BytesPath;
@@ -86,6 +87,10 @@ pub struct FileSinkConfig {
 
     #[configurable(derived)]
     #[serde(default)]
+    pub timezone: Option<TimeZone>,
+
+    #[configurable(derived)]
+    #[serde(default)]
     internal_metrics: FileInternalMetricsConfig,
 }
 
@@ -97,6 +102,7 @@ impl GenerateConfig for FileSinkConfig {
             encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             compression: Default::default(),
             acknowledgements: Default::default(),
+            timezone: Default::default(),
             internal_metrics: Default::default(),
         })
         .unwrap()
@@ -181,9 +187,9 @@ impl OutFile {
 impl SinkConfig for FileSinkConfig {
     async fn build(
         &self,
-        _cx: SinkContext,
+        cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        let sink = FileSink::new(self)?;
+        let sink = FileSink::new(self, cx)?;
         Ok((
             super::VectorSink::from_event_streamsink(sink),
             future::ok(()).boxed(),
@@ -211,13 +217,18 @@ pub struct FileSink {
 }
 
 impl FileSink {
-    pub fn new(config: &FileSinkConfig) -> crate::Result<Self> {
+    pub fn new(config: &FileSinkConfig, cx: SinkContext) -> crate::Result<Self> {
         let transformer = config.encoding.transformer();
         let (framer, serializer) = config.encoding.build(SinkType::StreamBased)?;
         let encoder = Encoder::<Framer>::new(framer, serializer);
 
+        let offset = config
+            .timezone
+            .or(cx.globals.timezone)
+            .and_then(timezone_to_offset);
+
         Ok(Self {
-            path: config.path.clone(),
+            path: config.path.clone().with_tz_offset(offset),
             transformer,
             encoder,
             idle_timeout: config.idle_timeout,
@@ -464,6 +475,7 @@ mod tests {
             encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             compression: Compression::None,
             acknowledgements: Default::default(),
+            timezone: Default::default(),
             internal_metrics: Default::default(),
         };
 
@@ -487,6 +499,7 @@ mod tests {
             encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             compression: Compression::Gzip,
             acknowledgements: Default::default(),
+            timezone: Default::default(),
             internal_metrics: Default::default(),
         };
 
@@ -510,6 +523,7 @@ mod tests {
             encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             compression: Compression::Zstd,
             acknowledgements: Default::default(),
+            timezone: Default::default(),
             internal_metrics: Default::default(),
         };
 
@@ -538,6 +552,7 @@ mod tests {
             encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             compression: Compression::None,
             acknowledgements: Default::default(),
+            timezone: Default::default(),
             internal_metrics: Default::default(),
         };
 
@@ -617,6 +632,7 @@ mod tests {
             encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             compression: Compression::None,
             acknowledgements: Default::default(),
+            timezone: Default::default(),
             internal_metrics: Default::default(),
         };
 
@@ -626,7 +642,7 @@ mod tests {
 
         let sink_handle = tokio::spawn(async move {
             assert_sink_compliance(&FILE_SINK_TAGS, async move {
-                let sink = FileSink::new(&config).unwrap();
+                let sink = FileSink::new(&config, SinkContext::default()).unwrap();
                 VectorSink::from_event_streamsink(sink)
                     .run(Box::pin(rx.map(Into::into)))
                     .await
@@ -670,7 +686,7 @@ mod tests {
 
     async fn run_assert_sink(config: FileSinkConfig, events: impl Iterator<Item = Event> + Send) {
         assert_sink_compliance(&FILE_SINK_TAGS, async move {
-            let sink = FileSink::new(&config).unwrap();
+            let sink = FileSink::new(&config, SinkContext::default()).unwrap();
             VectorSink::from_event_streamsink(sink)
                 .run(Box::pin(stream::iter(events.map(Into::into))))
                 .await
