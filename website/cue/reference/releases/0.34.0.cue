@@ -30,6 +30,15 @@ releases: "0.34.0": {
 		be decommissioned on February 28th, 2024.
 		"""
 
+	known_issues: [
+		"""
+			The Datadog Metrics sink fails to send a large number of requests due to incorrectly
+			sized batches [#19110](https://github.com/vectordotdev/vector/issues/19110). This will
+			be fixed in v0.34.1. Until the fix is released, if you are using the Datadog Metrics
+			sink, we advise remaining on v0.33.1.
+			""",
+	]
+
 	changelog: [
 		{
 			type: "feat"
