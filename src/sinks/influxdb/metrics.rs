@@ -159,10 +159,7 @@ impl InfluxDbSvc {
         let protocol_version = settings.protocol_version();
 
         let batch = config.batch.into_batch_settings()?;
-        let request = config.request.unwrap_with(&TowerRequestConfig {
-            retry_attempts: Some(5),
-            ..Default::default()
-        });
+        let request = config.request.into_settings();
 
         let uri = settings.write_uri(endpoint)?;
 

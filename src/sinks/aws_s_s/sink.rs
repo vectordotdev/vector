@@ -40,9 +40,7 @@ where
     }
 
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
-        let request = self
-            .request
-            .unwrap_with(&TowerRequestConfig::default().timeout_secs(30));
+        let request = self.request.into_settings();
         let retry_logic: SSRetryLogic<E> = super::retry::SSRetryLogic::new();
         let service = tower::ServiceBuilder::new()
             .settings(request, retry_logic)

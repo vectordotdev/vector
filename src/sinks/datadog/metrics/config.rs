@@ -22,8 +22,6 @@ use crate::{
     tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
 
-const DEFAULT_REQUEST_RETRY_ATTEMPTS: usize = 5;
-
 #[derive(Clone, Copy, Debug, Default)]
 pub struct DatadogMetricsDefaultBatchSettings;
 
@@ -33,12 +31,12 @@ pub struct DatadogMetricsDefaultBatchSettings;
 // conservative, though, we use 100K here.  This will also get a little more tricky when it comes to
 // distributions and sketches, but we're going to have to implement incremental encoding to handle
 // "we've exceeded our maximum payload size, split this batch" scenarios anyways.
-// TODO: revisit our concurrency and batching defaults
 impl SinkBatchSettings for DatadogMetricsDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = Some(100_000);
     const MAX_BYTES: Option<usize> = None;
     const TIMEOUT_SECS: f64 = 2.0;
 }
+
 pub(super) const SERIES_V1_PATH: &str = "/api/v1/series";
 pub(super) const SERIES_V2_PATH: &str = "/api/v2/series";
 pub(super) const SKETCHES_PATH: &str = "/api/beta/sketches";
@@ -248,9 +246,7 @@ impl DatadogMetricsConfig {
         let batcher_settings = self.batch.into_batcher_settings()?;
 
         // TODO: revisit our concurrency and batching defaults
-        let request_limits = self.request.unwrap_with(
-            &TowerRequestConfig::default().retry_attempts(DEFAULT_REQUEST_RETRY_ATTEMPTS),
-        );
+        let request_limits = self.request.into_settings();
 
         let endpoint_configuration = self.generate_metrics_endpoint_configuration()?;
         let service = ServiceBuilder::new()
