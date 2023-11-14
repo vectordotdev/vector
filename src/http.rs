@@ -489,7 +489,7 @@ where
 /// A service that limits the maximum age of a client connection. It does so by adding a
 /// `Connection: close` header to the response if `max_connection_age` time has elapsed
 /// since `start_reference`.
-/// 
+///
 /// **Notes:**
 /// - This is intended to be used in a Hyper server (or similar) that will automatically close
 /// the connection after a response with a `Connection: close` header is sent.
