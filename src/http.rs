@@ -438,7 +438,11 @@ impl Default for KeepaliveConfig {
 /// `Connection: close` header to the response if `max_connection_duration` time has elapsed
 /// since `start_reference`.
 ///
-/// Note that this layer assumes that it is instantiated once per connection.
+/// **Notes:**
+/// - This is intended to be used in a Hyper server (or similar) that will automatically close
+/// the connection after a response with a `Connection: close` header is sent.
+/// - This layer assumes that it is instantiated once per connection, which is true within the
+/// Hyper framework.
 
 pub struct MaxConnectionAgeLayer {
     start_reference: Instant,
@@ -485,8 +489,12 @@ where
 /// A service that limits the maximum age of a client connection. It does so by adding a
 /// `Connection: close` header to the response if `max_connection_age` time has elapsed
 /// since `start_reference`.
-///
-/// Note that this service assumes that it is instantiated once per connection.
+/// 
+/// **Notes:**
+/// - This is intended to be used in a Hyper server (or similar) that will automatically close
+/// the connection after a response with a `Connection: close` header is sent.
+/// - This service assumes that it is instantiated once per connection, which is true within the
+/// Hyper framework.
 #[derive(Clone)]
 pub struct MaxConnectionAgeService<S> {
     service: S,
@@ -526,6 +534,7 @@ where
                     ?peer_addr,
                 );
                 // Tell the client to close this connection.
+                // Hyper will automatically close the connection after the response is sent.
                 response.headers_mut().insert(
                     hyper::header::CONNECTION,
                     hyper::header::HeaderValue::from_static("close"),
