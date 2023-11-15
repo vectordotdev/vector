@@ -69,7 +69,7 @@ pub struct LogToMetricConfig {
     /// ```
     /// This is an example JSON representation of a counter with the following properties:
     ///
-    /// - `counter`: An object with a single property `value` representing the counter value (e.g., 10.0).
+    /// - `counter`: An object with a single property `value` representing the counter value, in this case, `10.0`).
     /// - `kind`: A string indicating the kind of counter, in this case, "incremental".
     /// - `name`: A string representing the name of the counter, here set to "test.transform.counter".
     /// - `tags`: An object containing additional tags such as "env" and "host".
