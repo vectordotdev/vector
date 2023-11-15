@@ -48,8 +48,10 @@ const ORIGIN_SERVICE_VALUE: u32 = 3;
 pub struct LogToMetricConfig {
     /// A list of metrics to generate.
     pub metrics: Vec<MetricConfig>,
-    /// This flag will process all incoming events metrics and will attempt to convert them to logs. Otherwise, only items specified in the 'metrics' field will be processes.
-    /// NOTE: If defined, the `metrics` field is ignored.
+    /// Setting this flag will change the behavior of this transformation.
+    /// Notably the `metrics` field will be ignored. 
+    /// All incoming events will be processed and if possible they will be converted to log events. 
+    /// Otherwise, only items specified in the 'metrics' field will be processes.
     ///
     /// ```
     /// use serde_json::json;
