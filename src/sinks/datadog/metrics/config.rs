@@ -140,24 +140,6 @@ impl DatadogMetricsEndpointConfiguration {
     }
 }
 
-impl From<DatadogMetricsEndpoint> for DatadogMetricsPayloadLimits {
-    fn from(endpoint: DatadogMetricsEndpoint) -> Self {
-        // from https://docs.datadoghq.com/api/latest/metrics/#submit-metrics
-        match endpoint {
-            // Sketches use the same payload size limits as v1 series
-            DatadogMetricsEndpoint::Series(SeriesApiVersion::V1)
-            | DatadogMetricsEndpoint::Sketches => Self {
-                uncompressed: 62_914_560, // 62 MB
-                compressed: 3_200_000,    // 3.2 MB
-            },
-            DatadogMetricsEndpoint::Series(SeriesApiVersion::V2) => Self {
-                uncompressed: 5_242_880, // 5 MB
-                compressed: 512_000,     // 500 KB
-            },
-        }
-    }
-}
-
 /// Configuration for the `datadog_metrics` sink.
 #[configurable_component(sink("datadog_metrics", "Publish metric events to Datadog."))]
 #[derive(Clone, Debug, Default)]
