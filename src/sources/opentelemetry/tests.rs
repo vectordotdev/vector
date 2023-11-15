@@ -47,6 +47,7 @@ async fn receive_grpc_logs_vector_namespace() {
             http: HttpConfig {
                 address: http_addr,
                 tls: Default::default(),
+                keepalive: Default::default(),
             },
             acknowledgements: Default::default(),
             log_namespace: Some(true),
@@ -184,6 +185,7 @@ async fn receive_grpc_logs_legacy_namespace() {
             http: HttpConfig {
                 address: http_addr,
                 tls: Default::default(),
+                keepalive: Default::default(),
             },
             acknowledgements: Default::default(),
             log_namespace: Default::default(),

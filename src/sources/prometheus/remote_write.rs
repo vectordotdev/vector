@@ -13,6 +13,7 @@ use crate::{
         GenerateConfig, SourceAcknowledgementsConfig, SourceConfig, SourceContext, SourceOutput,
     },
     event::Event,
+    http::KeepaliveConfig,
     internal_events::PrometheusRemoteWriteParseError,
     serde::bool_or_struct,
     sources::{
@@ -45,6 +46,10 @@ pub struct PrometheusRemoteWriteConfig {
     #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
+
+    #[configurable(derived)]
+    #[serde(default)]
+    keepalive: KeepaliveConfig,
 }
 
 impl PrometheusRemoteWriteConfig {
@@ -55,6 +60,7 @@ impl PrometheusRemoteWriteConfig {
             tls: None,
             auth: None,
             acknowledgements: false.into(),
+            keepalive: KeepaliveConfig::default(),
         }
     }
 }
@@ -66,6 +72,7 @@ impl GenerateConfig for PrometheusRemoteWriteConfig {
             tls: None,
             auth: None,
             acknowledgements: SourceAcknowledgementsConfig::default(),
+            keepalive: KeepaliveConfig::default(),
         })
         .unwrap()
     }
@@ -86,6 +93,7 @@ impl SourceConfig for PrometheusRemoteWriteConfig {
             &self.auth,
             cx,
             self.acknowledgements,
+            self.keepalive.clone(),
         )
     }
 
@@ -183,6 +191,7 @@ mod test {
             auth: None,
             tls: tls.clone(),
             acknowledgements: SourceAcknowledgementsConfig::default(),
+            keepalive: KeepaliveConfig::default(),
         };
         let source = source
             .build(SourceContext::new_test(tx, None))
@@ -275,6 +284,7 @@ mod test {
             auth: None,
             tls: None,
             acknowledgements: SourceAcknowledgementsConfig::default(),
+            keepalive: KeepaliveConfig::default(),
         };
         let source = source
             .build(SourceContext::new_test(tx, None))
@@ -364,6 +374,7 @@ mod integration_tests {
             auth: None,
             tls: None,
             acknowledgements: SourceAcknowledgementsConfig::default(),
+            keepalive: KeepaliveConfig::default(),
         };
 
         let events = run_and_assert_source_compliance(
