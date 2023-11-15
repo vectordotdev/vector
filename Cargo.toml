@@ -233,7 +233,7 @@ greptimedb-client = { git = "https://github.com/GreptimeTeam/greptimedb-client-r
 
 # External libs
 arc-swap = { version = "1.6", default-features = false, optional = true }
-async-compression = { version = "0.4.4", default-features = false, features = ["tokio", "gzip", "zstd"], optional = true }
+async-compression = { version = "0.4.5", default-features = false, features = ["tokio", "gzip", "zstd"], optional = true }
 apache-avro = { version = "0.16.0", default-features = false, optional = true }
 axum = { version = "0.6.20", default-features = false }
 base64 = { version = "0.21.5", default-features = false, optional = true }
