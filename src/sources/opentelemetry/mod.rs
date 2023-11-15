@@ -35,6 +35,7 @@ use crate::{
         DataType, GenerateConfig, Resource, SourceAcknowledgementsConfig, SourceConfig,
         SourceContext, SourceOutput,
     },
+    http::KeepaliveConfig,
     serde::bool_or_struct,
     sources::{util::grpc::run_grpc_server, Source},
     tls::{MaybeTlsSettings, TlsEnableableConfig},
@@ -102,12 +103,17 @@ struct HttpConfig {
     #[configurable(derived)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     tls: Option<TlsEnableableConfig>,
+
+    #[configurable(derived)]
+    #[serde(default)]
+    keepalive: KeepaliveConfig,
 }
 
 fn example_http_config() -> HttpConfig {
     HttpConfig {
         address: "0.0.0.0:4318".parse().unwrap(),
         tls: None,
+        keepalive: KeepaliveConfig::default(),
     }
 }
 
@@ -162,8 +168,13 @@ impl SourceConfig for OpentelemetryConfig {
             bytes_received,
             events_received,
         );
-        let http_source =
-            run_http_server(self.http.address, http_tls_settings, filters, cx.shutdown);
+        let http_source = run_http_server(
+            self.http.address,
+            http_tls_settings,
+            filters,
+            cx.shutdown,
+            self.http.keepalive.clone(),
+        );
 
         Ok(join(grpc_source, http_source).map(|_| Ok(())).boxed())
     }

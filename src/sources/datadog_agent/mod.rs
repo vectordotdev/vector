@@ -18,6 +18,7 @@ pub(crate) mod ddtrace_proto {
 }
 
 use std::convert::Infallible;
+use std::time::Duration;
 use std::{fmt::Debug, io::Read, net::SocketAddr, sync::Arc};
 
 use bytes::{Buf, Bytes};
@@ -30,6 +31,7 @@ use hyper::Server;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
+use tokio::net::TcpStream;
 use tower::ServiceBuilder;
 use tracing::Span;
 use vector_lib::codecs::decoding::{DeserializerConfig, FramingConfig};
@@ -38,11 +40,12 @@ use vector_lib::configurable::configurable_component;
 use vector_lib::event::{BatchNotifier, BatchStatus};
 use vector_lib::internal_event::{EventsReceived, Registered};
 use vector_lib::lookup::owned_value_path;
+use vector_lib::tls::MaybeTlsIncomingStream;
 use vrl::path::OwnedTargetPath;
 use vrl::value::Kind;
 use warp::{filters::BoxedFilter, reject::Rejection, reply::Response, Filter, Reply};
 
-use crate::http::build_http_trace_layer;
+use crate::http::{build_http_trace_layer, KeepaliveConfig, MaxConnectionAgeLayer};
 use crate::{
     codecs::{Decoder, DecodingConfig},
     config::{
@@ -126,6 +129,10 @@ pub struct DatadogAgentConfig {
     #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
+
+    #[configurable(derived)]
+    #[serde(default)]
+    keepalive: KeepaliveConfig,
 }
 
 impl GenerateConfig for DatadogAgentConfig {
@@ -142,6 +149,7 @@ impl GenerateConfig for DatadogAgentConfig {
             disable_traces: false,
             multiple_outputs: false,
             log_namespace: Some(false),
+            keepalive: KeepaliveConfig::default(),
         })
         .unwrap()
     }
@@ -176,6 +184,7 @@ impl SourceConfig for DatadogAgentConfig {
         let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
         let filters = source.build_warp_filters(cx.out, acknowledgements, self)?;
         let shutdown = cx.shutdown;
+        let keepalive_settings = self.keepalive.clone();
 
         info!(message = "Building HTTP server.", address = %self.address);
 
@@ -191,9 +200,16 @@ impl SourceConfig for DatadogAgentConfig {
             });
 
             let span = Span::current();
-            let make_svc = make_service_fn(move |_conn| {
+            let make_svc = make_service_fn(move |conn: &MaybeTlsIncomingStream<TcpStream>| {
                 let svc = ServiceBuilder::new()
                     .layer(build_http_trace_layer(span.clone()))
+                    .option_layer(keepalive_settings.max_connection_age_secs.map(|secs| {
+                        MaxConnectionAgeLayer::new(
+                            Duration::from_secs(secs),
+                            keepalive_settings.max_connection_age_jitter_factor,
+                            conn.peer_addr(),
+                        )
+                    }))
                     .service(warp::service(routes.clone()));
                 futures_util::future::ok::<_, Infallible>(svc)
             });
