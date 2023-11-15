@@ -24,12 +24,6 @@ impl Default for ExtraContext {
     }
 }
 
-impl std::fmt::Debug for ExtraContext {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "ExtraContext")
-    }
-}
-
 impl ExtraContext {
     /// Create a new `ExtraContext` with the provided [`anymap::Map`].
     pub fn new(context: Map<dyn Any + Send + Sync>) -> Self {

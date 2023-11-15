@@ -93,7 +93,7 @@ impl Opts {
 }
 
 /// Performs topology, component, and health checks.
-pub async fn validate(opts: &Opts, color: bool, extra_context: ExtraContext) -> ExitCode {
+pub async fn validate(opts: &Opts, color: bool) -> ExitCode {
     let mut fmt = Formatter::new(color);
 
     let mut validated = true;
@@ -105,7 +105,7 @@ pub async fn validate(opts: &Opts, color: bool, extra_context: ExtraContext) -> 
 
     if !opts.no_environment {
         if let Some(tmp_directory) = create_tmp_directory(&mut config, &mut fmt) {
-            validated &= validate_environment(opts, &config, &mut fmt, extra_context).await;
+            validated &= validate_environment(opts, &config, &mut fmt).await;
             remove_tmp_directory(tmp_directory);
         } else {
             validated = false;
@@ -170,20 +170,14 @@ pub fn validate_config(opts: &Opts, fmt: &mut Formatter) -> Option<Config> {
     Some(config)
 }
 
-async fn validate_environment(
-    opts: &Opts,
-    config: &Config,
-    fmt: &mut Formatter,
-    extra_context: ExtraContext,
-) -> bool {
+async fn validate_environment(opts: &Opts, config: &Config, fmt: &mut Formatter) -> bool {
     let diff = ConfigDiff::initial(config);
 
-    let mut pieces =
-        if let Some(pieces) = validate_components(config, &diff, fmt, extra_context).await {
-            pieces
-        } else {
-            return false;
-        };
+    let mut pieces = if let Some(pieces) = validate_components(config, &diff, fmt).await {
+        pieces
+    } else {
+        return false;
+    };
 
     validate_healthchecks(opts, config, &diff, &mut pieces, fmt).await
 }
@@ -192,9 +186,10 @@ async fn validate_components(
     config: &Config,
     diff: &ConfigDiff,
     fmt: &mut Formatter,
-    extra_context: ExtraContext,
 ) -> Option<TopologyPieces> {
-    match topology::TopologyPieces::build(config, diff, HashMap::new(), extra_context).await {
+    match topology::TopologyPieces::build(config, diff, HashMap::new(), ExtraContext::default())
+        .await
+    {
         Ok(pieces) => {
             fmt.success("Component configuration");
             Some(pieces)

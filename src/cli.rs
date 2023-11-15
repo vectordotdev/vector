@@ -307,7 +307,7 @@ impl SubCommand {
             Self::Test(t) => unit_test::cmd(t, &mut signals.handler).await,
             #[cfg(feature = "api-client")]
             Self::Top(t) => top::cmd(t).await,
-            Self::Validate(v) => validate::validate(v, color, Default::default()).await,
+            Self::Validate(v) => validate::validate(v, color).await,
             Self::Vrl(s) => {
                 let mut functions = vrl::stdlib::all();
                 functions.extend(vector_vrl_functions::all());

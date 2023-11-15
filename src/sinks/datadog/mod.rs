@@ -95,15 +95,15 @@ impl LocalDatadogCommonConfig {
 
     pub fn with_globals(
         &self,
-        config: &datadog::Options,
+        config: datadog::Options,
     ) -> Result<DatadogCommonConfig, ConfigurationError> {
         Ok(DatadogCommonConfig {
             endpoint: self.endpoint.clone(),
-            site: self.site.clone().unwrap_or(config.site.clone()),
+            site: self.site.clone().unwrap_or(config.site),
             default_api_key: self
                 .default_api_key
                 .clone()
-                .or(config.api_key.clone())
+                .or(config.api_key)
                 .ok_or(ConfigurationError::ApiKeyRequired)?,
             tls: self.tls.clone(),
             acknowledgements: self.acknowledgements,

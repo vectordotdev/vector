@@ -165,7 +165,7 @@ impl SinkConfig for DatadogMetricsConfig {
             .get::<datadog::Options>()
             .cloned()
             .unwrap_or_default();
-        let dd_common = self.dd_common.with_globals(&global)?;
+        let dd_common = self.dd_common.with_globals(global)?;
         let healthcheck = dd_common.build_healthcheck(client.clone())?;
         let sink = self.build_sink(&dd_common, client)?;
 
