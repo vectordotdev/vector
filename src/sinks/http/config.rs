@@ -286,7 +286,7 @@ impl SinkConfig for HttpSinkConfig {
 
         let service = HttpService::new(client, http_sink_request_builder);
 
-        let request_limits = self.request.tower.unwrap_with(&Default::default());
+        let request_limits = self.request.tower.into_settings();
 
         let service = ServiceBuilder::new()
             .settings(request_limits, http_response_retry_logic())

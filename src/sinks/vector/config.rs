@@ -123,7 +123,7 @@ impl SinkConfig for VectorConfig {
         let healthcheck_client = VectorService::new(client.clone(), healthcheck_uri, false);
         let healthcheck = healthcheck(healthcheck_client, cx.healthcheck);
         let service = VectorService::new(client, uri, self.compression);
-        let request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
+        let request_settings = self.request.into_settings();
         let batch_settings = self.batch.into_batcher_settings()?;
 
         let service = ServiceBuilder::new()

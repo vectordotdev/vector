@@ -16,35 +16,23 @@ use crate::{
     http::HttpClient,
     sinks::{
         datadog::DatadogCommonConfig,
-        util::{
-            batch::BatchConfig, Concurrency, ServiceBuilderExt, SinkBatchSettings,
-            TowerRequestConfig,
-        },
+        util::{batch::BatchConfig, ServiceBuilderExt, SinkBatchSettings, TowerRequestConfig},
         Healthcheck, UriParseSnafu, VectorSink,
     },
     tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
 
-// TODO: revisit our concurrency and batching defaults
-const DEFAULT_REQUEST_RETRY_ATTEMPTS: usize = 5;
-
-const DEFAULT_REQUEST_FIXED_CONCURRENCY: usize = 150;
-
 #[derive(Clone, Copy, Debug, Default)]
 pub struct DatadogMetricsDefaultBatchSettings;
 
 // This default is centered around "series" data, which should be the lion's share of what we
-// process. The value of 1k events was arrived at empirically by testing the sink's performance
-// with the v2 series endpoint.
+// process.  Given that a single series, when encoded, is in the 150-300 byte range, we can fit a
+// lot of these into a single request, something like 150-200K series.  Simply to be a little more
+// conservative, though, we use 100K here.  This will also get a little more tricky when it comes to
+// distributions and sketches, but we're going to have to implement incremental encoding to handle
+// "we've exceeded our maximum payload size, split this batch" scenarios anyways.
 impl SinkBatchSettings for DatadogMetricsDefaultBatchSettings {
-    // TODO: the series V1 endpoint support is considered deprecated and should be removed in a future release.
-    // At that time when the V1 support is removed, the 1k value for max events can be used directly.
-    const MAX_EVENTS: Option<usize> = Some(
-        match option_env!("VECTOR_TEMP_USE_DD_METRICS_SERIES_V1_API") {
-            Some(_) => 100_000,
-            None => 1_000,
-        },
-    );
+    const MAX_EVENTS: Option<usize> = Some(100_000);
     const MAX_BYTES: Option<usize> = None;
     const TIMEOUT_SECS: f64 = 2.0;
 }
@@ -52,9 +40,6 @@ impl SinkBatchSettings for DatadogMetricsDefaultBatchSettings {
 pub(super) const SERIES_V1_PATH: &str = "/api/v1/series";
 pub(super) const SERIES_V2_PATH: &str = "/api/v2/series";
 pub(super) const SKETCHES_PATH: &str = "/api/beta/sketches";
-
-// TODO: the series V1 endpoint support is considered deprecated and should be removed in a future release.
-// At that time when the V1 support is removed, the SeriesApiVersion stops being useful and can be removed.
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum SeriesApiVersion {
@@ -69,14 +54,14 @@ impl SeriesApiVersion {
             Self::V2 => SERIES_V2_PATH,
         }
     }
-    fn get_api_version_backwards_compatible() -> Self {
+    fn get_api_version() -> Self {
         static API_VERSION: OnceLock<SeriesApiVersion> = OnceLock::new();
-        *API_VERSION.get_or_init(
-            || match option_env!("VECTOR_TEMP_USE_DD_METRICS_SERIES_V1_API") {
-                Some(_) => Self::V1,
-                None => Self::V2,
-            },
-        )
+        *API_VERSION.get_or_init(|| {
+            match std::env::var("VECTOR_TEMP_USE_DD_METRICS_SERIES_V2_API") {
+                Ok(_) => Self::V2,
+                Err(_) => Self::V1,
+            }
+        })
     }
 }
 
@@ -87,6 +72,12 @@ impl SeriesApiVersion {
 pub enum DatadogMetricsEndpoint {
     Series(SeriesApiVersion),
     Sketches,
+}
+
+/// Payload limits for metrics are endpoint-dependent.
+pub(super) struct DatadogMetricsPayloadLimits {
+    pub(super) uncompressed: usize,
+    pub(super) compressed: usize,
 }
 
 impl DatadogMetricsEndpoint {
@@ -105,7 +96,23 @@ impl DatadogMetricsEndpoint {
 
     // Creates an instance of the `Series` variant with the default API version.
     pub fn series() -> Self {
-        Self::Series(SeriesApiVersion::get_api_version_backwards_compatible())
+        Self::Series(SeriesApiVersion::get_api_version())
+    }
+
+    pub(super) fn payload_limits(&self) -> DatadogMetricsPayloadLimits {
+        // from https://docs.datadoghq.com/api/latest/metrics/#submit-metrics
+        match self {
+            // Sketches use the same payload size limits as v1 series
+            DatadogMetricsEndpoint::Series(SeriesApiVersion::V1)
+            | DatadogMetricsEndpoint::Sketches => DatadogMetricsPayloadLimits {
+                uncompressed: 62_914_560, // 62 MB
+                compressed: 3_200_000,    // 3.2 MB
+            },
+            DatadogMetricsEndpoint::Series(SeriesApiVersion::V2) => DatadogMetricsPayloadLimits {
+                uncompressed: 5_242_880, // 5 MB
+                compressed: 512_000,     // 500 KB
+            },
+        }
     }
 }
 
@@ -131,12 +138,6 @@ impl DatadogMetricsEndpointConfiguration {
             DatadogMetricsEndpoint::Sketches => self.sketches_endpoint.clone(),
         }
     }
-}
-
-/// Payload limits for metrics are endpoint-dependent.
-pub(super) struct DatadogMetricsPayloadLimits {
-    pub(super) uncompressed: usize,
-    pub(super) compressed: usize,
 }
 
 impl From<DatadogMetricsEndpoint> for DatadogMetricsPayloadLimits {
@@ -230,12 +231,7 @@ impl DatadogMetricsConfig {
     ) -> crate::Result<DatadogMetricsEndpointConfiguration> {
         let base_uri = self.get_base_agent_endpoint();
 
-        // TODO: the V1 endpoint support is considered deprecated and should be removed in a future release.
-        // At that time, the get_api_version_backwards_compatible() should be replaced with statically using the v2.
-        let series_endpoint = build_uri(
-            &base_uri,
-            SeriesApiVersion::get_api_version_backwards_compatible().get_path(),
-        )?;
+        let series_endpoint = build_uri(&base_uri, SeriesApiVersion::get_api_version().get_path())?;
         let sketches_endpoint = build_uri(&base_uri, SKETCHES_PATH)?;
 
         Ok(DatadogMetricsEndpointConfiguration::new(
@@ -261,17 +257,8 @@ impl DatadogMetricsConfig {
     fn build_sink(&self, client: HttpClient) -> crate::Result<VectorSink> {
         let batcher_settings = self.batch.into_batcher_settings()?;
 
-        // TODO: the V1 endpoint support is considered deprecated and should be removed in a future release.
-        // At that time this variable can be removed and the fixed concurrency setting used directly.
-        let default_request_settings = match option_env!("VECTOR_TEMP_USE_DD_METRICS_SERIES_V1_API")
-        {
-            Some(_) => TowerRequestConfig::default(),
-            None => TowerRequestConfig::new(Concurrency::Fixed(DEFAULT_REQUEST_FIXED_CONCURRENCY)),
-        };
-
-        let request_limits = self
-            .request
-            .unwrap_with(&default_request_settings.retry_attempts(DEFAULT_REQUEST_RETRY_ATTEMPTS));
+        // TODO: revisit our concurrency and batching defaults
+        let request_limits = self.request.into_settings();
 
         let endpoint_configuration = self.generate_metrics_endpoint_configuration()?;
         let service = ServiceBuilder::new()

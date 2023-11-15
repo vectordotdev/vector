@@ -38,7 +38,7 @@ The following command **removes** the existing repository and configures the
 new repository.
 
 ```sh
-CSM_MIGRATE=true bash -c "$(curl -L https://s3.amazonaws.com/dd-agent/scripts/install_script_vector0.sh)"
+CSM_MIGRATE=true bash -c "$(curl -L https://setup.vector.dev)"
 ```
 
 Alternatively, `CSM_MIGRATE` may be left unset to leave the removal of the

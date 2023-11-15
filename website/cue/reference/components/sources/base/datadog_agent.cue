@@ -174,12 +174,12 @@ base: components: sources: datadog_agent: configuration: {
 		type: bool: default: false
 	}
 	disable_metrics: {
-		description: "If this is set to `true`, metrics are not accepted by the component."
+		description: "If this is set to `true`, metrics (beta) are not accepted by the component."
 		required:    false
 		type: bool: default: false
 	}
 	disable_traces: {
-		description: "If this is set to `true`, traces are not accepted by the component."
+		description: "If this is set to `true`, traces (alpha) are not accepted by the component."
 		required:    false
 		type: bool: default: false
 	}
@@ -276,9 +276,9 @@ base: components: sources: datadog_agent: configuration: {
 	}
 	multiple_outputs: {
 		description: """
-			If this is set to `true` logs, metrics, and traces are sent to different outputs.
+			If this is set to `true`, logs, metrics (beta), and traces (alpha) are sent to different outputs.
 
-			For a source component named `agent`, the received logs, metrics, and traces can then be
+			For a source component named `agent`, the received logs, metrics (beta), and traces (alpha) can then be
 			configured as input to other components by specifying `agent.logs`, `agent.metrics`, and
 			`agent.traces`, respectively.
 			"""

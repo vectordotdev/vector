@@ -24,7 +24,7 @@ use crate::{
 pub struct AggregateConfig {
     /// The interval between flushes, in milliseconds.
     ///
-    /// During this time frame, metrics with the same series data (name, namespace, tags, and so on) are aggregated.
+    /// During this time frame, metrics (beta) with the same series data (name, namespace, tags, and so on) are aggregated.
     #[serde(default = "default_interval_ms")]
     #[configurable(metadata(docs::human_name = "Flush Interval"))]
     pub interval_ms: u64,
