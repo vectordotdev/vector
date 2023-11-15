@@ -4565,6 +4565,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "itertools"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "25db6b064527c5d482d0423354fcd07a89a2dfe07b67892e62411946db7f07b0"
+dependencies = [
+ "either",
+]
+
+[[package]]
 name = "itoa"
 version = "1.0.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6811,7 +6820,7 @@ checksum = "8bdf592881d821b83d471f8af290226c8d51402259e9bb5be7f9f8bdebbb11ac"
 dependencies = [
  "bytes 1.5.0",
  "heck 0.4.1",
- "itertools 0.11.0",
+ "itertools 0.10.5",
  "log",
  "multimap",
  "once_cell",
@@ -6845,7 +6854,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "265baba7fabd416cf5078179f7d2cbeca4ce7a9041111900675ea7c4cb8a4c32"
 dependencies = [
  "anyhow",
- "itertools 0.11.0",
+ "itertools 0.10.5",
  "proc-macro2 1.0.69",
  "quote 1.0.33",
  "syn 2.0.39",
@@ -9850,7 +9859,7 @@ dependencies = [
  "hex",
  "indexmap 2.1.0",
  "indicatif",
- "itertools 0.11.0",
+ "itertools 0.12.0",
  "log",
  "once_cell",
  "os_info",
@@ -9957,7 +9966,7 @@ dependencies = [
  "indoc",
  "infer 0.15.0",
  "inventory",
- "itertools 0.11.0",
+ "itertools 0.12.0",
  "k8s-openapi 0.18.0",
  "kube",
  "lapin",
