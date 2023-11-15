@@ -2,8 +2,36 @@ package metadata
 
 base: components: transforms: log_to_metric: configuration: {
 	all_metrics: {
-		description: "this flag will process all metrics to logs, if defined the `metrics` field is ignored."
-		required:    false
+		description: """
+			Setting this flag will change the behavior of this transformation.
+			Notably the `metrics` field will be ignored.
+			All incoming events will be processed and if possible they will be converted to log events.
+			Otherwise, only items specified in the 'metrics' field will be processes.
+
+			```
+			use serde_json::json;
+			let json_event = json!({
+			    "counter": {
+			        "value": 10.0
+			    },
+			    "kind": "incremental",
+			    "name": "test.transform.counter",
+			    "tags": {
+			        "env": "test_env",
+			        "host": "localhost"
+			    }
+			});
+			```
+			This is an example JSON representation of a counter with the following properties:
+
+			- `counter`: An object with a single property `value` representing the counter value (e.g., 10.0).
+			- `kind`: A string indicating the kind of counter, in this case, "incremental".
+			- `name`: A string representing the name of the counter, here set to "test.transform.counter".
+			- `tags`: An object containing additional tags such as "env" and "host".
+
+			Objects that can be processes include counter, histogram, gauge, set and summary.
+			"""
+		required: false
 		type: bool: {}
 	}
 	metrics: {
