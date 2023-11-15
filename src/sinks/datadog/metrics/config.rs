@@ -101,17 +101,23 @@ impl DatadogMetricsEndpoint {
 
     pub(super) const fn payload_limits(self) -> DatadogMetricsPayloadLimits {
         // from https://docs.datadoghq.com/api/latest/metrics/#submit-metrics
-        match self {
+
+        let (uncompressed, compressed) = match self {
             // Sketches use the same payload size limits as v1 series
             DatadogMetricsEndpoint::Series(SeriesApiVersion::V1)
-            | DatadogMetricsEndpoint::Sketches => DatadogMetricsPayloadLimits {
-                uncompressed: 62_914_560, // 62 MB
-                compressed: 3_200_000,    // 3.2 MB
-            },
-            DatadogMetricsEndpoint::Series(SeriesApiVersion::V2) => DatadogMetricsPayloadLimits {
-                uncompressed: 5_242_880, // 5 MB
-                compressed: 512_000,     // 500 KB
-            },
+            | DatadogMetricsEndpoint::Sketches => (
+                62_914_560, // 60 MiB
+                3_200_000,  // 3.2 MB
+            ),
+            DatadogMetricsEndpoint::Series(SeriesApiVersion::V2) => (
+                5_242_880, // 5 MiB
+                512_000,   // 512 KB
+            ),
+        };
+
+        DatadogMetricsPayloadLimits {
+            uncompressed,
+            compressed,
         }
     }
 }
