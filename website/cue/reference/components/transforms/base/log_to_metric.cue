@@ -3,13 +3,11 @@ package metadata
 base: components: transforms: log_to_metric: configuration: {
 	all_metrics: {
 		description: """
-			Setting this flag will change the behavior of this transformation.
+			Setting this flag changes the behavior of this transformation.
 			Notably the `metrics` field will be ignored.
 			All incoming events will be processed and if possible they will be converted to log events.
 			Otherwise, only items specified in the 'metrics' field will be processes.
-
-			```
-			use serde_json::json;
+			<pre class="chroma"><code class="language-toml" data-lang="toml">use serde_json::json;
 			let json_event = json!({
 			    "counter": {
 			        "value": 10.0
@@ -21,15 +19,16 @@ base: components: transforms: log_to_metric: configuration: {
 			        "host": "localhost"
 			    }
 			});
-			```
+			</code></pre>
+
 			This is an example JSON representation of a counter with the following properties:
 
-			- `counter`: An object with a single property `value` representing the counter value (e.g., 10.0).
+			- `counter`: An object with a single property `value` representing the counter value, in this case, `10.0`).
 			- `kind`: A string indicating the kind of counter, in this case, "incremental".
 			- `name`: A string representing the name of the counter, here set to "test.transform.counter".
 			- `tags`: An object containing additional tags such as "env" and "host".
 
-			Objects that can be processes include counter, histogram, gauge, set and summary.
+			Objects that can be processed include counter, histogram, gauge, set and summary.
 			"""
 		required: false
 		type: bool: {}
@@ -53,9 +52,9 @@ base: components: transforms: log_to_metric: configuration: {
 				description: """
 					Metric kind.
 
-					Metrics can be either absolute or incremental. Absolute metrics represent a sort of "last write wins" scenario,
-					where the latest absolute value seen is meant to be the actual metric value. In contrast, and perhaps intuitively,
-					incremental metrics are meant to be additive, such that we don't know what the total value of the metric is, but we know
+					Metrics can be either absolute of incremental. Absolute metrics represent a sort of "last write wins" scenario,
+					where the latest absolute value seen is meant to be the actual metric value.  In contrast, and perhaps intuitively,
+					incremental metrics are meant to be additive, such that we don't know what total value of the metric is, but we know
 					that we'll be adding or subtracting the given value from it.
 
 					Generally speaking, most metrics storage systems deal with incremental updates. A notable exception is Prometheus,
