@@ -187,7 +187,7 @@ impl GenerateConfig for LogToMetricConfig {
             }],
             all_metrics: Some(true),
         })
-            .unwrap()
+        .unwrap()
     }
 }
 
@@ -922,7 +922,7 @@ mod tests {
             assert_eq!(out.recv().await, None);
             result
         })
-            .await
+        .await
     }
 
     async fn do_transform_multiple_events(
@@ -950,7 +950,7 @@ mod tests {
             assert_eq!(out.recv().await, None);
             results
         })
-            .await
+        .await
     }
 
     #[tokio::test]
@@ -987,7 +987,7 @@ mod tests {
                 MetricValue::Counter { value: 1.0 },
                 metadata,
             )
-                .with_timestamp(Some(ts()))
+            .with_timestamp(Some(ts()))
         );
     }
 
@@ -1031,13 +1031,13 @@ mod tests {
                 MetricValue::Counter { value: 1.0 },
                 metadata,
             )
-                .with_namespace(Some("app"))
-                .with_tags(Some(metric_tags!(
+            .with_namespace(Some("app"))
+            .with_tags(Some(metric_tags!(
                 "method" => "post",
                 "code" => "200",
                 "host" => "localhost",
             )))
-                .with_timestamp(Some(ts()))
+            .with_timestamp(Some(ts()))
         );
     }
 
@@ -1131,7 +1131,7 @@ mod tests {
                 MetricValue::Counter { value: 1.0 },
                 metadata
             )
-                .with_timestamp(Some(ts()))
+            .with_timestamp(Some(ts()))
         );
     }
 
@@ -1186,7 +1186,7 @@ mod tests {
                 MetricValue::Counter { value: 33.99 },
                 metadata,
             )
-                .with_timestamp(Some(ts()))
+            .with_timestamp(Some(ts()))
         );
     }
 
@@ -1228,7 +1228,7 @@ mod tests {
                 MetricValue::Counter { value: 33.99 },
                 metadata,
             )
-                .with_timestamp(Some(ts()))
+            .with_timestamp(Some(ts()))
         );
     }
 
@@ -1270,7 +1270,7 @@ mod tests {
                 MetricValue::Gauge { value: 123.0 },
                 metadata,
             )
-                .with_timestamp(Some(ts()))
+            .with_timestamp(Some(ts()))
         );
     }
 
@@ -1367,7 +1367,7 @@ mod tests {
                 MetricValue::Counter { value: 1.0 },
                 metadata.clone(),
             )
-                .with_timestamp(Some(ts()))
+            .with_timestamp(Some(ts()))
         );
         assert_eq!(
             output[1].clone().into_metric(),
@@ -1377,7 +1377,7 @@ mod tests {
                 MetricValue::Counter { value: 1.0 },
                 metadata,
             )
-                .with_timestamp(Some(ts()))
+            .with_timestamp(Some(ts()))
         );
     }
 
@@ -1435,7 +1435,7 @@ mod tests {
                 },
                 metadata.clone(),
             )
-                .with_timestamp(Some(ts()))
+            .with_timestamp(Some(ts()))
         );
         assert_eq!(
             output[1].as_metric(),
@@ -1445,8 +1445,8 @@ mod tests {
                 MetricValue::Counter { value: 1.0 },
                 metadata,
             )
-                .with_namespace(Some("local"))
-                .with_timestamp(Some(ts()))
+            .with_namespace(Some("local"))
+            .with_timestamp(Some(ts()))
         );
     }
 
@@ -1488,7 +1488,7 @@ mod tests {
                 },
                 metadata,
             )
-                .with_timestamp(Some(ts()))
+            .with_timestamp(Some(ts()))
         );
     }
 
@@ -1531,7 +1531,7 @@ mod tests {
                 },
                 metadata
             )
-                .with_timestamp(Some(ts()))
+            .with_timestamp(Some(ts()))
         );
     }
 
@@ -1574,7 +1574,7 @@ mod tests {
                 },
                 metadata
             )
-                .with_timestamp(Some(ts()))
+            .with_timestamp(Some(ts()))
         );
     }
 
@@ -1622,12 +1622,12 @@ mod tests {
                 MetricValue::Gauge { value: 990.0 },
                 metric.metadata().clone(),
             )
-                .with_namespace(Some("test_namespace"))
-                .with_tags(Some(metric_tags!(
+            .with_namespace(Some("test_namespace"))
+            .with_tags(Some(metric_tags!(
                 "env" => "test_env",
                 "host" => "localhost",
             )))
-                .with_timestamp(Some(ts()))
+            .with_timestamp(Some(ts()))
         );
     }
 
@@ -1701,12 +1701,12 @@ mod tests {
                 },
                 metric.metadata().clone(),
             )
-                .with_namespace(Some("test_namespace"))
-                .with_tags(Some(metric_tags!(
+            .with_namespace(Some("test_namespace"))
+            .with_tags(Some(metric_tags!(
                 "env" => "test_env",
                 "host" => "localhost",
             )))
-                .with_timestamp(Some(ts()))
+            .with_timestamp(Some(ts()))
         );
     }
 
@@ -1762,12 +1762,12 @@ mod tests {
                 },
                 metric.metadata().clone(),
             )
-                .with_namespace(Some("test_namespace"))
-                .with_tags(Some(metric_tags!(
+            .with_namespace(Some("test_namespace"))
+            .with_tags(Some(metric_tags!(
                 "env" => "test_env",
                 "host" => "localhost",
             )))
-                .with_timestamp(Some(ts()))
+            .with_timestamp(Some(ts()))
         );
     }
 
@@ -1823,12 +1823,12 @@ mod tests {
                 },
                 metric.metadata().clone(),
             )
-                .with_namespace(Some("test_namespace"))
-                .with_tags(Some(metric_tags!(
+            .with_namespace(Some("test_namespace"))
+            .with_tags(Some(metric_tags!(
                 "env" => "test_env",
                 "host" => "localhost",
             )))
-                .with_timestamp(Some(ts()))
+            .with_timestamp(Some(ts()))
         );
     }
 
@@ -1886,12 +1886,12 @@ mod tests {
                 },
                 metric.metadata().clone(),
             )
-                .with_namespace(Some("test_namespace"))
-                .with_tags(Some(metric_tags!(
+            .with_namespace(Some("test_namespace"))
+            .with_tags(Some(metric_tags!(
                 "env" => "test_env",
                 "host" => "localhost",
             )))
-                .with_timestamp(Some(ts()))
+            .with_timestamp(Some(ts()))
         );
     }
 
@@ -1925,12 +1925,12 @@ mod tests {
                 MetricValue::Counter { value: 10.0 },
                 metric.metadata().clone(),
             )
-                .with_namespace(Some("test_namespace"))
-                .with_tags(Some(metric_tags!(
+            .with_namespace(Some("test_namespace"))
+            .with_tags(Some(metric_tags!(
                 "env" => "test_env",
                 "host" => "localhost",
             )))
-                .with_timestamp(Some(ts()))
+            .with_timestamp(Some(ts()))
         );
     }
 }
