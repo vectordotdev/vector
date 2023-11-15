@@ -87,20 +87,20 @@ pub struct DatadogAgentConfig {
     #[serde(default = "crate::serde::default_false")]
     disable_logs: bool,
 
-    /// If this is set to `true`, metrics are not accepted by the component.
+    /// If this is set to `true`, metrics (beta) are not accepted by the component.
     #[configurable(metadata(docs::advanced))]
     #[serde(default = "crate::serde::default_false")]
     disable_metrics: bool,
 
-    /// If this is set to `true`, traces are not accepted by the component.
+    /// If this is set to `true`, traces (alpha) are not accepted by the component.
     #[configurable(metadata(docs::advanced))]
     #[serde(default = "crate::serde::default_false")]
     disable_traces: bool,
 
-    /// If this is set to `true` logs, metrics, and traces are sent to different outputs.
+    /// If this is set to `true`, logs, metrics (beta), and traces (alpha) are sent to different outputs.
     ///
     ///
-    /// For a source component named `agent`, the received logs, metrics, and traces can then be
+    /// For a source component named `agent`, the received logs, metrics (beta), and traces (alpha) can then be
     /// configured as input to other components by specifying `agent.logs`, `agent.metrics`, and
     /// `agent.traces`, respectively.
     #[configurable(metadata(docs::advanced))]

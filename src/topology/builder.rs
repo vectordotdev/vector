@@ -48,7 +48,7 @@ use crate::{
     extra_context::ExtraContext,
     internal_events::EventsReceived,
     shutdown::SourceShutdownCoordinator,
-    source_sender::CHUNK_SIZE,
+    source_sender::{SourceSenderItem, CHUNK_SIZE},
     spawn_named,
     topology::task::TaskError,
     transforms::{SyncTransform, TaskTransform, Transform, TransformOutputs, TransformOutputsBuf},
@@ -247,13 +247,20 @@ impl<'a> Builder<'a> {
                 let pump = async move {
                     debug!("Source pump starting.");
 
-                    while let Some(mut array) = rx.next().await {
+                    while let Some(SourceSenderItem {
+                        events: mut array,
+                        send_reference,
+                    }) = rx.next().await
+                    {
                         array.set_output_id(&source);
                         array.set_source_type(source_type);
-                        fanout.send(array).await.map_err(|e| {
-                            debug!("Source pump finished with an error.");
-                            TaskError::wrapped(e)
-                        })?;
+                        fanout
+                            .send(array, Some(send_reference))
+                            .await
+                            .map_err(|e| {
+                                debug!("Source pump finished with an error.");
+                                TaskError::wrapped(e)
+                            })?;
                     }
 
                     debug!("Source pump finished normally.");
@@ -482,7 +489,8 @@ impl<'a> Builder<'a> {
             };
 
             let (input_tx, input_rx) =
-                TopologyBuilder::standalone_memory(TOPOLOGY_BUFFER_SIZE, WhenFull::Block).await;
+                TopologyBuilder::standalone_memory(TOPOLOGY_BUFFER_SIZE, WhenFull::Block, &span)
+                    .await;
 
             self.inputs
                 .insert(key.clone(), (input_tx, node.inputs.clone()));
@@ -993,9 +1001,9 @@ fn build_task_transform(
             for event in events.iter_events_mut() {
                 update_runtime_schema_definition(event, &output_id, &schema_definition_map);
             }
-            events
+            (events, Instant::now())
         })
-        .inspect(move |events: &EventArray| {
+        .inspect(move |(events, _): &(EventArray, Instant)| {
             events_sent.emit(CountByteSize(
                 events.len(),
                 events.estimated_json_encoded_size_of(),

@@ -7,7 +7,6 @@ use std::{
     },
 };
 
-use crate::schema::Definition;
 use crate::{
     config::{Config, ConfigDiff, SinkOuter},
     event::{into_event_stream, Event, EventArray, EventContainer, LogEvent},
@@ -21,6 +20,7 @@ use crate::{
     },
     topology::{RunningTopology, TopologyPieces},
 };
+use crate::{schema::Definition, source_sender::SourceSenderItem};
 use futures::{future, stream, StreamExt};
 use tokio::{
     task::yield_now,
@@ -78,8 +78,8 @@ fn into_message(event: Event) -> String {
         .into_owned()
 }
 
-fn into_message_stream(array: EventArray) -> impl futures::Stream<Item = String> {
-    stream::iter(array.into_events().map(into_message))
+fn into_message_stream(array: SourceSenderItem) -> impl futures::Stream<Item = String> {
+    stream::iter(array.events.into_events().map(into_message))
 }
 
 #[tokio::test]
@@ -120,7 +120,7 @@ async fn topology_shutdown_while_active() {
     assert_eq!(processed_events.len(), counter.load(Ordering::Relaxed));
     for event in processed_events
         .into_iter()
-        .flat_map(EventArray::into_events)
+        .flat_map(|item| EventArray::into_events(item.into()))
     {
         assert_eq!(
             event.as_log()[&crate::config::log_schema()
@@ -185,11 +185,11 @@ async fn topology_multiple_sources() {
 
     in1.send_event(event1.clone()).await.unwrap();
 
-    let out_event1 = out1.next().await;
+    let out_event1: Option<EventArray> = out1.next().await.map(|item| item.into());
 
     in2.send_event(event2.clone()).await.unwrap();
 
-    let out_event2 = out1.next().await;
+    let out_event2: Option<EventArray> = out1.next().await.map(|item| item.into());
 
     topology.stop().await;
 
@@ -904,7 +904,7 @@ async fn topology_disk_buffer_flushes_on_idle() {
 
     // make sure there are no unexpected stragglers
     let rest = out1.collect::<Vec<_>>().await;
-    assert_eq!(rest, vec![]);
+    assert!(rest.is_empty());
 }
 
 #[tokio::test]
@@ -953,12 +953,12 @@ async fn source_metadata_reaches_sink() {
     in1.send_event(event1.clone()).await.unwrap();
 
     let out_event1 = out1.next().await.unwrap();
-    let out_event1 = out_event1.iter_events().next().unwrap();
+    let out_event1 = out_event1.events.iter_events().next().unwrap();
 
     in2.send_event(event2.clone()).await.unwrap();
 
     let out_event2 = out1.next().await.unwrap();
-    let out_event2 = out_event2.iter_events().next().unwrap();
+    let out_event2 = out_event2.events.iter_events().next().unwrap();
 
     topology.stop().await;
 
