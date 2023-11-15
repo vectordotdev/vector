@@ -215,7 +215,7 @@ lapin = { version = "2.3.1", default-features = false, features = ["native-tls"]
 # API
 async-graphql = { version = "6.0.10", default-features = false, optional = true, features = ["chrono", "playground"] }
 async-graphql-warp = { version = "6.0.10", default-features = false, optional = true }
-itertools = { version = "0.11.0", default-features = false }
+itertools = { version = "0.12.0", default-features = false }
 
 # API client
 crossterm = { version = "0.27.0", default-features = false, features = ["event-stream", "windows"], optional = true }
@@ -349,7 +349,7 @@ azure_storage_blobs = { version = "0.17", default-features = false, features = [
 azure_storage = { version = "0.17", default-features = false }
 base64 = "0.21.5"
 criterion = { version = "0.5.1", features = ["html_reports", "async_tokio"] }
-itertools = { version = "0.11.0", default-features = false, features = ["use_alloc"] }
+itertools = { version = "0.12.0", default-features = false, features = ["use_alloc"] }
 libc = "0.2.150"
 similar-asserts = "1.5.0"
 proptest = "1.4"
