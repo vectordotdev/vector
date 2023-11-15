@@ -72,6 +72,7 @@ pub(crate) mod common;
 mod convert_config;
 pub mod encoding_transcode;
 pub mod enrichment_tables;
+pub mod extra_context;
 #[cfg(feature = "gcp")]
 pub mod gcp;
 pub(crate) mod graph;

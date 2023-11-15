@@ -685,7 +685,9 @@ pub async fn start_topology(
     require_healthy: impl Into<Option<bool>>,
 ) -> (RunningTopology, ShutdownErrorReceiver) {
     config.healthchecks.set_require_healthy(require_healthy);
-    RunningTopology::start_init_validated(config).await.unwrap()
+    RunningTopology::start_init_validated(config, Default::default())
+        .await
+        .unwrap()
 }
 
 /// Collect the first `n` events from a stream while a future is spawned

@@ -1,7 +1,6 @@
 #![allow(missing_docs)]
 use std::{num::NonZeroUsize, path::PathBuf, process::ExitStatus, time::Duration};
 
-use anymap::AnyMap;
 use exitcode::ExitCode;
 use futures::StreamExt;
 #[cfg(feature = "enterprise")]
@@ -16,6 +15,7 @@ use crate::config::enterprise::{
     attach_enterprise_components, report_configuration, EnterpriseError, EnterpriseMetadata,
     EnterpriseReporter,
 };
+use crate::extra_context::ExtraContext;
 #[cfg(not(feature = "enterprise-tests"))]
 use crate::metrics;
 #[cfg(feature = "api")]
@@ -50,27 +50,26 @@ pub struct ApplicationConfig {
     pub api: config::api::Options,
     #[cfg(feature = "enterprise")]
     pub enterprise: Option<EnterpriseReporter<BoxFuture<'static, ()>>>,
-    pub datadog_options: config::datadog::Options,
+    pub extra_context: ExtraContext,
 }
 
 pub struct Application {
     pub root_opts: RootOpts,
     pub config: ApplicationConfig,
     pub signals: SignalPair,
+    pub extra_context: ExtraContext,
 }
 
 impl ApplicationConfig {
     pub async fn from_opts(
         opts: &RootOpts,
-        extra_context: AnyMap,
         signal_handler: &mut SignalHandler,
+        extra_context: ExtraContext,
     ) -> Result<Self, ExitCode> {
         let config_paths = opts.config_paths_with_formats();
 
         let graceful_shutdown_duration = (!opts.no_graceful_shutdown_limit)
             .then(|| Duration::from_secs(u64::from(opts.graceful_shutdown_limit_secs)));
-
-        let datadog_options = extra_context.get::<config::datadog::Options>();
 
         let config = load_configs(
             &config_paths,
@@ -78,17 +77,17 @@ impl ApplicationConfig {
             opts.require_healthy,
             opts.allow_empty_config,
             graceful_shutdown_duration,
-            datadog_options.cloned(),
             signal_handler,
         )
         .await?;
 
-        Self::from_config(config_paths, config).await
+        Self::from_config(config_paths, config, extra_context).await
     }
 
     pub async fn from_config(
         config_paths: Vec<ConfigPath>,
         config: Config,
+        extra_context: ExtraContext,
     ) -> Result<Self, ExitCode> {
         // This is ugly, but needed to allow `config` to be mutable for building the enterprise
         // features, but also avoid a "does not need to be mutable" warning when the enterprise
@@ -98,14 +97,13 @@ impl ApplicationConfig {
         #[cfg(feature = "enterprise")]
         let enterprise = build_enterprise(&mut config, config_paths.clone())?;
 
-        let datadog_options = config.datadog.clone();
-
         #[cfg(feature = "api")]
         let api = config.api;
 
-        let (topology, graceful_crash_receiver) = RunningTopology::start_init_validated(config)
-            .await
-            .ok_or(exitcode::CONFIG)?;
+        let (topology, graceful_crash_receiver) =
+            RunningTopology::start_init_validated(config, extra_context.clone())
+                .await
+                .ok_or(exitcode::CONFIG)?;
 
         Ok(Self {
             config_paths,
@@ -116,12 +114,18 @@ impl ApplicationConfig {
             api,
             #[cfg(feature = "enterprise")]
             enterprise,
-            datadog_options,
+            extra_context,
         })
     }
 
-    pub async fn add_internal_config(&mut self, config: Config) -> Result<(), ExitCode> {
-        let Some((topology, _)) = RunningTopology::start_init_validated(config).await else {
+    pub async fn add_internal_config(
+        &mut self,
+        config: Config,
+        extra_context: ExtraContext,
+    ) -> Result<(), ExitCode> {
+        let Some((topology, _)) =
+            RunningTopology::start_init_validated(config, extra_context).await
+        else {
             return Err(exitcode::CONFIG);
         };
         self.internal_topologies.push(topology);
@@ -164,28 +168,34 @@ impl ApplicationConfig {
 }
 
 impl Application {
-    pub fn run() -> ExitStatus {
-        let (runtime, app) = Self::prepare_start().unwrap_or_else(|code| std::process::exit(code));
+    pub fn run(extra_context: ExtraContext) -> ExitStatus {
+        let (runtime, app) =
+            Self::prepare_start(extra_context).unwrap_or_else(|code| std::process::exit(code));
 
         runtime.block_on(app.run())
     }
 
-    pub fn prepare_start() -> Result<(Runtime, StartedApplication), ExitCode> {
-        Self::prepare()
+    pub fn prepare_start(
+        extra_context: ExtraContext,
+    ) -> Result<(Runtime, StartedApplication), ExitCode> {
+        Self::prepare(extra_context)
             .and_then(|(runtime, app)| app.start(runtime.handle()).map(|app| (runtime, app)))
     }
 
-    pub fn prepare() -> Result<(Runtime, Self), ExitCode> {
+    pub fn prepare(extra_context: ExtraContext) -> Result<(Runtime, Self), ExitCode> {
         let opts = Opts::get_matches().map_err(|error| {
             // Printing to stdout/err can itself fail; ignore it.
             _ = error.print();
             exitcode::USAGE
         })?;
 
-        Self::prepare_from_opts(opts)
+        Self::prepare_from_opts(opts, extra_context)
     }
 
-    pub fn prepare_from_opts(opts: Opts) -> Result<(Runtime, Self), ExitCode> {
+    pub fn prepare_from_opts(
+        opts: Opts,
+        extra_context: ExtraContext,
+    ) -> Result<(Runtime, Self), ExitCode> {
         init_global(!opts.root.openssl_no_probe);
 
         let color = opts.root.color.use_color();
@@ -213,8 +223,8 @@ impl Application {
 
         let config = runtime.block_on(ApplicationConfig::from_opts(
             &opts.root,
-            AnyMap::new(),
             &mut signals.handler,
+            extra_context.clone(),
         ))?;
 
         Ok((
@@ -223,6 +233,7 @@ impl Application {
                 root_opts: opts.root,
                 config,
                 signals,
+                extra_context,
             },
         ))
     }
@@ -239,6 +250,7 @@ impl Application {
             root_opts,
             config,
             signals,
+            extra_context,
         } = self;
 
         let topology_controller = SharedTopologyController::new(TopologyController {
@@ -249,6 +261,7 @@ impl Application {
             require_healthy: root_opts.require_healthy,
             #[cfg(feature = "enterprise")]
             enterprise_reporter: config.enterprise,
+            extra_context,
         });
 
         Ok(StartedApplication {
@@ -257,7 +270,6 @@ impl Application {
             graceful_crash_receiver: config.graceful_crash_receiver,
             signals,
             topology_controller,
-            datadog_options: config.datadog_options,
             allow_empty_config: root_opts.allow_empty_config,
         })
     }
@@ -269,7 +281,6 @@ pub struct StartedApplication {
     pub graceful_crash_receiver: ShutdownErrorReceiver,
     pub signals: SignalPair,
     pub topology_controller: SharedTopologyController,
-    pub datadog_options: config::datadog::Options,
     pub allow_empty_config: bool,
 }
 
@@ -285,7 +296,6 @@ impl StartedApplication {
             signals,
             topology_controller,
             internal_topologies,
-            datadog_options,
             allow_empty_config,
         } = self;
 
@@ -302,7 +312,6 @@ impl StartedApplication {
                     &topology_controller,
                     &config_paths,
                     &mut signal_handler,
-                    datadog_options.clone(),
                     allow_empty_config,
                 ).await {
                     break signal;
@@ -331,7 +340,6 @@ async fn handle_signal(
     topology_controller: &SharedTopologyController,
     config_paths: &[ConfigPath],
     signal_handler: &mut SignalHandler,
-    datadog_options: config::datadog::Options,
     allow_empty_config: bool,
 ) -> Option<SignalTo> {
     match signal {
@@ -353,7 +361,6 @@ async fn handle_signal(
 
             // Reload config
             let new_config = config::load_from_paths_with_provider_and_secrets(
-                Some(datadog_options),
                 &topology_controller.config_paths,
                 signal_handler,
                 allow_empty_config,
@@ -503,7 +510,6 @@ pub async fn load_configs(
     require_healthy: Option<bool>,
     allow_empty_config: bool,
     graceful_shutdown_duration: Option<Duration>,
-    datadog: Option<config::datadog::Options>,
     signal_handler: &mut SignalHandler,
 ) -> Result<Config, ExitCode> {
     let config_paths = config::process_paths(config_paths).ok_or(exitcode::CONFIG)?;
@@ -528,7 +534,6 @@ pub async fn load_configs(
     config::init_log_schema(&config_paths, true).map_err(handle_config_errors)?;
 
     let mut config = config::load_from_paths_with_provider_and_secrets(
-        datadog,
         &config_paths,
         signal_handler,
         allow_empty_config,

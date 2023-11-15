@@ -419,7 +419,7 @@ async fn build_unit_test(
     }
     let config = config_builder.build()?;
     let diff = config::ConfigDiff::initial(&config);
-    let pieces = TopologyPieces::build(&config, &diff, HashMap::new()).await?;
+    let pieces = TopologyPieces::build(&config, &diff, HashMap::new(), Default::default()).await?;
 
     Ok(UnitTest {
         name: test.name,

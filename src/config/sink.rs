@@ -14,8 +14,8 @@ use vector_lib::{
     sink::VectorSink,
 };
 
-use super::datadog;
 use super::{id::Inputs, schema, ComponentKey, ProxyConfig, Resource};
+use crate::extra_context::ExtraContext;
 use crate::sinks::{util::UriSerde, Healthcheck};
 
 pub type BoxedSink = Box<dyn SinkConfig>;
@@ -240,16 +240,11 @@ dyn_clone::clone_trait_object!(SinkConfig);
 pub struct SinkContext {
     pub healthcheck: SinkHealthcheckOptions,
     pub globals: GlobalOptions,
-    #[cfg(any(
-        feature = "sinks-datadog_logs",
-        feature = "sinks-datadog_metrics",
-        feature = "sinks-datadog_traces",
-    ))]
-    pub datadog: datadog::Options,
     pub proxy: ProxyConfig,
     pub schema: schema::Options,
     pub app_name: String,
     pub app_name_slug: String,
+    pub extra_context: ExtraContext,
 }
 
 impl Default for SinkContext {
@@ -257,11 +252,11 @@ impl Default for SinkContext {
         Self {
             healthcheck: Default::default(),
             globals: Default::default(),
-            datadog: Default::default(),
             proxy: Default::default(),
             schema: Default::default(),
             app_name: crate::get_app_name().to_string(),
             app_name_slug: crate::get_slugified_app_name(),
+            extra_context: Default::default(),
         }
     }
 }

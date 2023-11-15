@@ -8,8 +8,7 @@ use vector_lib::{
 };
 
 use crate::{
-    common::datadog::get_api_base_endpoint,
-    config::datadog,
+    common::datadog::{self, get_api_base_endpoint},
     http::{HttpClient, HttpError},
     sinks::HealthcheckError,
 };

@@ -7,6 +7,7 @@ use vector_lib::{config::proxy::ProxyConfig, schema::meaning};
 use vrl::value::Kind;
 
 use super::{service::LogApiRetry, sink::LogSinkBuilder};
+use crate::common::datadog;
 use crate::{
     codecs::Transformer,
     config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
@@ -157,7 +158,12 @@ impl DatadogLogsConfig {
 impl SinkConfig for DatadogLogsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let client = self.create_client(&cx.proxy)?;
-        let dd_common = self.dd_common.with_globals(&cx.datadog)?;
+        let global = cx
+            .extra_context
+            .get::<datadog::Options>()
+            .cloned()
+            .unwrap_or_default();
+        let dd_common = self.dd_common.with_globals(&global)?;
 
         let healthcheck = dd_common.build_healthcheck(client.clone())?;
 

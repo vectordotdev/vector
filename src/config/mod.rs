@@ -25,12 +25,6 @@ pub mod api;
 mod builder;
 mod cmd;
 mod compiler;
-#[cfg(any(
-    feature = "sinks-datadog_logs",
-    feature = "sinks-datadog_metrics",
-    feature = "sinks-datadog_traces",
-))]
-pub mod datadog;
 mod diff;
 mod enrichment_table;
 #[cfg(feature = "enterprise")]
@@ -114,12 +108,6 @@ pub struct Config {
     #[cfg(feature = "api")]
     pub api: api::Options,
     pub schema: schema::Options,
-    #[cfg(any(
-        feature = "sinks-datadog_logs",
-        feature = "sinks-datadog_metrics",
-        feature = "sinks-datadog_traces",
-    ))]
-    pub datadog: datadog::Options,
     pub hash: Option<String>,
     #[cfg(feature = "enterprise")]
     pub enterprise: Option<enterprise::Options>,
@@ -573,7 +561,8 @@ mod tests {
                 let c2 = config::load_from_str(config, format).unwrap();
                 match (
                     config::warnings(&c2),
-                    topology::TopologyPieces::build(&c, &diff, HashMap::new()).await,
+                    topology::TopologyPieces::build(&c, &diff, HashMap::new(), Default::default())
+                        .await,
                 ) {
                     (warnings, Ok(_pieces)) => Ok(warnings),
                     (_, Err(errors)) => Err(errors),

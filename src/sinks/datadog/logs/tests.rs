@@ -17,7 +17,9 @@ use vector_lib::{
 };
 
 use crate::{
+    common::datadog,
     config::{SinkConfig, SinkContext},
+    extra_context::ExtraContext,
     http::HttpError,
     sinks::{
         util::retries::RetryLogic,
@@ -539,8 +541,15 @@ async fn global_options() {
     let config = indoc! {r#"
             compression = "none"
         "#};
-    let mut cx = SinkContext::default();
-    cx.datadog.api_key = Some("global-key".to_string().into());
+    let mut context = anymap::Map::new();
+    context.insert(datadog::Options {
+        api_key: Some("global-key".to_string().into()),
+        ..Default::default()
+    });
+    let cx = SinkContext {
+        extra_context: ExtraContext::new(context),
+        ..SinkContext::default()
+    };
     let (mut config, cx) = load_sink_with_context::<DatadogLogsConfig>(config, cx).unwrap();
 
     let addr = next_addr();
@@ -580,8 +589,15 @@ async fn override_global_options() {
         "#};
 
     // Set a global key option, which should be overridden by the option in the component configuration.
-    let mut cx = SinkContext::default();
-    cx.datadog.api_key = Some("global-key".to_string().into());
+    let mut context = anymap::Map::new();
+    context.insert(datadog::Options {
+        api_key: Some("global-key".to_string().into()),
+        ..Default::default()
+    });
+    let cx = SinkContext {
+        extra_context: ExtraContext::new(context),
+        ..SinkContext::default()
+    };
     let (mut config, cx) = load_sink_with_context::<DatadogLogsConfig>(config, cx).unwrap();
 
     let addr = next_addr();

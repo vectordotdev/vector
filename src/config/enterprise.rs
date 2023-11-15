@@ -17,11 +17,11 @@ use url::{ParseError, Url};
 use vector_lib::config::proxy::ProxyConfig;
 
 use super::{
-    datadog::default_site, load_source_from_paths, process_paths, ComponentKey, Config, ConfigPath,
-    OutputId, SinkOuter, SourceOuter, TransformOuter,
+    load_source_from_paths, process_paths, ComponentKey, Config, ConfigPath, OutputId, SinkOuter,
+    SourceOuter, TransformOuter,
 };
 use crate::{
-    common::datadog::get_api_base_endpoint,
+    common::datadog::{default_site, get_api_base_endpoint},
     conditions::AnyCondition,
     http::{HttpClient, HttpError},
     sinks::{

@@ -7,6 +7,8 @@ use std::process::ExitCode;
 
 #[cfg(unix)]
 fn main() -> ExitCode {
+    use vector::extra_context::ExtraContext;
+
     #[cfg(feature = "allocation-tracing")]
     {
         use crate::vector::internal_telemetry::allocations::{
@@ -37,7 +39,9 @@ fn main() -> ExitCode {
         }
     }
 
-    let exit_code = Application::run().code().unwrap_or(exitcode::UNAVAILABLE) as u8;
+    let exit_code = Application::run(ExtraContext::default())
+        .code()
+        .unwrap_or(exitcode::UNAVAILABLE) as u8;
     ExitCode::from(exit_code)
 }
 

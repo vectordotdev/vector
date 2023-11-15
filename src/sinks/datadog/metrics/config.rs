@@ -12,6 +12,7 @@ use super::{
     sink::DatadogMetricsSink,
 };
 use crate::{
+    common::datadog,
     config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext},
     http::HttpClient,
     sinks::{
@@ -159,7 +160,12 @@ impl_generate_config_from_default!(DatadogMetricsConfig);
 impl SinkConfig for DatadogMetricsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let client = self.build_client(&cx.proxy)?;
-        let dd_common = self.dd_common.with_globals(&cx.datadog)?;
+        let global = cx
+            .extra_context
+            .get::<datadog::Options>()
+            .cloned()
+            .unwrap_or_default();
+        let dd_common = self.dd_common.with_globals(&global)?;
         let healthcheck = dd_common.build_healthcheck(client.clone())?;
         let sink = self.build_sink(&dd_common, client)?;
 
