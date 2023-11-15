@@ -56,24 +56,13 @@ impl Default for Concurrency {
 }
 
 impl Concurrency {
-    const fn if_adaptive(self, other: Self) -> Self {
+    pub const fn parse_concurrency(&self) -> Option<usize> {
         match self {
-            Self::Adaptive => other,
-            _ => self,
-        }
-    }
-
-    pub const fn parse_concurrency(&self, other: Self) -> Option<usize> {
-        match self.if_adaptive(other) {
             Concurrency::None => Some(1),
             Concurrency::Adaptive => None,
-            Concurrency::Fixed(limit) => Some(limit),
+            Concurrency::Fixed(limit) => Some(*limit),
         }
     }
-}
-
-pub const fn concurrency_is_adaptive(concurrency: &Concurrency) -> bool {
-    matches!(concurrency, Concurrency::Adaptive)
 }
 
 impl<'de> Deserialize<'de> for Concurrency {

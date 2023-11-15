@@ -15,6 +15,7 @@ use vector_lib::event::{EventFinalizers, Finalizable};
 use vector_lib::{request_metadata::RequestMetadata, TimeZone};
 
 use crate::sinks::util::metadata::RequestMetadataBuilder;
+use crate::sinks::util::service::TowerRequestConfigDefaults;
 use crate::{
     codecs::{Encoder, EncodingConfigWithFraming, SinkType, Transformer},
     config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
@@ -46,6 +47,13 @@ use crate::{
 pub enum GcsHealthcheckError {
     #[snafu(display("key_prefix template parse error: {}", source))]
     KeyPrefixTemplate { source: TemplateParseError },
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct GcsTowerRequestConfigDefaults;
+
+impl TowerRequestConfigDefaults for GcsTowerRequestConfigDefaults {
+    const RATE_LIMIT_NUM: u64 = 1_000;
 }
 
 /// Configuration for the `gcp_cloud_storage` sink.
@@ -149,7 +157,7 @@ pub struct GcsSinkConfig {
 
     #[configurable(derived)]
     #[serde(default)]
-    request: TowerRequestConfig,
+    request: TowerRequestConfig<GcsTowerRequestConfigDefaults>,
 
     #[serde(flatten)]
     auth: GcpAuthConfig,
@@ -245,10 +253,7 @@ impl GcsSinkConfig {
         auth: GcpAuthenticator,
         cx: SinkContext,
     ) -> crate::Result<VectorSink> {
-        let request = self.request.unwrap_with(&TowerRequestConfig {
-            rate_limit_num: Some(1000),
-            ..Default::default()
-        });
+        let request = self.request.into_settings();
 
         let batch_settings = self.batch.into_batcher_settings()?;
 
