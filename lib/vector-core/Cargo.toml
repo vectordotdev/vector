@@ -63,7 +63,7 @@ vector-config = { path = "../vector-config" }
 vector-config-common = { path = "../vector-config-common" }
 vector-config-macros = { path = "../vector-config-macros" }
 vrl.workspace = true
-memchr = "2.6.4"
+bytecount = "0.6.7"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 security-framework = "2.9.2"

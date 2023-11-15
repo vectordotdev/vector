@@ -97,8 +97,7 @@ impl EstimatedJsonEncodedSizeOf for str {
 // serializing to JSON. The goal is improve our overall accuracy in the case of relatively common
 // scenarios like strings of nested JSON, etc.
 fn count_escapes(input: &[u8]) -> usize {
-    memchr::memchr3_iter(b'"', b'\\', b'\t', input).count()
-        + memchr::memchr2_iter(b'\n', b'\r', input).count()
+    bytecount::count(input, b'"')
 }
 
 impl EstimatedJsonEncodedSizeOf for String {

@@ -1760,6 +1760,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "bytecount"
+version = "0.6.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e1e5f035d16fc623ae5f74981db80a439803888314e3a555fd6f04acd51a3205"
+
+[[package]]
 name = "bytemuck"
 version = "1.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5584,7 +5590,8 @@ dependencies = [
 [[package]]
 name = "ntapi"
 version = "0.3.7"
-source = "git+https://github.com/MSxDOS/ntapi.git?rev=24fc1e47677fc9f6e38e5f154e6011dc9b270da6#24fc1e47677fc9f6e38e5f154e6011dc9b270da6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c28774a7fd2fbb4f0babd8237ce554b73af68021b5f695a3cebd6c59bac0980f"
 dependencies = [
  "winapi",
 ]
@@ -10222,6 +10229,7 @@ dependencies = [
  "async-trait",
  "base64 0.21.5",
  "bitmask-enum",
+ "bytecount",
  "bytes 1.5.0",
  "chrono",
  "chrono-tz",
@@ -10239,7 +10247,6 @@ dependencies = [
  "http",
  "hyper-proxy",
  "indexmap 2.1.0",
- "memchr",
  "metrics",
  "metrics-tracing-context",
  "metrics-util",
