@@ -99,7 +99,7 @@ impl DatadogMetricsEndpoint {
         Self::Series(SeriesApiVersion::get_api_version())
     }
 
-    pub(super) fn payload_limits(&self) -> DatadogMetricsPayloadLimits {
+    pub(super) const fn payload_limits(self) -> DatadogMetricsPayloadLimits {
         // from https://docs.datadoghq.com/api/latest/metrics/#submit-metrics
         match self {
             // Sketches use the same payload size limits as v1 series

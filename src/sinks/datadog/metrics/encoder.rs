@@ -17,7 +17,7 @@ use vector_lib::{
     EstimatedJsonEncodedSizeOf,
 };
 
-use super::config::{DatadogMetricsEndpoint, DatadogMetricsPayloadLimits, SeriesApiVersion};
+use super::config::{DatadogMetricsEndpoint, SeriesApiVersion};
 use crate::{
     common::datadog::{
         DatadogMetricType, DatadogPoint, DatadogSeriesMetric, DatadogSeriesMetricMetadata,
@@ -169,7 +169,7 @@ impl DatadogMetricsEncoder {
         endpoint: DatadogMetricsEndpoint,
         default_namespace: Option<String>,
     ) -> Result<Self, CreateError> {
-        let payload_limits: DatadogMetricsPayloadLimits = endpoint.into();
+        let payload_limits = endpoint.payload_limits();
         Self::with_payload_limits(
             endpoint,
             default_namespace,
