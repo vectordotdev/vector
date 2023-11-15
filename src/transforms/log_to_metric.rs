@@ -74,7 +74,7 @@ pub struct LogToMetricConfig {
     /// - `name`: A string representing the name of the counter, here set to "test.transform.counter".
     /// - `tags`: An object containing additional tags such as "env" and "host".
     ///
-    /// Objects that can be processes include counter, histogram, gauge, set and summary.
+    /// Objects that can be processed include counter, histogram, gauge, set and summary.
     pub all_metrics: Option<bool>,
 }
 
