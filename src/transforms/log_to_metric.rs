@@ -48,7 +48,32 @@ const ORIGIN_SERVICE_VALUE: u32 = 3;
 pub struct LogToMetricConfig {
     /// A list of metrics to generate.
     pub metrics: Vec<MetricConfig>,
-    /// this flag will process all metrics to logs, if defined the `metrics` field is ignored.
+    /// This flag will process all incoming events metrics and will attempt to convert them to logs. Otherwise, only items specified in the 'metrics' field will be processes.
+    /// NOTE: If defined, the `metrics` field is ignored.
+    ///
+    /// ```
+    /// use serde_json::json;
+    /// let json_event = json!({
+    ///     "counter": {
+    ///         "value": 10.0
+    ///     },
+    ///     "kind": "incremental",
+    ///     "name": "test.transform.counter",
+    ///     "tags": {
+    ///         "env": "test_env",
+    ///         "host": "localhost"
+    ///     }
+    /// });
+    /// ```
+    ///
+    /// This is an example JSON representation of a counter with the following properties:
+    ///
+    /// - `counter`: An object with a single property `value` representing the counter value (e.g., 10.0).
+    /// - `kind`: A string indicating the kind of counter, in this case, "incremental".
+    /// - `name`: A string representing the name of the counter, here set to "test.transform.counter".
+    /// - `tags`: An object containing additional tags such as "env" and "host".
+    ///
+    /// Objects that can be processes include counter, histogram, gauge, set and summary.
     pub all_metrics: Option<bool>,
 }
 
