@@ -49,8 +49,8 @@ pub struct LogToMetricConfig {
     /// A list of metrics to generate.
     pub metrics: Vec<MetricConfig>,
     /// Setting this flag will change the behavior of this transformation.
-    /// Notably the `metrics` field will be ignored. 
-    /// All incoming events will be processed and if possible they will be converted to log events. 
+    /// Notably the `metrics` field will be ignored.
+    /// All incoming events will be processed and if possible they will be converted to log events.
     /// Otherwise, only items specified in the 'metrics' field will be processes.
     ///
     /// ```
@@ -67,7 +67,6 @@ pub struct LogToMetricConfig {
     ///     }
     /// });
     /// ```
-    ///
     /// This is an example JSON representation of a counter with the following properties:
     ///
     /// - `counter`: An object with a single property `value` representing the counter value (e.g., 10.0).
