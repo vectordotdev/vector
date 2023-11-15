@@ -1873,6 +1873,7 @@ fn test_config_outputs() {
             disable_metrics: false,
             disable_traces: false,
             log_namespace: Some(false),
+            keepalive: Default::default(),
         };
 
         let mut outputs = config

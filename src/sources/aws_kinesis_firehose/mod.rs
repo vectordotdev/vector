@@ -1,7 +1,9 @@
+use std::time::Duration;
 use std::{convert::Infallible, fmt, net::SocketAddr};
 
 use futures::FutureExt;
 use hyper::{service::make_service_fn, Server};
+use tokio::net::TcpStream;
 use tower::ServiceBuilder;
 use tracing::Span;
 use vector_lib::codecs::decoding::{DeserializerConfig, FramingConfig};
@@ -9,8 +11,10 @@ use vector_lib::config::{LegacyKey, LogNamespace};
 use vector_lib::configurable::configurable_component;
 use vector_lib::lookup::owned_value_path;
 use vector_lib::sensitive_string::SensitiveString;
+use vector_lib::tls::MaybeTlsIncomingStream;
 use vrl::value::Kind;
 
+use crate::http::{KeepaliveConfig, MaxConnectionAgeLayer};
 use crate::{
     codecs::DecodingConfig,
     config::{
@@ -96,6 +100,10 @@ pub struct AwsKinesisFirehoseConfig {
     #[configurable(metadata(docs::hidden))]
     #[serde(default)]
     log_namespace: Option<bool>,
+
+    #[configurable(derived)]
+    #[serde(default)]
+    keepalive: KeepaliveConfig,
 }
 
 const fn access_keys_example() -> [&'static str; 2] {
@@ -174,12 +182,20 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
         let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
         let listener = tls.bind(&self.address).await?;
 
+        let keepalive_settings = self.keepalive.clone();
         let shutdown = cx.shutdown;
         Ok(Box::pin(async move {
             let span = Span::current();
-            let make_svc = make_service_fn(move |_conn| {
+            let make_svc = make_service_fn(move |conn: &MaybeTlsIncomingStream<TcpStream>| {
                 let svc = ServiceBuilder::new()
                     .layer(build_http_trace_layer(span.clone()))
+                    .option_layer(keepalive_settings.max_connection_age_secs.map(|secs| {
+                        MaxConnectionAgeLayer::new(
+                            Duration::from_secs(secs),
+                            keepalive_settings.max_connection_age_jitter_factor,
+                            conn.peer_addr(),
+                        )
+                    }))
                     .service(warp::service(svc.clone()));
                 futures_util::future::ok::<_, Infallible>(svc)
             });
@@ -244,6 +260,7 @@ impl GenerateConfig for AwsKinesisFirehoseConfig {
             decoding: default_decoding(),
             acknowledgements: Default::default(),
             log_namespace: None,
+            keepalive: Default::default(),
         })
         .unwrap()
     }
@@ -336,6 +353,7 @@ mod tests {
                 decoding: default_decoding(),
                 acknowledgements: true.into(),
                 log_namespace: Some(log_namespace),
+                keepalive: Default::default(),
             }
             .build(cx)
             .await
