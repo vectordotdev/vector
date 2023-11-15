@@ -1,6 +1,5 @@
 use std::sync::Arc;
 use std::{collections::HashMap, num::ParseFloatError};
-use std::fmt;
 
 use chrono::Utc;
 use indexmap::IndexMap;
@@ -31,8 +30,7 @@ use crate::{
     internal_events::{
         LogToMetricFieldNullError, LogToMetricParseFloatError,
         MetricMetadataInvalidFieldValueError, MetricMetadataMetricDetailsNotFoundError,
-        MetricMetadataParseError,
-        ParserMissingFieldError, DROP_EVENT,
+        MetricMetadataParseError, ParserMissingFieldError, DROP_EVENT,
     },
     schema,
     template::{Template, TemplateRenderingError},
@@ -237,8 +235,8 @@ pub enum TransformParseErrorKind {
     ArrayError,
 }
 
-impl fmt::Display for TransformParseErrorKind {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+impl std::fmt::Display for TransformParseErrorKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "{:?}", self)
     }
 }
@@ -782,7 +780,8 @@ impl FunctionTransform for LogToMetric {
         let mut buffer = Vec::with_capacity(self.config.metrics.len());
         if self
             .config
-            .all_metrics.is_some_and(|all_metrics| all_metrics)
+            .all_metrics
+            .is_some_and(|all_metrics| all_metrics)
         {
             match to_metrics(&event) {
                 Ok(metric) => {
