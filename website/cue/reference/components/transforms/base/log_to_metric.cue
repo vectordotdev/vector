@@ -3,10 +3,10 @@ package metadata
 base: components: transforms: log_to_metric: configuration: {
 	all_metrics: {
 		description: """
-			Setting this flag changes the behavior of this transformation.
-			Notably the `metrics` field will be ignored.
-			All incoming events will be processed and if possible they will be converted to log events.
-			Otherwise, only items specified in the 'metrics' field will be processes.
+			Setting this flag changes the behavior of this transformation.<br />
+			<p>Notably the `metrics` field will be ignored.</p>
+			<p>All incoming events will be processed and if possible they will be converted to log events.
+			Otherwise, only items specified in the 'metrics' field will be processed.</p>
 			<pre class="chroma"><code class="language-toml" data-lang="toml">use serde_json::json;
 			let json_event = json!({
 			    "counter": {
