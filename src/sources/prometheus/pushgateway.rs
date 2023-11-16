@@ -4,9 +4,9 @@ use std::{collections::HashMap, net::SocketAddr};
 
 use bytes::Bytes;
 use itertools::Itertools;
-use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
 use warp::http::HeaderMap;
+use vector_lib::config::LogNamespace;
+use vector_lib::configurable::configurable_component;
 
 use super::parser;
 use crate::{
@@ -21,6 +21,7 @@ use crate::{
     },
     tls::TlsEnableableConfig,
 };
+use crate::http::KeepaliveConfig;
 
 /// Configuration for the `prometheus_pushgateway` source.
 #[configurable_component(source(
@@ -46,6 +47,10 @@ pub struct PrometheusPushgatewayConfig {
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
 
+    #[configurable(derived)]
+    #[serde(default)]
+    keepalive: KeepaliveConfig,
+
     /// Whether to aggregate values across pushes.
     ///
     /// Applies to all Prometheus metric types except gauges (i.e. counters, histograms, and distributions)
@@ -62,6 +67,7 @@ impl GenerateConfig for PrometheusPushgatewayConfig {
             auth: None,
             acknowledgements: SourceAcknowledgementsConfig::default(),
             aggregate_metrics: false,
+            keepalive: KeepaliveConfig::default(),
         })
         .unwrap()
     }
@@ -84,6 +90,7 @@ impl SourceConfig for PrometheusPushgatewayConfig {
             &self.auth,
             cx,
             self.acknowledgements,
+            self.keepalive.clone(),
         )
     }
 
@@ -218,10 +225,8 @@ mod test {
     use crate::test_util::wait_for_tcp;
     use crate::{test_util, SourceSender};
     use chrono::{TimeZone, Timelike, Utc};
-    use vector_common::finalization::EventStatus;
-    use vector_core::event::{Metric, MetricKind, MetricValue};
-    use vector_core::metric_tags;
-    use vector_core::tls::MaybeTlsSettings;
+    use vector_lib::event::{EventStatus, Metric, MetricKind, MetricValue};
+    use vector_lib::tls::MaybeTlsSettings;
 
     fn events_to_metrics(events: Vec<Event>) -> Vec<Metric> {
         events.into_iter().map(Event::into_metric).collect()
@@ -320,6 +325,7 @@ mod test {
                 auth: None,
                 tls: tls.clone(),
                 acknowledgements: SourceAcknowledgementsConfig::default(),
+                keepalive: KeepaliveConfig::default(),
                 aggregate_metrics: true,
             };
             let source = source
@@ -391,7 +397,7 @@ mod test {
                     "jobs_distribution",
                     MetricKind::Incremental,
                     MetricValue::AggregatedHistogram {
-                        buckets: vector_core::buckets![
+                        buckets: vector_lib::buckets![
                             1.0 => 0, 2.5 => 0, 5.0 => 0, 10.0 => 1
                         ],
                         count: 1,
@@ -406,7 +412,7 @@ mod test {
                     "jobs_summary",
                     MetricKind::Absolute,
                     MetricValue::AggregatedSummary {
-                        quantiles: vector_core::quantiles![],
+                        quantiles: vector_lib::quantiles![],
                         count: 1,
                         sum: 8.0,
                     },
@@ -430,7 +436,7 @@ mod test {
             )
             .await;
 
-            vector_common::assert_event_data_eq!(expected, events_to_metrics(output));
+            vector_lib::assert_event_data_eq!(expected, events_to_metrics(output));
         })
         .await;
     }
