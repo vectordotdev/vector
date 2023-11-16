@@ -1,3 +1,4 @@
+//! Functionality shared between Datadog sources and sinks.
 // Allow unused imports here, since use of these functions will differ depending on the
 // Datadog component type, whether it's used in integration tests, etc.
 #![allow(dead_code)]
@@ -5,8 +6,8 @@
 use serde::{Deserialize, Serialize};
 use vector_lib::{event::DatadogMetricOriginMetadata, sensitive_string::SensitiveString};
 
-pub const DD_US_SITE: &str = "datadoghq.com";
-pub const DD_EU_SITE: &str = "datadoghq.eu";
+pub(crate) const DD_US_SITE: &str = "datadoghq.com";
+pub(crate) const DD_EU_SITE: &str = "datadoghq.eu";
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub(crate) struct DatadogSeriesMetric {
@@ -72,6 +73,6 @@ fn default_api_key() -> Option<SensitiveString> {
     std::env::var("DD_API_KEY").ok().map(Into::into)
 }
 
-pub fn default_site() -> String {
+pub(crate) fn default_site() -> String {
     std::env::var("DD_SITE").unwrap_or(DD_US_SITE.to_string())
 }

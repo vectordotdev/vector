@@ -57,7 +57,6 @@ pub struct Application {
     pub root_opts: RootOpts,
     pub config: ApplicationConfig,
     pub signals: SignalPair,
-    pub extra_context: ExtraContext,
 }
 
 impl ApplicationConfig {
@@ -233,7 +232,6 @@ impl Application {
                 root_opts: opts.root,
                 config,
                 signals,
-                extra_context,
             },
         ))
     }
@@ -250,7 +248,6 @@ impl Application {
             root_opts,
             config,
             signals,
-            extra_context,
         } = self;
 
         let topology_controller = SharedTopologyController::new(TopologyController {
@@ -261,7 +258,7 @@ impl Application {
             require_healthy: root_opts.require_healthy,
             #[cfg(feature = "enterprise")]
             enterprise_reporter: config.enterprise,
-            extra_context,
+            extra_context: config.extra_context,
         });
 
         Ok(StartedApplication {

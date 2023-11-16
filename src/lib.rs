@@ -68,7 +68,7 @@ pub mod async_read;
 pub mod aws;
 #[allow(unreachable_pub)]
 pub mod codecs;
-pub(crate) mod common;
+pub mod common;
 mod convert_config;
 pub mod encoding_transcode;
 pub mod enrichment_tables;
