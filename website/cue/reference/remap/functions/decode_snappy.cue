@@ -19,14 +19,14 @@ remap: functions: decode_snappy: {
 	]
 	return: types: ["string"]
 
-//	examples: [
-//		  {
-//		   title: "Decode Snappy data"
-//		   source: #"""
-//		    encoded_text = decode_base64!("LKxUaGUgcXVpY2sgYnJvd24gZm94IGp1bXBzIG92ZXIgMTMgbGF6eSBkb2dzLg==")
-//		    decode_snappy!(encoded_text)
-//		    """#
-//		   return: "The quick brown fox jumps over 13 lazy dogs."
-//		  },
-//	]
+	//	examples: [
+	//		  {
+	//		   title: "Decode Snappy data"
+	//		   source: #"""
+	//		    encoded_text = decode_base64!("LKxUaGUgcXVpY2sgYnJvd24gZm94IGp1bXBzIG92ZXIgMTMgbGF6eSBkb2dzLg==")
+	//		    decode_snappy!(encoded_text)
+	//		    """#
+	//		   return: "The quick brown fox jumps over 13 lazy dogs."
+	//		  },
+	//	]
 }
