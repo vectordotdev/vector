@@ -10,7 +10,6 @@ use std::{
 };
 
 use futures_util::{future::ready, Stream, StreamExt};
-use lookup::event_path;
 use metrics_tracing_context::MetricsLayer;
 use tokio::sync::{
     broadcast::{self, Receiver, Sender},
@@ -27,6 +26,7 @@ use tracing_subscriber::{
     Layer,
 };
 pub use tracing_tower::{InstrumentableService, InstrumentedService};
+use vector_lib::lookup::event_path;
 use vrl::value::Value;
 
 use crate::event::LogEvent;

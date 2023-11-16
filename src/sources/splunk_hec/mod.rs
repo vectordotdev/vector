@@ -1,8 +1,10 @@
 use std::{
     collections::HashMap,
+    convert::Infallible,
     io::Read,
     net::{Ipv4Addr, SocketAddr},
     sync::Arc,
+    time::Duration,
 };
 
 use bytes::{Buf, Bytes};
@@ -10,21 +12,24 @@ use chrono::{DateTime, TimeZone, Utc};
 use flate2::read::MultiGzDecoder;
 use futures::FutureExt;
 use http::StatusCode;
-use lookup::lookup_v2::OptionalValuePath;
-use lookup::{event_path, owned_value_path};
+use hyper::{service::make_service_fn, Server};
 use serde::Serialize;
 use serde_json::{de::Read as JsonRead, Deserializer, Value as JsonValue};
 use snafu::Snafu;
+use tokio::net::TcpStream;
+use tower::ServiceBuilder;
 use tracing::Span;
-use vector_common::internal_event::{CountByteSize, InternalEventHandle as _, Registered};
-use vector_common::sensitive_string::SensitiveString;
-use vector_config::configurable_component;
-use vector_core::{
+use vector_lib::internal_event::{CountByteSize, InternalEventHandle as _, Registered};
+use vector_lib::lookup::lookup_v2::OptionalValuePath;
+use vector_lib::lookup::{self, event_path, owned_value_path};
+use vector_lib::sensitive_string::SensitiveString;
+use vector_lib::{
     config::{LegacyKey, LogNamespace},
     event::BatchNotifier,
     schema::meaning,
     EstimatedJsonEncodedSizeOf,
 };
+use vector_lib::{configurable::configurable_component, tls::MaybeTlsIncomingStream};
 use vrl::value::{kind::Collection, Kind};
 use warp::{filters::BoxedFilter, path, reject::Rejection, reply::Response, Filter, Reply};
 
@@ -38,6 +43,7 @@ use self::{
 use crate::{
     config::{log_schema, DataType, Resource, SourceConfig, SourceContext, SourceOutput},
     event::{Event, LogEvent, Value},
+    http::{build_http_trace_layer, KeepaliveConfig, MaxConnectionAgeLayer},
     internal_events::{
         EventsReceived, HttpBytesReceived, SplunkHecRequestBodyInvalidError, SplunkHecRequestError,
         SplunkHecRequestReceived,
@@ -102,6 +108,10 @@ pub struct SplunkConfig {
     #[configurable(metadata(docs::hidden))]
     #[serde(default)]
     log_namespace: Option<bool>,
+
+    #[configurable(derived)]
+    #[serde(default)]
+    keepalive: KeepaliveConfig,
 }
 
 impl_generate_config_from_default!(SplunkConfig);
@@ -116,6 +126,7 @@ impl Default for SplunkConfig {
             acknowledgements: Default::default(),
             store_hec_token: false,
             log_namespace: None,
+            keepalive: Default::default(),
         }
     }
 }
@@ -164,14 +175,30 @@ impl SourceConfig for SplunkConfig {
 
         let listener = tls.bind(&self.address).await?;
 
+        let keepalive_settings = self.keepalive.clone();
         Ok(Box::pin(async move {
             let span = Span::current();
-            warp::serve(services.with(warp::trace(move |_info| span.clone())))
-                .serve_incoming_with_graceful_shutdown(
-                    listener.accept_stream(),
-                    shutdown.map(|_| ()),
-                )
-                .await;
+            let make_svc = make_service_fn(move |conn: &MaybeTlsIncomingStream<TcpStream>| {
+                let svc = ServiceBuilder::new()
+                    .layer(build_http_trace_layer(span.clone()))
+                    .option_layer(keepalive_settings.max_connection_age_secs.map(|secs| {
+                        MaxConnectionAgeLayer::new(
+                            Duration::from_secs(secs),
+                            keepalive_settings.max_connection_age_jitter_factor,
+                            conn.peer_addr(),
+                        )
+                    }))
+                    .service(warp::service(services.clone()));
+                futures_util::future::ok::<_, Infallible>(svc)
+            });
+
+            Server::builder(hyper::server::accept::from_stream(listener.accept_stream()))
+                .serve(make_svc)
+                .with_graceful_shutdown(shutdown.map(|_| ()))
+                .await
+                .map_err(|err| {
+                    error!("An error occurred: {:?}.", err);
+                })?;
 
             Ok(())
         }))
@@ -182,7 +209,7 @@ impl SourceConfig for SplunkConfig {
 
         let schema_definition = match log_namespace {
             LogNamespace::Legacy => {
-                let definition = vector_core::schema::Definition::empty_legacy_namespace()
+                let definition = vector_lib::schema::Definition::empty_legacy_namespace()
                     .with_event_field(
                         &owned_value_path!("line"),
                         Kind::object(Collection::empty())
@@ -201,7 +228,7 @@ impl SourceConfig for SplunkConfig {
                     definition
                 }
             }
-            LogNamespace::Vector => vector_core::schema::Definition::new_with_default_metadata(
+            LogNamespace::Vector => vector_lib::schema::Definition::new_with_default_metadata(
                 Kind::bytes().or_object(Collection::empty()),
                 [log_namespace],
             ),
@@ -339,11 +366,6 @@ impl SplunkSource {
                     let mut out = out.clone();
                     let idx_ack = idx_ack.clone();
                     let events_received = events_received.clone();
-                    emit!(HttpBytesReceived {
-                        byte_size: body.len(),
-                        http_path: path.as_str(),
-                        protocol,
-                    });
 
                     async move {
                         if idx_ack.is_some() && channel.is_none() {
@@ -351,14 +373,19 @@ impl SplunkSource {
                         }
 
                         let mut data = Vec::new();
-                        let body = if gzip {
+                        let (byte_size, body) = if gzip {
                             MultiGzDecoder::new(body.reader())
                                 .read_to_end(&mut data)
                                 .map_err(|_| Rejection::from(ApiError::BadRequest))?;
-                            String::from_utf8_lossy(data.as_slice())
+                            (data.len(), String::from_utf8_lossy(data.as_slice()))
                         } else {
-                            String::from_utf8_lossy(body.as_ref())
+                            (body.len(), String::from_utf8_lossy(body.as_ref()))
                         };
+                        emit!(HttpBytesReceived {
+                            byte_size,
+                            http_path: path.as_str(),
+                            protocol,
+                        });
 
                         let (batch, receiver) =
                             BatchNotifier::maybe_new_with_receiver(idx_ack.is_some());
@@ -1209,12 +1236,12 @@ mod tests {
     use std::{net::SocketAddr, num::NonZeroU64};
 
     use chrono::{TimeZone, Utc};
-    use codecs::{JsonSerializerConfig, TextSerializerConfig};
     use futures_util::Stream;
     use reqwest::{RequestBuilder, Response};
     use serde::Deserialize;
-    use vector_common::sensitive_string::SensitiveString;
-    use vector_core::{event::EventStatus, schema::Definition};
+    use vector_lib::codecs::{JsonSerializerConfig, TextSerializerConfig};
+    use vector_lib::sensitive_string::SensitiveString;
+    use vector_lib::{event::EventStatus, schema::Definition};
     use vrl::path::PathPrefix;
 
     use super::*;
@@ -1275,6 +1302,7 @@ mod tests {
                 acknowledgements: acknowledgements.unwrap_or_default(),
                 store_hec_token,
                 log_namespace: None,
+                keepalive: Default::default(),
             }
             .build(cx)
             .await

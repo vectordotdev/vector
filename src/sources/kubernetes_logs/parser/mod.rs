@@ -2,7 +2,7 @@ mod cri;
 mod docker;
 mod test_util;
 
-use vector_core::config::LogNamespace;
+use vector_lib::config::LogNamespace;
 
 use crate::sources::kubernetes_logs::transform_utils::get_message_path;
 use crate::{
@@ -79,7 +79,7 @@ impl FunctionTransform for Parser {
 #[cfg(test)]
 mod tests {
     use bytes::Bytes;
-    use lookup::event_path;
+    use vector_lib::lookup::event_path;
     use vrl::value;
 
     use super::*;

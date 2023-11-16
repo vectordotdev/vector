@@ -20,11 +20,11 @@ use futures::{
     sink::{Sink, SinkExt},
     stream::{self, StreamExt, TryStreamExt},
 };
-use lookup::OwnedValuePath;
 use tokio::{self, net::UnixListener, task::JoinHandle};
 use tokio_stream::wrappers::UnixListenerStream;
 use tokio_util::codec::{length_delimited, Framed};
 use tracing::{field, Instrument};
+use vector_lib::lookup::OwnedValuePath;
 
 use crate::{
     event::Event,
@@ -595,7 +595,6 @@ mod test {
         sink::{Sink, SinkExt},
         stream::{self, StreamExt},
     };
-    use lookup::{owned_value_path, path, OwnedValuePath};
     use tokio::{
         self,
         net::UnixStream,
@@ -603,7 +602,8 @@ mod test {
         time::{Duration, Instant},
     };
     use tokio_util::codec::{length_delimited, Framed};
-    use vector_core::config::{LegacyKey, LogNamespace};
+    use vector_lib::config::{LegacyKey, LogNamespace};
+    use vector_lib::lookup::{owned_value_path, path, OwnedValuePath};
 
     use super::{
         build_framestream_unix_source, spawn_event_handling_tasks, ControlField, ControlHeader,

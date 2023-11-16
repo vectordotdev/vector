@@ -57,6 +57,7 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
         provider: _,
         secret,
         graceful_shutdown_duration,
+        allow_empty: _,
     } = builder;
 
     let graph = match Graph::new(&sources, &transforms, &sinks, schema) {
@@ -198,7 +199,7 @@ fn expand_globs_inner(inputs: &mut Inputs<String>, id: &str, candidates: &IndexS
 mod test {
     use super::*;
     use crate::test_util::mock::{basic_sink, basic_source, basic_transform};
-    use vector_core::config::ComponentKey;
+    use vector_lib::config::ComponentKey;
 
     #[test]
     fn glob_expansion() {

@@ -18,7 +18,7 @@ use loader::process::Process;
 pub use loader::*;
 pub use secret::*;
 pub use source::*;
-use vector_config::NamedComponent;
+use vector_lib::configurable::NamedComponent;
 
 use super::{
     builder::ConfigBuilder, format, validation, vars, Config, ConfigPath, Format, FormatHint,
@@ -133,6 +133,7 @@ pub fn load_from_paths(config_paths: &[ConfigPath]) -> Result<Config, Vec<String
 pub async fn load_from_paths_with_provider_and_secrets(
     config_paths: &[ConfigPath],
     signal_handler: &mut signal::SignalHandler,
+    allow_empty: bool,
 ) -> Result<Config, Vec<String>> {
     // Load secret backends first
     let (mut secrets_backends_loader, secrets_warning) =
@@ -148,6 +149,8 @@ pub async fn load_from_paths_with_provider_and_secrets(
         debug!(message = "No secret placeholder found, skipping secret resolution.");
         load_builder_from_paths(config_paths)?
     };
+
+    builder.allow_empty = allow_empty;
 
     validation::check_provider(&builder)?;
     signal_handler.clear();

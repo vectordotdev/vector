@@ -6,7 +6,7 @@ mod udp;
 use std::{fmt, net::SocketAddr};
 
 use snafu::Snafu;
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 
 use crate::config::{Protocol, Resource};
 

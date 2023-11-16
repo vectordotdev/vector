@@ -87,7 +87,7 @@ pub mod vector;
 
 pub mod util;
 
-pub use vector_core::source::Source;
+pub use vector_lib::source::Source;
 
 /// Common build errors
 #[derive(Debug, Snafu)]

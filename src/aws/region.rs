@@ -1,5 +1,5 @@
 use aws_types::region::Region;
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 
 /// Configuration of the region/endpoint to use when interacting with an AWS service.
 #[configurable_component]

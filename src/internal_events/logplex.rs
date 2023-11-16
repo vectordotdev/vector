@@ -1,6 +1,6 @@
 use metrics::counter;
-use vector_common::internal_event::{error_stage, error_type};
-use vector_core::internal_event::InternalEvent;
+use vector_lib::internal_event::InternalEvent;
+use vector_lib::internal_event::{error_stage, error_type};
 
 use super::prelude::io_error_code;
 
@@ -45,7 +45,5 @@ impl InternalEvent for HerokuLogplexRequestReadError {
             "error_code" => io_error_code(&self.error),
             "stage" => error_stage::PROCESSING,
         );
-        // deprecated
-        counter!("request_read_errors_total", 1);
     }
 }

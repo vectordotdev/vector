@@ -13,7 +13,7 @@
 # ------------------------------------------------------------------------------
 
 # Change this to use a non-default directory for Vector data storage:
-# data_dir = "/var/lib/vector"
+# data_dir: "/var/lib/vector"
 
 # Random Syslog-formatted logs
 sources:

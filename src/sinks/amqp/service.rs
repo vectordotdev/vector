@@ -1,9 +1,6 @@
 //! The main tower service that takes the request created by the request builder
 //! and sends it to `AMQP`.
-use crate::{
-    internal_events::sink::{AmqpAcknowledgementError, AmqpDeliveryError},
-    sinks::prelude::*,
-};
+use crate::sinks::prelude::*;
 use bytes::Bytes;
 use futures::future::BoxFuture;
 use lapin::{options::BasicPublishOptions, BasicProperties};
@@ -88,10 +85,13 @@ pub(super) struct AmqpService {
 #[derive(Debug, Snafu)]
 pub(super) enum AmqpError {
     #[snafu(display("Failed retrieving Acknowledgement: {}", error))]
-    AmqpAcknowledgementFailed { error: lapin::Error },
+    AcknowledgementFailed { error: lapin::Error },
 
     #[snafu(display("Failed AMQP request: {}", error))]
-    AmqpDeliveryFailed { error: lapin::Error },
+    DeliveryFailed { error: lapin::Error },
+
+    #[snafu(display("Received Negative Acknowledgement from AMQP broker."))]
+    Nack,
 }
 
 impl Service<AmqpRequest> for AmqpService {
@@ -109,11 +109,6 @@ impl Service<AmqpRequest> for AmqpService {
         let channel = Arc::clone(&self.channel);
 
         Box::pin(async move {
-            channel
-                .confirm_select(lapin::options::ConfirmSelectOptions::default())
-                .await
-                .unwrap();
-
             let byte_size = req.body.len();
             let fut = channel
                 .basic_publish(
@@ -127,28 +122,14 @@ impl Service<AmqpRequest> for AmqpService {
 
             match fut {
                 Ok(result) => match result.await {
-                    Ok(lapin::publisher_confirm::Confirmation::Nack(_)) => {
-                        warn!("Received Negative Acknowledgement from AMQP server.");
-                        Ok(AmqpResponse {
-                            json_size: req.metadata.into_events_estimated_json_encoded_byte_size(),
-                            byte_size,
-                        })
-                    }
-                    Err(error) => {
-                        // TODO: In due course the caller could emit these on error.
-                        emit!(AmqpAcknowledgementError { error: &error });
-                        Err(AmqpError::AmqpAcknowledgementFailed { error })
-                    }
+                    Ok(lapin::publisher_confirm::Confirmation::Nack(_)) => Err(AmqpError::Nack),
+                    Err(error) => Err(AmqpError::AcknowledgementFailed { error }),
                     Ok(_) => Ok(AmqpResponse {
                         json_size: req.metadata.into_events_estimated_json_encoded_byte_size(),
                         byte_size,
                     }),
                 },
-                Err(error) => {
-                    // TODO: In due course the caller could emit these on error.
-                    emit!(AmqpDeliveryError { error: &error });
-                    Err(AmqpError::AmqpDeliveryFailed { error })
-                }
+                Err(error) => Err(AmqpError::DeliveryFailed { error }),
             }
         })
     }

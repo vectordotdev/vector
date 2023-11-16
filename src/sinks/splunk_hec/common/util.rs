@@ -4,9 +4,9 @@ use bytes::Bytes;
 use futures_util::future::BoxFuture;
 use http::{Request, StatusCode, Uri};
 use hyper::Body;
-use lookup::lookup_v2::OptionalValuePath;
 use snafu::{ResultExt, Snafu};
-use vector_core::{config::proxy::ProxyConfig, event::EventRef};
+use vector_lib::lookup::lookup_v2::OptionalValuePath;
+use vector_lib::{config::proxy::ProxyConfig, event::EventRef};
 
 use super::{
     request::HecRequest,
@@ -168,7 +168,7 @@ pub fn render_template_string<'a>(
 mod tests {
     use bytes::Bytes;
     use http::{HeaderValue, Uri};
-    use vector_core::config::proxy::ProxyConfig;
+    use vector_lib::config::proxy::ProxyConfig;
     use wiremock::{
         matchers::{header, method, path},
         Mock, MockServer, ResponseTemplate,
@@ -397,7 +397,7 @@ mod integration_tests {
 
     use http::StatusCode;
     use tokio::time::Duration;
-    use vector_core::config::proxy::ProxyConfig;
+    use vector_lib::config::proxy::ProxyConfig;
     use warp::Filter;
 
     use super::{

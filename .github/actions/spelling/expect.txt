@@ -69,6 +69,7 @@ badunit
 bak
 barfoo
 barieom
+basearch
 baseof
 basevalue
 baskinc
@@ -378,6 +379,7 @@ filecontents
 filterlist
 finalizable
 fingerprinter
+fipsmodule
 fizzaxbbuzz
 fizzbuzz
 fkn
@@ -449,6 +451,8 @@ gogoproto
 goldberg
 goldmark
 GPB
+gpgcheck
+gpgkey
 gqlgen
 graphqlconfig
 grault
@@ -574,6 +578,7 @@ kernelmode
 keybase
 keyclock
 keyid
+keyring
 keyxxxxx
 khvzak
 kib
@@ -634,6 +639,7 @@ lukesteensen
 macports
 MAINPID
 majorly
+makecache
 MAKECMDGOALS
 Makefiles
 markability
@@ -797,6 +803,7 @@ opinsights
 oplog
 optimizable
 orgid
+OSSL
 ostype
 otel
 otelcol
@@ -1228,6 +1235,7 @@ wktpointer
 wmem
 woooooow
 woothee
+wor
 wordlist
 workdir
 workstreams

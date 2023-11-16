@@ -8,7 +8,10 @@ use crate::{
     sinks::{
         gcp,
         prelude::*,
-        util::http::{http_response_retry_logic, HttpService, HttpServiceRequestBuilder},
+        util::{
+            http::{http_response_retry_logic, HttpService, HttpServiceRequestBuilder},
+            service::TowerRequestConfigDefaults,
+        },
     },
 };
 
@@ -16,6 +19,13 @@ use super::{
     request_builder::{StackdriverMetricsEncoder, StackdriverMetricsRequestBuilder},
     sink::StackdriverMetricsSink,
 };
+
+#[derive(Clone, Copy, Debug)]
+pub struct StackdriverMetricsTowerRequestConfigDefaults;
+
+impl TowerRequestConfigDefaults for StackdriverMetricsTowerRequestConfigDefaults {
+    const RATE_LIMIT_NUM: u64 = 1_000;
+}
 
 /// Configuration for the `gcp_stackdriver_metrics` sink.
 #[configurable_component(sink(
@@ -49,7 +59,7 @@ pub struct StackdriverConfig {
 
     #[configurable(derived)]
     #[serde(default)]
-    pub(super) request: TowerRequestConfig,
+    pub(super) request: TowerRequestConfig<StackdriverMetricsTowerRequestConfigDefaults>,
 
     #[configurable(derived)]
     #[serde(default)]
@@ -98,11 +108,7 @@ impl SinkConfig for StackdriverConfig {
             },
         };
 
-        let request_limits = self.request.unwrap_with(
-            &TowerRequestConfig::default()
-                .rate_limit_duration_secs(1)
-                .rate_limit_num(1000),
-        );
+        let request_limits = self.request.into_settings();
 
         let uri: Uri = format!(
             "{}/v3/projects/{}/timeSeries",

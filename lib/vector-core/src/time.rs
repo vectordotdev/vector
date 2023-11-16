@@ -8,7 +8,7 @@ use std::task::{Context, Poll};
 /// this trait represents the minimum functionality required to describe management of keyed timers
 /// for the types implemented in this crate that require such behavior.
 ///
-/// Users can look at `vector_core::stream::batcher::ExpirationQueue` for a concrete implementation.
+/// Users can look at `vector_stream::batcher::ExpirationQueue` for a concrete implementation.
 pub trait KeyedTimer<K> {
     /// Clear the timer.
     ///
@@ -32,6 +32,6 @@ pub trait KeyedTimer<K> {
     /// Unlike a typical stream, returning `None` only indicates that the queue
     /// is empty, not that the queue will never return anything else in the future.
     ///
-    /// Used primarily for property testing vis-á-vis `vector_core::stream::batcher::Batcher`.
+    /// Used primarily for property testing vis-á-vis `vector_stream::batcher::Batcher`.
     fn poll_expired(&mut self, cx: &mut Context) -> Poll<Option<K>>;
 }

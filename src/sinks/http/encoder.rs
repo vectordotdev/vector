@@ -5,7 +5,9 @@ use crate::{
     sinks::util::encoding::{write_all, Encoder as SinkEncoder},
 };
 use bytes::{BufMut, BytesMut};
-use codecs::{
+use std::io;
+use tokio_util::codec::Encoder as _;
+use vector_lib::codecs::{
     encoding::{
         Framer,
         Framer::{CharacterDelimited, NewlineDelimited},
@@ -13,8 +15,6 @@ use codecs::{
     },
     CharacterDelimitedEncoder,
 };
-use std::io;
-use tokio_util::codec::Encoder as _;
 
 use crate::sinks::prelude::*;
 

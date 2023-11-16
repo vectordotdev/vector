@@ -25,13 +25,13 @@ use tokio_postgres::{
     Client, Config, Error as PgError, NoTls, Row,
 };
 use tokio_stream::wrappers::IntervalStream;
-use vector_common::{
+use vector_lib::config::LogNamespace;
+use vector_lib::configurable::configurable_component;
+use vector_lib::{
     internal_event::{CountByteSize, InternalEventHandle as _, Registered},
     json_size::JsonSize,
 };
-use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
-use vector_core::{metric_tags, ByteSizeOf, EstimatedJsonEncodedSizeOf};
+use vector_lib::{metric_tags, ByteSizeOf, EstimatedJsonEncodedSizeOf};
 
 use crate::{
     config::{SourceConfig, SourceContext, SourceOutput},
@@ -220,13 +220,14 @@ impl SourceConfig for PostgresqlMetricsConfig {
             while interval.next().await.is_some() {
                 let start = Instant::now();
                 let metrics = join_all(sources.iter_mut().map(|source| source.collect())).await;
-                let count = metrics.len();
                 emit!(CollectionCompleted {
                     start,
                     end: Instant::now()
                 });
 
-                let metrics = metrics.into_iter().flatten();
+                let metrics: Vec<Metric> = metrics.into_iter().flatten().collect();
+                let count = metrics.len();
+
                 if (cx.out.send_batch(metrics).await).is_err() {
                     emit!(StreamClosedError { count });
                     return Err(());

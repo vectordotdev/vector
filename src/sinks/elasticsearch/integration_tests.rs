@@ -7,7 +7,7 @@ use futures::StreamExt;
 use futures::{future::ready, stream};
 use http::{Request, StatusCode};
 use serde_json::{json, Value};
-use vector_core::{
+use vector_lib::{
     config::{init_telemetry, log_schema, Tags, Telemetry},
     event::{BatchNotifier, BatchStatus, Event, LogEvent},
 };

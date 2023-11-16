@@ -3,7 +3,7 @@ use crate::{event::LogEvent, test_util::trace_init};
 use bytes::Bytes;
 use std::ffi::OsStr;
 use std::io::Cursor;
-use vector_core::event::EventMetadata;
+use vector_lib::event::EventMetadata;
 use vrl::value;
 
 #[cfg(unix)]

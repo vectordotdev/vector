@@ -4,17 +4,15 @@ use futures::{poll, FutureExt, Stream, StreamExt, TryFutureExt};
 use tokio::{pin, select};
 use tower::Service;
 use tracing::Instrument;
+use vector_common::internal_event::emit;
 use vector_common::internal_event::{
     register, ByteSize, BytesSent, CallError, InternalEventHandle as _, PollReadyError, Registered,
     RegisteredEventCache, SharedString, TaggedEventsSent,
 };
 use vector_common::request_metadata::{GroupedCountByteSize, MetaDescriptive};
+use vector_core::event::{EventFinalizers, EventStatus, Finalizable};
 
 use super::FuturesUnorderedCount;
-use crate::{
-    event::{EventFinalizers, EventStatus, Finalizable},
-    internal_event::emit,
-};
 
 pub trait DriverResponse {
     fn event_status(&self) -> EventStatus;
@@ -293,7 +291,7 @@ mod tests {
     }
 
     impl Finalizable for DelayRequest {
-        fn take_finalizers(&mut self) -> crate::event::EventFinalizers {
+        fn take_finalizers(&mut self) -> vector_core::event::EventFinalizers {
             std::mem::take(&mut self.1)
         }
     }
@@ -365,6 +363,7 @@ mod tests {
             let upper = self.upper_bound_us;
 
             // Generate a value between 10ms and 500ms, with a long tail shape to the distribution.
+            #[allow(clippy::cast_sign_loss)] // Value will be positive anyways
             self.jitter
                 .sample_iter(&mut self.jitter_gen)
                 .map(|n| n * lower as f64)

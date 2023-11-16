@@ -1,9 +1,9 @@
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
-use lookup::{path, OwnedTargetPath};
 use serde_json::Value as JsonValue;
 use snafu::{OptionExt, ResultExt, Snafu};
-use vector_core::config::{LegacyKey, LogNamespace};
+use vector_lib::config::{LegacyKey, LogNamespace};
+use vector_lib::lookup::{self, path, OwnedTargetPath};
 
 use crate::sources::kubernetes_logs::transform_utils::get_message_path;
 use crate::{

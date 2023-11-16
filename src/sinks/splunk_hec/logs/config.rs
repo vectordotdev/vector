@@ -1,12 +1,12 @@
 use std::sync::Arc;
 
-use codecs::TextSerializerConfig;
 use futures_util::FutureExt;
-use lookup::lookup_v2::{ConfigValuePath, OptionalValuePath};
 use tower::ServiceBuilder;
-use vector_common::sensitive_string::SensitiveString;
-use vector_config::configurable_component;
-use vector_core::sink::VectorSink;
+use vector_lib::codecs::TextSerializerConfig;
+use vector_lib::configurable::configurable_component;
+use vector_lib::lookup::lookup_v2::{ConfigValuePath, OptionalValuePath};
+use vector_lib::sensitive_string::SensitiveString;
+use vector_lib::sink::VectorSink;
 
 use super::{encoder::HecLogsEncoder, request_builder::HecLogsRequestBuilder, sink::HecLogsSink};
 use crate::sinks::splunk_hec::common::config_timestamp_key;
@@ -239,7 +239,7 @@ impl HecLogsSinkConfig {
             compression: self.compression,
         };
 
-        let request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
+        let request_settings = self.request.into_settings();
         let http_request_builder = Arc::new(HttpRequestBuilder::new(
             self.endpoint.clone(),
             self.endpoint_target,

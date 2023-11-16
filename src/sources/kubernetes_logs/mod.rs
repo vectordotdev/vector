@@ -8,11 +8,6 @@ use std::{path::PathBuf, time::Duration};
 
 use bytes::Bytes;
 use chrono::Utc;
-use codecs::{BytesDeserializer, BytesDeserializerConfig};
-use file_source::{
-    calculate_ignore_before, Checkpointer, FileServer, FileServerShutdown, FingerprintStrategy,
-    Fingerprinter, Line, ReadFrom, ReadFromConfig,
-};
 use futures::{future::FutureExt, stream::StreamExt};
 use futures_util::Stream;
 use k8s_openapi::api::core::v1::{Namespace, Node, Pod};
@@ -24,14 +19,19 @@ use kube::{
     Client, Config as ClientConfig,
 };
 use lifecycle::Lifecycle;
-use lookup::{lookup_v2::OptionalTargetPath, owned_value_path, path, OwnedTargetPath};
 use serde_with::serde_as;
-use vector_common::{
+use vector_lib::codecs::{BytesDeserializer, BytesDeserializerConfig};
+use vector_lib::configurable::configurable_component;
+use vector_lib::file_source::{
+    calculate_ignore_before, Checkpointer, FileServer, FileServerShutdown, FingerprintStrategy,
+    Fingerprinter, Line, ReadFrom, ReadFromConfig,
+};
+use vector_lib::lookup::{lookup_v2::OptionalTargetPath, owned_value_path, path, OwnedTargetPath};
+use vector_lib::{config::LegacyKey, config::LogNamespace, EstimatedJsonEncodedSizeOf};
+use vector_lib::{
     internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol},
     TimeZone,
 };
-use vector_config::configurable_component;
-use vector_core::{config::LegacyKey, config::LogNamespace, EstimatedJsonEncodedSizeOf};
 use vrl::value::{kind::Collection, Kind};
 
 use crate::sources::kubernetes_logs::partial_events_merger::merge_partial_events;
@@ -42,7 +42,7 @@ use crate::{
     },
     event::Event,
     internal_events::{
-        FileSourceInternalEventsEmitter, KubernetesLifecycleError,
+        FileInternalMetricsConfig, FileSourceInternalEventsEmitter, KubernetesLifecycleError,
         KubernetesLogsEventAnnotationError, KubernetesLogsEventNamespaceAnnotationError,
         KubernetesLogsEventNodeAnnotationError, KubernetesLogsEventsReceived,
         KubernetesLogsPodInfo, StreamClosedError,
@@ -235,6 +235,10 @@ pub struct Config {
     #[configurable(metadata(docs::hidden))]
     #[serde(default)]
     log_namespace: Option<bool>,
+
+    #[configurable(derived)]
+    #[serde(default)]
+    internal_metrics: FileInternalMetricsConfig,
 }
 
 const fn default_read_from() -> ReadFromConfig {
@@ -278,6 +282,7 @@ impl Default for Config {
             use_apiserver_cache: false,
             delay_deletion_ms: default_delay_deletion_ms(),
             log_namespace: None,
+            internal_metrics: Default::default(),
         }
     }
 }
@@ -528,6 +533,7 @@ struct Source {
     use_apiserver_cache: bool,
     ingestion_timestamp_field: Option<OwnedTargetPath>,
     delay_deletion: Duration,
+    include_file_metric_tag: bool,
 }
 
 impl Source {
@@ -606,6 +612,7 @@ impl Source {
             use_apiserver_cache: config.use_apiserver_cache,
             ingestion_timestamp_field,
             delay_deletion,
+            include_file_metric_tag: config.internal_metrics.include_file_tag,
         })
     }
 
@@ -638,6 +645,7 @@ impl Source {
             use_apiserver_cache,
             ingestion_timestamp_field,
             delay_deletion,
+            include_file_metric_tag,
         } = self;
 
         let mut reflectors = Vec::new();
@@ -775,7 +783,9 @@ impl Source {
             // We do not remove the log files, `kubelet` is responsible for it.
             remove_after: None,
             // The standard emitter.
-            emitter: FileSourceInternalEventsEmitter,
+            emitter: FileSourceInternalEventsEmitter {
+                include_file_metric_tag,
+            },
             // A handle to the current tokio runtime
             handle: tokio::runtime::Handle::current(),
         };
@@ -1045,9 +1055,9 @@ fn prepare_label_selector(selector: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use lookup::{owned_value_path, OwnedTargetPath};
     use similar_asserts::assert_eq;
-    use vector_core::{config::LogNamespace, schema::Definition};
+    use vector_lib::lookup::{owned_value_path, OwnedTargetPath};
+    use vector_lib::{config::LogNamespace, schema::Definition};
     use vrl::value::{kind::Collection, Kind};
 
     use crate::config::SourceConfig;

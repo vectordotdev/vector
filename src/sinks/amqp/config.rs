@@ -1,8 +1,8 @@
 //! Configuration functionality for the `AMQP` sink.
 use crate::{amqp::AmqpConfig, sinks::prelude::*};
-use codecs::TextSerializerConfig;
 use lapin::{types::ShortString, BasicProperties};
 use std::sync::Arc;
+use vector_lib::codecs::TextSerializerConfig;
 
 use super::sink::AmqpSink;
 

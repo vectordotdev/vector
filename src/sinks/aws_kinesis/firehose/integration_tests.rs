@@ -3,10 +3,10 @@
 
 use aws_sdk_elasticsearch::Client as EsClient;
 use aws_sdk_firehose::model::ElasticsearchDestinationConfiguration;
-use codecs::JsonSerializerConfig;
 use futures::TryFutureExt;
 use serde_json::{json, Value};
 use tokio::time::{sleep, Duration};
+use vector_lib::codecs::JsonSerializerConfig;
 
 use super::{config::KinesisFirehoseClientBuilder, *};
 use crate::{
@@ -52,8 +52,8 @@ async fn firehose_put_records() {
         encoding: JsonSerializerConfig::default().into(), // required for ES destination w/ localstack
         compression: Compression::None,
         request: TowerRequestConfig {
-            timeout_secs: Some(10),
-            retry_attempts: Some(0),
+            timeout_secs: 10,
+            retry_attempts: 0,
             ..Default::default()
         },
         tls: None,

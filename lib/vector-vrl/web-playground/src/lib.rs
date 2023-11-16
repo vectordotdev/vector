@@ -121,6 +121,15 @@ pub fn vector_version() -> String {
 }
 
 #[wasm_bindgen]
+pub fn vector_link() -> String {
+    built_info::VECTOR_LINK.to_string()
+}
+
+#[wasm_bindgen]
 pub fn vrl_version() -> String {
     built_info::VRL_VERSION.to_string()
+}
+#[wasm_bindgen]
+pub fn vrl_link() -> String {
+    built_info::VRL_LINK.to_string()
 }

@@ -1,12 +1,11 @@
+use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use chrono::TimeZone;
 use ordered_float::NotNan;
 
-use crate::{
-    event::{self, BTreeMap, MetricTags, WithMetadata},
-    metrics::AgentDDSketch,
-};
+use super::{MetricTags, WithMetadata};
+use crate::{event, metrics::AgentDDSketch};
 
 #[allow(warnings, clippy::all, clippy::pedantic)]
 mod proto_event {
@@ -15,7 +14,7 @@ mod proto_event {
 pub use event_wrapper::Event;
 pub use metric::Value as MetricValue;
 pub use proto_event::*;
-use vrl::value::Value as VrlValue;
+use vrl::value::{ObjectMap, Value as VrlValue};
 
 use super::{array, metric::MetricSketch, EventMetadata};
 
@@ -91,7 +90,7 @@ impl From<Trace> for Event {
     }
 }
 
-impl From<Log> for event::LogEvent {
+impl From<Log> for super::LogEvent {
     fn from(log: Log) -> Self {
         #[allow(deprecated)]
         let metadata = log
@@ -111,15 +110,15 @@ impl From<Log> for event::LogEvent {
             let fields = log
                 .fields
                 .into_iter()
-                .filter_map(|(k, v)| decode_value(v).map(|value| (k, value)))
-                .collect::<BTreeMap<_, _>>();
+                .filter_map(|(k, v)| decode_value(v).map(|value| (k.into(), value)))
+                .collect::<ObjectMap>();
 
             Self::from_map(fields, metadata)
         }
     }
 }
 
-impl From<Trace> for event::TraceEvent {
+impl From<Trace> for super::TraceEvent {
     fn from(trace: Trace) -> Self {
         #[allow(deprecated)]
         let metadata = trace
@@ -136,14 +135,14 @@ impl From<Trace> for event::TraceEvent {
         let fields = trace
             .fields
             .into_iter()
-            .filter_map(|(k, v)| decode_value(v).map(|value| (k, value)))
-            .collect::<BTreeMap<_, _>>();
+            .filter_map(|(k, v)| decode_value(v).map(|value| (k.into(), value)))
+            .collect::<ObjectMap>();
 
-        Self::from(event::LogEvent::from_map(fields, metadata))
+        Self::from(super::LogEvent::from_map(fields, metadata))
     }
 }
 
-impl From<MetricValue> for event::MetricValue {
+impl From<MetricValue> for super::MetricValue {
     fn from(value: MetricValue) -> Self {
         match value {
             MetricValue::Counter(counter) => Self::Counter {
@@ -155,14 +154,14 @@ impl From<MetricValue> for event::MetricValue {
             },
             MetricValue::Distribution1(dist) => Self::Distribution {
                 statistic: dist.statistic().into(),
-                samples: event::metric::zip_samples(dist.values, dist.sample_rates),
+                samples: super::metric::zip_samples(dist.values, dist.sample_rates),
             },
             MetricValue::Distribution2(dist) => Self::Distribution {
                 statistic: dist.statistic().into(),
                 samples: dist.samples.into_iter().map(Into::into).collect(),
             },
             MetricValue::AggregatedHistogram1(hist) => Self::AggregatedHistogram {
-                buckets: event::metric::zip_buckets(
+                buckets: super::metric::zip_buckets(
                     hist.buckets,
                     hist.counts.iter().map(|h| u64::from(*h)),
                 ),
@@ -180,7 +179,7 @@ impl From<MetricValue> for event::MetricValue {
                 sum: hist.sum,
             },
             MetricValue::AggregatedSummary1(summary) => Self::AggregatedSummary {
-                quantiles: event::metric::zip_quantiles(summary.quantiles, summary.values),
+                quantiles: super::metric::zip_quantiles(summary.quantiles, summary.values),
                 count: u64::from(summary.count),
                 sum: summary.sum,
             },
@@ -203,11 +202,11 @@ impl From<MetricValue> for event::MetricValue {
     }
 }
 
-impl From<Metric> for event::Metric {
+impl From<Metric> for super::Metric {
     fn from(metric: Metric) -> Self {
         let kind = match metric.kind() {
-            metric::Kind::Incremental => event::MetricKind::Incremental,
-            metric::Kind::Absolute => event::MetricKind::Absolute,
+            metric::Kind::Incremental => super::MetricKind::Incremental,
+            metric::Kind::Absolute => super::MetricKind::Absolute,
         };
 
         let name = metric.name;
@@ -231,7 +230,7 @@ impl From<Metric> for event::Metric {
                         values
                             .values
                             .into_iter()
-                            .map(|value| event::metric::TagValue::from(value.value))
+                            .map(|value| super::metric::TagValue::from(value.value))
                             .collect(),
                     )
                 })
@@ -243,7 +242,7 @@ impl From<Metric> for event::Metric {
         tags.extend(metric.tags_v1);
         let tags = (!tags.is_empty()).then_some(tags);
 
-        let value = event::MetricValue::from(metric.value.unwrap());
+        let value = super::MetricValue::from(metric.value.unwrap());
 
         #[allow(deprecated)]
         let metadata = metric
@@ -265,7 +264,7 @@ impl From<Metric> for event::Metric {
     }
 }
 
-impl From<EventWrapper> for event::Event {
+impl From<EventWrapper> for super::Event {
     fn from(proto: EventWrapper) -> Self {
         let event = proto.event.unwrap();
 
@@ -277,20 +276,20 @@ impl From<EventWrapper> for event::Event {
     }
 }
 
-impl From<event::LogEvent> for Log {
-    fn from(log_event: event::LogEvent) -> Self {
+impl From<super::LogEvent> for Log {
+    fn from(log_event: super::LogEvent) -> Self {
         WithMetadata::<Self>::from(log_event).data
     }
 }
 
-impl From<event::TraceEvent> for Trace {
-    fn from(trace: event::TraceEvent) -> Self {
+impl From<super::TraceEvent> for Trace {
+    fn from(trace: super::TraceEvent) -> Self {
         WithMetadata::<Self>::from(trace).data
     }
 }
 
-impl From<event::LogEvent> for WithMetadata<Log> {
-    fn from(log_event: event::LogEvent) -> Self {
+impl From<super::LogEvent> for WithMetadata<Log> {
+    fn from(log_event: super::LogEvent) -> Self {
         let (value, metadata) = log_event.into_parts();
 
         // Due to the backwards compatibility requirement by the
@@ -304,7 +303,7 @@ impl From<event::LogEvent> for WithMetadata<Log> {
             // using only "fields" to prevent having to use the dummy value
             let fields = fields
                 .into_iter()
-                .map(|(k, v)| (k, encode_value(v)))
+                .map(|(k, v)| (k.into(), encode_value(v)))
                 .collect::<BTreeMap<_, _>>();
 
             (fields, None)
@@ -330,12 +329,12 @@ impl From<event::LogEvent> for WithMetadata<Log> {
     }
 }
 
-impl From<event::TraceEvent> for WithMetadata<Trace> {
-    fn from(trace: event::TraceEvent) -> Self {
+impl From<super::TraceEvent> for WithMetadata<Trace> {
+    fn from(trace: super::TraceEvent) -> Self {
         let (fields, metadata) = trace.into_parts();
         let fields = fields
             .into_iter()
-            .map(|(k, v)| (k, encode_value(v)))
+            .map(|(k, v)| (k.into(), encode_value(v)))
             .collect::<BTreeMap<_, _>>();
 
         #[allow(deprecated)]
@@ -349,31 +348,31 @@ impl From<event::TraceEvent> for WithMetadata<Trace> {
     }
 }
 
-impl From<event::Metric> for Metric {
-    fn from(metric: event::Metric) -> Self {
+impl From<super::Metric> for Metric {
+    fn from(metric: super::Metric) -> Self {
         WithMetadata::<Self>::from(metric).data
     }
 }
 
-impl From<event::MetricValue> for MetricValue {
-    fn from(value: event::MetricValue) -> Self {
+impl From<super::MetricValue> for MetricValue {
+    fn from(value: super::MetricValue) -> Self {
         match value {
-            event::MetricValue::Counter { value } => Self::Counter(Counter { value }),
-            event::MetricValue::Gauge { value } => Self::Gauge(Gauge { value }),
-            event::MetricValue::Set { values } => Self::Set(Set {
+            super::MetricValue::Counter { value } => Self::Counter(Counter { value }),
+            super::MetricValue::Gauge { value } => Self::Gauge(Gauge { value }),
+            super::MetricValue::Set { values } => Self::Set(Set {
                 values: values.into_iter().collect(),
             }),
-            event::MetricValue::Distribution { samples, statistic } => {
+            super::MetricValue::Distribution { samples, statistic } => {
                 Self::Distribution2(Distribution2 {
                     samples: samples.into_iter().map(Into::into).collect(),
                     statistic: match statistic {
-                        event::StatisticKind::Histogram => StatisticKind::Histogram,
-                        event::StatisticKind::Summary => StatisticKind::Summary,
+                        super::StatisticKind::Histogram => StatisticKind::Histogram,
+                        super::StatisticKind::Summary => StatisticKind::Summary,
                     }
                     .into(),
                 })
             }
-            event::MetricValue::AggregatedHistogram {
+            super::MetricValue::AggregatedHistogram {
                 buckets,
                 count,
                 sum,
@@ -382,7 +381,7 @@ impl From<event::MetricValue> for MetricValue {
                 count,
                 sum,
             }),
-            event::MetricValue::AggregatedSummary {
+            super::MetricValue::AggregatedSummary {
                 quantiles,
                 count,
                 sum,
@@ -391,7 +390,7 @@ impl From<event::MetricValue> for MetricValue {
                 count,
                 sum,
             }),
-            event::MetricValue::Sketch { sketch } => match sketch {
+            super::MetricValue::Sketch { sketch } => match sketch {
                 MetricSketch::AgentDDSketch(ddsketch) => {
                     let bin_map = ddsketch.bin_map();
                     let (keys, counts) = bin_map.into_parts();
@@ -415,8 +414,8 @@ impl From<event::MetricValue> for MetricValue {
     }
 }
 
-impl From<event::Metric> for WithMetadata<Metric> {
-    fn from(metric: event::Metric) -> Self {
+impl From<super::Metric> for WithMetadata<Metric> {
+    fn from(metric: super::Metric) -> Self {
         let (series, data, metadata) = metric.into_parts();
         let name = series.name.name;
         let namespace = series.name.namespace.unwrap_or_default();
@@ -431,8 +430,8 @@ impl From<event::Metric> for WithMetadata<Metric> {
         let tags = series.tags.unwrap_or_default();
 
         let kind = match data.kind {
-            event::MetricKind::Incremental => metric::Kind::Incremental,
-            event::MetricKind::Absolute => metric::Kind::Absolute,
+            super::MetricKind::Incremental => metric::Kind::Incremental,
+            super::MetricKind::Absolute => metric::Kind::Absolute,
         }
         .into();
 
@@ -482,30 +481,30 @@ impl From<event::Metric> for WithMetadata<Metric> {
     }
 }
 
-impl From<event::Event> for Event {
-    fn from(event: event::Event) -> Self {
+impl From<super::Event> for Event {
+    fn from(event: super::Event) -> Self {
         WithMetadata::<Self>::from(event).data
     }
 }
 
-impl From<event::Event> for WithMetadata<Event> {
-    fn from(event: event::Event) -> Self {
+impl From<super::Event> for WithMetadata<Event> {
+    fn from(event: super::Event) -> Self {
         match event {
-            event::Event::Log(log_event) => WithMetadata::<Log>::from(log_event).into(),
-            event::Event::Metric(metric) => WithMetadata::<Metric>::from(metric).into(),
-            event::Event::Trace(trace) => WithMetadata::<Trace>::from(trace).into(),
+            super::Event::Log(log_event) => WithMetadata::<Log>::from(log_event).into(),
+            super::Event::Metric(metric) => WithMetadata::<Metric>::from(metric).into(),
+            super::Event::Trace(trace) => WithMetadata::<Trace>::from(trace).into(),
         }
     }
 }
 
-impl From<event::Event> for EventWrapper {
-    fn from(event: event::Event) -> Self {
+impl From<super::Event> for EventWrapper {
+    fn from(event: super::Event) -> Self {
         WithMetadata::<EventWrapper>::from(event).data
     }
 }
 
-impl From<event::Event> for WithMetadata<EventWrapper> {
-    fn from(event: event::Event) -> Self {
+impl From<super::Event> for WithMetadata<EventWrapper> {
+    fn from(event: super::Event) -> Self {
         WithMetadata::<Event>::from(event).into()
     }
 }
@@ -562,15 +561,15 @@ impl From<sketch::AgentDdSketch> for MetricSketch {
     }
 }
 
-impl From<event::metadata::Secrets> for Secrets {
-    fn from(value: event::metadata::Secrets) -> Self {
+impl From<super::metadata::Secrets> for Secrets {
+    fn from(value: super::metadata::Secrets) -> Self {
         Self {
             entries: value.into_iter().map(|(k, v)| (k, v.to_string())).collect(),
         }
     }
 }
 
-impl From<Secrets> for event::metadata::Secrets {
+impl From<Secrets> for super::metadata::Secrets {
     fn from(value: Secrets) -> Self {
         let mut secrets = Self::new();
         for (k, v) in value.entries {
@@ -581,8 +580,8 @@ impl From<Secrets> for event::metadata::Secrets {
     }
 }
 
-impl From<event::DatadogMetricOriginMetadata> for DatadogOriginMetadata {
-    fn from(value: event::DatadogMetricOriginMetadata) -> Self {
+impl From<super::DatadogMetricOriginMetadata> for DatadogOriginMetadata {
+    fn from(value: super::DatadogMetricOriginMetadata) -> Self {
         Self {
             origin_product: value.product(),
             origin_category: value.category(),
@@ -591,7 +590,7 @@ impl From<event::DatadogMetricOriginMetadata> for DatadogOriginMetadata {
     }
 }
 
-impl From<DatadogOriginMetadata> for event::DatadogMetricOriginMetadata {
+impl From<DatadogOriginMetadata> for super::DatadogMetricOriginMetadata {
     fn from(value: DatadogOriginMetadata) -> Self {
         Self::new(
             value.origin_product,
@@ -677,21 +676,21 @@ impl From<Metadata> for EventMetadata {
     }
 }
 
-fn decode_value(input: Value) -> Option<event::Value> {
+fn decode_value(input: Value) -> Option<super::Value> {
     match input.kind {
-        Some(value::Kind::RawBytes(data)) => Some(event::Value::Bytes(data)),
-        Some(value::Kind::Timestamp(ts)) => Some(event::Value::Timestamp(
+        Some(value::Kind::RawBytes(data)) => Some(super::Value::Bytes(data)),
+        Some(value::Kind::Timestamp(ts)) => Some(super::Value::Timestamp(
             chrono::Utc
                 .timestamp_opt(ts.seconds, ts.nanos as u32)
                 .single()
                 .expect("invalid timestamp"),
         )),
-        Some(value::Kind::Integer(value)) => Some(event::Value::Integer(value)),
-        Some(value::Kind::Float(value)) => Some(event::Value::Float(NotNan::new(value).unwrap())),
-        Some(value::Kind::Boolean(value)) => Some(event::Value::Boolean(value)),
+        Some(value::Kind::Integer(value)) => Some(super::Value::Integer(value)),
+        Some(value::Kind::Float(value)) => Some(super::Value::Float(NotNan::new(value).unwrap())),
+        Some(value::Kind::Boolean(value)) => Some(super::Value::Boolean(value)),
         Some(value::Kind::Map(map)) => decode_map(map.fields),
         Some(value::Kind::Array(array)) => decode_array(array.items),
-        Some(value::Kind::Null(_)) => Some(event::Value::Null),
+        Some(value::Kind::Null(_)) => Some(super::Value::Null),
         None => {
             error!("Encoded event contains unknown value kind.");
             None
@@ -699,51 +698,51 @@ fn decode_value(input: Value) -> Option<event::Value> {
     }
 }
 
-fn decode_map(fields: BTreeMap<String, Value>) -> Option<event::Value> {
+fn decode_map(fields: BTreeMap<String, Value>) -> Option<super::Value> {
     fields
         .into_iter()
-        .map(|(key, value)| decode_value(value).map(|value| (key, value)))
-        .collect::<Option<BTreeMap<_, _>>>()
+        .map(|(key, value)| decode_value(value).map(|value| (key.into(), value)))
+        .collect::<Option<ObjectMap>>()
         .map(event::Value::Object)
 }
 
-fn decode_array(items: Vec<Value>) -> Option<event::Value> {
+fn decode_array(items: Vec<Value>) -> Option<super::Value> {
     items
         .into_iter()
         .map(decode_value)
         .collect::<Option<Vec<_>>>()
-        .map(event::Value::Array)
+        .map(super::Value::Array)
 }
 
-fn encode_value(value: event::Value) -> Value {
+fn encode_value(value: super::Value) -> Value {
     Value {
         kind: match value {
-            event::Value::Bytes(b) => Some(value::Kind::RawBytes(b)),
-            event::Value::Regex(regex) => Some(value::Kind::RawBytes(regex.as_bytes())),
-            event::Value::Timestamp(ts) => Some(value::Kind::Timestamp(prost_types::Timestamp {
+            super::Value::Bytes(b) => Some(value::Kind::RawBytes(b)),
+            super::Value::Regex(regex) => Some(value::Kind::RawBytes(regex.as_bytes())),
+            super::Value::Timestamp(ts) => Some(value::Kind::Timestamp(prost_types::Timestamp {
                 seconds: ts.timestamp(),
                 nanos: ts.timestamp_subsec_nanos() as i32,
             })),
-            event::Value::Integer(value) => Some(value::Kind::Integer(value)),
-            event::Value::Float(value) => Some(value::Kind::Float(value.into_inner())),
-            event::Value::Boolean(value) => Some(value::Kind::Boolean(value)),
-            event::Value::Object(fields) => Some(value::Kind::Map(encode_map(fields))),
-            event::Value::Array(items) => Some(value::Kind::Array(encode_array(items))),
-            event::Value::Null => Some(value::Kind::Null(ValueNull::NullValue as i32)),
+            super::Value::Integer(value) => Some(value::Kind::Integer(value)),
+            super::Value::Float(value) => Some(value::Kind::Float(value.into_inner())),
+            super::Value::Boolean(value) => Some(value::Kind::Boolean(value)),
+            super::Value::Object(fields) => Some(value::Kind::Map(encode_map(fields))),
+            super::Value::Array(items) => Some(value::Kind::Array(encode_array(items))),
+            super::Value::Null => Some(value::Kind::Null(ValueNull::NullValue as i32)),
         },
     }
 }
 
-fn encode_map(fields: BTreeMap<String, event::Value>) -> ValueMap {
+fn encode_map(fields: ObjectMap) -> ValueMap {
     ValueMap {
         fields: fields
             .into_iter()
-            .map(|(key, value)| (key, encode_value(value)))
+            .map(|(key, value)| (key.into(), encode_value(value)))
             .collect(),
     }
 }
 
-fn encode_array(items: Vec<event::Value>) -> ValueArray {
+fn encode_array(items: Vec<super::Value>) -> ValueArray {
     ValueArray {
         items: items.into_iter().map(encode_value).collect(),
     }
