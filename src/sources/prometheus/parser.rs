@@ -1182,7 +1182,7 @@ mod test {
                     "jobs_distribution",
                     MetricKind::Incremental,
                     MetricValue::AggregatedHistogram {
-                        buckets: vector_core::buckets![
+                        buckets: vector_lib::buckets![
                             1.0 => 0, 2.5 => 0, 5.0 => 0, 10.0 => 1
                         ],
                         count: 1,
@@ -1195,7 +1195,7 @@ mod test {
                     "jobs_summary",
                     MetricKind::Absolute,
                     MetricValue::AggregatedSummary {
-                        quantiles: vector_core::quantiles![],
+                        quantiles: vector_lib::quantiles![],
                         count: 1,
                         sum: 8.0,
                     },
@@ -1251,7 +1251,7 @@ mod test {
                     "jobs_distribution",
                     MetricKind::Absolute,
                     MetricValue::AggregatedHistogram {
-                        buckets: vector_core::buckets![
+                        buckets: vector_lib::buckets![
                             1.0 => 0, 2.5 => 0, 5.0 => 0, 10.0 => 1
                         ],
                         count: 1,
@@ -1264,7 +1264,7 @@ mod test {
                     "jobs_summary",
                     MetricKind::Absolute,
                     MetricValue::AggregatedSummary {
-                        quantiles: vector_core::quantiles![],
+                        quantiles: vector_lib::quantiles![],
                         count: 1,
                         sum: 8.0,
                     },
