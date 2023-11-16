@@ -5884,9 +5884,9 @@ checksum = "624a8340c38c1b80fd549087862da4ba43e08858af025b236e509b6649fc13d5"
 
 [[package]]
 name = "opendal"
-version = "0.41.0"
+version = "0.42.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e31b48f0af6de5b3b344c1acc1e06c4581dca3e13cd5ba05269927fc2abf953a"
+checksum = "ec1f653f28f2ced5ab8214ebb456674a234ee3379f3e493ab46dd7964eca43f9"
 dependencies = [
  "anyhow",
  "async-compat",
@@ -5898,7 +5898,6 @@ dependencies = [
  "flagset",
  "futures 0.3.29",
  "http",
- "hyper",
  "log",
  "md-5",
  "once_cell",
@@ -6820,7 +6819,7 @@ checksum = "8bdf592881d821b83d471f8af290226c8d51402259e9bb5be7f9f8bdebbb11ac"
 dependencies = [
  "bytes 1.5.0",
  "heck 0.4.1",
- "itertools 0.10.5",
+ "itertools 0.11.0",
  "log",
  "multimap",
  "once_cell",
@@ -6854,7 +6853,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "265baba7fabd416cf5078179f7d2cbeca4ce7a9041111900675ea7c4cb8a4c32"
 dependencies = [
  "anyhow",
- "itertools 0.10.5",
+ "itertools 0.11.0",
  "proc-macro2 1.0.69",
  "quote 1.0.33",
  "syn 2.0.39",
