@@ -149,6 +149,7 @@ impl<'a, T> CountingWrite<'a, T> {
     }
 }
 
+#[allow(clippy::disallowed_methods)]
 impl<'a, T: std::io::Write> std::io::Write for CountingWrite<'a, T> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         self.count.set(self.count.get() + buf.len());
@@ -188,7 +189,7 @@ impl LogRequestBuilder {
             match try_serialize(&events, total_estimated) {
                 Ok(buf) => {
                     let request =
-                        self.finish_request(buf, events, byte_size.clone(), api_key.clone())?;
+                        self.finish_request(buf, events, byte_size.clone(), Arc::clone(&api_key))?;
                     requests.push(request);
                 }
                 Err(RequestBuildError::PayloadTooBig { events_that_fit }) => {
