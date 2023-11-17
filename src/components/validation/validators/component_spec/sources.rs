@@ -1,6 +1,6 @@
 use std::fmt::{Display, Formatter};
 
-use vector_core::event::{Event, MetricKind};
+use vector_lib::event::{Event, MetricKind};
 
 use crate::components::validation::RunnerMetrics;
 
@@ -68,14 +68,14 @@ pub fn validate_sources(
 
 fn sum_counters(
     metric_name: &SourceMetricType,
-    metrics: &[&vector_core::event::Metric],
+    metrics: &[&vector_lib::event::Metric],
 ) -> Result<u64, Vec<String>> {
     let mut sum: f64 = 0.0;
     let mut errs = Vec::new();
 
     for m in metrics {
         match m.value() {
-            vector_core::event::MetricValue::Counter { value } => {
+            vector_lib::event::MetricValue::Counter { value } => {
                 if let MetricKind::Absolute = m.data().kind {
                     sum = *value;
                 } else {

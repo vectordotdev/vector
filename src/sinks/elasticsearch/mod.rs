@@ -21,8 +21,8 @@ pub use config::*;
 pub use encoder::ElasticsearchEncoder;
 use http::{uri::InvalidUri, Request};
 use snafu::Snafu;
-use vector_common::sensitive_string::SensitiveString;
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
+use vector_lib::sensitive_string::SensitiveString;
 
 use crate::{
     event::{EventRef, LogEvent},

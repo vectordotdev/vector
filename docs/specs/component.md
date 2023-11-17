@@ -163,7 +163,6 @@ the reception of Vector events from an upstream component.
   - `protocol` - The protocol used to send the bytes (i.e., `tcp`, `udp`,
     `unix`, `http`, `https`, `file`, etc.).
   - `http_path` - If relevant, the HTTP path, excluding query strings.
-  - `socket` - If relevant, the socket number that bytes were received from.
 - Metrics
   - MUST increment the `component_received_bytes_total` counter by the defined value with
     the defined properties as metric tags.

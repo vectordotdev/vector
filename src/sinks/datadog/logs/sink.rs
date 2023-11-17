@@ -1,9 +1,9 @@
 use std::{fmt::Debug, io, sync::Arc};
 
 use bytes::Bytes;
-use codecs::{encoding::Framer, CharacterDelimitedEncoder, JsonSerializerConfig};
-use lookup::event_path;
 use snafu::Snafu;
+use vector_lib::codecs::{encoding::Framer, CharacterDelimitedEncoder, JsonSerializerConfig};
+use vector_lib::lookup::event_path;
 
 use super::{config::MAX_PAYLOAD_BYTES, service::LogApiRequest};
 use crate::sinks::{
@@ -261,8 +261,9 @@ where
         let default_api_key = Arc::clone(&self.default_api_key);
 
         let partitioner = EventPartitioner;
+        let batch_settings = self.batch_settings;
 
-        let input = input.batched_partitioned(partitioner, self.batch_settings);
+        let input = input.batched_partitioned(partitioner, || batch_settings.as_byte_size_config());
         input
             .request_builder(
                 default_request_builder_concurrency_limit(),

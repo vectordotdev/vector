@@ -2,8 +2,7 @@ use std::fmt::Write as _;
 use std::str::Utf8Error;
 
 use data_encoding::{BASE32HEX_NOPAD, BASE64, HEXUPPER};
-use thiserror::Error;
-use trust_dns_proto::{
+use hickory_proto::{
     error::ProtoError,
     op::{message::Message as TrustDnsMessage, Edns, Query},
     rr::{
@@ -19,6 +18,7 @@ use trust_dns_proto::{
     },
     serialize::binary::{BinDecodable, BinDecoder},
 };
+use thiserror::Error;
 
 use super::dns_message::{
     self, DnsQueryMessage, DnsRecord, DnsUpdateMessage, EdnsOptionEntry, OptPseudoSection,
@@ -150,7 +150,9 @@ impl DnsMessageParser {
 
     fn parse_dns_record(&mut self, record: &Record) -> DnsParserResult<DnsRecord> {
         let record_data = match record.data() {
-            Some(RData::Unknown { code, rdata }) => self.format_unknown_rdata(*code, rdata),
+            Some(RData::Unknown { code, rdata }) => {
+                self.format_unknown_rdata((*code).into(), rdata)
+            }
             Some(rdata) => format_rdata(rdata),
             None => Ok((Some(String::from("")), None)), // NULL record
         }?;
@@ -744,6 +746,26 @@ fn format_rdata(rdata: &RData) -> DnsParserResult<(Option<String>, Option<Vec<u8
                 );
                 Ok((Some(sig_rdata), None))
             }
+            // RSIG is a derivation of SIG but choosing to keep this duplicate code in lieu of the alternative
+            // which is to allocate to the heap with Box in order to deref.
+            DNSSECRData::RRSIG(sig) => {
+                let sig_rdata = format!(
+                    "{} {} {} {} {} {} {} {} {}",
+                    match format_record_type(sig.type_covered()) {
+                        Some(record_type) => record_type,
+                        None => String::from("Unknown record type"),
+                    },
+                    u8::from(sig.algorithm()),
+                    sig.num_labels(),
+                    sig.original_ttl(),
+                    sig.sig_expiration(), // currently in epoch convert to human readable ?
+                    sig.sig_inception(),  // currently in epoch convert to human readable ?
+                    sig.key_tag(),
+                    sig.signer_name(),
+                    BASE64.encode(sig.sig())
+                );
+                Ok((Some(sig_rdata), None))
+            }
             DNSSECRData::Unknown { code: _, rdata } => Ok((None, Some(rdata.anything().to_vec()))),
             _ => Err(DnsMessageParserError::SimpleError {
                 cause: format!("Unsupported rdata {:?}", rdata),
@@ -1113,11 +1135,11 @@ mod tests {
         str::FromStr,
     };
 
-    use trust_dns_proto::rr::{
+    use hickory_proto::rr::{
         dnssec::{
             rdata::{
                 dnskey::DNSKEY, ds::DS, nsec::NSEC, nsec3::NSEC3, nsec3param::NSEC3PARAM, sig::SIG,
-                DNSSECRData,
+                DNSSECRData, RRSIG,
             },
             Algorithm as DNSSEC_Algorithm, DigestType, Nsec3HashAlgorithm,
         },
@@ -1304,7 +1326,7 @@ mod tests {
 
     #[test]
     fn test_format_rdata_for_cname_type() {
-        let rdata = RData::CNAME(trust_dns_proto::rr::rdata::CNAME(
+        let rdata = RData::CNAME(hickory_proto::rr::rdata::CNAME(
             Name::from_str("www.example.com.").unwrap(),
         ));
         let rdata_text = format_rdata(&rdata);
@@ -1531,6 +1553,35 @@ mod tests {
     #[test]
     fn test_format_rdata_for_sig_type() {
         let rdata = RData::DNSSEC(DNSSECRData::SIG(SIG::new(
+            RecordType::NULL,
+            DNSSEC_Algorithm::RSASHA256,
+            0,
+            0,
+            2,
+            1,
+            5,
+            Name::from_str("www.example.com").unwrap(),
+            vec![
+                0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22,
+                23, 24, 25, 26, 27, 28, 29, 29, 31,
+            ],
+        )));
+        let rdata_text = format_rdata(&rdata);
+        assert!(rdata_text.is_ok());
+        if let Ok((parsed, raw_rdata)) = rdata_text {
+            assert!(raw_rdata.is_none());
+            assert_eq!(
+                "NULL 8 0 0 2 1 5 www.example.com AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHR8=",
+                parsed.unwrap()
+            );
+        }
+    }
+
+    // rsig is a derivation of the SIG record data, but the upstream crate does not handle that with an trait
+    // so there isn't really a great way to reduce code duplication here.
+    #[test]
+    fn test_format_rdata_for_rsig_type() {
+        let rdata = RData::DNSSEC(DNSSECRData::RRSIG(RRSIG::new(
             RecordType::NULL,
             DNSSEC_Algorithm::RSASHA256,
             0,

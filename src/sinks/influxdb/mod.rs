@@ -9,9 +9,9 @@ use futures::FutureExt;
 use http::{StatusCode, Uri};
 use snafu::{ResultExt, Snafu};
 use tower::Service;
-use vector_common::sensitive_string::SensitiveString;
-use vector_config::configurable_component;
-use vector_core::event::MetricTags;
+use vector_lib::configurable::configurable_component;
+use vector_lib::event::{KeyString, MetricTags};
+use vector_lib::sensitive_string::SensitiveString;
 
 use crate::http::HttpClient;
 
@@ -232,7 +232,7 @@ pub(in crate::sinks) fn influx_line_protocol(
     protocol_version: ProtocolVersion,
     measurement: &str,
     tags: Option<MetricTags>,
-    fields: Option<HashMap<String, Field>>,
+    fields: Option<HashMap<KeyString, Field>>,
     timestamp: i64,
     line_protocol: &mut BytesMut,
 ) -> Result<(), &'static str> {
@@ -284,7 +284,7 @@ fn encode_tags(tags: MetricTags, output: &mut BytesMut) {
 
 fn encode_fields(
     protocol_version: ProtocolVersion,
-    fields: HashMap<String, Field>,
+    fields: HashMap<KeyString, Field>,
     output: &mut BytesMut,
 ) {
     let original_len = output.len();
@@ -380,7 +380,7 @@ pub mod test_util {
     use std::{fs::File, io::Read};
 
     use chrono::{offset::TimeZone, DateTime, SecondsFormat, Timelike, Utc};
-    use vector_core::metric_tags;
+    use vector_lib::metric_tags;
 
     use super::*;
     use crate::tls;
@@ -736,20 +736,17 @@ mod tests {
     #[test]
     fn test_encode_fields_v1() {
         let fields = vec![
+            ("field_string".into(), Field::String("string value".into())),
             (
-                "field_string".to_owned(),
-                Field::String("string value".to_owned()),
+                "field_string_escape".into(),
+                Field::String("string\\val\"ue".into()),
             ),
-            (
-                "field_string_escape".to_owned(),
-                Field::String("string\\val\"ue".to_owned()),
-            ),
-            ("field_float".to_owned(), Field::Float(123.45)),
-            ("field_unsigned_int".to_owned(), Field::UnsignedInt(657)),
-            ("field_int".to_owned(), Field::Int(657646)),
-            ("field_bool_true".to_owned(), Field::Bool(true)),
-            ("field_bool_false".to_owned(), Field::Bool(false)),
-            ("escape key".to_owned(), Field::Float(10.0)),
+            ("field_float".into(), Field::Float(123.45)),
+            ("field_unsigned_int".into(), Field::UnsignedInt(657)),
+            ("field_int".into(), Field::Int(657646)),
+            ("field_bool_true".into(), Field::Bool(true)),
+            ("field_bool_false".into(), Field::Bool(false)),
+            ("escape key".into(), Field::Float(10.0)),
         ]
         .into_iter()
         .collect();
@@ -776,20 +773,17 @@ mod tests {
     #[test]
     fn test_encode_fields() {
         let fields = vec![
+            ("field_string".into(), Field::String("string value".into())),
             (
-                "field_string".to_owned(),
-                Field::String("string value".to_owned()),
+                "field_string_escape".into(),
+                Field::String("string\\val\"ue".into()),
             ),
-            (
-                "field_string_escape".to_owned(),
-                Field::String("string\\val\"ue".to_owned()),
-            ),
-            ("field_float".to_owned(), Field::Float(123.45)),
-            ("field_unsigned_int".to_owned(), Field::UnsignedInt(657)),
-            ("field_int".to_owned(), Field::Int(657646)),
-            ("field_bool_true".to_owned(), Field::Bool(true)),
-            ("field_bool_false".to_owned(), Field::Bool(false)),
-            ("escape key".to_owned(), Field::Float(10.0)),
+            ("field_float".into(), Field::Float(123.45)),
+            ("field_unsigned_int".into(), Field::UnsignedInt(657)),
+            ("field_int".into(), Field::Int(657646)),
+            ("field_bool_true".into(), Field::Bool(true)),
+            ("field_bool_false".into(), Field::Bool(false)),
+            ("escape key".into(), Field::Float(10.0)),
         ]
         .into_iter()
         .collect();

@@ -123,7 +123,7 @@ where
         let protocol = get_http_scheme_from_uri(&self.credentials.get_uri());
 
         input
-            .batched(self.batcher_settings.into_byte_size_config())
+            .batched(self.batcher_settings.as_byte_size_config())
             .request_builder(default_request_builder_concurrency_limit(), request_builder)
             .filter_map(
                 |request: Result<NewRelicApiRequest, NewRelicSinkError>| async move {

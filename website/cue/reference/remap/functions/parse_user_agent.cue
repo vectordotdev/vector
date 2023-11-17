@@ -3,7 +3,7 @@ package metadata
 remap: functions: parse_user_agent: {
 	category:    "Parse"
 	description: """
-		Parses the `value` as a user agent string. Which has [a loosely defined format](\(urls.user_agent))
+		Parses the `value` as a user agent string, which has [a loosely defined format](\(urls.user_agent))
 		so this parser only provides best effort guarantee.
 		"""
 	notices: [

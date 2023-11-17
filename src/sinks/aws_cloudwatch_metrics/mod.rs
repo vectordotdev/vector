@@ -14,8 +14,8 @@ use futures::{stream, FutureExt, SinkExt};
 use futures_util::{future, future::BoxFuture};
 use std::task::{Context, Poll};
 use tower::Service;
-use vector_config::configurable_component;
-use vector_core::{sink::VectorSink, ByteSizeOf, EstimatedJsonEncodedSizeOf};
+use vector_lib::configurable::configurable_component;
+use vector_lib::{sink::VectorSink, ByteSizeOf, EstimatedJsonEncodedSizeOf};
 
 use crate::{
     aws::{
@@ -36,6 +36,8 @@ use crate::{
     tls::TlsConfig,
 };
 
+use super::util::service::TowerRequestConfigDefaults;
+
 #[derive(Clone, Copy, Debug, Default)]
 pub struct CloudWatchMetricsDefaultBatchSettings;
 
@@ -43,6 +45,13 @@ impl SinkBatchSettings for CloudWatchMetricsDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = Some(20);
     const MAX_BYTES: Option<usize> = None;
     const TIMEOUT_SECS: f64 = 1.0;
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct CloudWatchMetricsTowerRequestConfigDefaults;
+
+impl TowerRequestConfigDefaults for CloudWatchMetricsTowerRequestConfigDefaults {
+    const RATE_LIMIT_NUM: u64 = 150;
 }
 
 /// Configuration for the `aws_cloudwatch_metrics` sink.
@@ -79,7 +88,7 @@ pub struct CloudWatchMetricsSinkConfig {
 
     #[configurable(derived)]
     #[serde(default)]
-    pub request: TowerRequestConfig,
+    pub request: TowerRequestConfig<CloudWatchMetricsTowerRequestConfigDefaults>,
 
     #[configurable(derived)]
     pub tls: Option<TlsConfig>,
@@ -225,11 +234,7 @@ impl CloudWatchMetricsSvc {
     ) -> crate::Result<VectorSink> {
         let default_namespace = config.default_namespace.clone();
         let batch = config.batch.into_batch_settings()?;
-        let request_settings = config.request.unwrap_with(
-            &TowerRequestConfig::default()
-                .timeout_secs(30)
-                .rate_limit_num(150),
-        );
+        let request_settings = config.request.into_settings();
 
         let service = CloudWatchMetricsSvc { client };
         let buffer = PartitionBuffer::new(MetricsBuffer::new(batch.size));

@@ -1,6 +1,6 @@
 use bytes::BytesMut;
 use tokio_util::codec::Encoder as _;
-use vector_core::config::telemetry;
+use vector_lib::config::telemetry;
 
 use crate::sinks::{prelude::*, util::EncodedLength};
 

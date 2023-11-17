@@ -527,7 +527,7 @@ package-aarch64-unknown-linux-musl-all: package-aarch64-unknown-linux-musl # Bui
 package-aarch64-unknown-linux-gnu-all: package-aarch64-unknown-linux-gnu package-deb-aarch64 package-rpm-aarch64 # Build all aarch64 GNU packages
 
 .PHONY: package-armv7-unknown-linux-gnueabihf-all
-package-armv7-unknown-linux-gnueabihf-all: package-armv7-unknown-linux-gnueabihf package-deb-armv7-gnu package-rpm-armv7hl-gnu package-rpm-armv7-gnu  # Build all armv7-unknown-linux-gnueabihf MUSL packages
+package-armv7-unknown-linux-gnueabihf-all: package-armv7-unknown-linux-gnueabihf package-deb-armv7-gnu package-rpm-armv7hl-gnu  # Build all armv7-unknown-linux-gnueabihf MUSL packages
 
 .PHONY: package-x86_64-unknown-linux-gnu
 package-x86_64-unknown-linux-gnu: target/artifacts/vector-${VERSION}-x86_64-unknown-linux-gnu.tar.gz ## Build an archive suitable for the `x86_64-unknown-linux-gnu` triple.
@@ -584,10 +584,6 @@ package-rpm-x86_64-unknown-linux-musl: package-x86_64-unknown-linux-musl ## Buil
 .PHONY: package-rpm-aarch64
 package-rpm-aarch64: package-aarch64-unknown-linux-gnu ## Build the aarch64 rpm package
 	$(CONTAINER_TOOL) run -v  $(PWD):/git/vectordotdev/vector/ -e TARGET=aarch64-unknown-linux-gnu -e VECTOR_VERSION $(ENVIRONMENT_UPSTREAM) cargo vdev package rpm
-
-.PHONY: package-rpm-armv7-gnu
-package-rpm-armv7-gnu: package-armv7-unknown-linux-gnueabihf ## Build the armv7-unknown-linux-gnueabihf rpm package
-	$(CONTAINER_TOOL) run -v  $(PWD):/git/vectordotdev/vector/ -e TARGET=armv7-unknown-linux-gnueabihf -e VECTOR_VERSION $(ENVIRONMENT_UPSTREAM) cargo vdev package rpm
 
 .PHONY: package-rpm-armv7hl-gnu
 package-rpm-armv7hl-gnu: package-armv7-unknown-linux-gnueabihf ## Build the armv7hl-unknown-linux-gnueabihf rpm package

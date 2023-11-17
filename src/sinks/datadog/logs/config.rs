@@ -2,14 +2,13 @@ use std::{convert::TryFrom, sync::Arc};
 
 use indoc::indoc;
 use tower::ServiceBuilder;
-use vector_config::configurable_component;
-use vector_core::{config::proxy::ProxyConfig, schema::meaning};
+use vector_lib::configurable::configurable_component;
+use vector_lib::{config::proxy::ProxyConfig, schema::meaning};
 use vrl::value::Kind;
 
 use super::{service::LogApiRetry, sink::LogSinkBuilder};
 use crate::{
     codecs::Transformer,
-    common::datadog::Region,
     config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     http::HttpClient,
     schema,
@@ -53,11 +52,6 @@ pub struct DatadogLogsConfig {
     #[serde(flatten)]
     pub dd_common: DatadogCommonConfig,
 
-    /// The Datadog region to send logs to.
-    #[configurable(deprecated = "This option has been deprecated, use the `site` option instead.")]
-    #[serde(default)]
-    pub region: Option<Region>,
-
     #[configurable(derived)]
     #[serde(default)]
     pub compression: Option<Compression>,
@@ -91,16 +85,11 @@ impl DatadogLogsConfig {
     // TODO: We should probably hoist this type of base URI generation so that all DD sinks can
     // utilize it, since it all follows the same pattern.
     fn get_uri(&self) -> http::Uri {
-        let base_url = self.dd_common.endpoint.clone().unwrap_or_else(|| {
-            if let Some(region) = self.region {
-                match region {
-                    Region::Eu => "https://http-intake.logs.datadoghq.eu".to_string(),
-                    Region::Us => "https://http-intake.logs.datadoghq.com".to_string(),
-                }
-            } else {
-                format!("https://http-intake.logs.{}", self.dd_common.site)
-            }
-        });
+        let base_url = self
+            .dd_common
+            .endpoint
+            .clone()
+            .unwrap_or_else(|| format!("https://http-intake.logs.{}", self.dd_common.site));
 
         http::Uri::try_from(format!("{}/api/v2/logs", base_url)).expect("URI not valid")
     }
@@ -115,7 +104,7 @@ impl DatadogLogsConfig {
         dd_evp_origin: String,
     ) -> crate::Result<VectorSink> {
         let default_api_key: Arc<str> = Arc::from(self.dd_common.default_api_key.inner());
-        let request_limits = self.request.tower.unwrap_with(&Default::default());
+        let request_limits = self.request.tower.into_settings();
 
         // We forcefully cap the provided batch configuration to the size/log line limits imposed by
         // the Datadog Logs API, but we still allow them to be lowered if need be.
@@ -165,9 +154,7 @@ impl SinkConfig for DatadogLogsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let client = self.create_client(&cx.proxy)?;
 
-        let healthcheck = self
-            .dd_common
-            .build_healthcheck(client.clone(), self.region.as_ref())?;
+        let healthcheck = self.dd_common.build_healthcheck(client.clone())?;
 
         let sink = self.build_processor(client, cx.app_name_slug)?;
 

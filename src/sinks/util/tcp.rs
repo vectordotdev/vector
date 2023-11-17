@@ -17,9 +17,9 @@ use tokio::{
     time::sleep,
 };
 use tokio_util::codec::Encoder;
-use vector_common::json_size::JsonSize;
-use vector_config::configurable_component;
-use vector_core::{ByteSizeOf, EstimatedJsonEncodedSizeOf};
+use vector_lib::configurable::configurable_component;
+use vector_lib::json_size::JsonSize;
+use vector_lib::{ByteSizeOf, EstimatedJsonEncodedSizeOf};
 
 use crate::{
     codecs::Transformer,
@@ -107,7 +107,11 @@ impl TcpSinkConfig {
     pub fn build(
         &self,
         transformer: Transformer,
-        encoder: impl Encoder<Event, Error = codecs::encoding::Error> + Clone + Send + Sync + 'static,
+        encoder: impl Encoder<Event, Error = vector_lib::codecs::encoding::Error>
+            + Clone
+            + Send
+            + Sync
+            + 'static,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
         let uri = self.address.parse::<http::Uri>()?;
         let host = uri.host().ok_or(SinkBuildError::MissingHost)?.to_string();
@@ -216,7 +220,7 @@ impl TcpConnector {
 
 struct TcpSink<E>
 where
-    E: Encoder<Event, Error = codecs::encoding::Error> + Clone + Send + Sync,
+    E: Encoder<Event, Error = vector_lib::codecs::encoding::Error> + Clone + Send + Sync,
 {
     connector: TcpConnector,
     transformer: Transformer,
@@ -225,7 +229,7 @@ where
 
 impl<E> TcpSink<E>
 where
-    E: Encoder<Event, Error = codecs::encoding::Error> + Clone + Send + Sync + 'static,
+    E: Encoder<Event, Error = vector_lib::codecs::encoding::Error> + Clone + Send + Sync + 'static,
 {
     const fn new(connector: TcpConnector, transformer: Transformer, encoder: E) -> Self {
         Self {
@@ -268,7 +272,12 @@ where
 #[async_trait]
 impl<E> StreamSink<Event> for TcpSink<E>
 where
-    E: Encoder<Event, Error = codecs::encoding::Error> + Clone + Send + Sync + Sync + 'static,
+    E: Encoder<Event, Error = vector_lib::codecs::encoding::Error>
+        + Clone
+        + Send
+        + Sync
+        + Sync
+        + 'static,
 {
     async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         // We need [Peekable](https://docs.rs/futures/0.3.6/futures/stream/struct.Peekable.html) for initiating

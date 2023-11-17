@@ -26,7 +26,8 @@ applications:
             - hugo version
         build:
           commands:
-            - if [ ! -n "${AWS_PULL_REQUEST_ID}" ]; then DEPLOY_PRIME_URL="https://$(echo "${AWS_BRANCH}" | sed 's/[./]/-/g').d1a7j77663uxsc.amplifyapp.com"; else DEPLOY_PRIME_URL="https://pr-${AWS_PULL_REQUEST_ID}.d1a7j77663uxsc.amplifyapp.com"; fi
+            - DEPLOY_PRIME_URL=$(echo "https://$(echo "${AWS_BRANCH}" | sed 's/[./]/-/g').d1a7j77663uxsc.amplifyapp.com" )
+            - if [[ "${AWS_BRANCH}" =~ ^v0[-.][0-9]+([-.]?[0-9]+)?$ ]]; then DEPLOY_COMMAND="ci-production-build"; fi
             - make $DEPLOY_COMMAND
       artifacts:
         baseDirectory: public

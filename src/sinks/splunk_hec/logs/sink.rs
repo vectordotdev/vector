@@ -15,7 +15,7 @@ use crate::{
         util::processed_event::ProcessedEvent,
     },
 };
-use lookup::{event_path, OwnedValuePath, PathPrefix};
+use vector_lib::lookup::{event_path, OwnedValuePath, PathPrefix};
 
 pub struct HecLogsSink<S> {
     pub context: SinkContext,
@@ -61,6 +61,7 @@ where
             timestamp_key: self.timestamp_key.clone(),
             endpoint_target: self.endpoint_target,
         };
+        let batch_settings = self.batch_settings;
 
         input
             .map(move |event| process_log(event, &data))
@@ -77,7 +78,7 @@ where
                 } else {
                     EventPartitioner::new(None, None, None, None)
                 },
-                self.batch_settings,
+                || batch_settings.as_byte_size_config(),
             )
             .request_builder(
                 default_request_builder_concurrency_limit(),

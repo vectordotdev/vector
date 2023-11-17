@@ -1,18 +1,18 @@
 use bytes::Bytes;
 use chrono::Utc;
-use codecs::{
+use futures::StreamExt;
+use snafu::{ResultExt, Snafu};
+use tokio_util::codec::FramedRead;
+use vector_lib::codecs::{
     decoding::{DeserializerConfig, FramingConfig},
     StreamDecodingError,
 };
-use futures::StreamExt;
-use lookup::{lookup_v2::OptionalValuePath, owned_value_path, path, OwnedValuePath};
-use snafu::{ResultExt, Snafu};
-use tokio_util::codec::FramedRead;
-use vector_common::internal_event::{
+use vector_lib::configurable::configurable_component;
+use vector_lib::internal_event::{
     ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol, Registered,
 };
-use vector_config::configurable_component;
-use vector_core::{
+use vector_lib::lookup::{lookup_v2::OptionalValuePath, owned_value_path, path, OwnedValuePath};
+use vector_lib::{
     config::{LegacyKey, LogNamespace},
     EstimatedJsonEncodedSizeOf,
 };

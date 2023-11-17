@@ -200,7 +200,9 @@ mod tests {
         SeedableRng,
     };
     use serde_json::json;
-    use vector_config::component::{SinkDescription, SourceDescription, TransformDescription};
+    use vector_lib::configurable::component::{
+        SinkDescription, SourceDescription, TransformDescription,
+    };
 
     use crate::config::Format;
     use crate::{

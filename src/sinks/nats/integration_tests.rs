@@ -1,5 +1,5 @@
-use codecs::TextSerializerConfig;
 use std::time::Duration;
+use vector_lib::codecs::TextSerializerConfig;
 
 use super::{config::NatsSinkConfig, sink::NatsSink, NatsError};
 use crate::{

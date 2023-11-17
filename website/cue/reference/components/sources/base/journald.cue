@@ -49,6 +49,16 @@ base: components: sources: journald: configuration: {
 		required: false
 		type: string: examples: ["/var/lib/vector"]
 	}
+	emit_cursor: {
+		description: """
+			Whether to emit the [__CURSOR field][cursor]. See also [sd_journal_get_cursor][get_cursor].
+
+			[cursor]: https://www.freedesktop.org/software/systemd/man/latest/systemd.journal-fields.html#Address%20Fields
+			[get_cursor]: https://www.freedesktop.org/software/systemd/man/latest/sd_journal_get_cursor.html
+			"""
+		required: false
+		type: bool: default: false
+	}
 	exclude_matches: {
 		description: """
 			A list of sets of field/value pairs that, if any are present in a journal entry,

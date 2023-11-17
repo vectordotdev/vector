@@ -1,7 +1,7 @@
 use std::{borrow::Cow, fmt::Debug, marker::PhantomData};
 
-use lookup::lookup_v2::ConfigValuePath;
 use rand::random;
+use vector_lib::lookup::lookup_v2::ConfigValuePath;
 use vrl::path::PathPrefix;
 
 use crate::{
@@ -42,6 +42,8 @@ where
     R: Record + Send + Sync + Unpin + Clone + 'static,
 {
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
+        let batch_settings = self.batch_settings;
+
         input
             .filter_map(|event| {
                 // Panic: This sink only accepts Logs, so this should never panic
@@ -67,7 +69,7 @@ where
                 KinesisPartitioner {
                     _phantom: PhantomData,
                 },
-                self.batch_settings,
+                || batch_settings.as_byte_size_config(),
             )
             .map(|(key, events)| {
                 let metadata = RequestMetadata::from_batch(

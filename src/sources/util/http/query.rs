@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
-use lookup::path;
-use vector_core::{
+use vector_lib::lookup::path;
+use vector_lib::{
     config::{LegacyKey, LogNamespace},
     event::Event,
 };

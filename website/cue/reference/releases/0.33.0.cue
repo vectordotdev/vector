@@ -26,7 +26,8 @@ releases: "0.33.0": {
 		"""
 
 	known_issues: [
-		"The Debian package installer will overwrite existing `/etc/default/vector` and `/etc/vector/vector.yaml` files. This will be fixed in v0.33.1.",
+		"The Debian package installer will overwrite existing `/etc/default/vector` and `/etc/vector/vector.yaml` files. This was fixed in v0.33.1.",
+		"The `clickhouse` sink health check will fail due to the accidentally inclusion of an extra `/` in the request URI. This was fixed in v0.34.0.",
 	]
 
 	changelog: [

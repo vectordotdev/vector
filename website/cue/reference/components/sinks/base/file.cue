@@ -270,8 +270,12 @@ base: components: sinks: file: configuration: {
 				description: "Format used for timestamp fields."
 				required:    false
 				type: string: enum: {
-					rfc3339: "Represent the timestamp as a RFC 3339 timestamp."
-					unix:    "Represent the timestamp as a Unix timestamp."
+					rfc3339:    "Represent the timestamp as a RFC 3339 timestamp."
+					unix:       "Represent the timestamp as a Unix timestamp."
+					unix_float: "Represent the timestamp as a Unix timestamp in floating point."
+					unix_ms:    "Represent the timestamp as a Unix timestamp in milliseconds."
+					unix_ns:    "Represent the timestamp as a Unix timestamp in nanoseconds."
+					unix_us:    "Represent the timestamp as a Unix timestamp in microseconds"
 				}
 			}
 		}
@@ -321,6 +325,20 @@ base: components: sinks: file: configuration: {
 			unit: "seconds"
 		}
 	}
+	internal_metrics: {
+		description: "Configuration of internal metrics for file-based components."
+		required:    false
+		type: object: options: include_file_tag: {
+			description: """
+				Whether or not to include the "file" tag on the component's corresponding internal metrics.
+
+				This is useful for distinguishing between different files while monitoring. However, the tag's
+				cardinality is unbounded.
+				"""
+			required: false
+			type: bool: default: false
+		}
+	}
 	path: {
 		description: """
 			File path to write events to.
@@ -332,5 +350,16 @@ base: components: sinks: file: configuration: {
 			examples: ["/tmp/vector-%Y-%m-%d.log", "/tmp/application-{{ application_id }}-%Y-%m-%d.log", "/tmp/vector-%Y-%m-%d.log.zst"]
 			syntax: "template"
 		}
+	}
+	timezone: {
+		description: """
+			Timezone to use for any date specifiers in template strings.
+
+			This can refer to any valid timezone as defined in the [TZ database][tzdb], or "local" which refers to the system local timezone. It will default to the [globally configured timezone](https://vector.dev/docs/reference/configuration/global-options/#timezone).
+
+			[tzdb]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
+			"""
+		required: false
+		type: string: examples: ["local", "America/New_York", "EST5EDT"]
 	}
 }

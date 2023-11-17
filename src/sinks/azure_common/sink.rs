@@ -42,7 +42,7 @@ where
         let request_builder = self.request_builder;
 
         input
-            .batched_partitioned(partitioner, settings)
+            .batched_partitioned(partitioner, || settings.as_byte_size_config())
             .filter_map(|(key, batch)| async move {
                 // We don't need to emit an error here if the event is dropped since this will occur if the template
                 // couldn't be rendered during the partitioning. A `TemplateRenderingError` is already emitted when

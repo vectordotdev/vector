@@ -2,7 +2,7 @@
 
 use bytes::Bytes;
 use http::{Request, Uri};
-use vector_common::sensitive_string::SensitiveString;
+use vector_lib::sensitive_string::SensitiveString;
 
 use crate::sinks::util::http::HttpServiceRequestBuilder;
 

@@ -9,11 +9,11 @@ use prost::Message;
 use vrl::event_path;
 use warp::{filters::BoxedFilter, path, path::FullPath, reply::Response, Filter, Rejection, Reply};
 
-use vector_common::internal_event::{CountByteSize, InternalEventHandle as _};
-use vector_core::EstimatedJsonEncodedSizeOf;
+use vector_lib::internal_event::{CountByteSize, InternalEventHandle as _};
+use vector_lib::EstimatedJsonEncodedSizeOf;
 
 use crate::{
-    event::{Event, TraceEvent, Value},
+    event::{Event, ObjectMap, TraceEvent, Value},
     sources::{
         datadog_agent::{ddtrace_proto, handle_request, ApiKeyQueryParams, DatadogAgentSource},
         util::ErrorMessage,
@@ -282,8 +282,8 @@ fn handle_dd_trace_payload_v0(
     Ok(enriched_events)
 }
 
-fn convert_span(dd_span: ddtrace_proto::Span) -> BTreeMap<String, Value> {
-    let mut span = BTreeMap::<String, Value>::new();
+fn convert_span(dd_span: ddtrace_proto::Span) -> ObjectMap {
+    let mut span = ObjectMap::new();
     span.insert("service".into(), Value::from(dd_span.service));
     span.insert("name".into(), Value::from(dd_span.name));
 
@@ -308,8 +308,13 @@ fn convert_span(dd_span: ddtrace_proto::Span) -> BTreeMap<String, Value> {
             dd_span
                 .metrics
                 .into_iter()
-                .map(|(k, v)| (k, NotNan::new(v).map(Value::Float).unwrap_or(Value::Null)))
-                .collect::<BTreeMap<String, Value>>(),
+                .map(|(k, v)| {
+                    (
+                        k.into(),
+                        NotNan::new(v).map(Value::Float).unwrap_or(Value::Null),
+                    )
+                })
+                .collect::<ObjectMap>(),
         ),
     );
     span.insert("type".into(), Value::from(dd_span.r#type));
@@ -319,17 +324,17 @@ fn convert_span(dd_span: ddtrace_proto::Span) -> BTreeMap<String, Value> {
             dd_span
                 .meta_struct
                 .into_iter()
-                .map(|(k, v)| (k, Value::from(bytes::Bytes::from(v))))
-                .collect::<BTreeMap<String, Value>>(),
+                .map(|(k, v)| (k.into(), Value::from(bytes::Bytes::from(v))))
+                .collect::<ObjectMap>(),
         ),
     );
 
     span
 }
 
-fn convert_tags(original_map: BTreeMap<String, String>) -> BTreeMap<String, Value> {
+fn convert_tags(original_map: BTreeMap<String, String>) -> ObjectMap {
     original_map
         .into_iter()
-        .map(|(k, v)| (k, Value::from(v)))
-        .collect::<BTreeMap<String, Value>>()
+        .map(|(k, v)| (k.into(), Value::from(v)))
+        .collect::<ObjectMap>()
 }

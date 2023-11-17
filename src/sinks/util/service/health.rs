@@ -15,10 +15,9 @@ use serde_with::serde_as;
 use stream_cancel::{Trigger, Tripwire};
 use tokio::time::{sleep, Duration};
 use tower::Service;
-use vector_config::configurable_component;
+use vector_lib::{configurable::configurable_component, emit};
 
 use crate::{
-    emit,
     internal_events::{EndpointsActive, OpenGauge, OpenToken},
     sinks::util::retries::ExponentialBackoff,
 };
