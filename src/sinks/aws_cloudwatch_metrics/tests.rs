@@ -1,4 +1,4 @@
-use aws_sdk_cloudwatch::types::DateTime;
+use aws_smithy_types::DateTime;
 use chrono::{offset::TimeZone, Timelike, Utc};
 use similar_asserts::assert_eq;
 use vector_lib::metric_tags;

@@ -1,7 +1,7 @@
 use std::convert::TryFrom;
 
+use aws_config::Region;
 use aws_sdk_cloudwatchlogs::Client as CloudwatchLogsClient;
-use aws_sdk_cloudwatchlogs::Region;
 use chrono::Duration;
 use futures::{stream, StreamExt};
 use similar_asserts::assert_eq;

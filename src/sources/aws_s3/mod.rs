@@ -1,7 +1,7 @@
 use std::{convert::TryInto, io::ErrorKind};
 
 use async_compression::tokio::bufread;
-use aws_sdk_s3::types::ByteStream;
+use aws_smithy_types::byte_stream::ByteStream;
 use futures::{stream, stream::StreamExt, TryStreamExt};
 use snafu::Snafu;
 use tokio_util::io::StreamReader;
@@ -379,10 +379,9 @@ fn object_key_to_compression(key: &str) -> Option<Compression> {
 
 #[cfg(test)]
 mod test {
-    use aws_sdk_s3::types::ByteStream;
     use tokio::io::AsyncReadExt;
 
-    use super::{s3_object_decoder, Compression};
+    use super::*;
 
     #[test]
     fn determine_compression() {
@@ -444,7 +443,7 @@ mod integration_tests {
     };
 
     use aws_sdk_s3::{types::ByteStream, Client as S3Client};
-    use aws_sdk_sqs::{model::QueueAttributeName, Client as SqsClient};
+    use aws_sdk_sqs::{types::QueueAttributeName, Client as SqsClient};
     use similar_asserts::assert_eq;
     use vector_lib::codecs::{decoding::DeserializerConfig, JsonDeserializerConfig};
     use vector_lib::lookup::path;

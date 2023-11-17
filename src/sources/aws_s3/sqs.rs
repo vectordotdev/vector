@@ -1,14 +1,16 @@
 use std::collections::HashMap;
 use std::{future::ready, num::NonZeroUsize, panic, sync::Arc};
 
-use aws_sdk_s3::{error::GetObjectError, Client as S3Client};
-use aws_sdk_sqs::{
-    error::{DeleteMessageBatchError, ReceiveMessageError},
-    model::{DeleteMessageBatchRequestEntry, Message},
-    output::DeleteMessageBatchOutput,
-    Client as SqsClient,
+use aws_sdk_s3::operation::get_object::GetObjectError;
+use aws_sdk_s3::Client as S3Client;
+use aws_sdk_sqs::operation::delete_message_batch::{
+    DeleteMessageBatchError, DeleteMessageBatchOutput,
 };
-use aws_smithy_client::SdkError;
+use aws_sdk_sqs::operation::receive_message::ReceiveMessageError;
+use aws_sdk_sqs::types::{DeleteMessageBatchRequestEntry, Message};
+use aws_sdk_sqs::Client as SqsClient;
+use aws_smithy_runtime_api::client::orchestrator::HttpResponse;
+use aws_smithy_runtime_api::client::result::SdkError;
 use aws_types::region::Region;
 use bytes::Bytes;
 use chrono::{DateTime, TimeZone, Utc};
@@ -154,7 +156,7 @@ pub enum ProcessingError {
     },
     #[snafu(display("Failed to fetch s3://{}/{}: {}", bucket, key, source))]
     GetObject {
-        source: SdkError<GetObjectError>,
+        source: SdkError<GetObjectError, HttpResponse>,
         bucket: String,
         key: String,
     },
@@ -359,7 +361,9 @@ impl IngestorProcess {
                             DeleteMessageBatchRequestEntry::builder()
                                 .id(message_id)
                                 .receipt_handle(receipt_handle)
-                                .build(),
+                                .build()
+                                // TODO - This should not unwrap
+                                .unwrap(),
                         );
                     }
                 }
@@ -620,7 +624,9 @@ impl IngestorProcess {
         }
     }
 
-    async fn receive_messages(&mut self) -> Result<Vec<Message>, SdkError<ReceiveMessageError>> {
+    async fn receive_messages(
+        &mut self,
+    ) -> Result<Vec<Message>, SdkError<ReceiveMessageError, HttpResponse>> {
         self.state
             .sqs_client
             .receive_message()
@@ -636,7 +642,7 @@ impl IngestorProcess {
     async fn delete_messages(
         &mut self,
         entries: Vec<DeleteMessageBatchRequestEntry>,
-    ) -> Result<DeleteMessageBatchOutput, SdkError<DeleteMessageBatchError>> {
+    ) -> Result<DeleteMessageBatchOutput, SdkError<DeleteMessageBatchError, HttpResponse>> {
         self.state
             .sqs_client
             .delete_message_batch()

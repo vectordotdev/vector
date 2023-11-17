@@ -1,11 +1,11 @@
 use std::collections::{BTreeMap, HashMap};
 
 use aws_sdk_s3::{
-    error::PutObjectError,
-    model::{ObjectCannedAcl, ServerSideEncryption, StorageClass},
+    operation::put_object::PutObjectError,
+    types::{ObjectCannedAcl, ServerSideEncryption, StorageClass},
     Client as S3Client,
 };
-use aws_smithy_client::SdkError;
+use aws_smithy_runtime_api::client::{orchestrator::HttpResponse, result::SdkError};
 use futures::FutureExt;
 use http::StatusCode;
 use snafu::Snafu;
@@ -305,7 +305,7 @@ impl From<S3CannedAcl> for ObjectCannedAcl {
 pub struct S3RetryLogic;
 
 impl RetryLogic for S3RetryLogic {
-    type Error = SdkError<PutObjectError>;
+    type Error = SdkError<PutObjectError, HttpResponse>;
     type Response = S3Response;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {

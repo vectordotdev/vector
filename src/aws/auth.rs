@@ -2,6 +2,7 @@ use std::time::Duration;
 
 use aws_config::{
     default_provider::credentials::DefaultCredentialsChain,
+    identity::IdentityCache,
     imds,
     profile::{
         profile_file::{ProfileFileKind, ProfileFiles},
@@ -9,9 +10,8 @@ use aws_config::{
     },
     sts::AssumeRoleProviderBuilder,
 };
-use aws_credential_types::{
-    cache::CredentialsCache, provider::SharedCredentialsProvider, Credentials,
-};
+use aws_credential_types::{provider::SharedCredentialsProvider, Credentials};
+use aws_smithy_runtime_api::client::identity::SharedIdentityCache;
 use aws_types::region::Region;
 use serde_with::serde_as;
 use vector_lib::configurable::configurable_component;
@@ -180,7 +180,7 @@ fn default_profile() -> String {
 }
 
 impl AwsAuthentication {
-    pub async fn credentials_cache(&self) -> crate::Result<CredentialsCache> {
+    pub async fn credentials_cache(&self) -> crate::Result<SharedIdentityCache> {
         match self {
             AwsAuthentication::Role {
                 load_timeout_secs, ..
@@ -188,17 +188,17 @@ impl AwsAuthentication {
             | AwsAuthentication::Default {
                 load_timeout_secs, ..
             } => {
-                let credentials_cache = CredentialsCache::lazy_builder()
+                let credentials_cache = IdentityCache::lazy()
                     .load_timeout(
                         load_timeout_secs
                             .map(Duration::from_secs)
                             .unwrap_or(DEFAULT_LOAD_TIMEOUT),
                     )
-                    .into_credentials_cache();
+                    .build();
 
                 Ok(credentials_cache)
             }
-            _ => Ok(CredentialsCache::lazy()),
+            _ => Ok(IdentityCache::lazy().build()),
         }
     }
 
@@ -228,7 +228,7 @@ impl AwsAuthentication {
                         builder = builder.external_id(external_id)
                     }
 
-                    let provider = builder.build(provider);
+                    let provider = builder.build_from_provider(provider).await;
 
                     return Ok(SharedCredentialsProvider::new(provider));
                 }
@@ -264,8 +264,9 @@ impl AwsAuthentication {
                     builder = builder.external_id(external_id)
                 }
 
-                let provider =
-                    builder.build(default_credentials_provider(auth_region, *imds).await?);
+                let provider = builder
+                    .build_from_provider(default_credentials_provider(auth_region, *imds).await?)
+                    .await;
 
                 Ok(SharedCredentialsProvider::new(provider))
             }
@@ -299,8 +300,7 @@ async fn default_credentials_provider(
         .max_attempts(imds.max_attempts)
         .connect_timeout(imds.connect_timeout)
         .read_timeout(imds.read_timeout)
-        .build()
-        .await?;
+        .build();
 
     let credentials_provider = DefaultCredentialsChain::builder()
         .region(region)

@@ -1,12 +1,15 @@
 use std::collections::HashMap;
 
-use aws_sdk_sqs::{model::QueueAttributeName, Client as SqsClient, Region};
+use aws_config::Region;
+use aws_sdk_sqs::{types::QueueAttributeName, Client as SqsClient};
 use tokio::time::{sleep, Duration};
 use vector_lib::codecs::TextSerializerConfig;
 
 use crate::config::{SinkConfig, SinkContext};
-use crate::sinks::aws_s_s::sqs::config::{healthcheck, SqsSinkConfig};
-use crate::sinks::aws_s_s::sqs::BaseSSSinkConfig;
+use crate::sinks::aws_s_s::sqs::{
+    config::{healthcheck, SqsSinkConfig},
+    BaseSSSinkConfig,
+};
 use crate::{
     aws::{create_client, AwsAuthentication, RegionOrEndpoint},
     common::sqs::SqsClientBuilder,

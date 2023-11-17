@@ -6,15 +6,14 @@ use std::{
 };
 
 use aws_sdk_s3::{
-    error::CreateBucketErrorKind,
-    model::{
+    operation::{create_bucket::CreateBucketError, get_object::GetObjectOutput},
+    types::{
         DefaultRetention, ObjectLockConfiguration, ObjectLockEnabled, ObjectLockRetentionMode,
         ObjectLockRule,
     },
-    output::GetObjectOutput,
-    types::SdkError,
     Client as S3Client,
 };
+use aws_smithy_runtime_api::client::result::SdkError;
 use bytes::Buf;
 use flate2::read::MultiGzDecoder;
 use futures::{stream, Stream};
@@ -547,8 +546,8 @@ async fn create_bucket(bucket: &str, object_lock_enabled: bool) {
     {
         Ok(_) => {}
         Err(err) => match err {
-            SdkError::ServiceError(inner) => match &inner.err().kind {
-                CreateBucketErrorKind::BucketAlreadyOwnedByYou(_) => {}
+            SdkError::ServiceError(inner) => match &inner.err() {
+                CreateBucketError::BucketAlreadyOwnedByYou(_) => {}
                 err => panic!("Failed to create bucket: {:?}", err),
             },
             err => panic!("Failed to create bucket: {:?}", err),
@@ -556,7 +555,7 @@ async fn create_bucket(bucket: &str, object_lock_enabled: bool) {
     }
 }
 
-async fn list_objects(bucket: &str, prefix: String) -> Option<Vec<aws_sdk_s3::model::Object>> {
+async fn list_objects(bucket: &str, prefix: String) -> Option<Vec<aws_sdk_s3::types::Object>> {
     let prefix = prefix.split('/').next().unwrap().to_string();
 
     client()
