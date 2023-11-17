@@ -19,8 +19,8 @@ enumflags2 = { version = "0.7.8", default-features = false }
 float_eq = { version = "1.0", default-features = false }
 futures = { version = "0.3.29", default-features = false, features = ["std"] }
 futures-util = { version = "0.3.29", default-features = false, features = ["std"] }
-headers = { version = "0.3.9", default-features = false }
-http = { version = "0.2.9", default-features = false }
+headers = { version = "0.4.0", default-features = false }
+http.workspace = true
 hyper-proxy = { version = "0.9.1", default-features = false, features = ["openssl-tls"] }
 indexmap = { version = "2.1.0", default-features = false, features = ["serde", "std"] }
 lookup = { package = "vector-lookup", path = "../vector-lookup" }
