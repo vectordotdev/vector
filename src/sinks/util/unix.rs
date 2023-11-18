@@ -17,7 +17,7 @@ use crate::{
         ConnectionOpen, OpenGauge, SocketMode, UnixSocketConnectionEstablished,
         UnixSocketOutgoingConnectionError, UnixSocketSendError,
     },
-    sink::VecSinkExt,
+    sink_ext::VecSinkExt,
     sinks::{
         util::{
             retries::ExponentialBackoff,

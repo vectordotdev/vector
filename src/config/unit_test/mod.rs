@@ -3,7 +3,7 @@ mod tests;
 mod unit_test_components;
 
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{BTreeMap, HashMap, HashSet},
     sync::Arc,
 };
 
@@ -15,6 +15,11 @@ use tokio::sync::{
     Mutex,
 };
 use uuid::Uuid;
+use vrl::{
+    compiler::{state::RuntimeState, Context, TargetValue, TimeZone},
+    diagnostic::Formatter,
+    value,
+};
 
 pub use self::unit_test_components::{
     UnitTestSinkCheck, UnitTestSinkConfig, UnitTestSinkResult, UnitTestSourceConfig,
@@ -557,6 +562,31 @@ fn build_input_event(input: &TestInput) -> Result<Event, String> {
             Some(v) => Ok(Event::Log(LogEvent::from_str_legacy(v.clone()))),
             None => Err("input type 'raw' requires the field 'value'".to_string()),
         },
+        "vrl" => {
+            if let Some(source) = &input.source {
+                let fns = vrl::stdlib::all();
+                let result = vrl::compiler::compile(source, &fns)
+                    .map_err(|e| Formatter::new(source, e.clone()).to_string())?;
+
+                let mut target = TargetValue {
+                    value: value!({}),
+                    metadata: value::Value::Object(BTreeMap::new()),
+                    secrets: value::Secrets::default(),
+                };
+
+                let mut state = RuntimeState::default();
+                let timezone = TimeZone::default();
+                let mut ctx = Context::new(&mut target, &mut state, &timezone);
+
+                result
+                    .program
+                    .resolve(&mut ctx)
+                    .map(|v| Event::Log(LogEvent::from(v.clone())))
+                    .map_err(|e| e.to_string())
+            } else {
+                Err("input type 'vrl' requires the field 'source'".to_string())
+            }
+        }
         "log" => {
             if let Some(log_fields) = &input.log_fields {
                 let mut event = LogEvent::from_str_legacy("");

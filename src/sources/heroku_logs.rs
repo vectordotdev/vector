@@ -30,6 +30,7 @@ use crate::{
         SourceContext, SourceOutput,
     },
     event::{Event, LogEvent},
+    http::KeepaliveConfig,
     internal_events::{HerokuLogplexRequestReadError, HerokuLogplexRequestReceived},
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
     sources::util::{
@@ -77,6 +78,10 @@ pub struct LogplexConfig {
     #[configurable(metadata(docs::hidden))]
     #[serde(default)]
     log_namespace: Option<bool>,
+
+    #[configurable(derived)]
+    #[serde(default)]
+    keepalive: KeepaliveConfig,
 }
 
 impl LogplexConfig {
@@ -146,6 +151,7 @@ impl Default for LogplexConfig {
             decoding: default_decoding(),
             acknowledgements: SourceAcknowledgementsConfig::default(),
             log_namespace: None,
+            keepalive: KeepaliveConfig::default(),
         }
     }
 }
@@ -182,6 +188,7 @@ impl SourceConfig for LogplexConfig {
             &self.auth,
             cx,
             self.acknowledgements,
+            self.keepalive.clone(),
         )
     }
 
@@ -452,6 +459,7 @@ mod tests {
                 decoding: default_decoding(),
                 acknowledgements: acknowledgements.into(),
                 log_namespace: None,
+                keepalive: Default::default(),
             }
             .build(context)
             .await

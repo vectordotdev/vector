@@ -760,9 +760,8 @@ mod integration_tests {
         test_util::{components::assert_transform_compliance, next_addr},
         transforms::test::create_topology,
     };
-    use std::collections::BTreeMap;
     use vector_lib::assert_event_data_eq;
-    use vrl::value::Value;
+    use vrl::value::{ObjectMap, Value};
     use warp::Filter;
 
     fn ec2_metadata_address() -> String {
@@ -1027,9 +1026,9 @@ mod integration_tests {
             expected_log.insert(format!("\"{}\"", REGION_KEY).as_str(), "us-east-1");
             expected_log.insert(
                 format!("\"{}\"", TAGS_KEY).as_str(),
-                BTreeMap::from([
-                    ("Name".to_string(), Value::from("test-instance")),
-                    ("Test".to_string(), Value::from("test-tag")),
+                ObjectMap::from([
+                    ("Name".into(), Value::from("test-instance")),
+                    ("Test".into(), Value::from("test-tag")),
                 ]),
             );
 

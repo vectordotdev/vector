@@ -293,7 +293,7 @@ impl TaskTransform<Event> for Dedupe {
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::BTreeMap, sync::Arc};
+    use std::sync::Arc;
 
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
@@ -303,7 +303,7 @@ mod tests {
 
     use crate::config::schema::Definition;
     use crate::{
-        event::{Event, LogEvent, Value},
+        event::{Event, LogEvent, ObjectMap, Value},
         test_util::components::assert_transform_compliance,
         transforms::{
             dedupe::{CacheConfig, DedupeConfig, FieldMatchConfig},
@@ -677,12 +677,12 @@ mod tests {
             let (topology, mut out) =
                 create_topology(ReceiverStream::new(rx), transform_config).await;
 
-            let mut map1: BTreeMap<String, Value> = BTreeMap::new();
+            let mut map1 = ObjectMap::new();
             map1.insert("key".into(), "123".into());
             let mut event1 = Event::Log(LogEvent::from("message"));
             event1.as_mut_log().insert("matched", map1);
 
-            let mut map2: BTreeMap<String, Value> = BTreeMap::new();
+            let mut map2 = ObjectMap::new();
             map2.insert("key".into(), 123.into());
             let mut event2 = Event::Log(LogEvent::from("message"));
             event2.as_mut_log().insert("matched", map2);

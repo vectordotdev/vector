@@ -104,7 +104,7 @@ impl DatadogLogsConfig {
         dd_evp_origin: String,
     ) -> crate::Result<VectorSink> {
         let default_api_key: Arc<str> = Arc::from(self.dd_common.default_api_key.inner());
-        let request_limits = self.request.tower.unwrap_with(&Default::default());
+        let request_limits = self.request.tower.into_settings();
 
         // We forcefully cap the provided batch configuration to the size/log line limits imposed by
         // the Datadog Logs API, but we still allow them to be lowered if need be.

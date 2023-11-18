@@ -7,6 +7,7 @@ pub use vrl::path::{
     parse_target_path, parse_value_path, BorrowedSegment, OwnedSegment, OwnedTargetPath,
     OwnedValuePath, PathConcat, PathParseError, PathPrefix, TargetPath, ValuePath,
 };
+use vrl::value::KeyString;
 
 /// A wrapper around `OwnedValuePath` that allows it to be used in Vector config.
 /// This requires a valid path to be used. If you want to allow optional paths,
@@ -21,6 +22,14 @@ impl TryFrom<String> for ConfigValuePath {
 
     fn try_from(src: String) -> Result<Self, Self::Error> {
         OwnedValuePath::try_from(src).map(ConfigValuePath)
+    }
+}
+
+impl TryFrom<KeyString> for ConfigValuePath {
+    type Error = PathParseError;
+
+    fn try_from(src: KeyString) -> Result<Self, Self::Error> {
+        OwnedValuePath::try_from(String::from(src)).map(ConfigValuePath)
     }
 }
 
@@ -56,6 +65,14 @@ impl TryFrom<String> for ConfigTargetPath {
     type Error = PathParseError;
 
     fn try_from(src: String) -> Result<Self, Self::Error> {
+        OwnedTargetPath::try_from(src).map(ConfigTargetPath)
+    }
+}
+
+impl TryFrom<KeyString> for ConfigTargetPath {
+    type Error = PathParseError;
+
+    fn try_from(src: KeyString) -> Result<Self, Self::Error> {
         OwnedTargetPath::try_from(src).map(ConfigTargetPath)
     }
 }

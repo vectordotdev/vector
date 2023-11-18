@@ -1,4 +1,4 @@
-use vector_core::ByteSizeOf;
+use vector_common::byte_size_of::ByteSizeOf;
 
 use crate::batcher::data::BatchData;
 

@@ -28,6 +28,7 @@ use crate::{
         SourceOutput,
     },
     event::{Event, Value},
+    http::KeepaliveConfig,
     register_validatable_component,
     serde::{bool_or_struct, default_decoding},
     sources::util::{
@@ -154,6 +155,10 @@ pub struct SimpleHttpConfig {
     #[configurable(metadata(docs::hidden))]
     #[serde(default)]
     log_namespace: Option<bool>,
+
+    #[configurable(derived)]
+    #[serde(default)]
+    keepalive: KeepaliveConfig,
 }
 
 impl SimpleHttpConfig {
@@ -256,6 +261,7 @@ impl Default for SimpleHttpConfig {
             decoding: Some(default_decoding()),
             acknowledgements: SourceAcknowledgementsConfig::default(),
             log_namespace: None,
+            keepalive: KeepaliveConfig::default(),
         }
     }
 }
@@ -347,6 +353,7 @@ impl SourceConfig for SimpleHttpConfig {
             &self.auth,
             cx,
             self.acknowledgements,
+            self.keepalive.clone(),
         )
     }
 
@@ -477,7 +484,7 @@ impl HttpSource for SimpleHttpSource {
 #[cfg(test)]
 mod tests {
     use std::str::FromStr;
-    use std::{collections::BTreeMap, io::Write, net::SocketAddr};
+    use std::{io::Write, net::SocketAddr};
 
     use flate2::{
         write::{GzEncoder, ZlibEncoder},
@@ -486,9 +493,6 @@ mod tests {
     use futures::Stream;
     use http::{HeaderMap, Method, StatusCode};
     use similar_asserts::assert_eq;
-    use vrl::value::kind::Collection;
-    use vrl::value::Kind;
-
     use vector_lib::codecs::{
         decoding::{DeserializerConfig, FramingConfig},
         BytesDecoderConfig, JsonDeserializerConfig,
@@ -498,6 +502,7 @@ mod tests {
     use vector_lib::lookup::lookup_v2::OptionalValuePath;
     use vector_lib::lookup::{event_path, owned_value_path, OwnedTargetPath, PathPrefix};
     use vector_lib::schema::Definition;
+    use vrl::value::{kind::Collection, Kind, ObjectMap};
 
     use crate::sources::http_server::HttpMethod;
     use crate::{
@@ -559,6 +564,7 @@ mod tests {
                 decoding,
                 acknowledgements: acknowledgements.into(),
                 log_namespace: None,
+                keepalive: Default::default(),
             }
             .build(context)
             .await
@@ -890,8 +896,8 @@ mod tests {
         {
             let event = events.remove(0);
             let log = event.as_log();
-            let mut map = BTreeMap::new();
-            map.insert("dotted.key2".to_string(), Value::from("value2"));
+            let mut map = ObjectMap::new();
+            map.insert("dotted.key2".into(), Value::from("value2"));
             assert_eq!(log["nested"], map.into());
         }
     }

@@ -19,7 +19,7 @@ use crate::{
             ElasticsearchAuthConfig, ElasticsearchCommonMode, ElasticsearchConfig, ParseError,
         },
         util::auth::Auth,
-        util::{http::RequestConfig, TowerRequestConfig, UriSerde},
+        util::{http::RequestConfig, UriSerde},
         HealthcheckError,
     },
     tls::TlsSettings,
@@ -89,10 +89,7 @@ impl ElasticsearchCommon {
 
         let mode = config.common_mode()?;
 
-        let tower_request = config
-            .request
-            .tower
-            .unwrap_with(&TowerRequestConfig::default());
+        let tower_request = config.request.tower.into_settings();
 
         let mut query_params = config.query.clone().unwrap_or_default();
         query_params.insert(

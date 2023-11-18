@@ -7,6 +7,7 @@ use futures::StreamExt;
 use futures_util::future::BoxFuture;
 use once_cell::race::OnceNonZeroUsize;
 use tokio::runtime::{self, Runtime};
+use tokio::sync::broadcast::error::RecvError;
 use tokio_stream::wrappers::UnboundedReceiverStream;
 
 #[cfg(feature = "enterprise")]
@@ -22,6 +23,7 @@ use crate::{
     cli::{handle_config_errors, LogFormat, Opts, RootOpts},
     config::{self, Config, ConfigPath},
     heartbeat,
+    internal_events::{VectorQuit, VectorStarted, VectorStopped},
     signal::{SignalHandler, SignalPair, SignalRx, SignalTo},
     topology::{
         ReloadOutcome, RunningTopology, SharedTopologyController, ShutdownErrorReceiver,
@@ -37,10 +39,6 @@ use std::os::windows::process::ExitStatusExt;
 use tokio::runtime::Handle;
 
 pub static WORKER_THREADS: OnceNonZeroUsize = OnceNonZeroUsize::new();
-
-use crate::internal_events::{VectorQuit, VectorStarted, VectorStopped};
-
-use tokio::sync::broadcast::error::RecvError;
 
 pub struct ApplicationConfig {
     pub config_paths: Vec<config::ConfigPath>,
