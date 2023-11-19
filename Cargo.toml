@@ -77,11 +77,8 @@ start = false
 # libc requirements are defined by `cross`
 # https://github.com/rust-embedded/cross#supported-targets
 # Though, it seems like aarch64 libc is actually 2.18 and not 2.19
-[package.metadata.deb.variants.arm-unknown-linux-gnueabihf]
+[package.metadata.deb.variants.arm-unknown-linux-gnueabi]
 depends = "libc6 (>= 2.15)"
-
-[package.metadata.deb.variants.arm-unknown-linux-musleabihf]
-depends = ""
 
 [package.metadata.deb.variants.armv7-unknown-linux-gnueabihf]
 depends = "libc6 (>= 2.15)"
@@ -429,8 +426,8 @@ target-aarch64-unknown-linux-gnu = ["api", "api-client", "enrichment-tables", "r
 target-aarch64-unknown-linux-musl = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "enterprise"]
 target-armv7-unknown-linux-gnueabihf = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "enterprise"]
 target-armv7-unknown-linux-musleabihf = ["api", "api-client", "rdkafka?/cmake_build", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "enterprise"]
-target-arm-unknown-linux-gnueabihf = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "enterprise"]
-target-arm-unknown-linux-musleabihf = ["api", "api-client", "rdkafka?/cmake_build", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "enterprise"]
+target-arm-unknown-linux-gnueabi = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "enterprise"]
+target-arm-unknown-linux-musleabi = ["api", "api-client", "rdkafka?/cmake_build", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "enterprise"]
 target-x86_64-unknown-linux-gnu = ["api", "api-client", "rdkafka?/cmake_build", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "rdkafka?/gssapi-vendored", "enterprise"]
 target-x86_64-unknown-linux-musl = ["api", "api-client", "rdkafka?/cmake_build", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "enterprise"]
 # Does not currently build

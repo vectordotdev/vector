@@ -17,9 +17,35 @@ PLATFORM="${PLATFORM:-}"
 PUSH="${PUSH:-"true"}"
 REPO="${REPO:-"timberio/vector"}"
 
+IFS=, read -ra REQUESTED_PLATFORMS <<< "$PLATFORM"
+declare -A SUPPORTED_PLATFORMS=(
+  [debian]="linux/amd64,linux/arm/v6,linux/arm/v7,linux/arm64/v8"
+  [alpine]="linux/amd64,linux/arm/v6,linux/arm/v7,linux/arm64/v8"
+  [distroless-static]="linux/amd64,linux/arm/v7,linux/arm64/v8"
+  [distroless-libc]="linux/amd64,linux/arm/v7,linux/arm64/v8"
+)
+
 #
 # Functions
 #
+
+evaluate_supported_platforms_for_base() {
+  local BASE="$1"
+  IFS=, read -ra SUPPORTED_PLATFORMS_FOR_BASE <<< ${SUPPORTED_PLATFORMS["$BASE"]}
+
+  local BUILDABLE_PLATFORMS=""
+  for platform in "${REQUESTED_PLATFORMS[@]}"
+  do
+    if [[ ${SUPPORTED_PLATFORMS_FOR_BASE[@]} =~ $platform ]]
+    then
+      BUILDABLE_PLATFORMS+="$platform,"
+    else
+      >&2 echo "WARN: skipping $platform for $BASE, no base image for platform"
+    fi
+  done
+
+  echo "${BUILDABLE_PLATFORMS%?}"
+}
 
 build() {
   local BASE="$1"
@@ -33,6 +59,8 @@ build() {
     if [[ "$PUSH" == "true" ]]; then
       ARGS+=(--push)
     fi
+
+    local BUILDABLE_PLATFORMS=$(evaluate_supported_platforms_for_base $BASE)
 
     docker buildx build \
       --platform="$PLATFORM" \
