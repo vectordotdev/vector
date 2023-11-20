@@ -1,37 +1,50 @@
-use crate::codecs::{Decoder, DecodingConfig};
-use crate::config::{SourceConfig, SourceContext};
-use crate::event::BatchNotifier;
-use crate::internal_events::{
-    PulsarErrorEvent, PulsarErrorEventData, PulsarErrorEventType, StreamClosedError,
-};
-use crate::serde::{bool_or_struct, default_decoding, default_framing_message_based};
-use crate::SourceSender;
+//! `Pulsar` source.
+//! Accepts log events streamed from [`Apache Pulsar`][pulsar].
+//!
+//! [pulsar]: https://pulsar.apache.org/
 use chrono::TimeZone;
-use codecs::decoding::{DeserializerConfig, FramingConfig};
-use codecs::StreamDecodingError;
+use codecs::{
+    decoding::{DeserializerConfig, FramingConfig},
+    StreamDecodingError,
+};
 use futures_util::StreamExt;
 use lookup::{owned_value_path, path};
-use pulsar::authentication::oauth2::{OAuth2Authentication, OAuth2Params};
-use pulsar::consumer::Message;
-use pulsar::error::AuthenticationError;
-use pulsar::message::proto::MessageIdData;
-use pulsar::{Authentication, SubType};
-use pulsar::{Consumer, Pulsar, TokioExecutor};
-use tokio_util::codec::FramedRead;
-use vector_common::finalization::BatchStatus;
-use vector_common::finalizer::OrderedFinalizer;
-use vector_common::internal_event::{
-    ByteSize, BytesReceived, CountByteSize, EventsReceived, InternalEventHandle as _, Protocol,
-    Registered,
+use pulsar::{
+    authentication::oauth2::{OAuth2Authentication, OAuth2Params},
+    consumer::Message,
+    error::AuthenticationError,
+    message::proto::MessageIdData,
+    Authentication, Consumer, Pulsar, SubType, TokioExecutor,
 };
-use vector_common::sensitive_string::SensitiveString;
-use vector_common::shutdown::ShutdownSignal;
+use tokio_util::codec::FramedRead;
+use vector_common::{
+    finalization::BatchStatus,
+    finalizer::OrderedFinalizer,
+    internal_event::{
+        ByteSize, BytesReceived, CountByteSize, EventsReceived, InternalEventHandle as _, Protocol,
+        Registered,
+    },
+    sensitive_string::SensitiveString,
+    shutdown::ShutdownSignal,
+};
 use vector_config_macros::configurable_component;
-use vector_core::config::{LegacyKey, LogNamespace, SourceAcknowledgementsConfig, SourceOutput};
-use vector_core::event::Event;
-use vector_core::ByteSizeOf;
-
+use vector_core::{
+    config::{LegacyKey, LogNamespace, SourceAcknowledgementsConfig, SourceOutput},
+    event::Event,
+    ByteSizeOf,
+};
 use vrl::value::Kind;
+
+use crate::{
+    codecs::{Decoder, DecodingConfig},
+    config::{SourceConfig, SourceContext},
+    event::BatchNotifier,
+    internal_events::{
+        PulsarErrorEvent, PulsarErrorEventData, PulsarErrorEventType, StreamClosedError,
+    },
+    serde::{bool_or_struct, default_decoding, default_framing_message_based},
+    SourceSender,
+};
 
 /// Configuration for the `pulsar` source.
 #[configurable_component(source("pulsar", "Collect logs from Apache Pulsar."))]
