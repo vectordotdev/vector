@@ -331,44 +331,6 @@ configuration: {
 			}
 		}
 
-		datadog: {
-			common: false
-			description: """
-					Options that can be set for all Datadog sinks. Values set here can be overriden be each individual sink.
-				"""
-			required: false
-			type: object: {
-				examples: []
-				options: {
-					api_key: {
-						common: true
-						description: """
-							Default Datadog API key to use for Datadog components.
-
-							This can also be specified with the `DD_API_KEY` environment variable.
-							"""
-						required: false
-						type: string: {
-							examples: ["${DATADOG_API_KEY_ENV_VAR}", "ef8d5de700e7989468166c40fc8a0ccd"]
-						}
-					}
-					site: {
-						common: true
-						description: """
-							Default site to use for Datadog components.
-
-							This can also be specified with the `DD_SITE` environment variable.
-							"""
-						required: false
-						type: string: {
-							examples: ["us3.datadoghq.com", "datadoghq.eu"]
-						}
-					}
-
-				}
-			}
-		}
-
 		log_schema: {
 			common:      false
 			description: """

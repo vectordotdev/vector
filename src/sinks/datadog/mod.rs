@@ -45,10 +45,13 @@ pub struct LocalDatadogCommonConfig {
 
     /// The Datadog [site][dd_site] to send observability data to.
     ///
-    /// If not set here, the value is taken from the [global options][global_options].
+    /// This value can also be set by specifying the `DD_SITE` environment variable.
+    /// The value specified here takes precedence over the environment variable.
+    ///
+    /// If not specified by the environment variable, a default value of
+    /// `datadoghq.com` is taken.
     ///
     /// [dd_site]: https://docs.datadoghq.com/getting_started/site
-    /// [global_options]: /docs/reference/configuration/global-options/#datadog
     #[configurable(metadata(docs::examples = "us3.datadoghq.com"))]
     #[configurable(metadata(docs::examples = "datadoghq.eu"))]
     site: Option<String>,
@@ -58,7 +61,8 @@ pub struct LocalDatadogCommonConfig {
     /// If an event has a Datadog [API key][api_key] set explicitly in its metadata, it takes
     /// precedence over this setting.
     ///
-    /// If not set here, the value is taken from the [global options][global_options].
+    /// This value can also be set by specifying the `DD_API_KEY` environment variable.
+    /// The value specified here takes precedence over the environment variable.
     ///
     /// [api_key]: https://docs.datadoghq.com/api/?lang=bash#authentication
     /// [global_options]: /docs/reference/configuration/global-options/#datadog
@@ -111,7 +115,7 @@ impl LocalDatadogCommonConfig {
     }
 }
 
-#[derive(Debug, Snafu)]
+#[derive(Debug, Snafu, PartialEq, Eq)]
 pub enum ConfigurationError {
     #[snafu(display("API Key must be specified."))]
     ApiKeyRequired,
@@ -224,5 +228,62 @@ impl DatadogApiError {
             DatadogApiError::BadRequest | DatadogApiError::PayloadTooLarge => false,
             DatadogApiError::ServerError | DatadogApiError::Forbidden => true,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn local_config_with_no_overrides() {
+        let local = LocalDatadogCommonConfig::new(
+            None,
+            Some("potato.com".into()),
+            Some("key".to_string().into()),
+        );
+        let global = datadog::Options {
+            api_key: Some("more key".to_string().into()),
+            site: "tomato.com".into(),
+        };
+
+        let overrided = local.with_globals(global).unwrap();
+
+        assert_eq!(None, overrided.endpoint);
+        assert_eq!("potato.com".to_string(), overrided.site);
+        assert_eq!(
+            SensitiveString::from("key".to_string()),
+            overrided.default_api_key
+        );
+    }
+
+    #[test]
+    fn local_config_with_overrides() {
+        let local = LocalDatadogCommonConfig::new(None, None, None);
+        let global = datadog::Options {
+            api_key: Some("more key".to_string().into()),
+            site: "tomato.com".into(),
+        };
+
+        let overrided = local.with_globals(global).unwrap();
+
+        assert_eq!(None, overrided.endpoint);
+        assert_eq!("tomato.com".to_string(), overrided.site);
+        assert_eq!(
+            SensitiveString::from("more key".to_string()),
+            overrided.default_api_key
+        );
+    }
+
+    #[test]
+    fn no_api_key() {
+        let local = LocalDatadogCommonConfig::new(None, None, None);
+        let global = datadog::Options {
+            api_key: None,
+            site: "tomato.com".into(),
+        };
+
+        let error = local.with_globals(global).unwrap_err();
+        assert_eq!(ConfigurationError::ApiKeyRequired, error);
     }
 }

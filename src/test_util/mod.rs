@@ -16,6 +16,7 @@ use std::{
     task::{ready, Context, Poll},
 };
 
+use chrono::{SubsecRound, Utc};
 use flate2::read::MultiGzDecoder;
 use futures::{stream, task::noop_waker_ref, FutureExt, SinkExt, Stream, StreamExt, TryStreamExt};
 use openssl::ssl::{SslConnector, SslFiletype, SslMethod, SslVerifyMode};
@@ -34,8 +35,11 @@ use tokio_stream::wrappers::TcpListenerStream;
 #[cfg(unix)]
 use tokio_stream::wrappers::UnixListenerStream;
 use tokio_util::codec::{Encoder, FramedRead, FramedWrite, LinesCodec};
-use vector_lib::buffers::topology::channel::LimitedReceiver;
-use vector_lib::event::{BatchNotifier, Event, EventArray, LogEvent};
+use vector_lib::event::{BatchNotifier, Event, EventArray, LogEvent, MetricTags, MetricValue};
+use vector_lib::{
+    buffers::topology::channel::LimitedReceiver,
+    event::{Metric, MetricKind},
+};
 #[cfg(test)]
 use zstd::Decoder as ZstdDecoder;
 
@@ -274,6 +278,35 @@ pub fn generate_events_with_stream<Gen: FnMut(usize) -> Event>(
         stream::iter(events.clone()).map(|event| event.into_log()),
         batch,
     );
+    (events, stream)
+}
+
+pub fn random_metrics_with_stream(
+    count: usize,
+    batch: Option<BatchNotifier>,
+    tags: Option<MetricTags>,
+) -> (Vec<Event>, impl Stream<Item = EventArray>) {
+    let timestamp = Utc::now().trunc_subsecs(3);
+    let events: Vec<_> = (0..count)
+        .map(|index| {
+            let ts = timestamp + (std::time::Duration::from_secs(2) * index as u32);
+            Event::Metric(
+                Metric::new(
+                    format!("counter_{}", thread_rng().gen::<u32>()),
+                    MetricKind::Incremental,
+                    MetricValue::Counter {
+                        value: index as f64,
+                    },
+                )
+                .with_timestamp(Some(ts))
+                .with_tags(tags.clone()),
+            )
+            // this ensures we get Origin Metadata, with an undefined service but that's ok.
+            .with_source_type("a_source_like_none_other")
+        })
+        .collect();
+
+    let stream = map_event_batch_stream(stream::iter(events.clone()), batch);
     (events, stream)
 }
 
