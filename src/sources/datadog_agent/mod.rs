@@ -21,7 +21,7 @@ use std::convert::Infallible;
 use std::time::Duration;
 use std::{fmt::Debug, io::Read, net::SocketAddr, sync::Arc};
 
-use bytes::{Buf, Bytes};
+use bytes::{Buf, Bytes, BytesMut};
 use chrono::{serde::ts_milliseconds, DateTime, Utc};
 use flate2::read::{MultiGzDecoder, ZlibDecoder};
 use futures::FutureExt;
@@ -516,7 +516,7 @@ fn handle_decode_error(encoding: &str, error: impl std::error::Error) -> ErrorMe
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct LogMsg {
-    pub message: Bytes,
+    pub message: BytesMut,
     pub status: Bytes,
     #[serde(
         deserialize_with = "ts_milliseconds::deserialize",

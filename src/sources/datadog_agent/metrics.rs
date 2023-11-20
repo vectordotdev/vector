@@ -460,24 +460,25 @@ fn into_vector_metric(
     let (namespace, name) = namespace_name_from_dd_metric(&dd_metric.metric);
 
     match dd_metric.r#type {
-        DatadogMetricType::Count => dd_metric
-            .points
-            .iter()
-            .map(|dd_point| {
-                Metric::new(
-                    name.to_string(),
-                    MetricKind::Incremental,
-                    MetricValue::Counter { value: dd_point.1 },
-                )
-                .with_timestamp(Some(
-                    Utc.timestamp_opt(dd_point.0, 0)
-                        .single()
-                        .expect("invalid timestamp"),
-                ))
-                .with_tags(Some(tags.clone()))
-                .with_namespace(namespace)
-            })
-            .collect::<Vec<_>>(),
+        DatadogMetricType::Count => {
+            let base_value = MetricValue::Counter { value: 0.0 };
+            let base_metric = Metric::new(name, MetricKind::Incremental, base_value)
+                .with_tags(Some(tags))
+                .with_namespace(namespace);
+
+            itertools::repeat_n(base_metric, dd_metric.points.len())
+                .zip(dd_metric.points)
+                .map(|(base_metric, dd_point)| {
+                    base_metric
+                        .with_value(MetricValue::Counter { value: dd_point.1 })
+                        .with_timestamp(Some(
+                            Utc.timestamp_opt(dd_point.0, 0)
+                                .single()
+                                .expect("invalid timestamp"),
+                        ))
+                })
+                .collect::<Vec<_>>()
+        }
         DatadogMetricType::Gauge => dd_metric
             .points
             .iter()
@@ -498,29 +499,29 @@ fn into_vector_metric(
             .collect::<Vec<_>>(),
         // Agent sends rate only for dogstatsd counter https://github.com/DataDog/datadog-agent/blob/f4a13c6dca5e2da4bb722f861a8ac4c2f715531d/pkg/metrics/counter.go#L8-L10
         // for consistency purpose (w.r.t. (dog)statsd source) they are turned back into counters
-        DatadogMetricType::Rate => dd_metric
-            .points
-            .iter()
-            .map(|dd_point| {
-                let i = dd_metric.interval.filter(|v| *v != 0).unwrap_or(1);
-                Metric::new(
-                    name.to_string(),
-                    MetricKind::Incremental,
-                    MetricValue::Counter {
-                        value: dd_point.1 * (i as f64),
-                    },
-                )
-                .with_timestamp(Some(
-                    Utc.timestamp_opt(dd_point.0, 0)
-                        .single()
-                        .expect("invalid timestamp"),
-                ))
-                // dd_metric.interval is in seconds, convert to ms
-                .with_interval_ms(NonZeroU32::new(i * 1000))
-                .with_tags(Some(tags.clone()))
-                .with_namespace(namespace)
-            })
-            .collect::<Vec<_>>(),
+        DatadogMetricType::Rate => {
+            let base_value = MetricValue::Counter { value: 0.0 };
+            let base_metric = Metric::new(name, MetricKind::Incremental, base_value)
+                .with_tags(Some(tags))
+                .with_namespace(namespace);
+
+            itertools::repeat_n(base_metric, dd_metric.points.len())
+                .zip(dd_metric.points)
+                .map(|(base_metric, dd_point)| {
+                    let i = dd_metric.interval.filter(|v| *v != 0).unwrap_or(1);
+                    let value = dd_point.1 * (i as f64);
+
+                    base_metric
+                        .with_value(MetricValue::Counter { value })
+                        .with_interval_ms(NonZeroU32::new(i * 1000))
+                        .with_timestamp(Some(
+                            Utc.timestamp_opt(dd_point.0, 0)
+                                .single()
+                                .expect("invalid timestamp"),
+                        ))
+                })
+                .collect::<Vec<_>>()
+        }
     }
     .into_iter()
     .map(|mut metric| {

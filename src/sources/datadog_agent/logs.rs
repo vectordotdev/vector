@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use bytes::{BufMut, Bytes, BytesMut};
+use bytes::Bytes;
 use chrono::Utc;
 use http::StatusCode;
 use tokio_util::codec::Decoder;
@@ -88,7 +88,7 @@ pub(crate) fn decode_log_body(
     let mut decoded = Vec::new();
 
     for LogMsg {
-        message,
+        mut message,
         status,
         timestamp,
         hostname,
@@ -98,10 +98,8 @@ pub(crate) fn decode_log_body(
     } in messages
     {
         let mut decoder = source.decoder.clone();
-        let mut buffer = BytesMut::new();
-        buffer.put(message);
         loop {
-            match decoder.decode_eof(&mut buffer) {
+            match decoder.decode_eof(&mut message) {
                 Ok(Some((events, _byte_size))) => {
                     for mut event in events {
                         if let Event::Log(ref mut log) = event {
