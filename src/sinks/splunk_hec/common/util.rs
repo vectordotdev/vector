@@ -143,7 +143,9 @@ pub fn config_host_key() -> OptionalTargetPath {
 
 pub fn config_timestamp_key() -> OptionalTargetPath {
     OptionalTargetPath {
-        path: crate::config::log_schema().timestamp_key_target_path().cloned(),
+        path: crate::config::log_schema()
+            .timestamp_key_target_path()
+            .cloned(),
     }
 }
 
