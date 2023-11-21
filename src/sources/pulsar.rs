@@ -335,7 +335,7 @@ async fn pulsar_source(
                     Err(error) => {
                         pulsar_error_events.emit(PulsarErrorEventData{
                             msg: error.to_string(),
-                            error_type:PulsarErrorEventType::ReadError,
+                            error_type:PulsarErrorEventType::Read,
                         });
                     }
                 }
@@ -346,6 +346,7 @@ async fn pulsar_source(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn parse_message(
     msg: Message<String>,
     decoder: &Decoder,
@@ -469,7 +470,7 @@ async fn finalize_event_stream(
                 if let Err(error) = consumer.ack_with_id(topic.as_str(), message_id).await {
                     pulsar_error_events.emit(PulsarErrorEventData {
                         msg: error.to_string(),
-                        error_type: PulsarErrorEventType::AckError,
+                        error_type: PulsarErrorEventType::Ack,
                     });
                 }
             }
@@ -491,7 +492,7 @@ async fn handle_ack(
             {
                 pulsar_error_events.emit(PulsarErrorEventData {
                     msg: error.to_string(),
-                    error_type: PulsarErrorEventType::AckError,
+                    error_type: PulsarErrorEventType::Ack,
                 });
             }
         }
@@ -502,7 +503,7 @@ async fn handle_ack(
             {
                 pulsar_error_events.emit(PulsarErrorEventData {
                     msg: error.to_string(),
-                    error_type: PulsarErrorEventType::NAckError,
+                    error_type: PulsarErrorEventType::NAck,
                 });
             }
         }
@@ -513,7 +514,7 @@ async fn handle_ack(
             {
                 pulsar_error_events.emit(PulsarErrorEventData {
                     msg: error.to_string(),
-                    error_type: PulsarErrorEventType::NAckError,
+                    error_type: PulsarErrorEventType::NAck,
                 });
             }
         }
