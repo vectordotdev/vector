@@ -2,12 +2,12 @@ use futures_util::FutureExt;
 use http::{Request, StatusCode, Uri};
 use hyper::body::Body;
 use snafu::Snafu;
-use vector_common::sensitive_string::SensitiveString;
-use vector_config::configurable_component;
-use vector_core::{config::AcknowledgementsConfig, tls::TlsEnableableConfig};
+use vector_lib::configurable::configurable_component;
+use vector_lib::sensitive_string::SensitiveString;
+use vector_lib::{config::AcknowledgementsConfig, tls::TlsEnableableConfig};
 
 use crate::{
-    common::datadog::{get_api_base_endpoint, get_base_domain_region, Region, DD_US_SITE},
+    common::datadog::{get_api_base_endpoint, DD_US_SITE},
     http::{HttpClient, HttpError},
     sinks::HealthcheckError,
 };
@@ -36,8 +36,9 @@ pub(crate) fn default_site() -> String {
 pub struct DatadogCommonConfig {
     /// The endpoint to send observability data to.
     ///
-    /// The endpoint must contain an HTTP scheme, and may specify a
-    /// hostname or IP address and port.
+    /// The endpoint must contain an HTTP scheme, and may specify a hostname or IP
+    /// address and port. The API path should NOT be specified as this is handled by
+    /// the sink.
     ///
     /// If set, overrides the `site` option.
     #[configurable(metadata(docs::advanced))]
@@ -92,15 +93,9 @@ impl Default for DatadogCommonConfig {
 impl DatadogCommonConfig {
     /// Returns a `Healthcheck` which is a future that will be used to ensure the
     /// `<site>/api/v1/validate` endpoint is reachable.
-    fn build_healthcheck(
-        &self,
-        client: HttpClient,
-        region: Option<&Region>,
-    ) -> crate::Result<Healthcheck> {
-        let validate_endpoint = get_api_validate_endpoint(
-            self.endpoint.as_ref(),
-            get_base_domain_region(self.site.as_str(), region),
-        )?;
+    fn build_healthcheck(&self, client: HttpClient) -> crate::Result<Healthcheck> {
+        let validate_endpoint =
+            get_api_validate_endpoint(self.endpoint.as_ref(), self.site.as_str())?;
 
         let api_key: String = self.default_api_key.clone().into();
 

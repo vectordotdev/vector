@@ -1,18 +1,6 @@
-use std::num::NonZeroUsize;
-
-use futures::stream::BoxStream;
-use futures_util::StreamExt;
-use vector_core::sink::StreamSink;
-
 use super::{client::Client, request_builder::SSRequestBuilder, service::SSService};
-use crate::internal_events::SinkRequestBuildError;
 use crate::sinks::aws_s_s::retry::SSRetryLogic;
-use crate::{
-    event::Event,
-    sinks::util::{
-        builder::SinkBuilderExt, ServiceBuilderExt, SinkBatchSettings, TowerRequestConfig,
-    },
-};
+use crate::sinks::prelude::*;
 
 #[derive(Clone, Copy, Debug, Default)]
 pub(crate) struct SqsSinkDefaultBatchSettings;
@@ -52,17 +40,17 @@ where
     }
 
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
-        let request = self
-            .request
-            .unwrap_with(&TowerRequestConfig::default().timeout_secs(30));
-        let request_builder_concurrency_limit = NonZeroUsize::new(50);
+        let request = self.request.into_settings();
         let retry_logic: SSRetryLogic<E> = super::retry::SSRetryLogic::new();
         let service = tower::ServiceBuilder::new()
             .settings(request, retry_logic)
             .service(self.service);
 
         input
-            .request_builder(request_builder_concurrency_limit, self.request_builder)
+            .request_builder(
+                default_request_builder_concurrency_limit(),
+                self.request_builder,
+            )
             .filter_map(|req| async move {
                 req.map_err(|error| {
                     emit!(SinkRequestBuildError { error });

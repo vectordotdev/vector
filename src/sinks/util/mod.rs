@@ -16,6 +16,7 @@ pub mod request_builder;
 pub mod retries;
 pub mod service;
 pub mod sink;
+pub mod snappy;
 pub mod socket_bytes_sink;
 pub mod statistic;
 pub mod tcp;
@@ -51,9 +52,10 @@ pub use service::{
 pub use sink::{BatchSink, PartitionBatchSink, StreamSink};
 use snafu::Snafu;
 pub use uri::UriSerde;
-use vector_common::json_size::JsonSize;
+use vector_lib::{json_size::JsonSize, TimeZone};
 
 use crate::event::EventFinalizers;
+use chrono::{FixedOffset, Offset, Utc};
 
 #[derive(Debug, Snafu)]
 enum SinkBuildError {
@@ -131,5 +133,12 @@ pub trait ElementCount {
 impl<T> ElementCount for Vec<T> {
     fn element_count(&self) -> usize {
         self.len()
+    }
+}
+
+pub fn timezone_to_offset(tz: TimeZone) -> Option<FixedOffset> {
+    match tz {
+        TimeZone::Local => Some(*Utc::now().with_timezone(&chrono::Local).offset()),
+        TimeZone::Named(tz) => Some(Utc::now().with_timezone(&tz).offset().fix()),
     }
 }

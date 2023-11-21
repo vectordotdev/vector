@@ -33,11 +33,14 @@ where
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         input
             // Batch the input stream with size calculation based on the configured codec
-            .batched(self.batch_settings.into_item_size_config(HttpBatchSizer {
+            .batched(self.batch_settings.as_item_size_config(HttpBatchSizer {
                 encoder: self.request_builder.encoder.encoder.clone(),
             }))
-            // Build requests with no concurrency limit.
-            .request_builder(None, self.request_builder)
+            // Build requests with default concurrency limit.
+            .request_builder(
+                default_request_builder_concurrency_limit(),
+                self.request_builder,
+            )
             // Filter out any errors that occurred in the request building.
             .filter_map(|request| async move {
                 match request {

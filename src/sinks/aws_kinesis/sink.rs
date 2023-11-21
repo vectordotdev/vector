@@ -1,7 +1,7 @@
-use std::{borrow::Cow, fmt::Debug, marker::PhantomData, num::NonZeroUsize};
+use std::{borrow::Cow, fmt::Debug, marker::PhantomData};
 
-use lookup::lookup_v2::ConfigValuePath;
 use rand::random;
+use vector_lib::lookup::lookup_v2::ConfigValuePath;
 use vrl::path::PathPrefix;
 
 use crate::{
@@ -42,7 +42,7 @@ where
     R: Record + Send + Sync + Unpin + Clone + 'static,
 {
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
-        let request_builder_concurrency_limit = NonZeroUsize::new(50);
+        let batch_settings = self.batch_settings;
 
         input
             .filter_map(|event| {
@@ -52,7 +52,10 @@ where
 
                 future::ready(processed)
             })
-            .request_builder(request_builder_concurrency_limit, self.request_builder)
+            .request_builder(
+                default_request_builder_concurrency_limit(),
+                self.request_builder,
+            )
             .filter_map(|request| async move {
                 match request {
                     Err(error) => {
@@ -66,7 +69,7 @@ where
                 KinesisPartitioner {
                     _phantom: PhantomData,
                 },
-                self.batch_settings,
+                || batch_settings.as_byte_size_config(),
             )
             .map(|(key, events)| {
                 let metadata = RequestMetadata::from_batch(

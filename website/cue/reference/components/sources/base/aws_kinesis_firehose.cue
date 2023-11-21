@@ -71,7 +71,7 @@ base: components: sources: aws_kinesis_firehose: configuration: {
 															[json]: https://www.json.org/
 															"""
 						native: """
-															Decodes the raw bytes as Vector’s [native Protocol Buffers format][vector_native_protobuf].
+															Decodes the raw bytes as [native Protocol Buffers format][vector_native_protobuf].
 
 															This codec is **[experimental][experimental]**.
 
@@ -79,7 +79,7 @@ base: components: sources: aws_kinesis_firehose: configuration: {
 															[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
 															"""
 						native_json: """
-															Decodes the raw bytes as Vector’s [native JSON format][vector_native_json].
+															Decodes the raw bytes as [native JSON format][vector_native_json].
 
 															This codec is **[experimental][experimental]**.
 
@@ -273,6 +273,37 @@ base: components: sources: aws_kinesis_firehose: configuration: {
 					description: "The maximum length of the byte buffer."
 					required:    false
 					type: uint: {}
+				}
+			}
+		}
+	}
+	keepalive: {
+		description: "Configuration of HTTP server keepalive parameters."
+		required:    false
+		type: object: options: {
+			max_connection_age_jitter_factor: {
+				description: """
+					The factor by which to jitter the `max_connection_age_secs` value.
+
+					A value of 0.1 means that the actual duration will be between 90% and 110% of the
+					specified maximum duration.
+					"""
+				required: false
+				type: float: default: 0.1
+			}
+			max_connection_age_secs: {
+				description: """
+					The maximum amount of time a connection may exist before it is closed
+					by sending a `Connection: close` header on the HTTP response.
+
+					A random jitter configured by `max_connection_age_jitter_factor` is added
+					to the specified duration to spread out connection storms.
+					"""
+				required: false
+				type: uint: {
+					default: 300
+					examples: [600]
+					unit: "seconds"
 				}
 			}
 		}

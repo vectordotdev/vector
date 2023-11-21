@@ -106,6 +106,11 @@ base: components: sinks: file: configuration: {
 						[vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
 						[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
 						"""
+					protobuf: """
+						Encodes an event as a [Protobuf][protobuf] message.
+
+						[protobuf]: https://protobuf.dev/
+						"""
 					raw_message: """
 						No encoding.
 
@@ -162,7 +167,7 @@ base: components: sinks: file: configuration: {
 																In some variants of CSV, quotes are escaped using a special escape character
 																like \\ (instead of escaping quotes by doubling them).
 
-																To use this `double_quotes` needs to be disabled as well otherwise it is ignored
+																To use this, `double_quotes` needs to be disabled as well otherwise it is ignored.
 																"""
 						required: false
 						type: uint: default: 34
@@ -191,18 +196,18 @@ base: components: sinks: file: configuration: {
 						type: string: {
 							default: "necessary"
 							enum: {
-								always: "This puts quotes around every field. Always."
+								always: "Always puts quotes around every field."
 								necessary: """
-																			This puts quotes around fields only when necessary.
-																			They are necessary when fields contain a quote, delimiter or record terminator.
+																			Puts quotes around fields only when necessary.
+																			They are necessary when fields contain a quote, delimiter, or record terminator.
 																			Quotes are also necessary when writing an empty record
 																			(which is indistinguishable from a record with one empty field).
 																			"""
-								never: "This never writes quotes, even if it would produce invalid CSV data."
+								never: "Never writes quotes, even if it produces invalid CSV data."
 								non_numeric: """
-																			This puts quotes around all fields that are non-numeric.
+																			Puts quotes around all fields that are non-numeric.
 																			Namely, when writing a field that does not parse as a valid float or integer,
-																			then quotes will be used even if they aren’t strictly necessary.
+																			then quotes are used even if they aren't strictly necessary.
 																			"""
 							}
 						}
@@ -240,12 +245,37 @@ base: components: sinks: file: configuration: {
 				required:    false
 				type: array: items: type: string: {}
 			}
+			protobuf: {
+				description:   "Options for the Protobuf serializer."
+				relevant_when: "codec = \"protobuf\""
+				required:      true
+				type: object: options: {
+					desc_file: {
+						description: """
+																The path to the protobuf descriptor set file.
+
+																This file is the output of `protoc -o <path> ...`
+																"""
+						required: true
+						type: string: examples: ["/etc/vector/protobuf_descriptor_set.desc"]
+					}
+					message_type: {
+						description: "The name of the message type to use for serializing."
+						required:    true
+						type: string: examples: ["package.Message"]
+					}
+				}
+			}
 			timestamp_format: {
 				description: "Format used for timestamp fields."
 				required:    false
 				type: string: enum: {
-					rfc3339: "Represent the timestamp as a RFC 3339 timestamp."
-					unix:    "Represent the timestamp as a Unix timestamp."
+					rfc3339:    "Represent the timestamp as a RFC 3339 timestamp."
+					unix:       "Represent the timestamp as a Unix timestamp."
+					unix_float: "Represent the timestamp as a Unix timestamp in floating point."
+					unix_ms:    "Represent the timestamp as a Unix timestamp in milliseconds."
+					unix_ns:    "Represent the timestamp as a Unix timestamp in nanoseconds."
+					unix_us:    "Represent the timestamp as a Unix timestamp in microseconds"
 				}
 			}
 		}
@@ -295,6 +325,20 @@ base: components: sinks: file: configuration: {
 			unit: "seconds"
 		}
 	}
+	internal_metrics: {
+		description: "Configuration of internal metrics for file-based components."
+		required:    false
+		type: object: options: include_file_tag: {
+			description: """
+				Whether or not to include the "file" tag on the component's corresponding internal metrics.
+
+				This is useful for distinguishing between different files while monitoring. However, the tag's
+				cardinality is unbounded.
+				"""
+			required: false
+			type: bool: default: false
+		}
+	}
 	path: {
 		description: """
 			File path to write events to.
@@ -306,5 +350,16 @@ base: components: sinks: file: configuration: {
 			examples: ["/tmp/vector-%Y-%m-%d.log", "/tmp/application-{{ application_id }}-%Y-%m-%d.log", "/tmp/vector-%Y-%m-%d.log.zst"]
 			syntax: "template"
 		}
+	}
+	timezone: {
+		description: """
+			Timezone to use for any date specifiers in template strings.
+
+			This can refer to any valid timezone as defined in the [TZ database][tzdb], or "local" which refers to the system local timezone. It will default to the [globally configured timezone](https://vector.dev/docs/reference/configuration/global-options/#timezone).
+
+			[tzdb]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
+			"""
+		required: false
+		type: string: examples: ["local", "America/New_York", "EST5EDT"]
 	}
 }

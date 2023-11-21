@@ -1,10 +1,9 @@
 use metrics::counter;
 #[cfg(feature = "sources-aws_s3")]
 pub use s3::*;
-use vector_core::internal_event::InternalEvent;
-
+use vector_lib::internal_event::InternalEvent;
 #[cfg(any(feature = "sources-aws_s3", feature = "sources-aws_sqs"))]
-use vector_common::internal_event::{error_stage, error_type};
+use vector_lib::internal_event::{error_stage, error_type};
 
 #[cfg(feature = "sources-aws_s3")]
 mod s3 {
@@ -38,8 +37,6 @@ mod s3 {
                 "error_type" => error_type::PARSER_FAILED,
                 "stage" => error_stage::PROCESSING,
             );
-            // deprecated
-            counter!("sqs_message_processing_failed_total", 1);
         }
     }
 
@@ -86,8 +83,6 @@ mod s3 {
                 "error_type" => error_type::ACKNOWLEDGMENT_FAILED,
                 "stage" => error_stage::PROCESSING,
             );
-            // deprecated
-            counter!("sqs_message_delete_failed_total", self.entries.len() as u64);
         }
     }
 
@@ -117,9 +112,6 @@ mod s3 {
                 "error_type" => error_type::ACKNOWLEDGMENT_FAILED,
                 "stage" => error_stage::PROCESSING,
             );
-            // deprecated
-            counter!("sqs_message_delete_failed_total", self.entries.len() as u64);
-            counter!("sqs_message_delete_batch_failed_total", 1);
         }
     }
 }
@@ -145,8 +137,6 @@ impl<'a, E: std::fmt::Display> InternalEvent for SqsMessageReceiveError<'a, E> {
             "error_type" => error_type::REQUEST_FAILED,
             "stage" => error_stage::RECEIVING,
         );
-        // deprecated
-        counter!("sqs_message_receive_failed_total", 1);
     }
 }
 
@@ -198,8 +188,6 @@ impl<'a, E: std::fmt::Display> InternalEvent for SqsMessageDeleteError<'a, E> {
             "error_type" => error_type::WRITER_FAILED,
             "stage" => error_stage::PROCESSING,
         );
-        // deprecated
-        counter!("sqs_message_delete_failed_total", 1);
     }
 }
 

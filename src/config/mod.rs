@@ -9,12 +9,15 @@ use std::{
 };
 
 use indexmap::IndexMap;
-pub use vector_config::component::{GenerateConfig, SinkDescription, TransformDescription};
-use vector_config::configurable_component;
-pub use vector_core::config::{
+use serde::Serialize;
+pub use vector_lib::config::{
     AcknowledgementsConfig, DataType, GlobalOptions, Input, LogNamespace,
     SourceAcknowledgementsConfig, SourceOutput, TransformOutput,
 };
+pub use vector_lib::configurable::component::{
+    GenerateConfig, SinkDescription, TransformDescription,
+};
+use vector_lib::configurable::configurable_component;
 
 use crate::{conditions, event::Metric, secrets::SecretBackends, serde::OneOrMany};
 
@@ -62,7 +65,7 @@ pub use transform::{
 pub use unit_test::{build_unit_tests, build_unit_tests_main, UnitTestResult};
 pub use validation::warnings;
 pub use vars::{interpolate, ENVIRONMENT_VARIABLE_INTERPOLATION_REGEX};
-pub use vector_core::config::{
+pub use vector_lib::config::{
     init_telemetry, log_schema, proxy::ProxyConfig, telemetry, LogSchema, OutputId,
 };
 
@@ -72,7 +75,7 @@ pub use vector_core::config::{
 /// If deny is set, will panic if schema has already been set.
 pub fn init_log_schema(config_paths: &[ConfigPath], deny_if_set: bool) -> Result<(), Vec<String>> {
     let (builder, _) = load_builder_from_paths(config_paths)?;
-    vector_core::config::init_log_schema(builder.global.log_schema, deny_if_set);
+    vector_lib::config::init_log_schema(builder.global.log_schema, deny_if_set);
     Ok(())
 }
 
@@ -100,7 +103,7 @@ impl ConfigPath {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Serialize)]
 pub struct Config {
     #[cfg(feature = "api")]
     pub api: api::Options,
@@ -122,6 +125,10 @@ pub struct Config {
 impl Config {
     pub fn builder() -> builder::ConfigBuilder {
         Default::default()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.sources.is_empty()
     }
 
     pub fn sources(&self) -> impl Iterator<Item = (&ComponentKey, &SourceOuter)> {
@@ -238,17 +245,6 @@ impl Default for HealthcheckOptions {
             require_healthy: false,
         }
     }
-}
-
-#[macro_export]
-macro_rules! impl_generate_config_from_default {
-    ($type:ty) => {
-        impl $crate::config::GenerateConfig for $type {
-            fn generate_config() -> toml::value::Value {
-                toml::value::Value::try_from(&Self::default()).unwrap()
-            }
-        }
-    };
 }
 
 /// Unique thing, like port, of which only one owner can be.
@@ -509,7 +505,7 @@ pub struct TestInput {
 
     /// The type of the input event.
     ///
-    /// Can be either `raw`, `log`, or `metric.
+    /// Can be either `raw`, `vrl`, `log`, or `metric.
     #[serde(default = "default_test_input_type", rename = "type")]
     pub type_str: String,
 
@@ -518,6 +514,11 @@ pub struct TestInput {
     /// Use this only when the input event should be a raw event (i.e. unprocessed/undecoded log
     /// event) and when the input type is set to `raw`.
     pub value: Option<String>,
+
+    /// The vrl expression to generate the input event.
+    ///
+    /// Only relevant when `type` is `vrl`.
+    pub source: Option<String>,
 
     /// The set of log fields to use when creating a log input event.
     ///
@@ -565,7 +566,7 @@ mod tests {
                 let c2 = config::load_from_str(config, format).unwrap();
                 match (
                     config::warnings(&c2),
-                    topology::builder::build_pieces(&c, &diff, HashMap::new()).await,
+                    topology::TopologyPieces::build(&c, &diff, HashMap::new()).await,
                 ) {
                     (warnings, Ok(_pieces)) => Ok(warnings),
                     (_, Err(errors)) => Err(errors),
@@ -1420,7 +1421,7 @@ mod resource_tests {
 #[cfg(all(test, feature = "sources-stdin", feature = "sinks-console"))]
 mod resource_config_tests {
     use indoc::indoc;
-    use vector_config::schema::generate_root_schema;
+    use vector_lib::configurable::schema::generate_root_schema;
 
     use super::{load_from_str, Format};
 
@@ -1451,8 +1452,8 @@ mod resource_config_tests {
     fn generate_component_config_schema() {
         use crate::config::{SinkOuter, SourceOuter, TransformOuter};
         use indexmap::IndexMap;
-        use vector_common::config::ComponentKey;
-        use vector_config::configurable_component;
+        use vector_lib::config::ComponentKey;
+        use vector_lib::configurable::configurable_component;
 
         /// Top-level Vector configuration.
         #[configurable_component]

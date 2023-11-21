@@ -1,7 +1,5 @@
-use std::{collections::BTreeMap, convert::TryInto, fmt::Debug, sync::Arc};
+use std::{convert::TryInto, fmt::Debug, sync::Arc};
 
-use crate::config::LogNamespace;
-use crate::{config::OutputId, ByteSizeOf};
 pub use array::{into_event_stream, EventArray, EventContainer, LogArray, MetricArray, TraceArray};
 pub use estimated_json_encoded_size_of::EstimatedJsonEncodedSizeOf;
 pub use finalization::{
@@ -9,19 +7,22 @@ pub use finalization::{
     Finalizable,
 };
 pub use log_event::LogEvent;
-pub use metadata::{EventMetadata, WithMetadata};
+pub use metadata::{DatadogMetricOriginMetadata, EventMetadata, WithMetadata};
 pub use metric::{Metric, MetricKind, MetricTags, MetricValue, StatisticKind};
 pub use r#ref::{EventMutRef, EventRef};
 use serde::{Deserialize, Serialize};
 pub use trace::TraceEvent;
 use vector_buffers::EventCount;
 use vector_common::{
-    config::ComponentKey, finalization, internal_event::TaggedEventsSent, json_size::JsonSize,
-    request_metadata::GetEventCountTags, EventDataEq,
+    byte_size_of::ByteSizeOf, config::ComponentKey, finalization, internal_event::TaggedEventsSent,
+    json_size::JsonSize, request_metadata::GetEventCountTags, EventDataEq,
 };
-pub use vrl::value::Value;
+pub use vrl::value::{KeyString, ObjectMap, Value};
 #[cfg(feature = "vrl")]
 pub use vrl_target::{TargetEvents, VrlTarget};
+
+use crate::config::LogNamespace;
+use crate::config::OutputId;
 
 pub mod array;
 pub mod discriminant;
@@ -307,10 +308,22 @@ impl Event {
         self.metadata_mut().set_upstream_id(upstream_id);
     }
 
+    /// Sets the `source_type` in the event metadata to the provided value.
+    pub fn set_source_type(&mut self, source_type: &'static str) {
+        self.metadata_mut().set_source_type(source_type);
+    }
+
     /// Sets the `source_id` in the event metadata to the provided value.
     #[must_use]
     pub fn with_source_id(mut self, source_id: Arc<ComponentKey>) -> Self {
         self.metadata_mut().set_source_id(source_id);
+        self
+    }
+
+    /// Sets the `source_type` in the event metadata to the provided value.
+    #[must_use]
+    pub fn with_source_type(mut self, source_type: &'static str) -> Self {
+        self.metadata_mut().set_source_type(source_type);
         self
     }
 
@@ -335,8 +348,8 @@ impl Event {
                 serde_json::Value::Object(fields) => Ok(LogEvent::from(
                     fields
                         .into_iter()
-                        .map(|(k, v)| (k, v.into()))
-                        .collect::<BTreeMap<_, _>>(),
+                        .map(|(k, v)| (k.into(), v.into()))
+                        .collect::<ObjectMap>(),
                 )
                 .into()),
                 _ => Err(crate::Error::from(

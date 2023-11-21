@@ -5,8 +5,8 @@ use indoc::indoc;
 use snafu::ResultExt;
 use tokio::sync::oneshot::{channel, Sender};
 use tower::ServiceBuilder;
-use vector_config::configurable_component;
-use vector_core::config::{proxy::ProxyConfig, AcknowledgementsConfig};
+use vector_lib::config::{proxy::ProxyConfig, AcknowledgementsConfig};
+use vector_lib::configurable::configurable_component;
 
 use super::{
     apm_stats::{flush_apm_stats_thread, Aggregator},
@@ -40,9 +40,6 @@ pub const BATCH_MAX_EVENTS: usize = 1_000;
 pub const BATCH_DEFAULT_TIMEOUT_SECS: f64 = 10.0;
 
 pub const PAYLOAD_LIMIT: usize = 3_200_000;
-
-const DEFAULT_REQUEST_RETRY_ATTEMPTS: usize = 5;
-const DEFAULT_REQUEST_RETRY_MAX_DURATION_SECS: u64 = 300;
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct DatadogTracesDefaultBatchSettings;
@@ -130,11 +127,7 @@ impl DatadogTracesConfig {
 
     pub fn build_sink(&self, client: HttpClient) -> crate::Result<VectorSink> {
         let default_api_key: Arc<str> = Arc::from(self.dd_common.default_api_key.inner());
-        let request_limits = self.request.unwrap_with(
-            &TowerRequestConfig::default()
-                .retry_attempts(DEFAULT_REQUEST_RETRY_ATTEMPTS)
-                .retry_max_duration_secs(DEFAULT_REQUEST_RETRY_MAX_DURATION_SECS),
-        );
+        let request_limits = self.request.into_settings();
         let endpoints = self.generate_traces_endpoint_configuration()?;
 
         let batcher_settings = self
@@ -215,7 +208,7 @@ impl DatadogTracesConfig {
 impl SinkConfig for DatadogTracesConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let client = self.build_client(&cx.proxy)?;
-        let healthcheck = self.dd_common.build_healthcheck(client.clone(), None)?;
+        let healthcheck = self.dd_common.build_healthcheck(client.clone())?;
         let sink = self.build_sink(client)?;
 
         Ok((sink, healthcheck))

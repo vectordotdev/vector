@@ -3,12 +3,7 @@
 //!
 //! [pulsar]: https://pulsar.apache.org/
 use chrono::TimeZone;
-use codecs::{
-    decoding::{DeserializerConfig, FramingConfig},
-    StreamDecodingError,
-};
 use futures_util::StreamExt;
-use lookup::{owned_value_path, path};
 use pulsar::{
     authentication::oauth2::{OAuth2Authentication, OAuth2Params},
     consumer::Message,
@@ -17,23 +12,26 @@ use pulsar::{
     Authentication, Consumer, Pulsar, SubType, TokioExecutor,
 };
 use tokio_util::codec::FramedRead;
-use vector_common::{
+
+use vector_lib::{
+    codecs::{
+        decoding::{DeserializerConfig, FramingConfig},
+        StreamDecodingError,
+    },
+    config::{LegacyKey, LogNamespace, SourceAcknowledgementsConfig, SourceOutput},
+    configurable::configurable_component,
+    event::Event,
     finalization::BatchStatus,
     finalizer::OrderedFinalizer,
     internal_event::{
-        ByteSize, BytesReceived, CountByteSize, EventsReceived, InternalEventHandle as _, Protocol,
+        ByteSize, BytesReceived, CountByteSize, EventsReceived, InternalEventHandle, Protocol,
         Registered,
     },
     sensitive_string::SensitiveString,
     shutdown::ShutdownSignal,
-};
-use vector_config_macros::configurable_component;
-use vector_core::{
-    config::{LegacyKey, LogNamespace, SourceAcknowledgementsConfig, SourceOutput},
-    event::Event,
     ByteSizeOf,
 };
-use vrl::value::Kind;
+use vrl::{owned_value_path, path, value::Kind};
 
 use crate::{
     codecs::{Decoder, DecodingConfig},

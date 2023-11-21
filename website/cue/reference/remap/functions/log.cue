@@ -3,7 +3,7 @@ package metadata
 remap: functions: log: {
 	category:    "Debug"
 	description: """
-		Logs the `value` to Vector's [stdout](\(urls.stdout)) at the specified `level`.
+		Logs the `value` to [stdout](\(urls.stdout)) at the specified `level`.
 		"""
 
 	arguments: [

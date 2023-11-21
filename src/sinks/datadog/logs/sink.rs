@@ -1,30 +1,14 @@
-use std::{fmt::Debug, io, num::NonZeroUsize, sync::Arc};
+use std::{fmt::Debug, io, sync::Arc};
 
-use async_trait::async_trait;
 use bytes::Bytes;
-use codecs::{encoding::Framer, CharacterDelimitedEncoder, JsonSerializerConfig};
-use futures::stream::{BoxStream, StreamExt};
-use lookup::event_path;
 use snafu::Snafu;
-use tower::Service;
-use vector_common::request_metadata::{GroupedCountByteSize, RequestMetadata};
-use vector_core::{
-    event::{Event, EventFinalizers, Finalizable, Value},
-    partition::Partitioner,
-    sink::StreamSink,
-    stream::{BatcherSettings, DriverResponse},
-};
+use vector_lib::codecs::{encoding::Framer, CharacterDelimitedEncoder, JsonSerializerConfig};
+use vector_lib::lookup::event_path;
 
 use super::{config::MAX_PAYLOAD_BYTES, service::LogApiRequest};
-use crate::{
-    codecs::{Encoder, Transformer},
-    internal_events::SinkRequestBuildError,
-    sinks::util::{
-        encoding::{write_all, Encoder as _},
-        metadata::RequestMetadataBuilder,
-        request_builder::EncodeResult,
-        Compression, Compressor, RequestBuilder, SinkBuilderExt,
-    },
+use crate::sinks::{
+    prelude::*,
+    util::{encoding::Encoder as _, Compressor},
 };
 #[derive(Default)]
 struct EventPartitioner;
@@ -277,12 +261,12 @@ where
         let default_api_key = Arc::clone(&self.default_api_key);
 
         let partitioner = EventPartitioner;
+        let batch_settings = self.batch_settings;
 
-        let builder_limit = NonZeroUsize::new(64);
-        let input = input.batched_partitioned(partitioner, self.batch_settings);
+        let input = input.batched_partitioned(partitioner, || batch_settings.as_byte_size_config());
         input
             .request_builder(
-                builder_limit,
+                default_request_builder_concurrency_limit(),
                 LogRequestBuilder {
                     default_api_key,
                     encoding: self.encoding,

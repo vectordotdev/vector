@@ -1,11 +1,10 @@
 use std::borrow::Cow;
 
 use metrics::counter;
-use vector_common::{
-    internal_event::{error_stage, error_type},
+use vector_lib::{
+    internal_event::{error_stage, error_type, InternalEvent},
     json_size::JsonSize,
 };
-use vector_core::internal_event::InternalEvent;
 
 use super::prelude::{http_error_code, hyper_error_code};
 
@@ -84,7 +83,6 @@ impl InternalEvent for AwsEcsMetricsResponseError<'_> {
             endpoint = %self.endpoint,
             internal_log_rate_limit = true,
         );
-        counter!("http_error_response_total", 1);
         counter!(
             "component_errors_total", 1,
             "stage" => error_stage::RECEIVING,
@@ -112,7 +110,6 @@ impl InternalEvent for AwsEcsMetricsHttpError<'_> {
             endpoint = %self.endpoint,
             internal_log_rate_limit = true,
         );
-        counter!("http_request_errors_total", 1);
         counter!(
             "component_errors_total", 1,
             "stage" => error_stage::RECEIVING,

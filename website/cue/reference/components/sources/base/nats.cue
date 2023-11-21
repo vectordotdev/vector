@@ -120,7 +120,7 @@ base: components: sources: nats: configuration: {
 															[json]: https://www.json.org/
 															"""
 						native: """
-															Decodes the raw bytes as Vector’s [native Protocol Buffers format][vector_native_protobuf].
+															Decodes the raw bytes as [native Protocol Buffers format][vector_native_protobuf].
 
 															This codec is **[experimental][experimental]**.
 
@@ -128,7 +128,7 @@ base: components: sources: nats: configuration: {
 															[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
 															"""
 						native_json: """
-															Decodes the raw bytes as Vector’s [native JSON format][vector_native_json].
+															Decodes the raw bytes as [native JSON format][vector_native_json].
 
 															This codec is **[experimental][experimental]**.
 
@@ -344,6 +344,20 @@ base: components: sources: nats: configuration: {
 		description: "The `NATS` subject key."
 		required:    false
 		type: string: default: "subject"
+	}
+	subscriber_capacity: {
+		description: """
+			The buffer capacity of the underlying NATS subscriber.
+
+			This value determines how many messages the NATS subscriber buffers
+			before incoming messages are dropped.
+
+			See the [async_nats documentation][async_nats_subscription_capacity] for more information.
+
+			[async_nats_subscription_capacity]: https://docs.rs/async-nats/latest/async_nats/struct.ConnectOptions.html#method.subscription_capacity
+			"""
+		required: false
+		type: uint: default: 4096
 	}
 	tls: {
 		description: "Configures the TLS options for incoming/outgoing connections."

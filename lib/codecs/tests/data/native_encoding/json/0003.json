@@ -1,1 +1,1 @@
-{"metric":{"name":"e","tags":{"_":"o"},"timestamp":"1969-12-31T19:38:35.000027772Z","kind":"incremental","aggregated_summary":{"quantiles":[{"quantile":-261952.0,"value":896.0},{"quantile":612032.0,"value":-835264.0},{"quantile":937536.0,"value":383296.0},{"quantile":-43264.0,"value":973824.0},{"quantile":505024.0,"value":322112.0}],"count":10393387044110716784,"sum":597120.0}}}
+{"log":{"8@":"",";_":null}}

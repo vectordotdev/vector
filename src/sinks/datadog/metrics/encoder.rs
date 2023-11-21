@@ -7,21 +7,21 @@ use std::{
 
 use bytes::{BufMut, Bytes};
 use chrono::{DateTime, Utc};
-use prost::Message;
+use once_cell::sync::Lazy;
 use snafu::{ResultExt, Snafu};
-use vector_common::request_metadata::GroupedCountByteSize;
-use vector_core::{
+use vector_lib::request_metadata::GroupedCountByteSize;
+use vector_lib::{
     config::{log_schema, telemetry, LogSchema},
-    event::{metric::MetricSketch, Metric, MetricTags, MetricValue},
+    event::{metric::MetricSketch, DatadogMetricOriginMetadata, Metric, MetricTags, MetricValue},
     metrics::AgentDDSketch,
     EstimatedJsonEncodedSizeOf,
 };
 
-use super::config::{
-    DatadogMetricsEndpoint, MAXIMUM_PAYLOAD_COMPRESSED_SIZE, MAXIMUM_PAYLOAD_SIZE,
-};
+use super::config::{DatadogMetricsEndpoint, SeriesApiVersion};
 use crate::{
-    common::datadog::{DatadogMetricType, DatadogPoint, DatadogSeriesMetric},
+    common::datadog::{
+        DatadogMetricType, DatadogPoint, DatadogSeriesMetric, DatadogSeriesMetricMetadata,
+    },
     proto::fds::protobuf_descriptors,
     sinks::util::{encode_namespace, request_builder::EncodeResult, Compression, Compressor},
 };
@@ -29,6 +29,19 @@ use crate::{
 const SERIES_PAYLOAD_HEADER: &[u8] = b"{\"series\":[";
 const SERIES_PAYLOAD_FOOTER: &[u8] = b"]}";
 const SERIES_PAYLOAD_DELIMITER: &[u8] = b",";
+
+pub(super) const ORIGIN_CATEGORY_VALUE: u32 = 11;
+
+const DEFAULT_DD_ORIGIN_PRODUCT_VALUE: u32 = 14;
+
+pub(super) static ORIGIN_PRODUCT_VALUE: Lazy<u32> = Lazy::new(|| {
+    option_env!("DD_ORIGIN_PRODUCT")
+        .map(|p| {
+            p.parse::<u32>()
+                .expect("Env var DD_ORIGIN_PRODUCT must be an unsigned 32 bit integer.")
+        })
+        .unwrap_or(DEFAULT_DD_ORIGIN_PRODUCT_VALUE)
+});
 
 #[allow(warnings, clippy::pedantic, clippy::nursery)]
 mod ddmetric_proto {
@@ -146,6 +159,8 @@ pub struct DatadogMetricsEncoder {
 
     state: EncoderState,
     log_schema: &'static LogSchema,
+
+    origin_product_value: u32,
 }
 
 impl DatadogMetricsEncoder {
@@ -154,13 +169,12 @@ impl DatadogMetricsEncoder {
         endpoint: DatadogMetricsEndpoint,
         default_namespace: Option<String>,
     ) -> Result<Self, CreateError> {
-        // According to the datadog-agent code, sketches use the same payload size limits as series
-        // data. We're just gonna go with that for now.
+        let payload_limits = endpoint.payload_limits();
         Self::with_payload_limits(
             endpoint,
             default_namespace,
-            MAXIMUM_PAYLOAD_SIZE,
-            MAXIMUM_PAYLOAD_COMPRESSED_SIZE,
+            payload_limits.uncompressed,
+            payload_limits.compressed,
         )
     }
 
@@ -182,6 +196,7 @@ impl DatadogMetricsEncoder {
             compressed_limit,
             state: EncoderState::default(),
             log_schema: log_schema(),
+            origin_product_value: *ORIGIN_PRODUCT_VALUE,
         })
     }
 }
@@ -209,12 +224,31 @@ impl DatadogMetricsEncoder {
             .byte_size
             .add_event(&metric, metric.estimated_json_encoded_size_of());
 
+        // For V2 Series metrics, and Sketches: We encode a single Series or Sketch metric incrementally,
+        // which means that we specifically write it as if we were writing a single field entry in the
+        // overall `SketchPayload` message or `MetricPayload` type.
+        //
+        // By doing so, we can encode multiple metrics and concatenate all the buffers, and have the
+        // resulting buffer appear as if it's a normal `<>Payload` message with a bunch of repeats
+        // of the `sketches` / `series` field.
+        //
+        // Crucially, this code works because `SketchPayload` has two fields -- metadata and sketches --
+        // and we never actually set the metadata field... so the resulting message generated overall
+        // for `SketchPayload` with a single sketch looks just like as if we literally wrote out a
+        // single value for the given field.
+        //
+        // Similary, `MetricPayload` has a single repeated `series` field.
+
         match self.endpoint {
-            // Series metrics are encoded via JSON, in an incremental fashion.
-            DatadogMetricsEndpoint::Series => {
+            // V1 Series metrics are encoded via JSON, in an incremental fashion.
+            DatadogMetricsEndpoint::Series(SeriesApiVersion::V1) => {
                 // A single `Metric` might generate multiple Datadog series metrics.
-                let all_series =
-                    generate_series_metrics(&metric, &self.default_namespace, self.log_schema)?;
+                let all_series = generate_series_metrics(
+                    &metric,
+                    &self.default_namespace,
+                    self.log_schema,
+                    self.origin_product_value,
+                )?;
 
                 // We handle adding the JSON array separator (comma) manually since the encoding is
                 // happening incrementally.
@@ -229,18 +263,51 @@ impl DatadogMetricsEncoder {
                     serde_json::to_writer(&mut self.state.buf, series)?;
                 }
             }
+            // V2 Series metrics are encoded via ProtoBuf, in an incremental fashion.
+            DatadogMetricsEndpoint::Series(SeriesApiVersion::V2) => match metric.value() {
+                MetricValue::Counter { .. }
+                | MetricValue::Gauge { .. }
+                | MetricValue::Set { .. }
+                | MetricValue::AggregatedSummary { .. } => {
+                    let series_proto = series_to_proto_message(
+                        &metric,
+                        &self.default_namespace,
+                        self.log_schema,
+                        self.origin_product_value,
+                    )?;
+
+                    encode_proto_key_and_message(
+                        series_proto,
+                        get_series_payload_series_field_number(),
+                        &mut self.state.buf,
+                    )?;
+                }
+                value => {
+                    return Err(EncoderError::InvalidMetric {
+                        expected: "series",
+                        metric_value: value.as_name(),
+                    })
+                }
+            },
             // Sketches are encoded via ProtoBuf, also in an incremental fashion.
             DatadogMetricsEndpoint::Sketches => match metric.value() {
                 MetricValue::Sketch { sketch } => match sketch {
                     MetricSketch::AgentDDSketch(ddsketch) => {
-                        encode_sketch_incremental(
+                        if let Some(sketch_proto) = sketch_to_proto_message(
                             &metric,
                             ddsketch,
                             &self.default_namespace,
                             self.log_schema,
-                            &mut self.state.buf,
-                        )
-                        .map_err(|_| EncoderError::ProtoEncodingFailed)?;
+                            self.origin_product_value,
+                        ) {
+                            encode_proto_key_and_message(
+                                sketch_proto,
+                                get_sketch_payload_sketches_field_number(),
+                                &mut self.state.buf,
+                            )?;
+                        } else {
+                            // If the sketch was empty, that's fine too
+                        }
                     }
                 },
                 value => {
@@ -370,6 +437,35 @@ impl DatadogMetricsEncoder {
     }
 }
 
+fn generate_proto_metadata(
+    maybe_pass_through: Option<&DatadogMetricOriginMetadata>,
+    maybe_source_type: Option<&str>,
+    origin_product_value: u32,
+) -> Option<ddmetric_proto::Metadata> {
+    generate_origin_metadata(maybe_pass_through, maybe_source_type, origin_product_value).map(
+        |origin| {
+            if origin.product().is_none()
+                || origin.category().is_none()
+                || origin.service().is_none()
+            {
+                warn!(
+                    message = "Generated sketch origin metadata should have each field set.",
+                    product = origin.product(),
+                    category = origin.category(),
+                    service = origin.service()
+                );
+            }
+            ddmetric_proto::Metadata {
+                origin: Some(ddmetric_proto::Origin {
+                    origin_product: origin.product().unwrap_or_default(),
+                    origin_category: origin.category().unwrap_or_default(),
+                    origin_service: origin.service().unwrap_or_default(),
+                }),
+            }
+        },
+    )
+}
+
 fn get_sketch_payload_sketches_field_number() -> u32 {
     static SKETCH_PAYLOAD_SKETCHES_FIELD_NUM: OnceLock<u32> = OnceLock::new();
     *SKETCH_PAYLOAD_SKETCHES_FIELD_NUM.get_or_init(|| {
@@ -385,12 +481,32 @@ fn get_sketch_payload_sketches_field_number() -> u32 {
     })
 }
 
+fn get_series_payload_series_field_number() -> u32 {
+    static SERIES_PAYLOAD_SERIES_FIELD_NUM: OnceLock<u32> = OnceLock::new();
+    *SERIES_PAYLOAD_SERIES_FIELD_NUM.get_or_init(|| {
+        let descriptors = protobuf_descriptors();
+        let descriptor = descriptors
+            .get_message_by_name("datadog.agentpayload.MetricPayload")
+            .expect("should not fail to find `MetricPayload` message in descriptor pool");
+
+        descriptor
+            .get_field_by_name("series")
+            .map(|field| field.number())
+            .expect("`series` field must exist in `MetricPayload` message")
+    })
+}
+
 fn sketch_to_proto_message(
     metric: &Metric,
     ddsketch: &AgentDDSketch,
     default_namespace: &Option<Arc<str>>,
     log_schema: &'static LogSchema,
-) -> ddmetric_proto::sketch_payload::Sketch {
+    origin_product_value: u32,
+) -> Option<ddmetric_proto::sketch_payload::Sketch> {
+    if ddsketch.is_empty() {
+        return None;
+    }
+
     let name = get_namespaced_name(metric, default_namespace);
     let ts = encode_timestamp(metric.timestamp());
     let mut tags = metric.tags().cloned().unwrap_or_default();
@@ -418,7 +534,16 @@ fn sketch_to_proto_message(
     let k = bins.into_iter().map(Into::into).collect();
     let n = counts.into_iter().map(Into::into).collect();
 
-    ddmetric_proto::sketch_payload::Sketch {
+    let event_metadata = metric.metadata();
+    let metadata = generate_proto_metadata(
+        event_metadata.datadog_origin_metadata(),
+        event_metadata.source_type(),
+        origin_product_value,
+    );
+
+    trace!(?metadata, "Generated sketch metadata.");
+
+    Some(ddmetric_proto::sketch_payload::Sketch {
         metric: name,
         tags,
         host,
@@ -433,42 +558,126 @@ fn sketch_to_proto_message(
             k,
             n,
         }],
-    }
+        metadata,
+    })
 }
 
-fn encode_sketch_incremental<B>(
+fn series_to_proto_message(
     metric: &Metric,
-    ddsketch: &AgentDDSketch,
     default_namespace: &Option<Arc<str>>,
     log_schema: &'static LogSchema,
-    buf: &mut B,
-) -> Result<(), prost::EncodeError>
+    origin_product_value: u32,
+) -> Result<ddmetric_proto::metric_payload::MetricSeries, EncoderError> {
+    let metric_name = get_namespaced_name(metric, default_namespace);
+    let mut tags = metric.tags().cloned().unwrap_or_default();
+
+    let mut resources = vec![];
+
+    if let Some(host) = log_schema
+        .host_key()
+        .map(|key| tags.remove(key.to_string().as_str()).unwrap_or_default())
+    {
+        resources.push(ddmetric_proto::metric_payload::Resource {
+            r#type: "host".to_string(),
+            name: host,
+        });
+    }
+
+    // In the `datadog_agent` source, the tag is added as `device` for the V1 endpoint
+    // and `resource.device` for the V2 endpoint.
+    if let Some(device) = tags.remove("device").or(tags.remove("resource.device")) {
+        resources.push(ddmetric_proto::metric_payload::Resource {
+            r#type: "device".to_string(),
+            name: device,
+        });
+    }
+
+    let source_type_name = tags.remove("source_type_name").unwrap_or_default();
+
+    let tags = encode_tags(&tags);
+
+    let event_metadata = metric.metadata();
+    let metadata = generate_proto_metadata(
+        event_metadata.datadog_origin_metadata(),
+        event_metadata.source_type(),
+        origin_product_value,
+    );
+    trace!(?metadata, "Generated MetricSeries metadata.");
+
+    let timestamp = encode_timestamp(metric.timestamp());
+
+    // our internal representation is in milliseconds but the expected output is in seconds
+    let maybe_interval = metric.interval_ms().map(|i| i.get() / 1000);
+
+    let (points, metric_type) = match metric.value() {
+        MetricValue::Counter { value } => {
+            if let Some(interval) = maybe_interval {
+                // When an interval is defined, it implies the value should be in a per-second form,
+                // so we need to get back to seconds from our milliseconds-based interval, and then
+                // divide our value by that amount as well.
+                let value = *value / (interval as f64);
+                (
+                    vec![ddmetric_proto::metric_payload::MetricPoint { value, timestamp }],
+                    ddmetric_proto::metric_payload::MetricType::Rate,
+                )
+            } else {
+                (
+                    vec![ddmetric_proto::metric_payload::MetricPoint {
+                        value: *value,
+                        timestamp,
+                    }],
+                    ddmetric_proto::metric_payload::MetricType::Count,
+                )
+            }
+        }
+        MetricValue::Set { values } => (
+            vec![ddmetric_proto::metric_payload::MetricPoint {
+                value: values.len() as f64,
+                timestamp,
+            }],
+            ddmetric_proto::metric_payload::MetricType::Gauge,
+        ),
+        MetricValue::Gauge { value } => (
+            vec![ddmetric_proto::metric_payload::MetricPoint {
+                value: *value,
+                timestamp,
+            }],
+            ddmetric_proto::metric_payload::MetricType::Gauge,
+        ),
+        // NOTE: AggregatedSummary will have been previously split into counters and gauges during normalization
+        value => {
+            // this case should have already been surfaced by encode_single_metric() so this should never be reached
+            return Err(EncoderError::InvalidMetric {
+                expected: "series",
+                metric_value: value.as_name(),
+            });
+        }
+    };
+
+    Ok(ddmetric_proto::metric_payload::MetricSeries {
+        resources,
+        metric: metric_name,
+        tags,
+        points,
+        r#type: metric_type.into(),
+        // unit is omitted
+        unit: "".to_string(),
+        source_type_name,
+        interval: maybe_interval.unwrap_or(0) as i64,
+        metadata,
+    })
+}
+
+// Manually write the field tag and then encode the Message payload directly as a length-delimited message.
+fn encode_proto_key_and_message<T, B>(msg: T, tag: u32, buf: &mut B) -> Result<(), EncoderError>
 where
+    T: prost::Message,
     B: BufMut,
 {
-    // This encodes a single sketch metric incrementally, which means that we specifically write it
-    // as if we were writing a single field entry in the overall `SketchPayload` message
-    // type.
-    //
-    // By doing so, we can encode multiple sketches and concatenate all the buffers, and have the
-    // resulting buffer appear as if it's a normal `SketchPayload` message with a bunch of repeats
-    // of the `sketches` field.
-    //
-    // Crucially, this code works because `SketchPayload` has two fields -- metadata and sketches --
-    // and we never actually set the metadata field... so the resulting message generated overall
-    // for `SketchPayload` with a single sketch looks just like as if we literally wrote out a
-    // single value for the given field.
+    prost::encoding::encode_key(tag, prost::encoding::WireType::LengthDelimited, buf);
 
-    let sketch_proto = sketch_to_proto_message(metric, ddsketch, default_namespace, log_schema);
-
-    // Manually write the field tag for `sketches` and then encode the sketch payload directly as a
-    // length-delimited message.
-    prost::encoding::encode_key(
-        get_sketch_payload_sketches_field_number(),
-        prost::encoding::WireType::LengthDelimited,
-        buf,
-    );
-    sketch_proto.encode_length_delimited(buf)
+    msg.encode_length_delimited(buf)
+        .map_err(|_| EncoderError::ProtoEncodingFailed)
 }
 
 fn get_namespaced_name(metric: &Metric, default_namespace: &Option<Arc<str>>) -> String {
@@ -501,10 +710,106 @@ fn encode_timestamp(timestamp: Option<DateTime<Utc>>) -> i64 {
     }
 }
 
+// Given the vector source type, return the OriginService value associated with that integration, if any.
+fn source_type_to_service(source_type: &str) -> Option<u32> {
+    match source_type {
+        // In order to preserve consistent behavior, we intentionally don't set origin metadata
+        // for the case where the Datadog Agent did not set it.
+        "datadog_agent" => None,
+
+        // These are the sources for which metrics truly originated from this Vector instance.
+        "apache_metrics" => Some(17),
+        "aws_ecs_metrics" => Some(209),
+        "eventstoredb_metrics" => Some(210),
+        "host_metrics" => Some(211),
+        "internal_metrics" => Some(212),
+        "mongodb_metrics" => Some(111),
+        "nginx_metrics" => Some(117),
+        "open_telemetry" => Some(213),
+        "postgresql_metrics" => Some(128),
+        "prometheus_remote_write" => Some(214),
+        "prometheus_scrape" => Some(215),
+        "statsd" => Some(153),
+
+        // These sources are only capable of receiving metrics with the `native` or `native_json` codec.
+        // Generally that means the Origin Metadata will have been set as a pass through.
+        // However, if the upstream Vector instance did not set Origin Metadata (for example if it is an
+        // older version version), we will at least set the OriginProduct and OriginCategory.
+        "kafka" | "nats" | "redis" | "gcp_pubsub" | "http_client" | "http_server" | "vector" => {
+            Some(0)
+        }
+
+        // This scenario should not occur- if it does it means we added a source that deals with metrics,
+        // and did not update this function.
+        // But if it does occur, by setting the Service value to be undefined, we at least populate the
+        // OriginProduct and OriginCategory.
+        _ => {
+            debug!("Source {source_type} OriginService value is undefined! This source needs to be properly mapped to a Service value.");
+            Some(0)
+        }
+    }
+}
+
+/// Determine the correct Origin metadata values to use depending on if they have been
+/// set already upstream or not. The generalized struct `DatadogMetricOriginMetadata` is
+/// utilized in this function, which allows the series and sketch encoding to call and map
+/// the result appropriately for the given protocol they operate on.
+fn generate_origin_metadata(
+    maybe_pass_through: Option<&DatadogMetricOriginMetadata>,
+    maybe_source_type: Option<&str>,
+    origin_product_value: u32,
+) -> Option<DatadogMetricOriginMetadata> {
+    let no_value = 0;
+
+    // An upstream vector source or a transform has set the origin metadata already.
+    // Currently this is only possible by these scenarios:
+    //     - `datadog_agent` source receiving the metadata on ingested metrics
+    //     - `vector` source receiving events with EventMetadata that already has the origins set
+    //     - A metrics source configured with the `native` or `native_json` codecs, where the upstream
+    //       Vector instance enriched the EventMetadata with Origin metadata.
+    //     - `log_to_metric` transform set the OriginService in the EventMetadata when it creates
+    //        the new metric.
+    if let Some(pass_through) = maybe_pass_through {
+        Some(DatadogMetricOriginMetadata::new(
+            pass_through.product().or(Some(origin_product_value)),
+            pass_through.category().or(Some(ORIGIN_CATEGORY_VALUE)),
+            pass_through.service().or(Some(no_value)),
+        ))
+
+    // No metadata has been set upstream
+    } else {
+        maybe_source_type.and_then(|source_type| {
+            // Only set the metadata if the source is a metric source we should set it for.
+            // In order to preserve consistent behavior, we intentionally don't set origin metadata
+            // for the case where the Datadog Agent did not set it.
+            source_type_to_service(source_type).map(|origin_service_value| {
+                DatadogMetricOriginMetadata::new(
+                    Some(origin_product_value),
+                    Some(ORIGIN_CATEGORY_VALUE),
+                    Some(origin_service_value),
+                )
+            })
+        })
+    }
+}
+
+fn generate_series_metadata(
+    maybe_pass_through: Option<&DatadogMetricOriginMetadata>,
+    maybe_source_type: Option<&str>,
+    origin_product_value: u32,
+) -> Option<DatadogSeriesMetricMetadata> {
+    generate_origin_metadata(maybe_pass_through, maybe_source_type, origin_product_value).map(
+        |origin| DatadogSeriesMetricMetadata {
+            origin: Some(origin),
+        },
+    )
+}
+
 fn generate_series_metrics(
     metric: &Metric,
     default_namespace: &Option<Arc<str>>,
     log_schema: &'static LogSchema,
+    origin_product_value: u32,
 ) -> Result<Vec<DatadogSeriesMetric>, EncoderError> {
     let name = get_namespaced_name(metric, default_namespace);
 
@@ -518,52 +823,37 @@ fn generate_series_metrics(
     let ts = encode_timestamp(metric.timestamp());
     let tags = Some(encode_tags(&tags));
 
-    let results = match (metric.value(), metric.interval_ms()) {
-        (MetricValue::Counter { value }, maybe_interval_ms) => {
-            let (value, interval, metric_type) = match maybe_interval_ms {
-                None => (*value, None, DatadogMetricType::Count),
+    // our internal representation is in milliseconds but the expected output is in seconds
+    let maybe_interval = metric.interval_ms().map(|i| i.get() / 1000);
+
+    let event_metadata = metric.metadata();
+    let metadata = generate_series_metadata(
+        event_metadata.datadog_origin_metadata(),
+        event_metadata.source_type(),
+        origin_product_value,
+    );
+
+    trace!(?metadata, "Generated series metadata.");
+
+    let (points, metric_type) = match metric.value() {
+        MetricValue::Counter { value } => {
+            if let Some(interval) = maybe_interval {
                 // When an interval is defined, it implies the value should be in a per-second form,
                 // so we need to get back to seconds from our milliseconds-based interval, and then
                 // divide our value by that amount as well.
-                Some(interval_ms) => (
-                    (*value) * 1000.0 / (interval_ms.get() as f64),
-                    Some(interval_ms.get() / 1000),
-                    DatadogMetricType::Rate,
-                ),
-            };
-
-            vec![DatadogSeriesMetric {
-                metric: name,
-                r#type: metric_type,
-                interval,
-                points: vec![DatadogPoint(ts, value)],
-                tags,
-                host,
-                source_type_name,
-                device,
-            }]
+                let value = *value / (interval as f64);
+                (vec![DatadogPoint(ts, value)], DatadogMetricType::Rate)
+            } else {
+                (vec![DatadogPoint(ts, *value)], DatadogMetricType::Count)
+            }
         }
-        (MetricValue::Set { values }, _) => vec![DatadogSeriesMetric {
-            metric: name,
-            r#type: DatadogMetricType::Gauge,
-            interval: None,
-            points: vec![DatadogPoint(ts, values.len() as f64)],
-            tags,
-            host,
-            source_type_name,
-            device,
-        }],
-        (MetricValue::Gauge { value }, _) => vec![DatadogSeriesMetric {
-            metric: name,
-            r#type: DatadogMetricType::Gauge,
-            interval: None,
-            points: vec![DatadogPoint(ts, *value)],
-            tags,
-            host,
-            source_type_name,
-            device,
-        }],
-        (value, _) => {
+        MetricValue::Set { values } => (
+            vec![DatadogPoint(ts, values.len() as f64)],
+            DatadogMetricType::Gauge,
+        ),
+        MetricValue::Gauge { value } => (vec![DatadogPoint(ts, *value)], DatadogMetricType::Gauge),
+        // NOTE: AggregatedSummary will have been previously split into counters and gauges during normalization
+        value => {
             return Err(EncoderError::InvalidMetric {
                 expected: "series",
                 metric_value: value.as_name(),
@@ -571,7 +861,17 @@ fn generate_series_metrics(
         }
     };
 
-    Ok(results)
+    Ok(vec![DatadogSeriesMetric {
+        metric: name,
+        r#type: metric_type,
+        interval: maybe_interval,
+        points,
+        tags,
+        host,
+        source_type_name,
+        device,
+        metadata,
+    }])
 }
 
 fn get_compressor() -> Compressor {
@@ -650,7 +950,7 @@ fn write_payload_header(
     writer: &mut dyn io::Write,
 ) -> io::Result<usize> {
     match endpoint {
-        DatadogMetricsEndpoint::Series => writer
+        DatadogMetricsEndpoint::Series(SeriesApiVersion::V1) => writer
             .write_all(SERIES_PAYLOAD_HEADER)
             .map(|_| SERIES_PAYLOAD_HEADER.len()),
         _ => Ok(0),
@@ -662,7 +962,7 @@ fn write_payload_delimiter(
     writer: &mut dyn io::Write,
 ) -> io::Result<usize> {
     match endpoint {
-        DatadogMetricsEndpoint::Series => writer
+        DatadogMetricsEndpoint::Series(SeriesApiVersion::V1) => writer
             .write_all(SERIES_PAYLOAD_DELIMITER)
             .map(|_| SERIES_PAYLOAD_DELIMITER.len()),
         _ => Ok(0),
@@ -674,7 +974,7 @@ fn write_payload_footer(
     writer: &mut dyn io::Write,
 ) -> io::Result<usize> {
     match endpoint {
-        DatadogMetricsEndpoint::Series => writer
+        DatadogMetricsEndpoint::Series(SeriesApiVersion::V1) => writer
             .write_all(SERIES_PAYLOAD_FOOTER)
             .map(|_| SERIES_PAYLOAD_FOOTER.len()),
         _ => Ok(0),
@@ -697,29 +997,41 @@ mod tests {
         proptest, strategy::Strategy, string::string_regex,
     };
     use prost::Message;
-    use vector_core::{
+    use vector_lib::{
         config::{log_schema, LogSchema},
         event::{
             metric::{MetricSketch, TagValue},
-            Metric, MetricKind, MetricTags, MetricValue,
+            DatadogMetricOriginMetadata, EventMetadata, Metric, MetricKind, MetricTags,
+            MetricValue,
         },
         metric_tags,
         metrics::AgentDDSketch,
     };
 
     use super::{
-        ddmetric_proto, encode_sketch_incremental, encode_tags, encode_timestamp,
-        generate_series_metrics, get_compressor, max_compression_overhead_len,
-        max_uncompressed_header_len, sketch_to_proto_message, validate_payload_size_limits,
-        write_payload_footer, write_payload_header, DatadogMetricsEncoder, EncoderError,
+        ddmetric_proto, encode_proto_key_and_message, encode_tags, encode_timestamp,
+        generate_series_metrics, get_compressor, get_sketch_payload_sketches_field_number,
+        max_compression_overhead_len, max_uncompressed_header_len, series_to_proto_message,
+        sketch_to_proto_message, validate_payload_size_limits, write_payload_footer,
+        write_payload_header, DatadogMetricsEncoder, EncoderError,
     };
     use crate::{
-        common::datadog::DatadogMetricType, sinks::datadog::metrics::config::DatadogMetricsEndpoint,
+        common::datadog::DatadogMetricType,
+        sinks::datadog::metrics::{
+            config::{DatadogMetricsEndpoint, SeriesApiVersion},
+            encoder::{DEFAULT_DD_ORIGIN_PRODUCT_VALUE, ORIGIN_PRODUCT_VALUE},
+        },
     };
 
     fn get_simple_counter() -> Metric {
         let value = MetricValue::Counter { value: 3.14 };
         Metric::new("basic_counter", MetricKind::Incremental, value).with_timestamp(Some(ts()))
+    }
+
+    fn get_simple_counter_with_metadata(metadata: EventMetadata) -> Metric {
+        let value = MetricValue::Counter { value: 3.14 };
+        Metric::new_with_metadata("basic_counter", MetricKind::Incremental, value, metadata)
+            .with_timestamp(Some(ts()))
     }
 
     fn get_simple_rate_counter(value: f64, interval_ms: u32) -> Metric {
@@ -739,10 +1051,16 @@ mod tests {
     fn get_compressed_empty_series_payload() -> Bytes {
         let mut compressor = get_compressor();
 
-        _ = write_payload_header(DatadogMetricsEndpoint::Series, &mut compressor)
-            .expect("should not fail");
-        _ = write_payload_footer(DatadogMetricsEndpoint::Series, &mut compressor)
-            .expect("should not fail");
+        _ = write_payload_header(
+            DatadogMetricsEndpoint::Series(SeriesApiVersion::V1),
+            &mut compressor,
+        )
+        .expect("should not fail");
+        _ = write_payload_footer(
+            DatadogMetricsEndpoint::Series(SeriesApiVersion::V1),
+            &mut compressor,
+        )
+        .expect("should not fail");
 
         compressor.finish().expect("should not fail").freeze()
     }
@@ -790,15 +1108,11 @@ mod tests {
             };
             match sketch {
                 MetricSketch::AgentDDSketch(ddsketch) => {
-                    // Don't encode any empty sketches.
-                    if ddsketch.is_empty() {
-                        continue;
+                    if let Some(sketch) =
+                        sketch_to_proto_message(metric, ddsketch, default_namespace, log_schema, 14)
+                    {
+                        sketches.push(sketch);
                     }
-
-                    let sketch =
-                        sketch_to_proto_message(metric, ddsketch, default_namespace, log_schema);
-
-                    sketches.push(sketch);
                 }
             }
         }
@@ -844,10 +1158,19 @@ mod tests {
         ));
 
         // And sketches can't go to the series endpoint.
-        // Series metrics can't go to the sketches endpoint.
-        let mut series_encoder = DatadogMetricsEncoder::new(DatadogMetricsEndpoint::Series, None)
-            .expect("default payload size limits should be valid");
-        let sketch_result = series_encoder.try_encode(get_simple_sketch());
+        let mut series_v1_encoder =
+            DatadogMetricsEncoder::new(DatadogMetricsEndpoint::Series(SeriesApiVersion::V1), None)
+                .expect("default payload size limits should be valid");
+        let sketch_result = series_v1_encoder.try_encode(get_simple_sketch());
+        assert!(matches!(
+            sketch_result.err(),
+            Some(EncoderError::InvalidMetric { .. })
+        ));
+
+        let mut series_v2_encoder =
+            DatadogMetricsEncoder::new(DatadogMetricsEndpoint::Series(SeriesApiVersion::V2), None)
+                .expect("default payload size limits should be valid");
+        let sketch_result = series_v2_encoder.try_encode(get_simple_sketch());
         assert!(matches!(
             sketch_result.err(),
             Some(EncoderError::InvalidMetric { .. })
@@ -867,26 +1190,222 @@ mod tests {
         let expected_value = value / (interval_ms / 1000) as f64;
         let expected_interval = interval_ms / 1000;
 
-        // Encode the metric and make sure we did the rate conversion correctly.
-        let result = generate_series_metrics(&rate_counter, &None, log_schema());
-        assert!(result.is_ok());
+        // series v1
+        {
+            // Encode the metric and make sure we did the rate conversion correctly.
+            let result = generate_series_metrics(
+                &rate_counter,
+                &None,
+                log_schema(),
+                DEFAULT_DD_ORIGIN_PRODUCT_VALUE,
+            );
+            assert!(result.is_ok());
 
-        let metrics = result.unwrap();
-        assert_eq!(metrics.len(), 1);
+            let metrics = result.unwrap();
+            assert_eq!(metrics.len(), 1);
 
-        let actual = &metrics[0];
-        assert_eq!(actual.r#type, DatadogMetricType::Rate);
-        assert_eq!(actual.interval, Some(expected_interval));
-        assert_eq!(actual.points.len(), 1);
-        assert_eq!(actual.points[0].1, expected_value);
+            let actual = &metrics[0];
+            assert_eq!(actual.r#type, DatadogMetricType::Rate);
+            assert_eq!(actual.interval, Some(expected_interval));
+            assert_eq!(actual.points.len(), 1);
+            assert_eq!(actual.points[0].1, expected_value);
+        }
+
+        // series v2
+        {
+            let series_proto = series_to_proto_message(
+                &rate_counter,
+                &None,
+                log_schema(),
+                DEFAULT_DD_ORIGIN_PRODUCT_VALUE,
+            )
+            .unwrap();
+            assert_eq!(series_proto.r#type, 2);
+            assert_eq!(series_proto.interval, expected_interval as i64);
+            assert_eq!(series_proto.points.len(), 1);
+            assert_eq!(series_proto.points[0].value, expected_value);
+        }
     }
 
     #[test]
-    fn encode_single_series_metric_with_default_limits() {
+    fn encode_non_rate_metric_with_interval() {
+        // It is possible that the Agent sends Gauges with an interval set. This
+        // Occurs when the origin of the metric is Dogstatsd, where the interval
+        // is set to 10.
+
+        let value = 423.1331;
+        let interval_ms = 10000;
+
+        let gauge = Metric::new(
+            "basic_gauge",
+            MetricKind::Incremental,
+            MetricValue::Gauge { value },
+        )
+        .with_timestamp(Some(ts()))
+        .with_interval_ms(NonZeroU32::new(interval_ms));
+
+        let expected_value = value; // For gauge, the value should not be modified by interval
+        let expected_interval = interval_ms / 1000;
+
+        // series v1
+        {
+            // Encode the metric and make sure we did the rate conversion correctly.
+            let result = generate_series_metrics(
+                &gauge,
+                &None,
+                log_schema(),
+                DEFAULT_DD_ORIGIN_PRODUCT_VALUE,
+            );
+            assert!(result.is_ok());
+
+            let metrics = result.unwrap();
+            assert_eq!(metrics.len(), 1);
+
+            let actual = &metrics[0];
+            assert_eq!(actual.r#type, DatadogMetricType::Gauge);
+            assert_eq!(actual.interval, Some(expected_interval));
+            assert_eq!(actual.points.len(), 1);
+            assert_eq!(actual.points[0].1, expected_value);
+        }
+
+        // series v2
+        {
+            let series_proto = series_to_proto_message(
+                &gauge,
+                &None,
+                log_schema(),
+                DEFAULT_DD_ORIGIN_PRODUCT_VALUE,
+            )
+            .unwrap();
+            assert_eq!(series_proto.r#type, 3);
+            assert_eq!(series_proto.interval, expected_interval as i64);
+            assert_eq!(series_proto.points.len(), 1);
+            assert_eq!(series_proto.points[0].value, expected_value);
+        }
+    }
+
+    #[test]
+    fn encode_origin_metadata_pass_through() {
+        let product = 10;
+        let category = 11;
+        let service = 9;
+
+        let event_metadata = EventMetadata::default().with_origin_metadata(
+            DatadogMetricOriginMetadata::new(Some(product), Some(category), Some(service)),
+        );
+        let counter = get_simple_counter_with_metadata(event_metadata);
+
+        // series v1
+        {
+            let result = generate_series_metrics(
+                &counter,
+                &None,
+                log_schema(),
+                DEFAULT_DD_ORIGIN_PRODUCT_VALUE,
+            );
+            assert!(result.is_ok());
+
+            let metrics = result.unwrap();
+            assert_eq!(metrics.len(), 1);
+
+            let actual = &metrics[0];
+            let generated_origin = actual.metadata.as_ref().unwrap().origin.as_ref().unwrap();
+
+            assert_eq!(generated_origin.product().unwrap(), product);
+            assert_eq!(generated_origin.category().unwrap(), category);
+            assert_eq!(generated_origin.service().unwrap(), service);
+        }
+        // series v2
+        {
+            let series_proto = series_to_proto_message(
+                &counter,
+                &None,
+                log_schema(),
+                DEFAULT_DD_ORIGIN_PRODUCT_VALUE,
+            )
+            .unwrap();
+
+            let generated_origin = series_proto.metadata.unwrap().origin.unwrap();
+            assert_eq!(generated_origin.origin_product, product);
+            assert_eq!(generated_origin.origin_category, category);
+            assert_eq!(generated_origin.origin_service, service);
+        }
+    }
+
+    #[test]
+    fn encode_origin_metadata_vector_sourced() {
+        let product = *ORIGIN_PRODUCT_VALUE;
+
+        let category = 11;
+        let service = 153;
+
+        let mut counter = get_simple_counter();
+
+        counter.metadata_mut().set_source_type("statsd");
+
+        // series v1
+        {
+            let result = generate_series_metrics(&counter, &None, log_schema(), product);
+            assert!(result.is_ok());
+
+            let metrics = result.unwrap();
+            assert_eq!(metrics.len(), 1);
+
+            let actual = &metrics[0];
+            let generated_origin = actual.metadata.as_ref().unwrap().origin.as_ref().unwrap();
+
+            assert_eq!(generated_origin.product().unwrap(), product);
+            assert_eq!(generated_origin.category().unwrap(), category);
+            assert_eq!(generated_origin.service().unwrap(), service);
+        }
+        // series v2
+        {
+            let series_proto = series_to_proto_message(
+                &counter,
+                &None,
+                log_schema(),
+                DEFAULT_DD_ORIGIN_PRODUCT_VALUE,
+            )
+            .unwrap();
+
+            let generated_origin = series_proto.metadata.unwrap().origin.unwrap();
+            assert_eq!(generated_origin.origin_product, product);
+            assert_eq!(generated_origin.origin_category, category);
+            assert_eq!(generated_origin.origin_service, service);
+        }
+    }
+
+    #[test]
+    fn encode_single_series_v1_metric_with_default_limits() {
         // This is a simple test where we ensure that a single metric, with the default limits, can
         // be encoded without hitting any errors.
-        let mut encoder = DatadogMetricsEncoder::new(DatadogMetricsEndpoint::Series, None)
-            .expect("default payload size limits should be valid");
+        let mut encoder =
+            DatadogMetricsEncoder::new(DatadogMetricsEndpoint::Series(SeriesApiVersion::V1), None)
+                .expect("default payload size limits should be valid");
+        let counter = get_simple_counter();
+        let expected = counter.clone();
+
+        // Encode the counter.
+        let result = encoder.try_encode(counter);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), None);
+
+        // Finish the payload, make sure we got what we came for.
+        let result = encoder.finish();
+        assert!(result.is_ok());
+
+        let (_payload, mut processed) = result.unwrap();
+        assert_eq!(processed.len(), 1);
+        assert_eq!(expected, processed.pop().unwrap());
+    }
+
+    #[test]
+    fn encode_single_series_v2_metric_with_default_limits() {
+        // This is a simple test where we ensure that a single metric, with the default limits, can
+        // be encoded without hitting any errors.
+        let mut encoder =
+            DatadogMetricsEncoder::new(DatadogMetricsEndpoint::Series(SeriesApiVersion::V2), None)
+                .expect("default payload size limits should be valid");
         let counter = get_simple_counter();
         let expected = counter.clone();
 
@@ -928,6 +1447,34 @@ mod tests {
     }
 
     #[test]
+    fn encode_empty_sketch() {
+        // This is a simple test where we ensure that a single metric, with the default limits, can
+        // be encoded without hitting any errors.
+        let mut encoder = DatadogMetricsEncoder::new(DatadogMetricsEndpoint::Sketches, None)
+            .expect("default payload size limits should be valid");
+        let sketch = Metric::new(
+            "empty",
+            MetricKind::Incremental,
+            AgentDDSketch::with_agent_defaults().into(),
+        )
+        .with_timestamp(Some(ts()));
+        let expected = sketch.clone();
+
+        // Encode the sketch.
+        let result = encoder.try_encode(sketch);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), None);
+
+        // Finish the payload, make sure we got what we came for.
+        let result = encoder.finish();
+        assert!(result.is_ok());
+
+        let (_payload, mut processed) = result.unwrap();
+        assert_eq!(processed.len(), 1);
+        assert_eq!(expected, processed.pop().unwrap());
+    }
+
+    #[test]
     fn encode_multiple_sketch_metrics_normal_vs_incremental() {
         // This tests our incremental sketch encoding against the more straightforward approach of
         // just building/encoding a full `SketchPayload` message.
@@ -944,14 +1491,18 @@ mod tests {
         for metric in &metrics {
             match metric.value() {
                 MetricValue::Sketch { sketch } => match sketch {
-                    MetricSketch::AgentDDSketch(ddsketch) => encode_sketch_incremental(
-                        metric,
-                        ddsketch,
-                        &None,
-                        log_schema(),
-                        &mut incremental_buf,
-                    )
-                    .unwrap(),
+                    MetricSketch::AgentDDSketch(ddsketch) => {
+                        if let Some(sketch_proto) =
+                            sketch_to_proto_message(metric, ddsketch, &None, log_schema(), 14)
+                        {
+                            encode_proto_key_and_message(
+                                sketch_proto,
+                                get_sketch_payload_sketches_field_number(),
+                                &mut incremental_buf,
+                            )
+                            .unwrap();
+                        }
+                    }
                 },
                 _ => panic!("should be a sketch"),
             }
@@ -966,13 +1517,16 @@ mod tests {
         let header_len = max_uncompressed_header_len();
 
         // This is too small.
-        let result =
-            validate_payload_size_limits(DatadogMetricsEndpoint::Series, header_len, usize::MAX);
+        let result = validate_payload_size_limits(
+            DatadogMetricsEndpoint::Series(SeriesApiVersion::V2),
+            header_len,
+            usize::MAX,
+        );
         assert_eq!(result, None);
 
         // This is just right.
         let result = validate_payload_size_limits(
-            DatadogMetricsEndpoint::Series,
+            DatadogMetricsEndpoint::Series(SeriesApiVersion::V2),
             header_len + 1,
             usize::MAX,
         );
@@ -985,7 +1539,7 @@ mod tests {
 
         // This is too small.
         let result = validate_payload_size_limits(
-            DatadogMetricsEndpoint::Series,
+            DatadogMetricsEndpoint::Series(SeriesApiVersion::V2),
             usize::MAX,
             compression_overhead_len,
         );
@@ -993,7 +1547,7 @@ mod tests {
 
         // This is just right.
         let result = validate_payload_size_limits(
-            DatadogMetricsEndpoint::Series,
+            DatadogMetricsEndpoint::Series(SeriesApiVersion::V2),
             usize::MAX,
             compression_overhead_len + 1,
         );
@@ -1035,7 +1589,7 @@ mod tests {
         // uncompressed payload would exceed the limit.
         let header_len = max_uncompressed_header_len();
         let mut encoder = DatadogMetricsEncoder::with_payload_limits(
-            DatadogMetricsEndpoint::Series,
+            DatadogMetricsEndpoint::Series(SeriesApiVersion::V1),
             None,
             header_len + 1,
             usize::MAX,
@@ -1111,7 +1665,7 @@ mod tests {
         let uncompressed_limit = 128;
         let compressed_limit = 32;
         let mut encoder = DatadogMetricsEncoder::with_payload_limits(
-            DatadogMetricsEndpoint::Series,
+            DatadogMetricsEndpoint::Series(SeriesApiVersion::V1),
             None,
             uncompressed_limit,
             compressed_limit,
@@ -1214,7 +1768,7 @@ mod tests {
             // We check this with targeted unit tests as well but this is some cheap insurance to
             // show that we're hopefully not missing any particular corner cases.
             let result = DatadogMetricsEncoder::with_payload_limits(
-                DatadogMetricsEndpoint::Series,
+                DatadogMetricsEndpoint::Series(SeriesApiVersion::V2),
                 None,
                 uncompressed_limit,
                 compressed_limit,

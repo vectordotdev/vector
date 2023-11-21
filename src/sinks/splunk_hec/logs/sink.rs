@@ -1,34 +1,21 @@
-use std::{fmt, num::NonZeroUsize, sync::Arc};
+use std::{fmt, sync::Arc};
 
-use async_trait::async_trait;
-use futures_util::{stream::BoxStream, StreamExt};
 use serde::Serialize;
-use tower::Service;
-use vector_buffers::EventCount;
-use vector_core::{
-    event::{Event, LogEvent, Value},
-    partition::Partitioner,
-    sink::StreamSink,
-    stream::{BatcherSettings, DriverResponse},
-    ByteSizeOf,
-};
 
 use super::request_builder::HecLogsRequestBuilder;
 use crate::{
-    config::SinkContext,
     internal_events::SplunkEventTimestampInvalidType,
     internal_events::SplunkEventTimestampMissing,
-    internal_events::TemplateRenderingError,
     sinks::{
+        prelude::*,
         splunk_hec::common::{
             render_template_string, request::HecRequest, EndpointTarget, INDEX_FIELD,
             SOURCETYPE_FIELD, SOURCE_FIELD,
         },
-        util::{processed_event::ProcessedEvent, SinkBuilderExt},
+        util::processed_event::ProcessedEvent,
     },
-    template::Template,
 };
-use lookup::{event_path, OwnedValuePath, PathPrefix};
+use vector_lib::lookup::{event_path, OwnedValuePath, PathPrefix};
 
 pub struct HecLogsSink<S> {
     pub context: SinkContext,
@@ -64,8 +51,6 @@ where
     S::Error: fmt::Debug + Into<crate::Error> + Send,
 {
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
-        let builder_limit = NonZeroUsize::new(64);
-
         let data = HecLogData {
             sourcetype: self.sourcetype.as_ref(),
             source: self.source.as_ref(),
@@ -76,6 +61,7 @@ where
             timestamp_key: self.timestamp_key.clone(),
             endpoint_target: self.endpoint_target,
         };
+        let batch_settings = self.batch_settings;
 
         input
             .map(move |event| process_log(event, &data))
@@ -92,9 +78,12 @@ where
                 } else {
                     EventPartitioner::new(None, None, None, None)
                 },
-                self.batch_settings,
+                || batch_settings.as_byte_size_config(),
             )
-            .request_builder(builder_limit, self.request_builder)
+            .request_builder(
+                default_request_builder_concurrency_limit(),
+                self.request_builder,
+            )
             .filter_map(|request| async move {
                 match request {
                     Err(e) => {

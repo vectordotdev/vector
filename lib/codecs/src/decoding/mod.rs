@@ -12,7 +12,7 @@ pub use format::{
     GelfDeserializerConfig, GelfDeserializerOptions, JsonDeserializer, JsonDeserializerConfig,
     JsonDeserializerOptions, NativeDeserializer, NativeDeserializerConfig, NativeJsonDeserializer,
     NativeJsonDeserializerConfig, NativeJsonDeserializerOptions, ProtobufDeserializer,
-    ProtobufDeserializerConfig,
+    ProtobufDeserializerConfig, ProtobufDeserializerOptions,
 };
 #[cfg(feature = "syslog")]
 pub use format::{SyslogDeserializer, SyslogDeserializerConfig, SyslogDeserializerOptions};
@@ -216,7 +216,7 @@ pub enum DeserializerConfig {
     /// [rfc5424]: https://www.ietf.org/rfc/rfc5424.txt
     Syslog(SyslogDeserializerConfig),
 
-    /// Decodes the raw bytes as Vector’s [native Protocol Buffers format][vector_native_protobuf].
+    /// Decodes the raw bytes as [native Protocol Buffers format][vector_native_protobuf].
     ///
     /// This codec is **[experimental][experimental]**.
     ///
@@ -224,7 +224,7 @@ pub enum DeserializerConfig {
     /// [experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
     Native,
 
-    /// Decodes the raw bytes as Vector’s [native JSON format][vector_native_json].
+    /// Decodes the raw bytes as [native JSON format][vector_native_json].
     ///
     /// This codec is **[experimental][experimental]**.
     ///

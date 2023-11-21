@@ -5,10 +5,7 @@ on:
 
 jobs:
   unit-mac:
-    # Full CI suites for this platform were only recently introduced.
-    # Some failures are permitted until we can properly correct them.
-    continue-on-error: true
-    runs-on: macos-11
+    runs-on: macos-13
     env:
       CARGO_INCREMENTAL: 0
     steps:
@@ -20,7 +17,7 @@ jobs:
 
       - name: (PR comment) Set latest commit status as pending
         if: ${{ github.event_name == 'issue_comment' }}
-        uses: myrotvorets/set-commit-status-action@v1.1.7
+        uses: myrotvorets/set-commit-status-action@v2.0.0
         with:
           sha: ${{ steps.comment-branch.outputs.head_sha }}
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -56,7 +53,7 @@ jobs:
       - run: make test-behavior
 
       - name: (PR comment) Set latest commit status as ${{ job.status }}
-        uses: myrotvorets/set-commit-status-action@v1.1.7
+        uses: myrotvorets/set-commit-status-action@v2.0.0
         if: always() && github.event_name == 'issue_comment'
         with:
           sha: ${{ steps.comment-branch.outputs.head_sha }}

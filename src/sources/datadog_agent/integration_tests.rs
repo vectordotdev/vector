@@ -185,6 +185,8 @@ fn get_simple_trace() -> String {
             ]
         ]
         "#},
-        Utc::now().timestamp_nanos()
+        Utc::now()
+            .timestamp_nanos_opt()
+            .expect("Timestamp out of range")
     )
 }

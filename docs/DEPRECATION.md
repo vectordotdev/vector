@@ -78,6 +78,7 @@ When introducing a deprecation into Vector, the pull request introducing the dep
   the new name will be appended with the text `(formerly OldName)`.
 - Add a log message to Vector that is logged at the `WARN` level starting with the word `DEPRECATION` if Vector detects
   the deprecated configuration or feature being used (when possible).
+- Add the deprecation to [DEPRECATIONS.md](DEPRECATIONS.md) to track migration (if applicable) and removal
 
 When removing a deprecation in a subsequent release, the pull request should:
 
@@ -85,3 +86,4 @@ When removing a deprecation in a subsequent release, the pull request should:
 - Remove the deprecation from the documentation
 - Add a note to the Breaking Changes section of the upgrade guide for the next release with a description and directions
   for transitioning if applicable.
+- Remove the deprecation from [DEPRECATIONS.md](DEPRECATIONS.md)

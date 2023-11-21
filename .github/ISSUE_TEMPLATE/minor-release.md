@@ -7,6 +7,8 @@ labels: "domain: releasing"
 
 The week before the release:
 
+- [ ] Check for any outstanding deprecation actions in [DEPRECATIONS.md](docs/DEPRECATIONS.md) and
+      take them (or have someone help you take them)
 - [ ] Create a new release branch from master to freeze commits
   - `git fetch && git checkout origin/master && git checkout -b v0.<new version number> && git push -u`
 - [ ] Create a new release preparation branch from `master`
@@ -45,6 +47,7 @@ On the day of release:
   - [ ] `git push origin v0.<minor>.0`
 - [ ] Wait for release workflow to complete
   - Discoverable via [https://github.com/timberio/vector/actions/workflows/release.yml](https://github.com/timberio/vector/actions/workflows/release.yml)
+- [ ] Release Linux packages. See [`vector-release` usage](https://github.com/DataDog/vector-release#usage).
 - [ ] Release updated Helm chart. See [releasing Helm chart](https://github.com/vectordotdev/helm-charts#releasing).
 - [ ] Once Helm chart is released, updated Vector manifests
     - Run `cargo vdev build manifests` and open a PR with changes

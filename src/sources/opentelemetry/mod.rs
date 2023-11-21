@@ -11,16 +11,16 @@ mod status;
 use std::net::SocketAddr;
 
 use futures::{future::join, FutureExt, TryFutureExt};
-use lookup::{owned_value_path, OwnedTargetPath};
-use opentelemetry_proto::convert::{
+use vector_lib::lookup::{owned_value_path, OwnedTargetPath};
+use vector_lib::opentelemetry::convert::{
     ATTRIBUTES_KEY, DROPPED_ATTRIBUTES_COUNT_KEY, FLAGS_KEY, OBSERVED_TIMESTAMP_KEY, RESOURCE_KEY,
     SEVERITY_NUMBER_KEY, SEVERITY_TEXT_KEY, SPAN_ID_KEY, TRACE_ID_KEY,
 };
 
-use opentelemetry_proto::proto::collector::logs::v1::logs_service_server::LogsServiceServer;
-use vector_common::internal_event::{BytesReceived, EventsReceived, Protocol};
-use vector_config::configurable_component;
-use vector_core::{
+use vector_lib::configurable::configurable_component;
+use vector_lib::internal_event::{BytesReceived, EventsReceived, Protocol};
+use vector_lib::opentelemetry::proto::collector::logs::v1::logs_service_server::LogsServiceServer;
+use vector_lib::{
     config::{log_schema, LegacyKey, LogNamespace},
     schema::Definition,
 };
@@ -35,6 +35,7 @@ use crate::{
         DataType, GenerateConfig, Resource, SourceAcknowledgementsConfig, SourceConfig,
         SourceContext, SourceOutput,
     },
+    http::KeepaliveConfig,
     serde::bool_or_struct,
     sources::{util::grpc::run_grpc_server, Source},
     tls::{MaybeTlsSettings, TlsEnableableConfig},
@@ -102,12 +103,17 @@ struct HttpConfig {
     #[configurable(derived)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     tls: Option<TlsEnableableConfig>,
+
+    #[configurable(derived)]
+    #[serde(default)]
+    keepalive: KeepaliveConfig,
 }
 
 fn example_http_config() -> HttpConfig {
     HttpConfig {
         address: "0.0.0.0:4318".parse().unwrap(),
         tls: None,
+        keepalive: KeepaliveConfig::default(),
     }
 }
 
@@ -162,8 +168,13 @@ impl SourceConfig for OpentelemetryConfig {
             bytes_received,
             events_received,
         );
-        let http_source =
-            run_http_server(self.http.address, http_tls_settings, filters, cx.shutdown);
+        let http_source = run_http_server(
+            self.http.address,
+            http_tls_settings,
+            filters,
+            cx.shutdown,
+            self.http.keepalive.clone(),
+        );
 
         Ok(join(grpc_source, http_source).map(|_| Ok(())).boxed())
     }

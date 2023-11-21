@@ -77,7 +77,7 @@ base: components: sources: kafka: configuration: {
 															[json]: https://www.json.org/
 															"""
 						native: """
-															Decodes the raw bytes as Vector’s [native Protocol Buffers format][vector_native_protobuf].
+															Decodes the raw bytes as [native Protocol Buffers format][vector_native_protobuf].
 
 															This codec is **[experimental][experimental]**.
 
@@ -85,7 +85,7 @@ base: components: sources: kafka: configuration: {
 															[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
 															"""
 						native_json: """
-															Decodes the raw bytes as Vector’s [native JSON format][vector_native_json].
+															Decodes the raw bytes as [native JSON format][vector_native_json].
 
 															This codec is **[experimental][experimental]**.
 
@@ -191,6 +191,21 @@ base: components: sources: kafka: configuration: {
 				}
 			}
 		}
+	}
+	drain_timeout_ms: {
+		description: """
+			Timeout to drain pending acknowledgements during shutdown or a Kafka
+			consumer group rebalance.
+
+			When Vector shuts down or the Kafka consumer group revokes partitions from this
+			consumer, wait a maximum of `drain_timeout_ms` for the source to
+			process pending acknowledgements. Must be less than `session_timeout_ms`
+			to ensure the consumer is not excluded from the group during a rebalance.
+
+			Default value is half of `session_timeout_ms`.
+			"""
+		required: false
+		type: uint: examples: [2500, 5000]
 	}
 	fetch_wait_max_ms: {
 		description: "Maximum time the broker may wait to fill the response."
@@ -346,7 +361,7 @@ base: components: sources: kafka: configuration: {
 		}
 	}
 	metrics: {
-		description: "Metrics configuration."
+		description: "Metrics (beta) configuration."
 		required:    false
 		type: object: options: topic_lag_metric: {
 			description: "Expose topic lag metrics for all topics and partitions. Metric names are `kafka_consumer_lag`."

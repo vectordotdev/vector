@@ -1,11 +1,11 @@
 use metrics::counter;
-use vector_core::internal_event::InternalEvent;
-
-use crate::sources::nginx_metrics::parser::ParseError;
-use vector_common::{
+use vector_lib::internal_event::InternalEvent;
+use vector_lib::{
     internal_event::{error_stage, error_type},
     json_size::JsonSize,
 };
+
+use crate::sources::nginx_metrics::parser::ParseError;
 
 #[derive(Debug)]
 pub struct NginxMetricsEventsReceived<'a> {
@@ -54,8 +54,6 @@ impl<'a> InternalEvent for NginxMetricsRequestError<'a> {
             "error_type" => error_type::REQUEST_FAILED,
             "stage" => error_stage::RECEIVING,
         );
-        // deprecated
-        counter!("http_request_errors_total", 1);
     }
 }
 
@@ -80,7 +78,5 @@ impl<'a> InternalEvent for NginxMetricsStubStatusParseError<'a> {
             "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::PROCESSING,
         );
-        // deprecated
-        counter!("parse_errors_total", 1);
     }
 }

@@ -1,1 +1,2 @@
 mod logs;
+mod metrics;

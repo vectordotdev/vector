@@ -7,7 +7,7 @@ use super::{
     bucket::Bucket, ClientStatsBucket, ClientStatsPayload, PartitionKey,
     BUCKET_DURATION_NANOSECONDS,
 };
-use crate::event::{TraceEvent, Value};
+use crate::event::{ObjectMap, TraceEvent, Value};
 
 const MEASURED_KEY: &str = "_dd.measured";
 const PARTIAL_VERSION_KEY: &str = "_dd.partial_version";
@@ -26,7 +26,7 @@ pub(crate) struct AggregationKey {
 
 impl AggregationKey {
     fn new_aggregation_from_span(
-        span: &BTreeMap<String, Value>,
+        span: &ObjectMap,
         payload_key: PayloadAggregationKey,
         synthetics: bool,
     ) -> Self {
@@ -71,7 +71,7 @@ pub(crate) struct PayloadAggregationKey {
 }
 
 impl PayloadAggregationKey {
-    fn with_span_context(self, span: &BTreeMap<String, Value>) -> Self {
+    fn with_span_context(self, span: &ObjectMap) -> Self {
         PayloadAggregationKey {
             env: span
                 .get("meta")
@@ -124,7 +124,11 @@ impl Aggregator {
     pub fn new(default_api_key: Arc<str>) -> Self {
         Self {
             buckets: BTreeMap::new(),
-            oldest_timestamp: align_timestamp(Utc::now().timestamp_nanos() as u64),
+            oldest_timestamp: align_timestamp(
+                Utc::now()
+                    .timestamp_nanos_opt()
+                    .expect("Timestamp out of range") as u64,
+            ),
             default_api_key,
             // We can't know the below fields until have received a trace event
             agent_env: None,
@@ -217,7 +221,7 @@ impl Aggregator {
     /// The key is constructed from various span/trace properties (see `AggregationKey`).
     fn handle_span(
         &mut self,
-        span: &BTreeMap<String, Value>,
+        span: &ObjectMap,
         weight: f64,
         is_top: bool,
         synthetics: bool,
@@ -228,8 +232,12 @@ impl Aggregator {
         let aggkey = AggregationKey::new_aggregation_from_span(span, payload_aggkey, synthetics);
 
         let start = match span.get("start") {
-            Some(Value::Timestamp(val)) => val.timestamp_nanos() as u64,
-            _ => Utc::now().timestamp_nanos() as u64,
+            Some(Value::Timestamp(val)) => {
+                val.timestamp_nanos_opt().expect("Timestamp out of range") as u64
+            }
+            _ => Utc::now()
+                .timestamp_nanos_opt()
+                .expect("Timestamp out of range") as u64,
         };
 
         let duration = match span.get("duration") {
@@ -277,7 +285,9 @@ impl Aggregator {
         // Based on https://github.com/DataDog/datadog-agent/blob/cfa750c7412faa98e87a015f8ee670e5828bbe7f/pkg/trace/stats/concentrator.go#L38-L41
         // , and https://github.com/DataDog/datadog-agent/blob/cfa750c7412faa98e87a015f8ee670e5828bbe7f/pkg/trace/stats/concentrator.go#L195-L207
 
-        let now = Utc::now().timestamp_nanos() as u64;
+        let now = Utc::now()
+            .timestamp_nanos_opt()
+            .expect("Timestamp out of range") as u64;
 
         let flush_cutoff_time = if force {
             // flush all the remaining buckets (the Vector process is exiting)
@@ -377,7 +387,7 @@ const fn align_timestamp(start: u64) -> u64 {
 
 /// Assumes that all metrics are all encoded as Value::Float.
 /// Return the f64 of the specified key or None of key not present.
-fn get_metric_value_float(span: &BTreeMap<String, Value>, key: &str) -> Option<f64> {
+fn get_metric_value_float(span: &ObjectMap, key: &str) -> Option<f64> {
     span.get("metrics")
         .and_then(|m| m.as_object())
         .map(|m| match m.get(key) {
@@ -389,7 +399,7 @@ fn get_metric_value_float(span: &BTreeMap<String, Value>, key: &str) -> Option<f
 }
 
 /// Returns true if the value of this metric is equal to 1.0
-fn metric_value_is_1(span: &BTreeMap<String, Value>, key: &str) -> bool {
+fn metric_value_is_1(span: &ObjectMap, key: &str) -> bool {
     match get_metric_value_float(span, key) {
         Some(f) => f == 1.0,
         None => false,
@@ -397,14 +407,14 @@ fn metric_value_is_1(span: &BTreeMap<String, Value>, key: &str) -> bool {
 }
 
 /// Returns true if span is top-level.
-fn has_top_level(span: &BTreeMap<String, Value>) -> bool {
+fn has_top_level(span: &ObjectMap) -> bool {
     // Based on: https://github.com/DataDog/datadog-agent/blob/cfa750c7412faa98e87a015f8ee670e5828bbe7f/pkg/trace/traceutil/span.go#L28-L31
 
     metric_value_is_1(span, TOP_LEVEL_KEY)
 }
 
 /// Returns true if a span should be measured (i.e. it should get trace metrics calculated).
-fn is_measured(span: &BTreeMap<String, Value>) -> bool {
+fn is_measured(span: &ObjectMap) -> bool {
     // Based on https://github.com/DataDog/datadog-agent/blob/cfa750c7412faa98e87a015f8ee670e5828bbe7f/pkg/trace/traceutil/span.go#L40-L43
 
     metric_value_is_1(span, MEASURED_KEY)
@@ -414,7 +424,7 @@ fn is_measured(span: &BTreeMap<String, Value>) -> bool {
 /// These types of spans are partial images of long-running spans.
 /// When incomplete, a partial snapshot has a metric _dd.partial_version which is a positive integer.
 /// The metric usually increases each time a new version of the same span is sent by the tracer
-fn is_partial_snapshot(span: &BTreeMap<String, Value>) -> bool {
+fn is_partial_snapshot(span: &ObjectMap) -> bool {
     // Based on: https://github.com/DataDog/datadog-agent/blob/cfa750c7412faa98e87a015f8ee670e5828bbe7f/pkg/trace/traceutil/span.go#L49-L52
 
     match get_metric_value_float(span, PARTIAL_VERSION_KEY) {

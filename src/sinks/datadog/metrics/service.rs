@@ -10,11 +10,9 @@ use http::{
 use hyper::Body;
 use snafu::ResultExt;
 use tower::Service;
-use vector_common::request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata};
-use vector_core::{
-    event::{EventFinalizers, EventStatus, Finalizable},
-    stream::DriverResponse,
-};
+use vector_lib::event::{EventFinalizers, EventStatus, Finalizable};
+use vector_lib::request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata};
+use vector_lib::stream::DriverResponse;
 
 use crate::{
     http::{BuildRequestSnafu, CallRequestSnafu, HttpClient},
@@ -144,7 +142,7 @@ impl DriverResponse for DatadogMetricsResponse {
     }
 
     fn bytes_sent(&self) -> Option<usize> {
-        Some(self.request_metadata.request_wire_size())
+        Some(self.request_metadata.request_encoded_size())
     }
 }
 

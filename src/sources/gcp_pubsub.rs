@@ -5,11 +5,9 @@ use std::{
 };
 
 use chrono::NaiveDateTime;
-use codecs::decoding::{DeserializerConfig, FramingConfig};
 use derivative::Derivative;
 use futures::{stream, stream::FuturesUnordered, FutureExt, Stream, StreamExt, TryFutureExt};
 use http::uri::{InvalidUri, Scheme, Uri};
-use lookup::owned_value_path;
 use once_cell::sync::Lazy;
 use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
@@ -20,12 +18,14 @@ use tonic::{
     transport::{Certificate, ClientTlsConfig, Endpoint, Identity},
     Code, Request, Status,
 };
-use vector_common::internal_event::{
+use vector_lib::codecs::decoding::{DeserializerConfig, FramingConfig};
+use vector_lib::config::{LegacyKey, LogNamespace};
+use vector_lib::configurable::configurable_component;
+use vector_lib::internal_event::{
     ByteSize, BytesReceived, EventsReceived, InternalEventHandle as _, Protocol, Registered,
 };
-use vector_common::{byte_size_of::ByteSizeOf, finalizer::UnorderedFinalizer};
-use vector_config::configurable_component;
-use vector_core::config::{LegacyKey, LogNamespace};
+use vector_lib::lookup::owned_value_path;
+use vector_lib::{byte_size_of::ByteSizeOf, finalizer::UnorderedFinalizer};
 use vrl::path;
 use vrl::value::{kind::Collection, Kind};
 
@@ -68,7 +68,7 @@ type Finalizer = UnorderedFinalizer<Vec<String>>;
 mod proto {
     include!(concat!(env!("OUT_DIR"), "/google.pubsub.v1.rs"));
 
-    use vector_core::ByteSizeOf;
+    use vector_lib::ByteSizeOf;
 
     impl ByteSizeOf for StreamingPullResponse {
         fn allocated_bytes(&self) -> usize {
@@ -131,9 +131,11 @@ static CLIENT_ID: Lazy<String> = Lazy::new(|| uuid::Uuid::new_v4().to_string());
 #[serde(deny_unknown_fields)]
 pub struct PubsubConfig {
     /// The project name from which to pull logs.
+    #[configurable(metadata(docs::examples = "my-log-source-project"))]
     pub project: String,
 
     /// The subscription within the project which is configured to receive logs.
+    #[configurable(metadata(docs::examples = "my-vector-source-subscription"))]
     pub subscription: String,
 
     /// The endpoint from which to pull data.
@@ -664,7 +666,7 @@ impl PubsubSource {
             message
                 .attributes
                 .into_iter()
-                .map(|(key, value)| (key, Value::Bytes(value.into())))
+                .map(|(key, value)| (key.into(), Value::Bytes(value.into())))
                 .collect(),
         );
         let log_namespace = self.log_namespace;
@@ -744,8 +746,8 @@ impl Future for Task {
 
 #[cfg(test)]
 mod tests {
-    use lookup::OwnedTargetPath;
-    use vector_core::schema::Definition;
+    use vector_lib::lookup::OwnedTargetPath;
+    use vector_lib::schema::Definition;
 
     use super::*;
 
@@ -1169,7 +1171,7 @@ mod integration_tests {
                 .clone();
             assert_eq!(logattr.len(), attributes.len());
             for (a, b) in logattr.into_iter().zip(&attributes) {
-                assert_eq!(&a.0, b.0);
+                assert_eq!(&a.0, b.0.as_str());
                 assert_eq!(a.1, b.1.clone().into());
             }
         }

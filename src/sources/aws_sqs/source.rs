@@ -8,9 +8,9 @@ use chrono::{DateTime, TimeZone, Utc};
 use futures::{FutureExt, StreamExt};
 use tokio::{pin, select};
 use tracing_futures::Instrument;
-use vector_common::finalizer::UnorderedFinalizer;
-use vector_common::internal_event::{EventsReceived, Registered};
-use vector_core::config::LogNamespace;
+use vector_lib::config::LogNamespace;
+use vector_lib::finalizer::UnorderedFinalizer;
+use vector_lib::internal_event::{EventsReceived, Registered};
 
 use crate::{
     codecs::Decoder,
@@ -224,7 +224,7 @@ mod tests {
     use crate::config::{log_schema, SourceConfig};
     use crate::sources::aws_sqs::AwsSqsConfig;
     use chrono::SecondsFormat;
-    use lookup::path;
+    use vector_lib::lookup::path;
 
     #[tokio::test]
     async fn test_decode_vector_namespace() {

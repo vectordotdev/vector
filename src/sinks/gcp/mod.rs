@@ -1,13 +1,12 @@
 use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 
 pub mod chronicle_unstructured;
 pub mod cloud_storage;
 pub mod pubsub;
 pub mod stackdriver;
-pub mod stackdriver_metrics;
 
 /// A monitored resource.
 ///
@@ -103,18 +102,18 @@ pub struct GcpResource {
 
 #[derive(Serialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct GcpSerie<'a> {
+pub struct GcpSerie {
     pub metric: GcpMetric,
     pub resource: GcpResource,
     pub metric_kind: GcpMetricKind,
     pub value_type: GcpValueType,
-    pub points: &'a [GcpPoint],
+    pub points: Vec<GcpPoint>,
 }
 
 #[derive(Serialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct GcpSeries<'a> {
-    time_series: &'a [GcpSerie<'a>],
+    time_series: &'a [GcpSerie],
 }
 
 fn serialize_int64_value<S>(value: &Option<i64>, serializer: S) -> Result<S::Ok, S::Error>
@@ -180,7 +179,7 @@ mod tests {
                 },
                 metric_kind: GcpMetricKind::Gauge,
                 value_type: GcpValueType::Int64,
-                points: &[GcpPoint {
+                points: vec![GcpPoint {
                     interval: GcpInterval {
                         start_time: None,
                         end_time,

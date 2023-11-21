@@ -15,22 +15,22 @@ use vector_core::{
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum QuoteStyle {
-    /// This puts quotes around every field. Always.
+    /// Always puts quotes around every field.
     Always,
 
-    /// This puts quotes around fields only when necessary.
-    /// They are necessary when fields contain a quote, delimiter or record terminator.
+    /// Puts quotes around fields only when necessary.
+    /// They are necessary when fields contain a quote, delimiter, or record terminator.
     /// Quotes are also necessary when writing an empty record
     /// (which is indistinguishable from a record with one empty field).
     #[default]
     Necessary,
 
-    /// This puts quotes around all fields that are non-numeric.
+    /// Puts quotes around all fields that are non-numeric.
     /// Namely, when writing a field that does not parse as a valid float or integer,
-    /// then quotes will be used even if they aren’t strictly necessary.
+    /// then quotes are used even if they aren't strictly necessary.
     NonNumeric,
 
-    /// This never writes quotes, even if it would produce invalid CSV data.
+    /// Never writes quotes, even if it produces invalid CSV data.
     Never,
 }
 
@@ -97,7 +97,7 @@ pub struct CsvSerializerOptions {
     /// In some variants of CSV, quotes are escaped using a special escape character
     /// like \ (instead of escaping quotes by doubling them).
     ///
-    /// To use this `double_quotes` needs to be disabled as well otherwise it is ignored
+    /// To use this, `double_quotes` needs to be disabled as well otherwise it is ignored.
     #[serde(
         default = "default_escape",
         with = "vector_core::serde::ascii_char",
@@ -309,20 +309,20 @@ mod tests {
     use chrono::DateTime;
     use ordered_float::NotNan;
     use vector_common::btreemap;
-    use vector_core::event::{LogEvent, Value};
+    use vector_core::event::{LogEvent, ObjectMap, Value};
 
     use super::*;
 
     fn make_event_with_fields(field_data: Vec<(&str, &str)>) -> (Vec<ConfigTargetPath>, Event) {
         let mut fields: Vec<ConfigTargetPath> = std::vec::Vec::new();
-        let mut tree = std::collections::BTreeMap::new();
+        let mut tree = ObjectMap::new();
 
-        for (field_name, field_value) in field_data.iter() {
-            let field = ConfigTargetPath::try_from(field_name.to_string()).unwrap();
+        for (field_name, field_value) in field_data.into_iter() {
+            let field = ConfigTargetPath::try_from(field_name.clone()).unwrap();
             fields.push(field);
 
             let field_value = Value::from(field_value.to_string());
-            tree.insert(field_name.to_string().clone(), field_value);
+            tree.insert(field_name.into(), field_value);
         }
 
         let event = Event::Log(LogEvent::from(tree));

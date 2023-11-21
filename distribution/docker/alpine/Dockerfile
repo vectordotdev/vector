@@ -13,7 +13,7 @@ FROM docker.io/alpine:3.18
 RUN apk --no-cache add ca-certificates tzdata
 
 COPY --from=builder /vector/bin/* /usr/local/bin/
-COPY --from=builder /vector/config/vector.toml /etc/vector/vector.toml
+COPY --from=builder /vector/config/vector.yaml /etc/vector/vector.yaml
 COPY --from=builder /var/lib/vector /var/lib/vector
 
 # Smoke test

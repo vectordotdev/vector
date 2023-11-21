@@ -140,6 +140,20 @@ base: components: sources: kubernetes_logs: configuration: {
 		required: false
 		type: string: examples: [".ingest_timestamp", "ingest_ts"]
 	}
+	internal_metrics: {
+		description: "Configuration of internal metrics for file-based components."
+		required:    false
+		type: object: options: include_file_tag: {
+			description: """
+				Whether or not to include the "file" tag on the component's corresponding internal metrics.
+
+				This is useful for distinguishing between different files while monitoring. However, the tag's
+				cardinality is unbounded.
+				"""
+			required: false
+			type: bool: default: false
+		}
+	}
 	kube_config_file: {
 		description: """
 			Optional path to a readable [kubeconfig][kubeconfig] file.
@@ -166,7 +180,7 @@ base: components: sources: kubernetes_logs: configuration: {
 	max_read_bytes: {
 		description: """
 			Max amount of bytes to read from a single file before switching over to the next file.
-			**Note:** This does not apply when `oldest_first` is `true.
+			**Note:** This does not apply when `oldest_first` is `true`.
 
 			This allows distributing the reads more or less evenly across
 			the files.
@@ -210,7 +224,7 @@ base: components: sources: kubernetes_logs: configuration: {
 		}
 	}
 	oldest_first: {
-		description: "Instead of balancing read capacity fairly across all watched files, prioritize draining the oldest files before moving on to read data from younger files."
+		description: "Instead of balancing read capacity fairly across all watched files, prioritize draining the oldest files before moving on to read data from more recent files."
 		required:    false
 		type: bool: default: true
 	}

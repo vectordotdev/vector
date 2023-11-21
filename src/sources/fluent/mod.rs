@@ -6,17 +6,17 @@ use std::time::Duration;
 use base64::prelude::{Engine as _, BASE64_STANDARD};
 use bytes::{Buf, Bytes, BytesMut};
 use chrono::Utc;
-use codecs::{BytesDeserializerConfig, StreamDecodingError};
 use flate2::read::MultiGzDecoder;
-use lookup::lookup_v2::parse_value_path;
-use lookup::{metadata_path, owned_value_path, path, OwnedValuePath};
 use rmp_serde::{decode, Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use tokio_util::codec::Decoder;
-use vector_config::configurable_component;
-use vector_core::config::{LegacyKey, LogNamespace};
-use vector_core::schema::Definition;
+use vector_lib::codecs::{BytesDeserializerConfig, StreamDecodingError};
+use vector_lib::config::{LegacyKey, LogNamespace};
+use vector_lib::configurable::configurable_component;
+use vector_lib::lookup::lookup_v2::parse_value_path;
+use vector_lib::lookup::{metadata_path, owned_value_path, path, OwnedValuePath};
+use vector_lib::schema::Definition;
 use vrl::value::kind::Collection;
 use vrl::value::{Kind, Value};
 
@@ -629,18 +629,17 @@ impl From<FluentEvent<'_>> for LogEvent {
 mod tests {
     use bytes::BytesMut;
     use chrono::{DateTime, Utc};
-    use lookup::OwnedTargetPath;
     use rmp_serde::Serializer;
     use serde::Serialize;
-    use std::collections::BTreeMap;
     use tokio::{
         io::{AsyncReadExt, AsyncWriteExt},
         time::{error::Elapsed, timeout, Duration},
     };
     use tokio_util::codec::Decoder;
-    use vector_common::assert_event_data_eq;
-    use vector_core::{event::Value, schema::Definition};
-    use vrl::value::kind::Collection;
+    use vector_lib::assert_event_data_eq;
+    use vector_lib::lookup::OwnedTargetPath;
+    use vector_lib::schema::Definition;
+    use vrl::value::{kind::Collection, ObjectMap, Value};
 
     use super::{message::FluentMessageOptions, *};
     use crate::{
@@ -661,15 +660,15 @@ mod tests {
     // Decode base64: https://toolslick.com/conversion/data/messagepack-to-json
 
     fn mock_event(name: &str, timestamp: &str) -> Event {
-        Event::Log(LogEvent::from(BTreeMap::from([
-            (String::from("message"), Value::from(name)),
+        Event::Log(LogEvent::from(ObjectMap::from([
+            ("message".into(), Value::from(name)),
             (
-                log_schema().source_type_key().unwrap().to_string(),
+                log_schema().source_type_key().unwrap().to_string().into(),
                 Value::from(FluentConfig::NAME),
             ),
-            (String::from("tag"), Value::from("tag.name")),
+            ("tag".into(), Value::from("tag.name")),
             (
-                String::from("timestamp"),
+                "timestamp".into(),
                 Value::Timestamp(DateTime::parse_from_rfc3339(timestamp).unwrap().into()),
             ),
         ])))
@@ -1050,7 +1049,7 @@ mod integration_tests {
 
     use futures::Stream;
     use tokio::time::sleep;
-    use vector_core::event::{Event, EventStatus};
+    use vector_lib::event::{Event, EventStatus};
 
     use crate::{
         config::{SourceConfig, SourceContext},

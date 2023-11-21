@@ -2,7 +2,7 @@ use std::{fmt::Debug, sync::Arc};
 
 use http::Uri;
 use tower::ServiceBuilder;
-use vector_common::sensitive_string::SensitiveString;
+use vector_lib::sensitive_string::SensitiveString;
 
 use super::{
     healthcheck, NewRelicApiResponse, NewRelicApiService, NewRelicEncoder, NewRelicSink,
@@ -141,7 +141,7 @@ impl SinkConfig for NewRelicConfig {
             .limit_max_events(self.batch.max_events.unwrap_or(100))?
             .into_batcher_settings()?;
 
-        let request_limits = self.request.unwrap_with(&Default::default());
+        let request_limits = self.request.into_settings();
         let tls_settings = TlsSettings::from_options(&None)?;
         let client = HttpClient::new(tls_settings, &cx.proxy)?;
         let credentials = Arc::from(NewRelicCredentials::from(self));

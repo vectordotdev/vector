@@ -11,7 +11,7 @@ use futures::{
 use http::request::Parts;
 use hyper::StatusCode;
 use indoc::indoc;
-use vector_core::{
+use vector_lib::{
     config::{init_telemetry, Tags, Telemetry},
     event::{BatchNotifier, BatchStatus, Event, LogEvent},
 };
@@ -402,14 +402,13 @@ async fn enterprise_headers_v1() {
 }
 
 async fn enterprise_headers_inner(api_status: ApiStatus) {
-    let (mut config, cx) = load_sink::<DatadogLogsConfig>(indoc! {r#"
+    let (mut config, mut cx) = load_sink::<DatadogLogsConfig>(indoc! {r#"
             default_api_key = "atoken"
             compression = "none"
-
-            [request]
-            headers.DD-EVP-ORIGIN = "vector-enterprise"
         "#})
     .unwrap();
+    cx.app_name = "Vector Enterprise".to_string();
+    cx.app_name_slug = "vector-enterprise".to_string();
 
     let addr = next_addr();
     // Swap out the endpoint so we can force send it to our local server

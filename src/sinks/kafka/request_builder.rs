@@ -1,42 +1,43 @@
-use std::num::NonZeroUsize;
-
-use bytes::{Bytes, BytesMut};
+use bytes::Bytes;
 use rdkafka::message::{Header, OwnedHeaders};
-use tokio_util::codec::Encoder as _;
-use vrl::path::OwnedTargetPath;
+use vector_lib::lookup::OwnedTargetPath;
 
 use crate::{
-    codecs::{Encoder, Transformer},
-    event::{Event, Finalizable, Value},
-    internal_events::{KafkaHeaderExtractionError, TemplateRenderingError},
+    internal_events::KafkaHeaderExtractionError,
     sinks::{
         kafka::service::{KafkaRequest, KafkaRequestMetadata},
-        util::metadata::RequestMetadataBuilder,
+        prelude::*,
     },
-    template::Template,
 };
 
 pub struct KafkaRequestBuilder {
     pub key_field: Option<OwnedTargetPath>,
     pub headers_key: Option<OwnedTargetPath>,
-    pub topic_template: Template,
-    pub transformer: Transformer,
-    pub encoder: Encoder<()>,
+    pub encoder: (Transformer, Encoder<()>),
 }
 
-impl KafkaRequestBuilder {
-    pub fn build_request(&mut self, mut event: Event) -> Option<KafkaRequest> {
-        let topic = self
-            .topic_template
-            .render_string(&event)
-            .map_err(|error| {
-                emit!(TemplateRenderingError {
-                    field: None,
-                    drop_event: true,
-                    error,
-                });
-            })
-            .ok()?;
+impl RequestBuilder<(String, Event)> for KafkaRequestBuilder {
+    type Metadata = KafkaRequestMetadata;
+    type Events = Event;
+    type Encoder = (Transformer, Encoder<()>);
+    type Payload = Bytes;
+    type Request = KafkaRequest;
+    type Error = std::io::Error;
+
+    fn compression(&self) -> Compression {
+        Compression::None
+    }
+
+    fn encoder(&self) -> &Self::Encoder {
+        &self.encoder
+    }
+
+    fn split_input(
+        &self,
+        input: (String, Event),
+    ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
+        let (topic, mut event) = input;
+        let builder = RequestMetadataBuilder::from_event(&event);
 
         let metadata = KafkaRequestMetadata {
             finalizers: event.take_finalizers(),
@@ -45,23 +46,21 @@ impl KafkaRequestBuilder {
             headers: get_headers(&event, self.headers_key.as_ref()),
             topic,
         };
-        self.transformer.transform(&mut event);
-        let mut body = BytesMut::new();
 
-        // Ensure the metadata builder is built after transforming the event so we have the event
-        // size taking into account any dropped fields.
-        let metadata_builder = RequestMetadataBuilder::from_event(&event);
-        self.encoder.encode(event, &mut body).ok()?;
-        let body = body.freeze();
+        (metadata, builder, event)
+    }
 
-        let bytes_len = NonZeroUsize::new(body.len()).expect("payload should never be zero length");
-        let request_metadata = metadata_builder.with_request_size(bytes_len);
-
-        Some(KafkaRequest {
-            body,
+    fn build_request(
+        &self,
+        metadata: Self::Metadata,
+        request_metadata: RequestMetadata,
+        payload: EncodeResult<Self::Payload>,
+    ) -> Self::Request {
+        KafkaRequest {
+            body: payload.into_payload(),
             metadata,
             request_metadata,
-        })
+        }
     }
 }
 
@@ -120,20 +119,18 @@ fn get_headers(event: &Event, headers_key: Option<&OwnedTargetPath>) -> Option<O
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeMap;
-
     use bytes::Bytes;
     use rdkafka::message::Headers;
 
     use super::*;
-    use crate::event::LogEvent;
+    use crate::event::{LogEvent, ObjectMap};
 
     #[test]
     fn kafka_get_headers() {
         let headers_key = OwnedTargetPath::try_from("headers".to_string()).unwrap();
-        let mut header_values = BTreeMap::new();
-        header_values.insert("a-key".to_string(), Value::Bytes(Bytes::from("a-value")));
-        header_values.insert("b-key".to_string(), Value::Bytes(Bytes::from("b-value")));
+        let mut header_values = ObjectMap::new();
+        header_values.insert("a-key".into(), Value::Bytes(Bytes::from("a-value")));
+        header_values.insert("b-key".into(), Value::Bytes(Bytes::from("b-value")));
 
         let mut event = Event::Log(LogEvent::from("hello"));
         event.as_mut_log().insert(&headers_key, header_values);

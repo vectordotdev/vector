@@ -3,7 +3,7 @@ use std::{borrow::Cow, collections::BTreeMap, time::Duration};
 use colored::{ColoredString, Colorize};
 use tokio_stream::StreamExt;
 use url::Url;
-use vector_api_client::{
+use vector_lib::api_client::{
     connect_subscription_client,
     gql::{
         output_events_by_component_id_patterns_subscription::OutputEventsByComponentIdPatternsSubscriptionOutputEventsByComponentIdPatterns,
@@ -32,7 +32,7 @@ pub(crate) async fn cmd(opts: &super::Opts, signal_rx: SignalRx) -> exitcode::Ex
 
             Have you enabled the API?
 
-            To enable the API, add the following to your `vector.toml` config file:
+            To enable the API, add the following to your Vector config file:
 
             [api]
                 enabled = true"},

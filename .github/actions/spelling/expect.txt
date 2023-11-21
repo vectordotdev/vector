@@ -49,11 +49,11 @@ authsvc
 autobenches
 AUTOBUILD
 AUTODESPAWN
-AUTOPULL
 autodiscovered
 autodiscovery
 autogen
 autoinstalling
+AUTOPULL
 autospawn
 autospawning
 autotools
@@ -69,6 +69,7 @@ badunit
 bak
 barfoo
 barieom
+basearch
 baseof
 basevalue
 baskinc
@@ -186,6 +187,7 @@ composability
 concating
 concats
 condrestart
+conffiles
 configkey
 configmap
 confl
@@ -197,6 +199,7 @@ copypasta'd
 copypasted
 copytruncate
 corechecks
+corepack
 could've
 counteraaaaaaaaaaa
 cpf
@@ -348,6 +351,7 @@ exitcodes
 exprhere
 extendedstatus
 extendee
+extglob
 extr
 extralight
 extrepo
@@ -375,6 +379,7 @@ filecontents
 filterlist
 finalizable
 fingerprinter
+fipsmodule
 fizzaxbbuzz
 fizzbuzz
 fkn
@@ -446,6 +451,8 @@ gogoproto
 goldberg
 goldmark
 GPB
+gpgcheck
+gpgkey
 gqlgen
 graphqlconfig
 grault
@@ -523,6 +530,7 @@ ingesters
 ingestor
 initdb
 initech
+installdeb
 Instrumentable
 interpolatedstring
 interpretervm
@@ -570,6 +578,7 @@ kernelmode
 keybase
 keyclock
 keyid
+keyring
 keyxxxxx
 khvzak
 kib
@@ -630,6 +639,7 @@ lukesteensen
 macports
 MAINPID
 majorly
+makecache
 MAKECMDGOALS
 Makefiles
 markability
@@ -739,6 +749,7 @@ noauth
 nocapture
 nochild
 nodebuginfo
+nodistro
 nofield
 nofree
 nomac
@@ -792,6 +803,7 @@ opinsights
 oplog
 optimizable
 orgid
+OSSL
 ostype
 otel
 otelcol
@@ -835,6 +847,7 @@ posttrunc
 prebuild
 precpu
 preds
+prefs
 preinst
 preread
 prereqs
@@ -983,6 +996,7 @@ skywalking
 slashin
 slf
 slideover
+slugified
 smallvec
 smartphone
 Smol
@@ -1068,6 +1082,7 @@ Takeaways
 targetgroup
 tarpit
 tcmalloc
+teconsent
 telecom
 templatable
 templateable
@@ -1127,6 +1142,8 @@ tripwires
 Trivago
 trivy
 Troutwine
+trustarc
+truste
 TRUSTSTORE
 TSDB
 Tsvg
@@ -1165,6 +1182,7 @@ userpass
 uucp
 UVY
 uwtable
+Uyuni
 valfoo
 validpaths
 Varda

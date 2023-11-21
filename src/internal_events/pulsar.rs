@@ -1,17 +1,12 @@
-use metrics::counter;
-use metrics::{register_counter, register_histogram, Counter, Histogram};
-use vector_core::internal_event::InternalEvent;
-
-use crate::emit;
-use vector_common::{
-    internal_event::{error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL},
-    registered_event,
+use metrics::{counter, register_counter, Counter};
+use vector_lib::internal_event::{
+    error_stage, error_type, ComponentEventsDropped, InternalEvent, UNINTENTIONAL,
 };
 
 #[derive(Debug)]
 pub struct PulsarSendingError {
     pub count: usize,
-    pub error: vector_common::Error,
+    pub error: vector_lib::Error,
 }
 
 impl InternalEvent for PulsarSendingError {

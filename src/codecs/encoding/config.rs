@@ -1,9 +1,9 @@
 use crate::codecs::Transformer;
-use codecs::{
+use vector_lib::codecs::{
     encoding::{Framer, FramingConfig, Serializer, SerializerConfig},
     CharacterDelimitedEncoder, LengthDelimitedEncoder, NewlineDelimitedEncoder,
 };
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 
 /// Encoding configuration.
 #[configurable_component]
@@ -112,6 +112,11 @@ impl EncodingConfigWithFraming {
                 // https://github.com/Graylog2/graylog2-server/issues/1240
                 CharacterDelimitedEncoder::new(0).into()
             }
+            (None, Serializer::Protobuf(_)) => {
+                // Protobuf uses length-delimited messages, see:
+                // https://developers.google.com/protocol-buffers/docs/techniques#streaming
+                LengthDelimitedEncoder::new().into()
+            }
             (
                 None,
                 Serializer::Csv(_)
@@ -149,7 +154,7 @@ where
 
 #[cfg(test)]
 mod test {
-    use lookup::lookup_v2::{parse_value_path, ConfigValuePath};
+    use vector_lib::lookup::lookup_v2::{parse_value_path, ConfigValuePath};
 
     use super::*;
     use crate::codecs::encoding::TimestampFormat;

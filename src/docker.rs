@@ -11,7 +11,7 @@ use bollard::{
 use futures::StreamExt;
 use http::uri::Uri;
 use snafu::Snafu;
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 
 // From bollard source.
 const DEFAULT_TIMEOUT: u64 = 120;

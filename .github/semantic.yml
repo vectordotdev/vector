@@ -200,7 +200,6 @@ scopes:
   - clickhouse sink # Anything `clickhouse` sink related
   - console sink # Anything `console` sink related
   - databend sink # Anything `databend` sink related
-  - datadog_archives sink # Anything `datadog_archives` sink related
   - datadog_events sink # Anything `datadog_events` sink related
   - datadog_logs sink # Anything `datadog_logs` sink related
   - datadog_metrics sink # Anything `datadog_metrics` sink related

@@ -49,13 +49,13 @@ jobs:
     steps:
       - name: Generate authentication token
         id: generate_token
-        uses: tibdex/github-app-token@0d49dd721133f900ebd5e0dff2810704e8defbc6
+        uses: tibdex/github-app-token@3beb63f4bd073e61482598c45c71c1019b59b73a
         with:
           app_id: ${{ secrets.GH_APP_DATADOG_VECTOR_CI_APP_ID }}
           private_key: ${{ secrets.GH_APP_DATADOG_VECTOR_CI_APP_PRIVATE_KEY }}
       - name: Get PR comment author
         id: comment
-        uses: tspascoal/get-user-teams-membership@v2
+        uses: tspascoal/get-user-teams-membership@v3
         with:
           username: ${{ github.actor }}
           team: 'Vector'
@@ -70,7 +70,7 @@ jobs:
         id: comment-branch
 
       - name: (PR comment) Set latest commit status as pending
-        uses: myrotvorets/set-commit-status-action@v1.1.7
+        uses: myrotvorets/set-commit-status-action@v2.0.0
         with:
           sha: ${{ steps.comment-branch.outputs.head_sha }}
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -381,13 +381,13 @@ jobs:
     steps:
       - name: Generate authentication token
         id: generate_token
-        uses: tibdex/github-app-token@0d49dd721133f900ebd5e0dff2810704e8defbc6
+        uses: tibdex/github-app-token@3beb63f4bd073e61482598c45c71c1019b59b73a
         with:
           app_id: ${{ secrets.GH_APP_DATADOG_VECTOR_CI_APP_ID }}
           private_key: ${{ secrets.GH_APP_DATADOG_VECTOR_CI_APP_PRIVATE_KEY }}
       - name: Validate issue comment
         if: github.event_name == 'issue_comment'
-        uses: tspascoal/get-user-teams-membership@v2
+        uses: tspascoal/get-user-teams-membership@v3
         with:
           username: ${{ github.actor }}
           team: 'Vector'
@@ -398,7 +398,7 @@ jobs:
         id: comment-branch
 
       - name: (PR comment) Submit PR result as ${{ needs.integration-tests.result }}
-        uses: myrotvorets/set-commit-status-action@v1.1.7
+        uses: myrotvorets/set-commit-status-action@v2.0.0
         with:
           sha: ${{ steps.comment-branch.outputs.head_sha }}
           token: ${{ secrets.GITHUB_TOKEN }}

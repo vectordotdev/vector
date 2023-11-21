@@ -99,7 +99,7 @@ base: components: sources: gcp_pubsub: configuration: {
 															[json]: https://www.json.org/
 															"""
 						native: """
-															Decodes the raw bytes as Vector’s [native Protocol Buffers format][vector_native_protobuf].
+															Decodes the raw bytes as [native Protocol Buffers format][vector_native_protobuf].
 
 															This codec is **[experimental][experimental]**.
 
@@ -107,7 +107,7 @@ base: components: sources: gcp_pubsub: configuration: {
 															[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
 															"""
 						native_json: """
-															Decodes the raw bytes as Vector’s [native JSON format][vector_native_json].
+															Decodes the raw bytes as [native JSON format][vector_native_json].
 
 															This codec is **[experimental][experimental]**.
 
@@ -356,7 +356,7 @@ base: components: sources: gcp_pubsub: configuration: {
 	project: {
 		description: "The project name from which to pull logs."
 		required:    true
-		type: string: {}
+		type: string: examples: ["my-log-source-project"]
 	}
 	retry_delay_seconds: {
 		deprecated:         true
@@ -376,7 +376,7 @@ base: components: sources: gcp_pubsub: configuration: {
 	subscription: {
 		description: "The subscription within the project which is configured to receive logs."
 		required:    true
-		type: string: {}
+		type: string: examples: ["my-vector-source-subscription"]
 	}
 	tls: {
 		description: "TLS configuration."

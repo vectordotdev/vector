@@ -12,7 +12,7 @@ set -u
 
 # If PACKAGE_ROOT is unset or empty, default it.
 PACKAGE_ROOT="${PACKAGE_ROOT:-"https://packages.timber.io/vector"}"
-VECTOR_VERSION="0.32.1"
+VECTOR_VERSION="0.34.0"
 _divider="--------------------------------------------------------------------------------"
 _prompt=">>>"
 _indent="   "
@@ -224,7 +224,7 @@ install_from_archive() {
     printf "%s Install succeeded! 🚀\n" "$_prompt"
     printf "%s To start Vector:\n" "$_prompt"
     printf "\n"
-    printf "%s vector --config $prefix/config/vector.toml\n" "$_indent"
+    printf "%s vector --config $prefix/config/vector.yaml\n" "$_indent"
     printf "\n"
     printf "%s More information at https://vector.dev/docs/\n" "$_prompt"
 

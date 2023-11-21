@@ -1,4 +1,4 @@
-use std::{fmt::Debug, num::NonZeroUsize, sync::Arc};
+use std::{fmt::Debug, sync::Arc};
 
 use async_trait::async_trait;
 use bytes::Bytes;
@@ -115,7 +115,6 @@ where
     S::Error: Debug + Into<crate::Error> + Send,
 {
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
-        let builder_limit = NonZeroUsize::new(64);
         let request_builder = NewRelicRequestBuilder {
             encoder: self.encoder,
             compression: self.compression,
@@ -124,8 +123,8 @@ where
         let protocol = get_http_scheme_from_uri(&self.credentials.get_uri());
 
         input
-            .batched(self.batcher_settings.into_byte_size_config())
-            .request_builder(builder_limit, request_builder)
+            .batched(self.batcher_settings.as_byte_size_config())
+            .request_builder(default_request_builder_concurrency_limit(), request_builder)
             .filter_map(
                 |request: Result<NewRelicApiRequest, NewRelicSinkError>| async move {
                     match request {

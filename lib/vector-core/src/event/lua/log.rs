@@ -1,12 +1,12 @@
 use mlua::prelude::*;
 
-use crate::event::{EventMetadata, LogEvent, Value};
+use super::super::{EventMetadata, LogEvent, Value};
 
-impl<'a> ToLua<'a> for LogEvent {
+impl<'a> IntoLua<'a> for LogEvent {
     #![allow(clippy::wrong_self_convention)] // this trait is defined by mlua
-    fn to_lua(self, lua: &'a Lua) -> LuaResult<LuaValue> {
+    fn into_lua(self, lua: &'a Lua) -> LuaResult<LuaValue> {
         let (value, _metadata) = self.into_parts();
-        value.to_lua(lua)
+        value.into_lua(lua)
     }
 }
 
@@ -22,7 +22,7 @@ mod test {
     use super::*;
 
     #[test]
-    fn to_lua() {
+    fn into_lua() {
         let mut log = LogEvent::default();
         log.insert("a", 1);
         log.insert("nested.field", "2");

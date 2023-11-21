@@ -167,5 +167,21 @@ remap: expressions: function_call: {
 				"""#
 			return: ["hello", "world!"]
 		},
+		{
+			title: "Infallible function invocation"
+			source: #"""
+				split("apples and pears and bananas", " and ")
+				"""#
+			return: ["apples", "pears", "bananas"]
+		},
+		{
+			title: "Fallible function invocation"
+			input: log: message: "apples and pears and bananas"
+			source: #"""
+				# The compiler cannot determine the argument type thus we need to do error handling.
+				split!(.message, " and ")
+				"""#
+			return: ["apples", "pears", "bananas"]
+		},
 	]
 }

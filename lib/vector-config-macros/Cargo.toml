@@ -11,10 +11,10 @@ proc-macro = true
 darling = { version = "0.20", default-features = false, features = ["suggestions"] }
 proc-macro2 = { version = "1.0", default-features = false }
 quote = { version = "1.0", default-features = false }
-serde_derive_internals = "0.28"
+serde_derive_internals = "0.29"
 syn = { version = "2.0", default-features = false, features = ["full", "extra-traits", "visit-mut", "visit"] }
 vector-config-common = { path = "../vector-config-common" }
 
 [dev-dependencies]
-serde = { version = "1.0.188", default-features = false }
+serde = { version = "1.0.192", default-features = false }
 vector-config = { path = "../vector-config" }
