@@ -13,7 +13,7 @@ use vrl::owned_value_path;
 use vrl::path::OwnedTargetPath;
 
 use super::sink::HecProcessedEvent;
-use crate::sinks::splunk_hec::common::config_timestamp_key;
+use crate::sinks::splunk_hec::common::config_timestamp_key_target_path;
 use crate::{
     codecs::{Encoder, EncodingConfig},
     config::{SinkConfig, SinkContext},
@@ -103,7 +103,7 @@ fn get_processed_event() -> HecProcessedEvent {
         Some(vrl::value::Value::Timestamp(
             Utc.timestamp_nanos(1638366107111456123),
         )),
-        config_timestamp_key().path,
+        config_timestamp_key_target_path().path,
     )
 }
 

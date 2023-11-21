@@ -2,7 +2,7 @@ use std::convert::TryFrom;
 
 use futures::{future::ready, stream};
 use serde_json::Value as JsonValue;
-use vector_lib::lookup::lookup_v2::OptionalTargetPath;
+use vector_lib::lookup::lookup_v2::OptionalValuePath;
 use vector_lib::{
     config::{init_telemetry, Tags, Telemetry},
     event::{BatchNotifier, BatchStatus, Event, MetricValue},
@@ -37,7 +37,7 @@ async fn config() -> HecMetricsSinkConfig {
         default_namespace: None,
         default_token: get_token().await.into(),
         endpoint: splunk_hec_address(),
-        host_key: OptionalTargetPath::event("host"),
+        host_key: OptionalValuePath::new("host"),
         index: None,
         sourcetype: None,
         source: None,

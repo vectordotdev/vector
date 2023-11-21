@@ -8,7 +8,6 @@ use vector_lib::{
     metric_tags, ByteSizeOf,
 };
 use vrl::owned_value_path;
-use vrl::path::OwnedTargetPath;
 
 use super::sink::{process_metric, HecProcessedEvent};
 use crate::sinks::splunk_hec::common::config_host_key;
@@ -72,7 +71,7 @@ fn get_processed_event(
         sourcetype.as_ref(),
         source.as_ref(),
         index.as_ref(),
-        Some(&OwnedTargetPath::event(owned_value_path!("host"))),
+        Some(&owned_value_path!("host")),
         default_namespace,
     )
     .unwrap()
@@ -137,7 +136,7 @@ fn test_process_metric_unsupported_type_returns_none() {
         sourcetype,
         source,
         index,
-        Some(&OwnedTargetPath::event(owned_value_path!("host_key"))),
+        Some(&owned_value_path!("host_key")),
         default_namespace
     )
     .is_none());

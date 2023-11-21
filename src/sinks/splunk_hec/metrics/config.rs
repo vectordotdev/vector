@@ -3,7 +3,7 @@ use std::sync::Arc;
 use futures_util::FutureExt;
 use tower::ServiceBuilder;
 use vector_lib::configurable::configurable_component;
-use vector_lib::lookup::lookup_v2::OptionalTargetPath;
+use vector_lib::lookup::lookup_v2::OptionalValuePath;
 use vector_lib::sensitive_string::SensitiveString;
 use vector_lib::sink::VectorSink;
 
@@ -73,7 +73,7 @@ pub struct HecMetricsSinkConfig {
     /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
     #[configurable(metadata(docs::advanced))]
     #[serde(default = "config_host_key")]
-    pub host_key: OptionalTargetPath,
+    pub host_key: OptionalValuePath,
 
     /// The name of the index where to send the events to.
     ///
