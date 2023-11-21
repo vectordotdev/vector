@@ -91,7 +91,7 @@ registered_event!(
 
     fn emit(&self,error:PulsarErrorEventData) {
         match error.error_type{
-            PulsarErrorEventType::ReadError=>{
+            PulsarErrorEventType::ReadError => {
                 error!(
                     message = "Failed to read message.",
                     error = error.msg,
@@ -103,7 +103,7 @@ registered_event!(
 
                 self.read_errors.increment(1_u64);
             }
-            PulsarErrorEventType::AckError=>{
+            PulsarErrorEventType::AckError => {
                 error!(
                     message = "Failed to acknowledge message.",
                     error = error.msg,
@@ -115,7 +115,7 @@ registered_event!(
 
                 self.ack_errors.increment(1_u64);
             }
-            PulsarErrorEventType::NAckError=>{
+            PulsarErrorEventType::NAckError => {
                 error!(
                     message = "Failed to negatively acknowledge message.",
                     error = error.msg,
