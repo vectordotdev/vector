@@ -66,7 +66,8 @@ base: components: sinks: datadog_metrics: configuration: {
 			If an event has a Datadog [API key][api_key] set explicitly in its metadata, it takes
 			precedence over this setting.
 
-			If not set here, the value is taken from the [global options][global_options].
+			This value can also be set by specifying the `DD_API_KEY` environment variable.
+			The value specified here takes precedence over the environment variable.
 
 			[api_key]: https://docs.datadoghq.com/api/?lang=bash#authentication
 			[global_options]: /docs/reference/configuration/global-options/#datadog
@@ -287,10 +288,13 @@ base: components: sinks: datadog_metrics: configuration: {
 		description: """
 			The Datadog [site][dd_site] to send observability data to.
 
-			If not set here, the value is taken from the [global options][global_options].
+			This value can also be set by specifying the `DD_SITE` environment variable.
+			The value specified here takes precedence over the environment variable.
+
+			If not specified by the environment variable, a default value of
+			`datadoghq.com` is taken.
 
 			[dd_site]: https://docs.datadoghq.com/getting_started/site
-			[global_options]: /docs/reference/configuration/global-options/#datadog
 			"""
 		required: false
 		type: string: examples: ["us3.datadoghq.com", "datadoghq.eu"]
