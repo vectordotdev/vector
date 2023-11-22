@@ -187,7 +187,7 @@ opendal = {version = "0.42", default-features = false, features = ["native-tls",
 
 # Tower
 tower = { version = "0.4.13", default-features = false, features = ["buffer", "limit", "retry", "timeout", "util", "balance", "discover"] }
-tower-http = { version = "0.4.4", default-features = false, features = ["decompression-gzip", "trace"]}
+tower-http = { version = "0.5.0", default-features = false, features = ["decompression-gzip", "trace"]}
 # Serde
 serde = { version = "1.0.193", default-features = false, features = ["derive"] }
 serde-toml-merge = { version = "0.3.3", default-features = false }
