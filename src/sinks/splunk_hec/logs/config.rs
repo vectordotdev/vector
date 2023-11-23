@@ -4,12 +4,12 @@ use futures_util::FutureExt;
 use tower::ServiceBuilder;
 use vector_lib::codecs::TextSerializerConfig;
 use vector_lib::configurable::configurable_component;
-use vector_lib::lookup::lookup_v2::{ConfigValuePath, OptionalValuePath};
+use vector_lib::lookup::lookup_v2::{ConfigValuePath, OptionalTargetPath};
 use vector_lib::sensitive_string::SensitiveString;
 use vector_lib::sink::VectorSink;
 
 use super::{encoder::HecLogsEncoder, request_builder::HecLogsRequestBuilder, sink::HecLogsSink};
-use crate::sinks::splunk_hec::common::config_timestamp_key;
+use crate::sinks::splunk_hec::common::config_timestamp_key_target_path;
 use crate::{
     codecs::{Encoder, EncodingConfig},
     config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
@@ -17,7 +17,8 @@ use crate::{
     sinks::{
         splunk_hec::common::{
             acknowledgements::HecClientAcknowledgementsConfig,
-            build_healthcheck, build_http_batch_service, config_host_key, create_client,
+            build_healthcheck, build_http_batch_service, config_host_key_target_path,
+            create_client,
             service::{HecService, HttpRequestBuilder},
             EndpointTarget, SplunkHecDefaultBatchSettings,
         },
@@ -64,8 +65,8 @@ pub struct HecLogsSinkConfig {
     ///
     /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
     #[configurable(metadata(docs::advanced))]
-    #[serde(default = "config_host_key")]
-    pub host_key: OptionalValuePath,
+    #[serde(default = "config_host_key_target_path")]
+    pub host_key: OptionalTargetPath,
 
     /// Fields to be [added to Splunk index][splunk_field_index_docs].
     ///
@@ -135,9 +136,9 @@ pub struct HecLogsSinkConfig {
     ///
     /// [global_timestamp_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.timestamp_key
     #[configurable(metadata(docs::advanced))]
-    #[serde(default = "crate::sinks::splunk_hec::common::config_timestamp_key")]
+    #[serde(default = "crate::sinks::splunk_hec::common::config_timestamp_key_target_path")]
     #[configurable(metadata(docs::examples = "timestamp", docs::examples = ""))]
-    pub timestamp_key: OptionalValuePath,
+    pub timestamp_key: OptionalTargetPath,
 
     /// Passes the `auto_extract_timestamp` option to Splunk.
     ///
@@ -165,7 +166,7 @@ impl GenerateConfig for HecLogsSinkConfig {
         toml::Value::try_from(Self {
             default_token: "${VECTOR_SPLUNK_HEC_TOKEN}".to_owned().into(),
             endpoint: "endpoint".to_owned(),
-            host_key: config_host_key(),
+            host_key: config_host_key_target_path(),
             indexed_fields: vec![],
             index: None,
             sourcetype: None,
@@ -177,7 +178,7 @@ impl GenerateConfig for HecLogsSinkConfig {
             tls: None,
             acknowledgements: Default::default(),
             timestamp_nanos_key: None,
-            timestamp_key: config_timestamp_key(),
+            timestamp_key: config_timestamp_key_target_path(),
             auto_extract_timestamp: None,
             endpoint_target: EndpointTarget::Event,
         })
