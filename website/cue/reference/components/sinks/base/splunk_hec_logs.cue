@@ -424,7 +424,7 @@ base: components: sinks: splunk_hec_logs: configuration: {
 			[global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
 			"""
 		required: false
-		type: string: default: "host"
+		type: string: default: ".host"
 	}
 	index: {
 		description: """
@@ -673,7 +673,7 @@ base: components: sinks: splunk_hec_logs: configuration: {
 			"""
 		required: false
 		type: string: {
-			default: "timestamp"
+			default: ".timestamp"
 			examples: ["timestamp", ""]
 		}
 	}
