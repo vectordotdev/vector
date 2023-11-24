@@ -158,23 +158,23 @@ metrics-tracing-context = { version = "0.14.0", default-features = false }
 
 # AWS - Official SDK
 # depending on a fork to circumvent https://github.com/awslabs/aws-sdk-rust/issues/749
-aws-sdk-s3 = { version = "0.39", default-features = false, optional = true }
-aws-sdk-sqs = { version = "0.39", default-features = false, optional = true }
-aws-sdk-sns = { version = "0.39", default-features = false, optional = true }
-aws-sdk-cloudwatch = { version = "0.39", default-features = false, optional = true }
-aws-sdk-cloudwatchlogs = { version = "0.39", default-features = false, optional = true }
-aws-sdk-elasticsearch = { version = "0.39", default-features = false, optional = true }
-aws-sdk-firehose = { version = "0.39", default-features = false, optional = true }
-aws-sdk-kinesis = { version = "0.39", default-features = false, optional = true }
+aws-sdk-s3 = { version = "0.39", default-features = false, features = ["behavior-version-latest"], optional = true }
+aws-sdk-sqs = { version = "0.39", default-features = false, features = ["behavior-version-latest"], optional = true }
+aws-sdk-sns = { version = "0.39", default-features = false, features = ["behavior-version-latest"], optional = true }
+aws-sdk-cloudwatch = { version = "0.39", default-features = false, features = ["behavior-version-latest"], optional = true }
+aws-sdk-cloudwatchlogs = { version = "0.39", default-features = false, features = ["behavior-version-latest"], optional = true }
+aws-sdk-elasticsearch = { version = "0.39", default-features = false, features = ["behavior-version-latest"], optional = true }
+aws-sdk-firehose = { version = "0.39", default-features = false, features = ["behavior-version-latest"], optional = true }
+aws-sdk-kinesis = { version = "0.39", default-features = false, features = ["behavior-version-latest"], optional = true }
 aws-types = { version = "1.0.0", default-features = false, optional = true }
 aws-sigv4 = { version = "1.0.0", default-features = false, features = ["sign-http"], optional = true }
-aws-config = { version = "1.0.0", default-features = false, optional = true }
+aws-config = { version = "1.0.0", default-features = false, features = ["behavior-version-latest"], optional = true }
 aws-credential-types = { version = "1.0.0", default-features = false, features = ["hardcoded-credentials"], optional = true }
 aws-smithy-http = { version = "0.60", default-features = false, features = ["event-stream"], optional = true }
 aws-smithy-types = { version = "1.0.1", default-features = false, optional = true }
 aws-smithy-runtime-api = { version = "1.0.1", default-features = false, optional = true }
-aws-smithy-runtime = { version = "1.0.1", default-features = false, features = ["client", "connector-hyper-0-14-x"], optional = true }
-aws-smithy-async = { version = "1.0.1", default-features = false, optional = true }
+aws-smithy-runtime = { version = "1.0.1", default-features = false, features = ["client", "connector-hyper-0-14-x", "tls-rustls", "rt-tokio"], optional = true }
+aws-smithy-async = { version = "1.0.1", default-features = false, features = ["rt-tokio"], optional = true }
 
 # Azure
 azure_core = { version = "0.17", default-features = false, features = ["enable_reqwest"], optional = true }

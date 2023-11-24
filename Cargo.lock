@@ -1160,9 +1160,11 @@ dependencies = [
  "http",
  "http-body",
  "hyper",
+ "hyper-rustls",
  "once_cell",
  "pin-project-lite",
  "pin-utils",
+ "rustls",
  "tokio",
  "tracing 0.1.40",
 ]
