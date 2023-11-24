@@ -1,10 +1,8 @@
 #![cfg(feature = "aws-kinesis-streams-integration-tests")]
 #![cfg(test)]
 
-use aws_sdk_kinesis::{
-    model::{Record, ShardIteratorType},
-    types::DateTime,
-};
+use aws_sdk_kinesis::types::{Record, ShardIteratorType};
+use aws_smithy_types::DateTime;
 use tokio::time::{sleep, Duration};
 use vector_lib::codecs::TextSerializerConfig;
 
@@ -123,7 +121,7 @@ async fn kinesis_put_records_without_partition_key() {
 
     let mut output_lines = records
         .into_iter()
-        .map(|e| String::from_utf8(e.data.unwrap().into_inner()).unwrap())
+        .map(|e| String::from_utf8(e.data.into_inner()).unwrap())
         .collect::<Vec<_>>();
 
     input_lines.sort();
@@ -144,7 +142,6 @@ async fn fetch_records(stream_name: String, timestamp: i64) -> crate::Result<Vec
         .stream_description
         .unwrap()
         .shards
-        .unwrap()
         .into_iter()
         .next()
         .expect("No shards");
@@ -152,7 +149,7 @@ async fn fetch_records(stream_name: String, timestamp: i64) -> crate::Result<Vec
     let resp = client
         .get_shard_iterator()
         .stream_name(stream_name)
-        .shard_id(shard.shard_id.unwrap())
+        .shard_id(shard.shard_id)
         .shard_iterator_type(ShardIteratorType::AtTimestamp)
         .timestamp(DateTime::from_millis(timestamp))
         .send()
@@ -165,7 +162,7 @@ async fn fetch_records(stream_name: String, timestamp: i64) -> crate::Result<Vec
         .set_limit(None)
         .send()
         .await?;
-    Ok(resp.records.unwrap_or_default())
+    Ok(resp.records)
 }
 
 async fn client() -> aws_sdk_kinesis::Client {

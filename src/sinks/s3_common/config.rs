@@ -5,9 +5,11 @@ use aws_sdk_s3::{
     types::{ObjectCannedAcl, ServerSideEncryption, StorageClass},
     Client as S3Client,
 };
-use aws_smithy_runtime_api::client::{orchestrator::HttpResponse, result::SdkError};
+use aws_smithy_runtime_api::{
+    client::{orchestrator::HttpResponse, result::SdkError},
+    StatusCode,
+};
 use futures::FutureExt;
-use http::StatusCode;
 use snafu::Snafu;
 use vector_lib::configurable::configurable_component;
 
@@ -335,9 +337,9 @@ pub fn build_healthcheck(bucket: String, client: S3Client) -> crate::Result<Heal
         match req {
             Ok(_) => Ok(()),
             Err(error) => Err(match error {
-                SdkError::ServiceError(inner) => match inner.into_raw().http().status() {
-                    StatusCode::FORBIDDEN => HealthcheckError::InvalidCredentials.into(),
-                    StatusCode::NOT_FOUND => HealthcheckError::UnknownBucket { bucket }.into(),
+                SdkError::ServiceError(inner) => match inner.into_raw().status().as_u16() {
+                    403 /* StatusCode::FORBIDDEN */ => HealthcheckError::InvalidCredentials.into(),
+                    404 /* StatusCode::NOT_FOUND */ => HealthcheckError::UnknownBucket { bucket }.into(),
                     status => HealthcheckError::UnknownStatus { status }.into(),
                 },
                 error => error.into(),

@@ -9116,7 +9116,7 @@ dependencies = [
  "hyper-timeout",
  "percent-encoding",
  "pin-project",
- "prost 0.12.1",
+ "prost 0.12.3",
  "rustls",
  "rustls-native-certs",
  "rustls-pemfile",

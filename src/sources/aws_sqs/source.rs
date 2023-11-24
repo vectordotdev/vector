@@ -1,7 +1,7 @@
 use std::{collections::HashMap, panic, str::FromStr, sync::Arc};
 
 use aws_sdk_sqs::{
-    model::{DeleteMessageBatchRequestEntry, MessageSystemAttributeName, QueueAttributeName},
+    types::{DeleteMessageBatchRequestEntry, MessageSystemAttributeName, QueueAttributeName},
     Client as SqsClient,
 };
 use chrono::{DateTime, TimeZone, Utc};
@@ -208,7 +208,9 @@ async fn delete_messages(client: SqsClient, receipts: Vec<String>, queue_url: St
                 DeleteMessageBatchRequestEntry::builder()
                     .id(id.to_string())
                     .receipt_handle(receipt)
-                    .build(),
+                    .build()
+                    // TODO don't unwrap
+                    .unwrap(),
             );
         }
         if let Err(err) = batch.send().await {

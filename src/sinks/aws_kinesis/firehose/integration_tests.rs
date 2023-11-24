@@ -2,7 +2,7 @@
 #![cfg(test)]
 
 use aws_sdk_elasticsearch::Client as EsClient;
-use aws_sdk_firehose::model::ElasticsearchDestinationConfiguration;
+use aws_sdk_firehose::types::ElasticsearchDestinationConfiguration;
 use futures::TryFutureExt;
 use serde_json::{json, Value};
 use tokio::time::{sleep, Duration};
@@ -171,11 +171,7 @@ async fn ensure_elasticsearch_domain(domain_name: String) -> String {
         .send()
         .await
     {
-        Ok(res) => res
-            .domain_status
-            .expect("no domain status")
-            .arn
-            .expect("arn expected"),
+        Ok(res) => res.domain_status.expect("no domain status").arn,
         Err(error) => panic!("Unable to create the Elasticsearch domain {:?}", error),
     };
 

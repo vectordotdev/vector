@@ -305,7 +305,11 @@ async fn s3_object_decoder(
 
     let r = tokio::io::BufReader::new(StreamReader::new(
         stream::iter(Some(first))
-            .chain(body)
+            .chain(Box::pin(async_stream::stream! {
+                while let Some(next) = body.next().await {
+                    yield next;
+                }
+            }))
             .map_err(|e| std::io::Error::new(ErrorKind::Other, e)),
     ));
 
@@ -442,14 +446,14 @@ mod integration_tests {
         time::Duration,
     };
 
-    use aws_sdk_s3::{types::ByteStream, Client as S3Client};
+    use aws_sdk_s3::Client as S3Client;
     use aws_sdk_sqs::{types::QueueAttributeName, Client as SqsClient};
     use similar_asserts::assert_eq;
     use vector_lib::codecs::{decoding::DeserializerConfig, JsonDeserializerConfig};
     use vector_lib::lookup::path;
     use vrl::value::Value;
 
-    use super::{sqs, AwsS3Config, Compression, Strategy};
+    use super::*;
     use crate::{
         aws::{create_client, AwsAuthentication, RegionOrEndpoint},
         common::sqs::SqsClientBuilder,

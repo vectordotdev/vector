@@ -1,6 +1,6 @@
 use std::{fs::File, io::Read};
 
-use aws_smithy_http::body::SdkBody;
+use aws_smithy_types::body::SdkBody;
 use bytes::Bytes;
 use chrono::Utc;
 use futures::StreamExt;

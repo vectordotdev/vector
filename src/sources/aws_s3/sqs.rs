@@ -383,20 +383,16 @@ impl IngestorProcess {
                 Ok(result) => {
                     // Batch deletes can have partial successes/failures, so we have to check
                     // for both cases and emit accordingly.
-                    if let Some(successful_entries) = &result.successful {
-                        if !successful_entries.is_empty() {
-                            emit!(SqsMessageDeleteSucceeded {
-                                message_ids: result.successful.unwrap_or_default(),
-                            });
-                        }
+                    if !result.successful.is_empty() {
+                        emit!(SqsMessageDeleteSucceeded {
+                            message_ids: result.successful,
+                        });
                     }
 
-                    if let Some(failed_entries) = &result.failed {
-                        if !failed_entries.is_empty() {
-                            emit!(SqsMessageDeletePartialError {
-                                entries: result.failed.unwrap_or_default()
-                            });
-                        }
+                    if !result.failed.is_empty() {
+                        emit!(SqsMessageDeletePartialError {
+                            entries: result.failed
+                        });
                     }
                 }
                 Err(err) => {
