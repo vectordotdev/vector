@@ -315,7 +315,7 @@ toml = { version = "0.8.8", default-features = false, features = ["parse", "disp
 tonic = { version = "0.10", optional = true, default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "gzip"] }
 hickory-proto = { version = "0.24.0", default-features = false, features = ["dnssec"], optional = true }
 typetag = { version = "0.2.13", default-features = false }
-url = { version = "2.4.1", default-features = false, features = ["serde"] }
+url = { version = "2.5.0", default-features = false, features = ["serde"] }
 uuid = { version = "1", default-features = false, features = ["serde", "v4"] }
 warp = { version = "0.3.6", default-features = false }
 zstd = { version = "0.13.0", default-features = false }
