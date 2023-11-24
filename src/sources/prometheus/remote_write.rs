@@ -13,6 +13,7 @@ use crate::{
         GenerateConfig, SourceAcknowledgementsConfig, SourceConfig, SourceContext, SourceOutput,
     },
     event::Event,
+    http::KeepaliveConfig,
     internal_events::PrometheusRemoteWriteParseError,
     serde::bool_or_struct,
     sources::{
@@ -45,6 +46,10 @@ pub struct PrometheusRemoteWriteConfig {
     #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
+
+    #[configurable(derived)]
+    #[serde(default)]
+    keepalive: KeepaliveConfig,
 }
 
 impl PrometheusRemoteWriteConfig {
@@ -55,6 +60,7 @@ impl PrometheusRemoteWriteConfig {
             tls: None,
             auth: None,
             acknowledgements: false.into(),
+            keepalive: KeepaliveConfig::default(),
         }
     }
 }
@@ -66,6 +72,7 @@ impl GenerateConfig for PrometheusRemoteWriteConfig {
             tls: None,
             auth: None,
             acknowledgements: SourceAcknowledgementsConfig::default(),
+            keepalive: KeepaliveConfig::default(),
         })
         .unwrap()
     }
@@ -86,6 +93,7 @@ impl SourceConfig for PrometheusRemoteWriteConfig {
             &self.auth,
             cx,
             self.acknowledgements,
+            self.keepalive.clone(),
         )
     }
 
@@ -122,22 +130,18 @@ impl RemoteWriteSource {
 }
 
 impl HttpSource for RemoteWriteSource {
+    fn decode(&self, encoding_header: Option<&str>, body: Bytes) -> Result<Bytes, ErrorMessage> {
+        // Default to snappy decoding the request body.
+        decode(encoding_header.or(Some("snappy")), body)
+    }
+
     fn build_events(
         &self,
-        mut body: Bytes,
-        header_map: &HeaderMap,
+        body: Bytes,
+        _header_map: &HeaderMap,
         _query_parameters: &HashMap<String, String>,
         _full_path: &str,
     ) -> Result<Vec<Event>, ErrorMessage> {
-        // If `Content-Encoding` header isn't `snappy` HttpSource won't decode it for us
-        // se we need to.
-        if header_map
-            .get("Content-Encoding")
-            .map(|header| header.as_ref())
-            != Some(&b"snappy"[..])
-        {
-            body = decode(&Some("snappy".to_string()), body)?;
-        }
         let events = self.decode_body(body)?;
         Ok(events)
     }
@@ -187,6 +191,7 @@ mod test {
             auth: None,
             tls: tls.clone(),
             acknowledgements: SourceAcknowledgementsConfig::default(),
+            keepalive: KeepaliveConfig::default(),
         };
         let source = source
             .build(SourceContext::new_test(tx, None))
@@ -279,6 +284,7 @@ mod test {
             auth: None,
             tls: None,
             acknowledgements: SourceAcknowledgementsConfig::default(),
+            keepalive: KeepaliveConfig::default(),
         };
         let source = source
             .build(SourceContext::new_test(tx, None))
@@ -368,6 +374,7 @@ mod integration_tests {
             auth: None,
             tls: None,
             acknowledgements: SourceAcknowledgementsConfig::default(),
+            keepalive: KeepaliveConfig::default(),
         };
 
         let events = run_and_assert_source_compliance(

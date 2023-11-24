@@ -4,7 +4,7 @@ use std::{borrow::Cow, convert::TryFrom, fmt, hash::Hash, path::PathBuf};
 use bytes::Bytes;
 use chrono::{
     format::{strftime::StrftimeItems, Item},
-    Utc,
+    FixedOffset, Utc,
 };
 use once_cell::sync::Lazy;
 use regex::Regex;
@@ -63,6 +63,9 @@ pub struct Template {
 
     #[serde(skip)]
     reserve_size: usize,
+
+    #[serde(skip)]
+    tz_offset: Option<FixedOffset>,
 }
 
 impl TryFrom<&str> for Template {
@@ -116,6 +119,7 @@ impl TryFrom<Cow<'_, str>> for Template {
                 src: src.into_owned(),
                 is_static,
                 reserve_size,
+                tz_offset: None,
             }
         })
     }
@@ -137,6 +141,11 @@ impl fmt::Display for Template {
 impl ConfigurableString for Template {}
 
 impl Template {
+    /// set tz offset
+    pub const fn with_tz_offset(mut self, tz_offset: Option<FixedOffset>) -> Self {
+        self.tz_offset = tz_offset;
+        self
+    }
     /// Renders the given template with data from the event.
     pub fn render<'a>(
         &self,
@@ -163,7 +172,9 @@ impl Template {
         for part in &self.parts {
             match part {
                 Part::Literal(lit) => out.push_str(lit),
-                Part::Strftime(items) => out.push_str(&render_timestamp(items, event)),
+                Part::Strftime(items) => {
+                    out.push_str(&render_timestamp(items, event, self.tz_offset))
+                }
                 Part::Reference(key) => {
                     out.push_str(
                         &match event {
@@ -344,8 +355,12 @@ fn render_metric_field<'a>(key: &str, metric: &'a Metric) -> Option<&'a str> {
     }
 }
 
-fn render_timestamp(items: &ParsedStrftime, event: EventRef<'_>) -> String {
-    match event {
+fn render_timestamp(
+    items: &ParsedStrftime,
+    event: EventRef<'_>,
+    tz_offset: Option<FixedOffset>,
+) -> String {
+    let timestamp = match event {
         EventRef::Log(log) => log_schema()
             .timestamp_key_target_path()
             .and_then(|timestamp_key| {
@@ -365,14 +380,24 @@ fn render_timestamp(items: &ParsedStrftime, event: EventRef<'_>) -> String {
                 })
         }
     }
-    .unwrap_or_else(Utc::now)
-    .format_with_items(items.as_items())
-    .to_string()
+    .unwrap_or_else(Utc::now);
+
+    match tz_offset {
+        Some(offset) => timestamp
+            .with_timezone(&offset)
+            .format_with_items(items.as_items())
+            .to_string(),
+        None => timestamp
+            .with_timezone(&chrono::Utc)
+            .format_with_items(items.as_items())
+            .to_string(),
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use chrono::TimeZone;
+    use chrono::{Offset, TimeZone, Utc};
+    use chrono_tz::Tz;
     use vector_lib::lookup::{metadata_path, PathPrefix};
     use vector_lib::metric_tags;
 
@@ -651,6 +676,25 @@ mod tests {
                 missing_keys: vec!["namespace".into()]
             }),
             template.render(&metric)
+        );
+    }
+
+    #[test]
+    fn render_log_with_timezone() {
+        let ts = Utc.with_ymd_and_hms(2001, 2, 3, 4, 5, 6).unwrap();
+
+        let template = Template::try_from("vector-%Y-%m-%d-%H.log").unwrap();
+        let mut event = Event::Log(LogEvent::from("hello world"));
+        event.as_mut_log().insert(
+            (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
+            ts,
+        );
+
+        let tz: Tz = "Asia/Singapore".parse().unwrap();
+        let offset = Some(Utc::now().with_timezone(&tz).offset().fix());
+        assert_eq!(
+            Ok(Bytes::from("vector-2001-02-03-12.log")),
+            template.with_tz_offset(offset).render(&event)
         );
     }
 

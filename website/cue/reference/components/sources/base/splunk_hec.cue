@@ -72,6 +72,37 @@ base: components: sources: splunk_hec: configuration: {
 		required: false
 		type: string: default: "0.0.0.0:8088"
 	}
+	keepalive: {
+		description: "Configuration of HTTP server keepalive parameters."
+		required:    false
+		type: object: options: {
+			max_connection_age_jitter_factor: {
+				description: """
+					The factor by which to jitter the `max_connection_age_secs` value.
+
+					A value of 0.1 means that the actual duration will be between 90% and 110% of the
+					specified maximum duration.
+					"""
+				required: false
+				type: float: default: 0.1
+			}
+			max_connection_age_secs: {
+				description: """
+					The maximum amount of time a connection may exist before it is closed
+					by sending a `Connection: close` header on the HTTP response.
+
+					A random jitter configured by `max_connection_age_jitter_factor` is added
+					to the specified duration to spread out connection storms.
+					"""
+				required: false
+				type: uint: {
+					default: 300
+					examples: [600]
+					unit: "seconds"
+				}
+			}
+		}
+	}
 	store_hec_token: {
 		description: """
 			Whether or not to forward the Splunk HEC authentication token with events.

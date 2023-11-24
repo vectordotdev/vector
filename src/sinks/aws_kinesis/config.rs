@@ -101,7 +101,7 @@ where
     E: Send + 'static,
     RT: RetryLogic<Response = KinesisResponse> + Default,
 {
-    let request_limits = config.request.unwrap_with(&TowerRequestConfig::default());
+    let request_limits = config.request.into_settings();
 
     let region = config.region.region();
     let service = ServiceBuilder::new()

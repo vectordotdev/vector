@@ -95,7 +95,7 @@ impl SinkConfig for ClickhouseConfig {
             self.date_time_best_effort,
         );
 
-        let request_limits = self.request.unwrap_with(&Default::default());
+        let request_limits = self.request.into_settings();
         let service = ServiceBuilder::new()
             .settings(request_limits, ClickhouseRetryLogic::default())
             .service(service);

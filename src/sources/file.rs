@@ -33,8 +33,8 @@ use crate::{
     encoding_transcode::{Decoder, Encoder},
     event::{BatchNotifier, BatchStatus, LogEvent},
     internal_events::{
-        FileBytesReceived, FileEventsReceived, FileOpen, FileSourceInternalEventsEmitter,
-        StreamClosedError,
+        FileBytesReceived, FileEventsReceived, FileInternalMetricsConfig, FileOpen,
+        FileSourceInternalEventsEmitter, StreamClosedError,
     },
     line_agg::{self, LineAgg},
     serde::bool_or_struct,
@@ -246,6 +246,10 @@ pub struct FileConfig {
     #[configurable(metadata(docs::hidden))]
     #[serde(default)]
     log_namespace: Option<bool>,
+
+    #[configurable(derived)]
+    #[serde(default)]
+    internal_metrics: FileInternalMetricsConfig,
 }
 
 fn default_max_line_bytes() -> usize {
@@ -397,6 +401,7 @@ impl Default for FileConfig {
             encoding: None,
             acknowledgements: Default::default(),
             log_namespace: None,
+            internal_metrics: Default::default(),
         }
     }
 }
@@ -508,11 +513,15 @@ pub fn file_source(
         Some(config.read_from),
     );
 
+    let emitter = FileSourceInternalEventsEmitter {
+        include_file_metric_tag: config.internal_metrics.include_file_tag,
+    };
+
     let paths_provider = Glob::new(
         &config.include,
         &config.exclude,
         MatchOptions::default(),
-        FileSourceInternalEventsEmitter,
+        emitter.clone(),
     )
     .expect("invalid glob patterns");
 
@@ -543,7 +552,7 @@ pub fn file_source(
         },
         oldest_first: config.oldest_first,
         remove_after: config.remove_after_secs.map(Duration::from_secs),
-        emitter: FileSourceInternalEventsEmitter,
+        emitter,
         handle: tokio::runtime::Handle::current(),
     };
 
@@ -588,6 +597,7 @@ pub fn file_source(
     };
 
     let checkpoints = checkpointer.view();
+    let include_file_metric_tag = config.internal_metrics.include_file_tag;
     Box::pin(async move {
         info!(message = "Starting file server.", include = ?include, exclude = ?exclude);
 
@@ -602,6 +612,7 @@ pub fn file_source(
                 emit!(FileBytesReceived {
                     byte_size: line.text.len(),
                     file: &line.filename,
+                    include_file_metric_tag,
                 });
                 // transcode each line from the file's encoding charset to utf8
                 line.text = match encoding_decoder.as_mut() {
@@ -639,6 +650,7 @@ pub fn file_source(
                 &line.filename,
                 &event_metadata,
                 log_namespace,
+                include_file_metric_tag,
             );
 
             if let Some(finalizer) = &finalizer {
@@ -749,6 +761,7 @@ fn create_event(
     file: &str,
     meta: &EventMetadata,
     log_namespace: LogNamespace,
+    include_file_metric_tag: bool,
 ) -> LogEvent {
     let deserializer = BytesDeserializer;
     let mut event = deserializer.parse_single(line, log_namespace);
@@ -800,6 +813,7 @@ fn create_event(
         count: 1,
         file,
         byte_size: event.estimated_json_encoded_size_of(),
+        include_file_metric_tag,
     });
 
     event
@@ -845,6 +859,9 @@ mod tests {
             },
             data_dir: Some(dir.path().to_path_buf()),
             glob_minimum_cooldown_ms: Duration::from_millis(100),
+            internal_metrics: FileInternalMetricsConfig {
+                include_file_tag: true,
+            },
             ..Default::default()
         }
     }
@@ -1035,7 +1052,7 @@ mod tests {
             file_key: Some(owned_value_path!("file")),
             offset_key: Some(owned_value_path!("offset")),
         };
-        let log = create_event(line, offset, file, &meta, LogNamespace::Legacy);
+        let log = create_event(line, offset, file, &meta, LogNamespace::Legacy, false);
 
         assert_eq!(log["file"], "some_file.rs".into());
         assert_eq!(log["host"], "Some.Machine".into());
@@ -1057,7 +1074,7 @@ mod tests {
             file_key: Some(owned_value_path!("file_path")),
             offset_key: Some(owned_value_path!("off")),
         };
-        let log = create_event(line, offset, file, &meta, LogNamespace::Legacy);
+        let log = create_event(line, offset, file, &meta, LogNamespace::Legacy, false);
 
         assert_eq!(log["file_path"], "some_file.rs".into());
         assert_eq!(log["hostname"], "Some.Machine".into());
@@ -1079,7 +1096,7 @@ mod tests {
             file_key: Some(owned_value_path!("ignored")),
             offset_key: Some(owned_value_path!("ignored")),
         };
-        let log = create_event(line, offset, file, &meta, LogNamespace::Vector);
+        let log = create_event(line, offset, file, &meta, LogNamespace::Vector, false);
 
         assert_eq!(log.value(), &value!("hello world"));
 

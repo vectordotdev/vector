@@ -5,7 +5,7 @@ use stream_cancel::Trigger;
 use tokio::sync::oneshot::Sender;
 use vector_lib::event::EventArray;
 
-use crate::SourceSender;
+use crate::{source_sender::SourceSenderItem, SourceSender};
 
 use self::{
     sinks::{
@@ -74,7 +74,7 @@ pub const fn backpressure_sink(num_to_consume: usize) -> BackpressureSinkConfig 
     BackpressureSinkConfig { num_to_consume }
 }
 
-pub fn basic_sink(channel_size: usize) -> (impl Stream<Item = EventArray>, BasicSinkConfig) {
+pub fn basic_sink(channel_size: usize) -> (impl Stream<Item = SourceSenderItem>, BasicSinkConfig) {
     let (tx, rx) = SourceSender::new_test_sender_with_buffer(channel_size);
     let sink = BasicSinkConfig::new(tx, true);
     (rx.into_stream(), sink)
@@ -83,7 +83,7 @@ pub fn basic_sink(channel_size: usize) -> (impl Stream<Item = EventArray>, Basic
 pub fn basic_sink_with_data(
     channel_size: usize,
     data: &str,
-) -> (impl Stream<Item = EventArray>, BasicSinkConfig) {
+) -> (impl Stream<Item = SourceSenderItem>, BasicSinkConfig) {
     let (tx, rx) = SourceSender::new_test_sender_with_buffer(channel_size);
     let sink = BasicSinkConfig::new_with_data(tx, true, data);
     (rx.into_stream(), sink)
@@ -91,7 +91,7 @@ pub fn basic_sink_with_data(
 
 pub fn basic_sink_failing_healthcheck(
     channel_size: usize,
-) -> (impl Stream<Item = EventArray>, BasicSinkConfig) {
+) -> (impl Stream<Item = SourceSenderItem>, BasicSinkConfig) {
     let (tx, rx) = SourceSender::new_test_sender_with_buffer(channel_size);
     let sink = BasicSinkConfig::new(tx, false);
     (rx.into_stream(), sink)

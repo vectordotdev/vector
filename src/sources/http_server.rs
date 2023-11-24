@@ -28,6 +28,7 @@ use crate::{
         SourceOutput,
     },
     event::{Event, Value},
+    http::KeepaliveConfig,
     register_validatable_component,
     serde::{bool_or_struct, default_decoding},
     sources::util::{
@@ -154,6 +155,10 @@ pub struct SimpleHttpConfig {
     #[configurable(metadata(docs::hidden))]
     #[serde(default)]
     log_namespace: Option<bool>,
+
+    #[configurable(derived)]
+    #[serde(default)]
+    keepalive: KeepaliveConfig,
 }
 
 impl SimpleHttpConfig {
@@ -256,6 +261,7 @@ impl Default for SimpleHttpConfig {
             decoding: Some(default_decoding()),
             acknowledgements: SourceAcknowledgementsConfig::default(),
             log_namespace: None,
+            keepalive: KeepaliveConfig::default(),
         }
     }
 }
@@ -347,6 +353,7 @@ impl SourceConfig for SimpleHttpConfig {
             &self.auth,
             cx,
             self.acknowledgements,
+            self.keepalive.clone(),
         )
     }
 
@@ -557,6 +564,7 @@ mod tests {
                 decoding,
                 acknowledgements: acknowledgements.into(),
                 log_namespace: None,
+                keepalive: Default::default(),
             }
             .build(context)
             .await
