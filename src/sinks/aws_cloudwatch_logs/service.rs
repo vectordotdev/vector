@@ -4,7 +4,6 @@ use std::{
     task::{ready, Context, Poll},
 };
 
-use aws_sdk_cloudwatch::Client;
 use aws_sdk_cloudwatchlogs::{
     operation::{
         create_log_group::CreateLogGroupError, create_log_stream::CreateLogStreamError,
@@ -54,7 +53,7 @@ type Svc = Buffer<
 >;
 
 // TODO Is this right?
-pub type SmithyClient = std::sync::Arc<Client>;
+// pub type SmithyClient = std::sync::Arc<Client>;
 
 #[derive(Debug)]
 pub enum CloudwatchError {

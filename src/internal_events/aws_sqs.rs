@@ -49,7 +49,7 @@ mod s3 {
         fn emit(self) {
             trace!(message = "Deleted SQS message(s).",
             message_ids = %self.message_ids.iter()
-                .map(|x| x.id)
+                .map(|x| x.id.as_str())
                 .collect::<Vec<_>>()
                 .join(", "));
             counter!(
@@ -97,7 +97,7 @@ mod s3 {
             error!(
                 message = "Deletion of SQS message(s) failed.",
                 message_ids = %self.entries.iter()
-                    .map(|x| x.id)
+                    .map(|x| x.id.as_str())
                     .collect::<Vec<_>>()
                     .join(", "),
                 error = %self.error,

@@ -262,7 +262,7 @@ impl Client {
                 .log_group_name(group_name)
                 .log_stream_name(stream_name)
                 .customize()
-                .mutate_request(|mut req| {
+                .mutate_request(move |req| {
                     for (header, value) in headers.iter() {
                         req.headers_mut().insert(
                             // TODO: We should validate these values are valid before here so we don't risk a panic.

@@ -213,7 +213,8 @@ async fn ensure_elasticsearch_delivery_stream(
                 .domain_arn(elasticsearch_arn)
                 .role_arn("doesn't matter")
                 .type_name("doesn't matter")
-                .build(),
+                .build()
+                .expect("all builder fields populated"),
         )
         .send()
         .await

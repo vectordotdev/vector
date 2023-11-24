@@ -13,10 +13,13 @@ use std::time::SystemTime;
 
 pub use auth::{AwsAuthentication, ImdsAuthentication};
 use aws_config::{meta::region::ProvideRegion, retry::RetryConfig, Region, SdkConfig};
-use aws_credential_types::provider::SharedCredentialsProvider;
+use aws_credential_types::provider::{ProvideCredentials, SharedCredentialsProvider};
 use aws_sdk_s3::{config::Builder, Config};
-use aws_sigv4::http_request::{SignableRequest, SigningParams, SigningSettings};
+use aws_sigv4::http_request::{SignableBody, SignableRequest, SigningParams, SigningSettings};
+use aws_sigv4::sign::v4;
 use aws_smithy_runtime::client::http::hyper_014::HyperClientBuilder;
+use aws_smithy_runtime_api::client::identity::Identity;
+use aws_smithy_runtime_api::client::orchestrator::HttpRequest;
 use aws_smithy_runtime_api::{
     client::{
         interceptors::{Intercept, SharedInterceptor},
@@ -205,22 +208,38 @@ pub async fn sign_request(
     credentials_provider: &SharedCredentialsProvider,
     region: &Option<Region>,
 ) -> crate::Result<()> {
-    let signable_request = SignableRequest::from(&*request);
+    let signable_request = SignableRequest::new(
+        request.method().as_str(),
+        request.uri().to_string(),
+        request.headers().iter().map(|(k, v)| {
+            (
+                k.as_str(),
+                // TODO No unwrap()
+                std::str::from_utf8(v.as_bytes()).expect("only utf8 headers are signable"),
+            )
+        }),
+        SignableBody::Bytes(request.body().as_ref()),
+    )?;
+
     let credentials = credentials_provider.provide_credentials().await?;
-    let mut signing_params_builder = SigningParams::builder()
-        .access_key(credentials.access_key_id())
-        .secret_key(credentials.secret_access_key())
+    let identity = Identity::new(credentials, None);
+    let signing_params_builder = v4::SigningParams::builder()
+        .identity(&identity)
         .region(region.as_ref().map(|r| r.as_ref()).unwrap_or(""))
-        .service_name(service_name)
+        .name(service_name)
         .time(SystemTime::now())
         .settings(SigningSettings::default());
 
-    signing_params_builder.set_security_token(credentials.session_token());
+    // TODO SMW - wut is this?
+    // signing_params_builder.set_security_token(credentials.session_token());
+
+    let signing_params = signing_params_builder
+        .build()
+        .expect("all signing params set");
 
     let (signing_instructions, _signature) =
-        aws_sigv4::http_request::sign(signable_request, &signing_params_builder.build()?)?
-            .into_parts();
-    signing_instructions.apply_to_request(request);
+        aws_sigv4::http_request::sign(signable_request, &signing_params.into())?.into_parts();
+    signing_instructions.apply_to_request_http0x(request);
 
     Ok(())
 }
