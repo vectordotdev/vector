@@ -88,10 +88,13 @@ pub struct SimpleHttpConfig {
 
     /// A list of HTTP headers to include in the log event.
     ///
+    /// Accepts wildcard (`*`) character for headers matching a specified pattern
+    ///
     /// These override any values included in the JSON payload with conflicting names.
     #[serde(default)]
     #[configurable(metadata(docs::examples = "User-Agent"))]
     #[configurable(metadata(docs::examples = "X-My-Custom-Header"))]
+    #[configurable(metadata(docs::examples = "X-*"))]
     headers: Vec<String>,
 
     /// A list of URL query parameters to include in the log event.
@@ -322,23 +325,27 @@ fn remove_duplicates(mut list: Vec<String>, list_name: &str) -> Vec<String> {
     }
     list
 }
-/// Removes glob matches from the list, and logs a `warn!()` for each.
-fn remove_glob_matches(list: &Vec<String>, patterns: &Vec<glob::Pattern>, list_name: &str) -> Vec<String> {
 
-    let mut ret = Vec::new();
+#[derive(Clone)]
+enum HttpConfigParamKind {
+    Glob(glob::Pattern),
+    Exact(String)
+}
 
-    for pattern in patterns.iter() {
-        for name in list.iter() {
-            if pattern.matches(name) {
-                warn!(
-                    "`{}` configuration contains specific entry `{}` that matches wildcard entry `{}`. Removing.",
-                    list_name, name, pattern.as_str()
-                );
-            } else {
-                ret.push(name.clone());
-            }
+fn build_param_matcher(list: &Vec<String>, list_name: &str) -> Vec<HttpConfigParamKind> {
+    let ret: Vec<HttpConfigParamKind> = list.iter().map(|s| {
+        match s.contains('*') {
+            true => HttpConfigParamKind::Glob(glob::Pattern::new(&s)
+                        .unwrap_or_else(|_| {
+                            warn!(
+                                "`{}` configuration contains invalid glob pattern `{}`. ignoring.",
+                                list_name, s
+                            );
+                            glob::Pattern::default()
+                        })),
+            false => HttpConfigParamKind::Exact(s.to_string())
         }
-    }
+    }).collect();
 
     ret
 }
@@ -350,23 +357,8 @@ impl SourceConfig for SimpleHttpConfig {
         let decoder = self.get_decoding_config()?.build()?;
         let log_namespace = cx.log_namespace(self.log_namespace);
 
-        let (glob_headers, mut headers): (Vec<String>, Vec<String>) = self.headers
-            .clone()
-            .into_iter()
-            .partition(|s| s.contains('*'));
-
-        let glob_headers: Vec<glob::Pattern> = remove_duplicates(glob_headers, "headers")
-            .into_iter()
-            .map(|s| glob::Pattern::new(&s).unwrap())
-            .collect();
-
-        if !glob_headers.is_empty() {
-            headers = remove_glob_matches(&headers, &glob_headers, "headers");
-        }
-
         let source = SimpleHttpSource {
-            headers: remove_duplicates(headers, "headers"),
-            glob_headers: glob_headers.clone(),
+            headers: build_param_matcher(&remove_duplicates(self.headers.clone(), "headers"), "headers"),
             query_parameters: remove_duplicates(self.query_parameters.clone(), "query_parameters"),
             path_key: self.path_key.clone(),
             decoder,
@@ -412,8 +404,7 @@ impl SourceConfig for SimpleHttpConfig {
 
 #[derive(Clone)]
 struct SimpleHttpSource {
-    headers: Vec<String>,
-    glob_headers: Vec<glob::Pattern>,
+    headers: Vec<HttpConfigParamKind>,
     query_parameters: Vec<String>,
     path_key: OptionalValuePath,
     decoder: Decoder,
@@ -443,36 +434,35 @@ impl HttpSource for SimpleHttpSource {
                         request_path.to_owned(),
                     );
 
-                    // add any matching wildcard headers to each event
-                    for header_pattern in &self.glob_headers {
-                        for header_name in headers_config.keys() {
-                            if header_pattern.matches(header_name.as_str()) {
-
+                    for h in &self.headers {
+                        match h {
+                            HttpConfigParamKind::Exact(header_name) => {
                                 let value = headers_config.get(header_name).map(HeaderValue::as_bytes);
 
                                 self.log_namespace.insert_source_metadata(
                                     SimpleHttpConfig::NAME,
                                     log,
-                                    Some(LegacyKey::InsertIfEmpty(path!(header_name.as_str()))),
-                                    path!("headers", header_name.as_str()),
+                                    Some(LegacyKey::InsertIfEmpty(path!(header_name))),
+                                    path!("headers", header_name),
                                     Value::from(value.map(Bytes::copy_from_slice)),
                                 );
+                            },
+                            HttpConfigParamKind::Glob(header_pattern) => {
+                                for header_name in headers_config.keys() {
+                                    if header_pattern.matches(header_name.as_str()) {
+                                        let value = headers_config.get(header_name).map(HeaderValue::as_bytes);
+
+                                        self.log_namespace.insert_source_metadata(
+                                        SimpleHttpConfig::NAME,
+                                        log,
+                                        Some(LegacyKey::InsertIfEmpty(path!(header_name.as_str()))),
+                                        path!("headers", header_name.as_str()),
+                                        Value::from(value.map(Bytes::copy_from_slice)),
+                                        );
+                                    }
+                                }
                             }
-                        }
-                    }
-
-                    // add each specific header to each event
-                    for header_name in &self.headers {
-                        let value = headers_config.get(header_name).map(HeaderValue::as_bytes);
-
-                        self.log_namespace.insert_source_metadata(
-                            SimpleHttpConfig::NAME,
-                            log,
-                            Some(LegacyKey::InsertIfEmpty(path!(header_name))),
-                            path!("headers", header_name),
-                            Value::from(value.map(Bytes::copy_from_slice)),
-                        );
-
+                        };
                     }
 
                     self.log_namespace.insert_standard_vector_source_metadata(
@@ -1032,11 +1022,13 @@ mod tests {
             let mut headers = HeaderMap::new();
             headers.insert("User-Agent", "test_client".parse().unwrap());
             headers.insert("Upgrade-Insecure-Requests", "false".parse().unwrap());
+            headers.insert("X-Test-Header", "true".parse().unwrap());
 
             let (rx, addr) = source(
                 vec![
                     "User-Agent".to_string(),
                     "Upgrade-Insecure-Requests".to_string(),
+                    "X-*".to_string(),
                     "AbsentHeader".to_string(),
                 ],
                 vec![],
@@ -1067,6 +1059,7 @@ mod tests {
             assert_eq!(log["key1"], "value1".into());
             assert_eq!(log["\"User-Agent\""], "test_client".into());
             assert_eq!(log["\"Upgrade-Insecure-Requests\""], "false".into());
+            assert_eq!(log["X-Test-Header"], "true".into());
             assert_eq!(log["AbsentHeader"], Value::Null);
             assert_event_metadata(log).await;
         }
