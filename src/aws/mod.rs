@@ -14,7 +14,7 @@ use std::time::SystemTime;
 pub use auth::{AwsAuthentication, ImdsAuthentication};
 use aws_config::{meta::region::ProvideRegion, retry::RetryConfig, Region, SdkConfig};
 use aws_credential_types::provider::{ProvideCredentials, SharedCredentialsProvider};
-use aws_sdk_s3::{config::Builder, Config};
+use aws_sdk_sqs::{config::Builder, Config};
 use aws_sigv4::http_request::{SignableBody, SignableRequest, SigningParams, SigningSettings};
 use aws_sigv4::sign::v4;
 use aws_smithy_runtime::client::http::hyper_014::HyperClientBuilder;
@@ -125,9 +125,10 @@ pub async fn create_smithy_client<T: ClientBuilder>(
     // let middleware = DynMiddleware::new(middleware_builder);
 
     let client_builder = Builder::new();
-    let mut client_builder = client_builder.http_client(connector);
-    // .middleware(middleware)
-    // .set_interceptors(T::default_middleware());
+    let mut client_builder = client_builder
+        .http_client(connector)
+        // .middleware(middleware)
+        // .set_interceptors(T::default_middleware());
     // .sleep_impl(Arc::new(TokioSleep::new()));
     client_builder.set_retry_config(Some(retry_config.into()));
 
