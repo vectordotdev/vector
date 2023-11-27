@@ -3909,8 +3909,23 @@ checksum = "06683b93020a07e3dbcf5f8c0f6d40080d725bea7936fc01ad345c01b97dc270"
 dependencies = [
  "base64 0.21.5",
  "bytes 1.5.0",
- "headers-core",
+ "headers-core 0.2.0",
  "http 0.2.9",
+ "httpdate",
+ "mime",
+ "sha1",
+]
+
+[[package]]
+name = "headers"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "322106e6bd0cba2d5ead589ddb8150a13d7c4217cf80d7c4f682ca994ccc6aa9"
+dependencies = [
+ "base64 0.21.5",
+ "bytes 1.5.0",
+ "headers-core 0.3.0",
+ "http 1.0.0",
  "httpdate",
  "mime",
  "sha1",
@@ -3923,6 +3938,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e7f66481bfee273957b1f20485a4ff3362987f85b2c236580d81b4eb7a326429"
 dependencies = [
  "http 0.2.9",
+]
+
+[[package]]
+name = "headers-core"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "54b4a22553d4242c49fddb9ba998a99962b5cc6f22cb5a3482bec22522403ce4"
+dependencies = [
+ "http 1.0.0",
 ]
 
 [[package]]
@@ -4285,7 +4309,7 @@ checksum = "ca815a891b24fdfb243fa3239c86154392b0953ee584aa1a2a1f66d20cbe75cc"
 dependencies = [
  "bytes 1.5.0",
  "futures 0.3.29",
- "headers",
+ "headers 0.3.9",
  "http 0.2.9",
  "hyper",
  "openssl",
@@ -10016,7 +10040,7 @@ dependencies = [
  "h2 0.4.0",
  "hash_hasher",
  "hashbrown 0.14.2",
- "headers",
+ "headers 0.4.0",
  "heim",
  "hex",
  "hickory-proto",
@@ -10309,7 +10333,7 @@ dependencies = [
  "float_eq",
  "futures 0.3.29",
  "futures-util",
- "headers",
+ "headers 0.4.0",
  "http 0.2.9",
  "hyper-proxy",
  "indexmap 2.1.0",
@@ -10623,7 +10647,7 @@ dependencies = [
  "bytes 1.5.0",
  "futures-channel",
  "futures-util",
- "headers",
+ "headers 0.3.9",
  "http 0.2.9",
  "hyper",
  "log",
