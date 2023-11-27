@@ -74,6 +74,7 @@ async fn kinesis_put_records_with_partition_key() {
 
     run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
 
+    // Hard-coded sleeps are bad, but we're waiting on localstack's state to converge.
     sleep(Duration::from_secs(1)).await;
 
     let records = fetch_records(stream, timestamp).await.unwrap();
@@ -129,6 +130,7 @@ async fn kinesis_put_records_without_partition_key() {
 
     run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
 
+    // Hard-coded sleeps are bad, but we're waiting on localstack's state to converge.
     sleep(Duration::from_secs(1)).await;
 
     let records = fetch_records(stream, timestamp).await.unwrap();
