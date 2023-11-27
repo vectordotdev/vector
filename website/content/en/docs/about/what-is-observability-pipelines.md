@@ -6,7 +6,7 @@ tags: ["concepts"]
 
 Observability Pipelines is a commercial observability data pipeline for collecting, processing, and routing observability data from any source to any destination in the infrastructure that you own or manage.
 
-Compared to Vector, Observability Pipelines enables you to:
+Use Observability Pipelines to:
 
 - Manage your pipelines from a control plane. You can build or edit pipelines, whether it is to route a subset of data to a new destination or introduce a new sensitive data redaction rule, and roll out these changes to your active pipelines from the Datadog UI.
 - Monitor your pipelines to understand the health of your pipelines, identify bottlenecks and latencies, fine-tune performance, validate data delivery, and investigate your largest volume contributors.
