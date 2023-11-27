@@ -86,8 +86,7 @@ impl DatadogLogsConfig {
     // TODO: We should probably hoist this type of base URI generation so that all DD sinks can
     // utilize it, since it all follows the same pattern.
     fn get_uri(&self, dd_common: &DatadogCommonConfig) -> http::Uri {
-        let base_url = self
-            .dd_common
+        let base_url = dd_common
             .endpoint
             .clone()
             .unwrap_or_else(|| format!("https://http-intake.logs.{}", dd_common.site));
@@ -158,11 +157,7 @@ impl DatadogLogsConfig {
 impl SinkConfig for DatadogLogsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let client = self.create_client(&cx.proxy)?;
-        let global = cx
-            .extra_context
-            .get::<datadog::Options>()
-            .cloned()
-            .unwrap_or_default();
+        let global = cx.extra_context.get_or_default::<datadog::Options>();
         let dd_common = self.dd_common.with_globals(global)?;
 
         let healthcheck = dd_common.build_healthcheck(client.clone())?;

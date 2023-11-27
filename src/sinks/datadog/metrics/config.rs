@@ -157,11 +157,7 @@ impl_generate_config_from_default!(DatadogMetricsConfig);
 impl SinkConfig for DatadogMetricsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let client = self.build_client(&cx.proxy)?;
-        let global = cx
-            .extra_context
-            .get::<datadog::Options>()
-            .cloned()
-            .unwrap_or_default();
+        let global = cx.extra_context.get_or_default::<datadog::Options>();
         let dd_common = self.dd_common.with_globals(global)?;
         let healthcheck = dd_common.build_healthcheck(client.clone())?;
         let sink = self.build_sink(&dd_common, client)?;
@@ -188,7 +184,7 @@ impl DatadogMetricsConfig {
     ///
     /// The `endpoint` configuration field will be used here if it is present.
     fn get_base_agent_endpoint(&self, dd_common: &DatadogCommonConfig) -> String {
-        self.dd_common.endpoint.clone().unwrap_or_else(|| {
+        dd_common.endpoint.clone().unwrap_or_else(|| {
             let version = str::replace(crate::built_info::PKG_VERSION, ".", "-");
             format!(
                 "https://{}-vector.agent.{}",

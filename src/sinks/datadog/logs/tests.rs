@@ -9,7 +9,6 @@ use futures::{
     StreamExt,
 };
 use http::request::Parts;
-use hyper::StatusCode;
 use indoc::indoc;
 use vector_lib::{
     config::{init_telemetry, Tags, Telemetry},
@@ -23,7 +22,7 @@ use crate::{
     http::HttpError,
     sinks::{
         util::retries::RetryLogic,
-        util::test::{build_test_server_status, load_sink, load_sink_with_context},
+        util::test::{load_sink, load_sink_with_context},
     },
     test_util::{
         components::{
@@ -35,38 +34,14 @@ use crate::{
     tls::TlsError,
 };
 
-use super::{super::DatadogApiError, config::DatadogLogsConfig, service::LogApiRetry};
-
-// The sink must support v1 and v2 API endpoints which have different codes for
-// signaling status. This enum allows us to signal which API endpoint and what
-// kind of response we want our test to model without getting into the details
-// of exactly what that code is.
-enum ApiStatus {
-    OKv1,
-    OKv2,
-    BadRequestv1,
-    BadRequestv2,
-}
-
-fn test_server(
-    addr: std::net::SocketAddr,
-    api_status: ApiStatus,
-) -> (
-    futures::channel::mpsc::Receiver<(http::request::Parts, Bytes)>,
-    stream_cancel::Trigger,
-    impl std::future::Future<Output = Result<(), ()>>,
-) {
-    let status = match api_status {
-        ApiStatus::OKv1 => StatusCode::OK,
-        ApiStatus::OKv2 => StatusCode::ACCEPTED,
-        ApiStatus::BadRequestv1 | ApiStatus::BadRequestv2 => StatusCode::BAD_REQUEST,
-    };
-
-    // NOTE: we pass `Trigger` out to the caller even though this suite never
-    // uses it as it's being dropped cancels the stream machinery here,
-    // indicating failures that might not be valid.
-    build_test_server_status(addr, status)
-}
+use super::{
+    super::{
+        tests::{test_server, ApiStatus},
+        DatadogApiError,
+    },
+    config::DatadogLogsConfig,
+    service::LogApiRetry,
+};
 
 fn event_with_api_key(msg: &str, key: &str) -> Event {
     let mut e = Event::Log(LogEvent::from(msg));

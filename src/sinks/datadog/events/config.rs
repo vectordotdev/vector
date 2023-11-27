@@ -93,11 +93,7 @@ impl DatadogEventsConfig {
 impl SinkConfig for DatadogEventsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let client = self.build_client(cx.proxy())?;
-        let global = cx
-            .extra_context
-            .get::<datadog::Options>()
-            .cloned()
-            .unwrap_or_default();
+        let global = cx.extra_context.get_or_default::<datadog::Options>();
         let dd_common = self.dd_common.with_globals(global)?;
         let healthcheck = dd_common.build_healthcheck(client.clone())?;
         let sink = self.build_sink(&dd_common, client)?;
