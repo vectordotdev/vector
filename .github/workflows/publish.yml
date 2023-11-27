@@ -335,11 +335,9 @@ jobs:
           - "quay.io/centos/centos:stream9"
           - "amazonlinux:1"
           - "amazonlinux:2"
-          - "fedora:34"
-          - "fedora:35"
-          - "fedora:36"
           - "fedora:37"
           - "fedora:38"
+          - "fedora:39"
     container:
       image: ${{ matrix.container }}
     steps:
