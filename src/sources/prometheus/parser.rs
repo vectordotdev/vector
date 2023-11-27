@@ -2,8 +2,8 @@ use std::cmp::Ordering;
 
 use chrono::{DateTime, TimeZone, Utc};
 #[cfg(feature = "sources-prometheus-remote-write")]
-use prometheus_parser::proto;
-use prometheus_parser::{GroupKind, MetricGroup, ParserError};
+use vector_lib::prometheus::parser::proto;
+use vector_lib::prometheus::parser::{GroupKind, MetricGroup, ParserError};
 
 use crate::event::{
     metric::{Bucket, Metric, MetricKind, MetricTags, MetricValue, Quantile},
@@ -21,12 +21,12 @@ fn utc_timestamp(timestamp: Option<i64>, default: DateTime<Utc>) -> DateTime<Utc
 
 #[cfg(any(test, feature = "sources-prometheus-scrape"))]
 pub(super) fn parse_text(packet: &str) -> Result<Vec<Event>, ParserError> {
-    prometheus_parser::parse_text(packet).map(reparse_groups)
+    vector_lib::prometheus::parser::parse_text(packet).map(reparse_groups)
 }
 
 #[cfg(feature = "sources-prometheus-remote-write")]
 pub(super) fn parse_request(request: proto::WriteRequest) -> Result<Vec<Event>, ParserError> {
-    prometheus_parser::parse_request(request).map(reparse_groups)
+    vector_lib::prometheus::parser::parse_request(request).map(reparse_groups)
 }
 
 fn reparse_groups(groups: Vec<MetricGroup>) -> Vec<Event> {
@@ -137,8 +137,8 @@ mod test {
     use chrono::{TimeZone, Timelike, Utc};
     use once_cell::sync::Lazy;
     use similar_asserts::assert_eq;
-    use vector_common::assert_event_data_eq;
-    use vector_core::metric_tags;
+    use vector_lib::assert_event_data_eq;
+    use vector_lib::metric_tags;
 
     use super::*;
     use crate::event::metric::{Metric, MetricKind, MetricValue};
@@ -658,7 +658,7 @@ mod test {
                 "http_request_duration_seconds",
                 MetricKind::Absolute,
                 MetricValue::AggregatedHistogram {
-                    buckets: vector_core::buckets![
+                    buckets: vector_lib::buckets![
                         0.05 => 24054, 0.1 => 9390, 0.2 => 66948, 0.5 => 28997, 1.0 => 4599
                     ],
                     count: 144320,
@@ -686,7 +686,7 @@ mod test {
                 "duration",
                 MetricKind::Absolute,
                 MetricValue::AggregatedHistogram {
-                    buckets: vector_core::buckets![1.0 => 133988],
+                    buckets: vector_lib::buckets![1.0 => 133988],
                     count: 144320,
                     sum: 53423.0,
                 },
@@ -713,7 +713,7 @@ mod test {
                 "duration",
                 MetricKind::Absolute,
                 MetricValue::AggregatedHistogram {
-                    buckets: vector_core::buckets![1.0 => 2000, 10.0 => 0],
+                    buckets: vector_lib::buckets![1.0 => 2000, 10.0 => 0],
                     count: 2000,
                     sum: 2000.0,
                 },
@@ -773,7 +773,7 @@ mod test {
             Ok(vec![
                 Metric::new(
                     "gitlab_runner_job_duration_seconds", MetricKind::Absolute, MetricValue::AggregatedHistogram {
-                        buckets: vector_core::buckets![
+                        buckets: vector_lib::buckets![
                             30.0 => 327,
                             60.0 => 147,
                             300.0 => 61,
@@ -793,7 +793,7 @@ mod test {
                     .with_timestamp(Some(*TIMESTAMP)),
                 Metric::new(
                     "gitlab_runner_job_duration_seconds", MetricKind::Absolute, MetricValue::AggregatedHistogram {
-                        buckets: vector_core::buckets![
+                        buckets: vector_lib::buckets![
                             30.0 => 1,
                             60.0 => 0,
                             300.0 => 0,
@@ -813,7 +813,7 @@ mod test {
                     .with_timestamp(Some(*TIMESTAMP)),
                 Metric::new(
                     "gitlab_runner_job_duration_seconds", MetricKind::Absolute, MetricValue::AggregatedHistogram {
-                        buckets: vector_core::buckets![
+                        buckets: vector_lib::buckets![
                             30.0 => 285, 60.0 => 880, 300.0 => 1906, 600.0 => 80, 1800.0 => 101, 3600.0 => 3,
                             7200.0 => 0, 10800.0 => 0, 18000.0 => 0, 36000.0 => 0
                         ],
@@ -857,7 +857,7 @@ mod test {
                     "rpc_duration_seconds",
                     MetricKind::Absolute,
                     MetricValue::AggregatedSummary {
-                        quantiles: vector_core::quantiles![
+                        quantiles: vector_lib::quantiles![
                             0.01 => 3102.0,
                             0.05 => 3272.0,
                             0.5 => 4773.0,
@@ -874,7 +874,7 @@ mod test {
                     "go_gc_duration_seconds",
                     MetricKind::Absolute,
                     MetricValue::AggregatedSummary {
-                        quantiles: vector_core::quantiles![
+                        quantiles: vector_lib::quantiles![
                             0.0 => 0.009460965,
                             0.25 => 0.009793382,
                             0.5 => 0.009870205,

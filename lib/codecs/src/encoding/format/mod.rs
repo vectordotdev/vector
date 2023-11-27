@@ -11,6 +11,7 @@ mod json;
 mod logfmt;
 mod native;
 mod native_json;
+mod protobuf;
 mod raw_message;
 mod text;
 
@@ -24,6 +25,7 @@ pub use json::{JsonSerializer, JsonSerializerConfig};
 pub use logfmt::{LogfmtSerializer, LogfmtSerializerConfig};
 pub use native::{NativeSerializer, NativeSerializerConfig};
 pub use native_json::{NativeJsonSerializer, NativeJsonSerializerConfig};
+pub use protobuf::{ProtobufSerializer, ProtobufSerializerConfig, ProtobufSerializerOptions};
 pub use raw_message::{RawMessageSerializer, RawMessageSerializerConfig};
 pub use text::{TextSerializer, TextSerializerConfig};
 use vector_core::event::Event;

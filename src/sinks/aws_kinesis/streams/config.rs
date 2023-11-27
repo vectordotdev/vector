@@ -3,9 +3,9 @@ use aws_sdk_kinesis::{
     types::SdkError,
 };
 use futures::FutureExt;
-use lookup::lookup_v2::ConfigValuePath;
 use snafu::Snafu;
-use vector_config::{component::GenerateConfig, configurable_component};
+use vector_lib::configurable::{component::GenerateConfig, configurable_component};
+use vector_lib::lookup::lookup_v2::ConfigValuePath;
 
 use crate::sinks::util::retries::RetryAction;
 use crate::{

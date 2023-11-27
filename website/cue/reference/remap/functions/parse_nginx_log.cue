@@ -4,11 +4,14 @@ remap: functions: parse_nginx_log: {
 	category:    "Parse"
 	description: """
       Parses Nginx access and error log lines. Lines can be in [`combined`](\(urls.nginx_combined)),
-      [`ingress_upstreaminfo`](\(urls.nginx_ingress_upstreaminfo)) or [`error`](\(urls.nginx_error)) format.
+      [`ingress_upstreaminfo`](\(urls.nginx_ingress_upstreaminfo)), or [`error`](\(urls.nginx_error)) format.
       """
 	notices: [
 		"""
 			Missing information in the log message may be indicated by `-`. These fields are omitted in the result.
+			""",
+		"""
+			In case of `ingress_upstreaminfo` format the following fields may be safely omitted in the log message: `remote_addr`, `remote_user`, `http_referer`, `http_user_agent`, `proxy_alternative_upstream_name`, `upstream_addr`, `upstream_response_length`, `upstream_response_time`, `upstream_status`.
 			""",
 	]
 
@@ -45,9 +48,9 @@ remap: functions: parse_nginx_log: {
 	]
 
 	internal_failure_reasons: [
-		"`value` doesn't match the specified format",
-		"`timestamp_format` isn't a valid format string",
-		"The timestamp in `value` fails to parse using the provided `timestamp_format`",
+		"`value` does not match the specified format.",
+		"`timestamp_format` is not a valid format string.",
+		"The timestamp in `value` fails to parse using the provided `timestamp_format`.",
 	]
 	return: types: ["object"]
 
@@ -91,6 +94,34 @@ remap: functions: parse_nginx_log: {
 				server:    "localhost"
 				request:   "POST /not-found HTTP/1.1"
 				host:      "localhost:8081"
+			}
+		},
+		{
+			title: "Parse via Nginx log format (ingress_upstreaminfo)"
+			source: #"""
+				parse_nginx_log!(
+				    s'0.0.0.0 - bob [18/Mar/2023:15:00:00 +0000] "GET /some/path HTTP/2.0" 200 12312 "https://10.0.0.1/some/referer" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36" 462 0.050 [some-upstream-service-9000] [some-other-upstream-5000] 10.0.50.80:9000 19437 0.049 200 752178adb17130b291aefd8c386279e7',
+				    "ingress_upstreaminfo"
+				)
+				"""#
+			return: {
+				body_bytes_size:                 12312
+				http_referer:                    "https://10.0.0.1/some/referer"
+				http_user_agent:                 "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36"
+				proxy_alternative_upstream_name: "some-other-upstream-5000"
+				proxy_upstream_name:             "some-upstream-service-9000"
+				remote_addr:                     "0.0.0.0"
+				remote_user:                     "bob"
+				req_id:                          "752178adb17130b291aefd8c386279e7"
+				request:                         "GET /some/path HTTP/2.0"
+				request_length:                  462
+				request_time:                    0.050
+				status:                          200
+				timestamp:                       "2023-03-18T15:00:00Z"
+				upstream_addr:                   "10.0.50.80:9000"
+				upstream_response_length:        19437
+				upstream_response_time:          0.049
+				upstream_status:                 200
 			}
 		},
 	]

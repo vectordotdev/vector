@@ -5,8 +5,8 @@ git config --global --add safe.directory /git/vectordotdev/vector
 
 rustup show # causes installation of version from rust-toolchain.toml
 rustup default "$(rustup show active-toolchain | awk '{print $1;}')"
-if [[ "$(cargo-deb --version)" != "1.41.3" ]] ; then
-  rustup run stable cargo install cargo-deb --version 1.41.3 --force --locked
+if [[ "$(cargo-deb --version)" != "2.0.0" ]] ; then
+  rustup run stable cargo install cargo-deb --version 2.0.0 --force --locked
 fi
 if [[ "$(cross --version | grep cross)" != "cross 0.2.5" ]] ; then
   rustup run stable cargo install cross --version 0.2.5 --force --locked
@@ -18,7 +18,7 @@ if ! cargo deny --version >& /dev/null ; then
   rustup run stable cargo install cargo-deny --force --locked
 fi
 if ! dd-rust-license-tool --help >& /dev/null ; then
-  rustup run stable cargo install dd-rust-license-tool --version 1.0.1 --force --locked
+  rustup run stable cargo install dd-rust-license-tool --version 1.0.2 --force --locked
 fi
 
 # Currently fixing this to version 0.30 since version 0.31 has introduced

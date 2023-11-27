@@ -6,7 +6,7 @@ edition = "2021"
 publish = false
 
 [dependencies]
-apache-avro = { version = "0.15.0", default-features = false }
+apache-avro = { version = "0.16.0", default-features = false }
 bytes = { version = "1", default-features = false }
 chrono = { version = "0.4", default-features = false }
 csv-core = { version = "0.1.10", default-features = false }
@@ -15,15 +15,15 @@ dyn-clone = { version = "1", default-features = false }
 lookup = { package = "vector-lookup", path = "../vector-lookup", default-features = false }
 memchr = { version = "2", default-features = false }
 once_cell = { version = "1.18", default-features = false }
-ordered-float = { version = "3.9.1", default-features = false }
-prost = { version = "0.12.1", default-features = false, features = ["std"] }
+ordered-float = { version = "4.1.1", default-features = false }
+prost = { version = "0.12.3", default-features = false, features = ["std"] }
 prost-reflect = { version = "0.12", default-features = false, features = ["serde"] }
-regex = { version = "1.9.5", default-features = false, features = ["std", "perf"] }
+regex = { version = "1.10.2", default-features = false, features = ["std", "perf"] }
 serde = { version = "1", default-features = false, features = ["derive"] }
 serde_json = { version = "1", default-features = false }
 smallvec = { version = "1", default-features = false, features = ["union"] }
 snafu = { version = "0.7.5", default-features = false, features = ["futures"] }
-syslog_loose = { version = "0.19", default-features = false, optional = true }
+syslog_loose = { version = "0.21", default-features = false, optional = true }
 tokio-util = { version = "0.7", default-features = false, features = ["codec"] }
 tracing = { version = "0.1", default-features = false }
 vrl.workspace = true
@@ -38,8 +38,8 @@ futures = { version = "0.3", default-features = false }
 indoc = { version = "2", default-features = false }
 tokio = { version = "1", features = ["test-util"] }
 similar-asserts = "1.5.0"
-vrl = { version = "0.6.0", features = ["cli", "test", "test_framework", "arbitrary"] }
 vector-core = { path = "../vector-core", default-features = false, features = ["test"] }
+vrl.workspace = true
 
 [features]
 syslog = ["dep:syslog_loose"]

@@ -1,26 +1,26 @@
 use mlua::prelude::*;
 
-use crate::event::lua::metric::LuaMetric;
-use crate::event::{Event, LogEvent, Metric};
+use super::super::{Event, LogEvent, Metric};
+use super::metric::LuaMetric;
 
 pub struct LuaEvent {
     pub event: Event,
     pub metric_multi_value_tags: bool,
 }
 
-impl<'a> ToLua<'a> for LuaEvent {
+impl<'a> IntoLua<'a> for LuaEvent {
     #![allow(clippy::wrong_self_convention)] // this trait is defined by mlua
-    fn to_lua(self, lua: &'a Lua) -> LuaResult<LuaValue> {
+    fn into_lua(self, lua: &'a Lua) -> LuaResult<LuaValue> {
         let table = lua.create_table()?;
         match self.event {
-            Event::Log(log) => table.raw_set("log", log.to_lua(lua)?)?,
+            Event::Log(log) => table.raw_set("log", log.into_lua(lua)?)?,
             Event::Metric(metric) => table.raw_set(
                 "metric",
                 LuaMetric {
                     metric,
                     multi_value_tags: self.metric_multi_value_tags,
                 }
-                .to_lua(lua)?,
+                .into_lua(lua)?,
             )?,
             Event::Trace(_) => {
                 return Err(LuaError::ToLuaConversionError {
@@ -92,7 +92,7 @@ mod test {
     }
 
     #[test]
-    fn to_lua_log() {
+    fn into_lua_log() {
         let mut event = LogEvent::default();
         event.insert("field", "value");
 
@@ -107,7 +107,7 @@ mod test {
     }
 
     #[test]
-    fn to_lua_metric() {
+    fn into_lua_metric() {
         let event = Event::Metric(Metric::new(
             "example counter",
             MetricKind::Absolute,

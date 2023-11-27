@@ -2,9 +2,10 @@ use std::{future::ready, pin::Pin};
 
 use futures::{stream, Stream, StreamExt};
 use mlua::ExternalError;
+use mlua::FromLua;
 use ordered_float::NotNan;
 use snafu::{ResultExt, Snafu};
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 use vrl::path::parse_target_path;
 
 use crate::config::OutputId;
@@ -104,7 +105,7 @@ impl Clone for Lua {
 
 // This wrapping structure is added in order to make it possible to have independent implementations
 // of `mlua::UserData` trait for event in version 1 and version 2 of the transform.
-#[derive(Clone)]
+#[derive(Clone, FromLua)]
 struct LuaEvent {
     inner: Event,
 }
@@ -225,7 +226,7 @@ impl mlua::UserData for LuaEvent {
         methods.add_meta_method_mut(
             mlua::MetaMethod::NewIndex,
             |_lua, this, (key, value): (String, Option<mlua::Value<'lua>>)| {
-                let key_path = parse_target_path(key.as_str()).map_err(|e| e.to_lua_err())?;
+                let key_path = parse_target_path(key.as_str()).map_err(|e| e.into_lua_err())?;
                 match value {
                     Some(mlua::Value::String(string)) => {
                         this.inner.as_mut_log().insert(

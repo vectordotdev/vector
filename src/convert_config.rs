@@ -157,8 +157,7 @@ fn walk_dir_and_convert(
             let new_output_dir = if entry_path.is_dir() {
                 let last_component = entry_path
                     .file_name()
-                    .unwrap_or_else(|| panic!("Failed to get file_name for {entry_path:?}"))
-                    .clone();
+                    .unwrap_or_else(|| panic!("Failed to get file_name for {entry_path:?}"));
                 let new_dir = output_dir.join(last_component);
 
                 if !new_dir.exists() {
@@ -201,7 +200,12 @@ fn walk_dir_and_convert(
     }
 }
 
-#[cfg(test)]
+#[cfg(all(
+    test,
+    feature = "sources-demo_logs",
+    feature = "transforms-remap",
+    feature = "sinks-console"
+))]
 mod tests {
     use crate::config::{format, ConfigBuilder, Format};
     use crate::convert_config::{check_paths, walk_dir_and_convert, Opts};

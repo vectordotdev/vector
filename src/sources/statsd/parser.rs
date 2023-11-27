@@ -68,7 +68,7 @@ pub fn parse(packet: &str) -> Result<Metric, ParseError> {
             let val: f64 = parts[0].parse()?;
             Metric::new(
                 name, MetricKind::Incremental, MetricValue::Distribution {
-                    samples: vector_core::samples![convert_to_base_units(unit, val) => sample_rate as u32],
+                    samples: vector_lib::samples![convert_to_base_units(unit, val) => sample_rate as u32],
                     statistic: convert_to_statistic(unit),
                 },
             ).with_tags(tags)
@@ -197,7 +197,7 @@ impl fmt::Display for ParseError {
     }
 }
 
-vector_common::impl_event_data_eq!(ParseError);
+vector_lib::impl_event_data_eq!(ParseError);
 
 impl error::Error for ParseError {}
 
@@ -215,8 +215,8 @@ impl From<ParseFloatError> for ParseError {
 
 #[cfg(test)]
 mod test {
-    use vector_common::assert_event_data_eq;
-    use vector_core::{event::metric::TagValue, metric_tags};
+    use vector_lib::assert_event_data_eq;
+    use vector_lib::{event::metric::TagValue, metric_tags};
 
     use super::{parse, sanitize_key, sanitize_sampling};
     use crate::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
@@ -301,7 +301,7 @@ mod test {
                 "glork",
                 MetricKind::Incremental,
                 MetricValue::Distribution {
-                    samples: vector_core::samples![0.320 => 10],
+                    samples: vector_lib::samples![0.320 => 10],
                     statistic: StatisticKind::Histogram
                 },
             )),
@@ -316,7 +316,7 @@ mod test {
                 "glork",
                 MetricKind::Incremental,
                 MetricValue::Distribution {
-                    samples: vector_core::samples![320.0 => 10],
+                    samples: vector_lib::samples![320.0 => 10],
                     statistic: StatisticKind::Histogram
                 },
             )
@@ -336,7 +336,7 @@ mod test {
                 "glork",
                 MetricKind::Incremental,
                 MetricValue::Distribution {
-                    samples: vector_core::samples![320.0 => 10],
+                    samples: vector_lib::samples![320.0 => 10],
                     statistic: StatisticKind::Summary
                 },
             )

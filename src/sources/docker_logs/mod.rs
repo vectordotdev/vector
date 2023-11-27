@@ -11,20 +11,20 @@ use bollard::{
 };
 use bytes::{Buf, Bytes};
 use chrono::{DateTime, FixedOffset, Local, ParseError, Utc};
-use codecs::{BytesDeserializer, BytesDeserializerConfig};
 use futures::{Stream, StreamExt};
-use lookup::{
-    lookup_v2::OptionalValuePath, metadata_path, owned_value_path, path, OwnedValuePath, PathPrefix,
-};
 use once_cell::sync::Lazy;
 use serde_with::serde_as;
 use tokio::sync::mpsc;
 use tracing_futures::Instrument;
-use vector_common::internal_event::{
+use vector_lib::codecs::{BytesDeserializer, BytesDeserializerConfig};
+use vector_lib::config::{LegacyKey, LogNamespace};
+use vector_lib::configurable::configurable_component;
+use vector_lib::internal_event::{
     ByteSize, BytesReceived, InternalEventHandle as _, Protocol, Registered,
 };
-use vector_config::configurable_component;
-use vector_core::config::{LegacyKey, LogNamespace};
+use vector_lib::lookup::{
+    lookup_v2::OptionalValuePath, metadata_path, owned_value_path, path, OwnedValuePath, PathPrefix,
+};
 use vrl::event_path;
 use vrl::value::{kind::Collection, Kind};
 
@@ -37,8 +37,7 @@ use crate::{
         DockerLogsCommunicationError, DockerLogsContainerEventReceived,
         DockerLogsContainerMetadataFetchError, DockerLogsContainerUnwatch,
         DockerLogsContainerWatch, DockerLogsEventsReceived,
-        DockerLogsLoggingDriverUnsupportedError, DockerLogsReceivedOutOfOrderError,
-        DockerLogsTimestampParseError, StreamClosedError,
+        DockerLogsLoggingDriverUnsupportedError, DockerLogsTimestampParseError, StreamClosedError,
     },
     line_agg::{self, LineAgg},
     shutdown::ShutdownSignal,
@@ -793,7 +792,7 @@ impl EventStreamBuilder {
                 error = v.as_ref().err().cloned();
                 ready(v.is_ok())
             })
-            .filter_map(|v| ready(v.unwrap()))
+            .filter_map(|v| ready(v.ok().flatten()))
             .take_until(self.shutdown.clone());
 
         let events_stream: Box<dyn Stream<Item = LogEvent> + Unpin + Send> =
@@ -994,25 +993,38 @@ impl ContainerLogInfo {
         let timestamp_str = splitter.next()?;
         let timestamp = match DateTime::parse_from_rfc3339(timestamp_str) {
             Ok(timestamp) => {
-                // Timestamp check
+                // Timestamp check. This is included to avoid processing the same log multiple times, which can
+                // occur when a container changes generations, and to avoid processing logs with timestamps before
+                // the created timestamp.
                 match self.last_log.as_ref() {
-                    // Received log has not already been processed.
-                    Some(&(ref last, gen))
-                        if *last < timestamp || (*last == timestamp && gen == self.generation) =>
-                    {
-                        // noop
+                    Some(&(last, gen)) => {
+                        if last < timestamp || (last == timestamp && gen == self.generation) {
+                            // Noop - log received in order.
+                        } else {
+                            // Docker returns logs in order.
+                            // If we reach this state, this log is from a previous generation of the container.
+                            // It was already processed, so we can safely skip it.
+                            trace!(
+                                message = "Received log from previous container generation.",
+                                log_timestamp = %timestamp_str,
+                                last_log_timestamp = %last,
+                            );
+                            return None;
+                        }
                     }
-                    // Received log is after the time the container was created.
-                    None if self.created <= timestamp.with_timezone(&Utc) => {
-                        // noop
-                    }
-                    // Received log is older than the previously received entry.
-                    _ => {
-                        emit!(DockerLogsReceivedOutOfOrderError {
-                            container_id: self.id.as_str(),
-                            timestamp_str,
-                        });
-                        return None;
+                    None => {
+                        if self.created < timestamp.with_timezone(&Utc) {
+                            // Noop - first log to process.
+                        } else {
+                            // Received a log with a timestamp before that provided to the Docker API.
+                            // This should not happen, but if it does, we can just ignore these logs.
+                            trace!(
+                                message = "Received log from before created timestamp.",
+                                log_timestamp = %timestamp_str,
+                                created_timestamp = %self.created
+                            );
+                            return None;
+                        }
                     }
                 }
 

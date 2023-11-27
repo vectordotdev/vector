@@ -21,7 +21,7 @@
 //!
 use greptimedb_client::Client;
 use snafu::Snafu;
-use vector_common::sensitive_string::SensitiveString;
+use vector_lib::sensitive_string::SensitiveString;
 
 use crate::sinks::prelude::*;
 
@@ -116,7 +116,7 @@ impl_generate_config_from_default!(GreptimeDBConfig);
 #[async_trait::async_trait]
 impl SinkConfig for GreptimeDBConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
+        let request_settings = self.request.into_settings();
         let service = ServiceBuilder::new()
             .settings(request_settings, GreptimeDBRetryLogic)
             .service(service::GreptimeDBService::try_new(self)?);

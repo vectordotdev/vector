@@ -13,6 +13,17 @@ message CommonMetadata {
 	string api_key = 6;
 }
 
+message Origin {
+    reserved 1,2,3;
+    uint32 origin_product = 4;
+    uint32 origin_category = 5;
+    uint32 origin_service = 6;
+}
+
+message Metadata {
+    Origin origin = 1;
+}
+
 message MetricPayload {
     enum MetricType {
         UNSPECIFIED = 0;
@@ -40,7 +51,7 @@ message MetricPayload {
         string unit = 6;
         string source_type_name = 7;
         int64 interval = 8;
-        reserved 9;
+        Metadata metadata = 9;
     }
     repeated MetricSeries series = 1;
 }
@@ -76,6 +87,7 @@ message SketchPayload {
                 reserved 5, 6;
 				reserved "distributionsK", "distributionsC";
 		repeated Dogsketch dogsketches = 7;
+		Metadata metadata = 8;
 	}
 	repeated Sketch sketches = 1;
 	CommonMetadata metadata = 2;

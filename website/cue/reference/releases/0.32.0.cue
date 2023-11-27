@@ -38,6 +38,10 @@ releases: "0.32.0": {
 			it to `false` via `--openssl-legacy-provider=false`. Instead it complains of extra
 			arguments. This is fixed in v0.32.1.
 			""",
+		"""
+			For AWS components, using `assume_role` for authentication without an `external_id`
+			caused a panic. This is fixed in v0.32.2`.
+			""",
 	]
 
 	changelog: [

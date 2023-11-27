@@ -9,8 +9,8 @@ use indexmap::IndexMap;
 use prost::Message;
 use tonic::body::BoxBody;
 use tower::Service;
-use vector_common::request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata};
-use vector_core::stream::DriverResponse;
+use vector_lib::request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata};
+use vector_lib::stream::DriverResponse;
 
 use super::VectorSinkError;
 use crate::{

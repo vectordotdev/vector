@@ -44,10 +44,12 @@ Collectd
 Comcast
 Consolas
 Coolpad
+BADDCAFE
 DEBHELPER
-DOOV
 Danew
+dkr
 Dockerfiles
+DOOV
 Douban
 Enot
 Evercoss
@@ -111,6 +113,7 @@ Mediacom
 Medion
 Meizu
 Mertz
+metakey
 Metakey
 Micromax
 Mito
@@ -408,7 +411,9 @@ rpms
 rstest
 rsyslog
 rsyslogd
+security-tab
 servlet
+sublocation
 snyk
 socketaddr
 solarwinds

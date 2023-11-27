@@ -5,7 +5,7 @@ use hyper_proxy::ProxyConnector;
 use indexmap::IndexMap;
 use tonic::body::BoxBody;
 use tower::ServiceBuilder;
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 
 use super::{
     service::{VectorResponse, VectorService},
@@ -133,7 +133,7 @@ impl SinkConfig for VectorConfig {
         let healthcheck_client = VectorService::new(client.clone(), healthcheck_uri, false, headers.clone());
         let healthcheck = healthcheck(healthcheck_client, cx.healthcheck);
         let service = VectorService::new(client, uri, self.compression, headers);
-        let request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
+        let request_settings = self.request.into_settings();
         let batch_settings = self.batch.into_batcher_settings()?;
 
         let service = ServiceBuilder::new()

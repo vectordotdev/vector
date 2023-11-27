@@ -5,7 +5,7 @@ use snafu::ResultExt;
 use crate::sinks::prelude::*;
 
 use super::{
-    config::NatsSinkConfig,
+    config::{NatsSinkConfig, NatsTowerRequestConfigDefaults},
     request_builder::{NatsEncoder, NatsRequestBuilder},
     service::{NatsResponse, NatsService},
     EncodingSnafu, NatsError,
@@ -17,7 +17,7 @@ pub(super) struct NatsEvent {
 }
 
 pub(super) struct NatsSink {
-    request: TowerRequestConfig,
+    request: TowerRequestConfig<NatsTowerRequestConfigDefaults>,
     transformer: Transformer,
     encoder: Encoder<()>,
     connection: Arc<async_nats::Client>,
@@ -59,10 +59,7 @@ impl NatsSink {
     }
 
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
-        let request = self.request.unwrap_with(&TowerRequestConfig {
-            concurrency: Concurrency::Fixed(1),
-            ..Default::default()
-        });
+        let request = self.request.into_settings();
 
         let request_builder = NatsRequestBuilder {
             encoder: NatsEncoder {
@@ -79,7 +76,7 @@ impl NatsSink {
 
         input
             .filter_map(|event| std::future::ready(self.make_nats_event(event)))
-            .request_builder(None, request_builder)
+            .request_builder(default_request_builder_concurrency_limit(), request_builder)
             .filter_map(|request| async move {
                 match request {
                     Err(e) => {

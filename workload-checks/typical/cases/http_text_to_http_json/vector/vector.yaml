@@ -1,0 +1,16 @@
+data_dir: "/var/lib/vector"
+
+sources:
+  logs:
+    type:    "http_server"
+    address: "0.0.0.0:8282"
+    decoding:
+      codec: "bytes"
+
+sinks:
+  http_sink:
+    type: "http"
+    uri:  "http://localhost:8080"
+    inputs: [ "logs" ]
+    encoding:
+      codec: "json"

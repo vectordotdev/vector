@@ -1,4 +1,4 @@
-use vector_core::{
+use vector_lib::{
     event::{Metric, MetricValue},
     metrics::AgentDDSketch,
 };
@@ -38,7 +38,7 @@ impl MetricNormalize for DatadogMetricsNormalizer {
 
 #[cfg(test)]
 mod tests {
-    use vector_core::{
+    use vector_lib::{
         event::{metric::MetricSketch, Metric, MetricKind, MetricValue},
         metrics::AgentDDSketch,
     };

@@ -82,10 +82,6 @@ components: sources: aws_sqs: components._aws & {
 		}
 	}
 
-	telemetry: metrics: {
-		sqs_message_delete_failed_total: components.sources.internal_metrics.output.metrics.sqs_message_delete_failed_total
-	}
-
 	how_it_works: {
 		aws_sqs: {
 			title: "AWS SQS"

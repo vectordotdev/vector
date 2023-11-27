@@ -1,4 +1,5 @@
 #![allow(missing_docs)]
+
 use std::{num::NonZeroU64, path::PathBuf};
 
 use clap::{ArgAction, CommandFactory, FromArgMatches, Parser};
@@ -63,10 +64,8 @@ impl Opts {
 pub struct RootOpts {
     /// Read configuration from one or more files. Wildcard paths are supported.
     /// File format is detected from the file name.
-    /// If zero files are specified the deprecated default config path
-    /// `/etc/vector/vector.toml` will be targeted.
-    /// And if the aforementioned file does not exist,
-    /// then `/etc/vector/vector.yaml` will be used.
+    /// If zero files are specified, the deprecated default config path
+    /// `/etc/vector/vector.yaml` is targeted.
     #[arg(
         id = "config",
         short,
@@ -198,18 +197,6 @@ pub struct RootOpts {
     )]
     pub allocation_tracing_reporting_interval_ms: u64,
 
-    /// Load the OpenSSL legacy provider.
-    #[arg(
-        long,
-        env = "VECTOR_OPENSSL_LEGACY_PROVIDER",
-        default_value = "true",
-        default_missing_value = "true",
-        num_args = 0..=1,
-        require_equals = true,
-        action = ArgAction::Set
-    )]
-    pub openssl_legacy_provider: bool,
-
     /// Disable probing and configuration of root certificate locations on the system for OpenSSL.
     ///
     /// The probe functionality manipulates the `SSL_CERT_FILE` and `SSL_CERT_DIR` environment variables
@@ -217,6 +204,13 @@ pub struct RootOpts {
     /// default inherits the environment of the Vector process.
     #[arg(long, env = "VECTOR_OPENSSL_NO_PROBE", default_value = "false")]
     pub openssl_no_probe: bool,
+
+    /// Allow the configuration to run without any components. This is useful for loading in an
+    /// empty stub config that will later be replaced with actual components. Note that this is
+    /// likely not useful without also watching for config file changes as described in
+    /// `--watch-config`.
+    #[arg(long, env = "VECTOR_ALLOW_EMPTY_CONFIG", default_value = "false")]
+    pub allow_empty_config: bool,
 }
 
 impl RootOpts {
@@ -334,7 +328,10 @@ impl Color {
     pub fn use_color(&self) -> bool {
         match self {
             #[cfg(unix)]
-            Color::Auto => atty::is(atty::Stream::Stdout),
+            Color::Auto => {
+                use std::io::IsTerminal;
+                std::io::stdout().is_terminal()
+            }
             #[cfg(windows)]
             Color::Auto => false, // ANSI colors are not supported by cmd.exe
             Color::Always => true,

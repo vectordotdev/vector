@@ -1,10 +1,10 @@
 use metrics::counter;
 
-use vector_common::{
+use vector_lib::internal_event::InternalEvent;
+use vector_lib::{
     internal_event::{error_stage, error_type},
     json_size::JsonSize,
 };
-use vector_core::internal_event::InternalEvent;
 
 use super::prelude::http_error_code;
 use crate::sources::apache_metrics;
@@ -47,12 +47,6 @@ impl InternalEvent for ApacheMetricsParseError<'_> {
             endpoint = %self.endpoint,
             internal_log_rate_limit = true,
         );
-        debug!(
-            message = %format!("Parse error:\n\n{}\n\n", self.error),
-            endpoint = %self.endpoint,
-            internal_log_rate_limit = true
-        );
-        counter!("parse_errors_total", 1);
         counter!(
             "component_errors_total", 1,
             "stage" => error_stage::PROCESSING,
@@ -78,7 +72,6 @@ impl InternalEvent for ApacheMetricsResponseError<'_> {
             endpoint = %self.endpoint,
             internal_log_rate_limit = true,
         );
-        counter!("http_error_response_total", 1);
         counter!(
             "component_errors_total", 1,
             "stage" => error_stage::RECEIVING,
@@ -105,7 +98,6 @@ impl InternalEvent for ApacheMetricsHttpError<'_> {
             endpoint = %self.endpoint,
             internal_log_rate_limit = true,
         );
-        counter!("http_request_errors_total", 1);
         counter!(
             "component_errors_total", 1,
             "stage" => error_stage::RECEIVING,

@@ -3,7 +3,7 @@
 #![allow(dead_code)]
 #![allow(unreachable_pub)]
 use serde::{Deserialize, Serialize};
-use vector_config::configurable_component;
+use vector_lib::event::DatadogMetricOriginMetadata;
 
 pub const DD_US_SITE: &str = "datadoghq.com";
 pub const DD_EU_SITE: &str = "datadoghq.eu";
@@ -21,6 +21,14 @@ pub(crate) struct DatadogSeriesMetric {
     pub(crate) source_type_name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) device: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) metadata: Option<DatadogSeriesMetricMetadata>,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub(crate) struct DatadogSeriesMetricMetadata {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) origin: Option<DatadogMetricOriginMetadata>,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
@@ -33,37 +41,6 @@ pub(crate) enum DatadogMetricType {
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub(crate) struct DatadogPoint<T>(pub(crate) i64, pub(crate) T);
-
-/// A Datadog region.
-#[configurable_component]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub enum Region {
-    /// US region.
-    Us,
-
-    /// EU region.
-    Eu,
-}
-
-/// Gets the base domain to use for any calls to Datadog.
-///
-/// This is a helper function for Datadog component configs using the deprecated `region` field.
-///
-/// If `region` is not specified, we fallback to `site`.
-///
-/// TODO: This should be deleted when the deprecated `region` config option is fully removed,
-///       and the callers will replace the result of this function call with just `site`.
-pub(crate) const fn get_base_domain_region<'a>(site: &'a str, region: Option<&Region>) -> &'a str {
-    if let Some(region) = region {
-        match region {
-            Region::Eu => DD_EU_SITE,
-            Region::Us => DD_US_SITE,
-        }
-    } else {
-        site
-    }
-}
 
 /// Gets the base API endpoint to use for any calls to Datadog.
 ///

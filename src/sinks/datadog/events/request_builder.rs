@@ -1,10 +1,10 @@
 use std::{io, sync::Arc};
 
 use bytes::Bytes;
-use codecs::JsonSerializerConfig;
-use lookup::lookup_v2::ConfigValuePath;
-use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
-use vector_core::ByteSizeOf;
+use vector_lib::codecs::JsonSerializerConfig;
+use vector_lib::lookup::lookup_v2::ConfigValuePath;
+use vector_lib::request_metadata::{MetaDescriptive, RequestMetadata};
+use vector_lib::ByteSizeOf;
 
 use crate::{
     codecs::{Encoder, TimestampFormat, Transformer},

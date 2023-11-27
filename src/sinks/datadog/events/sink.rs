@@ -1,17 +1,12 @@
-use std::{fmt, num::NonZeroUsize};
+use std::fmt;
 
-use async_trait::async_trait;
-use futures::{stream::BoxStream, StreamExt};
-use lookup::event_path;
-use tower::Service;
-use vector_core::stream::DriverResponse;
+use vector_lib::lookup::event_path;
 
 use crate::{
-    event::Event,
-    internal_events::{ParserMissingFieldError, SinkRequestBuildError, DROP_EVENT},
+    internal_events::{ParserMissingFieldError, DROP_EVENT},
     sinks::{
         datadog::events::request_builder::{DatadogEventsRequest, DatadogEventsRequestBuilder},
-        util::{SinkBuilderExt, StreamSink},
+        prelude::*,
     },
 };
 
@@ -27,11 +22,12 @@ where
     S::Error: fmt::Debug + Into<crate::Error> + Send,
 {
     async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
-        let concurrency_limit = NonZeroUsize::new(50);
-
         input
             .filter_map(ensure_required_fields)
-            .request_builder(concurrency_limit, DatadogEventsRequestBuilder::new())
+            .request_builder(
+                default_request_builder_concurrency_limit(),
+                DatadogEventsRequestBuilder::new(),
+            )
             .filter_map(|request| async move {
                 match request {
                     Err(error) => {

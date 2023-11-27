@@ -49,6 +49,16 @@ base: components: sources: journald: configuration: {
 		required: false
 		type: string: examples: ["/var/lib/vector"]
 	}
+	emit_cursor: {
+		description: """
+			Whether to emit the [__CURSOR field][cursor]. See also [sd_journal_get_cursor][get_cursor].
+
+			[cursor]: https://www.freedesktop.org/software/systemd/man/latest/systemd.journal-fields.html#Address%20Fields
+			[get_cursor]: https://www.freedesktop.org/software/systemd/man/latest/sd_journal_get_cursor.html
+			"""
+		required: false
+		type: bool: default: false
+	}
 	exclude_matches: {
 		description: """
 			A list of sets of field/value pairs that, if any are present in a journal entry,
@@ -80,6 +90,18 @@ base: components: sources: journald: configuration: {
 		type: array: {
 			default: []
 			items: type: string: examples: ["badservice", "sysinit.target"]
+		}
+	}
+	extra_args: {
+		description: """
+			A list of extra command line arguments to pass to `journalctl`.
+
+			If specified, it is merged to the command line arguments as-is.
+			"""
+		required: false
+		type: array: {
+			default: []
+			items: type: string: examples: ["--merge"]
 		}
 	}
 	include_matches: {

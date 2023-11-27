@@ -9,6 +9,7 @@
 # /ci-run-all                 : runs all of the below
 # /ci-run-cli                 : runs CLI - Linux
 # /ci-run-misc                : runs Miscellaneous - Linux
+# /ci-run-deny                : runs Deny - Linux
 # /ci-run-component-features  : runs Component Features - Linux
 # /ci-run-cross               : runs Cross
 # /ci-run-unit-mac            : runs Unit - Mac
@@ -16,6 +17,7 @@
 # /ci-run-environment         : runs Environment Suite
 # /ci-run-regression          : runs Regression Detection Suite
 # /ci-run-k8s                 : runs K8s E2E Suite
+# /ci-run-workload-checks     : runs Workload Checks Suite
 
 name: Comment Trigger
 
@@ -50,6 +52,7 @@ jobs:
       github.event.issue.pull_request && ( contains(github.event.comment.body, '/ci-run-all')
           || contains(github.event.comment.body, '/ci-run-cli')
           || contains(github.event.comment.body, '/ci-run-misc')
+          || contains(github.event.comment.body, '/ci-run-deny')
           || contains(github.event.comment.body, '/ci-run-component-features')
           || contains(github.event.comment.body, '/ci-run-cross')
           || contains(github.event.comment.body, '/ci-run-unit-mac')
@@ -57,17 +60,18 @@ jobs:
           || contains(github.event.comment.body, '/ci-run-environment')
           || contains(github.event.comment.body, '/ci-run-regression')
           || contains(github.event.comment.body, '/ci-run-k8s')
+          || contains(github.event.comment.body, '/ci-run-workload-checks')
       )
     steps:
       - name: Generate authentication token
         id: generate_token
-        uses: tibdex/github-app-token@0914d50df753bbc42180d982a6550f195390069f
+        uses: tibdex/github-app-token@3beb63f4bd073e61482598c45c71c1019b59b73a
         with:
           app_id: ${{ secrets.GH_APP_DATADOG_VECTOR_CI_APP_ID }}
           private_key: ${{ secrets.GH_APP_DATADOG_VECTOR_CI_APP_PRIVATE_KEY }}
       - name: Get PR comment author
         id: comment
-        uses: tspascoal/get-user-teams-membership@v2
+        uses: tspascoal/get-user-teams-membership@v3
         with:
           username: ${{ github.actor }}
           team: 'Vector'
@@ -87,6 +91,12 @@ jobs:
     needs: validate
     if: contains(github.event.comment.body, '/ci-run-all') || contains(github.event.comment.body, '/ci-run-misc')
     uses: ./.github/workflows/misc.yml
+    secrets: inherit
+
+  deny:
+    needs: validate
+    if: contains(github.event.comment.body, '/ci-run-all') || contains(github.event.comment.body, '/ci-run-deny')
+    uses: ./.github/workflows/deny.yml
     secrets: inherit
 
   component-features:
@@ -129,4 +139,10 @@ jobs:
     needs: validate
     if: contains(github.event.comment.body, '/ci-run-all') || contains(github.event.comment.body, '/ci-run-k8s')
     uses: ./.github/workflows/k8s_e2e.yml
+    secrets: inherit
+
+  workload-checks:
+    needs: validate
+    if: contains(github.event.comment.body, '/ci-run-all') || contains(github.event.comment.body, '/ci-run-workload-checks')
+    uses: ./.github/workflows/workload_checks.yml
     secrets: inherit

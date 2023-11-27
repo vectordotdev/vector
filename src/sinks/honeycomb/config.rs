@@ -3,7 +3,7 @@
 use bytes::Bytes;
 use futures::FutureExt;
 use http::{Request, StatusCode, Uri};
-use vector_common::sensitive_string::SensitiveString;
+use vector_lib::sensitive_string::SensitiveString;
 use vrl::value::Kind;
 
 use crate::{
@@ -113,7 +113,7 @@ impl SinkConfig for HoneycombConfig {
 
         let service = HttpService::new(client.clone(), honeycomb_service_request_builder);
 
-        let request_limits = self.request.unwrap_with(&TowerRequestConfig::default());
+        let request_limits = self.request.into_settings();
 
         let service = ServiceBuilder::new()
             .settings(request_limits, http_response_retry_logic())

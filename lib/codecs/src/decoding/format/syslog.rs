@@ -4,13 +4,12 @@ use derivative::Derivative;
 use lookup::{event_path, owned_value_path, OwnedTargetPath, OwnedValuePath};
 use smallvec::{smallvec, SmallVec};
 use std::borrow::Cow;
-use std::collections::BTreeMap;
 use syslog_loose::{IncompleteDate, Message, ProcId, Protocol, Variant};
 use vector_config::configurable_component;
 use vector_core::config::{LegacyKey, LogNamespace};
 use vector_core::{
     config::{log_schema, DataType},
-    event::{Event, LogEvent, Value},
+    event::{Event, LogEvent, ObjectMap, Value},
     schema,
 };
 use vrl::value::{kind::Collection, Kind};
@@ -292,7 +291,7 @@ impl Deserializer for SyslogDeserializer {
                 log
             }
             _ => {
-                let mut log = LogEvent::from(Value::Object(BTreeMap::new()));
+                let mut log = LogEvent::from(Value::Object(ObjectMap::new()));
                 insert_fields_from_syslog(&mut log, parsed, log_namespace);
                 log
             }
@@ -402,15 +401,15 @@ fn insert_metadata_fields_from_syslog(
         );
     }
 
-    let mut sdata: BTreeMap<String, Value> = BTreeMap::new();
+    let mut sdata = ObjectMap::new();
     for element in parsed.structured_data.into_iter() {
-        let mut data: BTreeMap<String, Value> = BTreeMap::new();
+        let mut data = ObjectMap::new();
 
         for (name, value) in element.params() {
-            data.insert(name.to_string(), value.into());
+            data.insert(name.to_string().into(), value.into());
         }
 
-        sdata.insert(element.id.to_string(), data.into());
+        sdata.insert(element.id.into(), data.into());
     }
 
     log_namespace.insert_source_metadata(
@@ -474,9 +473,9 @@ fn insert_fields_from_syslog(
     }
 
     for element in parsed.structured_data.into_iter() {
-        let mut sdata: BTreeMap<String, Value> = BTreeMap::new();
+        let mut sdata = ObjectMap::new();
         for (name, value) in element.params() {
-            sdata.insert(name.to_string(), value.into());
+            sdata.insert(name.to_string().into(), value.into());
         }
         log.insert(event_path!(element.id), sdata);
     }

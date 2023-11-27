@@ -1,0 +1,48 @@
+# Set global options
+"data_dir": "/var/lib/vector"
+
+# Ingest data by tailing one or more files
+"sources":
+  "apache_logs":
+    "type": "file"
+    "include": [ "/var/log/apache2/*.log" ]    # supports globbing
+    "ignore_older": 86400                    # 1 day
+
+# Structure and parse the data
+"transforms":
+  "apache_parser":
+    "inputs": [ "apache_logs" ]
+    "type": "remap"
+    "drop_on_error": false
+    "source": '''
+. = parse_apache_log!(.message)
+'''
+
+  "apache_sample":
+    "inputs": [ "apache_parser" ]
+    "type": "sample"
+    "rate": 2                            # only keep 50% (1/`rate`)
+
+# Send structured data to a short-term storage
+"sinks":
+  "es_cluster":
+    "inputs": [ "apache_sample" ]            # only take sampled data
+    "type": "elasticsearch"
+    "endpoint": "http://79.12.221.222:9200"   # local or external host
+    "bulk":
+      "index": "vector-%Y-%m-%d"             # daily indices
+
+  # Send structured data to a cost-effective long-term storage
+  "s3_archives":
+    "inputs": [ "apache_parser" ]           # don't sample for S3
+    "type": "aws_s3"
+    "region": "us-east-1"
+    "bucket": "my-log-archives"
+    "key_prefix": "date=%Y-%m-%d"         # daily partitions, hive friendly format
+    "compression": "gzip"                 # compress final objects
+    "framing":
+      "method": "newline_delimited"       # new line delimited...
+    "encoding":
+      "codec": "json"                     # ...JSON
+    "batch":
+      "max_bytes": 10000000               # 10mb uncompressed

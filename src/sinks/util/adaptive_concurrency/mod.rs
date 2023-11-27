@@ -9,13 +9,9 @@ mod service;
 #[cfg(test)]
 pub mod tests;
 
-// Make sure to update the max range of the `AdaptiveConcurrencySettings::initial_concurrency` when changing
-// this constant.
-pub(super) const MAX_CONCURRENCY: usize = 200;
-
 pub(crate) use layer::AdaptiveConcurrencyLimitLayer;
 pub(crate) use service::AdaptiveConcurrencyLimit;
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 
 fn instant_now() -> std::time::Instant {
     tokio::time::Instant::now().into()
@@ -36,7 +32,7 @@ pub struct AdaptiveConcurrencySettings {
     /// It is recommended to set this value to your service's average limit if you're seeing that it takes a
     /// long time to ramp up adaptive concurrency after a restart. You can find this value by looking at the
     /// `adaptive_concurrency_limit` metric.
-    #[configurable(validation(range(min = 1, max = 200)))]
+    #[configurable(validation(range(min = 1)))]
     #[serde(default = "default_initial_concurrency")]
     pub(super) initial_concurrency: usize,
 
@@ -72,6 +68,13 @@ pub struct AdaptiveConcurrencySettings {
     #[configurable(validation(range(min = 0.0)))]
     #[serde(default = "default_rtt_deviation_scale")]
     pub(super) rtt_deviation_scale: f64,
+
+    /// The maximum concurrency limit.
+    ///
+    /// The adaptive request concurrency limit will not go above this bound. This is put in place as a safeguard.
+    #[configurable(validation(range(min = 1)))]
+    #[serde(default = "default_max_concurrency_limit")]
+    pub(super) max_concurrency_limit: usize,
 }
 
 const fn default_initial_concurrency() -> usize {
@@ -90,10 +93,8 @@ const fn default_rtt_deviation_scale() -> f64 {
     2.5
 }
 
-impl AdaptiveConcurrencySettings {
-    pub const fn max_concurrency() -> usize {
-        MAX_CONCURRENCY
-    }
+const fn default_max_concurrency_limit() -> usize {
+    200
 }
 
 impl Default for AdaptiveConcurrencySettings {
@@ -103,6 +104,7 @@ impl Default for AdaptiveConcurrencySettings {
             decrease_ratio: default_decrease_ratio(),
             ewma_alpha: default_ewma_alpha(),
             rtt_deviation_scale: default_rtt_deviation_scale(),
+            max_concurrency_limit: default_max_concurrency_limit(),
         }
     }
 }

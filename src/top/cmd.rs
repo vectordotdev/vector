@@ -3,7 +3,7 @@ use std::time::Duration;
 use chrono::Local;
 use futures_util::future::join_all;
 use tokio::sync::{mpsc, oneshot};
-use vector_api_client::{connect_subscription_client, Client};
+use vector_lib::api_client::{connect_subscription_client, Client};
 
 use super::{
     dashboard::{init_dashboard, is_tty},
@@ -37,7 +37,7 @@ pub async fn cmd(opts: &super::Opts) -> exitcode::ExitCode {
 
             Have you enabled the API?
 
-            To enable the API, add the following to your `vector.toml` config file:
+            To enable the API, add the following to your Vector config file:
 
             [api]
                 enabled = true"},

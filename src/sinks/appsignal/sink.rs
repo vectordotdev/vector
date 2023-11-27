@@ -1,17 +1,6 @@
-use futures::{stream::BoxStream, StreamExt};
 use futures_util::future::ready;
-use tower::{Service, ServiceBuilder};
-use vector_core::{
-    event::Event,
-    sink::StreamSink,
-    stream::{BatcherSettings, DriverResponse},
-};
 
-use crate::{
-    codecs::Transformer,
-    internal_events::SinkRequestBuildError,
-    sinks::util::{buffer::metrics::MetricNormalizer, builder::SinkBuilderExt, Compression},
-};
+use crate::sinks::{prelude::*, util::buffer::metrics::MetricNormalizer};
 
 use super::{
     encoder::AppsignalEncoder,
@@ -45,9 +34,9 @@ where
                     Some(event)
                 })
             })
-            .batched(self.batch_settings.into_byte_size_config())
+            .batched(self.batch_settings.as_byte_size_config())
             .request_builder(
-                None,
+                default_request_builder_concurrency_limit(),
                 AppsignalRequestBuilder {
                     compression: self.compression,
                     encoder: AppsignalEncoder {

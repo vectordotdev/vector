@@ -252,8 +252,12 @@ components: sinks: [Name=string]: {
 									type: string: {
 										default: "rfc3339"
 										enum: {
-											rfc3339: "Formats as a RFC3339 string"
-											unix:    "Formats as a unix timestamp"
+											rfc3339:    "Formats as a RFC3339 string"
+											unix:       "Formats as a unix timestamp"
+											unix_ms:    "Formats as a unix timestamp in milliseconds"
+											unix_us:    "Formats as a unix timestamp in microseconds"
+											unix_ns:    "Formats as a unix timestamp in nanoseconds"
+											unix_float: "Formats as a unix timestamp in floating point"
 										}
 									}
 								}
@@ -601,10 +605,11 @@ components: sinks: [Name=string]: {
 								If Adaptive Request Concurrency is not for you, you can manually set static concurrency
 								limits by specifying an integer for `request.concurrency`:
 
-								```toml title="vector.toml"
-								[sinks.my-sink]
-								  request.concurrency = 10
-								```
+								```yaml title="vector.yaml"
+								sinks:
+									my-sink:
+										request:
+											concurrency: 10
 								"""
 						},
 						{
@@ -614,10 +619,12 @@ components: sinks: [Name=string]: {
 								throughput via the `request.rate_limit_duration_secs` and `request.rate_limit_num`
 								options.
 
-								```toml title="vector.toml"
-								[sinks.my-sink]
-								  request.rate_limit_duration_secs = 1
-								  request.rate_limit_num = 10
+								```yaml title="vector.yaml"
+								sinks:
+									my-sink:
+										request:
+											rate_limit_duration_secs: 1
+											rate_limit_num: 10
 								```
 
 								These will apply to both `adaptive` and fixed `request.concurrency` values.
@@ -644,7 +651,9 @@ components: sinks: [Name=string]: {
 					title: "Transport Layer Security (TLS)"
 					body:  """
 						Vector uses [OpenSSL](\(urls.openssl)) for TLS protocols due to OpenSSL's maturity. You can
-						enable and adjust TLS behavior using the [`tls.*`](#tls) options.
+						enable and adjust TLS behavior via the [`tls.*`](#tls) options and/or via an
+						[OpenSSL configuration file](\(urls.openssl_conf)). The file location defaults to
+						`/usr/local/ssl/openssl.cnf` or can be specified with the `OPENSSL_CONF` environment variable.
 						"""
 				}
 			}

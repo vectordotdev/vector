@@ -6,13 +6,14 @@ use futures::future;
 use http::StatusCode;
 use ordered_float::NotNan;
 use prost::Message;
-use vector_common::internal_event::{CountByteSize, InternalEventHandle as _};
-use vector_core::EstimatedJsonEncodedSizeOf;
 use vrl::event_path;
 use warp::{filters::BoxedFilter, path, path::FullPath, reply::Response, Filter, Rejection, Reply};
 
+use vector_lib::internal_event::{CountByteSize, InternalEventHandle as _};
+use vector_lib::EstimatedJsonEncodedSizeOf;
+
 use crate::{
-    event::{Event, TraceEvent, Value},
+    event::{Event, ObjectMap, TraceEvent, Value},
     sources::{
         datadog_agent::{ddtrace_proto, handle_request, ApiKeyQueryParams, DatadogAgentSource},
         util::ErrorMessage,
@@ -150,8 +151,14 @@ fn handle_dd_trace_payload_v1(
             trace_event.insert(&source.log_schema_host_key, hostname.clone());
             trace_event.insert(event_path!("env"), env.clone());
             trace_event.insert(event_path!("agent_version"), agent_version.clone());
-            trace_event.insert(event_path!("target_tps"), target_tps);
-            trace_event.insert(event_path!("error_tps"), error_tps);
+            trace_event.insert(
+                event_path!("target_tps"),
+                Value::Float(NotNan::new(target_tps).expect("target_tps cannot be Nan")),
+            );
+            trace_event.insert(
+                event_path!("error_tps"),
+                Value::Float(NotNan::new(error_tps).expect("error_tps cannot be Nan")),
+            );
             if let Some(Value::Object(span_tags)) = trace_event.get_mut(event_path!("tags")) {
                 span_tags.extend(tags.clone());
             } else {
@@ -275,8 +282,8 @@ fn handle_dd_trace_payload_v0(
     Ok(enriched_events)
 }
 
-fn convert_span(dd_span: ddtrace_proto::Span) -> BTreeMap<String, Value> {
-    let mut span = BTreeMap::<String, Value>::new();
+fn convert_span(dd_span: ddtrace_proto::Span) -> ObjectMap {
+    let mut span = ObjectMap::new();
     span.insert("service".into(), Value::from(dd_span.service));
     span.insert("name".into(), Value::from(dd_span.name));
 
@@ -301,8 +308,13 @@ fn convert_span(dd_span: ddtrace_proto::Span) -> BTreeMap<String, Value> {
             dd_span
                 .metrics
                 .into_iter()
-                .map(|(k, v)| (k, NotNan::new(v).map(Value::Float).unwrap_or(Value::Null)))
-                .collect::<BTreeMap<String, Value>>(),
+                .map(|(k, v)| {
+                    (
+                        k.into(),
+                        NotNan::new(v).map(Value::Float).unwrap_or(Value::Null),
+                    )
+                })
+                .collect::<ObjectMap>(),
         ),
     );
     span.insert("type".into(), Value::from(dd_span.r#type));
@@ -312,17 +324,17 @@ fn convert_span(dd_span: ddtrace_proto::Span) -> BTreeMap<String, Value> {
             dd_span
                 .meta_struct
                 .into_iter()
-                .map(|(k, v)| (k, Value::from(bytes::Bytes::from(v))))
-                .collect::<BTreeMap<String, Value>>(),
+                .map(|(k, v)| (k.into(), Value::from(bytes::Bytes::from(v))))
+                .collect::<ObjectMap>(),
         ),
     );
 
     span
 }
 
-fn convert_tags(original_map: BTreeMap<String, String>) -> BTreeMap<String, Value> {
+fn convert_tags(original_map: BTreeMap<String, String>) -> ObjectMap {
     original_map
         .into_iter()
-        .map(|(k, v)| (k, Value::from(v)))
-        .collect::<BTreeMap<String, Value>>()
+        .map(|(k, v)| (k.into(), Value::from(v)))
+        .collect::<ObjectMap>()
 }

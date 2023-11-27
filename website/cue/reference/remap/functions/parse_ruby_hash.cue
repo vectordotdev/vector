@@ -21,7 +21,7 @@ remap: functions: parse_ruby_hash: {
 		},
 	]
 	internal_failure_reasons: [
-		"`value` isn't a valid ruby hash formatted payload",
+		"`value` is not a valid ruby hash formatted payload.",
 	]
 
 	return: types: ["object"]

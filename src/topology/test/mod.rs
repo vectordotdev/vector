@@ -7,7 +7,6 @@ use std::{
     },
 };
 
-use crate::schema::Definition;
 use crate::{
     config::{Config, ConfigDiff, SinkOuter},
     event::{into_event_stream, Event, EventArray, EventContainer, LogEvent},
@@ -19,16 +18,17 @@ use crate::{
         },
         start_topology, trace_init,
     },
-    topology::{self, builder},
+    topology::{RunningTopology, TopologyPieces},
 };
+use crate::{schema::Definition, source_sender::SourceSenderItem};
 use futures::{future, stream, StreamExt};
 use tokio::{
     task::yield_now,
     time::{sleep, Duration},
 };
-use vector_buffers::{BufferConfig, BufferType, WhenFull};
-use vector_common::config::ComponentKey;
-use vector_core::config::OutputId;
+use vector_lib::buffers::{BufferConfig, BufferType, WhenFull};
+use vector_lib::config::ComponentKey;
+use vector_lib::config::OutputId;
 
 mod backpressure;
 mod compliance;
@@ -78,8 +78,8 @@ fn into_message(event: Event) -> String {
         .into_owned()
 }
 
-fn into_message_stream(array: EventArray) -> impl futures::Stream<Item = String> {
-    stream::iter(array.into_events().map(into_message))
+fn into_message_stream(array: SourceSenderItem) -> impl futures::Stream<Item = String> {
+    stream::iter(array.events.into_events().map(into_message))
 }
 
 #[tokio::test]
@@ -120,7 +120,7 @@ async fn topology_shutdown_while_active() {
     assert_eq!(processed_events.len(), counter.load(Ordering::Relaxed));
     for event in processed_events
         .into_iter()
-        .flat_map(EventArray::into_events)
+        .flat_map(|item| EventArray::into_events(item.into()))
     {
         assert_eq!(
             event.as_log()[&crate::config::log_schema()
@@ -185,11 +185,11 @@ async fn topology_multiple_sources() {
 
     in1.send_event(event1.clone()).await.unwrap();
 
-    let out_event1 = out1.next().await;
+    let out_event1: Option<EventArray> = out1.next().await.map(|item| item.into());
 
     in2.send_event(event2.clone()).await.unwrap();
 
-    let out_event2 = out1.next().await;
+    let out_event2: Option<EventArray> = out1.next().await.map(|item| item.into());
 
     topology.stop().await;
 
@@ -629,7 +629,9 @@ async fn topology_swap_transform_is_atomic() {
         }
     };
     let input = async move {
-        in1.send_batch(iter::from_fn(events)).await.unwrap();
+        in1.send_event_stream(stream::iter(iter::from_fn(events)))
+            .await
+            .unwrap();
     };
     let output = out1.for_each(move |_| {
         recv_counter.fetch_add(1, Ordering::Release);
@@ -782,12 +784,7 @@ async fn topology_rebuild_connected_transform() {
 async fn topology_required_healthcheck_fails_start() {
     let mut config = basic_config_with_sink_failing_healthcheck();
     config.healthchecks.require_healthy = true;
-    let diff = ConfigDiff::initial(&config);
-    let pieces = topology::build_or_log_errors(&config, &diff, HashMap::new())
-        .await
-        .unwrap();
-
-    assert!(topology::start_validated(config, diff, pieces)
+    assert!(RunningTopology::start_init_validated(config)
         .await
         .is_none());
 }
@@ -795,11 +792,7 @@ async fn topology_required_healthcheck_fails_start() {
 #[tokio::test]
 async fn topology_optional_healthcheck_does_not_fail_start() {
     let config = basic_config_with_sink_failing_healthcheck();
-    let diff = ConfigDiff::initial(&config);
-    let pieces = topology::build_or_log_errors(&config, &diff, HashMap::new())
-        .await
-        .unwrap();
-    assert!(topology::start_validated(config, diff, pieces)
+    assert!(RunningTopology::start_init_validated(config)
         .await
         .is_some());
 }
@@ -898,7 +891,7 @@ async fn topology_disk_buffer_flushes_on_idle() {
 
     // make sure there are no unexpected stragglers
     let rest = out1.collect::<Vec<_>>().await;
-    assert_eq!(rest, vec![]);
+    assert!(rest.is_empty());
 }
 
 #[tokio::test]
@@ -913,7 +906,7 @@ async fn topology_transform_error_definition() {
 
     let config = config.build().unwrap();
     let diff = ConfigDiff::initial(&config);
-    let errors = match builder::build_pieces(&config, &diff, HashMap::new()).await {
+    let errors = match TopologyPieces::build(&config, &diff, HashMap::new()).await {
         Ok(_) => panic!("build pieces should not succeed"),
         Err(err) => err,
     };
@@ -946,12 +939,12 @@ async fn source_metadata_reaches_sink() {
     in1.send_event(event1.clone()).await.unwrap();
 
     let out_event1 = out1.next().await.unwrap();
-    let out_event1 = out_event1.iter_events().next().unwrap();
+    let out_event1 = out_event1.events.iter_events().next().unwrap();
 
     in2.send_event(event2.clone()).await.unwrap();
 
     let out_event2 = out1.next().await.unwrap();
-    let out_event2 = out_event2.iter_events().next().unwrap();
+    let out_event2 = out_event2.events.iter_events().next().unwrap();
 
     topology.stop().await;
 

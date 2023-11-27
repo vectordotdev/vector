@@ -43,6 +43,7 @@ async fn receive_logs_legacy_namespace() {
             http: HttpConfig {
                 address: source_http_address().parse().unwrap(),
                 tls: Default::default(),
+                keepalive: Default::default(),
             },
             acknowledgements: Default::default(),
             log_namespace: Default::default(),

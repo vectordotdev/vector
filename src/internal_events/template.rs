@@ -1,8 +1,6 @@
-use crate::emit;
 use metrics::counter;
-use vector_core::internal_event::{ComponentEventsDropped, InternalEvent, UNINTENTIONAL};
-
-use vector_common::internal_event::{error_stage, error_type};
+use vector_lib::internal_event::{error_stage, error_type};
+use vector_lib::internal_event::{ComponentEventsDropped, InternalEvent, UNINTENTIONAL};
 
 pub struct TemplateRenderingError<'a> {
     pub field: Option<&'a str>,
