@@ -260,7 +260,7 @@ governor = { version = "0.6.0", default-features = false, features = ["dashmap",
 grok = { version = "2.0.0", default-features = false, optional = true }
 h2 = { version = "0.4.0", default-features = false, optional = true }
 hash_hasher = { version = "2.0.0", default-features = false }
-hashbrown = { version = "0.14.2", default-features = false, optional = true, features = ["ahash"] }
+hashbrown = { version = "0.14.3", default-features = false, optional = true, features = ["ahash"] }
 headers = { version = "0.3.9", default-features = false }
 hostname = { version = "0.3.1", default-features = false }
 http = { version = "0.2.9", default-features = false }
