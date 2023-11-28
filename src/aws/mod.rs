@@ -17,6 +17,7 @@ use aws_credential_types::provider::{ProvideCredentials, SharedCredentialsProvid
 use aws_sdk_sqs::{config::Builder, Config};
 use aws_sigv4::http_request::{SignableBody, SignableRequest, SigningParams, SigningSettings};
 use aws_sigv4::sign::v4;
+use aws_smithy_async::rt::sleep::TokioSleep;
 use aws_smithy_runtime::client::http::hyper_014::HyperClientBuilder;
 use aws_smithy_runtime_api::client::identity::Identity;
 use aws_smithy_runtime_api::client::orchestrator::HttpRequest;
@@ -102,37 +103,38 @@ pub trait ClientBuilder {
 
 pub async fn create_smithy_client<T: ClientBuilder>(
     _region: Region,
-    proxy: &ProxyConfig,
-    tls_options: &Option<TlsConfig>,
+    _proxy: &ProxyConfig,
+    _tls_options: &Option<TlsConfig>,
     _is_sink: bool,
-    retry_config: RetryConfig,
+    _retry_config: RetryConfig,
 ) -> crate::Result<Config> {
-    let tls_settings = MaybeTlsSettings::tls_client(tls_options)?;
+    unimplemented!()
+    //     let tls_settings = MaybeTlsSettings::tls_client(tls_options)?;
 
-    let connector = if proxy.enabled {
-        let proxy = build_proxy_connector(tls_settings, proxy)?;
-        // let hyper_client = aws_smithy_client::hyper_ext::Adapter::builder().build(proxy);
-        HyperClientBuilder::new().build(proxy)
-    } else {
-        let tls_connector = build_tls_connector(tls_settings)?;
-        // let hyper_client = aws_smithy_client::hyper_ext::Adapter::builder().build(tls_connector);
-        HyperClientBuilder::new().build(tls_connector)
-    };
+    //     let connector = if proxy.enabled {
+    //         let proxy = build_proxy_connector(tls_settings, proxy)?;
+    //         // let hyper_client = aws_smithy_client::hyper_ext::Adapter::builder().build(proxy);
+    //         HyperClientBuilder::new().build(proxy)
+    //     } else {
+    //         let tls_connector = build_tls_connector(tls_settings)?;
+    //         // let hyper_client = aws_smithy_client::hyper_ext::Adapter::builder().build(tls_connector);
+    //         HyperClientBuilder::new().build(tls_connector)
+    //     };
 
-    // let middleware_builder = ServiceBuilder::new()
-    //     .layer(CaptureRequestSize::new(is_sink, region))
-    //     .layer(T::default_middleware());
-    // let middleware = DynMiddleware::new(middleware_builder);
+    //     // let middleware_builder = ServiceBuilder::new()
+    //     //     .layer(CaptureRequestSize::new(is_sink, region))
+    //     //     .layer(T::default_middleware());
+    //     // let middleware = DynMiddleware::new(middleware_builder);
 
-    let client_builder = Builder::new();
-    let mut client_builder = client_builder
-        .http_client(connector)
-        // .middleware(middleware)
-        // .set_interceptors(T::default_middleware());
-    // .sleep_impl(Arc::new(TokioSleep::new()));
-    client_builder.set_retry_config(Some(retry_config.into()));
+    //     let client_builder = Builder::new();
+    //     let mut client_builder = client_builder
+    //         .http_client(connector)
+    //         // .middleware(middleware)
+    //         // .set_interceptors(T::default_middleware());
+    //     // .sleep_impl(Arc::new(TokioSleep::new()));
+    //     client_builder.set_retry_config(Some(retry_config.into()));
 
-    Ok(client_builder.build())
+    //     Ok(client_builder.build())
 }
 
 pub async fn resolve_region(region: Option<Region>) -> crate::Result<Region> {
@@ -164,8 +166,8 @@ pub async fn create_client_and_region<T: ClientBuilder>(
     auth: &AwsAuthentication,
     region: Option<Region>,
     endpoint: Option<String>,
-    _proxy: &ProxyConfig,
-    _tls_options: &Option<TlsConfig>,
+    proxy: &ProxyConfig,
+    tls_options: &Option<TlsConfig>,
     _is_sink: bool,
 ) -> crate::Result<(T::Client, Region)> {
     let retry_config = RetryConfig::disabled();
@@ -177,8 +179,22 @@ pub async fn create_client_and_region<T: ClientBuilder>(
     let provider_config =
         aws_config::provider_config::ProviderConfig::empty().with_region(Some(region.clone()));
 
+    let tls_settings = MaybeTlsSettings::tls_client(tls_options)?;
+
+    let connector = if proxy.enabled {
+        let proxy = build_proxy_connector(tls_settings, proxy)?;
+        // let hyper_client = aws_smithy_client::hyper_ext::Adapter::builder().build(proxy);
+        HyperClientBuilder::new().build(proxy)
+    } else {
+        let tls_connector = build_tls_connector(tls_settings)?;
+        // let hyper_client = aws_smithy_client::hyper_ext::Adapter::builder().build(tls_connector);
+        HyperClientBuilder::new().build(tls_connector)
+    };
+
     // Build the configuration first.
     let mut config_builder = SdkConfig::builder()
+        .http_client(connector)
+        .sleep_impl(Arc::new(TokioSleep::new()))
         .identity_cache(auth.credentials_cache().await?)
         .credentials_provider(auth.credentials_provider(region.clone()).await?)
         .region(region.clone())
