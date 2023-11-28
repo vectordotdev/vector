@@ -54,6 +54,6 @@ On the day of release:
 - [ ] Add docker images to [https://github.com/DataDog/images](https://github.com/DataDog/images/tree/master/vector) to have them available internally.
 - [ ] Cherry-pick any release commits from the release branch that are not on `master`, to `master`
 - [ ] Bump the release number in the `Cargo.toml` on master to the next major release
-- [ ] Drop a note in the #websites Slack channel to request an update of the branch deployed for
+- [ ] Drop a note in the #websites Slack channel to request an update of the branch deployed
       at https://vector.dev to the new release branch.
 - [ ] Kick-off post-mortems for any regressions resolved by the release
