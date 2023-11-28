@@ -3,12 +3,12 @@
 
 use aws_sdk_elasticsearch::Client as EsClient;
 use aws_sdk_firehose::model::ElasticsearchDestinationConfiguration;
+use futures::StreamExt;
 use futures::TryFutureExt;
 use serde_json::{json, Value};
 use tokio::time::{sleep, Duration};
 use vector_lib::codecs::JsonSerializerConfig;
 use vector_lib::lookup::lookup_v2::ConfigValuePath;
-use futures::StreamExt;
 
 use super::{config::KinesisFirehoseClientBuilder, *};
 use crate::{
@@ -233,7 +233,7 @@ async fn firehose_put_records_with_partition_key() {
         .as_array()
         .expect("Elasticsearch response does not include hits->hits");
     #[allow(clippy::needless_collect)] // https://github.com/rust-lang/rust-clippy/issues/6909
-        let input = input
+    let input = input
         .into_iter()
         .map(|rec| serde_json::to_value(&rec.into_log()).unwrap())
         .collect::<Vec<_>>();
