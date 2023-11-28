@@ -31,7 +31,7 @@ async fn create_test_client() -> SqsClient {
     let proxy = ProxyConfig::default();
     create_client::<SqsClientBuilder>(
         &auth,
-        Some(Region::new("localstack")),
+        Some(Region::new("us-east-1")),
         Some(endpoint),
         &proxy,
         &None,

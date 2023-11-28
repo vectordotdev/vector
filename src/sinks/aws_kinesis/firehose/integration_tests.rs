@@ -44,7 +44,7 @@ async fn firehose_put_records() {
     let mut batch = BatchConfig::default();
     batch.max_events = Some(2);
 
-    let region = RegionOrEndpoint::with_both("localstack", kinesis_address().as_str());
+    let region = RegionOrEndpoint::with_both("us-east-1", kinesis_address().as_str());
 
     let base = KinesisSinkBaseConfig {
         stream_name: stream.clone(),
@@ -130,7 +130,7 @@ async fn firehose_put_records() {
 }
 
 fn test_region_endpoint() -> RegionOrEndpoint {
-    RegionOrEndpoint::with_both("localstack", kinesis_address())
+    RegionOrEndpoint::with_both("us-east-1", kinesis_address())
 }
 
 async fn firehose_client() -> aws_sdk_firehose::Client {

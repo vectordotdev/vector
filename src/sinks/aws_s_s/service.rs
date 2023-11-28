@@ -65,7 +65,15 @@ where
         let byte_size = entry.size_of();
         let client = self.client.clone();
 
-        Box::pin(async move { client.send_message(entry, byte_size).await })
+        Box::pin(async move {
+            let result = client.send_message(entry, byte_size).await;
+
+            if let Err(ref err) = result {
+                dbg!(err);
+            }
+
+            result
+        })
     }
 }
 

@@ -33,7 +33,7 @@ fn kinesis_address() -> String {
 //
 //    let base = KinesisSinkBaseConfig {
 //        stream_name: stream.clone(),
-//        region: RegionOrEndpoint::with_both("localstack", kinesis_address().as_str()),
+//        region: RegionOrEndpoint::with_both("us-east-1", kinesis_address().as_str()),
 //        encoding: TextSerializerConfig::default().into(),
 //        compression: Compression::None,
 //        request: Default::default(),
@@ -89,7 +89,7 @@ async fn kinesis_put_records_without_partition_key() {
 
     let base = KinesisSinkBaseConfig {
         stream_name: stream.clone(),
-        region: RegionOrEndpoint::with_both("localstack", kinesis_address().as_str()),
+        region: RegionOrEndpoint::with_both("us-east-1", kinesis_address().as_str()),
         encoding: TextSerializerConfig::default().into(),
         compression: Compression::None,
         request: Default::default(),
@@ -168,7 +168,7 @@ async fn fetch_records(stream_name: String, timestamp: i64) -> crate::Result<Vec
 async fn client() -> aws_sdk_kinesis::Client {
     let auth = AwsAuthentication::test_auth();
     let proxy = ProxyConfig::default();
-    let region = RegionOrEndpoint::with_both("localstack", kinesis_address());
+    let region = RegionOrEndpoint::with_both("us-east-1", kinesis_address());
     create_client::<KinesisClientBuilder>(
         &auth,
         region.region(),
