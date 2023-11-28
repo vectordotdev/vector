@@ -54,8 +54,6 @@ On the day of release:
 - [ ] Add docker images to [https://github.com/DataDog/images](https://github.com/DataDog/images/tree/master/vector) to have them available internally.
 - [ ] Cherry-pick any release commits from the release branch that are not on `master`, to `master`
 - [ ] Bump the release number in the `Cargo.toml` on master to the next major release
-- [ ] [Update Netlify deploy settings](https://app.netlify.com/sites/vector-project/settings/deploys#deploy-contexts)
-  - [ ] Update production branch to the new major version
-  - [ ] Update branch deploys to include the previous major version
-  - [ ] Add [branch subdomain](https://app.netlify.com/sites/vector-project/settings/domain) for previous version
+- [ ] Drop a note in the #websites Slack channel to request an update of the branch deployed
+      at https://vector.dev to the new release branch.
 - [ ] Kick-off post-mortems for any regressions resolved by the release
