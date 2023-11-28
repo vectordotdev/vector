@@ -9,7 +9,7 @@ components: sources: pulsar: {
 		deployment_roles: ["aggregator"]
 		development:   "beta"
 		egress_method: "stream"
-		stateful: false
+		stateful:      false
 	}
 
 	features: {
