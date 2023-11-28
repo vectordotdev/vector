@@ -1,3 +1,4 @@
+use aws_sdk_s3::config;
 use aws_smithy_runtime_api::client::interceptors::SharedInterceptor;
 
 use crate::aws::ClientBuilder;
@@ -15,11 +16,7 @@ impl ClientBuilder for S3ClientBuilder {
     }
 
     fn build(config: &aws_types::SdkConfig) -> Self::Client {
-        // TODO - where i put this?
-        // let config = aws_sdk_s3::config::Builder::from(config)
-        //     .force_path_style(true)
-        //     .build();
-
-        aws_sdk_s3::client::Client::new(config)
+        let config = config::Builder::from(config).force_path_style(true).build();
+        aws_sdk_s3::client::Client::from_conf(config)
     }
 }
