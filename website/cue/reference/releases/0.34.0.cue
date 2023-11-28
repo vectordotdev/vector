@@ -38,7 +38,7 @@ releases: "0.34.0": {
 			sink, we advise remaining on v0.33.1.
 			""",
 		"""
-			The `protobuf` encoder does not work in components [#19230](https://github.com/vectordotdev/vector/issues/19230).
+			The `protobuf` encoder does not work in sinks [#19230](https://github.com/vectordotdev/vector/issues/19230).
 			""",
 	]
 
