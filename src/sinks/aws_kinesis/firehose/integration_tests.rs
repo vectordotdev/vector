@@ -75,6 +75,7 @@ async fn firehose_put_records_without_partition_key() {
 
     run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
 
+    // Hard-coded sleeps are bad, but we're waiting on localstack's state to converge.
     sleep(Duration::from_secs(5)).await;
 
     let config = ElasticsearchConfig {
@@ -186,6 +187,7 @@ async fn firehose_put_records_with_partition_key() {
 
     run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
 
+    // Hard-coded sleeps are bad, but we're waiting on localstack's state to converge.
     sleep(Duration::from_secs(5)).await;
 
     let config = ElasticsearchConfig {
