@@ -232,7 +232,7 @@ jobs:
           export REPLICAS="10"
           export TOTAL_SAMPLES="600"
           export P_VALUE="0.1"
-          export SMP_CRATE_VERSION="0.10.0"
+          export SMP_CRATE_VERSION="0.11.0"
           export LADING_VERSION="0.20.0"
 
           echo "warmup seconds: ${WARMUP_SECONDS}"
@@ -531,6 +531,7 @@ jobs:
             --wait \
             --wait-delay-seconds 60 \
             --wait-timeout-minutes 90 \
+            --use-consignor welch \
             --submission-metadata ${{ runner.temp }}/submission-metadata
 
       - name: Handle cancellation if necessary
@@ -620,7 +621,7 @@ jobs:
           chmod +x ${{ runner.temp }}/bin/smp
 
           ${{ runner.temp }}/bin/smp --team-id ${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }} job result \
-            --submission-metadata ${{ runner.temp }}/submission-metadata
+            --submission-metadata ${{ runner.temp }}/submission-metadata --use-consignor welch
 
       - name: Check status, cancelled
         if: ${{ cancelled() }}
@@ -712,7 +713,7 @@ jobs:
 
           ${{ runner.temp }}/bin/smp --team-id ${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }} job sync \
             --submission-metadata ${{ runner.temp }}/submission-metadata \
-            --output-path "${{ runner.temp }}/outputs"
+            --output-path "${{ runner.temp }}/outputs" --use-consignor welch
 
       - name: Read regression report
         id: read-analysis
