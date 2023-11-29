@@ -34,7 +34,7 @@ async fn global_options() {
     // Swap out the endpoint so we can force send it
     // to our local server
     let endpoint = format!("http://{}", addr);
-    config.dd_common.endpoint = Some(endpoint.clone());
+    config.local_dd_common.endpoint = Some(endpoint.clone());
 
     let (sink, _) = config.build(cx).await.unwrap();
 
@@ -79,7 +79,7 @@ async fn override_global_options() {
     // Swap out the endpoint so we can force send it
     // to our local server
     let endpoint = format!("http://{}", addr);
-    config.dd_common.endpoint = Some(endpoint.clone());
+    config.local_dd_common.endpoint = Some(endpoint.clone());
 
     let (sink, _) = config.build(cx).await.unwrap();
 

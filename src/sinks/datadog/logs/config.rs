@@ -51,7 +51,7 @@ impl SinkBatchSettings for DatadogLogsDefaultBatchSettings {
 #[serde(deny_unknown_fields)]
 pub struct DatadogLogsConfig {
     #[serde(flatten)]
-    pub dd_common: LocalDatadogCommonConfig,
+    pub local_dd_common: LocalDatadogCommonConfig,
 
     #[configurable(derived)]
     #[serde(default)]
@@ -141,7 +141,7 @@ impl DatadogLogsConfig {
     pub fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<HttpClient> {
         let tls_settings = MaybeTlsSettings::from_config(
             &Some(
-                self.dd_common
+                self.local_dd_common
                     .tls
                     .clone()
                     .unwrap_or_else(TlsEnableableConfig::enabled),
@@ -158,7 +158,7 @@ impl SinkConfig for DatadogLogsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let client = self.create_client(&cx.proxy)?;
         let global = cx.extra_context.get_or_default::<datadog::Options>();
-        let dd_common = self.dd_common.with_globals(global)?;
+        let dd_common = self.local_dd_common.with_globals(global)?;
 
         let healthcheck = dd_common.build_healthcheck(client.clone())?;
 
@@ -181,7 +181,7 @@ impl SinkConfig for DatadogLogsConfig {
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
-        &self.dd_common.acknowledgements
+        &self.local_dd_common.acknowledgements
     }
 }
 

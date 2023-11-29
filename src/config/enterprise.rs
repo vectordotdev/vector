@@ -460,7 +460,7 @@ fn setup_logs_reporting(
 
     // Create a Datadog logs sink to consume and emit internal logs.
     let datadog_logs = DatadogLogsConfig {
-        dd_common: LocalDatadogCommonConfig::new(
+        local_dd_common: LocalDatadogCommonConfig::new(
             datadog.endpoint.clone(),
             Some(datadog.site.clone()),
             Some(api_key.into()),
@@ -566,7 +566,7 @@ fn setup_metrics_reporting(
 
     // Create a Datadog metrics sink to consume and emit internal + host metrics.
     let datadog_metrics = DatadogMetricsConfig {
-        dd_common: LocalDatadogCommonConfig::new(
+        local_dd_common: LocalDatadogCommonConfig::new(
             datadog.endpoint.clone(),
             Some(datadog.site.clone()),
             Some(api_key.into()),
