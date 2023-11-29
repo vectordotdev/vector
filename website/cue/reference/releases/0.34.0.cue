@@ -37,6 +37,9 @@ releases: "0.34.0": {
 			be fixed in v0.34.1. Until the fix is released, if you are using the Datadog Metrics
 			sink, we advise remaining on v0.33.1.
 			""",
+		"""
+			The `protobuf` encoder does not work in sinks [#19230](https://github.com/vectordotdev/vector/issues/19230).
+			""",
 	]
 
 	changelog: [
