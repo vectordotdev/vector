@@ -616,6 +616,7 @@ sinks-logs = [
   "sinks-axiom",
   "sinks-azure_blob",
   "sinks-azure_monitor_logs",
+  "sinks-better_stack",
   "sinks-blackhole",
   "sinks-chronicle",
   "sinks-clickhouse",
@@ -676,6 +677,7 @@ sinks-aws_sns = ["aws-core", "dep:aws-sdk-sns"]
 sinks-axiom = ["sinks-elasticsearch"]
 sinks-azure_blob = ["dep:azure_core", "dep:azure_identity", "dep:azure_storage", "dep:azure_storage_blobs"]
 sinks-azure_monitor_logs = []
+sinks-better_stack = []
 sinks-blackhole = []
 sinks-chronicle = []
 sinks-clickhouse = []
