@@ -318,7 +318,7 @@ mod tests {
         let mut tree = ObjectMap::new();
 
         for (field_name, field_value) in field_data.into_iter() {
-            let field = ConfigTargetPath::try_from(field_name.clone()).unwrap();
+            let field = ConfigTargetPath::try_from(field_name.to_string()).unwrap();
             fields.push(field);
 
             let field_value = Value::from(field_value.to_string());
