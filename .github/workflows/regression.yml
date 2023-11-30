@@ -232,7 +232,7 @@ jobs:
           export REPLICAS="10"
           export TOTAL_SAMPLES="600"
           export P_VALUE="0.1"
-          export SMP_CRATE_VERSION="0.10.0"
+          export SMP_CRATE_VERSION="0.11.0"
           export LADING_VERSION="0.19.1"
 
           echo "warmup seconds: ${WARMUP_SECONDS}"
