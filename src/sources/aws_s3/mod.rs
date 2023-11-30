@@ -899,6 +899,8 @@ mod integration_tests {
                 assert_eq!(namespace.get_source_metadata(AwsS3Config::NAME, log, path!("region"), path!("region")).unwrap(), &"us-east-1".into());
             }
 
+            // TODO - This is not pleasant to have to do this.
+            tokio::time::sleep(Duration::from_secs(10)).await;
             // Make sure the SQS message is deleted
             match status {
                 Errored => {

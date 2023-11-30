@@ -1,7 +1,7 @@
 #![cfg(feature = "aws-kinesis-firehose-integration-tests")]
 #![cfg(test)]
 
-use aws_sdk_elasticsearch::Client as EsClient;
+use aws_sdk_elasticsearch::{types::DomainEndpointOptions, Client as EsClient};
 use aws_sdk_firehose::types::ElasticsearchDestinationConfiguration;
 use futures::TryFutureExt;
 use serde_json::{json, Value};
@@ -30,7 +30,10 @@ fn kinesis_address() -> String {
 }
 
 fn elasticsearch_address() -> String {
-    std::env::var("ELASTICSEARCH_ADDRESS").unwrap_or_else(|_| "http://localhost:4571".into())
+    format!(
+        "{}/es-endpoint",
+        std::env::var("ELASTICSEARCH_ADDRESS").unwrap_or_else(|_| "http://localhost:4566".into()),
+    )
 }
 
 #[tokio::test]
@@ -168,6 +171,12 @@ async fn ensure_elasticsearch_domain(domain_name: String) -> String {
     let arn = match client
         .create_elasticsearch_domain()
         .domain_name(domain_name)
+        .domain_endpoint_options(
+            DomainEndpointOptions::builder()
+                .custom_endpoint_enabled(true)
+                .custom_endpoint(elasticsearch_address())
+                .build(),
+        )
         .send()
         .await
     {
@@ -185,12 +194,12 @@ async fn ensure_elasticsearch_domain(domain_name: String) -> String {
                 .map(|v| {
                     v.get("status")
                         .and_then(|status| status.as_str())
-                        .map(|status| status == "green")
+                        .map(|status| status == "green" || status == "yellow")
                         .unwrap_or(false)
                 })
                 .unwrap_or(false)
         },
-        Duration::from_secs(60),
+        Duration::from_secs(120),
     )
     .await;
 

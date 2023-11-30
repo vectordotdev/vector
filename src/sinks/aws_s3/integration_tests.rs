@@ -425,7 +425,7 @@ async fn s3_flush_on_exhaustion() {
             filename_append_uuid: true,
             filename_extension: None,
             options: S3Options::default(),
-            region: RegionOrEndpoint::with_both("minio", s3_address()),
+            region: RegionOrEndpoint::with_both("us-east-1", s3_address()),
             encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             compression: Compression::None,
             batch,
@@ -482,7 +482,7 @@ async fn s3_flush_on_exhaustion() {
 
 async fn client() -> S3Client {
     let auth = AwsAuthentication::test_auth();
-    let region = RegionOrEndpoint::with_both("minio", s3_address());
+    let region = RegionOrEndpoint::with_both("us-east-1", s3_address());
     let proxy = ProxyConfig::default();
     let tls_options = None;
     create_client::<S3ClientBuilder>(
@@ -509,7 +509,7 @@ fn config(bucket: &str, batch_size: usize) -> S3SinkConfig {
         filename_append_uuid: true,
         filename_extension: None,
         options: S3Options::default(),
-        region: RegionOrEndpoint::with_both("minio", s3_address()),
+        region: RegionOrEndpoint::with_both("us-east-1", s3_address()),
         encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
         compression: Compression::None,
         batch,
