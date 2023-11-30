@@ -183,7 +183,11 @@ pub fn try_from(value: AvroValue) -> vector_common::Result<VrlValue> {
         AvroValue::Boolean(boolean) => Ok(VrlValue::from(boolean)),
         AvroValue::Bytes(bytes) => Ok(VrlValue::from(bytes)),
         AvroValue::Date(d) => Ok(VrlValue::from(d)),
-        AvroValue::Decimal(d) => return Err(format!("AvroValue::Decimal is not supported")),
+        AvroValue::Decimal(_) => {
+            return Err(vector_common::Error::from(format!(
+                "AvroValue::Decimal is not supported"
+            )))
+        }
         AvroValue::Double(double) => Ok(VrlValue::from_f64_or_zero(double)),
         AvroValue::Duration(d) => Ok(VrlValue::Array(
             <[u8; 12]>::from(d)
