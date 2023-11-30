@@ -2142,7 +2142,7 @@ dependencies = [
  "similar-asserts",
  "smallvec",
  "snafu",
- "syslog_loose 0.21.0",
+ "syslog_loose",
  "tokio",
  "tokio-util",
  "tracing 0.1.40",
@@ -7658,12 +7658,9 @@ dependencies = [
 
 [[package]]
 name = "roxmltree"
-version = "0.18.1"
+version = "0.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "862340e351ce1b271a378ec53f304a5558f7db87f3769dc655a8f6ecbb68b302"
-dependencies = [
- "xmlparser",
-]
+checksum = "3cd14fd5e3b777a7422cca79358c57a8f6e3a703d9ac187448d0daf220c2407f"
 
 [[package]]
 name = "rsa"
@@ -8746,16 +8743,6 @@ dependencies = [
  "libc",
  "log",
  "time",
-]
-
-[[package]]
-name = "syslog_loose"
-version = "0.19.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "acf5252d1adec0a489a0225f867c1a7fd445e41674530a396d0629cff0c4b211"
-dependencies = [
- "chrono",
- "nom",
 ]
 
 [[package]]
@@ -9873,9 +9860,9 @@ checksum = "09cc8ee72d2a9becf2f2febe0205bbed8fc6615b7cb429ad062dc7b7ddd036a9"
 
 [[package]]
 name = "utf8-width"
-version = "0.1.6"
+version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5190c9442dcdaf0ddd50f37420417d219ae5261bbf5db120d0f9bab996c9cba1"
+checksum = "86bd8d4e895da8537e5315b8254664e6b769c4ff3db18321b297a1e7004392e3"
 
 [[package]]
 name = "utf8parse"
@@ -10481,7 +10468,7 @@ checksum = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"
 [[package]]
 name = "vrl"
 version = "0.8.1"
-source = "git+https://github.com/vectordotdev/vrl?rev=37319dfca17dc5d7637b24455199029cc30eb128#37319dfca17dc5d7637b24455199029cc30eb128"
+source = "git+https://github.com/vectordotdev/vrl?rev=892d0526a691f5675c76e4e27e10ba008b020a3c#892d0526a691f5675c76e4e27e10ba008b020a3c"
 dependencies = [
  "aes",
  "ansi_term",
@@ -10515,7 +10502,7 @@ dependencies = [
  "hostname",
  "indexmap 2.1.0",
  "indoc",
- "itertools 0.11.0",
+ "itertools 0.12.0",
  "lalrpop",
  "lalrpop-util",
  "md-5",
@@ -10536,7 +10523,7 @@ dependencies = [
  "quoted_printable",
  "rand 0.8.5",
  "regex",
- "roxmltree 0.18.1",
+ "roxmltree 0.19.0",
  "rust_decimal",
  "rustyline",
  "seahash",
@@ -10546,8 +10533,9 @@ dependencies = [
  "sha2",
  "sha3",
  "snafu",
+ "snap",
  "strip-ansi-escapes",
- "syslog_loose 0.19.0",
+ "syslog_loose",
  "termcolor",
  "thiserror",
  "tracing 0.1.40",
