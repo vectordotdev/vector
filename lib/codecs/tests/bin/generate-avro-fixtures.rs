@@ -252,6 +252,7 @@ fn generate_avro_test_case_map() {
     }
     let mut scores = HashMap::new();
     scores.insert(String::from("Blue"), 10i64);
+    scores.insert(String::from("Yellow"), 50i64);
     let value = Test { map_field: scores };
     generate_test_case(schema, value, "map");
 }
