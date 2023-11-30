@@ -31,7 +31,7 @@ impl ProtobufSerializerConfig {
 
     /// The data type of events that are accepted by `ProtobufSerializer`.
     pub fn input_type(&self) -> DataType {
-        DataType::all()
+        DataType::Log
     }
 
     /// The schema required by the serializer.
@@ -252,7 +252,7 @@ mod tests {
                 message_type: "test_protobuf.Person".into(),
             },
         };
-        assert_eq!(config.input_type(), DataType::all());
+        assert_eq!(config.input_type(), DataType::Log);
     }
 
     #[test]
