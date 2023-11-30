@@ -332,17 +332,16 @@ fn remove_duplicates(mut list: Vec<String>, list_name: &str) -> Vec<String> {
 #[derive(Clone)]
 enum HttpConfigParamKind {
     Glob(glob::Pattern),
-    Exact(String)
+    Exact(String),
 }
 
-fn build_param_matcher(list: &Vec<String>) -> crate::Result<Vec<HttpConfigParamKind>> {
-    list.iter().map(|s| {
-        match s.contains('*') {
-            true => Ok(HttpConfigParamKind::Glob(glob::Pattern::new(&s)?)),
-            false => Ok(HttpConfigParamKind::Exact(s.to_string()))
-        }
-    })
-    .collect::<crate::Result<Vec<HttpConfigParamKind>>>()
+fn build_param_matcher(list: &[String]) -> crate::Result<Vec<HttpConfigParamKind>> {
+    list.iter()
+        .map(|s| match s.contains('*') {
+            true => Ok(HttpConfigParamKind::Glob(glob::Pattern::new(s)?)),
+            false => Ok(HttpConfigParamKind::Exact(s.to_string())),
+        })
+        .collect::<crate::Result<Vec<HttpConfigParamKind>>>()
 }
 
 #[async_trait::async_trait]
@@ -432,7 +431,8 @@ impl HttpSource for SimpleHttpSource {
                     for h in &self.headers {
                         match h {
                             HttpConfigParamKind::Exact(header_name) => {
-                                let value = headers_config.get(header_name).map(HeaderValue::as_bytes);
+                                let value =
+                                    headers_config.get(header_name).map(HeaderValue::as_bytes);
 
                                 self.log_namespace.insert_source_metadata(
                                     SimpleHttpConfig::NAME,
@@ -441,18 +441,25 @@ impl HttpSource for SimpleHttpSource {
                                     path!("headers", header_name),
                                     Value::from(value.map(Bytes::copy_from_slice)),
                                 );
-                            },
+                            }
                             HttpConfigParamKind::Glob(header_pattern) => {
                                 for header_name in headers_config.keys() {
-                                    if header_pattern.matches_with(header_name.as_str(), glob::MatchOptions::default()) {
-                                        let value = headers_config.get(header_name).map(HeaderValue::as_bytes);
+                                    if header_pattern.matches_with(
+                                        header_name.as_str(),
+                                        glob::MatchOptions::default(),
+                                    ) {
+                                        let value = headers_config
+                                            .get(header_name)
+                                            .map(HeaderValue::as_bytes);
 
                                         self.log_namespace.insert_source_metadata(
-                                        SimpleHttpConfig::NAME,
-                                        log,
-                                        Some(LegacyKey::InsertIfEmpty(path!(header_name.as_str()))),
-                                        path!("headers", header_name.as_str()),
-                                        Value::from(value.map(Bytes::copy_from_slice)),
+                                            SimpleHttpConfig::NAME,
+                                            log,
+                                            Some(LegacyKey::InsertIfEmpty(path!(
+                                                header_name.as_str()
+                                            ))),
+                                            path!("headers", header_name.as_str()),
+                                            Value::from(value.map(Bytes::copy_from_slice)),
                                         );
                                     }
                                 }
@@ -1068,9 +1075,7 @@ mod tests {
             headers.insert("X-Case-Sensitive-Value", "CaseSensitive".parse().unwrap());
 
             let (rx, addr) = source(
-                vec![
-                    "*".to_string(),
-                ],
+                vec!["*".to_string()],
                 vec![],
                 "http_path",
                 "/",
@@ -1096,14 +1101,12 @@ mod tests {
         {
             let event = events.remove(0);
             let log = event.as_log();
-            println!("{:?}", log);
             assert_eq!(log["key1"], "value1".into());
             assert_eq!(log["\"user-agent\""], "test_client".into());
             assert_eq!(log["\"x-case-sensitive-value\""], "CaseSensitive".into());
             assert_event_metadata(log).await;
         }
     }
-
 
     #[tokio::test]
     async fn http_query() {
