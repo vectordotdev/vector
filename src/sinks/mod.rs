@@ -32,7 +32,6 @@ pub mod azure_common;
 pub mod azure_monitor_logs;
 #[cfg(feature = "sinks-better_stack")]
 pub mod better_stack;
-// pub mod better_stack_metrics;
 #[cfg(feature = "sinks-blackhole")]
 pub mod blackhole;
 #[cfg(feature = "sinks-clickhouse")]

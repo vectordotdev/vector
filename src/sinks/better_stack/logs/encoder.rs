@@ -50,6 +50,7 @@ impl SinkEncoder<Vec<Event>> for BetterStackLogsEncoder {
         let body_content = String::from_utf8_lossy(&data);
 
         body.extend(body_content.as_bytes());
+
         let body = body.freeze();
 
         write_all(writer, n_events, body.as_ref()).map(|()| (body.len(), byte_size))

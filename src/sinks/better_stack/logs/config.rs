@@ -23,8 +23,9 @@ use super::{
 };
 
 /// Configuration for the `better_stack_logs` sink.
-#[configurable_component(sink("better_stack_logs", "Deliver logs to Better Stack."))]
+#[configurable_component(sink("better_stack_logs", "Send logs to Better Stack."))]
 #[derive(Clone, Debug)]
+#[serde(deny_unknown_fields)]
 pub struct BetterStackLogsConfig {
     // This endpoint is not user-configurable and only exists for testing purposes
     #[serde(skip, default = "default_endpoint")]
@@ -61,11 +62,6 @@ pub struct BetterStackLogsConfig {
 
 fn default_endpoint() -> String {
     "https://in.logs.betterstack.com".to_string()
-    // "https://sl.eu.ngrok.io".to_string()
-    // "https://simonx4583jwnf.free.beeceptor.com".to_string()
-    // "https://simon-3432refae.free.beeceptor.com".to_string()
-    // "https://simon-34325432.free.beeceptor.com".to_string()
-    // "https://simon-358435984793.free.beeceptor.com".to_string()
 }
 
 #[derive(Clone, Copy, Debug, Default)]
