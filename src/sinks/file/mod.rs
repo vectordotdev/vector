@@ -91,7 +91,7 @@ pub struct FileSinkConfig {
 
     #[configurable(derived)]
     #[serde(default)]
-    internal_metrics: FileInternalMetricsConfig,
+    pub internal_metrics: FileInternalMetricsConfig,
 }
 
 impl GenerateConfig for FileSinkConfig {
