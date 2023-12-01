@@ -1,5 +1,4 @@
 use aws_sdk_sns::Client as SnsClient;
-use aws_smithy_runtime_api::client::interceptors::SharedInterceptor;
 
 use crate::aws::RegionOrEndpoint;
 
@@ -107,14 +106,7 @@ impl SinkConfig for SnsSinkConfig {
 pub(super) struct SnsClientBuilder;
 
 impl ClientBuilder for SnsClientBuilder {
-    type Config = aws_sdk_sns::config::Config;
     type Client = aws_sdk_sns::client::Client;
-    // type DefaultMiddleware = aws_sdk_sns::middleware::DefaultMiddleware;
-
-    fn default_middleware() -> Vec<SharedInterceptor> {
-        // aws_sdk_sns::middleware::DefaultMiddleware::new()
-        vec![]
-    }
 
     fn build(config: &aws_types::SdkConfig) -> Self::Client {
         aws_sdk_sns::client::Client::new(config)

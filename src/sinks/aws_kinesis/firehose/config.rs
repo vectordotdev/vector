@@ -1,13 +1,7 @@
-use aws_sdk_firehose::{
-    config::Config,
-    operation::{
-        describe_delivery_stream::DescribeDeliveryStreamError,
-        put_record_batch::PutRecordBatchError,
-    },
+use aws_sdk_firehose::operation::{
+    describe_delivery_stream::DescribeDeliveryStreamError, put_record_batch::PutRecordBatchError,
 };
-use aws_smithy_runtime_api::client::{
-    interceptors::SharedInterceptor, orchestrator::HttpResponse, result::SdkError,
-};
+use aws_smithy_runtime_api::client::{orchestrator::HttpResponse, result::SdkError};
 use futures::FutureExt;
 use snafu::Snafu;
 use vector_lib::configurable::configurable_component;
@@ -42,13 +36,7 @@ enum HealthcheckError {
 pub struct KinesisFirehoseClientBuilder;
 
 impl ClientBuilder for KinesisFirehoseClientBuilder {
-    type Config = Config;
     type Client = KinesisClient;
-    // type DefaultMiddleware = DefaultMiddleware;
-
-    fn default_middleware() -> Vec<SharedInterceptor> {
-        vec![]
-    }
 
     fn build(config: &aws_types::SdkConfig) -> Self::Client {
         Self::Client::new(config)

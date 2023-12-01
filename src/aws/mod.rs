@@ -96,10 +96,7 @@ fn check_response(res: &HttpResponse) -> bool {
 }
 
 pub trait ClientBuilder {
-    type Config;
     type Client;
-
-    fn default_middleware() -> Vec<SharedInterceptor>;
 
     fn build(config: &SdkConfig) -> Self::Client;
 }

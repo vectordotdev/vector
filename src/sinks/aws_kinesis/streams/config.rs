@@ -1,4 +1,3 @@
-use aws_sdk_cloudwatch::config::SharedInterceptor;
 use aws_sdk_kinesis::operation::describe_stream::DescribeStreamError;
 use aws_sdk_kinesis::operation::put_records::PutRecordsError;
 use aws_smithy_runtime_api::client::{orchestrator::HttpResponse, result::SdkError};
@@ -42,14 +41,7 @@ enum HealthcheckError {
 pub struct KinesisClientBuilder;
 
 impl ClientBuilder for KinesisClientBuilder {
-    type Config = aws_sdk_kinesis::config::Config;
     type Client = KinesisClient;
-    // type DefaultMiddleware = aws_sdk_kinesis::middleware::DefaultMiddleware;
-
-    fn default_middleware() -> Vec<SharedInterceptor> {
-        // aws_sdk_kinesis::middleware::DefaultMiddleware::new()
-        vec![]
-    }
 
     fn build(config: &aws_types::SdkConfig) -> Self::Client {
         KinesisClient::new(config)

@@ -4,7 +4,6 @@ mod integration_tests;
 mod tests;
 
 use aws_config::Region;
-use aws_sdk_cloudwatch::config::SharedInterceptor;
 use aws_sdk_cloudwatch::error::SdkError;
 use aws_sdk_cloudwatch::operation::put_metric_data::PutMetricDataError;
 use aws_sdk_cloudwatch::types::{Dimension, MetricDatum};
@@ -118,15 +117,7 @@ impl_generate_config_from_default!(CloudWatchMetricsSinkConfig);
 struct CloudwatchMetricsClientBuilder;
 
 impl ClientBuilder for CloudwatchMetricsClientBuilder {
-    type Config = aws_sdk_cloudwatch::config::Config;
     type Client = aws_sdk_cloudwatch::client::Client;
-    // type DefaultMiddleware = aws_sdk_cloudwatch::middleware::DefaultMiddleware;
-
-    fn default_middleware() -> Vec<SharedInterceptor> {
-        // aws_sdk_cloudwatch::middleware::DefaultMiddleware::new()
-        // TODO - do we need any interceptors?
-        vec![]
-    }
 
     fn build(config: &aws_types::SdkConfig) -> Self::Client {
         aws_sdk_cloudwatch::client::Client::new(config)

@@ -1,19 +1,11 @@
 use aws_sdk_s3::config;
-use aws_smithy_runtime_api::client::interceptors::SharedInterceptor;
 
 use crate::aws::ClientBuilder;
 
 pub(crate) struct S3ClientBuilder;
 
 impl ClientBuilder for S3ClientBuilder {
-    type Config = aws_sdk_s3::config::Config;
     type Client = aws_sdk_s3::client::Client;
-    // type DefaultMiddleware = aws_sdk_s3::middleware::DefaultMiddleware;
-
-    fn default_middleware() -> Vec<SharedInterceptor> {
-        // aws_sdk_s3::middleware::DefaultMiddleware::new()
-        vec![]
-    }
 
     fn build(config: &aws_types::SdkConfig) -> Self::Client {
         let config = config::Builder::from(config).force_path_style(true).build();

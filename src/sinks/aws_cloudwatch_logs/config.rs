@@ -1,5 +1,4 @@
 use aws_sdk_cloudwatchlogs::Client as CloudwatchLogsClient;
-use aws_smithy_runtime_api::client::interceptors::SharedInterceptor;
 use futures::FutureExt;
 use serde::{de, Deserialize, Deserializer};
 use tower::ServiceBuilder;
@@ -32,14 +31,7 @@ use crate::{
 pub struct CloudwatchLogsClientBuilder;
 
 impl ClientBuilder for CloudwatchLogsClientBuilder {
-    type Config = aws_sdk_cloudwatchlogs::config::Config;
     type Client = aws_sdk_cloudwatchlogs::client::Client;
-    // type DefaultMiddleware = aws_sdk_cloudwatchlogs::middleware::DefaultMiddleware;
-
-    fn default_middleware() -> Vec<SharedInterceptor> {
-        // aws_sdk_cloudwatchlogs::middleware::DefaultMiddleware::new()
-        vec![]
-    }
 
     fn build(config: &aws_types::SdkConfig) -> Self::Client {
         aws_sdk_cloudwatchlogs::client::Client::new(config)
