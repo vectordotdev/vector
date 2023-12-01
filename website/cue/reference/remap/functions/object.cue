@@ -4,7 +4,7 @@ remap: functions: object: {
 	category: "Type"
 	description: """
 		Returns `value` if it is an object, otherwise returns an error. This enables the type checker to guarantee that the
-		returned value is an object and can be used in any function that expects one.
+		returned value is an object and can be used in any function that expects an object.
 		"""
 
 	arguments: [

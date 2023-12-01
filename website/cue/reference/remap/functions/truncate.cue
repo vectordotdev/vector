@@ -22,8 +22,8 @@ remap: functions: truncate: {
 		{
 			name: "ellipsis"
 			description: """
-				This argument is deprecated. An ellipsis (`...`) is appended if this is set to `true` _and_ the `value` string
-				ends up being truncated because it exceeded the `limit`.
+				This argument is deprecated. An ellipsis (`...`) is appended if the parameter is set to `true` _and_ the `value` string
+				is truncated because it exceeded the `limit`.
 				"""
 			required: false
 			type: ["boolean"]

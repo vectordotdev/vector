@@ -9,7 +9,7 @@ remap: functions: is_array: {
 	arguments: [
 		{
 			name:        "value"
-			description: #"The value to check."#
+			description: #"The value to check if it is an array."#
 			required:    true
 			type: ["any"]
 		},

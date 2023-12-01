@@ -4,7 +4,7 @@ remap: functions: array: {
 	category: "Type"
 	description: """
 		Returns `value` if it is an array, otherwise returns an error. This enables the type checker to guarantee that the
-		returned value is an array and can be used in any function that expects one.
+		returned value is an array and can be used in any function that expects an array.
 		"""
 
 	arguments: [

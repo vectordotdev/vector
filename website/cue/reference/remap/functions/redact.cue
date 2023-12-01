@@ -21,7 +21,7 @@ remap: functions: redact: {
 
 				- For strings, the sensitive data is redacted and a new string is returned.
 				- For arrays, the sensitive data is redacted in each string element.
-				- For objects, the sensitive data in each string value is masked, but the keys are not.
+				- For objects, the sensitive data in each string value is masked, but the keys are not masked.
 
 				For arrays and objects, the function recurses into any nested arrays or objects. Any non-string elements are
 				skipped.
@@ -36,13 +36,13 @@ remap: functions: redact: {
 			description: #"""
 				List of filters applied to `value`.
 
-				Each filter can be specified in one of the following ways:
+				Each filter can be specified in the following ways:
 
-				- As a regular expression directly, which is used to redact text that match it.
+				- As a regular expression, which is used to redact text that match it.
 				- As an object with a `type` key that corresponds to a named filter and additional keys for customizing that filter.
 				- As a named filter, if it has no required parameters.
 
-				Named filters are:
+				Named filters can be a:
 
 				- `pattern`: Redacts text matching any regular expressions specified in the `patterns`
 					key, which is required. This is the expanded version of just passing a regular expression as a filter.
@@ -50,8 +50,9 @@ remap: functions: redact: {
 
 				See examples for more details.
 
-				This parameter must be a static expression. You cannot use variables or other dynamic expressions
-				with it. This allows validation of the argument at compile-time to avoid runtime errors.
+				This parameter must be a static expression. This to allow validation of the argument at compile-time
+				to avoid runtime errors. You cannot use variables or other dynamic expressions
+				with it.
 				"""#
 			required: true
 			type: ["array"]

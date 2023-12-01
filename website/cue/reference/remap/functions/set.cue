@@ -5,10 +5,10 @@ remap: functions: set: {
 	description: """
 		Dynamically insert data into the path of a given object or array.
 
-		When you know the path you want to assign a value to,
+		If you know the path you want to assign a value to,
 		use static path assignments such as `.foo.bar[1] = true` for
-		improved performance and readability. However, when you do not
-		know the path names, use this dynamic `set` function to
+		improved performance and readability. However, if you do not
+		know the path names, use the dynamic `set` function to
 		insert the data into the object or array.
 		"""
 
@@ -33,7 +33,7 @@ remap: functions: set: {
 		},
 	]
 	internal_failure_reasons: [
-		#"`path` segment must be a string or an integer."#,
+		#"The `path` segment must be a string or an integer."#,
 	]
 	return: types: ["object", "array"]
 

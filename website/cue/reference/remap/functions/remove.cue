@@ -3,13 +3,13 @@ package metadata
 remap: functions: remove: {
 	category: "Path"
 	description: """
-		Dynamically remove the value for a given `path`.
+		Dynamically remove the value for a given path.
 
-		When you know the path you want to remove, use
+		If you know the path you want to remove, use
 		the `del` function and static paths such as `del(.foo.bar[1])`
 		to remove the value at that path. The `del` function returns the
-		deleted value, and is more performant than this function.
-		However, when you do not know the path names, use this dynamic
+		deleted value, and is more performant than `remove`.
+		However, if you do not know the path names, use the dynamic
 		`remove` function to remove the value at the provided path.
 		"""
 
@@ -29,8 +29,8 @@ remap: functions: remove: {
 		{
 			name:        "compact"
 			description: """
-				After deletion, if `compact` is `true`, empty objects and
-				arrays left behind are also removed.
+				After deletion, if `compact` is `true`, any empty objects or
+				arrays left are also removed.
 				"""
 			required:    false
 			default:     false
@@ -38,7 +38,7 @@ remap: functions: remove: {
 		},
 	]
 	internal_failure_reasons: [
-		#"`path` segment must be a string or an integer."#,
+		#"The `path` segment must be a string or an integer."#,
 	]
 	return: types: ["object", "array"]
 

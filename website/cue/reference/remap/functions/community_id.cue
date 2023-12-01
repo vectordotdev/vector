@@ -3,7 +3,7 @@ package metadata
 remap: functions: community_id: {
 	category:    "String"
 	description: """
-		Generate an ID based on the [Community ID Spec](\(urls.community_id_spec)).
+		Generates an ID based on the [Community ID Spec](\(urls.community_id_spec)).
 		"""
 
 	arguments: [

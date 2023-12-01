@@ -9,7 +9,7 @@ remap: functions: is_timestamp: {
 	arguments: [
 		{
 			name:        "value"
-			description: #"The value to check."#
+			description: #"The value to check if it is a timestamp."#
 			required:    true
 			type: ["any"]
 		},

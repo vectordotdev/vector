@@ -9,7 +9,7 @@ remap: functions: is_regex: {
 	arguments: [
 		{
 			name:        "value"
-			description: #"The value to check."#
+			description: #"The value to check if it is a regex."#
 			required:    true
 			type: ["any"]
 		},

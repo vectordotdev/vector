@@ -9,7 +9,7 @@ remap: functions: is_string: {
 	arguments: [
 		{
 			name:        "value"
-			description: #"The value to check."#
+			description: #"The value to check if it is a string."#
 			required:    true
 			type: ["any"]
 		},
