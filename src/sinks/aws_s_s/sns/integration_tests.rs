@@ -87,7 +87,7 @@ async fn sns_send_message_batch() {
     };
 
     let config = SnsSinkConfig {
-        region: RegionOrEndpoint::with_both("local", sns_address().as_str()),
+        region: RegionOrEndpoint::with_both("us-east-1", sns_address().as_str()),
         topic_arn: topic_arn.clone(),
         base_config,
     };
@@ -165,6 +165,7 @@ async fn get_queue_arn(client: &SqsClient, queue_url: String) -> String {
     client
         .get_queue_attributes()
         .queue_url(queue_url)
+        .attribute_names(QueueAttributeName::QueueArn)
         .send()
         .await
         .unwrap()

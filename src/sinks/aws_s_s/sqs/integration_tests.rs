@@ -61,7 +61,7 @@ async fn sqs_send_message_batch() {
     };
 
     let config = SqsSinkConfig {
-        region: RegionOrEndpoint::with_both("local", sqs_address().as_str()),
+        region: RegionOrEndpoint::with_both("us-east-1", sqs_address().as_str()),
         queue_url: queue_url.clone(),
         base_config,
     };

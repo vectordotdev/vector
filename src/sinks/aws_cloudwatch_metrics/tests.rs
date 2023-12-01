@@ -22,7 +22,7 @@ fn generate_config() {
 fn config() -> CloudWatchMetricsSinkConfig {
     CloudWatchMetricsSinkConfig {
         default_namespace: "vector".into(),
-        region: RegionOrEndpoint::with_region("local".to_owned()),
+        region: RegionOrEndpoint::with_region("us-east-1".to_owned()),
         ..Default::default()
     }
 }

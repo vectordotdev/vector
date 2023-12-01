@@ -76,7 +76,7 @@ async fn s3_insert_message_into_with_flat_key_prefix() {
     assert!(key.ends_with(".log"));
 
     let obj = get_object(&bucket, key).await;
-    assert_eq!(obj.content_encoding, Some("identity".to_string()));
+    assert_eq!(obj.content_encoding, None);
 
     let response_lines = get_lines(obj).await;
     assert_eq!(lines, response_lines);
@@ -110,7 +110,7 @@ async fn s3_insert_message_into_with_folder_key_prefix() {
     assert!(key.ends_with(".log"));
 
     let obj = get_object(&bucket, key).await;
-    assert_eq!(obj.content_encoding, Some("identity".to_string()));
+    assert_eq!(obj.content_encoding, None);
 
     let response_lines = get_lines(obj).await;
     assert_eq!(lines, response_lines);
@@ -147,7 +147,7 @@ async fn s3_insert_message_into_with_ssekms_key_id() {
     assert!(key.ends_with(".log"));
 
     let obj = get_object(&bucket, key).await;
-    assert_eq!(obj.content_encoding, Some("identity".to_string()));
+    assert_eq!(obj.content_encoding, None);
 
     let response_lines = get_lines(obj).await;
     assert_eq!(lines, response_lines);
@@ -348,7 +348,7 @@ async fn s3_insert_message_into_object_lock() {
     assert!(key.ends_with(".log"));
 
     let obj = get_object(&bucket, key).await;
-    assert_eq!(obj.content_encoding, Some("identity".to_string()));
+    assert_eq!(obj.content_encoding, None);
 
     let response_lines = get_lines(obj).await;
     assert_eq!(lines, response_lines);
