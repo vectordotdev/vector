@@ -50,9 +50,8 @@ remap: functions: redact: {
 
 				See examples for more details.
 
-				This parameter must be a static expression. This to allow validation of the argument at compile-time
-				to avoid runtime errors. You cannot use variables or other dynamic expressions
-				with it.
+				This parameter must be a static expression so that the argument can be validated at compile-time
+				to avoid runtime errors. You cannot use variables or other dynamic expressions with it.
 				"""#
 			required: true
 			type: ["array"]
