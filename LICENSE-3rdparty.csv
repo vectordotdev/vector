@@ -100,8 +100,6 @@ bloomy,https://docs.rs/bloomy/,MIT,"Aleksandr Bezobchuk <aleks.bezobchuk@gmail.c
 bollard,https://github.com/fussybeaver/bollard,Apache-2.0,Bollard contributors
 borsh,https://github.com/near/borsh-rs,MIT OR Apache-2.0,Near Inc <hello@near.org>
 borsh-derive,https://github.com/nearprotocol/borsh,Apache-2.0,Near Inc <hello@nearprotocol.com>
-borsh-derive-internal,https://github.com/nearprotocol/borsh,Apache-2.0,Near Inc <hello@nearprotocol.com>
-borsh-schema-derive-internal,https://github.com/nearprotocol/borsh,Apache-2.0,Near Inc <hello@nearprotocol.com>
 bson,https://github.com/mongodb/bson-rust,MIT,"Y. T. Chung <zonyitoo@gmail.com>, Kevin Yeh <kevinyeah@utexas.edu>, Saghm Rossi <saghmrossi@gmail.com>, Patrick Freed <patrick.freed@mongodb.com>, Isabel Atkinson <isabel.atkinson@mongodb.com>, Abraham Egnor <abraham.egnor@mongodb.com>"
 bstr,https://github.com/BurntSushi/bstr,MIT OR Apache-2.0,Andrew Gallant <jamslam@gmail.com>
 bumpalo,https://github.com/fitzgen/bumpalo,MIT OR Apache-2.0,Nick Fitzgerald <fitzgen@gmail.com>
@@ -421,7 +419,6 @@ pretty_assertions,https://github.com/rust-pretty-assertions/rust-pretty-assertio
 prettydiff,https://github.com/romankoblov/prettydiff,MIT,Roman Koblov <penpen938@me.com>
 prettytable-rs,https://github.com/phsym/prettytable-rs,BSD-3-Clause,Pierre-Henri Symoneaux
 primeorder,https://github.com/RustCrypto/elliptic-curves/tree/master/primeorder,Apache-2.0 OR MIT,RustCrypto Developers
-proc-macro-crate,https://github.com/bkchr/proc-macro-crate,Apache-2.0 OR MIT,Bastian Köcher <git@kchr.de>
 proc-macro-crate,https://github.com/bkchr/proc-macro-crate,MIT OR Apache-2.0,Bastian Köcher <git@kchr.de>
 proc-macro-error,https://gitlab.com/CreepySkeleton/proc-macro-error,MIT OR Apache-2.0,CreepySkeleton <creepy-skeleton@yandex.ru>
 proc-macro-hack,https://github.com/dtolnay/proc-macro-hack,MIT OR Apache-2.0,David Tolnay <dtolnay@gmail.com>
@@ -554,6 +551,7 @@ structopt-derive,https://github.com/TeXitoi/structopt,Apache-2.0 OR MIT,Guillaum
 strum,https://github.com/Peternator7/strum,MIT,Peter Glotfelty <peter.glotfelty@microsoft.com>
 subtle,https://github.com/dalek-cryptography/subtle,BSD-3-Clause,"Isis Lovecruft <isis@patternsinthevoid.net>, Henry de Valence <hdevalence@hdevalence.ca>"
 syn,https://github.com/dtolnay/syn,MIT OR Apache-2.0,David Tolnay <dtolnay@gmail.com>
+syn_derive,https://github.com/Kyuuhachi/syn_derive,MIT OR Apache-2.0,Kyuuhachi <caagr98@gmail.com>
 sync_wrapper,https://github.com/Actyx/sync_wrapper,Apache-2.0,Actyx AG <developer@actyx.io>
 syslog,https://github.com/Geal/rust-syslog,MIT,contact@geoffroycouprie.com
 syslog_loose,https://github.com/FungusHumungus/syslog-loose,MIT,Stephen Wakely <fungus.humungus@gmail.com>
