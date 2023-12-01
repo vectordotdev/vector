@@ -51,7 +51,7 @@ impl ClientBuilder for KinesisFirehoseClientBuilder {
     }
 
     fn build(config: &aws_types::SdkConfig) -> Self::Client {
-        Self::Client::new(config.into())
+        Self::Client::new(config)
     }
 }
 

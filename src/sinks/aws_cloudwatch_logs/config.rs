@@ -42,7 +42,7 @@ impl ClientBuilder for CloudwatchLogsClientBuilder {
     }
 
     fn build(config: &aws_types::SdkConfig) -> Self::Client {
-        aws_sdk_cloudwatchlogs::client::Client::new(config.into())
+        aws_sdk_cloudwatchlogs::client::Client::new(config)
     }
 }
 

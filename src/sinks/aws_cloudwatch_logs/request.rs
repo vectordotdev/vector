@@ -110,14 +110,12 @@ impl Future for CloudwatchFuture {
                                 if matches!(
                                     inner.err(),
                                     DescribeLogStreamsError::ResourceNotFoundException(_)
-                                ) {
-                                    if self.create_missing_group {
-                                        info!("Log group provided does not exist; creating a new one.");
+                                ) && self.create_missing_group
+                                {
+                                    info!("Log group provided does not exist; creating a new one.");
 
-                                        self.state =
-                                            State::CreateGroup(self.client.create_log_group());
-                                        continue;
-                                    }
+                                    self.state = State::CreateGroup(self.client.create_log_group());
+                                    continue;
                                 }
                             }
                             return Poll::Ready(Err(CloudwatchError::DescribeLogStreams(err)));
