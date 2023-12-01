@@ -3,7 +3,7 @@ package metadata
 remap: functions: is_null: {
 	category:    "Type"
 	description: """
-		Check if the type of `value` is `null`. For a more relaxed function, 
+		Check if `value`'s type is `null`. For a more relaxed function, 
 		see [`is_nullish`](\(urls.vrl_functions)#\(remap.functions.is_nullish.anchor)).
 		"""
 

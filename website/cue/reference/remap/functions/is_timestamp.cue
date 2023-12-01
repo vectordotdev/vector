@@ -3,7 +3,7 @@ package metadata
 remap: functions: is_timestamp: {
 	category: "Type"
 	description: """
-		Check if the type of `value` is a timestamp.
+		Check if `value`'s type is a timestamp.
 		"""
 
 	arguments: [

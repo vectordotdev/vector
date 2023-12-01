@@ -17,7 +17,7 @@ remap: functions: redact: {
 			description: #"""
 				The value to redact sensitive data from.
 
-				The function's behavior depends on the type of `value`:
+				The function's behavior depends on `value`'s type:
 
 				- For strings, the sensitive data is redacted and a new string is returned.
 				- For arrays, the sensitive data is redacted in each string element.

@@ -3,7 +3,7 @@ package metadata
 remap: functions: is_boolean: {
 	category: "Type"
 	description: """
-		Check if the type of `value` is a boolean.
+		Check if the `value`'s type is a boolean.
 		"""
 
 	arguments: [

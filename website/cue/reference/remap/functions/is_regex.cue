@@ -3,7 +3,7 @@ package metadata
 remap: functions: is_regex: {
 	category: "Type"
 	description: """
-		Check if the type of `value` is a regex.
+		Check if `value`'s type is a regex.
 		"""
 
 	arguments: [

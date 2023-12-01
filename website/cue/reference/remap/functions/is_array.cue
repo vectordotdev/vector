@@ -3,7 +3,7 @@ package metadata
 remap: functions: is_array: {
 	category: "Type"
 	description: """
-		Check if the type of `value` is an array.
+		Check if the `value`'s type is an array.
 		"""
 
 	arguments: [

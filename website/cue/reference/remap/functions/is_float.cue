@@ -3,7 +3,7 @@ package metadata
 remap: functions: is_float: {
 	category: "Type"
 	description: """
-		Check if the type of `value` is a float.
+		Check if the `value`'s type is a float.
 		"""
 
 	arguments: [
