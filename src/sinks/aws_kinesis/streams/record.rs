@@ -22,8 +22,7 @@ impl Record for KinesisStreamRecord {
                 .data(Blob::new(&payload_bytes[..]))
                 .partition_key(partition_key)
                 .build()
-                // TODO should not unwrap
-                .unwrap(),
+                .expect("all required builder fields set"),
         }
     }
 
@@ -38,10 +37,6 @@ impl Record for KinesisStreamRecord {
         // data is base64 encoded
         let data_len = self.record.data.as_ref().len();
         let key_len = self.record.partition_key.len();
-        // .as_ref()
-        // .iter()
-        // .map(|key| key.len())
-        // .unwrap_or(0);
 
         (data_len + 2) / 3 * 4 + hash_key_size + key_len + 10
     }

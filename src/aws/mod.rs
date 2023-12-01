@@ -19,6 +19,7 @@ use aws_sigv4::http_request::{SignableBody, SignableRequest, SigningParams, Sign
 use aws_sigv4::sign::v4;
 use aws_smithy_async::rt::sleep::TokioSleep;
 use aws_smithy_runtime::client::http::hyper_014::HyperClientBuilder;
+use aws_smithy_runtime_api::client::http::{HttpConnector, SharedHttpConnector};
 use aws_smithy_runtime_api::client::identity::Identity;
 use aws_smithy_runtime_api::client::orchestrator::HttpRequest;
 use aws_smithy_runtime_api::{
@@ -29,7 +30,10 @@ use aws_smithy_runtime_api::{
     },
     http::{Request, Response, StatusCode},
 };
+use aws_smithy_types::body::SdkBody;
+use aws_types::sdk_config::SharedHttpClient;
 use bytes::Bytes;
+use futures_util::FutureExt;
 use http::HeaderMap;
 use http_body::Body;
 use pin_project::pin_project;
@@ -183,12 +187,16 @@ pub async fn create_client_and_region<T: ClientBuilder>(
 
     let connector = if proxy.enabled {
         let proxy = build_proxy_connector(tls_settings, proxy)?;
-        // let hyper_client = aws_smithy_client::hyper_ext::Adapter::builder().build(proxy);
         HyperClientBuilder::new().build(proxy)
     } else {
         let tls_connector = build_tls_connector(tls_settings)?;
-        // let hyper_client = aws_smithy_client::hyper_ext::Adapter::builder().build(tls_connector);
         HyperClientBuilder::new().build(tls_connector)
+    };
+
+    // Create a custom http connector that will emit the required metrics for us.
+    let connector = AwsHttpClient {
+        http: connector,
+        region: region.clone(),
     };
 
     // Build the configuration first.
@@ -211,10 +219,6 @@ pub async fn create_client_and_region<T: ClientBuilder>(
     }
 
     let config = config_builder.build();
-
-    // let client =
-    //     create_smithy_client::<T>(region.clone(), proxy, tls_options, is_sink, retry_config)
-    //         .await?;
 
     Ok((T::build(&config), region))
 }
@@ -259,6 +263,58 @@ pub async fn sign_request(
     signing_instructions.apply_to_request_http0x(request);
 
     Ok(())
+}
+
+#[derive(Debug)]
+pub struct AwsHttpClient<T> {
+    http: T,
+    region: Region,
+}
+
+impl<T> aws_smithy_runtime_api::client::http::HttpClient for AwsHttpClient<T>
+where
+    T: aws_smithy_runtime_api::client::http::HttpClient,
+{
+    fn http_connector(
+        &self,
+        settings: &aws_smithy_runtime_api::client::http::HttpConnectorSettings,
+        components: &aws_sdk_cloudwatch::config::RuntimeComponents,
+    ) -> SharedHttpConnector {
+        let http_connector = self.http.http_connector(settings, components);
+
+        SharedHttpConnector::new(AwsConnector {
+            region: self.region.clone(),
+            http: http_connector,
+        })
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct AwsConnector<T> {
+    http: T,
+    region: Region,
+}
+
+impl<T> aws_smithy_runtime_api::client::http::HttpConnector for AwsConnector<T>
+where
+    T: aws_smithy_runtime_api::client::http::HttpConnector,
+{
+    fn call(&self, req: HttpRequest) -> aws_smithy_runtime_api::client::http::HttpConnectorFuture {
+        let byte_size = req.body().bytes().expect("body cannot be lazy").len();
+        let fut = self.http.call(req);
+        let region = self.region.clone();
+
+        aws_smithy_runtime_api::client::http::HttpConnectorFuture::new(fut.inspect(move |result| {
+            if let Ok(result) = result {
+                if result.status().is_success() {
+                    emit!(AwsBytesSent {
+                        byte_size,
+                        region: Some(region.clone()),
+                    });
+                }
+            }
+        }))
+    }
 }
 
 // TODO: Put this back

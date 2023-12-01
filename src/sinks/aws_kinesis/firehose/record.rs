@@ -21,8 +21,7 @@ impl Record for KinesisFirehoseRecord {
             record: KinesisRecord::builder()
                 .data(Blob::new(&payload_bytes[..]))
                 .build()
-                // TODO Handle properly
-                .expect("this should not be here"),
+                .expect("all builder records specified"),
         }
     }
 
