@@ -17,7 +17,12 @@ use aws_smithy_runtime_api::client::{orchestrator::HttpResponse, result::SdkErro
 use chrono::Duration;
 use futures::{future::BoxFuture, FutureExt};
 use futures_util::TryFutureExt;
+use http::{
+    header::{HeaderName, InvalidHeaderName, InvalidHeaderValue},
+    HeaderValue,
+};
 use indexmap::IndexMap;
+use snafu::{ResultExt, Snafu};
 use tokio::sync::oneshot;
 use tower::{
     buffer::Buffer,
@@ -51,9 +56,6 @@ type Svc = Buffer<
     >,
     Vec<InputLogEvent>,
 >;
-
-// TODO Is this right?
-// pub type SmithyClient = std::sync::Arc<Client>;
 
 #[derive(Debug)]
 pub enum CloudwatchError {
@@ -125,16 +127,40 @@ impl DriverResponse for CloudwatchResponse {
     }
 }
 
+#[derive(Snafu, Debug)]
+enum HeaderError {
+    #[snafu(display("invalid header name {source}"))]
+    InvalidName { source: InvalidHeaderName },
+    #[snafu(display("invalid header value {source}"))]
+    InvalidValue { source: InvalidHeaderValue },
+}
+
 impl CloudwatchLogsPartitionSvc {
-    pub fn new(config: CloudwatchLogsSinkConfig, client: CloudwatchLogsClient) -> Self {
+    pub fn new(
+        config: CloudwatchLogsSinkConfig,
+        client: CloudwatchLogsClient,
+    ) -> crate::Result<Self> {
         let request_settings = config.request.tower.into_settings();
 
-        Self {
+        let headers = config
+            .request
+            .headers
+            .iter()
+            .map(|(name, value)| {
+                Ok((
+                    HeaderName::from_bytes(name.as_bytes()).context(InvalidNameSnafu {})?,
+                    HeaderValue::from_str(value.as_str()).context(InvalidValueSnafu {})?,
+                ))
+            })
+            .collect::<Result<IndexMap<_, _>, HeaderError>>()?;
+
+        Ok(Self {
             config,
             clients: HashMap::new(),
             request_settings,
             client,
-        }
+            headers,
+        })
     }
 }
 
@@ -160,10 +186,10 @@ impl Service<BatchCloudwatchRequest> for CloudwatchLogsPartitionSvc {
                     .message(req.message)
                     .timestamp(req.timestamp)
                     .build()
+                    .expect("all builder fields specified")
             })
-            .collect::<Result<_, _>>()
-            // TODO - this should not unwrap
-            .unwrap();
+            .collect();
+
         let svc = if let Some(svc) = &mut self.clients.get_mut(&key) {
             svc.clone()
         } else {
@@ -185,6 +211,7 @@ impl Service<BatchCloudwatchRequest> for CloudwatchLogsPartitionSvc {
                     self.config.clone(),
                     &key,
                     self.client.clone(),
+                    self.headers.clone(),
                 ));
 
             self.clients.insert(key, svc.clone());
@@ -203,6 +230,7 @@ impl CloudwatchLogsSvc {
         config: CloudwatchLogsSinkConfig,
         key: &CloudwatchKey,
         client: CloudwatchLogsClient,
+        headers: IndexMap<HeaderName, HeaderValue>,
     ) -> Self {
         let group_name = key.group.clone();
         let stream_name = key.stream.clone();
@@ -213,7 +241,7 @@ impl CloudwatchLogsSvc {
         let retention = config.retention.clone();
 
         CloudwatchLogsSvc {
-            headers: config.request.headers,
+            headers,
             client,
             stream_name,
             group_name,
@@ -313,7 +341,7 @@ impl Service<Vec<InputLogEvent>> for CloudwatchLogsSvc {
 
 pub struct CloudwatchLogsSvc {
     client: CloudwatchLogsClient,
-    headers: IndexMap<String, String>,
+    headers: IndexMap<HeaderName, HeaderValue>,
     stream_name: String,
     group_name: String,
     create_missing_group: bool,
@@ -332,6 +360,7 @@ impl EncodedLength for InputLogEvent {
 #[derive(Clone)]
 pub struct CloudwatchLogsPartitionSvc {
     config: CloudwatchLogsSinkConfig,
+    headers: IndexMap<HeaderName, HeaderValue>,
     clients: HashMap<CloudwatchKey, Svc>,
     request_settings: TowerRequestSettings,
     client: CloudwatchLogsClient,

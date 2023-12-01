@@ -209,8 +209,7 @@ async fn delete_messages(client: SqsClient, receipts: Vec<String>, queue_url: St
                     .id(id.to_string())
                     .receipt_handle(receipt)
                     .build()
-                    // TODO don't unwrap
-                    .unwrap(),
+                    .expect("all required builder parameters specified"),
             );
         }
         if let Err(err) = batch.send().await {

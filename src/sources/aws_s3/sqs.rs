@@ -362,8 +362,7 @@ impl IngestorProcess {
                                 .id(message_id)
                                 .receipt_handle(receipt_handle)
                                 .build()
-                                // TODO - This should not unwrap
-                                .unwrap(),
+                                .expect("all required builder params specified"),
                         );
                     }
                 }

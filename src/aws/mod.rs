@@ -39,10 +39,11 @@ use http_body::Body;
 use pin_project::pin_project;
 use regex::RegexSet;
 pub use region::RegionOrEndpoint;
+use snafu::{ResultExt, Snafu};
 use tower::{Layer, Service};
 
 use crate::config::ProxyConfig;
-use crate::http::{build_proxy_connector, build_tls_connector};
+use crate::http::{build_proxy_connector, build_tls_connector, status};
 use crate::internal_events::AwsBytesSent;
 use crate::tls::{MaybeTlsSettings, TlsConfig};
 
@@ -90,7 +91,7 @@ fn check_response(res: &HttpResponse) -> bool {
 
     retry_header
         || status.is_server_error()
-        || status.as_u16() == 429 //StatusCode::TOO_MANY_REQUESTS <- TODO We should really have these as constants.
+        || status.as_u16() == status::TOO_MANY_REQUESTS
         || (status.is_client_error() && re.is_match(response_body.as_ref()))
 }
 
@@ -185,22 +186,33 @@ pub async fn create_client_and_region<T: ClientBuilder>(
     Ok((T::build(&config), region))
 }
 
+#[derive(Snafu, Debug)]
+enum SigningError {
+    #[snafu(display("cannot sign the request because the headers are not valid utf-8"))]
+    NotUTF8Header,
+}
+
 pub async fn sign_request(
     service_name: &str,
     request: &mut http::Request<Bytes>,
     credentials_provider: &SharedCredentialsProvider,
     region: &Option<Region>,
 ) -> crate::Result<()> {
+    let headers = request
+        .headers()
+        .iter()
+        .map(|(k, v)| {
+            Ok((
+                k.as_str(),
+                std::str::from_utf8(v.as_bytes()).map_err(|_| SigningError::NotUTF8Header)?,
+            ))
+        })
+        .collect::<Result<Vec<_>, SigningError>>()?;
+
     let signable_request = SignableRequest::new(
         request.method().as_str(),
         request.uri().to_string(),
-        request.headers().iter().map(|(k, v)| {
-            (
-                k.as_str(),
-                // TODO No unwrap()
-                std::str::from_utf8(v.as_bytes()).expect("only utf8 headers are signable"),
-            )
-        }),
+        headers.into_iter(),
         SignableBody::Bytes(request.body().as_ref()),
     )?;
 

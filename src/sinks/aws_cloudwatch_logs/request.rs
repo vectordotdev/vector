@@ -17,8 +17,7 @@ use aws_sdk_cloudwatchlogs::{
 };
 use aws_smithy_runtime_api::client::{orchestrator::HttpResponse, result::SdkError};
 use futures::{future::BoxFuture, FutureExt};
-use http::header::HeaderName;
-use http::HeaderValue;
+use http::{header::HeaderName, HeaderValue};
 use indexmap::IndexMap;
 use tokio::sync::oneshot;
 
@@ -39,7 +38,7 @@ struct Client {
     client: CloudwatchLogsClient,
     stream_name: String,
     group_name: String,
-    headers: IndexMap<String, String>,
+    headers: IndexMap<HeaderName, HeaderValue>,
     retention_days: u32,
 }
 
@@ -58,7 +57,7 @@ impl CloudwatchFuture {
     #[allow(clippy::too_many_arguments)]
     pub(super) fn new(
         client: CloudwatchLogsClient,
-        headers: IndexMap<String, String>,
+        headers: IndexMap<HeaderName, HeaderValue>,
         stream_name: String,
         group_name: String,
         create_missing_group: bool,
@@ -264,11 +263,7 @@ impl Client {
                 .customize()
                 .mutate_request(move |req| {
                     for (header, value) in headers.iter() {
-                        req.headers_mut().insert(
-                            // TODO: We should validate these values are valid before here so we don't risk a panic.
-                            HeaderName::from_bytes(header.as_bytes()).expect("valid header name"),
-                            HeaderValue::from_str(value.as_str()).expect("valid header value"),
-                        );
+                        req.headers_mut().insert(header.clone(), value.clone());
                     }
                 })
                 .send()
