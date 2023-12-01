@@ -15,7 +15,7 @@ impl InputHandler {
     pub(super) async fn watch(mut self, method: Method) -> crate::Result<Source> {
         let mut conn = self
             .client
-            .get_tokio_connection_manager()
+            .get_connection_manager()
             .await
             .context(ConnectionSnafu {})?;
 
@@ -67,13 +67,13 @@ async fn backoff_exponential(exp: u32) {
 }
 
 async fn brpop(conn: &mut ConnectionManager, key: &str) -> RedisResult<String> {
-    conn.brpop(key, 0)
+    conn.brpop(key, 0.0)
         .await
         .map(|(_, value): (String, String)| value)
 }
 
 async fn blpop(conn: &mut ConnectionManager, key: &str) -> RedisResult<String> {
-    conn.blpop(key, 0)
+    conn.blpop(key, 0.0)
         .await
         .map(|(_, value): (String, String)| value)
 }
