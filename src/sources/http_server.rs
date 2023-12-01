@@ -430,6 +430,9 @@ impl HttpSource for SimpleHttpSource {
 
                     for h in &self.headers {
                         match h {
+                            // Add each non-wildcard containing header that was specified
+                            // in the `headers` config option to the event if an exact match
+                            // is found.
                             HttpConfigParamKind::Exact(header_name) => {
                                 let value =
                                     headers_config.get(header_name).map(HeaderValue::as_bytes);
@@ -442,6 +445,8 @@ impl HttpSource for SimpleHttpSource {
                                     Value::from(value.map(Bytes::copy_from_slice)),
                                 );
                             }
+                            // Add all headers that match against wildcard pattens specified
+                            // in the `headers` config option to the event.
                             HttpConfigParamKind::Glob(header_pattern) => {
                                 for header_name in headers_config.keys() {
                                     if header_pattern.matches_with(
