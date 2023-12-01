@@ -28,7 +28,7 @@ mod tests {
     #[test]
     fn test_get_message_descriptor() {
         let path = PathBuf::from(std::env::var_os("CARGO_MANIFEST_DIR").unwrap())
-            .join("tests/data/protobuf/test.desc");
+            .join("tests/data/protobuf/protos/test.desc");
         let message_descriptor = get_message_descriptor(&path, "test.Integers").unwrap();
         assert_eq!("Integers", message_descriptor.name());
         assert_eq!(4, message_descriptor.fields().count());
