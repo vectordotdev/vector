@@ -12,7 +12,41 @@ pub struct AcceptedTagValueSet {
 
 enum TagValueSetStorage {
     Set(HashSet<TagValueSet>),
-    Bloom(BloomFilter<TagValueSet>),
+    Bloom(BloomFilterStorage),
+}
+
+/// A bloom filter that tracks the number of items inserted into it.
+struct BloomFilterStorage {
+    inner: BloomFilter<TagValueSet>,
+
+    /// Count of items inserted into the bloom filter.
+    /// We manually track this because `BloomFilter::count` has O(n) time complexity.
+    count: usize,
+}
+
+impl BloomFilterStorage {
+    fn new(size: usize) -> Self {
+        Self {
+            inner: BloomFilter::with_size(size),
+            count: 0,
+        }
+    }
+
+    fn insert(&mut self, value: &TagValueSet) {
+        // Only update the count if the value is not already in the bloom filter.
+        if !self.inner.contains(value) {
+            self.inner.insert(value);
+            self.count += 1;
+        }
+    }
+
+    fn contains(&self, value: &TagValueSet) -> bool {
+        self.inner.contains(value)
+    }
+
+    const fn count(&self) -> usize {
+        self.count
+    }
 }
 
 impl fmt::Debug for TagValueSetStorage {
@@ -29,8 +63,7 @@ impl AcceptedTagValueSet {
         let storage = match &mode {
             Mode::Exact => TagValueSetStorage::Set(HashSet::with_capacity(value_limit)),
             Mode::Probabilistic(config) => {
-                let num_bits = config.cache_size_per_key / 8; // Convert bytes to bits
-                TagValueSetStorage::Bloom(BloomFilter::with_size(num_bits))
+                TagValueSetStorage::Bloom(BloomFilterStorage::new(config.cache_size_per_key))
             }
         };
         Self { storage }
@@ -57,5 +90,49 @@ impl AcceptedTagValueSet {
             }
             TagValueSetStorage::Bloom(bloom) => bloom.insert(&value),
         };
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::event::metric::TagValueSet;
+    use crate::transforms::tag_cardinality_limit::config::Mode;
+
+    #[test]
+    fn test_accepted_tag_value_set_exact() {
+        let mut accepted_tag_value_set = AcceptedTagValueSet::new(2, &Mode::Exact);
+
+        assert!(!accepted_tag_value_set.contains(&TagValueSet::from(["value1".to_string()])));
+        assert_eq!(accepted_tag_value_set.len(), 0);
+
+        accepted_tag_value_set.insert(TagValueSet::from(["value1".to_string()]));
+        assert_eq!(accepted_tag_value_set.len(), 1);
+        assert!(accepted_tag_value_set.contains(&TagValueSet::from(["value1".to_string()])));
+
+        accepted_tag_value_set.insert(TagValueSet::from(["value2".to_string()]));
+        assert_eq!(accepted_tag_value_set.len(), 2);
+        assert!(accepted_tag_value_set.contains(&TagValueSet::from(["value2".to_string()])));
+    }
+
+    #[test]
+    fn test_accepted_tag_value_set_probabilistic() {
+        let mut accepted_tag_value_set = AcceptedTagValueSet::new(2, &Mode::Exact);
+
+        assert!(!accepted_tag_value_set.contains(&TagValueSet::from(["value1".to_string()])));
+        assert_eq!(accepted_tag_value_set.len(), 0);
+
+        accepted_tag_value_set.insert(TagValueSet::from(["value1".to_string()]));
+        assert_eq!(accepted_tag_value_set.len(), 1);
+        assert!(accepted_tag_value_set.contains(&TagValueSet::from(["value1".to_string()])));
+
+        // Inserting the same value again should not increase the count.
+        accepted_tag_value_set.insert(TagValueSet::from(["value1".to_string()]));
+        assert_eq!(accepted_tag_value_set.len(), 1);
+        assert!(accepted_tag_value_set.contains(&TagValueSet::from(["value1".to_string()])));
+
+        accepted_tag_value_set.insert(TagValueSet::from(["value2".to_string()]));
+        assert_eq!(accepted_tag_value_set.len(), 2);
+        assert!(accepted_tag_value_set.contains(&TagValueSet::from(["value2".to_string()])));
     }
 }
