@@ -719,7 +719,7 @@ jobs:
         id: read-analysis
         uses: juliangruber/read-file-action@v1
         with:
-          path: ${{ runner.temp }}/outputs/report.html
+          path: ${{ runner.temp }}/outputs/report.md
 
       - name: Post report to PR
         uses: peter-evans/create-or-update-comment@v3
