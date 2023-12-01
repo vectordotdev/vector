@@ -3,13 +3,13 @@ package metadata
 remap: functions: is_float: {
 	category: "Type"
 	description: """
-		Check if the type of a `value` is a float or not.
+		Check if the type of `value` is a float or not.
 		"""
 
 	arguments: [
 		{
 			name:        "value"
-			description: #"The value to check"#
+			description: #"The value to check."#
 			required:    true
 			type: ["any"]
 		},

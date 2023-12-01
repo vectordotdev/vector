@@ -23,7 +23,7 @@ remap: functions: truncate: {
 			name: "ellipsis"
 			description: """
 				This argument is deprecated. An ellipsis (`...`) is appended if this is set to `true` _and_ the `value` string
-				ends up being truncated because it's exceeded the `limit`.
+				ends up being truncated because it exceeded the `limit`.
 				"""
 			required: false
 			type: ["boolean"]
@@ -31,8 +31,8 @@ remap: functions: truncate: {
 		{
 			name: "suffix"
 			description: """
-				A custom suffix (`...`) will be appended to truncated strings.
-				This is ignored if "ellipsis" is set to true for backwards compatibility.
+				A custom suffix (`...`) is appended to truncated strings.
+				If `ellipsis` is set to `true`, this parameter is ignored for backwards compatibility.
 				"""
 			required: false
 			type: ["string"]

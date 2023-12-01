@@ -3,13 +3,13 @@ package metadata
 remap: functions: is_object: {
 	category: "Type"
 	description: """
-		Check if the type of a `value` is an object or not.
+		Check if the type of `value` is an object.
 		"""
 
 	arguments: [
 		{
 			name:        "value"
-			description: #"The value to check"#
+			description: #"The value to check if it is an object."#
 			required:    true
 			type: ["any"]
 		},

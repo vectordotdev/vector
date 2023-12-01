@@ -9,7 +9,7 @@ remap: functions: is_json: {
 	arguments: [
 		{
 			name:        "value"
-			description: #"The value to check"#
+			description: #"The value to check."#
 			required:    true
 			type: ["string"]
 		},

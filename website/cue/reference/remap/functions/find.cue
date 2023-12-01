@@ -4,7 +4,7 @@ remap: functions: find: {
 	category: "String"
 	description: """
 		Determines the start position of the first found element in `value`,
-		from left to right, that matches the `pattern` or returns -1 if not found.
+		from left to right, that matches the `pattern` or returns `-1` if not found.
 		"""
 
 	arguments: [

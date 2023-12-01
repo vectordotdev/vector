@@ -3,12 +3,12 @@ package metadata
 remap: functions: get: {
 	category: "Path"
 	description: """
-		Dynamically get the value of a given path.
+		Dynamically get the value of a given `path`.
 
-		When you know the path you want to look up, you should use
+		When you know the path you want to look up, use
 		static paths such as `.foo.bar[1]` to get the value of that
-		path. However, when you don't know the path names in advance,
-		you can use this dynamic get function to get at the requested
+		path. However, when you do not know the path names,
+		use this dynamic `get` function to get the requested
 		value.
 		"""
 
@@ -21,13 +21,13 @@ remap: functions: get: {
 		},
 		{
 			name:        "path"
-			description: "An array of path segments to look up the value for."
+			description: "An array of path segments to look up the value."
 			required:    true
 			type: ["array"]
 		},
 	]
 	internal_failure_reasons: [
-		#"path segment must be either "string" or "integer""#,
+		#"`path` segment must be a string or an integer."#,
 	]
 	return: types: ["any"]
 
