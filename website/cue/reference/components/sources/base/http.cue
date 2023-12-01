@@ -287,7 +287,7 @@ base: components: sources: http: configuration: {
 		description: """
 			A list of HTTP headers to include in the log event.
 
-			Accepts wildcard (`*`) character for headers matching a specified pattern.
+			Accepts the wildcard (`*`) character for headers matching a specified pattern.
 
 			Specifying "*" results in all headers included in the log event.
 
