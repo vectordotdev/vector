@@ -27,13 +27,13 @@ remap: functions: remove: {
 			type: ["array"]
 		},
 		{
-			name:        "compact"
+			name: "compact"
 			description: """
 				After deletion, if `compact` is `true`, any empty objects or
 				arrays left are also removed.
 				"""
-			required:    false
-			default:     false
+			required: false
+			default:  false
 			type: ["boolean"]
 		},
 	]
