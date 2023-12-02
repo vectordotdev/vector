@@ -7,7 +7,9 @@ env:
   PULSAR_ADDRESS: pulsar://pulsar:6650
 
 matrix:
-  version: [latest]
+  # Temporarily pegging to the latest known stable release
+  # since using `latest` is failing consistently.
+  version: [3.0.1]
 
 # changes to these files/paths will invoke the integration test in CI
 # expressions are evaluated using https://github.com/micromatch/picomatch
