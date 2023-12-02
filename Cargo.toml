@@ -364,7 +364,7 @@ tower-test = "0.4.0"
 vector-lib = { path = "lib/vector-lib", default-features = false, features = ["vrl", "test"] }
 vrl = {  git = "https://github.com/vectordotdev/vrl", rev = "37319dfca17dc5d7637b24455199029cc30eb128", features = ["cli", "test", "test_framework", "arbitrary"] }
 
-wiremock = "0.5.21"
+wiremock = "0.5.22"
 zstd = { version = "0.13.0", default-features = false }
 
 [patch.crates-io]
