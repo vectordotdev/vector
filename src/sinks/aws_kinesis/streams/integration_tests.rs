@@ -52,10 +52,7 @@ async fn kinesis_put_records_with_partition_key() {
         partition_key_field: Some(partition_key.clone()),
     };
 
-    let config = KinesisStreamsSinkConfig {
-        batch,
-        base,
-    };
+    let config = KinesisStreamsSinkConfig { batch, base };
 
     let cx = SinkContext::default();
 
