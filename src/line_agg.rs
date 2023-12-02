@@ -255,17 +255,22 @@ where
         let val = match val {
             // If we have to emit just one line - that's easy,
             // we just return it.
-            (src, Emit::One((line, context, last_context))) => (src, line, context, last_context),
+            (src, Emit::One((line, initial_context, last_context))) => {
+                (src, line, initial_context, last_context)
+            }
             // If we have to emit two lines - take the second
             // one and stash it, then return the first one.
             // This way, the stashed line will be returned
             // on the next stream poll.
             (
                 src,
-                Emit::Two((line, context, last_context), (line_to_stash, context_to_stash, _)),
+                Emit::Two(
+                    (line, initial_context, last_context),
+                    (line_to_stash, context_to_stash, _),
+                ),
             ) => {
                 *this.stashed = Some((src.clone(), line_to_stash, context_to_stash));
-                (src, line, context, last_context)
+                (src, line, initial_context, last_context)
             }
         };
         Some(val)
@@ -364,7 +369,7 @@ where
 struct Aggregate<C> {
     lines: Vec<Bytes>,
     initial_context: C,
-    context: Option<C>,
+    last_context: Option<C>,
 }
 
 impl<C> Aggregate<C> {
@@ -372,12 +377,12 @@ impl<C> Aggregate<C> {
         Self {
             lines: vec![first_line],
             initial_context,
-            context: None,
+            last_context: None,
         }
     }
 
     fn add_next_line(&mut self, line: Bytes, context: C) {
-        self.context = Some(context);
+        self.last_context = Some(context);
         self.lines.push(line);
     }
 
@@ -393,7 +398,7 @@ impl<C> Aggregate<C> {
             }
             bytes_mut.extend_from_slice(&line);
         }
-        (bytes_mut.freeze(), self.initial_context, self.context)
+        (bytes_mut.freeze(), self.initial_context, self.last_context)
     }
 }
 
