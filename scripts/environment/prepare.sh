@@ -11,8 +11,8 @@ fi
 if [[ "$(cross --version | grep cross)" != "cross 0.2.5" ]] ; then
   rustup run stable cargo install cross --version 0.2.5 --force --locked
 fi
-if [[ "$(cargo-nextest --version)" != "cargo-nextest 0.9.47" ]] ; then
-  rustup run stable cargo install cargo-nextest --version 0.9.47 --force --locked
+if [[ "$(cargo-nextest --version)" != "cargo-nextest 0.9.64" ]] ; then
+  rustup run stable cargo install cargo-nextest --version 0.9.64 --force --locked
 fi
 if ! cargo deny --version >& /dev/null ; then
   rustup run stable cargo install cargo-deny --force --locked
