@@ -1969,14 +1969,14 @@ mod tests {
     fn assert_no_metrics(source: String) {
         vector_lib::metrics::init_test();
 
-        let confing = RemapConfig {
+        let config = RemapConfig {
             source: Some(source),
             drop_on_error: true,
             drop_on_abort: true,
             reroute_dropped: true,
             ..Default::default()
         };
-        let mut ast_runner = remap(confing).unwrap();
+        let mut ast_runner = remap(config).unwrap();
         let input_event =
             Event::from_json_value(serde_json::json!({"a": 42}), LogNamespace::Vector).unwrap();
         let dropped_event = transform_one_fallible(&mut ast_runner, input_event).unwrap_err();
