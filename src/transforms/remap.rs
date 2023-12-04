@@ -615,6 +615,7 @@ mod tests {
     use vrl::{btreemap, event_path};
 
     use super::*;
+    use crate::metrics::Controller;
     use crate::{
         config::{build_unit_tests, ConfigBuilder},
         event::{
@@ -632,7 +633,6 @@ mod tests {
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
     use vector_lib::enrichment::TableRegistry;
-    use crate::metrics::Controller;
 
     fn test_default_schema_definition() -> schema::Definition {
         schema::Definition::empty_legacy_namespace().with_event_field(
@@ -1977,9 +1977,10 @@ mod tests {
             ..Default::default()
         };
         let mut ast_runner = remap(confing).unwrap();
-        let input_event =  Event::from_json_value(serde_json::json!({"a": 42}),
-                                                  LogNamespace::Vector).unwrap();
-        let dropped_event = transform_one_fallible(&mut ast_runner, input_event).unwrap_err();        let dropped_log = dropped_event.as_log();
+        let input_event =
+            Event::from_json_value(serde_json::json!({"a": 42}), LogNamespace::Vector).unwrap();
+        let dropped_event = transform_one_fallible(&mut ast_runner, input_event).unwrap_err();
+        let dropped_log = dropped_event.as_log();
         assert_eq!(dropped_log.get(event_path!("a")), Some(&Value::from(42)));
 
         let controller = Controller::get().expect("no controller");
