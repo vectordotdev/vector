@@ -5,7 +5,7 @@ git config --global --add safe.directory /git/vectordotdev/vector
 
 rustup show # causes installation of version from rust-toolchain.toml
 rustup default "$(rustup show active-toolchain | awk '{print $1;}')"
-if [[ "$(cargo-deb --version)" != "2.0.0" ]] ; then
+if [[ "$(cargo-deb --version)" != "2.0.2" ]] ; then
   rustup run stable cargo install cargo-deb --version 2.0.0 --force --locked
 fi
 if [[ "$(cross --version | grep cross)" != "cross 0.2.5" ]] ; then
