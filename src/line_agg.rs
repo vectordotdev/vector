@@ -782,7 +782,7 @@ mod tests {
 
         assert_results(
             results.await.unwrap(),
-            &[(expected.as_str(), lines.len() - 1, None)],
+            &[(expected.as_str(), 0, Some(lines.len() - 1))],
         );
     }
 
