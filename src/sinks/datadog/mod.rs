@@ -2,12 +2,13 @@ use futures_util::FutureExt;
 use http::{Request, StatusCode, Uri};
 use hyper::body::Body;
 use snafu::Snafu;
-use vector_lib::configurable::configurable_component;
-use vector_lib::sensitive_string::SensitiveString;
-use vector_lib::{config::AcknowledgementsConfig, tls::TlsEnableableConfig};
+use vector_lib::{
+    config::AcknowledgementsConfig, configurable::configurable_component,
+    sensitive_string::SensitiveString, tls::TlsEnableableConfig,
+};
 
 use crate::{
-    common::datadog::{get_api_base_endpoint, DD_US_SITE},
+    common::datadog::{self, get_api_base_endpoint},
     http::{HttpClient, HttpError},
     sinks::HealthcheckError,
 };
@@ -23,17 +24,12 @@ pub mod metrics;
 #[cfg(feature = "sinks-datadog_traces")]
 pub mod traces;
 
-/// Get the default Datadog site, which is the US site.
-pub(crate) fn default_site() -> String {
-    DD_US_SITE.to_owned()
-}
-
 /// Shared configuration for Datadog sinks.
 /// Contains the maximum set of common settings that applies to all DD sink components.
 #[configurable_component]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
-pub struct DatadogCommonConfig {
+pub struct LocalDatadogCommonConfig {
     /// The endpoint to send observability data to.
     ///
     /// The endpoint must contain an HTTP scheme, and may specify a hostname or IP
@@ -45,29 +41,38 @@ pub struct DatadogCommonConfig {
     #[configurable(metadata(docs::examples = "http://127.0.0.1:8080"))]
     #[configurable(metadata(docs::examples = "http://example.com:12345"))]
     #[serde(default)]
-    pub endpoint: Option<String>,
+    endpoint: Option<String>,
 
     /// The Datadog [site][dd_site] to send observability data to.
+    ///
+    /// This value can also be set by specifying the `DD_SITE` environment variable.
+    /// The value specified here takes precedence over the environment variable.
+    ///
+    /// If not specified by the environment variable, a default value of
+    /// `datadoghq.com` is taken.
     ///
     /// [dd_site]: https://docs.datadoghq.com/getting_started/site
     #[configurable(metadata(docs::examples = "us3.datadoghq.com"))]
     #[configurable(metadata(docs::examples = "datadoghq.eu"))]
-    #[serde(default = "default_site")]
-    pub site: String,
+    site: Option<String>,
 
     /// The default Datadog [API key][api_key] to use in authentication of HTTP requests.
     ///
     /// If an event has a Datadog [API key][api_key] set explicitly in its metadata, it takes
     /// precedence over this setting.
     ///
+    /// This value can also be set by specifying the `DD_API_KEY` environment variable.
+    /// The value specified here takes precedence over the environment variable.
+    ///
     /// [api_key]: https://docs.datadoghq.com/api/?lang=bash#authentication
+    /// [global_options]: /docs/reference/configuration/global-options/#datadog
     #[configurable(metadata(docs::examples = "${DATADOG_API_KEY_ENV_VAR}"))]
     #[configurable(metadata(docs::examples = "ef8d5de700e7989468166c40fc8a0ccd"))]
-    pub default_api_key: SensitiveString,
+    default_api_key: Option<SensitiveString>,
 
     #[configurable(derived)]
     #[serde(default)]
-    pub tls: Option<TlsEnableableConfig>,
+    tls: Option<TlsEnableableConfig>,
 
     #[configurable(derived)]
     #[serde(
@@ -75,19 +80,52 @@ pub struct DatadogCommonConfig {
         deserialize_with = "crate::serde::bool_or_struct",
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
-    pub acknowledgements: AcknowledgementsConfig,
+    acknowledgements: AcknowledgementsConfig,
 }
 
-impl Default for DatadogCommonConfig {
-    fn default() -> Self {
+impl LocalDatadogCommonConfig {
+    pub fn new(
+        endpoint: Option<String>,
+        site: Option<String>,
+        default_api_key: Option<SensitiveString>,
+    ) -> Self {
         Self {
-            endpoint: None,
-            site: default_site(),
-            default_api_key: SensitiveString::default(),
-            tls: None,
-            acknowledgements: AcknowledgementsConfig::default(),
+            endpoint,
+            site,
+            default_api_key,
+            ..Default::default()
         }
     }
+
+    pub fn with_globals(
+        &self,
+        config: datadog::Options,
+    ) -> Result<DatadogCommonConfig, ConfigurationError> {
+        Ok(DatadogCommonConfig {
+            endpoint: self.endpoint.clone(),
+            site: self.site.clone().unwrap_or(config.site),
+            default_api_key: self
+                .default_api_key
+                .clone()
+                .or(config.api_key)
+                .ok_or(ConfigurationError::ApiKeyRequired)?,
+            acknowledgements: self.acknowledgements,
+        })
+    }
+}
+
+#[derive(Debug, Snafu, PartialEq, Eq)]
+pub enum ConfigurationError {
+    #[snafu(display("API Key must be specified."))]
+    ApiKeyRequired,
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct DatadogCommonConfig {
+    pub endpoint: Option<String>,
+    pub site: String,
+    pub default_api_key: SensitiveString,
+    pub acknowledgements: AcknowledgementsConfig,
 }
 
 impl DatadogCommonConfig {
@@ -188,5 +226,97 @@ impl DatadogApiError {
             DatadogApiError::BadRequest | DatadogApiError::PayloadTooLarge => false,
             DatadogApiError::ServerError | DatadogApiError::Forbidden => true,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use bytes::Bytes;
+
+    use crate::sinks::util::test::build_test_server_status;
+
+    use super::*;
+
+    // The sink must support v1 and v2 API endpoints which have different codes for
+    // signaling status. This enum allows us to signal which API endpoint and what
+    // kind of response we want our test to model without getting into the details
+    // of exactly what that code is.
+    pub(super) enum ApiStatus {
+        OKv1,
+        OKv2,
+        BadRequestv1,
+        BadRequestv2,
+    }
+
+    pub(super) fn test_server(
+        addr: std::net::SocketAddr,
+        api_status: ApiStatus,
+    ) -> (
+        futures::channel::mpsc::Receiver<(http::request::Parts, Bytes)>,
+        stream_cancel::Trigger,
+        impl std::future::Future<Output = Result<(), ()>>,
+    ) {
+        let status = match api_status {
+            ApiStatus::OKv1 => StatusCode::OK,
+            ApiStatus::OKv2 => StatusCode::ACCEPTED,
+            ApiStatus::BadRequestv1 | ApiStatus::BadRequestv2 => StatusCode::BAD_REQUEST,
+        };
+
+        // NOTE: we pass `Trigger` out to the caller even though this suite never
+        // uses it as it being dropped cancels the stream machinery here,
+        // indicating that failures that might not be valid.
+        build_test_server_status(addr, status)
+    }
+
+    #[test]
+    fn local_config_with_no_overrides() {
+        let local = LocalDatadogCommonConfig::new(
+            None,
+            Some("potato.com".into()),
+            Some("key".to_string().into()),
+        );
+        let global = datadog::Options {
+            api_key: Some("more key".to_string().into()),
+            site: "tomato.com".into(),
+        };
+
+        let overriden = local.with_globals(global).unwrap();
+
+        assert_eq!(None, overriden.endpoint);
+        assert_eq!("potato.com".to_string(), overriden.site);
+        assert_eq!(
+            SensitiveString::from("key".to_string()),
+            overriden.default_api_key
+        );
+    }
+
+    #[test]
+    fn local_config_with_overrides() {
+        let local = LocalDatadogCommonConfig::new(None, None, None);
+        let global = datadog::Options {
+            api_key: Some("more key".to_string().into()),
+            site: "tomato.com".into(),
+        };
+
+        let overriden = local.with_globals(global).unwrap();
+
+        assert_eq!(None, overriden.endpoint);
+        assert_eq!("tomato.com".to_string(), overriden.site);
+        assert_eq!(
+            SensitiveString::from("more key".to_string()),
+            overriden.default_api_key
+        );
+    }
+
+    #[test]
+    fn no_api_key() {
+        let local = LocalDatadogCommonConfig::new(None, None, None);
+        let global = datadog::Options {
+            api_key: None,
+            site: "tomato.com".into(),
+        };
+
+        let error = local.with_globals(global).unwrap_err();
+        assert_eq!(ConfigurationError::ApiKeyRequired, error);
     }
 }
