@@ -19,7 +19,9 @@ use aws_sigv4::http_request::{SignableBody, SignableRequest, SigningParams, Sign
 use aws_sigv4::sign::v4;
 use aws_smithy_async::rt::sleep::TokioSleep;
 use aws_smithy_runtime::client::http::hyper_014::HyperClientBuilder;
-use aws_smithy_runtime_api::client::http::{HttpConnector, SharedHttpConnector};
+use aws_smithy_runtime_api::client::http::{
+    HttpConnector, HttpConnectorFuture, SharedHttpConnector,
+};
 use aws_smithy_runtime_api::client::identity::Identity;
 use aws_smithy_runtime_api::client::orchestrator::HttpRequest;
 use aws_smithy_runtime_api::{
@@ -222,9 +224,6 @@ pub async fn sign_request(
         .time(SystemTime::now())
         .settings(SigningSettings::default());
 
-    // TODO SMW - wut is this?
-    // signing_params_builder.set_security_token(credentials.session_token());
-
     let signing_params = signing_params_builder
         .build()
         .expect("all signing params set");
@@ -266,16 +265,16 @@ pub struct AwsConnector<T> {
     region: Region,
 }
 
-impl<T> aws_smithy_runtime_api::client::http::HttpConnector for AwsConnector<T>
+impl<T> HttpConnector for AwsConnector<T>
 where
-    T: aws_smithy_runtime_api::client::http::HttpConnector,
+    T: HttpConnector,
 {
-    fn call(&self, req: HttpRequest) -> aws_smithy_runtime_api::client::http::HttpConnectorFuture {
+    fn call(&self, req: HttpRequest) -> HttpConnectorFuture {
         let byte_size = req.body().bytes().expect("body cannot be lazy").len();
         let fut = self.http.call(req);
         let region = self.region.clone();
 
-        aws_smithy_runtime_api::client::http::HttpConnectorFuture::new(fut.inspect(move |result| {
+        HttpConnectorFuture::new(fut.inspect(move |result| {
             if let Ok(result) = result {
                 if result.status().is_success() {
                     emit!(AwsBytesSent {
