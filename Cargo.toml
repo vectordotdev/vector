@@ -34,6 +34,7 @@ name = "secret-backend-example"
 path = "src/config/loading/secret_backend_example.rs"
 test = false
 bench = false
+required-features = ["secret-backend-example"]
 
 # CI-based builds use full release optimization.  See scripts/environment/release-flags.sh.
 # This results in roughly a 5% reduction in performance when compiling locally vs when
@@ -389,6 +390,9 @@ default-musl = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build"
 default-no-api-client = ["api", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "rdkafka?/gssapi-vendored", "enterprise"]
 default-no-vrl-cli = ["api", "sinks", "sources", "sources-dnstap", "transforms", "unix", "rdkafka?/gssapi-vendored", "enterprise"]
 tokio-console = ["dep:console-subscriber", "tokio/tracing"]
+
+# Enables the binary secret-backend-example
+secret-backend-example = ["transforms"]
 
 all-logs = ["sinks-logs", "sources-logs", "sources-dnstap", "transforms-logs"]
 all-metrics = ["sinks-metrics", "sources-metrics", "transforms-metrics", "enterprise"]
