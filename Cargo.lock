@@ -1950,7 +1950,6 @@ dependencies = [
  "chrono",
  "chrono-tz-build",
  "phf",
- "serde",
 ]
 
 [[package]]
@@ -1992,12 +1991,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "cidr"
-version = "0.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8d18b093eba54c9aaa1e3784d4361eb2ba944cf7d0a932a830132238f483e8d8"
-
-[[package]]
 name = "cidr-utils"
 version = "0.5.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2008,17 +2001,6 @@ dependencies = [
  "num-traits",
  "once_cell",
  "regex",
-]
-
-[[package]]
-name = "cidr-utils"
-version = "0.6.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "25c0a9fb70c2c2cc2a520aa259b1d1345650046a07df1b6da1d3cefcd327f43e"
-dependencies = [
- "cidr",
- "num-bigint",
- "num-traits",
 ]
 
 [[package]]
@@ -2156,8 +2138,6 @@ dependencies = [
  "tracing 0.1.40",
  "vector-common",
  "vector-config",
- "vector-config-common",
- "vector-config-macros",
  "vector-core",
  "vector-lookup",
  "vrl",
@@ -2758,12 +2738,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5c297a1c74b71ae29df00c3e22dd9534821d60eb9af5a0192823fa2acea70c2a"
 
 [[package]]
-name = "db-key"
-version = "0.0.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b72465f46d518f6015d9cf07f7f3013a95dd6b9c2747c3d65ae0cce43929d14f"
-
-[[package]]
 name = "deadpool"
 version = "0.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2967,7 +2941,6 @@ dependencies = [
  "serde_json",
  "snafu",
  "tracing 0.1.40",
- "tracing-subscriber",
  "vector-config",
  "vector-config-common",
 ]
@@ -3373,8 +3346,6 @@ dependencies = [
  "tokio",
  "tracing 0.1.40",
  "vector-config",
- "vector-config-common",
- "vector-config-macros",
  "winapi",
 ]
 
@@ -5044,21 +5015,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b5e6163cb8c49088c2c36f57875e58ccd8c87c7427f7fbd50ea6710b2f3f2e8f"
 
 [[package]]
-name = "logfmt"
-version = "0.0.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "879777f0cc6f3646a044de60e4ab98c75617e3f9580f7a2032e6ad7ea0cd3054"
-
-[[package]]
 name = "loki-logproto"
 version = "0.1.0"
 dependencies = [
- "bytes 1.5.0",
  "chrono",
  "prost 0.12.3",
  "prost-build 0.12.3",
  "prost-types 0.12.3",
- "snap",
 ]
 
 [[package]]
@@ -5601,7 +5564,7 @@ version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1b41e7479dc3678ea792431e04bafd62a31879035f4a5fa707602df062f58c77"
 dependencies = [
- "cidr-utils 0.5.11",
+ "cidr-utils",
  "serde",
 ]
 
@@ -5800,15 +5763,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "num_enum"
-version = "0.7.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "683751d591e6d81200c39fb0d1032608b77724f34114db54f571ff1317b337c0"
-dependencies = [
- "num_enum_derive 0.7.1",
-]
-
-[[package]]
 name = "num_enum_derive"
 version = "0.5.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5827,18 +5781,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "96667db765a921f7b295ffee8b60472b686a51d4f21c2ee4ffdb94c7013b65a6"
 dependencies = [
  "proc-macro-crate 1.3.1",
- "proc-macro2 1.0.70",
- "quote 1.0.33",
- "syn 2.0.39",
-]
-
-[[package]]
-name = "num_enum_derive"
-version = "0.7.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6c11e44798ad209ccdd91fc192f0526a369a01234f7373e1b141c96d7cee4f0e"
-dependencies = [
- "proc-macro-crate 2.0.0",
  "proc-macro2 1.0.70",
  "quote 1.0.33",
  "syn 2.0.39",
@@ -6110,16 +6052,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "536900a8093134cf9ccf00a27deb3532421099e958d9dd431135d0c7543ca1e8"
 dependencies = [
  "num-traits",
-]
-
-[[package]]
-name = "os_info"
-version = "3.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "006e42d5b888366f1880eda20371fedde764ed2213dc8496f49622fa0c99cd5e"
-dependencies = [
- "log",
- "winapi",
 ]
 
 [[package]]
@@ -6796,10 +6728,8 @@ version = "0.1.0"
 dependencies = [
  "indexmap 2.1.0",
  "nom",
- "num_enum 0.7.1",
  "prost 0.12.3",
  "prost-build 0.12.3",
- "prost-types 0.12.3",
  "snafu",
  "vector-common",
 ]
@@ -8069,17 +7999,6 @@ checksum = "f3a1a3341211875ef120e117ea7fd5228530ae7e7036a779fdc9117be6b3282c"
 dependencies = [
  "ordered-float 2.10.1",
  "serde",
-]
-
-[[package]]
-name = "serde-wasm-bindgen"
-version = "0.6.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "17ba92964781421b6cef36bf0d7da26d201e96d84e1b10e7ae6ed416e516906d"
-dependencies = [
- "js-sys",
- "serde",
- "wasm-bindgen",
 ]
 
 [[package]]
@@ -9938,7 +9857,6 @@ dependencies = [
  "itertools 0.12.0",
  "log",
  "once_cell",
- "os_info",
  "owo-colors",
  "paste",
  "regex",
@@ -10002,7 +9920,6 @@ dependencies = [
  "bytesize",
  "chrono",
  "chrono-tz",
- "cidr-utils 0.6.1",
  "clap 4.4.10",
  "colored",
  "console-subscriber",
@@ -10049,7 +9966,6 @@ dependencies = [
  "lapin",
  "libc",
  "listenfd",
- "logfmt",
  "loki-logproto",
  "lru",
  "maxminddb",
@@ -10208,8 +10124,6 @@ dependencies = [
  "tracing-subscriber",
  "vector-common",
  "vector-config",
- "vector-config-common",
- "vector-config-macros",
 ]
 
 [[package]]
@@ -10219,19 +10133,16 @@ dependencies = [
  "async-stream",
  "bytes 1.5.0",
  "chrono",
- "chrono-tz",
  "crossbeam-utils",
  "derivative",
  "futures 0.3.29",
  "indexmap 2.1.0",
  "metrics",
  "nom",
- "ordered-float 4.1.1",
  "paste",
  "pin-project",
  "quickcheck",
  "quickcheck_macros",
- "ryu",
  "serde",
  "serde_json",
  "smallvec",
@@ -10240,8 +10151,6 @@ dependencies = [
  "tokio",
  "tracing 0.1.40",
  "vector-config",
- "vector-config-common",
- "vector-config-macros",
  "vrl",
 ]
 
@@ -10313,7 +10222,6 @@ dependencies = [
  "chrono-tz",
  "criterion",
  "crossbeam-utils",
- "db-key",
  "dyn-clone",
  "enrichment",
  "enumflags2",
@@ -10366,15 +10274,11 @@ dependencies = [
  "toml 0.8.8",
  "tonic 0.10.2",
  "tracing 0.1.40",
- "tracing-core 0.1.32",
  "tracing-subscriber",
- "typetag",
  "url",
  "vector-buffers",
  "vector-common",
  "vector-config",
- "vector-config-common",
- "vector-config-macros",
  "vector-lookup",
  "vrl",
 ]
@@ -10447,14 +10351,10 @@ dependencies = [
 name = "vector-vrl-tests"
 version = "0.1.0"
 dependencies = [
- "ansi_term",
- "chrono",
  "chrono-tz",
  "clap 4.4.10",
  "enrichment",
  "glob",
- "prettydiff",
- "regex",
  "serde",
  "serde_json",
  "tikv-jemallocator",
@@ -10469,10 +10369,8 @@ version = "0.1.0"
 dependencies = [
  "cargo_toml",
  "enrichment",
- "getrandom 0.2.11",
  "gloo-utils",
  "serde",
- "serde-wasm-bindgen",
  "vector-vrl-functions",
  "vrl",
  "wasm-bindgen",
@@ -10509,7 +10407,7 @@ dependencies = [
  "charset",
  "chrono",
  "chrono-tz",
- "cidr-utils 0.5.11",
+ "cidr-utils",
  "clap 4.4.10",
  "codespan-reporting",
  "community-id",

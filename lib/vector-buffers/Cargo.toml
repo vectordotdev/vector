@@ -29,8 +29,6 @@ tokio-util = { version = "0.7.0", default-features = false }
 tokio = { version = "1.34.0", default-features = false, features = ["rt", "macros", "rt-multi-thread", "sync", "fs", "io-util", "time"] }
 tracing = { version = "0.1.34", default-features = false, features = ["attributes"] }
 vector-config = { path = "../vector-config", default-features = false }
-vector-config-common = { path = "../vector-config-common", default-features = false }
-vector-config-macros = { path = "../vector-config-macros", default-features = false }
 vector-common = { path = "../vector-common", default-features = false, features = ["byte_size_of", "serde"] }
 
 [dev-dependencies]

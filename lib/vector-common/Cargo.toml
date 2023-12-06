@@ -43,7 +43,6 @@ tokenize = [
 [dependencies]
 async-stream = "0.3.5"
 bytes = { version = "1.5.0", default-features = false, optional = true }
-chrono-tz = { version = "0.8.4", default-features = false, features = ["serde"] }
 chrono = { version = "0.4", default-features = false, optional = true, features = ["clock"] }
 crossbeam-utils = { version = "0.8.16", default-features = false }
 derivative = { version = "2.2.0", default-features = false }
@@ -51,10 +50,8 @@ futures = { version = "0.3.29", default-features = false, features = ["std"] }
 indexmap = { version = "2.1.0", default-features = false, features = ["std"] }
 metrics = "0.21.1"
 nom = { version = "7", optional = true }
-ordered-float = { version = "4.1.1", default-features = false }
 paste = "1.0.14"
 pin-project.workspace = true
-ryu = { version = "1", default-features = false }
 serde_json = { version = "1.0.107", default-features = false, features = ["std", "raw_value"] }
 serde = { version = "1.0.193", optional = true, features = ["derive"] }
 smallvec = { version = "1", default-features = false }
@@ -64,8 +61,6 @@ tokio = { version = "1.34.0", default-features = false, features = ["macros", "t
 tracing = { version = "0.1.34", default-features = false }
 vrl.workspace = true
 vector-config = { path = "../vector-config" }
-vector-config-common = { path = "../vector-config-common" }
-vector-config-macros = { path = "../vector-config-macros" }
 
 [dev-dependencies]
 futures = { version = "0.3.29", default-features = false, features = ["async-await", "std"] }

@@ -25,7 +25,6 @@ indicatif = { version = "0.17.7", features = ["improved_unicode"] }
 itertools = "0.12.0"
 log = "0.4.20"
 once_cell = "1.18"
-os_info = { version = "3.7.0", default-features = false }
 # watch https://github.com/epage/anstyle for official interop with Clap
 owo-colors = { version = "3.5.0", features = ["supports-colors"] }
 paste = "1.0.14"
