@@ -5,7 +5,7 @@ use std::{
 };
 
 use anymap::{
-    any::{Any, IntoBox},
+    core::any::{Any, IntoBox},
     Map,
 };
 
