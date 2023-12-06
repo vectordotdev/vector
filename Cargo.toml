@@ -446,7 +446,6 @@ aws-core = [
   "dep:aws-smithy-async",
   "dep:aws-smithy-client",
   "dep:aws-smithy-http",
-  # "dep:aws-smithy-http-tower",
   "dep:aws-smithy-types",
 ]
 
