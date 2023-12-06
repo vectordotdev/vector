@@ -25,5 +25,3 @@ In order to cover as many observability use cases as possible, we've built Vecto
 Vector is built to be deployable in multiple roles and topologies:
 
 {{< jump "/docs/setup/deployment" >}}
-
-
