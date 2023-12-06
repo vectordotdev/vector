@@ -304,7 +304,7 @@ seahash = { version = "4.1.0", default-features = false }
 semver = { version = "1.0.20", default-features = false, features = ["serde", "std"], optional = true }
 smallvec = { version = "1", default-features = false, features = ["union", "serde"] }
 snafu = { version = "0.7.5", default-features = false, features = ["futures"] }
-snap = { version = "1.1.0", default-features = false }
+snap = { version = "1.1.1", default-features = false }
 socket2 = { version = "0.5.5", default-features = false }
 stream-cancel = { version = "0.8.1", default-features = false }
 strip-ansi-escapes = { version = "0.2.0", default-features = false }
