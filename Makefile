@@ -343,7 +343,7 @@ test-aarch64-unknown-linux-gnu: cross-test-aarch64-unknown-linux-gnu ## Runs uni
 
 .PHONY: test-behavior-config
 test-behavior-config: ## Runs configuration related behavioral tests
-	${MAYBE_ENVIRONMENT_EXEC} cargo build --no-default-features --features transforms --bin secret-backend-example
+	${MAYBE_ENVIRONMENT_EXEC} cargo build --no-default-features --features secret-backend-example --bin secret-backend-example
 	${MAYBE_ENVIRONMENT_EXEC} cargo run --no-default-features --features transforms -- test tests/behavior/config/*
 
 .PHONY: test-behavior-%
