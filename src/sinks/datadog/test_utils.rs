@@ -1,3 +1,4 @@
+// #![cfg(any(feature = "sinks-datadog_logs", feature = "sinks-datadog_metrics"))]
 use bytes::Bytes;
 use http::status::StatusCode;
 
@@ -9,8 +10,11 @@ use crate::sinks::util::test::build_test_server_status;
 // of exactly what that code is.
 pub(super) enum ApiStatus {
     OKv1,
+    #[cfg(feature = "sinks-datadog_logs")]
     OKv2,
+    #[cfg(feature = "sinks-datadog_logs")]
     BadRequestv1,
+    #[cfg(feature = "sinks-datadog_logs")]
     BadRequestv2,
 }
 
@@ -24,7 +28,9 @@ pub(super) fn test_server(
 ) {
     let status = match api_status {
         ApiStatus::OKv1 => StatusCode::OK,
+        #[cfg(feature = "sinks-datadog_logs")]
         ApiStatus::OKv2 => StatusCode::ACCEPTED,
+        #[cfg(feature = "sinks-datadog_logs")]
         ApiStatus::BadRequestv1 | ApiStatus::BadRequestv2 => StatusCode::BAD_REQUEST,
     };
 
