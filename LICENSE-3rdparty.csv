@@ -20,7 +20,6 @@ anstyle-query,https://github.com/rust-cli/anstyle,MIT OR Apache-2.0,The anstyle-
 anstyle-wincon,https://github.com/rust-cli/anstyle,MIT OR Apache-2.0,The anstyle-wincon Authors
 anyhow,https://github.com/dtolnay/anyhow,MIT OR Apache-2.0,David Tolnay <dtolnay@gmail.com>
 anymap,https://github.com/chris-morgan/anymap,BlueOak-1.0.0 OR MIT OR Apache-2.0,Chris Morgan <rust@chrismorgan.info>
-anymap,https://github.com/chris-morgan/anymap,MIT OR Apache-2.0,Chris Morgan <me@chrismorgan.info>
 apache-avro,https://github.com/apache/avro,Apache-2.0,Apache Avro team <dev@avro.apache.org>
 arbitrary,https://github.com/rust-fuzz/arbitrary,MIT OR Apache-2.0,"The Rust-Fuzz Project Developers, Nick Fitzgerald <fitzgen@gmail.com>, Manish Goregaokar <manishsmail@gmail.com>, Simonas Kazlauskas <arbitrary@kazlauskas.me>, Brian L. Troutwine <brian@troutwine.us>, Corey Farwell <coreyf@rwell.org>"
 arc-swap,https://github.com/vorner/arc-swap,MIT OR Apache-2.0,Michal 'vorner' Vaner <vorner@vorner.cz>
