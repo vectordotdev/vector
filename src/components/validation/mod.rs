@@ -280,7 +280,11 @@ mod tests {
             .build()
             .unwrap();
         rt.block_on(async {
-            let mut runner = Runner::from_configuration(configuration, test_case_data_path, ExtraContext::default());
+            let mut runner = Runner::from_configuration(
+                configuration,
+                test_case_data_path,
+                ExtraContext::default(),
+            );
             runner.add_validator(StandardValidators::ComponentSpec);
 
             match runner.run_validation().await {
