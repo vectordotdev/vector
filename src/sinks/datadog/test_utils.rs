@@ -1,4 +1,3 @@
-// #![cfg(any(feature = "sinks-datadog_logs", feature = "sinks-datadog_metrics"))]
 use bytes::Bytes;
 use http::status::StatusCode;
 
