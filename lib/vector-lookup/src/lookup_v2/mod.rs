@@ -64,11 +64,7 @@ pub struct ConfigTargetPath(pub OwnedTargetPath);
 
 impl fmt::Display for ConfigTargetPath {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let prefix_char = match self.0.prefix {
-            PathPrefix::Event => '.',
-            PathPrefix::Metadata => '%',
-        };
-        write!(f, "{}{}", prefix_char, self.0.path)
+        write!(f, "{}", self.0)
     }
 }
 
