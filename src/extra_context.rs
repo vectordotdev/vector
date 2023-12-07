@@ -20,10 +20,7 @@ impl ExtraContext {
     /// Create a new `ExtraContext` that contains the single passed in value.
     pub fn single_value<T: Any + Send + Sync>(value: T) -> Self {
         let mut map = HashMap::new();
-        map.insert(
-            value.type_id(),
-            Box::new(value) as Box<dyn Any + Send + Sync>,
-        );
+        map.insert(value.type_id(), Box::new(value) as _);
         Self(Arc::new(map))
     }
 
@@ -56,12 +53,12 @@ impl ExtraContext {
 mod tests {
     use super::*;
 
-    #[derive(Clone, Eq, PartialEq, Debug)]
+    #[derive(Clone, Eq, PartialEq, Debug, Default)]
     struct Peas {
         beans: usize,
     }
 
-    #[derive(Clone, Eq, PartialEq, Debug)]
+    #[derive(Clone, Eq, PartialEq, Debug, Default)]
     struct Potatoes(usize);
 
     #[test]
@@ -75,6 +72,17 @@ mod tests {
 
         assert_eq!(&Peas { beans: 42 }, context.get::<Peas>().unwrap());
         assert_eq!(&Potatoes(8), context.get::<Potatoes>().unwrap());
+    }
+
+    #[test]
+    fn get_or_default_fetches_item() {
+        let potatoes = Potatoes(8);
+
+        let mut context = ExtraContext::default();
+        context.insert(potatoes);
+
+        assert_eq!(Potatoes(8), context.get_or_default::<Potatoes>());
+        assert_eq!(Peas::default(), context.get_or_default::<Peas>());
     }
 
     #[test]
