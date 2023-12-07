@@ -2,6 +2,7 @@ use futures::StreamExt;
 use indoc::indoc;
 use vector_lib::finalization::{BatchNotifier, BatchStatus};
 
+use crate::sinks::datadog::test_utils::{test_server, ApiStatus};
 use crate::{
     common::datadog,
     config::{SinkConfig, SinkContext},
@@ -13,10 +14,7 @@ use crate::{
     },
 };
 
-use super::{
-    super::tests::{test_server, ApiStatus},
-    config::DatadogMetricsConfig,
-};
+use super::config::DatadogMetricsConfig;
 
 #[tokio::test]
 async fn global_options() {

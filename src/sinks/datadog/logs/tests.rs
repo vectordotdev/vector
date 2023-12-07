@@ -15,6 +15,7 @@ use vector_lib::{
     event::{BatchNotifier, BatchStatus, Event, LogEvent},
 };
 
+use crate::sinks::datadog::test_utils::{test_server, ApiStatus};
 use crate::{
     common::datadog,
     config::{SinkConfig, SinkContext},
@@ -34,14 +35,7 @@ use crate::{
     tls::TlsError,
 };
 
-use super::{
-    super::{
-        tests::{test_server, ApiStatus},
-        DatadogApiError,
-    },
-    config::DatadogLogsConfig,
-    service::LogApiRetry,
-};
+use super::{super::DatadogApiError, config::DatadogLogsConfig, service::LogApiRetry};
 
 fn event_with_api_key(msg: &str, key: &str) -> Event {
     let mut e = Event::Log(LogEvent::from(msg));
