@@ -31,7 +31,7 @@ impl ProtobufSerializerConfig {
 
     /// The data type of events that are accepted by `ProtobufSerializer`.
     pub fn input_type(&self) -> DataType {
-        DataType::Log.and(DataType::Trace)
+        DataType::Log
     }
 
     /// The schema required by the serializer.
@@ -234,10 +234,25 @@ mod tests {
         };
     }
 
+    fn test_data_dir() -> PathBuf {
+        PathBuf::from(std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("tests/data/protobuf")
+    }
+
     fn test_message_descriptor(message_type: &str) -> MessageDescriptor {
         let path = PathBuf::from(std::env::var_os("CARGO_MANIFEST_DIR").unwrap())
             .join("tests/data/protobuf/protos/test.desc");
         get_message_descriptor(&path, &format!("test.{message_type}")).unwrap()
+    }
+
+    #[test]
+    fn test_config_input_type() {
+        let config = ProtobufSerializerConfig {
+            protobuf: ProtobufSerializerOptions {
+                desc_file: test_data_dir().join("test_protobuf.desc"),
+                message_type: "test_protobuf.Person".into(),
+            },
+        };
+        assert_eq!(config.input_type(), DataType::Log);
     }
 
     #[test]
