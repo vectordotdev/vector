@@ -166,7 +166,10 @@ pub async fn create_client_and_region<T: ClientBuilder>(
         .http_client(connector)
         .sleep_impl(Arc::new(TokioSleep::new()))
         .identity_cache(auth.credentials_cache().await?)
-        .credentials_provider(auth.credentials_provider(region.clone()).await?)
+        .credentials_provider(
+            auth.credentials_provider(region.clone(), proxy, tls_options)
+                .await?,
+        )
         .region(region.clone())
         .retry_config(retry_config.clone());
 

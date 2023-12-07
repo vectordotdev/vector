@@ -8,14 +8,18 @@ use aws_config::{
         profile_file::{ProfileFileKind, ProfileFiles},
         ProfileFileCredentialsProvider,
     },
+    provider_config::ProviderConfig,
     sts::AssumeRoleProviderBuilder,
 };
 use aws_credential_types::{provider::SharedCredentialsProvider, Credentials};
+use aws_smithy_runtime::client::http::hyper_014::HyperClientBuilder;
 use aws_smithy_runtime_api::client::identity::SharedIdentityCache;
 use aws_types::region::Region;
 use serde_with::serde_as;
-use vector_lib::configurable::configurable_component;
-use vector_lib::sensitive_string::SensitiveString;
+use vector_lib::{config::proxy::ProxyConfig, sensitive_string::SensitiveString, tls::TlsConfig};
+use vector_lib::{configurable::configurable_component, tls::MaybeTlsSettings};
+
+use crate::http::{build_proxy_connector, build_tls_connector};
 
 // matches default load timeout from the SDK as of 0.10.1, but lets us confidently document the
 // default rather than relying on the SDK default to not change
@@ -205,6 +209,8 @@ impl AwsAuthentication {
     pub async fn credentials_provider(
         &self,
         service_region: Region,
+        proxy: &ProxyConfig,
+        tls_options: &Option<TlsConfig>,
     ) -> crate::Result<SharedCredentialsProvider> {
         match self {
             Self::AccessKey {
@@ -265,7 +271,10 @@ impl AwsAuthentication {
                 }
 
                 let provider = builder
-                    .build_from_provider(default_credentials_provider(auth_region, *imds).await?)
+                    .build_from_provider(
+                        default_credentials_provider(auth_region, proxy, tls_options, *imds)
+                            .await?,
+                    )
                     .await;
 
                 Ok(SharedCredentialsProvider::new(provider))
@@ -273,6 +282,8 @@ impl AwsAuthentication {
             AwsAuthentication::Default { imds, region, .. } => Ok(SharedCredentialsProvider::new(
                 default_credentials_provider(
                     region.clone().map(Region::new).unwrap_or(service_region),
+                    proxy,
+                    tls_options,
                     *imds,
                 )
                 .await?,
@@ -294,17 +305,34 @@ impl AwsAuthentication {
 
 async fn default_credentials_provider(
     region: Region,
+    proxy: &ProxyConfig,
+    tls_options: &Option<TlsConfig>,
     imds: ImdsAuthentication,
 ) -> crate::Result<SharedCredentialsProvider> {
+    let tls_settings = MaybeTlsSettings::tls_client(tls_options)?;
+    let connector = if proxy.enabled {
+        let proxy = build_proxy_connector(tls_settings, proxy)?;
+        HyperClientBuilder::new().build(proxy)
+    } else {
+        let tls_connector = build_tls_connector(tls_settings)?;
+        HyperClientBuilder::new().build(tls_connector)
+    };
+
+    let provider_config = ProviderConfig::empty()
+        .with_region(Some(region.clone()))
+        .with_http_client(connector);
+
     let client = imds::Client::builder()
         .max_attempts(imds.max_attempts)
         .connect_timeout(imds.connect_timeout)
         .read_timeout(imds.read_timeout)
+        .configure(&provider_config)
         .build();
 
     let credentials_provider = DefaultCredentialsChain::builder()
         .region(region)
         .imds_client(client)
+        .configure(provider_config)
         .build()
         .await;
 
