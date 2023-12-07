@@ -21,7 +21,10 @@ pub mod events;
 pub mod logs;
 #[cfg(feature = "sinks-datadog_metrics")]
 pub mod metrics;
-#[cfg(test)]
+#[cfg(any(
+    all(feature = "sinks-datadog_logs", test),
+    all(feature = "sinks-datadog_metrics", test)
+))]
 mod test_utils;
 #[cfg(feature = "sinks-datadog_traces")]
 pub mod traces;
