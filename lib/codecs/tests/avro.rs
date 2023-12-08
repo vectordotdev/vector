@@ -20,7 +20,7 @@ use vector_core::{config::LogNamespace, event::Event};
 fn roundtrip_avro_fixtures(
     #[files("tests/data/avro/generated/*.avro")]
     #[exclude(
-        ".*(date|decimal_var|duration|fixed|time_millis|timestamp_micros|timestamp_millis).avro"
+        ".*(date|decimal_var|fixed|time_millis|timestamp_micros|timestamp_millis).avro"
     )]
     path: PathBuf,
     #[case] reserialize: bool,

@@ -1,4 +1,4 @@
-use apache_avro::{types::Value, Days, Decimal, Duration, Millis, Months, Schema};
+use apache_avro::{types::Value, Decimal, Schema};
 use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::io::Write;
@@ -398,29 +398,6 @@ fn generate_avro_test_case_timestamp_micros() {
     generate_test_case(schema, value, "timestamp_micros");
 }
 
-fn generate_avro_test_case_duration() {
-    let schema = r#"
-    {
-        "type": "record",
-        "name": "test",
-        "fields": [
-            {"name": "duration_field", "type": {
-                "type": "fixed",
-                "size": 12,
-                "name": "duration"
-              },
-              "logicalType": "duration"
-            }
-        ]
-    }
-    "#;
-    let record = Value::Record(vec![(
-        "duration_field".into(),
-        Value::Duration(Duration::new(Months::new(6), Days::new(7), Millis::new(8))),
-    )]);
-    generate_test_case_from_value(schema, record, "duration");
-}
-
 fn generate_avro_test_case_uuid() {
     let schema = r#"
     {
@@ -485,6 +462,5 @@ fn main() {
     generate_avro_test_case_time_micros();
     generate_avro_test_case_timestamp_millis();
     generate_avro_test_case_timestamp_micros();
-    generate_avro_test_case_duration();
     generate_avro_test_case_uuid();
 }

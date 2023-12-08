@@ -1,1 +1,0 @@
-{"name":"test","type":"record","fields":[{"name":"duration_field","type":{"type":{"name":"duration","type":"fixed","size":12},"logicalType":"duration"}}]}
