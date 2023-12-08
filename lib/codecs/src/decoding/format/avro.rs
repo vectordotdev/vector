@@ -89,7 +89,12 @@ impl From<&AvroDeserializerOptions> for AvroSerializerOptions {
 #[configurable_component]
 #[derive(Clone, Debug)]
 pub struct AvroDeserializerOptions {
-    /// The Avro schema.
+    /// The Avro schema definition. 
+    /// Please note that the following [`apache_avro::types::Value`] variants are currently *not* supported:
+    /// * `Decimal`
+    /// * `Duration`
+    /// * `LocalTimestampMillis`
+    /// * `LocalTimestampMicros`
     #[configurable(metadata(
         docs::examples = r#"{ "type": "record", "name": "log", "fields": [{ "name": "message", "type": "string" }] }"#,
         docs::additional_props_description = r#"Supports most avro data types, unsupported data types includes
