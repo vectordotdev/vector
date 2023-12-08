@@ -7,6 +7,6 @@ publish = false
 license = "MPL-2.0"
 
 [dependencies]
-clap = { version = "4.4.10", features = ["derive"] }
+clap = { version = "4.4.11", features = ["derive"] }
 vector-vrl-functions = { path = "../functions" }
 vrl.workspace = true
