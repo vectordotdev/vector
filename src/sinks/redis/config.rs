@@ -157,7 +157,7 @@ impl SinkConfig for RedisSinkConfig {
 impl RedisSinkConfig {
     pub(super) async fn build_client(&self) -> RedisResult<ConnectionManager> {
         let client = redis::Client::open(self.endpoint.as_str())?;
-        client.get_tokio_connection_manager().await
+        client.get_connection_manager().await
     }
 
     async fn healthcheck(mut conn: ConnectionManager) -> crate::Result<()> {

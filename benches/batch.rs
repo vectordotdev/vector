@@ -11,6 +11,7 @@ use vector::{
     },
     test_util::{random_lines, runtime},
 };
+use vector_lib::json_size::JsonSize;
 
 fn benchmark_batch(c: &mut Criterion) {
     let event_len: usize = 100;
@@ -58,7 +59,7 @@ fn benchmark_batch(c: &mut Criterion) {
                             inner: b,
                             key: Bytes::from("key"),
                         }))
-                        .map(|item| Ok(EncodedEvent::new(item, 0))),
+                        .map(|item| Ok(EncodedEvent::new(item, 0, JsonSize::zero()))),
                         batch_sink,
                     )
                 },
@@ -86,7 +87,8 @@ fn benchmark_batch(c: &mut Criterion) {
 
                         (
                             rt,
-                            stream::iter(input.clone()).map(|item| Ok(EncodedEvent::new(item, 0))),
+                            stream::iter(input.clone())
+                                .map(|item| Ok(EncodedEvent::new(item, 0, JsonSize::zero()))),
                             batch_sink,
                         )
                     },
