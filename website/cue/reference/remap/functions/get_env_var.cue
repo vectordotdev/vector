@@ -15,8 +15,8 @@ remap: functions: get_env_var: {
 		},
 	]
 	internal_failure_reasons: [
-		"Environment variable `name` doesn't exist",
-		"Value of environment variable `name` isn't valid Unicode",
+		"Environment variable `name` does not exist.",
+		"The value of environment variable `name` is not valid Unicode",
 	]
 	return: types: ["string"]
 

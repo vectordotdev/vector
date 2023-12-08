@@ -7,7 +7,7 @@ publish = false
 license = "MIT"
 
 [dependencies]
-data-encoding = "2.4"
+data-encoding = "2.5"
 thiserror = "1.0"
 hickory-proto = { version = "0.24", features = ["dnssec"] }
 

@@ -6,10 +6,9 @@ remap: functions: redact: {
 		Redact sensitive data in `value` such as:
 
 		- [US social security card numbers](\(urls.us_social_security_number))
-		- and other forms of personally identifiable information via custom patterns
-		- (more to come!)
+		- Other forms of personally identifiable information with custom patterns
 
-		This can help achieve compliance by ensuring sensitive data never leaves your network.
+		This can help achieve compliance by ensuring sensitive data does not leave your network.
 		"""
 
 	arguments: [
@@ -18,16 +17,16 @@ remap: functions: redact: {
 			description: #"""
 				The value to redact sensitive data from.
 
-				Its behavior differs depending on the type of `value`:
+				The function's behavior depends on `value`'s type:
 
-				- For strings, it simply redacts the sensitive data and returns a new string
-				- For arrays, it redacts the sensitive data in each string element
-				- For objects, it masks the sensitive data in each string value, but not keys
+				- For strings, the sensitive data is redacted and a new string is returned.
+				- For arrays, the sensitive data is redacted in each string element.
+				- For objects, the sensitive data in each string value is masked, but the keys are not masked.
 
-				For arrays and objects it will recurse into any nested arrays or objects. Any non-string elements will
-				be skipped.
+				For arrays and objects, the function recurses into any nested arrays or objects. Any non-string elements are
+				skipped.
 
-				Any redacted text will be replaced with `[REDACTED]`.
+				Redacted text is replaced with `[REDACTED]`.
 				"""#
 			required: true
 			type: ["string", "object", "array"]
@@ -35,24 +34,24 @@ remap: functions: redact: {
 		{
 			name: "filters"
 			description: #"""
-				List of filters to be applied to the `value`.
+				List of filters applied to `value`.
 
-				Each filter can be specified in one of three ways:
+				Each filter can be specified in the following ways:
 
-				- As a regular expression directly, which will be used to redact text matching it
-				- As an object with a `type` key that corresponds to a named filter and additional keys for customizing that filter
-				- As a named filter, if it has no required parameters
+				- As a regular expression, which is used to redact text that match it.
+				- As an object with a `type` key that corresponds to a named filter and additional keys for customizing that filter.
+				- As a named filter, if it has no required parameters.
 
-				Named filters are:
+				Named filters can be a:
 
-				- `pattern`: Redact text matching any regular expressions specified in the, required, `patterns`
-					key. This is the expanded form of just passing a regular expression as a filter.
-				- `us_social_security_number`: Redact US social security card numbers.
+				- `pattern`: Redacts text matching any regular expressions specified in the `patterns`
+					key, which is required. This is the expanded version of just passing a regular expression as a filter.
+				- `us_social_security_number`: Redacts US social security card numbers.
 
 				See examples for more details.
 
-				This parameter must be a static expression. You cannot use variables or other dynamic expressions
-				with it. This allows us to validate the argument at compile-time to avoid runtime errors.
+				This parameter must be a static expression so that the argument can be validated at compile-time
+				to avoid runtime errors. You cannot use variables or other dynamic expressions with it.
 				"""#
 			required: true
 			type: ["array"]

@@ -287,12 +287,16 @@ base: components: sources: http: configuration: {
 		description: """
 			A list of HTTP headers to include in the log event.
 
+			Accepts the wildcard (`*`) character for headers matching a specified pattern.
+
+			Specifying "*" results in all headers included in the log event.
+
 			These override any values included in the JSON payload with conflicting names.
 			"""
 		required: false
 		type: array: {
 			default: []
-			items: type: string: examples: ["User-Agent", "X-My-Custom-Header"]
+			items: type: string: examples: ["User-Agent", "X-My-Custom-Header", "X-*", "*"]
 		}
 	}
 	keepalive: {

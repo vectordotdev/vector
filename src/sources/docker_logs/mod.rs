@@ -1308,7 +1308,7 @@ fn line_agg_adapter(
         (stream, message, log)
     });
     let line_agg_out = LineAgg::<_, Bytes, LogEvent>::new(line_agg_in, logic);
-    line_agg_out.map(move |(_, message, mut log)| {
+    line_agg_out.map(move |(_, message, mut log, _)| {
         match log_namespace {
             LogNamespace::Vector => log.insert(event_path!(), message),
             LogNamespace::Legacy => log.insert(
