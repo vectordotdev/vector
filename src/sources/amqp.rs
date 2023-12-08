@@ -19,12 +19,12 @@ use chrono::{TimeZone, Utc};
 use futures::{FutureExt, StreamExt};
 use futures_util::Stream;
 use lapin::{acker::Acker, message::Delivery, Channel};
-use lookup::{lookup_v2::OptionalValuePath, metadata_path, owned_value_path, path};
 use snafu::Snafu;
 use std::{io::Cursor, pin::Pin};
 use tokio_util::codec::FramedRead;
 use vector_lib::codecs::decoding::{DeserializerConfig, FramingConfig};
 use vector_lib::configurable::configurable_component;
+use vector_lib::lookup::{lookup_v2::OptionalValuePath, metadata_path, owned_value_path, path};
 use vector_lib::{
     config::{log_schema, LegacyKey, LogNamespace, SourceAcknowledgementsConfig},
     event::Event,
@@ -492,7 +492,7 @@ async fn handle_ack(status: BatchStatus, entry: FinalizerEntry) {
 
 #[cfg(test)]
 pub mod test {
-    use lookup::OwnedTargetPath;
+    use vector_lib::lookup::OwnedTargetPath;
     use vector_lib::schema::Definition;
     use vector_lib::tls::TlsConfig;
     use vrl::value::kind::Collection;

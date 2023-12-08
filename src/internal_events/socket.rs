@@ -5,8 +5,6 @@ use vector_lib::{
     json_size::JsonSize,
 };
 
-use crate::emit;
-
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 #[allow(dead_code)] // some features only use some variants
 pub enum SocketMode {

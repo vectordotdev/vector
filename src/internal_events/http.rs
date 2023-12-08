@@ -3,7 +3,6 @@ use std::{error::Error, time::Duration};
 use http::Response;
 use metrics::{counter, histogram};
 use vector_lib::internal_event::InternalEvent;
-
 use vector_lib::{
     internal_event::{error_stage, error_type},
     json_size::JsonSize,

@@ -8,13 +8,13 @@ use std::{
 use base64::prelude::{Engine as _, BASE64_STANDARD};
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
-use once_cell::sync::Lazy;
-use prost::Message;
-use snafu::Snafu;
-use trust_dns_proto::{
+use hickory_proto::{
     rr::domain::Name,
     serialize::binary::{BinDecodable, BinDecoder},
 };
+use once_cell::sync::Lazy;
+use prost::Message;
+use snafu::Snafu;
 use vrl::{owned_value_path, path};
 
 use crate::{
@@ -33,9 +33,9 @@ use dnstap_proto::{
     message::Type as DnstapMessageType, Dnstap, Message as DnstapMessage, SocketFamily,
     SocketProtocol,
 };
-use lookup::lookup_v2::ValuePath;
-use lookup::PathPrefix;
 use vector_lib::config::log_schema;
+use vector_lib::lookup::lookup_v2::ValuePath;
+use vector_lib::lookup::PathPrefix;
 
 use super::{
     dns_message::{

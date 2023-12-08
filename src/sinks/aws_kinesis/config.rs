@@ -1,5 +1,5 @@
-use lookup::lookup_v2::ConfigValuePath;
 use std::marker::PhantomData;
+use vector_lib::lookup::lookup_v2::ConfigValuePath;
 
 use vector_lib::stream::BatcherSettings;
 
@@ -95,7 +95,7 @@ where
     E: Send + 'static,
     RT: RetryLogic<Response = KinesisResponse> + Default,
 {
-    let request_limits = config.request.unwrap_with(&TowerRequestConfig::default());
+    let request_limits = config.request.into_settings();
 
     let region = config.region.region();
     let service = ServiceBuilder::new()

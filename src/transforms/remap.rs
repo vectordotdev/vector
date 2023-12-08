@@ -6,12 +6,12 @@ use std::{
     path::PathBuf,
 };
 
-use lookup::{metadata_path, owned_value_path, PathPrefix};
 use snafu::{ResultExt, Snafu};
 use vector_lib::codecs::MetricTagValues;
 use vector_lib::compile_vrl;
 use vector_lib::config::LogNamespace;
 use vector_lib::configurable::configurable_component;
+use vector_lib::lookup::{metadata_path, owned_value_path, PathPrefix};
 use vector_lib::schema::Definition;
 use vector_lib::TimeZone;
 use vector_vrl_functions::set_semantic_meaning::MeaningList;

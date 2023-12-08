@@ -442,9 +442,9 @@ mod tests {
     use std::collections::HashMap;
 
     use indexmap::IndexMap;
-    use lookup::owned_value_path;
     use similar_asserts::assert_eq;
     use vector_lib::config::{DataType, SourceOutput, TransformOutput};
+    use vector_lib::lookup::owned_value_path;
     use vrl::value::Kind;
 
     use super::*;

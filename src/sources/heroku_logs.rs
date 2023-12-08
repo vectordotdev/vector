@@ -7,13 +7,13 @@ use std::{
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use chrono::{DateTime, Utc};
-use lookup::{lookup_v2::parse_value_path, owned_value_path, path};
 use smallvec::SmallVec;
 use tokio_util::codec::Decoder as _;
 use vector_lib::codecs::{
     decoding::{DeserializerConfig, FramingConfig},
     StreamDecodingError,
 };
+use vector_lib::lookup::{lookup_v2::parse_value_path, owned_value_path, path};
 use vrl::value::{kind::Collection, Kind};
 use warp::http::{HeaderMap, StatusCode};
 
@@ -30,6 +30,7 @@ use crate::{
         SourceContext, SourceOutput,
     },
     event::{Event, LogEvent},
+    http::KeepaliveConfig,
     internal_events::{HerokuLogplexRequestReadError, HerokuLogplexRequestReceived},
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
     sources::util::{
@@ -77,6 +78,10 @@ pub struct LogplexConfig {
     #[configurable(metadata(docs::hidden))]
     #[serde(default)]
     log_namespace: Option<bool>,
+
+    #[configurable(derived)]
+    #[serde(default)]
+    keepalive: KeepaliveConfig,
 }
 
 impl LogplexConfig {
@@ -146,6 +151,7 @@ impl Default for LogplexConfig {
             decoding: default_decoding(),
             acknowledgements: SourceAcknowledgementsConfig::default(),
             log_namespace: None,
+            keepalive: KeepaliveConfig::default(),
         }
     }
 }
@@ -182,6 +188,7 @@ impl SourceConfig for LogplexConfig {
             &self.auth,
             cx,
             self.acknowledgements,
+            self.keepalive.clone(),
         )
     }
 
@@ -408,8 +415,8 @@ mod tests {
 
     use chrono::{DateTime, Utc};
     use futures::Stream;
-    use lookup::{owned_value_path, OwnedTargetPath};
     use similar_asserts::assert_eq;
+    use vector_lib::lookup::{owned_value_path, OwnedTargetPath};
     use vector_lib::{
         config::LogNamespace,
         event::{Event, EventStatus, Value},
@@ -452,6 +459,7 @@ mod tests {
                 decoding: default_decoding(),
                 acknowledgements: acknowledgements.into(),
                 log_namespace: None,
+                keepalive: Default::default(),
             }
             .build(context)
             .await

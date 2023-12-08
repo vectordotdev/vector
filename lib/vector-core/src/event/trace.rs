@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, fmt::Debug};
+use std::fmt::Debug;
 
 use lookup::lookup_v2::TargetPath;
 use serde::{Deserialize, Serialize};
@@ -11,7 +11,7 @@ use vrl::path::PathParseError;
 
 use super::{
     BatchNotifier, EstimatedJsonEncodedSizeOf, EventFinalizer, EventFinalizers, EventMetadata,
-    Finalizable, LogEvent, Value,
+    Finalizable, LogEvent, ObjectMap, Value,
 };
 
 /// Traces are a newtype of `LogEvent`
@@ -23,13 +23,13 @@ impl TraceEvent {
     /// # Panics
     ///
     /// Panics if the fields of the `TraceEvent` are not a `Value::Map`.
-    pub fn into_parts(self) -> (BTreeMap<String, Value>, EventMetadata) {
+    pub fn into_parts(self) -> (ObjectMap, EventMetadata) {
         let (value, metadata) = self.0.into_parts();
         let map = value.into_object().expect("inner value must be a map");
         (map, metadata)
     }
 
-    pub fn from_parts(fields: BTreeMap<String, Value>, metadata: EventMetadata) -> Self {
+    pub fn from_parts(fields: ObjectMap, metadata: EventMetadata) -> Self {
         Self(LogEvent::from_map(fields, metadata))
     }
 
@@ -63,11 +63,11 @@ impl TraceEvent {
         Self(self.0.with_batch_notifier_option(batch))
     }
 
-    /// Convert a `TraceEvent` into a `BTreeMap` of it's fields
+    /// Convert a `TraceEvent` into an `ObjectMap` of it's fields
     /// # Panics
     ///
     /// Panics if the fields of the `TraceEvent` are not a `Value::Map`.
-    pub fn as_map(&self) -> &BTreeMap<String, Value> {
+    pub fn as_map(&self) -> &ObjectMap {
         self.0.as_map().expect("inner value must be a map")
     }
 
@@ -120,8 +120,8 @@ impl From<LogEvent> for TraceEvent {
     }
 }
 
-impl From<BTreeMap<String, Value>> for TraceEvent {
-    fn from(map: BTreeMap<String, Value>) -> Self {
+impl From<ObjectMap> for TraceEvent {
+    fn from(map: ObjectMap) -> Self {
         Self(map.into())
     }
 }

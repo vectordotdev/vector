@@ -14,7 +14,7 @@ use crate::{
     config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext},
     event::{
         metric::{Metric, MetricValue, Sample, StatisticKind},
-        Event,
+        Event, KeyString,
     },
     http::HttpClient,
     internal_events::InfluxdbEncodingError,
@@ -159,10 +159,7 @@ impl InfluxDbSvc {
         let protocol_version = settings.protocol_version();
 
         let batch = config.batch.into_batch_settings()?;
-        let request = config.request.unwrap_with(&TowerRequestConfig {
-            retry_attempts: Some(5),
-            ..Default::default()
-        });
+        let request = config.request.into_settings();
 
         let uri = settings.write_uri(endpoint)?;
 
@@ -319,7 +316,7 @@ fn encode_events(
 fn get_type_and_fields(
     value: &MetricValue,
     quantiles: &[f64],
-) -> (&'static str, Option<HashMap<String, Field>>) {
+) -> (&'static str, Option<HashMap<KeyString, Field>>) {
     match value {
         MetricValue::Counter { value } => ("counter", Some(to_fields(*value))),
         MetricValue::Gauge { value } => ("gauge", Some(to_fields(*value))),
@@ -329,17 +326,17 @@ fn get_type_and_fields(
             count,
             sum,
         } => {
-            let mut fields: HashMap<String, Field> = buckets
+            let mut fields: HashMap<KeyString, Field> = buckets
                 .iter()
                 .map(|sample| {
                     (
-                        format!("bucket_{}", sample.upper_limit),
+                        format!("bucket_{}", sample.upper_limit).into(),
                         Field::UnsignedInt(sample.count),
                     )
                 })
                 .collect();
-            fields.insert("count".to_owned(), Field::UnsignedInt(*count));
-            fields.insert("sum".to_owned(), Field::Float(*sum));
+            fields.insert("count".into(), Field::UnsignedInt(*count));
+            fields.insert("sum".into(), Field::Float(*sum));
 
             ("histogram", Some(fields))
         }
@@ -348,17 +345,17 @@ fn get_type_and_fields(
             count,
             sum,
         } => {
-            let mut fields: HashMap<String, Field> = quantiles
+            let mut fields: HashMap<KeyString, Field> = quantiles
                 .iter()
                 .map(|quantile| {
                     (
-                        format!("quantile_{}", quantile.quantile),
+                        format!("quantile_{}", quantile.quantile).into(),
                         Field::Float(quantile.value),
                     )
                 })
                 .collect();
-            fields.insert("count".to_owned(), Field::UnsignedInt(*count));
-            fields.insert("sum".to_owned(), Field::Float(*sum));
+            fields.insert("count".into(), Field::UnsignedInt(*count));
+            fields.insert("sum".into(), Field::Float(*sum));
 
             ("summary", Some(fields))
         }
@@ -382,31 +379,25 @@ fn get_type_and_fields(
                             value: ddsketch.quantile(*q).unwrap_or(0.0),
                         };
                         (
-                            quantile.to_percentile_string(),
+                            quantile.to_percentile_string().into(),
                             Field::Float(quantile.value),
                         )
                     })
-                    .collect::<HashMap<_, _>>();
+                    .collect::<HashMap<KeyString, _>>();
                 fields.insert(
-                    "count".to_owned(),
+                    "count".into(),
                     Field::UnsignedInt(u64::from(ddsketch.count())),
                 );
                 fields.insert(
-                    "min".to_owned(),
+                    "min".into(),
                     Field::Float(ddsketch.min().unwrap_or(f64::MAX)),
                 );
                 fields.insert(
-                    "max".to_owned(),
+                    "max".into(),
                     Field::Float(ddsketch.max().unwrap_or(f64::MIN)),
                 );
-                fields.insert(
-                    "sum".to_owned(),
-                    Field::Float(ddsketch.sum().unwrap_or(0.0)),
-                );
-                fields.insert(
-                    "avg".to_owned(),
-                    Field::Float(ddsketch.avg().unwrap_or(0.0)),
-                );
+                fields.insert("sum".into(), Field::Float(ddsketch.sum().unwrap_or(0.0)));
+                fields.insert("avg".into(), Field::Float(ddsketch.avg().unwrap_or(0.0)));
 
                 ("sketch", Some(fields))
             }
@@ -414,34 +405,33 @@ fn get_type_and_fields(
     }
 }
 
-fn encode_distribution(samples: &[Sample], quantiles: &[f64]) -> Option<HashMap<String, Field>> {
+fn encode_distribution(samples: &[Sample], quantiles: &[f64]) -> Option<HashMap<KeyString, Field>> {
     let statistic = DistributionStatistic::from_samples(samples, quantiles)?;
 
-    let fields: HashMap<String, Field> = vec![
-        ("min".to_owned(), Field::Float(statistic.min)),
-        ("max".to_owned(), Field::Float(statistic.max)),
-        ("median".to_owned(), Field::Float(statistic.median)),
-        ("avg".to_owned(), Field::Float(statistic.avg)),
-        ("sum".to_owned(), Field::Float(statistic.sum)),
-        ("count".to_owned(), Field::Float(statistic.count as f64)),
-    ]
-    .into_iter()
-    .chain(
-        statistic
-            .quantiles
-            .iter()
-            .map(|&(p, val)| (format!("quantile_{:.2}", p), Field::Float(val))),
+    Some(
+        [
+            ("min".into(), Field::Float(statistic.min)),
+            ("max".into(), Field::Float(statistic.max)),
+            ("median".into(), Field::Float(statistic.median)),
+            ("avg".into(), Field::Float(statistic.avg)),
+            ("sum".into(), Field::Float(statistic.sum)),
+            ("count".into(), Field::Float(statistic.count as f64)),
+        ]
+        .into_iter()
+        .chain(
+            statistic
+                .quantiles
+                .iter()
+                .map(|&(p, val)| (format!("quantile_{:.2}", p).into(), Field::Float(val))),
+        )
+        .collect(),
     )
-    .collect();
-
-    Some(fields)
 }
 
-fn to_fields(value: f64) -> HashMap<String, Field> {
-    let fields: HashMap<String, Field> = vec![("value".to_owned(), Field::Float(value))]
+fn to_fields(value: f64) -> HashMap<KeyString, Field> {
+    [("value".into(), Field::Float(value))]
         .into_iter()
-        .collect();
-    fields
+        .collect()
 }
 
 #[cfg(test)]

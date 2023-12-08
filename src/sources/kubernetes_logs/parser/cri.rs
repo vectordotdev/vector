@@ -1,8 +1,8 @@
 use chrono::{DateTime, Utc};
 use derivative::Derivative;
-use lookup::path;
 use vector_lib::config::{log_schema, LegacyKey, LogNamespace};
 use vector_lib::conversion;
+use vector_lib::lookup::path;
 
 use crate::sources::kubernetes_logs::transform_utils::get_message_path;
 use crate::{

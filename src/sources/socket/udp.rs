@@ -2,7 +2,6 @@ use bytes::BytesMut;
 use chrono::Utc;
 use futures::StreamExt;
 use listenfd::ListenFd;
-use lookup::{lookup_v2::OptionalValuePath, owned_value_path, path};
 use tokio_util::codec::FramedRead;
 use vector_lib::codecs::{
     decoding::{DeserializerConfig, FramingConfig},
@@ -10,6 +9,7 @@ use vector_lib::codecs::{
 };
 use vector_lib::configurable::configurable_component;
 use vector_lib::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
+use vector_lib::lookup::{lookup_v2::OptionalValuePath, owned_value_path, path};
 use vector_lib::{
     config::{LegacyKey, LogNamespace},
     EstimatedJsonEncodedSizeOf,

@@ -221,6 +221,27 @@ Integration tests are not run by default when running
 `cargo vdev test`. Instead, they are accessible via the integration subcommand (example:
 `cargo vdev int test aws` runs aws-related integration tests). You can find the list of available integration tests using `cargo vdev int show`. Integration tests require docker or podman to run.
 
+### Running other checks
+
+There are other checks that are run by CI before the PR can be merged. These should be run locally
+first to ensure they pass.
+
+```sh
+# Run the Clippy linter to catch common mistakes.
+cargo vdev check rust
+# Ensure all code is properly formatted. Code can be run through `rustfmt` using `cargo fmt` to ensure it is properly formatted.
+cargo vdev check fmt
+# Ensure the internal metrics that Vector emits conform to standards.
+cargo vdev check events
+# Ensure the `LICENSE-3rdparty.csv` file is up to date with the licenses each of Vector's dependencies are published under.
+cargo vdev check licenses
+# Vector's documentation for each component is generated from the comments attached to the Component structs and members.
+# Running this ensures that the generated docs are up to date.
+make check-component-docs
+# Generate the code documentation for the Vector project.
+# Run this to ensure the docs can be generated without errors (warnings are acceptable at the minute).
+cd rust-doc && make docs
+```
 
 ### Deprecations
 

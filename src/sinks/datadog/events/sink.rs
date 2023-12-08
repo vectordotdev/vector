@@ -1,6 +1,6 @@
 use std::fmt;
 
-use lookup::event_path;
+use vector_lib::lookup::event_path;
 
 use crate::{
     internal_events::{ParserMissingFieldError, DROP_EVENT},

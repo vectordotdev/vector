@@ -6,6 +6,7 @@ use rdkafka::{
 };
 use snafu::{ResultExt, Snafu};
 use tokio::time::Duration;
+use tracing::Span;
 use vrl::path::OwnedTargetPath;
 
 use super::config::{KafkaRole, KafkaSinkConfig};
@@ -37,7 +38,10 @@ pub(crate) fn create_producer(
     client_config: ClientConfig,
 ) -> crate::Result<FutureProducer<KafkaStatisticsContext>> {
     let producer = client_config
-        .create_with_context(KafkaStatisticsContext::default())
+        .create_with_context(KafkaStatisticsContext {
+            expose_lag_metrics: false,
+            span: Span::current(),
+        })
         .context(KafkaCreateFailedSnafu)?;
     Ok(producer)
 }

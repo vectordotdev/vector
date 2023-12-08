@@ -381,7 +381,7 @@ base: components: sources: gcp_pubsub: configuration: {
 	project: {
 		description: "The project name from which to pull logs."
 		required:    true
-		type: string: {}
+		type: string: examples: ["my-log-source-project"]
 	}
 	retry_delay_seconds: {
 		deprecated:         true
@@ -401,7 +401,7 @@ base: components: sources: gcp_pubsub: configuration: {
 	subscription: {
 		description: "The subscription within the project which is configured to receive logs."
 		required:    true
-		type: string: {}
+		type: string: examples: ["my-vector-source-subscription"]
 	}
 	tls: {
 		description: "TLS configuration."

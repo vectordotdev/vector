@@ -199,12 +199,12 @@ base: components: sources: datadog_agent: configuration: {
 		type: bool: default: false
 	}
 	disable_metrics: {
-		description: "If this is set to `true`, metrics are not accepted by the component."
+		description: "If this is set to `true`, metrics (beta) are not accepted by the component."
 		required:    false
 		type: bool: default: false
 	}
 	disable_traces: {
-		description: "If this is set to `true`, traces are not accepted by the component."
+		description: "If this is set to `true`, traces (alpha) are not accepted by the component."
 		required:    false
 		type: bool: default: false
 	}
@@ -299,11 +299,42 @@ base: components: sources: datadog_agent: configuration: {
 			}
 		}
 	}
+	keepalive: {
+		description: "Configuration of HTTP server keepalive parameters."
+		required:    false
+		type: object: options: {
+			max_connection_age_jitter_factor: {
+				description: """
+					The factor by which to jitter the `max_connection_age_secs` value.
+
+					A value of 0.1 means that the actual duration will be between 90% and 110% of the
+					specified maximum duration.
+					"""
+				required: false
+				type: float: default: 0.1
+			}
+			max_connection_age_secs: {
+				description: """
+					The maximum amount of time a connection may exist before it is closed
+					by sending a `Connection: close` header on the HTTP response.
+
+					A random jitter configured by `max_connection_age_jitter_factor` is added
+					to the specified duration to spread out connection storms.
+					"""
+				required: false
+				type: uint: {
+					default: 300
+					examples: [600]
+					unit: "seconds"
+				}
+			}
+		}
+	}
 	multiple_outputs: {
 		description: """
-			If this is set to `true` logs, metrics, and traces are sent to different outputs.
+			If this is set to `true`, logs, metrics (beta), and traces (alpha) are sent to different outputs.
 
-			For a source component named `agent`, the received logs, metrics, and traces can then be
+			For a source component named `agent`, the received logs, metrics (beta), and traces (alpha) can then be
 			configured as input to other components by specifying `agent.logs`, `agent.metrics`, and
 			`agent.traces`, respectively.
 			"""

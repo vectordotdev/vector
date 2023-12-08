@@ -6,7 +6,6 @@ use crate::{
     },
 };
 use futures_util::FutureExt;
-use lookup::lookup_v2::OptionalTargetPath;
 use pulsar::{
     authentication::oauth2::{OAuth2Authentication, OAuth2Params},
     compression,
@@ -18,6 +17,7 @@ use pulsar::{error::AuthenticationError, OperationRetryOptions};
 use snafu::ResultExt;
 use vector_lib::codecs::{encoding::SerializerConfig, TextSerializerConfig};
 use vector_lib::config::DataType;
+use vector_lib::lookup::lookup_v2::OptionalTargetPath;
 use vector_lib::sensitive_string::SensitiveString;
 use vrl::value::Kind;
 

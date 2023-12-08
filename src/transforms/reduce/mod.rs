@@ -1,7 +1,5 @@
 use futures::Stream;
 use indexmap::IndexMap;
-use lookup::lookup_v2::parse_target_path;
-use lookup::PathPrefix;
 use serde_with::serde_as;
 use std::collections::BTreeMap;
 use std::{
@@ -11,6 +9,8 @@ use std::{
     time::{Duration, Instant},
 };
 use vector_lib::configurable::configurable_component;
+use vector_lib::lookup::lookup_v2::parse_target_path;
+use vector_lib::lookup::PathPrefix;
 
 use crate::config::OutputId;
 use crate::{
@@ -30,7 +30,7 @@ pub use merge_strategy::*;
 use vector_lib::config::LogNamespace;
 use vector_lib::stream::expiration_map::{map_with_expiration, Emitter};
 use vrl::value::kind::Collection;
-use vrl::value::Kind;
+use vrl::value::{KeyString, Kind};
 
 /// Configuration for the `reduce` transform.
 #[serde_as]
@@ -91,7 +91,7 @@ pub struct ReduceConfig {
     #[configurable(metadata(
         docs::additional_props_description = "An individual merge strategy."
     ))]
-    pub merge_strategies: IndexMap<String, MergeStrategy>,
+    pub merge_strategies: IndexMap<KeyString, MergeStrategy>,
 
     /// A condition used to distinguish the final event of a transaction.
     ///
@@ -237,7 +237,7 @@ impl TransformConfig for ReduceConfig {
 #[derive(Debug)]
 struct ReduceState {
     events: usize,
-    fields: HashMap<String, Box<dyn ReduceValueMerger>>,
+    fields: HashMap<KeyString, Box<dyn ReduceValueMerger>>,
     stale_since: Instant,
     metadata: EventMetadata,
 }
@@ -255,7 +255,7 @@ impl ReduceState {
         }
     }
 
-    fn add_event(&mut self, e: LogEvent, strategies: &IndexMap<String, MergeStrategy>) {
+    fn add_event(&mut self, e: LogEvent, strategies: &IndexMap<KeyString, MergeStrategy>) {
         let (value, metadata) = e.into_parts();
         self.metadata.merge(metadata);
 
@@ -309,7 +309,7 @@ pub struct Reduce {
     expire_after: Duration,
     flush_period: Duration,
     group_by: Vec<String>,
-    merge_strategies: IndexMap<String, MergeStrategy>,
+    merge_strategies: IndexMap<KeyString, MergeStrategy>,
     reduce_merge_states: HashMap<Discriminant, ReduceState>,
     ends_when: Option<Condition>,
     starts_when: Option<Condition>,
@@ -478,7 +478,7 @@ mod test {
     use crate::event::{LogEvent, Value};
     use crate::test_util::components::assert_transform_compliance;
     use crate::transforms::test::create_topology;
-    use lookup::owned_value_path;
+    use vector_lib::lookup::owned_value_path;
 
     #[test]
     fn generate_config() {

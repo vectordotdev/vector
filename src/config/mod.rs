@@ -127,6 +127,10 @@ impl Config {
         Default::default()
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.sources.is_empty()
+    }
+
     pub fn sources(&self) -> impl Iterator<Item = (&ComponentKey, &SourceOuter)> {
         self.sources.iter()
     }
@@ -241,17 +245,6 @@ impl Default for HealthcheckOptions {
             require_healthy: false,
         }
     }
-}
-
-#[macro_export]
-macro_rules! impl_generate_config_from_default {
-    ($type:ty) => {
-        impl $crate::config::GenerateConfig for $type {
-            fn generate_config() -> toml::value::Value {
-                toml::value::Value::try_from(&Self::default()).unwrap()
-            }
-        }
-    };
 }
 
 /// Unique thing, like port, of which only one owner can be.
@@ -512,7 +505,7 @@ pub struct TestInput {
 
     /// The type of the input event.
     ///
-    /// Can be either `raw`, `log`, or `metric.
+    /// Can be either `raw`, `vrl`, `log`, or `metric.
     #[serde(default = "default_test_input_type", rename = "type")]
     pub type_str: String,
 
@@ -521,6 +514,11 @@ pub struct TestInput {
     /// Use this only when the input event should be a raw event (i.e. unprocessed/undecoded log
     /// event) and when the input type is set to `raw`.
     pub value: Option<String>,
+
+    /// The vrl expression to generate the input event.
+    ///
+    /// Only relevant when `type` is `vrl`.
+    pub source: Option<String>,
 
     /// The set of log fields to use when creating a log input event.
     ///

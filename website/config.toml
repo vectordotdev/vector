@@ -148,7 +148,7 @@ url = "/community"
 weight = 6
 
 [[languages.en.menus.navbar]]
-name = "Enterprise"
+name = "Observability Pipelines"
 url = "https://www.datadoghq.com/product/observability-pipelines"
 weight = 7
 

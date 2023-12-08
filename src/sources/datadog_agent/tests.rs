@@ -10,7 +10,6 @@ use chrono::{TimeZone, Utc};
 use futures::{Stream, StreamExt};
 use http::HeaderMap;
 use indoc::indoc;
-use lookup::{owned_value_path, OwnedTargetPath};
 use ordered_float::NotNan;
 use prost::Message;
 use quickcheck::{Arbitrary, Gen, QuickCheck, TestResult};
@@ -19,13 +18,14 @@ use vector_lib::codecs::{
     decoding::{Deserializer, DeserializerConfig, Framer},
     BytesDecoder, BytesDeserializer,
 };
+use vector_lib::lookup::{owned_value_path, OwnedTargetPath};
 use vector_lib::{
     config::LogNamespace,
     event::{metric::TagValue, MetricTags},
     metric_tags,
 };
 use vrl::compiler::value::Collection;
-use vrl::value::Kind;
+use vrl::value::{Kind, ObjectMap};
 
 use crate::schema::Definition;
 use crate::{
@@ -118,6 +118,27 @@ fn test_decode_log_body() {
     }
 
     QuickCheck::new().quickcheck(inner as fn(Vec<LogMsg>) -> TestResult);
+}
+
+#[test]
+fn test_decode_log_body_empty_object() {
+    let body = Bytes::from("{}");
+    let api_key = None;
+    let decoder = crate::codecs::Decoder::new(
+        Framer::Bytes(BytesDecoder::new()),
+        Deserializer::Bytes(BytesDeserializer),
+    );
+
+    let source = DatadogAgentSource::new(
+        true,
+        decoder,
+        "http",
+        test_logs_schema_definition(),
+        LogNamespace::Legacy,
+    );
+
+    let events = decode_log_body(body, api_key, &source).unwrap();
+    assert_eq!(events.len(), 0);
 }
 
 #[test]
@@ -1229,12 +1250,8 @@ async fn decode_traces() {
 
             assert_eq!(
                 trace_v2.as_map()["tags"],
-                Value::Object(BTreeMap::from_iter(
-                    [
-                        ("a".to_string(), "tag".into()),
-                        ("another".to_string(), "tag".into())
-                    ]
-                    .into_iter()
+                Value::Object(ObjectMap::from_iter(
+                    [("a".into(), "tag".into()), ("another".into(), "tag".into())].into_iter()
                 ))
             );
 
@@ -1852,6 +1869,7 @@ fn test_config_outputs() {
             disable_metrics: false,
             disable_traces: false,
             log_namespace: Some(false),
+            keepalive: Default::default(),
         };
 
         let mut outputs = config

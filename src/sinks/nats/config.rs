@@ -5,10 +5,17 @@ use vector_lib::tls::TlsEnableableConfig;
 
 use crate::{
     nats::{from_tls_auth_config, NatsAuthConfig, NatsConfigError},
-    sinks::prelude::*,
+    sinks::{prelude::*, util::service::TowerRequestConfigDefaults},
 };
 
 use super::{sink::NatsSink, ConfigSnafu, ConnectSnafu, NatsError};
+
+#[derive(Clone, Copy, Debug)]
+pub struct NatsTowerRequestConfigDefaults;
+
+impl TowerRequestConfigDefaults for NatsTowerRequestConfigDefaults {
+    const CONCURRENCY: Concurrency = Concurrency::None;
+}
 
 /// Configuration for the `nats` sink.
 #[configurable_component(sink(
@@ -68,7 +75,7 @@ pub struct NatsSinkConfig {
 
     #[configurable(derived)]
     #[serde(default)]
-    pub(super) request: TowerRequestConfig,
+    pub(super) request: TowerRequestConfig<NatsTowerRequestConfigDefaults>,
 }
 
 fn default_name() -> String {
