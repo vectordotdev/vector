@@ -51,7 +51,7 @@ futures = { version = "0.3.29", default-features = false, features = ["std"] }
 indexmap = { version = "2.1.0", default-features = false, features = ["std"] }
 metrics = "0.21.1"
 nom = { version = "7", optional = true }
-ordered-float = { version = "4.1.1", default-features = false }
+ordered-float = { version = "4.2.0", default-features = false }
 paste = "1.0.14"
 pin-project.workspace = true
 ryu = { version = "1", default-features = false }
