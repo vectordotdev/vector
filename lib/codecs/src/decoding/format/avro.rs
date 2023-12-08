@@ -90,7 +90,9 @@ impl From<&AvroDeserializerOptions> for AvroSerializerOptions {
 pub struct AvroDeserializerOptions {
     /// The Avro schema.
     #[configurable(metadata(
-        docs::examples = r#"{ "type": "record", "name": "log", "fields": [{ "name": "message", "type": "string" }] }"#
+        docs::examples = r#"{ "type": "record", "name": "log", "fields": [{ "name": "message", "type": "string" }] }"#,
+        docs::additional_props_description = r#"Supports most avro data types, unsupported data types includes
+        ["decimal", "duration", "local-timestamp-millis", "local-timestamp-micros"]"#,
     ))]
     pub schema: String,
 
@@ -189,12 +191,9 @@ pub fn try_from(value: AvroValue) -> vector_common::Result<VrlValue> {
             )))
         }
         AvroValue::Double(double) => Ok(VrlValue::from_f64_or_zero(double)),
-        AvroValue::Duration(d) => Ok(VrlValue::Array(
-            <[u8; 12]>::from(d)
-                .into_iter()
-                .map(VrlValue::from)
-                .collect(),
-        )),
+        AvroValue::Duration(_) => Err(
+            vector_common::Error::from(format!("AvroValue::Duration is not supported")),
+        ),
         AvroValue::Enum(_, string) => Ok(VrlValue::from(string)),
         AvroValue::Fixed(_, bytes) => Ok(VrlValue::from(bytes)),
         AvroValue::Float(float) => Ok(VrlValue::from_f64_or_zero(float as f64)),
@@ -226,7 +225,9 @@ pub fn try_from(value: AvroValue) -> vector_common::Result<VrlValue> {
         )),
         AvroValue::Union(_, v) => try_from(*v),
         AvroValue::Uuid(uuid) => Ok(VrlValue::from(uuid.as_hyphenated().to_string())),
-        AvroValue::LocalTimestampMillis(_) | AvroValue::LocalTimestampMicros(_) => unimplemented!(),
+        AvroValue::LocalTimestampMillis(_) | AvroValue::LocalTimestampMicros(_) => Err(
+            vector_common::Error::from(format!("AvroValue::LocalTimestampMillis and AvroValue::LocalTimestampMicros is not supported")),
+        ),
     }
 }
 
