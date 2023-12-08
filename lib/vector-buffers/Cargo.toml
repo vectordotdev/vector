@@ -34,7 +34,7 @@ vector-config-macros = { path = "../vector-config-macros", default-features = fa
 vector-common = { path = "../vector-common", default-features = false, features = ["byte_size_of", "serde"] }
 
 [dev-dependencies]
-clap = "4.4.10"
+clap = "4.4.11"
 criterion = { version = "0.5", features = ["html_reports", "async_tokio"] }
 crossbeam-queue = "0.3.8"
 hdrhistogram = "7.5.4"
