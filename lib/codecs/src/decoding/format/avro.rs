@@ -89,7 +89,7 @@ impl From<&AvroDeserializerOptions> for AvroSerializerOptions {
 #[configurable_component]
 #[derive(Clone, Debug)]
 pub struct AvroDeserializerOptions {
-    /// The Avro schema definition. 
+    /// The Avro schema definition.
     /// Please note that the following [`apache_avro::types::Value`] variants are currently *not* supported:
     /// * `Decimal`
     /// * `Duration`
@@ -192,13 +192,13 @@ pub fn try_from(value: AvroValue) -> vector_common::Result<VrlValue> {
         AvroValue::Bytes(bytes) => Ok(VrlValue::from(bytes)),
         AvroValue::Date(d) => Ok(VrlValue::from(d)),
         AvroValue::Decimal(_) => {
-            return Err(vector_common::Error::from(format!(
+            Err(vector_common::Error::from(
                 "AvroValue::Decimal is not supported"
-            )))
+            ))
         }
         AvroValue::Double(double) => Ok(VrlValue::from_f64_or_zero(double)),
         AvroValue::Duration(_) => Err(
-            vector_common::Error::from(format!("AvroValue::Duration is not supported")),
+            vector_common::Error::from("AvroValue::Duration is not supported"),
         ),
         AvroValue::Enum(_, string) => Ok(VrlValue::from(string)),
         AvroValue::Fixed(_, bytes) => Ok(VrlValue::from(bytes)),
@@ -232,7 +232,7 @@ pub fn try_from(value: AvroValue) -> vector_common::Result<VrlValue> {
         AvroValue::Union(_, v) => try_from(*v),
         AvroValue::Uuid(uuid) => Ok(VrlValue::from(uuid.as_hyphenated().to_string())),
         AvroValue::LocalTimestampMillis(_) | AvroValue::LocalTimestampMicros(_) => Err(
-            vector_common::Error::from(format!("AvroValue::LocalTimestampMillis and AvroValue::LocalTimestampMicros is not supported")),
+            vector_common::Error::from("AvroValue::LocalTimestampMillis and AvroValue::LocalTimestampMicros is not supported"),
         ),
     }
 }
@@ -245,15 +245,14 @@ mod tests {
 
     use super::*;
 
-    #[test]
-    fn deserialize_avro() {
-        #[derive(Debug, Clone, Serialize, Deserialize)]
-        struct Log {
-            message: String,
-        }
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    struct Log {
+        message: String,
+    }
 
-        let schema = r#"
-            {
+    fn get_schema() -> Schema {
+        let schema = String::from(
+            r#"{
                 "type": "record",
                 "name": "log",
                 "fields": [
@@ -263,9 +262,15 @@ mod tests {
                     }
                 ]
             }
-        "#
-        .to_owned();
-        let schema = Schema::parse_str(&schema).unwrap();
+        "#,
+        );
+
+        Schema::parse_str(&schema).unwrap()
+    }
+
+    #[test]
+    fn deserialize_avro() {
+        let schema = get_schema();
 
         let event = Log {
             message: "hello from avro".to_owned(),
@@ -288,25 +293,7 @@ mod tests {
 
     #[test]
     fn deserialize_avro_strip_schema_id_prefix() {
-        #[derive(Debug, Clone, Serialize, Deserialize)]
-        struct Log {
-            message: String,
-        }
-
-        let schema = r#"
-            {
-                "type": "record",
-                "name": "log",
-                "fields": [
-                    {
-                        "name": "message",
-                        "type": "string"
-                    }
-                ]
-            }
-        "#
-        .to_owned();
-        let schema = Schema::parse_str(&schema).unwrap();
+        let schema = get_schema();
 
         let event = Log {
             message: "hello from avro".to_owned(),
@@ -332,29 +319,12 @@ mod tests {
 
     #[test]
     fn deserialize_avro_uuid() {
-        #[derive(Debug, Clone, Serialize, Deserialize)]
-        struct Log {
-            uuid: String,
-        }
-
-        let raw_schema = r#"
-            {
-                "type": "record",
-                "name": "log",
-                "fields": [
-                    {
-                        "name": "uuid",
-                        "type": "string",
-                        "logicalType":"uuid"
-                    }
-                ]
-            }
-        "#
-        .to_owned();
-        let schema = Schema::parse_str(&raw_schema).unwrap();
+        let schema = get_schema();
 
         let uuid = Uuid::new_v4().hyphenated().to_string();
-        let event = Log { uuid: uuid.clone() };
+        let event = Log {
+            message: uuid.clone(),
+        };
         let value = apache_avro::to_value(event).unwrap();
         // let value = value.resolve(&schema).unwrap();
         let datum = apache_avro::to_avro_datum(&schema, value).unwrap();
@@ -369,7 +339,7 @@ mod tests {
             .unwrap();
         assert_eq!(events.len(), 1);
         assert_eq!(
-            events[0].as_log().get("uuid").unwrap(),
+            events[0].as_log().get("message").unwrap(),
             &VrlValue::from(uuid)
         );
     }
