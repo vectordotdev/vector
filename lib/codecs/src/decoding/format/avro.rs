@@ -12,6 +12,7 @@ use vector_core::{
     event::{Event, LogEvent},
     schema,
 };
+use vrl::value::KeyString;
 
 type VrlValue = vrl::value::Value;
 type AvroValue = apache_avro::types::Value;
@@ -201,13 +202,13 @@ pub fn try_from(value: AvroValue) -> vector_common::Result<VrlValue> {
         AvroValue::Long(long) => Ok(VrlValue::from(long)),
         AvroValue::Map(items) => items
             .into_iter()
-            .map(|(key, value)| try_from(value).map(|v| (key, v)))
+            .map(|(key, value)| try_from(value).map(|v| (KeyString::from(key) , v)))
             .collect::<Result<Vec<_>, _>>()
             .map(|v| VrlValue::Object(v.into_iter().collect())),
         AvroValue::Null => Ok(VrlValue::Null),
         AvroValue::Record(items) => items
             .into_iter()
-            .map(|(key, value)| try_from(value).map(|v| (key, v)))
+            .map(|(key, value)| try_from(value).map(|v| (KeyString::from(key), v)))
             .collect::<Result<Vec<_>, _>>()
             .map(|v| VrlValue::Object(v.into_iter().collect())),
         AvroValue::String(string) => Ok(VrlValue::from(string)),
