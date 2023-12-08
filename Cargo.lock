@@ -7336,9 +7336,9 @@ dependencies = [
 
 [[package]]
 name = "redis"
-version = "0.23.4"
+version = "0.24.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1326371ccc7b3cd1c0c603f6eb3490a1ddecf1e7fb4a3caacf5db4684f5a7db9"
+checksum = "c580d9cbbe1d1b479e8d67cf9daf6a62c957e6846048408b80b43ac3f6af84cd"
 dependencies = [
  "arc-swap",
  "async-trait",
