@@ -8,8 +8,7 @@ There is currently a multi-step procedure to re-generate the data files.
 1. run the bash
 
 ```bash
-    (optional)$ rm lib/codecs/tests/data/avro/generated/*
-    $ cargo run --package codecs --bin generate-avro-fixtures
+cargo run --package codecs --bin generate-avro-fixtures
 ```
 
 That test case writes out the appropriate files into `lib/codecs/tests/data/avro/generated/` dir.
