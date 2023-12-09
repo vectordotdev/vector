@@ -149,13 +149,20 @@ base: components: sources: aws_sqs: configuration: {
 				required:      true
 				type: object: options: {
 					schema: {
-						description: "The Avro schema."
-						required:    true
+						description: """
+																The Avro schema definition.
+																Please note that the following [`apache_avro::types::Value`] variants are currently *not* supported:
+																* `Decimal`
+																* `Duration`
+																* `LocalTimestampMillis`
+																* `LocalTimestampMicros`
+																"""
+						required: true
 						type: string: examples: ["{ \"type\": \"record\", \"name\": \"log\", \"fields\": [{ \"name\": \"message\", \"type\": \"string\" }] }"]
 					}
 					strip_schema_id_prefix: {
 						description: """
-																For avro datum encoded in kafka messages, the bytes are prefixed with the schema id.  Set this to true to strip the schema id prefix.
+																For Avro datum encoded in Kafka messages, the bytes are prefixed with the schema ID.  Set this to true to strip the schema ID prefix.
 																According to [Confluent Kafka's document](https://docs.confluent.io/platform/current/schema-registry/fundamentals/serdes-develop/index.html#wire-format).
 																"""
 						required: true
