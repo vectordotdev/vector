@@ -23,7 +23,7 @@ async fn topology_doesnt_reload_new_data_dir() {
     new_config.global.data_dir = Some(Path::new("/qwerty").to_path_buf());
 
     topology
-        .reload_config_and_respawn(new_config.build().unwrap())
+        .reload_config_and_respawn(new_config.build().unwrap(), Default::default())
         .await
         .unwrap();
 

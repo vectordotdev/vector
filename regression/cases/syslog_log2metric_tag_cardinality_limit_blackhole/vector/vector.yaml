@@ -1,0 +1,60 @@
+data_dir: "/var/lib/vector"
+
+##
+## Sources
+##
+
+sources:
+  internal_metrics:
+    type: "internal_metrics"
+
+  syslog:
+    type:       "syslog"
+    address:    "0.0.0.0:8282"
+    max_length: 1500000
+    mode:       "tcp"
+
+##
+## Transforms
+##
+
+transforms:
+  remap:
+    type:   "remap"
+    inputs: [ "syslog" ]
+    source: |-
+      .cardinality_1000 = random_int(0, 1000)
+
+  log2metric:
+    type: "log_to_metric"
+    inputs: [ "remap" ]
+    metrics:
+      - type:  "counter"
+        field: "procid"
+        tags:
+          hostname: "{{ host }}"
+          facility: "{{ facility }}"
+          severity: "{{ severity }}"
+          cardinality_1000: "{{ cardinality_1000 }}"
+
+  cardinality_control:
+    type: "tag_cardinality_limit"
+    inputs: [ "log2metric" ]
+    limit_exceeded_action: "drop_tag"
+    mode: "probabilistic"
+    value_limit: 100
+
+##
+## Sinks
+##
+
+sinks:
+  prometheus:
+    type:    "prometheus_exporter"
+    inputs: [ "internal_metrics" ]
+    address: "0.0.0.0:9090"
+
+  blackhole:
+    type: "blackhole"
+    print_interval_secs: 0
+    inputs: [ "cardinality_control" ]

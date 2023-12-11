@@ -86,7 +86,7 @@ const fn default_value_limit() -> usize {
 }
 
 pub(crate) const fn default_cache_size() -> usize {
-    5000 * 1024 // 5KB
+    5 * 1024 // 5KB
 }
 
 impl GenerateConfig for TagCardinalityLimitConfig {

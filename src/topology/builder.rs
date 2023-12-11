@@ -45,6 +45,7 @@ use crate::{
         ProxyConfig, SinkContext, SourceContext, TransformContext, TransformOuter, TransformOutput,
     },
     event::{EventArray, EventContainer},
+    extra_context::ExtraContext,
     internal_events::EventsReceived,
     shutdown::SourceShutdownCoordinator,
     source_sender::{SourceSenderItem, CHUNK_SIZE},
@@ -84,6 +85,7 @@ struct Builder<'a> {
     inputs: HashMap<ComponentKey, (BufferSender<EventArray>, Inputs<OutputId>)>,
     healthchecks: HashMap<ComponentKey, Task>,
     detach_triggers: HashMap<ComponentKey, Trigger>,
+    extra_context: ExtraContext,
 }
 
 impl<'a> Builder<'a> {
@@ -91,6 +93,7 @@ impl<'a> Builder<'a> {
         config: &'a super::Config,
         diff: &'a ConfigDiff,
         buffers: HashMap<ComponentKey, BuiltBuffer>,
+        extra_context: ExtraContext,
     ) -> Self {
         Self {
             config,
@@ -103,6 +106,7 @@ impl<'a> Builder<'a> {
             inputs: HashMap::new(),
             healthchecks: HashMap::new(),
             detach_triggers: HashMap::new(),
+            extra_context,
         }
     }
 
@@ -568,6 +572,7 @@ impl<'a> Builder<'a> {
                 schema: self.config.schema,
                 app_name: crate::get_app_name().to_string(),
                 app_name_slug: crate::get_slugified_app_name(),
+                extra_context: self.extra_context.clone(),
             };
 
             let (sink, healthcheck) = match sink.inner.build(cx).await {
@@ -684,8 +689,9 @@ impl TopologyPieces {
         config: &Config,
         diff: &ConfigDiff,
         buffers: HashMap<ComponentKey, BuiltBuffer>,
+        extra_context: ExtraContext,
     ) -> Option<Self> {
-        match TopologyPieces::build(config, diff, buffers).await {
+        match TopologyPieces::build(config, diff, buffers, extra_context).await {
             Err(errors) => {
                 for error in errors {
                     error!(message = "Configuration error.", %error);
@@ -701,8 +707,11 @@ impl TopologyPieces {
         config: &super::Config,
         diff: &ConfigDiff,
         buffers: HashMap<ComponentKey, BuiltBuffer>,
+        extra_context: ExtraContext,
     ) -> Result<Self, Vec<String>> {
-        Builder::new(config, diff, buffers).build().await
+        Builder::new(config, diff, buffers, extra_context)
+            .build()
+            .await
     }
 }
 

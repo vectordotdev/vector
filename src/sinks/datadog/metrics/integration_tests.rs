@@ -124,7 +124,7 @@ async fn start_test(events: Vec<Event>) -> (Vec<Event>, Receiver<(http::request:
     // Swap out the endpoint so we can force send it
     // to our local server
     let endpoint = format!("http://{}", addr);
-    config.dd_common.endpoint = Some(endpoint.clone());
+    config.local_dd_common.endpoint = Some(endpoint.clone());
 
     let (sink, _) = config.build(cx).await.unwrap();
 
