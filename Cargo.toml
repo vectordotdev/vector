@@ -60,7 +60,7 @@ assets = [
   ["NOTICE", "/usr/share/vector/NOTICE", "644"],
   ["LICENSE-3rdparty.csv", "/usr/share/vector/LICENSE-3rdparty.csv", "644"],
 ]
-license-file = ["target/debian-license.txt"]
+license-file = ["target/debian-license.txt", "0"]
 extended-description-file = "target/debian-extended-description.txt"
 
 [package.metadata.deb.systemd-units]
