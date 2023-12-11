@@ -465,21 +465,7 @@ fn get_log_levels(default: &str) -> String {
                 log
             })
         })
-        .unwrap_or_else(|_| match default {
-            "off" => "off".to_owned(),
-            level => [
-                format!("vector={}", level),
-                format!("codec={}", level),
-                format!("vrl={}", level),
-                format!("file_source={}", level),
-                format!("tower_limit={}", level),
-                format!("rdkafka={}", level),
-                format!("buffers={}", level),
-                format!("lapin={}", level),
-                format!("kube={}", level),
-            ]
-            .join(","),
-        })
+        .unwrap_or_else(|_| default.into())
 }
 
 pub fn build_runtime(threads: Option<usize>, thread_name: &str) -> Result<Runtime, ExitCode> {
