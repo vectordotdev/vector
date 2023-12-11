@@ -165,23 +165,23 @@ fn generate_avro_test_case_enum() {
         "type": "record",
         "name": "test",
         "fields": [
-            {"name": "enum_field", "type": "enum", "symbols" : ["SPADES", "HEARTS", "DIAMONDS", "CLUBS"]}
+            {"name": "enum_field", "type": "enum", "symbols" : ["Spades", "Hearts", "Diamonds", "Clubs"]}
         ]
     }
     "#;
     #[derive(Debug, Serialize, Deserialize, Clone)]
     enum Value {
-        SPADES,
-        HEARTS,
-        DIAMONDS,
-        CLUBS,
+        Spades,
+        Hearts,
+        Diamonds,
+        Clubs,
     }
     #[derive(Debug, Serialize, Deserialize, Clone)]
     struct Test {
         enum_field: Value,
     }
     let value = Test {
-        enum_field: Value::HEARTS,
+        enum_field: Value::Hearts,
     };
     generate_test_case(schema, value, "enum");
 }
