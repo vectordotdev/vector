@@ -297,26 +297,6 @@ fn generate_avro_test_case_date() {
     generate_test_case(schema, value, "date");
 }
 
-fn generate_avro_test_case_decimal_var() {
-    let schema = r#"
-    {
-        "type": "record",
-        "name": "test",
-        "fields": [
-            {"name": "decimal_var_field", "type": "bytes", "logicalType": "decimal","precision": 10,"scale": 3}
-        ]
-    }
-    "#;
-
-    let record = Value::Record(vec![(
-        "decimal_var_field".into(),
-        Value::Decimal(Decimal::from([
-            249, 33, 74, 206, 142, 64, 190, 170, 17, 153,
-        ])),
-    )]);
-    generate_test_case_from_value(schema, record, "decimal_var");
-}
-
 fn generate_avro_test_case_time_millis() {
     let schema = r#"
     {
@@ -456,7 +436,6 @@ fn main() {
     generate_avro_test_case_map();
     generate_avro_test_case_record();
     generate_avro_test_case_date();
-    generate_avro_test_case_decimal_var();
     generate_avro_test_case_time_millis();
     generate_avro_test_case_time_micros();
     generate_avro_test_case_timestamp_millis();

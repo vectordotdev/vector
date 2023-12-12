@@ -1,1 +1,0 @@
-{"name":"test","type":"record","fields":[{"name":"decimal_var_field","type":{"type":"bytes","logicalType":"decimal","precision":10,"scale":3}}]}
