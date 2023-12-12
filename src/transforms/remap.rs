@@ -139,11 +139,11 @@ pub struct RemapConfig {
 
 /// The propagated errors should not contain file contents to prevent exposing sensitive data.
 fn redacted_diagnostics(source: &str, diagnostics: DiagnosticList) -> String {
-    let placehoder = '*';
+    let placeholder = '*';
     // The formatter depends on whitespaces.
     let redacted_source: String = source
         .chars()
-        .map(|c| if c.is_whitespace() { c } else { placehoder })
+        .map(|c| if c.is_whitespace() { c } else { placeholder })
         .collect();
     // Remove placeholder chars to hide the content length.
     format!(
@@ -152,7 +152,7 @@ fn redacted_diagnostics(source: &str, diagnostics: DiagnosticList) -> String {
         Formatter::new(&redacted_source, diagnostics)
             .colored()
             .to_string()
-            .replace(placehoder, " ")
+            .replace(placeholder, " ")
     )
 }
 
