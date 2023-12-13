@@ -299,6 +299,7 @@ fn generate_avro_test_case_date() {
     generate_test_case(schema, value, "date");
 }
 
+#[allow(unused)]
 fn generate_avro_test_case_decimal_var() {
     let schema = r#"
     {
