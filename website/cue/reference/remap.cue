@@ -245,9 +245,9 @@ remap: #Remap & {
 				1 │ structured = parse_key_value(.message)
 				  │ ------------ ^^^^^^^^^^^^^^^^^^^^^^^^^
 				  │ │            │
-				  │ │            this expression is fallible
-				  │ │            update the expression to be infallible
-				  │ │            note if an argument type is invalid it can render a function fallible
+				  │ │            this expression is fallible because at least one argument's type cannot be verified to be valid
+				  │ │            update the expression to be infallible by adding a `!`: `parse_key_value!(.message)`
+				  │ │            `.message` argument type is `any` and this function expected a parameter `value` of type `string`
 				  │ or change this to an infallible assignment:
 				  │ structured, err = parse_key_value(.message)
 				  │
