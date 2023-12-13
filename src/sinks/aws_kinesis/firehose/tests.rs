@@ -35,6 +35,7 @@ async fn check_batch_size() {
         auth: Default::default(),
         request_retry_partial: false,
         acknowledgements: Default::default(),
+        partition_key_field: None,
     };
 
     let config = KinesisFirehoseSinkConfig { batch, base };
@@ -65,6 +66,7 @@ async fn check_batch_events() {
         auth: Default::default(),
         request_retry_partial: false,
         acknowledgements: Default::default(),
+        partition_key_field: None,
     };
 
     let config = KinesisFirehoseSinkConfig { batch, base };

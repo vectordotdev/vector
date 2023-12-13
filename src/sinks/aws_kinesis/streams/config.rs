@@ -5,7 +5,6 @@ use aws_sdk_kinesis::{
 use futures::FutureExt;
 use snafu::Snafu;
 use vector_lib::configurable::{component::GenerateConfig, configurable_component};
-use vector_lib::lookup::lookup_v2::ConfigValuePath;
 
 use crate::sinks::util::retries::RetryAction;
 use crate::{
@@ -77,12 +76,6 @@ pub struct KinesisStreamsSinkConfig {
     #[serde(flatten)]
     pub base: KinesisSinkBaseConfig,
 
-    /// The log field used as the Kinesis record’s partition key value.
-    ///
-    /// If not specified, a unique partition key is generated for each Kinesis record.
-    #[configurable(metadata(docs::examples = "user_id"))]
-    pub partition_key_field: Option<ConfigValuePath>,
-
     #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<KinesisDefaultBatchSettings>,
@@ -151,7 +144,7 @@ impl SinkConfig for KinesisStreamsSinkConfig {
             KinesisRetryLogic,
         >(
             &self.base,
-            self.partition_key_field.clone(),
+            self.base.partition_key_field.clone(),
             batch_settings,
             KinesisStreamClient { client },
             KinesisRetryLogic {
