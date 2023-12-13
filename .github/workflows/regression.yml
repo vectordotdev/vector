@@ -34,7 +34,8 @@ on:
   pull_request:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.comment.html_url || github.event.merge_group.head_sha || github.sha }}
+  # In flight runs will be canceled only by re-trigger through the merge queue. The comment.html_url should always be unique.
+  group: ${{ github.workflow }}-${{ github.event.comment.html_url || github.event.merge_group.head_sha }}
   cancel-in-progress: true
 
 env:
@@ -232,7 +233,7 @@ jobs:
           export REPLICAS="10"
           export TOTAL_SAMPLES="600"
           export P_VALUE="0.1"
-          export SMP_CRATE_VERSION="0.10.0"
+          export SMP_CRATE_VERSION="0.11.0"
           export LADING_VERSION="0.19.1"
 
           echo "warmup seconds: ${WARMUP_SECONDS}"
@@ -301,7 +302,7 @@ jobs:
         uses: docker/setup-buildx-action@v3.0.0
 
       - name: Build 'vector' target image
-        uses: docker/build-push-action@v5.0.0
+        uses: docker/build-push-action@v5.1.0
         with:
           context: baseline-vector/
           cache-from: type=gha
@@ -338,7 +339,7 @@ jobs:
         uses: docker/setup-buildx-action@v3.0.0
 
       - name: Build 'vector' target image
-        uses: docker/build-push-action@v5.0.0
+        uses: docker/build-push-action@v5.1.0
         with:
           context: comparison-vector/
           cache-from: type=gha
@@ -531,6 +532,7 @@ jobs:
             --wait \
             --wait-delay-seconds 60 \
             --wait-timeout-minutes 90 \
+            --use-consignor welch \
             --submission-metadata ${{ runner.temp }}/submission-metadata
 
       - name: Handle cancellation if necessary
@@ -620,7 +622,7 @@ jobs:
           chmod +x ${{ runner.temp }}/bin/smp
 
           ${{ runner.temp }}/bin/smp --team-id ${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }} job result \
-            --submission-metadata ${{ runner.temp }}/submission-metadata
+            --submission-metadata ${{ runner.temp }}/submission-metadata --use-consignor welch
 
       - name: Check status, cancelled
         if: ${{ cancelled() }}
@@ -712,13 +714,13 @@ jobs:
 
           ${{ runner.temp }}/bin/smp --team-id ${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }} job sync \
             --submission-metadata ${{ runner.temp }}/submission-metadata \
-            --output-path "${{ runner.temp }}/outputs"
+            --output-path "${{ runner.temp }}/outputs" --use-consignor welch
 
       - name: Read regression report
         id: read-analysis
         uses: juliangruber/read-file-action@v1
         with:
-          path: ${{ runner.temp }}/outputs/report.html
+          path: ${{ runner.temp }}/outputs/report.md
 
       - name: Post report to PR
         uses: peter-evans/create-or-update-comment@v3

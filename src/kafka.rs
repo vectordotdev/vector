@@ -112,6 +112,20 @@ impl KafkaAuthConfig {
         if tls_enabled {
             let tls = self.tls.as_ref().unwrap();
 
+            if let Some(verify_certificate) = &tls.options.verify_certificate {
+                client.set(
+                    "enable.ssl.certificate.verification",
+                    &verify_certificate.to_string(),
+                );
+            }
+
+            if let Some(verify_hostname) = &tls.options.verify_hostname {
+                client.set(
+                    "ssl.endpoint.identification.algorithm",
+                    if *verify_hostname { "https" } else { "none" },
+                );
+            }
+
             if let Some(path) = &tls.options.ca_file {
                 let text = pathbuf_to_string(path)?;
                 if text.contains(PEM_START_MARKER) {

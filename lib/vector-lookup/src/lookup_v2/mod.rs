@@ -1,6 +1,7 @@
 mod optional_path;
 
 pub use optional_path::{OptionalTargetPath, OptionalValuePath};
+use std::fmt;
 use vector_config_macros::configurable_component;
 
 pub use vrl::path::{
@@ -60,6 +61,12 @@ impl From<&str> for ConfigValuePath {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[serde(try_from = "String", into = "String")]
 pub struct ConfigTargetPath(pub OwnedTargetPath);
+
+impl fmt::Display for ConfigTargetPath {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
 
 impl TryFrom<String> for ConfigTargetPath {
     type Error = PathParseError;

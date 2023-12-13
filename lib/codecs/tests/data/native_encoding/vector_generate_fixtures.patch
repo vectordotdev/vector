@@ -6,8 +6,8 @@ index 0f51fc830..aadf99841 100644
  rand_distr = "0.4.3"
  tracing-subscriber = { version = "0.3.17", default-features = false, features = ["env-filter", "fmt", "ansi", "registry"] }
  vector-common = { path = "../vector-common", default-features = false, features = ["test"] }
--vrl = { version = "0.8.1", features = ["cli", "test", "test_framework", "arbitrary"] }
-+vrl = { version = "0.8.1", features = ["cli", "test", "test_framework", "arbitrary"], path = "../../../vrl" }
+-vrl = { version = "0.9.0", features = ["cli", "test", "test_framework", "arbitrary"] }
++vrl = { path = "../../../vrl", features = ["cli", "test", "test_framework", "arbitrary"] }
  
  [features]
  api = ["dep:async-graphql"]

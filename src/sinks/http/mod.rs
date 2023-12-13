@@ -4,7 +4,7 @@
 //! taking a stream of [`vector_lib::event::Event`]s and forwarding them to an HTTP server.
 
 mod batch;
-mod config;
+pub mod config;
 mod encoder;
 mod request_builder;
 mod service;

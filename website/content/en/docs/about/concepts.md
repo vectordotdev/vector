@@ -1,6 +1,6 @@
 ---
 title: Concepts
-weight: 2
+weight: 3
 tags: ["concepts", "meta", "events", "logs", "metrics", "components", "sources", "transforms", "sinks", "pipeline", "roles", "agent", "aggregator", "topology"]
 ---
 
@@ -26,7 +26,7 @@ A **metric** event represents a numerical operation performed on a time series. 
 
 ### Traces
 
-A **trace** event can be thought of as a special kind of log event. As of this writing, the components that support trace events are: the `datadog_agent` source, the `datadog_traces` sink, and the `sample` and `remap` transforms.
+A **trace** event can be thought of as a special kind of log event. The components that support trace events are: the `datadog_agent` source, the `datadog_traces` sink, and the `sample` and `remap` transforms. **Note**: Support for traces is limited and is in alpha.
 
 If you're interested in using traces with a Vector component that doesn't yet support them, please open an issue so we can have a better understanding of what components to prioritize adding trace support for.
 

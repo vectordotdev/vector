@@ -3,20 +3,20 @@ package metadata
 remap: functions: object: {
 	category: "Type"
 	description: """
-		Returns the `value` if it's an object and errors otherwise. This enables the type checker to guarantee that the
-		returned value is an object and can be used in any function that expects one.
+		Returns `value` if it is an object, otherwise returns an error. This enables the type checker to guarantee that the
+		returned value is an object and can be used in any function that expects an object.
 		"""
 
 	arguments: [
 		{
 			name:        "value"
-			description: "The value that you need to ensure is an object."
+			description: "The value to check if it is an object."
 			required:    true
 			type: ["any"]
 		},
 	]
 	internal_failure_reasons: [
-		"`value` isn't an object.",
+		"`value` is not an object.",
 	]
 	return: {
 		types: ["object"]

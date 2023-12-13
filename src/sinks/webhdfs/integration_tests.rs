@@ -76,7 +76,7 @@ async fn hdfs_rotate_files_after_the_buffer_size_is_reached() {
 
     let mut objects: Vec<Entry> = op
         .list_with("/")
-        .delimiter("")
+        .recursive(true)
         .metakey(Metakey::Mode)
         .await
         .unwrap();

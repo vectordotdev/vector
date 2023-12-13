@@ -362,7 +362,7 @@ base: components: sinks: humio_logs: configuration: {
 			[global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
 			"""
 		required: false
-		type: string: default: "host"
+		type: string: default: ".host"
 	}
 	index: {
 		description: """
@@ -602,7 +602,7 @@ base: components: sinks: humio_logs: configuration: {
 			[global_timestamp_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.timestamp_key
 			"""
 		required: false
-		type: string: default: "timestamp"
+		type: string: default: ".timestamp"
 	}
 	timestamp_nanos_key: {
 		description: "Overrides the name of the log field used to retrieve the nanosecond-enabled timestamp to send to Humio."

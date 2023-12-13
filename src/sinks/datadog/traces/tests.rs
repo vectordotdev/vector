@@ -14,11 +14,13 @@ use vrl::event_path;
 use super::{apm_stats::StatsPayload, dd_proto, ddsketch_full, DatadogTracesConfig};
 
 use crate::{
-    config::SinkConfig,
+    common::datadog,
+    config::{SinkConfig, SinkContext},
     event::{ObjectMap, TraceEvent, Value},
-    sinks::util::test::{build_test_server_status, load_sink},
+    extra_context::ExtraContext,
+    sinks::util::test::{build_test_server_status, load_sink, load_sink_with_context},
     test_util::{
-        components::{assert_sink_compliance, SINK_TAGS},
+        components::{assert_sink_compliance, run_and_assert_sink_compliance, SINK_TAGS},
         map_event_batch_stream, next_addr,
     },
 };
@@ -307,4 +309,89 @@ async fn multiple_traces() {
     assert_eq!(cgs_trace_1.name, "a_name");
     assert_eq!(cgs_trace_1.resource, "trace_1");
     assert_eq!(cgs_trace_1.service, "a_service");
+}
+
+#[tokio::test]
+async fn global_options() {
+    let config = indoc! {r#"
+            compression = "none"
+        "#};
+    let cx = SinkContext {
+        extra_context: ExtraContext::single_value(datadog::Options {
+            api_key: Some("global-key".to_string().into()),
+            ..Default::default()
+        }),
+        ..SinkContext::default()
+    };
+    let (mut config, cx) = load_sink_with_context::<DatadogTracesConfig>(config, cx).unwrap();
+
+    let addr = next_addr();
+    // Swap out the endpoint so we can force send it
+    // to our local server
+    let endpoint = format!("http://{}", addr);
+    config.local_dd_common.endpoint = Some(endpoint.clone());
+
+    let (sink, _) = config.build(cx).await.unwrap();
+
+    let (rx, _trigger, server) = build_test_server_status(addr, StatusCode::OK);
+    tokio::spawn(server);
+
+    let t = simple_trace_event("a_resource".to_string());
+    let events = stream::iter(vec![Event::Trace(t)]);
+
+    run_and_assert_sink_compliance(sink, events, &SINK_TAGS).await;
+
+    let keys = rx
+        .take(1)
+        .map(|r| r.0.headers.get("DD-API-KEY").unwrap().clone())
+        .collect::<Vec<_>>()
+        .await;
+
+    assert!(keys
+        .iter()
+        .all(|value| value.to_str().unwrap() == "global-key"));
+}
+
+#[tokio::test]
+async fn override_global_options() {
+    let config = indoc! {r#"
+            default_api_key = "local-key"
+            compression = "none"
+        "#};
+
+    // Set a global key option, which should be overridden by the option in the component configuration.
+    let cx = SinkContext {
+        extra_context: ExtraContext::single_value(datadog::Options {
+            api_key: Some("global-key".to_string().into()),
+            ..Default::default()
+        }),
+        ..SinkContext::default()
+    };
+    let (mut config, cx) = load_sink_with_context::<DatadogTracesConfig>(config, cx).unwrap();
+
+    let addr = next_addr();
+    // Swap out the endpoint so we can force send it
+    // to our local server
+    let endpoint = format!("http://{}", addr);
+    config.local_dd_common.endpoint = Some(endpoint.clone());
+
+    let (sink, _) = config.build(cx).await.unwrap();
+
+    let (rx, _trigger, server) = build_test_server_status(addr, StatusCode::OK);
+    tokio::spawn(server);
+
+    let t = simple_trace_event("a_resource".to_string());
+    let events = stream::iter(vec![Event::Trace(t)]);
+
+    run_and_assert_sink_compliance(sink, events, &SINK_TAGS).await;
+
+    let keys = rx
+        .take(1)
+        .map(|r| r.0.headers.get("DD-API-KEY").unwrap().clone())
+        .collect::<Vec<_>>()
+        .await;
+
+    assert!(keys
+        .iter()
+        .all(|value| value.to_str().unwrap() == "local-key"));
 }

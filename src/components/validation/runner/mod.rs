@@ -25,6 +25,7 @@ use crate::{
     codecs::Encoder,
     components::validation::{RunnerMetrics, TestCase},
     config::ConfigBuilder,
+    extra_context::ExtraContext,
     topology::RunningTopology,
 };
 
@@ -154,17 +155,20 @@ pub struct Runner {
     configuration: ValidationConfiguration,
     test_case_data_path: PathBuf,
     validators: HashMap<String, Box<dyn Validator>>,
+    extra_context: ExtraContext,
 }
 
 impl Runner {
     pub fn from_configuration(
         configuration: ValidationConfiguration,
         test_case_data_path: PathBuf,
+        extra_context: ExtraContext,
     ) -> Self {
         Self {
             configuration,
             test_case_data_path,
             validators: HashMap::new(),
+            extra_context,
         }
     }
 
@@ -271,7 +275,11 @@ impl Runner {
             // At this point, we need to actually spawn the configured component topology so that it
             // runs, and make sure we have a way to tell it when to shutdown so that we can properly
             // sequence the test in terms of sending inputs, waiting for outputs, etc.
-            spawn_component_topology(config_builder, &topology_task_coordinator);
+            spawn_component_topology(
+                config_builder,
+                &topology_task_coordinator,
+                self.extra_context.clone(),
+            );
             let topology_task_coordinator = topology_task_coordinator.started().await;
 
             // Now we'll spawn two tasks: one for sending inputs, and one for collecting outputs.
@@ -462,6 +470,7 @@ fn build_external_resource(
 fn spawn_component_topology(
     config_builder: ConfigBuilder,
     topology_task_coordinator: &TaskCoordinator<Configuring>,
+    extra_context: ExtraContext,
 ) {
     let topology_started = topology_task_coordinator.track_started();
     let topology_completed = topology_task_coordinator.track_completed();
@@ -482,7 +491,9 @@ fn spawn_component_topology(
             debug!("Building component topology...");
 
             let (topology, mut crash_rx) =
-                RunningTopology::start_init_validated(config).await.unwrap();
+                RunningTopology::start_init_validated(config, extra_context)
+                    .await
+                    .unwrap();
 
             debug!("Component topology built and spawned.");
             topology_started.mark_as_done();

@@ -100,9 +100,13 @@ base: components: sinks: datadog_logs: configuration: {
 			If an event has a Datadog [API key][api_key] set explicitly in its metadata, it takes
 			precedence over this setting.
 
+			This value can also be set by specifying the `DD_API_KEY` environment variable.
+			The value specified here takes precedence over the environment variable.
+
 			[api_key]: https://docs.datadoghq.com/api/?lang=bash#authentication
+			[global_options]: /docs/reference/configuration/global-options/#datadog
 			"""
-		required: true
+		required: false
 		type: string: examples: ["${DATADOG_API_KEY_ENV_VAR}", "ef8d5de700e7989468166c40fc8a0ccd"]
 	}
 	encoding: {
@@ -345,13 +349,16 @@ base: components: sinks: datadog_logs: configuration: {
 		description: """
 			The Datadog [site][dd_site] to send observability data to.
 
+			This value can also be set by specifying the `DD_SITE` environment variable.
+			The value specified here takes precedence over the environment variable.
+
+			If not specified by the environment variable, a default value of
+			`datadoghq.com` is taken.
+
 			[dd_site]: https://docs.datadoghq.com/getting_started/site
 			"""
 		required: false
-		type: string: {
-			default: "datadoghq.com"
-			examples: ["us3.datadoghq.com", "datadoghq.eu"]
-		}
+		type: string: examples: ["us3.datadoghq.com", "datadoghq.eu"]
 	}
 	tls: {
 		description: "Configures the TLS options for incoming/outgoing connections."

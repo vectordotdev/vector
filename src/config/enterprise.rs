@@ -21,13 +21,12 @@ use super::{
     SourceOuter, TransformOuter,
 };
 use crate::{
-    common::datadog::get_api_base_endpoint,
+    common::datadog::{default_site, get_api_base_endpoint},
     conditions::AnyCondition,
     http::{HttpClient, HttpError},
     sinks::{
         datadog::{
-            default_site, logs::DatadogLogsConfig, metrics::DatadogMetricsConfig,
-            DatadogCommonConfig,
+            logs::DatadogLogsConfig, metrics::DatadogMetricsConfig, LocalDatadogCommonConfig,
         },
         util::{http::RequestConfig, retries::ExponentialBackoff},
     },
@@ -461,12 +460,11 @@ fn setup_logs_reporting(
 
     // Create a Datadog logs sink to consume and emit internal logs.
     let datadog_logs = DatadogLogsConfig {
-        dd_common: DatadogCommonConfig {
-            endpoint: datadog.endpoint.clone(),
-            site: datadog.site.clone(),
-            default_api_key: api_key.into(),
-            ..Default::default()
-        },
+        local_dd_common: LocalDatadogCommonConfig::new(
+            datadog.endpoint.clone(),
+            Some(datadog.site.clone()),
+            Some(api_key.into()),
+        ),
         request: RequestConfig {
             headers: IndexMap::from([(
                 "DD-EVP-ORIGIN".to_string(),
@@ -568,12 +566,11 @@ fn setup_metrics_reporting(
 
     // Create a Datadog metrics sink to consume and emit internal + host metrics.
     let datadog_metrics = DatadogMetricsConfig {
-        dd_common: DatadogCommonConfig {
-            endpoint: datadog.endpoint.clone(),
-            site: datadog.site.clone(),
-            default_api_key: api_key.into(),
-            ..Default::default()
-        },
+        local_dd_common: LocalDatadogCommonConfig::new(
+            datadog.endpoint.clone(),
+            Some(datadog.site.clone()),
+            Some(api_key.into()),
+        ),
         ..Default::default()
     };
 
