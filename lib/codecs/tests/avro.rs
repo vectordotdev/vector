@@ -18,9 +18,7 @@ use vector_core::{config::LogNamespace, event::Event};
 #[case(true)]
 #[case(false)]
 fn roundtrip_avro_fixtures(
-    #[files("tests/data/avro/generated/*.avro")]
-    #[exclude(".*(date|fixed|time_millis|timestamp_micros|timestamp_millis).avro")]
-    path: PathBuf,
+    #[files("tests/data/avro/generated/*.avro")] path: PathBuf,
     #[case] reserialize: bool,
 ) {
     let schema_path = path.as_path().with_extension("avsc");

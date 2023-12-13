@@ -1,1 +1,0 @@
-{"name":"test","type":"record","fields":[{"name":"fixed_field","type":{"name":"fixed_field","type":"fixed","size":16}}]}
