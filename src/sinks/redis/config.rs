@@ -1,9 +1,16 @@
 use redis::{aio::ConnectionManager, RedisResult};
 use snafu::prelude::*;
 
-use crate::sinks::prelude::*;
+use crate::sinks::{prelude::*, util::service::TowerRequestConfigDefaults};
 
 use super::{sink::RedisSink, RedisCreateFailedSnafu};
+
+#[derive(Clone, Copy, Debug)]
+pub struct RedisTowerRequestConfigDefaults;
+
+impl TowerRequestConfigDefaults for RedisTowerRequestConfigDefaults {
+    const CONCURRENCY: Concurrency = Concurrency::None;
+}
 
 /// Redis data type to store messages in.
 #[configurable_component]
@@ -98,7 +105,7 @@ pub struct RedisSinkConfig {
 
     #[configurable(derived)]
     #[serde(default)]
-    pub(super) request: TowerRequestConfig,
+    pub(super) request: TowerRequestConfig<RedisTowerRequestConfigDefaults>,
 
     #[configurable(derived)]
     #[serde(
@@ -150,7 +157,7 @@ impl SinkConfig for RedisSinkConfig {
 impl RedisSinkConfig {
     pub(super) async fn build_client(&self) -> RedisResult<ConnectionManager> {
         let client = redis::Client::open(self.endpoint.as_str())?;
-        client.get_tokio_connection_manager().await
+        client.get_connection_manager().await
     }
 
     async fn healthcheck(mut conn: ConnectionManager) -> crate::Result<()> {

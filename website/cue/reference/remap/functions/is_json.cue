@@ -9,7 +9,7 @@ remap: functions: is_json: {
 	arguments: [
 		{
 			name:        "value"
-			description: #"The value to check"#
+			description: #"The value to check if it is a valid JSON document."#
 			required:    true
 			type: ["string"]
 		},

@@ -26,6 +26,7 @@ use super::{
 use crate::{
     config::{ComponentKey, Config, ConfigDiff, HealthcheckOptions, Inputs, OutputId, Resource},
     event::EventArray,
+    extra_context::ExtraContext,
     shutdown::SourceShutdownCoordinator,
     signal::ShutdownError,
     spawn_named,
@@ -219,7 +220,11 @@ impl RunningTopology {
     ///
     /// If all changes from the new configuration cannot be made, and the current configuration
     /// cannot be fully restored, then `Err(())` is returned.
-    pub async fn reload_config_and_respawn(&mut self, new_config: Config) -> Result<bool, ()> {
+    pub async fn reload_config_and_respawn(
+        &mut self,
+        new_config: Config,
+        extra_context: ExtraContext,
+    ) -> Result<bool, ()> {
         info!("Reloading running topology with new configuration.");
 
         if self.config.global != new_config.global {
@@ -249,8 +254,13 @@ impl RunningTopology {
         // Try to build all of the new components coming from the new configuration.  If we can
         // successfully build them, we'll attempt to connect them up to the topology and spawn their
         // respective component tasks.
-        if let Some(mut new_pieces) =
-            TopologyPieces::build_or_log_errors(&new_config, &diff, buffers.clone()).await
+        if let Some(mut new_pieces) = TopologyPieces::build_or_log_errors(
+            &new_config,
+            &diff,
+            buffers.clone(),
+            extra_context.clone(),
+        )
+        .await
         {
             // If healthchecks are configured for any of the changing/new components, try running
             // them before moving forward with connecting and spawning.  In some cases, healthchecks
@@ -276,7 +286,8 @@ impl RunningTopology {
 
         let diff = diff.flip();
         if let Some(mut new_pieces) =
-            TopologyPieces::build_or_log_errors(&self.config, &diff, buffers).await
+            TopologyPieces::build_or_log_errors(&self.config, &diff, buffers, extra_context.clone())
+                .await
         {
             if self
                 .run_healthchecks(&diff, &mut new_pieces, self.config.healthchecks)
@@ -977,9 +988,14 @@ impl RunningTopology {
             .insert(key.clone(), spawn_named(source_task, task_name.as_ref()));
     }
 
-    pub async fn start_init_validated(config: Config) -> Option<(Self, ShutdownErrorReceiver)> {
+    pub async fn start_init_validated(
+        config: Config,
+        extra_context: ExtraContext,
+    ) -> Option<(Self, ShutdownErrorReceiver)> {
         let diff = ConfigDiff::initial(&config);
-        let pieces = TopologyPieces::build_or_log_errors(&config, &diff, HashMap::new()).await?;
+        let pieces =
+            TopologyPieces::build_or_log_errors(&config, &diff, HashMap::new(), extra_context)
+                .await?;
         Self::start_validated(config, diff, pieces).await
     }
 

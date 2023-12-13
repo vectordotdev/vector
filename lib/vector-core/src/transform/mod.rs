@@ -1,12 +1,10 @@
-use std::sync::Arc;
-use std::{collections::HashMap, error, pin::Pin};
+use std::{collections::HashMap, error, pin::Pin, sync::Arc, time::Instant};
 
 use futures::{Stream, StreamExt};
 use vector_common::internal_event::{
     self, register, CountByteSize, EventsSent, InternalEventHandle as _, Registered, DEFAULT_OUTPUT,
 };
-use vector_common::json_size::JsonSize;
-use vector_common::EventDataEq;
+use vector_common::{byte_size_of::ByteSizeOf, json_size::JsonSize, EventDataEq};
 
 use crate::config::{ComponentKey, OutputId};
 use crate::event::EventMutRef;
@@ -17,7 +15,7 @@ use crate::{
         into_event_stream, EstimatedJsonEncodedSizeOf, Event, EventArray, EventContainer, EventRef,
     },
     fanout::{self, Fanout},
-    schema, ByteSizeOf,
+    schema,
 };
 
 #[cfg(feature = "lua")]
@@ -493,8 +491,9 @@ impl OutputBuffer {
         &mut self,
         output: &mut Fanout,
     ) -> Result<(), Box<dyn error::Error + Send + Sync>> {
+        let send_start = Some(Instant::now());
         for array in std::mem::take(&mut self.0) {
-            output.send(array).await?;
+            output.send(array, send_start).await?;
         }
 
         Ok(())

@@ -7,9 +7,11 @@ use std::{
 use aws_sdk_cloudwatchlogs::error::{
     CreateLogGroupError, CreateLogGroupErrorKind, CreateLogStreamError, CreateLogStreamErrorKind,
     DescribeLogStreamsError, DescribeLogStreamsErrorKind, PutLogEventsError,
+    PutRetentionPolicyError,
 };
 use aws_sdk_cloudwatchlogs::operation::PutLogEvents;
 
+use crate::sinks::aws_cloudwatch_logs::config::Retention;
 use aws_sdk_cloudwatchlogs::model::InputLogEvent;
 use aws_sdk_cloudwatchlogs::output::{DescribeLogStreamsOutput, PutLogEventsOutput};
 use aws_sdk_cloudwatchlogs::types::SdkError;
@@ -27,6 +29,7 @@ pub struct CloudwatchFuture {
     state: State,
     create_missing_group: bool,
     create_missing_stream: bool,
+    retention_enabled: bool,
     events: Vec<Vec<InputLogEvent>>,
     token_tx: Option<oneshot::Sender<Option<String>>>,
 }
@@ -41,6 +44,7 @@ struct Client {
     stream_name: String,
     group_name: String,
     headers: IndexMap<String, String>,
+    retention_days: u32,
 }
 
 type ClientResult<T, E> = BoxFuture<'static, Result<T, SdkError<E>>>;
@@ -50,6 +54,7 @@ enum State {
     CreateStream(ClientResult<(), CreateLogStreamError>),
     DescribeStream(ClientResult<DescribeLogStreamsOutput, DescribeLogStreamsError>),
     Put(ClientResult<PutLogEventsOutput, PutLogEventsError>),
+    PutRetentionPolicy(ClientResult<(), PutRetentionPolicyError>),
 }
 
 impl CloudwatchFuture {
@@ -63,16 +68,19 @@ impl CloudwatchFuture {
         group_name: String,
         create_missing_group: bool,
         create_missing_stream: bool,
+        retention: Retention,
         mut events: Vec<Vec<InputLogEvent>>,
         token: Option<String>,
         token_tx: oneshot::Sender<Option<String>>,
     ) -> Self {
+        let retention_days = retention.days;
         let client = Client {
             client,
             smithy_client,
             stream_name,
             group_name,
             headers,
+            retention_days,
         };
 
         let state = if let Some(token) = token {
@@ -81,6 +89,8 @@ impl CloudwatchFuture {
             State::DescribeStream(client.describe_stream())
         };
 
+        let retention_enabled = retention.enabled;
+
         Self {
             client,
             events,
@@ -88,6 +98,7 @@ impl CloudwatchFuture {
             token_tx: Some(token_tx),
             create_missing_group,
             create_missing_stream,
+            retention_enabled,
         }
     }
 }
@@ -115,15 +126,17 @@ impl Future for CloudwatchFuture {
                                     }
                                 }
                             }
-                            return Poll::Ready(Err(CloudwatchError::Describe(err)));
+                            return Poll::Ready(Err(CloudwatchError::DescribeLogStreams(err)));
                         }
                     };
+
+                    let stream_name = &self.client.stream_name;
 
                     if let Some(stream) = response
                         .log_streams
                         .ok_or(CloudwatchError::NoStreamsFound)?
                         .into_iter()
-                        .next()
+                        .find(|log_stream| log_stream.log_stream_name == Some(stream_name.clone()))
                     {
                         debug!(message = "Stream found.", stream = ?stream.log_stream_name);
 
@@ -162,6 +175,11 @@ impl Future for CloudwatchFuture {
                     };
 
                     info!(message = "Group created.", name = %self.client.group_name);
+
+                    if self.retention_enabled {
+                        self.state = State::PutRetentionPolicy(self.client.put_retention_policy());
+                        continue;
+                    }
 
                     // self does not abide by `create_missing_stream` since a group
                     // never has any streams and thus we need to create one if a group
@@ -211,6 +229,19 @@ impl Future for CloudwatchFuture {
 
                         return Poll::Ready(Ok(()));
                     }
+                }
+
+                State::PutRetentionPolicy(fut) => {
+                    match ready!(fut.poll_unpin(cx)) {
+                        Ok(_) => {}
+                        Err(error) => {
+                            return Poll::Ready(Err(CloudwatchError::PutRetentionPolicy(error)))
+                        }
+                    }
+
+                    info!(message = "Retention policy updated for stream.", name = %self.client.stream_name);
+
+                    self.state = State::CreateStream(self.client.create_log_stream());
                 }
             }
         }
@@ -268,7 +299,6 @@ impl Client {
         Box::pin(async move {
             client
                 .describe_log_streams()
-                .limit(1)
                 .log_group_name(group_name)
                 .log_stream_name_prefix(stream_name)
                 .send()
@@ -298,6 +328,21 @@ impl Client {
                 .create_log_stream()
                 .log_group_name(group_name)
                 .log_stream_name(stream_name)
+                .send()
+                .await?;
+            Ok(())
+        })
+    }
+
+    pub fn put_retention_policy(&self) -> ClientResult<(), PutRetentionPolicyError> {
+        let client = self.client.clone();
+        let group_name = self.group_name.clone();
+        let retention_days = self.retention_days;
+        Box::pin(async move {
+            client
+                .put_retention_policy()
+                .log_group_name(group_name)
+                .retention_in_days(retention_days.try_into().unwrap())
                 .send()
                 .await?;
             Ok(())

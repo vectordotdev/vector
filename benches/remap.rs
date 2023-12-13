@@ -2,7 +2,6 @@ use std::collections::HashMap;
 
 use chrono::{DateTime, Utc};
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
-use indexmap::IndexMap;
 use vector::{
     config::{DataType, TransformOutput},
     event::{Event, LogEvent, Value},
@@ -11,7 +10,6 @@ use vector::{
         SyncTransform, TransformOutputsBuf,
     },
 };
-use vector_common::TimeZone;
 use vrl::event_path;
 use vrl::prelude::*;
 
@@ -64,7 +62,7 @@ fn benchmark_remap(c: &mut Criterion) {
                         .to_string(),
                     ),
                     file: None,
-                    timezone: TimeZone::default(),
+                    timezone: None,
                     drop_on_error: true,
                     drop_on_abort: true,
                     ..Default::default()
@@ -117,7 +115,7 @@ fn benchmark_remap(c: &mut Criterion) {
                 RemapConfig {
                     source: Some(".bar = parse_json!(string!(.foo))".to_owned()),
                     file: None,
-                    timezone: TimeZone::default(),
+                    timezone: None,
                     drop_on_error: true,
                     drop_on_abort: true,
                     ..Default::default()
@@ -179,7 +177,7 @@ fn benchmark_remap(c: &mut Criterion) {
                 "#}
                 .to_owned()),
                 file: None,
-                timezone: TimeZone::default(),
+                timezone: None,
                 drop_on_error: true,
                 drop_on_abort: true,
                     ..Default::default()

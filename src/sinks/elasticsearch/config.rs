@@ -23,7 +23,7 @@ use crate::{
         },
         util::{
             http::RequestConfig, service::HealthConfig, BatchConfig, Compression,
-            RealtimeSizeBasedDefaultBatchSettings, TowerRequestConfig,
+            RealtimeSizeBasedDefaultBatchSettings,
         },
         Healthcheck, VectorSink,
     },
@@ -482,10 +482,7 @@ impl SinkConfig for ElasticsearchConfig {
 
         let client = HttpClient::new(common.tls_settings.clone(), cx.proxy())?;
 
-        let request_limits = self
-            .request
-            .tower
-            .unwrap_with(&TowerRequestConfig::default());
+        let request_limits = self.request.tower.into_settings();
 
         let health_config = self.endpoint_health.clone().unwrap_or_default();
 
@@ -509,6 +506,7 @@ impl SinkConfig for ElasticsearchConfig {
             services,
             health_config,
             ElasticsearchHealthLogic,
+            1,
         );
 
         let sink = ElasticsearchSink::new(&common, self, service)?;

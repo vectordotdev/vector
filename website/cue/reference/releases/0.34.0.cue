@@ -22,13 +22,25 @@ releases: "0.34.0": {
 		  change and recommended practices to either secure the disk buffers or to avoid
 		  storing secrets in events altogether.
 
-		  This release also marks the deprecation of the OS package repositories hosted at
-		  `repositories.timber.io`. Instead, packages have been moved to `apt.vector.dev` and
-		  `yum.vector.dev`. Please see the [release
-		  highlight](/highlights/2023-11-07-new-linux-repos) for details about this change and
-		  instructions on how to migrate. The repositories located at `repositories.timber.io` will
-		  be decommissioned on February 28th, 2024.
+		This release also marks the deprecation of the OS package repositories hosted at
+		`repositories.timber.io`. Instead, packages have been moved to `apt.vector.dev` and
+		`yum.vector.dev`. Please see the [release
+		highlight](/highlights/2023-11-07-new-linux-repos) for details about this change and
+		instructions on how to migrate. The repositories located at `repositories.timber.io` will
+		be decommissioned on February 28th, 2024.
 		"""
+
+	known_issues: [
+		"""
+			The Datadog Metrics sink fails to send a large number of requests due to incorrectly
+			sized batches [#19110](https://github.com/vectordotdev/vector/issues/19110). This will
+			be fixed in v0.34.1. Until the fix is released, if you are using the Datadog Metrics
+			sink, we advise remaining on v0.33.1.
+			""",
+		"""
+			The `protobuf` encoder does not work in sinks [#19230](https://github.com/vectordotdev/vector/issues/19230).
+			""",
+	]
 
 	changelog: [
 		{

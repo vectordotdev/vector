@@ -103,9 +103,10 @@ uri = "http://{address2}/"
     )
     .unwrap();
     let diff = ConfigDiff::initial(&config);
-    let pieces = TopologyPieces::build_or_log_errors(&config, &diff, HashMap::new())
-        .await
-        .unwrap();
+    let pieces =
+        TopologyPieces::build_or_log_errors(&config, &diff, HashMap::new(), Default::default())
+            .await
+            .unwrap();
     let (_topology, _) = RunningTopology::start_validated(config, diff, pieces)
         .await
         .unwrap();

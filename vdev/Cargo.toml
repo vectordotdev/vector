@@ -11,7 +11,7 @@ publish = false
 anyhow = "1.0.75"
 cached = "0.46.1"
 chrono = { version = "0.4.31", default-features = false, features = ["serde", "clock"] }
-clap = { version = "4.4.7", features = ["derive"] }
+clap = { version = "4.4.11", features = ["derive"] }
 clap-verbosity-flag = "2.1.0"
 clap_complete = "4.4.4"
 confy = "0.5.1"
@@ -22,9 +22,9 @@ glob = { version = "0.3.1", default-features = false }
 hex = "0.4.3"
 indexmap = { version = "2.0", default-features = false, features = ["serde", "std"] }
 indicatif = { version = "0.17.7", features = ["improved_unicode"] }
-itertools = "0.11.0"
+itertools = "0.12.0"
 log = "0.4.20"
-once_cell = "1.18"
+once_cell = "1.19"
 os_info = { version = "3.7.0", default-features = false }
 # watch https://github.com/epage/anstyle for official interop with Clap
 owo-colors = { version = "3.5.0", features = ["supports-colors"] }

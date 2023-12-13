@@ -12,7 +12,7 @@ use crossbeam_queue::ArrayQueue;
 use futures::Stream;
 use tokio::sync::{Notify, OwnedSemaphorePermit, Semaphore, TryAcquireError};
 
-use crate::Bufferable;
+use crate::InMemoryBufferable;
 
 /// Error returned by `LimitedSender::send` when the receiver has disconnected.
 #[derive(Debug, PartialEq, Eq)]
@@ -79,7 +79,7 @@ pub struct LimitedSender<T> {
     sender_count: Arc<AtomicUsize>,
 }
 
-impl<T: Bufferable> LimitedSender<T> {
+impl<T: InMemoryBufferable> LimitedSender<T> {
     #[allow(clippy::cast_possible_truncation)]
     fn get_required_permits_for_item(&self, item: &T) -> u32 {
         // We have to limit the number of permits we ask for to the overall limit since we're always

@@ -1,16 +1,15 @@
 use std::{fmt, time::Duration};
 
 use bytes::BytesMut;
-use codecs::{
-    self,
-    decoding::{Deserializer, Framer},
-    BytesDeserializer, CharacterDelimitedDecoder,
-};
 use criterion::{
     criterion_group, measurement::WallTime, BatchSize, BenchmarkGroup, BenchmarkId, Criterion,
     SamplingMode, Throughput,
 };
 use tokio_util::codec::Decoder;
+use vector_lib::codecs::{
+    decoding::{Deserializer, Framer},
+    BytesDeserializer, CharacterDelimitedDecoder,
+};
 
 #[derive(Debug)]
 struct Param {

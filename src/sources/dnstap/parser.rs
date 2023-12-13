@@ -8,13 +8,13 @@ use std::{
 use base64::prelude::{Engine as _, BASE64_STANDARD};
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
-use once_cell::sync::Lazy;
-use prost::Message;
-use snafu::Snafu;
-use trust_dns_proto::{
+use hickory_proto::{
     rr::domain::Name,
     serialize::binary::{BinDecodable, BinDecoder},
 };
+use once_cell::sync::Lazy;
+use prost::Message;
+use snafu::Snafu;
 use vrl::{owned_value_path, path};
 
 use crate::{

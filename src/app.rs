@@ -7,6 +7,7 @@ use futures::StreamExt;
 use futures_util::future::BoxFuture;
 use once_cell::race::OnceNonZeroUsize;
 use tokio::runtime::{self, Runtime};
+use tokio::sync::broadcast::error::RecvError;
 use tokio_stream::wrappers::UnboundedReceiverStream;
 
 #[cfg(feature = "enterprise")]
@@ -14,6 +15,7 @@ use crate::config::enterprise::{
     attach_enterprise_components, report_configuration, EnterpriseError, EnterpriseMetadata,
     EnterpriseReporter,
 };
+use crate::extra_context::ExtraContext;
 #[cfg(not(feature = "enterprise-tests"))]
 use crate::metrics;
 #[cfg(feature = "api")]
@@ -22,6 +24,7 @@ use crate::{
     cli::{handle_config_errors, LogFormat, Opts, RootOpts},
     config::{self, Config, ConfigPath},
     heartbeat,
+    internal_events::{VectorQuit, VectorStarted, VectorStopped},
     signal::{SignalHandler, SignalPair, SignalRx, SignalTo},
     topology::{
         ReloadOutcome, RunningTopology, SharedTopologyController, ShutdownErrorReceiver,
@@ -38,10 +41,6 @@ use tokio::runtime::Handle;
 
 pub static WORKER_THREADS: OnceNonZeroUsize = OnceNonZeroUsize::new();
 
-use crate::internal_events::{VectorQuit, VectorStarted, VectorStopped};
-
-use tokio::sync::broadcast::error::RecvError;
-
 pub struct ApplicationConfig {
     pub config_paths: Vec<config::ConfigPath>,
     pub topology: RunningTopology,
@@ -51,6 +50,7 @@ pub struct ApplicationConfig {
     pub api: config::api::Options,
     #[cfg(feature = "enterprise")]
     pub enterprise: Option<EnterpriseReporter<BoxFuture<'static, ()>>>,
+    pub extra_context: ExtraContext,
 }
 
 pub struct Application {
@@ -63,6 +63,7 @@ impl ApplicationConfig {
     pub async fn from_opts(
         opts: &RootOpts,
         signal_handler: &mut SignalHandler,
+        extra_context: ExtraContext,
     ) -> Result<Self, ExitCode> {
         let config_paths = opts.config_paths_with_formats();
 
@@ -79,12 +80,13 @@ impl ApplicationConfig {
         )
         .await?;
 
-        Self::from_config(config_paths, config).await
+        Self::from_config(config_paths, config, extra_context).await
     }
 
     pub async fn from_config(
         config_paths: Vec<ConfigPath>,
         config: Config,
+        extra_context: ExtraContext,
     ) -> Result<Self, ExitCode> {
         // This is ugly, but needed to allow `config` to be mutable for building the enterprise
         // features, but also avoid a "does not need to be mutable" warning when the enterprise
@@ -97,9 +99,10 @@ impl ApplicationConfig {
         #[cfg(feature = "api")]
         let api = config.api;
 
-        let (topology, graceful_crash_receiver) = RunningTopology::start_init_validated(config)
-            .await
-            .ok_or(exitcode::CONFIG)?;
+        let (topology, graceful_crash_receiver) =
+            RunningTopology::start_init_validated(config, extra_context.clone())
+                .await
+                .ok_or(exitcode::CONFIG)?;
 
         Ok(Self {
             config_paths,
@@ -110,11 +113,18 @@ impl ApplicationConfig {
             api,
             #[cfg(feature = "enterprise")]
             enterprise,
+            extra_context,
         })
     }
 
-    pub async fn add_internal_config(&mut self, config: Config) -> Result<(), ExitCode> {
-        let Some((topology, _)) = RunningTopology::start_init_validated(config).await else {
+    pub async fn add_internal_config(
+        &mut self,
+        config: Config,
+        extra_context: ExtraContext,
+    ) -> Result<(), ExitCode> {
+        let Some((topology, _)) =
+            RunningTopology::start_init_validated(config, extra_context).await
+        else {
             return Err(exitcode::CONFIG);
         };
         self.internal_topologies.push(topology);
@@ -157,28 +167,34 @@ impl ApplicationConfig {
 }
 
 impl Application {
-    pub fn run() -> ExitStatus {
-        let (runtime, app) = Self::prepare_start().unwrap_or_else(|code| std::process::exit(code));
+    pub fn run(extra_context: ExtraContext) -> ExitStatus {
+        let (runtime, app) =
+            Self::prepare_start(extra_context).unwrap_or_else(|code| std::process::exit(code));
 
         runtime.block_on(app.run())
     }
 
-    pub fn prepare_start() -> Result<(Runtime, StartedApplication), ExitCode> {
-        Self::prepare()
+    pub fn prepare_start(
+        extra_context: ExtraContext,
+    ) -> Result<(Runtime, StartedApplication), ExitCode> {
+        Self::prepare(extra_context)
             .and_then(|(runtime, app)| app.start(runtime.handle()).map(|app| (runtime, app)))
     }
 
-    pub fn prepare() -> Result<(Runtime, Self), ExitCode> {
+    pub fn prepare(extra_context: ExtraContext) -> Result<(Runtime, Self), ExitCode> {
         let opts = Opts::get_matches().map_err(|error| {
             // Printing to stdout/err can itself fail; ignore it.
             _ = error.print();
             exitcode::USAGE
         })?;
 
-        Self::prepare_from_opts(opts)
+        Self::prepare_from_opts(opts, extra_context)
     }
 
-    pub fn prepare_from_opts(opts: Opts) -> Result<(Runtime, Self), ExitCode> {
+    pub fn prepare_from_opts(
+        opts: Opts,
+        extra_context: ExtraContext,
+    ) -> Result<(Runtime, Self), ExitCode> {
         init_global(!opts.root.openssl_no_probe);
 
         let color = opts.root.color.use_color();
@@ -207,6 +223,7 @@ impl Application {
         let config = runtime.block_on(ApplicationConfig::from_opts(
             &opts.root,
             &mut signals.handler,
+            extra_context.clone(),
         ))?;
 
         Ok((
@@ -241,6 +258,7 @@ impl Application {
             require_healthy: root_opts.require_healthy,
             #[cfg(feature = "enterprise")]
             enterprise_reporter: config.enterprise,
+            extra_context: config.extra_context,
         });
 
         Ok(StartedApplication {
@@ -447,21 +465,7 @@ fn get_log_levels(default: &str) -> String {
                 log
             })
         })
-        .unwrap_or_else(|_| match default {
-            "off" => "off".to_owned(),
-            level => [
-                format!("vector={}", level),
-                format!("codec={}", level),
-                format!("vrl={}", level),
-                format!("file_source={}", level),
-                format!("tower_limit={}", level),
-                format!("rdkafka={}", level),
-                format!("buffers={}", level),
-                format!("lapin={}", level),
-                format!("kube={}", level),
-            ]
-            .join(","),
-        })
+        .unwrap_or_else(|_| default.into())
 }
 
 pub fn build_runtime(threads: Option<usize>, thread_name: &str) -> Result<Runtime, ExitCode> {

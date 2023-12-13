@@ -1,13 +1,10 @@
-use crate::event::Event;
-use crate::sinks::pulsar::config::PulsarSinkConfig;
-use std::collections::BTreeMap;
+use bytes::Bytes;
 use vector_lib::configurable::component::GenerateConfig;
 use vector_lib::lookup::lookup_v2::OptionalTargetPath;
-use vrl::value::Value;
+use vrl::value::{ObjectMap, Value};
 
-use bytes::Bytes;
-
-use crate::event::LogEvent;
+use crate::event::{Event, LogEvent};
+use crate::sinks::pulsar::config::PulsarSinkConfig;
 
 #[test]
 fn generate_config() {
@@ -18,9 +15,9 @@ fn generate_config() {
 fn pulsar_get_headers() {
     let properties_key = OptionalTargetPath::try_from("properties".to_string())
         .expect("unable to parse OptionalTargetPath");
-    let mut property_values = BTreeMap::new();
-    property_values.insert("a-key".to_string(), Value::Bytes(Bytes::from("a-value")));
-    property_values.insert("b-key".to_string(), Value::Bytes(Bytes::from("b-value")));
+    let mut property_values = ObjectMap::new();
+    property_values.insert("a-key".into(), Value::Bytes(Bytes::from("a-value")));
+    property_values.insert("b-key".into(), Value::Bytes(Bytes::from("b-value")));
 
     let mut event = Event::Log(LogEvent::from("hello"));
     event

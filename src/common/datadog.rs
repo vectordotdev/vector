@@ -1,12 +1,13 @@
+//! Functionality shared between Datadog sources and sinks.
 // Allow unused imports here, since use of these functions will differ depending on the
 // Datadog component type, whether it's used in integration tests, etc.
 #![allow(dead_code)]
 #![allow(unreachable_pub)]
 use serde::{Deserialize, Serialize};
-use vector_lib::event::DatadogMetricOriginMetadata;
+use vector_lib::{event::DatadogMetricOriginMetadata, sensitive_string::SensitiveString};
 
-pub const DD_US_SITE: &str = "datadoghq.com";
-pub const DD_EU_SITE: &str = "datadoghq.eu";
+pub(crate) const DD_US_SITE: &str = "datadoghq.com";
+pub(crate) const DD_EU_SITE: &str = "datadoghq.eu";
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub(crate) struct DatadogSeriesMetric {
@@ -49,4 +50,29 @@ pub(crate) fn get_api_base_endpoint(endpoint: Option<&String>, site: &str) -> St
     endpoint
         .cloned()
         .unwrap_or_else(|| format!("https://api.{}", site))
+}
+
+/// Default settings to use for Datadog components.
+#[derive(Clone, Debug, Derivative)]
+#[derivative(Default)]
+pub struct Options {
+    /// Default Datadog API key to use for Datadog components.
+    ///
+    /// This can also be specified with the `DD_API_KEY` environment variable.
+    #[derivative(Default(value = "default_api_key()"))]
+    pub api_key: Option<SensitiveString>,
+
+    /// Default site to use for Datadog components.
+    ///
+    /// This can also be specified with the `DD_SITE` environment variable.
+    #[derivative(Default(value = "default_site()"))]
+    pub site: String,
+}
+
+fn default_api_key() -> Option<SensitiveString> {
+    std::env::var("DD_API_KEY").ok().map(Into::into)
+}
+
+pub(crate) fn default_site() -> String {
+    std::env::var("DD_SITE").unwrap_or(DD_US_SITE.to_string())
 }
