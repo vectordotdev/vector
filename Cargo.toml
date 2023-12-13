@@ -62,6 +62,7 @@ assets = [
 ]
 license-file = ["target/debian-license.txt"]
 extended-description-file = "target/debian-extended-description.txt"
+recommends = "datadog-signing-keys (>= 1:1.3.1)"
 
 [package.metadata.deb.systemd-units]
 unit-scripts = "distribution/systemd/"
@@ -73,23 +74,18 @@ start = false
 # Though, it seems like aarch64 libc is actually 2.18 and not 2.19
 [package.metadata.deb.variants.armv7-unknown-linux-gnueabihf]
 depends = "libc6 (>= 2.15)"
-recommends = "datadog-signing-keys (>= 1:1.3.1)"
 
 [package.metadata.deb.variants.x86_64-unknown-linux-gnu]
 depends = "libc6 (>= 2.15)"
-recommends = "datadog-signing-keys (>= 1:1.3.1)"
 
 [package.metadata.deb.variants.x86_64-unknown-linux-musl]
 depends = ""
-recommends = "datadog-signing-keys (>= 1:1.3.1)"
 
 [package.metadata.deb.variants.aarch64-unknown-linux-gnu]
 depends = "libc6 (>= 2.18)"
-recommends = "datadog-signing-keys (>= 1:1.3.1)"
 
 [package.metadata.deb.variants.aarch64-unknown-linux-musl]
 depends = ""
-recommends = "datadog-signing-keys (>= 1:1.3.1)"
 
 [workspace]
 members = [
