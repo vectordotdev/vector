@@ -65,6 +65,12 @@ pub struct KinesisSinkBaseConfig {
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     pub acknowledgements: AcknowledgementsConfig,
+
+    /// The log field used as the Kinesis record’s partition key value.
+    ///
+    /// If not specified, a unique partition key is generated for each Kinesis record.
+    #[configurable(metadata(docs::examples = "user_id"))]
+    pub partition_key_field: Option<ConfigValuePath>,
 }
 
 impl KinesisSinkBaseConfig {

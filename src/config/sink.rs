@@ -15,6 +15,7 @@ use vector_lib::{
 };
 
 use super::{id::Inputs, schema, ComponentKey, ProxyConfig, Resource};
+use crate::extra_context::ExtraContext;
 use crate::sinks::{util::UriSerde, Healthcheck};
 
 pub type BoxedSink = Box<dyn SinkConfig>;
@@ -235,7 +236,7 @@ pub trait SinkConfig: DynClone + NamedComponent + core::fmt::Debug + Send + Sync
 
 dyn_clone::clone_trait_object!(SinkConfig);
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct SinkContext {
     pub healthcheck: SinkHealthcheckOptions,
     pub globals: GlobalOptions,
@@ -243,6 +244,7 @@ pub struct SinkContext {
     pub schema: schema::Options,
     pub app_name: String,
     pub app_name_slug: String,
+    pub extra_context: ExtraContext,
 }
 
 impl Default for SinkContext {
@@ -254,6 +256,7 @@ impl Default for SinkContext {
             schema: Default::default(),
             app_name: crate::get_app_name().to_string(),
             app_name_slug: crate::get_slugified_app_name(),
+            extra_context: Default::default(),
         }
     }
 }

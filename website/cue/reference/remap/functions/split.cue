@@ -3,7 +3,7 @@ package metadata
 remap: functions: split: {
 	category: "String"
 	description: """
-		Splits the `value` string via the `pattern`.
+		Splits the `value` string using `pattern`.
 		"""
 
 	arguments: [

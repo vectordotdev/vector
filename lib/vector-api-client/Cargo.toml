@@ -30,7 +30,7 @@ tokio-tungstenite = { version = "0.20.1", default-features = false, features = [
 
 # External libs
 chrono = { version = "0.4.31", default-features = false, features = ["serde"] }
-clap = { version = "4.4.10", default-features = false, features = ["derive"] }
+clap = { version = "4.4.11", default-features = false, features = ["derive"] }
 url = { version = "2.5.0", default-features = false }
 uuid = { version = "1", default-features = false, features = ["serde", "v4"] }
 indoc = { version = "2.0.4", default-features = false }
