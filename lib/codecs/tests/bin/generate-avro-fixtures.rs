@@ -1,4 +1,4 @@
-use apache_avro::{types::Value, Schema};
+use apache_avro::{types::Value, Decimal, Schema};
 use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::io::Write;
@@ -142,6 +142,24 @@ fn generate_avro_test_case_string() {
     generate_test_case(schema, value, "string");
 }
 
+#[allow(unused)]
+fn generate_avro_test_case_fixed() {
+    let schema = r#"
+    {
+        "type": "record",
+        "name": "test",
+        "fields": [
+            {"name": "fixed_field", "type":"fixed", "size": 16}
+        ]
+    }
+    "#;
+    let record = Value::Record(vec![(
+        "fixed_field".into(),
+        Value::Fixed(16, b"1019181716151413".to_vec()),
+    )]);
+    generate_test_case_from_value(schema, record, "fixed");
+}
+
 fn generate_avro_test_case_enum() {
     let schema = r#"
     {
@@ -262,6 +280,66 @@ fn generate_avro_test_case_record() {
     generate_test_case(schema, value, "record");
 }
 
+#[allow(unused)]
+fn generate_avro_test_case_date() {
+    let schema = r#"
+    {
+        "type": "record",
+        "name": "test",
+        "fields": [
+            {"name": "date_field", "type": "int", "logicalType": "date"}
+        ]
+    }
+    "#;
+    #[derive(Debug, Serialize, Deserialize, Clone)]
+    struct Test {
+        date_field: i32,
+    }
+    let value = Test { date_field: 19646 };
+    generate_test_case(schema, value, "date");
+}
+
+fn generate_avro_test_case_decimal_var() {
+    let schema = r#"
+    {
+        "type": "record",
+        "name": "test",
+        "fields": [
+            {"name": "decimal_var_field", "type": "bytes", "logicalType": "decimal","precision": 10,"scale": 3}
+        ]
+    }
+    "#;
+
+    let record = Value::Record(vec![(
+        "decimal_var_field".into(),
+        Value::Decimal(Decimal::from([
+            249, 33, 74, 206, 142, 64, 190, 170, 17, 153,
+        ])),
+    )]);
+    generate_test_case_from_value(schema, record, "decimal_var");
+}
+
+#[allow(unused)]
+fn generate_avro_test_case_time_millis() {
+    let schema = r#"
+    {
+        "type": "record",
+        "name": "test",
+        "fields": [
+            {"name": "time_millis_field", "type": "int", "logicalType": "time-millis"}
+        ]
+    }
+    "#;
+    #[derive(Debug, Serialize, Deserialize, Clone)]
+    struct Test {
+        time_millis_field: i32,
+    }
+    let value = Test {
+        time_millis_field: 59820123,
+    };
+    generate_test_case(schema, value, "time_millis");
+}
+
 fn generate_avro_test_case_time_micros() {
     let schema = r#"
     {
@@ -280,6 +358,48 @@ fn generate_avro_test_case_time_micros() {
         time_micros_field: 59820123456i64,
     };
     generate_test_case(schema, value, "time_micros");
+}
+
+#[allow(unused)]
+fn generate_avro_test_case_timestamp_millis() {
+    let schema = r#"
+    {
+        "type": "record",
+        "name": "test",
+        "fields": [
+            {"name": "timestamp_millis_field", "type": "long", "logicalType": "timestamp-millis"}
+        ]
+    }
+    "#;
+    #[derive(Debug, Serialize, Deserialize, Clone)]
+    struct Test {
+        timestamp_millis_field: i64,
+    }
+    let value = Test {
+        timestamp_millis_field: 1697445291056i64,
+    };
+    generate_test_case(schema, value, "timestamp_millis");
+}
+
+#[allow(unused)]
+fn generate_avro_test_case_timestamp_micros() {
+    let schema = r#"
+    {
+        "type": "record",
+        "name": "test",
+        "fields": [
+            {"name": "timestamp_micros_field", "type": "long", "logicalType": "timestamp-micros"}
+        ]
+    }
+    "#;
+    #[derive(Debug, Serialize, Deserialize, Clone)]
+    struct Test {
+        timestamp_micros_field: i64,
+    }
+    let value = Test {
+        timestamp_micros_field: 1697445291056567i64,
+    };
+    generate_test_case(schema, value, "timestamp_micros");
 }
 
 fn generate_avro_test_case_uuid() {
