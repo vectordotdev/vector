@@ -103,7 +103,7 @@ pub struct AvroDeserializerOptions {
     ///
     /// This seems to be an issue when converting Vrl back into avro.
     /// Example:
-    /// timestamp_micros and timestamp_millis are longs in Avro but maped to timestamps for Vrl,
+    /// timestamp_micros and timestamp_millis are longs in Avro but converted to timestamps for Vrl,
     /// so when trying to change them back to Avro they fail with unexpected type.
     /// This should be fixable by extending encode in `lib/codecs/src/encoding/format/avro.rs`
     /// to know the avro schema at serialization time.
