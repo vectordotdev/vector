@@ -95,11 +95,7 @@ pub struct AvroDeserializerOptions {
     /// * `Decimal`
     /// * `Duration`
     /// * `Fixed`
-    /// * `LocalTimestampMicros`
-    /// * `LocalTimestampMillis`
     /// * `TimeMillis`
-    /// * `TimestampMicros`
-    /// * `TimestampMillis`
     ///
     #[configurable(metadata(
         docs::examples = r#"{ "type": "record", "name": "log", "fields": [{ "name": "message", "type": "string" }] }"#,
