@@ -314,7 +314,7 @@ jobs:
             vector:${{ needs.compute-metadata.outputs.baseline-tag }}
 
       - name: Upload image as artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: baseline-image
           path: "${{ runner.temp }}/baseline-image.tar"
@@ -351,7 +351,7 @@ jobs:
             vector:${{ needs.compute-metadata.outputs.comparison-tag }}
 
       - name: Upload image as artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: comparison-image
           path: "${{ runner.temp }}/comparison-image.tar"
@@ -516,7 +516,7 @@ jobs:
             --target-name vector \
             --submission-metadata ${{ runner.temp }}/submission-metadata
 
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: vector-submission-metadata
           path: ${{ runner.temp }}/submission-metadata
@@ -730,7 +730,7 @@ jobs:
           body: ${{ steps.read-analysis.outputs.content }}
 
       - name: Upload regression report to artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: capture-artifacts
           path: ${{ runner.temp }}/outputs/*
