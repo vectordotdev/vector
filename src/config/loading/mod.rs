@@ -8,6 +8,7 @@ use std::{
     fmt::Debug,
     fs::{File, ReadDir},
     path::{Path, PathBuf},
+    sync::atomic::{AtomicBool, Ordering},
     sync::Mutex,
 };
 
@@ -26,6 +27,18 @@ use super::{
 use crate::{config::ProviderConfig, signal};
 
 pub static CONFIG_PATHS: Mutex<Vec<ConfigPath>> = Mutex::new(Vec::new());
+
+// Technically, this global should be a parameter to the `config::vars::interpolate` function, which
+// is passed in from its caller `prepare_input` below, etc. However:
+//
+// 1. That ended up needing to have the parameter added to literally dozens of functions, as
+// `prepare_input` has long chains of callers.
+//
+// 2. This variable is only ever set in one place, at program global startup from the command line.
+//
+// 3. This setting is itended to be transitional, anyways, and is marked as deprecated to be removed
+// in a future version after strict mode becomes the default.
+pub static STRICT_ENV_VARS: AtomicBool = AtomicBool::new(false);
 
 pub(super) fn read_dir<P: AsRef<Path> + Debug>(path: P) -> Result<ReadDir, Vec<String>> {
     path.as_ref()
@@ -293,7 +306,11 @@ pub fn prepare_input<R: std::io::Read>(mut input: R) -> Result<(String, Vec<Stri
             vars.insert("HOSTNAME".into(), hostname);
         }
     }
-    vars::interpolate(&source_string, &vars)
+    vars::interpolate(
+        &source_string,
+        &vars,
+        STRICT_ENV_VARS.load(Ordering::Relaxed),
+    )
 }
 
 pub fn load<R: std::io::Read, T>(input: R, format: Format) -> Result<(T, Vec<String>), Vec<String>>
