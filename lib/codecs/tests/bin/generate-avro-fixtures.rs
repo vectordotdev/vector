@@ -361,7 +361,6 @@ fn generate_avro_test_case_time_micros() {
     generate_test_case(schema, value, "time_micros");
 }
 
-#[allow(unused)]
 fn generate_avro_test_case_timestamp_millis() {
     let schema = r#"
     {
@@ -382,7 +381,6 @@ fn generate_avro_test_case_timestamp_millis() {
     generate_test_case(schema, value, "timestamp_millis");
 }
 
-#[allow(unused)]
 fn generate_avro_test_case_timestamp_micros() {
     let schema = r#"
     {
@@ -401,6 +399,46 @@ fn generate_avro_test_case_timestamp_micros() {
         timestamp_micros_field: 1697445291056567i64,
     };
     generate_test_case(schema, value, "timestamp_micros");
+}
+
+fn generate_avro_test_case_local_timestamp_millis() {
+    let schema = r#"
+    {
+        "type": "record",
+        "name": "test",
+        "fields": [
+            {"name": "local_timestamp_millis_field", "type": "long", "logicalType": "local-timestamp-millis"}
+        ]
+    }
+    "#;
+    #[derive(Debug, Serialize, Deserialize, Clone)]
+    struct Test {
+        local_timestamp_millis_field: i64,
+    }
+    let value = Test {
+        local_timestamp_millis_field: 1697445291056i64,
+    };
+    generate_test_case(schema, value, "local-timestamp_millis");
+}
+
+fn generate_avro_test_case_local_timestamp_micros() {
+    let schema = r#"
+    {
+        "type": "record",
+        "name": "test",
+        "fields": [
+            {"name": "local_timestamp_micros_field", "type": "long", "logicalType": "local-timestamp-micros"}
+        ]
+    }
+    "#;
+    #[derive(Debug, Serialize, Deserialize, Clone)]
+    struct Test {
+        local_timestamp_micros_field: i64,
+    }
+    let value = Test {
+        local_timestamp_micros_field: 1697445291056567i64,
+    };
+    generate_test_case(schema, value, "local-timestamp_micros");
 }
 
 fn generate_avro_test_case_uuid() {
@@ -448,18 +486,22 @@ fn main() {
     if !PathBuf::from(FIXTURES_PATH).is_dir() {
         panic!("dir {FIXTURES_PATH} not exist\n");
     }
+    generate_avro_test_case_array();
     generate_avro_test_case_boolean();
+    generate_avro_test_case_bytes();
+    generate_avro_test_case_double();
+    generate_avro_test_case_enum();
+    generate_avro_test_case_float();
     generate_avro_test_case_int();
     generate_avro_test_case_long();
-    generate_avro_test_case_float();
-    generate_avro_test_case_double();
-    generate_avro_test_case_bytes();
-    generate_avro_test_case_string();
-    generate_avro_test_case_enum();
-    generate_avro_test_case_union();
-    generate_avro_test_case_array();
     generate_avro_test_case_map();
     generate_avro_test_case_record();
+    generate_avro_test_case_string();
     generate_avro_test_case_time_micros();
+    generate_avro_test_case_timestamp_micros();
+    generate_avro_test_case_timestamp_millis();
+    generate_avro_test_case_local_timestamp_micros();
+    generate_avro_test_case_local_timestamp_millis();
+    generate_avro_test_case_union();
     generate_avro_test_case_uuid();
 }

@@ -101,13 +101,6 @@ pub struct AvroDeserializerOptions {
     /// * `TimestampMicros`
     /// * `TimestampMillis`
     ///
-    /// This seems to be an issue when converting Vrl back into avro.
-    /// Example:
-    /// timestamp_micros and timestamp_millis are longs in Avro but converted to timestamps for Vrl,
-    /// so when trying to change them back to Avro they fail with unexpected type.
-    /// This should be fixable by extending encode in `lib/codecs/src/encoding/format/avro.rs`
-    /// to know the avro schema at serialization time.
-    /// [See comment here](https://github.com/vectordotdev/vector/pull/19342#discussion_r1424215373)
     #[configurable(metadata(
         docs::examples = r#"{ "type": "record", "name": "log", "fields": [{ "name": "message", "type": "string" }] }"#,
         docs::additional_props_description = r#"Supports most avro data types, unsupported data types includes
@@ -204,25 +197,25 @@ pub fn try_from(value: AvroValue) -> vector_common::Result<VrlValue> {
         AvroValue::Boolean(boolean) => Ok(VrlValue::from(boolean)),
         AvroValue::Bytes(bytes) => Ok(VrlValue::from(bytes)),
         AvroValue::Date(_) => Err(vector_common::Error::from(
-                "AvroValue::Date is not supported"
-            )) ,
+            "AvroValue::Date is not supported",
+        )),
         AvroValue::Decimal(_) => Err(vector_common::Error::from(
-                "AvroValue::Decimal is not supported"
-            )) ,
+            "AvroValue::Decimal is not supported",
+        )),
         AvroValue::Double(double) => Ok(VrlValue::from_f64_or_zero(double)),
-        AvroValue::Duration(_) => Err(
-            vector_common::Error::from("AvroValue::Duration is not supported"),
-        ),
+        AvroValue::Duration(_) => Err(vector_common::Error::from(
+            "AvroValue::Duration is not supported",
+        )),
         AvroValue::Enum(_, string) => Ok(VrlValue::from(string)),
-        AvroValue::Fixed(_, _) => Err(
-            vector_common::Error::from("AvroValue::Fixed is not supported"),
-        ),
+        AvroValue::Fixed(_, _) => Err(vector_common::Error::from(
+            "AvroValue::Fixed is not supported",
+        )),
         AvroValue::Float(float) => Ok(VrlValue::from_f64_or_zero(float as f64)),
         AvroValue::Int(int) => Ok(VrlValue::from(int)),
         AvroValue::Long(long) => Ok(VrlValue::from(long)),
         AvroValue::Map(items) => items
             .into_iter()
-            .map(|(key, value)| try_from(value).map(|v| (KeyString::from(key) , v)))
+            .map(|(key, value)| try_from(value).map(|v| (KeyString::from(key), v)))
             .collect::<Result<Vec<_>, _>>()
             .map(|v| VrlValue::Object(v.into_iter().collect())),
         AvroValue::Null => Ok(VrlValue::Null),
@@ -233,17 +226,15 @@ pub fn try_from(value: AvroValue) -> vector_common::Result<VrlValue> {
             .map(|v| VrlValue::Object(v.into_iter().collect())),
         AvroValue::String(string) => Ok(VrlValue::from(string)),
         AvroValue::TimeMicros(time_micros) => Ok(VrlValue::from(time_micros)),
-        AvroValue::TimeMillis(_) =>  Err(
-            vector_common::Error::from("AvroValue::TimeMillis is not supported"),
-        ),
-        AvroValue::TimestampMicros(_) | AvroValue::TimestampMillis(_) => Err(
-            vector_common::Error::from("AvroValue::TimestampMillis and AvroValue::TimestampMicros is not supported"),
-        ),
+        AvroValue::TimeMillis(_) => Err(vector_common::Error::from(
+            "AvroValue::TimeMillis is not supported",
+        )),
+        AvroValue::TimestampMicros(ts_micros) => Ok(VrlValue::from(ts_micros)),
+        AvroValue::TimestampMillis(ts_millis) => Ok(VrlValue::from(ts_millis)),
         AvroValue::Union(_, v) => try_from(*v),
         AvroValue::Uuid(uuid) => Ok(VrlValue::from(uuid.as_hyphenated().to_string())),
-        AvroValue::LocalTimestampMillis(_) | AvroValue::LocalTimestampMicros(_) => Err(
-            vector_common::Error::from("AvroValue::LocalTimestampMillis and AvroValue::LocalTimestampMicros is not supported"),
-        ),
+        AvroValue::LocalTimestampMillis(ts_millis) => Ok(VrlValue::from(ts_millis)),
+        AvroValue::LocalTimestampMicros(ts_micros) => Ok(VrlValue::from(ts_micros)),
     }
 }
 
