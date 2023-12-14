@@ -247,7 +247,7 @@ releases: "0.34.0": {
 
 				- `grpc_server_messages_received_total`
 				- `grpc_server_messages_sent_total`
-				- `grpc_server_handler_duration_seconds
+				- `grpc_server_handler_duration_seconds`
 				"""
 			pr_numbers: [18887]
 		},
