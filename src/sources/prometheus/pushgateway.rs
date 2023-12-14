@@ -201,7 +201,22 @@ fn decode_label_pair(k: &str, v: &str) -> Result<(String, String), ErrorMessage>
         return Ok((stripped_key.to_owned(), "".to_owned()));
     }
 
-    let decoded_bytes = BASE64_URL_SAFE.decode(v).map_err(|_| {
+    // The Prometheus Pushgateway has a fairly permissive base64 implementation
+    // that allows padding to be missing. We need to fake that by adding in
+    // any missing padding before we pass the value to the base64 decoder.
+    //
+    // This is documented, as examples in their README don't use padding:
+    //
+    // https://github.com/prometheus/pushgateway/blob/ec7afda4eef288bd9b9c43d063e4df54c8961272/README.md#url
+    let missing_padding = v.len() % 4;
+    let padded_value = if missing_padding == 0 {
+        v.to_owned()
+    } else {
+        let padding = "=".repeat(missing_padding);
+        v.to_owned() + &padding
+    };
+
+    let decoded_bytes = BASE64_URL_SAFE.decode(padded_value).map_err(|_| {
         ErrorMessage::new(
             http::StatusCode::BAD_REQUEST,
             format!("Grouping key invalid - invalid base64 value for key {}: {}", k, v),
@@ -262,6 +277,19 @@ mod test {
     #[test]
     fn test_parse_path_with_base64_segment() {
         let path = "/metrics/job/foo/instance@base64/YmFyL2Jheg==";
+        let expected: Vec<_> = vec![("job", "foo"), ("instance", "bar/baz")]
+            .into_iter()
+            .map(|(k, v)| (k.to_owned(), v.to_owned()))
+            .collect();
+        let actual = parse_path_labels(path);
+
+        assert!(actual.is_ok());
+        assert_eq!(actual.unwrap(), expected);
+    }
+
+    #[test]
+    fn test_parse_path_with_base64_segment_missing_padding() {
+        let path = "/metrics/job/foo/instance@base64/YmFyL2Jheg";
         let expected: Vec<_> = vec![("job", "foo"), ("instance", "bar/baz")]
             .into_iter()
             .map(|(k, v)| (k.to_owned(), v.to_owned()))
