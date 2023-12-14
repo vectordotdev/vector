@@ -289,7 +289,7 @@ mod test {
 
     #[test]
     fn test_parse_path_with_base64_segment_missing_padding() {
-        let path = "/metrics/job/foo/instance@base64/YmFyL2Jheg"; // cspell:disable-line
+        let path = "/metrics/job/foo/instance@base64/YmFyL2Jheg";
         let expected: Vec<_> = vec![("job", "foo"), ("instance", "bar/baz")]
             .into_iter()
             .map(|(k, v)| (k.to_owned(), v.to_owned()))
