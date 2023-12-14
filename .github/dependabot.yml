@@ -65,3 +65,8 @@ updates:
       - "domain: ci"
     commit-message:
       prefix: "chore(ci)"
+    groups:
+      artifact:
+        patterns:
+        - "actions/download-artifact"
+        - "actions/upload-artifact"
