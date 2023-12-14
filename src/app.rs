@@ -16,8 +16,6 @@ use crate::config::enterprise::{
     EnterpriseReporter,
 };
 use crate::extra_context::ExtraContext;
-#[cfg(not(feature = "enterprise-tests"))]
-use crate::metrics;
 #[cfg(feature = "api")]
 use crate::{api, internal_events::ApiStarted};
 use crate::{
@@ -195,7 +193,7 @@ impl Application {
         opts: Opts,
         extra_context: ExtraContext,
     ) -> Result<(Runtime, Self), ExitCode> {
-        init_global(!opts.root.openssl_no_probe);
+        opts.root.init_global();
 
         let color = opts.root.color.use_color();
 
@@ -443,15 +441,6 @@ impl FinishedApplication {
             exitcode::OK
         })
     }
-}
-
-pub fn init_global(openssl_probe: bool) {
-    if openssl_probe {
-        openssl_probe::init_ssl_cert_env_vars();
-    }
-
-    #[cfg(not(feature = "enterprise-tests"))]
-    metrics::init_global().expect("metrics initialization failed");
 }
 
 fn get_log_levels(default: &str) -> String {
