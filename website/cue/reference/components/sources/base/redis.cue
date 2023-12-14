@@ -29,10 +29,11 @@ base: components: sources: redis: configuration: {
 						description: """
 																The Avro schema definition.
 																Please note that the following [`apache_avro::types::Value`] variants are currently *not* supported:
+																* `Date`
 																* `Decimal`
 																* `Duration`
-																* `LocalTimestampMillis`
-																* `LocalTimestampMicros`
+																* `Fixed`
+																* `TimeMillis`
 																"""
 						required: true
 						type: string: examples: ["{ \"type\": \"record\", \"name\": \"log\", \"fields\": [{ \"name\": \"message\", \"type\": \"string\" }] }"]

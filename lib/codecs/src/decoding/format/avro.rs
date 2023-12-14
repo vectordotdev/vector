@@ -96,7 +96,6 @@ pub struct AvroDeserializerOptions {
     /// * `Duration`
     /// * `Fixed`
     /// * `TimeMillis`
-    ///
     #[configurable(metadata(
         docs::examples = r#"{ "type": "record", "name": "log", "fields": [{ "name": "message", "type": "string" }] }"#,
         docs::additional_props_description = r#"Supports most avro data types, unsupported data types includes
