@@ -1,3 +1,16 @@
+//! A metrics source that emulates the behaviour of a Prometheus Pushgateway.
+//!
+//! The protocol
+//! [is described](https://github.com/prometheus/pushgateway/blob/master/README.md)
+//! in the original Pushgateway repo, though there are some important caveats
+//! to our implementation:
+//!
+//!   - We only support `POST` requests, not `PUT`, as the semantics of `PUT`
+//!     requests in the spec aren't possible to replicate within Vector.
+//!   - We don't support protobuf requests, only the Prometheus text format.
+//!   - Only counters and histograms can be aggregated as there is no meaningful
+//!     way to aggregate gauges or summaries.
+
 use base64::prelude::BASE64_URL_SAFE;
 use base64::Engine;
 use std::{collections::HashMap, net::SocketAddr};
