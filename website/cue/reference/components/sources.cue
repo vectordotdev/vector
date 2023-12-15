@@ -176,6 +176,11 @@ components: sources: [Name=string]: {
 								type: string: {
 									default: "bytes"
 									enum: {
+										avro: """
+											Decodes the raw bytes as an [Apache Avro][apache_avro] record.
+
+											[apache_avro]: https://avro.apache.org/
+											"""
 										bytes: "Uses the raw bytes as-is."
 										json: """
 											Decodes the raw bytes as [JSON][json].
