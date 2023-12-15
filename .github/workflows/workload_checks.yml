@@ -138,7 +138,7 @@ jobs:
                 --tags smp_status=nightly,client_team="vector",tag_date="${CURRENT_DATE}" \
                 --submission-metadata ${{ runner.temp }}/submission-metadata
 
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: vector-submission-metadata
           path: ${{ runner.temp }}/submission-metadata
