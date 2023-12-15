@@ -127,6 +127,10 @@ pub struct ChronicleUnstructuredConfig {
     #[configurable(metadata(docs::examples = "c8c65bfa-5f2c-42d4-9189-64bb7b939f2c"))]
     pub customer_id: String,
 
+    /// User-configured environment namespace to identify the data domain the logs originated from.
+    #[configurable(metadata(docs::examples = "production"))]
+    pub namespace: String,
+
     #[serde(flatten)]
     pub auth: GcpAuthConfig,
 
@@ -167,6 +171,7 @@ impl GenerateConfig for ChronicleUnstructuredConfig {
         toml::from_str(indoc! {r#"
             credentials_path = "/path/to/credentials.json"
             customer_id = "customer_id"
+            namespace = "namespace"
             log_type = "log_type"
             encoding.codec = "text"
         "#})
@@ -303,6 +308,7 @@ impl MetaDescriptive for ChronicleRequest {
 #[derive(Clone, Debug)]
 struct ChronicleEncoder {
     customer_id: String,
+    namespace: String,
     encoder: codecs::Encoder<()>,
     transformer: codecs::Transformer,
 }
@@ -349,6 +355,7 @@ impl Encoder<(String, Vec<Event>)> for ChronicleEncoder {
 
         let json = json!({
             "customer_id": self.customer_id,
+            "namespace": self.namespace,
             "log_type": partition_key,
             "entries": events,
         });
@@ -434,6 +441,7 @@ impl ChronicleRequestBuilder {
         let encoder = crate::codecs::Encoder::<()>::new(serializer);
         let encoder = ChronicleEncoder {
             customer_id: config.customer_id.clone(),
+            namespace: config.namespace.clone(),
             encoder,
             transformer,
         };
@@ -535,6 +543,7 @@ mod integration_tests {
             indoc! { r#"
              endpoint = "{}"
              customer_id = "customer id"
+             namespace = "namespace"
              credentials_path = "{}"
              log_type = "{}"
              encoding.codec = "text"
@@ -622,6 +631,7 @@ mod integration_tests {
     #[derive(Clone, Debug, Deserialize, Serialize)]
     pub struct Log {
         customer_id: String,
+        namespace: String,
         log_type: String,
         log_text: String,
         ts_rfc3339: String,
