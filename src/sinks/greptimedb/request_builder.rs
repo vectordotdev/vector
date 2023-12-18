@@ -97,7 +97,7 @@ pub(super) fn metric_to_insert_request(metric: Metric) -> RowInsertRequest {
         } => {
             encode_histogram(buckets.as_ref(), &mut schema, &mut columns);
             encode_f64_value("count", *count as f64, &mut schema, &mut columns);
-            encode_f64_value("sum", *sum as f64, &mut schema, &mut columns);
+            encode_f64_value("sum", *sum, &mut schema, &mut columns);
         }
         MetricValue::AggregatedSummary {
             quantiles,
@@ -106,7 +106,7 @@ pub(super) fn metric_to_insert_request(metric: Metric) -> RowInsertRequest {
         } => {
             encode_quantiles(quantiles.as_ref(), &mut schema, &mut columns);
             encode_f64_value("count", *count as f64, &mut schema, &mut columns);
-            encode_f64_value("sum", *sum as f64, &mut schema, &mut columns);
+            encode_f64_value("sum", *sum, &mut schema, &mut columns);
         }
         MetricValue::Sketch { sketch } => {
             let MetricSketch::AgentDDSketch(sketch) = sketch;
