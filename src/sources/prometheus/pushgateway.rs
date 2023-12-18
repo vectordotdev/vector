@@ -17,11 +17,12 @@ use std::{collections::HashMap, net::SocketAddr};
 
 use bytes::Bytes;
 use itertools::Itertools;
-use warp::http::HeaderMap;
 use vector_lib::config::LogNamespace;
 use vector_lib::configurable::configurable_component;
+use warp::http::HeaderMap;
 
 use super::parser;
+use crate::http::KeepaliveConfig;
 use crate::{
     config::{
         GenerateConfig, SourceAcknowledgementsConfig, SourceConfig, SourceContext, SourceOutput,
@@ -34,7 +35,6 @@ use crate::{
     },
     tls::TlsEnableableConfig,
 };
-use crate::http::KeepaliveConfig;
 
 /// Configuration for the `prometheus_pushgateway` source.
 #[configurable_component(source(
@@ -233,14 +233,20 @@ fn decode_label_pair(k: &str, v: &str) -> Result<(String, String), ErrorMessage>
     let decoded_bytes = BASE64_URL_SAFE.decode(padded_value).map_err(|_| {
         ErrorMessage::new(
             http::StatusCode::BAD_REQUEST,
-            format!("Grouping key invalid - invalid base64 value for key {}: {}", k, v),
+            format!(
+                "Grouping key invalid - invalid base64 value for key {}: {}",
+                k, v
+            ),
         )
     })?;
 
     let decoded = String::from_utf8(decoded_bytes).map_err(|_| {
         ErrorMessage::new(
             http::StatusCode::BAD_REQUEST,
-            format!("Grouping key invalid - invalid UTF-8 in decoded base64 value for key {}", k),
+            format!(
+                "Grouping key invalid - invalid UTF-8 in decoded base64 value for key {}",
+                k
+            ),
         )
     })?;
 

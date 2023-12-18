@@ -21,7 +21,8 @@ fn utc_timestamp(timestamp: Option<i64>, default: DateTime<Utc>) -> DateTime<Utc
 
 #[cfg(any(test, feature = "sources-prometheus-scrape"))]
 pub(super) fn parse_text(packet: &str) -> Result<Vec<Event>, ParserError> {
-    vector_lib::prometheus::parser::parse_text(packet).map(|group| reparse_groups(group, vec![], false))
+    vector_lib::prometheus::parser::parse_text(packet)
+        .map(|group| reparse_groups(group, vec![], false))
 }
 
 #[cfg(any(test, feature = "sources-prometheus-pushgateway"))]
@@ -36,7 +37,8 @@ pub(super) fn parse_text_with_overrides(
 
 #[cfg(feature = "sources-prometheus-remote-write")]
 pub(super) fn parse_request(request: proto::WriteRequest) -> Result<Vec<Event>, ParserError> {
-    vector_lib::prometheus::parser::parse_request(request).map(|group| reparse_groups(group, vec![], false))
+    vector_lib::prometheus::parser::parse_request(request)
+        .map(|group| reparse_groups(group, vec![], false))
 }
 
 fn reparse_groups(
