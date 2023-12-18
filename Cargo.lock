@@ -2209,7 +2209,7 @@ dependencies = [
  "futures-core",
  "prost 0.12.3",
  "prost-types 0.12.3",
- "tonic 0.10.2",
+ "tonic",
  "tracing-core 0.1.32",
 ]
 
@@ -2231,7 +2231,7 @@ dependencies = [
  "thread_local",
  "tokio",
  "tokio-stream",
- "tonic 0.10.2",
+ "tonic",
  "tracing 0.1.40",
  "tracing-core 0.1.32",
  "tracing-subscriber",
@@ -3682,19 +3682,21 @@ dependencies = [
 [[package]]
 name = "greptime-proto"
 version = "0.1.0"
-source = "git+https://github.com/GreptimeTeam/greptime-proto.git?tag=0.2.1#4398d20c56d5f7939cc2960789cb1fa7dd18e6fe"
+source = "git+https://github.com/GreptimeTeam/greptime-proto.git?tag=v0.4.1#4306ab645ee55b3f7f2ad3fb7acc5820f967c1aa"
 dependencies = [
- "prost 0.11.9",
+ "prost 0.12.3",
  "serde",
  "serde_json",
- "tonic 0.9.2",
- "tonic-build 0.9.2",
+ "strum",
+ "strum_macros",
+ "tonic",
+ "tonic-build 0.10.2",
 ]
 
 [[package]]
 name = "greptimedb-client"
 version = "0.1.0"
-source = "git+https://github.com/GreptimeTeam/greptimedb-client-rust.git?rev=bc32362adf0df17a41a95bae4221d6d8f1775656#bc32362adf0df17a41a95bae4221d6d8f1775656"
+source = "git+https://github.com/GreptimeTeam/greptimedb-client-rust.git?rev=4cb19ec47eeaf634c451d9ae438dac445a8a3dce#4cb19ec47eeaf634c451d9ae438dac445a8a3dce"
 dependencies = [
  "dashmap",
  "enum_dispatch",
@@ -3702,12 +3704,12 @@ dependencies = [
  "futures-util",
  "greptime-proto",
  "parking_lot",
- "prost 0.11.9",
+ "prost 0.12.3",
  "rand 0.8.5",
  "snafu",
  "tokio",
  "tokio-stream",
- "tonic 0.9.2",
+ "tonic",
  "tonic-build 0.9.2",
  "tower",
 ]
@@ -5985,7 +5987,7 @@ dependencies = [
  "ordered-float 4.2.0",
  "prost 0.12.3",
  "prost-build 0.12.3",
- "tonic 0.10.2",
+ "tonic",
  "tonic-build 0.10.2",
  "vector-core",
  "vector-lookup",
@@ -9105,37 +9107,6 @@ dependencies = [
 
 [[package]]
 name = "tonic"
-version = "0.9.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3082666a3a6433f7f511c7192923fa1fe07c69332d3c6a2e6bb040b569199d5a"
-dependencies = [
- "async-stream",
- "async-trait",
- "axum",
- "base64 0.21.6",
- "bytes 1.5.0",
- "futures-core",
- "futures-util",
- "h2 0.3.22",
- "http 0.2.9",
- "http-body",
- "hyper",
- "hyper-timeout",
- "percent-encoding",
- "pin-project",
- "prost 0.11.9",
- "rustls-pemfile",
- "tokio",
- "tokio-rustls",
- "tokio-stream",
- "tower",
- "tower-layer",
- "tower-service",
- "tracing 0.1.40",
-]
-
-[[package]]
-name = "tonic"
 version = "0.10.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d560933a0de61cf715926b9cac824d4c883c2c43142f787595e48280c40a1d0e"
@@ -9953,7 +9924,7 @@ dependencies = [
  "tokio-tungstenite",
  "tokio-util",
  "toml 0.8.8",
- "tonic 0.10.2",
+ "tonic",
  "tonic-build 0.10.2",
  "tower",
  "tower-http",
@@ -10195,7 +10166,7 @@ dependencies = [
  "tokio-test",
  "tokio-util",
  "toml 0.8.8",
- "tonic 0.10.2",
+ "tonic",
  "tracing 0.1.40",
  "tracing-core 0.1.32",
  "tracing-subscriber",
