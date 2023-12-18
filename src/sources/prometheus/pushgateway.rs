@@ -66,7 +66,8 @@ pub struct PrometheusPushgatewayConfig {
 
     /// Whether to aggregate values across pushes.
     ///
-    /// Applies to all Prometheus metric types except gauges (i.e. counters, histograms, and distributions)
+    /// Only applies to counters and histograms as gauges and summaries can't be
+    /// meaningfully aggregated.
     #[configurable(metadata(docs::examples = true))]
     #[serde(default = "crate::serde::default_false")]
     aggregate_metrics: bool,
