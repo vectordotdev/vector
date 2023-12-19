@@ -1,0 +1,57 @@
+# Configuration for `towncrier` used during release process to auto-generate changelog.
+
+[tool.towncrier]
+directory = "changelog.d"
+filename = "CHANGELOG.md"
+start_string = "<!-- changelog start -->\n"
+underlines = ["", "", ""]
+title_format = "## [{version}]"
+issue_format = "[#{issue}](https://github.com/vectordotdev/vector/pull/{issue})"
+
+# The following configurations specify which fragment "types" are
+# allowed.
+#
+# If a change applies to more than one type, select the one it most
+# applies to. Or, if applicable, multiple changelog fragments can be
+# added for one PR. For example, if a PR includes a breaking change
+# around some feature, but also fixes a bug in the same part of the
+# code but is tangential to the breaking change, a separate
+# fragment can be added to call out the fix.
+
+# A change that is incompatible with prior versions which
+# requires users to make adjustments.
+[[tool.towncrier.type]]
+directory = "breaking"
+name = "Breaking Changes & Upgrade Guide"
+showcontent = true
+
+# A change that has implications for security.
+[[tool.towncrier.type]]
+directory = "security"
+name = "Security"
+showcontent = true
+
+# A change that is introducing a deprecation.
+[[tool.towncrier.type]]
+directory = "deprecated"
+name = "Deprecations"
+showcontent = true
+
+# A change that is introducing a new feature.
+[[tool.towncrier.type]]
+directory = "feature"
+name = "New Features"
+showcontent = true
+
+# A change that is enhancing existing functionality in a user
+# perceivable way.
+[[tool.towncrier.type]]
+directory = "enhanced"
+name = "Enhancements"
+showcontent = true
+
+# A change that is fixing a bug.
+[[tool.towncrier.type]]
+directory = "fixed"
+name = "Fixes"
+showcontent = true

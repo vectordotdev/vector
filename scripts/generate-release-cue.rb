@@ -26,6 +26,7 @@ require_relative "util/version"
 
 ROOT = ".."
 RELEASE_REFERENCE_DIR = File.join(ROOT, "website", "cue", "reference", "releases")
+CHANGELOG_DIR = File.join(ROOT, "changelog.d")
 TYPES = ["chore", "docs", "feat", "fix", "enhancement", "perf"]
 TYPES_THAT_REQUIRE_SCOPES = ["feat", "enhancement", "fix"]
 
@@ -109,6 +110,87 @@ def create_log_file!(current_commits, new_version)
   release_log_path
 end
 
+def generate_changelog!(commits)
+
+  entries = ""
+
+  Dir.glob("#{CHANGELOG_DIR}/*.md") do |fname|
+
+    # Util::Printer.title("#{fname}")
+    if File.basename(fname) == "README.md"
+      next
+    end
+
+    if entries != ""
+      entries += ",\n"
+    end
+
+    # description = File.read(fname)
+    fragment_contents = File.open(fname)
+
+    # add the GitHub username for any fragments
+    # that have an authors field at the end of the
+    # fragment. This is generally used for external
+    # contributor PRs.
+    lines = fragment_contents.to_a
+    last = lines.last
+    contributors = Array.new
+
+    if last.start_with?("authors: ")
+      authors_str = last[9..]
+      authors_str = authors_str.delete(" \t\r\n")
+      authors_arr = authors_str.split(",")
+      authors_arr.each { |author| contributors.push(author) }
+
+      # remove that line from the description
+      lines.pop()
+    end
+
+    description = lines.join("")
+
+    # get the PR number of the changelog fragment.
+    # the fragment type is not used in the Vector release currently.
+    basename = File.basename(fname, "*.md")
+    parts = basename.split(".")
+
+    pr_number = parts[0].to_i
+    pr_numbers = Array(pr_number)
+
+    commit = commits.find { |commit|
+      commit.pr_number == pr_number
+    }
+
+    if commit.nil?
+        Util::Printer.error!("Changelog fragment #{fname} PR number does not match any commit.")
+    end
+
+    scopes = commit.scopes
+    type = commit.type
+
+    entry = "{\n" +
+      "type: #{type.to_json}\n" +
+      "scopes: #{scopes.to_json}\n" +
+      "description: \"\"\"\n" +
+      "#{description}" +
+      "\"\"\"\n" +
+      "pr_numbers: #{pr_numbers.to_json}\n"
+
+    if commit.breaking_change == true
+      entry += "breaking: #{commit.breaking_change.to_json}\n"
+    end
+
+    if contributors.length() > 0
+      entry += "contributors: #{contributors.to_json}\n"
+    end
+
+    entry += "}"
+
+    entries += entry
+  end
+
+  entries
+end
+
 def create_release_file!(new_version)
   release_log_path = "#{RELEASE_REFERENCE_DIR}/#{new_version}.log"
   git_log = Vector::GitLogCommit.from_file!(release_log_path)
@@ -119,6 +201,8 @@ def create_release_file!(new_version)
   if commits.any?
     commits.each(&:validate!)
     cue_commits = commits.collect(&:to_cue_struct).join(",\n    ")
+
+    changelog_entries = generate_changelog!(commits)
 
     if File.exists?(release_reference_path)
       words =
@@ -149,6 +233,10 @@ def create_release_file!(new_version)
             codename: ""
 
             whats_next: []
+
+            changelog: [
+          #{changelog_entries}
+            ]
 
             commits: [
           #{cue_commits}

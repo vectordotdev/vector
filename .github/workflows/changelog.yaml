@@ -1,0 +1,51 @@
+# Changelog
+#
+# Validates that a changelog entry was added.
+# Runs on PRs when:
+#   - openen/re-opened
+#   - new commits pushed
+#   - label is added or removed
+
+name: Changelog
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+jobs:
+  check-changelog:
+    env:
+      PR_HAS_LABEL: ${{ contains( github.event.pull_request.labels.*.name, 'no-changelog') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Get PR comment author
+        id: author
+        uses: tspascoal/get-user-teams-membership@v3
+        with:
+          username: ${{ github.actor }}
+          team: 'Vector'
+          GITHUB_TOKEN: ${{ steps.generate_token.outputs.token }}
+
+      - 
+        env:
+          EXTERN_CONTRIBUTOR: ${{ steps.author.outputs.isTeamMember }}
+        run: |
+          if [[ $PR_HAS_LABEL == 'true' ]] ; then
+            echo "'no-changelog' label detected."
+            exit 0
+          fi
+
+          # helper script needs to reference the main branch to compare against
+          git fetch origin main:refs/remotes/origin/master
+
+          # If the PR author is an external contributor, validate that the
+          # changelog fragments added contain the author line for website rendering.
+          args=""
+          if [[ $PR_HAS_LABEL == 'true' ]] ; then
+            echo "PR author detected to be an external contributor."
+            args="--author"
+          fi
+
+          ./scripts/check_changelog_fragments.sh ${args}
