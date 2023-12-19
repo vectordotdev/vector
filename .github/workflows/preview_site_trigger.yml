@@ -11,7 +11,7 @@ jobs:
       EXCLUDED_BRANCHES: |
         gh-readonly-queue*
         dependabot*
-    if: ${{ ! contains(github.head_ref, env.EXCLUDED_BRANCHES) }}
+    if: ${{ ! contains(github.head_ref, $EXCLUDED_BRANCHES) }}
     steps:
       - name: Echo approval
         run: |
