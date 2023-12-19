@@ -7,11 +7,7 @@ on:
 jobs:
   approval_check:
     runs-on: ubuntu-latest
-    env:
-      EXCLUDED_BRANCHES: |
-        gh-readonly-queue*
-        dependabot*
-    if: ${{ ! contains(github.head_ref, $EXCLUDED_BRANCHES) }}
+    if: ${{ ! contains(github.head_ref, 'dependabot*') && ! contains(github.head_ref, 'gh-readonly-queue*') }}
     steps:
       - name: Echo approval
         run: |
