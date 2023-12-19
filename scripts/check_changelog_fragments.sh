@@ -5,16 +5,16 @@
 # finds an issue with your changelog fragment, you can unstage the fragment
 # from being committed and fix the issue.
 
-OPW_CHANGELOG_DIR="changelog.d"
+CHANGELOG_DIR="changelog.d"
 FRAGMENT_TYPES="breaking|security|deprecated|feature|enhanced|fixed"
 
-if [ ! -d "${OPW_CHANGELOG_DIR}" ]; then
-  echo "No ./${OPW_CHANGELOG_DIR} found. This tool must be invoked from the root of the OPW repo."
+if [ ! -d "${CHANGELOG_DIR}" ]; then
+  echo "No ./${CHANGELOG_DIR} found. This tool must be invoked from the root of the OPW repo."
   exit 1
 fi
 
 # diff-filter=A lists only added files
-ADDED=$(git diff --name-only --diff-filter=A origin/master ${OPW_CHANGELOG_DIR})
+ADDED=$(git diff --name-only --diff-filter=A origin/master ${CHANGELOG_DIR})
 
 if [ $(echo "$ADDED" | grep -c .) -lt 1 ]; then
   echo "No changelog fragments detected"
@@ -61,7 +61,7 @@ while IFS= read -r fname; do
   # contains a properly formatted authors line at the end of the file, generally
   # used for external contributor PRs.
   if [[ $1 == "--authors" ]]; then
-    last=$( tail -n 1 "${OPW_CHANGELOG_DIR}/${fname}" )
+    last=$( tail -n 1 "${CHANGELOG_DIR}/${fname}" )
     if ! [[ "${last}" =~ ^(authors: .*)$ ]]; then
       echo "invalid fragment contents: author option was specified but fragment ${fname} contains no authors."
       exit 1

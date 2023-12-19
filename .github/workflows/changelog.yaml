@@ -2,7 +2,7 @@
 #
 # Validates that a changelog entry was added.
 # Runs on PRs when:
-#   - openen/re-opened
+#   - opened/re-opened
 #   - new commits pushed
 #   - label is added or removed
 
