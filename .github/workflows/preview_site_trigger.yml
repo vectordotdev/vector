@@ -12,7 +12,7 @@ env:
 jobs:
   approval_check:
     runs-on: ubuntu-latest
-    if: ${{ ! contains(github.base_ref, env.EXCLUDED_BRANCHES) }}
+    if: ${{ ! contains(github.head_ref, env.EXCLUDED_BRANCHES) }}
     steps:
       - name: Echo approval
         run: |
