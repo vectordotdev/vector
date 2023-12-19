@@ -9,7 +9,7 @@ CHANGELOG_DIR="changelog.d"
 FRAGMENT_TYPES="breaking|security|deprecated|feature|enhanced|fixed"
 
 if [ ! -d "${CHANGELOG_DIR}" ]; then
-  echo "No ./${CHANGELOG_DIR} found. This tool must be invoked from the root of the OPW repo."
+  echo "No ./${CHANGELOG_DIR} found. This tool must be invoked from the root of the repo."
   exit 1
 fi
 

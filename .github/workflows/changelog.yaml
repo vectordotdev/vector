@@ -44,7 +44,7 @@ jobs:
           fi
 
           # helper script needs to reference the main branch to compare against
-          git fetch origin main:refs/remotes/origin/master
+          git fetch origin master:refs/remotes/origin/master
 
           # If the PR author is an external contributor, validate that the
           # changelog fragments added contain the author line for website rendering.
