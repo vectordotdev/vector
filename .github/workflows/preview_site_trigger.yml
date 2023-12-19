@@ -4,14 +4,13 @@ on:
   pull_request:
     types: [opened, reopened]
 
-env:
-  EXCLUDED_BRANCHES: |
-    gh-readonly-queue*
-    dependabot*
-
 jobs:
   approval_check:
     runs-on: ubuntu-latest
+    env:
+      EXCLUDED_BRANCHES: |
+        gh-readonly-queue*
+        dependabot*
     if: ${{ ! contains(github.head_ref, env.EXCLUDED_BRANCHES) }}
     steps:
       - name: Echo approval
