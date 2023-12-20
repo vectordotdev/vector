@@ -169,7 +169,7 @@ def generate_changelog!(new_version)
 
     # map the fragment type to Vector's semantic types
     # https://github.com/vectordotdev/vector/blob/master/.github/semantic.yml#L13
-    # the type "chore" isn't rendered in the changelog on the webiste currently,
+    # the type "chore" isn't rendered in the changelog on the website currently,
     # but we are mapping "breaking" and "deprecations" to that type, and both of
     # these are handled in the upgrade guide separately.
     type = ""
