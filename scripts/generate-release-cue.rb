@@ -175,13 +175,13 @@ def generate_changelog!(new_version)
     type = ""
     if fragment_type == "breaking"
       type = "chore"
-    elsif fragment_type == "security" or fragment_type == "fixes"
+    elsif fragment_type == "security" or fragment_type == "fix"
       type = "fix"
-    elsif fragment_type == "deprecations"
+    elsif fragment_type == "deprecation"
       type = "chore"
-    elsif fragment_type == "features"
+    elsif fragment_type == "feature"
       type = "feat"
-    elsif fragment_type == "enhancements"
+    elsif fragment_type == "enhancement"
       type = "enhancement"
     else
        Util::Printer.error!("Changelog fragment #{fname} is invalid. Fragment type #{fragment_type} unrecognized.")
