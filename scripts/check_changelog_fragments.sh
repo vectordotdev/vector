@@ -6,7 +6,7 @@
 # from being committed and fix the issue.
 
 CHANGELOG_DIR="changelog.d"
-FRAGMENT_TYPES="breaking|security|deprecations|features|enhancements|fixes"
+FRAGMENT_TYPES="breaking|security|deprecation|feature|enhancement|fix"
 
 if [ ! -d "${CHANGELOG_DIR}" ]; then
   echo "No ./${CHANGELOG_DIR} found. This tool must be invoked from the root of the repo."

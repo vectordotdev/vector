@@ -46,10 +46,10 @@ Filename rules:
 
 - breaking: A change that is incompatible with prior versions which requires users to make adjustments.
 - security: A change that is has implications for security.
-- deprecations: A change that is introducing a deprecation.
-- features: A change that is introducing a new feature.
-- enhancements: A change that is enhancing existing functionality in a user perceivable way.
-- fixes: A change that is fixing a bug.
+- deprecation: A change that is introducing a deprecation.
+- feature: A change that is introducing a new feature.
+- enhancement: A change that is enhancing existing functionality in a user perceivable way.
+- fix: A change that is fixing a bug.
 
 ### Breaking changes
 
