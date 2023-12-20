@@ -6,7 +6,7 @@ generate the project's user facing changelog.
 The tool used to generate the changelog is [towncrier](https://towncrier.readthedocs.io/en/stable/markdown.html).
 
 The configuration file is `changelog.toml`.
-The changelog fragments are are located in `changelog.d/`.
+The changelog fragments are located in `changelog.d/`.
 
 ## Process
 

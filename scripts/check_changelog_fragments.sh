@@ -2,7 +2,7 @@
 
 # This script is intended to run during CI, however it can be run locally by
 # committing changelog fragments before executing the script. If the script
-# finds an issue with your changelog fragment, you can unstage the fragment
+# finds an issue with your changelog fragment, you can un-stage the fragment
 # from being committed and fix the issue.
 
 CHANGELOG_DIR="changelog.d"
