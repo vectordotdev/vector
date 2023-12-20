@@ -3,9 +3,8 @@
 This directory contains changelog "fragments" that are collected during a release to
 generate the project's user facing changelog.
 
-The tool used to generate the changelog is [towncrier](https://towncrier.readthedocs.io/en/stable/markdown.html).
+The conventions used for this changelog logic follow [towncrier](https://towncrier.readthedocs.io/en/stable/markdown.html).
 
-The configuration file is `changelog.toml`.
 The changelog fragments are located in `changelog.d/`.
 
 ## Process
@@ -38,8 +37,13 @@ Filename rules:
 - The first segment (unique_name) should be a unique string related to the change.
   Optionally, if there is a GitHub issue associated with the change, it can be used as a prefix.
   For example `42_very_important_change.breaking.md`, vs `very_important_change.breaking.md`.
-- The type must be one of: breaking|security|deprecations|features|enhancements|fixes.
-  These types are described in more detail in the config file (see `changelog.toml`).
+- The type must be one of:
+    - breaking: A change that is incompatible with prior versions which requires users to make adjustments.
+    - security: A change that is has implications for security.
+    - deprecations: A change that is introducing a deprecation.
+    - features: A change that is introducing a new feature.
+    - enhancements: A change that is enhancing existing functionality in a user perceivable way.
+    - fixes: A change that is fixing a bug.
 - Only the two period delimiters can be used.
 - The file must be markdown.
 
@@ -69,14 +73,3 @@ Here is an example of a changelog fragment that adds a breaking change explanati
     explaining the change has to span multiple lines of text.
 
     It even necessitates a line break. It is a breaking change after all.
-
-This renders in the auto generated changelog as:
-
-    ## [X.X.X]
-
-    ### Breaking Changes & Upgrade Guide
-
-    - This change is so great. It's such a great change that this sentence
-      explaining the change has to span multiple lines of text.
-
-      It even necessitates a line break. It is a breaking change after all.

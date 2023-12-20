@@ -49,7 +49,7 @@ jobs:
           # If the PR author is an external contributor, validate that the
           # changelog fragments added contain the author line for website rendering.
           args=""
-          if [[ $PR_HAS_LABEL == 'true' ]] ; then
+          if [[ $EXTERN_CONTRIBUTOR == 'true' ]] ; then
             echo "PR author detected to be an external contributor."
             args="--author"
           fi

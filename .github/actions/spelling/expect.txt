@@ -978,7 +978,6 @@ Shenzhen
 shiplift
 shortcode
 shortstat
-showcontent
 should've
 shutsdown
 Sichert
@@ -1133,7 +1132,6 @@ toor
 topdir
 topojson
 toproto
-towncrier
 Toxiproxy
 Tpng
 Trauring
