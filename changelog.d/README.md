@@ -34,18 +34,22 @@ rendered as an item in a bulleted list under the "type" of fragment.
 The contents of the file must be valid markdown.
 
 Filename rules:
+
 - The first segment (unique_name) should be a unique string related to the change.
   Optionally, if there is a GitHub issue associated with the change, it can be used as a prefix.
   For example `42_very_important_change.breaking.md`, vs `very_important_change.breaking.md`.
-- The type must be one of:
-    - breaking: A change that is incompatible with prior versions which requires users to make adjustments.
-    - security: A change that is has implications for security.
-    - deprecations: A change that is introducing a deprecation.
-    - features: A change that is introducing a new feature.
-    - enhancements: A change that is enhancing existing functionality in a user perceivable way.
-    - fixes: A change that is fixing a bug.
+- The type must be one of the valid types in [Fragment types](#types)
 - Only the two period delimiters can be used.
 - The file must be markdown.
+
+#### Fragment types {#types}
+
+- breaking: A change that is incompatible with prior versions which requires users to make adjustments.
+- security: A change that is has implications for security.
+- deprecations: A change that is introducing a deprecation.
+- features: A change that is introducing a new feature.
+- enhancements: A change that is enhancing existing functionality in a user perceivable way.
+- fixes: A change that is fixing a bug.
 
 ### Breaking changes
 
