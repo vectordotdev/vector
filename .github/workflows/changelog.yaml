@@ -36,20 +36,20 @@ jobs:
           GITHUB_TOKEN: ${{ steps.generate_token.outputs.token }}
 
       - env:
-          EXTERN_CONTRIBUTOR: ${{ steps.author.outputs.isTeamMember }}
+          AUTHOR_IS_TEAM_MEMBER: ${{ steps.author.outputs.isTeamMember }}
         run: |
           if [[ $PR_HAS_LABEL == 'true' ]] ; then
             echo "'no-changelog' label detected."
             exit 0
           fi
 
-          # helper script needs to reference the main branch to compare against
+          # helper script needs to reference the master branch to compare against
           git fetch origin master:refs/remotes/origin/master
 
           # If the PR author is an external contributor, validate that the
           # changelog fragments added contain the author line for website rendering.
           args=""
-          if [[ $EXTERN_CONTRIBUTOR == 'true' ]] ; then
+          if [[ $AUTHOR_IS_TEAM_MEMBER != 'true' ]] ; then
             echo "PR author detected to be an external contributor."
             args="--author"
           fi
