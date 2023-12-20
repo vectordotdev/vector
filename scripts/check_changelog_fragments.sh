@@ -6,7 +6,7 @@
 # from being committed and fix the issue.
 
 CHANGELOG_DIR="changelog.d"
-FRAGMENT_TYPES="breaking|security|deprecated|feature|enhanced|fixed"
+FRAGMENT_TYPES="breaking|security|deprecations|features|enhancements|fixes"
 
 if [ ! -d "${CHANGELOG_DIR}" ]; then
   echo "No ./${CHANGELOG_DIR} found. This tool must be invoked from the root of the repo."
@@ -14,9 +14,9 @@ if [ ! -d "${CHANGELOG_DIR}" ]; then
 fi
 
 # diff-filter=A lists only added files
-ADDED=$(git diff --name-only --diff-filter=A origin/master ${CHANGELOG_DIR})
+FRAGMENTS=$(git diff --name-only --diff-filter=A origin/master ${CHANGELOG_DIR})
 
-if [ "$(echo "$ADDED" | grep -c .)" -lt 1 ]; then
+if [ "$(echo "$FRAGMENTS" | grep -c .)" -lt 1 ]; then
   echo "No changelog fragments detected"
   echo "If no changes  necessitate user-facing explanations, add the GH label 'no-changelog'"
   echo "Otherwise, add changelog fragments to changelog.d/"
@@ -24,7 +24,7 @@ if [ "$(echo "$ADDED" | grep -c .)" -lt 1 ]; then
 fi
 
 # extract the basename from the file path
-ADDED=$(echo "${ADDED}" | xargs -n1 basename)
+FRAGMENTS=$(xargs -n1 basename <<< "${FRAGMENTS}")
 
 # validate the fragments
 while IFS= read -r fname; do
@@ -38,12 +38,7 @@ while IFS= read -r fname; do
   IFS="." read -r -a arr <<< "${fname}"
 
   if [ "${#arr[@]}" -ne 3 ]; then
-    echo "invalid fragment filename: wrong number of period delimiters. expected '<pr_number>.<fragment_type>.md'. (${fname})"
-    exit 1
-  fi
-
-  if ! [[ "${arr[0]}" =~ ^[0-9]+$ ]]; then
-    echo "invalid fragment filename: fragment must begin with an integer (PR number). expected '<pr_number>.<fragment_type>.md' (${fname})"
+    echo "invalid fragment filename: wrong number of period delimiters. expected '<unique_name>.<fragment_type>.md'. (${fname})"
     exit 1
   fi
 
@@ -69,7 +64,6 @@ while IFS= read -r fname; do
 
   fi
 
-done <<< "$ADDED"
-
+done <<< "$FRAGMENTS"
 
 echo "changelog additions are valid."

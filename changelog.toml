@@ -33,25 +33,25 @@ showcontent = true
 
 # A change that is introducing a deprecation.
 [[tool.towncrier.type]]
-directory = "deprecated"
+directory = "deprecations"
 name = "Deprecations"
 showcontent = true
 
 # A change that is introducing a new feature.
 [[tool.towncrier.type]]
-directory = "feature"
+directory = "features"
 name = "New Features"
 showcontent = true
 
 # A change that is enhancing existing functionality in a user
 # perceivable way.
 [[tool.towncrier.type]]
-directory = "enhanced"
+directory = "enhancements"
 name = "Enhancements"
 showcontent = true
 
 # A change that is fixing a bug.
 [[tool.towncrier.type]]
-directory = "fixed"
+directory = "fixes"
 name = "Fixes"
 showcontent = true

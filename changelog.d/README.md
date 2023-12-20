@@ -25,7 +25,7 @@ To mark a PR as not requiring user-facing changelog notes, add the label 'no-cha
 To run the same check that is run in CI to validate that your changelog fragments have
 the correct syntax, commit the fragment additions and then run ./scripts/check_changelog_fragments.sh
 
-The format for fragments is: \<pr_number\>.\<fragment_type\>.md
+The format for fragments is: `<unique_name>.<fragment_type>.md`
 
 ### Fragment conventions
 
@@ -35,8 +35,10 @@ rendered as an item in a bulleted list under the "type" of fragment.
 The contents of the file must be valid markdown.
 
 Filename rules:
-- Must begin with the PR number associated with the change.
-- The type must be one of: breaking|security|deprecated|feature|enhanced|fixed.
+- The first segment (unique_name) should be a unique string related to the change.
+  Optionally, if there is a GitHub issue associated with the change, it can be used as a prefix.
+  For example `42_very_important_change.breaking.md`, vs `very_important_change.breaking.md`.
+- The type must be one of: breaking|security|deprecations|features|enhancements|fixes.
   These types are described in more detail in the config file (see `changelog.toml`).
 - Only the two period delimiters can be used.
 - The file must be markdown.
@@ -47,18 +49,28 @@ When using the type 'breaking' to add notes for a breaking change, these should 
 other entries typically. It should include all details that would be relevant for the user to need
 to handle upgrading to the breaking change.
 
+## Community Contributors
+
+When a PR is authored/has commits by a contributor from the Vector community, the fragment contents
+can optionally contain a line which specifies the community members involved in making the change.
+This is later used during the release process to render as a link to the github user profile for
+the authors specified.
+
+The process for adding this is simply to have the last line of the file be in this format:
+
+    authors: <author1_gh_username>, <author2_gh_username>, <...>
+
 ## Example
 
 Here is an example of a changelog fragment that adds a breaking change explanation.
 
-    $ cat changelog.d/42.breaking.md
+    $ cat changelog.d/42_very_good_words.breaking.md
     This change is so great. It's such a great change that this sentence
     explaining the change has to span multiple lines of text.
 
     It even necessitates a line break. It is a breaking change after all.
 
 This renders in the auto generated changelog as:
-(note that PR links are omitted in the public facing version of the changelog)
 
     ## [X.X.X]
 
@@ -67,4 +79,4 @@ This renders in the auto generated changelog as:
     - This change is so great. It's such a great change that this sentence
       explaining the change has to span multiple lines of text.
 
-      It even necessitates a line break. It is a breaking change after all. ([#42])(https://github.com/vectordotdev/vector/pull/42))
+      It even necessitates a line break. It is a breaking change after all.

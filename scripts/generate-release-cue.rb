@@ -110,13 +110,22 @@ def create_log_file!(current_commits, new_version)
   release_log_path
 end
 
-def generate_changelog!(commits)
+def retire_changelog_entries!(new_version)
+  Dir.glob("#{CHANGELOG_DIR}/*.md") do |fname|
+    if File.basename(fname) == "README.md"
+      next
+    end
+    cmd = "git mv " + fname + " " + CHANGELOG_DIR + "/" + new_version.to_json + "/"
+    system(cmd)
+  end
+end
+
+def generate_changelog!(new_version)
 
   entries = ""
 
   Dir.glob("#{CHANGELOG_DIR}/*.md") do |fname|
 
-    # Util::Printer.title("#{fname}")
     if File.basename(fname) == "README.md"
       next
     end
@@ -125,7 +134,6 @@ def generate_changelog!(commits)
       entries += ",\n"
     end
 
-    # description = File.read(fname)
     fragment_contents = File.open(fname)
 
     # add the GitHub username for any fragments
@@ -153,31 +161,39 @@ def generate_changelog!(commits)
     basename = File.basename(fname, "*.md")
     parts = basename.split(".")
 
-    pr_number = parts[0].to_i
-    pr_numbers = Array(pr_number)
-
-    commit = commits.find { |commit|
-      commit.pr_number == pr_number
-    }
-
-    if commit.nil?
-        Util::Printer.error!("Changelog fragment #{fname} PR number does not match any commit.")
+    if parts.length() != 3
+       Util::Printer.error!("Changelog fragment #{fname} is invalid (exactly two period delimiters required).")
     end
 
-    scopes = commit.scopes
-    type = commit.type
+    fragment_type = parts[1]
 
+    # map the fragment type to Vector's semantic types
+    # https://github.com/vectordotdev/vector/blob/master/.github/semantic.yml#L13
+    # the type "chore" isn't rendered in the changelog on the webiste currently,
+    # but we are mapping "breaking" and "deprecations" to that type, and both of
+    # these are handled in the upgrade guide separately.
+    type = ""
+    if fragment_type == "breaking"
+      type = "chore"
+    elsif fragment_type == "security" or fragment_type == "fixes"
+      type = "fix"
+    elsif fragment_type == "deprecations"
+      type = "chore"
+    elsif fragment_type == "features"
+      type = "feat"
+    elsif fragment_type == "enhancements"
+      type = "enhancement"
+    else
+       Util::Printer.error!("Changelog fragment #{fname} is invalid. Fragment type #{fragment_type} unrecognized.")
+    end
+
+    # Note: `pr_numbers`, `scopes` and `breaking` are being omitted from the entries.
+    #       These are currently not required for rendering in the website.
     entry = "{\n" +
       "type: #{type.to_json}\n" +
-      "scopes: #{scopes.to_json}\n" +
       "description: \"\"\"\n" +
       "#{description}" +
-      "\"\"\"\n" +
-      "pr_numbers: #{pr_numbers.to_json}\n"
-
-    if commit.breaking_change == true
-      entry += "breaking: #{commit.breaking_change.to_json}\n"
-    end
+      "\"\"\"\n"
 
     if contributors.length() > 0
       entry += "contributors: #{contributors.to_json}\n"
@@ -187,6 +203,8 @@ def generate_changelog!(commits)
 
     entries += entry
   end
+
+  retire_changelog_entries!(new_version)
 
   entries
 end
@@ -202,7 +220,7 @@ def create_release_file!(new_version)
     commits.each(&:validate!)
     cue_commits = commits.collect(&:to_cue_struct).join(",\n    ")
 
-    changelog_entries = generate_changelog!(commits)
+    changelog_entries = generate_changelog!(new_version)
 
     if File.exists?(release_reference_path)
       words =
