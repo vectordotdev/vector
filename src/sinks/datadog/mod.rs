@@ -246,8 +246,7 @@ impl DatadogApiError {
             // https://github.com/vectordotdev/vector/issues/10870
             // https://github.com/vectordotdev/vector/issues/12220
             DatadogApiError::HttpError { error } => error.is_retriable(),
-            DatadogApiError::BadRequest
-            | DatadogApiError::PayloadTooLarge => false,
+            DatadogApiError::BadRequest | DatadogApiError::PayloadTooLarge => false,
             DatadogApiError::ServerError
             | DatadogApiError::ClientError
             | DatadogApiError::Unauthorized
