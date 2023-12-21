@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use std::task::{Context, Poll};
 
-use bytes::{Buf, Bytes};
+use bytes::Bytes;
 use futures::future::BoxFuture;
 use http::{
     header::{HeaderValue, CONTENT_ENCODING, CONTENT_TYPE},
@@ -15,7 +15,7 @@ use vector_lib::request_metadata::{GroupedCountByteSize, MetaDescriptive, Reques
 use vector_lib::stream::DriverResponse;
 
 use crate::{
-    http::{BuildRequestSnafu, CallRequestSnafu, HttpClient},
+    http::{BuildRequestSnafu, HttpClient},
     sinks::datadog::DatadogApiError,
     sinks::util::retries::RetryLogic,
 };
@@ -104,7 +104,6 @@ impl MetaDescriptive for DatadogMetricsRequest {
 #[derive(Debug)]
 pub struct DatadogMetricsResponse {
     status_code: StatusCode,
-    body: Bytes,
     request_metadata: RequestMetadata,
 }
 
@@ -172,17 +171,10 @@ impl Service<DatadogMetricsRequest> for DatadogMetricsService {
                 .map_err(|error| DatadogApiError::HttpError { error })?;
 
             let result = client.send(request).await;
-            let (parts, body) = DatadogApiError::from_result(result)?.into_parts();
-
-            let mut body = hyper::body::aggregate(body)
-                .await
-                .context(CallRequestSnafu)
-                .map_err(|error| DatadogApiError::HttpError { error })?;
-            let body = body.copy_to_bytes(body.remaining());
+            let result = DatadogApiError::from_result(result)?;
 
             Ok(DatadogMetricsResponse {
-                status_code: parts.status,
-                body,
+                status_code: result.status(),
                 request_metadata,
             })
         })
