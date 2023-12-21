@@ -82,7 +82,8 @@ components: sinks: splunk_hec_logs: {
 	}
 
 	telemetry: metrics: {
-		requests_received_total: components.sources.internal_metrics.output.metrics.requests_received_total
+		http_client_responses_total:      components.sources.internal_metrics.output.metrics.http_client_responses_total
+		http_client_response_rtt_seconds: components.sources.internal_metrics.output.metrics.http_client_response_rtt_seconds
 	}
 
 	how_it_works: sinks._splunk_hec.how_it_works
