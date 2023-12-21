@@ -42,7 +42,8 @@ releases: "0.34.0": {
 			Loki rejecting the requests with an HTTP 400 response. This is fixed in v0.34.1.
 			""",
 		"""
-			The `protobuf` encoder does not work in sinks [#19230](https://github.com/vectordotdev/vector/issues/19230).
+			The `protobuf` encoder does not work in sinks
+			[#19230](https://github.com/vectordotdev/vector/issues/19230). Fixed in `v0.34.2`.
 			""",
 	]
 
