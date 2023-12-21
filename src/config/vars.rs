@@ -67,7 +67,7 @@ pub fn interpolate(
                         } else {
                             warnings
                                 .push(format!(
-                                    "Unknown environment variable in config. name = {name:?}",
+                                    "Unknown environment variable in config. This is DEPRECATED and will become an error in future versions. name = {name:?}",
                                 ));
                             ""
                         }),

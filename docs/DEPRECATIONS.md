@@ -14,9 +14,10 @@ For example:
 
 ## To be deprecated
 
-- v0.37.0 strict_env_vars Add deprecation warning for missing environment variable interpolation.
-
 ## To be migrated
+
+- v0.37.0 strict_env_vars Change the default for missing environment variable interpolation from
+  warning to erroring.
 
 ## To be removed
 
