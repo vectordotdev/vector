@@ -176,16 +176,24 @@ fn get_api_validate_endpoint(endpoint: Option<&String>, site: &str) -> crate::Re
 
 #[derive(Debug, Snafu)]
 pub enum DatadogApiError {
-    #[snafu(display("Server responded with an error."))]
-    ServerError,
     #[snafu(display("Failed to make HTTP(S) request: {}", error))]
     HttpError { error: HttpError },
-    #[snafu(display("Client sent a payload that is too large."))]
-    PayloadTooLarge,
     #[snafu(display("Client request was not valid for unknown reasons."))]
     BadRequest,
+    #[snafu(display("Client request was unauthorized."))]
+    Unauthorized,
     #[snafu(display("Client request was forbidden."))]
     Forbidden,
+    #[snafu(display("Client request timed out."))]
+    RequestTimeout,
+    #[snafu(display("Client sent a payload that is too large."))]
+    PayloadTooLarge,
+    #[snafu(display("Client sent too many requests (rate limiting)."))]
+    TooManyRequests,
+    #[snafu(display("Client request was invalid."))]
+    ClientError,
+    #[snafu(display("Server responded with an error."))]
+    ServerError,
 }
 
 impl DatadogApiError {
@@ -204,14 +212,24 @@ impl DatadogApiError {
                     // 202: Accepted (v2)
                     // 400: Bad request (likely an issue in the payload
                     //      formatting)
+                    // 401: Unauthorized (likely a missing API Key))
                     // 403: Permission issue (likely using an invalid API Key)
+                    // 408: Request Timeout, request should be retried after some
                     // 413: Payload too large (batch is above 5MB uncompressed)
-                    // 5xx: Internal error, request should be retried after some
-                    //      time
+                    // 429: Too Many Requests, request should be retried after some time
+                    // 500: Internal Server Error, the server encountered an unexpected condition
+                    //      that prevented it from fulfilling the request, request should be
+                    //      retried after some time
+                    // 503: Service Unavailable, the server is not ready to handle the request
+                    //      probably because it is overloaded, request should be retried after some time
+                    s if s.is_success() => Ok(response),
                     StatusCode::BAD_REQUEST => Err(DatadogApiError::BadRequest),
+                    StatusCode::UNAUTHORIZED => Err(DatadogApiError::Unauthorized),
                     StatusCode::FORBIDDEN => Err(DatadogApiError::Forbidden),
-                    StatusCode::OK | StatusCode::ACCEPTED => Ok(response),
+                    StatusCode::REQUEST_TIMEOUT => Err(DatadogApiError::RequestTimeout),
                     StatusCode::PAYLOAD_TOO_LARGE => Err(DatadogApiError::PayloadTooLarge),
+                    StatusCode::TOO_MANY_REQUESTS => Err(DatadogApiError::TooManyRequests),
+                    s if s.is_client_error() => Err(DatadogApiError::ClientError),
                     _ => Err(DatadogApiError::ServerError),
                 }
             }
@@ -222,14 +240,20 @@ impl DatadogApiError {
     pub const fn is_retriable(&self) -> bool {
         match self {
             // This retry logic will be expanded further, but specifically retrying unauthorized
-            // requests and lower level HttpErrorsfor now.
+            // requests and lower level HttpErrors for now.
             // I verified using `curl` that `403` is the respose code for this.
             //
             // https://github.com/vectordotdev/vector/issues/10870
             // https://github.com/vectordotdev/vector/issues/12220
             DatadogApiError::HttpError { error } => error.is_retriable(),
-            DatadogApiError::BadRequest | DatadogApiError::PayloadTooLarge => false,
-            DatadogApiError::ServerError | DatadogApiError::Forbidden => true,
+            DatadogApiError::ClientError
+            | DatadogApiError::BadRequest
+            | DatadogApiError::Unauthorized
+            | DatadogApiError::PayloadTooLarge => false,
+            DatadogApiError::ServerError
+            | DatadogApiError::Forbidden
+            | DatadogApiError::RequestTimeout
+            | DatadogApiError::TooManyRequests => true,
         }
     }
 }
