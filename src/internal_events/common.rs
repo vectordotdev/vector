@@ -105,20 +105,6 @@ impl InternalEvent for StreamClosedError {
 }
 
 #[derive(Debug)]
-pub struct RequestCompleted {
-    pub start: Instant,
-    pub end: Instant,
-}
-
-impl InternalEvent for RequestCompleted {
-    fn emit(self) {
-        debug!(message = "Request completed.");
-        counter!("requests_completed_total", 1);
-        histogram!("request_duration_seconds", self.end - self.start);
-    }
-}
-
-#[derive(Debug)]
 pub struct CollectionCompleted {
     pub start: Instant,
     pub end: Instant,
