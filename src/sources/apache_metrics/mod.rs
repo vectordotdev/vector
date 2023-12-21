@@ -15,8 +15,8 @@ use crate::{
     event::metric::{Metric, MetricKind, MetricValue},
     http::HttpClient,
     internal_events::{
-        ApacheMetricsEventsReceived, ApacheMetricsHttpError, ApacheMetricsParseError,
-        ApacheMetricsResponseError, EndpointBytesReceived, StreamClosedError,
+        ApacheMetricsEventsReceived, ApacheMetricsParseError, EndpointBytesReceived,
+        HttpClientHttpError, HttpClientHttpResponseError, StreamClosedError,
     },
     shutdown::ShutdownSignal,
     SourceSender,
@@ -225,9 +225,9 @@ fn apache_metrics(
                                 Some(stream::iter(metrics))
                             }
                             Ok((header, _)) => {
-                                emit!(ApacheMetricsResponseError {
+                                emit!(HttpClientHttpResponseError {
                                     code: header.status,
-                                    endpoint: &sanitized_url,
+                                    url: sanitized_url.to_owned(),
                                 });
                                 Some(stream::iter(vec![Metric::new(
                                     "up",
@@ -239,9 +239,9 @@ fn apache_metrics(
                                 .with_timestamp(Some(Utc::now()))]))
                             }
                             Err(error) => {
-                                emit!(ApacheMetricsHttpError {
+                                emit!(HttpClientHttpError {
                                     error,
-                                    endpoint: &sanitized_url
+                                    url: sanitized_url.to_owned(),
                                 });
                                 Some(stream::iter(vec![Metric::new(
                                     "up",
