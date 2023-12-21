@@ -6,7 +6,7 @@ use vector_lib::{
     json_size::JsonSize,
 };
 
-use super::prelude::{http_error_code, hyper_error_code};
+use super::prelude::http_error_code;
 
 #[derive(Debug)]
 pub struct AwsEcsMetricsEventsReceived<'a> {
@@ -95,7 +95,7 @@ impl InternalEvent for AwsEcsMetricsResponseError<'_> {
 
 #[derive(Debug)]
 pub struct AwsEcsMetricsHttpError<'a> {
-    pub error: hyper::Error,
+    pub error: crate::Error,
     pub endpoint: &'a str,
 }
 
@@ -106,7 +106,6 @@ impl InternalEvent for AwsEcsMetricsHttpError<'_> {
             error = ?self.error,
             stage = error_stage::RECEIVING,
             error_type = error_type::REQUEST_FAILED,
-            error_code = %hyper_error_code(&self.error),
             endpoint = %self.endpoint,
             internal_log_rate_limit = true,
         );
@@ -114,7 +113,6 @@ impl InternalEvent for AwsEcsMetricsHttpError<'_> {
             "component_errors_total", 1,
             "stage" => error_stage::RECEIVING,
             "error_type" => error_type::REQUEST_FAILED,
-            "error_code" => hyper_error_code(&self.error),
             "endpoint" => self.endpoint.to_string(),
         );
     }

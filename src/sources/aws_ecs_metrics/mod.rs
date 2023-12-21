@@ -1,7 +1,7 @@
 use std::{env, time::Duration};
 
 use futures::StreamExt;
-use hyper::{Body, Client, Request};
+use hyper::{Body, Request};
 use serde_with::serde_as;
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
@@ -11,6 +11,7 @@ use vector_lib::{config::LogNamespace, EstimatedJsonEncodedSizeOf};
 
 use crate::{
     config::{GenerateConfig, SourceConfig, SourceContext, SourceOutput},
+    http::HttpClient,
     internal_events::{
         AwsEcsMetricsEventsReceived, AwsEcsMetricsHttpError, AwsEcsMetricsParseError,
         AwsEcsMetricsResponseError, StreamClosedError,
@@ -150,8 +151,10 @@ impl GenerateConfig for AwsEcsMetricsSourceConfig {
 impl SourceConfig for AwsEcsMetricsSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let namespace = Some(self.namespace.clone()).filter(|namespace| !namespace.is_empty());
+        let http_client = HttpClient::new(None, &cx.proxy)?;
 
         Ok(Box::pin(aws_ecs_metrics(
+            http_client,
             self.stats_endpoint(),
             self.scrape_interval_secs,
             namespace,
@@ -170,6 +173,7 @@ impl SourceConfig for AwsEcsMetricsSourceConfig {
 }
 
 async fn aws_ecs_metrics(
+    http_client: HttpClient,
     url: String,
     interval: Duration,
     namespace: Option<String>,
@@ -179,14 +183,12 @@ async fn aws_ecs_metrics(
     let mut interval = IntervalStream::new(time::interval(interval)).take_until(shutdown);
     let bytes_received = register!(BytesReceived::from(Protocol::HTTP));
     while interval.next().await.is_some() {
-        let client = Client::new();
-
         let request = Request::get(&url)
             .body(Body::empty())
             .expect("error creating request");
         let uri = request.uri().clone();
 
-        match client.request(request).await {
+        match http_client.send(request).await {
             Ok(response) if response.status() == hyper::StatusCode::OK => {
                 match hyper::body::to_bytes(response).await {
                     Ok(body) => {
@@ -217,7 +219,7 @@ async fn aws_ecs_metrics(
                     }
                     Err(error) => {
                         emit!(AwsEcsMetricsHttpError {
-                            error,
+                            error: crate::Error::from(error),
                             endpoint: &url
                         });
                     }
@@ -231,7 +233,7 @@ async fn aws_ecs_metrics(
             }
             Err(error) => {
                 emit!(AwsEcsMetricsHttpError {
-                    error,
+                    error: crate::Error::from(error),
                     endpoint: &url
                 });
             }
