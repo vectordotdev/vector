@@ -6,6 +6,9 @@
 # from being committed and fix the issue.
 
 CHANGELOG_DIR="changelog.d"
+
+# NOTE: If these are altered, update both the 'changelog.d/README.md' and
+#       'scripts/generate-release-cue.rb' accordingly.
 FRAGMENT_TYPES="breaking|security|deprecation|feature|enhancement|fix"
 
 if [ ! -d "${CHANGELOG_DIR}" ]; then

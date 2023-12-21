@@ -111,12 +111,13 @@ def create_log_file!(current_commits, new_version)
 end
 
 def retire_changelog_entries!(new_version)
+  system('mkdir', '-p', CHANGELOG_DIR + '/' + new_version.to_s)
+
   Dir.glob("#{CHANGELOG_DIR}/*.md") do |fname|
     if File.basename(fname) == "README.md"
       next
     end
-    cmd = "git mv " + fname + " " + CHANGELOG_DIR + "/" + new_version.to_json + "/"
-    system(cmd)
+    system('git', 'mv', fname, CHANGELOG_DIR + '/' + new_version.to_s + '/')
   end
 end
 
@@ -158,10 +159,10 @@ def generate_changelog!(new_version)
 
     # get the PR number of the changelog fragment.
     # the fragment type is not used in the Vector release currently.
-    basename = File.basename(fname, "*.md")
+    basename = File.basename(fname, ".md")
     parts = basename.split(".")
 
-    if parts.length() != 3
+    if parts.length() != 2
        Util::Printer.error!("Changelog fragment #{fname} is invalid (exactly two period delimiters required).")
     end
 
@@ -172,6 +173,9 @@ def generate_changelog!(new_version)
     # the type "chore" isn't rendered in the changelog on the website currently,
     # but we are mapping "breaking" and "deprecations" to that type, and both of
     # these are handled in the upgrade guide separately.
+
+    # NOTE: If the fragment types are altered, update both the 'changelog.d/README.md' and
+    #       'scripts/check_changelog_fragments.sh' accordingly.
     type = ""
     if fragment_type == "breaking"
       type = "chore"
@@ -204,7 +208,9 @@ def generate_changelog!(new_version)
     entries += entry
   end
 
-  retire_changelog_entries!(new_version)
+  if entries != ""
+    retire_changelog_entries!(new_version)
+  end
 
   entries
 end
