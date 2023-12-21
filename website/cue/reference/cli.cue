@@ -15,7 +15,7 @@ cli: {
 		required:    bool | *false
 		name:        Arg
 		type:        #ArgType
-		default?:    string | [...string]
+		default?: string | [...string]
 	}
 
 	#ArgType: "string" | "list"
