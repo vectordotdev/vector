@@ -105,7 +105,11 @@ impl GenerateConfig for BigqueryConfig {
 }
 
 /// Create a future that sends a single nothing-request to BigQuery
-async fn healthcheck_future(uri: Uri, auth: GcpAuthenticator) -> crate::Result<()> {
+async fn healthcheck_future(
+    uri: Uri,
+    auth: GcpAuthenticator,
+    write_stream: String,
+) -> crate::Result<()> {
     let channel = Channel::builder(uri)
         .tls_config(tonic::transport::channel::ClientTlsConfig::new())
         .unwrap()
@@ -116,10 +120,15 @@ async fn healthcheck_future(uri: Uri, auth: GcpAuthenticator) -> crate::Result<(
         channel,
         AuthInterceptor { auth },
     );
-    let stream = tokio_stream::once(proto::AppendRowsRequest::default());
+    // specify the write_stream so that there's enough information to perform an IAM check
+    let stream = tokio_stream::once(proto::AppendRowsRequest {
+        write_stream,
+        ..proto::AppendRowsRequest::default()
+    });
     let mut response = client.append_rows(stream).await?;
     // the result is expected to be `InvalidArgument`
     // because we use a bunch of empty values in the request
+    // (and `InvalidArgument` specifically means we made it past the auth check)
     if let Err(status) = response.get_mut().message().await {
         if status.code() != tonic::Code::InvalidArgument {
             return Err(status.into());
@@ -141,7 +150,12 @@ impl SinkConfig for BigqueryConfig {
 
         // Kick off the healthcheck
         let healthcheck: Healthcheck = if cx.healthcheck.enabled {
-            healthcheck_future(self.endpoint.parse()?, auth.clone()).boxed()
+            healthcheck_future(
+                self.endpoint.parse()?,
+                auth.clone(),
+                self.get_write_stream(),
+            )
+            .boxed()
         } else {
             Box::pin(async move { Ok(()) })
         };
