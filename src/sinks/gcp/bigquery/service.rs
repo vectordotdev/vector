@@ -102,6 +102,8 @@ pub enum BigqueryServiceError {
     Transport { error: tonic::transport::Error },
     #[snafu(display("BigQuery request failure: {}", status))]
     Request { status: tonic::Status },
+    #[snafu(display("BigQuery row write failures: {:?}", row_errors))]
+    RowWrite { row_errors: Vec<proto::RowError> },
 }
 
 impl From<tonic::transport::Error> for BigqueryServiceError {
@@ -113,6 +115,12 @@ impl From<tonic::transport::Error> for BigqueryServiceError {
 impl From<tonic::Status> for BigqueryServiceError {
     fn from(status: tonic::Status) -> Self {
         Self::Request { status }
+    }
+}
+
+impl From<Vec<proto::RowError>> for BigqueryServiceError {
+    fn from(row_errors: Vec<proto::RowError>) -> Self {
+        Self::RowWrite { row_errors }
     }
 }
 
@@ -153,14 +161,28 @@ impl Service<BigqueryRequest> for BigqueryService {
         Box::pin(async move {
             // Ideally, we would maintain the gRPC stream, detect when auth expired and re-request with new auth.
             // But issuing a new request every time leads to more comprehensible code with reasonable performance.
+            trace!(
+                message = "Sending request to BigQuery",
+                request = format!("{:?}", request.request),
+            );
             let stream = tokio_stream::once(request.request);
             let response = client.append_rows(stream).await?;
             match response.into_inner().message().await? {
-                Some(body) => Ok(BigqueryResponse {
-                    body,
-                    request_byte_size,
-                    request_uncompressed_size,
-                }),
+                Some(body) => {
+                    trace!(
+                        message = "Received response body from BigQuery",
+                        body = format!("{:?}", body),
+                    );
+                    if body.row_errors.is_empty() {
+                        Ok(BigqueryResponse {
+                            body,
+                            request_byte_size,
+                            request_uncompressed_size,
+                        })
+                    } else {
+                        Err(body.row_errors.into())
+                    }
+                }
                 None => Err(tonic::Status::unknown("response stream closed").into()),
             }
         })
