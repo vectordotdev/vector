@@ -347,7 +347,7 @@ components: sources: [Name=string]: {
 								required:    false
 								type: string: {
 									default: null
-									examples: [ "CN=localhost,OU=Vector,O=Datadog,L=New York,ST=New York,C=US"]
+									examples: ["CN=localhost,OU=Vector,O=Datadog,L=New York,ST=New York,C=US"]
 								}
 							}
 						}

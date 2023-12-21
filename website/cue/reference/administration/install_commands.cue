@@ -8,7 +8,7 @@ package metadata
 
 administration: {
 	install_commands: [#Command, ...#Command] & [
-				{
+		{
 			title:   "For humans"
 			command: "curl --proto '=https' --tlsv1.2 -sSfL https://sh.vector.dev | bash"
 		},
