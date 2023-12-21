@@ -13,7 +13,7 @@ pub struct HerokuLogplexRequestReceived<'a> {
 
 impl<'a> InternalEvent for HerokuLogplexRequestReceived<'a> {
     fn emit(self) {
-        info!(
+        debug!(
             message = "Handling logplex request.",
             msg_count = %self.msg_count,
             frame_id = %self.frame_id,
