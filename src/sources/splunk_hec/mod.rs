@@ -46,7 +46,6 @@ use crate::{
     http::{build_http_trace_layer, KeepaliveConfig, MaxConnectionAgeLayer},
     internal_events::{
         EventsReceived, HttpBytesReceived, SplunkHecRequestBodyInvalidError, SplunkHecRequestError,
-        SplunkHecRequestReceived,
     },
     serde::bool_or_struct,
     source_sender::ClosedError,
@@ -151,15 +150,6 @@ impl SourceConfig for SplunkConfig {
         let options = SplunkSource::options();
 
         let services = path!("services" / "collector" / ..)
-            .and(
-                warp::path::full()
-                    .map(|path: warp::filters::path::FullPath| {
-                        emit!(SplunkHecRequestReceived {
-                            path: path.as_str()
-                        });
-                    })
-                    .untuple_one(),
-            )
             .and(
                 event_service
                     .or(raw_service)

@@ -20,7 +20,6 @@ impl<'a> InternalEvent for HerokuLogplexRequestReceived<'a> {
             drain_token = %self.drain_token,
             internal_log_rate_limit = true
         );
-        counter!("requests_received_total", 1);
     }
 }
 

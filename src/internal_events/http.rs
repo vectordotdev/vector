@@ -15,6 +15,10 @@ pub struct HttpServerRequestReceived;
 
 impl InternalEvent for HttpServerRequestReceived {
     fn emit(self) {
+        debug!(
+            message = "Received HTTP request.",
+            internal_log_rate_limit = true
+        );
         counter!("http_server_requests_received_total", 1);
     }
 }

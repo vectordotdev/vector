@@ -17,5 +17,3 @@ For example:
 ## To be migrated
 
 ## To be removed
-
-- http_internal_metrics v0.35.0 `requests_completed_total`, `request_duration_seconds`, and `requests_received_total` internal metrics should be removed.
