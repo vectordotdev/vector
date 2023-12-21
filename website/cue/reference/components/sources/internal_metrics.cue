@@ -747,24 +747,6 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
-		request_duration_seconds: {
-			description:       "The total request duration in seconds."
-			type:              "histogram"
-			default_namespace: "vector"
-			tags:              _internal_metrics_tags
-		}
-		requests_completed_total: {
-			description:       "The total number of requests completed by this component."
-			type:              "counter"
-			default_namespace: "vector"
-			tags:              _component_tags
-		}
-		requests_received_total: {
-			description:       "The total number of requests received by this component."
-			type:              "counter"
-			default_namespace: "vector"
-			tags:              _component_tags
-		}
 		send_errors_total: {
 			description:       "The total number of errors sending messages."
 			type:              "counter"
