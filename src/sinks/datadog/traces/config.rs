@@ -53,14 +53,16 @@ impl SinkBatchSettings for DatadogTracesDefaultBatchSettings {
 
 /// Configuration for the `datadog_traces` sink.
 #[configurable_component(sink("datadog_traces", "Publish trace events to Datadog."))]
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Derivative)]
+#[derivative(Default)]
 #[serde(deny_unknown_fields)]
 pub struct DatadogTracesConfig {
     #[serde(flatten)]
     pub local_dd_common: LocalDatadogCommonConfig,
 
     #[configurable(derived)]
-    #[serde(default)]
+    #[derivative(Default(value = "default_compression()"))]
+    #[serde(default = "default_compression")]
     pub compression: Option<Compression>,
 
     #[configurable(derived)]
@@ -70,6 +72,10 @@ pub struct DatadogTracesConfig {
     #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
+}
+
+const fn default_compression() -> Option<Compression> {
+    Some(Compression::zstd_default())
 }
 
 impl GenerateConfig for DatadogTracesConfig {
