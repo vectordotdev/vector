@@ -27,7 +27,7 @@ log = "0.4.20"
 once_cell = "1.19"
 os_info = { version = "3.7.0", default-features = false }
 # watch https://github.com/epage/anstyle for official interop with Clap
-owo-colors = { version = "3.5.0", features = ["supports-colors"] }
+owo-colors = { version = "4.0.0", features = ["supports-colors"] }
 paste = "1.0.14"
 regex = { version = "1.10.2", default-features = false, features = ["std", "perf"] }
 reqwest = { version = "0.11", features = ["json", "blocking"] }
