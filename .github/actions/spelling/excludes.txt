@@ -16,6 +16,7 @@
 \.ai$
 \.all-contributorsrc$
 \.avi$
+\.avro$
 \.bmp$
 \.bz2$
 \.class$

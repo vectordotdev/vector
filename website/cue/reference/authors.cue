@@ -6,7 +6,7 @@ package metadata
 }
 
 authors: [#Author, ...#Author] & [
-		{
+	{
 		handle: "barieom"
 		name:   "Barry Eom"
 	},

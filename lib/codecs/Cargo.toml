@@ -5,6 +5,10 @@ authors = ["Vector Contributors <vector@datadoghq.com>"]
 edition = "2021"
 publish = false
 
+[[bin]]
+name = "generate-avro-fixtures"
+path = "tests/bin/generate-avro-fixtures.rs"
+
 [dependencies]
 apache-avro = { version = "0.16.0", default-features = false }
 bytes = { version = "1", default-features = false }
@@ -39,6 +43,8 @@ indoc = { version = "2", default-features = false }
 tokio = { version = "1", features = ["test-util"] }
 similar-asserts = "1.5.0"
 vector-core = { path = "../vector-core", default-features = false, features = ["test"] }
+uuid = { version = "1", default-features = false, features = ["serde", "v4"] }
+rstest = "0.18.2"
 vrl.workspace = true
 
 [features]

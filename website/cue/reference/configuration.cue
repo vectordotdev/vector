@@ -160,7 +160,7 @@ configuration: {
 									required:    false
 									type: string: {
 										default: ","
-										examples: [ ":"]
+										examples: [":"]
 									}
 								}
 

@@ -20,5 +20,3 @@ For example:
   warning to erroring.
 
 ## To be removed
-
-- v0.35.0 http_internal_metrics `requests_completed_total`, `request_duration_seconds`, and `requests_received_total` internal metrics should be removed.
