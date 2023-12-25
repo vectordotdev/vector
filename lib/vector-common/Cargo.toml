@@ -47,7 +47,7 @@ chrono-tz = { version = "0.8.4", default-features = false, features = ["serde"] 
 chrono = { version = "0.4", default-features = false, optional = true, features = ["clock"] }
 crossbeam-utils = { version = "0.8.17", default-features = false }
 derivative = { version = "2.2.0", default-features = false }
-futures = { version = "0.3.29", default-features = false, features = ["std"] }
+futures = { version = "0.3.30", default-features = false, features = ["std"] }
 indexmap = { version = "2.1.0", default-features = false, features = ["std"] }
 metrics = "0.21.1"
 nom = { version = "7", optional = true }
@@ -68,7 +68,7 @@ vector-config-common = { path = "../vector-config-common" }
 vector-config-macros = { path = "../vector-config-macros" }
 
 [dev-dependencies]
-futures = { version = "0.3.29", default-features = false, features = ["async-await", "std"] }
+futures = { version = "0.3.30", default-features = false, features = ["async-await", "std"] }
 tokio = { version = "1.35.1", default-features = false, features = ["rt", "time"] }
 quickcheck = "1"
 quickcheck_macros = "1"
