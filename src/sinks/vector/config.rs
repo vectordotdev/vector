@@ -2,6 +2,7 @@ use http::Uri;
 use hyper::client::HttpConnector;
 use hyper_openssl::HttpsConnector;
 use hyper_proxy::ProxyConnector;
+use indexmap::IndexMap;
 use tonic::body::BoxBody;
 use tower::ServiceBuilder;
 use vector_lib::configurable::configurable_component;
@@ -58,6 +59,12 @@ pub struct VectorConfig {
     #[serde(default)]
     compression: bool,
 
+    /// A list of custom headers to add to each request.
+    #[configurable(metadata(
+        docs::additional_props_description = "An HTTP request header and it's value."
+    ))]
+    headers: Option<IndexMap<String, String>>,
+
     #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<RealtimeEventBasedDefaultBatchSettings>,
@@ -98,6 +105,7 @@ fn default_config(address: &str) -> VectorConfig {
         version: None,
         address: address.to_owned(),
         compression: false,
+        headers: None,
         batch: BatchConfig::default(),
         request: TowerRequestConfig::default(),
         tls: None,
@@ -112,6 +120,8 @@ impl SinkConfig for VectorConfig {
         let tls = MaybeTlsSettings::from_config(&self.tls, false)?;
         let uri = with_default_scheme(&self.address, tls.is_tls())?;
 
+        let headers = self.headers.clone();
+
         let client = new_client(&tls, cx.proxy())?;
 
         let healthcheck_uri = cx
@@ -120,9 +130,9 @@ impl SinkConfig for VectorConfig {
             .clone()
             .map(|uri| uri.uri)
             .unwrap_or_else(|| uri.clone());
-        let healthcheck_client = VectorService::new(client.clone(), healthcheck_uri, false);
+        let healthcheck_client = VectorService::new(client.clone(), healthcheck_uri, false, headers.clone());
         let healthcheck = healthcheck(healthcheck_client, cx.healthcheck);
-        let service = VectorService::new(client, uri, self.compression);
+        let service = VectorService::new(client, uri, self.compression, headers);
         let request_settings = self.request.into_settings();
         let batch_settings = self.batch.into_batcher_settings()?;
 
