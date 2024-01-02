@@ -7,7 +7,6 @@ use futures_util::StreamExt;
 use pulsar::{
     authentication::oauth2::{OAuth2Authentication, OAuth2Params},
     consumer::Message,
-    error::AuthenticationError,
     message::proto::MessageIdData,
     Authentication, Consumer, Pulsar, SubType, TokioExecutor,
 };
@@ -29,7 +28,7 @@ use vector_lib::{
     },
     sensitive_string::SensitiveString,
     shutdown::ShutdownSignal,
-    ByteSizeOf,
+    EstimatedJsonEncodedSizeOf,
 };
 use vrl::{owned_value_path, path, value::Kind};
 
@@ -67,7 +66,7 @@ pub struct PulsarSourceConfig {
     #[configurable(metadata(docs::examples = "subscription_name"))]
     subscription_name: Option<String>,
 
-    /// Priority level for a consumer to which a broker gives more priority while dispatching messages in Shared subscription type.
+    /// The consumer's priority level.
     ///
     /// The broker follows descending priorities. For example, 0=max-priority, 1, 2,...
     ///
@@ -106,25 +105,32 @@ pub struct PulsarSourceConfig {
 /// Authentication configuration.
 #[configurable_component]
 #[derive(Clone, Debug)]
-struct AuthConfig {
-    /// Basic authentication name/username.
-    ///
-    /// This can be used either for basic authentication (username/password) or JWT authentication.
-    /// When used for JWT, the value should be `token`.
-    #[configurable(metadata(docs::examples = "${PULSAR_NAME}"))]
-    #[configurable(metadata(docs::examples = "name123"))]
-    name: Option<String>,
+#[serde(deny_unknown_fields, untagged)]
+enum AuthConfig {
+    /// Basic authentication.
+    Basic {
+        /// Basic authentication name/username.
+        ///
+        /// This can be used either for basic authentication (username/password) or JWT authentication.
+        /// When used for JWT, the value should be `token`.
+        #[configurable(metadata(docs::examples = "${PULSAR_NAME}"))]
+        #[configurable(metadata(docs::examples = "name123"))]
+        name: String,
 
-    /// Basic authentication password/token.
-    ///
-    /// This can be used either for basic authentication (username/password) or JWT authentication.
-    /// When used for JWT, the value should be the signed JWT, in the compact representation.
-    #[configurable(metadata(docs::examples = "${PULSAR_TOKEN}"))]
-    #[configurable(metadata(docs::examples = "123456789"))]
-    token: Option<SensitiveString>,
+        /// Basic authentication password/token.
+        ///
+        /// This can be used either for basic authentication (username/password) or JWT authentication.
+        /// When used for JWT, the value should be the signed JWT, in the compact representation.
+        #[configurable(metadata(docs::examples = "${PULSAR_TOKEN}"))]
+        #[configurable(metadata(docs::examples = "123456789"))]
+        token: SensitiveString,
+    },
 
-    #[configurable(derived)]
-    oauth2: Option<OAuth2Config>,
+    /// OAuth authentication.
+    OAuth {
+        #[configurable(derived)]
+        oauth2: OAuth2Config,
+    },
 }
 
 /// OAuth2-specific authentication configuration.
@@ -162,7 +168,7 @@ struct DeadLetterQueuePolicy {
     /// Maximum number of times that a message will be redelivered before being sent to the dead letter queue.
     pub max_redeliver_count: usize,
 
-    /// Name of the dead topic where the failing messages will be sent.
+    /// Name of the dead letter topic where the failing messages will be sent.
     pub dead_letter_topic: String,
 }
 
@@ -242,29 +248,19 @@ impl PulsarSourceConfig {
         let mut builder = Pulsar::builder(&self.endpoint, TokioExecutor);
 
         if let Some(auth) = &self.auth {
-            builder = match (
-                auth.name.as_ref(),
-                auth.token.as_ref(),
-                auth.oauth2.as_ref(),
-            ) {
-                (Some(name), Some(token), None) => builder.with_auth(Authentication {
+            builder = match auth {
+                AuthConfig::Basic { name, token } => builder.with_auth(Authentication {
                     name: name.clone(),
                     data: token.inner().as_bytes().to_vec(),
                 }),
-                (None, None, Some(oauth2)) => {
-                    builder.with_auth_provider(OAuth2Authentication::client_credentials(OAuth2Params {
+                AuthConfig::OAuth { oauth2 } => builder.with_auth_provider(
+                    OAuth2Authentication::client_credentials(OAuth2Params {
                         issuer_url: oauth2.issuer_url.clone(),
                         credentials_url: oauth2.credentials_url.clone(),
                         audience: oauth2.audience.clone(),
                         scope: oauth2.scope.clone(),
-                    }))
-                }
-                _ => return Err(Box::new(pulsar::error::Error::Authentication(
-                    AuthenticationError::Custom(
-                        "Invalid auth config: can only specify name and token or oauth2 configuration"
-                            .to_string(),
-                    ),
-                ))),
+                    }),
+                ),
             };
         }
 
@@ -370,7 +366,7 @@ async fn parse_message(
                 Ok((events, _byte_size)) => {
                     events_received.emit(CountByteSize(
                         events.len(),
-                        events.size_of().into(),
+                        events.estimated_json_encoded_size_of(),
                     ));
 
                     let now = chrono::Utc::now();
@@ -496,18 +492,7 @@ async fn handle_ack(
                 });
             }
         }
-        BatchStatus::Errored => {
-            if let Err(error) = consumer
-                .nack_with_id(entry.topic.as_str(), entry.message_id)
-                .await
-            {
-                pulsar_error_events.emit(PulsarErrorEventData {
-                    msg: error.to_string(),
-                    error_type: PulsarErrorEventType::NAck,
-                });
-            }
-        }
-        BatchStatus::Rejected => {
+        BatchStatus::Errored | BatchStatus::Rejected => {
             if let Err(error) = consumer
                 .nack_with_id(entry.topic.as_str(), entry.message_id)
                 .await

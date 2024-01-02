@@ -1,6 +1,27 @@
 package metadata
 
 base: components: sources: pulsar: configuration: {
+	acknowledgements: {
+		deprecated: true
+		description: """
+			Controls how acknowledgements are handled by this source.
+
+			This setting is **deprecated** in favor of enabling `acknowledgements` at the [global][global_acks] or sink level.
+
+			Enabling or disabling acknowledgements at the source level has **no effect** on acknowledgement behavior.
+
+			See [End-to-end Acknowledgements][e2e_acks] for more information on how event acknowledgement is handled.
+
+			[global_acks]: https://vector.dev/docs/reference/configuration/global-options/#acknowledgements
+			[e2e_acks]: https://vector.dev/docs/about/under-the-hood/architecture/end-to-end-acknowledgements/
+			"""
+		required: false
+		type: object: options: enabled: {
+			description: "Whether or not end-to-end acknowledgements are enabled for this source."
+			required:    false
+			type: bool: {}
+		}
+	}
 	auth: {
 		description: "Authentication configuration."
 		required:    false
@@ -12,17 +33,17 @@ base: components: sources: pulsar: configuration: {
 					This can be used either for basic authentication (username/password) or JWT authentication.
 					When used for JWT, the value should be `token`.
 					"""
-				required: false
-				type: string: syntax: "literal"
+				required: true
+				type: string: examples: ["${PULSAR_NAME}", "name123"]
 			}
 			oauth2: {
 				description: "OAuth2-specific authentication configuration."
-				required:    false
+				required:    true
 				type: object: options: {
 					audience: {
 						description: "The OAuth2 audience."
 						required:    false
-						type: string: syntax: "literal"
+						type: string: examples: ["${OAUTH2_AUDIENCE}", "pulsar"]
 					}
 					credentials_url: {
 						description: """
@@ -31,17 +52,17 @@ base: components: sources: pulsar: configuration: {
 																A data URL is also supported.
 																"""
 						required: true
-						type: string: syntax: "literal"
+						type: string: examples: ["{OAUTH2_CREDENTIALS_URL}", "file:///oauth2_credentials", "data:application/json;base64,cHVsc2FyCg=="]
 					}
 					issuer_url: {
 						description: "The issuer URL."
 						required:    true
-						type: string: syntax: "literal"
+						type: string: examples: ["${OAUTH2_ISSUER_URL}", "https://oauth2.issuer"]
 					}
 					scope: {
 						description: "The OAuth2 scope."
 						required:    false
-						type: string: syntax: "literal"
+						type: string: examples: ["${OAUTH2_SCOPE}", "admin"]
 					}
 				}
 			}
@@ -52,60 +73,34 @@ base: components: sources: pulsar: configuration: {
 					This can be used either for basic authentication (username/password) or JWT authentication.
 					When used for JWT, the value should be the signed JWT, in the compact representation.
 					"""
-				required: false
-				type: string: syntax: "literal"
+				required: true
+				type: string: examples: ["${PULSAR_TOKEN}", "123456789"]
 			}
 		}
-	}
-	endpoint: {
-		description: "The endpoint to which the Pulsar client should connect to."
-		required:    true
-		type: string: syntax: "literal"
-	}
-	topics: {
-		description: "The Pulsar topic names to read events from."
-		required:    true
-		type: array: items: type: string: syntax: "literal"
-	}
-	consumer_name: {
-		description: "The Pulsar consumer name."
-		required:    false
-		type: string: syntax: "literal"
-	}
-	subscription_name: {
-		description: "The Pulsar subscription name."
-		required:    false
-		type: string: syntax: "literal"
-	}
-	priority_level: {
-		description: """
-			Priority level for a consumer to which a broker gives more priority while dispatching messages in Shared subscription type.
-
-			The broker follows descending priorities. For example, 0=max-priority, 1, 2,...
-
-			In Shared subscription type, the broker first dispatches messages to the max priority level consumers if they have permits. Otherwise, the broker considers next priority level consumers.
-			"""
-		required: false
-		type: int: {}
 	}
 	batch_size: {
 		description: "Max count of messages in a batch."
 		required:    false
 		type: uint: {}
 	}
+	consumer_name: {
+		description: "The Pulsar consumer name."
+		required:    false
+		type: string: examples: ["consumer-name"]
+	}
 	dead_letter_queue_policy: {
 		description: "Dead Letter Queue policy configuration."
 		required:    false
-		type: object: {
+		type: object: options: {
+			dead_letter_topic: {
+				description: "Name of the dead letter topic where the failing messages will be sent."
+				required:    true
+				type: string: {}
+			}
 			max_redeliver_count: {
 				description: "Maximum number of times that a message will be redelivered before being sent to the dead letter queue."
-				required:    false
+				required:    true
 				type: uint: {}
-			}
-			dead_letter_topic: {
-				description: "Name of the dead topic where the failing messages will be sent."
-				required:    false
-				type: string: syntax: "literal"
 			}
 		}
 	}
@@ -131,7 +126,7 @@ base: components: sources: pulsar: configuration: {
 															[json]: https://www.json.org/
 															"""
 						native: """
-															Decodes the raw bytes as Vector’s [native Protocol Buffers format][vector_native_protobuf].
+															Decodes the raw bytes as [native Protocol Buffers format][vector_native_protobuf].
 
 															This codec is **[experimental][experimental]**.
 
@@ -139,7 +134,7 @@ base: components: sources: pulsar: configuration: {
 															[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
 															"""
 						native_json: """
-															Decodes the raw bytes as Vector’s [native JSON format][vector_native_json].
+															Decodes the raw bytes as [native JSON format][vector_native_json].
 
 															This codec is **[experimental][experimental]**.
 
@@ -246,9 +241,20 @@ base: components: sources: pulsar: configuration: {
 			}
 		}
 	}
+	endpoint: {
+		description: "The endpoint to which the Pulsar client should connect to."
+		required:    true
+		type: string: examples: ["pulsar://127.0.0.1:6650"]
+	}
 	framing: {
-		description: "Configuration for building a `Framer`."
-		required:    false
+		description: """
+			Framing configuration.
+
+			Framing handles how events are separated when encoded in a raw byte form, where each event is
+			a frame that must be prefixed, or delimited, in a way that marks where an event begins and
+			ends within the byte stream.
+			"""
+		required: false
 		type: object: options: {
 			character_delimited: {
 				description:   "Options for the character delimited decoder."
@@ -265,6 +271,14 @@ base: components: sources: pulsar: configuration: {
 																The maximum length of the byte buffer.
 
 																This length does *not* include the trailing delimiter.
+
+																By default, there is no maximum length enforced. If events are malformed, this can lead to
+																additional resource usage as events continue to be buffered in memory, and can potentially
+																lead to memory exhaustion in extreme cases.
+
+																If there is a risk of processing malformed data, such as logs with user-controlled input,
+																consider setting the maximum length to a reasonably large value as a safety net. This
+																ensures that processing is not actually unbounded.
 																"""
 						required: false
 						type: uint: {}
@@ -272,15 +286,20 @@ base: components: sources: pulsar: configuration: {
 				}
 			}
 			method: {
-				required: false
+				description: "The framing method."
+				required:    false
 				type: string: {
 					default: "bytes"
 					enum: {
-						bytes:               "Configures the `BytesDecoder`."
-						character_delimited: "Configures the `CharacterDelimitedDecoder`."
-						length_delimited:    "Configures the `LengthDelimitedDecoder`."
-						newline_delimited:   "Configures the `NewlineDelimitedDecoder`."
-						octet_counting:      "Configures the `OctetCountingDecoder`."
+						bytes:               "Byte frames are passed through as-is according to the underlying I/O boundaries (for example, split between messages or stream segments)."
+						character_delimited: "Byte frames which are delimited by a chosen character."
+						length_delimited:    "Byte frames which are prefixed by an unsigned big-endian 32-bit integer indicating the length."
+						newline_delimited:   "Byte frames which are delimited by a newline character."
+						octet_counting: """
+															Byte frames according to the [octet counting][octet_counting] format.
+
+															[octet_counting]: https://tools.ietf.org/html/rfc6587#section-3.4.1
+															"""
 					}
 				}
 			}
@@ -293,6 +312,14 @@ base: components: sources: pulsar: configuration: {
 						The maximum length of the byte buffer.
 
 						This length does *not* include the trailing delimiter.
+
+						By default, there is no maximum length enforced. If events are malformed, this can lead to
+						additional resource usage as events continue to be buffered in memory, and can potentially
+						lead to memory exhaustion in extreme cases.
+
+						If there is a risk of processing malformed data, such as logs with user-controlled input,
+						consider setting the maximum length to a reasonably large value as a safety net. This
+						ensures that processing is not actually unbounded.
 						"""
 					required: false
 					type: uint: {}
@@ -309,5 +336,26 @@ base: components: sources: pulsar: configuration: {
 				}
 			}
 		}
+	}
+	priority_level: {
+		description: """
+			The consumer's priority level.
+
+			The broker follows descending priorities. For example, 0=max-priority, 1, 2,...
+
+			In Shared subscription type, the broker first dispatches messages to the max priority level consumers if they have permits. Otherwise, the broker considers next priority level consumers.
+			"""
+		required: false
+		type: int: {}
+	}
+	subscription_name: {
+		description: "The Pulsar subscription name."
+		required:    false
+		type: string: examples: ["subscription_name"]
+	}
+	topics: {
+		description: "The Pulsar topic names to read events from."
+		required:    true
+		type: array: items: type: string: examples: ["[persistent://public/default/my-topic]"]
 	}
 }

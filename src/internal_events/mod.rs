@@ -100,7 +100,7 @@ mod process;
     feature = "sinks-prometheus"
 ))]
 mod prometheus;
-#[cfg(feature = "sinks-pulsar")]
+#[cfg(any(feature = "sinks-pulsar", feature = "sources-pulsar"))]
 mod pulsar;
 #[cfg(feature = "sources-redis")]
 mod redis;
@@ -233,7 +233,7 @@ pub(crate) use self::postgresql_metrics::*;
     feature = "sinks-prometheus"
 ))]
 pub(crate) use self::prometheus::*;
-#[cfg(feature = "sinks-pulsar")]
+#[cfg(any(feature = "sinks-pulsar", feature = "sources-pulsar"))]
 pub(crate) use self::pulsar::*;
 #[cfg(feature = "sources-redis")]
 pub(crate) use self::redis::*;
