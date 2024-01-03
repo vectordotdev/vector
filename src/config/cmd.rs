@@ -255,6 +255,7 @@ mod tests {
                 (env_var.to_string(), "syslog".to_string()),
                 (env_var_in_arr.to_string(), "in".to_string()),
             ]),
+            true,
         )
         .unwrap();
 
