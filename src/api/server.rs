@@ -108,8 +108,7 @@ fn make_routes(
         .and_then(handler::health);
 
     // Memory profiling.
-    let heap = warp::path("/debug/pprof/heap")
-        .and_then(handler::heap_profile);
+    let heap = warp::path("/debug/pprof/heap").and_then(handler::heap_profile);
 
     // 404.
     let not_found = warp::any().and_then(|| async { Err(warp::reject::not_found()) });
