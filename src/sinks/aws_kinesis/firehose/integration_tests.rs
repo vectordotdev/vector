@@ -144,7 +144,7 @@ async fn firehose_put_records_with_partition_key() {
     let mut batch = BatchConfig::default();
     batch.max_events = Some(20);
 
-    let region = RegionOrEndpoint::with_both("localstack", kinesis_address().as_str());
+    let region = RegionOrEndpoint::with_both("us-east-1", kinesis_address().as_str());
 
     let partition_value = "a_value";
     let partition_key = ConfigValuePath::try_from("partition_key".to_string()).unwrap();
