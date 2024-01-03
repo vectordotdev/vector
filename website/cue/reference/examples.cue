@@ -6,7 +6,7 @@ package metadata
 }
 
 config_examples: [#ConfigExample, ...#ConfigExample] & [
-			{
+	{
 		title: "Redacted Datadog Agent logs to Datadog"
 		example: #"""
 			sources:

@@ -19,7 +19,6 @@ impl<'a> InternalEvent for AwsKinesisFirehoseRequestReceived<'a> {
             source_arn = %self.source_arn.unwrap_or_default(),
             internal_log_rate_limit = true
         );
-        counter!("requests_received_total", 1);
     }
 }
 

@@ -58,9 +58,13 @@ base: components: sources: syslog: configuration: {
 		description: "The type of socket to use."
 		required:    true
 		type: string: enum: {
-			tcp:  "Listen on TCP."
-			udp:  "Listen on UDP."
-			unix: "Listen on UDS. (Unix domain socket)"
+			tcp: "Listen on TCP."
+			udp: "Listen on UDP."
+			unix: """
+				Listen on UDS (Unix domain socket). This only supports Unix stream sockets.
+
+				For Unix datagram sockets, use the `socket` source instead.
+				"""
 		}
 	}
 	path: {

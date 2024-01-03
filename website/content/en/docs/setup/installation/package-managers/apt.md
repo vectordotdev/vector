@@ -6,7 +6,8 @@ weight: 1
 
 [Advanced Package Tool][apt], or **APT**, is a free package manager that handles the installation and removal of software on [Debian], [Ubuntu], and other [Linux] distributions.
 
-Our APT repositories are provided by [Cloudsmith] and you can find [instructions][repos] for manually adding the repositories. This page covers installing and managing Vector through the [APT package repository][apt].
+Our APT repositories are provided by [Datadog]. This page covers installing and managing Vector
+through the [APT package repository][apt].
 
 ## Supported architectures
 
@@ -52,8 +53,7 @@ sudo apt remove vector
 {{< jump "/docs/administration/management" "apt-dpkg-rpm-yum-pacman" >}}
 
 [apt]: https://en.wikipedia.org/wiki/APT_(software)
-[cloudsmith]: https://cloudsmith.io/~timber/repos/vector/packages
+[datadog]: https://www.datadoghq.com/
 [debian]: https://debian.org
 [linux]: https://linux.org
-[repos]: https://cloudsmith.io/~timber/repos/vector/setup/#formats-deb
 [ubuntu]: https://ubuntu.com

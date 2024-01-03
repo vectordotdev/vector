@@ -538,6 +538,7 @@ socket2,https://github.com/rust-lang/socket2,MIT OR Apache-2.0,"Alex Crichton <a
 spin,https://github.com/mvdnes/spin-rs,MIT,"Mathijs van de Nes <git@mathijs.vd-nes.nl>, John Ericson <git@JohnEricson.me>"
 spin,https://github.com/mvdnes/spin-rs,MIT,"Mathijs van de Nes <git@mathijs.vd-nes.nl>, John Ericson <git@JohnEricson.me>, Joshua Barretto <joshua.s.barretto@gmail.com>"
 spki,https://github.com/RustCrypto/formats/tree/master/spki,Apache-2.0 OR MIT,RustCrypto Developers
+stability,https://github.com/sagebind/stability,MIT,Stephen M. Coakley <me@stephencoakley.com>
 static_assertions,https://github.com/nvzqz/static-assertions-rs,MIT OR Apache-2.0,Nikolai Vazquez
 stream-cancel,https://github.com/jonhoo/stream-cancel,MIT OR Apache-2.0,Jon Gjengset <jon@thesquareplanet.com>
 stringprep,https://github.com/sfackler/rust-stringprep,MIT OR Apache-2.0,Steven Fackler <sfackler@gmail.com>
@@ -573,7 +574,7 @@ tokio,https://github.com/tokio-rs/tokio,MIT,Tokio Contributors <team@tokio.rs>
 tokio-io,https://github.com/tokio-rs/tokio,MIT,Carl Lerche <me@carllerche.com>
 tokio-io-timeout,https://github.com/sfackler/tokio-io-timeout,MIT OR Apache-2.0,Steven Fackler <sfackler@gmail.com>
 tokio-native-tls,https://github.com/tokio-rs/tls,MIT,Tokio Contributors <team@tokio.rs>
-tokio-openssl,https://github.com/sfackler/tokio-openssl,MIT OR Apache-2.0,Alex Crichton <alex@alexcrichton.com>
+tokio-openssl,https://github.com/tokio-rs/tokio-openssl,MIT OR Apache-2.0,Alex Crichton <alex@alexcrichton.com>
 tokio-postgres,https://github.com/sfackler/rust-postgres,MIT OR Apache-2.0,Steven Fackler <sfackler@gmail.com>
 tokio-retry,https://github.com/srijs/rust-tokio-retry,MIT,Sam Rijs <srijs@airpost.net>
 tokio-rustls,https://github.com/rustls/tokio-rustls,MIT OR Apache-2.0,The tokio-rustls Authors

@@ -12,7 +12,7 @@ use bytes::Bytes;
 use futures_util::{stream, FutureExt, StreamExt, TryFutureExt};
 use http::{response::Parts, Uri};
 use hyper::{Body, Request};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 use std::{collections::HashMap, future::ready};
 use tokio_stream::wrappers::IntervalStream;
 use vector_lib::json_size::JsonSize;
@@ -21,7 +21,7 @@ use crate::{
     http::{Auth, HttpClient},
     internal_events::{
         EndpointBytesReceived, HttpClientEventsReceived, HttpClientHttpError,
-        HttpClientHttpResponseError, RequestCompleted, StreamClosedError,
+        HttpClientHttpResponseError, StreamClosedError,
     },
     sources::util::http::HttpMethod,
     tls::TlsSettings,
@@ -175,7 +175,6 @@ pub(crate) async fn call<
                 auth.apply(&mut request);
             }
 
-            let start = Instant::now();
             tokio::time::timeout(inputs.timeout, client.send(request))
                 .then(move |result| async move {
                     match result {
@@ -202,10 +201,6 @@ pub(crate) async fn call<
                 .filter_map(move |response| {
                     ready(match response {
                         Ok((header, body)) if header.status == hyper::StatusCode::OK => {
-                            emit!(RequestCompleted {
-                                start,
-                                end: Instant::now()
-                            });
                             context.on_response(&url, &header, &body).map(|mut events| {
                                 let byte_size = if events.is_empty() {
                                     // We need to explicitly set the byte size
