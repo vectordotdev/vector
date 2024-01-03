@@ -1,12 +1,11 @@
-#![cfg(feature = "aws-kinesis-firehose-integration-tests")]
-#![cfg(test)]
-
 use aws_sdk_elasticsearch::{types::DomainEndpointOptions, Client as EsClient};
 use aws_sdk_firehose::types::ElasticsearchDestinationConfiguration;
+use futures::StreamExt;
 use futures::TryFutureExt;
 use serde_json::{json, Value};
 use tokio::time::{sleep, Duration};
 use vector_lib::codecs::JsonSerializerConfig;
+use vector_lib::lookup::lookup_v2::ConfigValuePath;
 
 use super::{config::KinesisFirehoseClientBuilder, *};
 use crate::{
@@ -37,7 +36,7 @@ fn elasticsearch_address() -> String {
 }
 
 #[tokio::test]
-async fn firehose_put_records() {
+async fn firehose_put_records_without_partition_key() {
     let stream = gen_stream();
 
     let elasticsearch_arn = ensure_elasticsearch_domain(stream.clone().to_string()).await;
@@ -63,6 +62,7 @@ async fn firehose_put_records() {
         auth: Default::default(),
         acknowledgements: Default::default(),
         request_retry_partial: Default::default(),
+        partition_key_field: None,
     };
 
     let config = KinesisFirehoseSinkConfig { batch, base };
@@ -75,6 +75,119 @@ async fn firehose_put_records() {
 
     run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
 
+    // Hard-coded sleeps are bad, but we're waiting on localstack's state to converge.
+    sleep(Duration::from_secs(5)).await;
+
+    let config = ElasticsearchConfig {
+        auth: Some(ElasticsearchAuthConfig::Aws(AwsAuthentication::Default {
+            load_timeout_secs: Some(5),
+            imds: ImdsAuthentication::default(),
+            region: None,
+        })),
+        endpoints: vec![elasticsearch_address()],
+        bulk: BulkConfig {
+            index: Template::try_from(stream.clone()).expect("unable to parse Template"),
+            ..Default::default()
+        },
+        aws: Some(region),
+        ..Default::default()
+    };
+    let common = ElasticsearchCommon::parse_single(&config)
+        .await
+        .expect("Config error");
+
+    let client = reqwest::Client::builder()
+        .build()
+        .expect("Could not build HTTP client");
+
+    let response = client
+        .get(&format!("{}/{}/_search", common.base_url, stream))
+        .json(&json!({
+            "query": { "query_string": { "query": "*" } }
+        }))
+        .send()
+        .await
+        .unwrap()
+        .json::<Value>()
+        .await
+        .expect("could not issue Elasticsearch search request");
+
+    let total = response["hits"]["total"]["value"]
+        .as_u64()
+        .expect("Elasticsearch response does not include hits->total->value");
+    assert_eq!(input.len() as u64, total);
+
+    let hits = response["hits"]["hits"]
+        .as_array()
+        .expect("Elasticsearch response does not include hits->hits");
+    #[allow(clippy::needless_collect)] // https://github.com/rust-lang/rust-clippy/issues/6909
+    let input = input
+        .into_iter()
+        .map(|rec| serde_json::to_value(&rec.into_log()).unwrap())
+        .collect::<Vec<_>>();
+    for hit in hits {
+        let hit = hit
+            .get("_source")
+            .expect("Elasticsearch hit missing _source");
+        assert!(input.contains(hit));
+    }
+}
+
+#[tokio::test]
+async fn firehose_put_records_with_partition_key() {
+    let stream = gen_stream();
+
+    let elasticsearch_arn = ensure_elasticsearch_domain(stream.clone().to_string()).await;
+
+    ensure_elasticsearch_delivery_stream(stream.clone(), elasticsearch_arn.clone()).await;
+
+    let mut batch = BatchConfig::default();
+    batch.max_events = Some(20);
+
+    let region = RegionOrEndpoint::with_both("localstack", kinesis_address().as_str());
+
+    let partition_value = "a_value";
+    let partition_key = ConfigValuePath::try_from("partition_key".to_string()).unwrap();
+
+    let base = KinesisSinkBaseConfig {
+        stream_name: stream.clone(),
+        region: region.clone(),
+        encoding: JsonSerializerConfig::default().into(), // required for ES destination w/ localstack
+        compression: Compression::None,
+        request: TowerRequestConfig {
+            timeout_secs: 10,
+            retry_attempts: 0,
+            ..Default::default()
+        },
+        tls: None,
+        auth: Default::default(),
+        acknowledgements: Default::default(),
+        request_retry_partial: Default::default(),
+        partition_key_field: Some(partition_key.clone()),
+    };
+
+    let config = KinesisFirehoseSinkConfig { batch, base };
+
+    let cx = SinkContext::default();
+
+    let (sink, _) = config.build(cx).await.unwrap();
+
+    let (mut input, events) = random_events_with_stream(100, 100, None);
+
+    let events = events.map(move |mut events| {
+        events.iter_logs_mut().for_each(move |log| {
+            log.insert("partition_key", partition_value);
+        });
+        events
+    });
+
+    input.iter_mut().for_each(move |log| {
+        log.as_mut_log().insert("partition_key", partition_value);
+    });
+
+    run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
+
+    // Hard-coded sleeps are bad, but we're waiting on localstack's state to converge.
     sleep(Duration::from_secs(5)).await;
 
     let config = ElasticsearchConfig {

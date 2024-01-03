@@ -436,6 +436,15 @@ base: components: sinks: aws_kinesis_firehose: configuration: {
 		required:    false
 		type: string: examples: ["http://127.0.0.0:5000/path/to/service"]
 	}
+	partition_key_field: {
+		description: """
+			The log field used as the Kinesis record’s partition key value.
+
+			If not specified, a unique partition key is generated for each Kinesis record.
+			"""
+		required: false
+		type: string: examples: ["user_id"]
+	}
 	region: {
 		description: """
 			The [AWS region][aws_region] of the target service.

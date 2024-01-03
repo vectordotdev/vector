@@ -1,4 +1,6 @@
 mod config;
+#[cfg(feature = "aws-kinesis-firehose-integration-tests")]
+#[cfg(test)]
 mod integration_tests;
 mod record;
 mod tests;

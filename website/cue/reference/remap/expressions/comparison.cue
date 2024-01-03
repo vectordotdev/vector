@@ -28,10 +28,10 @@ remap: expressions: comparison: {
 				enum: {
 					"==": "Equal. Operates on all types."
 					"!=": "Not equal. Operates on all types."
-					">=": "Greater than or equal. Operates on `int` and `float` types."
-					">":  "Greater than. Operates on `int` and `float` types."
-					"<=": "Less than or equal. Operates on `int` and `float` types."
-					"<":  "Less than. Operates on `int` and `float` types."
+					">=": "Greater than or equal. Operates on `int`, `float`, and `timestamp` types."
+					">":  "Greater than. Operates on `int`, `float`, and `timestamp` types."
+					"<=": "Less than or equal. Operates on `int`, `float`, and `timestamp` types."
+					"<":  "Less than. Operates on `int`, `float`, and `timestamp` types."
 				}
 			}
 		}
@@ -101,6 +101,13 @@ remap: expressions: comparison: {
 				1 < 2
 				"""#
 			return: true
+		},
+		{
+			title: "Less than timestamps"
+			source: #"""
+				t'2024-04-04T22:22:22.234142+01:00' < t'2024-04-04T22:22:22.234142+04:00'
+				"""#
+			return: false
 		},
 	]
 }

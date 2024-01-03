@@ -6,7 +6,8 @@ weight: 9
 
 The [Yellowdog Updater, Modified][yum] (YUM) is a free and open-source command-line package-manager for Linux operating system using the RPM Package Manager.
 
-Our Yum repositories are provided by [Cloudsmith] and you can find [instructions for manually adding the repositories][add_repo]. This page covers installing and managing Vector through the YUM package repository.
+Our Yum repositories are provided by [Datadog]. This page covers installing and managing Vector
+through the YUM package repository.
 
 ## Installation
 
@@ -45,6 +46,5 @@ sudo yum remove vector
 
 {{< jump "/docs/administration/management" "apt-dpkg-rpm-yum-pacman" >}}
 
-[add_repo]: https://cloudsmith.io/~timber/repos/vector/setup/#formats-rpm
-[cloudsmith]: https://cloudsmith.io/~timber/repos/vector/packages/
+[Datadog]: https://www.datadoghq.com/
 [yum]: https://en.wikipedia.org/wiki/Yum_(software)

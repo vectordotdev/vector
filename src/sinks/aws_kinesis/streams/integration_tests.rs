@@ -35,6 +35,8 @@ async fn kinesis_put_records_with_partition_key() {
 
     let partition_value = "a_value";
 
+    let partition_key = ConfigValuePath::try_from("partition_key".to_string()).unwrap();
+
     let base = KinesisSinkBaseConfig {
         stream_name: stream.clone(),
         region: RegionOrEndpoint::with_both("localstack", kinesis_address().as_str()),
@@ -45,15 +47,10 @@ async fn kinesis_put_records_with_partition_key() {
         auth: Default::default(),
         acknowledgements: Default::default(),
         request_retry_partial: Default::default(),
-    };
-
-    let partition_key = ConfigValuePath::try_from("partition_key".to_string()).unwrap();
-
-    let config = KinesisStreamsSinkConfig {
         partition_key_field: Some(partition_key.clone()),
-        batch,
-        base,
     };
+
+    let config = KinesisStreamsSinkConfig { batch, base };
 
     let cx = SinkContext::default();
 
@@ -110,13 +107,10 @@ async fn kinesis_put_records_without_partition_key() {
         auth: Default::default(),
         acknowledgements: Default::default(),
         request_retry_partial: Default::default(),
+        partition_key_field: None,
     };
 
-    let config = KinesisStreamsSinkConfig {
-        partition_key_field: None,
-        batch,
-        base,
-    };
+    let config = KinesisStreamsSinkConfig { batch, base };
 
     let cx = SinkContext::default();
 
