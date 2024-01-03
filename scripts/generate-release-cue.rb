@@ -110,14 +110,13 @@ def create_log_file!(current_commits, new_version)
   release_log_path
 end
 
-def retire_changelog_entries!(new_version)
-  system('mkdir', '-p', CHANGELOG_DIR + '/' + new_version.to_s)
+def retire_changelog_entries!()
 
   Dir.glob("#{CHANGELOG_DIR}/*.md") do |fname|
     if File.basename(fname) == "README.md"
       next
     end
-    system('git', 'mv', fname, CHANGELOG_DIR + '/' + new_version.to_s + '/')
+    system('git', 'rm', fname)
   end
 end
 
@@ -209,7 +208,7 @@ def generate_changelog!(new_version)
   end
 
   if entries != ""
-    retire_changelog_entries!(new_version)
+    retire_changelog_entries!()
   end
 
   entries
