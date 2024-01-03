@@ -104,6 +104,5 @@ components: sources: heroku_logs: {
 		http_server_handler_duration_seconds: components.sources.internal_metrics.output.metrics.http_server_handler_duration_seconds
 		http_server_requests_received_total:  components.sources.internal_metrics.output.metrics.http_server_requests_received_total
 		http_server_responses_sent_total:     components.sources.internal_metrics.output.metrics.http_server_responses_sent_total
-		requests_received_total:              components.sources.internal_metrics.output.metrics.requests_received_total
 	}
 }

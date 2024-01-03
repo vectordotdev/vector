@@ -33,12 +33,17 @@ releases: "0.34.0": {
 	known_issues: [
 		"""
 			The Datadog Metrics sink fails to send a large number of requests due to incorrectly
-			sized batches [#19110](https://github.com/vectordotdev/vector/issues/19110). This will
-			be fixed in v0.34.1. Until the fix is released, if you are using the Datadog Metrics
-			sink, we advise remaining on v0.33.1.
+			sized batches [#19110](https://github.com/vectordotdev/vector/issues/19110). This is
+			fixed in v0.34.1.
 			""",
 		"""
-			The `protobuf` encoder does not work in sinks [#19230](https://github.com/vectordotdev/vector/issues/19230).
+			The Loki sink incorrectly sets the `Content-Encoding` header on requests to
+			`application/json` when the default `snappy` compression is used. This results in
+			Loki rejecting the requests with an HTTP 400 response. This is fixed in v0.34.1.
+			""",
+		"""
+			The `protobuf` encoder does not work in sinks
+			[#19230](https://github.com/vectordotdev/vector/issues/19230). Fixed in `v0.34.2`.
 			""",
 	]
 
