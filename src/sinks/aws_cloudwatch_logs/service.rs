@@ -267,13 +267,7 @@ impl CloudwatchLogsSvc {
             let limit = oldest.timestamp // .expect("timestamp must exist")
                 + Duration::days(1).num_milliseconds();
 
-            if events
-                .last()
-                .expect("Events can't be empty")
-                .timestamp
-                // .expect("timestamp must exist")
-                <= limit
-            {
+            if events.last().expect("Events can't be empty").timestamp <= limit {
                 // Fast path.
                 // In most cases the difference between oldest and newest event
                 // is less than 24h.

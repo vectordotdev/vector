@@ -198,7 +198,7 @@ async fn ensure_elasticsearch_domain(domain_name: String) -> String {
                 .map(|v| {
                     v.get("status")
                         .and_then(|status| status.as_str())
-                        .map(|status| status == "green" || status == "yellow")
+                        .map(|status| status != "red")
                         .unwrap_or(false)
                 })
                 .unwrap_or(false)
