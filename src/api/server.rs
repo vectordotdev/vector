@@ -107,6 +107,10 @@ fn make_routes(
         .and(with_shared(running))
         .and_then(handler::health);
 
+    // Memory profiling.
+    let heap = warp::path("/debug/pprof/heap")
+        .and_then(handler::heap_profile);
+
     // 404.
     let not_found = warp::any().and_then(|| async { Err(warp::reject::not_found()) });
 
@@ -166,6 +170,7 @@ fn make_routes(
     // Wire up the health + GraphQL endpoints. Provides a permissive CORS policy to allow for
     // cross-origin interaction with the Vector API.
     health
+        .or(heap)
         .or(graphql_handler)
         .or(graphql_playground)
         .or(not_found)
