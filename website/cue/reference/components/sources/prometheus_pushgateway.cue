@@ -62,34 +62,34 @@ components: sources: prometheus_pushgateway: {
 		post_vs_put: {
 			title: "HTTP Methods - POST vs PUT"
 			body: """
-				The official Prometheus Pushgateway implementation supports `POST` and
-				`PUT` requests for pushing metrics to a grouping key, with slightly
-				different semantics.
+					The official Prometheus Pushgateway implementation supports `POST` and
+					`PUT` requests for pushing metrics to a grouping key, with slightly
+					different semantics.
 
-				When metrics are sent via a `POST` request, only metrics with the same
-				name are replaced. When they're sent via a `PUT` request, all metrics
-				within the grouping key are replaced.
+					When metrics are sent via a `POST` request, only metrics with the same
+					name are replaced. When they're sent via a `PUT` request, all metrics
+					within the grouping key are replaced.
 
-				Due to the difficulty of supporting the `PUT` semantics in Vector's
-				architecture, only `POST` has been implemented.
-			"""
+					Due to the difficulty of supporting the `PUT` semantics in Vector's
+					architecture, only `POST` has been implemented.
+				"""
 		}
 
 		protobuf: {
 			title: "Protobuf"
 			body: """
-				The Prometheus Protobuf format is currently unsupported. Metrics can only
-				be pushed in the text exposition format.
-			"""
+					The Prometheus Protobuf format is currently unsupported. Metrics can only
+					be pushed in the text exposition format.
+				"""
 		}
 
 		aggregation: {
 			title: "Metric aggregation"
 			body: """
-				When `aggregate_metrics` is enabled only counters and histograms will be
-				summed as it doesn't make sense to sum gauges or summaries from separate
-				pushes.
-			"""
+					When `aggregate_metrics` is enabled only counters and histograms will be
+					summed as it doesn't make sense to sum gauges or summaries from separate
+					pushes.
+				"""
 		}
 	}
 
