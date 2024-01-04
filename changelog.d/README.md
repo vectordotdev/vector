@@ -54,7 +54,7 @@ Filename rules:
 #### Fragment contents
 
 When fragments are rendered in the changelog, each fragment becomes an item in a markdown list.
-For this reason, when creating the content in a fragment, the format must be renderable as a mardown list.
+For this reason, when creating the content in a fragment, the format must be renderable as a markdown list.
 
 As an example, separating content with markdown header syntax should be avoided, as that will render
 as a heading in the main changelog and not the list. Instead, separate content with newlines.
