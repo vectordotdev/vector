@@ -51,6 +51,14 @@ Filename rules:
 - enhancement: A change that is enhancing existing functionality in a user perceivable way.
 - fix: A change that is fixing a bug.
 
+#### Fragment contents
+
+When fragments are rendered in the changelog, each fragment becomes an item in a markdown list.
+For this reason, when creating the content in a fragment, the format must be renderable as a mardown list.
+
+As an example, separating content with markdown header syntax should be avoided, as that will render
+as a heading in the main changelog and not the list. Instead, separate content with newlines.
+
 ### Breaking changes
 
 When using the type 'breaking' to add notes for a breaking change, these should be more verbose than
