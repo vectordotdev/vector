@@ -379,10 +379,13 @@ fn component_to_filtered_metrics(
         m.into_iter()
             .filter(filter_fn)
             .filter_map(|m| m.tag_value("component_id").map(|id| (id, m)))
-            .fold(BTreeMap::new(), |mut map, (id, m)| {
-                map.entry(id).or_insert_with(Vec::new).push(m);
-                map
-            })
+            .fold(
+                BTreeMap::new(),
+                |mut map: BTreeMap<String, Vec<Metric>>, (id, m)| {
+                    map.entry(id).or_default().push(m);
+                    map
+                },
+            )
     })
 }
 

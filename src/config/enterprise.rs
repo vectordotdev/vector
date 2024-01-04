@@ -394,7 +394,7 @@ pub(crate) fn report_on_reload(
 ) -> Option<EnterpriseReporter<BoxFuture<'static, ()>>> {
     attach_enterprise_components(config, &metadata);
 
-    let enterprise = match enterprise {
+    match enterprise {
         Some(enterprise) => {
             enterprise.send(report_configuration(config_paths, metadata));
             None
@@ -404,9 +404,7 @@ pub(crate) fn report_on_reload(
             enterprise.send(report_configuration(config_paths, metadata));
             Some(enterprise)
         }
-    };
-
-    enterprise
+    }
 }
 
 pub(crate) fn attach_enterprise_components(config: &mut Config, metadata: &EnterpriseMetadata) {

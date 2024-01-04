@@ -264,7 +264,7 @@ impl Table for Geoip {
         select: Option<&[String]>,
         _: Option<IndexHandle>,
     ) -> Result<Vec<ObjectMap>, String> {
-        match condition.get(0) {
+        match condition.first() {
             Some(_) if condition.len() > 1 => Err("Only one condition is allowed".to_string()),
             Some(Condition::Equals { value, .. }) => {
                 let ip = value
