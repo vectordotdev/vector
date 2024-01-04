@@ -24,8 +24,6 @@ mod tests;
 #[cfg(all(test, feature = "prometheus-integration-tests"))]
 mod integration_tests;
 
-pub use config::RemoteWriteConfig;
-
 #[derive(Debug, Snafu)]
 enum Errors {
     #[cfg(feature = "aws-core")]
