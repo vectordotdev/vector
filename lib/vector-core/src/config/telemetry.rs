@@ -87,9 +87,9 @@ mod test {
 
     #[test]
     fn partial_telemetry() {
-        let toml = r#"
+        let toml = r"
             emit_source = true
-        "#;
+        ";
         toml::from_str::<Telemetry>(toml).unwrap();
     }
 }

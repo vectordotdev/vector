@@ -282,7 +282,7 @@ impl MetricGroup {
 }
 
 fn matching_group<T: Default>(values: &mut MetricMap<T>, group: GroupKey) -> &mut T {
-    values.entry(group).or_insert_with(T::default)
+    values.entry(group).or_default()
 }
 
 /// Parse the given text input, and group the result into higher-level

@@ -169,11 +169,13 @@ mod test {
     }
 
     #[test]
-    #[should_panic]
+    #[should_panic(
+        expected = "called `Result::unwrap()` on an `Err` value: SyntaxError { message: \"[string \\\"lib/vector-core/src/event/lua/event.rs:179:20...\\\"]:1: unexpected symbol near '{'\", incomplete_input: false }"
+    )]
     fn from_lua_missing_log_and_metric() {
-        let lua_event = r#"{
+        let lua_event = r"{
             some_field: {}
-        }"#;
+        }";
         Lua::new().load(lua_event).eval::<Event>().unwrap();
     }
 }

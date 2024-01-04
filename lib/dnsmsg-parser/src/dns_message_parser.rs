@@ -131,7 +131,7 @@ impl DnsMessageParser {
             .collect::<Vec<ZoneInfo>>();
 
         zones
-            .get(0)
+            .first()
             .cloned()
             .ok_or_else(|| DnsMessageParserError::SimpleError {
                 cause: format!(
