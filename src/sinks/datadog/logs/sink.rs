@@ -98,11 +98,11 @@ fn normalize_event(event: &mut Event) {
         log.rename_key(host_path, event_path!("hostname"));
     }
 
-    let message_path = log
+    let timestamp_path = log
         .timestamp_path()
         .expect("timestamp is required (make sure the \"timestamp\" semantic meaning is set)")
         .clone();
-    if let Some(Value::Timestamp(ts)) = log.remove(&message_path) {
+    if let Some(Value::Timestamp(ts)) = log.remove(&timestamp_path) {
         log.insert(
             event_path!("timestamp"),
             Value::Integer(ts.timestamp_millis()),
