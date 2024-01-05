@@ -168,6 +168,8 @@ mod test {
         vector_common::assert_event_data_eq!(event, expected);
     }
 
+    // The expected panic is a clippy lint. The resulting error message is platform dependent, so only run this test on non-windows.
+    #[cfg(not(windows))]
     #[test]
     #[should_panic(
         expected = "called `Result::unwrap()` on an `Err` value: SyntaxError { message: \"[string \\\"lib/vector-core/src/event/lua/event.rs:179:20...\\\"]:1: unexpected symbol near '{'\", incomplete_input: false }"
