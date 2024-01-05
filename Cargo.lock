@@ -3696,7 +3696,7 @@ dependencies = [
 [[package]]
 name = "greptimedb-client"
 version = "0.1.0"
-source = "git+https://github.com/GreptimeTeam/greptimedb-client-rust.git?rev=4cb19ec47eeaf634c451d9ae438dac445a8a3dce#4cb19ec47eeaf634c451d9ae438dac445a8a3dce"
+source = "git+https://github.com/GreptimeTeam/greptimedb-ingester-rust.git?rev=4cb19ec47eeaf634c451d9ae438dac445a8a3dce#4cb19ec47eeaf634c451d9ae438dac445a8a3dce"
 dependencies = [
  "dashmap",
  "enum_dispatch",

@@ -229,7 +229,7 @@ hex = { version = "0.4.3", default-features = false, optional = true }
 sha2 = { version = "0.10.8", default-features = false, optional = true }
 
 # GreptimeDB
-greptimedb-client = { git = "https://github.com/GreptimeTeam/greptimedb-client-rust.git", rev = "4cb19ec47eeaf634c451d9ae438dac445a8a3dce", optional = true }
+greptimedb-client = { git = "https://github.com/GreptimeTeam/greptimedb-ingester-rust.git", rev = "4cb19ec47eeaf634c451d9ae438dac445a8a3dce", optional = true }
 
 # External libs
 arc-swap = { version = "1.6", default-features = false, optional = true }
