@@ -260,11 +260,11 @@ impl HttpClientContext for PrometheusScrapeContext {
                 match (honor_label, metric.tag_value(tag)) {
                     (false, Some(old_instance)) => {
                         metric.replace_tag(format!("exported_{}", tag), old_instance);
-                        metric.replace_tag(tag.clone(), instance.clone());
+                        metric.replace_tag(tag, instance);
                     }
                     (true, Some(_)) => {}
                     (_, None) => {
-                        metric.replace_tag(tag.clone(), instance.clone());
+                        metric.replace_tag(tag, instance);
                     }
                 }
             }
@@ -277,11 +277,11 @@ impl HttpClientContext for PrometheusScrapeContext {
                 match (honor_label, metric.tag_value(tag)) {
                     (false, Some(old_endpoint)) => {
                         metric.replace_tag(format!("exported_{}", tag), old_endpoint);
-                        metric.replace_tag(tag.clone(), endpoint.clone());
+                        metric.replace_tag(tag, endpoint);
                     }
                     (true, Some(_)) => {}
                     (_, None) => {
-                        metric.replace_tag(tag.clone(), endpoint.clone());
+                        metric.replace_tag(tag, endpoint);
                     }
                 }
             }

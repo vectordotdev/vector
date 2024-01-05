@@ -24,7 +24,7 @@ use super::{
     estimated_json_encoded_size_of::EstimatedJsonEncodedSizeOf, BatchNotifier, EventFinalizer,
     EventFinalizers, EventMetadata, Finalizable,
 };
-use crate::config::telemetry;
+use crate::{config::telemetry, string::VectorString};
 
 #[cfg(any(test, feature = "test"))]
 mod arbitrary;
@@ -324,7 +324,7 @@ impl Metric {
     }
 
     /// Removes a tag from this metric, returning the value of the tag if the tag was previously in the metric.
-    pub fn remove_tag(&mut self, key: &str) -> Option<String> {
+    pub fn remove_tag(&mut self, key: &str) -> Option<VectorString> {
         self.series.remove_tag(key)
     }
 
@@ -351,13 +351,17 @@ impl Metric {
     /// containing the previous value of the tag.
     ///
     /// *Note:* This will create the tags map if it is not present.
-    pub fn replace_tag(&mut self, name: String, value: String) -> Option<String> {
+    pub fn replace_tag(
+        &mut self,
+        name: impl Into<VectorString>,
+        value: impl Into<TagValue>,
+    ) -> Option<VectorString> {
         self.series.replace_tag(name, value)
     }
 
     pub fn set_multi_value_tag(
         &mut self,
-        name: String,
+        name: impl Into<VectorString>,
         values: impl IntoIterator<Item = TagValue>,
     ) {
         self.series.set_multi_value_tag(name, values);

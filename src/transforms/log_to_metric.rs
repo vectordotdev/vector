@@ -304,7 +304,7 @@ fn render_tag_into(
     let value = match template {
         None => TagValue::Bare,
         Some(template) => match render_template(template, event) {
-            Ok(result) => TagValue::Value(result),
+            Ok(result) => result.into(),
             Err(TransformError::TemplateRenderingError(error)) => {
                 emit!(crate::internal_events::TemplateRenderingError {
                     error,

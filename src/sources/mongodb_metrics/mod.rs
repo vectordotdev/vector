@@ -37,7 +37,7 @@ macro_rules! tags {
         {
             let mut tags = $tags.clone();
             $(
-                tags.replace($key.into(), $value.to_string());
+                tags.replace($key, $value.to_string());
             )*
             tags
         }

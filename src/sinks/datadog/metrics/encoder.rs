@@ -513,7 +513,8 @@ fn sketch_to_proto_message(
     let host = log_schema
         .host_key()
         .map(|key| tags.remove(key.to_string().as_str()).unwrap_or_default())
-        .unwrap_or_default();
+        .unwrap_or_default()
+        .into_string();
     let tags = encode_tags(&tags);
 
     let cnt = ddsketch.count() as i64;
@@ -579,7 +580,7 @@ fn series_to_proto_message(
     {
         resources.push(ddmetric_proto::metric_payload::Resource {
             r#type: "host".to_string(),
-            name: host,
+            name: host.into_string(),
         });
     }
 
@@ -588,11 +589,14 @@ fn series_to_proto_message(
     if let Some(device) = tags.remove("device").or(tags.remove("resource.device")) {
         resources.push(ddmetric_proto::metric_payload::Resource {
             r#type: "device".to_string(),
-            name: device,
+            name: device.into_string(),
         });
     }
 
-    let source_type_name = tags.remove("source_type_name").unwrap_or_default();
+    let source_type_name = tags
+        .remove("source_type_name")
+        .unwrap_or_default()
+        .into_string();
 
     let tags = encode_tags(&tags);
 
@@ -814,12 +818,14 @@ fn generate_series_metrics(
     let name = get_namespaced_name(metric, default_namespace);
 
     let mut tags = metric.tags().cloned().unwrap_or_default();
-    let host = log_schema
-        .host_key()
-        .map(|key| tags.remove(key.to_string().as_str()).unwrap_or_default());
+    let host = log_schema.host_key().map(|key| {
+        tags.remove(key.to_string().as_str())
+            .unwrap_or_default()
+            .into_string()
+    });
 
-    let source_type_name = tags.remove("source_type_name");
-    let device = tags.remove("device");
+    let source_type_name = tags.remove("source_type_name").map(|s| s.into_string());
+    let device = tags.remove("device").map(|s| s.into_string());
     let ts = encode_timestamp(metric.timestamp());
     let tags = Some(encode_tags(&tags));
 

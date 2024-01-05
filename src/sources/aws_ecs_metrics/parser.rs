@@ -155,8 +155,8 @@ fn gauge(
 
 fn blkio_tags(item: &BlockIoStat, tags: &MetricTags) -> MetricTags {
     let mut tags = tags.clone();
-    tags.replace("device".into(), format!("{}:{}", item.major, item.minor));
-    tags.replace("op".into(), item.op.to_lowercase());
+    tags.replace("device", format!("{}:{}", item.major, item.minor));
+    tags.replace("op", item.op.to_lowercase());
     tags
 }
 
@@ -346,7 +346,7 @@ fn cpu_metrics(
             metrics.extend((0..online_cpus).filter_map(|index| {
                 percpu_usage.get(index).map(|value| {
                     let mut tags = tags.clone();
-                    tags.replace("cpu".into(), index.to_string());
+                    tags.replace("cpu", index.to_string());
 
                     counter(
                         usage,
@@ -480,7 +480,7 @@ fn network_metrics(
     tags: &MetricTags,
 ) -> Vec<Metric> {
     let mut tags = tags.clone();
-    tags.replace("device".into(), interface.to_string());
+    tags.replace("device", interface.to_string());
 
     [
         ("receive_bytes_total", network.rx_bytes),
@@ -516,9 +516,9 @@ pub(super) fn parse(
 
     for (id, container) in parsed {
         let mut tags = MetricTags::default();
-        tags.replace("container_id".into(), id);
+        tags.replace("container_id", id);
         if let Some(name) = container.name {
-            tags.replace("container_name".into(), name);
+            tags.replace("container_name", name);
         }
 
         if let Some(blkio) = container.blkio_stats {

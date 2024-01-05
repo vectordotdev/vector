@@ -105,6 +105,7 @@ impl encoding::Encoder<Vec<Metric>> for StackdriverMetricsEncoder {
                     .tags
                     .unwrap_or_default()
                     .into_iter_single()
+                    .map(|(k, v)| (k.into_string(), v.into_string()))
                     .collect::<std::collections::HashMap<_, _>>();
 
                 gcp::GcpSerie {

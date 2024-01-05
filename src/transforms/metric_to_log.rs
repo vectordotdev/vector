@@ -680,7 +680,7 @@ mod tests {
                     .collect(),
             ));
             // The resulting tag must be either a single string value or not present.
-            let value = values.into_single().map(|value| Value::Bytes(value.into()));
+            let value = values.into_single().map(|value| Value::Bytes(value.into_string().into()));
             assert_eq!(tags.get(&*name), value.as_ref());
         }
 
