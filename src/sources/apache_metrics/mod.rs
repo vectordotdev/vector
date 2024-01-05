@@ -1,7 +1,4 @@
-use std::{
-    future::ready,
-    time::{Duration, Instant},
-};
+use std::{future::ready, time::Duration};
 
 use chrono::Utc;
 use futures::{stream, FutureExt, StreamExt, TryFutureExt};
@@ -18,8 +15,8 @@ use crate::{
     event::metric::{Metric, MetricKind, MetricValue},
     http::HttpClient,
     internal_events::{
-        ApacheMetricsEventsReceived, ApacheMetricsHttpError, ApacheMetricsParseError,
-        ApacheMetricsResponseError, EndpointBytesReceived, RequestCompleted, StreamClosedError,
+        ApacheMetricsEventsReceived, ApacheMetricsParseError, EndpointBytesReceived,
+        HttpClientHttpError, HttpClientHttpResponseError, StreamClosedError,
     },
     shutdown::ShutdownSignal,
     SourceSender,
@@ -171,7 +168,6 @@ fn apache_metrics(
                     "host" => url.sanitized_authority(),
                 };
 
-                let start = Instant::now();
                 let namespace = namespace.clone();
                 client
                     .send(request)
@@ -185,11 +181,6 @@ fn apache_metrics(
                     .filter_map(move |response| {
                         ready(match response {
                             Ok((header, body)) if header.status == hyper::StatusCode::OK => {
-                                emit!(RequestCompleted {
-                                    start,
-                                    end: Instant::now()
-                                });
-
                                 let byte_size = body.len();
                                 let body = String::from_utf8_lossy(&body);
                                 emit!(EndpointBytesReceived {
@@ -234,9 +225,9 @@ fn apache_metrics(
                                 Some(stream::iter(metrics))
                             }
                             Ok((header, _)) => {
-                                emit!(ApacheMetricsResponseError {
+                                emit!(HttpClientHttpResponseError {
                                     code: header.status,
-                                    endpoint: &sanitized_url,
+                                    url: sanitized_url.to_owned(),
                                 });
                                 Some(stream::iter(vec![Metric::new(
                                     "up",
@@ -248,9 +239,9 @@ fn apache_metrics(
                                 .with_timestamp(Some(Utc::now()))]))
                             }
                             Err(error) => {
-                                emit!(ApacheMetricsHttpError {
+                                emit!(HttpClientHttpError {
                                     error,
-                                    endpoint: &sanitized_url
+                                    url: sanitized_url.to_owned(),
                                 });
                                 Some(stream::iter(vec![Metric::new(
                                     "up",

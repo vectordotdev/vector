@@ -53,10 +53,10 @@ apt-get install --yes --no-install-recommends \
 # Cue
 TEMP=$(mktemp -d)
 curl \
-    -L https://github.com/cue-lang/cue/releases/download/v0.5.0/cue_v0.5.0_linux_amd64.tar.gz \
-    -o "${TEMP}/cue_v0.5.0_linux_amd64.tar.gz"
+    -L https://github.com/cue-lang/cue/releases/download/v0.7.0/cue_v0.7.0_linux_amd64.tar.gz \
+    -o "${TEMP}/cue_v0.7.0_linux_amd64.tar.gz"
 tar \
-    -xvf "${TEMP}/cue_v0.5.0_linux_amd64.tar.gz" \
+    -xvf "${TEMP}/cue_v0.7.0_linux_amd64.tar.gz" \
     -C "${TEMP}"
 cp "${TEMP}/cue" /usr/bin/cue
 rm -rf "$TEMP"

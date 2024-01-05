@@ -7,6 +7,7 @@ updates:
       time: "04:00" # UTC
     labels:
       - "domain: deps"
+      - "no-changelog"
     commit-message:
       prefix: "chore(deps)"
     open-pull-requests-limit: 100
@@ -65,3 +66,8 @@ updates:
       - "domain: ci"
     commit-message:
       prefix: "chore(ci)"
+    groups:
+      artifact:
+        patterns:
+        - "actions/download-artifact"
+        - "actions/upload-artifact"

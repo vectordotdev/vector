@@ -53,7 +53,7 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
       - run: sudo apt-get install --yes curl bc
-      - run:  curl --proto '=https' --tlsv1.2 -sSf https://sh.vector.dev | bash -s -- -y
+      - run:  curl --proto '=https' --tlsv1.2 -sSfL https://sh.vector.dev | bash -s -- -y
       - run: ~/.vector/bin/vector --version
 
       - name: (PR comment) Get PR branch
