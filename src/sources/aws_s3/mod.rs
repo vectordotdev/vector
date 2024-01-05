@@ -898,7 +898,7 @@ mod integration_tests {
             }
 
             // Unfortunately we need a fairly large sleep here to ensure that the source has actually managed to delete the SQS message.
-            // The deletion of this message occurs after the Event has been sent out by the source and there is no way of knowing when this 
+            // The deletion of this message occurs after the Event has been sent out by the source and there is no way of knowing when this
             // process has finished other than waiting around for a while.
             tokio::time::sleep(Duration::from_secs(10)).await;
             // Make sure the SQS message is deleted
