@@ -39,12 +39,7 @@ base: components: sources: prometheus_pushgateway: configuration: {
 			meaningfully aggregated.
 			"""
 		required: false
-		type: bool: {
-			default: false
-			examples: [
-				true,
-			]
-		}
+		type: bool: default: false
 	}
 	auth: {
 		description: "HTTP Basic authentication configuration."
