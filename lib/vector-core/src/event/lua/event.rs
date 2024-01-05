@@ -168,12 +168,9 @@ mod test {
         vector_common::assert_event_data_eq!(event, expected);
     }
 
-    // The expected panic is a clippy lint. The resulting error message is platform dependent, so only run this test on non-windows.
-    #[cfg(not(windows))]
+    // the panic message a) is platform dependent and b) can change if any code is added before this function.
+    #[allow(clippy::should_panic_without_expect)]
     #[test]
-    #[should_panic(
-        expected = "called `Result::unwrap()` on an `Err` value: SyntaxError { message: \"[string \\\"lib/vector-core/src/event/lua/event.rs:179:20...\\\"]:1: unexpected symbol near '{'\", incomplete_input: false }"
-    )]
     fn from_lua_missing_log_and_metric() {
         let lua_event = r"{
             some_field: {}
