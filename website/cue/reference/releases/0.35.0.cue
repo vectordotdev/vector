@@ -369,7 +369,7 @@ releases: "0.35.0": {
 				[configurations](/docs/reference/configuration/#environment-variables) are
 				undefined, Vector will raise an error rather than a silent warning.
 
-				In a future release, this will "strict environment variable" mode will be the
+				In a future release, this "strict environment variable" mode will be the
 				default. This release deprecates the current behavior of only outputting a warning
 				for undefined variables.
 
