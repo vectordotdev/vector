@@ -179,17 +179,17 @@ impl LogRequestBuilder {
             total_estimated += estimated.get();
         }
 
-        let mut batches = vec![events];
+        let mut batches = vec![(events, byte_size)];
         let mut requests = Vec::new();
 
-        while let Some(mut events) = batches.pop() {
+        while let Some((mut events, byte_size)) = batches.pop() {
             if events.is_empty() {
                 continue;
             }
             match try_serialize(&events, total_estimated) {
                 Ok(buf) => {
                     let request =
-                        self.finish_request(buf, events, byte_size.clone(), Arc::clone(&api_key))?;
+                        self.finish_request(buf, events, byte_size, Arc::clone(&api_key))?;
                     requests.push(request);
                 }
                 Err(RequestBuildError::PayloadTooBig { events_that_fit }) => {
@@ -198,11 +198,28 @@ impl LogRequestBuilder {
                         let _too_big = events.pop();
                         // TODO: emit dropped event
 
-                        batches.push(events);
+                        let mut byte_size = telemetry().create_request_count_byte_size();
+                        for event in events.iter_mut() {
+                            let estimated = event.estimated_json_encoded_size_of();
+                            byte_size.add_event(event, estimated);
+                        }
+                        batches.push((events, byte_size));
                     } else {
                         let next = events.split_off(events_that_fit);
-                        batches.push(events);
-                        batches.push(next);
+
+                        let mut byte_size = telemetry().create_request_count_byte_size();
+                        for event in &events {
+                            let estimated = event.estimated_json_encoded_size_of();
+                            byte_size.add_event(event, estimated);
+                        }
+                        batches.push((events, byte_size));
+
+                        let mut byte_size = telemetry().create_request_count_byte_size();
+                        for event in &next {
+                            let estimated = event.estimated_json_encoded_size_of();
+                            byte_size.add_event(event, estimated);
+                        }
+                        batches.push((next, byte_size));
                     }
                 }
                 Err(e) => return Err(e),
