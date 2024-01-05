@@ -179,8 +179,8 @@ aws-smithy-http-tower = { git = "https://github.com/vectordotdev/aws-sdk-rust", 
 aws-smithy-types = { git = "https://github.com/vectordotdev/aws-sdk-rust", rev = "3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670", default-features = false, optional = true }
 
 # Azure
-azure_core = { version = "0.17", default-features = false, features = ["enable_reqwest"], optional = true }
-azure_identity = { version = "0.17", default-features = false, features = ["enable_reqwest"], optional = true }
+azure_core = { version = "0.18", default-features = false, features = ["enable_reqwest"], optional = true }
+azure_identity = { version = "0.18", default-features = false, features = ["enable_reqwest"], optional = true }
 azure_storage = { version = "0.17", default-features = false, optional = true }
 azure_storage_blobs = { version = "0.17", default-features = false, optional = true }
 
@@ -345,8 +345,8 @@ openssl-src = { version = "300", default-features = false, features = ["force-en
 [dev-dependencies]
 approx = "0.5.1"
 assert_cmd = { version = "2.0.12", default-features = false }
-azure_core = { version = "0.17", default-features = false, features = ["enable_reqwest", "azurite_workaround"] }
-azure_identity = { version = "0.17", default-features = false, features = ["enable_reqwest"] }
+azure_core = { version = "0.18", default-features = false, features = ["enable_reqwest", "azurite_workaround"] }
+azure_identity = { version = "0.18", default-features = false, features = ["enable_reqwest"] }
 azure_storage_blobs = { version = "0.17", default-features = false, features = ["azurite_workaround"] }
 azure_storage = { version = "0.17", default-features = false }
 base64 = "0.21.5"
