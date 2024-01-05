@@ -341,7 +341,7 @@ releases: "0.35.0": {
 				setting `decoding.codec` to `avro` on components that support it. Additional
 				AVRO-specific codec options are configurable via `decoding.avro`.
 				"""
-			concributors: ["Ion-manden"]
+			contributors: ["Ion-manden"]
 			pr_numbers: [19342]
 		},
 		{
@@ -363,13 +363,15 @@ releases: "0.35.0": {
 			type: "chore"
 			scopes: ["cli", "config"]
 			description: """
-				Vector now has the ability to turn all undefinined variable warnings into errors by
+				Vector now has the ability to turn all undefined variable warnings into errors by
 				using the `--strict-env-vars` flag (or `VECTOR_STRICT_ENV_VARS` environment
 				variable) when running Vector. If any environment variables that are used in
 				[configurations](/docs/reference/configuration/#environment-variables) are
 				undefined, Vector will raise an error rather than a silent warning.
 
-				In a future release, this will "strict environment variable" mode will be the default. This release deprecates the current behavior of only outputing a warning for undefined variables.
+				In a future release, this will "strict environment variable" mode will be the
+				default. This release deprecates the current behavior of only outputting a warning
+				for undefined variables.
 
 				See [upgrade guide](/highlights/2023-12-19-0-35-0-upgrade-guide#strict-env-vars) for
 				details.
@@ -425,7 +427,7 @@ releases: "0.35.0": {
 		{sha: "9692ee0a5e5b393008d7273abbb485f3aa6052e7", date: "2023-11-18 06:55:37 UTC", description: "Bump nkeys from 0.3.2 to 0.4.0", pr_number:                                                   19181, scopes: ["deps"], type:                                               "chore", breaking_change:       false, author: "dependabot[bot]", files_count:   2, insertions_count:  19, deletions_count:   3},
 		{sha: "d391c43366de80224a07b04a7482e6e70c7ae233", date: "2023-11-18 03:32:13 UTC", description: "Bump docker/build-push-action from 5.0.0 to 5.1.0", pr_number:                                19185, scopes: ["ci"], type:                                                 "chore", breaking_change:       false, author: "dependabot[bot]", files_count:   2, insertions_count:  3, deletions_count:    3},
 		{sha: "114715eaf5584d191e8a44688d40ff5fc6079147", date: "2023-11-18 06:29:11 UTC", description: "dynamically convert all logs to metrics", pr_number:                                          19160, scopes: ["log_to_metric"], type:                                      "feat", breaking_change:        false, author: "Steve Steward", files_count:     4, insertions_count:  1018, deletions_count: 104},
-		{sha: "b595fb4c6b3f31e4738f6cec1c8021d6cdb5c79f", date: "2023-11-18 14:57:36 UTC", description: "add vrl as test input", pr_number:                                                            19107, scopes: ["unittests"], type:                                          "feat", breaking_change:        false, author: "Michael Hoffmann", files_count:  4, insertions_count:  71, deletions_count:   2},
+		{sha: "b595fb4c6b3f31e4738f6cec1c8021d6cdb5c79f", date: "2023-11-18 14:57:36 UTC", description: "add vrl as test input", pr_number:                                                            19107, scopes: ["unit tests"], type:                                         "feat", breaking_change:        false, author: "Michael Hoffmann", files_count:  4, insertions_count:  71, deletions_count:   2},
 		{sha: "d4189e06bd7f8efa1b0daf68f5e1a57eb5b489af", date: "2023-11-18 23:12:42 UTC", description: "fixed kafka tls config", pr_number:                                                           19117, scopes: ["kafka source", "kafka sink", "auth"], type:                 "fix", breaking_change:         false, author: "zjj", files_count:               1, insertions_count:  14, deletions_count:   0},
 		{sha: "50eb79c5e5338f34a40a1e8891f1d3b81981ace7", date: "2023-11-21 00:19:40 UTC", description: "Bump hdrhistogram from 7.5.3 to 7.5.4", pr_number:                                            19194, scopes: ["deps"], type:                                               "chore", breaking_change:       false, author: "dependabot[bot]", files_count:   2, insertions_count:  4, deletions_count:    4},
 		{sha: "3ca8c1cdaa567dfc6240be29eb13919b660ca0dd", date: "2023-11-21 06:20:19 UTC", description: "Bump uuid from 1.5.0 to 1.6.0", pr_number:                                                    19195, scopes: ["deps"], type:                                               "chore", breaking_change:       false, author: "dependabot[bot]", files_count:   1, insertions_count:  2, deletions_count:    2},
