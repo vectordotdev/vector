@@ -195,7 +195,7 @@ releases: "0.35.0": {
 		},
 		{
 			type: "fix"
-			scopes: ["kafka source", "kafa sink"]
+			scopes: ["kafka source", "kafka sink"]
 			description: """
 				The `kafka` source and sink now correctly propagate the component-level
 				`tls.verify_certificate` setting. Previously this was always set to `true`.
