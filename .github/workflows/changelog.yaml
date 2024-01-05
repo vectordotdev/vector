@@ -21,6 +21,7 @@ jobs:
       - uses: actions/checkout@v3
 
       - name: Generate authentication token
+        if: ${{ secrets.GH_APP_DATADOG_VECTOR_CI_APP_ID != '' }}
         id: generate_token
         uses: tibdex/github-app-token@3beb63f4bd073e61482598c45c71c1019b59b73a
         with:
@@ -28,6 +29,7 @@ jobs:
           private_key: ${{ secrets.GH_APP_DATADOG_VECTOR_CI_APP_PRIVATE_KEY }}
 
       - name: Get PR comment author
+        if: ${{ secrets.GH_APP_DATADOG_VECTOR_CI_APP_ID != '' }}
         id: author
         uses: tspascoal/get-user-teams-membership@v3
         with:
@@ -36,6 +38,7 @@ jobs:
           GITHUB_TOKEN: ${{ steps.generate_token.outputs.token }}
 
       - env:
+          # if the prior step did not run, this var will be ''
           AUTHOR_IS_TEAM_MEMBER: ${{ steps.author.outputs.isTeamMember }}
         run: |
           if [[ $PR_HAS_LABEL == 'true' ]] ; then
