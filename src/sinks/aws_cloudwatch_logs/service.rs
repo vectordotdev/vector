@@ -264,8 +264,7 @@ impl CloudwatchLogsSvc {
         // We will split events into 24h batches.
         // Relies on log_events being sorted by timestamp in ascending order.
         while let Some(oldest) = events.first() {
-            let limit = oldest.timestamp // .expect("timestamp must exist")
-                + Duration::days(1).num_milliseconds();
+            let limit = oldest.timestamp + Duration::days(1).num_milliseconds();
 
             if events.last().expect("Events can't be empty").timestamp <= limit {
                 // Fast path.

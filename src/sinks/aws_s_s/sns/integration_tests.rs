@@ -37,7 +37,6 @@ async fn create_sns_test_client() -> SnsClient {
         Some(endpoint),
         &proxy,
         &None,
-        true,
     )
     .await
     .unwrap()
@@ -58,7 +57,6 @@ async fn create_sqs_test_client() -> SqsClient {
         Some(endpoint),
         &proxy,
         &None,
-        true,
     )
     .await
     .unwrap()

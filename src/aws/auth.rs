@@ -1,3 +1,4 @@
+//! Authentication settings for AWS components.
 use std::time::Duration;
 
 use aws_config::{
@@ -184,7 +185,8 @@ fn default_profile() -> String {
 }
 
 impl AwsAuthentication {
-    pub async fn credentials_cache(&self) -> crate::Result<SharedIdentityCache> {
+    /// Creates the identity cache to store credentials based on the authentication mechanism chosen.
+    pub(super) async fn credentials_cache(&self) -> crate::Result<SharedIdentityCache> {
         match self {
             AwsAuthentication::Role {
                 load_timeout_secs, ..
@@ -206,6 +208,7 @@ impl AwsAuthentication {
         }
     }
 
+    /// Returns the provider for the credentials based on the authentication mechanism chosen.
     pub async fn credentials_provider(
         &self,
         service_region: Region,
@@ -292,6 +295,7 @@ impl AwsAuthentication {
     }
 
     #[cfg(test)]
+    /// Creates dummy authentication for tests.
     pub fn test_auth() -> AwsAuthentication {
         AwsAuthentication::AccessKey {
             access_key_id: "dummy".to_string().into(),

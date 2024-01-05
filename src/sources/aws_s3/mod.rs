@@ -237,7 +237,6 @@ impl AwsS3Config {
             endpoint.clone(),
             proxy,
             &self.tls_options,
-            false,
         )
         .await?;
 
@@ -253,7 +252,6 @@ impl AwsS3Config {
                     endpoint,
                     proxy,
                     &sqs.tls_options,
-                    false,
                 )
                 .await?;
 
@@ -979,7 +977,6 @@ mod integration_tests {
             region_endpoint.endpoint(),
             &proxy_config,
             &None,
-            false,
         )
         .await
         .unwrap()
@@ -998,7 +995,6 @@ mod integration_tests {
             region_endpoint.endpoint(),
             &proxy_config,
             &None,
-            false,
         )
         .await
         .unwrap()

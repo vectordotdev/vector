@@ -18,6 +18,7 @@ use crate::{
     aws::{create_client, is_retriable_error, AwsAuthentication, RegionOrEndpoint},
     common::s3::S3ClientBuilder,
     config::ProxyConfig,
+    http::status,
     sinks::{util::retries::RetryLogic, Healthcheck},
     tls::TlsConfig,
 };
@@ -340,8 +341,8 @@ pub fn build_healthcheck(bucket: String, client: S3Client) -> crate::Result<Heal
                 SdkError::ServiceError(inner) => {
                     let status = inner.into_raw().status();
                     match status.as_u16() {
-                        403 /* StatusCode::FORBIDDEN */ => HealthcheckError::InvalidCredentials.into(),
-                        404 /* StatusCode::NOT_FOUND */ => HealthcheckError::UnknownBucket { bucket }.into(),
+                        status::FORBIDDEN => HealthcheckError::InvalidCredentials.into(),
+                        status::NOT_FOUND => HealthcheckError::UnknownBucket { bucket }.into(),
                         _ => HealthcheckError::UnknownStatus { status }.into(),
                     }
                 }
@@ -362,7 +363,7 @@ pub async fn create_service(
     let endpoint = region.endpoint();
     let region = region.region();
     let client =
-        create_client::<S3ClientBuilder>(auth, region.clone(), endpoint, proxy, tls_options, true)
+        create_client::<S3ClientBuilder>(auth, region.clone(), endpoint, proxy, tls_options)
             .await?;
     Ok(S3Service::new(client))
 }

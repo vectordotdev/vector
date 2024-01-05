@@ -1,48 +1,29 @@
-#![allow(missing_docs)]
-#![allow(unused_imports)]
+//! Shared functionality for the AWS components.
 pub mod auth;
 pub mod region;
-
-use std::error::Error;
-use std::future::Future;
-use std::pin::Pin;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, OnceLock};
-use std::task::{Context, Poll};
-use std::time::SystemTime;
 
 pub use auth::{AwsAuthentication, ImdsAuthentication};
 use aws_config::{meta::region::ProvideRegion, retry::RetryConfig, Region, SdkConfig};
 use aws_credential_types::provider::{ProvideCredentials, SharedCredentialsProvider};
-use aws_sdk_sqs::{config::Builder, Config};
-use aws_sigv4::http_request::{SignableBody, SignableRequest, SigningParams, SigningSettings};
-use aws_sigv4::sign::v4;
+use aws_sigv4::{
+    http_request::{SignableBody, SignableRequest, SigningSettings},
+    sign::v4,
+};
 use aws_smithy_async::rt::sleep::TokioSleep;
 use aws_smithy_runtime::client::http::hyper_014::HyperClientBuilder;
-use aws_smithy_runtime_api::client::http::{
-    HttpConnector, HttpConnectorFuture, SharedHttpConnector,
+use aws_smithy_runtime_api::client::{
+    http::{HttpConnector, HttpConnectorFuture, SharedHttpConnector},
+    identity::Identity,
+    orchestrator::{HttpRequest, HttpResponse},
+    result::SdkError,
 };
-use aws_smithy_runtime_api::client::identity::Identity;
-use aws_smithy_runtime_api::client::orchestrator::HttpRequest;
-use aws_smithy_runtime_api::{
-    client::{
-        interceptors::{Intercept, SharedInterceptor},
-        orchestrator::HttpResponse,
-        result::SdkError,
-    },
-    http::{Request, Response, StatusCode},
-};
-use aws_smithy_types::body::SdkBody;
-use aws_types::sdk_config::SharedHttpClient;
 use bytes::Bytes;
 use futures_util::FutureExt;
-use http::HeaderMap;
-use http_body::Body;
-use pin_project::pin_project;
 use regex::RegexSet;
 pub use region::RegionOrEndpoint;
-use snafu::{ResultExt, Snafu};
-use tower::{Layer, Service};
+use snafu::Snafu;
+use std::sync::{Arc, OnceLock};
+use std::time::SystemTime;
 
 use crate::config::ProxyConfig;
 use crate::http::{build_proxy_connector, build_tls_connector, status};
@@ -51,6 +32,7 @@ use crate::tls::{MaybeTlsSettings, TlsConfig};
 
 static RETRIABLE_CODES: OnceLock<RegexSet> = OnceLock::new();
 
+/// Checks if the request can be retried after the given error was returned.
 pub fn is_retriable_error<T>(error: &SdkError<T, HttpResponse>) -> bool {
     match error {
         SdkError::TimeoutError(_) | SdkError::DispatchFailure(_) => true,
@@ -97,13 +79,16 @@ fn check_response(res: &HttpResponse) -> bool {
         || (status.is_client_error() && re.is_match(response_body.as_ref()))
 }
 
+/// Implement for each AWS service to create the appropriate AWS sdk client.
 pub trait ClientBuilder {
+    /// The type of the client in the SDK.
     type Client;
 
+    /// Build the client using the given config settings.
     fn build(config: &SdkConfig) -> Self::Client;
 }
 
-pub async fn resolve_region(region: Option<Region>) -> crate::Result<Region> {
+async fn resolve_region(region: Option<Region>) -> crate::Result<Region> {
     match region {
         Some(region) => Ok(region),
         None => aws_config::default_provider::region::default_provider()
@@ -115,26 +100,26 @@ pub async fn resolve_region(region: Option<Region>) -> crate::Result<Region> {
     }
 }
 
+/// Create the SDK client using the provided settings.
 pub async fn create_client<T: ClientBuilder>(
     auth: &AwsAuthentication,
     region: Option<Region>,
     endpoint: Option<String>,
     proxy: &ProxyConfig,
     tls_options: &Option<TlsConfig>,
-    is_sink: bool,
 ) -> crate::Result<T::Client> {
-    create_client_and_region::<T>(auth, region, endpoint, proxy, tls_options, is_sink)
+    create_client_and_region::<T>(auth, region, endpoint, proxy, tls_options)
         .await
         .map(|(client, _)| client)
 }
 
+/// Create the SDK client and resolve the region using the provided settings.
 pub async fn create_client_and_region<T: ClientBuilder>(
     auth: &AwsAuthentication,
     region: Option<Region>,
     endpoint: Option<String>,
     proxy: &ProxyConfig,
     tls_options: &Option<TlsConfig>,
-    _is_sink: bool,
 ) -> crate::Result<(T::Client, Region)> {
     let retry_config = RetryConfig::disabled();
 
@@ -194,6 +179,8 @@ enum SigningError {
     NotUTF8Header,
 }
 
+/// Sign the request prior to sending to AWS.
+/// The signature is added to the provided `request`.
 pub async fn sign_request(
     service_name: &str,
     request: &mut http::Request<Bytes>,
@@ -239,7 +226,7 @@ pub async fn sign_request(
 }
 
 #[derive(Debug)]
-pub struct AwsHttpClient<T> {
+struct AwsHttpClient<T> {
     http: T,
     region: Region,
 }
@@ -263,7 +250,7 @@ where
 }
 
 #[derive(Clone, Debug)]
-pub struct AwsConnector<T> {
+struct AwsConnector<T> {
     http: T,
     region: Region,
 }

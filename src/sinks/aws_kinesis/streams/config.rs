@@ -109,7 +109,6 @@ impl KinesisStreamsSinkConfig {
             self.base.region.endpoint(),
             proxy,
             &self.base.tls,
-            true,
         )
         .await
     }
