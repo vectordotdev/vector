@@ -17,13 +17,25 @@ use aws_smithy_runtime_api::client::{
     orchestrator::{HttpRequest, HttpResponse},
     result::SdkError,
 };
+use aws_smithy_types::body::SdkBody;
 use bytes::Bytes;
 use futures_util::FutureExt;
+use http::HeaderMap;
+use http_body::{combinators::BoxBody, Body};
+use pin_project::pin_project;
 use regex::RegexSet;
 pub use region::RegionOrEndpoint;
 use snafu::Snafu;
-use std::sync::{Arc, OnceLock};
 use std::time::SystemTime;
+use std::{
+    error::Error,
+    pin::Pin,
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc, OnceLock,
+    },
+    task::{Context, Poll},
+};
 
 use crate::config::ProxyConfig;
 use crate::http::{build_proxy_connector, build_tls_connector, status};
@@ -260,11 +272,20 @@ where
     T: HttpConnector,
 {
     fn call(&self, req: HttpRequest) -> HttpConnectorFuture {
-        let byte_size = req.body().bytes().expect("body cannot be lazy").len();
+        let bytes_sent = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let req = req.map(|body| {
+            let bytes_sent = Arc::clone(&bytes_sent);
+            body.map_preserve_contents(move |body| {
+                let body = MeasuredBody::new(body, Arc::clone(&bytes_sent));
+                SdkBody::from_body_0_4(BoxBody::new(body))
+            })
+        });
+
         let fut = self.http.call(req);
         let region = self.region.clone();
 
         HttpConnectorFuture::new(fut.inspect(move |result| {
+            let byte_size = bytes_sent.load(Ordering::Relaxed);
             if let Ok(result) = result {
                 if result.status().is_success() {
                     emit!(AwsBytesSent {
@@ -274,5 +295,51 @@ where
                 }
             }
         }))
+    }
+}
+
+#[pin_project]
+struct MeasuredBody {
+    #[pin]
+    inner: SdkBody,
+    shared_bytes_sent: Arc<AtomicUsize>,
+}
+
+impl MeasuredBody {
+    fn new(body: SdkBody, shared_bytes_sent: Arc<AtomicUsize>) -> Self {
+        Self {
+            inner: body,
+            shared_bytes_sent,
+        }
+    }
+}
+
+impl Body for MeasuredBody {
+    type Data = Bytes;
+    type Error = Box<dyn Error + Send + Sync>;
+
+    fn poll_data(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+    ) -> Poll<Option<Result<Self::Data, Self::Error>>> {
+        let this = self.project();
+
+        match this.inner.poll_data(cx) {
+            Poll::Ready(Some(Ok(data))) => {
+                this.shared_bytes_sent
+                    .fetch_add(data.len(), Ordering::Release);
+                Poll::Ready(Some(Ok(data)))
+            }
+            Poll::Ready(None) => Poll::Ready(None),
+            Poll::Ready(Some(Err(e))) => Poll::Ready(Some(Err(e))),
+            Poll::Pending => Poll::Pending,
+        }
+    }
+
+    fn poll_trailers(
+        self: Pin<&mut Self>,
+        _cx: &mut Context<'_>,
+    ) -> Poll<Result<Option<HeaderMap>, Self::Error>> {
+        Poll::Ready(Ok(None))
     }
 }
