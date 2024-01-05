@@ -2,7 +2,10 @@ use std::{fmt::Debug, io, sync::Arc};
 
 use serde::{ser::SerializeSeq, Serializer};
 use snafu::Snafu;
-use vector_lib::lookup::event_path;
+use vector_lib::{
+    internal_event::{ComponentEventsDropped, UNINTENTIONAL},
+    lookup::event_path,
+};
 
 use super::{config::MAX_PAYLOAD_BYTES, service::LogApiRequest};
 use crate::sinks::{
@@ -196,7 +199,10 @@ impl LogRequestBuilder {
                     if events_that_fit == 0 {
                         // first event was too large for whole request
                         let _too_big = events.pop();
-                        // TODO: emit dropped event
+                        emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+                            count: 1,
+                            reason: "Event too large to encode."
+                        });
 
                         let mut byte_size = telemetry().create_request_count_byte_size();
                         for event in events.iter_mut() {
