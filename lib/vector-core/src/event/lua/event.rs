@@ -168,9 +168,10 @@ mod test {
         vector_common::assert_event_data_eq!(event, expected);
     }
 
+    #[test]
     // the panic message a) is platform dependent and b) can change if any code is added before this function.
     #[allow(clippy::should_panic_without_expect)]
-    #[test]
+    #[should_panic]
     fn from_lua_missing_log_and_metric() {
         let lua_event = r"{
             some_field: {}
