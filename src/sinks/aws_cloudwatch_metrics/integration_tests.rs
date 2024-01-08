@@ -18,7 +18,7 @@ fn cloudwatch_address() -> String {
 fn config() -> CloudWatchMetricsSinkConfig {
     CloudWatchMetricsSinkConfig {
         default_namespace: "vector".into(),
-        region: RegionOrEndpoint::with_both("local", cloudwatch_address().as_str()),
+        region: RegionOrEndpoint::with_both("us-east-1", cloudwatch_address().as_str()),
         ..Default::default()
     }
 }
