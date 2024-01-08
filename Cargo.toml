@@ -191,7 +191,7 @@ opendal = {version = "0.44", default-features = false, features = ["native-tls",
 tower = { version = "0.4.13", default-features = false, features = ["buffer", "limit", "retry", "timeout", "util", "balance", "discover"] }
 tower-http = { version = "0.4.4", default-features = false, features = ["decompression-gzip", "trace"]}
 # Serde
-serde = { version = "1.0.193", default-features = false, features = ["derive"] }
+serde = { version = "1.0.194", default-features = false, features = ["derive"] }
 serde-toml-merge = { version = "0.3.3", default-features = false }
 serde_bytes = { version = "0.11.12", default-features = false, features = ["std"], optional = true }
 serde_json = { version = "1.0.109", default-features = false, features = ["raw_value"] }
@@ -316,7 +316,7 @@ tokio-tungstenite = {version = "0.20.1", default-features = false, features = ["
 toml = { version = "0.8.8", default-features = false, features = ["parse", "display"] }
 tonic = { version = "0.10", optional = true, default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "gzip"] }
 hickory-proto = { version = "0.24.0", default-features = false, features = ["dnssec"], optional = true }
-typetag = { version = "0.2.14", default-features = false }
+typetag = { version = "0.2.15", default-features = false }
 url = { version = "2.5.0", default-features = false, features = ["serde"] }
 uuid = { version = "1", default-features = false, features = ["serde", "v4"] }
 warp = { version = "0.3.6", default-features = false }
