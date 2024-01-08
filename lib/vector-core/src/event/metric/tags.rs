@@ -555,7 +555,7 @@ impl MetricTags {
     }
 
     pub fn keys(&self) -> impl Iterator<Item = &str> {
-        self.0.keys().map(|k| k.as_str())
+        self.0.keys().map(VectorString::as_str)
     }
 
     pub fn extend<K, V>(&mut self, tags: impl IntoIterator<Item = (K, V)>)

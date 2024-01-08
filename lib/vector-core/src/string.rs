@@ -9,7 +9,7 @@ use vector_config::{
     Configurable, ConfigurableString, GenerateError, Metadata, ToValue,
 };
 
-#[derive(Clone, Debug, Eq, Ord)]
+#[derive(Clone, Debug, Eq)]
 pub enum VectorString {
     Owned(String),
     Shared(Chars),
@@ -28,7 +28,7 @@ impl VectorString {
     pub fn as_str(&self) -> &str {
         match self {
             Self::Owned(s) => s.as_str(),
-            Self::Shared(s) => &s,
+            Self::Shared(s) => s,
             Self::Static(s) => s,
         }
     }
@@ -73,6 +73,12 @@ impl PartialEq<VectorString> for VectorString {
 impl PartialOrd for VectorString {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         self.as_str().partial_cmp(other.as_str())
+    }
+}
+
+impl Ord for VectorString {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.as_str().cmp(other.as_str())
     }
 }
 
@@ -171,7 +177,7 @@ impl<'a> mlua::prelude::IntoLua<'a> for VectorString {
         lua: &'a mlua::prelude::Lua,
     ) -> mlua::prelude::LuaResult<mlua::prelude::LuaValue<'a>> {
         lua.create_string(self.as_bytes())
-            .map(|s| mlua::prelude::LuaValue::String(s))
+            .map(mlua::prelude::LuaValue::String)
     }
 }
 
