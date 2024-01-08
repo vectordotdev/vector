@@ -162,6 +162,15 @@ discuss if a change that large is even needed! This will produce a quicker
 response to the change and likely produce code that aligns better with our
 process.
 
+#### Changelog
+
+By default, all pull requests are assumed to include user-facing changes that
+need to be communicated in the project's changelog. If your pull request does
+not contain user-facing changes that warrant describing in the changelog, add
+the label 'no-changelog' to your PR. When in doubt, consult the vector team
+for guidance. The details on how to add a changelog entry for your PR are
+outlined in detail in [changelog.d/README.md](changelog.d/README.md).
+
 ### CI
 
 Currently, Vector uses GitHub Actions to run tests. The workflows are defined in
