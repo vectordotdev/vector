@@ -156,7 +156,7 @@ tracing-tower = { git = "https://github.com/tokio-rs/tracing", default-features 
 
 # Metrics
 metrics = "0.22.0"
-metrics-tracing-context = { version = "0.14.0", default-features = false }
+metrics-tracing-context = { version = "0.15.0", default-features = false }
 
 # AWS - Official SDK
 aws-sdk-s3 = { version = "1.3.0", default-features = false, features = ["behavior-version-latest"], optional = true }

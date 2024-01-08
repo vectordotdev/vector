@@ -2,7 +2,7 @@ use std::sync::{atomic::Ordering, Arc, RwLock};
 use std::{cell::OnceCell, time::Duration};
 
 use chrono::Utc;
-use metrics::{Counter, Gauge, Histogram, Key, KeyName, Recorder, SharedString, Unit};
+use metrics::{Counter, Gauge, Histogram, Key, KeyName, Metadata, Recorder, SharedString, Unit};
 use metrics_util::{registry::Registry as MetricsRegistry, MetricKindMask};
 use quanta::Clock;
 
@@ -94,45 +94,28 @@ impl Registry {
 /// [`VectorRecorder`] is a [`metrics::Recorder`] implementation that's suitable
 /// for the advanced usage that we have in Vector.
 #[derive(Clone)]
-pub(super) enum VectorRecorder {
-    Global(Arc<Registry>),
-    ThreadLocal,
-}
+pub(super) struct VectorRecorder(Arc<Registry>);
 
 impl VectorRecorder {
-    pub(super) fn new_global() -> Self {
-        Self::Global(Arc::new(Registry::new()))
-    }
-
-    pub(super) fn new_test() -> Self {
-        Self::with_thread_local(Registry::clear);
-        Self::ThreadLocal
+    pub(super) fn new() -> Self {
+        Self(Arc::new(Registry::new()))
     }
 
     pub(super) fn with_registry<T>(&self, doit: impl FnOnce(&Registry) -> T) -> T {
-        match &self {
-            Self::Global(registry) => doit(registry),
-            // This is only called after the registry is created, so we can just use a dummy
-            // idle_timeout parameter.
-            Self::ThreadLocal => Self::with_thread_local(doit),
-        }
-    }
-
-    fn with_thread_local<T>(doit: impl FnOnce(&Registry) -> T) -> T {
-        LOCAL_REGISTRY.with(|oc| doit(oc.get_or_init(Registry::new)))
+        doit(&self.0)
     }
 }
 
 impl Recorder for VectorRecorder {
-    fn register_counter(&self, key: &Key) -> Counter {
+    fn register_counter(&self, key: &Key, _meta: &Metadata<'_>) -> Counter {
         self.with_registry(|r| r.get_counter(key))
     }
 
-    fn register_gauge(&self, key: &Key) -> Gauge {
+    fn register_gauge(&self, key: &Key, _meta: &Metadata<'_>) -> Gauge {
         self.with_registry(|r| r.get_gauge(key))
     }
 
-    fn register_histogram(&self, key: &Key) -> Histogram {
+    fn register_histogram(&self, key: &Key, _meta: &Metadata<'_>) -> Histogram {
         self.with_registry(|r| r.get_histogram(key))
     }
 

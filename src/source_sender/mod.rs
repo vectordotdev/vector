@@ -3,7 +3,7 @@ use std::{collections::HashMap, fmt, sync::Arc, time::Instant};
 
 use chrono::Utc;
 use futures::{Stream, StreamExt};
-use metrics::{register_histogram, Histogram};
+use metrics::{histogram, Histogram};
 use tracing::Span;
 use vector_lib::buffers::topology::channel::{self, LimitedReceiver, LimitedSender};
 use vector_lib::buffers::EventCount;
@@ -170,13 +170,13 @@ impl SourceSender {
             buf_size: CHUNK_SIZE,
             inner: None,
             named_inners: Default::default(),
-            lag_time: Some(register_histogram!(LAG_TIME_NAME)),
+            lag_time: Some(histogram!(LAG_TIME_NAME)),
         }
     }
 
     #[cfg(test)]
     pub fn new_test_sender_with_buffer(n: usize) -> (Self, LimitedReceiver<SourceSenderItem>) {
-        let lag_time = Some(register_histogram!(LAG_TIME_NAME));
+        let lag_time = Some(histogram!(LAG_TIME_NAME));
         let output_id = OutputId {
             component: "test".to_string().into(),
             port: None,
@@ -539,10 +539,10 @@ mod tests {
     use rand::{thread_rng, Rng};
     use tokio::time::timeout;
     use vector_lib::event::{LogEvent, Metric, MetricKind, MetricValue, TraceEvent};
+    use vector_lib::metrics;
     use vrl::event_path;
 
     use super::*;
-    use crate::metrics::{self, Controller};
 
     #[tokio::test]
     async fn emits_lag_time_for_log() {
@@ -580,24 +580,25 @@ mod tests {
     }
 
     async fn emit_and_test(make_event: impl FnOnce(DateTime<Utc>) -> Event) {
-        metrics::init_test();
-        let (mut sender, _stream) = SourceSender::new_test();
         let millis = thread_rng().gen_range(10..10000);
         let timestamp = Utc::now() - Duration::milliseconds(millis);
         let expected = millis as f64 / 1000.0;
-
         let event = make_event(timestamp);
-        sender
-            .send_event(event)
-            .await
-            .expect("Send should not fail");
 
-        let lag_times = Controller::get()
-            .expect("There must be a controller")
-            .capture_metrics()
-            .into_iter()
-            .filter(|metric| metric.name() == "source_lag_time_seconds")
-            .collect::<Vec<_>>();
+        let lag_times = metrics::with_test_recorder_async(|controller| async move {
+            let (mut sender, _stream) = SourceSender::new_test();
+
+            sender
+                .send_event(event)
+                .await
+                .expect("Send should not fail");
+
+            controller
+                .capture_metrics()
+                .into_iter()
+                .filter(|metric| metric.name() == "source_lag_time_seconds")
+                .collect::<Vec<_>>()
+        });
         assert_eq!(lag_times.len(), 1);
 
         let lag_time = &lag_times[0];
@@ -618,10 +619,8 @@ mod tests {
                 }
                 assert_eq!(*count, 1);
                 assert!(
-                    (*sum - expected).abs() <= 0.002,
-                    "Histogram sum does not match expected sum: {} vs {}",
-                    *sum,
-                    expected,
+                    (sum - expected).abs() <= 0.002,
+                    "Histogram sum does not match expected sum: {sum} vs {expected}",
                 );
             }
             _ => panic!("source_lag_time_seconds has invalid type"),
@@ -630,80 +629,80 @@ mod tests {
 
     #[tokio::test]
     async fn emits_component_discarded_events_total_for_send_event() {
-        metrics::init_test();
-        let (mut sender, _recv) = SourceSender::new_test_sender_with_buffer(1);
+        metrics::with_test_recorder_async(|controller| async move {
+            let (mut sender, _recv) = SourceSender::new_test_sender_with_buffer(1);
 
-        let event = Event::Metric(Metric::new(
-            "name",
-            MetricKind::Absolute,
-            MetricValue::Gauge { value: 123.4 },
-        ));
+            let event = Event::Metric(Metric::new(
+                "name",
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: 123.4 },
+            ));
 
-        // First send will succeed.
-        sender
-            .send_event(event.clone())
-            .await
-            .expect("First send should not fail");
+            // First send will succeed.
+            sender
+                .send_event(event.clone())
+                .await
+                .expect("First send should not fail");
 
-        // Second send will timeout, so the future will not be polled to completion.
-        let res = timeout(
-            std::time::Duration::from_millis(100),
-            sender.send_event(event.clone()),
-        )
-        .await;
-        assert!(res.is_err(), "Send should have timed out.");
+            // Second send will timeout, so the future will not be polled to completion.
+            let res = timeout(
+                std::time::Duration::from_millis(100),
+                sender.send_event(event.clone()),
+            )
+            .await;
+            assert!(res.is_err(), "Send should have timed out.");
 
-        let component_discarded_events_total = Controller::get()
-            .expect("There must be a controller")
-            .capture_metrics()
-            .into_iter()
-            .filter(|metric| metric.name() == "component_discarded_events_total")
-            .collect::<Vec<_>>();
-        assert_eq!(component_discarded_events_total.len(), 1);
+            let component_discarded_events_total = controller
+                .capture_metrics()
+                .into_iter()
+                .filter(|metric| metric.name() == "component_discarded_events_total")
+                .collect::<Vec<_>>();
+            assert_eq!(component_discarded_events_total.len(), 1);
 
-        let component_discarded_events_total = &component_discarded_events_total[0];
-        let MetricValue::Counter { value } = component_discarded_events_total.value() else {
-            panic!("component_discarded_events_total has invalid type")
-        };
-        assert_eq!(*value, 1.0);
+            let component_discarded_events_total = &component_discarded_events_total[0];
+            let MetricValue::Counter { value } = component_discarded_events_total.value() else {
+                panic!("component_discarded_events_total has invalid type")
+            };
+            assert_eq!(*value, 1.0);
+        });
     }
 
     #[tokio::test]
     async fn emits_component_discarded_events_total_for_send_batch() {
-        metrics::init_test();
-        let (mut sender, _recv) = SourceSender::new_test_sender_with_buffer(1);
+        metrics::with_test_recorder_async(|controller| async move {
+            let (mut sender, _recv) = SourceSender::new_test_sender_with_buffer(1);
 
-        let expected_drop = 100;
-        let events: Vec<Event> = (0..(CHUNK_SIZE + expected_drop))
-            .map(|_| {
-                Event::Metric(Metric::new(
-                    "name",
-                    MetricKind::Absolute,
-                    MetricValue::Gauge { value: 123.4 },
-                ))
-            })
-            .collect();
+            let expected_drop = 100;
+            let events: Vec<Event> = (0..(CHUNK_SIZE + expected_drop))
+                .map(|_| {
+                    Event::Metric(Metric::new(
+                        "name",
+                        MetricKind::Absolute,
+                        MetricValue::Gauge { value: 123.4 },
+                    ))
+                })
+                .collect();
 
-        // `CHUNK_SIZE` events will be sent into buffer but then the future will not be polled to completion.
-        let res = timeout(
-            std::time::Duration::from_millis(100),
-            sender.send_batch(events),
-        )
-        .await;
-        assert!(res.is_err(), "Send should have timed out.");
+            // `CHUNK_SIZE` events will be sent into buffer but then the future will not be polled to completion.
+            let res = timeout(
+                std::time::Duration::from_millis(100),
+                sender.send_batch(events),
+            )
+            .await;
+            assert!(res.is_err(), "Send should have timed out.");
 
-        let component_discarded_events_total = Controller::get()
-            .expect("There must be a controller")
-            .capture_metrics()
-            .into_iter()
-            .filter(|metric| metric.name() == "component_discarded_events_total")
-            .collect::<Vec<_>>();
-        assert_eq!(component_discarded_events_total.len(), 1);
+            let component_discarded_events_total = controller
+                .capture_metrics()
+                .into_iter()
+                .filter(|metric| metric.name() == "component_discarded_events_total")
+                .collect::<Vec<_>>();
+            assert_eq!(component_discarded_events_total.len(), 1);
 
-        let component_discarded_events_total = &component_discarded_events_total[0];
-        let MetricValue::Counter { value } = component_discarded_events_total.value() else {
-            panic!("component_discarded_events_total has invalid type")
-        };
-        assert_eq!(*value, expected_drop as f64);
+            let component_discarded_events_total = &component_discarded_events_total[0];
+            let MetricValue::Counter { value } = component_discarded_events_total.value() else {
+                panic!("component_discarded_events_total has invalid type")
+            };
+            assert_eq!(*value, expected_drop as f64);
+        });
     }
 }

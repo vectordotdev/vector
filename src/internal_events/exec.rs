@@ -26,13 +26,15 @@ impl InternalEvent for ExecEventsReceived<'_> {
             command = %self.command,
         );
         counter!(
-            "component_received_events_total", self.count as u64,
+            "component_received_events_total",
             "command" => self.command.to_owned(),
-        );
+        )
+        .increment(self.count as u64);
         counter!(
-            "component_received_event_bytes_total", self.byte_size.get() as u64,
+            "component_received_event_bytes_total",
             "command" => self.command.to_owned(),
-        );
+        )
+        .increment(self.byte_size.get() as u64);
     }
 }
 
@@ -54,12 +56,13 @@ impl InternalEvent for ExecFailedError<'_> {
             internal_log_rate_limit = true,
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "command" => self.command.to_owned(),
             "error_type" => error_type::COMMAND_FAILED,
             "error_code" => io_error_code(&self.error),
             "stage" => error_stage::RECEIVING,
-        );
+        )
+        .increment(1);
     }
 }
 
@@ -82,11 +85,12 @@ impl InternalEvent for ExecTimeoutError<'_> {
             internal_log_rate_limit = true,
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "command" => self.command.to_owned(),
             "error_type" => error_type::TIMED_OUT,
             "stage" => error_stage::RECEIVING,
-        );
+        )
+        .increment(1);
     }
 }
 
@@ -117,16 +121,18 @@ impl InternalEvent for ExecCommandExecuted<'_> {
             internal_log_rate_limit = true,
         );
         counter!(
-            "command_executed_total", 1,
+            "command_executed_total",
             "command" => self.command.to_owned(),
             "exit_status" => exit_status.clone(),
-        );
+        )
+        .increment(1);
 
         histogram!(
-            "command_execution_duration_seconds", self.exec_duration,
-            "command" => self.command.to_owned(),
+            "command_execution_duration_seconds",
             "exit_status" => exit_status,
-        );
+            "command" => self.command.to_owned(),
+        )
+        .record(self.exec_duration);
     }
 }
 
@@ -191,12 +197,13 @@ impl InternalEvent for ExecFailedToSignalChildError<'_> {
             internal_log_rate_limit = true,
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "command" => format!("{:?}", self.command.as_std()),
             "error_code" => self.error.to_error_code(),
             "error_type" => error_type::COMMAND_FAILED,
             "stage" => error_stage::RECEIVING,
-        );
+        )
+        .increment(1);
     }
 }
 
@@ -212,10 +219,11 @@ impl InternalEvent for ExecChannelClosedError {
             internal_log_rate_limit = true,
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_type" => error_type::COMMAND_FAILED,
             "stage" => error_stage::RECEIVING,
-        );
+        )
+        .increment(1);
         emit!(ComponentEventsDropped::<UNINTENTIONAL> {
             count: 1,
             reason: exec_reason

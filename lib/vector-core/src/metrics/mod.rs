@@ -4,9 +4,10 @@ mod recency;
 mod recorder;
 mod storage;
 
-use std::{sync::OnceLock, time::Duration};
+use std::{future::Future, sync::OnceLock, time::Duration};
 
 use chrono::Utc;
+use futures::executor;
 use metrics::Key;
 use metrics_tracing_context::TracingContextLayer;
 use metrics_util::layers::Layer;
@@ -57,7 +58,7 @@ fn init(recorder: VectorRecorder) -> Result<()> {
     // An escape hatch to allow disabling internal metrics core. May be used for
     // performance reasons. This is a hidden and undocumented functionality.
     if !metrics_enabled() {
-        metrics::set_boxed_recorder(Box::new(metrics::NoopRecorder))
+        metrics::set_global_recorder(metrics::NoopRecorder)
             .map_err(|_| Error::AlreadyInitialized)?;
         info!(message = "Internal metrics core is disabled.");
         return Ok(());
@@ -74,9 +75,9 @@ fn init(recorder: VectorRecorder) -> Result<()> {
     let controller = Controller {
         recorder: recorder.clone(),
     };
-    CONTROLLER
-        .set(controller)
-        .map_err(|_| Error::AlreadyInitialized)?;
+    let Ok(()) = CONTROLLER.set(controller) else {
+        return Err(Error::AlreadyInitialized);
+    };
 
     ////
     //// Initialize the recorder.
@@ -85,16 +86,13 @@ fn init(recorder: VectorRecorder) -> Result<()> {
     // The recorder is the interface between metrics-rs and our registry. In our
     // case it doesn't _do_ much other than shepherd into the registry and
     // update the cardinality counter, see above, as needed.
-    let recorder: Box<dyn metrics::Recorder> = if tracing_context_layer_enabled() {
+    if tracing_context_layer_enabled() {
         // Apply a layer to capture tracing span fields as labels.
-        Box::new(TracingContextLayer::new(VectorLabelFilter).layer(recorder))
+        metrics::set_global_recorder(TracingContextLayer::new(VectorLabelFilter).layer(recorder))
+            .map_err(|_| Error::AlreadyInitialized)
     } else {
-        Box::new(recorder)
-    };
-
-    // This where we combine metrics-rs and our registry. We box it to avoid
-    // having to fiddle with statics ourselves.
-    metrics::set_boxed_recorder(recorder).map_err(|_| Error::AlreadyInitialized)
+        metrics::set_global_recorder(recorder).map_err(|_| Error::AlreadyInitialized)
+    }
 }
 
 /// Initialize the default metrics sub-system
@@ -103,21 +101,30 @@ fn init(recorder: VectorRecorder) -> Result<()> {
 ///
 /// This function will error if it is called multiple times.
 pub fn init_global() -> Result<()> {
-    init(VectorRecorder::new_global())
+    init(VectorRecorder::new())
 }
 
 /// Initialize the thread-local metrics sub-system. This function will loop until a recorder is
 /// actually set.
-pub fn init_test() {
-    if init(VectorRecorder::new_test()).is_err() {
-        // The only error case returned by `init` is `AlreadyInitialized`. A race condition is
-        // possible here: if metrics are being initialized by two (or more) test threads
-        // simultaneously, the ones that fail to set return immediately, possibly allowing
-        // subsequent code to execute before the static recorder value is actually set within the
-        // `metrics` crate. To prevent subsequent code from running with an unset recorder, loop
-        // here until a recorder is available.
-        while metrics::try_recorder().is_none() {}
-    }
+pub fn with_test_recorder<T>(doit: impl FnOnce(Controller) -> T) -> T {
+    let recorder = VectorRecorder::new();
+    let controller = Controller {
+        recorder: recorder.clone(),
+    };
+    metrics::with_local_recorder(&recorder, || doit(controller))
+}
+
+/// Initialize the thread-local metrics sub-system. This function will loop until a recorder is
+/// actually set.
+pub fn with_test_recorder_async<F, T>(doit: impl FnOnce(Controller) -> F) -> T
+where
+    F: Future<Output = T>,
+{
+    let recorder = VectorRecorder::new();
+    let controller = Controller {
+        recorder: recorder.clone(),
+    };
+    metrics::with_local_recorder(&recorder, || executor::block_on(doit(controller)))
 }
 
 impl Controller {
@@ -132,7 +139,7 @@ impl Controller {
     ///
     /// This function will fail if the metrics subsystem has not been correctly
     /// initialized.
-    pub fn get() -> Result<&'static Self> {
+    pub fn get_global() -> Result<&'static Self> {
         CONTROLLER.get().ok_or(Error::NotInitialized)
     }
 
@@ -177,50 +184,6 @@ impl Controller {
     }
 }
 
-#[macro_export]
-/// This macro is used to emit metrics as a `counter` while simultaneously
-/// converting from absolute values to incremental values.
-///
-/// Values that do not arrive in strictly monotonically increasing order are
-/// ignored and will not be emitted.
-macro_rules! update_counter {
-    ($label:literal, $value:expr) => {{
-        use ::std::sync::atomic::{AtomicU64, Ordering};
-
-        static PREVIOUS_VALUE: AtomicU64 = AtomicU64::new(0);
-
-        let new_value = $value;
-        let mut previous_value = PREVIOUS_VALUE.load(Ordering::Relaxed);
-
-        loop {
-            // Either a new greater value has been emitted before this thread updated the counter
-            // or values were provided that are not in strictly monotonically increasing order.
-            // Ignore.
-            if new_value <= previous_value {
-                break;
-            }
-
-            match PREVIOUS_VALUE.compare_exchange_weak(
-                previous_value,
-                new_value,
-                Ordering::SeqCst,
-                Ordering::Relaxed,
-            ) {
-                // Another thread has written a new value before us. Re-enter loop.
-                Err(value) => previous_value = value,
-                // Calculate delta to last emitted value and emit it.
-                Ok(_) => {
-                    let delta = new_value - previous_value;
-                    // Albeit very unlikely, note that this sequence of deltas might be emitted in
-                    // a different order than they were calculated.
-                    counter!($label, delta);
-                    break;
-                }
-            }
-        }
-    }};
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -229,109 +192,105 @@ mod tests {
 
     const IDLE_TIMEOUT: f64 = 0.5;
 
-    fn init_metrics() -> &'static Controller {
-        init_test();
-        Controller::get().expect("Could not get global metrics controller")
-    }
-
     #[test]
     fn cardinality_matches() {
         for cardinality in [0, 1, 10, 100, 1000, 10000] {
-            init_test();
-            let controller = Controller::get().unwrap();
-            controller.reset();
-
-            for idx in 0..cardinality {
-                metrics::counter!("test", 1, "idx" => idx.to_string());
-            }
-
-            let metrics = controller.capture_metrics();
-            assert_eq!(metrics.len(), cardinality + 2);
-
-            #[allow(clippy::cast_precision_loss)]
-            let value = metrics.len() as f64;
-            for metric in metrics {
-                match metric.name() {
-                    CARDINALITY_KEY_NAME => {
-                        assert_eq!(metric.value(), &MetricValue::Gauge { value });
-                        assert_eq!(metric.kind(), MetricKind::Absolute);
-                    }
-                    CARDINALITY_COUNTER_KEY_NAME => {
-                        assert_eq!(metric.value(), &MetricValue::Counter { value });
-                        assert_eq!(metric.kind(), MetricKind::Absolute);
-                    }
-                    _ => {}
+            with_test_recorder(|controller| {
+                for idx in 0..cardinality {
+                    metrics::counter!("test", "idx" => idx.to_string()).increment(1);
                 }
-            }
+
+                let metrics = controller.capture_metrics();
+                assert_eq!(metrics.len(), cardinality + 2);
+
+                #[allow(clippy::cast_precision_loss)]
+                let value = metrics.len() as f64;
+                for metric in metrics {
+                    match metric.name() {
+                        CARDINALITY_KEY_NAME => {
+                            assert_eq!(metric.value(), &MetricValue::Gauge { value });
+                            assert_eq!(metric.kind(), MetricKind::Absolute);
+                        }
+                        CARDINALITY_COUNTER_KEY_NAME => {
+                            assert_eq!(metric.value(), &MetricValue::Counter { value });
+                            assert_eq!(metric.kind(), MetricKind::Absolute);
+                        }
+                        _ => {}
+                    }
+                }
+            });
         }
     }
 
     #[test]
     fn handles_registered_metrics() {
-        let controller = init_metrics();
-
-        let counter = metrics::register_counter!("test7");
-        assert_eq!(controller.capture_metrics().len(), 3);
-        counter.increment(1);
-        assert_eq!(controller.capture_metrics().len(), 3);
-        let gauge = metrics::register_gauge!("test8");
-        assert_eq!(controller.capture_metrics().len(), 4);
-        gauge.set(1.0);
-        assert_eq!(controller.capture_metrics().len(), 4);
+        with_test_recorder(|controller| {
+            let counter = metrics::counter!("test7");
+            assert_eq!(controller.capture_metrics().len(), 3);
+            counter.increment(1);
+            assert_eq!(controller.capture_metrics().len(), 3);
+            let gauge = metrics::gauge!("test8");
+            assert_eq!(controller.capture_metrics().len(), 4);
+            gauge.set(1.0);
+            assert_eq!(controller.capture_metrics().len(), 4);
+        });
     }
 
     #[test]
     fn expires_metrics() {
-        let controller = init_metrics();
-        controller.set_expiry(Some(IDLE_TIMEOUT)).unwrap();
+        with_test_recorder(|controller| {
+            controller.set_expiry(Some(IDLE_TIMEOUT)).unwrap();
 
-        metrics::counter!("test2", 1);
-        metrics::counter!("test3", 2);
-        assert_eq!(controller.capture_metrics().len(), 4);
+            metrics::counter!("test2").increment(1);
+            metrics::counter!("test3").increment(2);
+            assert_eq!(controller.capture_metrics().len(), 4);
 
-        std::thread::sleep(Duration::from_secs_f64(IDLE_TIMEOUT * 2.0));
-        metrics::counter!("test2", 3);
-        assert_eq!(controller.capture_metrics().len(), 3);
+            std::thread::sleep(Duration::from_secs_f64(IDLE_TIMEOUT * 2.0));
+            metrics::counter!("test2").increment(3);
+            assert_eq!(controller.capture_metrics().len(), 3);
+        });
     }
 
     #[test]
     fn expires_metrics_tags() {
-        let controller = init_metrics();
-        controller.set_expiry(Some(IDLE_TIMEOUT)).unwrap();
+        with_test_recorder(|controller| {
+            controller.set_expiry(Some(IDLE_TIMEOUT)).unwrap();
 
-        metrics::counter!("test4", 1, "tag" => "value1");
-        metrics::counter!("test4", 2, "tag" => "value2");
-        assert_eq!(controller.capture_metrics().len(), 4);
+            metrics::counter!("test4", "tag" => "value1").increment(1);
+            metrics::counter!("test4", "tag" => "value2").increment(2);
+            assert_eq!(controller.capture_metrics().len(), 4);
 
-        std::thread::sleep(Duration::from_secs_f64(IDLE_TIMEOUT * 2.0));
-        metrics::counter!("test4", 3, "tag" => "value1");
-        assert_eq!(controller.capture_metrics().len(), 3);
+            std::thread::sleep(Duration::from_secs_f64(IDLE_TIMEOUT * 2.0));
+            metrics::counter!("test4", "tag" => "value1").increment(3);
+            assert_eq!(controller.capture_metrics().len(), 3);
+        });
     }
 
     #[test]
     fn skips_expiring_registered() {
-        let controller = init_metrics();
-        controller.set_expiry(Some(IDLE_TIMEOUT)).unwrap();
+        with_test_recorder(|controller| {
+            controller.set_expiry(Some(IDLE_TIMEOUT)).unwrap();
 
-        let a = metrics::register_counter!("test5");
-        metrics::counter!("test6", 5);
-        assert_eq!(controller.capture_metrics().len(), 4);
-        a.increment(1);
-        assert_eq!(controller.capture_metrics().len(), 4);
+            let a = metrics::counter!("test5");
+            metrics::counter!("test6").increment(5);
+            assert_eq!(controller.capture_metrics().len(), 4);
+            a.increment(1);
+            assert_eq!(controller.capture_metrics().len(), 4);
 
-        std::thread::sleep(Duration::from_secs_f64(IDLE_TIMEOUT * 2.0));
-        assert_eq!(controller.capture_metrics().len(), 3);
+            std::thread::sleep(Duration::from_secs_f64(IDLE_TIMEOUT * 2.0));
+            assert_eq!(controller.capture_metrics().len(), 3);
 
-        a.increment(1);
-        let metrics = controller.capture_metrics();
-        assert_eq!(metrics.len(), 3);
-        let metric = metrics
-            .into_iter()
-            .find(|metric| metric.name() == "test5")
-            .expect("Test metric is not present");
-        match metric.value() {
-            MetricValue::Counter { value } => assert_eq!(*value, 2.0),
-            value => panic!("Invalid metric value {value:?}"),
-        }
+            a.increment(1);
+            let metrics = controller.capture_metrics();
+            assert_eq!(metrics.len(), 3);
+            let metric = metrics
+                .into_iter()
+                .find(|metric| metric.name() == "test5")
+                .expect("Test metric is not present");
+            match metric.value() {
+                MetricValue::Counter { value } => assert_eq!(*value, 2.0),
+                value => panic!("Invalid metric value {value:?}"),
+            }
+        });
     }
 }

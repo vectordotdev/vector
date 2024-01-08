@@ -847,6 +847,7 @@ mod integration_tests {
     use once_cell::sync::Lazy;
     use serde_json::{json, Value};
     use tokio::time::{Duration, Instant};
+    use vector_lib::metrics::{self, Controller};
     use vrl::btreemap;
 
     use super::*;
@@ -1123,9 +1124,13 @@ mod integration_tests {
             serde_json::from_str(&String::from_utf8(body.to_vec()).unwrap()).unwrap()
         }
 
-        async fn shutdown_check(&self, shutdown: shutdown::SourceShutdownCoordinator) {
+        async fn shutdown_check(
+            &self,
+            shutdown: shutdown::SourceShutdownCoordinator,
+            controller: &Controller,
+        ) {
             self.shutdown(shutdown).await;
-            components::SOURCE_TESTS.assert(&components::HTTP_PULL_SOURCE_TAGS);
+            components::SOURCE_TESTS.assert(controller, &components::HTTP_PULL_SOURCE_TAGS);
         }
 
         async fn shutdown(&self, mut shutdown: shutdown::SourceShutdownCoordinator) {
