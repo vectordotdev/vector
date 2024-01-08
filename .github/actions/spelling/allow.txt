@@ -416,6 +416,7 @@ rsyslog
 rsyslogd
 security-tab
 servlet
+Sinjo
 sublocation
 snyk
 socketaddr
