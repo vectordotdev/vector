@@ -1,9 +1,9 @@
-use std::{num::NonZeroU32, sync::Arc};
+use std::{num::NonZeroU32, ops::Deref as _, sync::Arc};
 
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
 use http::StatusCode;
-use prost::Message;
+use protobuf::{Chars, Message as _};
 use serde::{Deserialize, Serialize};
 use warp::{filters::BoxedFilter, path, path::FullPath, reply::Response, Filter};
 
@@ -25,8 +25,9 @@ use crate::{
     schema,
     sources::{
         datadog_agent::{
-            ddmetric_proto::{metric_payload, Metadata, MetricPayload, SketchPayload},
-            handle_request, ApiKeyQueryParams, DatadogAgentSource,
+            handle_request,
+            proto::metrics::{metric_payload, Metadata, MetricPayload, SketchPayload},
+            ApiKeyQueryParams, DatadogAgentSource,
         },
         util::{extract_tag_key_and_value, ErrorMessage},
     },
@@ -256,7 +257,7 @@ pub(crate) fn decode_ddseries_v2(
     frame: Bytes,
     api_key: &Option<Arc<str>>,
 ) -> crate::Result<Vec<Event>> {
-    let payload = MetricPayload::decode(frame)?;
+    let payload = MetricPayload::parse_from_tokio_bytes(&frame)?;
     let decoded_metrics: Vec<Event> = payload
         .series
         .into_iter()
@@ -296,21 +297,21 @@ pub(crate) fn decode_ddseries_v2(
             serie.resources.into_iter().for_each(|r| {
                 // As per https://github.com/DataDog/datadog-agent/blob/a62ac9fb13e1e5060b89e731b8355b2b20a07c5b/pkg/serializer/internal/metrics/iterable_series.go#L180-L189
                 // the hostname can be found in MetricSeries::resources and that is the only value stored there.
-                if r.r#type.eq("host") {
+                if r.type_().eq("host") {
                     log_schema()
                         .host_key()
                         .and_then(|key| tags.replace(key.to_string(), r.name));
                 } else {
                     // But to avoid losing information if this situation changes, any other resource type/name will be saved in the tags map
-                    tags.replace(format!("resource.{}", r.r#type), r.name);
+                    tags.replace(format!("resource.{}", r.type_()), r.name);
                 }
             });
             (!serie.source_type_name.is_empty())
                 .then(|| tags.replace("source_type_name", serie.source_type_name));
             // As per https://github.com/DataDog/datadog-agent/blob/a62ac9fb13e1e5060b89e731b8355b2b20a07c5b/pkg/serializer/internal/metrics/iterable_series.go#L224
             // serie.unit is omitted
-            match metric_payload::MetricType::try_from(serie.r#type) {
-                Ok(metric_payload::MetricType::Count) => serie
+            match serie.type_.enum_value() {
+                Ok(metric_payload::MetricType::COUNT) => serie
                     .points
                     .iter()
                     .map(|dd_point| {
@@ -331,7 +332,7 @@ pub(crate) fn decode_ddseries_v2(
                         .with_namespace(namespace)
                     })
                     .collect::<Vec<_>>(),
-                Ok(metric_payload::MetricType::Gauge) => serie
+                Ok(metric_payload::MetricType::GAUGE) => serie
                     .points
                     .iter()
                     .map(|dd_point| {
@@ -353,7 +354,7 @@ pub(crate) fn decode_ddseries_v2(
                         .with_interval_ms(non_rate_interval)
                     })
                     .collect::<Vec<_>>(),
-                Ok(metric_payload::MetricType::Rate) => serie
+                Ok(metric_payload::MetricType::RATE) => serie
                     .points
                     .iter()
                     .map(|dd_point| {
@@ -380,8 +381,8 @@ pub(crate) fn decode_ddseries_v2(
                         .with_namespace(namespace)
                     })
                     .collect::<Vec<_>>(),
-                Ok(metric_payload::MetricType::Unspecified) | Err(_) => {
-                    warn!("Unspecified metric type ({}).", serie.r#type);
+                Ok(metric_payload::MetricType::UNSPECIFIED) | Err(_) => {
+                    warn!("Unspecified metric type ({}).", serie.type_.value());
                     Vec::new()
                 }
             }
@@ -433,8 +434,12 @@ fn decode_datadog_series_v1(
     Ok(decoded_metrics)
 }
 
-fn into_metric_tags(tags: Vec<String>) -> MetricTags {
-    tags.iter().map(extract_tag_key_and_value).collect()
+fn into_metric_tags(tags: Vec<Chars>) -> MetricTags {
+    // TODO: inefficient conversion (in `extract_tag_key_and_value`) to `String` when `Bytes` would
+    // suffice. address once we have solution for getting original `Bytes` from `Chars`~`
+    tags.iter()
+        .map(|tag| extract_tag_key_and_value(tag.deref()))
+        .collect()
 }
 
 fn into_vector_metric(
@@ -442,7 +447,12 @@ fn into_vector_metric(
     api_key: Option<Arc<str>>,
     schema_definition: &Arc<schema::Definition>,
 ) -> Vec<Event> {
-    let mut tags = into_metric_tags(dd_metric.tags.unwrap_or_default());
+    let mut tags: MetricTags = dd_metric
+        .tags
+        .unwrap_or_default()
+        .into_iter()
+        .map(extract_tag_key_and_value)
+        .collect();
 
     if let Some(key) = log_schema().host_key() {
         dd_metric
@@ -549,7 +559,7 @@ pub(crate) fn decode_ddsketch(
     frame: Bytes,
     api_key: &Option<Arc<str>>,
 ) -> crate::Result<Vec<Event>> {
-    let payload = SketchPayload::decode(frame)?;
+    let payload = SketchPayload::parse_from_tokio_bytes(&frame)?;
     // payload.metadata is always empty for payload coming from dd agents
     Ok(payload
         .sketches

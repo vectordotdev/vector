@@ -5,17 +5,8 @@ mod tests;
 
 pub mod logs;
 pub mod metrics;
+pub(crate) mod proto;
 pub mod traces;
-
-#[allow(warnings, clippy::pedantic, clippy::nursery)]
-pub(crate) mod ddmetric_proto {
-    include!(concat!(env!("OUT_DIR"), "/datadog.agentpayload.rs"));
-}
-
-#[allow(warnings)]
-pub(crate) mod ddtrace_proto {
-    include!(concat!(env!("OUT_DIR"), "/dd_trace.rs"));
-}
 
 use std::convert::Infallible;
 use std::time::Duration;
