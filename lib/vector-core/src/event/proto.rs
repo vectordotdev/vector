@@ -5,7 +5,7 @@ use chrono::TimeZone;
 use ordered_float::NotNan;
 
 use super::{MetricTags, WithMetadata};
-use crate::{event, metrics::AgentDDSketch};
+use crate::{event, metrics::AgentDDSketch, string::VectorString};
 
 #[allow(warnings, clippy::all, clippy::pedantic)]
 mod proto_event {
@@ -226,7 +226,7 @@ impl From<Metric> for super::Metric {
                 .into_iter()
                 .map(|(tag, values)| {
                     (
-                        tag,
+                        tag.into(),
                         values
                             .values
                             .into_iter()
@@ -445,7 +445,7 @@ impl From<super::Metric> for WithMetadata<Metric> {
             .filter_map(|(tag, values)| {
                 values
                     .as_single()
-                    .map(|value| (tag.clone(), value.to_string()))
+                    .map(|value| (tag.to_string(), value.to_string()))
             })
             .collect();
         // These are the full tag values.
@@ -456,10 +456,10 @@ impl From<super::Metric> for WithMetadata<Metric> {
                 let values = values
                     .into_iter()
                     .map(|value| TagValue {
-                        value: value.into_option(),
+                        value: value.into_option().map(VectorString::into_string),
                     })
                     .collect();
-                (tag, TagValues { values })
+                (tag.into_string(), TagValues { values })
             })
             .collect();
 

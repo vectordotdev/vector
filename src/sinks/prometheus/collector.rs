@@ -334,16 +334,19 @@ impl TimeSeries {
         // label for the actual metric name. For convenience below, an
         // optional extra tag is added.
         let mut labels = tags.cloned().unwrap_or_default();
-        labels.replace(METRIC_NAME_LABEL.into(), [name, suffix].join(""));
+        labels.replace(METRIC_NAME_LABEL, [name, suffix].join(""));
         if let Some((name, value)) = extra {
-            labels.replace(name.into(), value);
+            labels.replace(name.to_string(), value);
         }
 
         // Extract the labels into a vec and sort to produce a
         // consistent key for the buffer.
         let mut labels = labels
             .into_iter_single()
-            .map(|(name, value)| proto::Label { name, value })
+            .map(|(name, value)| proto::Label {
+                name: name.into_string(),
+                value: value.into_string(),
+            })
             .collect::<Labels>();
         labels.sort();
         labels

@@ -153,8 +153,7 @@ impl MetricSplit for AggregatedSummarySplitter {
 
                 for quantile in quantiles {
                     let mut quantile_series = series.clone();
-                    quantile_series
-                        .replace_tag(String::from("quantile"), quantile.to_quantile_string());
+                    quantile_series.replace_tag("quantile", quantile.to_quantile_string());
                     let quantile_data = MetricData::from_parts(
                         time,
                         kind,

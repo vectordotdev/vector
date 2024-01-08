@@ -8,7 +8,6 @@ use vector_lib::metric_tags;
 use super::*;
 use crate::config::schema::Definition;
 use crate::config::LogNamespace;
-use crate::event::metric::TagValue;
 use crate::event::{metric, Event, Metric, MetricTags};
 use crate::test_util::components::assert_transform_compliance;
 use crate::transforms::tag_cardinality_limit::config::{
@@ -195,33 +194,15 @@ async fn tag_cardinality_limit_drop_tag_bloom_multi_value() {
 async fn drop_tag_multi_value(config: TagCardinalityLimitConfig) {
     assert_transform_compliance(async move {
         let mut tags1 = MetricTags::default();
-        tags1.set_multi_value(
-            "tag1".to_string(),
-            vec![
-                TagValue::Value("val1.a".to_string()),
-                TagValue::Value("val1.b".to_string()),
-            ],
-        );
+        tags1.set_multi_value("tag1".to_string(), vec!["val1.a".into(), "val1.b".into()]);
         let mut event1 = make_metric(tags1);
 
         let mut tags2 = MetricTags::default();
-        tags2.set_multi_value(
-            "tag1".to_string(),
-            vec![
-                TagValue::Value("val1.a".to_string()),
-                TagValue::Value("val1.c".to_string()),
-            ],
-        );
+        tags2.set_multi_value("tag1".to_string(), vec!["val1.a".into(), "val1.c".into()]);
         let mut event2 = make_metric(tags2);
 
         let mut tags3 = MetricTags::default();
-        tags3.set_multi_value(
-            "tag1".to_string(),
-            vec![
-                TagValue::Value("val1.b".to_string()),
-                TagValue::Value("val1.c".to_string()),
-            ],
-        );
+        tags3.set_multi_value("tag1".to_string(), vec!["val1.b".into(), "val1.c".into()]);
         let mut event3 = make_metric(tags3);
 
         let (tx, rx) = mpsc::channel(1);

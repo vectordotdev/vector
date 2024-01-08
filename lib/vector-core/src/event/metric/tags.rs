@@ -8,9 +8,12 @@ use std::hash::{Hash, Hasher};
 use std::{cmp::Ordering, mem};
 
 use indexmap::IndexSet;
+use protobuf::Chars;
 use serde::{ser::SerializeSeq, Deserialize, Deserializer, Serialize, Serializer};
 use vector_common::byte_size_of::ByteSizeOf;
 use vector_config::{configurable_component, Configurable};
+
+use crate::string::VectorString;
 
 /// A single tag value, either a bare tag or a value.
 #[derive(Clone, Configurable, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
@@ -20,12 +23,18 @@ pub enum TagValue {
     Bare,
 
     /// Tag value containing a string.
-    Value(String),
+    Value(VectorString),
 }
 
 impl From<String> for TagValue {
     fn from(value: String) -> Self {
-        Self::Value(value)
+        Self::Value(value.into())
+    }
+}
+
+impl From<&String> for TagValue {
+    fn from(value: &String) -> Self {
+        Self::Value(value.into())
     }
 }
 
@@ -33,20 +42,26 @@ impl From<Option<String>> for TagValue {
     fn from(value: Option<String>) -> Self {
         match value {
             None => Self::Bare,
-            Some(value) => Self::Value(value),
+            Some(value) => Self::Value(value.into()),
         }
     }
 }
 
 impl From<&str> for TagValue {
     fn from(value: &str) -> Self {
-        Self::Value(value.to_string())
+        Self::Value(value.to_string().into())
     }
 }
 
 impl From<Cow<'_, str>> for TagValue {
     fn from(value: Cow<'_, str>) -> Self {
-        Self::Value(value.to_string())
+        Self::Value(value.to_string().into())
+    }
+}
+
+impl From<Chars> for TagValue {
+    fn from(value: Chars) -> Self {
+        Self::Value(value.into())
     }
 }
 
@@ -67,7 +82,7 @@ impl TagValue {
         }
     }
 
-    pub fn into_option(self) -> Option<String> {
+    pub fn into_option(self) -> Option<VectorString> {
         match self {
             Self::Bare => None,
             Self::Value(value) => Some(value),
@@ -134,7 +149,7 @@ impl Display for TagValueSet {
 impl TagValueSet {
     /// Convert this set into a single value, mimicking the behavior of this set being just a plain
     /// single string while still storing all of the values.
-    pub fn into_single(self) -> Option<String> {
+    pub fn into_single(self) -> Option<VectorString> {
         match self {
             Self::Empty => None,
             Self::Single(tag) => tag.into_option(),
@@ -312,7 +327,7 @@ impl<const N: usize> From<[String; N]> for TagValueSet {
         // See logic in `TagValueSet::insert` to why we can't just use `Self(values.into())`
         let mut result = Self::default();
         for value in values {
-            result.insert(TagValue::Value(value));
+            result.insert(TagValue::Value(value.into()));
         }
         result
     }
@@ -328,7 +343,7 @@ impl From<Vec<String>> for TagValueSet {
     fn from(values: Vec<String>) -> Self {
         let mut result = Self::default();
         for value in values {
-            result.insert(TagValue::Value(value));
+            result.insert(TagValue::Value(value.into()));
         }
         result
     }
@@ -457,7 +472,7 @@ impl Serialize for TagValueSet {
 /// Tags for a metric series.
 #[configurable_component]
 #[derive(Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct MetricTags(pub(in crate::event) BTreeMap<String, TagValueSet>);
+pub struct MetricTags(pub(in crate::event) BTreeMap<VectorString, TagValueSet>);
 
 impl MetricTags {
     pub fn is_empty(&self) -> bool {
@@ -477,25 +492,25 @@ impl MetricTags {
     pub fn iter_all(&self) -> impl Iterator<Item = (&str, TagValueRef<'_>)> {
         self.0
             .iter()
-            .flat_map(|(name, tags)| tags.iter().map(|tag| (name.as_ref(), tag)))
+            .flat_map(|(name, tags)| tags.iter().map(|tag| (name.as_str(), tag)))
     }
 
     /// Iterate over references to a single value of each tag.
     pub fn iter_single(&self) -> impl Iterator<Item = (&str, &str)> {
         self.0
             .iter()
-            .filter_map(|(name, tags)| tags.as_single().map(|tag| (name.as_ref(), tag)))
+            .filter_map(|(name, tags)| tags.as_single().map(|tag| (name.as_str(), tag)))
     }
 
     /// Iterate over all values of each tag.
-    pub fn into_iter_all(self) -> impl Iterator<Item = (String, TagValue)> {
+    pub fn into_iter_all(self) -> impl Iterator<Item = (VectorString, TagValue)> {
         self.0
             .into_iter()
             .flat_map(|(name, tags)| tags.into_iter().map(move |tag| (name.clone(), tag)))
     }
 
     /// Iterate over a single value of each tag.
-    pub fn into_iter_single(self) -> impl Iterator<Item = (String, String)> {
+    pub fn into_iter_single(self) -> impl Iterator<Item = (VectorString, VectorString)> {
         self.0
             .into_iter()
             .filter_map(|(name, tags)| tags.into_single().map(|tag| (name, tag)))
@@ -511,36 +526,45 @@ impl MetricTags {
 
     /// Add a value to a tag. This does not replace any existing tags unless the value is a
     /// duplicate.
-    pub fn insert(&mut self, name: String, value: impl Into<TagValue>) {
-        self.0.entry(name).or_default().insert(value.into());
+    pub fn insert(&mut self, name: impl Into<VectorString>, value: impl Into<TagValue>) {
+        self.0.entry(name.into()).or_default().insert(value.into());
     }
 
     /// Replace all the values of a tag with a single value.
-    pub fn replace(&mut self, name: String, value: impl Into<TagValue>) -> Option<String> {
+    pub fn replace(
+        &mut self,
+        name: impl Into<VectorString>,
+        value: impl Into<TagValue>,
+    ) -> Option<VectorString> {
         self.0
-            .insert(name, TagValueSet::from([value.into()]))
+            .insert(name.into(), TagValueSet::from([value.into()]))
             .and_then(TagValueSet::into_single)
     }
 
-    pub fn set_multi_value(&mut self, name: String, values: impl IntoIterator<Item = TagValue>) {
+    pub fn set_multi_value(
+        &mut self,
+        name: impl Into<VectorString>,
+        values: impl IntoIterator<Item = TagValue>,
+    ) {
         let x = TagValueSet::from_iter(values);
-        self.0.insert(name, x);
+        self.0.insert(name.into(), x);
     }
 
-    pub fn remove(&mut self, name: &str) -> Option<String> {
+    pub fn remove(&mut self, name: &str) -> Option<VectorString> {
         self.0.remove(name).and_then(TagValueSet::into_single)
     }
 
     pub fn keys(&self) -> impl Iterator<Item = &str> {
-        self.0.keys().map(String::as_str)
+        self.0.keys().map(VectorString::as_str)
     }
 
-    pub fn extend(&mut self, tags: impl IntoIterator<Item = (String, String)>) {
+    pub fn extend<K, V>(&mut self, tags: impl IntoIterator<Item = (K, V)>)
+    where
+        K: Into<VectorString>,
+        V: Into<TagValue>,
+    {
         for (key, value) in tags {
-            self.0
-                .entry(key)
-                .or_default()
-                .insert(TagValue::Value(value));
+            self.0.entry(key.into()).or_default().insert(value);
         }
     }
 
@@ -580,11 +604,7 @@ impl FromIterator<(String, String)> for MetricTags {
     fn from_iter<T: IntoIterator<Item = (String, String)>>(tags: T) -> Self {
         let mut result = Self::default();
         for (key, value) in tags {
-            result
-                .0
-                .entry(key)
-                .or_default()
-                .insert(TagValue::Value(value));
+            result.0.entry(key.into()).or_default().insert(value);
         }
         result
     }
@@ -594,7 +614,7 @@ impl FromIterator<(String, TagValue)> for MetricTags {
     fn from_iter<T: IntoIterator<Item = (String, TagValue)>>(tags: T) -> Self {
         let mut result = Self::default();
         for (key, value) in tags {
-            result.0.entry(key).or_default().insert(value);
+            result.0.entry(key.into()).or_default().insert(value);
         }
         result
     }
@@ -674,7 +694,7 @@ mod tests {
             let mut set = TagValueSet::from(values.clone());
             assert_eq!(set.is_empty(), values.is_empty());
             // All input values are contained in the set.
-            assert!(values.iter().all(|v| set.contains(&TagValue::Value(v.clone()))));
+            assert!(values.iter().all(|v| set.contains(&TagValue::Value(v.into()))));
             // All set values were in the input.
             assert!(set.iter().all(
                 |s| values.contains(&s.expect("must not contain bare tags").into())
@@ -698,19 +718,19 @@ mod tests {
 
                 if let Some(first) = values.first() {
                     // Check that re-adding the last value doesn't change the set.
-                    set.insert(TagValue::Value(values.last().unwrap().clone()));
+                    set.insert(values.last().unwrap());
                     assert_eq!(set.len(), start_len);
                     assert_eq!(set.as_single(), values.last().map(String::as_str));
 
                     // But re-adding the first value makes it the last.
-                    set.insert(TagValue::Value(first.clone()));
+                    set.insert(first);
                     assert_eq!(set.len(), start_len);
                     assert_eq!(set.as_single(), Some(first.as_str()));
                 }
             }
 
             let new_addition = !values.iter().any(|v| v == &addition);
-            let addition=TagValue::Value(addition);
+            let addition = TagValue::from(addition);
             assert_eq!(new_addition, !set.contains(&addition));
             set.insert(addition.clone());
             assert!(set.contains(&addition));

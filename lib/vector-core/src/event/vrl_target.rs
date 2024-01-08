@@ -1,4 +1,3 @@
-use std::borrow::Cow;
 use std::{collections::BTreeMap, convert::TryFrom, marker::PhantomData};
 
 use lookup::lookup_v2::OwnedSegment;
@@ -245,9 +244,7 @@ fn set_metric_tag_values(name: String, value: &Value, metric: &mut Metric, multi
             .unwrap_or(&[])
             .iter()
             .filter_map(|value| match value {
-                Value::Bytes(bytes) => {
-                    Some(TagValue::Value(String::from_utf8_lossy(bytes).to_string()))
-                }
+                Value::Bytes(bytes) => Some(String::from_utf8_lossy(bytes).into()),
                 Value::Null => Some(TagValue::Bare),
                 _ => None,
             })
@@ -256,7 +253,7 @@ fn set_metric_tag_values(name: String, value: &Value, metric: &mut Metric, multi
         metric.set_multi_value_tag(name, tag_values);
     } else {
         // set a single tag value
-        if let Ok(tag_value) = value.try_bytes_utf8_lossy().map(Cow::into_owned) {
+        if let Ok(tag_value) = value.try_bytes_utf8_lossy() {
             metric.replace_tag(name, tag_value);
         } else if value.is_null() {
             metric.set_multi_value_tag(name, vec![TagValue::Bare]);
@@ -413,7 +410,7 @@ impl Target for VrlTarget {
                             ["timestamp"] => metric.data.time.timestamp.take().map(Into::into),
                             ["tags"] => metric.series.tags.take().map(|map| {
                                 map.into_iter_single()
-                                    .map(|(k, v)| (k, v.into()))
+                                    .map(|(k, v)| (k.into_string(), v.into()))
                                     .collect::<vrl::value::Value>()
                             }),
                             ["tags", field] => metric.remove_tag(field).map(Into::into),

@@ -337,10 +337,7 @@ impl http_client::HttpClientContext for HttpClientContext {
                 }
                 Event::Metric(ref mut metric) => {
                     if let Some(source_type_key) = log_schema().source_type_key() {
-                        metric.replace_tag(
-                            source_type_key.to_string(),
-                            HttpClientConfig::NAME.to_string(),
-                        );
+                        metric.replace_tag(source_type_key.to_string(), HttpClientConfig::NAME);
                     }
                 }
                 Event::Trace(ref mut trace) => {

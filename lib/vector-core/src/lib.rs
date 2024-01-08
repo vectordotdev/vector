@@ -26,6 +26,7 @@
 #![allow(clippy::non_ascii_literal)] // using unicode literals is a-okay in vector
 #![allow(clippy::unnested_or_patterns)] // nightly-only feature as of 1.51.0
 #![allow(clippy::type_complexity)] // long-types happen, especially in async code
+#![allow(clippy::mutable_key_type)]
 
 pub mod config;
 pub mod event;
@@ -36,6 +37,7 @@ pub mod schema;
 pub mod serde;
 pub mod sink;
 pub mod source;
+pub mod string;
 pub mod tcp;
 #[cfg(test)]
 mod test_util;

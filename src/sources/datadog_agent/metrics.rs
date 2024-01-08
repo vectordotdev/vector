@@ -306,7 +306,7 @@ pub(crate) fn decode_ddseries_v2(
                 }
             });
             (!serie.source_type_name.is_empty())
-                .then(|| tags.replace("source_type_name".into(), serie.source_type_name));
+                .then(|| tags.replace("source_type_name", serie.source_type_name));
             // As per https://github.com/DataDog/datadog-agent/blob/a62ac9fb13e1e5060b89e731b8355b2b20a07c5b/pkg/serializer/internal/metrics/iterable_series.go#L224
             // serie.unit is omitted
             match metric_payload::MetricType::try_from(serie.r#type) {
@@ -452,10 +452,8 @@ fn into_vector_metric(
 
     dd_metric
         .source_type_name
-        .and_then(|source| tags.replace("source_type_name".into(), source));
-    dd_metric
-        .device
-        .and_then(|dev| tags.replace("device".into(), dev));
+        .and_then(|source| tags.replace("source_type_name", source));
+    dd_metric.device.and_then(|dev| tags.replace("device", dev));
 
     let (namespace, name) = namespace_name_from_dd_metric(&dd_metric.metric);
 

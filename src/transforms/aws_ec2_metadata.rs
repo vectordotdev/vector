@@ -320,8 +320,7 @@ impl Ec2MetadataTransform {
             }
             Event::Metric(ref mut metric) => {
                 state.iter().for_each(|(k, v)| {
-                    metric
-                        .replace_tag(k.metric_tag.clone(), String::from_utf8_lossy(v).to_string());
+                    metric.replace_tag(&k.metric_tag, String::from_utf8_lossy(v));
                 });
             }
             Event::Trace(_) => panic!("Traces are not supported."),

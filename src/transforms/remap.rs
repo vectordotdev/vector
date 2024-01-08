@@ -488,21 +488,18 @@ where
             },
             Event::Metric(ref mut metric) => {
                 if let Some(metadata_key) = log_schema().metadata_key() {
-                    metric.replace_tag(format!("{}.dropped.reason", metadata_key), reason.into());
+                    metric.replace_tag(format!("{}.dropped.reason", metadata_key), reason);
                     metric.replace_tag(
                         format!("{}.dropped.component_id", metadata_key),
                         self.component_key
                             .as_ref()
                             .map(ToString::to_string)
-                            .unwrap_or_else(String::new),
+                            .unwrap_or_default(),
                     );
-                    metric.replace_tag(
-                        format!("{}.dropped.component_type", metadata_key),
-                        "remap".into(),
-                    );
+                    metric.replace_tag(format!("{}.dropped.component_type", metadata_key), "remap");
                     metric.replace_tag(
                         format!("{}.dropped.component_kind", metadata_key),
-                        "transform".into(),
+                        "transform",
                     );
                 }
             }
@@ -1141,7 +1138,7 @@ mod tests {
                 MetricKind::Absolute,
                 MetricValue::Counter { value: 1.0 },
             );
-            metric.replace_tag("hello".into(), "world".into());
+            metric.replace_tag("hello", "world");
             Event::Metric(metric)
         };
 
@@ -1151,7 +1148,7 @@ mod tests {
                 MetricKind::Absolute,
                 MetricValue::Counter { value: 1.0 },
             );
-            metric.replace_tag("hello".into(), "goodbye".into());
+            metric.replace_tag("hello", "goodbye");
             Event::Metric(metric)
         };
 
@@ -1161,7 +1158,7 @@ mod tests {
                 MetricKind::Absolute,
                 MetricValue::Counter { value: 1.0 },
             );
-            metric.replace_tag("not_hello".into(), "oops".into());
+            metric.replace_tag("not_hello", "oops");
             Event::Metric(metric)
         };
 

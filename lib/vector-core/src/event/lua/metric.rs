@@ -438,11 +438,8 @@ mod test {
             MetricValue::Counter { value: 1.0 },
         )
         .with_tags(Some(MetricTags(BTreeMap::from([(
-            "example tag".to_string(),
-            TagValueSet::from(vec![
-                TagValue::from("a".to_string()),
-                TagValue::from("b".to_string()),
-            ]),
+            "example tag".into(),
+            TagValueSet::from(vec!["a".to_string(), "b".to_string()]),
         )]))));
 
         assert_metric(
@@ -682,11 +679,8 @@ mod test {
         )
         .with_namespace(Some("example_namespace"))
         .with_tags(Some(MetricTags(BTreeMap::from([(
-            "example tag".to_string(),
-            TagValueSet::from(vec![
-                TagValue::from("a".to_string()),
-                TagValue::from("b".to_string()),
-            ]),
+            "example tag".into(),
+            TagValueSet::from(vec!["a".to_string(), "b".to_string()]),
         )]))))
         .with_timestamp(Some(
             Utc.with_ymd_and_hms(2018, 11, 14, 8, 9, 10)

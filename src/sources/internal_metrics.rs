@@ -160,7 +160,7 @@ impl<'a> InternalMetrics<'a> {
             IntervalStream::new(time::interval(self.interval)).take_until(self.shutdown);
         while interval.next().await.is_some() {
             let hostname = crate::get_hostname();
-            let pid = std::process::id().to_string();
+            let pid = std::process::id();
 
             let metrics = self.controller.capture_metrics();
             let count = metrics.len();
@@ -179,11 +179,11 @@ impl<'a> InternalMetrics<'a> {
 
                 if let Some(host_key) = &self.host_key.path {
                     if let Ok(hostname) = &hostname {
-                        metric.replace_tag(host_key.to_string(), hostname.to_owned());
+                        metric.replace_tag(host_key.to_string(), hostname);
                     }
                 }
                 if let Some(pid_key) = &self.pid_key {
-                    metric.replace_tag(pid_key.to_owned(), pid.clone());
+                    metric.replace_tag(pid_key.to_string(), pid.to_string());
                 }
                 metric
             });

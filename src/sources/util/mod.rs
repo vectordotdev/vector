@@ -83,7 +83,7 @@ pub fn extract_tag_key_and_value<S: AsRef<str>>(
     // If no colon is found, then it is classified as a Bare tag.
     match tag_chunk.split_once(':') {
         // the notation `tag:` is valid for StatsD. The effect is an empty string value.
-        Some((prefix, suffix)) => (prefix.to_string(), TagValue::Value(suffix.to_string())),
+        Some((prefix, suffix)) => (prefix.to_string(), TagValue::from(suffix)),
         None => (tag_chunk.to_string(), TagValue::Bare),
     }
 }
