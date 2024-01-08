@@ -159,24 +159,23 @@ metrics = "0.21.1"
 metrics-tracing-context = { version = "0.14.0", default-features = false }
 
 # AWS - Official SDK
-# depending on a fork to circumvent https://github.com/awslabs/aws-sdk-rust/issues/749
-aws-sdk-s3 = { git = "https://github.com/vectordotdev/aws-sdk-rust", rev = "3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670", default-features = false, features = ["native-tls"], optional = true }
-aws-sdk-sqs = { git = "https://github.com/vectordotdev/aws-sdk-rust", rev = "3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670", default-features = false, features = ["native-tls"], optional = true }
-aws-sdk-sns = { git = "https://github.com/vectordotdev/aws-sdk-rust", rev = "3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670", default-features = false, features = ["native-tls"], optional = true }
-aws-sdk-cloudwatch = { git = "https://github.com/vectordotdev/aws-sdk-rust", rev = "3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670", default-features = false, features = ["native-tls"], optional = true }
-aws-sdk-cloudwatchlogs = { git = "https://github.com/vectordotdev/aws-sdk-rust", rev = "3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670", default-features = false, features = ["native-tls"], optional = true }
-aws-sdk-elasticsearch = { git = "https://github.com/vectordotdev/aws-sdk-rust", rev = "3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670", default-features = false, features = ["native-tls"], optional = true }
-aws-sdk-firehose = { git = "https://github.com/vectordotdev/aws-sdk-rust", rev = "3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670", default-features = false, features = ["native-tls"], optional = true }
-aws-sdk-kinesis = { git = "https://github.com/vectordotdev/aws-sdk-rust", rev = "3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670", default-features = false, features = ["native-tls"], optional = true }
-aws-types = { git = "https://github.com/vectordotdev/aws-sdk-rust", rev = "3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670", default-features = false, optional = true }
-aws-sigv4 = { git = "https://github.com/vectordotdev/aws-sdk-rust", rev = "3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670", default-features = false, features = ["sign-http"], optional = true }
-aws-config = { git = "https://github.com/vectordotdev/aws-sdk-rust", rev = "3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670", default-features = false, features = ["native-tls"], optional = true }
-aws-credential-types = { git = "https://github.com/vectordotdev/aws-sdk-rust", rev = "3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670", default-features = false, features = ["hardcoded-credentials"], optional = true }
-aws-smithy-async = { git = "https://github.com/vectordotdev/aws-sdk-rust", rev = "3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670", default-features = false, optional = true }
-aws-smithy-client = { git = "https://github.com/vectordotdev/aws-sdk-rust", rev = "3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670", default-features = false, features = ["client-hyper"], optional = true}
-aws-smithy-http = { git = "https://github.com/vectordotdev/aws-sdk-rust", rev = "3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670", default-features = false, features = ["event-stream"], optional = true }
-aws-smithy-http-tower = { git = "https://github.com/vectordotdev/aws-sdk-rust", rev = "3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670", default-features = false, optional = true }
-aws-smithy-types = { git = "https://github.com/vectordotdev/aws-sdk-rust", rev = "3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670", default-features = false, optional = true }
+aws-sdk-s3 = { version = "1.3.0", default-features = false, features = ["behavior-version-latest"], optional = true }
+aws-sdk-sqs = { version = "1.3.0", default-features = false, features = ["behavior-version-latest"], optional = true }
+aws-sdk-sns = { version = "1.3.0", default-features = false, features = ["behavior-version-latest"], optional = true }
+aws-sdk-cloudwatch = { version = "1.3.0", default-features = false, features = ["behavior-version-latest"], optional = true }
+aws-sdk-cloudwatchlogs = { version = "1.3.0", default-features = false, features = ["behavior-version-latest"], optional = true }
+aws-sdk-elasticsearch = { version = "1.3.0", default-features = false, features = ["behavior-version-latest"], optional = true }
+aws-sdk-firehose = { version = "1.3.0", default-features = false, features = ["behavior-version-latest"], optional = true }
+aws-sdk-kinesis = { version = "1.3.0", default-features = false, features = ["behavior-version-latest"], optional = true }
+aws-types = { version = "1.0.1", default-features = false, optional = true }
+aws-sigv4 = { version = "1.0.1", default-features = false, features = ["sign-http"], optional = true }
+aws-config = { version = "1.0.1", default-features = false, features = ["behavior-version-latest"], optional = true }
+aws-credential-types = { version = "1.0.1", default-features = false, features = ["hardcoded-credentials"], optional = true }
+aws-smithy-http = { version = "0.60", default-features = false, features = ["event-stream"], optional = true }
+aws-smithy-types = { version = "1.0.2", default-features = false, optional = true }
+aws-smithy-runtime-api = { version = "1.0.2", default-features = false, optional = true }
+aws-smithy-runtime = { version = "1.0.2", default-features = false, features = ["client", "connector-hyper-0-14-x", "rt-tokio"], optional = true }
+aws-smithy-async = { version = "1.0.2", default-features = false, features = ["rt-tokio"], optional = true }
 
 # Azure
 azure_core = { version = "0.17", default-features = false, features = ["enable_reqwest"], optional = true }
@@ -191,7 +190,7 @@ opendal = {version = "0.44", default-features = false, features = ["native-tls",
 tower = { version = "0.4.13", default-features = false, features = ["buffer", "limit", "retry", "timeout", "util", "balance", "discover"] }
 tower-http = { version = "0.4.4", default-features = false, features = ["decompression-gzip", "trace"]}
 # Serde
-serde = { version = "1.0.194", default-features = false, features = ["derive"] }
+serde = { version = "1.0.195", default-features = false, features = ["derive"] }
 serde-toml-merge = { version = "0.3.3", default-features = false }
 serde_bytes = { version = "0.11.12", default-features = false, features = ["std"], optional = true }
 serde_json = { version = "1.0.109", default-features = false, features = ["raw_value"] }
@@ -345,6 +344,7 @@ openssl-src = { version = "300", default-features = false, features = ["force-en
 [dev-dependencies]
 approx = "0.5.1"
 assert_cmd = { version = "2.0.12", default-features = false }
+aws-smithy-runtime = { version = "1.0.2", default-features = false, features = ["tls-rustls"] }
 azure_core = { version = "0.17", default-features = false, features = ["enable_reqwest", "azurite_workaround"] }
 azure_identity = { version = "0.17", default-features = false, features = ["enable_reqwest"] }
 azure_storage_blobs = { version = "0.17", default-features = false, features = ["azurite_workaround"] }
@@ -446,10 +446,10 @@ aws-core = [
   "dep:aws-sigv4",
   "dep:aws-types",
   "dep:aws-smithy-async",
-  "dep:aws-smithy-client",
   "dep:aws-smithy-http",
-  "dep:aws-smithy-http-tower",
   "dep:aws-smithy-types",
+  "dep:aws-smithy-runtime",
+  "dep:aws-smithy-runtime-api",
 ]
 
 # Anything that requires Protocol Buffers.

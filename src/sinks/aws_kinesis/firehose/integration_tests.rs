@@ -1,8 +1,5 @@
-#![cfg(feature = "aws-kinesis-firehose-integration-tests")]
-#![cfg(test)]
-
-use aws_sdk_elasticsearch::Client as EsClient;
-use aws_sdk_firehose::model::ElasticsearchDestinationConfiguration;
+use aws_sdk_elasticsearch::{types::DomainEndpointOptions, Client as EsClient};
+use aws_sdk_firehose::types::ElasticsearchDestinationConfiguration;
 use futures::StreamExt;
 use futures::TryFutureExt;
 use serde_json::{json, Value};
@@ -32,7 +29,10 @@ fn kinesis_address() -> String {
 }
 
 fn elasticsearch_address() -> String {
-    std::env::var("ELASTICSEARCH_ADDRESS").unwrap_or_else(|_| "http://localhost:4571".into())
+    format!(
+        "{}/es-endpoint",
+        std::env::var("ELASTICSEARCH_ADDRESS").unwrap_or_else(|_| "http://localhost:4566".into()),
+    )
 }
 
 #[tokio::test]
@@ -46,7 +46,7 @@ async fn firehose_put_records_without_partition_key() {
     let mut batch = BatchConfig::default();
     batch.max_events = Some(2);
 
-    let region = RegionOrEndpoint::with_both("localstack", kinesis_address().as_str());
+    let region = RegionOrEndpoint::with_both("us-east-1", kinesis_address().as_str());
 
     let base = KinesisSinkBaseConfig {
         stream_name: stream.clone(),
@@ -144,7 +144,7 @@ async fn firehose_put_records_with_partition_key() {
     let mut batch = BatchConfig::default();
     batch.max_events = Some(20);
 
-    let region = RegionOrEndpoint::with_both("localstack", kinesis_address().as_str());
+    let region = RegionOrEndpoint::with_both("us-east-1", kinesis_address().as_str());
 
     let partition_value = "a_value";
     let partition_key = ConfigValuePath::try_from("partition_key".to_string()).unwrap();
@@ -246,7 +246,7 @@ async fn firehose_put_records_with_partition_key() {
 }
 
 fn test_region_endpoint() -> RegionOrEndpoint {
-    RegionOrEndpoint::with_both("localstack", kinesis_address())
+    RegionOrEndpoint::with_both("us-east-1", kinesis_address())
 }
 
 async fn firehose_client() -> aws_sdk_firehose::Client {
@@ -260,7 +260,6 @@ async fn firehose_client() -> aws_sdk_firehose::Client {
         region_endpoint.endpoint(),
         &proxy,
         &None,
-        true,
     )
     .await
     .unwrap()
@@ -272,7 +271,11 @@ async fn ensure_elasticsearch_domain(domain_name: String) -> String {
         aws_sdk_elasticsearch::config::Builder::new()
             .credentials_provider(
                 AwsAuthentication::test_auth()
-                    .credentials_provider(test_region_endpoint().region().unwrap())
+                    .credentials_provider(
+                        test_region_endpoint().region().unwrap(),
+                        &Default::default(),
+                        &None,
+                    )
                     .await
                     .unwrap(),
             )
@@ -284,14 +287,16 @@ async fn ensure_elasticsearch_domain(domain_name: String) -> String {
     let arn = match client
         .create_elasticsearch_domain()
         .domain_name(domain_name)
+        .domain_endpoint_options(
+            DomainEndpointOptions::builder()
+                .custom_endpoint_enabled(true)
+                .custom_endpoint(elasticsearch_address())
+                .build(),
+        )
         .send()
         .await
     {
-        Ok(res) => res
-            .domain_status
-            .expect("no domain status")
-            .arn
-            .expect("arn expected"),
+        Ok(res) => res.domain_status.expect("no domain status").arn,
         Err(error) => panic!("Unable to create the Elasticsearch domain {:?}", error),
     };
 
@@ -310,7 +315,7 @@ async fn ensure_elasticsearch_domain(domain_name: String) -> String {
                 })
                 .unwrap_or(false)
         },
-        Duration::from_secs(60),
+        Duration::from_secs(120),
     )
     .await;
 
@@ -333,7 +338,8 @@ async fn ensure_elasticsearch_delivery_stream(
                 .domain_arn(elasticsearch_arn)
                 .role_arn("doesn't matter")
                 .type_name("doesn't matter")
-                .build(),
+                .build()
+                .expect("all builder fields populated"),
         )
         .send()
         .await

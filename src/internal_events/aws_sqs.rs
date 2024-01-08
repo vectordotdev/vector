@@ -7,7 +7,7 @@ use vector_lib::internal_event::{error_stage, error_type};
 
 #[cfg(feature = "sources-aws_s3")]
 mod s3 {
-    use aws_sdk_sqs::model::{
+    use aws_sdk_sqs::types::{
         BatchResultErrorEntry, DeleteMessageBatchRequestEntry, DeleteMessageBatchResultEntry,
     };
 
@@ -49,7 +49,7 @@ mod s3 {
         fn emit(self) {
             trace!(message = "Deleted SQS message(s).",
             message_ids = %self.message_ids.iter()
-                .map(|x| x.id.clone().unwrap_or_default())
+                .map(|x| x.id.as_str())
                 .collect::<Vec<_>>()
                 .join(", "));
             counter!(
@@ -69,7 +69,7 @@ mod s3 {
             error!(
                 message = "Deletion of SQS message(s) failed.",
                 message_ids = %self.entries.iter()
-                    .map(|x| format!("{}/{}", x.id.clone().unwrap_or_default(), x.code.clone().unwrap_or_default()))
+                    .map(|x| format!("{}/{}", x.id, x.code))
                     .collect::<Vec<_>>()
                     .join(", "),
                 error_code = "failed_deleting_some_sqs_messages",
@@ -97,7 +97,7 @@ mod s3 {
             error!(
                 message = "Deletion of SQS message(s) failed.",
                 message_ids = %self.entries.iter()
-                    .map(|x| x.id.clone().unwrap_or_default())
+                    .map(|x| x.id.as_str())
                     .collect::<Vec<_>>()
                     .join(", "),
                 error = %self.error,
