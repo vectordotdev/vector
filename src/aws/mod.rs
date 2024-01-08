@@ -290,7 +290,7 @@ where
                 if result.status().is_success() {
                     emit!(AwsBytesSent {
                         byte_size,
-                        region: Some(region.clone()),
+                        region: Some(region),
                     });
                 }
             }
