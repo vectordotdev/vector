@@ -24,7 +24,7 @@ mod tests;
 #[cfg(all(test, feature = "prometheus-integration-tests"))]
 mod integration_tests;
 
-#[cfg(test)]
+#[cfg(all(test, feature = "sources-prometheus-remote-write"))]
 pub use config::RemoteWriteConfig;
 
 #[derive(Debug, Snafu)]
