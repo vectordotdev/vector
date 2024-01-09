@@ -8,6 +8,8 @@ remap: functions: del: {
 		For dynamic path deletion, see the `remove` function.
 		"""
 
+	pure: false
+
 	arguments: [
 		{
 			name:        "path"
