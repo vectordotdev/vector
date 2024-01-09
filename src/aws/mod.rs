@@ -12,10 +12,13 @@ use aws_sigv4::{
 use aws_smithy_async::rt::sleep::TokioSleep;
 use aws_smithy_runtime::client::http::hyper_014::HyperClientBuilder;
 use aws_smithy_runtime_api::client::{
-    http::{HttpConnector, HttpConnectorFuture, SharedHttpConnector},
+    http::{
+        HttpClient, HttpConnector, HttpConnectorFuture, HttpConnectorSettings, SharedHttpConnector,
+    },
     identity::Identity,
     orchestrator::{HttpRequest, HttpResponse},
     result::SdkError,
+    runtime_components::RuntimeComponents,
 };
 use aws_smithy_types::body::SdkBody;
 use bytes::Bytes;
@@ -243,14 +246,14 @@ struct AwsHttpClient<T> {
     region: Region,
 }
 
-impl<T> aws_smithy_runtime_api::client::http::HttpClient for AwsHttpClient<T>
+impl<T> HttpClient for AwsHttpClient<T>
 where
-    T: aws_smithy_runtime_api::client::http::HttpClient,
+    T: HttpClient,
 {
     fn http_connector(
         &self,
-        settings: &aws_smithy_runtime_api::client::http::HttpConnectorSettings,
-        components: &aws_sdk_cloudwatch::config::RuntimeComponents,
+        settings: &HttpConnectorSettings,
+        components: &RuntimeComponents,
     ) -> SharedHttpConnector {
         let http_connector = self.http.http_connector(settings, components);
 
