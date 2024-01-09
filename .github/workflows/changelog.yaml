@@ -56,7 +56,7 @@ jobs:
           args=""
           if [[ $AUTHOR_IS_TEAM_MEMBER != 'true' ]] ; then
             echo "PR author detected to be an external contributor."
-            args="--author"
+            args="--authors"
           fi
 
           ./scripts/check_changelog_fragments.sh ${args}
