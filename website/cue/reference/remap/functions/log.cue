@@ -6,6 +6,8 @@ remap: functions: log: {
 		Logs the `value` to [stdout](\(urls.stdout)) at the specified `level`.
 		"""
 
+	pure: false
+
 	arguments: [
 		{
 			name:        "value"

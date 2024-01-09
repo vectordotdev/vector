@@ -14,6 +14,8 @@ remap: functions: assert: {
 			""",
 	]
 
+	pure: false
+
 	arguments: [
 		{
 			name:        "condition"
