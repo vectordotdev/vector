@@ -21,3 +21,36 @@ pub(super) async fn health(running: Arc<AtomicBool>) -> Result<impl Reply, Rejec
         ))
     }
 }
+
+#[cfg(not(feature = "jemalloc_pprof"))]
+pub(super) async fn heap_profile() -> Result<impl Reply, Rejection> {
+    Ok(warp::reply::with_status(
+        "heap profiling not availale",
+        warp::http::StatusCode::FORBIDDEN,
+    ))
+}
+
+#[cfg(feature = "jemalloc_pprof")]
+pub(super) async fn heap_profile() -> Result<impl Reply, Rejection> {
+    let mut prof_ctl = jemalloc_pprof::PROF_CTL.as_ref().unwrap().lock().await;
+    require_profiling_activated(&prof_ctl)?;
+    let pprof = prof_ctl.dump_pprof().map_err(|err| {
+        warp::reply::with_status(err.to_string(), warp::http::StatusCode::FORBIDDEN)
+    })?;
+    Ok(pprof)
+}
+
+/// Checks whether jemalloc profiling is activated an returns an error response if not.
+#[cfg(feature = "jemalloc_pprof")]
+fn require_profiling_activated(
+    prof_ctl: &jemalloc_pprof::JemallocProfCtl,
+) -> Result<(), Rejection> {
+    if prof_ctl.activated() {
+        Ok(())
+    } else {
+        Err(warp::reply::with_status(
+            "heap profiling not activated",
+            warp::http::StatusCode::FORBIDDEN,
+        ))
+    }
+}
