@@ -103,12 +103,8 @@ impl Arbitrary for Variant {
         let use_memory_buffer = bool::arbitrary(g);
 
         // Using a u16 ensures we avoid any allocation errors for our holding buffers, etc.
-        let max_events = NonZeroU16::arbitrary(g)
-            .try_into()
-            .expect("we don't support 16-bit platforms");
-        let max_size = NonZeroU16::arbitrary(g)
-            .try_into()
-            .expect("we don't support 16-bit platforms");
+        let max_events = NonZeroU16::arbitrary(g).into();
+        let max_size = NonZeroU16::arbitrary(g).into();
 
         let when_full = WhenFull::arbitrary(g);
 

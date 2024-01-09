@@ -494,7 +494,7 @@ where
                         self.component_key
                             .as_ref()
                             .map(ToString::to_string)
-                            .unwrap_or_else(String::new),
+                            .unwrap_or_default(),
                     );
                     metric.replace_tag(
                         format!("{}.dropped.component_type", metadata_key),

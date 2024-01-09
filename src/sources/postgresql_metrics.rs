@@ -1034,7 +1034,7 @@ mod integration_tests {
         assert_source_compliance(&PULL_SOURCE_TAGS, async move {
             let config: Config = endpoint.parse().unwrap();
             let tags_endpoint = config_to_endpoint(&config);
-            let tags_host = match config.get_hosts().get(0).unwrap() {
+            let tags_host = match config.get_hosts().first().unwrap() {
                 Host::Tcp(host) => host.clone(),
                 #[cfg(unix)]
                 Host::Unix(path) => path.to_string_lossy().to_string(),

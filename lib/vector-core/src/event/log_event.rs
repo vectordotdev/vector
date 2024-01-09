@@ -434,7 +434,7 @@ impl LogEvent {
         &self,
     ) -> Option<impl Iterator<Item = (KeyString, &Value)> + Serialize> {
         match self.metadata.value() {
-            Value::Object(metadata_map) => Some(metadata_map).map(all_metadata_fields),
+            Value::Object(metadata_map) => Some(all_metadata_fields(metadata_map)),
             _ => None,
         }
     }

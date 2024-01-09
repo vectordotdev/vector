@@ -538,37 +538,6 @@ where
     panic!("Timeout")
 }
 
-#[cfg(test)]
-mod tests {
-    use std::{
-        sync::{Arc, RwLock},
-        time::Duration,
-    };
-
-    use super::retry_until;
-
-    // helper which errors the first 3x, and succeeds on the 4th
-    async fn retry_until_helper(count: Arc<RwLock<i32>>) -> Result<(), ()> {
-        if *count.read().unwrap() < 3 {
-            let mut c = count.write().unwrap();
-            *c += 1;
-            return Err(());
-        }
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn retry_until_before_timeout() {
-        let count = Arc::new(RwLock::new(0));
-        let func = || {
-            let count = Arc::clone(&count);
-            retry_until_helper(count)
-        };
-
-        retry_until(func, Duration::from_millis(10), Duration::from_secs(1)).await;
-    }
-}
-
 pub struct CountReceiver<T> {
     count: Arc<AtomicUsize>,
     trigger: Option<oneshot::Sender<()>>,
@@ -758,4 +727,35 @@ where
     let events = collect_ready(stream).await;
     sender.await.expect("Failed to send data");
     events
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{
+        sync::{Arc, RwLock},
+        time::Duration,
+    };
+
+    use super::retry_until;
+
+    // helper which errors the first 3x, and succeeds on the 4th
+    async fn retry_until_helper(count: Arc<RwLock<i32>>) -> Result<(), ()> {
+        if *count.read().unwrap() < 3 {
+            let mut c = count.write().unwrap();
+            *c += 1;
+            return Err(());
+        }
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn retry_until_before_timeout() {
+        let count = Arc::new(RwLock::new(0));
+        let func = || {
+            let count = Arc::clone(&count);
+            retry_until_helper(count)
+        };
+
+        retry_until(func, Duration::from_millis(10), Duration::from_secs(1)).await;
+    }
 }
