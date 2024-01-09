@@ -5,7 +5,7 @@ remap: {
 		name:        string
 		description: string
 		required:    bool
-		default?:    bool | string | int | [string, ...string]
+		default?: bool | string | int | [string, ...string]
 		type: [remap.#Type, ...remap.#Type]
 		enum?: #Enum
 	}
@@ -15,7 +15,7 @@ remap: {
 		name:        string
 		category:    #FunctionCategory
 		description: string
-		notices:     [string, ...string] | *[]
+		notices: [string, ...string] | *[]
 
 		arguments: [...#Argument]
 		return: {
