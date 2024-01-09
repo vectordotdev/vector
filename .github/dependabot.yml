@@ -24,6 +24,9 @@ updates:
       clap:
         patterns:
         - "clap*"
+      crossbeam:
+        patterns:
+        - "crossbeam*"
       csv:
         patterns:
         - "csv*"
