@@ -68,4 +68,8 @@ pub(crate) static GELF_TARGET_PATHS: Lazy<GelfTargetPaths> = Lazy::new(|| GelfTa
 /// Regex for matching valid field names. Must contain only word chars, periods and dashes.
 /// Additional field names must also be prefixed with an `_` , however that is intentionally
 /// omitted from this regex to be checked separately to create a specific error message.
-pub static VALID_FIELD_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^[\w\.\-@]*$").unwrap());
+pub static VALID_FIELD_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^[\w\.\-]*$").unwrap());
+
+/// Regex for matching valid field names in the decoder. Additionally, allow @ characters
+/// produced by Graylog GELF outputs, which are strictly not valid in the GELF specification
+pub static VALID_DECODE_FIELD_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^[\w\.\-@]*$").unwrap());
