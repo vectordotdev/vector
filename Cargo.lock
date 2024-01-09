@@ -6944,12 +6944,11 @@ dependencies = [
 [[package]]
 name = "protobuf"
 version = "3.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b65f4a8ec18723a734e5dc09c173e0abf9690432da5340285d536edcb4dac190"
+source = "git+https://github.com/vectordotdev/rust-protobuf.git?branch=tobz/chars-into-bytes#6c3ab5ab72da50f42b0a3e6794ab99f4e2bbd7e9"
 dependencies = [
  "bytes 1.5.0",
  "once_cell",
- "protobuf-support",
+ "protobuf-support 3.3.0 (git+https://github.com/vectordotdev/rust-protobuf.git?branch=tobz/chars-into-bytes)",
  "thiserror",
 ]
 
@@ -6978,7 +6977,7 @@ dependencies = [
  "indexmap 1.9.3",
  "log",
  "protobuf",
- "protobuf-support",
+ "protobuf-support 3.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "tempfile",
  "thiserror",
  "which 4.4.2",
@@ -6989,6 +6988,14 @@ name = "protobuf-support"
 version = "3.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6872f4d4f4b98303239a2b5838f5bbbb77b01ffc892d627957f37a22d7cfe69c"
+dependencies = [
+ "thiserror",
+]
+
+[[package]]
+name = "protobuf-support"
+version = "3.3.0"
+source = "git+https://github.com/vectordotdev/rust-protobuf.git?branch=tobz/chars-into-bytes#6c3ab5ab72da50f42b0a3e6794ab99f4e2bbd7e9"
 dependencies = [
  "thiserror",
 ]

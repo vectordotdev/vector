@@ -128,8 +128,15 @@ impl From<VectorString> for vrl::value::Value {
     fn from(value: VectorString) -> Self {
         match value {
             VectorString::Owned(s) => s.into(),
-            VectorString::Shared(s) => s.as_bytes().into(),
-            VectorString::Static(s) => s.as_bytes().into(),
+            VectorString::Shared(s) => unsafe {
+                // SAFETY: `Chars::into_bytes` is unsafe because it means giving up the invariant
+                // that the string data is known, valid UTF-8. Since we're _immediately_ sticking it
+                // into `Value::Bytes`, we're not actually handing over an invalid UTF-8 string...
+                // and VRL is going to do UTF-8 validity checks anytime it needs to do string-y
+                // things to `Values::Bytes` anyways.
+                s.into_bytes().into()
+            },
+            VectorString::Static(s) => bytes::Bytes::from_static(s.as_bytes()).into(),
         }
     }
 }
