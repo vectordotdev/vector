@@ -1,9 +1,4 @@
-use std::{
-    collections::{BTreeMap, HashMap},
-    iter::FromIterator,
-    net::SocketAddr,
-    str,
-};
+use std::{collections::HashMap, iter::FromIterator, net::SocketAddr, str};
 
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
@@ -11,7 +6,7 @@ use futures::{Stream, StreamExt};
 use http::HeaderMap;
 use indoc::indoc;
 use ordered_float::NotNan;
-use prost::Message;
+use protobuf::{Message as _, MessageField};
 use quickcheck::{Arbitrary, Gen, QuickCheck, TestResult};
 use similar_asserts::assert_eq;
 use vector_lib::codecs::{
@@ -39,8 +34,8 @@ use crate::{
     schema,
     serde::{default_decoding, default_framing_message_based},
     sources::datadog_agent::{
-        ddmetric_proto, ddtrace_proto, logs::decode_log_body, metrics::DatadogSeriesRequest,
-        DatadogAgentConfig, DatadogAgentSource, LogMsg, LOGS, METRICS, TRACES,
+        logs::decode_log_body, metrics::DatadogSeriesRequest, proto, DatadogAgentConfig,
+        DatadogAgentSource, LogMsg, LOGS, METRICS, TRACES,
     },
     test_util::{
         components::{assert_source_compliance, HTTP_PUSH_SOURCE_TAGS},
@@ -966,17 +961,12 @@ async fn decode_sketches() {
             "12345678abcdefgh12345678abcdefgh".parse().unwrap(),
         );
 
-        let mut buf = Vec::new();
-        let sketch = ddmetric_proto::sketch_payload::Sketch {
-            metric: "dd_sketch".to_string(),
-            tags: vec![
-                "foo:bar".to_string(),
-                "foo:baz".to_string(),
-                "foobar".to_string(),
-            ],
-            host: "a_host".to_string(),
+        let sketch = proto::metrics::sketch_payload::Sketch {
+            metric: "dd_sketch".into(),
+            tags: vec!["foo:bar".into(), "foo:baz".into(), "foobar".into()],
+            host: "a_host".into(),
             distributions: Vec::new(),
-            dogsketches: vec![ddmetric_proto::sketch_payload::sketch::Dogsketch {
+            dogsketches: vec![proto::metrics::sketch_payload::sketch::Dogsketch {
                 ts: 1542182950,
                 cnt: 2,
                 min: 16.0,
@@ -985,22 +975,26 @@ async fn decode_sketches() {
                 sum: 74.0,
                 k: vec![1517, 1559],
                 n: vec![1, 1],
+                ..Default::default()
             }],
-            metadata: Some(ddmetric_proto::Metadata {
-                origin: Some(ddmetric_proto::Origin {
+            metadata: MessageField::some(proto::metrics::Metadata {
+                origin: MessageField::some(proto::metrics::Origin {
                     origin_product: 10,
                     origin_category: 11,
                     origin_service: 9,
+                    ..Default::default()
                 }),
+                ..Default::default()
             }),
+            ..Default::default()
         };
 
-        let sketch_payload = ddmetric_proto::SketchPayload {
-            metadata: None,
+        let sketch_payload = proto::metrics::SketchPayload {
             sketches: vec![sketch],
+            ..Default::default()
         };
 
-        sketch_payload.encode(&mut buf).unwrap();
+        let buf = sketch_payload.write_to_bytes().unwrap();
 
         let events = spawn_collect_n(
             async move {
@@ -1081,82 +1075,84 @@ async fn decode_traces() {
         );
         headers.insert("X-Datadog-Reported-Languages", "ada".parse().unwrap());
 
-        let mut buf_v1 = Vec::new();
-
-        let span = ddtrace_proto::Span {
-            service: "a_service".to_string(),
-            name: "a_name".to_string(),
-            resource: "a_resource".to_string(),
-            trace_id: 123u64,
-            span_id: 456u64,
-            parent_id: 789u64,
+        let span = proto::traces::Span {
+            service: "a_service".into(),
+            name: "a_name".into(),
+            resource: "a_resource".into(),
+            traceID: 123u64,
+            spanID: 456u64,
+            parentID: 789u64,
             start: 1_431_648_000_000_001i64,
             duration: 1_000_000_000i64,
             error: 404i32,
-            meta: BTreeMap::from_iter([("foo".to_string(), "bar".to_string())].into_iter()),
-            metrics: BTreeMap::from_iter([("a_metrics".to_string(), 0.577f64)].into_iter()),
-            r#type: "a_type".to_string(),
-            meta_struct: BTreeMap::new(),
+            meta: HashMap::from_iter([("foo".into(), "bar".into())].into_iter()),
+            metrics: HashMap::from_iter([("a_metrics".into(), 0.577f64)].into_iter()),
+            type_: "a_type".into(),
+            meta_struct: HashMap::new(),
+            ..Default::default()
         };
 
-        let trace = ddtrace_proto::ApiTrace {
-            trace_id: 123u64,
+        let trace = proto::traces::APITrace {
+            traceID: 123u64,
             spans: vec![span.clone()],
-            start_time: 1_431_648_000_000_001i64,
-            end_time: 1_431_649_000_000_001i64,
+            startTime: 1_431_648_000_000_001i64,
+            endTime: 1_431_649_000_000_001i64,
+            ..Default::default()
         };
 
-        let payload_v1 = ddtrace_proto::TracePayload {
-            host_name: "a_hostname".to_string(),
-            env: "an_environment".to_string(),
+        let payload_v1 = proto::traces::TracePayload {
+            hostName: "a_hostname".into(),
+            env: "an_environment".into(),
             traces: vec![trace],
             transactions: vec![span.clone()],
             // Other filea
-            tracer_payloads: vec![],
-            tags: BTreeMap::new(),
-            agent_version: "".to_string(),
-            target_tps: 0f64,
-            error_tps: 0f64,
+            tracerPayloads: vec![],
+            tags: HashMap::new(),
+            agentVersion: "".into(),
+            targetTPS: 0f64,
+            errorTPS: 0f64,
+            ..Default::default()
         };
 
-        payload_v1.encode(&mut buf_v1).unwrap();
+        let buf_v1 = payload_v1.write_to_bytes().unwrap();
 
-        let mut buf_v2 = Vec::new();
-
-        let chunk = ddtrace_proto::TraceChunk {
+        let chunk = proto::traces::TraceChunk {
             priority: 42i32,
-            origin: "an_origin".to_string(),
-            dropped_trace: false,
+            origin: "an_origin".into(),
+            droppedTrace: false,
             spans: vec![span],
-            tags: BTreeMap::from_iter([("a".to_string(), "tag".to_string())].into_iter()),
+            tags: HashMap::from_iter([("a".into(), "tag".into())].into_iter()),
+            ..Default::default()
         };
 
-        let tracer_payload = ddtrace_proto::TracerPayload {
-            container_id: "an_id".to_string(),
-            language_name: "plop".to_string(),
-            language_version: "v33".to_string(),
-            tracer_version: "v577".to_string(),
-            runtime_id: "123abc".to_string(),
+        let tracer_payload = proto::traces::TracerPayload {
+            containerID: "an_id".into(),
+            languageName: "plop".into(),
+            languageVersion: "v33".into(),
+            tracerVersion: "v577".into(),
+            runtimeID: "123abc".into(),
             chunks: vec![chunk],
-            env: "env".to_string(),
-            tags: BTreeMap::from_iter([("another".to_string(), "tag".to_string())].into_iter()),
-            hostname: "hostname".to_string(),
-            app_version: "v314".to_string(),
+            env: "env".into(),
+            tags: HashMap::from_iter([("another".into(), "tag".into())].into_iter()),
+            hostname: "hostname".into(),
+            appVersion: "v314".into(),
+            ..Default::default()
         };
 
-        let payload_v2 = ddtrace_proto::TracePayload {
-            host_name: "a_hostname".to_string(),
-            env: "env".to_string(),
+        let payload_v2 = proto::traces::TracePayload {
+            hostName: "a_hostname".into(),
+            env: "env".into(),
             traces: vec![],
             transactions: vec![],
-            tracer_payloads: vec![tracer_payload],
-            tags: BTreeMap::new(),
-            agent_version: "v1.23456".to_string(),
-            target_tps: 10f64,
-            error_tps: 10f64,
+            tracerPayloads: vec![tracer_payload],
+            tags: HashMap::new(),
+            agentVersion: "v1.23456".into(),
+            targetTPS: 10f64,
+            errorTPS: 10f64,
+            ..Default::default()
         };
 
-        payload_v2.encode(&mut buf_v2).unwrap();
+        let buf_v2 = payload_v2.write_to_bytes().unwrap();
 
         let events = spawn_collect_n(
             async move {
@@ -1900,75 +1896,87 @@ async fn decode_series_endpoint_v2() {
         );
 
         let series = vec![
-            ddmetric_proto::metric_payload::MetricSeries {
-                resources: vec![ddmetric_proto::metric_payload::Resource {
-                    r#type: "host".to_string(),
-                    name: "random_host".to_string(),
+            proto::metrics::metric_payload::MetricSeries {
+                resources: vec![proto::metrics::metric_payload::Resource {
+                    type_: "host".into(),
+                    name: "random_host".into(),
+                    ..Default::default()
                 }],
-                metric: "namespace.dd_gauge".to_string(),
-                tags: vec!["foo:bar".to_string()],
+                metric: "namespace.dd_gauge".into(),
+                tags: vec!["foo:bar".into()],
                 points: vec![
-                    ddmetric_proto::metric_payload::MetricPoint {
+                    proto::metrics::metric_payload::MetricPoint {
                         value: 3.14,
                         timestamp: 1542182950,
+                        ..Default::default()
                     },
-                    ddmetric_proto::metric_payload::MetricPoint {
+                    proto::metrics::metric_payload::MetricPoint {
                         value: 3.1415,
                         timestamp: 1542182951,
+                        ..Default::default()
                     },
                 ],
-                r#type: ddmetric_proto::metric_payload::MetricType::Gauge as i32,
-                unit: "".to_string(),
-                source_type_name: "a_random_source_type_name".to_string(),
+                type_: proto::metrics::metric_payload::MetricType::GAUGE.into(),
+                unit: "".into(),
+                source_type_name: "a_random_source_type_name".into(),
                 interval: 10, // Dogstatsd sets Gauge interval to 10 by default
-                metadata: None,
+                ..Default::default()
             },
-            ddmetric_proto::metric_payload::MetricSeries {
-                resources: vec![ddmetric_proto::metric_payload::Resource {
-                    r#type: "host".to_string(),
-                    name: "another_random_host".to_string(),
+            proto::metrics::metric_payload::MetricSeries {
+                resources: vec![proto::metrics::metric_payload::Resource {
+                    type_: "host".into(),
+                    name: "another_random_host".into(),
+                    ..Default::default()
                 }],
-                metric: "another_namespace.dd_rate".to_string(),
-                tags: vec!["foo:bar:baz".to_string(), "foo:bizbaz".to_string()],
-                points: vec![ddmetric_proto::metric_payload::MetricPoint {
+                metric: "another_namespace.dd_rate".into(),
+                tags: vec!["foo:bar:baz".into(), "foo:bizbaz".into()],
+                points: vec![proto::metrics::metric_payload::MetricPoint {
                     value: 3.14,
                     timestamp: 1542182950,
+                    ..Default::default()
                 }],
-                r#type: ddmetric_proto::metric_payload::MetricType::Rate as i32,
-                unit: "".to_string(),
-                source_type_name: "another_random_source_type_name".to_string(),
+                type_: proto::metrics::metric_payload::MetricType::RATE.into(),
+                unit: "".into(),
+                source_type_name: "another_random_source_type_name".into(),
                 interval: 10,
-                metadata: None,
+                ..Default::default()
             },
-            ddmetric_proto::metric_payload::MetricSeries {
-                resources: vec![ddmetric_proto::metric_payload::Resource {
-                    r#type: "host".to_string(),
-                    name: "a_host".to_string(),
+            proto::metrics::metric_payload::MetricSeries {
+                resources: vec![proto::metrics::metric_payload::Resource {
+                    type_: "host".into(),
+                    name: "a_host".into(),
+                    ..Default::default()
                 }],
-                metric: "dd_count".to_string(),
-                tags: vec!["foobar".to_string()],
-                points: vec![ddmetric_proto::metric_payload::MetricPoint {
+                metric: "dd_count".into(),
+                tags: vec!["foobar".into()],
+                points: vec![proto::metrics::metric_payload::MetricPoint {
                     value: 16777216_f64,
                     timestamp: 1542182955,
+                    ..Default::default()
                 }],
-                r#type: ddmetric_proto::metric_payload::MetricType::Count as i32,
-                unit: "".to_string(),
-                source_type_name: "a_very_random_source_type_name".to_string(),
+                type_: proto::metrics::metric_payload::MetricType::COUNT.into(),
+                unit: "".into(),
+                source_type_name: "a_very_random_source_type_name".into(),
                 interval: 0,
-                metadata: Some(ddmetric_proto::Metadata {
-                    origin: Some(ddmetric_proto::Origin {
+                metadata: MessageField::some(proto::metrics::Metadata {
+                    origin: MessageField::some(proto::metrics::Origin {
                         origin_product: 10,
                         origin_category: 10,
                         origin_service: 42,
+                        ..Default::default()
                     }),
+                    ..Default::default()
                 }),
+                ..Default::default()
             },
         ];
 
-        let series_payload = ddmetric_proto::MetricPayload { series };
+        let series_payload = proto::metrics::MetricPayload {
+            series,
+            ..Default::default()
+        };
 
-        let mut buf = Vec::new();
-        series_payload.encode(&mut buf).unwrap();
+        let buf = series_payload.write_to_bytes().unwrap();
 
         let events = spawn_collect_n(
             async move {

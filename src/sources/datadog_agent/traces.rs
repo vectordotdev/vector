@@ -1,11 +1,11 @@
-use std::{collections::BTreeMap, sync::Arc};
+use std::{collections::HashMap, sync::Arc};
 
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
 use futures::future;
 use http::StatusCode;
 use ordered_float::NotNan;
-use prost::Message;
+use protobuf::{Chars, Message as _};
 use vrl::event_path;
 use warp::{filters::BoxedFilter, path, path::FullPath, reply::Response, Filter, Rejection, Reply};
 
@@ -15,7 +15,11 @@ use vector_lib::EstimatedJsonEncodedSizeOf;
 use crate::{
     event::{Event, ObjectMap, TraceEvent, Value},
     sources::{
-        datadog_agent::{ddtrace_proto, handle_request, ApiKeyQueryParams, DatadogAgentSource},
+        datadog_agent::{
+            handle_request,
+            proto::traces::{Span, TracePayload, TracerPayload},
+            ApiKeyQueryParams, DatadogAgentSource,
+        },
         util::ErrorMessage,
     },
     SourceSender,
@@ -101,8 +105,8 @@ fn handle_dd_trace_payload(
     lang: Option<&String>,
     source: &DatadogAgentSource,
 ) -> crate::Result<Vec<Event>> {
-    let decoded_payload = ddtrace_proto::TracePayload::decode(frame)?;
-    if decoded_payload.tracer_payloads.is_empty() {
+    let decoded_payload = TracePayload::parse_from_tokio_bytes(&frame)?;
+    if decoded_payload.tracerPayloads.is_empty() {
         debug!("Older trace payload decoded.");
         handle_dd_trace_payload_v0(decoded_payload, api_key, lang, source)
     } else {
@@ -113,19 +117,21 @@ fn handle_dd_trace_payload(
 
 /// Decode Datadog newer protobuf schema
 fn handle_dd_trace_payload_v1(
-    decoded_payload: ddtrace_proto::TracePayload,
+    decoded_payload: TracePayload,
     api_key: Option<Arc<str>>,
     source: &DatadogAgentSource,
 ) -> crate::Result<Vec<Event>> {
-    let env = decoded_payload.env;
-    let hostname = decoded_payload.host_name;
-    let agent_version = decoded_payload.agent_version;
-    let target_tps = decoded_payload.target_tps;
-    let error_tps = decoded_payload.error_tps;
+    // TODO: inefficient conversion to `String` when `Bytes` would suffice. address once we have
+    // solution for getting original `Bytes` from `Chars`
+    let env = decoded_payload.env.to_string();
+    let hostname = decoded_payload.hostName.to_string();
+    let agent_version = decoded_payload.agentVersion.to_string();
+    let target_tps = decoded_payload.targetTPS;
+    let error_tps = decoded_payload.errorTPS;
     let tags = convert_tags(decoded_payload.tags);
 
     let trace_events: Vec<TraceEvent> = decoded_payload
-        .tracer_payloads
+        .tracerPayloads
         .into_iter()
         .flat_map(convert_dd_tracer_payload)
         .collect();
@@ -170,7 +176,7 @@ fn handle_dd_trace_payload_v1(
     Ok(enriched_events)
 }
 
-fn convert_dd_tracer_payload(payload: ddtrace_proto::TracerPayload) -> Vec<TraceEvent> {
+fn convert_dd_tracer_payload(payload: TracerPayload) -> Vec<TraceEvent> {
     let tags = convert_tags(payload.tags);
     payload
         .chunks
@@ -178,8 +184,10 @@ fn convert_dd_tracer_payload(payload: ddtrace_proto::TracerPayload) -> Vec<Trace
         .map(|trace| {
             let mut trace_event = TraceEvent::default();
             trace_event.insert(event_path!("priority"), trace.priority as i64);
-            trace_event.insert(event_path!("origin"), trace.origin);
-            trace_event.insert(event_path!("dropped"), trace.dropped_trace);
+            // TODO: inefficient conversion to `String` when `Bytes` would suffice. address once we have
+            // solution for getting original `Bytes` from `Chars`
+            trace_event.insert(event_path!("origin"), trace.origin.to_string());
+            trace_event.insert(event_path!("dropped"), trace.droppedTrace);
             let mut trace_tags = convert_tags(trace.tags);
             trace_tags.extend(tags.clone());
             trace_event.insert(event_path!("tags"), Value::from(trace_tags));
@@ -193,18 +201,23 @@ fn convert_dd_tracer_payload(payload: ddtrace_proto::TracerPayload) -> Vec<Trace
                     .collect::<Vec<Value>>(),
             );
 
-            trace_event.insert(event_path!("container_id"), payload.container_id.clone());
-            trace_event.insert(event_path!("language_name"), payload.language_name.clone());
+            // TODO: inefficient conversion to `String` when `Bytes` would suffice. address once we have
+            // solution for getting original `Bytes` from `Chars`
+            trace_event.insert(event_path!("container_id"), payload.containerID.to_string());
+            trace_event.insert(
+                event_path!("language_name"),
+                payload.languageName.to_string(),
+            );
             trace_event.insert(
                 event_path!("language_version"),
-                payload.language_version.clone(),
+                payload.languageVersion.to_string(),
             );
             trace_event.insert(
                 event_path!("tracer_version"),
-                payload.tracer_version.clone(),
+                payload.tracerVersion.to_string(),
             );
-            trace_event.insert(event_path!("runtime_id"), payload.runtime_id.clone());
-            trace_event.insert(event_path!("app_version"), payload.app_version.clone());
+            trace_event.insert(event_path!("runtime_id"), payload.runtimeID.to_string());
+            trace_event.insert(event_path!("app_version"), payload.appVersion.to_string());
             trace_event
         })
         .collect()
@@ -212,13 +225,15 @@ fn convert_dd_tracer_payload(payload: ddtrace_proto::TracerPayload) -> Vec<Trace
 
 // Decode Datadog older protobuf schema
 fn handle_dd_trace_payload_v0(
-    decoded_payload: ddtrace_proto::TracePayload,
+    decoded_payload: TracePayload,
     api_key: Option<Arc<str>>,
     lang: Option<&String>,
     source: &DatadogAgentSource,
 ) -> crate::Result<Vec<Event>> {
-    let env = decoded_payload.env;
-    let hostname = decoded_payload.host_name;
+    // TODO: inefficient conversion to `String` when `Bytes` would suffice. address once we have
+    // solution for getting original `Bytes` from `Chars`
+    let env = decoded_payload.env.to_string();
+    let hostname = decoded_payload.hostName.to_string();
 
     let trace_events: Vec<TraceEvent> =
     // Each traces is mapped to one event...
@@ -231,9 +246,9 @@ fn handle_dd_trace_payload_v0(
             // TODO trace_id is being forced into an i64 but
             // the incoming payload is u64. This is a bug and needs to be fixed per:
             // https://github.com/vectordotdev/vector/issues/14687
-            trace_event.insert(event_path!("trace_id"), dd_trace.trace_id as i64);
-            trace_event.insert(event_path!("start_time"), Utc.timestamp_nanos(dd_trace.start_time));
-            trace_event.insert(event_path!("end_time"), Utc.timestamp_nanos(dd_trace.end_time));
+            trace_event.insert(event_path!("trace_id"), dd_trace.traceID as i64);
+            trace_event.insert(event_path!("start_time"), Utc.timestamp_nanos(dd_trace.startTime));
+            trace_event.insert(event_path!("end_time"), Utc.timestamp_nanos(dd_trace.endTime));
             trace_event.insert(
                 event_path!("spans"),
                 dd_trace
@@ -282,19 +297,18 @@ fn handle_dd_trace_payload_v0(
     Ok(enriched_events)
 }
 
-fn convert_span(dd_span: ddtrace_proto::Span) -> ObjectMap {
+fn convert_span(dd_span: Span) -> ObjectMap {
     let mut span = ObjectMap::new();
-    span.insert("service".into(), Value::from(dd_span.service));
-    span.insert("name".into(), Value::from(dd_span.name));
 
-    span.insert("resource".into(), Value::from(dd_span.resource));
+    // TODO: inefficient conversion to `String` when `Bytes` would suffice. address once we have
+    // solution for getting original `Bytes` from `Chars`
+    span.insert("service".into(), Value::from(dd_span.service.to_string()));
+    span.insert("name".into(), Value::from(dd_span.name.to_string()));
+    span.insert("resource".into(), Value::from(dd_span.resource.to_string()));
 
-    // TODO trace_id, span_id and parent_id are being forced into an i64 but
-    // the incoming payload is u64. This is a bug and needs to be fixed per:
-    // https://github.com/vectordotdev/vector/issues/14687
-    span.insert("trace_id".into(), Value::from(dd_span.trace_id as i64));
-    span.insert("span_id".into(), Value::from(dd_span.span_id as i64));
-    span.insert("parent_id".into(), Value::from(dd_span.parent_id as i64));
+    span.insert("trace_id".into(), Value::from(dd_span.traceID));
+    span.insert("span_id".into(), Value::from(dd_span.spanID));
+    span.insert("parent_id".into(), Value::from(dd_span.parentID));
     span.insert(
         "start".into(),
         Value::from(Utc.timestamp_nanos(dd_span.start)),
@@ -310,21 +324,23 @@ fn convert_span(dd_span: ddtrace_proto::Span) -> ObjectMap {
                 .into_iter()
                 .map(|(k, v)| {
                     (
-                        k.into(),
+                        k.to_string().into(),
                         NotNan::new(v).map(Value::Float).unwrap_or(Value::Null),
                     )
                 })
                 .collect::<ObjectMap>(),
         ),
     );
-    span.insert("type".into(), Value::from(dd_span.r#type));
+    // TODO: inefficient conversion to `String` when `Bytes` would suffice. address once we have
+    // solution for getting original `Bytes` from `Chars`
+    span.insert("type".into(), Value::from(dd_span.type_.to_string()));
     span.insert(
         "meta_struct".into(),
         Value::from(
             dd_span
                 .meta_struct
                 .into_iter()
-                .map(|(k, v)| (k.into(), Value::from(bytes::Bytes::from(v))))
+                .map(|(k, v)| (k.to_string().into(), Value::from(bytes::Bytes::from(v))))
                 .collect::<ObjectMap>(),
         ),
     );
@@ -332,9 +348,11 @@ fn convert_span(dd_span: ddtrace_proto::Span) -> ObjectMap {
     span
 }
 
-fn convert_tags(original_map: BTreeMap<String, String>) -> ObjectMap {
+fn convert_tags(original_map: HashMap<Chars, Chars>) -> ObjectMap {
     original_map
         .into_iter()
-        .map(|(k, v)| (k.into(), Value::from(v)))
+        // TODO: inefficient conversion to `String` when `Bytes` would suffice. address once we have
+        // solution for getting original `Bytes` from `Chars`
+        .map(|(k, v)| (k.to_string().into(), Value::from(v.to_string())))
         .collect::<ObjectMap>()
 }

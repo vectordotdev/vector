@@ -157,6 +157,37 @@ fn main() {
             .unwrap();
     }
 
+    #[cfg(feature = "dd-agent-source-protobuf-build")]
+    {
+        // We're doing Datadog Agent-specific codegen here for Protocol Buffers handling in the
+        // `datadog_agent` source as `protobuf` supports using `bytes` for both byte buffers _and_
+        // strings, which we utilize to attempt to do more zero-copy deserialization and this
+        // improve our memory utilization for what are otherwise string-heavy (and thus
+        // allocation-heavy) payloads.
+        println!("cargo:rerun-if-changed=proto/dd_trace.proto");
+        println!("cargo:rerun-if-changed=proto/ddsketch_full.proto");
+        println!("cargo:rerun-if-changed=proto/dd_metric.proto");
+
+        let codegen_customize = protobuf_codegen::Customize::default()
+            .tokio_bytes(true)
+            .tokio_bytes_for_string(true)
+            .generate_getter(true)
+            .gen_mod_rs(true)
+            .lite_runtime(true);
+
+        protobuf_codegen::Codegen::new()
+            .protoc()
+            .includes(&["proto"])
+            .inputs(&[
+                "proto/ddsketch_full.proto",
+                "proto/dd_metric.proto",
+                "proto/dd_trace.proto",
+            ])
+            .cargo_out_dir("dd-agent-protos")
+            .customize(codegen_customize)
+            .run_from_script();
+    }
+
     // We keep track of which environment variables we slurp in, and then emit stanzas at the end to
     // inform Cargo when it needs to rerun this build script.  This allows us to avoid rerunning it
     // every single time unless something _actually_ changes.

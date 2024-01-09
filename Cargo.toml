@@ -295,6 +295,7 @@ paste = "1.0.14"
 percent-encoding = { version = "2.3.1", default-features = false }
 postgres-openssl = { version = "0.5.0", default-features = false, features = ["runtime"], optional = true }
 pulsar = { version = "6.1.0", default-features = false, features = ["tokio-runtime", "auth-oauth2", "flate2", "lz4", "snap", "zstd"], optional = true }
+protobuf = { version = "3.3.0", default-features = false, features = ["with-bytes"], optional = true }
 rand = { version = "0.8.5", default-features = false, features = ["small_rng"] }
 rand_distr = { version = "0.4.3", default-features = false }
 rdkafka = { version = "0.35.0", default-features = false, features = ["tokio", "libz", "ssl", "zstd"], optional = true }
@@ -339,6 +340,7 @@ nix = { version = "0.26.2", default-features = false, features = ["socket", "sig
 [build-dependencies]
 prost-build = { version = "0.12", default-features = false, optional = true }
 tonic-build = { version = "0.10", default-features = false, features = ["transport", "prost"], optional = true }
+protobuf-codegen = { version = "3.3.0", default-features = false, optional = true }
 # update 'openssl_version' in website/config.toml whenever <major.minor> version changes
 openssl-src = { version = "300", default-features = false, features = ["force-engine", "legacy"] }
 
@@ -454,6 +456,7 @@ aws-core = [
 
 # Anything that requires Protocol Buffers.
 protobuf-build = ["dep:tonic-build", "dep:prost-build"]
+dd-agent-source-protobuf-build = ["dep:protobuf-codegen"]
 
 gcp = ["dep:base64", "dep:goauth", "dep:smpl_jwt"]
 
@@ -516,7 +519,7 @@ sources-aws_ecs_metrics = ["sources-utils-http-client"]
 sources-aws_kinesis_firehose = ["dep:base64", "dep:infer"]
 sources-aws_s3 = ["aws-core", "dep:aws-sdk-sqs", "dep:aws-sdk-s3", "dep:semver", "dep:async-compression", "sources-aws_sqs", "tokio-util/io"]
 sources-aws_sqs = ["aws-core", "dep:aws-sdk-sqs"]
-sources-datadog_agent = ["sources-utils-http-error", "protobuf-build"]
+sources-datadog_agent = ["sources-utils-http-error", "dep:protobuf", "protobuf-build", "dd-agent-source-protobuf-build"]
 sources-demo_logs = ["dep:fakedata"]
 sources-dnstap = ["dep:base64", "dep:hickory-proto", "dep:dnsmsg-parser", "protobuf-build"]
 sources-docker_logs = ["docker"]
