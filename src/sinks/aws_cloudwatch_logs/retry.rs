@@ -71,11 +71,11 @@ impl<T: Send + Sync + 'static> RetryLogic for CloudwatchRetryLogic<T> {
 #[cfg(test)]
 mod test {
     use aws_sdk_cloudwatchlogs::operation::put_log_events::PutLogEventsError;
-    use aws_sdk_s3::primitives::SdkBody;
     use aws_smithy_runtime_api::{
         client::{orchestrator::HttpResponse, result::SdkError},
         http::StatusCode,
     };
+    use aws_smithy_types::body::SdkBody;
 
     use crate::sinks::aws_cloudwatch_logs::{
         retry::CloudwatchRetryLogic, service::CloudwatchError,
