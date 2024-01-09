@@ -216,7 +216,6 @@ lapin = { version = "2.3.1", default-features = false, features = ["native-tls"]
 # API
 async-graphql = { version = "6.0.11", default-features = false, optional = true, features = ["chrono", "playground"] }
 async-graphql-warp = { version = "6.0.11", default-features = false, optional = true }
-itertools = { version = "0.12.0", default-features = false }
 
 # API client
 crossterm = { version = "0.27.0", default-features = false, features = ["event-stream", "windows"], optional = true }
@@ -274,6 +273,7 @@ indexmap = { version = "2.1.0", default-features = false, features = ["serde", "
 infer = { version = "0.15.0", default-features = false, optional = true}
 indoc = { version = "2.0.4", default-features = false }
 inventory = { version = "0.3.14", default-features = false }
+itertools = { version = "0.12.0", default-features = false, optional = false, features = ["use_alloc"] }
 k8s-openapi = { version = "0.18.0", default-features = false, features = ["api", "v1_26"], optional = true }
 kube = { version = "0.82.0", default-features = false, features = ["client", "openssl-tls", "runtime"], optional = true }
 listenfd = { version = "1.0.1", default-features = false, optional = true }
@@ -541,9 +541,10 @@ sources-nats = ["dep:async-nats", "dep:nkeys"]
 sources-nginx_metrics = ["dep:nom"]
 sources-opentelemetry = ["dep:hex", "vector-lib/opentelemetry", "dep:prost-types", "sources-http_server", "sources-utils-http", "sources-vector"]
 sources-postgresql_metrics = ["dep:postgres-openssl", "dep:tokio-postgres"]
-sources-prometheus = ["sources-prometheus-scrape", "sources-prometheus-remote-write"]
+sources-prometheus = ["sources-prometheus-scrape", "sources-prometheus-remote-write", "sources-prometheus-pushgateway"]
 sources-prometheus-scrape = ["sinks-prometheus", "sources-utils-http-client", "vector-lib/prometheus"]
 sources-prometheus-remote-write = ["sinks-prometheus", "sources-utils-http", "vector-lib/prometheus"]
+sources-prometheus-pushgateway = ["sinks-prometheus", "sources-utils-http", "vector-lib/prometheus"]
 sources-redis= ["dep:redis"]
 sources-socket = ["sources-utils-net", "tokio-util/net"]
 sources-splunk_hec = ["dep:roaring"]
