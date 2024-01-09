@@ -1,8 +1,7 @@
 use std::marker::PhantomData;
 use std::task::{Context, Poll};
 
-use aws_smithy_runtime_api::client::orchestrator::HttpResponse;
-use aws_smithy_runtime_api::client::result::SdkError;
+use aws_sdk_sqs::types::SdkError;
 use futures::future::BoxFuture;
 use tower::Service;
 use vector_lib::request_metadata::GroupedCountByteSize;
@@ -52,7 +51,7 @@ where
     E: std::fmt::Debug + std::fmt::Display + std::error::Error + Sync + Send + 'static,
 {
     type Response = SendMessageResponse;
-    type Error = SdkError<E, HttpResponse>;
+    type Error = SdkError<E>;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
     // Emission of an internal event in case of errors is handled upstream by the caller.

@@ -1,10 +1,12 @@
 #![cfg(feature = "aws-kinesis-streams-integration-tests")]
 #![cfg(test)]
 
-use aws_sdk_kinesis::types::{Record, ShardIteratorType};
-use aws_smithy_types::DateTime;
 use futures::StreamExt;
 
+use aws_sdk_kinesis::{
+    model::{Record, ShardIteratorType},
+    types::DateTime,
+};
 use tokio::time::{sleep, Duration};
 use vector_lib::codecs::TextSerializerConfig;
 use vector_lib::lookup::lookup_v2::ConfigValuePath;
@@ -77,10 +79,10 @@ async fn kinesis_put_records_with_partition_key() {
     let mut output_lines = records
         .into_iter()
         .map(|e| {
-            assert_eq!(partition_value, e.partition_key());
+            assert_eq!(Some(partition_value), e.partition_key());
             e
         })
-        .map(|e| String::from_utf8(e.data.into_inner()).unwrap())
+        .map(|e| String::from_utf8(e.data.unwrap().into_inner()).unwrap())
         .collect::<Vec<_>>();
 
     input_lines.sort();
@@ -99,7 +101,7 @@ async fn kinesis_put_records_without_partition_key() {
 
     let base = KinesisSinkBaseConfig {
         stream_name: stream.clone(),
-        region: RegionOrEndpoint::with_both("us-east-1", kinesis_address().as_str()),
+        region: RegionOrEndpoint::with_both("localstack", kinesis_address().as_str()),
         encoding: TextSerializerConfig::default().into(),
         compression: Compression::None,
         request: Default::default(),
@@ -129,7 +131,7 @@ async fn kinesis_put_records_without_partition_key() {
 
     let mut output_lines = records
         .into_iter()
-        .map(|e| String::from_utf8(e.data.into_inner()).unwrap())
+        .map(|e| String::from_utf8(e.data.unwrap().into_inner()).unwrap())
         .collect::<Vec<_>>();
 
     input_lines.sort();
@@ -150,6 +152,7 @@ async fn fetch_records(stream_name: String, timestamp: i64) -> crate::Result<Vec
         .stream_description
         .unwrap()
         .shards
+        .unwrap()
         .into_iter()
         .next()
         .expect("No shards");
@@ -157,7 +160,7 @@ async fn fetch_records(stream_name: String, timestamp: i64) -> crate::Result<Vec
     let resp = client
         .get_shard_iterator()
         .stream_name(stream_name)
-        .shard_id(shard.shard_id)
+        .shard_id(shard.shard_id.unwrap())
         .shard_iterator_type(ShardIteratorType::AtTimestamp)
         .timestamp(DateTime::from_millis(timestamp))
         .send()
@@ -170,16 +173,23 @@ async fn fetch_records(stream_name: String, timestamp: i64) -> crate::Result<Vec
         .set_limit(None)
         .send()
         .await?;
-    Ok(resp.records)
+    Ok(resp.records.unwrap_or_default())
 }
 
 async fn client() -> aws_sdk_kinesis::Client {
     let auth = AwsAuthentication::test_auth();
     let proxy = ProxyConfig::default();
-    let region = RegionOrEndpoint::with_both("us-east-1", kinesis_address());
-    create_client::<KinesisClientBuilder>(&auth, region.region(), region.endpoint(), &proxy, &None)
-        .await
-        .unwrap()
+    let region = RegionOrEndpoint::with_both("localstack", kinesis_address());
+    create_client::<KinesisClientBuilder>(
+        &auth,
+        region.region(),
+        region.endpoint(),
+        &proxy,
+        &None,
+        true,
+    )
+    .await
+    .unwrap()
 }
 
 async fn ensure_stream(stream_name: String) {

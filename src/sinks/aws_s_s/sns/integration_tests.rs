@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
-use aws_config::Region;
-use aws_sdk_sns::Client as SnsClient;
-use aws_sdk_sqs::{types::QueueAttributeName, Client as SqsClient};
+use aws_sdk_sns::{Client as SnsClient, Region};
+use aws_sdk_sqs::model::QueueAttributeName;
+use aws_sdk_sqs::Client as SqsClient;
 use tokio::time::{sleep, Duration};
 use vector_lib::codecs::TextSerializerConfig;
 
@@ -33,10 +33,11 @@ async fn create_sns_test_client() -> SnsClient {
     let proxy = ProxyConfig::default();
     create_client::<SnsClientBuilder>(
         &auth,
-        Some(Region::new("us-east-1")),
+        Some(Region::new("localstack")),
         Some(endpoint),
         &proxy,
         &None,
+        true,
     )
     .await
     .unwrap()
@@ -53,10 +54,11 @@ async fn create_sqs_test_client() -> SqsClient {
     let proxy = ProxyConfig::default();
     create_client::<SqsClientBuilder>(
         &auth,
-        Some(Region::new("us-east-1")),
+        Some(Region::new("localstack")),
         Some(endpoint),
         &proxy,
         &None,
+        true,
     )
     .await
     .unwrap()
@@ -85,7 +87,7 @@ async fn sns_send_message_batch() {
     };
 
     let config = SnsSinkConfig {
-        region: RegionOrEndpoint::with_both("us-east-1", sns_address().as_str()),
+        region: RegionOrEndpoint::with_both("local", sns_address().as_str()),
         topic_arn: topic_arn.clone(),
         base_config,
     };
@@ -163,7 +165,6 @@ async fn get_queue_arn(client: &SqsClient, queue_url: String) -> String {
     client
         .get_queue_attributes()
         .queue_url(queue_url)
-        .attribute_names(QueueAttributeName::QueueArn)
         .send()
         .await
         .unwrap()

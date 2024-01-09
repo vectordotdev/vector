@@ -1,4 +1,3 @@
-//! Handles the region settings for AWS components.
 use aws_types::region::Region;
 use vector_lib::configurable::configurable_component;
 
@@ -20,8 +19,6 @@ pub struct RegionOrEndpoint {
 }
 
 impl RegionOrEndpoint {
-    #[cfg(test)]
-    /// Creates with the given region.
     pub const fn with_region(region: String) -> Self {
         Self {
             region: Some(region),
@@ -29,8 +26,6 @@ impl RegionOrEndpoint {
         }
     }
 
-    #[cfg(test)]
-    /// Creates with both a region and an endpoint.
     pub fn with_both(region: impl Into<String>, endpoint: impl Into<String>) -> Self {
         Self {
             region: Some(region.into()),
@@ -38,12 +33,10 @@ impl RegionOrEndpoint {
         }
     }
 
-    /// Returns the endpoint.
     pub fn endpoint(&self) -> Option<String> {
         self.endpoint.clone()
     }
 
-    /// Returns the region.
     pub fn region(&self) -> Option<Region> {
         self.region.clone().map(Region::new)
     }

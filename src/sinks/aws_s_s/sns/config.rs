@@ -53,6 +53,7 @@ impl SnsSinkConfig {
             self.region.endpoint(),
             proxy,
             &self.base_config.tls,
+            true,
         )
         .await
     }
@@ -105,10 +106,16 @@ impl SinkConfig for SnsSinkConfig {
 pub(super) struct SnsClientBuilder;
 
 impl ClientBuilder for SnsClientBuilder {
+    type Config = aws_sdk_sns::config::Config;
     type Client = aws_sdk_sns::client::Client;
+    type DefaultMiddleware = aws_sdk_sns::middleware::DefaultMiddleware;
 
-    fn build(config: &aws_types::SdkConfig) -> Self::Client {
-        aws_sdk_sns::client::Client::new(config)
+    fn default_middleware() -> Self::DefaultMiddleware {
+        aws_sdk_sns::middleware::DefaultMiddleware::new()
+    }
+
+    fn build(client: aws_smithy_client::Client, config: &aws_types::SdkConfig) -> Self::Client {
+        aws_sdk_sns::client::Client::with_config(client, config.into())
     }
 }
 

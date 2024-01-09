@@ -1,10 +1,10 @@
 use std::task::{Context, Poll};
 
-use aws_sdk_s3::operation::put_object::PutObjectError;
-use aws_sdk_s3::Client as S3Client;
-use aws_smithy_runtime_api::client::orchestrator::HttpResponse;
-use aws_smithy_runtime_api::client::result::SdkError;
-use aws_smithy_types::byte_stream::ByteStream;
+use aws_sdk_s3::{
+    error::PutObjectError,
+    types::{ByteStream, SdkError},
+    Client as S3Client,
+};
 use base64::prelude::{Engine as _, BASE64_STANDARD};
 use bytes::Bytes;
 use futures::future::BoxFuture;
@@ -89,7 +89,7 @@ impl S3Service {
 
 impl Service<S3Request> for S3Service {
     type Response = S3Response;
-    type Error = SdkError<PutObjectError, HttpResponse>;
+    type Error = SdkError<PutObjectError>;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
     // Emission of an internal event in case of errors is handled upstream by the caller.

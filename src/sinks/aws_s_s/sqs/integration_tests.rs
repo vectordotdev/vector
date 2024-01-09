@@ -1,15 +1,12 @@
 use std::collections::HashMap;
 
-use aws_config::Region;
-use aws_sdk_sqs::{types::QueueAttributeName, Client as SqsClient};
+use aws_sdk_sqs::{model::QueueAttributeName, Client as SqsClient, Region};
 use tokio::time::{sleep, Duration};
 use vector_lib::codecs::TextSerializerConfig;
 
 use crate::config::{SinkConfig, SinkContext};
-use crate::sinks::aws_s_s::sqs::{
-    config::{healthcheck, SqsSinkConfig},
-    BaseSSSinkConfig,
-};
+use crate::sinks::aws_s_s::sqs::config::{healthcheck, SqsSinkConfig};
+use crate::sinks::aws_s_s::sqs::BaseSSSinkConfig;
 use crate::{
     aws::{create_client, AwsAuthentication, RegionOrEndpoint},
     common::sqs::SqsClientBuilder,
@@ -31,10 +28,11 @@ async fn create_test_client() -> SqsClient {
     let proxy = ProxyConfig::default();
     create_client::<SqsClientBuilder>(
         &auth,
-        Some(Region::new("us-east-1")),
+        Some(Region::new("localstack")),
         Some(endpoint),
         &proxy,
         &None,
+        true,
     )
     .await
     .unwrap()
@@ -60,7 +58,7 @@ async fn sqs_send_message_batch() {
     };
 
     let config = SqsSinkConfig {
-        region: RegionOrEndpoint::with_both("us-east-1", sqs_address().as_str()),
+        region: RegionOrEndpoint::with_both("local", sqs_address().as_str()),
         queue_url: queue_url.clone(),
         base_config,
     };

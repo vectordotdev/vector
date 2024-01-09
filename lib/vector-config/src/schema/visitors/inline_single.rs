@@ -177,7 +177,7 @@ impl Visitor for OccurrenceVisitor {
             let occurrences = self
                 .occurrence_map
                 .entry(current_schema_ref.into())
-                .or_default();
+                .or_insert_with(HashSet::new);
             occurrences.insert(current_parent_schema_ref);
         }
     }

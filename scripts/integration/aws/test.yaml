@@ -9,7 +9,7 @@ env:
   CLOUDWATCH_ADDRESS: http://mock-localstack:4566
   EC2_METADATA_ADDRESS: http://mock-ec2-metadata:1338
   ECS_ADDRESS: http://mock-ecs
-  ELASTICSEARCH_ADDRESS: http://mock-localstack:4566
+  ELASTICSEARCH_ADDRESS: http://mock-localstack:4571
   KINESIS_ADDRESS: http://mock-localstack:4566
   S3_ADDRESS: http://mock-localstack:4566
   SQS_ADDRESS: http://mock-localstack:4566

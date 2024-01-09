@@ -78,9 +78,7 @@ impl ElasticsearchCommon {
                     .ok_or(ParseError::RegionRequired)?
                     .ok_or(ParseError::RegionRequired)?;
                 Some(Auth::Aws {
-                    credentials_provider: aws
-                        .credentials_provider(region.clone(), proxy_config, &config.tls)
-                        .await?,
+                    credentials_provider: aws.credentials_provider(region.clone()).await?,
                     region,
                 })
             }

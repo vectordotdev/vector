@@ -37,12 +37,6 @@ use crate::{
     tls::{tls_connector_builder, MaybeTlsSettings, TlsError},
 };
 
-pub mod status {
-    pub const FORBIDDEN: u16 = 403;
-    pub const NOT_FOUND: u16 = 404;
-    pub const TOO_MANY_REQUESTS: u16 = 429;
-}
-
 #[derive(Debug, Snafu)]
 #[snafu(visibility(pub(crate)))]
 pub enum HttpError {

@@ -163,9 +163,7 @@ impl SinkConfig for RemoteWriteConfig {
                     .ok_or(Errors::AwsRegionRequired)?
                     .ok_or(Errors::AwsRegionRequired)?;
                 Some(Auth::Aws {
-                    credentials_provider: aws_auth
-                        .credentials_provider(region.clone(), cx.proxy(), &self.tls)
-                        .await?,
+                    credentials_provider: aws_auth.credentials_provider(region.clone()).await?,
                     region,
                 })
             }

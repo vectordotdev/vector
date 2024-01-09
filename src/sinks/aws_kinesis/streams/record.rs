@@ -1,6 +1,5 @@
-use aws_sdk_kinesis::operation::put_records::PutRecordsOutput;
-use aws_smithy_runtime_api::client::{orchestrator::HttpResponse, result::SdkError};
-use aws_smithy_types::Blob;
+use aws_sdk_kinesis::output::PutRecordsOutput;
+use aws_sdk_kinesis::types::{Blob, SdkError};
 use bytes::Bytes;
 use tracing::Instrument;
 
@@ -21,8 +20,7 @@ impl Record for KinesisStreamRecord {
             record: KinesisRecord::builder()
                 .data(Blob::new(&payload_bytes[..]))
                 .partition_key(partition_key)
-                .build()
-                .expect("all required builder fields set"),
+                .build(),
         }
     }
 
@@ -35,8 +33,19 @@ impl Record for KinesisStreamRecord {
             .unwrap_or_default();
 
         // data is base64 encoded
-        let data_len = self.record.data.as_ref().len();
-        let key_len = self.record.partition_key.len();
+        let data_len = self
+            .record
+            .data
+            .as_ref()
+            .map(|data| data.as_ref().len())
+            .unwrap_or(0);
+
+        let key_len = self
+            .record
+            .partition_key
+            .as_ref()
+            .map(|key| key.len())
+            .unwrap_or(0);
 
         (data_len + 2) / 3 * 4 + hash_key_size + key_len + 10
     }
@@ -60,12 +69,11 @@ impl SendRecord for KinesisStreamClient {
         &self,
         records: Vec<Self::T>,
         stream_name: String,
-    ) -> Result<KinesisResponse, SdkError<Self::E, HttpResponse>> {
+    ) -> Result<KinesisResponse, SdkError<Self::E>> {
         let rec_count = records.len();
-        let total_size = records
-            .iter()
-            .fold(0, |acc, record| acc + record.data().as_ref().len());
-
+        let total_size = records.iter().fold(0, |acc, record| {
+            acc + record.data().map(|v| v.as_ref().len()).unwrap_or_default()
+        });
         self.client
             .put_records()
             .set_records(Some(records))

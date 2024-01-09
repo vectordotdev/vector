@@ -2,9 +2,7 @@ mod config;
 mod integration_tests;
 mod record;
 
-use aws_sdk_kinesis::{
-    operation::put_records::PutRecordsError, types::PutRecordsRequestEntry, Client,
-};
+use aws_sdk_kinesis::{error::PutRecordsError, model::PutRecordsRequestEntry, Client};
 
 pub use super::{
     config::{build_sink, KinesisSinkBaseConfig},

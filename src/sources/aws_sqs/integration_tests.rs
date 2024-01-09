@@ -3,7 +3,7 @@
 
 use std::{collections::HashSet, time::Duration};
 
-use aws_sdk_sqs::operation::create_queue::CreateQueueOutput;
+use aws_sdk_sqs::output::CreateQueueOutput;
 use aws_types::region::Region;
 use futures::StreamExt;
 use tokio::time::timeout;
@@ -53,7 +53,7 @@ async fn get_sqs_client() -> aws_sdk_sqs::Client {
     let config = aws_sdk_sqs::config::Builder::new()
         .credentials_provider(
             AwsAuthentication::test_auth()
-                .credentials_provider(Region::new("custom"), &Default::default(), &None)
+                .credentials_provider(Region::new("custom"))
                 .await
                 .unwrap(),
         )

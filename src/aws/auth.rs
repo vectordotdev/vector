@@ -1,26 +1,21 @@
-//! Authentication settings for AWS components.
 use std::time::Duration;
 
 use aws_config::{
     default_provider::credentials::DefaultCredentialsChain,
-    identity::IdentityCache,
     imds,
     profile::{
         profile_file::{ProfileFileKind, ProfileFiles},
         ProfileFileCredentialsProvider,
     },
-    provider_config::ProviderConfig,
     sts::AssumeRoleProviderBuilder,
 };
-use aws_credential_types::{provider::SharedCredentialsProvider, Credentials};
-use aws_smithy_runtime::client::http::hyper_014::HyperClientBuilder;
-use aws_smithy_runtime_api::client::identity::SharedIdentityCache;
+use aws_credential_types::{
+    cache::CredentialsCache, provider::SharedCredentialsProvider, Credentials,
+};
 use aws_types::region::Region;
 use serde_with::serde_as;
-use vector_lib::{config::proxy::ProxyConfig, sensitive_string::SensitiveString, tls::TlsConfig};
-use vector_lib::{configurable::configurable_component, tls::MaybeTlsSettings};
-
-use crate::http::{build_proxy_connector, build_tls_connector};
+use vector_lib::configurable::configurable_component;
+use vector_lib::sensitive_string::SensitiveString;
 
 // matches default load timeout from the SDK as of 0.10.1, but lets us confidently document the
 // default rather than relying on the SDK default to not change
@@ -185,8 +180,7 @@ fn default_profile() -> String {
 }
 
 impl AwsAuthentication {
-    /// Creates the identity cache to store credentials based on the authentication mechanism chosen.
-    pub(super) async fn credentials_cache(&self) -> crate::Result<SharedIdentityCache> {
+    pub async fn credentials_cache(&self) -> crate::Result<CredentialsCache> {
         match self {
             AwsAuthentication::Role {
                 load_timeout_secs, ..
@@ -194,26 +188,23 @@ impl AwsAuthentication {
             | AwsAuthentication::Default {
                 load_timeout_secs, ..
             } => {
-                let credentials_cache = IdentityCache::lazy()
+                let credentials_cache = CredentialsCache::lazy_builder()
                     .load_timeout(
                         load_timeout_secs
                             .map(Duration::from_secs)
                             .unwrap_or(DEFAULT_LOAD_TIMEOUT),
                     )
-                    .build();
+                    .into_credentials_cache();
 
                 Ok(credentials_cache)
             }
-            _ => Ok(IdentityCache::lazy().build()),
+            _ => Ok(CredentialsCache::lazy()),
         }
     }
 
-    /// Returns the provider for the credentials based on the authentication mechanism chosen.
     pub async fn credentials_provider(
         &self,
         service_region: Region,
-        proxy: &ProxyConfig,
-        tls_options: &Option<TlsConfig>,
     ) -> crate::Result<SharedCredentialsProvider> {
         match self {
             Self::AccessKey {
@@ -237,7 +228,7 @@ impl AwsAuthentication {
                         builder = builder.external_id(external_id)
                     }
 
-                    let provider = builder.build_from_provider(provider).await;
+                    let provider = builder.build(provider);
 
                     return Ok(SharedCredentialsProvider::new(provider));
                 }
@@ -273,20 +264,14 @@ impl AwsAuthentication {
                     builder = builder.external_id(external_id)
                 }
 
-                let provider = builder
-                    .build_from_provider(
-                        default_credentials_provider(auth_region, proxy, tls_options, *imds)
-                            .await?,
-                    )
-                    .await;
+                let provider =
+                    builder.build(default_credentials_provider(auth_region, *imds).await?);
 
                 Ok(SharedCredentialsProvider::new(provider))
             }
             AwsAuthentication::Default { imds, region, .. } => Ok(SharedCredentialsProvider::new(
                 default_credentials_provider(
                     region.clone().map(Region::new).unwrap_or(service_region),
-                    proxy,
-                    tls_options,
                     *imds,
                 )
                 .await?,
@@ -295,7 +280,6 @@ impl AwsAuthentication {
     }
 
     #[cfg(test)]
-    /// Creates dummy authentication for tests.
     pub fn test_auth() -> AwsAuthentication {
         AwsAuthentication::AccessKey {
             access_key_id: "dummy".to_string().into(),
@@ -309,34 +293,18 @@ impl AwsAuthentication {
 
 async fn default_credentials_provider(
     region: Region,
-    proxy: &ProxyConfig,
-    tls_options: &Option<TlsConfig>,
     imds: ImdsAuthentication,
 ) -> crate::Result<SharedCredentialsProvider> {
-    let tls_settings = MaybeTlsSettings::tls_client(tls_options)?;
-    let connector = if proxy.enabled {
-        let proxy = build_proxy_connector(tls_settings, proxy)?;
-        HyperClientBuilder::new().build(proxy)
-    } else {
-        let tls_connector = build_tls_connector(tls_settings)?;
-        HyperClientBuilder::new().build(tls_connector)
-    };
-
-    let provider_config = ProviderConfig::empty()
-        .with_region(Some(region.clone()))
-        .with_http_client(connector);
-
     let client = imds::Client::builder()
         .max_attempts(imds.max_attempts)
         .connect_timeout(imds.connect_timeout)
         .read_timeout(imds.read_timeout)
-        .configure(&provider_config)
-        .build();
+        .build()
+        .await?;
 
     let credentials_provider = DefaultCredentialsChain::builder()
         .region(region)
         .imds_client(client)
-        .configure(provider_config)
         .build()
         .await;
 

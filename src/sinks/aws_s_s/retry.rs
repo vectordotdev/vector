@@ -1,6 +1,5 @@
+use aws_sdk_sqs::types::SdkError;
 use std::marker::PhantomData;
-
-use aws_smithy_runtime_api::client::{orchestrator::HttpResponse, result::SdkError};
 
 use super::service::SendMessageResponse;
 use crate::{aws::is_retriable_error, sinks::util::retries::RetryLogic};
@@ -25,7 +24,7 @@ impl<E> RetryLogic for SSRetryLogic<E>
 where
     E: std::fmt::Debug + std::fmt::Display + std::error::Error + Sync + Send + 'static,
 {
-    type Error = SdkError<E, HttpResponse>;
+    type Error = SdkError<E>;
     type Response = SendMessageResponse;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {

@@ -1,4 +1,5 @@
 use aws_sdk_cloudwatchlogs::Client as CloudwatchLogsClient;
+use aws_smithy_types::retry::RetryConfig;
 use futures::FutureExt;
 use serde::{de, Deserialize, Deserializer};
 use tower::ServiceBuilder;
@@ -8,7 +9,10 @@ use vector_lib::schema;
 use vrl::value::Kind;
 
 use crate::{
-    aws::{create_client, AwsAuthentication, ClientBuilder, RegionOrEndpoint},
+    aws::{
+        create_client, create_smithy_client, resolve_region, AwsAuthentication, ClientBuilder,
+        RegionOrEndpoint,
+    },
     codecs::{Encoder, EncodingConfig},
     config::{
         AcknowledgementsConfig, DataType, GenerateConfig, Input, ProxyConfig, SinkConfig,
@@ -31,10 +35,16 @@ use crate::{
 pub struct CloudwatchLogsClientBuilder;
 
 impl ClientBuilder for CloudwatchLogsClientBuilder {
+    type Config = aws_sdk_cloudwatchlogs::config::Config;
     type Client = aws_sdk_cloudwatchlogs::client::Client;
+    type DefaultMiddleware = aws_sdk_cloudwatchlogs::middleware::DefaultMiddleware;
 
-    fn build(config: &aws_types::SdkConfig) -> Self::Client {
-        aws_sdk_cloudwatchlogs::client::Client::new(config)
+    fn default_middleware() -> Self::DefaultMiddleware {
+        aws_sdk_cloudwatchlogs::middleware::DefaultMiddleware::new()
+    }
+
+    fn build(client: aws_smithy_client::Client, config: &aws_types::SdkConfig) -> Self::Client {
+        aws_sdk_cloudwatchlogs::client::Client::with_config(client, config.into())
     }
 }
 
@@ -174,6 +184,22 @@ impl CloudwatchLogsSinkConfig {
             self.region.endpoint(),
             proxy,
             &self.tls,
+            true,
+        )
+        .await
+    }
+
+    pub async fn create_smithy_client(
+        &self,
+        proxy: &ProxyConfig,
+    ) -> crate::Result<aws_smithy_client::Client> {
+        let region = resolve_region(self.region.region()).await?;
+        create_smithy_client::<CloudwatchLogsClientBuilder>(
+            region,
+            proxy,
+            &self.tls,
+            true,
+            RetryConfig::disabled(),
         )
         .await
     }
@@ -186,12 +212,14 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
         let batcher_settings = self.batch.into_batcher_settings()?;
         let request_settings = self.request.tower.into_settings();
         let client = self.create_client(cx.proxy()).await?;
+        let smithy_client = self.create_smithy_client(cx.proxy()).await?;
         let svc = ServiceBuilder::new()
             .settings(request_settings, CloudwatchRetryLogic::new())
             .service(CloudwatchLogsPartitionSvc::new(
                 self.clone(),
                 client.clone(),
-            )?);
+                std::sync::Arc::new(smithy_client),
+            ));
         let transformer = self.encoding.transformer();
         let serializer = self.encoding.build()?;
         let encoder = Encoder::<()>::new(serializer);
