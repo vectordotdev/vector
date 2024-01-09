@@ -33,7 +33,7 @@ regex = { version = "1.10.2", default-features = false, features = ["std", "perf
 reqwest = { version = "0.11", features = ["json", "blocking"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0.109"
-serde_yaml = "0.9.29"
+serde_yaml = "0.9.30"
 sha2 = "0.10.8"
 tempfile = "3.9.0"
 toml = { version = "0.8.8", default-features = false, features = ["parse"] }
