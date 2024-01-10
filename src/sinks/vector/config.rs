@@ -4,7 +4,7 @@ use hyper_openssl::HttpsConnector;
 use hyper_proxy::ProxyConnector;
 use tonic::body::BoxBody;
 use tower::ServiceBuilder;
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 
 use super::{
     service::{VectorResponse, VectorService},
@@ -16,6 +16,7 @@ use crate::{
         AcknowledgementsConfig, GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext,
         SinkHealthcheckOptions,
     },
+    http::build_proxy_connector,
     proto::vector as proto,
     sinks::{
         util::{
@@ -24,11 +25,11 @@ use crate::{
         },
         Healthcheck, VectorSink as VectorSinkType,
     },
-    tls::{tls_connector_builder, MaybeTlsSettings, TlsEnableableConfig},
+    tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
 
 /// Configuration for the `vector` sink.
-#[configurable_component(sink("vector"))]
+#[configurable_component(sink("vector", "Relay observability data to a Vector instance."))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct VectorConfig {
@@ -105,6 +106,7 @@ fn default_config(address: &str) -> VectorConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "vector")]
 impl SinkConfig for VectorConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSinkType, Healthcheck)> {
         let tls = MaybeTlsSettings::from_config(&self.tls, false)?;
@@ -121,7 +123,7 @@ impl SinkConfig for VectorConfig {
         let healthcheck_client = VectorService::new(client.clone(), healthcheck_uri, false);
         let healthcheck = healthcheck(healthcheck_client, cx.healthcheck);
         let service = VectorService::new(client, uri, self.compression);
-        let request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
+        let request_settings = self.request.into_settings();
         let batch_settings = self.batch.into_batcher_settings()?;
 
         let service = ServiceBuilder::new()
@@ -159,12 +161,12 @@ async fn healthcheck(
 
     let request = service.client.health_check(proto::HealthCheckRequest {});
     match request.await {
-        Ok(response) => match proto::ServingStatus::from_i32(response.into_inner().status) {
-            Some(proto::ServingStatus::Serving) => Ok(()),
-            Some(status) => Err(Box::new(VectorSinkError::Health {
+        Ok(response) => match proto::ServingStatus::try_from(response.into_inner().status) {
+            Ok(proto::ServingStatus::Serving) => Ok(()),
+            Ok(status) => Err(Box::new(VectorSinkError::Health {
                 status: Some(status.as_str_name()),
             })),
-            None => Err(Box::new(VectorSinkError::Health { status: None })),
+            Err(_) => Err(Box::new(VectorSinkError::Health { status: None })),
         },
         Err(source) => Err(Box::new(VectorSinkError::Request { source })),
     }
@@ -208,23 +210,7 @@ fn new_client(
     tls_settings: &MaybeTlsSettings,
     proxy_config: &ProxyConfig,
 ) -> crate::Result<hyper::Client<ProxyConnector<HttpsConnector<HttpConnector>>, BoxBody>> {
-    let mut http = HttpConnector::new();
-    http.enforce_http(false);
-
-    let tls = tls_connector_builder(tls_settings)?;
-    let mut https = HttpsConnector::with_connector(http, tls)?;
-
-    let settings = tls_settings.tls().cloned();
-    https.set_callback(move |c, _uri| {
-        if let Some(settings) = &settings {
-            settings.apply_connect_configuration(c);
-        }
-
-        Ok(())
-    });
-
-    let mut proxy = ProxyConnector::new(https).unwrap();
-    proxy_config.configure(&mut proxy)?;
+    let proxy = build_proxy_connector(tls_settings.clone(), proxy_config)?;
 
     Ok(hyper::Client::builder().http2_only(true).build(proxy))
 }
@@ -252,6 +238,7 @@ impl RetryLogic for VectorGrpcRetryLogic {
                     | OutOfRange
                     | Unimplemented
                     | Unauthenticated
+                    | DataLoss
             ),
             _ => true,
         }

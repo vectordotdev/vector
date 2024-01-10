@@ -31,18 +31,17 @@ base: components: sinks: statsd: configuration: {
 		description: """
 			The address to connect to.
 
-			Both IP address and hostname are accepted formats.
+			Both IP addresses and hostnames/fully qualified domain names (FQDNs) are accepted formats.
 
 			The address _must_ include a port.
 			"""
 		relevant_when: "mode = \"tcp\" or mode = \"udp\""
 		required:      true
-		type: string: examples: ["92.12.333.224:5000", "https://somehost:5000"]
+		type: string: examples: ["92.12.333.224:5000", "somehost:5000"]
 	}
 	batch: {
-		description:   "Event batching behavior."
-		relevant_when: "mode = \"udp\""
-		required:      false
+		description: "Event batching behavior."
+		required:    false
 		type: object: options: {
 			max_bytes: {
 				description: """
@@ -114,14 +113,13 @@ base: components: sinks: statsd: configuration: {
 		required:      true
 		type: string: examples: ["/path/to/socket"]
 	}
-	send_buffer_bytes: {
+	send_buffer_size: {
 		description: """
 			The size of the socket's send buffer.
 
 			If set, the value of the setting is passed via the `SO_SNDBUF` option.
 			"""
-		relevant_when: "mode = \"tcp\" or mode = \"udp\""
-		required:      false
+		required: false
 		type: uint: {
 			examples: [
 				65536,
@@ -222,6 +220,18 @@ base: components: sinks: statsd: configuration: {
 					"""
 				required: false
 				type: bool: {}
+			}
+		}
+	}
+	unix_mode: {
+		description:   "The Unix socket mode to use."
+		relevant_when: "mode = \"unix\""
+		required:      false
+		type: string: {
+			default: "Stream"
+			enum: {
+				Datagram: "Datagram-oriented (`SOCK_DGRAM`)."
+				Stream:   "Stream-oriented (`SOCK_STREAM`)."
 			}
 		}
 	}

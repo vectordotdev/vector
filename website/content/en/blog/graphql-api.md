@@ -114,9 +114,9 @@ query {
       node {
         componentId
         metrics {
-          # Total bytes processed by this sink.
-          processedBytesTotal {
-            processedBytesTotal
+          # Total bytes sent by this sink.
+          sentBytesTotal {
+            sentBytesTotal
           }
         }
       }

@@ -1,10 +1,9 @@
 use metrics::counter;
-use vector_common::internal_event::{
-    error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL,
+use vector_lib::internal_event::{
+    error_stage, error_type, ComponentEventsDropped, InternalEvent, UNINTENTIONAL,
 };
-use vector_core::internal_event::InternalEvent;
 
-use crate::{emit, internal_events::SocketOutgoingConnectionError};
+use crate::internal_events::SocketOutgoingConnectionError;
 
 // TODO: Get rid of this. UDP is connectionless, so there's no "successful" connect event, only
 // successfully binding a socket that can be used for receiving.
@@ -29,8 +28,6 @@ impl<E: std::error::Error> InternalEvent for UdpSocketOutgoingConnectionError<E>
         // ## skip check-duplicate-events ##
         // ## skip check-validity-events ##
         emit!(SocketOutgoingConnectionError { error: self.error });
-        // deprecated
-        counter!("connection_failed_total", 1, "mode" => "udp");
     }
 }
 

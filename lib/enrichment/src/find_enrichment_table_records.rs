@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 use vrl::prelude::*;
 
+use crate::vrl_util::is_case_sensitive;
 use crate::{
     vrl_util::{self, add_index, evaluate_condition},
     Case, Condition, IndexHandle, TableRegistry, TableSearch,
@@ -87,7 +88,7 @@ impl Function for FindEnrichmentTableRecords {
 
     fn compile(
         &self,
-        _state: &TypeState,
+        state: &TypeState,
         ctx: &mut FunctionCompileContext,
         arguments: ArgumentList,
     ) -> Compiled {
@@ -102,7 +103,7 @@ impl Function for FindEnrichmentTableRecords {
             .collect::<Vec<_>>();
 
         let table = arguments
-            .required_enum("table", &tables)?
+            .required_enum("table", &tables, state)?
             .try_bytes_utf8_lossy()
             .expect("table is not valid utf8")
             .into_owned();
@@ -110,21 +111,7 @@ impl Function for FindEnrichmentTableRecords {
 
         let select = arguments.optional("select");
 
-        let case_sensitive = arguments
-            .optional_literal("case_sensitive")?
-            .and_then(|literal| literal.resolve_constant())
-            .map(|value| value.try_boolean())
-            .transpose()
-            .expect("case_sensitive should be boolean") // This will have been caught by the type checker.
-            .map(|case_sensitive| {
-                if case_sensitive {
-                    Case::Sensitive
-                } else {
-                    Case::Insensitive
-                }
-            })
-            .unwrap_or(Case::Sensitive);
-
+        let case_sensitive = is_case_sensitive(&arguments, state)?;
         let index = Some(
             add_index(registry, &table, case_sensitive, &condition)
                 .map_err(|err| Box::new(err) as Box<_>)?,
@@ -145,7 +132,7 @@ impl Function for FindEnrichmentTableRecords {
 #[derive(Debug, Clone)]
 pub struct FindEnrichmentTableRecordsFn {
     table: String,
-    condition: BTreeMap<String, expression::Expr>,
+    condition: BTreeMap<KeyString, expression::Expr>,
     index: Option<IndexHandle>,
     select: Option<Box<dyn Expression>>,
     case_sensitive: Case,
@@ -191,9 +178,10 @@ impl FunctionExpression for FindEnrichmentTableRecordsFn {
 
 #[cfg(test)]
 mod tests {
-    use vector_common::TimeZone;
     use vrl::compiler::state::RuntimeState;
     use vrl::compiler::TargetValue;
+    use vrl::compiler::TimeZone;
+    use vrl::value;
     use vrl::value::Secrets;
 
     use super::*;
@@ -215,7 +203,7 @@ mod tests {
         };
 
         let tz = TimeZone::default();
-        let object: Value = BTreeMap::new().into();
+        let object: Value = ObjectMap::new().into();
         let mut target = TargetValue {
             value: object,
             metadata: value!({}),

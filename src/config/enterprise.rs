@@ -14,20 +14,19 @@ use tokio::{
     time::{sleep, Duration},
 };
 use url::{ParseError, Url};
-use vector_core::config::proxy::ProxyConfig;
+use vector_lib::config::proxy::ProxyConfig;
 
 use super::{
     load_source_from_paths, process_paths, ComponentKey, Config, ConfigPath, OutputId, SinkOuter,
     SourceOuter, TransformOuter,
 };
 use crate::{
-    common::datadog::{get_api_base_endpoint, get_base_domain_region, Region},
+    common::datadog::{default_site, get_api_base_endpoint},
     conditions::AnyCondition,
     http::{HttpClient, HttpError},
     sinks::{
         datadog::{
-            default_site, logs::DatadogLogsConfig, metrics::DatadogMetricsConfig,
-            DatadogCommonConfig,
+            logs::DatadogLogsConfig, metrics::DatadogMetricsConfig, LocalDatadogCommonConfig,
         },
         util::{http::RequestConfig, retries::ExponentialBackoff},
     },
@@ -38,7 +37,7 @@ use crate::{
     },
     transforms::{filter::FilterConfig, remap::RemapConfig},
 };
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 
 static HOST_METRICS_KEY: &str = "_datadog_host_metrics";
 static TAG_METRICS_KEY: &str = "_datadog_tag_metrics";
@@ -79,12 +78,6 @@ pub struct Options {
     #[serde(default = "default_site")]
     site: String,
 
-    /// The Datadog region to send data to.
-    ///
-    /// This option is deprecated, and the `site` field should be used instead.
-    #[configurable(deprecated)]
-    region: Option<Region>,
-
     /// The Datadog endpoint to send data to.
     ///
     /// This is an advanced setting that is generally meant only for testing, and overrides both
@@ -99,12 +92,6 @@ pub struct Options {
     /// [api_key]: https://docs.datadoghq.com/api/?lang=bash#authentication
     #[serde(default)]
     pub api_key: Option<String>,
-
-    /// The Datadog application key.
-    ///
-    /// This is deprecated.
-    #[configurable(deprecated)]
-    pub application_key: Option<String>,
 
     /// The configuration key for Observability Pipelines.
     pub configuration_key: String,
@@ -134,10 +121,8 @@ impl Default for Options {
             enabled: default_enabled(),
             enable_logs_reporting: default_enable_logs_reporting(),
             site: default_site(),
-            region: None,
             endpoint: None,
             api_key: None,
-            application_key: None,
             configuration_key: "".to_owned(),
             reporting_interval_secs: default_reporting_interval_secs(),
             max_retries: default_max_retries(),
@@ -332,12 +317,6 @@ impl TryFrom<&Config> for EnterpriseMetadata {
             },
         };
 
-        if opts.application_key.is_some() {
-            warn!(
-                "Datadog application key is deprecated. You can safely remove `application_key` from the config."
-            );
-        }
-
         info!(
             "Datadog API key provided. Integration with {} is enabled.",
             DATADOG_REPORTING_PRODUCT
@@ -415,7 +394,7 @@ pub(crate) fn report_on_reload(
 ) -> Option<EnterpriseReporter<BoxFuture<'static, ()>>> {
     attach_enterprise_components(config, &metadata);
 
-    let enterprise = match enterprise {
+    match enterprise {
         Some(enterprise) => {
             enterprise.send(report_configuration(config_paths, metadata));
             None
@@ -425,9 +404,7 @@ pub(crate) fn report_on_reload(
             enterprise.send(report_configuration(config_paths, metadata));
             Some(enterprise)
         }
-    };
-
-    enterprise
+    }
 }
 
 pub(crate) fn attach_enterprise_components(config: &mut Config, metadata: &EnterpriseMetadata) {
@@ -481,13 +458,11 @@ fn setup_logs_reporting(
 
     // Create a Datadog logs sink to consume and emit internal logs.
     let datadog_logs = DatadogLogsConfig {
-        dd_common: DatadogCommonConfig {
-            endpoint: datadog.endpoint.clone(),
-            site: datadog.site.clone(),
-            default_api_key: api_key.into(),
-            ..Default::default()
-        },
-        region: datadog.region,
+        local_dd_common: LocalDatadogCommonConfig::new(
+            datadog.endpoint.clone(),
+            Some(datadog.site.clone()),
+            Some(api_key.into()),
+        ),
         request: RequestConfig {
             headers: IndexMap::from([(
                 "DD-EVP-ORIGIN".to_string(),
@@ -589,13 +564,11 @@ fn setup_metrics_reporting(
 
     // Create a Datadog metrics sink to consume and emit internal + host metrics.
     let datadog_metrics = DatadogMetricsConfig {
-        dd_common: DatadogCommonConfig {
-            endpoint: datadog.endpoint.clone(),
-            site: datadog.site.clone(),
-            default_api_key: api_key.into(),
-            ..Default::default()
-        },
-        region: datadog.region,
+        local_dd_common: LocalDatadogCommonConfig::new(
+            datadog.endpoint.clone(),
+            Some(datadog.site.clone()),
+            Some(api_key.into()),
+        ),
         ..Default::default()
     };
 
@@ -684,7 +657,6 @@ pub(crate) fn report_configuration(
         let endpoint = get_reporting_endpoint(
             opts.endpoint.as_ref(),
             opts.site.as_str(),
-            opts.region,
             &opts.configuration_key,
         );
         // Datadog uses a JSON:API, so we'll serialize the config to a JSON
@@ -721,10 +693,9 @@ pub(crate) fn report_configuration(
 fn get_reporting_endpoint(
     endpoint: Option<&String>,
     site: &str,
-    region: Option<Region>,
     configuration_key: &str,
 ) -> String {
-    let base = get_base_domain_region(site, region.as_ref());
+    let base = site;
 
     format!(
         "{}{}/{}/versions",
@@ -832,10 +803,10 @@ mod test {
     use http::StatusCode;
     use indexmap::IndexMap;
     use tokio::time::sleep;
-    use vector_core::config::proxy::ProxyConfig;
+    use vector_lib::config::proxy::ProxyConfig;
+    use vrl::btreemap;
     use vrl::compiler::state::ExternalEnv;
     use vrl::compiler::{compile, compile_with_external, CompileConfig};
-    use vrl::value::btreemap;
     use vrl::value::kind::Collection;
     use vrl::value::Kind;
     use wiremock::{matchers, Mock, MockServer, ResponseTemplate};

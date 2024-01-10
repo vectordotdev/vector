@@ -3,8 +3,8 @@ use std::num::NonZeroUsize;
 use bytes::BytesMut;
 use chrono::Utc;
 use tokio_util::codec::Encoder as _;
-use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
-use vector_core::{
+use vector_lib::request_metadata::{MetaDescriptive, RequestMetadata};
+use vector_lib::{
     event::{EventFinalizers, Finalizable},
     ByteSizeOf,
 };
@@ -39,8 +39,12 @@ impl Finalizable for CloudwatchRequest {
 }
 
 impl MetaDescriptive for CloudwatchRequest {
-    fn get_metadata(&self) -> RequestMetadata {
-        self.metadata
+    fn get_metadata(&self) -> &RequestMetadata {
+        &self.metadata
+    }
+
+    fn metadata_mut(&mut self) -> &mut RequestMetadata {
+        &mut self.metadata
     }
 }
 
@@ -87,7 +91,7 @@ impl CloudwatchRequestBuilder {
         self.transformer.transform(&mut event);
         let mut message_bytes = BytesMut::new();
 
-        let builder = RequestMetadataBuilder::from_events(&event);
+        let builder = RequestMetadataBuilder::from_event(&event);
 
         if self.encoder.encode(event, &mut message_bytes).is_err() {
             // The encoder handles internal event emission for Error and EventsDropped.
@@ -134,8 +138,8 @@ impl ByteSizeOf for CloudwatchRequest {
 #[cfg(test)]
 mod tests {
     use chrono::Utc;
-    use vector_core::config::log_schema;
-    use vector_core::event::LogEvent;
+    use vector_lib::config::log_schema;
+    use vector_lib::event::LogEvent;
 
     use super::CloudwatchRequestBuilder;
 
@@ -150,13 +154,7 @@ mod tests {
         let timestamp = Utc::now();
         let message = "event message";
         let mut event = LogEvent::from(message);
-        event.insert(
-            (
-                lookup::PathPrefix::Event,
-                log_schema().timestamp_key().unwrap(),
-            ),
-            timestamp,
-        );
+        event.insert(log_schema().timestamp_key_target_path().unwrap(), timestamp);
 
         let request = request_builder.build(event.into()).unwrap();
         assert_eq!(request.timestamp, timestamp.timestamp_millis());

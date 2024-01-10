@@ -62,7 +62,7 @@ where
             Self {
                 sender: Some(todo_tx),
                 flush: flush1,
-                _phantom: PhantomData::default(),
+                _phantom: PhantomData,
             },
             finalizer_stream(shutdown, todo_rx, S::default(), flush2).boxed(),
         )
@@ -115,9 +115,16 @@ where
             tokio::select! {
                 biased;
                 _ = &mut shutdown, if handle_shutdown => break,
-                _ = flush.notified() => {
+                () = flush.notified() => {
                     // Drop all the existing status receivers and start over.
                     status_receivers = S::default();
+                },
+                // Prefer to remove finalizers than to add new finalizers to prevent unbounded
+                // growth under load.
+                finished = status_receivers.next(), if !status_receivers.is_empty() => match finished {
+                    Some((status, entry)) => yield (status, entry),
+                    // The `is_empty` guard above prevents this from being reachable.
+                    None => unreachable!(),
                 },
                 // Only poll for new entries until shutdown is flagged.
                 new_entry = new_entries.recv() => match new_entry {
@@ -129,11 +136,6 @@ where
                     }
                     // The end of the new entry channel signals shutdown
                     None => break,
-                },
-                finished = status_receivers.next(), if !status_receivers.is_empty() => match finished {
-                    Some((status, entry)) => yield (status, entry),
-                    // The `is_empty` guard above prevents this from being reachable.
-                    None => unreachable!(),
                 },
             }
         }
@@ -197,7 +199,7 @@ pub struct EmptyStream<T>(PhantomData<T>);
 
 impl<T> Default for EmptyStream<T> {
     fn default() -> Self {
-        Self(PhantomData::default())
+        Self(PhantomData)
     }
 }
 

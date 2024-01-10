@@ -1,10 +1,13 @@
 use std::collections::{HashMap, HashSet};
 
-use vector_core::event::{
-    metric::{MetricData, MetricSeries, Sample},
-    Event, EventMetadata, Metric, MetricValue,
+use std::fmt::Display;
+
+use vector_lib::event::{
+    metric::{Bucket, MetricData, MetricSeries, Sample},
+    Event, EventMetadata, Metric, MetricValue, StatisticKind,
 };
 
+use crate::event::MetricKind;
 use crate::sinks::util::buffer::metrics::{MetricNormalize, MetricSet};
 
 type SplitMetrics = HashMap<MetricSeries, (MetricData, EventMetadata)>;
@@ -141,8 +144,8 @@ pub fn read_set_values(metrics: &SplitMetrics, series: MetricSeries) -> Option<H
 #[macro_export]
 macro_rules! series {
 	($name:expr) => {
-		vector_core::event::metric::MetricSeries {
-			name: vector_core::event::metric::MetricName {
+		vector_lib::event::metric::MetricSeries {
+			name: vector_lib::event::metric::MetricName {
 				name: $name.into(),
 				namespace: None,
 			},
@@ -150,12 +153,12 @@ macro_rules! series {
 		}
 	};
 	($name:expr, $($tk:expr => $tv:expr),*) => {
-		vector_core::event::metric::MetricSeries {
-			name: vector_core::event::metric::MetricName {
+		vector_lib::event::metric::MetricSeries {
+			name: vector_lib::event::metric::MetricName {
 				name: $name.into(),
 				namespace: None,
 			},
-			tags: Some(vector_core::metric_tags!( $( $tk => $tv, )* )),
+			tags: Some(vector_lib::metric_tags!( $( $tk => $tv, )* )),
 		}
 	};
 }
@@ -245,4 +248,310 @@ pub fn assert_set(metrics: &SplitMetrics, series: MetricSeries, expected_values:
         .collect::<HashSet<_>>();
 
     assert_eq!(actual_values, expected_values);
+}
+
+fn buckets_from_samples(values: &[f64]) -> (Vec<Bucket>, f64, u64) {
+    // Generate buckets, and general statistics, for an input set of data.  We only use this in
+    // tests, and so we have some semi-realistic buckets here, but mainly we use them for testing,
+    // not for most accurately/efficiently representing the input samples.
+    let bounds = &[
+        1.0,
+        2.0,
+        4.0,
+        8.0,
+        16.0,
+        32.0,
+        64.0,
+        128.0,
+        256.0,
+        512.0,
+        1024.0,
+        f64::INFINITY,
+    ];
+    let mut buckets = bounds
+        .iter()
+        .map(|b| Bucket {
+            upper_limit: *b,
+            count: 0,
+        })
+        .collect::<Vec<_>>();
+
+    let mut sum = 0.0;
+    let mut count = 0;
+    for value in values {
+        for bucket in buckets.iter_mut() {
+            if *value <= bucket.upper_limit {
+                bucket.count += 1;
+            }
+        }
+
+        sum += *value;
+        count += 1;
+    }
+
+    (buckets, sum, count)
+}
+
+pub fn generate_f64s(start: u16, end: u16) -> Vec<f64> {
+    assert!(start <= end);
+    let mut samples = Vec::new();
+    for n in start..=end {
+        samples.push(f64::from(n));
+    }
+    samples
+}
+
+pub fn get_set<S, V>(values: S, kind: MetricKind) -> Metric
+where
+    S: IntoIterator<Item = V>,
+    V: Display,
+{
+    Metric::new(
+        "set",
+        kind,
+        MetricValue::Set {
+            values: values.into_iter().map(|i| i.to_string()).collect(),
+        },
+    )
+}
+
+pub fn get_distribution<S, V>(samples: S, kind: MetricKind) -> Metric
+where
+    S: IntoIterator<Item = V>,
+    V: Into<f64>,
+{
+    Metric::new(
+        "distribution",
+        kind,
+        MetricValue::Distribution {
+            samples: samples
+                .into_iter()
+                .map(|n| Sample {
+                    value: n.into(),
+                    rate: 1,
+                })
+                .collect(),
+            statistic: StatisticKind::Histogram,
+        },
+    )
+}
+
+pub fn get_aggregated_histogram<S, V>(samples: S, kind: MetricKind) -> Metric
+where
+    S: IntoIterator<Item = V>,
+    V: Into<f64>,
+{
+    let samples = samples.into_iter().map(Into::into).collect::<Vec<_>>();
+    let (buckets, sum, count) = buckets_from_samples(&samples);
+
+    Metric::new(
+        "agg_histogram",
+        kind,
+        MetricValue::AggregatedHistogram {
+            buckets,
+            count,
+            sum,
+        },
+    )
+}
+
+pub fn get_counter(value: f64, kind: MetricKind) -> Metric {
+    Metric::new("counter", kind, MetricValue::Counter { value })
+}
+
+pub fn get_gauge(value: f64, kind: MetricKind) -> Metric {
+    Metric::new("gauge", kind, MetricValue::Gauge { value })
+}
+
+pub fn assert_normalize<N: MetricNormalize>(
+    mut normalizer: N,
+    inputs: Vec<Metric>,
+    expected_outputs: Vec<Option<Metric>>,
+) {
+    let mut metric_set = MetricSet::default();
+
+    for (input, expected) in inputs.into_iter().zip(expected_outputs) {
+        let result = normalizer.normalize(&mut metric_set, input);
+        assert_eq!(result, expected);
+    }
+}
+
+pub mod tests {
+    use super::*;
+
+    pub fn absolute_counter_normalize_to_incremental<N: MetricNormalize>(normalizer: N) {
+        let first_value = 3.14;
+        let second_value = 8.675309;
+
+        let counters = vec![
+            get_counter(first_value, MetricKind::Absolute),
+            get_counter(second_value, MetricKind::Absolute),
+        ];
+
+        let expected_counters = vec![
+            None,
+            Some(get_counter(
+                second_value - first_value,
+                MetricKind::Incremental,
+            )),
+        ];
+
+        assert_normalize(normalizer, counters, expected_counters);
+    }
+
+    pub fn incremental_counter_normalize_to_incremental<N: MetricNormalize>(normalizer: N) {
+        let first_value = 3.14;
+        let second_value = 8.675309;
+
+        let counters = vec![
+            get_counter(first_value, MetricKind::Incremental),
+            get_counter(second_value, MetricKind::Incremental),
+        ];
+
+        let expected_counters = counters
+            .clone()
+            .into_iter()
+            .map(Option::Some)
+            .collect::<Vec<_>>();
+
+        assert_normalize(normalizer, counters, expected_counters);
+    }
+
+    pub fn mixed_counter_normalize_to_incremental<N: MetricNormalize>(normalizer: N) {
+        let first_value = 3.14;
+        let second_value = 8.675309;
+        let third_value = 16.19;
+
+        let counters = vec![
+            get_counter(first_value, MetricKind::Incremental),
+            get_counter(second_value, MetricKind::Absolute),
+            get_counter(third_value, MetricKind::Absolute),
+            get_counter(first_value, MetricKind::Absolute),
+            get_counter(second_value, MetricKind::Incremental),
+            get_counter(third_value, MetricKind::Incremental),
+        ];
+
+        let expected_counters = vec![
+            Some(get_counter(first_value, MetricKind::Incremental)),
+            None,
+            Some(get_counter(
+                third_value - second_value,
+                MetricKind::Incremental,
+            )),
+            None,
+            Some(get_counter(second_value, MetricKind::Incremental)),
+            Some(get_counter(third_value, MetricKind::Incremental)),
+        ];
+
+        assert_normalize(normalizer, counters, expected_counters);
+    }
+
+    pub fn absolute_gauge_normalize_to_absolute<N: MetricNormalize>(normalizer: N) {
+        let first_value = 3.14;
+        let second_value = 8.675309;
+
+        let gauges = vec![
+            get_gauge(first_value, MetricKind::Absolute),
+            get_gauge(second_value, MetricKind::Absolute),
+        ];
+
+        let expected_gauges = gauges
+            .clone()
+            .into_iter()
+            .map(Option::Some)
+            .collect::<Vec<_>>();
+
+        assert_normalize(normalizer, gauges, expected_gauges);
+    }
+
+    pub fn incremental_gauge_normalize_to_absolute<N: MetricNormalize>(normalizer: N) {
+        let first_value = 3.14;
+        let second_value = 8.675309;
+
+        let gauges = vec![
+            get_gauge(first_value, MetricKind::Incremental),
+            get_gauge(second_value, MetricKind::Incremental),
+        ];
+
+        let expected_gauges = vec![
+            Some(get_gauge(first_value, MetricKind::Absolute)),
+            Some(get_gauge(first_value + second_value, MetricKind::Absolute)),
+        ];
+
+        assert_normalize(normalizer, gauges, expected_gauges);
+    }
+
+    pub fn mixed_gauge_normalize_to_absolute<N: MetricNormalize>(normalizer: N) {
+        let first_value = 3.14;
+        let second_value = 8.675309;
+        let third_value = 16.19;
+
+        let gauges = vec![
+            get_gauge(first_value, MetricKind::Incremental),
+            get_gauge(second_value, MetricKind::Absolute),
+            get_gauge(third_value, MetricKind::Absolute),
+            get_gauge(first_value, MetricKind::Absolute),
+            get_gauge(second_value, MetricKind::Incremental),
+            get_gauge(third_value, MetricKind::Incremental),
+        ];
+
+        let expected_gauges = vec![
+            Some(get_gauge(first_value, MetricKind::Absolute)),
+            Some(get_gauge(second_value, MetricKind::Absolute)),
+            Some(get_gauge(third_value, MetricKind::Absolute)),
+            Some(get_gauge(first_value, MetricKind::Absolute)),
+            Some(get_gauge(first_value + second_value, MetricKind::Absolute)),
+            Some(get_gauge(
+                first_value + second_value + third_value,
+                MetricKind::Absolute,
+            )),
+        ];
+
+        assert_normalize(normalizer, gauges, expected_gauges);
+    }
+
+    pub fn absolute_set_normalize_to_incremental<N: MetricNormalize>(normalizer: N) {
+        let sets = vec![
+            get_set(1..=20, MetricKind::Absolute),
+            get_set(15..=25, MetricKind::Absolute),
+        ];
+
+        let expected_sets = vec![None, Some(get_set(21..=25, MetricKind::Incremental))];
+
+        assert_normalize(normalizer, sets, expected_sets);
+    }
+
+    pub fn incremental_set_normalize_to_incremental<N: MetricNormalize>(normalizer: N) {
+        let sets = vec![
+            get_set(1..=20, MetricKind::Incremental),
+            get_set(15..=25, MetricKind::Incremental),
+        ];
+
+        let expected_sets = vec![
+            Some(get_set(1..=20, MetricKind::Incremental)),
+            Some(get_set(15..=25, MetricKind::Incremental)),
+        ];
+
+        assert_normalize(normalizer, sets, expected_sets);
+    }
+
+    pub fn mixed_set_normalize_to_incremental<N: MetricNormalize>(normalizer: N) {
+        let sets = vec![
+            get_set(1..=20, MetricKind::Incremental),
+            get_set(10..=16, MetricKind::Absolute),
+            get_set(15..=25, MetricKind::Absolute),
+            get_set(1..5, MetricKind::Incremental),
+            get_set(3..=42, MetricKind::Incremental),
+        ];
+
+        let expected_sets = vec![
+            Some(get_set(1..=20, MetricKind::Incremental)),
+            None,
+            Some(get_set(17..=25, MetricKind::Incremental)),
+            Some(get_set(1..5, MetricKind::Incremental)),
+            Some(get_set(3..=42, MetricKind::Incremental)),
+        ];
+
+        assert_normalize(normalizer, sets, expected_sets);
+    }
 }

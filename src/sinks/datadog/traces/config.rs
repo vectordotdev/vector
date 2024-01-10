@@ -5,13 +5,14 @@ use indoc::indoc;
 use snafu::ResultExt;
 use tokio::sync::oneshot::{channel, Sender};
 use tower::ServiceBuilder;
-use vector_config::configurable_component;
-use vector_core::config::{proxy::ProxyConfig, AcknowledgementsConfig};
+use vector_lib::config::{proxy::ProxyConfig, AcknowledgementsConfig};
+use vector_lib::configurable::configurable_component;
 
 use super::{
     apm_stats::{flush_apm_stats_thread, Aggregator},
     service::TraceApiRetry,
 };
+use crate::common::datadog;
 use crate::{
     config::{GenerateConfig, Input, SinkConfig, SinkContext},
     http::HttpClient,
@@ -21,7 +22,7 @@ use crate::{
                 request_builder::DatadogTracesRequestBuilder, service::TraceApiService,
                 sink::TracesSink,
             },
-            DatadogCommonConfig,
+            DatadogCommonConfig, LocalDatadogCommonConfig,
         },
         util::{
             service::ServiceBuilderExt, BatchConfig, Compression, SinkBatchSettings,
@@ -41,9 +42,6 @@ pub const BATCH_DEFAULT_TIMEOUT_SECS: f64 = 10.0;
 
 pub const PAYLOAD_LIMIT: usize = 3_200_000;
 
-const DEFAULT_REQUEST_RETRY_ATTEMPTS: usize = 5;
-const DEFAULT_REQUEST_RETRY_MAX_DURATION_SECS: u64 = 300;
-
 #[derive(Clone, Copy, Debug, Default)]
 pub struct DatadogTracesDefaultBatchSettings;
 
@@ -54,12 +52,12 @@ impl SinkBatchSettings for DatadogTracesDefaultBatchSettings {
 }
 
 /// Configuration for the `datadog_traces` sink.
-#[configurable_component(sink("datadog_traces"))]
+#[configurable_component(sink("datadog_traces", "Publish trace events to Datadog."))]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct DatadogTracesConfig {
     #[serde(flatten)]
-    pub dd_common: DatadogCommonConfig,
+    pub local_dd_common: LocalDatadogCommonConfig,
 
     #[configurable(derived)]
     #[serde(default)]
@@ -108,17 +106,18 @@ impl DatadogTracesEndpointConfiguration {
 }
 
 impl DatadogTracesConfig {
-    fn get_base_uri(&self) -> String {
-        self.dd_common
+    fn get_base_uri(&self, dd_common: &DatadogCommonConfig) -> String {
+        dd_common
             .endpoint
             .clone()
-            .unwrap_or_else(|| format!("https://trace.agent.{}", self.dd_common.site))
+            .unwrap_or_else(|| format!("https://trace.agent.{}", dd_common.site))
     }
 
     fn generate_traces_endpoint_configuration(
         &self,
+        dd_common: &DatadogCommonConfig,
     ) -> crate::Result<DatadogTracesEndpointConfiguration> {
-        let base_uri = self.get_base_uri();
+        let base_uri = self.get_base_uri(dd_common);
         let traces_endpoint = build_uri(&base_uri, "/api/v0.2/traces")?;
         let stats_endpoint = build_uri(&base_uri, "/api/v0.2/stats")?;
 
@@ -128,14 +127,14 @@ impl DatadogTracesConfig {
         })
     }
 
-    pub fn build_sink(&self, client: HttpClient) -> crate::Result<VectorSink> {
-        let default_api_key: Arc<str> = Arc::from(self.dd_common.default_api_key.inner());
-        let request_limits = self.request.unwrap_with(
-            &TowerRequestConfig::default()
-                .retry_attempts(DEFAULT_REQUEST_RETRY_ATTEMPTS)
-                .retry_max_duration_secs(DEFAULT_REQUEST_RETRY_MAX_DURATION_SECS),
-        );
-        let endpoints = self.generate_traces_endpoint_configuration()?;
+    pub fn build_sink(
+        &self,
+        dd_common: &DatadogCommonConfig,
+        client: HttpClient,
+    ) -> crate::Result<VectorSink> {
+        let default_api_key: Arc<str> = Arc::from(dd_common.default_api_key.inner());
+        let request_limits = self.request.into_settings();
+        let endpoints = self.generate_traces_endpoint_configuration(dd_common)?;
 
         let batcher_settings = self
             .batch
@@ -171,7 +170,7 @@ impl DatadogTracesConfig {
             request_builder,
             batcher_settings,
             shutdown,
-            self.get_protocol(),
+            self.get_protocol(dd_common),
         );
 
         // Send the APM stats payloads independently of the sink framework.
@@ -191,7 +190,7 @@ impl DatadogTracesConfig {
     pub fn build_client(&self, proxy: &ProxyConfig) -> crate::Result<HttpClient> {
         let tls_settings = MaybeTlsSettings::from_config(
             &Some(
-                self.dd_common
+                self.local_dd_common
                     .tls
                     .clone()
                     .unwrap_or_else(TlsEnableableConfig::enabled),
@@ -201,8 +200,8 @@ impl DatadogTracesConfig {
         Ok(HttpClient::new(tls_settings, proxy)?)
     }
 
-    fn get_protocol(&self) -> String {
-        build_uri(&self.get_base_uri(), "")
+    fn get_protocol(&self, dd_common: &DatadogCommonConfig) -> String {
+        build_uri(&self.get_base_uri(dd_common), "")
             .unwrap()
             .scheme_str()
             .unwrap_or("http")
@@ -211,11 +210,14 @@ impl DatadogTracesConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "datadog_traces")]
 impl SinkConfig for DatadogTracesConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let client = self.build_client(&cx.proxy)?;
-        let healthcheck = self.dd_common.build_healthcheck(client.clone(), None)?;
-        let sink = self.build_sink(client)?;
+        let global = cx.extra_context.get_or_default::<datadog::Options>();
+        let dd_common = self.local_dd_common.with_globals(global)?;
+        let healthcheck = dd_common.build_healthcheck(client.clone())?;
+        let sink = self.build_sink(&dd_common, client)?;
 
         Ok((sink, healthcheck))
     }
@@ -225,7 +227,7 @@ impl SinkConfig for DatadogTracesConfig {
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
-        &self.dd_common.acknowledgements
+        &self.local_dd_common.acknowledgements
     }
 }
 

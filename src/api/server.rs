@@ -9,12 +9,17 @@ use async_graphql::{
     Data, Request, Schema,
 };
 use async_graphql_warp::{graphql_protocol, GraphQLResponse, GraphQLWebSocket};
+use hyper::{server::conn::AddrIncoming, service::make_service_fn, Server as HyperServer};
+use tokio::runtime::Handle;
 use tokio::sync::oneshot;
+use tower::ServiceBuilder;
+use tracing::Span;
 use warp::{filters::BoxedFilter, http::Response, ws::Ws, Filter, Reply};
 
 use super::{handler, schema, ShutdownTx};
 use crate::{
     config,
+    http::build_http_trace_layer,
     internal_events::{SocketBindError, SocketMode},
     topology,
 };
@@ -31,33 +36,48 @@ impl Server {
         config: &config::Config,
         watch_rx: topology::WatchRx,
         running: Arc<AtomicBool>,
-        runtime: &tokio::runtime::Runtime,
+        handle: &Handle,
     ) -> crate::Result<Self> {
         let routes = make_routes(config.api.playground, watch_rx, running);
 
         let (_shutdown, rx) = oneshot::channel();
         // warp uses `tokio::spawn` and so needs us to enter the runtime context.
-        let _guard = runtime.enter();
-        let (addr, server) = warp::serve(routes)
-            .try_bind_with_graceful_shutdown(
-                config.api.address.expect("No socket address"),
-                async {
+        let _guard = handle.enter();
+
+        let addr = config.api.address.expect("No socket address");
+        let incoming = AddrIncoming::bind(&addr).map_err(|error| {
+            emit!(SocketBindError {
+                mode: SocketMode::Tcp,
+                error: &error,
+            });
+            error
+        })?;
+
+        let span = Span::current();
+        let make_svc = make_service_fn(move |_conn| {
+            let svc = ServiceBuilder::new()
+                .layer(build_http_trace_layer(span.clone()))
+                .service(warp::service(routes.clone()));
+            futures_util::future::ok::<_, Infallible>(svc)
+        });
+
+        let server = async move {
+            HyperServer::builder(incoming)
+                .serve(make_svc)
+                .with_graceful_shutdown(async {
                     rx.await.ok();
-                },
-            )
-            .map_err(|error| {
-                emit!(SocketBindError {
-                    mode: SocketMode::Tcp,
-                    error: &error,
-                });
-                error
-            })?;
+                })
+                .await
+                .map_err(|err| {
+                    error!("An error occurred: {:?}.", err);
+                })
+        };
 
         // Update component schema with the config before starting the server.
         schema::components::update_config(config);
 
         // Spawn the server in the background.
-        runtime.spawn(server);
+        handle.spawn(server);
 
         Ok(Self { _shutdown, addr })
     }

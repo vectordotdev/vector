@@ -6,7 +6,7 @@ components: sinks: nats: {
 	classes: {
 		commonly_used: false
 		delivery:      "best_effort"
-		development:   "beta"
+		development:   "stable"
 		egress_method: "stream"
 		service_providers: []
 		stateful: false
@@ -64,10 +64,6 @@ components: sinks: nats: {
 	how_it_works: components._nats.how_it_works
 
 	telemetry: metrics: {
-		events_discarded_total:  components.sources.internal_metrics.output.metrics.events_discarded_total
-		processing_errors_total: components.sources.internal_metrics.output.metrics.processing_errors_total
-		processed_bytes_total:   components.sources.internal_metrics.output.metrics.processed_bytes_total
-		processed_events_total:  components.sources.internal_metrics.output.metrics.processed_events_total
-		send_errors_total:       components.sources.internal_metrics.output.metrics.send_errors_total
+		send_errors_total: components.sources.internal_metrics.output.metrics.send_errors_total
 	}
 }

@@ -9,7 +9,7 @@ components: transforms: throttle: {
 
 	classes: {
 		commonly_used: false
-		development:   "beta"
+		development:   "stable"
 		egress_method: "stream"
 		stateful:      true
 	}

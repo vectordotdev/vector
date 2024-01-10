@@ -12,3 +12,11 @@ env:
 
 matrix:
   version: ['7']
+
+# changes to these files/paths will invoke the integration test in CI
+# expressions are evaluated using https://github.com/micromatch/picomatch
+paths:
+- "src/common/datadog.rs"
+- "src/internal_events/datadog_*"
+- "src/sources/datadog_agent/**"
+- "scripts/integration/datadog-agent/**"

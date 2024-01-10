@@ -1,12 +1,15 @@
 use bollard::errors::Error;
 use chrono::ParseError;
 use metrics::counter;
-use vector_common::internal_event::{error_stage, error_type};
-use vector_core::internal_event::InternalEvent;
+use vector_lib::internal_event::InternalEvent;
+use vector_lib::{
+    internal_event::{error_stage, error_type},
+    json_size::JsonSize,
+};
 
 #[derive(Debug)]
 pub struct DockerLogsEventsReceived<'a> {
-    pub byte_size: usize,
+    pub byte_size: JsonSize,
     pub container_id: &'a str,
     pub container_name: &'a str,
 }
@@ -24,12 +27,7 @@ impl InternalEvent for DockerLogsEventsReceived<'_> {
             "container_name" => self.container_name.to_owned()
         );
         counter!(
-            "component_received_event_bytes_total", self.byte_size as u64,
-            "container_name" => self.container_name.to_owned()
-        );
-        // deprecated
-        counter!(
-            "events_in_total", 1,
+            "component_received_event_bytes_total", self.byte_size.get() as u64,
             "container_name" => self.container_name.to_owned()
         );
     }
@@ -103,8 +101,6 @@ impl InternalEvent for DockerLogsCommunicationError<'_> {
             "error_type" => error_type::CONNECTION_FAILED,
             "stage" => error_stage::RECEIVING,
         );
-        // deprecated
-        counter!("communication_errors_total", 1);
     }
 }
 
@@ -130,8 +126,6 @@ impl InternalEvent for DockerLogsContainerMetadataFetchError<'_> {
             "stage" => error_stage::RECEIVING,
             "container_id" => self.container_id.to_owned(),
         );
-        // deprecated
-        counter!("container_metadata_fetch_errors_total", 1);
     }
 }
 
@@ -157,8 +151,6 @@ impl InternalEvent for DockerLogsTimestampParseError<'_> {
             "stage" => error_stage::PROCESSING,
             "container_id" => self.container_id.to_owned(),
         );
-        // deprecated
-        counter!("timestamp_parse_errors_total", 1);
     }
 }
 
@@ -181,33 +173,6 @@ impl InternalEvent for DockerLogsLoggingDriverUnsupportedError<'_> {
         counter!(
             "component_errors_total", 1,
             "error_type" => error_type::CONFIGURATION_FAILED,
-            "stage" => error_stage::RECEIVING,
-            "container_id" => self.container_id.to_owned(),
-        );
-        // deprecated
-        counter!("logging_driver_errors_total", 1);
-    }
-}
-
-#[derive(Debug)]
-pub struct DockerLogsReceivedOutOfOrderError<'a> {
-    pub timestamp_str: &'a str,
-    pub container_id: &'a str,
-}
-
-impl InternalEvent for DockerLogsReceivedOutOfOrderError<'_> {
-    fn emit(self) {
-        error!(
-            message = "Received out of order log message.",
-            error_type = error_type::CONDITION_FAILED,
-            stage = error_stage::RECEIVING,
-            container_id = ?self.container_id,
-            timestamp = ?self.timestamp_str,
-            internal_log_rate_limit = true,
-        );
-        counter!(
-            "component_errors_total", 1,
-            "error_type" => error_type::CONDITION_FAILED,
             "stage" => error_stage::RECEIVING,
             "container_id" => self.container_id.to_owned(),
         );

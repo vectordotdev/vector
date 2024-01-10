@@ -1,16 +1,16 @@
 use bytes::BytesMut;
 use chrono::Utc;
-use codecs::{
+use futures::StreamExt;
+use listenfd::ListenFd;
+use tokio_util::codec::FramedRead;
+use vector_lib::codecs::{
     decoding::{DeserializerConfig, FramingConfig},
     StreamDecodingError,
 };
-use futures::StreamExt;
-use listenfd::ListenFd;
-use lookup::{lookup_v2::OptionalValuePath, owned_value_path, path};
-use tokio_util::codec::FramedRead;
-use vector_common::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
-use vector_config::configurable_component;
-use vector_core::{
+use vector_lib::configurable::configurable_component;
+use vector_lib::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
+use vector_lib::lookup::{lookup_v2::OptionalValuePath, owned_value_path, path};
+use vector_lib::{
     config::{LegacyKey, LogNamespace},
     EstimatedJsonEncodedSizeOf,
 };
@@ -22,6 +22,7 @@ use crate::{
     internal_events::{
         SocketBindError, SocketEventsReceived, SocketMode, SocketReceiveError, StreamClosedError,
     },
+    net,
     serde::{default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
     sources::{
@@ -29,7 +30,7 @@ use crate::{
         util::net::{try_bind_udp_socket, SocketListenAddr},
         Source,
     },
-    udp, SourceSender,
+    SourceSender,
 };
 
 /// UDP configuration for the `socket` source.
@@ -88,7 +89,7 @@ pub struct UdpConfig {
 }
 
 fn default_host_key() -> OptionalValuePath {
-    OptionalValuePath::from(owned_value_path!(log_schema().host_key()))
+    log_schema().host_key().cloned().into()
 }
 
 fn default_port_key() -> OptionalValuePath {
@@ -158,7 +159,7 @@ pub(super) fn udp(
             })?;
 
         if let Some(receive_buffer_bytes) = config.receive_buffer_bytes {
-            if let Err(error) = udp::set_receive_buffer_size(&socket, receive_buffer_bytes) {
+            if let Err(error) = net::set_receive_buffer_size(&socket, receive_buffer_bytes) {
                 warn!(message = "Failed configuring receive buffer size on UDP socket.", %error);
             }
         }
@@ -268,8 +269,8 @@ pub(super) fn udp(
 
                                 tokio::select!{
                                     result = out.send_batch(events) => {
-                                        if let Err(error) = result {
-                                            emit!(StreamClosedError { error, count });
+                                        if result.is_err() {
+                                            emit!(StreamClosedError { count });
                                             return Ok(())
                                         }
                                     }

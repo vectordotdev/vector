@@ -1,6 +1,5 @@
 use bytes::{Buf, Bytes, BytesMut};
 use memchr::memchr;
-use serde::{Deserialize, Serialize};
 use tokio_util::codec::Decoder;
 use tracing::{trace, warn};
 use vector_config::configurable_component;
@@ -8,7 +7,8 @@ use vector_config::configurable_component;
 use super::BoxedFramingError;
 
 /// Config used to build a `CharacterDelimitedDecoder`.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[configurable_component]
+#[derive(Debug, Clone)]
 pub struct CharacterDelimitedDecoderConfig {
     /// Options for the character delimited decoder.
     pub character_delimited: CharacterDelimitedDecoderOptions,

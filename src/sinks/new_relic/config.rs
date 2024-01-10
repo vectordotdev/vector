@@ -1,25 +1,15 @@
 use std::{fmt::Debug, sync::Arc};
 
-use futures::FutureExt;
 use http::Uri;
 use tower::ServiceBuilder;
-use vector_common::sensitive_string::SensitiveString;
-use vector_config::configurable_component;
+use vector_lib::sensitive_string::SensitiveString;
 
 use super::{
     healthcheck, NewRelicApiResponse, NewRelicApiService, NewRelicEncoder, NewRelicSink,
     NewRelicSinkError,
 };
-use crate::{
-    codecs::Transformer,
-    config::{AcknowledgementsConfig, DataType, Input, SinkConfig, SinkContext},
-    http::HttpClient,
-    sinks::util::{
-        retries::RetryLogic, service::ServiceBuilderExt, BatchConfig, Compression,
-        SinkBatchSettings, TowerRequestConfig,
-    },
-    tls::TlsSettings,
-};
+
+use crate::{http::HttpClient, sinks::prelude::*};
 
 /// New Relic region.
 #[configurable_component]
@@ -75,7 +65,7 @@ impl RetryLogic for NewRelicApiRetry {
 }
 
 /// Configuration for the `new_relic` sink.
-#[configurable_component(sink("new_relic"))]
+#[configurable_component(sink("new_relic", "Deliver events to New Relic."))]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct NewRelicConfig {
@@ -139,6 +129,7 @@ impl NewRelicConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "new_relic")]
 impl SinkConfig for NewRelicConfig {
     async fn build(
         &self,
@@ -150,7 +141,7 @@ impl SinkConfig for NewRelicConfig {
             .limit_max_events(self.batch.max_events.unwrap_or(100))?
             .into_batcher_settings()?;
 
-        let request_limits = self.request.unwrap_with(&Default::default());
+        let request_limits = self.request.into_settings();
         let tls_settings = TlsSettings::from_options(&None)?;
         let client = HttpClient::new(tls_settings, &cx.proxy)?;
         let credentials = Arc::from(NewRelicCredentials::from(self));
@@ -163,8 +154,10 @@ impl SinkConfig for NewRelicConfig {
 
         let sink = NewRelicSink {
             service,
-            transformer: self.encoding.clone(),
-            encoder: NewRelicEncoder,
+            encoder: NewRelicEncoder {
+                transformer: self.encoding.clone(),
+                credentials: Arc::clone(&credentials),
+            },
             credentials,
             compression: self.compression,
             batcher_settings,

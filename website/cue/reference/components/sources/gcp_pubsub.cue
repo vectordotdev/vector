@@ -99,12 +99,6 @@ components: sources: gcp_pubsub: {
 		}
 	}
 
-	telemetry: metrics: {
-		component_received_event_bytes_total: components.sources.internal_metrics.output.metrics.component_received_event_bytes_total
-		component_received_events_total:      components.sources.internal_metrics.output.metrics.component_received_events_total
-		component_received_bytes_total:       components.sources.internal_metrics.output.metrics.component_received_bytes_total
-	}
-
 	how_it_works: {
 		gcp_pubsub: {
 			title: "GCP Pub/Sub"

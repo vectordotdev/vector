@@ -5,6 +5,7 @@ use vector_common::TimeZone;
 use vector_config::configurable_component;
 
 use super::super::default_data_dir;
+use super::Telemetry;
 use super::{proxy::ProxyConfig, AcknowledgementsConfig, LogSchema};
 use crate::serde::bool_or_struct;
 
@@ -54,6 +55,16 @@ pub struct GlobalOptions {
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     pub log_schema: LogSchema,
+
+    /// Telemetry options.
+    ///
+    /// Determines whether `source` and `service` tags should be emitted with the
+    /// `component_sent_*` and `component_received_*` events.
+    #[serde(
+        default,
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    pub telemetry: Telemetry,
 
     /// The name of the time zone to apply to timestamp conversions that do not contain an explicit time zone.
     ///
@@ -218,10 +229,14 @@ impl GlobalOptions {
             errors.extend(merge_errors);
         }
 
+        let mut telemetry = self.telemetry.clone();
+        telemetry.merge(&with.telemetry);
+
         if errors.is_empty() {
             Ok(Self {
                 data_dir,
                 log_schema,
+                telemetry,
                 acknowledgements: self.acknowledgements.merge_default(&with.acknowledgements),
                 timezone: self.timezone.or(with.timezone),
                 proxy: self.proxy.merge(&with.proxy),

@@ -4,24 +4,27 @@ use bytes::{Bytes, BytesMut};
 use futures::SinkExt;
 use http::{Request, Uri};
 use indoc::indoc;
-use lookup::lookup_v2::{parse_value_path, OptionalValuePath};
-use lookup::{OwnedValuePath, PathPrefix};
-use vector_config::configurable_component;
-use vector_core::config::log_schema;
-use vector_core::schema;
+use vrl::event_path;
+use vrl::path::OwnedValuePath;
 use vrl::value::Kind;
 
+use vector_lib::config::log_schema;
+use vector_lib::configurable::configurable_component;
+use vector_lib::lookup::lookup_v2::OptionalValuePath;
+use vector_lib::lookup::PathPrefix;
+use vector_lib::schema;
+
+use super::{
+    encode_timestamp, healthcheck, influx_line_protocol, influxdb_settings, Field,
+    InfluxDb1Settings, InfluxDb2Settings, ProtocolVersion,
+};
 use crate::{
     codecs::Transformer,
     config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
-    event::{Event, MetricTags, Value},
+    event::{Event, KeyString, MetricTags, Value},
     http::HttpClient,
     internal_events::InfluxdbEncodingError,
     sinks::{
-        influxdb::{
-            encode_timestamp, healthcheck, influx_line_protocol, influxdb_settings, Field,
-            InfluxDb1Settings, InfluxDb2Settings, ProtocolVersion,
-        },
         util::{
             http::{BatchedHttpSink, HttpEventEncoder, HttpSink},
             BatchConfig, Buffer, Compression, SinkBatchSettings, TowerRequestConfig,
@@ -41,7 +44,7 @@ impl SinkBatchSettings for InfluxDbLogsDefaultBatchSettings {
 }
 
 /// Configuration for the `influxdb_logs` sink.
-#[configurable_component(sink("influxdb_logs"))]
+#[configurable_component(sink("influxdb_logs", "Deliver log event data to InfluxDB."))]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct InfluxDbLogsConfig {
@@ -72,7 +75,7 @@ pub struct InfluxDbLogsConfig {
     #[serde(default)]
     #[configurable(metadata(docs::examples = "field1"))]
     #[configurable(metadata(docs::examples = "parent.child_field"))]
-    pub tags: Vec<String>,
+    pub tags: Vec<KeyString>,
 
     #[serde(flatten)]
     pub influxdb1_settings: Option<InfluxDb1Settings>,
@@ -135,7 +138,7 @@ struct InfluxDbLogsSink {
     token: String,
     protocol_version: ProtocolVersion,
     measurement: String,
-    tags: HashSet<String>,
+    tags: HashSet<KeyString>,
     transformer: Transformer,
     host_key: OwnedValuePath,
     message_key: OwnedValuePath,
@@ -157,20 +160,18 @@ impl GenerateConfig for InfluxDbLogsConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "influxdb_logs")]
 impl SinkConfig for InfluxDbLogsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let measurement = self.get_measurement()?;
-        let tags: HashSet<String> = self.tags.clone().into_iter().collect();
+        let tags: HashSet<KeyString> = self.tags.iter().cloned().collect();
 
         let tls_settings = TlsSettings::from_options(&self.tls)?;
         let client = HttpClient::new(tls_settings, cx.proxy())?;
         let healthcheck = self.healthcheck(client.clone())?;
 
         let batch = self.batch.into_batch_settings()?;
-        let request = self.request.unwrap_with(&TowerRequestConfig {
-            retry_attempts: Some(5),
-            ..Default::default()
-        });
+        let request = self.request.into_settings();
 
         let settings = influxdb_settings(
             self.influxdb1_settings.clone(),
@@ -186,30 +187,24 @@ impl SinkConfig for InfluxDbLogsConfig {
 
         let host_key = self
             .host_key
-            .clone()
-            .and_then(|k| k.path)
-            .unwrap_or_else(|| {
-                parse_value_path(log_schema().host_key())
-                    .expect("global log_schema.host_key to be valid path")
-            });
+            .as_ref()
+            .and_then(|k| k.path.clone())
+            .or_else(|| log_schema().host_key().cloned())
+            .expect("global log_schema.host_key to be valid path");
 
         let message_key = self
             .message_key
-            .clone()
-            .and_then(|k| k.path)
-            .unwrap_or_else(|| {
-                parse_value_path(log_schema().message_key())
-                    .expect("global log_schema.message_key to be valid path")
-            });
+            .as_ref()
+            .and_then(|k| k.path.clone())
+            .or_else(|| log_schema().message_key().cloned())
+            .expect("global log_schema.message_key to be valid path");
 
         let source_type_key = self
             .source_type_key
-            .clone()
-            .and_then(|k| k.path)
-            .unwrap_or_else(|| {
-                parse_value_path(log_schema().source_type_key())
-                    .expect("global log_schema.source_type_key to be valid path")
-            });
+            .as_ref()
+            .and_then(|k| k.path.clone())
+            .or_else(|| log_schema().source_type_key().cloned())
+            .expect("global log_schema.source_type_key to be valid path");
 
         let sink = InfluxDbLogsSink {
             uri,
@@ -232,6 +227,7 @@ impl SinkConfig for InfluxDbLogsConfig {
         )
         .sink_map_err(|error| error!(message = "Fatal influxdb_logs sink error.", %error));
 
+        #[allow(deprecated)]
         Ok((VectorSink::from_event_sink(sink), healthcheck))
     }
 
@@ -252,7 +248,7 @@ impl SinkConfig for InfluxDbLogsConfig {
 struct InfluxDbLogsEncoder {
     protocol_version: ProtocolVersion,
     measurement: String,
-    tags: HashSet<String>,
+    tags: HashSet<KeyString>,
     transformer: Transformer,
     host_key: OwnedValuePath,
     message_key: OwnedValuePath,
@@ -266,25 +262,23 @@ impl HttpEventEncoder<BytesMut> for InfluxDbLogsEncoder {
         // the original value that was assigned to the root. To avoid this we intentionally rename
         // the path that points to "message" such that it has a dedicated key.
         // TODO: add a `TargetPath::is_event_root()` to conditionally rename?
-        if let Some(message_path) = log.message_path() {
-            log.rename_key(
-                message_path.as_str(),
-                (PathPrefix::Event, &self.message_key),
-            )
+        if let Some(message_path) = log.message_path().cloned().as_ref() {
+            log.rename_key(message_path, (PathPrefix::Event, &self.message_key));
         }
         // Add the `host` and `source_type` to the HashSet of tags to include
         // Ensure those paths are on the event to be encoded, rather than metadata
-        if let Some(host_path) = log.host_path() {
-            self.tags.replace(host_path.clone());
-            log.rename_key(host_path.as_str(), (PathPrefix::Event, &self.host_key));
+        if let Some(host_path) = log.host_path().cloned().as_ref() {
+            self.tags.replace(host_path.path.to_string().into());
+            log.rename_key(host_path, (PathPrefix::Event, &self.host_key));
         }
-        self.tags.replace(log.source_type_path().to_string());
-        log.rename_key(
-            log.source_type_path(),
-            (PathPrefix::Event, &self.source_type_key),
-        );
-        self.tags.replace("metric_type".to_string());
-        log.insert("metric_type", "logs");
+
+        if let Some(source_type_path) = log.source_type_path().cloned().as_ref() {
+            self.tags.replace(source_type_path.path.to_string().into());
+            log.rename_key(source_type_path, (PathPrefix::Event, &self.source_type_key));
+        }
+
+        self.tags.replace("metric_type".into());
+        log.insert(event_path!("metric_type"), "logs");
 
         // Timestamp
         let timestamp = encode_timestamp(match log.remove_timestamp() {
@@ -300,10 +294,10 @@ impl HttpEventEncoder<BytesMut> for InfluxDbLogsEncoder {
 
         // Tags + Fields
         let mut tags = MetricTags::default();
-        let mut fields: HashMap<String, Field> = HashMap::new();
+        let mut fields: HashMap<KeyString, Field> = HashMap::new();
         log.convert_to_fields().for_each(|(key, value)| {
-            if self.tags.contains(&key) {
-                tags.replace(key, value.to_string_lossy().into_owned());
+            if self.tags.contains(&key[..]) {
+                tags.replace(key.into(), value.to_string_lossy().into_owned());
             } else {
                 fields.insert(key, to_field(value));
             }
@@ -405,10 +399,10 @@ mod tests {
     use futures::{channel::mpsc, stream, StreamExt};
     use http::{request::Parts, StatusCode};
     use indoc::indoc;
-    use lookup::owned_value_path;
-    use vector_core::event::{BatchNotifier, BatchStatus, Event, LogEvent};
 
-    use super::*;
+    use vector_lib::event::{BatchNotifier, BatchStatus, Event, LogEvent};
+    use vector_lib::lookup::owned_value_path;
+
     use crate::{
         sinks::{
             influxdb::test_util::{assert_fields, split_line_protocol, ts},
@@ -422,6 +416,8 @@ mod tests {
             next_addr,
         },
     };
+
+    use super::*;
 
     type Receiver = mpsc::Receiver<(Parts, bytes::Bytes)>;
 
@@ -858,7 +854,7 @@ mod tests {
         let uri = uri.parse::<Uri>().unwrap();
         let token = token.to_string();
         let measurement = measurement.to_string();
-        let tags: HashSet<String> = tags.into_iter().map(|tag| tag.to_string()).collect();
+        let tags: HashSet<_> = tags.into_iter().map(|tag| tag.into()).collect();
         InfluxDbLogsSink {
             uri,
             token,
@@ -876,16 +872,17 @@ mod tests {
 #[cfg(feature = "influxdb-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
-    use chrono::Utc;
-    use codecs::BytesDeserializerConfig;
-    use futures::stream;
-    use lookup::{owned_value_path, path};
     use std::sync::Arc;
-    use vector_core::config::{LegacyKey, LogNamespace};
-    use vector_core::event::{BatchNotifier, BatchStatus, Event, LogEvent};
-    use vrl::value::value;
 
-    use super::*;
+    use chrono::Utc;
+    use futures::stream;
+    use vrl::value;
+
+    use vector_lib::codecs::BytesDeserializerConfig;
+    use vector_lib::config::{LegacyKey, LogNamespace};
+    use vector_lib::event::{BatchNotifier, BatchStatus, Event, LogEvent};
+    use vector_lib::lookup::{owned_value_path, path};
+
     use crate::{
         config::SinkContext,
         sinks::influxdb::{
@@ -896,15 +893,20 @@ mod integration_tests {
         test_util::components::{run_and_assert_sink_compliance, HTTP_SINK_TAGS},
     };
 
+    use super::*;
+
     #[tokio::test]
     async fn influxdb2_logs_put_data() {
         let endpoint = address_v2();
         onboarding_v2(&endpoint).await;
 
         let now = Utc::now();
-        let measure = format!("vector-{}", now.timestamp_nanos());
+        let measure = format!(
+            "vector-{}",
+            now.timestamp_nanos_opt().expect("Timestamp out of range")
+        );
 
-        let cx = SinkContext::new_test();
+        let cx = SinkContext::default();
 
         let config = InfluxDbLogsConfig {
             namespace: None,

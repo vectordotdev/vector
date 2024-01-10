@@ -12,8 +12,8 @@ use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
-use vector_config::configurable_component;
-use vector_core::{metric_tags, EstimatedJsonEncodedSizeOf};
+use vector_lib::configurable::configurable_component;
+use vector_lib::{metric_tags, EstimatedJsonEncodedSizeOf};
 
 use crate::{
     config::{SourceConfig, SourceContext, SourceOutput},
@@ -28,7 +28,7 @@ use crate::{
 
 pub mod parser;
 use parser::NginxStubStatus;
-use vector_core::config::LogNamespace;
+use vector_lib::config::LogNamespace;
 
 macro_rules! counter {
     ($value:expr) => {
@@ -74,6 +74,7 @@ pub struct NginxMetricsConfig {
     /// The interval between scrapes.
     #[serde(default = "default_scrape_interval_secs")]
     #[serde_as(as = "serde_with::DurationSeconds<u64>")]
+    #[configurable(metadata(docs::human_name = "Scrape Interval"))]
     scrape_interval_secs: Duration,
 
     /// Overrides the default namespace for the metrics emitted by the source.
@@ -126,16 +127,16 @@ impl SourceConfig for NginxMetricsConfig {
             while interval.next().await.is_some() {
                 let start = Instant::now();
                 let metrics = join_all(sources.iter().map(|nginx| nginx.collect())).await;
-                let count = metrics.len();
                 emit!(CollectionCompleted {
                     start,
                     end: Instant::now()
                 });
 
-                let metrics = metrics.into_iter().flatten();
+                let metrics: Vec<Metric> = metrics.into_iter().flatten().collect();
+                let count = metrics.len();
 
-                if let Err(error) = cx.out.send_batch(metrics).await {
-                    emit!(StreamClosedError { error, count });
+                if (cx.out.send_batch(metrics).await).is_err() {
+                    emit!(StreamClosedError { count });
                     return Err(());
                 }
             }

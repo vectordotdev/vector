@@ -31,5 +31,12 @@ remap: functions: match: {
 				"""
 			return: true
 		},
+		{
+			title: "String does not match the regular expression"
+			source: """
+				match("I'm a little teapot", r'.*balloon')
+				"""
+			return: false
+		},
 	]
 }

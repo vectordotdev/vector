@@ -1,22 +1,24 @@
+use std::sync::Arc;
+
 use chrono::{TimeZone, Utc};
 use futures::Stream;
 use futures_util::StreamExt;
-use lookup::path;
-use opentelemetry_proto::proto::{
+use similar_asserts::assert_eq;
+use tonic::Request;
+use vector_lib::config::LogNamespace;
+use vector_lib::lookup::path;
+use vector_lib::opentelemetry::proto::{
     collector::logs::v1::{logs_service_client::LogsServiceClient, ExportLogsServiceRequest},
     common::v1::{any_value, AnyValue, KeyValue},
     logs::v1::{LogRecord, ResourceLogs, ScopeLogs},
     resource::v1::Resource as OtelResource,
 };
-use similar_asserts::assert_eq;
-use std::collections::BTreeMap;
-use tonic::Request;
-use vector_core::config::LogNamespace;
-use vrl::value::value;
+use vrl::value;
 
+use crate::config::OutputId;
 use crate::{
     config::{SourceConfig, SourceContext},
-    event::{into_event_stream, Event, EventStatus, LogEvent, Value},
+    event::{into_event_stream, Event, EventStatus, LogEvent, ObjectMap, Value},
     sources::opentelemetry::{GrpcConfig, HttpConfig, OpentelemetryConfig, LOGS},
     test_util::{
         self,
@@ -45,6 +47,7 @@ async fn receive_grpc_logs_vector_namespace() {
             http: HttpConfig {
                 address: http_addr,
                 tls: Default::default(),
+                keepalive: Default::default(),
             },
             acknowledgements: Default::default(),
             log_namespace: Some(true),
@@ -182,6 +185,7 @@ async fn receive_grpc_logs_legacy_namespace() {
             http: HttpConfig {
                 address: http_addr,
                 tls: Default::default(),
+                keepalive: Default::default(),
             },
             acknowledgements: Default::default(),
             log_namespace: Default::default(),
@@ -269,7 +273,11 @@ async fn receive_grpc_logs_legacy_namespace() {
             ("observed_timestamp", Utc.timestamp_nanos(2).into()),
             ("source_type", "opentelemetry".into()),
         ]);
-        let expect_event = Event::from(LogEvent::from(expect_vec));
+        let mut expect_event = Event::from(LogEvent::from(expect_vec));
+        expect_event.set_upstream_id(Arc::new(OutputId {
+            component: "test".into(),
+            port: Some("logs".into()),
+        }));
         assert_eq!(actual_event, expect_event);
     })
     .await;
@@ -294,10 +302,10 @@ fn str_into_hex_bytes(s: &str) -> Vec<u8> {
     hex::decode(s).unwrap()
 }
 
-fn vec_into_btmap(arr: Vec<(&'static str, Value)>) -> BTreeMap<String, Value> {
-    BTreeMap::from_iter(
+fn vec_into_btmap(arr: Vec<(&'static str, Value)>) -> ObjectMap {
+    ObjectMap::from_iter(
         arr.into_iter()
-            .map(|(k, v)| (k.to_string(), v))
+            .map(|(k, v)| (k.into(), v))
             .collect::<Vec<(_, _)>>(),
     )
 }

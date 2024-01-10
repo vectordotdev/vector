@@ -25,7 +25,8 @@ use serde::Deserialize;
 use snafu::Snafu;
 use tokio::time::{self, sleep, Duration, Instant};
 use tower::Service;
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
+use vector_lib::json_size::JsonSize;
 
 use super::controller::ControllerStatistics;
 use crate::{
@@ -34,8 +35,8 @@ use crate::{
     metrics,
     sinks::{
         util::{
-            retries::RetryLogic, BatchSettings, Concurrency, EncodedEvent, EncodedLength,
-            TowerRequestConfig, VecBuffer,
+            retries::{JitterMode, RetryLogic},
+            BatchSettings, Concurrency, EncodedEvent, EncodedLength, TowerRequestConfig, VecBuffer,
         },
         Healthcheck, VectorSink,
     },
@@ -146,7 +147,7 @@ const fn default_concurrency() -> Concurrency {
 }
 
 /// Configuration for the `test_arc` sink.
-#[configurable_component(sink("test_arc"))]
+#[configurable_component(sink("test_arc", "Test (adaptive concurrency)."))]
 #[derive(Clone, Debug, Default)]
 pub struct TestConfig {
     #[configurable(derived)]
@@ -169,6 +170,7 @@ pub struct TestConfig {
 impl_generate_config_from_default!(TestConfig);
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "test_arc")]
 impl SinkConfig for TestConfig {
     async fn build(&self, _cx: SinkContext) -> Result<(VectorSink, Healthcheck), crate::Error> {
         let mut batch_settings = BatchSettings::default();
@@ -176,7 +178,7 @@ impl SinkConfig for TestConfig {
         batch_settings.size.events = 1;
         batch_settings.timeout = Duration::from_secs(9999);
 
-        let request = self.request.unwrap_with(&TowerRequestConfig::default());
+        let request = self.request.into_settings();
         let sink = request
             .batch_sink(
                 TestRetryLogic,
@@ -184,7 +186,9 @@ impl SinkConfig for TestConfig {
                 VecBuffer::new(batch_settings.size),
                 batch_settings.timeout,
             )
-            .with_flat_map(|event| stream::iter(Some(Ok(EncodedEvent::new(event, 0)))))
+            .with_flat_map(|event| {
+                stream::iter(Some(Ok(EncodedEvent::new(event, 0, JsonSize::zero()))))
+            })
             .sink_map_err(|error| panic!("Fatal test sink error: {}", error));
         let healthcheck = future::ok(()).boxed();
 
@@ -197,6 +201,7 @@ impl SinkConfig for TestConfig {
         );
         *self.controller_stats.lock().unwrap() = stats;
 
+        #[allow(deprecated)]
         Ok((VectorSink::from_event_sink(sink), healthcheck))
     }
 
@@ -388,7 +393,7 @@ impl Statistics {
     /// number of requests per second.
     fn prune_old_requests(&mut self, now: Instant) {
         let then = now - Duration::from_secs(1);
-        while let Some(&first) = self.requests.get(0) {
+        while let Some(&first) = self.requests.front() {
             if first > then {
                 break;
             }
@@ -410,8 +415,9 @@ async fn run_test(params: TestParams) -> TestResults {
     let test_config = TestConfig {
         request: TowerRequestConfig {
             concurrency: params.concurrency,
-            rate_limit_num: Some(9999),
-            timeout_secs: Some(1),
+            rate_limit_num: 9999,
+            timeout_secs: 1,
+            retry_jitter_mode: JitterMode::None,
             ..Default::default()
         },
         params,

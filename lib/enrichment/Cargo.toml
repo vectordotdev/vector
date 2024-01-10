@@ -7,7 +7,6 @@ publish = false
 
 [dependencies]
 arc-swap = { version = "1.6.0", default-features = false }
-dyn-clone = { version = "1.0.11", default-features = false }
-chrono = { version = "0.4.19", default-features = false }
-vector-common = { path = "../vector-common", default-features = false, features = [ "btreemap", "conversion", "serde" ] }
-vrl = { git = "https://github.com/vectordotdev/vrl", rev = "v0.3.0", default-features = false, features = ["diagnostic"] }
+chrono = { version = "0.4.31", default-features = false }
+dyn-clone = { version = "1.0.16", default-features = false }
+vrl.workspace = true

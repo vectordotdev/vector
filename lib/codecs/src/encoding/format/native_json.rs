@@ -52,8 +52,9 @@ impl Encoder<Event> for NativeJsonSerializer {
 #[cfg(test)]
 mod tests {
     use bytes::BytesMut;
-    use vector_core::event::{LogEvent, Value};
-    use vrl::value::btreemap;
+    use vector_core::buckets;
+    use vector_core::event::{LogEvent, Metric, MetricKind, MetricValue, Value};
+    use vrl::btreemap;
 
     use super::*;
 
@@ -82,6 +83,27 @@ mod tests {
 
         let json = serializer.to_json_value(event).unwrap();
 
+        assert_eq!(bytes.freeze(), serde_json::to_string(&json).unwrap());
+    }
+
+    #[test]
+    fn serialize_aggregated_histogram() {
+        let histogram_event = Event::from(Metric::new(
+            "histogram",
+            MetricKind::Absolute,
+            MetricValue::AggregatedHistogram {
+                count: 1,
+                sum: 1.0,
+                buckets: buckets!(f64::NEG_INFINITY => 0 ,2.0 => 1, f64::INFINITY => 0),
+            },
+        ));
+
+        let mut serializer = NativeJsonSerializer::new();
+        let mut bytes = BytesMut::new();
+        serializer
+            .encode(histogram_event.clone(), &mut bytes)
+            .unwrap();
+        let json = serializer.to_json_value(histogram_event).unwrap();
         assert_eq!(bytes.freeze(), serde_json::to_string(&json).unwrap());
     }
 }

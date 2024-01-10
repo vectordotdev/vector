@@ -25,10 +25,13 @@ use tokio_postgres::{
     Client, Config, Error as PgError, NoTls, Row,
 };
 use tokio_stream::wrappers::IntervalStream;
-use vector_common::internal_event::{CountByteSize, InternalEventHandle as _, Registered};
-use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
-use vector_core::{metric_tags, ByteSizeOf, EstimatedJsonEncodedSizeOf};
+use vector_lib::config::LogNamespace;
+use vector_lib::configurable::configurable_component;
+use vector_lib::{
+    internal_event::{CountByteSize, InternalEventHandle as _, Registered},
+    json_size::JsonSize,
+};
+use vector_lib::{metric_tags, ByteSizeOf, EstimatedJsonEncodedSizeOf};
 
 use crate::{
     config::{SourceConfig, SourceContext, SourceOutput},
@@ -156,6 +159,7 @@ pub struct PostgresqlMetricsConfig {
     /// The interval between scrapes.
     #[serde(default = "default_scrape_interval_secs")]
     #[serde_as(as = "serde_with::DurationSeconds<u64>")]
+    #[configurable(metadata(docs::human_name = "Scrape Interval"))]
     scrape_interval_secs: Duration,
 
     /// Overrides the default namespace for the metrics emitted by the source.
@@ -216,15 +220,16 @@ impl SourceConfig for PostgresqlMetricsConfig {
             while interval.next().await.is_some() {
                 let start = Instant::now();
                 let metrics = join_all(sources.iter_mut().map(|source| source.collect())).await;
-                let count = metrics.len();
                 emit!(CollectionCompleted {
                     start,
                     end: Instant::now()
                 });
 
-                let metrics = metrics.into_iter().flatten();
-                if let Err(error) = cx.out.send_batch(metrics).await {
-                    emit!(StreamClosedError { error, count });
+                let metrics: Vec<Metric> = metrics.into_iter().flatten().collect();
+                let count = metrics.len();
+
+                if (cx.out.send_batch(metrics).await).is_err() {
+                    emit!(StreamClosedError { count });
                     return Err(());
                 }
             }
@@ -566,20 +571,23 @@ impl PostgresqlMetrics {
         .await
         {
             Ok(result) => {
-                let (count, byte_size, received_byte_size) =
-                    result.iter().fold((0, 0, 0), |res, (set, size)| {
-                        (
-                            res.0 + set.len(),
-                            res.1 + set.estimated_json_encoded_size_of(),
-                            res.2 + size,
-                        )
-                    });
+                let (count, json_byte_size, received_byte_size) =
+                    result
+                        .iter()
+                        .fold((0, JsonSize::zero(), 0), |res, (set, size)| {
+                            (
+                                res.0 + set.len(),
+                                res.1 + set.estimated_json_encoded_size_of(),
+                                res.2 + size,
+                            )
+                        });
                 emit!(EndpointBytesReceived {
                     byte_size: received_byte_size,
                     protocol: "tcp",
                     endpoint: &self.endpoint,
                 });
-                self.events_received.emit(CountByteSize(count, byte_size));
+                self.events_received
+                    .emit(CountByteSize(count, json_byte_size));
                 self.client.set((client, client_version));
                 Ok(result.into_iter().flat_map(|(metrics, _)| metrics))
             }
@@ -1026,7 +1034,7 @@ mod integration_tests {
         assert_source_compliance(&PULL_SOURCE_TAGS, async move {
             let config: Config = endpoint.parse().unwrap();
             let tags_endpoint = config_to_endpoint(&config);
-            let tags_host = match config.get_hosts().get(0).unwrap() {
+            let tags_host = match config.get_hosts().first().unwrap() {
                 Host::Tcp(host) => host.clone(),
                 #[cfg(unix)]
                 Host::Unix(path) => path.to_string_lossy().to_string(),

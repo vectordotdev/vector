@@ -3,7 +3,7 @@ use std::{convert::TryFrom, time::Duration};
 use regex::bytes::Regex;
 use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 
 use crate::line_agg;
 
@@ -41,6 +41,7 @@ pub struct MultilineConfig {
     #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
     #[configurable(metadata(docs::examples = 1000))]
     #[configurable(metadata(docs::examples = 600000))]
+    #[configurable(metadata(docs::human_name = "Timeout"))]
     pub timeout_ms: Duration,
 }
 

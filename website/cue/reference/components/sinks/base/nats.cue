@@ -186,6 +186,11 @@ base: components: sinks: nats: configuration: {
 						[vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
 						[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
 						"""
+					protobuf: """
+						Encodes an event as a [Protobuf][protobuf] message.
+
+						[protobuf]: https://protobuf.dev/
+						"""
 					raw_message: """
 						No encoding.
 
@@ -211,18 +216,82 @@ base: components: sinks: nats: configuration: {
 				description:   "The CSV Serializer Options."
 				relevant_when: "codec = \"csv\""
 				required:      true
-				type: object: options: fields: {
-					description: """
-						Configures the fields that will be encoded, as well as the order in which they
-						appear in the output.
+				type: object: options: {
+					capacity: {
+						description: """
+																Set the capacity (in bytes) of the internal buffer used in the CSV writer.
+																This defaults to a reasonable setting.
+																"""
+						required: false
+						type: uint: default: 8192
+					}
+					delimiter: {
+						description: "The field delimiter to use when writing CSV."
+						required:    false
+						type: uint: default: 44
+					}
+					double_quote: {
+						description: """
+																Enable double quote escapes.
 
-						If a field is not present in the event, the output will be an empty string.
+																This is enabled by default, but it may be disabled. When disabled, quotes in
+																field data are escaped instead of doubled.
+																"""
+						required: false
+						type: bool: default: true
+					}
+					escape: {
+						description: """
+																The escape character to use when writing CSV.
 
-						Values of type `Array`, `Object`, and `Regex` are not supported and the
-						output will be an empty string.
-						"""
-					required: true
-					type: array: items: type: string: {}
+																In some variants of CSV, quotes are escaped using a special escape character
+																like \\ (instead of escaping quotes by doubling them).
+
+																To use this, `double_quotes` needs to be disabled as well otherwise it is ignored.
+																"""
+						required: false
+						type: uint: default: 34
+					}
+					fields: {
+						description: """
+																Configures the fields that will be encoded, as well as the order in which they
+																appear in the output.
+
+																If a field is not present in the event, the output will be an empty string.
+
+																Values of type `Array`, `Object`, and `Regex` are not supported and the
+																output will be an empty string.
+																"""
+						required: true
+						type: array: items: type: string: {}
+					}
+					quote: {
+						description: "The quote character to use when writing CSV."
+						required:    false
+						type: uint: default: 34
+					}
+					quote_style: {
+						description: "The quoting style to use when writing CSV data."
+						required:    false
+						type: string: {
+							default: "necessary"
+							enum: {
+								always: "Always puts quotes around every field."
+								necessary: """
+																			Puts quotes around fields only when necessary.
+																			They are necessary when fields contain a quote, delimiter, or record terminator.
+																			Quotes are also necessary when writing an empty record
+																			(which is indistinguishable from a record with one empty field).
+																			"""
+								never: "Never writes quotes, even if it produces invalid CSV data."
+								non_numeric: """
+																			Puts quotes around all fields that are non-numeric.
+																			Namely, when writing a field that does not parse as a valid float or integer,
+																			then quotes are used even if they aren't strictly necessary.
+																			"""
+							}
+						}
+					}
 				}
 			}
 			except_fields: {
@@ -256,12 +325,223 @@ base: components: sinks: nats: configuration: {
 				required:    false
 				type: array: items: type: string: {}
 			}
+			protobuf: {
+				description:   "Options for the Protobuf serializer."
+				relevant_when: "codec = \"protobuf\""
+				required:      true
+				type: object: options: {
+					desc_file: {
+						description: """
+																The path to the protobuf descriptor set file.
+
+																This file is the output of `protoc -o <path> ...`
+																"""
+						required: true
+						type: string: examples: ["/etc/vector/protobuf_descriptor_set.desc"]
+					}
+					message_type: {
+						description: "The name of the message type to use for serializing."
+						required:    true
+						type: string: examples: ["package.Message"]
+					}
+				}
+			}
 			timestamp_format: {
 				description: "Format used for timestamp fields."
 				required:    false
 				type: string: enum: {
-					rfc3339: "Represent the timestamp as a RFC 3339 timestamp."
-					unix:    "Represent the timestamp as a Unix timestamp."
+					rfc3339:    "Represent the timestamp as a RFC 3339 timestamp."
+					unix:       "Represent the timestamp as a Unix timestamp."
+					unix_float: "Represent the timestamp as a Unix timestamp in floating point."
+					unix_ms:    "Represent the timestamp as a Unix timestamp in milliseconds."
+					unix_ns:    "Represent the timestamp as a Unix timestamp in nanoseconds."
+					unix_us:    "Represent the timestamp as a Unix timestamp in microseconds"
+				}
+			}
+		}
+	}
+	request: {
+		description: """
+			Middleware settings for outbound requests.
+
+			Various settings can be configured, such as concurrency and rate limits, timeouts, retry behavior, etc.
+
+			Note that the retry backoff policy follows the Fibonacci sequence.
+			"""
+		required: false
+		type: object: options: {
+			adaptive_concurrency: {
+				description: """
+					Configuration of adaptive concurrency parameters.
+
+					These parameters typically do not require changes from the default, and incorrect values can lead to meta-stable or
+					unstable performance and sink behavior. Proceed with caution.
+					"""
+				required: false
+				type: object: options: {
+					decrease_ratio: {
+						description: """
+																The fraction of the current value to set the new concurrency limit when decreasing the limit.
+
+																Valid values are greater than `0` and less than `1`. Smaller values cause the algorithm to scale back rapidly
+																when latency increases.
+
+																Note that the new limit is rounded down after applying this ratio.
+																"""
+						required: false
+						type: float: default: 0.9
+					}
+					ewma_alpha: {
+						description: """
+																The weighting of new measurements compared to older measurements.
+
+																Valid values are greater than `0` and less than `1`.
+
+																ARC uses an exponentially weighted moving average (EWMA) of past RTT measurements as a reference to compare with
+																the current RTT. Smaller values cause this reference to adjust more slowly, which may be useful if a service has
+																unusually high response variability.
+																"""
+						required: false
+						type: float: default: 0.4
+					}
+					initial_concurrency: {
+						description: """
+																The initial concurrency limit to use. If not specified, the initial limit will be 1 (no concurrency).
+
+																It is recommended to set this value to your service's average limit if you're seeing that it takes a
+																long time to ramp up adaptive concurrency after a restart. You can find this value by looking at the
+																`adaptive_concurrency_limit` metric.
+																"""
+						required: false
+						type: uint: default: 1
+					}
+					max_concurrency_limit: {
+						description: """
+																The maximum concurrency limit.
+
+																The adaptive request concurrency limit will not go above this bound. This is put in place as a safeguard.
+																"""
+						required: false
+						type: uint: default: 200
+					}
+					rtt_deviation_scale: {
+						description: """
+																Scale of RTT deviations which are not considered anomalous.
+
+																Valid values are greater than or equal to `0`, and we expect reasonable values to range from `1.0` to `3.0`.
+
+																When calculating the past RTT average, we also compute a secondary “deviation” value that indicates how variable
+																those values are. We use that deviation when comparing the past RTT average to the current measurements, so we
+																can ignore increases in RTT that are within an expected range. This factor is used to scale up the deviation to
+																an appropriate range.  Larger values cause the algorithm to ignore larger increases in the RTT.
+																"""
+						required: false
+						type: float: default: 2.5
+					}
+				}
+			}
+			concurrency: {
+				description: """
+					Configuration for outbound request concurrency.
+
+					This can be set either to one of the below enum values or to a positive integer, which denotes
+					a fixed concurrency limit.
+					"""
+				required: false
+				type: {
+					string: {
+						default: "none"
+						enum: {
+							adaptive: """
+															Concurrency will be managed by Vector's [Adaptive Request Concurrency][arc] feature.
+
+															[arc]: https://vector.dev/docs/about/under-the-hood/networking/arc/
+															"""
+							none: """
+															A fixed concurrency of 1.
+
+															Only one request can be outstanding at any given time.
+															"""
+						}
+					}
+					uint: {}
+				}
+			}
+			rate_limit_duration_secs: {
+				description: "The time window used for the `rate_limit_num` option."
+				required:    false
+				type: uint: {
+					default: 1
+					unit:    "seconds"
+				}
+			}
+			rate_limit_num: {
+				description: "The maximum number of requests allowed within the `rate_limit_duration_secs` time window."
+				required:    false
+				type: uint: {
+					default: 9223372036854775807
+					unit:    "requests"
+				}
+			}
+			retry_attempts: {
+				description: "The maximum number of retries to make for failed requests."
+				required:    false
+				type: uint: {
+					default: 9223372036854775807
+					unit:    "retries"
+				}
+			}
+			retry_initial_backoff_secs: {
+				description: """
+					The amount of time to wait before attempting the first retry for a failed request.
+
+					After the first retry has failed, the fibonacci sequence is used to select future backoffs.
+					"""
+				required: false
+				type: uint: {
+					default: 1
+					unit:    "seconds"
+				}
+			}
+			retry_jitter_mode: {
+				description: "The jitter mode to use for retry backoff behavior."
+				required:    false
+				type: string: {
+					default: "Full"
+					enum: {
+						Full: """
+															Full jitter.
+
+															The random delay is anywhere from 0 up to the maximum current delay calculated by the backoff
+															strategy.
+
+															Incorporating full jitter into your backoff strategy can greatly reduce the likelihood
+															of creating accidental denial of service (DoS) conditions against your own systems when
+															many clients are recovering from a failure state.
+															"""
+						None: "No jitter."
+					}
+				}
+			}
+			retry_max_duration_secs: {
+				description: "The maximum amount of time to wait between retries."
+				required:    false
+				type: uint: {
+					default: 30
+					unit:    "seconds"
+				}
+			}
+			timeout_secs: {
+				description: """
+					The time a request can take before being aborted.
+
+					Datadog highly recommends that you do not lower this value below the service's internal timeout, as this could
+					create orphaned requests, pile on retries, and result in duplicate data downstream.
+					"""
+				required: false
+				type: uint: {
+					default: 60
+					unit:    "seconds"
 				}
 			}
 		}

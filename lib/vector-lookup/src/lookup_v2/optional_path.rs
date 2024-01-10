@@ -1,4 +1,6 @@
 use vector_config::configurable_component;
+use vrl::owned_value_path;
+use vrl::path::PathPrefix;
 
 use crate::lookup_v2::PathParseError;
 use crate::{OwnedTargetPath, OwnedValuePath};
@@ -14,6 +16,25 @@ pub struct OptionalTargetPath {
 impl OptionalTargetPath {
     pub fn none() -> Self {
         Self { path: None }
+    }
+
+    pub fn event(path: &str) -> Self {
+        Self {
+            path: Some(OwnedTargetPath {
+                prefix: PathPrefix::Event,
+                path: owned_value_path!(path),
+            }),
+        }
+    }
+
+    pub fn from(prefix: PathPrefix, path: Option<OwnedValuePath>) -> Self {
+        Self {
+            path: path.map(|path| OwnedTargetPath { prefix, path }),
+        }
+    }
+
+    pub fn as_ref(&self) -> Option<&OwnedTargetPath> {
+        self.path.as_ref()
     }
 }
 
@@ -56,6 +77,12 @@ impl OptionalValuePath {
     pub fn none() -> Self {
         Self { path: None }
     }
+
+    pub fn new(path: &str) -> Self {
+        Self {
+            path: Some(owned_value_path!(path)),
+        }
+    }
 }
 
 impl TryFrom<String> for OptionalValuePath {
@@ -82,5 +109,13 @@ impl From<OptionalValuePath> for String {
 impl From<OwnedValuePath> for OptionalValuePath {
     fn from(path: OwnedValuePath) -> Self {
         Self { path: Some(path) }
+    }
+}
+
+impl From<Option<OwnedValuePath>> for OptionalValuePath {
+    fn from(value: Option<OwnedValuePath>) -> Self {
+        value.map_or(OptionalValuePath::none(), |path| {
+            OptionalValuePath::from(path)
+        })
     }
 }

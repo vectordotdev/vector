@@ -6,7 +6,7 @@ components: sinks: azure_blob: {
 	classes: {
 		commonly_used: true
 		delivery:      "at_least_once"
-		development:   "beta"
+		development:   "stable"
 		egress_method: "batch"
 		service_providers: ["Azure"]
 		stateful: false
@@ -122,15 +122,5 @@ components: sinks: azure_blob: {
 				```
 				"""
 		}
-	}
-
-	telemetry: metrics: {
-		component_sent_events_total:      components.sources.internal_metrics.output.metrics.component_sent_events_total
-		component_sent_event_bytes_total: components.sources.internal_metrics.output.metrics.component_sent_event_bytes_total
-		events_discarded_total:           components.sources.internal_metrics.output.metrics.events_discarded_total
-		processing_errors_total:          components.sources.internal_metrics.output.metrics.processing_errors_total
-		http_error_response_total:        components.sources.internal_metrics.output.metrics.http_error_response_total
-		http_request_errors_total:        components.sources.internal_metrics.output.metrics.http_request_errors_total
-		processed_bytes_total:            components.sources.internal_metrics.output.metrics.processed_bytes_total
 	}
 }

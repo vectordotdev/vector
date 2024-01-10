@@ -11,21 +11,21 @@ use bollard::{
 };
 use bytes::{Buf, Bytes};
 use chrono::{DateTime, FixedOffset, Local, ParseError, Utc};
-use codecs::{BytesDeserializer, BytesDeserializerConfig};
 use futures::{Stream, StreamExt};
-use lookup::{
-    lookup_v2::{parse_value_path, OptionalValuePath},
-    metadata_path, owned_value_path, path, OwnedValuePath, PathPrefix,
-};
 use once_cell::sync::Lazy;
 use serde_with::serde_as;
 use tokio::sync::mpsc;
 use tracing_futures::Instrument;
-use vector_common::internal_event::{
+use vector_lib::codecs::{BytesDeserializer, BytesDeserializerConfig};
+use vector_lib::config::{LegacyKey, LogNamespace};
+use vector_lib::configurable::configurable_component;
+use vector_lib::internal_event::{
     ByteSize, BytesReceived, InternalEventHandle as _, Protocol, Registered,
 };
-use vector_config::configurable_component;
-use vector_core::config::{LegacyKey, LogNamespace};
+use vector_lib::lookup::{
+    lookup_v2::OptionalValuePath, metadata_path, owned_value_path, path, OwnedValuePath, PathPrefix,
+};
+use vrl::event_path;
 use vrl::value::{kind::Collection, Kind};
 
 use super::util::MultilineConfig;
@@ -37,8 +37,7 @@ use crate::{
         DockerLogsCommunicationError, DockerLogsContainerEventReceived,
         DockerLogsContainerMetadataFetchError, DockerLogsContainerUnwatch,
         DockerLogsContainerWatch, DockerLogsEventsReceived,
-        DockerLogsLoggingDriverUnsupportedError, DockerLogsReceivedOutOfOrderError,
-        DockerLogsTimestampParseError, StreamClosedError,
+        DockerLogsLoggingDriverUnsupportedError, DockerLogsTimestampParseError, StreamClosedError,
     },
     line_agg::{self, LineAgg},
     shutdown::ShutdownSignal,
@@ -151,6 +150,7 @@ pub struct DockerLogsConfig {
     /// The amount of time to wait before retrying after an error.
     #[serde_as(as = "serde_with::DurationSeconds<u64>")]
     #[serde(default = "default_retry_backoff_secs")]
+    #[configurable(metadata(docs::human_name = "Retry Backoff"))]
     retry_backoff_secs: Duration,
 
     /// Multiline aggregation configuration.
@@ -188,7 +188,7 @@ impl Default for DockerLogsConfig {
 }
 
 fn default_host_key() -> OptionalValuePath {
-    OptionalValuePath::from(owned_value_path!(log_schema().host_key()))
+    log_schema().host_key().cloned().into()
 }
 
 fn default_partial_event_marker_field() -> Option<String> {
@@ -337,9 +337,7 @@ impl SourceConfig for DockerLogsConfig {
                 Some("timestamp"),
             )
             .with_vector_metadata(
-                parse_value_path(log_schema().source_type_key())
-                    .ok()
-                    .as_ref(),
+                log_schema().source_type_key(),
                 &owned_value_path!("source_type"),
                 Kind::bytes(),
                 None,
@@ -794,7 +792,7 @@ impl EventStreamBuilder {
                 error = v.as_ref().err().cloned();
                 ready(v.is_ok())
             })
-            .filter_map(|v| ready(v.unwrap()))
+            .filter_map(|v| ready(v.ok().flatten()))
             .take_until(self.shutdown.clone());
 
         let events_stream: Box<dyn Stream<Item = LogEvent> + Unpin + Send> =
@@ -813,13 +811,10 @@ impl EventStreamBuilder {
         let result = {
             let mut stream = events_stream
                 .map(move |event| add_hostname(event, &host_key, &hostname, self.log_namespace));
-            self.out
-                .send_event_stream(&mut stream)
-                .await
-                .map_err(|error| {
-                    let (count, _) = stream.size_hint();
-                    emit!(StreamClosedError { error, count });
-                })
+            self.out.send_event_stream(&mut stream).await.map_err(|_| {
+                let (count, _) = stream.size_hint();
+                emit!(StreamClosedError { count });
+            })
         };
 
         // End of stream
@@ -998,25 +993,38 @@ impl ContainerLogInfo {
         let timestamp_str = splitter.next()?;
         let timestamp = match DateTime::parse_from_rfc3339(timestamp_str) {
             Ok(timestamp) => {
-                // Timestamp check
+                // Timestamp check. This is included to avoid processing the same log multiple times, which can
+                // occur when a container changes generations, and to avoid processing logs with timestamps before
+                // the created timestamp.
                 match self.last_log.as_ref() {
-                    // Received log has not already been processed.
-                    Some(&(ref last, gen))
-                        if *last < timestamp || (*last == timestamp && gen == self.generation) =>
-                    {
-                        // noop
+                    Some(&(last, gen)) => {
+                        if last < timestamp || (last == timestamp && gen == self.generation) {
+                            // Noop - log received in order.
+                        } else {
+                            // Docker returns logs in order.
+                            // If we reach this state, this log is from a previous generation of the container.
+                            // It was already processed, so we can safely skip it.
+                            trace!(
+                                message = "Received log from previous container generation.",
+                                log_timestamp = %timestamp_str,
+                                last_log_timestamp = %last,
+                            );
+                            return None;
+                        }
                     }
-                    // Received log is after the time the container was created.
-                    None if self.created <= timestamp.with_timezone(&Utc) => {
-                        // noop
-                    }
-                    // Received log is older than the previously received entry.
-                    _ => {
-                        emit!(DockerLogsReceivedOutOfOrderError {
-                            container_id: self.id.as_str(),
-                            timestamp_str,
-                        });
-                        return None;
+                    None => {
+                        if self.created < timestamp.with_timezone(&Utc) {
+                            // Noop - first log to process.
+                        } else {
+                            // Received a log with a timestamp before that provided to the Docker API.
+                            // This should not happen, but if it does, we can just ignore these logs.
+                            trace!(
+                                message = "Received log from before created timestamp.",
+                                log_timestamp = %timestamp_str,
+                                created_timestamp = %self.created
+                            );
+                            return None;
+                        }
                     }
                 }
 
@@ -1064,7 +1072,7 @@ impl ContainerLogInfo {
         };
 
         // Build the log.
-        let deserializer = BytesDeserializer::new();
+        let deserializer = BytesDeserializer;
         let mut log = deserializer.parse_single(bytes_message, log_namespace);
 
         // Container ID
@@ -1121,7 +1129,7 @@ impl ContainerLogInfo {
 
         log_namespace.insert_vector_metadata(
             &mut log,
-            Some(log_schema().source_type_key()),
+            log_schema().source_type_key(),
             path!("source_type"),
             Bytes::from_static(DockerLogsConfig::NAME.as_bytes()),
         );
@@ -1171,7 +1179,10 @@ impl ContainerLogInfo {
                         LogNamespace::Legacy => {
                             partial_event_merge_state.merge_in_next_event(
                                 log,
-                                &[log_schema().message_key().to_string()],
+                                &[log_schema()
+                                    .message_key()
+                                    .expect("global log_schema.message_key to be valid path")
+                                    .to_string()],
                             );
                         }
                     }
@@ -1192,8 +1203,13 @@ impl ContainerLogInfo {
                     LogNamespace::Vector => {
                         partial_event_merge_state.merge_in_final_event(log, &["."])
                     }
-                    LogNamespace::Legacy => partial_event_merge_state
-                        .merge_in_final_event(log, &[log_schema().message_key().to_string()]),
+                    LogNamespace::Legacy => partial_event_merge_state.merge_in_final_event(
+                        log,
+                        &[log_schema()
+                            .message_key()
+                            .expect("global log_schema.message_key to be valid path")
+                            .to_string()],
+                    ),
                 },
                 None => log,
             }
@@ -1267,16 +1283,24 @@ fn line_agg_adapter(
 ) -> impl Stream<Item = LogEvent> {
     let line_agg_in = inner.map(move |mut log| {
         let message_value = match log_namespace {
-            LogNamespace::Vector => log.remove(".").expect("`.` must exist in the event"),
+            LogNamespace::Vector => log
+                .remove(event_path!())
+                .expect("`.` must exist in the event"),
             LogNamespace::Legacy => log
-                .remove(log_schema().message_key())
+                .remove(
+                    log_schema()
+                        .message_key_target_path()
+                        .expect("global log_schema.message_key to be valid path"),
+                )
                 .expect("`message` must exist in the event"),
         };
         let stream_value = match log_namespace {
             LogNamespace::Vector => log
                 .get(metadata_path!(DockerLogsConfig::NAME, STREAM))
                 .expect("`docker_logs.stream` must exist in the metadata"),
-            LogNamespace::Legacy => log.get(STREAM).expect("stream must exist in the event"),
+            LogNamespace::Legacy => log
+                .get(event_path!(STREAM))
+                .expect("stream must exist in the event"),
         };
 
         let stream = stream_value.coerce_to_bytes();
@@ -1284,10 +1308,15 @@ fn line_agg_adapter(
         (stream, message, log)
     });
     let line_agg_out = LineAgg::<_, Bytes, LogEvent>::new(line_agg_in, logic);
-    line_agg_out.map(move |(_, message, mut log)| {
+    line_agg_out.map(move |(_, message, mut log, _)| {
         match log_namespace {
-            LogNamespace::Vector => log.insert(".", message),
-            LogNamespace::Legacy => log.insert(log_schema().message_key(), message),
+            LogNamespace::Vector => log.insert(event_path!(), message),
+            LogNamespace::Legacy => log.insert(
+                log_schema()
+                    .message_key_target_path()
+                    .expect("global log_schema.message_key to be valid path"),
+                message,
+            ),
         };
         log
     })

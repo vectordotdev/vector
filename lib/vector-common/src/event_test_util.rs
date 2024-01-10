@@ -15,7 +15,7 @@ pub fn contains_name_once(pattern: &str) -> Result<(), String> {
     EVENTS_RECORDED.with(|events| {
         let mut n_events = 0;
         let mut names = String::new();
-        for event in events.borrow().iter() {
+        for event in &*events.borrow() {
             if event.ends_with(pattern) {
                 if n_events > 0 {
                     names.push_str(", ");
@@ -44,7 +44,7 @@ pub fn clear_recorded_events() {
 #[allow(clippy::print_stdout)]
 pub fn debug_print_events() {
     EVENTS_RECORDED.with(|events| {
-        for event in events.borrow().iter() {
+        for event in &*events.borrow() {
             println!("{event}");
         }
     });

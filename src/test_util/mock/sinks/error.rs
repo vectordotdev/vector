@@ -5,8 +5,8 @@ use std::{
 
 use async_trait::async_trait;
 use futures_util::{future::ok, FutureExt, Sink};
-use vector_config::configurable_component;
-use vector_core::{
+use vector_lib::configurable::configurable_component;
+use vector_lib::{
     config::{AcknowledgementsConfig, Input},
     event::Event,
     sink::VectorSink,
@@ -18,7 +18,7 @@ use crate::{
 };
 
 /// Configuration for the `test_error` sink.
-#[configurable_component(sink("test_error"))]
+#[configurable_component(sink("test_error", "Test (error)."))]
 #[derive(Clone, Debug, Default)]
 pub struct ErrorSinkConfig {
     /// Dummy field used for generating unique configurations to trigger reloads.
@@ -28,8 +28,10 @@ pub struct ErrorSinkConfig {
 impl_generate_config_from_default!(ErrorSinkConfig);
 
 #[async_trait]
+#[typetag::serde(name = "test_error")]
 impl SinkConfig for ErrorSinkConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+        #[allow(deprecated)]
         Ok((VectorSink::from_event_sink(ErrorSink), ok(()).boxed()))
     }
 

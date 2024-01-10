@@ -4,16 +4,10 @@
 //! running inside the cluster as a DaemonSet.
 
 #![deny(missing_docs)]
-
 use std::{path::PathBuf, time::Duration};
 
 use bytes::Bytes;
 use chrono::Utc;
-use codecs::{BytesDeserializer, BytesDeserializerConfig};
-use file_source::{
-    calculate_ignore_before, Checkpointer, FileServer, FileServerShutdown, FingerprintStrategy,
-    Fingerprinter, Line, ReadFrom, ReadFromConfig,
-};
 use futures::{future::FutureExt, stream::StreamExt};
 use futures_util::Stream;
 use k8s_openapi::api::core::v1::{Namespace, Node, Pod};
@@ -21,25 +15,26 @@ use k8s_paths_provider::K8sPathsProvider;
 use kube::{
     api::Api,
     config::{self, KubeConfigOptions},
-    runtime::{
-        reflector::{self},
-        watcher, WatchStreamExt,
-    },
+    runtime::{reflector, watcher, WatchStreamExt},
     Client, Config as ClientConfig,
 };
 use lifecycle::Lifecycle;
-use lookup::{lookup_v2::OptionalTargetPath, owned_value_path, path, OwnedTargetPath};
 use serde_with::serde_as;
-use vector_common::{
+use vector_lib::codecs::{BytesDeserializer, BytesDeserializerConfig};
+use vector_lib::configurable::configurable_component;
+use vector_lib::file_source::{
+    calculate_ignore_before, Checkpointer, FileServer, FileServerShutdown, FingerprintStrategy,
+    Fingerprinter, Line, ReadFrom, ReadFromConfig,
+};
+use vector_lib::lookup::{lookup_v2::OptionalTargetPath, owned_value_path, path, OwnedTargetPath};
+use vector_lib::{config::LegacyKey, config::LogNamespace, EstimatedJsonEncodedSizeOf};
+use vector_lib::{
     internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol},
     TimeZone,
 };
-use vector_config::configurable_component;
-use vector_core::{
-    config::LegacyKey, config::LogNamespace, transform::TaskTransform, EstimatedJsonEncodedSizeOf,
-};
 use vrl::value::{kind::Collection, Kind};
 
+use crate::sources::kubernetes_logs::partial_events_merger::merge_partial_events;
 use crate::{
     config::{
         log_schema, ComponentKey, DataType, GenerateConfig, GlobalOptions, SourceConfig,
@@ -47,7 +42,7 @@ use crate::{
     },
     event::Event,
     internal_events::{
-        FileSourceInternalEventsEmitter, KubernetesLifecycleError,
+        FileInternalMetricsConfig, FileSourceInternalEventsEmitter, KubernetesLifecycleError,
         KubernetesLogsEventAnnotationError, KubernetesLogsEventNamespaceAnnotationError,
         KubernetesLogsEventNodeAnnotationError, KubernetesLogsEventsReceived,
         KubernetesLogsPodInfo, StreamClosedError,
@@ -74,9 +69,6 @@ use self::namespace_metadata_annotator::NamespaceMetadataAnnotator;
 use self::node_metadata_annotator::NodeMetadataAnnotator;
 use self::parser::Parser;
 use self::pod_metadata_annotator::PodMetadataAnnotator;
-
-/// The key we use for `file` field.
-const FILE_KEY: &str = "file";
 
 /// The `self_node_name` value env var key.
 const SELF_NODE_NAME_ENV_KEY: &str = "VECTOR_SELF_NODE_NAME";
@@ -143,6 +135,7 @@ pub struct Config {
     /// By default, the global `data_dir` option is used. Make sure the running user has write
     /// permissions to this directory.
     #[configurable(metadata(docs::examples = "/var/local/lib/vector/"))]
+    #[configurable(metadata(docs::human_name = "Data Directory"))]
     data_dir: Option<PathBuf>,
 
     #[configurable(derived)]
@@ -167,15 +160,20 @@ pub struct Config {
     #[serde(default)]
     #[configurable(metadata(docs::type_unit = "seconds"))]
     #[configurable(metadata(docs::examples = 600))]
+    #[configurable(metadata(docs::human_name = "Ignore Files Older Than"))]
     ignore_older_secs: Option<u64>,
 
-    /// Max amount of bytes to read from a single file before switching over
-    /// to the next file.
+    /// Max amount of bytes to read from a single file before switching over to the next file.
+    /// **Note:** This does not apply when `oldest_first` is `true`.
     ///
     /// This allows distributing the reads more or less evenly across
     /// the files.
     #[configurable(metadata(docs::type_unit = "bytes"))]
     max_read_bytes: usize,
+
+    /// Instead of balancing read capacity fairly across all watched files, prioritize draining the oldest files before moving on to read data from more recent files.
+    #[serde(default = "default_oldest_first")]
+    pub oldest_first: bool,
 
     /// The maximum number of bytes a line can contain before being discarded.
     ///
@@ -198,6 +196,7 @@ pub struct Config {
     /// in the underlying file server, so setting it too low may introduce
     /// a significant overhead.
     #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
+    #[configurable(metadata(docs::human_name = "Glob Minimum Cooldown"))]
     glob_minimum_cooldown_ms: Duration,
 
     /// Overrides the name of the log field used to add the ingestion timestamp to each event.
@@ -229,12 +228,17 @@ pub struct Config {
     /// removed. If relevant metadata has been removed, the log is forwarded un-enriched and a
     /// warning is emitted.
     #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
+    #[configurable(metadata(docs::human_name = "Delay Deletion"))]
     delay_deletion_ms: Duration,
 
     /// The namespace to use for logs. This overrides the global setting.
     #[configurable(metadata(docs::hidden))]
     #[serde(default)]
     log_namespace: Option<bool>,
+
+    #[configurable(derived)]
+    #[serde(default)]
+    internal_metrics: FileInternalMetricsConfig,
 }
 
 const fn default_read_from() -> ReadFromConfig {
@@ -268,6 +272,7 @@ impl Default for Config {
             read_from: default_read_from(),
             ignore_older_secs: None,
             max_read_bytes: default_max_read_bytes(),
+            oldest_first: default_oldest_first(),
             max_line_bytes: default_max_line_bytes(),
             fingerprint_lines: default_fingerprint_lines(),
             glob_minimum_cooldown_ms: default_glob_minimum_cooldown_ms(),
@@ -277,6 +282,7 @@ impl Default for Config {
             use_apiserver_cache: false,
             delay_deletion_ms: default_delay_deletion_ms(),
             log_namespace: None,
+            internal_metrics: Default::default(),
         }
     }
 }
@@ -520,12 +526,14 @@ struct Source {
     read_from: ReadFrom,
     ignore_older_secs: Option<u64>,
     max_read_bytes: usize,
+    oldest_first: bool,
     max_line_bytes: usize,
     fingerprint_lines: usize,
     glob_minimum_cooldown: Duration,
     use_apiserver_cache: bool,
     ingestion_timestamp_field: Option<OwnedTargetPath>,
     delay_deletion: Duration,
+    include_file_metric_tag: bool,
 }
 
 impl Source {
@@ -597,12 +605,14 @@ impl Source {
             read_from: ReadFrom::from(config.read_from),
             ignore_older_secs: config.ignore_older_secs,
             max_read_bytes: config.max_read_bytes,
+            oldest_first: config.oldest_first,
             max_line_bytes: config.max_line_bytes,
             fingerprint_lines: config.fingerprint_lines,
             glob_minimum_cooldown,
             use_apiserver_cache: config.use_apiserver_cache,
             ingestion_timestamp_field,
             delay_deletion,
+            include_file_metric_tag: config.internal_metrics.include_file_tag,
         })
     }
 
@@ -628,12 +638,14 @@ impl Source {
             read_from,
             ignore_older_secs,
             max_read_bytes,
+            oldest_first,
             max_line_bytes,
             fingerprint_lines,
             glob_minimum_cooldown,
             use_apiserver_cache,
             ingestion_timestamp_field,
             delay_deletion,
+            include_file_metric_tag,
         } = self;
 
         let mut reflectors = Vec::new();
@@ -767,24 +779,18 @@ impl Source {
                 max_line_length: max_line_bytes,
                 ignore_not_found: true,
             },
-            // We'd like to consume rotated pod log files first to release our file handle and let
-            // the space be reclaimed
-            oldest_first: true,
+            oldest_first,
             // We do not remove the log files, `kubelet` is responsible for it.
             remove_after: None,
             // The standard emitter.
-            emitter: FileSourceInternalEventsEmitter,
+            emitter: FileSourceInternalEventsEmitter {
+                include_file_metric_tag,
+            },
             // A handle to the current tokio runtime
             handle: tokio::runtime::Handle::current(),
         };
 
         let (file_source_tx, file_source_rx) = futures::channel::mpsc::channel::<Vec<Line>>(2);
-
-        let mut parser = Parser::new(log_namespace);
-        let partial_events_merger = Box::new(partial_events_merger::build(
-            auto_partial_merge,
-            log_namespace,
-        ));
 
         let checkpoints = checkpointer.view();
         let events = file_source_rx.flat_map(futures::stream::iter);
@@ -799,6 +805,7 @@ impl Source {
                 ingestion_timestamp_field.as_ref(),
                 log_namespace,
             );
+
             let file_info = annotator.annotate(&mut event, &line.filename);
 
             emit!(KubernetesLogsEventsReceived {
@@ -833,14 +840,22 @@ impl Source {
             checkpoints.update(line.file_id, line.end_offset);
             event
         });
+
+        let mut parser = Parser::new(log_namespace);
         let events = events.flat_map(move |event| {
             let mut buf = OutputBuffer::with_capacity(1);
             parser.transform(&mut buf, event);
             futures::stream::iter(buf.into_events())
         });
+
         let (events_count, _) = events.size_hint();
 
-        let mut stream = partial_events_merger.transform(Box::pin(events));
+        let mut stream = if auto_partial_merge {
+            merge_partial_events(events, log_namespace).left_stream()
+        } else {
+            events.right_stream()
+        };
+
         let event_processing_loop = out.send_event_stream(&mut stream);
 
         let mut lifecycle = Lifecycle::new();
@@ -867,8 +882,7 @@ impl Source {
             .map(|result| {
                 match result {
                     Ok(Ok(())) => info!(message = "Event processing loop completed gracefully."),
-                    Ok(Err(error)) => emit!(StreamClosedError {
-                        error,
+                    Ok(Err(_)) => emit!(StreamClosedError {
                         count: events_count
                     }),
                     Err(error) => emit!(KubernetesLifecycleError {
@@ -897,7 +911,7 @@ fn create_event(
     ingestion_timestamp_field: Option<&OwnedTargetPath>,
     log_namespace: LogNamespace,
 ) -> Event {
-    let deserializer = BytesDeserializer::new();
+    let deserializer = BytesDeserializer;
     let mut log = deserializer.parse_single(line, log_namespace);
 
     log_namespace.insert_source_metadata(
@@ -910,7 +924,7 @@ fn create_event(
 
     log_namespace.insert_vector_metadata(
         &mut log,
-        Some(log_schema().source_type_key()),
+        log_schema().source_type_key(),
         path!("source_type"),
         Bytes::from(Config::NAME),
     );
@@ -944,6 +958,12 @@ fn default_path_exclusion() -> Vec<PathBuf> {
 
 const fn default_max_read_bytes() -> usize {
     2048
+}
+
+// We'd like to consume rotated pod log files first to release our file handle and let
+// the space be reclaimed
+const fn default_oldest_first() -> bool {
+    true
 }
 
 const fn default_max_line_bytes() -> usize {
@@ -1035,9 +1055,9 @@ fn prepare_label_selector(selector: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use lookup::{owned_value_path, OwnedTargetPath};
     use similar_asserts::assert_eq;
-    use vector_core::{config::LogNamespace, schema::Definition};
+    use vector_lib::lookup::{owned_value_path, OwnedTargetPath};
+    use vector_lib::{config::LogNamespace, schema::Definition};
     use vrl::value::{kind::Collection, Kind};
 
     use crate::config::SourceConfig;

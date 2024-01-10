@@ -3,7 +3,7 @@ mod tests;
 mod unit_test_components;
 
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{BTreeMap, HashMap, HashSet},
     sync::Arc,
 };
 
@@ -15,6 +15,11 @@ use tokio::sync::{
     Mutex,
 };
 use uuid::Uuid;
+use vrl::{
+    compiler::{state::RuntimeState, Context, TargetValue, TimeZone},
+    diagnostic::Formatter,
+    value,
+};
 
 pub use self::unit_test_components::{
     UnitTestSinkCheck, UnitTestSinkConfig, UnitTestSinkResult, UnitTestSourceConfig,
@@ -29,16 +34,13 @@ use crate::{
     },
     event::{Event, LogEvent, Value},
     signal,
-    topology::{
-        self,
-        builder::{self, Pieces},
-    },
+    topology::{builder::TopologyPieces, RunningTopology},
 };
 
 pub struct UnitTest {
     pub name: String,
     config: Config,
-    pieces: Pieces,
+    pieces: TopologyPieces,
     test_result_rxs: Vec<Receiver<UnitTestSinkResult>>,
 }
 
@@ -49,7 +51,7 @@ pub struct UnitTestResult {
 impl UnitTest {
     pub async fn run(self) -> UnitTestResult {
         let diff = config::ConfigDiff::initial(&self.config);
-        let (topology, _) = topology::start_validated(self.config, diff, self.pieces)
+        let (topology, _) = RunningTopology::start_validated(self.config, diff, self.pieces)
             .await
             .unwrap();
         topology.sources_finished().await;
@@ -72,24 +74,11 @@ impl UnitTest {
     }
 }
 
-/// Loads Log Schema from configurations and sets global schema.
-/// Once this is done, configurations can be correctly loaded using
-/// configured log schema defaults.
-/// If deny is set, will panic if schema has already been set.
-fn init_log_schema_from_paths(
-    config_paths: &[ConfigPath],
-    deny_if_set: bool,
-) -> Result<(), Vec<String>> {
-    let (builder, _) = config::loading::load_builder_from_paths(config_paths)?;
-    vector_core::config::init_log_schema(builder.global.log_schema, deny_if_set);
-    Ok(())
-}
-
 pub async fn build_unit_tests_main(
     paths: &[ConfigPath],
     signal_handler: &mut signal::SignalHandler,
 ) -> Result<Vec<UnitTest>, Vec<String>> {
-    init_log_schema_from_paths(paths, false)?;
+    config::init_log_schema(paths, false)?;
     let (mut secrets_backends_loader, _) = loading::load_secret_backends_from_paths(paths)?;
     let (config_builder, _) = if secrets_backends_loader.has_secrets_to_retrieve() {
         let resolved_secrets = secrets_backends_loader
@@ -435,7 +424,7 @@ async fn build_unit_test(
     }
     let config = config_builder.build()?;
     let diff = config::ConfigDiff::initial(&config);
-    let pieces = builder::build_pieces(&config, &diff, HashMap::new()).await?;
+    let pieces = TopologyPieces::build(&config, &diff, HashMap::new(), Default::default()).await?;
 
     Ok(UnitTest {
         name: test.name,
@@ -573,6 +562,31 @@ fn build_input_event(input: &TestInput) -> Result<Event, String> {
             Some(v) => Ok(Event::Log(LogEvent::from_str_legacy(v.clone()))),
             None => Err("input type 'raw' requires the field 'value'".to_string()),
         },
+        "vrl" => {
+            if let Some(source) = &input.source {
+                let fns = vrl::stdlib::all();
+                let result = vrl::compiler::compile(source, &fns)
+                    .map_err(|e| Formatter::new(source, e.clone()).to_string())?;
+
+                let mut target = TargetValue {
+                    value: value!({}),
+                    metadata: value::Value::Object(BTreeMap::new()),
+                    secrets: value::Secrets::default(),
+                };
+
+                let mut state = RuntimeState::default();
+                let timezone = TimeZone::default();
+                let mut ctx = Context::new(&mut target, &mut state, &timezone);
+
+                result
+                    .program
+                    .resolve(&mut ctx)
+                    .map(|v| Event::Log(LogEvent::from(v.clone())))
+                    .map_err(|e| e.to_string())
+            } else {
+                Err("input type 'vrl' requires the field 'source'".to_string())
+            }
+        }
         "log" => {
             if let Some(log_fields) = &input.log_fields {
                 let mut event = LogEvent::from_str_legacy("");
@@ -585,7 +599,9 @@ fn build_input_event(input: &TestInput) -> Result<Event, String> {
                             NotNan::new(*f).map_err(|_| "NaN value not supported".to_string())?,
                         ),
                     };
-                    event.insert(path.as_str(), value);
+                    event
+                        .parse_path_and_insert(path, value)
+                        .map_err(|e| e.to_string())?;
                 }
                 Ok(event.into())
             } else {

@@ -15,10 +15,9 @@ use serde_with::serde_as;
 use stream_cancel::{Trigger, Tripwire};
 use tokio::time::{sleep, Duration};
 use tower::Service;
-use vector_config::configurable_component;
+use vector_lib::{configurable::configurable_component, emit};
 
 use crate::{
-    emit,
     internal_events::{EndpointsActive, OpenGauge, OpenToken},
     sinks::util::retries::ExponentialBackoff,
 };
@@ -37,11 +36,13 @@ pub struct HealthConfig {
     #[serde(default = "default_retry_initial_backoff_secs")]
     #[configurable(metadata(docs::type_unit = "seconds"))]
     // not using Duration type because the value is only used as a u64.
+    #[configurable(metadata(docs::human_name = "Retry Initial Backoff"))]
     pub retry_initial_backoff_secs: u64,
 
     /// Maximum delay between attempts to reactivate endpoints once they become unhealthy.
     #[serde_as(as = "serde_with::DurationSeconds<u64>")]
     #[serde(default = "default_retry_max_duration_secs")]
+    #[configurable(metadata(docs::human_name = "Max Retry Duration"))]
     pub retry_max_duration_secs: Duration,
 }
 

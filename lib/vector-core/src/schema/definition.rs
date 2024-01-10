@@ -1,9 +1,10 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::config::{log_schema, LegacyKey, LogNamespace};
-use lookup::lookup_v2::{parse_value_path, TargetPath};
+use lookup::lookup_v2::TargetPath;
 use lookup::{owned_value_path, OwnedTargetPath, OwnedValuePath, PathPrefix};
 use vrl::value::{kind::Collection, Kind};
+
+use crate::config::{log_schema, LegacyKey, LogNamespace};
 
 /// The definition of a schema.
 ///
@@ -144,9 +145,7 @@ impl Definition {
     #[must_use]
     pub fn with_standard_vector_source_metadata(self) -> Self {
         self.with_vector_metadata(
-            parse_value_path(log_schema().source_type_key())
-                .ok()
-                .as_ref(),
+            log_schema().source_type_key(),
             &owned_value_path!("source_type"),
             Kind::bytes(),
             None,
@@ -455,6 +454,25 @@ impl Definition {
         self.metadata_kind = self.metadata_kind.union(other.metadata_kind);
         self.log_namespaces.append(&mut other.log_namespaces);
         self
+    }
+
+    /// If the schema definition depends on the `LogNamespace`, this combines the individual
+    /// definitions for each `LogNamespace`.
+    pub fn combine_log_namespaces(
+        log_namespaces: &BTreeSet<LogNamespace>,
+        legacy: Self,
+        vector: Self,
+    ) -> Self {
+        let mut combined =
+            Definition::new_with_default_metadata(Kind::never(), log_namespaces.clone());
+
+        if log_namespaces.contains(&LogNamespace::Legacy) {
+            combined = combined.merge(legacy);
+        }
+        if log_namespaces.contains(&LogNamespace::Vector) {
+            combined = combined.merge(vector);
+        }
+        combined
     }
 
     /// Returns an `OwnedTargetPath` into an event, based on the provided `meaning`, if the meaning exists.

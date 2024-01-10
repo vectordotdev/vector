@@ -2,12 +2,12 @@
 use std::net::SocketAddr;
 
 use chrono::Utc;
-use codecs::NativeDeserializerConfig;
 use futures::TryFutureExt;
 use tonic::{Request, Response, Status};
-use vector_common::internal_event::{CountByteSize, InternalEventHandle as _};
-use vector_config::configurable_component;
-use vector_core::{
+use vector_lib::codecs::NativeDeserializerConfig;
+use vector_lib::configurable::configurable_component;
+use vector_lib::internal_event::{CountByteSize, InternalEventHandle as _};
+use vector_lib::{
     config::LogNamespace,
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event},
     EstimatedJsonEncodedSizeOf,
@@ -26,7 +26,7 @@ use crate::{
     SourceSender,
 };
 
-/// Marker type for the version two of the configuration for the `vector` source.
+/// Marker type for version two of the configuration for the `vector` source.
 #[configurable_component]
 #[derive(Clone, Debug)]
 enum VectorConfigVersion {
@@ -78,7 +78,7 @@ impl proto::Service for Service {
             .send_batch(events)
             .map_err(|error| {
                 let message = error.to_string();
-                emit!(StreamClosedError { error, count });
+                emit!(StreamClosedError { count });
                 Status::unavailable(message)
             })
             .and_then(|_| handle_batch_status(receiver))
@@ -181,7 +181,9 @@ impl SourceConfig for VectorConfig {
             acknowledgements,
             log_namespace,
         })
-        .accept_compressed(tonic::codec::CompressionEncoding::Gzip);
+        .accept_compressed(tonic::codec::CompressionEncoding::Gzip)
+        // Tonic added a default of 4MB in 0.9. This replaces the old behavior.
+        .max_decoding_message_size(usize::MAX);
 
         let source =
             run_grpc_server(self.address, tls_settings, service, cx.shutdown).map_err(|error| {
@@ -212,8 +214,8 @@ impl SourceConfig for VectorConfig {
 
 #[cfg(test)]
 mod test {
-    use lookup::owned_value_path;
-    use vector_core::{config::LogNamespace, schema::Definition};
+    use vector_lib::lookup::owned_value_path;
+    use vector_lib::{config::LogNamespace, schema::Definition};
     use vrl::value::{kind::Collection, Kind};
 
     use crate::config::SourceConfig;
@@ -273,19 +275,14 @@ mod test {
 #[cfg(feature = "sinks-vector")]
 #[cfg(test)]
 mod tests {
-    use vector_common::assert_event_data_eq;
-    use vector_core::config::log_schema;
-
     use super::*;
     use crate::{
         config::{SinkConfig as _, SinkContext},
         sinks::vector::VectorConfig as SinkConfig,
-        test_util::{
-            self,
-            components::{assert_source_compliance, SOURCE_TAGS},
-        },
-        SourceSender,
+        test_util, SourceSender,
     };
+    use vector_lib::assert_event_data_eq;
+    use vector_lib::config::log_schema;
 
     async fn run_test(vector_source_config_str: &str, addr: SocketAddr) {
         let config = format!(r#"address = "{}""#, addr);
@@ -303,16 +300,17 @@ mod tests {
         // but the sink side already does such a test and this is good
         // to ensure interoperability.
         let sink: SinkConfig = toml::from_str(vector_source_config_str).unwrap();
-        let cx = SinkContext::new_test();
+        let cx = SinkContext::default();
         let (sink, _) = sink.build(cx).await.unwrap();
 
         let (mut events, stream) = test_util::random_events_with_stream(100, 100, None);
         sink.run(stream).await.unwrap();
 
         for event in &mut events {
-            event
-                .as_mut_log()
-                .insert(log_schema().source_type_key(), "vector");
+            event.as_mut_log().insert(
+                log_schema().source_type_key_target_path().unwrap(),
+                "vector",
+            );
         }
 
         let output = test_util::collect_ready(rx).await;
@@ -323,25 +321,19 @@ mod tests {
     async fn receive_message() {
         let addr = test_util::next_addr();
 
-        assert_source_compliance(&SOURCE_TAGS, async {
-            let config = format!(r#"address = "{}""#, addr);
-            run_test(&config, addr).await;
-        })
-        .await;
+        let config = format!(r#"address = "{}""#, addr);
+        run_test(&config, addr).await;
     }
 
     #[tokio::test]
     async fn receive_compressed_message() {
         let addr = test_util::next_addr();
 
-        assert_source_compliance(&SOURCE_TAGS, async {
-            let config = format!(
-                r#"address = "{}"
+        let config = format!(
+            r#"address = "{}"
             compression=true"#,
-                addr
-            );
-            run_test(&config, addr).await;
-        })
-        .await;
+            addr
+        );
+        run_test(&config, addr).await;
     }
 }

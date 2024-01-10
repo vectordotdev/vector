@@ -9,7 +9,7 @@ components: transforms: sample: {
 
 	classes: {
 		commonly_used: false
-		development:   "beta"
+		development:   "stable"
 		egress_method: "stream"
 		stateful:      false
 	}
@@ -30,9 +30,5 @@ components: transforms: sample: {
 		logs:    true
 		metrics: null
 		traces:  true
-	}
-
-	telemetry: metrics: {
-		events_discarded_total: components.sources.internal_metrics.output.metrics.events_discarded_total
 	}
 }

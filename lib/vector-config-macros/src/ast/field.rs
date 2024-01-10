@@ -2,10 +2,11 @@ use darling::{
     util::{Flag, Override, SpannedValue},
     FromAttributes,
 };
-use proc_macro2::Span;
+use proc_macro2::{Span, TokenStream};
+use quote::ToTokens;
 use serde_derive_internals::ast as serde_ast;
-use syn::{parse_quote, spanned::Spanned, ExprPath, Ident};
-use vector_config_common::validation::Validation;
+use syn::{parse_quote, ExprPath, Ident};
+use vector_config_common::{configurable_package_name_hack, validation::Validation};
 
 use super::{
     util::{
@@ -32,7 +33,7 @@ impl<'a> Field<'a> {
     ) -> darling::Result<Field<'a>> {
         let original = serde.original;
 
-        let name = serde.attrs.name().deserialize_name();
+        let name = serde.attrs.name().deserialize_name().to_string();
         let default_value = get_serde_default_value(&serde.ty, serde.attrs.default());
 
         Attributes::from_attributes(&original.attrs)
@@ -174,7 +175,7 @@ impl<'a> Field<'a> {
     /// variants, to simply document themselves at the container/variant level and avoid needing to
     /// document that inner field which itself needs no further title/description.
     pub fn transparent(&self) -> bool {
-        self.attrs.transparent.is_some()
+        self.attrs.transparent.is_present()
     }
 
     /// Whether or not the field is deprecated.
@@ -239,12 +240,9 @@ impl<'a> Field<'a> {
     }
 }
 
-impl<'a> Spanned for Field<'a> {
-    fn span(&self) -> proc_macro2::Span {
-        match self.original.ident.as_ref() {
-            Some(ident) => ident.span(),
-            None => self.original.ty.span(),
-        }
+impl<'a> ToTokens for Field<'a> {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        self.original.to_tokens(tokens)
     }
 }
 
@@ -300,12 +298,12 @@ impl Attributes {
             // to throw an error if they are. As we're going to forcefully mark the field as
             // transparent, there's no reason to allow setting derived/transparent manually, as it
             // only leads to boilerplate and potential confusion.
-            if self.transparent.is_some() {
-                return Err(err_field_implicit_transparent(&self.transparent));
+            if self.transparent.is_present() {
+                return Err(err_field_implicit_transparent(&self.transparent.span()));
             }
 
-            if self.derived.is_some() {
-                return Err(err_field_implicit_transparent(&self.derived));
+            if self.derived.is_present() {
+                return Err(err_field_implicit_transparent(&self.derived.span()));
             }
 
             self.transparent = SpannedValue::new(Flag::present(), Span::call_site());
@@ -339,8 +337,8 @@ impl Attributes {
         // like a field that is flattened or not visible, it makes no sense to require a description or title for fields
         // in a virtual newtype.
         if self.description.is_none()
-            && !self.derived.is_some()
-            && !self.transparent.is_some()
+            && !self.derived.is_present()
+            && !self.transparent.is_present()
             && self.visible
             && !self.flatten
             && !is_virtual_newtype
@@ -354,7 +352,8 @@ impl Attributes {
             // serialize wrapper, since we know we'll have to do that in a few different places
             // during codegen, so it's cleaner to do it here.
             let field_ty = field.ty;
-            parse_quote! { ::vector_config::ser::Delegated<#field_ty, #virtual_ty> }
+            let vector_config = configurable_package_name_hack();
+            parse_quote! { #vector_config::ser::Delegated<#field_ty, #virtual_ty> }
         });
 
         Ok(self)

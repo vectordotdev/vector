@@ -1,21 +1,24 @@
 use std::collections::{BTreeMap, HashMap};
 
 use aws_sdk_s3::{
-    error::PutObjectError,
-    model::{ObjectCannedAcl, ServerSideEncryption, StorageClass},
+    operation::put_object::PutObjectError,
+    types::{ObjectCannedAcl, ServerSideEncryption, StorageClass},
     Client as S3Client,
 };
-use aws_smithy_client::SdkError;
+use aws_smithy_runtime_api::{
+    client::{orchestrator::HttpResponse, result::SdkError},
+    http::StatusCode,
+};
 use futures::FutureExt;
-use http::StatusCode;
 use snafu::Snafu;
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 
 use super::service::{S3Response, S3Service};
 use crate::{
     aws::{create_client, is_retriable_error, AwsAuthentication, RegionOrEndpoint},
     common::s3::S3ClientBuilder,
     config::ProxyConfig,
+    http::status,
     sinks::{util::retries::RetryLogic, Healthcheck},
     tls::TlsConfig,
 };
@@ -125,14 +128,11 @@ pub struct S3Options {
 }
 
 fn example_tags() -> HashMap<String, String> {
-    HashMap::<_, _>::from_iter(
-        [
-            ("Project".to_string(), "Blue".to_string()),
-            ("Classification".to_string(), "confidential".to_string()),
-            ("PHI".to_string(), "True".to_string()),
-        ]
-        .into_iter(),
-    )
+    HashMap::<_, _>::from_iter([
+        ("Project".to_string(), "Blue".to_string()),
+        ("Classification".to_string(), "confidential".to_string()),
+        ("PHI".to_string(), "True".to_string()),
+    ])
 }
 
 /// S3 storage classes.
@@ -299,9 +299,7 @@ impl From<S3CannedAcl> for ObjectCannedAcl {
             S3CannedAcl::AuthenticatedRead => ObjectCannedAcl::AuthenticatedRead,
             S3CannedAcl::BucketOwnerRead => ObjectCannedAcl::BucketOwnerRead,
             S3CannedAcl::BucketOwnerFullControl => ObjectCannedAcl::BucketOwnerFullControl,
-            S3CannedAcl::LogDeliveryWrite => {
-                ObjectCannedAcl::Unknown("log-delivery-write".to_string())
-            }
+            S3CannedAcl::LogDeliveryWrite => ObjectCannedAcl::from("log-delivery-write"),
         }
     }
 }
@@ -310,7 +308,7 @@ impl From<S3CannedAcl> for ObjectCannedAcl {
 pub struct S3RetryLogic;
 
 impl RetryLogic for S3RetryLogic {
-    type Error = SdkError<PutObjectError>;
+    type Error = SdkError<PutObjectError, HttpResponse>;
     type Response = S3Response;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
@@ -340,11 +338,14 @@ pub fn build_healthcheck(bucket: String, client: S3Client) -> crate::Result<Heal
         match req {
             Ok(_) => Ok(()),
             Err(error) => Err(match error {
-                SdkError::ServiceError { err: _, raw } => match raw.http().status() {
-                    StatusCode::FORBIDDEN => HealthcheckError::InvalidCredentials.into(),
-                    StatusCode::NOT_FOUND => HealthcheckError::UnknownBucket { bucket }.into(),
-                    status => HealthcheckError::UnknownStatus { status }.into(),
-                },
+                SdkError::ServiceError(inner) => {
+                    let status = inner.into_raw().status();
+                    match status.as_u16() {
+                        status::FORBIDDEN => HealthcheckError::InvalidCredentials.into(),
+                        status::NOT_FOUND => HealthcheckError::UnknownBucket { bucket }.into(),
+                        _ => HealthcheckError::UnknownStatus { status }.into(),
+                    }
+                }
                 error => error.into(),
             }),
         }
@@ -359,10 +360,10 @@ pub async fn create_service(
     proxy: &ProxyConfig,
     tls_options: &Option<TlsConfig>,
 ) -> crate::Result<S3Service> {
-    let endpoint = region.endpoint()?;
+    let endpoint = region.endpoint();
     let region = region.region();
     let client =
-        create_client::<S3ClientBuilder>(auth, region.clone(), endpoint, proxy, tls_options, true)
+        create_client::<S3ClientBuilder>(auth, region.clone(), endpoint, proxy, tls_options)
             .await?;
     Ok(S3Service::new(client))
 }

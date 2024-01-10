@@ -57,11 +57,6 @@ name: Check Spelling
 #     ... otherwise adjust the `with:` as you wish
 
 on:
-  push:
-    branches:
-    - "**"
-    tags-ignore:
-    - "**"
   pull_request_target:
     branches:
     - "**"

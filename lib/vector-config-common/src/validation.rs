@@ -1,9 +1,10 @@
 use darling::FromMeta;
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
-use syn::{Lit, Meta};
+use syn::{Expr, Lit, Meta};
 
 use crate::{
+    configurable_package_name_hack,
     num::{ERR_NUMERIC_OUT_OF_RANGE, NUMERIC_ENFORCED_LOWER_BOUND, NUMERIC_ENFORCED_UPPER_BOUND},
     schema::{InstanceType, SchemaObject},
 };
@@ -138,18 +139,19 @@ impl Format {
 
 impl ToTokens for Format {
     fn to_tokens(&self, tokens: &mut TokenStream) {
+        let vector_config = configurable_package_name_hack();
         let format_tokens = match self {
-            Format::Date => quote! { ::vector_config::validation::Format::Date },
-            Format::Time => quote! { ::vector_config::validation::Format::Time },
-            Format::DateTime => quote! { ::vector_config::validation::Format::DateTime },
-            Format::Duration => quote! { ::vector_config::validation::Format::Duration },
-            Format::Email => quote! { ::vector_config::validation::Format::Email },
-            Format::Hostname => quote! { ::vector_config::validation::Format::Hostname },
-            Format::Uri => quote! { ::vector_config::validation::Format::Uri },
-            Format::IPv4 => quote! { ::vector_config::validation::Format::IPv4 },
-            Format::IPv6 => quote! { ::vector_config::validation::Format::IPv6 },
-            Format::Uuid => quote! { ::vector_config::validation::Format::Uuid },
-            Format::Regex => quote! { ::vector_config::validation::Format::Regex },
+            Format::Date => quote! { #vector_config::validation::Format::Date },
+            Format::Time => quote! { #vector_config::validation::Format::Time },
+            Format::DateTime => quote! { #vector_config::validation::Format::DateTime },
+            Format::Duration => quote! { #vector_config::validation::Format::Duration },
+            Format::Email => quote! { #vector_config::validation::Format::Email },
+            Format::Hostname => quote! { #vector_config::validation::Format::Hostname },
+            Format::Uri => quote! { #vector_config::validation::Format::Uri },
+            Format::IPv4 => quote! { #vector_config::validation::Format::IPv4 },
+            Format::IPv6 => quote! { #vector_config::validation::Format::IPv6 },
+            Format::Uuid => quote! { #vector_config::validation::Format::Uuid },
+            Format::Regex => quote! { #vector_config::validation::Format::Regex },
         };
 
         tokens.extend(format_tokens);
@@ -292,24 +294,25 @@ impl Validation {
 
 impl ToTokens for Validation {
     fn to_tokens(&self, tokens: &mut TokenStream) {
+        let vector_config = configurable_package_name_hack();
         let validation_tokens = match self {
             Validation::KnownFormat(format) => {
-                quote! { ::vector_config::validation::Validation::KnownFormat(#format) }
+                quote! { #vector_config::validation::Validation::KnownFormat(#format) }
             }
             Validation::Length { minimum, maximum } => {
                 let min_tokens = option_as_token(*minimum);
                 let max_tokens = option_as_token(*maximum);
 
-                quote! { ::vector_config::validation::Validation::Length { minimum: #min_tokens, maximum: #max_tokens } }
+                quote! { #vector_config::validation::Validation::Length { minimum: #min_tokens, maximum: #max_tokens } }
             }
             Validation::Range { minimum, maximum } => {
                 let min_tokens = option_as_token(*minimum);
                 let max_tokens = option_as_token(*maximum);
 
-                quote! { ::vector_config::validation::Validation::Range { minimum: #min_tokens, maximum: #max_tokens } }
+                quote! { #vector_config::validation::Validation::Range { minimum: #min_tokens, maximum: #max_tokens } }
             }
             Validation::Pattern(pattern) => {
-                quote! { ::vector_config::validation::Validation::Pattern(#pattern.to_string()) }
+                quote! { #vector_config::validation::Validation::Pattern(#pattern.to_string()) }
             }
         };
 
@@ -336,17 +339,19 @@ fn maybe_float_or_int(meta: &Meta) -> darling::Result<Option<f64>> {
     // First make sure we can even get a valid f64 from this meta item.
     let result = match meta {
         Meta::Path(_) => Err(darling::Error::unexpected_type("path")),
-        Meta::List(_) => Err(darling::Error::unexpected_type("path")),
-        Meta::NameValue(nv) => match &nv.lit {
-            Lit::Str(s) => {
-                let s = s.value();
-                s.as_str()
-                    .parse()
-                    .map_err(|_| darling::Error::unknown_value(s.as_str()))
-            }
-            Lit::Int(i) => i.base10_parse::<f64>().map_err(Into::into),
-            Lit::Float(f) => f.base10_parse::<f64>().map_err(Into::into),
-            lit => Err(darling::Error::unexpected_lit_type(lit)),
+        Meta::List(_) => Err(darling::Error::unexpected_type("list")),
+        Meta::NameValue(nv) => match &nv.value {
+            Expr::Lit(expr) => match &expr.lit {
+                Lit::Str(s) => {
+                    let s = s.value();
+                    s.parse()
+                        .map_err(|_| darling::Error::unknown_value(s.as_str()))
+                }
+                Lit::Int(i) => i.base10_parse::<f64>().map_err(Into::into),
+                Lit::Float(f) => f.base10_parse::<f64>().map_err(Into::into),
+                lit => Err(darling::Error::unexpected_lit_type(lit)),
+            },
+            expr => Err(darling::Error::unexpected_expr_type(expr)),
         },
     };
 

@@ -5,17 +5,18 @@ use bytes::Bytes;
 use futures::{Stream, StreamExt};
 use http::{uri::PathAndQuery, Request, StatusCode, Uri};
 use hyper::{body::to_bytes as body_to_bytes, Body};
-use lookup::lookup_v2::{OptionalTargetPath, OwnedSegment};
-use lookup::owned_value_path;
-use lookup::OwnedTargetPath;
 use once_cell::sync::Lazy;
 use serde::Deserialize;
 use serde_with::serde_as;
 use snafu::ResultExt as _;
 use tokio::time::{sleep, Duration, Instant};
 use tracing::Instrument;
-use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
+use vector_lib::config::LogNamespace;
+use vector_lib::configurable::configurable_component;
+use vector_lib::lookup::lookup_v2::{OptionalTargetPath, OwnedSegment};
+use vector_lib::lookup::owned_value_path;
+use vector_lib::lookup::OwnedTargetPath;
+use vrl::value::kind::Collection;
 use vrl::value::Kind;
 
 use crate::config::OutputId;
@@ -246,7 +247,7 @@ impl TransformConfig for Ec2Metadata {
 
     fn outputs(
         &self,
-        _: enrichment::TableRegistry,
+        _: vector_lib::enrichment::TableRegistry,
         input_definitions: &[(OutputId, schema::Definition)],
         _: LogNamespace,
     ) -> Vec<TransformOutput> {
@@ -273,6 +274,11 @@ impl TransformConfig for Ec2Metadata {
             .iter()
             .map(|(output, definition)| {
                 let mut schema_definition = definition.clone();
+
+                // If the event is not an object, it will be converted to an object in this transform
+                if !schema_definition.event_kind().contains_object() {
+                    *schema_definition.event_kind_mut() = Kind::object(Collection::empty());
+                }
 
                 for path in paths {
                     schema_definition =
@@ -708,13 +714,45 @@ enum Ec2MetadataError {
     },
 }
 
+#[cfg(test)]
+mod test {
+    use crate::config::schema::Definition;
+    use crate::config::{LogNamespace, OutputId, TransformConfig};
+    use crate::transforms::aws_ec2_metadata::Ec2Metadata;
+    use vector_lib::enrichment::TableRegistry;
+    use vector_lib::lookup::OwnedTargetPath;
+    use vrl::owned_value_path;
+    use vrl::value::Kind;
+
+    #[tokio::test]
+    async fn schema_def_with_string_input() {
+        let transform_config = Ec2Metadata {
+            namespace: Some(OwnedTargetPath::event(owned_value_path!("ec2", "metadata")).into()),
+            ..Default::default()
+        };
+
+        let input_definition =
+            Definition::new(Kind::bytes(), Kind::any_object(), [LogNamespace::Vector]);
+
+        let mut outputs = transform_config.outputs(
+            TableRegistry::default(),
+            &[(OutputId::dummy(), input_definition)],
+            LogNamespace::Vector,
+        );
+        assert_eq!(outputs.len(), 1);
+        let output = outputs.pop().unwrap();
+        let actual_schema_def = output.schema_definitions(true)[&OutputId::dummy()].clone();
+        assert!(actual_schema_def.event_kind().is_object());
+    }
+}
+
 #[cfg(feature = "aws-ec2-metadata-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
-    use lookup::lookup_v2::{OwnedSegment, OwnedValuePath};
-    use lookup::{event_path, PathPrefix};
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
+    use vector_lib::lookup::lookup_v2::{OwnedSegment, OwnedValuePath};
+    use vector_lib::lookup::{event_path, PathPrefix};
 
     use super::*;
     use crate::{
@@ -722,8 +760,8 @@ mod integration_tests {
         test_util::{components::assert_transform_compliance, next_addr},
         transforms::test::create_topology,
     };
-    use std::collections::BTreeMap;
-    use vrl::value::Value;
+    use vector_lib::assert_event_data_eq;
+    use vrl::value::{ObjectMap, Value};
     use warp::Filter;
 
     fn ec2_metadata_address() -> String {
@@ -851,7 +889,7 @@ mod integration_tests {
             tx.send(log.into()).await.unwrap();
 
             let event = out.recv().await.unwrap();
-            assert_eq!(event.into_log(), expected_log);
+            assert_event_data_eq!(event.into_log(), expected_log);
 
             drop(tx);
             topology.stop().await;
@@ -952,7 +990,7 @@ mod integration_tests {
             tx.send(metric.into()).await.unwrap();
 
             let event = out.recv().await.unwrap();
-            assert_eq!(event.into_metric(), expected_metric);
+            assert_event_data_eq!(event.into_metric(), expected_metric);
 
             drop(tx);
             topology.stop().await;
@@ -988,16 +1026,16 @@ mod integration_tests {
             expected_log.insert(format!("\"{}\"", REGION_KEY).as_str(), "us-east-1");
             expected_log.insert(
                 format!("\"{}\"", TAGS_KEY).as_str(),
-                BTreeMap::from([
-                    ("Name".to_string(), Value::from("test-instance")),
-                    ("Test".to_string(), Value::from("test-tag")),
+                ObjectMap::from([
+                    ("Name".into(), Value::from("test-instance")),
+                    ("Test".into(), Value::from("test-tag")),
                 ]),
             );
 
             tx.send(log.into()).await.unwrap();
 
             let event = out.recv().await.unwrap();
-            assert_eq!(event.into_log(), expected_log);
+            assert_event_data_eq!(event.into_log(), expected_log);
 
             drop(tx);
             topology.stop().await;
@@ -1041,7 +1079,7 @@ mod integration_tests {
             tx.send(metric.into()).await.unwrap();
 
             let event = out.recv().await.unwrap();
-            assert_eq!(event.into_metric(), expected_metric);
+            assert_event_data_eq!(event.into_metric(), expected_metric);
 
             drop(tx);
             topology.stop().await;

@@ -11,7 +11,7 @@ services:
     image: docker.io/sigoden/dufs:${CONFIG_VERSION}
     command:
     - -a
-    - /@user:pass
+    - "user:pass@/"
     - --auth-method
     - basic
     - /data

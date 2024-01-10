@@ -1,6 +1,6 @@
 use bytes::Bytes;
-use vector_common::request_metadata::RequestMetadata;
-use vector_core::ByteSizeOf;
+use vector_lib::EstimatedJsonEncodedSizeOf;
+use vector_lib::{json_size::JsonSize, request_metadata::RequestMetadata};
 
 use crate::{
     event::{EventFinalizers, Finalizable},
@@ -25,7 +25,7 @@ pub struct ElasticsearchRequestBuilder {
 pub struct Metadata {
     finalizers: EventFinalizers,
     batch_size: usize,
-    events_byte_size: usize,
+    events_byte_size: JsonSize,
 }
 
 impl RequestBuilder<Vec<ProcessedEvent>> for ElasticsearchRequestBuilder {
@@ -50,9 +50,9 @@ impl RequestBuilder<Vec<ProcessedEvent>> for ElasticsearchRequestBuilder {
     ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
         let events_byte_size = events
             .iter()
-            .map(|x| x.log.size_of())
+            .map(|x| x.log.estimated_json_encoded_size_of())
             .reduce(|a, b| a + b)
-            .unwrap_or(0);
+            .unwrap_or(JsonSize::zero());
 
         let metadata_builder = RequestMetadataBuilder::from_events(&events);
 

@@ -20,7 +20,16 @@ where
     for<'a> T: Deserialize<'a> + SinkConfig,
 {
     let sink_config: T = toml::from_str(config)?;
-    let cx = SinkContext::new_test();
+    let cx = SinkContext::default();
+
+    Ok((sink_config, cx))
+}
+
+pub fn load_sink_with_context<T>(config: &str, cx: SinkContext) -> crate::Result<(T, SinkContext)>
+where
+    for<'a> T: Deserialize<'a> + SinkConfig,
+{
+    let sink_config: T = toml::from_str(config)?;
 
     Ok((sink_config, cx))
 }

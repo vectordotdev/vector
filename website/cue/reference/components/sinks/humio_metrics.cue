@@ -7,7 +7,6 @@ components: sinks: humio_metrics: {
 	features:      sinks._humio.features
 	support:       sinks._humio.support
 	configuration: base.components.sinks.humio_metrics.configuration
-	telemetry:     sinks._humio.telemetry
 
 	input: {
 		logs: false

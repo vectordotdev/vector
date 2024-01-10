@@ -94,7 +94,7 @@ components: sources: [Name=string]: {
 								type: string: {
 									default: features.codecs.default_framing
 									enum: {
-										bytes:               "Byte frames are passed through as-is according to the underlying I/O boundaries (e.g. split between messages or stream segments)."
+										bytes:               "Byte frames are passed through as-is according to the underlying I/O boundaries (e.g. split between messages, payloads, or streams)."
 										character_delimited: "Byte frames which are delimited by a chosen character."
 										length_delimited:    "Byte frames which are prefixed by an unsigned big-endian 32-bit integer indicating the length."
 										newline_delimited:   "Byte frames which are delimited by a newline character."
@@ -176,6 +176,11 @@ components: sources: [Name=string]: {
 								type: string: {
 									default: "bytes"
 									enum: {
+										avro: """
+											Decodes the raw bytes as an [Apache Avro][apache_avro] record.
+
+											[apache_avro]: https://avro.apache.org/
+											"""
 										bytes: "Uses the raw bytes as-is."
 										json: """
 											Decodes the raw bytes as [JSON][json].
@@ -342,7 +347,7 @@ components: sources: [Name=string]: {
 								required:    false
 								type: string: {
 									default: null
-									examples: [ "CN=localhost,OU=Vector,O=Datadog,L=New York,ST=New York,C=US"]
+									examples: ["CN=localhost,OU=Vector,O=Datadog,L=New York,ST=New York,C=US"]
 								}
 							}
 						}
@@ -356,9 +361,11 @@ components: sources: [Name=string]: {
 		_tls: {
 			title: "Transport Layer Security (TLS)"
 			body:  """
-				  Vector uses [OpenSSL](\(urls.openssl)) for TLS protocols. You can
-				  adjust TLS behavior via the `tls.*` options.
-				  """
+				Vector uses [OpenSSL](\(urls.openssl)) for TLS protocols due to OpenSSL's maturity. You can
+				enable and adjust TLS behavior via the `tls.*` options and/or via an
+				[OpenSSL configuration file](\(urls.openssl_conf)). The file location defaults to
+				`/usr/local/ssl/openssl.cnf` or can be specified with the `OPENSSL_CONF` environment variable.
+				"""
 		}
 
 		if features.collect != _|_ {
@@ -401,9 +408,14 @@ components: sources: [Name=string]: {
 	}
 
 	telemetry: metrics: {
-		events_out_total:                 components.sources.internal_metrics.output.metrics.events_out_total
-		component_sent_events_total:      components.sources.internal_metrics.output.metrics.component_sent_events_total
-		component_sent_event_bytes_total: components.sources.internal_metrics.output.metrics.component_sent_event_bytes_total
-		source_lag_time_seconds:          components.sources.internal_metrics.output.metrics.source_lag_time_seconds
+		component_discarded_events_total:     components.sources.internal_metrics.output.metrics.component_discarded_events_total
+		component_errors_total:               components.sources.internal_metrics.output.metrics.component_errors_total
+		component_received_bytes_total:       components.sources.internal_metrics.output.metrics.component_received_bytes_total
+		component_received_events_count:      components.sources.internal_metrics.output.metrics.component_received_events_count
+		component_received_events_total:      components.sources.internal_metrics.output.metrics.component_received_events_total
+		component_received_event_bytes_total: components.sources.internal_metrics.output.metrics.component_received_event_bytes_total
+		component_sent_events_total:          components.sources.internal_metrics.output.metrics.component_sent_events_total
+		component_sent_event_bytes_total:     components.sources.internal_metrics.output.metrics.component_sent_event_bytes_total
+		source_lag_time_seconds:              components.sources.internal_metrics.output.metrics.source_lag_time_seconds
 	}
 }

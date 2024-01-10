@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use std::{collections::HashMap, fmt, num::NonZeroUsize};
 
 use bitmask_enum::bitmask;
@@ -8,6 +9,7 @@ mod global_options;
 mod log_schema;
 pub mod output_id;
 pub mod proxy;
+mod telemetry;
 
 use crate::event::LogEvent;
 pub use global_options::GlobalOptions;
@@ -15,6 +17,7 @@ pub use log_schema::{init_log_schema, log_schema, LogSchema};
 use lookup::{lookup_v2::ValuePath, path, PathPrefix};
 pub use output_id::OutputId;
 use serde::{Deserialize, Serialize};
+pub use telemetry::{init_telemetry, telemetry, Tags, Telemetry};
 pub use vector_common::config::ComponentKey;
 use vector_config::configurable_component;
 use vrl::value::Value;
@@ -109,7 +112,7 @@ pub struct SourceOutput {
     // NOTE: schema definitions are only implemented/supported for log-type events. There is no
     // inherent blocker to support other types as well, but it'll require additional work to add
     // the relevant schemas, and store them separately in this type.
-    pub schema_definition: Option<schema::Definition>,
+    pub schema_definition: Option<Arc<schema::Definition>>,
 }
 
 impl SourceOutput {
@@ -127,7 +130,7 @@ impl SourceOutput {
         Self {
             port: None,
             ty,
-            schema_definition: Some(schema_definition),
+            schema_definition: Some(Arc::new(schema_definition)),
         }
     }
 
@@ -166,17 +169,15 @@ impl SourceOutput {
     /// Schema enabled is set in the users configuration.
     #[must_use]
     pub fn schema_definition(&self, schema_enabled: bool) -> Option<schema::Definition> {
+        use std::ops::Deref;
+
         self.schema_definition.as_ref().map(|definition| {
             if schema_enabled {
-                definition.clone()
+                definition.deref().clone()
             } else {
                 let mut new_definition =
                     schema::Definition::default_for_namespace(definition.log_namespaces());
-
-                if definition.log_namespaces().contains(&LogNamespace::Vector) {
-                    new_definition.add_meanings(definition.meanings());
-                }
-
+                new_definition.add_meanings(definition.meanings());
                 new_definition
             }
         })
@@ -201,7 +202,7 @@ pub struct TransformOutput {
     /// enabled, at least one definition  should be output. If the transform
     /// has multiple connected sources, it is possible to have multiple output
     /// definitions - one for each input.
-    log_schema_definitions: HashMap<OutputId, schema::Definition>,
+    pub log_schema_definitions: HashMap<OutputId, schema::Definition>,
 }
 
 impl TransformOutput {
@@ -243,11 +244,7 @@ impl TransformOutput {
                 .map(|(output, definition)| {
                     let mut new_definition =
                         schema::Definition::default_for_namespace(definition.log_namespaces());
-
-                    if definition.log_namespaces().contains(&LogNamespace::Vector) {
-                        new_definition.add_meanings(definition.meanings());
-                    }
-
+                    new_definition.add_meanings(definition.meanings());
                     (output.clone(), new_definition)
                 })
                 .collect()
@@ -479,7 +476,7 @@ impl LogNamespace {
     ) {
         self.insert_vector_metadata(
             log,
-            Some(log_schema().source_type_key()),
+            log_schema().source_type_key(),
             path!("source_type"),
             Bytes::from_static(source_name.as_bytes()),
         );
@@ -558,10 +555,10 @@ mod test {
 
     #[test]
     fn test_insert_standard_vector_source_metadata() {
-        let nested_path = "a.b.c.d";
-
         let mut schema = LogSchema::default();
-        schema.set_source_type_key(nested_path.to_owned());
+        schema.set_source_type_key(Some(OwnedTargetPath::event(owned_value_path!(
+            "a", "b", "c", "d"
+        ))));
         init_log_schema(schema, false);
 
         let namespace = LogNamespace::Legacy;
@@ -604,7 +601,10 @@ mod test {
 
         // There should be the default legacy definition without schemas enabled.
         assert_eq!(
-            Some(schema::Definition::default_legacy_namespace()),
+            Some(
+                schema::Definition::default_legacy_namespace()
+                    .with_meaning(OwnedTargetPath::event(owned_value_path!("zork")), "zork")
+            ),
             output.schema_definition(false)
         );
     }

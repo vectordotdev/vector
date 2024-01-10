@@ -1,16 +1,11 @@
 use crate::{
-    codecs::EncodingConfig,
-    config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     schema,
     sinks::{
+        prelude::*,
         pulsar::sink::{healthcheck, PulsarSink},
-        Healthcheck, VectorSink,
     },
-    template::Template,
 };
-use codecs::{encoding::SerializerConfig, TextSerializerConfig};
 use futures_util::FutureExt;
-use lookup::lookup_v2::OptionalTargetPath;
 use pulsar::{
     authentication::oauth2::{OAuth2Authentication, OAuth2Params},
     compression,
@@ -20,13 +15,14 @@ use pulsar::{
 };
 use pulsar::{error::AuthenticationError, OperationRetryOptions};
 use snafu::ResultExt;
-use vector_common::sensitive_string::SensitiveString;
-use vector_config::configurable_component;
-use vector_core::config::DataType;
+use vector_lib::codecs::{encoding::SerializerConfig, TextSerializerConfig};
+use vector_lib::config::DataType;
+use vector_lib::lookup::lookup_v2::OptionalTargetPath;
+use vector_lib::sensitive_string::SensitiveString;
 use vrl::value::Kind;
 
 /// Configuration for the `pulsar` sink.
-#[configurable_component(sink("pulsar"))]
+#[configurable_component(sink("pulsar", "Publish observability events to Apache Pulsar topics."))]
 #[derive(Clone, Debug)]
 pub struct PulsarSinkConfig {
     /// The endpoint to which the Pulsar client should connect to.
@@ -87,13 +83,17 @@ pub struct PulsarSinkConfig {
 #[configurable_component]
 #[derive(Clone, Copy, Debug, Default)]
 pub(crate) struct PulsarBatchConfig {
-    /// The maximum size of a batch before it is flushed.
+    /// The maximum amount of events in a batch before it is flushed.
     ///
     /// Note this is an unsigned 32 bit integer which is a smaller capacity than
     /// many of the other sink batch settings.
     #[configurable(metadata(docs::type_unit = "events"))]
     #[configurable(metadata(docs::examples = 1000))]
     pub max_events: Option<u32>,
+
+    /// The maximum size of a batch before it is flushed.
+    #[configurable(metadata(docs::type_unit = "bytes"))]
+    pub max_bytes: Option<usize>,
 }
 
 /// Authentication configuration.
@@ -235,6 +235,7 @@ impl PulsarSinkConfig {
             metadata: Default::default(),
             schema: None,
             batch_size: self.batch.max_events,
+            batch_byte_size: self.batch.max_bytes,
             compression: None,
         };
 
@@ -280,6 +281,7 @@ impl GenerateConfig for PulsarSinkConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "pulsar")]
 impl SinkConfig for PulsarSinkConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let client = self

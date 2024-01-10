@@ -29,7 +29,7 @@ components: sources: aws_sqs: components._aws & {
 		commonly_used: true
 		deployment_roles: ["aggregator"]
 		delivery:      "at_least_once"
-		development:   "beta"
+		development:   "stable"
 		egress_method: "stream"
 		stateful:      false
 	}
@@ -80,13 +80,6 @@ components: sources: aws_sqs: components._aws & {
 				description: "The time this message was sent to SQS."
 			}
 		}
-	}
-
-	telemetry: metrics: {
-		component_received_event_bytes_total: components.sources.internal_metrics.output.metrics.component_received_event_bytes_total
-		component_received_events_total:      components.sources.internal_metrics.output.metrics.component_received_events_total
-		component_received_bytes_total:       components.sources.internal_metrics.output.metrics.component_received_bytes_total
-		sqs_message_delete_failed_total:      components.sources.internal_metrics.output.metrics.sqs_message_delete_failed_total
 	}
 
 	how_it_works: {

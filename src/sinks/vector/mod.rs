@@ -1,6 +1,6 @@
 use snafu::Snafu;
 
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 
 mod config;
 mod service;
@@ -45,7 +45,10 @@ mod tests {
     use http::request::Parts;
     use hyper::Method;
     use prost::Message;
-    use vector_core::event::{BatchNotifier, BatchStatus};
+    use vector_lib::{
+        config::{init_telemetry, Tags, Telemetry},
+        event::{BatchNotifier, BatchStatus},
+    };
 
     use super::config::with_default_scheme;
     use super::*;
@@ -55,7 +58,10 @@ mod tests {
         proto::vector as proto,
         sinks::util::test::build_test_server_generic,
         test_util::{
-            components::{run_and_assert_sink_compliance, HTTP_SINK_TAGS},
+            components::{
+                run_and_assert_data_volume_sink_compliance, run_and_assert_sink_compliance,
+                DATA_VOLUME_SINK_TAGS, HTTP_SINK_TAGS,
+            },
             next_addr, random_lines_with_stream,
         },
     };
@@ -68,8 +74,12 @@ mod tests {
         crate::test_util::test_generate_config::<VectorConfig>();
     }
 
-    #[tokio::test]
-    async fn deliver_message() {
+    enum TestType {
+        Normal,
+        DataVolume,
+    }
+
+    async fn run_sink_test(test_type: TestType) {
         let num_lines = 10;
 
         let in_addr = next_addr();
@@ -77,7 +87,7 @@ mod tests {
         let config = format!(r#"address = "http://{}/""#, in_addr);
         let config: VectorConfig = toml::from_str(&config).unwrap();
 
-        let cx = SinkContext::new_test();
+        let cx = SinkContext::default();
 
         let (sink, _) = config.build(cx).await.unwrap();
         let (rx, trigger, server) = build_test_server_generic(in_addr, move || {
@@ -93,7 +103,15 @@ mod tests {
         let (batch, mut receiver) = BatchNotifier::new_with_receiver();
         let (input_lines, events) = random_lines_with_stream(8, num_lines, Some(batch));
 
-        run_and_assert_sink_compliance(sink, events, &HTTP_SINK_TAGS).await;
+        match test_type {
+            TestType::Normal => run_and_assert_sink_compliance(sink, events, &HTTP_SINK_TAGS).await,
+
+            TestType::DataVolume => {
+                run_and_assert_data_volume_sink_compliance(sink, events, &DATA_VOLUME_SINK_TAGS)
+                    .await
+            }
+        }
+
         drop(trigger);
 
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
@@ -113,6 +131,26 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn deliver_message() {
+        run_sink_test(TestType::Normal).await;
+    }
+
+    #[tokio::test]
+    async fn data_volume_tags() {
+        init_telemetry(
+            Telemetry {
+                tags: Tags {
+                    emit_service: true,
+                    emit_source: true,
+                },
+            },
+            true,
+        );
+
+        run_sink_test(TestType::DataVolume).await;
+    }
+
+    #[tokio::test]
     async fn acknowledges_error() {
         let num_lines = 10;
 
@@ -121,7 +159,7 @@ mod tests {
         let config = format!(r#"address = "http://{}/""#, in_addr);
         let config: VectorConfig = toml::from_str(&config).unwrap();
 
-        let cx = SinkContext::new_test();
+        let cx = SinkContext::default();
 
         let (sink, _) = config.build(cx).await.unwrap();
         let (_rx, trigger, server) = build_test_server_generic(in_addr, move || {

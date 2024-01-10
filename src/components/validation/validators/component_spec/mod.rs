@@ -1,14 +1,12 @@
 mod sources;
 
-use vector_core::event::{Event, Metric};
+use vector_lib::event::{Event, Metric};
 
-use crate::components::validation::{
-    ComponentType, TestCaseExpectation, TestEvent, ValidationConfiguration,
-};
+use crate::components::validation::{ComponentType, RunnerMetrics, TestCaseExpectation, TestEvent};
 
 use super::Validator;
 
-use self::sources::{validate_sources, SourceMetrics};
+use self::sources::{validate_sources, SourceMetricType};
 
 /// Validates that the component meets the requirements of the [Component Specification][component_spec].
 ///
@@ -28,12 +26,12 @@ impl Validator for ComponentSpecValidator {
 
     fn check_validation(
         &self,
-        configuration: ValidationConfiguration,
         component_type: ComponentType,
         expectation: TestCaseExpectation,
         inputs: &[TestEvent],
         outputs: &[Event],
         telemetry_events: &[Event],
+        runner_metrics: &RunnerMetrics,
     ) -> Result<Vec<String>, Vec<String>> {
         for input in inputs {
             debug!("Validator observed input event: {:?}", input);
@@ -52,7 +50,7 @@ impl Validator for ComponentSpecValidator {
             TestCaseExpectation::Success => {
                 if inputs.len() != outputs.len() {
                     return Err(vec![format!(
-                        "Sent {} inputs but only received {} outputs.",
+                        "Sent {} inputs but received {} outputs.",
                         inputs.len(),
                         outputs.len()
                     )]);
@@ -84,13 +82,7 @@ impl Validator for ComponentSpecValidator {
             format!("received {} telemetry events", telemetry_events.len()),
         ];
 
-        let out = validate_telemetry(
-            configuration,
-            component_type,
-            inputs,
-            outputs,
-            telemetry_events,
-        )?;
+        let out = validate_telemetry(component_type, telemetry_events, runner_metrics)?;
         run_out.extend(out);
 
         Ok(run_out)
@@ -98,18 +90,16 @@ impl Validator for ComponentSpecValidator {
 }
 
 fn validate_telemetry(
-    configuration: ValidationConfiguration,
     component_type: ComponentType,
-    inputs: &[TestEvent],
-    outputs: &[Event],
     telemetry_events: &[Event],
+    runner_metrics: &RunnerMetrics,
 ) -> Result<Vec<String>, Vec<String>> {
     let mut out: Vec<String> = Vec::new();
     let mut errs: Vec<String> = Vec::new();
 
     match component_type {
         ComponentType::Source => {
-            let result = validate_sources(&configuration, inputs, outputs, telemetry_events);
+            let result = validate_sources(telemetry_events, runner_metrics);
             match result {
                 Ok(o) => out.extend(o),
                 Err(e) => errs.extend(e),
@@ -128,13 +118,13 @@ fn validate_telemetry(
 
 fn filter_events_by_metric_and_component<'a>(
     telemetry_events: &'a [Event],
-    metric: SourceMetrics,
+    metric: &SourceMetricType,
     component_name: &'a str,
-) -> Result<Vec<&'a Metric>, Vec<String>> {
+) -> Vec<&'a Metric> {
     let metrics: Vec<&Metric> = telemetry_events
         .iter()
         .flat_map(|e| {
-            if let vector_core::event::Event::Metric(m) = e {
+            if let vector_lib::event::Event::Metric(m) = e {
                 Some(m)
             } else {
                 None
@@ -155,9 +145,5 @@ fn filter_events_by_metric_and_component<'a>(
 
     debug!("{}: {} metrics found.", metric.to_string(), metrics.len(),);
 
-    if metrics.is_empty() {
-        return Err(vec![format!("{}: no metrics were emitted.", metric)]);
-    }
-
-    Ok(metrics)
+    metrics
 }

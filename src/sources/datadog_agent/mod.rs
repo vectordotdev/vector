@@ -17,26 +17,35 @@ pub(crate) mod ddtrace_proto {
     include!(concat!(env!("OUT_DIR"), "/dd_trace.rs"));
 }
 
+use std::convert::Infallible;
+use std::time::Duration;
 use std::{fmt::Debug, io::Read, net::SocketAddr, sync::Arc};
 
 use bytes::{Buf, Bytes};
 use chrono::{serde::ts_milliseconds, DateTime, Utc};
-use codecs::decoding::{DeserializerConfig, FramingConfig};
 use flate2::read::{MultiGzDecoder, ZlibDecoder};
 use futures::FutureExt;
 use http::StatusCode;
-use lookup::owned_value_path;
+use hyper::service::make_service_fn;
+use hyper::Server;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
+use tokio::net::TcpStream;
+use tower::ServiceBuilder;
 use tracing::Span;
-use vector_common::internal_event::{EventsReceived, Registered};
-use vector_config::configurable_component;
-use vector_core::config::{LegacyKey, LogNamespace};
-use vector_core::event::{BatchNotifier, BatchStatus};
+use vector_lib::codecs::decoding::{DeserializerConfig, FramingConfig};
+use vector_lib::config::{LegacyKey, LogNamespace};
+use vector_lib::configurable::configurable_component;
+use vector_lib::event::{BatchNotifier, BatchStatus};
+use vector_lib::internal_event::{EventsReceived, Registered};
+use vector_lib::lookup::owned_value_path;
+use vector_lib::tls::MaybeTlsIncomingStream;
+use vrl::path::OwnedTargetPath;
 use vrl::value::Kind;
 use warp::{filters::BoxedFilter, reject::Rejection, reply::Response, Filter, Reply};
 
+use crate::http::{build_http_trace_layer, KeepaliveConfig, MaxConnectionAgeLayer};
 use crate::{
     codecs::{Decoder, DecodingConfig},
     config::{
@@ -81,20 +90,20 @@ pub struct DatadogAgentConfig {
     #[serde(default = "crate::serde::default_false")]
     disable_logs: bool,
 
-    /// If this is set to `true`, metrics are not accepted by the component.
+    /// If this is set to `true`, metrics (beta) are not accepted by the component.
     #[configurable(metadata(docs::advanced))]
     #[serde(default = "crate::serde::default_false")]
     disable_metrics: bool,
 
-    /// If this is set to `true`, traces are not accepted by the component.
+    /// If this is set to `true`, traces (alpha) are not accepted by the component.
     #[configurable(metadata(docs::advanced))]
     #[serde(default = "crate::serde::default_false")]
     disable_traces: bool,
 
-    /// If this is set to `true` logs, metrics, and traces are sent to different outputs.
+    /// If this is set to `true`, logs, metrics (beta), and traces (alpha) are sent to different outputs.
     ///
     ///
-    /// For a source component named `agent`, the received logs, metrics, and traces can then be
+    /// For a source component named `agent`, the received logs, metrics (beta), and traces (alpha) can then be
     /// configured as input to other components by specifying `agent.logs`, `agent.metrics`, and
     /// `agent.traces`, respectively.
     #[configurable(metadata(docs::advanced))]
@@ -120,6 +129,10 @@ pub struct DatadogAgentConfig {
     #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
+
+    #[configurable(derived)]
+    #[serde(default)]
+    keepalive: KeepaliveConfig,
 }
 
 impl GenerateConfig for DatadogAgentConfig {
@@ -136,6 +149,7 @@ impl GenerateConfig for DatadogAgentConfig {
             disable_traces: false,
             multiple_outputs: false,
             log_namespace: Some(false),
+            keepalive: KeepaliveConfig::default(),
         })
         .unwrap()
     }
@@ -155,7 +169,8 @@ impl SourceConfig for DatadogAgentConfig {
             .clone();
 
         let decoder =
-            DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace).build();
+            DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace)
+                .build()?;
 
         let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
         let source = DatadogAgentSource::new(
@@ -169,29 +184,43 @@ impl SourceConfig for DatadogAgentConfig {
         let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
         let filters = source.build_warp_filters(cx.out, acknowledgements, self)?;
         let shutdown = cx.shutdown;
+        let keepalive_settings = self.keepalive.clone();
 
         info!(message = "Building HTTP server.", address = %self.address);
 
         Ok(Box::pin(async move {
-            let span = Span::current();
-            let routes = filters
-                .with(warp::trace(move |_info| span.clone()))
-                .recover(|r: Rejection| async move {
-                    if let Some(e_msg) = r.find::<ErrorMessage>() {
-                        let json = warp::reply::json(e_msg);
-                        Ok(warp::reply::with_status(json, e_msg.status_code()))
-                    } else {
-                        // other internal error - will return 500 internal server error
-                        Err(r)
-                    }
-                });
+            let routes = filters.recover(|r: Rejection| async move {
+                if let Some(e_msg) = r.find::<ErrorMessage>() {
+                    let json = warp::reply::json(e_msg);
+                    Ok(warp::reply::with_status(json, e_msg.status_code()))
+                } else {
+                    // other internal error - will return 500 internal server error
+                    Err(r)
+                }
+            });
 
-            warp::serve(routes)
-                .serve_incoming_with_graceful_shutdown(
-                    listener.accept_stream(),
-                    shutdown.map(|_| ()),
-                )
-                .await;
+            let span = Span::current();
+            let make_svc = make_service_fn(move |conn: &MaybeTlsIncomingStream<TcpStream>| {
+                let svc = ServiceBuilder::new()
+                    .layer(build_http_trace_layer(span.clone()))
+                    .option_layer(keepalive_settings.max_connection_age_secs.map(|secs| {
+                        MaxConnectionAgeLayer::new(
+                            Duration::from_secs(secs),
+                            keepalive_settings.max_connection_age_jitter_factor,
+                            conn.peer_addr(),
+                        )
+                    }))
+                    .service(warp::service(routes.clone()));
+                futures_util::future::ok::<_, Infallible>(svc)
+            });
+
+            Server::builder(hyper::server::accept::from_stream(listener.accept_stream()))
+                .serve(make_svc)
+                .with_graceful_shutdown(shutdown.map(|_| ()))
+                .await
+                .map_err(|err| {
+                    error!("An error occurred: {:?}.", err);
+                })?;
 
             Ok(())
         }))
@@ -283,8 +312,8 @@ pub struct ApiKeyQueryParams {
 #[derive(Clone)]
 pub(crate) struct DatadogAgentSource {
     pub(crate) api_key_extractor: ApiKeyExtractor,
-    pub(crate) log_schema_host_key: &'static str,
-    pub(crate) log_schema_source_type_key: &'static str,
+    pub(crate) log_schema_host_key: OwnedTargetPath,
+    pub(crate) log_schema_source_type_key: OwnedTargetPath,
     pub(crate) log_namespace: LogNamespace,
     pub(crate) decoder: Decoder,
     protocol: &'static str,
@@ -333,8 +362,14 @@ impl DatadogAgentSource {
                 matcher: Regex::new(r"^/v1/input/(?P<api_key>[[:alnum:]]{32})/??")
                     .expect("static regex always compiles"),
             },
-            log_schema_host_key: log_schema().host_key(),
-            log_schema_source_type_key: log_schema().source_type_key(),
+            log_schema_host_key: log_schema()
+                .host_key_target_path()
+                .expect("global log_schema.host_key to be valid path")
+                .clone(),
+            log_schema_source_type_key: log_schema()
+                .source_type_key_target_path()
+                .expect("global log_schema.source_type_key to be valid path")
+                .clone(),
             decoder,
             protocol,
             logs_schema_definition: Arc::new(logs_schema_definition),
@@ -443,8 +478,8 @@ pub(crate) async fn handle_request(
             } else {
                 out.send_batch(events).await
             }
-            .map_err(move |error: crate::source_sender::ClosedError| {
-                emit!(StreamClosedError { error, count });
+            .map_err(|_| {
+                emit!(StreamClosedError { count });
                 warp::reject::custom(ApiError::ServerShutdown)
             })?;
             match receiver {

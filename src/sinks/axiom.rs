@@ -1,12 +1,12 @@
 use std::collections::HashMap;
 
-use vector_common::sensitive_string::SensitiveString;
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
+use vector_lib::sensitive_string::SensitiveString;
 
 use crate::{
     config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
     sinks::{
-        elasticsearch::{ElasticsearchApiVersion, ElasticsearchAuth, ElasticsearchConfig},
+        elasticsearch::{ElasticsearchApiVersion, ElasticsearchAuthConfig, ElasticsearchConfig},
         util::{http::RequestConfig, Compression},
         Healthcheck, VectorSink,
     },
@@ -16,7 +16,7 @@ use crate::{
 static CLOUD_URL: &str = "https://api.axiom.co";
 
 /// Configuration for the `axiom` sink.
-#[configurable_component(sink("axiom"))]
+#[configurable_component(sink("axiom", "Deliver log events to Axiom."))]
 #[derive(Clone, Debug, Default)]
 pub struct AxiomConfig {
     /// URI of the Axiom endpoint to send data to.
@@ -77,6 +77,7 @@ impl GenerateConfig for AxiomConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "axiom")]
 impl SinkConfig for AxiomConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let mut request = self.request.clone();
@@ -94,7 +95,7 @@ impl SinkConfig for AxiomConfig {
         let elasticsearch_config = ElasticsearchConfig {
             endpoints: vec![self.build_endpoint()],
             compression: self.compression,
-            auth: Some(ElasticsearchAuth::Basic {
+            auth: Some(ElasticsearchAuthConfig::Basic {
                 user: "axiom".to_string(),
                 password: self.token.clone(),
             }),
@@ -144,7 +145,7 @@ mod integration_tests {
     use futures::stream;
     use serde::{Deserialize, Serialize};
     use std::env;
-    use vector_core::event::{BatchNotifier, BatchStatus, Event, LogEvent};
+    use vector_lib::event::{BatchNotifier, BatchStatus, Event, LogEvent};
 
     use super::*;
     use crate::{
@@ -161,7 +162,7 @@ mod integration_tests {
         assert!(!token.is_empty(), "$AXIOM_TOKEN required");
         let dataset = env::var("AXIOM_DATASET").unwrap();
 
-        let cx = SinkContext::new_test();
+        let cx = SinkContext::default();
 
         let config = AxiomConfig {
             url: Some(url.clone()),

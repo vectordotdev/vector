@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use std::task::{Context, Poll};
 
-use bytes::{Buf, Bytes};
+use bytes::Bytes;
 use futures::future::BoxFuture;
 use http::{
     header::{HeaderValue, CONTENT_ENCODING, CONTENT_TYPE},
@@ -10,17 +10,14 @@ use http::{
 use hyper::Body;
 use snafu::ResultExt;
 use tower::Service;
-use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
-use vector_core::{
-    event::{EventFinalizers, EventStatus, Finalizable},
-    internal_event::CountByteSize,
-    stream::DriverResponse,
-};
+use vector_lib::event::{EventFinalizers, EventStatus, Finalizable};
+use vector_lib::request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata};
+use vector_lib::stream::DriverResponse;
 
 use crate::{
-    http::{BuildRequestSnafu, CallRequestSnafu, HttpClient},
+    http::{BuildRequestSnafu, HttpClient},
     sinks::datadog::DatadogApiError,
-    sinks::util::retries::{RetryAction, RetryLogic},
+    sinks::util::retries::RetryLogic,
 };
 
 /// Retry logic specific to the Datadog metrics endpoints.
@@ -34,23 +31,6 @@ impl RetryLogic for DatadogMetricsRetryLogic {
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
         error.is_retriable()
     }
-
-    fn should_retry_response(&self, response: &Self::Response) -> RetryAction {
-        let status = response.status_code;
-
-        match status {
-            StatusCode::FORBIDDEN => RetryAction::Retry("forbidden".into()),
-            StatusCode::TOO_MANY_REQUESTS => RetryAction::Retry("too many requests".into()),
-            StatusCode::NOT_IMPLEMENTED => {
-                RetryAction::DontRetry("endpoint not implemented".into())
-            }
-            _ if status.is_server_error() => RetryAction::Retry(
-                format!("{}: {}", status, String::from_utf8_lossy(&response.body)).into(),
-            ),
-            _ if status.is_success() => RetryAction::Successful,
-            _ => RetryAction::DontRetry(format!("response status: {}", status).into()),
-        }
-    }
 }
 
 /// Generalized request for sending metrics to the Datadog metrics endpoints.
@@ -61,7 +41,6 @@ pub struct DatadogMetricsRequest {
     pub uri: Uri,
     pub content_type: &'static str,
     pub finalizers: EventFinalizers,
-    pub raw_bytes: usize,
     pub metadata: RequestMetadata,
 }
 
@@ -112,8 +91,12 @@ impl Finalizable for DatadogMetricsRequest {
 }
 
 impl MetaDescriptive for DatadogMetricsRequest {
-    fn get_metadata(&self) -> RequestMetadata {
-        self.metadata
+    fn get_metadata(&self) -> &RequestMetadata {
+        &self.metadata
+    }
+
+    fn metadata_mut(&mut self) -> &mut RequestMetadata {
+        &mut self.metadata
     }
 }
 
@@ -121,10 +104,7 @@ impl MetaDescriptive for DatadogMetricsRequest {
 #[derive(Debug)]
 pub struct DatadogMetricsResponse {
     status_code: StatusCode,
-    body: Bytes,
-    batch_size: usize,
-    byte_size: usize,
-    raw_byte_size: usize,
+    request_metadata: RequestMetadata,
 }
 
 impl DriverResponse for DatadogMetricsResponse {
@@ -138,12 +118,13 @@ impl DriverResponse for DatadogMetricsResponse {
         }
     }
 
-    fn events_sent(&self) -> CountByteSize {
-        CountByteSize(self.batch_size, self.byte_size)
+    fn events_sent(&self) -> &GroupedCountByteSize {
+        self.request_metadata
+            .events_estimated_json_encoded_byte_size()
     }
 
     fn bytes_sent(&self) -> Option<usize> {
-        Some(self.raw_byte_size)
+        Some(self.request_metadata.request_encoded_size())
     }
 }
 
@@ -177,14 +158,12 @@ impl Service<DatadogMetricsRequest> for DatadogMetricsService {
     }
 
     // Emission of Error internal event is handled upstream by the caller
-    fn call(&mut self, request: DatadogMetricsRequest) -> Self::Future {
+    fn call(&mut self, mut request: DatadogMetricsRequest) -> Self::Future {
         let client = self.client.clone();
         let api_key = self.api_key.clone();
 
         Box::pin(async move {
-            let byte_size = request.get_metadata().events_byte_size();
-            let batch_size = request.get_metadata().event_count();
-            let raw_byte_size = request.raw_bytes;
+            let request_metadata = std::mem::take(request.metadata_mut());
 
             let request = request
                 .into_http_request(api_key)
@@ -192,20 +171,11 @@ impl Service<DatadogMetricsRequest> for DatadogMetricsService {
                 .map_err(|error| DatadogApiError::HttpError { error })?;
 
             let result = client.send(request).await;
-            let (parts, body) = DatadogApiError::from_result(result)?.into_parts();
-
-            let mut body = hyper::body::aggregate(body)
-                .await
-                .context(CallRequestSnafu)
-                .map_err(|error| DatadogApiError::HttpError { error })?;
-            let body = body.copy_to_bytes(body.remaining());
+            let result = DatadogApiError::from_result(result)?;
 
             Ok(DatadogMetricsResponse {
-                status_code: parts.status,
-                body,
-                batch_size,
-                byte_size,
-                raw_byte_size,
+                status_code: result.status(),
+                request_metadata,
             })
         })
     }

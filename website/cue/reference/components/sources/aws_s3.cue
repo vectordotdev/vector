@@ -25,7 +25,7 @@ components: sources: aws_s3: components._aws & {
 		commonly_used: true
 		deployment_roles: ["aggregator"]
 		delivery:      "at_least_once"
-		development:   "beta"
+		development:   "stable"
 		egress_method: "stream"
 		stateful:      false
 	}
@@ -162,18 +162,8 @@ components: sources: aws_s3: components._aws & {
 	]
 
 	telemetry: metrics: {
-		events_in_total:                        components.sources.internal_metrics.output.metrics.events_in_total
-		processed_bytes_total:                  components.sources.internal_metrics.output.metrics.processed_bytes_total
-		component_discarded_events_total:       components.sources.internal_metrics.output.metrics.component_discarded_events_total
-		component_errors_total:                 components.sources.internal_metrics.output.metrics.component_errors_total
-		component_received_bytes_total:         components.sources.internal_metrics.output.metrics.component_received_bytes_total
-		component_received_events_total:        components.sources.internal_metrics.output.metrics.component_received_events_total
-		component_received_event_bytes_total:   components.sources.internal_metrics.output.metrics.component_received_event_bytes_total
-		sqs_message_delete_failed_total:        components.sources.internal_metrics.output.metrics.sqs_message_delete_failed_total
 		sqs_message_delete_succeeded_total:     components.sources.internal_metrics.output.metrics.sqs_message_delete_succeeded_total
-		sqs_message_processing_failed_total:    components.sources.internal_metrics.output.metrics.sqs_message_processing_failed_total
 		sqs_message_processing_succeeded_total: components.sources.internal_metrics.output.metrics.sqs_message_processing_succeeded_total
-		sqs_message_receive_failed_total:       components.sources.internal_metrics.output.metrics.sqs_message_receive_failed_total
 		sqs_message_receive_succeeded_total:    components.sources.internal_metrics.output.metrics.sqs_message_receive_succeeded_total
 		sqs_message_received_messages_total:    components.sources.internal_metrics.output.metrics.sqs_message_received_messages_total
 		sqs_s3_event_record_ignored_total:      components.sources.internal_metrics.output.metrics.sqs_s3_event_record_ignored_total

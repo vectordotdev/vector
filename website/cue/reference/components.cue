@@ -218,8 +218,8 @@ components: {
 				uses_uri?: bool
 			}
 
-			exposes?: #FeaturesExpose
-			send?:    #FeaturesSend & {_args: Args}
+			exposes?:                      #FeaturesExpose
+			send?: #FeaturesSend & {_args: Args}
 		}
 
 		descriptions: [Name=string]: string
@@ -379,7 +379,7 @@ components: {
 
 					if enabled {
 						framing: bool | *false
-						enum:    [#EncodingCodec, ...#EncodingCodec] | null
+						enum: [#EncodingCodec, ...#EncodingCodec] | null
 					}
 				}
 			}
@@ -497,8 +497,8 @@ components: {
 			#RequiredFor: "operation" | "healthcheck"
 
 			// TODO: come up with a less janky URL generation scheme
-			_action:        !=""
-			required_for:   *["operation"] | [#RequiredFor, ...#RequiredFor]
+			_action: !=""
+			required_for: *["operation"] | [#RequiredFor, ...#RequiredFor]
 			docs_url:       !=""
 			required_when?: !=""
 
@@ -1274,14 +1274,6 @@ components: {
 					type:              "gauge"
 					default_namespace: "vector"
 				}
-			}
-		}
-
-		if Kind == "transform" {
-			telemetry: metrics: {
-				// Default metrics for each transform
-				processed_events_total: components.sources.internal_metrics.output.metrics.processed_events_total
-				processed_bytes_total:  components.sources.internal_metrics.output.metrics.processed_bytes_total
 			}
 		}
 

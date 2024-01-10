@@ -50,7 +50,7 @@ where
 impl Configurable for serde_with::DurationSeconds<u64, serde_with::formats::Strict> {
     fn referenceable_name() -> Option<&'static str> {
         // We're masking the type parameters here because we only deal with whole seconds via this
-        // version, and handle fractional seconds with `DurationSeconds<f64, Strict>`, which we
+        // version, and handle fractional seconds with `DurationSecondsWithFrac<f64, Strict>`, which we
         // expose as `serde_with::DurationFractionalSeconds`.
         Some("serde_with::DurationSeconds")
     }
@@ -76,7 +76,7 @@ impl Configurable for serde_with::DurationSeconds<u64, serde_with::formats::Stri
     }
 }
 
-impl Configurable for serde_with::DurationSeconds<f64, serde_with::formats::Strict> {
+impl Configurable for serde_with::DurationSecondsWithFrac<f64, serde_with::formats::Strict> {
     fn referenceable_name() -> Option<&'static str> {
         // We're masking the type parameters here because we only deal with fractional seconds via this
         // version, and handle whole seconds with `DurationSeconds<u64, Strict>`, which we

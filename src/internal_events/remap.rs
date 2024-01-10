@@ -1,8 +1,6 @@
-use crate::emit;
 use metrics::counter;
-use vector_core::internal_event::InternalEvent;
-
-use vector_common::internal_event::{
+use vector_lib::internal_event::InternalEvent;
+use vector_lib::internal_event::{
     error_stage, error_type, ComponentEventsDropped, INTENTIONAL, UNINTENTIONAL,
 };
 
@@ -34,8 +32,6 @@ impl InternalEvent for RemapMappingError {
                 reason: "Mapping failed with event.",
             });
         }
-        // deprecated
-        counter!("processing_errors_total", 1);
     }
 }
 

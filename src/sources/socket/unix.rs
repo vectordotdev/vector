@@ -2,11 +2,11 @@ use std::path::PathBuf;
 
 use bytes::Bytes;
 use chrono::Utc;
-use codecs::decoding::{DeserializerConfig, FramingConfig};
-use lookup::{lookup_v2::OptionalValuePath, path};
-use vector_common::shutdown::ShutdownSignal;
-use vector_config::configurable_component;
-use vector_core::config::{LegacyKey, LogNamespace};
+use vector_lib::codecs::decoding::{DeserializerConfig, FramingConfig};
+use vector_lib::config::{LegacyKey, LogNamespace};
+use vector_lib::configurable::configurable_component;
+use vector_lib::lookup::{lookup_v2::OptionalValuePath, path};
+use vector_lib::shutdown::ShutdownSignal;
 
 use crate::{
     codecs::Decoder,
@@ -127,11 +127,9 @@ pub(super) fn unix_datagram(
     let max_length = config
         .framing
         .and_then(|framing| match framing {
-            FramingConfig::CharacterDelimited {
-                character_delimited,
-            } => character_delimited.max_length,
-            FramingConfig::NewlineDelimited { newline_delimited } => newline_delimited.max_length,
-            FramingConfig::OctetCounting { octet_counting } => octet_counting.max_length,
+            FramingConfig::CharacterDelimited(config) => config.character_delimited.max_length,
+            FramingConfig::NewlineDelimited(config) => config.newline_delimited.max_length,
+            FramingConfig::OctetCounting(config) => config.octet_counting.max_length,
             _ => None,
         })
         .unwrap_or_else(crate::serde::default_max_length);

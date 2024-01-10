@@ -9,12 +9,14 @@ documentation in tandem with code changes.
 
 1. [Responsibilities](#responsibilities)
 2. [Reference documentation](#reference-documentation)
-   1. [Formatting](#formatting)
-   2. [Validating](#validating)
+   1. [Installing CUE](#installing-cue)
+   2. [Generating from source code](#generating-from-source-code)
+   3. [Formatting](#formatting)
+   4. [Validating](#validating)
       1. [Tips & tricks](#tips--tricks)
          1. [Make small incremental changes](#make-small-incremental-changes)
-   3. [Changelog](#changelog)
-   4. [Release highlights](#release-highlights)
+   5. [Changelog](#changelog)
+   6. [Release highlights](#release-highlights)
       1. [FAQ](#faq)
          1. [What makes a release highlight noteworthy?](#what-makes-a-release-highlight-noteworthy)
          2. [How is a release highlight different from a blog post?](#how-is-a-release-highlight-different-from-a-blog-post)
@@ -49,9 +51,18 @@ suitable for complex data definitions.
 
 Cue can be [installed](https://cuelang.org/docs/install/) from package managers,
 however it may be necessary to install it from source in order to use the correct
-version that Vector depends on. Currently Vector is using `v0.5.0`. Using a CUE
+version that Vector depends on. Currently Vector is using `v0.7.0`. Using a CUE
 version different than this may result in CUE check/build errors. We are aiming
 to improve the developer experience around external tool dependencies ([#15909](https://github.com/vectordotdev/vector/issues/15909)).
+
+### Generating from source code
+
+Much of Vector's reference documentation is automatically compiled from source code (e.g., doc comments).
+To regenerate this content, run:
+
+```bash
+cargo vdev build component-docs
+```
 
 ### Formatting
 

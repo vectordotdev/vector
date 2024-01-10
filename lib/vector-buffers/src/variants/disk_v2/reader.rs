@@ -53,7 +53,7 @@ impl ReadToken {
     }
 }
 
-/// Error that occurred during calls to [`Reader`].
+/// Error that occurred during calls to [`BufferReader`].
 #[derive(Debug, Snafu)]
 pub enum ReaderError<T>
 where
@@ -70,7 +70,7 @@ where
     /// The reader failed to deserialize the record.
     ///
     /// In most cases, this indicates that the data file being read was corrupted or truncated in
-    /// some fashion.  Callers of [`Reader::next`] will not actually receive this error, as it is
+    /// some fashion.  Callers of [`BufferReader::next`] will not actually receive this error, as it is
     /// handled internally by moving to the next data file, as corruption may have affected other
     /// records in a way that is not easily detectable and could lead to records which
     /// deserialize/decode but contain invalid data.
@@ -80,7 +80,7 @@ where
     /// The record's checksum did not match.
     ///
     /// In most cases, this indicates that the data file being read was corrupted or truncated in
-    /// some fashion.  Callers of [`Reader::next`] will not actually receive this error, as it is
+    /// some fashion.  Callers of [`BufferReader::next`] will not actually receive this error, as it is
     /// handled internally by moving to the next data file, as corruption may have affected other
     /// records in a way that is not easily detectable and could lead to records which
     /// deserialize/decode but contain invalid data.
@@ -394,7 +394,7 @@ where
 
 /// Reads records from the buffer.
 #[derive(Debug)]
-pub struct Reader<T, FS>
+pub struct BufferReader<T, FS>
 where
     FS: Filesystem,
 {
@@ -412,13 +412,13 @@ where
     _t: PhantomData<T>,
 }
 
-impl<T, FS> Reader<T, FS>
+impl<T, FS> BufferReader<T, FS>
 where
     T: Bufferable,
     FS: Filesystem,
     FS::File: Unpin,
 {
-    /// Creates a new [`Reader`] attached to the given [`Ledger`].
+    /// Creates a new [`BufferReader`] attached to the given [`Ledger`].
     pub(crate) fn new(ledger: Arc<Ledger<FS>>, finalizer: OrderedFinalizer<u64>) -> Self {
         let ledger_last_reader_record_id = ledger.state().get_last_reader_record_id();
         let next_expected_record_id = ledger_last_reader_record_id.wrapping_add(1);
@@ -855,7 +855,7 @@ where
                         // If there's an error decoding the item, just fall back to the slow path,
                         // because this file might actually be where we left off, so we don't want
                         // to incorrectly skip ahead or anything.
-                        break
+                        break;
                     };
 
                     // We have to remove 1 from the event count here because otherwise the ID would
@@ -901,12 +901,8 @@ where
         while self.last_reader_record_id < ledger_last {
             match self.next().await {
                 Ok(maybe_record) => {
-                    if maybe_record.is_none() && self.last_reader_record_id == 0 {
-                        // We've hit a point where there's no more data to read.  If our "last reader record
-                        // ID" hasn't moved at all, that means the buffer was already empty and we're caught
-                        // up, so we just pin ourselves to where the ledger says we left off, and we're good
-                        // to go.
-                        self.last_reader_record_id = ledger_last;
+                    if maybe_record.is_none() {
+                        // We've hit the end of the current data file so we've gone as far as we can.
                         break;
                     }
                 }

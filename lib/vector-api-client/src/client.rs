@@ -1,7 +1,8 @@
 use anyhow::Context;
 use graphql_client::GraphQLQuery;
-use indoc::indoc;
 use url::Url;
+
+use crate::gql::HealthQueryExt;
 
 /// Wrapped `Result` type, that returns deserialized GraphQL response data.
 pub type QueryResult<T> =
@@ -19,33 +20,9 @@ impl Client {
         Self { url }
     }
 
-    pub async fn new_with_healthcheck(url: Url) -> Option<Self> {
-        #![allow(clippy::print_stderr)]
-
-        use crate::gql::HealthQueryExt;
-
-        // Create a new API client for connecting to the local/remote Vector instance.
-        let client = Self::new(url.clone());
-
-        // Check that the GraphQL server is reachable
-        match client.health_query().await {
-            Ok(_) => Some(client),
-            _ => {
-                eprintln!(
-                    indoc! {"
-                    Vector API server isn't reachable ({}).
-
-                    Have you enabled the API?
-
-                    To enable the API, add the following to your `vector.toml` config file:
-
-                    [api]
-                      enabled = true"},
-                    url
-                );
-                None
-            }
-        }
+    /// Send a health query
+    pub async fn healthcheck(&self) -> Result<(), ()> {
+        self.health_query().await.map(|_| ()).map_err(|_| ())
     }
 
     /// Issue a GraphQL query using Reqwest, serializing the response to the associated

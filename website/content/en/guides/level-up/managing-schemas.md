@@ -135,9 +135,10 @@ type = "stdin"
 
 [transforms.parse]
 inputs = ["application"]
-drop_field = true
-drop_invalid = false
-type = "json_parser"
+type = "remap"
+source = '''
+. = parse_json!(.message)
+'''
 
 [transforms.not_gdpr]
 type = "filter"
@@ -328,8 +329,6 @@ Where are you deploying Vector? Let us know, maybe we can help optimize it!
 
 [docs.sinks.console]: /docs/reference/configuration/sinks/console/
 [docs.sources]: /docs/reference/configuration/sources/
-[docs.transforms.grok_parser]: /docs/reference/vrl/functions/#parse_grok
-[docs.transforms.json_parser]: /docs/reference/vrl/functions/#parse_json
 [docs.transforms.remap]: /docs/reference/configuration/transforms/remap/
 [docs.enrichment_functions]: /docs/reference/vrl/functions/#enrichment-functions
 

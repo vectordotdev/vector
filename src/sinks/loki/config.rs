@@ -1,59 +1,16 @@
 use std::collections::HashMap;
 
-use futures::future::FutureExt;
-use vector_config::configurable_component;
 use vrl::value::Kind;
 
 use super::{healthcheck::healthcheck, sink::LokiSink};
 use crate::{
-    codecs::EncodingConfig,
-    config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
     http::{Auth, HttpClient, MaybeAuth},
     schema,
-    sinks::{
-        util::{BatchConfig, Compression, SinkBatchSettings, TowerRequestConfig, UriSerde},
-        VectorSink,
-    },
-    template::Template,
-    tls::{TlsConfig, TlsSettings},
+    sinks::{prelude::*, util::UriSerde},
 };
 
-/// Loki-specific compression.
-#[configurable_component]
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub enum ExtendedCompression {
-    /// Snappy compression.
-    ///
-    /// This implies sending push requests as Protocol Buffers.
-    #[serde(rename = "snappy")]
-    Snappy,
-}
-
-/// Compression configuration.
-#[configurable_component]
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
-#[serde(untagged)]
-pub enum CompressionConfigAdapter {
-    /// Basic compression.
-    Original(Compression),
-
-    /// Loki-specific compression.
-    Extended(ExtendedCompression),
-}
-
-impl CompressionConfigAdapter {
-    pub const fn content_encoding(self) -> Option<&'static str> {
-        match self {
-            CompressionConfigAdapter::Original(compression) => compression.content_encoding(),
-            CompressionConfigAdapter::Extended(_) => Some("snappy"),
-        }
-    }
-}
-
-impl Default for CompressionConfigAdapter {
-    fn default() -> Self {
-        CompressionConfigAdapter::Extended(ExtendedCompression::Snappy)
-    }
+const fn default_compression() -> Compression {
+    Compression::Snappy
 }
 
 fn default_loki_path() -> String {
@@ -61,7 +18,7 @@ fn default_loki_path() -> String {
 }
 
 /// Configuration for the `loki` sink.
-#[configurable_component(sink("loki"))]
+#[configurable_component(sink("loki", "Deliver log event data to the Loki aggregation system."))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct LokiConfig {
@@ -115,9 +72,10 @@ pub struct LokiConfig {
     #[serde(default = "crate::serde::default_true")]
     pub remove_timestamp: bool,
 
-    #[configurable(derived)]
-    #[serde(default)]
-    pub compression: CompressionConfigAdapter,
+    /// Compression configuration.
+    /// Snappy compression implies sending push requests as Protocol Buffers.
+    #[serde(default = "default_compression")]
+    pub compression: Compression,
 
     #[configurable(derived)]
     #[serde(default)]
@@ -220,6 +178,7 @@ impl LokiConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "loki")]
 impl SinkConfig for LokiConfig {
     async fn build(
         &self,

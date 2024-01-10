@@ -282,7 +282,7 @@ impl MetricGroup {
 }
 
 fn matching_group<T: Default>(values: &mut MetricMap<T>, group: GroupKey) -> &mut T {
-    values.entry(group).or_insert_with(T::default)
+    values.entry(group).or_default()
 }
 
 /// Parse the given text input, and group the result into higher-level
@@ -468,7 +468,7 @@ mod test {
 
     #[test]
     fn test_parse_text() {
-        let input = r##"
+        let input = r#"
             # HELP http_requests_total The total number of HTTP requests.
             # TYPE http_requests_total counter
             http_requests_total{method="post",code="200"} 1027 1395066363000
@@ -512,7 +512,7 @@ mod test {
             rpc_duration_seconds{quantile="0.99"} 76656
             rpc_duration_seconds_sum 1.7560473e+07
             rpc_duration_seconds_count 4.588206224e+09
-            "##;
+            "#;
         let output = parse_text(input).unwrap();
         assert_eq!(output.len(), 7);
         match_group!(output[0], "http_requests_total", Counter => |metrics: &MetricMap<SimpleMetric>| {
@@ -651,7 +651,7 @@ mod test {
 
     #[test]
     fn test_errors() {
-        let input = r##"name{registry="default" content_type="html"} 1890"##;
+        let input = r#"name{registry="default" content_type="html"} 1890"#;
         let error = parse_text(input).unwrap_err();
         assert!(matches!(
             error,
@@ -681,7 +681,7 @@ mod test {
             }
         ));
 
-        let input = r##"name{registry="} 1890"##;
+        let input = r#"name{registry="} 1890"#;
         let error = parse_text(input).unwrap_err();
         assert!(matches!(
             error,

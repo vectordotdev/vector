@@ -2,10 +2,11 @@
 
 use once_cell::sync::Lazy;
 use regex::Regex;
+use vrl::owned_value_path;
+use vrl::path::OwnedTargetPath;
 
 /// GELF Message fields. Definitions from <https://docs.graylog.org/docs/gelf>.
 pub mod gelf_fields {
-
     /// (not a field) The latest version of the GELF specification.
     pub const GELF_VERSION: &str = "1.1";
 
@@ -39,6 +40,30 @@ pub mod gelf_fields {
 
     // < Every field with an underscore (_) prefix will be treated as an additional field. >
 }
+
+/// GELF owned target paths.
+pub(crate) struct GelfTargetPaths {
+    pub version: OwnedTargetPath,
+    pub host: OwnedTargetPath,
+    pub full_message: OwnedTargetPath,
+    pub level: OwnedTargetPath,
+    pub facility: OwnedTargetPath,
+    pub line: OwnedTargetPath,
+    pub file: OwnedTargetPath,
+    pub short_message: OwnedTargetPath,
+}
+
+/// Lazily initialized singleton.
+pub(crate) static GELF_TARGET_PATHS: Lazy<GelfTargetPaths> = Lazy::new(|| GelfTargetPaths {
+    version: OwnedTargetPath::event(owned_value_path!(gelf_fields::VERSION)),
+    host: OwnedTargetPath::event(owned_value_path!(gelf_fields::HOST)),
+    full_message: OwnedTargetPath::event(owned_value_path!(gelf_fields::FULL_MESSAGE)),
+    level: OwnedTargetPath::event(owned_value_path!(gelf_fields::LEVEL)),
+    facility: OwnedTargetPath::event(owned_value_path!(gelf_fields::FACILITY)),
+    line: OwnedTargetPath::event(owned_value_path!(gelf_fields::LINE)),
+    file: OwnedTargetPath::event(owned_value_path!(gelf_fields::FILE)),
+    short_message: OwnedTargetPath::event(owned_value_path!(gelf_fields::SHORT_MESSAGE)),
+});
 
 /// Regex for matching valid field names. Must contain only word chars, periods and dashes.
 /// Additional field names must also be prefixed with an `_` , however that is intentionally

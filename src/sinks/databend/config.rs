@@ -1,10 +1,10 @@
 use std::collections::BTreeMap;
 
-use codecs::encoding::{Framer, FramingConfig};
 use futures::future::FutureExt;
 use tower::ServiceBuilder;
-use vector_config::{component::GenerateConfig, configurable_component};
-use vector_core::tls::TlsSettings;
+use vector_lib::codecs::encoding::{Framer, FramingConfig};
+use vector_lib::configurable::{component::GenerateConfig, configurable_component};
+use vector_lib::tls::TlsSettings;
 
 use crate::{
     codecs::{Encoder, EncodingConfig},
@@ -30,7 +30,7 @@ use super::{
 };
 
 /// Configuration for the `databend` sink.
-#[configurable_component(sink("databend"))]
+#[configurable_component(sink("databend", "Deliver log data to a Databend database."))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct DatabendConfig {
@@ -103,6 +103,7 @@ impl DatabendConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "databend")]
 impl SinkConfig for DatabendConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let auth = self.auth.choose_one(&self.endpoint.auth)?;
@@ -115,7 +116,7 @@ impl SinkConfig for DatabendConfig {
             DatabendAPIClient::new(self.build_client(&cx)?, endpoint.clone(), auth.clone());
         let healthcheck = select_one(health_client).boxed();
 
-        let request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
+        let request_settings = self.request.into_settings();
         let batch_settings = self.batch.into_batcher_settings()?;
 
         let database = config.database;

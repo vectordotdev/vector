@@ -6,7 +6,7 @@ mod test_case;
 pub mod util;
 mod validators;
 
-use crate::{config::BoxedSource, config::BoxedTransform, sinks::Sinks};
+use crate::config::{BoxedSink, BoxedSource, BoxedTransform};
 
 pub use self::resources::*;
 #[cfg(feature = "component-validation-runner")]
@@ -46,7 +46,7 @@ pub enum ComponentConfiguration {
     Transform(BoxedTransform),
 
     /// A sink component.
-    Sink(Sinks),
+    Sink(BoxedSink),
 }
 
 /// Configuration for validating a component.
@@ -88,7 +88,7 @@ impl ValidationConfiguration {
     }
 
     /// Creates a new `ValidationConfiguration` for a sink.
-    pub fn from_sink<C: Into<Sinks>>(
+    pub fn from_sink<C: Into<BoxedSink>>(
         component_name: &'static str,
         config: C,
         external_resource: Option<ExternalResource>,
@@ -170,6 +170,20 @@ macro_rules! register_validatable_component {
     };
 }
 
+/// Input and Output runners populate this structure as they send and receive events.
+/// The structure is passed into the validator to use as the expected values for the
+/// metrics that the components under test actually output.
+#[derive(Default)]
+pub struct RunnerMetrics {
+    pub received_events_total: u64,
+    pub received_event_bytes_total: u64,
+    pub received_bytes_total: u64,
+    pub sent_bytes_total: u64, // a reciprocal for received_bytes_total
+    pub sent_event_bytes_total: u64,
+    pub sent_events_total: u64,
+    pub errors_total: u64,
+}
+
 #[cfg(all(test, feature = "component-validation-tests"))]
 mod tests {
     use std::{
@@ -180,6 +194,7 @@ mod tests {
     use test_generator::test_resources;
 
     use crate::components::validation::{Runner, StandardValidators};
+    use crate::extra_context::ExtraContext;
 
     use super::{ComponentType, ValidatableComponentDescription, ValidationConfiguration};
 
@@ -265,7 +280,11 @@ mod tests {
             .build()
             .unwrap();
         rt.block_on(async {
-            let mut runner = Runner::from_configuration(configuration, test_case_data_path);
+            let mut runner = Runner::from_configuration(
+                configuration,
+                test_case_data_path,
+                ExtraContext::default(),
+            );
             runner.add_validator(StandardValidators::ComponentSpec);
 
             match runner.run_validation().await {

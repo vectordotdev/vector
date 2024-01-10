@@ -8,38 +8,15 @@
 //! - Error handling
 //! - Limitation
 
-use std::{fmt, num::NonZeroUsize, task::Poll};
+use std::{fmt, task::Poll};
 
 use bytes::Bytes;
-use codecs::encoding::Framer;
-use futures::{stream::BoxStream, StreamExt};
 use opendal::Operator;
 use snafu::Snafu;
-use tower::Service;
 use tracing::Instrument;
-use vector_common::{
-    finalization::{EventStatus, Finalizable},
-    request_metadata::{MetaDescriptive, RequestMetadata},
-};
-use vector_core::{
-    internal_event::CountByteSize,
-    sink::StreamSink,
-    stream::{BatcherSettings, DriverResponse},
-    ByteSizeOf,
-};
+use vector_lib::codecs::encoding::Framer;
 
-use crate::{
-    codecs::{Encoder, Transformer},
-    event::{Event, EventFinalizers},
-    internal_events::SinkRequestBuildError,
-    sinks::{
-        util::{
-            metadata::RequestMetadataBuilder, partitioner::KeyPartitioner,
-            request_builder::EncodeResult, Compression, RequestBuilder, SinkBuilderExt,
-        },
-        BoxFuture,
-    },
-};
+use crate::sinks::{prelude::*, util::partitioner::KeyPartitioner};
 
 /// OpenDalSink provides generic a service upon OpenDAL.
 ///
@@ -98,18 +75,17 @@ where
         let partitioner = self.partitioner;
         let settings = self.batcher_settings;
 
-        let builder_limit = NonZeroUsize::new(64);
         let request_builder = self.request_builder;
 
         input
-            .batched_partitioned(partitioner, settings)
+            .batched_partitioned(partitioner, || settings.as_byte_size_config())
             .filter_map(|(key, batch)| async move {
                 // We don't need to emit an error here if the event is dropped since this will occur if the template
                 // couldn't be rendered during the partitioning. A `TemplateRenderingError` is already emitted when
                 // that occurs.
                 key.map(move |k| (k, batch))
             })
-            .request_builder(builder_limit, request_builder)
+            .request_builder(default_request_builder_concurrency_limit(), request_builder)
             .filter_map(|request| async move {
                 match request {
                     Err(error) => {
@@ -152,8 +128,12 @@ pub struct OpenDalRequest {
 }
 
 impl MetaDescriptive for OpenDalRequest {
-    fn get_metadata(&self) -> RequestMetadata {
-        self.request_metadata
+    fn get_metadata(&self) -> &RequestMetadata {
+        &self.request_metadata
+    }
+
+    fn metadata_mut(&mut self) -> &mut RequestMetadata {
+        &mut self.request_metadata
     }
 }
 
@@ -168,7 +148,7 @@ impl Finalizable for OpenDalRequest {
 pub struct OpenDalMetadata {
     pub partition_key: String,
     pub count: usize,
-    pub byte_size: usize,
+    pub byte_size: JsonSize,
     pub finalizers: EventFinalizers,
 }
 
@@ -204,7 +184,7 @@ impl RequestBuilder<(String, Vec<Event>)> for OpenDalRequestBuilder {
         let opendal_metadata = OpenDalMetadata {
             partition_key,
             count: events.len(),
-            byte_size: events.size_of(),
+            byte_size: events.estimated_json_encoded_size_of(),
             finalizers,
         };
 
@@ -236,8 +216,7 @@ impl RequestBuilder<(String, Vec<Event>)> for OpenDalRequestBuilder {
 /// OpenDalResponse is the response returned by OpenDAL services.
 #[derive(Debug)]
 pub struct OpenDalResponse {
-    pub count: usize,
-    pub events_byte_size: usize,
+    pub events_byte_size: GroupedCountByteSize,
     pub byte_size: usize,
 }
 
@@ -246,8 +225,8 @@ impl DriverResponse for OpenDalResponse {
         EventStatus::Delivered
     }
 
-    fn events_sent(&self) -> CountByteSize {
-        CountByteSize(self.count, self.events_byte_size)
+    fn events_sent(&self) -> &GroupedCountByteSize {
+        &self.events_byte_size
     }
 
     fn bytes_sent(&self) -> Option<usize> {
@@ -276,8 +255,9 @@ impl Service<OpenDalRequest> for OpenDalService {
                 .in_current_span()
                 .await;
             result.map(|_| OpenDalResponse {
-                count: request.metadata.count,
-                events_byte_size: request.metadata.byte_size,
+                events_byte_size: request
+                    .request_metadata
+                    .into_events_estimated_json_encoded_byte_size(),
                 byte_size,
             })
         })

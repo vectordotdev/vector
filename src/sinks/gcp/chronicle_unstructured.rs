@@ -12,15 +12,17 @@ use snafu::Snafu;
 use std::io;
 use tokio_util::codec::Encoder as _;
 use tower::{Service, ServiceBuilder};
-use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
-use vector_config::configurable_component;
-use vector_core::{
-    config::{AcknowledgementsConfig, Input},
+use vector_lib::configurable::configurable_component;
+use vector_lib::request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata};
+use vector_lib::{
+    config::{telemetry, AcknowledgementsConfig, Input},
     event::{Event, EventFinalizers, Finalizable},
     sink::VectorSink,
+    EstimatedJsonEncodedSizeOf,
 };
 use vrl::value::Kind;
 
+use crate::sinks::util::service::TowerRequestConfigDefaults;
 use crate::{
     codecs::{self, EncodingConfig},
     config::{GenerateConfig, SinkConfig, SinkContext},
@@ -96,8 +98,17 @@ impl SinkBatchSettings for ChronicleUnstructuredDefaultBatchSettings {
     const TIMEOUT_SECS: f64 = 15.0;
 }
 
+#[derive(Clone, Copy, Debug)]
+pub struct ChronicleUnstructuredTowerRequestConfigDefaults;
+
+impl TowerRequestConfigDefaults for ChronicleUnstructuredTowerRequestConfigDefaults {
+    const RATE_LIMIT_NUM: u64 = 1_000;
+}
 /// Configuration for the `gcp_chronicle_unstructured` sink.
-#[configurable_component(sink("gcp_chronicle_unstructured"))]
+#[configurable_component(sink(
+    "gcp_chronicle_unstructured",
+    "Store unstructured log events in Google Chronicle."
+))]
 #[derive(Clone, Debug)]
 pub struct ChronicleUnstructuredConfig {
     /// The endpoint to send data to.
@@ -128,7 +139,7 @@ pub struct ChronicleUnstructuredConfig {
 
     #[configurable(derived)]
     #[serde(default)]
-    pub request: TowerRequestConfig,
+    pub request: TowerRequestConfig<ChronicleUnstructuredTowerRequestConfigDefaults>,
 
     #[configurable(derived)]
     pub tls: Option<TlsConfig>,
@@ -190,6 +201,7 @@ pub enum ChronicleError {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "gcp_chronicle_unstructured")]
 impl SinkConfig for ChronicleUnstructuredConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let creds = self.auth.build(Scope::MalachiteIngestion).await?;
@@ -230,10 +242,7 @@ impl ChronicleUnstructuredConfig {
     ) -> crate::Result<VectorSink> {
         use crate::sinks::util::service::ServiceBuilderExt;
 
-        let request = self.request.unwrap_with(&TowerRequestConfig {
-            rate_limit_num: Some(1000),
-            ..Default::default()
-        });
+        let request = self.request.into_settings();
 
         let batch_settings = self.batch.into_batcher_settings()?;
 
@@ -243,7 +252,7 @@ impl ChronicleUnstructuredConfig {
             .settings(request, GcsRetryLogic)
             .service(ChronicleService::new(client, base_url, creds));
 
-        let request_settings = RequestSettings::new(self)?;
+        let request_settings = ChronicleRequestBuilder::new(self)?;
 
         let sink = GcsSink::new(svc, request_settings, partitioner, batch_settings, "http");
 
@@ -282,8 +291,12 @@ impl Finalizable for ChronicleRequest {
 }
 
 impl MetaDescriptive for ChronicleRequest {
-    fn get_metadata(&self) -> RequestMetadata {
-        self.metadata
+    fn get_metadata(&self) -> &RequestMetadata {
+        &self.metadata
+    }
+
+    fn metadata_mut(&mut self) -> &mut RequestMetadata {
+        &mut self.metadata
     }
 }
 
@@ -299,9 +312,10 @@ impl Encoder<(String, Vec<Event>)> for ChronicleEncoder {
         &self,
         input: (String, Vec<Event>),
         writer: &mut dyn io::Write,
-    ) -> io::Result<usize> {
+    ) -> io::Result<(usize, GroupedCountByteSize)> {
         let (partition_key, events) = input;
         let mut encoder = self.encoder.clone();
+        let mut byte_size = telemetry().create_request_count_byte_size();
         let events = events
             .into_iter()
             .filter_map(|mut event| {
@@ -312,6 +326,9 @@ impl Encoder<(String, Vec<Event>)> for ChronicleEncoder {
                     .cloned();
                 let mut bytes = BytesMut::new();
                 self.transformer.transform(&mut event);
+
+                byte_size.add_event(&event, event.estimated_json_encoded_size_of());
+
                 encoder.encode(event, &mut bytes).ok()?;
 
                 let mut value = json!({
@@ -341,7 +358,7 @@ impl Encoder<(String, Vec<Event>)> for ChronicleEncoder {
             Ok(())
         })?;
 
-        Ok(size)
+        Ok((size, byte_size))
     }
 }
 
@@ -349,7 +366,7 @@ impl Encoder<(String, Vec<Event>)> for ChronicleEncoder {
 // request. All possible values are pre-computed for direct use in
 // producing a request.
 #[derive(Clone, Debug)]
-struct RequestSettings {
+struct ChronicleRequestBuilder {
     encoder: ChronicleEncoder,
 }
 
@@ -369,7 +386,7 @@ impl AsRef<[u8]> for ChronicleRequestPayload {
     }
 }
 
-impl RequestBuilder<(String, Vec<Event>)> for RequestSettings {
+impl RequestBuilder<(String, Vec<Event>)> for ChronicleRequestBuilder {
     type Metadata = EventFinalizers;
     type Events = (String, Vec<Event>);
     type Encoder = ChronicleEncoder;
@@ -410,7 +427,7 @@ impl RequestBuilder<(String, Vec<Event>)> for RequestSettings {
     }
 }
 
-impl RequestSettings {
+impl ChronicleRequestBuilder {
     fn new(config: &ChronicleUnstructuredConfig) -> crate::Result<Self> {
         let transformer = config.encoding.transformer();
         let serializer = config.encoding.config().build()?;
@@ -470,7 +487,7 @@ impl Service<ChronicleRequest> for ChronicleService {
             HeaderValue::from_str(&request.body.len().to_string()).unwrap(),
         );
 
-        let metadata = request.get_metadata();
+        let metadata = request.get_metadata().clone();
 
         let mut http_request = builder.body(Body::from(request.body)).unwrap();
         self.creds.apply(&mut http_request);
@@ -499,7 +516,7 @@ impl Service<ChronicleRequest> for ChronicleService {
 mod integration_tests {
     use reqwest::{Client, Method, Response};
     use serde::{Deserialize, Serialize};
-    use vector_core::event::{BatchNotifier, BatchStatus};
+    use vector_lib::event::{BatchNotifier, BatchStatus};
 
     use super::*;
     use crate::test_util::{
@@ -533,7 +550,7 @@ mod integration_tests {
         log_type: &str,
         auth_path: &str,
     ) -> crate::Result<(VectorSink, crate::sinks::Healthcheck)> {
-        let cx = SinkContext::new_test();
+        let cx = SinkContext::default();
         config(log_type, auth_path).build(cx).await
     }
 
@@ -542,12 +559,10 @@ mod integration_tests {
         trace_init();
 
         let log_type = random_string(10);
-        let (sink, healthcheck) = config_build(
-            &log_type,
-            "/home/vector/scripts/integration/chronicle/auth.json",
-        )
-        .await
-        .expect("Building sink failed");
+        let (sink, healthcheck) =
+            config_build(&log_type, "/home/vector/scripts/integration/gcp/auth.json")
+                .await
+                .expect("Building sink failed");
 
         healthcheck.await.expect("Health check failed");
 
@@ -577,7 +592,7 @@ mod integration_tests {
         // Test with an auth file that doesnt match the public key sent to the dummy chronicle server.
         let sink = config_build(
             &log_type,
-            "/home/vector/scripts/integration/chronicle/invalidauth.json",
+            "/home/vector/scripts/integration/gcp/invalidauth.json",
         )
         .await;
 
@@ -591,12 +606,10 @@ mod integration_tests {
         // The chronicle-emulator we are testing against is setup so a `log_type` of "INVALID"
         // will return a `400 BAD_REQUEST`.
         let log_type = "INVALID";
-        let (sink, healthcheck) = config_build(
-            log_type,
-            "/home/vector/scripts/integration/chronicle/auth.json",
-        )
-        .await
-        .expect("Building sink failed");
+        let (sink, healthcheck) =
+            config_build(log_type, "/home/vector/scripts/integration/gcp/auth.json")
+                .await
+                .expect("Building sink failed");
 
         healthcheck.await.expect("Health check failed");
 

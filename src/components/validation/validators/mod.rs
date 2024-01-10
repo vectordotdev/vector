@@ -1,9 +1,10 @@
 mod component_spec;
+
 pub use self::component_spec::ComponentSpecValidator;
 
-use vector_core::event::Event;
+use vector_lib::event::Event;
 
-use super::{ComponentType, TestCaseExpectation, TestEvent, ValidationConfiguration};
+use super::{ComponentType, RunnerMetrics, TestCaseExpectation, TestEvent};
 
 /// A component validator.
 ///
@@ -19,12 +20,12 @@ pub trait Validator {
     /// provided as well.
     fn check_validation(
         &self,
-        configuration: ValidationConfiguration,
         component_type: ComponentType,
         expectation: TestCaseExpectation,
         inputs: &[TestEvent],
         outputs: &[Event],
         telemetry_events: &[Event],
+        runner_metrics: &RunnerMetrics,
     ) -> Result<Vec<String>, Vec<String>>;
 }
 

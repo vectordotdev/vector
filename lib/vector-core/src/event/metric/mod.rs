@@ -11,16 +11,20 @@ use std::{
 };
 
 use chrono::{DateTime, Utc};
-use vector_common::EventDataEq;
+use vector_common::{
+    byte_size_of::ByteSizeOf,
+    internal_event::{OptionalTag, TaggedEventsSent},
+    json_size::JsonSize,
+    request_metadata::GetEventCountTags,
+    EventDataEq,
+};
 use vector_config::configurable_component;
 
-use crate::{
-    event::{
-        estimated_json_encoded_size_of::EstimatedJsonEncodedSizeOf, BatchNotifier, EventFinalizer,
-        EventFinalizers, EventMetadata, Finalizable,
-    },
-    ByteSizeOf,
+use super::{
+    estimated_json_encoded_size_of::EstimatedJsonEncodedSizeOf, BatchNotifier, EventFinalizer,
+    EventFinalizers, EventMetadata, Finalizable,
 };
+use crate::config::telemetry;
 
 #[cfg(any(test, feature = "test"))]
 mod arbitrary;
@@ -430,7 +434,7 @@ impl Display for Metric {
     ///
     /// example:
     /// ```text
-    /// 2020-08-12T20:23:37.248661343Z vector_processed_bytes_total{component_kind="sink",component_type="blackhole"} = 6391
+    /// 2020-08-12T20:23:37.248661343Z vector_received_bytes_total{component_kind="sink",component_type="blackhole"} = 6391
     /// ```
     fn fmt(&self, fmt: &mut Formatter<'_>) -> Result<(), fmt::Error> {
         if let Some(timestamp) = &self.data.time.timestamp {
@@ -463,16 +467,38 @@ impl ByteSizeOf for Metric {
 }
 
 impl EstimatedJsonEncodedSizeOf for Metric {
-    fn estimated_json_encoded_size_of(&self) -> usize {
+    fn estimated_json_encoded_size_of(&self) -> JsonSize {
         // TODO: For now we're using the in-memory representation of the metric, but we'll convert
         // this to actually calculate the JSON encoded size in the near future.
-        self.size_of()
+        self.size_of().into()
     }
 }
 
 impl Finalizable for Metric {
     fn take_finalizers(&mut self) -> EventFinalizers {
         self.metadata.take_finalizers()
+    }
+}
+
+impl GetEventCountTags for Metric {
+    fn get_tags(&self) -> TaggedEventsSent {
+        let source = if telemetry().tags().emit_source {
+            self.metadata().source_id().cloned().into()
+        } else {
+            OptionalTag::Ignored
+        };
+
+        // Currently there is no way to specify a tag that means the service,
+        // so we will be hardcoding it to "service".
+        let service = if telemetry().tags().emit_service {
+            self.tags()
+                .and_then(|tags| tags.get("service").map(ToString::to_string))
+                .into()
+        } else {
+            OptionalTag::Ignored
+        };
+
+        TaggedEventsSent { source, service }
     }
 }
 
@@ -550,7 +576,7 @@ pub(crate) fn zip_samples(
 ) -> Vec<Sample> {
     values
         .into_iter()
-        .zip(rates.into_iter())
+        .zip(rates)
         .map(|(value, rate)| Sample { value, rate })
         .collect()
 }
@@ -562,7 +588,7 @@ pub(crate) fn zip_buckets(
 ) -> Vec<Bucket> {
     limits
         .into_iter()
-        .zip(counts.into_iter())
+        .zip(counts)
         .map(|(upper_limit, count)| Bucket { upper_limit, count })
         .collect()
 }
@@ -574,7 +600,7 @@ pub(crate) fn zip_quantiles(
 ) -> Vec<Quantile> {
     quantiles
         .into_iter()
-        .zip(values.into_iter())
+        .zip(values)
         .map(|(quantile, value)| Quantile { quantile, value })
         .collect()
 }
@@ -913,7 +939,7 @@ mod test {
                 )
                 .with_namespace(Some("vector"))
             ),
-            r#"vector_namespace{} = 1.23"#
+            r"vector_namespace{} = 1.23"
         );
 
         assert_eq!(
@@ -954,7 +980,7 @@ mod test {
                     }
                 )
             ),
-            r#"four{} = histogram 3@1 4@2"#
+            r"four{} = histogram 3@1 4@2"
         );
 
         assert_eq!(
@@ -970,7 +996,7 @@ mod test {
                     }
                 )
             ),
-            r#"five{} = count=107 sum=103 53@51 54@52"#
+            r"five{} = count=107 sum=103 53@51 54@52"
         );
 
         assert_eq!(
@@ -986,7 +1012,7 @@ mod test {
                     }
                 )
             ),
-            r#"six{} = count=2 sum=127 1@63 2@64"#
+            r"six{} = count=2 sum=127 1@63 2@64"
         );
     }
 

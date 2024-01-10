@@ -3,21 +3,18 @@ use std::io;
 use async_stream::stream;
 use bytes::Bytes;
 use chrono::Utc;
-use codecs::{
+use futures::{channel::mpsc, executor, SinkExt, StreamExt};
+use tokio_util::{codec::FramedRead, io::StreamReader};
+use vector_lib::codecs::{
     decoding::{DeserializerConfig, FramingConfig},
     StreamDecodingError,
 };
-use futures::{channel::mpsc, executor, SinkExt, StreamExt};
-use lookup::{
-    lookup_v2::{parse_value_path, OptionalValuePath},
-    owned_value_path, path, OwnedValuePath,
-};
-use tokio_util::{codec::FramedRead, io::StreamReader};
-use vector_common::internal_event::{
+use vector_lib::configurable::NamedComponent;
+use vector_lib::internal_event::{
     ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol,
 };
-use vector_config::NamedComponent;
-use vector_core::{
+use vector_lib::lookup::{lookup_v2::OptionalValuePath, owned_value_path, path, OwnedValuePath};
+use vector_lib::{
     config::{LegacyKey, LogNamespace},
     event::Event,
     EstimatedJsonEncodedSizeOf,
@@ -53,10 +50,10 @@ pub trait FileDescriptorConfig: NamedComponent {
     where
         R: Send + io::BufRead + 'static,
     {
-        let host_key = self.host_key().map_or_else(
-            || parse_value_path(log_schema().host_key()).ok(),
-            |k| k.path,
-        );
+        let host_key = self
+            .host_key()
+            .and_then(|k| k.path)
+            .or(log_schema().host_key().cloned());
         let hostname = crate::get_hostname().ok();
 
         let description = self.description();
@@ -65,7 +62,7 @@ pub trait FileDescriptorConfig: NamedComponent {
         let framing = self
             .framing()
             .unwrap_or_else(|| decoding.default_stream_framing());
-        let decoder = DecodingConfig::new(framing, decoding, log_namespace).build();
+        let decoder = DecodingConfig::new(framing, decoding, log_namespace).build()?;
 
         let (sender, receiver) = mpsc::channel(1024);
 
@@ -144,7 +141,7 @@ async fn process_stream(
                     bytes_received.emit(ByteSize(byte_size));
                     events_received.emit(CountByteSize(
                          events.len(),
-                        events.estimated_json_encoded_size_of(),
+                         events.estimated_json_encoded_size_of(),
                     ));
 
                     let now = Utc::now();
@@ -195,15 +192,15 @@ async fn process_stream(
             debug!("Finished sending.");
             Ok(())
         }
-        Err(error) => {
+        Err(_) => {
             let (count, _) = stream.size_hint();
-            emit!(StreamClosedError { error, count });
+            emit!(StreamClosedError { count });
             Err(())
         }
     }
 }
 
-/// Builds the `vector_core::config::Outputs` for stdin and
+/// Builds the `vector_lib::config::Outputs` for stdin and
 /// file_descriptor sources.
 fn outputs(
     log_namespace: LogNamespace,
@@ -211,17 +208,14 @@ fn outputs(
     decoding: &DeserializerConfig,
     source_name: &'static str,
 ) -> Vec<SourceOutput> {
-    let legacy_host_key = Some(LegacyKey::InsertIfEmpty(
-        host_key.clone().and_then(|k| k.path).unwrap_or_else(|| {
-            parse_value_path(log_schema().host_key()).expect("log_schema.host_key to be valid path")
-        }),
-    ));
-
     let schema_definition = decoding
         .schema_definition(log_namespace)
         .with_source_metadata(
             source_name,
-            legacy_host_key,
+            host_key
+                .clone()
+                .map_or(log_schema().host_key().cloned(), |key| key.path)
+                .map(LegacyKey::Overwrite),
             &owned_value_path!("host"),
             Kind::bytes(),
             Some("host"),

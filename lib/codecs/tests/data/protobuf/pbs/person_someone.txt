@@ -1,0 +1,2 @@
+debug print of person_someone.pb with prost
+Person { name: Some("someone"), id: None, email: None, phones: [PhoneNumber { number: Some("123456"), r#type: None }] }

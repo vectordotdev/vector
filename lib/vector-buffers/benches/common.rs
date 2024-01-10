@@ -2,7 +2,8 @@ use std::{error, fmt, path::PathBuf};
 
 use bytes::{Buf, BufMut};
 use metrics_tracing_context::{MetricsLayer, TracingContextLayer};
-use metrics_util::{debugging::DebuggingRecorder, layers::Layer};
+use metrics_util::debugging::DebuggingRecorder;
+use metrics_util::layers::Layer;
 use tracing::Span;
 use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
 use vector_buffers::{
@@ -163,7 +164,7 @@ pub async fn wtr_measurement<const N: usize>(
     messages: Vec<Message<N>>,
 ) {
     for msg in messages.into_iter() {
-        sender.send(msg).await.unwrap();
+        sender.send(msg, None).await.unwrap();
     }
     drop(sender);
 
@@ -176,7 +177,7 @@ pub async fn war_measurement<const N: usize>(
     messages: Vec<Message<N>>,
 ) {
     for msg in messages.into_iter() {
-        sender.send(msg).await.unwrap();
+        sender.send(msg, None).await.unwrap();
         _ = receiver.next().await.unwrap();
     }
 }

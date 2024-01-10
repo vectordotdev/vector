@@ -1,7 +1,7 @@
 use bytes::Bytes;
 use chrono::Utc;
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::HashMap,
     convert::{TryFrom, TryInto},
     fmt::Debug,
     iter::FromIterator,
@@ -11,21 +11,36 @@ use std::{
 };
 
 use crossbeam_utils::atomic::AtomicCell;
-use lookup::lookup_v2::TargetPath;
-use lookup::PathPrefix;
+use lookup::{lookup_v2::TargetPath, metadata_path, path, PathPrefix};
+use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize, Serializer};
-use vector_common::EventDataEq;
+use vector_common::{
+    byte_size_of::ByteSizeOf,
+    internal_event::{OptionalTag, TaggedEventsSent},
+    json_size::{JsonSize, NonZeroJsonSize},
+    request_metadata::GetEventCountTags,
+    EventDataEq,
+};
+use vrl::path::{parse_target_path, OwnedTargetPath, PathParseError};
+use vrl::{event_path, owned_value_path};
 
 use super::{
     estimated_json_encoded_size_of::EstimatedJsonEncodedSizeOf,
     finalization::{BatchNotifier, EventFinalizer},
     metadata::EventMetadata,
-    util, EventFinalizers, Finalizable, Value,
+    util, EventFinalizers, Finalizable, KeyString, ObjectMap, Value,
 };
-use crate::config::log_schema;
 use crate::config::LogNamespace;
-use crate::{event::MaybeAsLogMut, ByteSizeOf};
-use lookup::{metadata_path, path};
+use crate::config::{log_schema, telemetry};
+use crate::event::util::log::{all_fields, all_metadata_fields};
+use crate::event::MaybeAsLogMut;
+
+static VECTOR_SOURCE_TYPE_PATH: Lazy<Option<OwnedTargetPath>> = Lazy::new(|| {
+    Some(OwnedTargetPath::metadata(owned_value_path!(
+        "vector",
+        "source_type"
+    )))
+});
 
 #[derive(Debug, Deserialize)]
 struct Inner {
@@ -36,7 +51,7 @@ struct Inner {
     size_cache: AtomicCell<Option<NonZeroUsize>>,
 
     #[serde(skip)]
-    json_encoded_size_cache: AtomicCell<Option<NonZeroUsize>>,
+    json_encoded_size_cache: AtomicCell<Option<NonZeroJsonSize>>,
 }
 
 impl Inner {
@@ -73,12 +88,12 @@ impl ByteSizeOf for Inner {
 }
 
 impl EstimatedJsonEncodedSizeOf for Inner {
-    fn estimated_json_encoded_size_of(&self) -> usize {
+    fn estimated_json_encoded_size_of(&self) -> JsonSize {
         self.json_encoded_size_cache
             .load()
             .unwrap_or_else(|| {
                 let size = self.fields.estimated_json_encoded_size_of();
-                let size = NonZeroUsize::new(size).expect("Size cannot be zero");
+                let size = NonZeroJsonSize::new(size).expect("Size cannot be zero");
 
                 self.json_encoded_size_cache.store(Some(size));
                 size
@@ -145,9 +160,10 @@ impl LogEvent {
     /// valid for `LogNamespace::Legacy`
     pub fn from_str_legacy(msg: impl Into<String>) -> Self {
         let mut log = LogEvent::default();
-        log.insert(log_schema().message_key(), msg.into());
-        if let Some(timestamp_key) = log_schema().timestamp_key() {
-            log.insert((PathPrefix::Event, timestamp_key), Utc::now());
+        log.maybe_insert(log_schema().message_key_target_path(), msg.into());
+
+        if let Some(timestamp_key) = log_schema().timestamp_key_target_path() {
+            log.insert(timestamp_key, Utc::now());
         }
 
         log
@@ -204,8 +220,28 @@ impl Finalizable for LogEvent {
 }
 
 impl EstimatedJsonEncodedSizeOf for LogEvent {
-    fn estimated_json_encoded_size_of(&self) -> usize {
+    fn estimated_json_encoded_size_of(&self) -> JsonSize {
         self.inner.estimated_json_encoded_size_of()
+    }
+}
+
+impl GetEventCountTags for LogEvent {
+    fn get_tags(&self) -> TaggedEventsSent {
+        let source = if telemetry().tags().emit_source {
+            self.metadata().source_id().cloned().into()
+        } else {
+            OptionalTag::Ignored
+        };
+
+        let service = if telemetry().tags().emit_service {
+            self.get_by_meaning("service")
+                .map(|value| value.to_string_lossy().to_string())
+                .into()
+        } else {
+            OptionalTag::Ignored
+        };
+
+        TaggedEventsSent { source, service }
     }
 }
 
@@ -226,8 +262,8 @@ impl LogEvent {
         }
     }
 
-    ///  Create a `LogEvent` from a `BTreeMap` and `EventMetadata`
-    pub fn from_map(map: BTreeMap<String, Value>, metadata: EventMetadata) -> Self {
+    ///  Create a `LogEvent` from an `ObjectMap` and `EventMetadata`
+    pub fn from_map(map: ObjectMap, metadata: EventMetadata) -> Self {
         let inner = Arc::new(Inner::from(Value::Object(map)));
         Self { inner, metadata }
     }
@@ -259,6 +295,16 @@ impl LogEvent {
         self.metadata.add_finalizer(finalizer);
     }
 
+    /// Parse the specified `path` and if there are no parsing errors, attempt to get a reference to a value.
+    /// # Errors
+    /// Will return an error if path parsing failed.
+    pub fn parse_path_and_get_value(
+        &self,
+        path: impl AsRef<str>,
+    ) -> Result<Option<&Value>, PathParseError> {
+        parse_target_path(path.as_ref()).map(|path| self.get(&path))
+    }
+
     #[allow(clippy::needless_pass_by_value)] // TargetPath is always a reference
     pub fn get<'a>(&self, key: impl TargetPath<'a>) -> Option<&Value> {
         match key.prefix() {
@@ -267,19 +313,26 @@ impl LogEvent {
         }
     }
 
+    /// Retrieves the value of a field based on it's meaning.
+    /// This will first check if the value has previously been dropped. It is worth being
+    /// aware that if the field has been dropped and then somehow re-added, we still fetch
+    /// the dropped value here.
     pub fn get_by_meaning(&self, meaning: impl AsRef<str>) -> Option<&Value> {
-        self.metadata()
-            .schema_definition()
-            .meaning_path(meaning.as_ref())
-            .and_then(|path| self.get(path))
+        if let Some(dropped) = self.metadata().dropped_field(&meaning) {
+            Some(dropped)
+        } else {
+            self.metadata()
+                .schema_definition()
+                .meaning_path(meaning.as_ref())
+                .and_then(|path| self.get(path))
+        }
     }
 
-    // TODO(Jean): Once the event API uses `Lookup`, the allocation here can be removed.
-    pub fn find_key_by_meaning(&self, meaning: impl AsRef<str>) -> Option<String> {
+    /// Retrieves the target path of a field based on the specified `meaning`.
+    fn find_key_by_meaning(&self, meaning: impl AsRef<str>) -> Option<&OwnedTargetPath> {
         self.metadata()
             .schema_definition()
             .meaning_path(meaning.as_ref())
-            .map(std::string::ToString::to_string)
     }
 
     #[allow(clippy::needless_pass_by_value)] // TargetPath is always a reference
@@ -298,6 +351,19 @@ impl LogEvent {
         }
     }
 
+    /// Parse the specified `path` and if there are no parsing errors, attempt to insert the specified `value`.
+    ///
+    /// # Errors
+    /// Will return an error if path parsing failed.
+    pub fn parse_path_and_insert(
+        &mut self,
+        path: impl AsRef<str>,
+        value: impl Into<Value>,
+    ) -> Result<Option<Value>, PathParseError> {
+        let target_path = parse_target_path(path.as_ref())?;
+        Ok(self.insert(&target_path, value))
+    }
+
     #[allow(clippy::needless_pass_by_value)] // TargetPath is always a reference
     pub fn insert<'a>(
         &mut self,
@@ -310,6 +376,12 @@ impl LogEvent {
                 .metadata
                 .value_mut()
                 .insert(path.value_path(), value.into()),
+        }
+    }
+
+    pub fn maybe_insert<'a>(&mut self, path: Option<impl TargetPath<'a>>, value: impl Into<Value>) {
+        if let Some(path) = path {
+            self.insert(path, value);
         }
     }
 
@@ -341,20 +413,35 @@ impl LogEvent {
         }
     }
 
-    pub fn keys(&self) -> Option<impl Iterator<Item = String> + '_> {
+    pub fn keys(&self) -> Option<impl Iterator<Item = KeyString> + '_> {
         match &self.inner.fields {
             Value::Object(map) => Some(util::log::keys(map)),
             _ => None,
         }
     }
 
-    pub fn all_fields(&self) -> Option<impl Iterator<Item = (String, &Value)> + Serialize> {
-        self.as_map().map(util::log::all_fields)
+    /// If the event root value is a map, build and return an iterator to event field and value pairs.
+    /// TODO: Ideally this should return target paths to be consistent with other `LogEvent` methods.
+    pub fn all_event_fields(
+        &self,
+    ) -> Option<impl Iterator<Item = (KeyString, &Value)> + Serialize> {
+        self.as_map().map(all_fields)
+    }
+
+    /// If the metadata root value is a map, build and return an iterator to metadata field and value pairs.
+    /// TODO: Ideally this should return target paths to be consistent with other `LogEvent` methods.
+    pub fn all_metadata_fields(
+        &self,
+    ) -> Option<impl Iterator<Item = (KeyString, &Value)> + Serialize> {
+        match self.metadata.value() {
+            Value::Object(metadata_map) => Some(all_metadata_fields(metadata_map)),
+            _ => None,
+        }
     }
 
     /// Returns an iterator of all fields if the value is an Object. Otherwise,
     /// a single field is returned with a "message" key
-    pub fn convert_to_fields(&self) -> impl Iterator<Item = (String, &Value)> + Serialize {
+    pub fn convert_to_fields(&self) -> impl Iterator<Item = (KeyString, &Value)> + Serialize {
         if let Some(map) = self.as_map() {
             util::log::all_fields(map)
         } else {
@@ -370,14 +457,14 @@ impl LogEvent {
         }
     }
 
-    pub fn as_map(&self) -> Option<&BTreeMap<String, Value>> {
+    pub fn as_map(&self) -> Option<&ObjectMap> {
         match self.value() {
             Value::Object(map) => Some(map),
             _ => None,
         }
     }
 
-    pub fn as_map_mut(&mut self) -> Option<&mut BTreeMap<String, Value>> {
+    pub fn as_map_mut(&mut self) -> Option<&mut ObjectMap> {
         match self.value_mut() {
             Value::Object(map) => Some(map),
             _ => None,
@@ -385,14 +472,16 @@ impl LogEvent {
     }
 
     /// Merge all fields specified at `fields` from `incoming` to `current`.
+    /// Note that `fields` containing dots and other special characters will be treated as a single segment.
     pub fn merge(&mut self, mut incoming: LogEvent, fields: &[impl AsRef<str>]) {
         for field in fields {
-            let Some(incoming_val) = incoming.remove(field.as_ref()) else {
-                continue
+            let field_path = event_path!(field.as_ref());
+            let Some(incoming_val) = incoming.remove(field_path) else {
+                continue;
             };
-            match self.get_mut(field.as_ref()) {
+            match self.get_mut(field_path) {
                 None => {
-                    self.insert(field.as_ref(), incoming_val);
+                    self.insert(field_path, incoming_val);
                 }
                 Some(current_val) => current_val.merge(incoming_val),
             }
@@ -406,45 +495,37 @@ impl LogEvent {
 impl LogEvent {
     /// Fetches the "message" path of the event. This is either from the "message" semantic meaning (Vector namespace)
     /// or from the message key set on the "Global Log Schema" (Legacy namespace).
-    // TODO: This can eventually return a `&TargetOwnedPath` once Semantic meaning and the
-    //   "Global Log Schema" are updated to the new path lookup code
-    pub fn message_path(&self) -> Option<String> {
+    pub fn message_path(&self) -> Option<&OwnedTargetPath> {
         match self.namespace() {
             LogNamespace::Vector => self.find_key_by_meaning("message"),
-            LogNamespace::Legacy => Some(log_schema().message_key().to_owned()),
+            LogNamespace::Legacy => log_schema().message_key_target_path(),
         }
     }
 
     /// Fetches the "timestamp" path of the event. This is either from the "timestamp" semantic meaning (Vector namespace)
     /// or from the timestamp key set on the "Global Log Schema" (Legacy namespace).
-    // TODO: This can eventually return a `&TargetOwnedPath` once Semantic meaning and the
-    //   "Global Log Schema" are updated to the new path lookup code
-    pub fn timestamp_path(&self) -> Option<String> {
+    pub fn timestamp_path(&self) -> Option<&OwnedTargetPath> {
         match self.namespace() {
             LogNamespace::Vector => self.find_key_by_meaning("timestamp"),
-            LogNamespace::Legacy => log_schema().timestamp_key().map(ToString::to_string),
+            LogNamespace::Legacy => log_schema().timestamp_key_target_path(),
         }
     }
 
     /// Fetches the `host` path of the event. This is either from the "host" semantic meaning (Vector namespace)
     /// or from the host key set on the "Global Log Schema" (Legacy namespace).
-    // TODO: This can eventually return a `&TargetOwnedPath` once Semantic meaning and the
-    //   "Global Log Schema" are updated to the new path lookup code
-    pub fn host_path(&self) -> Option<String> {
+    pub fn host_path(&self) -> Option<&OwnedTargetPath> {
         match self.namespace() {
             LogNamespace::Vector => self.find_key_by_meaning("host"),
-            LogNamespace::Legacy => Some(log_schema().host_key().to_owned()),
+            LogNamespace::Legacy => log_schema().host_key_target_path(),
         }
     }
 
     /// Fetches the `source_type` path of the event. This is either from the `source_type` Vector metadata field (Vector namespace)
     /// or from the `source_type` key set on the "Global Log Schema" (Legacy namespace).
-    // TODO: This can eventually return a `&TargetOwnedPath` once Semantic meaning and the
-    //   "Global Log Schema" are updated to the new path lookup code
-    pub fn source_type_path(&self) -> &'static str {
+    pub fn source_type_path(&self) -> Option<&OwnedTargetPath> {
         match self.namespace() {
-            LogNamespace::Vector => "%vector.source_type",
-            LogNamespace::Legacy => log_schema().source_type_key(),
+            LogNamespace::Vector => VECTOR_SOURCE_TYPE_PATH.as_ref(),
+            LogNamespace::Legacy => log_schema().source_type_key_target_path(),
         }
     }
 
@@ -453,7 +534,9 @@ impl LogEvent {
     pub fn get_message(&self) -> Option<&Value> {
         match self.namespace() {
             LogNamespace::Vector => self.get_by_meaning("message"),
-            LogNamespace::Legacy => self.get((PathPrefix::Event, log_schema().message_key())),
+            LogNamespace::Legacy => log_schema()
+                .message_key_target_path()
+                .and_then(|key| self.get(key)),
         }
     }
 
@@ -463,8 +546,8 @@ impl LogEvent {
         match self.namespace() {
             LogNamespace::Vector => self.get_by_meaning("timestamp"),
             LogNamespace::Legacy => log_schema()
-                .timestamp_key()
-                .and_then(|key| self.get((PathPrefix::Event, key))),
+                .timestamp_key_target_path()
+                .and_then(|key| self.get(key)),
         }
     }
 
@@ -472,7 +555,8 @@ impl LogEvent {
     /// or from the timestamp key set on the "Global Log Schema" (Legacy namespace).
     pub fn remove_timestamp(&mut self) -> Option<Value> {
         self.timestamp_path()
-            .and_then(|key| self.remove(key.as_str()))
+            .cloned()
+            .and_then(|key| self.remove(&key))
     }
 
     /// Fetches the `host` of the event. This is either from the "host" semantic meaning (Vector namespace)
@@ -480,7 +564,9 @@ impl LogEvent {
     pub fn get_host(&self) -> Option<&Value> {
         match self.namespace() {
             LogNamespace::Vector => self.get_by_meaning("host"),
-            LogNamespace::Legacy => self.get((PathPrefix::Event, log_schema().host_key())),
+            LogNamespace::Legacy => log_schema()
+                .host_key_target_path()
+                .and_then(|key| self.get(key)),
         }
     }
 
@@ -489,7 +575,9 @@ impl LogEvent {
     pub fn get_source_type(&self) -> Option<&Value> {
         match self.namespace() {
             LogNamespace::Vector => self.get(metadata_path!("vector", "source_type")),
-            LogNamespace::Legacy => self.get((PathPrefix::Event, log_schema().source_type_key())),
+            LogNamespace::Legacy => log_schema()
+                .source_type_key_target_path()
+                .and_then(|key| self.get(key)),
         }
     }
 }
@@ -519,10 +607,9 @@ mod test_utils {
     impl From<Bytes> for LogEvent {
         fn from(message: Bytes) -> Self {
             let mut log = LogEvent::default();
-
-            log.insert(log_schema().message_key(), message);
-            if let Some(timestamp_key) = log_schema().timestamp_key() {
-                log.insert((PathPrefix::Event, timestamp_key), Utc::now());
+            log.maybe_insert(log_schema().message_key_target_path(), message);
+            if let Some(timestamp_key) = log_schema().timestamp_key_target_path() {
+                log.insert(timestamp_key, Utc::now());
             }
             log
         }
@@ -547,16 +634,16 @@ impl From<Value> for LogEvent {
     }
 }
 
-impl From<BTreeMap<String, Value>> for LogEvent {
-    fn from(map: BTreeMap<String, Value>) -> Self {
+impl From<ObjectMap> for LogEvent {
+    fn from(map: ObjectMap) -> Self {
         Self::from_parts(Value::Object(map), EventMetadata::default())
     }
 }
 
-impl From<HashMap<String, Value>> for LogEvent {
-    fn from(map: HashMap<String, Value>) -> Self {
+impl From<HashMap<KeyString, Value>> for LogEvent {
+    fn from(map: HashMap<KeyString, Value>) -> Self {
         Self::from_parts(
-            Value::Object(map.into_iter().collect::<BTreeMap<_, _>>()),
+            Value::Object(map.into_iter().collect::<ObjectMap>()),
             EventMetadata::default(),
         )
     }
@@ -570,8 +657,8 @@ impl TryFrom<serde_json::Value> for LogEvent {
             serde_json::Value::Object(fields) => Ok(LogEvent::from(
                 fields
                     .into_iter()
-                    .map(|(k, v)| (k, v.into()))
-                    .collect::<BTreeMap<_, _>>(),
+                    .map(|(k, v)| (k.into(), v.into()))
+                    .collect::<ObjectMap>(),
             )),
             _ => Err(crate::Error::from(
                 "Attempted to convert non-Object JSON into a LogEvent.",
@@ -588,6 +675,7 @@ impl TryInto<serde_json::Value> for LogEvent {
     }
 }
 
+#[cfg(any(test, feature = "test"))]
 impl<T> std::ops::Index<T> for LogEvent
 where
     T: AsRef<str>,
@@ -595,7 +683,9 @@ where
     type Output = Value;
 
     fn index(&self, key: T) -> &Value {
-        self.get(key.as_ref())
+        self.parse_path_and_get_value(key.as_ref())
+            .ok()
+            .flatten()
             .unwrap_or_else(|| panic!("Key is not found: {:?}", key.as_ref()))
     }
 }
@@ -607,7 +697,9 @@ where
 {
     fn extend<I: IntoIterator<Item = (K, V)>>(&mut self, iter: I) {
         for (k, v) in iter {
-            self.insert(k.as_ref(), v.into());
+            if let Ok(path) = parse_target_path(k.as_ref()) {
+                self.insert(&path, v.into());
+            }
         }
     }
 }
@@ -630,6 +722,24 @@ impl Serialize for LogEvent {
     }
 }
 
+// Tracing owned target paths used for tracing to log event conversions.
+struct TracingTargetPaths {
+    pub(crate) timestamp: OwnedTargetPath,
+    pub(crate) kind: OwnedTargetPath,
+    pub(crate) module_path: OwnedTargetPath,
+    pub(crate) level: OwnedTargetPath,
+    pub(crate) target: OwnedTargetPath,
+}
+
+/// Lazily initialized singleton.
+static TRACING_TARGET_PATHS: Lazy<TracingTargetPaths> = Lazy::new(|| TracingTargetPaths {
+    timestamp: OwnedTargetPath::event(owned_value_path!("timestamp")),
+    kind: OwnedTargetPath::event(owned_value_path!("metadata", "kind")),
+    level: OwnedTargetPath::event(owned_value_path!("metadata", "level")),
+    module_path: OwnedTargetPath::event(owned_value_path!("metadata", "module_path")),
+    target: OwnedTargetPath::event(owned_value_path!("metadata", "target")),
+});
+
 impl From<&tracing::Event<'_>> for LogEvent {
     fn from(event: &tracing::Event<'_>) -> Self {
         let now = chrono::Utc::now();
@@ -637,11 +747,11 @@ impl From<&tracing::Event<'_>> for LogEvent {
         event.record(&mut maker);
 
         let mut log = maker;
-        log.insert("timestamp", now);
+        log.insert(&TRACING_TARGET_PATHS.timestamp, now);
 
         let meta = event.metadata();
         log.insert(
-            "metadata.kind",
+            &TRACING_TARGET_PATHS.kind,
             if meta.is_event() {
                 Value::Bytes("event".to_string().into())
             } else if meta.is_span() {
@@ -650,42 +760,42 @@ impl From<&tracing::Event<'_>> for LogEvent {
                 Value::Null
             },
         );
-        log.insert("metadata.level", meta.level().to_string());
+        log.insert(&TRACING_TARGET_PATHS.level, meta.level().to_string());
         log.insert(
-            "metadata.module_path",
+            &TRACING_TARGET_PATHS.module_path,
             meta.module_path()
                 .map_or(Value::Null, |mp| Value::Bytes(mp.to_string().into())),
         );
-        log.insert("metadata.target", meta.target().to_string());
-
+        log.insert(&TRACING_TARGET_PATHS.target, meta.target().to_string());
         log
     }
 }
 
+/// Note that `tracing::field::Field` containing dots and other special characters will be treated as a single segment.
 impl tracing::field::Visit for LogEvent {
     fn record_str(&mut self, field: &tracing::field::Field, value: &str) {
-        self.insert(field.name(), value.to_string());
+        self.insert(event_path!(field.name()), value.to_string());
     }
 
     fn record_debug(&mut self, field: &tracing::field::Field, value: &dyn Debug) {
-        self.insert(field.name(), format!("{value:?}"));
+        self.insert(event_path!(field.name()), format!("{value:?}"));
     }
 
     fn record_i64(&mut self, field: &tracing::field::Field, value: i64) {
-        self.insert(field.name(), value);
+        self.insert(event_path!(field.name()), value);
     }
 
     fn record_u64(&mut self, field: &tracing::field::Field, value: u64) {
-        let field = field.name();
+        let field_path = event_path!(field.name());
         let converted: Result<i64, _> = value.try_into();
         match converted {
-            Ok(value) => self.insert(field, value),
-            Err(_) => self.insert(field, value.to_string()),
+            Ok(value) => self.insert(field_path, value),
+            Err(_) => self.insert(field_path, value.to_string()),
         };
     }
 
     fn record_bool(&mut self, field: &tracing::field::Field, value: bool) {
-        self.insert(field.name(), value);
+        self.insert(event_path!(field.name()), value);
     }
 }
 
@@ -694,7 +804,7 @@ mod test {
     use super::*;
     use crate::test_util::open_fixture;
     use lookup::event_path;
-    use vrl::value::value;
+    use vrl::value;
 
     // The following two tests assert that renaming a key has no effect if the
     // keys are equivalent, whether the key exists in the log or not.
@@ -995,5 +1105,39 @@ mod test {
         };
 
         vector_common::assert_event_data_eq!(merged, expected);
+    }
+
+    #[test]
+    fn event_fields_iter() {
+        let mut log = LogEvent::default();
+        log.insert("a", 0);
+        log.insert("a.b", 1);
+        log.insert("c", 2);
+        let actual: Vec<(KeyString, Value)> = log
+            .all_event_fields()
+            .unwrap()
+            .map(|(s, v)| (s, v.clone()))
+            .collect();
+        assert_eq!(
+            actual,
+            vec![("a.b".into(), 1.into()), ("c".into(), 2.into())]
+        );
+    }
+
+    #[test]
+    fn metadata_fields_iter() {
+        let mut log = LogEvent::default();
+        log.insert("%a", 0);
+        log.insert("%a.b", 1);
+        log.insert("%c", 2);
+        let actual: Vec<(KeyString, Value)> = log
+            .all_metadata_fields()
+            .unwrap()
+            .map(|(s, v)| (s, v.clone()))
+            .collect();
+        assert_eq!(
+            actual,
+            vec![("%a.b".into(), 1.into()), ("%c".into(), 2.into())]
+        );
     }
 }

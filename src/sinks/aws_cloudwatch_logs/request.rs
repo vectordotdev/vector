@@ -4,51 +4,52 @@ use std::{
     task::{ready, Context, Poll},
 };
 
-use aws_sdk_cloudwatchlogs::error::{
-    CreateLogGroupError, CreateLogGroupErrorKind, CreateLogStreamError, CreateLogStreamErrorKind,
-    DescribeLogStreamsError, DescribeLogStreamsErrorKind, PutLogEventsError,
+use aws_sdk_cloudwatchlogs::{
+    operation::{
+        create_log_group::CreateLogGroupError,
+        create_log_stream::CreateLogStreamError,
+        describe_log_streams::{DescribeLogStreamsError, DescribeLogStreamsOutput},
+        put_log_events::{PutLogEventsError, PutLogEventsOutput},
+        put_retention_policy::PutRetentionPolicyError,
+    },
+    types::InputLogEvent,
+    Client as CloudwatchLogsClient,
 };
-use aws_sdk_cloudwatchlogs::operation::PutLogEvents;
-
-use aws_sdk_cloudwatchlogs::model::InputLogEvent;
-use aws_sdk_cloudwatchlogs::output::{DescribeLogStreamsOutput, PutLogEventsOutput};
-use aws_sdk_cloudwatchlogs::types::SdkError;
-use aws_sdk_cloudwatchlogs::Client as CloudwatchLogsClient;
-use aws_smithy_http::operation::{Operation, Request};
+use aws_smithy_runtime_api::client::{orchestrator::HttpResponse, result::SdkError};
 use futures::{future::BoxFuture, FutureExt};
+use http::{header::HeaderName, HeaderValue};
 use indexmap::IndexMap;
 use tokio::sync::oneshot;
 
-use crate::sinks::aws_cloudwatch_logs::service::{CloudwatchError, SmithyClient};
+use crate::sinks::aws_cloudwatch_logs::config::Retention;
+use crate::sinks::aws_cloudwatch_logs::service::CloudwatchError;
 
 pub struct CloudwatchFuture {
     client: Client,
     state: State,
     create_missing_group: bool,
     create_missing_stream: bool,
+    retention_enabled: bool,
     events: Vec<Vec<InputLogEvent>>,
     token_tx: Option<oneshot::Sender<Option<String>>>,
 }
 
 struct Client {
     client: CloudwatchLogsClient,
-    // we store a separate smithy_client to set request headers for PutLogEvents since the regular
-    // client cannot set headers
-    //
-    // https://github.com/awslabs/aws-sdk-rust/issues/537
-    smithy_client: SmithyClient,
     stream_name: String,
     group_name: String,
-    headers: IndexMap<String, String>,
+    headers: IndexMap<HeaderName, HeaderValue>,
+    retention_days: u32,
 }
 
-type ClientResult<T, E> = BoxFuture<'static, Result<T, SdkError<E>>>;
+type ClientResult<T, E> = BoxFuture<'static, Result<T, SdkError<E, HttpResponse>>>;
 
 enum State {
     CreateGroup(ClientResult<(), CreateLogGroupError>),
     CreateStream(ClientResult<(), CreateLogStreamError>),
     DescribeStream(ClientResult<DescribeLogStreamsOutput, DescribeLogStreamsError>),
     Put(ClientResult<PutLogEventsOutput, PutLogEventsError>),
+    PutRetentionPolicy(ClientResult<(), PutRetentionPolicyError>),
 }
 
 impl CloudwatchFuture {
@@ -56,22 +57,23 @@ impl CloudwatchFuture {
     #[allow(clippy::too_many_arguments)]
     pub(super) fn new(
         client: CloudwatchLogsClient,
-        smithy_client: SmithyClient,
-        headers: IndexMap<String, String>,
+        headers: IndexMap<HeaderName, HeaderValue>,
         stream_name: String,
         group_name: String,
         create_missing_group: bool,
         create_missing_stream: bool,
+        retention: Retention,
         mut events: Vec<Vec<InputLogEvent>>,
         token: Option<String>,
         token_tx: oneshot::Sender<Option<String>>,
     ) -> Self {
+        let retention_days = retention.days;
         let client = Client {
             client,
-            smithy_client,
             stream_name,
             group_name,
             headers,
+            retention_days,
         };
 
         let state = if let Some(token) = token {
@@ -80,6 +82,8 @@ impl CloudwatchFuture {
             State::DescribeStream(client.describe_stream())
         };
 
+        let retention_enabled = retention.enabled;
+
         Self {
             client,
             events,
@@ -87,6 +91,7 @@ impl CloudwatchFuture {
             token_tx: Some(token_tx),
             create_missing_group,
             create_missing_stream,
+            retention_enabled,
         }
     }
 }
@@ -101,28 +106,29 @@ impl Future for CloudwatchFuture {
                     let response = match ready!(fut.poll_unpin(cx)) {
                         Ok(response) => response,
                         Err(err) => {
-                            if let SdkError::ServiceError { err, raw: _ } = &err {
-                                if let DescribeLogStreamsErrorKind::ResourceNotFoundException(_) =
-                                    err.kind
+                            if let SdkError::ServiceError(inner) = &err {
+                                if matches!(
+                                    inner.err(),
+                                    DescribeLogStreamsError::ResourceNotFoundException(_)
+                                ) && self.create_missing_group
                                 {
-                                    if self.create_missing_group {
-                                        info!("Log group provided does not exist; creating a new one.");
+                                    info!("Log group provided does not exist; creating a new one.");
 
-                                        self.state =
-                                            State::CreateGroup(self.client.create_log_group());
-                                        continue;
-                                    }
+                                    self.state = State::CreateGroup(self.client.create_log_group());
+                                    continue;
                                 }
                             }
-                            return Poll::Ready(Err(CloudwatchError::Describe(err)));
+                            return Poll::Ready(Err(CloudwatchError::DescribeLogStreams(err)));
                         }
                     };
+
+                    let stream_name = &self.client.stream_name;
 
                     if let Some(stream) = response
                         .log_streams
                         .ok_or(CloudwatchError::NoStreamsFound)?
                         .into_iter()
-                        .next()
+                        .find(|log_stream| log_stream.log_stream_name == Some(stream_name.clone()))
                     {
                         debug!(message = "Stream found.", stream = ?stream.log_stream_name);
 
@@ -148,9 +154,9 @@ impl Future for CloudwatchFuture {
                         Ok(_) => {}
                         Err(err) => {
                             let resource_already_exists = match &err {
-                                SdkError::ServiceError { err, raw: _ } => matches!(
-                                    err.kind,
-                                    CreateLogGroupErrorKind::ResourceAlreadyExistsException(_)
+                                SdkError::ServiceError(inner) => matches!(
+                                    inner.err(),
+                                    CreateLogGroupError::ResourceAlreadyExistsException(_)
                                 ),
                                 _ => false,
                             };
@@ -161,6 +167,11 @@ impl Future for CloudwatchFuture {
                     };
 
                     info!(message = "Group created.", name = %self.client.group_name);
+
+                    if self.retention_enabled {
+                        self.state = State::PutRetentionPolicy(self.client.put_retention_policy());
+                        continue;
+                    }
 
                     // self does not abide by `create_missing_stream` since a group
                     // never has any streams and thus we need to create one if a group
@@ -173,9 +184,9 @@ impl Future for CloudwatchFuture {
                         Ok(_) => {}
                         Err(err) => {
                             let resource_already_exists = match &err {
-                                SdkError::ServiceError { err, raw: _ } => matches!(
-                                    err.kind,
-                                    CreateLogStreamErrorKind::ResourceAlreadyExistsException(_)
+                                SdkError::ServiceError(inner) => matches!(
+                                    inner.err(),
+                                    CreateLogStreamError::ResourceAlreadyExistsException(_)
                                 ),
                                 _ => false,
                             };
@@ -211,6 +222,19 @@ impl Future for CloudwatchFuture {
                         return Poll::Ready(Ok(()));
                     }
                 }
+
+                State::PutRetentionPolicy(fut) => {
+                    match ready!(fut.poll_unpin(cx)) {
+                        Ok(_) => {}
+                        Err(error) => {
+                            return Poll::Ready(Err(CloudwatchError::PutRetentionPolicy(error)))
+                        }
+                    }
+
+                    info!(message = "Retention policy updated for stream.", name = %self.client.stream_name);
+
+                    self.state = State::CreateStream(self.client.create_log_stream());
+                }
             }
         }
     }
@@ -222,43 +246,25 @@ impl Client {
         sequence_token: Option<String>,
         log_events: Vec<InputLogEvent>,
     ) -> ClientResult<PutLogEventsOutput, PutLogEventsError> {
-        let client = std::sync::Arc::clone(&self.smithy_client);
-        let cw_client = self.client.clone();
+        let client = self.client.clone();
         let group_name = self.group_name.clone();
         let stream_name = self.stream_name.clone();
         let headers = self.headers.clone();
+
         Box::pin(async move {
-            // #12760 this is a relatively convoluted way of changing the headers of a request
-            // about to be sent. https://github.com/awslabs/aws-sdk-rust/issues/537 should
-            // eventually make this better.
-            let op = PutLogEvents::builder()
+            client
+                .put_log_events()
                 .set_log_events(Some(log_events))
                 .set_sequence_token(sequence_token)
                 .log_group_name(group_name)
                 .log_stream_name(stream_name)
-                .build()
-                .map_err(|err| SdkError::ConstructionFailure(err.into()))?
-                .make_operation(cw_client.conf())
-                .await
-                .map_err(|err| SdkError::ConstructionFailure(err.into()))?;
-
-            let (req, parts) = op.into_request_response();
-            let (mut body, props) = req.into_parts();
-            for (header, value) in headers.iter() {
-                let owned_header = header.clone();
-                let owned_value = value.clone();
-                body.headers_mut().insert(
-                    http::header::HeaderName::from_bytes(owned_header.as_bytes())
-                        .map_err(|err| SdkError::ConstructionFailure(err.into()))?,
-                    http::HeaderValue::from_str(owned_value.as_str())
-                        .map_err(|err| SdkError::ConstructionFailure(err.into()))?,
-                );
-            }
-            client
-                .call(Operation::from_parts(
-                    Request::from_parts(body, props),
-                    parts,
-                ))
+                .customize()
+                .mutate_request(move |req| {
+                    for (header, value) in headers.iter() {
+                        req.headers_mut().insert(header.clone(), value.clone());
+                    }
+                })
+                .send()
                 .await
         })
     }
@@ -272,7 +278,6 @@ impl Client {
         Box::pin(async move {
             client
                 .describe_log_streams()
-                .limit(1)
                 .log_group_name(group_name)
                 .log_stream_name_prefix(stream_name)
                 .send()
@@ -302,6 +307,21 @@ impl Client {
                 .create_log_stream()
                 .log_group_name(group_name)
                 .log_stream_name(stream_name)
+                .send()
+                .await?;
+            Ok(())
+        })
+    }
+
+    pub fn put_retention_policy(&self) -> ClientResult<(), PutRetentionPolicyError> {
+        let client = self.client.clone();
+        let group_name = self.group_name.clone();
+        let retention_days = self.retention_days;
+        Box::pin(async move {
+            client
+                .put_retention_policy()
+                .log_group_name(group_name)
+                .retention_in_days(retention_days.try_into().unwrap())
                 .send()
                 .await?;
             Ok(())

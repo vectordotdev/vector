@@ -11,8 +11,7 @@ use std::{
 use async_graphql::{Enum, InputObject, Interface, Object, Subscription};
 use once_cell::sync::Lazy;
 use tokio_stream::{wrappers::BroadcastStream, Stream, StreamExt};
-use vector_config::NamedComponent;
-use vector_core::internal_event::DEFAULT_OUTPUT;
+use vector_lib::internal_event::DEFAULT_OUTPUT;
 
 use crate::{
     api::schema::{
@@ -26,8 +25,8 @@ use crate::{
 
 #[derive(Debug, Clone, Interface)]
 #[graphql(
-    field(name = "component_id", type = "String"),
-    field(name = "component_type", type = "String")
+    field(name = "component_id", ty = "String"),
+    field(name = "component_type", ty = "String")
 )]
 pub enum Component {
     Source(source::Source),

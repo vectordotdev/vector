@@ -55,11 +55,11 @@ impl TagCardinalityLimit {
         }
 
         // Tag value not yet part of the accepted set.
-        if tag_value_set.len() < self.config.value_limit as usize {
+        if tag_value_set.len() < self.config.value_limit {
             // accept the new value
             tag_value_set.insert(value.clone());
 
-            if tag_value_set.len() == self.config.value_limit as usize {
+            if tag_value_set.len() == self.config.value_limit {
                 emit!(TagCardinalityValueLimitReached { key });
             }
 
@@ -76,7 +76,7 @@ impl TagCardinalityLimit {
         self.accepted_tags
             .get(key)
             .map(|value_set| {
-                !value_set.contains(value) && value_set.len() >= self.config.value_limit as usize
+                !value_set.contains(value) && value_set.len() >= self.config.value_limit
             })
             .unwrap_or(false)
     }

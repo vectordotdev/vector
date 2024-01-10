@@ -13,3 +13,11 @@ runner:
 
 matrix:
   version: ['13.1']
+
+# changes to these files/paths will invoke the integration test in CI
+# expressions are evaluated using https://github.com/micromatch/picomatch
+paths:
+- "src/internal_events/postgresql_metrics.rs"
+- "src/sources/postgresql_metrics.rs"
+- "src/sources/util/**"
+- "scripts/integration/postgres/**"

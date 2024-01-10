@@ -1,30 +1,14 @@
-use std::{fmt::Debug, io, num::NonZeroUsize, sync::Arc};
+use std::{fmt::Debug, io, sync::Arc};
 
-use async_trait::async_trait;
 use bytes::Bytes;
-use codecs::{encoding::Framer, CharacterDelimitedEncoder, JsonSerializerConfig};
-use futures::stream::{BoxStream, StreamExt};
-use lookup::event_path;
 use snafu::Snafu;
-use tower::Service;
-use vector_common::request_metadata::RequestMetadata;
-use vector_core::{
-    event::{Event, EventFinalizers, Finalizable, Value},
-    partition::Partitioner,
-    sink::StreamSink,
-    stream::{BatcherSettings, DriverResponse},
-};
+use vector_lib::codecs::{encoding::Framer, CharacterDelimitedEncoder, JsonSerializerConfig};
+use vector_lib::lookup::event_path;
 
 use super::{config::MAX_PAYLOAD_BYTES, service::LogApiRequest};
-use crate::{
-    codecs::{Encoder, Transformer},
-    internal_events::SinkRequestBuildError,
-    sinks::util::{
-        encoding::{write_all, Encoder as _},
-        metadata::RequestMetadataBuilder,
-        request_builder::EncodeResult,
-        Compression, Compressor, RequestBuilder, SinkBuilderExt,
-    },
+use crate::sinks::{
+    prelude::*,
+    util::{encoding::Encoder as _, Compressor},
 };
 #[derive(Default)]
 struct EventPartitioner;
@@ -125,24 +109,30 @@ impl JsonEncoding {
 }
 
 impl crate::sinks::util::encoding::Encoder<Vec<Event>> for JsonEncoding {
-    fn encode_input(&self, mut input: Vec<Event>, writer: &mut dyn io::Write) -> io::Result<usize> {
+    fn encode_input(
+        &self,
+        mut input: Vec<Event>,
+        writer: &mut dyn io::Write,
+    ) -> io::Result<(usize, GroupedCountByteSize)> {
         for event in input.iter_mut() {
             let log = event.as_mut_log();
             let message_path = log
                 .message_path()
-                .expect("message is required (make sure the \"message\" semantic meaning is set)");
-            log.rename_key(message_path.as_str(), event_path!("message"));
+                .expect("message is required (make sure the \"message\" semantic meaning is set)")
+                .clone();
+            log.rename_key(&message_path, event_path!("message"));
 
-            if let Some(host_path) = log.host_path() {
-                log.rename_key(host_path.as_str(), event_path!("hostname"));
+            if let Some(host_path) = log.host_path().cloned().as_ref() {
+                log.rename_key(host_path, event_path!("hostname"));
             }
 
-            if let Some(Value::Timestamp(ts)) = log.remove(
-                log
+            let message_path = log
                 .timestamp_path()
-                .expect("timestamp is required (make sure the \"timestamp\" semantic meaning is set)")
-                .as_str()
-            ) {
+                .expect(
+                    "timestamp is required (make sure the \"timestamp\" semantic meaning is set)",
+                )
+                .clone();
+            if let Some(Value::Timestamp(ts)) = log.remove(&message_path) {
                 log.insert(
                     event_path!("timestamp"),
                     Value::Integer(ts.timestamp_millis()),
@@ -219,7 +209,7 @@ impl RequestBuilder<(Option<Arc<str>>, Vec<Event>)> for LogRequestBuilder {
         // to (un)compressed size limitations.
         let mut buf = Vec::new();
         let n_events = events.len();
-        let uncompressed_size = self.encoder().encode_input(events, &mut buf)?;
+        let (uncompressed_size, byte_size) = self.encoder().encode_input(events, &mut buf)?;
         if uncompressed_size > MAX_PAYLOAD_BYTES {
             return Err(RequestBuildError::PayloadTooBig);
         }
@@ -230,9 +220,13 @@ impl RequestBuilder<(Option<Arc<str>>, Vec<Event>)> for LogRequestBuilder {
         let bytes = compressor.into_inner().freeze();
 
         if self.compression.is_compressed() {
-            Ok(EncodeResult::compressed(bytes, uncompressed_size))
+            Ok(EncodeResult::compressed(
+                bytes,
+                uncompressed_size,
+                byte_size,
+            ))
         } else {
-            Ok(EncodeResult::uncompressed(bytes))
+            Ok(EncodeResult::uncompressed(bytes, byte_size))
         }
     }
 
@@ -266,13 +260,13 @@ where
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let default_api_key = Arc::clone(&self.default_api_key);
 
-        let partitioner = EventPartitioner::default();
+        let partitioner = EventPartitioner;
+        let batch_settings = self.batch_settings;
 
-        let builder_limit = NonZeroUsize::new(64);
-        let input = input.batched_partitioned(partitioner, self.batch_settings);
+        let input = input.batched_partitioned(partitioner, || batch_settings.as_byte_size_config());
         input
             .request_builder(
-                builder_limit,
+                default_request_builder_concurrency_limit(),
                 LogRequestBuilder {
                     default_api_key,
                     encoding: self.encoding,

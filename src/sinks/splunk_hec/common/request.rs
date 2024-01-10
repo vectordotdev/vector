@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
 use bytes::Bytes;
-use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
-use vector_core::{
+use vector_lib::request_metadata::{MetaDescriptive, RequestMetadata};
+use vector_lib::{
     event::{EventFinalizers, Finalizable},
     ByteSizeOf,
 };
@@ -40,7 +40,11 @@ impl Finalizable for HecRequest {
 }
 
 impl MetaDescriptive for HecRequest {
-    fn get_metadata(&self) -> RequestMetadata {
-        self.metadata
+    fn get_metadata(&self) -> &RequestMetadata {
+        &self.metadata
+    }
+
+    fn metadata_mut(&mut self) -> &mut RequestMetadata {
+        &mut self.metadata
     }
 }

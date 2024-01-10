@@ -1,11 +1,11 @@
 use std::io;
 
 use bytes::Bytes;
-use chrono::Utc;
-use codecs::encoding::Framer;
+use chrono::{FixedOffset, Utc};
 use uuid::Uuid;
-use vector_common::request_metadata::RequestMetadata;
-use vector_core::event::Finalizable;
+use vector_lib::codecs::encoding::Framer;
+use vector_lib::event::Finalizable;
+use vector_lib::request_metadata::RequestMetadata;
 
 use crate::{
     codecs::{Encoder, Transformer},
@@ -32,6 +32,7 @@ pub struct S3RequestOptions {
     pub api_options: S3Options,
     pub encoder: (Transformer, Encoder<Framer>),
     pub compression: Compression,
+    pub filename_tz_offset: Option<FixedOffset>,
 }
 
 impl RequestBuilder<(S3PartitionKey, Vec<Event>)> for S3RequestOptions {
@@ -76,7 +77,14 @@ impl RequestBuilder<(S3PartitionKey, Vec<Event>)> for S3RequestOptions {
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
         let filename = {
-            let formatted_ts = Utc::now().format(self.filename_time_format.as_str());
+            let formatted_ts = match self.filename_tz_offset {
+                Some(offset) => Utc::now()
+                    .with_timezone(&offset)
+                    .format(self.filename_time_format.as_str()),
+                None => Utc::now()
+                    .with_timezone(&chrono::Utc)
+                    .format(self.filename_time_format.as_str()),
+            };
 
             self.filename_append_uuid
                 .then(|| format!("{}-{}", formatted_ts, Uuid::new_v4().hyphenated()))

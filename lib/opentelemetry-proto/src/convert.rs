@@ -2,12 +2,11 @@ use bytes::Bytes;
 use chrono::{DateTime, TimeZone, Utc};
 use lookup::path;
 use ordered_float::NotNan;
-use std::collections::BTreeMap;
 use vector_core::{
     config::{log_schema, LegacyKey, LogNamespace},
     event::{Event, LogEvent},
 };
-use vrl::value::Value;
+use vrl::value::{ObjectMap, Value};
 
 use super::proto::{
     common::v1::{any_value::Value as PBValue, KeyValue},
@@ -73,10 +72,14 @@ fn kv_list_into_value(arr: Vec<KeyValue>) -> Value {
     Value::Object(
         arr.into_iter()
             .filter_map(|kv| {
-                kv.value
-                    .map(|av| (kv.key, av.value.map(Into::into).unwrap_or(Value::Null)))
+                kv.value.map(|av| {
+                    (
+                        kv.key.into(),
+                        av.value.map(Into::into).unwrap_or(Value::Null),
+                    )
+                })
             })
-            .collect::<BTreeMap<String, Value>>(),
+            .collect::<ObjectMap>(),
     )
 }
 
@@ -94,7 +97,7 @@ impl ResourceLog {
             LogNamespace::Legacy => {
                 let mut log = LogEvent::default();
                 if let Some(v) = self.log_record.body.and_then(|av| av.value) {
-                    log.insert(log_schema().message_key(), v);
+                    log.maybe_insert(log_schema().message_key_target_path(), v);
                 }
                 log
             }
@@ -208,7 +211,7 @@ impl ResourceLog {
 
         log_namespace.insert_vector_metadata(
             &mut log,
-            Some(log_schema().source_type_key()),
+            log_schema().source_type_key(),
             path!("source_type"),
             Bytes::from_static(SOURCE_NAME.as_bytes()),
         );

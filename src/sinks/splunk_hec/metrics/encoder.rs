@@ -1,6 +1,8 @@
 use std::{collections::BTreeMap, iter};
 
 use serde::Serialize;
+use vector_lib::request_metadata::GroupedCountByteSize;
+use vector_lib::{config::telemetry, EstimatedJsonEncodedSizeOf};
 
 use super::sink::HecProcessedEvent;
 use crate::{internal_events::SplunkEventEncodeError, sinks::util::encoding::Encoder};
@@ -95,7 +97,12 @@ impl Encoder<Vec<HecProcessedEvent>> for HecMetricsEncoder {
         &self,
         input: Vec<HecProcessedEvent>,
         writer: &mut dyn std::io::Write,
-    ) -> std::io::Result<usize> {
+    ) -> std::io::Result<(usize, GroupedCountByteSize)> {
+        let mut byte_size = telemetry().create_request_count_byte_size();
+        for event in &input {
+            byte_size.add_event(event, event.estimated_json_encoded_size_of());
+        }
+
         let encoded_input: Vec<u8> = input
             .into_iter()
             .filter_map(Self::encode_event)
@@ -103,6 +110,6 @@ impl Encoder<Vec<HecProcessedEvent>> for HecMetricsEncoder {
             .collect();
         let encoded_size = encoded_input.len();
         writer.write_all(encoded_input.as_slice())?;
-        Ok(encoded_size)
+        Ok((encoded_size, byte_size))
     }
 }

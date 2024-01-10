@@ -1,9 +1,9 @@
 use std::num::NonZeroUsize;
 
-use codecs::decoding::{DeserializerConfig, FramingConfig};
-use lookup::owned_value_path;
-use vector_config::configurable_component;
-use vector_core::config::{LegacyKey, LogNamespace};
+use vector_lib::codecs::decoding::{DeserializerConfig, FramingConfig};
+use vector_lib::config::{LegacyKey, LogNamespace};
+use vector_lib::configurable::configurable_component;
+use vector_lib::lookup::owned_value_path;
 use vrl::value::Kind;
 
 use crate::aws::create_client;
@@ -45,6 +45,7 @@ pub struct AwsSqsConfig {
     #[serde(default = "default_poll_secs")]
     #[derivative(Default(value = "default_poll_secs()"))]
     #[configurable(metadata(docs::type_unit = "seconds"))]
+    #[configurable(metadata(docs::human_name = "Poll Wait Time"))]
     pub poll_secs: u32,
 
     /// The visibility timeout to use for messages, in seconds.
@@ -58,6 +59,7 @@ pub struct AwsSqsConfig {
     #[serde(default = "default_visibility_timeout_secs")]
     #[derivative(Default(value = "default_visibility_timeout_secs()"))]
     #[configurable(metadata(docs::type_unit = "seconds"))]
+    #[configurable(metadata(docs::human_name = "Visibility Timeout"))]
     pub(super) visibility_timeout_secs: u32,
 
     /// Whether to delete the message once it is processed.
@@ -109,7 +111,8 @@ impl SourceConfig for AwsSqsConfig {
 
         let client = self.build_client(&cx).await?;
         let decoder =
-            DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace).build();
+            DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace)
+                .build()?;
         let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
 
         Ok(Box::pin(
@@ -160,10 +163,9 @@ impl AwsSqsConfig {
         create_client::<SqsClientBuilder>(
             &self.auth,
             self.region.region(),
-            self.region.endpoint()?,
+            self.region.endpoint(),
             &cx.proxy,
             &self.tls,
-            false,
         )
         .await
     }

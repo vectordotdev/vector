@@ -14,3 +14,14 @@ env:
 
 matrix:
   version: [latest]
+
+# changes to these files/paths will invoke the integration test in CI
+# expressions are evaluated using https://github.com/micromatch/picomatch
+paths:
+- "src/internal_events/nats.rs"
+- "src/sources/nats.rs"
+- "src/sources/util/**"
+- "src/sinks/nats.rs"
+- "src/sinks/util/**"
+- "src/nats.rs"
+- "scripts/integration/nats/**"

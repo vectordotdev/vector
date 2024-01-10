@@ -1,0 +1,20 @@
+features:
+- greptimedb-integration-tests
+
+test_filter: '::greptimedb::'
+
+runner:
+  env:
+    GREPTIMEDB_ENDPOINT: greptimedb:4001
+    GREPTIMEDB_HTTP: http://greptimedb:4000
+
+matrix:
+  # Temporarily pegging to the latest known stable release
+  # since using `latest` is failing consistently.
+  version: [v0.4.4]
+
+# changes to these files/paths will invoke the integration test in CI
+# expressions are evaluated using https://github.com/micromatch/picomatch
+paths:
+- "src/sinks/greptimedb/**"
+- "scripts/integration/greptimedb/**"

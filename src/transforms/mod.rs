@@ -12,6 +12,7 @@ pub mod aws_ec2_metadata;
 pub mod dedupe;
 #[cfg(feature = "transforms-filter")]
 pub mod filter;
+#[cfg(feature = "transforms-log_to_metric")]
 pub mod log_to_metric;
 #[cfg(feature = "transforms-lua")]
 pub mod lua;
@@ -30,7 +31,7 @@ pub mod tag_cardinality_limit;
 #[cfg(feature = "transforms-throttle")]
 pub mod throttle;
 
-pub use vector_core::transform::{
+pub use vector_lib::transform::{
     FunctionTransform, OutputBuffer, SyncTransform, TaskTransform, Transform, TransformOutputs,
     TransformOutputsBuf,
 };
@@ -50,7 +51,7 @@ mod test {
     use futures_util::SinkExt;
     use tokio::sync::mpsc;
     use tokio_util::sync::PollSender;
-    use vector_core::transform::FunctionTransform;
+    use vector_lib::transform::FunctionTransform;
 
     use crate::{
         config::{
@@ -90,6 +91,7 @@ mod test {
 
         let (tx, rx) = mpsc::channel(1);
 
+        // TODO: Use non-hard-coded names to improve tests.
         builder.add_source("in", UnitTestStreamSourceConfig::new(events));
         builder.add_transform("transform", &["in"], transform_config);
         builder.add_sink(

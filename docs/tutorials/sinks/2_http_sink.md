@@ -12,32 +12,12 @@ To start, update our imports to the following:
 use std::task::Poll;
 
 use crate::{
-    config::{GenerateConfig, SinkConfig, SinkContext},
+    sinks::prelude::*,
     http::HttpClient,
     internal_events::SinkRequestBuildError,
-    sinks::util::{
-        encoding::{write_all, Encoder},
-        metadata::RequestMetadataBuilder,
-        request_builder::EncodeResult,
-        Compression, RequestBuilder, SinkBuilderExt,
-    },
-    sinks::Healthcheck,
 };
+use vector_core::config::telemetry;
 use bytes::Bytes;
-use futures::{future::BoxFuture, stream::BoxStream, StreamExt};
-use vector_common::{
-    finalization::{EventFinalizers, EventStatus, Finalizable},
-    internal_event::CountByteSize,
-    request_metadata::{MetaDescriptive, RequestMetadata},
-};
-use vector_config::configurable_component;
-use vector_core::{
-    config::{AcknowledgementsConfig, Input},
-    event::Event,
-    sink::{StreamSink, VectorSink},
-    stream::DriverResponse,
-    tls::TlsSettings,
-};
 ```
 
 # Configuration
@@ -102,12 +82,12 @@ struct BasicEncoder;
 The Encoder must implement the [`Encoder`][encoder] trait:
 
 ```rust
-impl Encoder<Event> for BasicEncoder {
+impl encoding::Encoder<Event> for BasicEncoder {
     fn encode_input(
         &self,
         input: Event,
         writer: &mut dyn std::io::Write,
-    ) -> std::io::Result<usize> {
+    ) -> std::io::Result<(usize, GroupedCountByteSize)> {
     }
 }
 ```
@@ -119,16 +99,25 @@ sending batches of events, or they may send a completely different type if each
 event is processed in some way prior to encoding.
 
 [`encode_input`][encoder_encode_input] serializes the event to a String and
-writes these bytes:
+writes these bytes. The function also creates a [`GroupedCountByteSize`]
+[grouped_count_byte_size] object. This object tracks the size of the event
+that is sent by the sink, optionally grouped by the source and  service that
+originated the event if Vector has been configured to do so. It is necessary to
+calculate the sizes in this function since the encode function sometimes drops
+fields from the event prior to encoding. We need the size to be calculated after
+these fields have been dropped.
 
 ```rust
     fn encode_input(
         &self,
         input: Event,
         writer: &mut dyn std::io::Write,
-    ) -> std::io::Result<usize> {
+    ) -> std::io::Result<(usize, GroupedCountByteSize)> {
+        let mut byte_size = telemetry().create_request_count_byte_size();
+        byte_size.add_event(&input, input.estimated_json_encoded_size_of());
+
         let event = serde_json::to_string(&input).unwrap();
-        write_all(writer, 1, event.as_bytes()).map(|()| event.len())
+        write_all(writer, 1, event.as_bytes()).map(|()| (event.len(), byte_size))
     }
 ```
 
@@ -173,8 +162,12 @@ We need to implement a number of traits for the request to access these fields:
 
 ```rust
 impl MetaDescriptive for BasicRequest {
-    fn get_metadata(&self) -> RequestMetadata {
-        self.metadata
+    fn get_metadata(&self) -> &RequestMetadata {
+        &self.metadata
+    }
+
+    fn metadata_mut(&mut self) -> &mut RequestMetadata {
+        &mut self.metadata
     }
 }
 
@@ -270,7 +263,7 @@ when sending the event to an `amqp` server.
         mut input: Event,
     ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
         let finalizers = input.take_finalizers();
-        let metadata_builder = RequestMetadataBuilder::from_events(&input);
+        let metadata_builder = RequestMetadataBuilder::from_event(&input);
         (finalizers, metadata_builder, input)
     }
 ```
@@ -296,6 +289,12 @@ where the data is actually sent.
 ```
 
 # Service
+
+**⚠ NOTE! This section implements an HTTP tower `Service` from scratch, for the
+purpose of demonstration only. Many sinks will require implementing `Service`
+in this way. Any new HTTP-based sink should ideally utilize the
+`HttpService` structure, which abstracts away most of the logic shared
+amongst HTTP-based sinks.**
 
 We need to create a [`Tower`][tower] service that is responsible for actually
 sending our final encoded data.
@@ -359,7 +358,12 @@ that will be invoked to send the actual data.
             match client.call(req).await {
                 Ok(response) => {
                     if response.status().is_success() {
-                        Ok(BasicResponse { byte_size })
+                        Ok(BasicResponse {
+                            byte_size,
+                            json_size: request
+                                .metadata
+                                .into_events_estimated_json_encoded_byte_size(),
+                        })
                     } else {
                         Err("received error response")
                     }
@@ -380,6 +384,7 @@ The return from our service must be an object that implements the
 ```rust
 struct BasicResponse {
     byte_size: usize,
+    json_size: GroupedCountByteSize,
 }
 
 impl DriverResponse for BasicResponse {
@@ -387,11 +392,13 @@ impl DriverResponse for BasicResponse {
         EventStatus::Delivered
     }
 
-    fn events_sent(&self) -> CountByteSize {
-        // (events count, byte size)
-        CountByteSize(1, self.byte_size)
+    fn events_sent(&self) -> &GroupedCountByteSize {
+        &self.json_size
     }
-}
+
+    fn bytes_sent(&self) -> Option<usize> {
+        Some(self.byte_size)
+    }}
 ```
 
 Vector calls the methods in this trait to determine if the event was delivered successfully.
@@ -490,7 +497,7 @@ BODY:
 {"log":{"host":"computer","message":"zork","source_type":"stdin","timestamp":"2023-01-23T10:21:57.215019942Z"}}
 ```
 
-[tutorial_1]: https://github.com/vectordotdev/vector/tree/master/docs/tutorials/sinsk/1_basic_sink.md
+[tutorial_1]: https://github.com/vectordotdev/vector/tree/master/docs/tutorials/sinks/1_basic_sink.md
 [tower]: https://docs.rs/tower/latest/tower/
 [tower_service]: https://docs.rs/tower/latest/tower/trait.Service.html
 [hyper_docs]: https://docs.rs/hyper/latest/hyper/
@@ -513,3 +520,4 @@ BODY:
 [sinkbuilder_ext_into_driver]: https://rust-doc.vector.dev/vector/sinks/util/builder/trait.sinkbuilderext#method.into_driver
 [stream_filter_map]: https://docs.rs/futures/latest/futures/stream/trait.StreamExt.html#method.filter_map
 [driver]: https://rust-doc.vector.dev/vector_core/stream/struct.driver
+[grouped_count_byte_size]: https://rust-doc.vector.dev/vector_common/request_metadata/enum.groupedcountbytesize

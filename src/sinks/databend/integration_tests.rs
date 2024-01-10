@@ -3,9 +3,9 @@ use std::collections::BTreeMap;
 use futures::future::ready;
 use futures::stream;
 
-use vector_common::sensitive_string::SensitiveString;
-use vector_core::config::proxy::ProxyConfig;
-use vector_core::event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event, LogEvent};
+use vector_lib::config::proxy::ProxyConfig;
+use vector_lib::event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event, LogEvent};
+use vector_lib::sensitive_string::SensitiveString;
 
 use crate::sinks::util::test::load_sink;
 use crate::{
@@ -124,7 +124,7 @@ async fn insert_event_with_cfg(cfg: String, table: String, client: DatabendAPICl
         .unwrap();
 
     let (config, _) = load_sink::<DatabendConfig>(&cfg).unwrap();
-    let (sink, _hc) = config.build(SinkContext::new_test()).await.unwrap();
+    let (sink, _hc) = config.build(SinkContext::default()).await.unwrap();
 
     let (input_event, mut receiver) = make_event();
     run_and_assert_sink_compliance(

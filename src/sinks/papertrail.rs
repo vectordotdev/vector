@@ -1,6 +1,6 @@
 use bytes::{BufMut, BytesMut};
 use syslog::{Facility, Formatter3164, LogFormat, Severity};
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 use vrl::value::Kind;
 
 use crate::{
@@ -16,7 +16,7 @@ use crate::{
 };
 
 /// Configuration for the `papertrail` sink.
-#[configurable_component(sink("papertrail"))]
+#[configurable_component(sink("papertrail", "Deliver log events to Papertrail from SolarWinds."))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct PapertrailConfig {
@@ -65,6 +65,7 @@ impl GenerateConfig for PapertrailConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "papertrail")]
 impl SinkConfig for PapertrailConfig {
     async fn build(
         &self,
@@ -130,7 +131,7 @@ struct PapertrailEncoder {
 }
 
 impl tokio_util::codec::Encoder<Event> for PapertrailEncoder {
-    type Error = codecs::encoding::Error;
+    type Error = vector_lib::codecs::encoding::Error;
 
     fn encode(
         &mut self,
@@ -185,10 +186,10 @@ mod tests {
     use std::convert::TryFrom;
 
     use bytes::BytesMut;
-    use codecs::JsonSerializerConfig;
     use futures::{future::ready, stream};
     use tokio_util::codec::Encoder as _;
-    use vector_core::event::{Event, LogEvent};
+    use vector_lib::codecs::JsonSerializerConfig;
+    use vector_lib::event::{Event, LogEvent};
 
     use crate::test_util::{
         components::{run_and_assert_sink_compliance, SINK_TAGS},
@@ -212,7 +213,7 @@ mod tests {
         config.endpoint = mock_endpoint.into();
         config.tls = Some(TlsEnableableConfig::default());
 
-        let context = SinkContext::new_test();
+        let context = SinkContext::default();
         let (sink, _healthcheck) = config.build(context).await.unwrap();
 
         let event = Event::Log(LogEvent::from("simple message"));

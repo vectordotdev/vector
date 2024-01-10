@@ -1,19 +1,11 @@
 use std::{collections::HashMap, num::NonZeroUsize};
 
 use bytes::{Bytes, BytesMut};
-use futures::{stream::BoxStream, StreamExt};
 use once_cell::sync::Lazy;
 use regex::Regex;
 use snafu::Snafu;
 use tokio_util::codec::Encoder as _;
-use vector_common::request_metadata::RequestMetadata;
-use vector_core::{
-    event::{Event, EventFinalizers, Finalizable, Value},
-    partition::Partitioner,
-    sink::StreamSink,
-    stream::BatcherSettings,
-    ByteSizeOf,
-};
+use vrl::path::parse_target_path;
 
 use super::{
     config::{LokiConfig, OutOfOrderAction},
@@ -21,24 +13,13 @@ use super::{
     service::{LokiRequest, LokiRetryLogic, LokiService},
 };
 use crate::sinks::loki::event::LokiBatchEncoding;
-use crate::sinks::{
-    loki::config::{CompressionConfigAdapter, ExtendedCompression},
-    util::metadata::RequestMetadataBuilder,
-};
 use crate::{
-    codecs::{Encoder, Transformer},
     http::{get_http_scheme_from_uri, HttpClient},
     internal_events::{
-        LokiEventUnlabeled, LokiOutOfOrderEventDropped, LokiOutOfOrderEventRewritten,
-        SinkRequestBuildError, TemplateRenderingError,
+        LokiEventUnlabeledError, LokiOutOfOrderEventDroppedError, LokiOutOfOrderEventRewritten,
+        SinkRequestBuildError,
     },
-    sinks::util::{
-        builder::SinkBuilderExt,
-        request_builder::EncodeResult,
-        service::{ServiceBuilderExt, Svc},
-        Compression, RequestBuilder,
-    },
-    template::Template,
+    sinks::prelude::*,
 };
 
 #[derive(Clone)]
@@ -83,7 +64,7 @@ impl Partitioner for RecordPartitioner {
 
 #[derive(Clone)]
 pub struct LokiRequestBuilder {
-    compression: CompressionConfigAdapter,
+    compression: Compression,
     encoder: LokiBatchEncoder,
 }
 
@@ -110,10 +91,7 @@ impl RequestBuilder<(PartitionKey, Vec<LokiRecord>)> for LokiRequestBuilder {
     type Error = RequestBuildError;
 
     fn compression(&self) -> Compression {
-        match self.compression {
-            CompressionConfigAdapter::Original(compression) => compression,
-            CompressionConfigAdapter::Extended(_) => Compression::None,
-        }
+        self.compression
     }
 
     fn encoder(&self) -> &Self::Encoder {
@@ -258,7 +236,9 @@ impl EventEncoder {
             for template in self.labels.values() {
                 if let Some(fields) = template.get_fields() {
                     for field in fields {
-                        event.as_mut_log().remove(field.as_str());
+                        if let Ok(path) = parse_target_path(field.as_str()) {
+                            event.as_mut_log().remove(&path);
+                        }
                     }
                 }
             }
@@ -268,17 +248,22 @@ impl EventEncoder {
     pub(super) fn encode_event(&mut self, mut event: Event) -> Option<LokiRecord> {
         let tenant_id = self.key_partitioner.partition(&event);
         let finalizers = event.take_finalizers();
+        let json_byte_size = event.estimated_json_encoded_size_of();
         let mut labels = self.build_labels(&event);
         self.remove_label_fields(&mut event);
 
         let timestamp = match event.as_log().get_timestamp() {
-            Some(Value::Timestamp(ts)) => ts.timestamp_nanos(),
-            _ => chrono::Utc::now().timestamp_nanos(),
+            Some(Value::Timestamp(ts)) => ts.timestamp_nanos_opt().expect("Timestamp out of range"),
+            _ => chrono::Utc::now()
+                .timestamp_nanos_opt()
+                .expect("Timestamp out of range"),
         };
 
         if self.remove_timestamp {
             event.as_mut_log().remove_timestamp();
         }
+
+        let event_count_tags = event.get_tags();
 
         self.transformer.transform(&mut event);
         let mut bytes = BytesMut::new();
@@ -288,7 +273,7 @@ impl EventEncoder {
         // `{agent="vector"}` label. This can happen if the only
         // label is a templatable one but the event doesn't match.
         if labels.is_empty() {
-            emit!(LokiEventUnlabeled);
+            emit!(LokiEventUnlabeledError);
             labels = vec![("agent".to_string(), "vector".to_string())]
         }
 
@@ -302,6 +287,8 @@ impl EventEncoder {
             },
             partition,
             finalizers,
+            json_byte_size,
+            event_count_tags,
         })
     }
 }
@@ -402,9 +389,9 @@ impl LokiSink {
         // requires in-order processing for version >= 2.4, instead we just keep the static limit
         // of 1 for now.
         let request_limits = match config.out_of_order_action {
-            OutOfOrderAction::Accept => config.request.unwrap_with(&Default::default()),
+            OutOfOrderAction::Accept => config.request.into_settings(),
             OutOfOrderAction::Drop | OutOfOrderAction::RewriteTimestamp => {
-                let mut settings = config.request.unwrap_with(&Default::default());
+                let mut settings = config.request.into_settings();
                 settings.concurrency = Some(1);
                 settings
             }
@@ -424,10 +411,8 @@ impl LokiSink {
         let serializer = config.encoding.build()?;
         let encoder = Encoder::<()>::new(serializer);
         let batch_encoder = match config.compression {
-            CompressionConfigAdapter::Original(_) => LokiBatchEncoder(LokiBatchEncoding::Json),
-            CompressionConfigAdapter::Extended(ExtendedCompression::Snappy) => {
-                LokiBatchEncoder(LokiBatchEncoding::Protobuf)
-            }
+            Compression::Snappy => LokiBatchEncoder(LokiBatchEncoding::Protobuf),
+            _ => LokiBatchEncoder(LokiBatchEncoding::Json),
         };
 
         Ok(Self {
@@ -457,17 +442,18 @@ impl LokiSink {
         // out_of_order_action's that require a complete ordering are limited to building 1 request
         // at a time
         let request_builder_concurrency = match self.out_of_order_action {
-            OutOfOrderAction::Accept => NonZeroUsize::new(50).expect("static"),
+            OutOfOrderAction::Accept => default_request_builder_concurrency_limit(),
             OutOfOrderAction::Drop | OutOfOrderAction::RewriteTimestamp => {
                 NonZeroUsize::new(1).expect("static")
             }
         };
+        let batch_settings = self.batch_settings;
 
         input
             .map(|event| encoder.encode_event(event))
             .filter_map(|event| async { event })
             .map(|record| filter.filter_record(record))
-            .batched_partitioned(RecordPartitioner::default(), self.batch_settings)
+            .batched_partitioned(RecordPartitioner, || batch_settings.as_byte_size_config())
             .filter_map(|(partition, batch)| async {
                 if let Some(partition) = partition {
                     let mut count: usize = 0;
@@ -486,11 +472,11 @@ impl LokiSink {
                     }
                     Some((partition, result))
                 } else {
-                    emit!(LokiOutOfOrderEventDropped { count: batch.len() });
+                    emit!(LokiOutOfOrderEventDroppedError { count: batch.len() });
                     None
                 }
             })
-            .request_builder(Some(request_builder_concurrency), self.request_builder)
+            .request_builder(request_builder_concurrency, self.request_builder)
             .filter_map(|request| async move {
                 match request {
                     Err(error) => {
@@ -523,14 +509,12 @@ fn slugify_text(input: String) -> String {
 
 #[cfg(test)]
 mod tests {
-    use std::{
-        collections::{BTreeMap, HashMap},
-        convert::TryFrom,
-    };
+    use std::{collections::HashMap, convert::TryFrom};
 
-    use codecs::JsonSerializerConfig;
     use futures::stream::StreamExt;
-    use vector_core::event::{Event, LogEvent, Value};
+    use vector_lib::codecs::JsonSerializerConfig;
+    use vector_lib::event::{Event, LogEvent, ObjectMap, Value};
+    use vector_lib::lookup::PathPrefix;
 
     use super::{EventEncoder, KeyPartitioner, RecordFilter};
     use crate::{
@@ -551,10 +535,7 @@ mod tests {
         let mut event = Event::Log(LogEvent::from("hello world"));
         let log = event.as_mut_log();
         log.insert(
-            (
-                lookup::PathPrefix::Event,
-                log_schema().timestamp_key().unwrap(),
-            ),
+            (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
             chrono::Utc::now(),
         );
         let record = encoder.encode_event(event).unwrap();
@@ -597,18 +578,15 @@ mod tests {
         let mut event = Event::Log(LogEvent::from("hello world"));
         let log = event.as_mut_log();
         log.insert(
-            (
-                lookup::PathPrefix::Event,
-                log_schema().timestamp_key().unwrap(),
-            ),
+            (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
             chrono::Utc::now(),
         );
         log.insert("name", "foo");
         log.insert("value", "bar");
 
-        let mut test_dict = BTreeMap::default();
-        test_dict.insert("one".to_string(), Value::from("foo"));
-        test_dict.insert("two".to_string(), Value::from("baz"));
+        let mut test_dict = ObjectMap::default();
+        test_dict.insert("one".into(), Value::from("foo"));
+        test_dict.insert("two".into(), Value::from("baz"));
         log.insert("dict", Value::from(test_dict));
 
         let record = encoder.encode_event(event).unwrap();
@@ -648,7 +626,7 @@ mod tests {
             remove_timestamp: false,
         };
 
-        let message = r###"
+        let message = r#"
         {
         	"kubernetes": {
         		"pod_labels": {
@@ -662,8 +640,8 @@ mod tests {
         		"cluster_version": "1.2.3"
         	}
         }
-        "###;
-        let msg: BTreeMap<String, Value> = serde_json::from_str(message)?;
+        "#;
+        let msg: ObjectMap = serde_json::from_str(message)?;
         let event = Event::Log(LogEvent::from(msg));
         let record = encoder.encode_event(event).unwrap();
 
@@ -698,7 +676,7 @@ mod tests {
             remove_timestamp: false,
         };
 
-        let message = r###"
+        let message = r#"
         {
         	"map1": {
         		"key1": "val1"
@@ -707,15 +685,15 @@ mod tests {
         		"l1_key1": "val2"
         	}
         }
-        "###;
-        let msg: BTreeMap<String, Value> = serde_json::from_str(message)?;
+        "#;
+        let msg: ObjectMap = serde_json::from_str(message)?;
         let event = Event::Log(LogEvent::from(msg));
         let record = encoder.encode_event(event).unwrap();
 
         assert_eq!(record.labels.len(), 1);
         let labels: HashMap<String, String> = record.labels.into_iter().collect();
         // EventEncoder.labels is type HashMap (unordered) -> both values can be valid
-        assert!(vec!["val1".to_string(), "val2".to_string()].contains(&labels["l1_key1"]));
+        assert!(["val1".to_string(), "val2".to_string()].contains(&labels["l1_key1"]));
         Ok(())
     }
 
@@ -736,7 +714,7 @@ mod tests {
             remove_timestamp: false,
         };
 
-        let msg: BTreeMap<String, Value> = serde_json::from_str("{}")?;
+        let msg: ObjectMap = serde_json::from_str("{}")?;
         let event = Event::Log(LogEvent::from(msg));
         let record = encoder.encode_event(event).unwrap();
 
@@ -759,10 +737,7 @@ mod tests {
         let mut event = Event::Log(LogEvent::from("hello world"));
         let log = event.as_mut_log();
         log.insert(
-            (
-                lookup::PathPrefix::Event,
-                log_schema().timestamp_key().unwrap(),
-            ),
+            (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
             chrono::Utc::now(),
         );
         let record = encoder.encode_event(event).unwrap();
@@ -792,10 +767,7 @@ mod tests {
         let mut event = Event::Log(LogEvent::from("hello world"));
         let log = event.as_mut_log();
         log.insert(
-            (
-                lookup::PathPrefix::Event,
-                log_schema().timestamp_key().unwrap(),
-            ),
+            (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
             chrono::Utc::now(),
         );
         log.insert("name", "foo");
@@ -827,10 +799,7 @@ mod tests {
                     base + chrono::Duration::seconds(i as i64)
                 };
                 log.insert(
-                    (
-                        lookup::PathPrefix::Event,
-                        log_schema().timestamp_key().unwrap(),
-                    ),
+                    (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
                     ts,
                 );
                 event

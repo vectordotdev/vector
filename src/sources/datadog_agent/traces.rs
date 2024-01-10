@@ -6,12 +6,14 @@ use futures::future;
 use http::StatusCode;
 use ordered_float::NotNan;
 use prost::Message;
-use vector_common::internal_event::{CountByteSize, InternalEventHandle as _};
-use vector_core::EstimatedJsonEncodedSizeOf;
+use vrl::event_path;
 use warp::{filters::BoxedFilter, path, path::FullPath, reply::Response, Filter, Rejection, Reply};
 
+use vector_lib::internal_event::{CountByteSize, InternalEventHandle as _};
+use vector_lib::EstimatedJsonEncodedSizeOf;
+
 use crate::{
-    event::{Event, TraceEvent, Value},
+    event::{Event, ObjectMap, TraceEvent, Value},
     sources::{
         datadog_agent::{ddtrace_proto, handle_request, ApiKeyQueryParams, DatadogAgentSource},
         util::ErrorMessage,
@@ -142,19 +144,25 @@ fn handle_dd_trace_payload_v1(
                     .set_datadog_api_key(Arc::clone(k));
             }
             trace_event.insert(
-                source.log_schema_source_type_key,
+                &source.log_schema_source_type_key,
                 Bytes::from("datadog_agent"),
             );
-            trace_event.insert("payload_version", "v2".to_string());
-            trace_event.insert(source.log_schema_host_key, hostname.clone());
-            trace_event.insert("env", env.clone());
-            trace_event.insert("agent_version", agent_version.clone());
-            trace_event.insert("target_tps", target_tps);
-            trace_event.insert("error_tps", error_tps);
-            if let Some(Value::Object(span_tags)) = trace_event.get_mut("tags") {
+            trace_event.insert(event_path!("payload_version"), "v2".to_string());
+            trace_event.insert(&source.log_schema_host_key, hostname.clone());
+            trace_event.insert(event_path!("env"), env.clone());
+            trace_event.insert(event_path!("agent_version"), agent_version.clone());
+            trace_event.insert(
+                event_path!("target_tps"),
+                Value::Float(NotNan::new(target_tps).expect("target_tps cannot be Nan")),
+            );
+            trace_event.insert(
+                event_path!("error_tps"),
+                Value::Float(NotNan::new(error_tps).expect("error_tps cannot be Nan")),
+            );
+            if let Some(Value::Object(span_tags)) = trace_event.get_mut(event_path!("tags")) {
                 span_tags.extend(tags.clone());
             } else {
-                trace_event.insert("tags", Value::from(tags.clone()));
+                trace_event.insert(event_path!("tags"), Value::from(tags.clone()));
             }
             Event::Trace(trace_event)
         })
@@ -169,15 +177,15 @@ fn convert_dd_tracer_payload(payload: ddtrace_proto::TracerPayload) -> Vec<Trace
         .into_iter()
         .map(|trace| {
             let mut trace_event = TraceEvent::default();
-            trace_event.insert("priority", trace.priority as i64);
-            trace_event.insert("origin", trace.origin);
-            trace_event.insert("dropped", trace.dropped_trace);
+            trace_event.insert(event_path!("priority"), trace.priority as i64);
+            trace_event.insert(event_path!("origin"), trace.origin);
+            trace_event.insert(event_path!("dropped"), trace.dropped_trace);
             let mut trace_tags = convert_tags(trace.tags);
             trace_tags.extend(tags.clone());
-            trace_event.insert("tags", Value::from(trace_tags));
+            trace_event.insert(event_path!("tags"), Value::from(trace_tags));
 
             trace_event.insert(
-                "spans",
+                event_path!("spans"),
                 trace
                     .spans
                     .into_iter()
@@ -185,12 +193,18 @@ fn convert_dd_tracer_payload(payload: ddtrace_proto::TracerPayload) -> Vec<Trace
                     .collect::<Vec<Value>>(),
             );
 
-            trace_event.insert("container_id", payload.container_id.clone());
-            trace_event.insert("language_name", payload.language_name.clone());
-            trace_event.insert("language_version", payload.language_version.clone());
-            trace_event.insert("tracer_version", payload.tracer_version.clone());
-            trace_event.insert("runtime_id", payload.runtime_id.clone());
-            trace_event.insert("app_version", payload.app_version.clone());
+            trace_event.insert(event_path!("container_id"), payload.container_id.clone());
+            trace_event.insert(event_path!("language_name"), payload.language_name.clone());
+            trace_event.insert(
+                event_path!("language_version"),
+                payload.language_version.clone(),
+            );
+            trace_event.insert(
+                event_path!("tracer_version"),
+                payload.tracer_version.clone(),
+            );
+            trace_event.insert(event_path!("runtime_id"), payload.runtime_id.clone());
+            trace_event.insert(event_path!("app_version"), payload.app_version.clone());
             trace_event
         })
         .collect()
@@ -217,11 +231,11 @@ fn handle_dd_trace_payload_v0(
             // TODO trace_id is being forced into an i64 but
             // the incoming payload is u64. This is a bug and needs to be fixed per:
             // https://github.com/vectordotdev/vector/issues/14687
-            trace_event.insert("trace_id", dd_trace.trace_id as i64);
-            trace_event.insert("start_time", Utc.timestamp_nanos(dd_trace.start_time));
-            trace_event.insert("end_time", Utc.timestamp_nanos(dd_trace.end_time));
+            trace_event.insert(event_path!("trace_id"), dd_trace.trace_id as i64);
+            trace_event.insert(event_path!("start_time"), Utc.timestamp_nanos(dd_trace.start_time));
+            trace_event.insert(event_path!("end_time"), Utc.timestamp_nanos(dd_trace.end_time));
             trace_event.insert(
-                "spans",
+                event_path!("spans"),
                 dd_trace
                     .spans
                     .into_iter()
@@ -233,8 +247,8 @@ fn handle_dd_trace_payload_v0(
         //... and each APM event is also mapped into its own event
         .chain(decoded_payload.transactions.into_iter().map(|s| {
             let mut trace_event = TraceEvent::default();
-            trace_event.insert("spans", vec![Value::from(convert_span(s))]);
-            trace_event.insert("dropped", true);
+            trace_event.insert(event_path!("spans"), vec![Value::from(convert_span(s))]);
+            trace_event.insert(event_path!("dropped"), true);
             trace_event
         })).collect();
 
@@ -252,15 +266,15 @@ fn handle_dd_trace_payload_v0(
                     .set_datadog_api_key(Arc::clone(k));
             }
             if let Some(lang) = lang {
-                trace_event.insert("language_name", lang.clone());
+                trace_event.insert(event_path!("language_name"), lang.clone());
             }
             trace_event.insert(
-                source.log_schema_source_type_key,
+                &source.log_schema_source_type_key,
                 Bytes::from("datadog_agent"),
             );
-            trace_event.insert("payload_version", "v1".to_string());
-            trace_event.insert(source.log_schema_host_key, hostname.clone());
-            trace_event.insert("env", env.clone());
+            trace_event.insert(event_path!("payload_version"), "v1".to_string());
+            trace_event.insert(&source.log_schema_host_key, hostname.clone());
+            trace_event.insert(event_path!("env"), env.clone());
             Event::Trace(trace_event)
         })
         .collect();
@@ -268,8 +282,8 @@ fn handle_dd_trace_payload_v0(
     Ok(enriched_events)
 }
 
-fn convert_span(dd_span: ddtrace_proto::Span) -> BTreeMap<String, Value> {
-    let mut span = BTreeMap::<String, Value>::new();
+fn convert_span(dd_span: ddtrace_proto::Span) -> ObjectMap {
+    let mut span = ObjectMap::new();
     span.insert("service".into(), Value::from(dd_span.service));
     span.insert("name".into(), Value::from(dd_span.name));
 
@@ -294,8 +308,13 @@ fn convert_span(dd_span: ddtrace_proto::Span) -> BTreeMap<String, Value> {
             dd_span
                 .metrics
                 .into_iter()
-                .map(|(k, v)| (k, NotNan::new(v).map(Value::Float).unwrap_or(Value::Null)))
-                .collect::<BTreeMap<String, Value>>(),
+                .map(|(k, v)| {
+                    (
+                        k.into(),
+                        NotNan::new(v).map(Value::Float).unwrap_or(Value::Null),
+                    )
+                })
+                .collect::<ObjectMap>(),
         ),
     );
     span.insert("type".into(), Value::from(dd_span.r#type));
@@ -305,17 +324,17 @@ fn convert_span(dd_span: ddtrace_proto::Span) -> BTreeMap<String, Value> {
             dd_span
                 .meta_struct
                 .into_iter()
-                .map(|(k, v)| (k, Value::from(bytes::Bytes::from(v))))
-                .collect::<BTreeMap<String, Value>>(),
+                .map(|(k, v)| (k.into(), Value::from(bytes::Bytes::from(v))))
+                .collect::<ObjectMap>(),
         ),
     );
 
     span
 }
 
-fn convert_tags(original_map: BTreeMap<String, String>) -> BTreeMap<String, Value> {
+fn convert_tags(original_map: BTreeMap<String, String>) -> ObjectMap {
     original_map
         .into_iter()
-        .map(|(k, v)| (k, Value::from(v)))
-        .collect::<BTreeMap<String, Value>>()
+        .map(|(k, v)| (k.into(), Value::from(v)))
+        .collect::<ObjectMap>()
 }

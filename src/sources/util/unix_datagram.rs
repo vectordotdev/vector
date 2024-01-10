@@ -1,13 +1,13 @@
 use std::{fs::remove_file, path::PathBuf};
 
 use bytes::{Bytes, BytesMut};
-use codecs::StreamDecodingError;
 use futures::StreamExt;
 use tokio::net::UnixDatagram;
 use tokio_util::codec::FramedRead;
 use tracing::field;
-use vector_common::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
-use vector_core::EstimatedJsonEncodedSizeOf;
+use vector_lib::codecs::StreamDecodingError;
+use vector_lib::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
+use vector_lib::EstimatedJsonEncodedSizeOf;
 
 use crate::{
     codecs::Decoder,
@@ -72,7 +72,7 @@ async fn listen(
         tokio::select! {
             recv = socket.recv_from(&mut buf) => {
                 let (byte_size, address) = recv.map_err(|error| {
-                    let error = codecs::decoding::Error::FramingError(error.into());
+                    let error = vector_lib::codecs::decoding::Error::FramingError(error.into());
                     emit!(SocketReceiveError {
                         mode: SocketMode::Unix,
                         error: &error
@@ -114,8 +114,8 @@ async fn listen(
                             handle_events(&mut events, received_from.clone());
 
                             let count = events.len();
-                            if let Err(error) = out.send_batch(events).await {
-                                emit!(StreamClosedError { error, count });
+                            if (out.send_batch(events).await).is_err() {
+                                emit!(StreamClosedError { count });
                             }
                         },
                         Some(Err(error)) => {

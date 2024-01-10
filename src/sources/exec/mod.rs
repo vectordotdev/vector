@@ -1,14 +1,11 @@
 use std::{
+    collections::HashMap,
     io::{Error, ErrorKind},
     path::PathBuf,
     process::ExitStatus,
 };
 
 use chrono::Utc;
-use codecs::{
-    decoding::{DeserializerConfig, FramingConfig},
-    StreamDecodingError,
-};
 use futures::StreamExt;
 use smallvec::SmallVec;
 use snafu::Snafu;
@@ -20,9 +17,14 @@ use tokio::{
 };
 use tokio_stream::wrappers::IntervalStream;
 use tokio_util::codec::FramedRead;
-use vector_common::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
-use vector_config::configurable_component;
-use vector_core::{config::LegacyKey, EstimatedJsonEncodedSizeOf};
+use vector_lib::codecs::{
+    decoding::{DeserializerConfig, FramingConfig},
+    StreamDecodingError,
+};
+use vector_lib::configurable::configurable_component;
+use vector_lib::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
+use vector_lib::{config::LegacyKey, EstimatedJsonEncodedSizeOf};
+use vrl::path::OwnedValuePath;
 use vrl::value::Kind;
 
 use crate::{
@@ -37,10 +39,11 @@ use crate::{
     shutdown::ShutdownSignal,
     SourceSender,
 };
-use lookup::{owned_value_path, path};
-use vector_core::config::{log_schema, LogNamespace};
+use vector_lib::config::{log_schema, LogNamespace};
+use vector_lib::lookup::{owned_value_path, path};
 
-pub mod sized_bytes_codec;
+#[cfg(test)]
+mod tests;
 
 /// Configuration for the `exec` source.
 #[configurable_component(source("exec", "Collect output from a process running on the host."))]
@@ -56,9 +59,20 @@ pub struct ExecConfig {
     #[configurable(derived)]
     pub streaming: Option<StreamingConfig>,
 
-    /// The command to be run, plus any arguments required.
+    /// The command to run, plus any arguments required.
     #[configurable(metadata(docs::examples = "echo", docs::examples = "Hello World!"))]
     pub command: Vec<String>,
+
+    /// Custom environment variables to set or update when running the command.
+    /// If a variable name already exists in the environment, its value is replaced.
+    #[serde(default)]
+    #[configurable(metadata(docs::additional_props_description = "An environment variable."))]
+    #[configurable(metadata(docs::examples = "environment_examples()"))]
+    pub environment: Option<HashMap<String, String>>,
+
+    /// Whether or not to clear the environment before setting custom environment variables.
+    #[serde(default = "default_clear_environment")]
+    pub clear_environment: bool,
 
     /// The directory in which to run the command.
     pub working_directory: Option<PathBuf>,
@@ -119,6 +133,7 @@ pub struct StreamingConfig {
 
     /// The amount of time, in seconds, before rerunning a streaming command that exited.
     #[serde(default = "default_respawn_interval_secs")]
+    #[configurable(metadata(docs::human_name = "Respawn Interval"))]
     respawn_interval_secs: u64,
 }
 
@@ -139,6 +154,8 @@ impl Default for ExecConfig {
             }),
             streaming: None,
             command: vec!["echo".to_owned(), "Hello World!".to_owned()],
+            environment: None,
+            clear_environment: default_clear_environment(),
             working_directory: None,
             include_stderr: default_include_stderr(),
             maximum_buffer_size_bytes: default_maximum_buffer_size(),
@@ -166,8 +183,20 @@ const fn default_respawn_on_exit() -> bool {
     true
 }
 
+const fn default_clear_environment() -> bool {
+    false
+}
+
 const fn default_include_stderr() -> bool {
     true
+}
+
+fn environment_examples() -> HashMap<String, String> {
+    HashMap::<_, _>::from_iter([
+        ("LANG".to_owned(), "es_ES.UTF-8".to_owned()),
+        ("TZ".to_owned(), "Etc/UTC".to_owned()),
+        ("PATH".to_owned(), "/bin:/usr/bin:/usr/local/bin".to_owned()),
+    ])
 }
 
 fn get_hostname() -> Option<String> {
@@ -232,7 +261,7 @@ impl SourceConfig for ExecConfig {
             .clone()
             .unwrap_or_else(|| self.decoding.default_stream_framing());
         let decoder =
-            DecodingConfig::new(framing, self.decoding.clone(), LogNamespace::Legacy).build();
+            DecodingConfig::new(framing, self.decoding.clone(), LogNamespace::Legacy).build()?;
 
         match &self.mode {
             Mode::Scheduled => {
@@ -275,9 +304,11 @@ impl SourceConfig for ExecConfig {
             .with_standard_vector_source_metadata()
             .with_source_metadata(
                 Self::NAME,
-                Some(LegacyKey::InsertIfEmpty(owned_value_path!(
-                    log_schema().host_key()
-                ))),
+                Some(LegacyKey::InsertIfEmpty(
+                    log_schema()
+                        .host_key()
+                        .map_or(OwnedValuePath::root(), |key| key.clone()),
+                )),
                 &owned_value_path!("host"),
                 Kind::bytes().or_undefined(),
                 Some("host"),
@@ -497,8 +528,8 @@ async fn run_command(
                         for event in &mut events {
                             handle_event(&config, &hostname, &Some(stream.to_string()), pid, event, log_namespace);
                         }
-                        if let Err(error) = out.send_batch(events).await {
-                            emit!(StreamClosedError { count, error });
+                        if (out.send_batch(events).await).is_err() {
+                            emit!(StreamClosedError { count });
                             break;
                         }
                     },
@@ -606,6 +637,16 @@ fn build_command(config: &ExecConfig) -> Command {
 
     command.kill_on_drop(true);
 
+    // Clear environment variables if needed
+    if config.clear_environment {
+        command.env_clear();
+    }
+
+    // Configure environment variables if needed
+    if let Some(envs) = &config.environment {
+        command.envs(envs);
+    }
+
     // Explicitly set the current dir if needed
     if let Some(current_dir) = &config.working_directory {
         command.current_dir(current_dir);
@@ -665,7 +706,7 @@ fn handle_event(
             log_namespace.insert_source_metadata(
                 ExecConfig::NAME,
                 log,
-                Some(LegacyKey::InsertIfEmpty(path!(log_schema().host_key()))),
+                log_schema().host_key().map(LegacyKey::InsertIfEmpty),
                 path!("host"),
                 hostname.clone(),
             );
@@ -715,423 +756,4 @@ fn spawn_reader_thread<R: 'static + AsyncRead + Unpin + std::marker::Send>(
 
         debug!("Finished capturing {} command output.", origin);
     }));
-}
-
-#[cfg(test)]
-mod tests {
-    use bytes::Bytes;
-    use std::io::Cursor;
-    use vector_core::event::EventMetadata;
-    use vrl::value::value;
-
-    #[cfg(unix)]
-    use futures::task::Poll;
-
-    use super::*;
-    use crate::config::log_schema;
-
-    use crate::{event::LogEvent, test_util::trace_init};
-
-    #[test]
-    fn test_generate_config() {
-        crate::test_util::test_generate_config::<ExecConfig>();
-    }
-
-    #[test]
-    fn test_scheduled_handle_event() {
-        let config = standard_scheduled_test_config();
-        let hostname = Some("Some.Machine".to_string());
-        let data_stream = Some(STDOUT.to_string());
-        let pid = Some(8888_u32);
-
-        let mut event = LogEvent::from("hello world").into();
-        handle_event(
-            &config,
-            &hostname,
-            &data_stream,
-            pid,
-            &mut event,
-            LogNamespace::Legacy,
-        );
-        let log = event.as_log();
-
-        assert_eq!(log[log_schema().host_key()], "Some.Machine".into());
-        assert_eq!(log[STREAM_KEY], STDOUT.into());
-        assert_eq!(log[PID_KEY], (8888_i64).into());
-        assert_eq!(log[COMMAND_KEY], config.command.into());
-        assert_eq!(log[log_schema().message_key()], "hello world".into());
-        assert_eq!(log[log_schema().source_type_key()], "exec".into());
-        assert!(log
-            .get((
-                lookup::PathPrefix::Event,
-                log_schema().timestamp_key().unwrap()
-            ))
-            .is_some());
-    }
-
-    #[test]
-    fn test_scheduled_handle_event_vector_namespace() {
-        let config = standard_scheduled_test_config();
-        let hostname = Some("Some.Machine".to_string());
-        let data_stream = Some(STDOUT.to_string());
-        let pid = Some(8888_u32);
-
-        let mut event: Event =
-            LogEvent::from_parts(value!("hello world"), EventMetadata::default()).into();
-
-        handle_event(
-            &config,
-            &hostname,
-            &data_stream,
-            pid,
-            &mut event,
-            LogNamespace::Vector,
-        );
-
-        let log = event.as_log();
-        let meta = log.metadata().value();
-
-        assert_eq!(
-            meta.get(path!(ExecConfig::NAME, "host")).unwrap(),
-            &value!("Some.Machine")
-        );
-        assert_eq!(
-            meta.get(path!(ExecConfig::NAME, STREAM_KEY)).unwrap(),
-            &value!(STDOUT)
-        );
-        assert_eq!(
-            meta.get(path!(ExecConfig::NAME, PID_KEY)).unwrap(),
-            &value!(8888_i64)
-        );
-        assert_eq!(
-            meta.get(path!(ExecConfig::NAME, COMMAND_KEY)).unwrap(),
-            &value!(config.command)
-        );
-        assert_eq!(log.value(), &value!("hello world"));
-        assert_eq!(
-            meta.get(path!("vector", "source_type")).unwrap(),
-            &value!("exec")
-        );
-        assert!(meta
-            .get(path!("vector", "ingest_timestamp"))
-            .unwrap()
-            .is_timestamp());
-    }
-
-    #[test]
-    fn test_streaming_create_event() {
-        let config = standard_streaming_test_config();
-        let hostname = Some("Some.Machine".to_string());
-        let data_stream = Some(STDOUT.to_string());
-        let pid = Some(8888_u32);
-
-        let mut event = LogEvent::from("hello world").into();
-        handle_event(
-            &config,
-            &hostname,
-            &data_stream,
-            pid,
-            &mut event,
-            LogNamespace::Legacy,
-        );
-        let log = event.as_log();
-
-        assert_eq!(log[log_schema().host_key()], "Some.Machine".into());
-        assert_eq!(log[STREAM_KEY], STDOUT.into());
-        assert_eq!(log[PID_KEY], (8888_i64).into());
-        assert_eq!(log[COMMAND_KEY], config.command.into());
-        assert_eq!(log[log_schema().message_key()], "hello world".into());
-        assert_eq!(log[log_schema().source_type_key()], "exec".into());
-        assert!(log
-            .get((
-                lookup::PathPrefix::Event,
-                log_schema().timestamp_key().unwrap()
-            ))
-            .is_some());
-    }
-
-    #[test]
-    fn test_streaming_create_event_vector_namespace() {
-        let config = standard_streaming_test_config();
-        let hostname = Some("Some.Machine".to_string());
-        let data_stream = Some(STDOUT.to_string());
-        let pid = Some(8888_u32);
-
-        let mut event: Event =
-            LogEvent::from_parts(value!("hello world"), EventMetadata::default()).into();
-
-        handle_event(
-            &config,
-            &hostname,
-            &data_stream,
-            pid,
-            &mut event,
-            LogNamespace::Vector,
-        );
-
-        let log = event.as_log();
-        let meta = event.metadata().value();
-
-        assert_eq!(
-            meta.get(path!(ExecConfig::NAME, "host")).unwrap(),
-            &value!("Some.Machine")
-        );
-        assert_eq!(
-            meta.get(path!(ExecConfig::NAME, STREAM_KEY)).unwrap(),
-            &value!(STDOUT)
-        );
-        assert_eq!(
-            meta.get(path!(ExecConfig::NAME, PID_KEY)).unwrap(),
-            &value!(8888_i64)
-        );
-        assert_eq!(
-            meta.get(path!(ExecConfig::NAME, COMMAND_KEY)).unwrap(),
-            &value!(config.command)
-        );
-        assert_eq!(log.value(), &value!("hello world"));
-        assert_eq!(
-            meta.get(path!("vector", "source_type")).unwrap(),
-            &value!("exec")
-        );
-        assert!(meta
-            .get(path!("vector", "ingest_timestamp"))
-            .unwrap()
-            .is_timestamp());
-    }
-
-    #[test]
-    fn test_build_command() {
-        let config = ExecConfig {
-            mode: Mode::Streaming,
-            scheduled: None,
-            streaming: Some(StreamingConfig {
-                respawn_on_exit: default_respawn_on_exit(),
-                respawn_interval_secs: default_respawn_interval_secs(),
-            }),
-            command: vec!["./runner".to_owned(), "arg1".to_owned(), "arg2".to_owned()],
-            working_directory: Some(PathBuf::from("/tmp")),
-            include_stderr: default_include_stderr(),
-            maximum_buffer_size_bytes: default_maximum_buffer_size(),
-            framing: None,
-            decoding: default_decoding(),
-            log_namespace: None,
-        };
-
-        let command = build_command(&config);
-
-        let mut expected_command = Command::new("./runner");
-        expected_command.kill_on_drop(true);
-        expected_command.current_dir("/tmp");
-        expected_command.args(vec!["arg1".to_owned(), "arg2".to_owned()]);
-
-        // Unfortunately the current_dir is not included in the formatted string
-        let expected_command_string = format!("{:?}", expected_command);
-        let command_string = format!("{:?}", command);
-
-        assert_eq!(expected_command_string, command_string);
-    }
-
-    #[tokio::test]
-    async fn test_spawn_reader_thread() {
-        trace_init();
-
-        let buf = Cursor::new("hello world\nhello rocket 🚀");
-        let reader = BufReader::new(buf);
-        let decoder = crate::codecs::Decoder::default();
-        let (sender, mut receiver) = channel(1024);
-
-        spawn_reader_thread(reader, decoder, STDOUT, sender);
-
-        let mut counter = 0;
-        if let Some(((events, byte_size), origin)) = receiver.recv().await {
-            assert_eq!(byte_size, 11);
-            assert_eq!(events.len(), 1);
-            let log = events[0].as_log();
-            assert_eq!(
-                log[log_schema().message_key()],
-                Bytes::from("hello world").into()
-            );
-            assert_eq!(origin, STDOUT);
-            counter += 1;
-        }
-
-        if let Some(((events, byte_size), origin)) = receiver.recv().await {
-            assert_eq!(byte_size, 17);
-            assert_eq!(events.len(), 1);
-            let log = events[0].as_log();
-            assert_eq!(
-                log[log_schema().message_key()],
-                Bytes::from("hello rocket 🚀").into()
-            );
-            assert_eq!(origin, STDOUT);
-            counter += 1;
-        }
-
-        assert_eq!(counter, 2);
-    }
-
-    #[tokio::test]
-    async fn test_drop_receiver() {
-        let config = standard_scheduled_test_config();
-        let hostname = Some("Some.Machine".to_string());
-        let decoder = Default::default();
-        let shutdown = ShutdownSignal::noop();
-        let (tx, rx) = SourceSender::new_test();
-
-        // Wait for our task to finish, wrapping it in a timeout
-        let timeout = tokio::time::timeout(
-            time::Duration::from_secs(5),
-            run_command(
-                config.clone(),
-                hostname,
-                decoder,
-                shutdown,
-                tx,
-                LogNamespace::Legacy,
-            ),
-        );
-
-        drop(rx);
-
-        let _timeout_result = crate::test_util::components::assert_source_error(
-            &crate::test_util::components::COMPONENT_ERROR_TAGS,
-            timeout,
-        )
-        .await;
-    }
-
-    #[tokio::test]
-    #[cfg(unix)]
-    async fn test_run_command_linux() {
-        let config = standard_scheduled_test_config();
-
-        let (mut rx, timeout_result) = crate::test_util::components::assert_source_compliance(
-            &crate::test_util::components::SOURCE_TAGS,
-            async {
-                let hostname = Some("Some.Machine".to_string());
-                let decoder = Default::default();
-                let shutdown = ShutdownSignal::noop();
-                let (tx, rx) = SourceSender::new_test();
-
-                // Wait for our task to finish, wrapping it in a timeout
-                let result = tokio::time::timeout(
-                    time::Duration::from_secs(5),
-                    run_command(
-                        config.clone(),
-                        hostname,
-                        decoder,
-                        shutdown,
-                        tx,
-                        LogNamespace::Legacy,
-                    ),
-                )
-                .await;
-                (rx, result)
-            },
-        )
-        .await;
-
-        let exit_status = timeout_result
-            .expect("command timed out")
-            .expect("command error");
-        assert_eq!(0_i32, exit_status.unwrap().code().unwrap());
-
-        if let Poll::Ready(Some(event)) = futures::poll!(rx.next()) {
-            let log = event.as_log();
-            assert_eq!(log[COMMAND_KEY], config.command.clone().into());
-            assert_eq!(log[STREAM_KEY], STDOUT.into());
-            assert_eq!(log[log_schema().source_type_key()], "exec".into());
-            assert_eq!(log[log_schema().message_key()], "Hello World!".into());
-            assert_eq!(log[log_schema().host_key()], "Some.Machine".into());
-            assert!(log.get(PID_KEY).is_some());
-            assert!(log
-                .get((
-                    lookup::PathPrefix::Event,
-                    log_schema().timestamp_key().unwrap()
-                ))
-                .is_some());
-
-            assert_eq!(8, log.all_fields().unwrap().count());
-        } else {
-            panic!("Expected to receive a linux event");
-        }
-    }
-
-    #[tokio::test]
-    #[cfg(unix)]
-    async fn test_graceful_shutdown() {
-        trace_init();
-        let mut config = standard_streaming_test_config();
-        config.command = vec![
-            String::from("bash"),
-            String::from("-c"),
-            String::from(
-                r#"trap 'echo signal received ; sleep 1; echo slept ; exit' SIGTERM; while true ; do sleep 10 ; done"#,
-            ),
-        ];
-        let hostname = Some("Some.Machine".to_string());
-        let decoder = Default::default();
-        let (trigger, shutdown, _) = ShutdownSignal::new_wired();
-        let (tx, mut rx) = SourceSender::new_test();
-
-        let task = tokio::spawn(run_command(
-            config.clone(),
-            hostname,
-            decoder,
-            shutdown,
-            tx,
-            LogNamespace::Legacy,
-        ));
-
-        tokio::time::sleep(Duration::from_secs(1)).await; // let the source start the command
-
-        drop(trigger); // start shutdown
-
-        let exit_status = tokio::time::timeout(time::Duration::from_secs(30), task)
-            .await
-            .expect("join failed")
-            .expect("command timed out")
-            .expect("command error");
-
-        assert_eq!(
-            0_i32,
-            exit_status.expect("missing exit status").code().unwrap()
-        );
-
-        if let Poll::Ready(Some(event)) = futures::poll!(rx.next()) {
-            let log = event.as_log();
-            assert_eq!(log[log_schema().message_key()], "signal received".into());
-        } else {
-            panic!("Expected to receive event");
-        }
-
-        if let Poll::Ready(Some(event)) = futures::poll!(rx.next()) {
-            let log = event.as_log();
-            assert_eq!(log[log_schema().message_key()], "slept".into());
-        } else {
-            panic!("Expected to receive event");
-        }
-    }
-
-    fn standard_scheduled_test_config() -> ExecConfig {
-        Default::default()
-    }
-
-    fn standard_streaming_test_config() -> ExecConfig {
-        ExecConfig {
-            mode: Mode::Streaming,
-            scheduled: None,
-            streaming: Some(StreamingConfig {
-                respawn_on_exit: default_respawn_on_exit(),
-                respawn_interval_secs: default_respawn_interval_secs(),
-            }),
-            command: vec!["yes".to_owned()],
-            working_directory: None,
-            include_stderr: default_include_stderr(),
-            maximum_buffer_size_bytes: default_maximum_buffer_size(),
-            framing: None,
-            decoding: default_decoding(),
-            log_namespace: None,
-        }
-    }
 }

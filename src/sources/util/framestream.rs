@@ -20,17 +20,15 @@ use futures::{
     sink::{Sink, SinkExt},
     stream::{self, StreamExt, TryStreamExt},
 };
-use lookup::OwnedValuePath;
 use tokio::{self, net::UnixListener, task::JoinHandle};
 use tokio_stream::wrappers::UnixListenerStream;
 use tokio_util::codec::{length_delimited, Framed};
 use tracing::{field, Instrument};
+use vector_lib::lookup::OwnedValuePath;
 
 use crate::{
     event::Event,
-    internal_events::{
-        SocketEventsReceived, SocketMode, UnixSocketError, UnixSocketFileDeleteError,
-    },
+    internal_events::{UnixSocketError, UnixSocketFileDeleteError},
     shutdown::ShutdownSignal,
     sources::Source,
     SourceSender,
@@ -157,11 +155,6 @@ impl FrameStreamReader {
         } else {
             //data frame
             if self.state.control_state == ControlState::ReadingData {
-                emit!(SocketEventsReceived {
-                    mode: SocketMode::Unix,
-                    byte_size: frame.len(),
-                    count: 1
-                });
                 Some(frame) //return data frame
             } else {
                 error!(
@@ -337,7 +330,7 @@ impl FrameStreamReader {
 
     fn send_control_frame(&mut self, frame: Bytes) {
         let empty_frame = Bytes::from(&b""[..]); //send empty frame to say we are control frame
-        let mut stream = stream::iter(vec![Ok(empty_frame), Ok(frame)].into_iter());
+        let mut stream = stream::iter(vec![Ok(empty_frame), Ok(frame)]);
 
         if let Err(e) = block_on(self.response_sink.lock().unwrap().send_all(&mut stream)) {
             error!("Encountered error '{:#?}' while sending control frame.", e);
@@ -357,7 +350,7 @@ pub trait FrameHandler {
     fn socket_send_buffer_size(&self) -> Option<usize>;
     fn host_key(&self) -> &Option<OwnedValuePath>;
     fn timestamp_key(&self) -> Option<&OwnedValuePath>;
-    fn source_type_key(&self) -> &str;
+    fn source_type_key(&self) -> Option<&OwnedValuePath>;
 }
 
 /**
@@ -602,7 +595,6 @@ mod test {
         sink::{Sink, SinkExt},
         stream::{self, StreamExt},
     };
-    use lookup::{owned_value_path, path, OwnedValuePath};
     use tokio::{
         self,
         net::UnixStream,
@@ -610,7 +602,8 @@ mod test {
         time::{Duration, Instant},
     };
     use tokio_util::codec::{length_delimited, Framed};
-    use vector_core::config::{LegacyKey, LogNamespace};
+    use vector_lib::config::{LegacyKey, LogNamespace};
+    use vector_lib::lookup::{owned_value_path, path, OwnedValuePath};
 
     use super::{
         build_framestream_unix_source, spawn_event_handling_tasks, ControlField, ControlHeader,
@@ -637,7 +630,7 @@ mod test {
         extra_task_handling_routine: F,
         host_key: Option<OwnedValuePath>,
         timestamp_key: Option<OwnedValuePath>,
-        source_type_key: String,
+        source_type_key: Option<OwnedValuePath>,
         log_namespace: LogNamespace,
     }
 
@@ -655,7 +648,7 @@ mod test {
                 extra_task_handling_routine: extra_routine,
                 host_key: Some(owned_value_path!("test_framestream")),
                 timestamp_key: Some(owned_value_path!("my_timestamp")),
-                source_type_key: "source_type".to_string(),
+                source_type_key: Some(owned_value_path!("source_type")),
                 log_namespace: LogNamespace::Legacy,
             }
         }
@@ -672,7 +665,10 @@ mod test {
         fn handle_event(&self, received_from: Option<Bytes>, frame: Bytes) -> Option<Event> {
             let mut log_event = LogEvent::from(frame);
 
-            log_event.insert(log_schema().source_type_key(), "framestream");
+            log_event.insert(
+                log_schema().source_type_key_target_path().unwrap(),
+                "framestream",
+            );
             if let Some(host) = received_from {
                 self.log_namespace.insert_source_metadata(
                     "framestream",
@@ -718,8 +714,8 @@ mod test {
             self.timestamp_key.as_ref()
         }
 
-        fn source_type_key(&self) -> &str {
-            self.source_type_key.as_str()
+        fn source_type_key(&self) -> Option<&OwnedValuePath> {
+            self.source_type_key.as_ref()
         }
     }
 
@@ -735,7 +731,7 @@ mod test {
         let source_id = ComponentKey::from(source_id);
         let socket_path = frame_handler.socket_path();
         let mut shutdown = SourceShutdownCoordinator::default();
-        let (shutdown_signal, _) = shutdown.register_source(&source_id);
+        let (shutdown_signal, _) = shutdown.register_source(&source_id, false);
         let server = build_framestream_unix_source(frame_handler, shutdown_signal, pipeline)
             .expect("Failed to build framestream unix source.");
 
@@ -858,11 +854,11 @@ mod test {
         send_control_frame(&mut sock_sink, create_control_frame(ControlHeader::Stop)).await;
 
         assert_eq!(
-            events[0].as_log()[&log_schema().message_key()],
+            events[0].as_log()[log_schema().message_key().unwrap().to_string()],
             "hello".into(),
         );
         assert_eq!(
-            events[1].as_log()[&log_schema().message_key()],
+            events[1].as_log()[log_schema().message_key().unwrap().to_string()],
             "world".into(),
         );
 
@@ -907,12 +903,13 @@ mod test {
         //5 - send STOP frame
         send_control_frame(&mut sock_sink, create_control_frame(ControlHeader::Stop)).await;
 
+        let message_key = log_schema().message_key().unwrap().to_string();
         assert!(events
             .iter()
-            .any(|e| e.as_log()[&log_schema().message_key()] == "hello".into()));
+            .any(|e| e.as_log()[&message_key] == "hello".into()));
         assert!(events
             .iter()
-            .any(|e| e.as_log()[&log_schema().message_key()] == "world".into()));
+            .any(|e| e.as_log()[&message_key] == "world".into()));
 
         drop(sock_stream); //explicitly drop the stream so we don't get warnings about not using it
 
@@ -1029,11 +1026,11 @@ mod test {
         send_control_frame(&mut sock_sink, create_control_frame(ControlHeader::Stop)).await;
 
         assert_eq!(
-            events[0].as_log()[&log_schema().message_key()],
+            events[0].as_log()[log_schema().message_key().unwrap().to_string()],
             "hello".into(),
         );
         assert_eq!(
-            events[1].as_log()[&log_schema().message_key()],
+            events[1].as_log()[log_schema().message_key().unwrap().to_string()],
             "world".into(),
         );
 
@@ -1069,11 +1066,11 @@ mod test {
         send_control_frame(&mut sock_sink, create_control_frame(ControlHeader::Stop)).await;
 
         assert_eq!(
-            events[0].as_log()[&log_schema().message_key()],
+            events[0].as_log()[log_schema().message_key().unwrap().to_string()],
             "hello".into(),
         );
         assert_eq!(
-            events[1].as_log()[&log_schema().message_key()],
+            events[1].as_log()[log_schema().message_key().unwrap().to_string()],
             "world".into(),
         );
 

@@ -4,7 +4,7 @@
 #
 # description: A lightweight and ultra-fast tool for building observability pipelines
 # processname: vector
-# config:      /etc/vector/vector.toml
+# config:      /etc/vector/vector.yaml
 # pidfile:     /var/run/vector.pid
 
 ### BEGIN INIT INFO

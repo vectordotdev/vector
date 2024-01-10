@@ -7,30 +7,30 @@ use std::{
 
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
-use codecs::{
-    decoding::{Deserializer, DeserializerConfig, Framer},
-    BytesDecoder, BytesDeserializer,
-};
 use futures::{Stream, StreamExt};
 use http::HeaderMap;
 use indoc::indoc;
-use lookup::{owned_value_path, OwnedTargetPath};
 use ordered_float::NotNan;
 use prost::Message;
 use quickcheck::{Arbitrary, Gen, QuickCheck, TestResult};
 use similar_asserts::assert_eq;
-use vector_core::{
+use vector_lib::codecs::{
+    decoding::{Deserializer, DeserializerConfig, Framer},
+    BytesDecoder, BytesDeserializer,
+};
+use vector_lib::lookup::{owned_value_path, OwnedTargetPath};
+use vector_lib::{
     config::LogNamespace,
     event::{metric::TagValue, MetricTags},
     metric_tags,
 };
 use vrl::compiler::value::Collection;
-use vrl::value::Kind;
+use vrl::value::{Kind, ObjectMap};
 
 use crate::schema::Definition;
 use crate::{
     common::datadog::{DatadogMetricType, DatadogPoint, DatadogSeriesMetric},
-    config::{log_schema, SourceConfig, SourceContext},
+    config::{SourceConfig, SourceContext},
     event::{
         into_event_stream,
         metric::{MetricKind, MetricSketch, MetricValue},
@@ -85,7 +85,7 @@ fn test_decode_log_body() {
         let api_key = None;
         let decoder = crate::codecs::Decoder::new(
             Framer::Bytes(BytesDecoder::new()),
-            Deserializer::Bytes(BytesDeserializer::new()),
+            Deserializer::Bytes(BytesDeserializer),
         );
 
         let source = DatadogAgentSource::new(
@@ -118,6 +118,27 @@ fn test_decode_log_body() {
     }
 
     QuickCheck::new().quickcheck(inner as fn(Vec<LogMsg>) -> TestResult);
+}
+
+#[test]
+fn test_decode_log_body_empty_object() {
+    let body = Bytes::from("{}");
+    let api_key = None;
+    let decoder = crate::codecs::Decoder::new(
+        Framer::Bytes(BytesDecoder::new()),
+        Deserializer::Bytes(BytesDeserializer),
+    );
+
+    let source = DatadogAgentSource::new(
+        true,
+        decoder,
+        "http",
+        test_logs_schema_definition(),
+        LogNamespace::Legacy,
+    );
+
+    let events = decode_log_body(body, api_key, &source).unwrap();
+    assert_eq!(events.len(), 0);
 }
 
 #[test]
@@ -238,7 +259,7 @@ async fn full_payload_v1() {
             assert_eq!(log["ddsource"], "curl".into());
             assert_eq!(log["ddtags"], "one,two,three".into());
             assert!(event.metadata().datadog_api_key().is_none());
-            assert_eq!(log[log_schema().source_type_key()], "datadog_agent".into());
+            assert_eq!(*log.get_source_type().unwrap(), "datadog_agent".into());
             assert_eq!(
                 event.metadata().schema_definition(),
                 &test_logs_schema_definition()
@@ -300,7 +321,7 @@ async fn full_payload_v2() {
             assert_eq!(log["ddsource"], "curl".into());
             assert_eq!(log["ddtags"], "one,two,three".into());
             assert!(event.metadata().datadog_api_key().is_none());
-            assert_eq!(log[log_schema().source_type_key()], "datadog_agent".into());
+            assert_eq!(*log.get_source_type().unwrap(), "datadog_agent".into());
             assert_eq!(
                 event.metadata().schema_definition(),
                 &test_logs_schema_definition()
@@ -362,7 +383,7 @@ async fn no_api_key() {
             assert_eq!(log["ddsource"], "curl".into());
             assert_eq!(log["ddtags"], "one,two,three".into());
             assert!(event.metadata().datadog_api_key().is_none());
-            assert_eq!(log[log_schema().source_type_key()], "datadog_agent".into());
+            assert_eq!(*log.get_source_type().unwrap(), "datadog_agent".into());
             assert_eq!(
                 event.metadata().schema_definition(),
                 &test_logs_schema_definition()
@@ -423,7 +444,7 @@ async fn api_key_in_url() {
             assert_eq!(log["service"], "vector".into());
             assert_eq!(log["ddsource"], "curl".into());
             assert_eq!(log["ddtags"], "one,two,three".into());
-            assert_eq!(log[log_schema().source_type_key()], "datadog_agent".into());
+            assert_eq!(*log.get_source_type().unwrap(), "datadog_agent".into());
             assert_eq!(
                 &event.metadata().datadog_api_key().as_ref().unwrap()[..],
                 "12345678abcdefgh12345678abcdefgh"
@@ -488,7 +509,7 @@ async fn api_key_in_query_params() {
             assert_eq!(log["service"], "vector".into());
             assert_eq!(log["ddsource"], "curl".into());
             assert_eq!(log["ddtags"], "one,two,three".into());
-            assert_eq!(log[log_schema().source_type_key()], "datadog_agent".into());
+            assert_eq!(*log.get_source_type().unwrap(), "datadog_agent".into());
             assert_eq!(
                 &event.metadata().datadog_api_key().as_ref().unwrap()[..],
                 "12345678abcdefgh12345678abcdefgh"
@@ -559,7 +580,7 @@ async fn api_key_in_header() {
             assert_eq!(log["service"], "vector".into());
             assert_eq!(log["ddsource"], "curl".into());
             assert_eq!(log["ddtags"], "one,two,three".into());
-            assert_eq!(log[log_schema().source_type_key()], "datadog_agent".into());
+            assert_eq!(*log.get_source_type().unwrap(), "datadog_agent".into());
             assert_eq!(
                 &event.metadata().datadog_api_key().as_ref().unwrap()[..],
                 "12345678abcdefgh12345678abcdefgh"
@@ -706,7 +727,7 @@ async fn ignores_api_key() {
             assert_eq!(log["service"], "vector".into());
             assert_eq!(log["ddsource"], "curl".into());
             assert_eq!(log["ddtags"], "one,two,three".into());
-            assert_eq!(log[log_schema().source_type_key()], "datadog_agent".into());
+            assert_eq!(*log.get_source_type().unwrap(), "datadog_agent".into());
             assert!(event.metadata().datadog_api_key().is_none());
             assert_eq!(
                 event.metadata().schema_definition(),
@@ -742,6 +763,7 @@ async fn decode_series_endpoint_v1() {
                     host: Some("random_host".to_string()),
                     source_type_name: None,
                     device: None,
+                    metadata: None,
                 },
                 DatadogSeriesMetric {
                     metric: "dd_rate".to_string(),
@@ -752,6 +774,7 @@ async fn decode_series_endpoint_v1() {
                     host: Some("another_random_host".to_string()),
                     source_type_name: None,
                     device: None,
+                    metadata: None,
                 },
                 DatadogSeriesMetric {
                     metric: "dd_count".to_string(),
@@ -762,6 +785,7 @@ async fn decode_series_endpoint_v1() {
                     host: Some("a_host".to_string()),
                     source_type_name: None,
                     device: None,
+                    metadata: None,
                 },
                 DatadogSeriesMetric {
                     metric: "system.disk.free".to_string(),
@@ -772,6 +796,7 @@ async fn decode_series_endpoint_v1() {
                     host: None,
                     source_type_name: None,
                     device: None,
+                    metadata: None,
                 },
                 DatadogSeriesMetric {
                     metric: "system.disk".to_string(),
@@ -782,6 +807,7 @@ async fn decode_series_endpoint_v1() {
                     host: None,
                     source_type_name: None,
                     device: None,
+                    metadata: None,
                 },
             ],
         };
@@ -960,6 +986,13 @@ async fn decode_sketches() {
                 k: vec![1517, 1559],
                 n: vec![1, 1],
             }],
+            metadata: Some(ddmetric_proto::Metadata {
+                origin: Some(ddmetric_proto::Origin {
+                    origin_product: 10,
+                    origin_category: 11,
+                    origin_service: 9,
+                }),
+            }),
         };
 
         let sketch_payload = ddmetric_proto::SketchPayload {
@@ -1026,6 +1059,11 @@ async fn decode_sketches() {
                 &events[0].metadata().datadog_api_key().as_ref().unwrap()[..],
                 "12345678abcdefgh12345678abcdefgh"
             );
+
+            let event_origin = &events[0].metadata().datadog_origin_metadata().unwrap();
+            assert_eq!(event_origin.product().unwrap(), 10);
+            assert_eq!(event_origin.category().unwrap(), 11);
+            assert_eq!(event_origin.service().unwrap(), 9);
         }
     })
     .await;
@@ -1212,12 +1250,8 @@ async fn decode_traces() {
 
             assert_eq!(
                 trace_v2.as_map()["tags"],
-                Value::Object(BTreeMap::from_iter(
-                    [
-                        ("a".to_string(), "tag".into()),
-                        ("another".to_string(), "tag".into())
-                    ]
-                    .into_iter()
+                Value::Object(ObjectMap::from_iter(
+                    [("a".into(), "tag".into()), ("another".into(), "tag".into())].into_iter()
                 ))
             );
 
@@ -1335,6 +1369,7 @@ async fn split_outputs() {
                 host: Some("random_host".to_string()),
                 source_type_name: None,
                 device: None,
+                metadata: None,
             }],
         };
         let mut metric_event = spawn_collect_n(
@@ -1398,7 +1433,7 @@ async fn split_outputs() {
             assert_eq!(log["service"], "vector".into());
             assert_eq!(log["ddsource"], "curl".into());
             assert_eq!(log["ddtags"], "one,two,three".into());
-            assert_eq!(log[log_schema().source_type_key()], "datadog_agent".into());
+            assert_eq!(*log.get_source_type().unwrap(), "datadog_agent".into());
             assert_eq!(
                 &event.metadata().datadog_api_key().as_ref().unwrap()[..],
                 "12345678abcdefgh12345678abcdefgh"
@@ -1595,7 +1630,7 @@ fn test_config_outputs() {
         (
             "json / single output",
             TestCase {
-                decoding: DeserializerConfig::Json,
+                decoding: DeserializerConfig::Json(Default::default()),
                 multiple_outputs: false,
                 want: HashMap::from([(
                     None,
@@ -1620,7 +1655,7 @@ fn test_config_outputs() {
         (
             "json / multiple output",
             TestCase {
-                decoding: DeserializerConfig::Json,
+                decoding: DeserializerConfig::Json(Default::default()),
                 multiple_outputs: true,
                 want: HashMap::from([
                     (
@@ -1658,11 +1693,11 @@ fn test_config_outputs() {
                 ]),
             },
         ),
-        #[cfg(feature = "sources-syslog")]
+        #[cfg(feature = "codecs-syslog")]
         (
             "syslog / single output",
             TestCase {
-                decoding: DeserializerConfig::Syslog,
+                decoding: DeserializerConfig::Syslog(Default::default()),
                 multiple_outputs: false,
                 want: HashMap::from([(
                     None,
@@ -1690,7 +1725,11 @@ fn test_config_outputs() {
                             )
                             .optional_field(&owned_value_path!("facility"), Kind::bytes(), None)
                             .optional_field(&owned_value_path!("version"), Kind::integer(), None)
-                            .optional_field(&owned_value_path!("appname"), Kind::bytes(), None)
+                            .optional_field(
+                                &owned_value_path!("appname"),
+                                Kind::bytes(),
+                                Some("service"),
+                            )
                             .optional_field(&owned_value_path!("msgid"), Kind::bytes(), None)
                             .optional_field(
                                 &owned_value_path!("procid"),
@@ -1729,11 +1768,11 @@ fn test_config_outputs() {
                 )]),
             },
         ),
-        #[cfg(feature = "sources-syslog")]
+        #[cfg(feature = "codecs-syslog")]
         (
             "syslog / multiple output",
             TestCase {
-                decoding: DeserializerConfig::Syslog,
+                decoding: DeserializerConfig::Syslog(Default::default()),
                 multiple_outputs: true,
                 want: HashMap::from([
                     (
@@ -1766,7 +1805,11 @@ fn test_config_outputs() {
                                     Kind::integer(),
                                     None,
                                 )
-                                .optional_field(&owned_value_path!("appname"), Kind::bytes(), None)
+                                .optional_field(
+                                    &owned_value_path!("appname"),
+                                    Kind::bytes(),
+                                    Some("service"),
+                                )
                                 .optional_field(&owned_value_path!("msgid"), Kind::bytes(), None)
                                 .optional_field(
                                     &owned_value_path!("procid"),
@@ -1826,6 +1869,7 @@ fn test_config_outputs() {
             disable_metrics: false,
             disable_traces: false,
             log_namespace: Some(false),
+            keepalive: Default::default(),
         };
 
         let mut outputs = config
@@ -1876,7 +1920,8 @@ async fn decode_series_endpoint_v2() {
                 r#type: ddmetric_proto::metric_payload::MetricType::Gauge as i32,
                 unit: "".to_string(),
                 source_type_name: "a_random_source_type_name".to_string(),
-                interval: 0,
+                interval: 10, // Dogstatsd sets Gauge interval to 10 by default
+                metadata: None,
             },
             ddmetric_proto::metric_payload::MetricSeries {
                 resources: vec![ddmetric_proto::metric_payload::Resource {
@@ -1893,6 +1938,7 @@ async fn decode_series_endpoint_v2() {
                 unit: "".to_string(),
                 source_type_name: "another_random_source_type_name".to_string(),
                 interval: 10,
+                metadata: None,
             },
             ddmetric_proto::metric_payload::MetricSeries {
                 resources: vec![ddmetric_proto::metric_payload::Resource {
@@ -1909,6 +1955,13 @@ async fn decode_series_endpoint_v2() {
                 unit: "".to_string(),
                 source_type_name: "a_very_random_source_type_name".to_string(),
                 interval: 0,
+                metadata: Some(ddmetric_proto::Metadata {
+                    origin: Some(ddmetric_proto::Origin {
+                        origin_product: 10,
+                        origin_category: 10,
+                        origin_service: 42,
+                    }),
+                }),
             },
         ];
 
@@ -1947,6 +2000,13 @@ async fn decode_series_endpoint_v2() {
                 )
             );
             assert_eq!(metric.kind(), MetricKind::Absolute);
+            assert_eq!(
+                metric
+                    .interval_ms()
+                    .expect("should have set interval")
+                    .get(),
+                10000
+            );
             assert_eq!(*metric.value(), MetricValue::Gauge { value: 3.14 });
             assert_tags(
                 metric,
@@ -1971,6 +2031,13 @@ async fn decode_series_endpoint_v2() {
             );
             assert_eq!(metric.kind(), MetricKind::Absolute);
             assert_eq!(*metric.value(), MetricValue::Gauge { value: 3.1415 });
+            assert_eq!(
+                metric
+                    .interval_ms()
+                    .expect("should have set interval")
+                    .get(),
+                10000
+            );
             assert_tags(
                 metric,
                 metric_tags!(
@@ -2049,6 +2116,34 @@ async fn decode_series_endpoint_v2() {
             assert_eq!(
                 &events[3].metadata().datadog_api_key().as_ref().unwrap()[..],
                 "12345678abcdefgh12345678abcdefgh"
+            );
+
+            assert_eq!(
+                events[3]
+                    .metadata()
+                    .datadog_origin_metadata()
+                    .unwrap()
+                    .product()
+                    .unwrap(),
+                10
+            );
+            assert_eq!(
+                events[3]
+                    .metadata()
+                    .datadog_origin_metadata()
+                    .unwrap()
+                    .category()
+                    .unwrap(),
+                10
+            );
+            assert_eq!(
+                events[3]
+                    .metadata()
+                    .datadog_origin_metadata()
+                    .unwrap()
+                    .service()
+                    .unwrap(),
+                42
             );
         }
     })

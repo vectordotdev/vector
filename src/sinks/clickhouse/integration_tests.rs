@@ -15,7 +15,8 @@ use http::StatusCode;
 use serde::Deserialize;
 use serde_json::Value;
 use tokio::time::{timeout, Duration};
-use vector_core::event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event, LogEvent};
+use vector_lib::event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event, LogEvent};
+use vector_lib::lookup::PathPrefix;
 use warp::Filter;
 
 use super::*;
@@ -24,7 +25,7 @@ use crate::{
     config::{log_schema, SinkConfig, SinkContext},
     sinks::util::{BatchConfig, Compression, TowerRequestConfig},
     test_util::{
-        components::{run_and_assert_sink_compliance, HTTP_SINK_TAGS},
+        components::{run_and_assert_sink_compliance, SINK_TAGS},
         random_string, trace_init,
     },
 };
@@ -45,11 +46,11 @@ async fn insert_events() {
 
     let config = ClickhouseConfig {
         endpoint: host.parse().unwrap(),
-        table: table.clone(),
+        table: table.clone().try_into().unwrap(),
         compression: Compression::None,
         batch,
         request: TowerRequestConfig {
-            retry_attempts: Some(1),
+            retry_attempts: 1,
             ..Default::default()
         },
         ..Default::default()
@@ -63,19 +64,15 @@ async fn insert_events() {
         )
         .await;
 
-    let (sink, _hc) = config.build(SinkContext::new_test()).await.unwrap();
+    let (sink, _hc) = config.build(SinkContext::default()).await.unwrap();
 
     let (mut input_event, mut receiver) = make_event();
     input_event
         .as_mut_log()
         .insert("items", vec!["item1", "item2"]);
 
-    run_and_assert_sink_compliance(
-        sink,
-        stream::once(ready(input_event.clone())),
-        &HTTP_SINK_TAGS,
-    )
-    .await;
+    run_and_assert_sink_compliance(sink, stream::once(ready(input_event.clone())), &SINK_TAGS)
+        .await;
 
     let output = client.select_all(&table).await;
     assert_eq!(1, output.rows);
@@ -98,12 +95,12 @@ async fn skip_unknown_fields() {
 
     let config = ClickhouseConfig {
         endpoint: host.parse().unwrap(),
-        table: table.clone(),
+        table: table.clone().try_into().unwrap(),
         skip_unknown_fields: true,
         compression: Compression::None,
         batch,
         request: TowerRequestConfig {
-            retry_attempts: Some(1),
+            retry_attempts: 1,
             ..Default::default()
         },
         ..Default::default()
@@ -114,17 +111,13 @@ async fn skip_unknown_fields() {
         .create_table(&table, "host String, timestamp String, message String")
         .await;
 
-    let (sink, _hc) = config.build(SinkContext::new_test()).await.unwrap();
+    let (sink, _hc) = config.build(SinkContext::default()).await.unwrap();
 
     let (mut input_event, mut receiver) = make_event();
     input_event.as_mut_log().insert("unknown", "mysteries");
 
-    run_and_assert_sink_compliance(
-        sink,
-        stream::once(ready(input_event.clone())),
-        &HTTP_SINK_TAGS,
-    )
-    .await;
+    run_and_assert_sink_compliance(sink, stream::once(ready(input_event.clone())), &SINK_TAGS)
+        .await;
 
     let output = client.select_all(&table).await;
     assert_eq!(1, output.rows);
@@ -148,12 +141,12 @@ async fn insert_events_unix_timestamps() {
 
     let config = ClickhouseConfig {
         endpoint: host.parse().unwrap(),
-        table: table.clone(),
+        table: table.clone().try_into().unwrap(),
         compression: Compression::None,
         encoding: Transformer::new(None, None, Some(TimestampFormat::Unix)).unwrap(),
         batch,
         request: TowerRequestConfig {
-            retry_attempts: Some(1),
+            retry_attempts: 1,
             ..Default::default()
         },
         ..Default::default()
@@ -167,33 +160,23 @@ async fn insert_events_unix_timestamps() {
         )
         .await;
 
-    let (sink, _hc) = config.build(SinkContext::new_test()).await.unwrap();
+    let (sink, _hc) = config.build(SinkContext::default()).await.unwrap();
 
     let (mut input_event, _receiver) = make_event();
 
-    run_and_assert_sink_compliance(
-        sink,
-        stream::once(ready(input_event.clone())),
-        &HTTP_SINK_TAGS,
-    )
-    .await;
+    run_and_assert_sink_compliance(sink, stream::once(ready(input_event.clone())), &SINK_TAGS)
+        .await;
 
     let output = client.select_all(&table).await;
     assert_eq!(1, output.rows);
 
     let exp_event = input_event.as_mut_log();
     exp_event.insert(
-        (
-            lookup::PathPrefix::Event,
-            log_schema().timestamp_key().unwrap(),
-        ),
+        (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
         format!(
             "{}",
             exp_event
-                .get((
-                    lookup::PathPrefix::Event,
-                    log_schema().timestamp_key().unwrap()
-                ))
+                .get_timestamp()
                 .unwrap()
                 .as_timestamp()
                 .unwrap()
@@ -235,33 +218,23 @@ timestamp_format = "unix""#,
         )
         .await;
 
-    let (sink, _hc) = config.build(SinkContext::new_test()).await.unwrap();
+    let (sink, _hc) = config.build(SinkContext::default()).await.unwrap();
 
     let (mut input_event, _receiver) = make_event();
 
-    run_and_assert_sink_compliance(
-        sink,
-        stream::once(ready(input_event.clone())),
-        &HTTP_SINK_TAGS,
-    )
-    .await;
+    run_and_assert_sink_compliance(sink, stream::once(ready(input_event.clone())), &SINK_TAGS)
+        .await;
 
     let output = client.select_all(&table).await;
     assert_eq!(1, output.rows);
 
     let exp_event = input_event.as_mut_log();
     exp_event.insert(
-        (
-            lookup::PathPrefix::Event,
-            log_schema().timestamp_key().unwrap(),
-        ),
+        (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
         format!(
             "{}",
             exp_event
-                .get((
-                    lookup::PathPrefix::Event,
-                    log_schema().timestamp_key().unwrap()
-                ))
+                .get_timestamp()
                 .unwrap()
                 .as_timestamp()
                 .unwrap()
@@ -285,20 +258,20 @@ async fn no_retry_on_incorrect_data() {
 
     let config = ClickhouseConfig {
         endpoint: host.parse().unwrap(),
-        table: table.clone(),
+        table: table.clone().try_into().unwrap(),
         compression: Compression::None,
         batch,
         ..Default::default()
     };
 
     let client = ClickhouseClient::new(host);
-    // the event contains a message field, but its being omitted to
-    // fail the request.
+    // The event contains a message field, but it's of type String, which will cause
+    // the request to fail.
     client
-        .create_table(&table, "host String, timestamp String")
+        .create_table(&table, "host String, timestamp String, message Int32")
         .await;
 
-    let (sink, _hc) = config.build(SinkContext::new_test()).await.unwrap();
+    let (sink, _hc) = config.build(SinkContext::default()).await.unwrap();
 
     let (input_event, mut receiver) = make_event();
 
@@ -336,11 +309,11 @@ async fn no_retry_on_incorrect_data_warp() {
 
     let config = ClickhouseConfig {
         endpoint: host.parse().unwrap(),
-        table: gen_table(),
+        table: gen_table().try_into().unwrap(),
         batch,
         ..Default::default()
     };
-    let (sink, _hc) = config.build(SinkContext::new_test()).await.unwrap();
+    let (sink, _hc) = config.build(SinkContext::default()).await.unwrap();
 
     let (input_event, mut receiver) = make_event();
 
@@ -351,7 +324,71 @@ async fn no_retry_on_incorrect_data_warp() {
         .unwrap()
         .unwrap();
 
-    assert_eq!(receiver.try_recv(), Ok(BatchStatus::Errored));
+    assert_eq!(receiver.try_recv(), Ok(BatchStatus::Rejected));
+}
+
+#[tokio::test]
+async fn templated_table() {
+    trace_init();
+
+    let n_tables = 2;
+    let table_events: Vec<(String, Event, BatchStatusReceiver)> = (0..n_tables)
+        .map(|_| {
+            let table = gen_table();
+            let (mut event, receiver) = make_event();
+            event.as_mut_log().insert("table", table.as_str());
+            (table, event, receiver)
+        })
+        .collect();
+
+    let host = clickhouse_address();
+
+    let mut batch = BatchConfig::default();
+    batch.max_events = Some(1);
+
+    let config = ClickhouseConfig {
+        endpoint: host.parse().unwrap(),
+        table: "{{ .table }}".try_into().unwrap(),
+        batch,
+        ..Default::default()
+    };
+
+    let client = ClickhouseClient::new(host);
+    for (table, _, _) in &table_events {
+        client
+            .create_table(
+                table,
+                "host String, timestamp String, message String, table String",
+            )
+            .await;
+    }
+
+    let (sink, _hc) = config.build(SinkContext::default()).await.unwrap();
+
+    let events: Vec<Event> = table_events
+        .iter()
+        .map(|(_, event, _)| event.clone())
+        .collect();
+    run_and_assert_sink_compliance(sink, stream::iter(events), &SINK_TAGS).await;
+
+    for (table, event, mut receiver) in table_events {
+        let output = client.select_all(&table).await;
+        assert_eq!(1, output.rows, "table {} should have 1 row", table);
+
+        let expected = serde_json::to_value(event.into_log()).unwrap();
+        assert_eq!(
+            expected, output.data[0],
+            "table \"{}\"'s one row should have the correct data",
+            table
+        );
+
+        assert_eq!(
+            receiver.try_recv(),
+            Ok(BatchStatus::Delivered),
+            "table \"{}\"'s event should have been delivered",
+            table
+        );
+    }
 }
 
 fn make_event() -> (Event, BatchStatusReceiver) {
@@ -378,7 +415,6 @@ impl ClickhouseClient {
         let response = self
             .client
             .post(&self.host)
-            //
             .body(format!(
                 "CREATE TABLE {}
                     ({})

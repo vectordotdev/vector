@@ -6,7 +6,7 @@ components: sinks: new_relic: {
 	classes: {
 		commonly_used: false
 		delivery:      "at_least_once"
-		development:   "stable"
+		development:   "beta"
 		egress_method: "batch"
 		service_providers: ["New Relic"]
 		stateful: false

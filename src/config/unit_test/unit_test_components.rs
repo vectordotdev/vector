@@ -3,8 +3,8 @@ use std::sync::Arc;
 use futures::{stream, Sink, Stream};
 use futures_util::{future, stream::BoxStream, FutureExt, StreamExt};
 use tokio::sync::{oneshot, Mutex};
-use vector_config::configurable_component;
-use vector_core::{
+use vector_lib::configurable::configurable_component;
+use vector_lib::{
     config::{DataType, Input, LogNamespace},
     event::Event,
     schema,
@@ -16,7 +16,6 @@ use crate::{
     config::{
         AcknowledgementsConfig, SinkConfig, SinkContext, SourceConfig, SourceContext, SourceOutput,
     },
-    impl_generate_config_from_default,
     sinks::Healthcheck,
     sources,
 };
@@ -135,7 +134,7 @@ pub struct UnitTestSinkResult {
 }
 
 /// Configuration for the `unit_test` sink.
-#[configurable_component(sink("unit_test"))]
+#[configurable_component(sink("unit_test", "Unit test."))]
 #[derive(Clone, Default, Derivative)]
 #[derivative(Debug)]
 pub struct UnitTestSinkConfig {
@@ -158,6 +157,7 @@ pub struct UnitTestSinkConfig {
 impl_generate_config_from_default!(UnitTestSinkConfig);
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "unit_test")]
 impl SinkConfig for UnitTestSinkConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let tx = self.result_tx.lock().await.take();
@@ -272,7 +272,7 @@ impl StreamSink<Event> for UnitTestSink {
 }
 
 /// Configuration for the `unit_test_stream` sink.
-#[configurable_component(sink("unit_test_stream"))]
+#[configurable_component(sink("unit_test_stream", "Unit test stream."))]
 #[derive(Clone, Default)]
 pub struct UnitTestStreamSinkConfig {
     /// Sink that receives the processed events.
@@ -297,11 +297,13 @@ impl std::fmt::Debug for UnitTestStreamSinkConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "unit_test_stream")]
 impl SinkConfig for UnitTestStreamSinkConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let sink = self.sink.lock().await.take().unwrap();
         let healthcheck = future::ok(()).boxed();
 
+        #[allow(deprecated)]
         Ok((VectorSink::from_event_sink(sink), healthcheck))
     }
 

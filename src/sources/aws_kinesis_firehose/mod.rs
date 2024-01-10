@@ -1,21 +1,27 @@
-use std::{fmt, net::SocketAddr};
+use std::time::Duration;
+use std::{convert::Infallible, fmt, net::SocketAddr};
 
-use codecs::decoding::{DeserializerConfig, FramingConfig};
 use futures::FutureExt;
-use lookup::owned_value_path;
+use hyper::{service::make_service_fn, Server};
+use tokio::net::TcpStream;
+use tower::ServiceBuilder;
 use tracing::Span;
-use vector_common::sensitive_string::SensitiveString;
-use vector_config::configurable_component;
-use vector_core::config::{LegacyKey, LogNamespace};
+use vector_lib::codecs::decoding::{DeserializerConfig, FramingConfig};
+use vector_lib::config::{LegacyKey, LogNamespace};
+use vector_lib::configurable::configurable_component;
+use vector_lib::lookup::owned_value_path;
+use vector_lib::sensitive_string::SensitiveString;
+use vector_lib::tls::MaybeTlsIncomingStream;
 use vrl::value::Kind;
-use warp::Filter;
 
+use crate::http::{KeepaliveConfig, MaxConnectionAgeLayer};
 use crate::{
     codecs::DecodingConfig,
     config::{
         GenerateConfig, Resource, SourceAcknowledgementsConfig, SourceConfig, SourceContext,
         SourceOutput,
     },
+    http::build_http_trace_layer,
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
     tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
@@ -37,7 +43,7 @@ pub struct AwsKinesisFirehoseConfig {
     #[configurable(metadata(docs::examples = "localhost:443"))]
     address: SocketAddr,
 
-    /// An optional access key to authenticate requests against.
+    /// An access key to authenticate requests against.
     ///
     /// AWS Kinesis Firehose can be configured to pass along a user-configurable access key with each request. If
     /// configured, `access_key` should be set to the same value. Otherwise, all requests are allowed.
@@ -45,7 +51,7 @@ pub struct AwsKinesisFirehoseConfig {
     #[configurable(metadata(docs::examples = "A94A8FE5CCB19BA61C4C08"))]
     access_key: Option<SensitiveString>,
 
-    /// An optional list of access keys to authenticate requests against.
+    /// A list of access keys to authenticate requests against.
     ///
     /// AWS Kinesis Firehose can be configured to pass along a user-configurable access key with each request. If
     /// configured, `access_keys` should be set to the same value. Otherwise, all requests are allowed.
@@ -94,6 +100,10 @@ pub struct AwsKinesisFirehoseConfig {
     #[configurable(metadata(docs::hidden))]
     #[serde(default)]
     log_namespace: Option<bool>,
+
+    #[configurable(derived)]
+    #[serde(default)]
+    keepalive: KeepaliveConfig,
 }
 
 const fn access_keys_example() -> [&'static str; 2] {
@@ -143,7 +153,8 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let log_namespace = cx.log_namespace(self.log_namespace);
         let decoder =
-            DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace).build();
+            DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace)
+                .build()?;
 
         let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
 
@@ -171,15 +182,32 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
         let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
         let listener = tls.bind(&self.address).await?;
 
+        let keepalive_settings = self.keepalive.clone();
         let shutdown = cx.shutdown;
         Ok(Box::pin(async move {
             let span = Span::current();
-            warp::serve(svc.with(warp::trace(move |_info| span.clone())))
-                .serve_incoming_with_graceful_shutdown(
-                    listener.accept_stream(),
-                    shutdown.map(|_| ()),
-                )
-                .await;
+            let make_svc = make_service_fn(move |conn: &MaybeTlsIncomingStream<TcpStream>| {
+                let svc = ServiceBuilder::new()
+                    .layer(build_http_trace_layer(span.clone()))
+                    .option_layer(keepalive_settings.max_connection_age_secs.map(|secs| {
+                        MaxConnectionAgeLayer::new(
+                            Duration::from_secs(secs),
+                            keepalive_settings.max_connection_age_jitter_factor,
+                            conn.peer_addr(),
+                        )
+                    }))
+                    .service(warp::service(svc.clone()));
+                futures_util::future::ok::<_, Infallible>(svc)
+            });
+
+            Server::builder(hyper::server::accept::from_stream(listener.accept_stream()))
+                .serve(make_svc)
+                .with_graceful_shutdown(shutdown.map(|_| ()))
+                .await
+                .map_err(|err| {
+                    error!("An error occurred: {:?}.", err);
+                })?;
+
             Ok(())
         }))
     }
@@ -232,6 +260,7 @@ impl GenerateConfig for AwsKinesisFirehoseConfig {
             decoding: default_decoding(),
             acknowledgements: Default::default(),
             log_namespace: None,
+            keepalive: Default::default(),
         })
         .unwrap()
     }
@@ -251,11 +280,11 @@ mod tests {
     use chrono::{DateTime, SubsecRound, Utc};
     use flate2::read::GzEncoder;
     use futures::Stream;
-    use lookup::path;
     use similar_asserts::assert_eq;
     use tokio::time::{sleep, Duration};
-    use vector_common::assert_event_data_eq;
-    use vrl::value::value;
+    use vector_lib::assert_event_data_eq;
+    use vector_lib::lookup::path;
+    use vrl::value;
 
     use super::*;
     use crate::{
@@ -324,6 +353,7 @@ mod tests {
                 decoding: default_decoding(),
                 acknowledgements: true.into(),
                 log_namespace: Some(log_namespace),
+                keepalive: Default::default(),
             }
             .build(cx)
             .await

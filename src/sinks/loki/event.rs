@@ -1,14 +1,9 @@
 use std::{collections::HashMap, io};
 
+use crate::sinks::{prelude::*, util::encoding::Encoder};
 use bytes::Bytes;
 use serde::{ser::SerializeSeq, Serialize};
-use vector_buffers::EventCount;
-use vector_core::{
-    event::{EventFinalizers, Finalizable},
-    ByteSizeOf, EstimatedJsonEncodedSizeOf,
-};
-
-use crate::sinks::util::encoding::{write_all, Encoder};
+use vector_lib::config::telemetry;
 
 pub type Labels = Vec<(String, String)>;
 
@@ -26,8 +21,13 @@ impl Encoder<Vec<LokiRecord>> for LokiBatchEncoder {
         &self,
         input: Vec<LokiRecord>,
         writer: &mut dyn io::Write,
-    ) -> io::Result<usize> {
+    ) -> io::Result<(usize, GroupedCountByteSize)> {
         let count = input.len();
+        let mut byte_size = telemetry().create_request_count_byte_size();
+        for event in &input {
+            byte_size.add_event(event, event.estimated_json_encoded_size_of());
+        }
+
         let batch = LokiBatch::from(input);
         let body = match self.0 {
             LokiBatchEncoding::Json => {
@@ -58,7 +58,7 @@ impl Encoder<Vec<LokiRecord>> for LokiBatchEncoder {
                 batch.encode()
             }
         };
-        write_all(writer, count, &body).map(|()| body.len())
+        write_all(writer, count, &body).map(|()| (body.len(), byte_size))
     }
 }
 
@@ -138,21 +138,6 @@ impl ByteSizeOf for LokiEvent {
     }
 }
 
-/// This implementation approximates the `Serialize` implementation below, without any allocations.
-impl EstimatedJsonEncodedSizeOf for LokiEvent {
-    fn estimated_json_encoded_size_of(&self) -> usize {
-        static BRACKETS_SIZE: usize = 2;
-        static COLON_SIZE: usize = 1;
-        static QUOTES_SIZE: usize = 2;
-
-        BRACKETS_SIZE
-            + QUOTES_SIZE
-            + self.timestamp.estimated_json_encoded_size_of()
-            + COLON_SIZE
-            + self.event.estimated_json_encoded_size_of()
-    }
-}
-
 impl Serialize for LokiEvent {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -171,7 +156,9 @@ pub struct LokiRecord {
     pub partition: PartitionKey,
     pub labels: Labels,
     pub event: LokiEvent,
+    pub json_byte_size: JsonSize,
     pub finalizers: EventFinalizers,
+    pub event_count_tags: TaggedEventsSent,
 }
 
 impl ByteSizeOf for LokiRecord {
@@ -185,8 +172,8 @@ impl ByteSizeOf for LokiRecord {
 }
 
 impl EstimatedJsonEncodedSizeOf for LokiRecord {
-    fn estimated_json_encoded_size_of(&self) -> usize {
-        self.event.estimated_json_encoded_size_of()
+    fn estimated_json_encoded_size_of(&self) -> JsonSize {
+        self.json_byte_size
     }
 }
 
@@ -200,6 +187,12 @@ impl EventCount for LokiRecord {
 impl Finalizable for LokiRecord {
     fn take_finalizers(&mut self) -> EventFinalizers {
         std::mem::take(&mut self.finalizers)
+    }
+}
+
+impl GetEventCountTags for LokiRecord {
+    fn get_tags(&self) -> TaggedEventsSent {
+        self.event_count_tags.clone()
     }
 }
 

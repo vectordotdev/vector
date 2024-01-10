@@ -14,7 +14,7 @@ use super::{
     io::{AsyncFile, Metadata, ProductionFilesystem, ReadableMemoryMap, WritableMemoryMap},
     ledger::LEDGER_LEN,
     record::RECORD_HEADER_LEN,
-    Buffer, DiskBufferConfigBuilder, Filesystem, Ledger, Reader, Writer,
+    Buffer, BufferReader, BufferWriter, DiskBufferConfigBuilder, Filesystem, Ledger,
 };
 use crate::{
     buffer_usage_data::BufferUsageHandle, encoding::FixedEncodable,
@@ -135,6 +135,24 @@ macro_rules! assert_reader_writer_v2_file_positions {
 }
 
 #[macro_export]
+macro_rules! assert_reader_last_writer_next_positions {
+    ($ledger:expr, $reader_expected:expr, $writer_expected:expr) => {{
+        let reader_actual = $ledger.state().get_last_reader_record_id();
+        let writer_actual = $ledger.state().get_next_writer_record_id();
+        assert_eq!(
+            $reader_expected, reader_actual,
+            "expected reader last read record ID of {}, got {} instead",
+            $reader_expected, reader_actual,
+        );
+        assert_eq!(
+            $writer_expected, writer_actual,
+            "expected writer next record ID of {}, got {} instead",
+            $writer_expected, writer_actual,
+        );
+    }};
+}
+
+#[macro_export]
 macro_rules! assert_enough_bytes_written {
     ($written:expr, $record_type:ty, $record_payload_size:expr) => {
         assert!(
@@ -179,8 +197,8 @@ macro_rules! set_data_file_length {
 pub(crate) async fn create_default_buffer_v2<P, R>(
     data_dir: P,
 ) -> (
-    Writer<R, FilesystemUnderTest>,
-    Reader<R, FilesystemUnderTest>,
+    BufferWriter<R, FilesystemUnderTest>,
+    BufferReader<R, FilesystemUnderTest>,
     Arc<Ledger<FilesystemUnderTest>>,
 )
 where
@@ -200,8 +218,8 @@ where
 pub(crate) async fn create_default_buffer_v2_with_usage<P, R>(
     data_dir: P,
 ) -> (
-    Writer<R, FilesystemUnderTest>,
-    Reader<R, FilesystemUnderTest>,
+    BufferWriter<R, FilesystemUnderTest>,
+    BufferReader<R, FilesystemUnderTest>,
     Arc<Ledger<FilesystemUnderTest>>,
     BufferUsageHandle,
 )
@@ -229,8 +247,8 @@ pub(crate) async fn create_buffer_v2_with_data_file_count_limit<P, R>(
     max_data_file_size: u64,
     data_file_count_limit: u64,
 ) -> (
-    Writer<R, FilesystemUnderTest>,
-    Reader<R, FilesystemUnderTest>,
+    BufferWriter<R, FilesystemUnderTest>,
+    BufferReader<R, FilesystemUnderTest>,
     Arc<Ledger<FilesystemUnderTest>>,
 )
 where
@@ -273,8 +291,8 @@ pub(crate) async fn create_buffer_v2_with_max_record_size<P, R>(
     data_dir: P,
     max_record_size: usize,
 ) -> (
-    Writer<R, FilesystemUnderTest>,
-    Reader<R, FilesystemUnderTest>,
+    BufferWriter<R, FilesystemUnderTest>,
+    BufferReader<R, FilesystemUnderTest>,
     Arc<Ledger<FilesystemUnderTest>>,
 )
 where
@@ -299,8 +317,8 @@ pub(crate) async fn create_buffer_v2_with_max_data_file_size<P, R>(
     data_dir: P,
     max_data_file_size: u64,
 ) -> (
-    Writer<R, FilesystemUnderTest>,
-    Reader<R, FilesystemUnderTest>,
+    BufferWriter<R, FilesystemUnderTest>,
+    BufferReader<R, FilesystemUnderTest>,
     Arc<Ledger<FilesystemUnderTest>>,
 )
 where
@@ -326,8 +344,8 @@ pub(crate) async fn create_buffer_v2_with_write_buffer_size<P, R>(
     data_dir: P,
     write_buffer_size: usize,
 ) -> (
-    Writer<R, FilesystemUnderTest>,
-    Reader<R, FilesystemUnderTest>,
+    BufferWriter<R, FilesystemUnderTest>,
+    BufferReader<R, FilesystemUnderTest>,
     Arc<Ledger<FilesystemUnderTest>>,
 )
 where
@@ -366,7 +384,7 @@ where
     u64::try_from(max_record_size).unwrap()
 }
 
-pub(crate) async fn read_next<T, FS>(reader: &mut Reader<T, FS>) -> Option<T>
+pub(crate) async fn read_next<T, FS>(reader: &mut BufferReader<T, FS>) -> Option<T>
 where
     T: Bufferable,
     FS: Filesystem,
@@ -375,7 +393,7 @@ where
     reader.next().await.expect("read should not fail")
 }
 
-pub(crate) async fn read_next_some<T, FS>(reader: &mut Reader<T, FS>) -> T
+pub(crate) async fn read_next_some<T, FS>(reader: &mut BufferReader<T, FS>) -> T
 where
     T: Bufferable,
     FS: Filesystem,

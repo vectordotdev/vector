@@ -6,8 +6,8 @@ use std::{
 
 use async_stream::stream;
 use futures::{Stream, StreamExt};
-use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
+use vector_lib::config::LogNamespace;
+use vector_lib::configurable::configurable_component;
 
 use crate::{
     config::{DataType, Input, OutputId, TransformConfig, TransformContext, TransformOutput},
@@ -24,8 +24,9 @@ use crate::{
 pub struct AggregateConfig {
     /// The interval between flushes, in milliseconds.
     ///
-    /// During this time frame, metrics with the same series data (name, namespace, tags, and so on) are aggregated.
+    /// During this time frame, metrics (beta) with the same series data (name, namespace, tags, and so on) are aggregated.
     #[serde(default = "default_interval_ms")]
+    #[configurable(metadata(docs::human_name = "Flush Interval"))]
     pub interval_ms: u64,
 }
 
@@ -48,7 +49,7 @@ impl TransformConfig for AggregateConfig {
 
     fn outputs(
         &self,
-        _: enrichment::TableRegistry,
+        _: vector_lib::enrichment::TableRegistry,
         _: &[(OutputId, schema::Definition)],
         _: LogNamespace,
     ) -> Vec<TransformOutput> {
@@ -149,13 +150,16 @@ impl TaskTransform<Event> for Aggregate {
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::BTreeSet, task::Poll};
+    use std::{collections::BTreeSet, sync::Arc, task::Poll};
 
     use futures::stream;
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
+    use vector_lib::config::ComponentKey;
+    use vrl::value::Kind;
 
     use super::*;
+    use crate::schema::Definition;
     use crate::{
         event::{metric, Event, Metric},
         test_util::components::assert_transform_compliance,
@@ -172,7 +176,16 @@ mod tests {
         kind: metric::MetricKind,
         value: metric::MetricValue,
     ) -> Event {
-        Event::Metric(Metric::new(name, kind, value))
+        let mut event = Event::Metric(Metric::new(name, kind, value))
+            .with_source_id(Arc::new(ComponentKey::from("in")))
+            .with_upstream_id(Arc::new(OutputId::from("transform")));
+        event.metadata_mut().set_schema_definition(&Arc::new(
+            Definition::new_with_default_metadata(Kind::any_object(), [LogNamespace::Legacy]),
+        ));
+
+        event.metadata_mut().set_source_type("unit_test_stream");
+
+        event
     }
 
     #[test]

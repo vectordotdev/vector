@@ -1,7 +1,7 @@
 features:
 - datadog-metrics-integration-tests
 
-test_filter: '::datadog::metrics::'
+test_filter: '::datadog::metrics::integration_tests'
 
 runner:
   env:
@@ -9,3 +9,12 @@ runner:
 
 matrix:
   version: [latest]
+
+# changes to these files/paths will invoke the integration test in CI
+# expressions are evaluated using https://github.com/micromatch/picomatch
+paths:
+- "src/common/datadog.rs"
+- "src/internal_events/datadog_*"
+- "src/sinks/datadog/metrics/**"
+- "src/sinks/util/**"
+- "scripts/integration/datadog-metrics/**"

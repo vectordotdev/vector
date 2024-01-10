@@ -1,5 +1,5 @@
-use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
+use vector_lib::config::LogNamespace;
+use vector_lib::configurable::configurable_component;
 
 pub(crate) use crate::schema::Definition;
 

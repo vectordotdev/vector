@@ -40,6 +40,11 @@ macro_rules! await_timeout {
     }};
 }
 
+/// Run a future with a temporary directory.
+///
+/// # Panics
+///
+/// Will panic if function cannot create a temp directory.
 pub async fn with_temp_dir<F, Fut, V>(f: F) -> V
 where
     F: FnOnce(&Path) -> Fut,

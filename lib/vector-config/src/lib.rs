@@ -117,6 +117,7 @@ pub use self::configurable::{Configurable, ConfigurableRef, ToValue};
 mod errors;
 pub use self::errors::{BoundDirection, GenerateError};
 mod external;
+mod http;
 mod metadata;
 pub use self::metadata::Metadata;
 mod named;
@@ -137,9 +138,7 @@ pub use vector_config_macros::*;
 // The crate exists so that both `vector_config_macros` and `vector_config` can import the types and work with them
 // natively, but from a codegen and usage perspective, it's much cleaner to export everything needed to use
 // `Configurable` from `vector_config` itself, and not leak out the crate arrangement as an impl detail.
-pub mod validation {
-    pub use vector_config_common::validation::*;
-}
+pub use vector_config_common::{attributes, validation};
 
 #[doc(hidden)]
 pub fn __ensure_numeric_validation_bounds<N>(metadata: &Metadata) -> Result<(), GenerateError>

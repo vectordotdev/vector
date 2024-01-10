@@ -54,7 +54,7 @@ base: components: sources: host_metrics: configuration: {
 				description: """
 					The number of levels of the cgroups hierarchy for which to report metrics.
 
-					A value of `1` means just the root or named cgroup.
+					A value of `1` means the root or named cgroup.
 					"""
 				required: false
 				type: uint: {
