@@ -52,11 +52,6 @@ pub fn get_channel() -> String {
     std::env::var("CHANNEL").unwrap_or_else(|_| "custom".to_string())
 }
 
-#[derive(Deserialize)]
-pub struct RustToolChain {
-    pub channel: String,
-}
-
 pub fn exists(path: impl AsRef<Path> + Debug) -> Result<bool> {
     match fs::metadata(path.as_ref()) {
         Ok(_) => Ok(true),
