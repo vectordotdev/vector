@@ -78,7 +78,7 @@ pub struct CsvSerializerOptions {
     #[serde(
         default = "default_delimiter",
         with = "vector_core::serde::ascii_char",
-        skip_serializing_if = "vector_core::serde::skip_serializing_if_default"
+        skip_serializing_if = "vector_core::serde::is_default"
     )]
     pub delimiter: u8,
 
@@ -88,7 +88,7 @@ pub struct CsvSerializerOptions {
     /// field data are escaped instead of doubled.
     #[serde(
         default = "default_double_quote",
-        skip_serializing_if = "vector_core::serde::skip_serializing_if_default"
+        skip_serializing_if = "vector_core::serde::is_default"
     )]
     pub double_quote: bool,
 
@@ -101,7 +101,7 @@ pub struct CsvSerializerOptions {
     #[serde(
         default = "default_escape",
         with = "vector_core::serde::ascii_char",
-        skip_serializing_if = "vector_core::serde::skip_serializing_if_default"
+        skip_serializing_if = "vector_core::serde::is_default"
     )]
     pub escape: u8,
 
@@ -109,15 +109,12 @@ pub struct CsvSerializerOptions {
     #[serde(
         default = "default_escape",
         with = "vector_core::serde::ascii_char",
-        skip_serializing_if = "vector_core::serde::skip_serializing_if_default"
+        skip_serializing_if = "vector_core::serde::is_default"
     )]
     quote: u8,
 
     /// The quoting style to use when writing CSV data.
-    #[serde(
-        default,
-        skip_serializing_if = "vector_core::serde::skip_serializing_if_default"
-    )]
+    #[serde(default, skip_serializing_if = "vector_core::serde::is_default")]
     pub quote_style: QuoteStyle,
 
     /// Set the capacity (in bytes) of the internal buffer used in the CSV writer.

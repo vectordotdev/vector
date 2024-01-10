@@ -5,7 +5,7 @@ use no_proxy::NoProxy;
 use url::Url;
 use vector_config::configurable_component;
 
-use crate::serde::skip_serializing_if_default;
+use crate::serde::is_default;
 
 // suggestion of standardization coming from https://about.gitlab.com/blog/2021/01/27/we-need-to-talk-no-proxy/
 fn from_env(key: &str) -> Option<String> {
@@ -54,7 +54,7 @@ pub struct ProxyConfig {
     /// Enables proxying support.
     #[serde(
         default = "ProxyConfig::default_enabled",
-        skip_serializing_if = "skip_serializing_if_default"
+        skip_serializing_if = "is_default"
     )]
     pub enabled: bool,
 
@@ -63,14 +63,14 @@ pub struct ProxyConfig {
     /// Must be a valid URI string.
     #[configurable(validation(format = "uri"))]
     #[configurable(metadata(docs::examples = "http://foo.bar:3128"))]
-    #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
+    #[serde(default, skip_serializing_if = "is_default")]
     pub http: Option<String>,
 
     /// Proxy endpoint to use when proxying HTTPS traffic.
     ///
     /// Must be a valid URI string.
     #[configurable(validation(format = "uri"))]
-    #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
+    #[serde(default, skip_serializing_if = "is_default")]
     #[configurable(metadata(docs::examples = "http://foo.bar:3128"))]
     pub https: Option<String>,
 
@@ -87,7 +87,7 @@ pub struct ProxyConfig {
     /// | Splat               | `*` matches all hosts                                                   |
     ///
     /// [cidr]: https://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing
-    #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
+    #[serde(default, skip_serializing_if = "is_default")]
     #[configurable(metadata(docs::examples = "localhost"))]
     #[configurable(metadata(docs::examples = ".foo.bar"))]
     #[configurable(metadata(docs::examples = "*"))]
