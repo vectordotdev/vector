@@ -2,6 +2,7 @@
 #
 # This workflow runs one or more integration tests triggered by a comment in a PR.
 # The comment must include '/ci-run-integration'.
+# More than one can be specified.
 #
 # Examples:
 #
@@ -9,11 +10,16 @@
 #
 #     /ci-run-integration-amqp
 #
-# 2. Run all integration tests:
+# 2. Run a two integration tests:
+#
+#     /ci-run-integration-datadog-logs
+#     /ci-run-integration-splunk
+#
+# 3. Run all integration tests:
 #
 #     /ci-run-integration-all
 #
-# 2. Run all CI (including all integration tests)
+# 4. Run all CI (including all integration tests)
 #
 #     /ci-run-all
 
