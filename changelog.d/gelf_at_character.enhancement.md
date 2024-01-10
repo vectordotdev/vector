@@ -1,1 +1,2 @@
-gracefully accept @ characters in labels when decoding GELF
+Gracefully accept `@` characters in labels when decoding GELF.
+authors: MartinEmrich
