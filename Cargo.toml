@@ -738,8 +738,15 @@ enterprise = [
 # Identifies that the build is a nightly build
 nightly = []
 
-# Testing-related features
+# Integration testing-related features
 all-integration-tests = [
+  # TODO: This is a temporary solution. When this GH issue
+  # https://github.com/vectordotdev/vector/issues/18829 , is worked, we will refactor
+  # to have a separate vdev e2e subcommand, and we can then use "all-e2e-tests" in
+  # that subcommand's processing. Until then the e2e tests must be included here
+  # in order for them to be exercised in CI.
+  "all-e2e-tests",
+
   "amqp-integration-tests",
   "appsignal-integration-tests",
   "aws-integration-tests",
@@ -844,6 +851,11 @@ webhdfs-integration-tests = ["sinks-webhdfs"]
 disable-resolv-conf = []
 shutdown-tests = ["api", "sinks-blackhole", "sinks-console", "sinks-prometheus", "sources", "transforms-lua", "transforms-remap", "unix"]
 cli-tests = ["sinks-blackhole", "sinks-socket", "sources-demo_logs", "sources-file"]
+
+# End-to-End testing-related features
+all-e2e-tests = [
+  "e2e-tests-datadog"
+]
 
 e2e-tests-datadog = [
   "sources-datadog_agent",

@@ -34,8 +34,6 @@ COPY scripts/environment/install-protoc.sh /
 COPY tests/data/ca/certs /certs
 RUN bash /install-protoc.sh
 
-RUN rustup run "${RUST_VERSION}" cargo install cargo-nextest --version 0.9.25 --locked
-
 WORKDIR /vector
 COPY . .
 ARG FEATURES
