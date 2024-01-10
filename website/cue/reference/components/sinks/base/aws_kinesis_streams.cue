@@ -15,7 +15,7 @@ base: components: sinks: aws_kinesis_streams: configuration: {
 				Whether or not end-to-end acknowledgements are enabled.
 
 				When enabled for a sink, any source connected to that sink, where the source supports
-				end-to-end acknowledgements as well, will wait for events to be acknowledged by the sink
+				end-to-end acknowledgements as well, waits for events to be acknowledged by the sink
 				before acknowledging them at the source.
 
 				Enabling or disabling acknowledgements at the sink level takes precedence over any global
@@ -50,6 +50,15 @@ base: components: sinks: aws_kinesis_streams: configuration: {
 				required:    true
 				type: string: examples: ["/my/aws/credentials"]
 			}
+			external_id: {
+				description: """
+					The optional unique external ID in conjunction with role to assume.
+
+					[external_id]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_create_for-user_externalid.html
+					"""
+				required: false
+				type: string: examples: ["randomEXAMPLEidString"]
+			}
 			imds: {
 				description: "Configuration for authenticating with AWS through IMDS."
 				required:    false
@@ -81,7 +90,7 @@ base: components: sinks: aws_kinesis_streams: configuration: {
 				description: """
 					Timeout for successfully loading any credentials, in seconds.
 
-					Relevant when the default credentials chain is used or `assume_role`.
+					Relevant when the default credentials chain or `assume_role` is used.
 					"""
 				required: false
 				type: uint: {
@@ -96,13 +105,16 @@ base: components: sinks: aws_kinesis_streams: configuration: {
 					Used to select AWS credentials from a provided credentials file.
 					"""
 				required: false
-				type: string: examples: ["develop"]
+				type: string: {
+					default: "default"
+					examples: ["develop"]
+				}
 			}
 			region: {
 				description: """
 					The [AWS region][aws_region] to send STS requests to.
 
-					If not set, this will default to the configured region
+					If not set, this defaults to the configured region
 					for the service itself.
 
 					[aws_region]: https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints
@@ -123,10 +135,10 @@ base: components: sinks: aws_kinesis_streams: configuration: {
 		type: object: options: {
 			max_bytes: {
 				description: """
-					The maximum size of a batch that will be processed by a sink.
+					The maximum size of a batch that is processed by a sink.
 
 					This is based on the uncompressed size of the batched events, before they are
-					serialized / compressed.
+					serialized/compressed.
 					"""
 				required: false
 				type: uint: {
@@ -168,10 +180,20 @@ base: components: sinks: aws_kinesis_streams: configuration: {
 					[gzip]: https://www.gzip.org/
 					"""
 				none: "No compression."
+				snappy: """
+					[Snappy][snappy] compression.
+
+					[snappy]: https://github.com/google/snappy/blob/main/docs/README.md
+					"""
 				zlib: """
-					[Zlib]][zlib] compression.
+					[Zlib][zlib] compression.
 
 					[zlib]: https://zlib.net/
+					"""
+				zstd: """
+					[Zstandard][zstd] compression.
+
+					[zstd]: https://facebook.github.io/zstd/
 					"""
 			}
 		}
@@ -199,6 +221,11 @@ base: components: sinks: aws_kinesis_streams: configuration: {
 
 						[apache_avro]: https://avro.apache.org/
 						"""
+					csv: """
+						Encodes an event as a CSV message.
+
+						This codec must be configured with fields to encode.
+						"""
 					gelf: """
 						Encodes an event as a [GELF][gelf] message.
 
@@ -215,7 +242,7 @@ base: components: sinks: aws_kinesis_streams: configuration: {
 						[logfmt]: https://brandur.org/logfmt
 						"""
 					native: """
-						Encodes an event in Vector’s [native Protocol Buffers format][vector_native_protobuf].
+						Encodes an event in the [native Protocol Buffers format][vector_native_protobuf].
 
 						This codec is **[experimental][experimental]**.
 
@@ -223,36 +250,123 @@ base: components: sinks: aws_kinesis_streams: configuration: {
 						[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
 						"""
 					native_json: """
-						Encodes an event in Vector’s [native JSON format][vector_native_json].
+						Encodes an event in the [native JSON format][vector_native_json].
 
 						This codec is **[experimental][experimental]**.
 
 						[vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
 						[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
 						"""
+					protobuf: """
+						Encodes an event as a [Protobuf][protobuf] message.
+
+						[protobuf]: https://protobuf.dev/
+						"""
 					raw_message: """
 						No encoding.
 
-						This "encoding" simply uses the `message` field of a log event.
+						This encoding uses the `message` field of a log event.
 
-						Users should take care if they're modifying their log events (such as by using a `remap`
-						transform, etc) and removing the message field while doing additional parsing on it, as this
+						Be careful if you are modifying your log events (for example, by using a `remap`
+						transform) and removing the message field while doing additional parsing on it, as this
 						could lead to the encoding emitting empty strings for the given event.
 						"""
 					text: """
 						Plain text encoding.
 
-						This "encoding" simply uses the `message` field of a log event. For metrics, it uses an
+						This encoding uses the `message` field of a log event. For metrics, it uses an
 						encoding that resembles the Prometheus export format.
 
-						Users should take care if they're modifying their log events (such as by using a `remap`
-						transform, etc) and removing the message field while doing additional parsing on it, as this
+						Be careful if you are modifying your log events (for example, by using a `remap`
+						transform) and removing the message field while doing additional parsing on it, as this
 						could lead to the encoding emitting empty strings for the given event.
 						"""
 				}
 			}
+			csv: {
+				description:   "The CSV Serializer Options."
+				relevant_when: "codec = \"csv\""
+				required:      true
+				type: object: options: {
+					capacity: {
+						description: """
+																Set the capacity (in bytes) of the internal buffer used in the CSV writer.
+																This defaults to a reasonable setting.
+																"""
+						required: false
+						type: uint: default: 8192
+					}
+					delimiter: {
+						description: "The field delimiter to use when writing CSV."
+						required:    false
+						type: uint: default: 44
+					}
+					double_quote: {
+						description: """
+																Enable double quote escapes.
+
+																This is enabled by default, but it may be disabled. When disabled, quotes in
+																field data are escaped instead of doubled.
+																"""
+						required: false
+						type: bool: default: true
+					}
+					escape: {
+						description: """
+																The escape character to use when writing CSV.
+
+																In some variants of CSV, quotes are escaped using a special escape character
+																like \\ (instead of escaping quotes by doubling them).
+
+																To use this, `double_quotes` needs to be disabled as well otherwise it is ignored.
+																"""
+						required: false
+						type: uint: default: 34
+					}
+					fields: {
+						description: """
+																Configures the fields that will be encoded, as well as the order in which they
+																appear in the output.
+
+																If a field is not present in the event, the output will be an empty string.
+
+																Values of type `Array`, `Object`, and `Regex` are not supported and the
+																output will be an empty string.
+																"""
+						required: true
+						type: array: items: type: string: {}
+					}
+					quote: {
+						description: "The quote character to use when writing CSV."
+						required:    false
+						type: uint: default: 34
+					}
+					quote_style: {
+						description: "The quoting style to use when writing CSV data."
+						required:    false
+						type: string: {
+							default: "necessary"
+							enum: {
+								always: "Always puts quotes around every field."
+								necessary: """
+																			Puts quotes around fields only when necessary.
+																			They are necessary when fields contain a quote, delimiter, or record terminator.
+																			Quotes are also necessary when writing an empty record
+																			(which is indistinguishable from a record with one empty field).
+																			"""
+								never: "Never writes quotes, even if it produces invalid CSV data."
+								non_numeric: """
+																			Puts quotes around all fields that are non-numeric.
+																			Namely, when writing a field that does not parse as a valid float or integer,
+																			then quotes are used even if they aren't strictly necessary.
+																			"""
+							}
+						}
+					}
+				}
+			}
 			except_fields: {
-				description: "List of fields that will be excluded from the encoded event."
+				description: "List of fields that are excluded from the encoded event."
 				required:    false
 				type: array: items: type: string: {}
 			}
@@ -260,34 +374,59 @@ base: components: sinks: aws_kinesis_streams: configuration: {
 				description: """
 					Controls how metric tag values are encoded.
 
-					When set to `single`, only the last non-bare value of tags will be displayed with the
-					metric.  When set to `full`, all metric tags will be exposed as separate assignments.
+					When set to `single`, only the last non-bare value of tags are displayed with the
+					metric.  When set to `full`, all metric tags are exposed as separate assignments.
 					"""
 				relevant_when: "codec = \"json\" or codec = \"text\""
 				required:      false
 				type: string: {
 					default: "single"
 					enum: {
-						full: "All tags will be exposed as arrays of either string or null values."
+						full: "All tags are exposed as arrays of either string or null values."
 						single: """
-															Tag values will be exposed as single strings, the same as they were before this config
-															option. Tags with multiple values will show the last assigned value, and null values will be
-															ignored.
+															Tag values are exposed as single strings, the same as they were before this config
+															option. Tags with multiple values show the last assigned value, and null values
+															are ignored.
 															"""
 					}
 				}
 			}
 			only_fields: {
-				description: "List of fields that will be included in the encoded event."
+				description: "List of fields that are included in the encoded event."
 				required:    false
 				type: array: items: type: string: {}
+			}
+			protobuf: {
+				description:   "Options for the Protobuf serializer."
+				relevant_when: "codec = \"protobuf\""
+				required:      true
+				type: object: options: {
+					desc_file: {
+						description: """
+																The path to the protobuf descriptor set file.
+
+																This file is the output of `protoc -o <path> ...`
+																"""
+						required: true
+						type: string: examples: ["/etc/vector/protobuf_descriptor_set.desc"]
+					}
+					message_type: {
+						description: "The name of the message type to use for serializing."
+						required:    true
+						type: string: examples: ["package.Message"]
+					}
+				}
 			}
 			timestamp_format: {
 				description: "Format used for timestamp fields."
 				required:    false
 				type: string: enum: {
-					rfc3339: "Represent the timestamp as a RFC 3339 timestamp."
-					unix:    "Represent the timestamp as a Unix timestamp."
+					rfc3339:    "Represent the timestamp as a RFC 3339 timestamp."
+					unix:       "Represent the timestamp as a Unix timestamp."
+					unix_float: "Represent the timestamp as a Unix timestamp in floating point."
+					unix_ms:    "Represent the timestamp as a Unix timestamp in milliseconds."
+					unix_ns:    "Represent the timestamp as a Unix timestamp in nanoseconds."
+					unix_us:    "Represent the timestamp as a Unix timestamp in microseconds"
 				}
 			}
 		}
@@ -301,10 +440,10 @@ base: components: sinks: aws_kinesis_streams: configuration: {
 		description: """
 			The log field used as the Kinesis record’s partition key value.
 
-			If not specified, a unique partition key will be generated for each Kinesis record.
+			If not specified, a unique partition key is generated for each Kinesis record.
 			"""
 		required: false
-		type: string: {}
+		type: string: examples: ["user_id"]
 	}
 	region: {
 		description: """
@@ -319,7 +458,9 @@ base: components: sinks: aws_kinesis_streams: configuration: {
 		description: """
 			Middleware settings for outbound requests.
 
-			Various settings can be configured, such as concurrency and rate limits, timeouts, etc.
+			Various settings can be configured, such as concurrency and rate limits, timeouts, retry behavior, etc.
+
+			Note that the retry backoff policy follows the Fibonacci sequence.
 			"""
 		required: false
 		type: object: options: {
@@ -357,6 +498,26 @@ base: components: sinks: aws_kinesis_streams: configuration: {
 						required: false
 						type: float: default: 0.4
 					}
+					initial_concurrency: {
+						description: """
+																The initial concurrency limit to use. If not specified, the initial limit will be 1 (no concurrency).
+
+																It is recommended to set this value to your service's average limit if you're seeing that it takes a
+																long time to ramp up adaptive concurrency after a restart. You can find this value by looking at the
+																`adaptive_concurrency_limit` metric.
+																"""
+						required: false
+						type: uint: default: 1
+					}
+					max_concurrency_limit: {
+						description: """
+																The maximum concurrency limit.
+
+																The adaptive request concurrency limit will not go above this bound. This is put in place as a safeguard.
+																"""
+						required: false
+						type: uint: default: 200
+					}
 					rtt_deviation_scale: {
 						description: """
 																Scale of RTT deviations which are not considered anomalous.
@@ -374,11 +535,16 @@ base: components: sinks: aws_kinesis_streams: configuration: {
 				}
 			}
 			concurrency: {
-				description: "Configuration for outbound request concurrency."
-				required:    false
+				description: """
+					Configuration for outbound request concurrency.
+
+					This can be set either to one of the below enum values or to a positive integer, which denotes
+					a fixed concurrency limit.
+					"""
+				required: false
 				type: {
 					string: {
-						default: "none"
+						default: "adaptive"
 						enum: {
 							adaptive: """
 															Concurrency will be managed by Vector's [Adaptive Request Concurrency][arc] feature.
@@ -412,12 +578,8 @@ base: components: sinks: aws_kinesis_streams: configuration: {
 				}
 			}
 			retry_attempts: {
-				description: """
-					The maximum number of retries to make for failed requests.
-
-					The default, for all intents and purposes, represents an infinite number of retries.
-					"""
-				required: false
+				description: "The maximum number of retries to make for failed requests."
+				required:    false
 				type: uint: {
 					default: 9223372036854775807
 					unit:    "retries"
@@ -427,7 +589,7 @@ base: components: sinks: aws_kinesis_streams: configuration: {
 				description: """
 					The amount of time to wait before attempting the first retry for a failed request.
 
-					After the first retry has failed, the fibonacci sequence will be used to select future backoffs.
+					After the first retry has failed, the fibonacci sequence is used to select future backoffs.
 					"""
 				required: false
 				type: uint: {
@@ -435,11 +597,31 @@ base: components: sinks: aws_kinesis_streams: configuration: {
 					unit:    "seconds"
 				}
 			}
+			retry_jitter_mode: {
+				description: "The jitter mode to use for retry backoff behavior."
+				required:    false
+				type: string: {
+					default: "Full"
+					enum: {
+						Full: """
+															Full jitter.
+
+															The random delay is anywhere from 0 up to the maximum current delay calculated by the backoff
+															strategy.
+
+															Incorporating full jitter into your backoff strategy can greatly reduce the likelihood
+															of creating accidental denial of service (DoS) conditions against your own systems when
+															many clients are recovering from a failure state.
+															"""
+						None: "No jitter."
+					}
+				}
+			}
 			retry_max_duration_secs: {
 				description: "The maximum amount of time to wait between retries."
 				required:    false
 				type: uint: {
-					default: 3600
+					default: 30
 					unit:    "seconds"
 				}
 			}
@@ -447,7 +629,7 @@ base: components: sinks: aws_kinesis_streams: configuration: {
 				description: """
 					The time a request can take before being aborted.
 
-					It is highly recommended that you do not lower this value below the service’s internal timeout, as this could
+					Datadog highly recommends that you do not lower this value below the service's internal timeout, as this could
 					create orphaned requests, pile on retries, and result in duplicate data downstream.
 					"""
 				required: false
@@ -458,6 +640,11 @@ base: components: sinks: aws_kinesis_streams: configuration: {
 			}
 		}
 	}
+	request_retry_partial: {
+		description: "Whether or not to retry successful requests containing partial failures."
+		required:    false
+		type: bool: default: false
+	}
 	stream_name: {
 		description: """
 			The [stream name][stream_name] of the target Kinesis Firehose delivery stream.
@@ -465,7 +652,7 @@ base: components: sinks: aws_kinesis_streams: configuration: {
 			[stream_name]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html
 			"""
 		required: true
-		type: string: {}
+		type: string: examples: ["my-stream"]
 	}
 	tls: {
 		description: "TLS configuration."
@@ -475,8 +662,8 @@ base: components: sinks: aws_kinesis_streams: configuration: {
 				description: """
 					Sets the list of supported ALPN protocols.
 
-					Declare the supported ALPN protocols, which are used during negotiation with peer. Prioritized in the order
-					they are defined.
+					Declare the supported ALPN protocols, which are used during negotiation with peer. They are prioritized in the order
+					that they are defined.
 					"""
 				required: false
 				type: array: items: type: string: examples: ["h2"]
@@ -524,10 +711,10 @@ base: components: sinks: aws_kinesis_streams: configuration: {
 				description: """
 					Enables certificate verification.
 
-					If enabled, certificates must be valid in terms of not being expired, as well as being issued by a trusted
-					issuer. This verification operates in a hierarchical manner, checking that not only the leaf certificate (the
-					certificate presented by the client/server) is valid, but also that the issuer of that certificate is valid, and
-					so on until reaching a root certificate.
+					If enabled, certificates must not be expired and must be issued by a trusted
+					issuer. This verification operates in a hierarchical manner, checking that the leaf certificate (the
+					certificate presented by the client/server) is not only valid, but that the issuer of that certificate is also valid, and
+					so on until the verification process reaches a root certificate.
 
 					Relevant for both incoming and outgoing connections.
 

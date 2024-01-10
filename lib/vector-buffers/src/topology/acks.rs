@@ -208,6 +208,10 @@ where
     ///
     /// Acknowledgements should be given by the caller to update the acknowledgement state before
     /// trying to get any eligible markers.
+    ///
+    /// # Panics
+    ///
+    /// Will panic if adding ack amount overflows.
     pub fn add_acknowledgements(&mut self, amount: N) {
         self.unclaimed_acks = self
             .unclaimed_acks
@@ -230,7 +234,7 @@ where
     /// - if we have no pending markers, `MarkerOffset::Gap` is returned, and contains the delta
     ///   between the given ID and the next expected marker ID
     /// - if we have pending markers, and the given ID is logically behind the next expected marker
-    ///   ID, `MarkerOffset::MontonicityViolation` is returned, indicating that the monotonicity
+    ///   ID, `MarkerOffset::MonotonicityViolation` is returned, indicating that the monotonicity
     ///   invariant has been violated
     /// - if we have pending markers, and the given ID is logically ahead of the next expected
     ///   marker, `MarkerOffset::Gap` is returned, specifying how far ahead of the next expected
@@ -315,6 +319,10 @@ where
     ///
     /// When other pending markers are present, and the given ID is logically behind the next
     /// expected marker ID, `Err(MarkerError::MonotonicityViolation)` is returned.
+    ///
+    /// # Panics
+    ///
+    /// Panics if pending markers is empty when last pending marker is an unknown size.
     pub fn add_marker(
         &mut self,
         id: N,
@@ -341,7 +349,7 @@ where
                 let last_marker = self
                     .pending_markers
                     .back_mut()
-                    .expect("pending markers should not be empty");
+                    .unwrap_or_else(|| unreachable!("pending markers should not be empty"));
 
                 last_marker.len = PendingMarkerLength::Assumed(len);
             }
@@ -425,13 +433,15 @@ where
                 let PendingMarker { id, data, .. } = self
                     .pending_markers
                     .pop_front()
-                    .expect("pending markers cannot be empty");
+                    .unwrap_or_else(|| unreachable!("pending markers cannot be empty"));
 
                 if acks_to_claim > N::min_value() {
                     self.unclaimed_acks = self
                         .unclaimed_acks
                         .checked_sub(&acks_to_claim)
-                        .expect("should not be able to claim more acks than are unclaimed");
+                        .unwrap_or_else(|| {
+                            unreachable!("should not be able to claim more acks than are unclaimed")
+                        });
                 }
 
                 self.acked_marker_id = id.wrapping_add(&len.len());
@@ -714,14 +724,13 @@ mod tests {
             let actual_result = apply_action_sut(&mut sut, action);
             assert_eq!(
                 expected_result, actual_result,
-                "{}: ran action {:?} expecting result {:?}, but got result {:?} instead",
-                name, action, expected_result, actual_result
+                "{name}: ran action {action:?} expecting result {expected_result:?}, but got result {actual_result:?} instead"
             );
         }
     }
 
     #[test]
-    #[should_panic]
+    #[should_panic(expected = "overflowing unclaimed acknowledgements is a serious bug")]
     fn panic_when_unclaimed_acks_overflows() {
         let actions = vec![Action::Acknowledge(u64::MAX), Action::Acknowledge(1)];
 
@@ -862,8 +871,7 @@ mod tests {
                                         let effective_offset = acked_marker_id.wrapping_add(unclaimed_acks);
                                         let is_eligible = required_acked_offset <= effective_offset && required_acked_offset >= *marker_id;
                                         assert!(!is_eligible,
-                                            "SUT returned None but next fixed-size marker on stack is eligible: id: {}, len: {}, acked_id_offset: {}",
-                                            marker_id, len, acked_marker_id);
+                                            "SUT returned None but next fixed-size marker on stack is eligible: id: {marker_id}, len: {len}, acked_id_offset: {acked_marker_id}");
                                     },
                                     PendingMarkerLength::Unknown => {
                                         // If we have an unknown marker, the only we shouldn't be

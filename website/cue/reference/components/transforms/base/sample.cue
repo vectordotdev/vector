@@ -8,22 +8,27 @@ base: components: transforms: sample: configuration: {
 	}
 	key_field: {
 		description: """
-			The name of the log field whose value will be hashed to determine if the event should be
-			passed.
+			The name of the field whose value is hashed to determine if the event should be
+			sampled.
 
-			Consistently samples the same events. Actual rate of sampling may differ from the configured
-			one if values in the field are not uniformly distributed. If left unspecified, or if the
-			event doesn’t have `key_field`, events will be count rated.
+			Each unique value for the key creates a bucket of related events to be sampled together
+			and the rate is applied to the buckets themselves to sample `1/N` buckets.  The overall rate
+			of sampling may differ from the configured one if values in the field are not uniformly
+			distributed. If left unspecified, or if the event doesn’t have `key_field`, then the
+			event is sampled independently.
+
+			This can be useful to, for example, ensure that all logs for a given transaction are
+			sampled together, but that overall `1/N` transactions are sampled.
 			"""
 		required: false
 		type: string: examples: ["message"]
 	}
 	rate: {
 		description: """
-			The rate at which events will be forwarded, expressed as `1/N`.
+			The rate at which events are forwarded, expressed as `1/N`.
 
-			For example, `rate = 10` means 1 out of every 10 events will be forwarded and the rest will
-			be dropped.
+			For example, `rate = 10` means 1 out of every 10 events are forwarded and the rest are
+			dropped.
 			"""
 		required: true
 		type: uint: {}

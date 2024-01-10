@@ -2,8 +2,12 @@ use std::convert::TryFrom;
 
 use futures::{future::ready, stream};
 use serde_json::Value as JsonValue;
-use vector_core::event::{BatchNotifier, BatchStatus, Event, MetricValue};
-use vector_core::metric_tags;
+use vector_lib::lookup::lookup_v2::OptionalValuePath;
+use vector_lib::{
+    config::{init_telemetry, Tags, Telemetry},
+    event::{BatchNotifier, BatchStatus, Event, MetricValue},
+    metric_tags,
+};
 
 use super::config::HecMetricsSinkConfig;
 use crate::{
@@ -16,7 +20,10 @@ use crate::{
         util::{BatchConfig, Compression, TowerRequestConfig},
     },
     template::Template,
-    test_util::components::{run_and_assert_sink_compliance, HTTP_SINK_TAGS},
+    test_util::components::{
+        run_and_assert_data_volume_sink_compliance, run_and_assert_sink_compliance,
+        DATA_VOLUME_SINK_TAGS, HTTP_SINK_TAGS,
+    },
 };
 
 const USERNAME: &str = "admin";
@@ -30,7 +37,7 @@ async fn config() -> HecMetricsSinkConfig {
         default_namespace: None,
         default_token: get_token().await.into(),
         endpoint: splunk_hec_address(),
-        host_key: "host".into(),
+        host_key: OptionalValuePath::new("host"),
         index: None,
         sourcetype: None,
         source: None,
@@ -70,7 +77,7 @@ fn get_counter(batch: BatchNotifier) -> Event {
 
 #[tokio::test]
 async fn splunk_insert_counter_metric() {
-    let cx = SinkContext::new_test();
+    let cx = SinkContext::default();
 
     let mut config = config().await;
     config.index = Template::try_from("testmetrics".to_string()).ok();
@@ -91,9 +98,51 @@ async fn splunk_insert_counter_metric() {
     );
 }
 
+fn enable_telemetry() {
+    init_telemetry(
+        Telemetry {
+            tags: Tags {
+                emit_service: true,
+                emit_source: true,
+            },
+        },
+        true,
+    );
+}
+
+#[tokio::test]
+async fn splunk_insert_counter_metric_data_volume() {
+    enable_telemetry();
+
+    let cx = SinkContext::default();
+
+    let mut config = config().await;
+    config.index = Template::try_from("testmetrics".to_string()).ok();
+    let (sink, _) = config.build(cx).await.unwrap();
+
+    let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+    let event = get_counter(batch.clone());
+    drop(batch);
+    run_and_assert_data_volume_sink_compliance(
+        sink,
+        stream::once(ready(event)),
+        &DATA_VOLUME_SINK_TAGS,
+    )
+    .await;
+    assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+
+    assert!(
+        metric_dimensions_exist(
+            "example-counter",
+            &["host", "source", "sourcetype", "tag_counter_test"],
+        )
+        .await
+    );
+}
+
 #[tokio::test]
 async fn splunk_insert_gauge_metric() {
-    let cx = SinkContext::new_test();
+    let cx = SinkContext::default();
 
     let mut config = config().await;
     config.index = Template::try_from("testmetrics".to_string()).ok();
@@ -116,7 +165,7 @@ async fn splunk_insert_gauge_metric() {
 
 #[tokio::test]
 async fn splunk_insert_multiple_counter_metrics() {
-    let cx = SinkContext::new_test();
+    let cx = SinkContext::default();
 
     let mut config = config().await;
     config.index = Template::try_from("testmetrics".to_string()).ok();
@@ -143,7 +192,7 @@ async fn splunk_insert_multiple_counter_metrics() {
 
 #[tokio::test]
 async fn splunk_insert_multiple_gauge_metrics() {
-    let cx = SinkContext::new_test();
+    let cx = SinkContext::default();
 
     let mut config = config().await;
     config.index = Template::try_from("testmetrics".to_string()).ok();

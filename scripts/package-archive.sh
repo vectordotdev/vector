@@ -87,6 +87,9 @@ cp -av README.md "$ARCHIVE_DIR/README.md$SUFFIX"
 # Create the license file for binary distributions (LICENSE + NOTICE)
 cat LICENSE NOTICE > "$ARCHIVE_DIR/LICENSE$SUFFIX"
 
+cp -av licenses "$ARCHIVE_DIR/licenses"
+cp -av LICENSE-3rdparty.csv "$ARCHIVE_DIR"
+
 # Copy the vector binary to /bin
 
 mkdir -p "$ARCHIVE_DIR/bin"

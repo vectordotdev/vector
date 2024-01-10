@@ -7,7 +7,7 @@ components: sinks: file: {
 		commonly_used: false
 		delivery:      "at_least_once"
 
-		development:   "beta"
+		development:   "stable"
 		egress_method: "stream"
 		service_providers: []
 		stateful: false
@@ -15,6 +15,7 @@ components: sinks: file: {
 
 	features: {
 		acknowledgements: true
+		auto_generated:   true
 		healthcheck: enabled: true
 		send: {
 			compression: {
@@ -42,25 +43,7 @@ components: sinks: file: {
 		notices: []
 	}
 
-	configuration: {
-		idle_timeout_secs: {
-			common:      false
-			description: "The amount of time a file can be idle  and stay open. After not receiving any events for this timeout, the file will be flushed and closed.\n"
-			required:    false
-			type: uint: {
-				default: 30
-				unit:    null
-			}
-		}
-		path: {
-			description: "File name to write events to. Compression format extension must be explicit."
-			required:    true
-			type: string: {
-				examples: ["/tmp/vector-%Y-%m-%d.log", "/tmp/application-{{ application_id }}-%Y-%m-%d.log"]
-				syntax: "template"
-			}
-		}
-	}
+	configuration: base.components.sinks.file.configuration
 
 	input: {
 		logs:    true
@@ -90,13 +73,5 @@ components: sinks: file: {
 				disk before acknowledging the events.
 				"""
 		}
-	}
-
-	telemetry: metrics: {
-		component_sent_bytes_total:       components.sources.internal_metrics.output.metrics.component_sent_bytes_total
-		component_sent_events_total:      components.sources.internal_metrics.output.metrics.component_sent_events_total
-		component_sent_event_bytes_total: components.sources.internal_metrics.output.metrics.component_sent_event_bytes_total
-		events_discarded_total:           components.sources.internal_metrics.output.metrics.events_discarded_total
-		processing_errors_total:          components.sources.internal_metrics.output.metrics.processing_errors_total
 	}
 }

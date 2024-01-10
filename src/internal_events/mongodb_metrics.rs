@@ -1,22 +1,25 @@
 use metrics::counter;
 use mongodb::{bson, error::Error as MongoError};
-use vector_core::internal_event::InternalEvent;
-
-use vector_common::internal_event::{error_stage, error_type};
+use vector_lib::internal_event::InternalEvent;
+use vector_lib::{
+    internal_event::{error_stage, error_type},
+    json_size::JsonSize,
+};
 
 #[derive(Debug)]
 pub struct MongoDbMetricsEventsReceived<'a> {
     pub count: usize,
-    pub byte_size: usize,
+    pub byte_size: JsonSize,
     pub endpoint: &'a str,
 }
 
 impl<'a> InternalEvent for MongoDbMetricsEventsReceived<'a> {
+    // ## skip check-duplicate-events ##
     fn emit(self) {
         trace!(
             message = "Events received.",
             count = self.count,
-            byte_size = self.byte_size,
+            byte_size = self.byte_size.get(),
             endpoint = self.endpoint,
         );
         counter!(
@@ -24,12 +27,7 @@ impl<'a> InternalEvent for MongoDbMetricsEventsReceived<'a> {
             "endpoint" => self.endpoint.to_owned(),
         );
         counter!(
-            "component_received_event_bytes_total", self.byte_size as u64,
-            "endpoint" => self.endpoint.to_owned(),
-        );
-        // deprecated
-        counter!(
-            "events_in_total", self.count as u64,
+            "component_received_event_bytes_total", self.byte_size.get() as u64,
             "endpoint" => self.endpoint.to_owned(),
         );
     }
@@ -55,8 +53,6 @@ impl<'a> InternalEvent for MongoDbMetricsRequestError<'a> {
             "error_type" => error_type::REQUEST_FAILED,
             "stage" => error_stage::RECEIVING,
         );
-        // deprecated
-        counter!("request_errors_total", 1);
     }
 }
 
@@ -81,7 +77,5 @@ impl<'a> InternalEvent for MongoDbMetricsBsonParseError<'a> {
             "stage" => error_stage::RECEIVING,
             "endpoint" => self.endpoint.to_owned(),
         );
-        // deprecated
-        counter!("parse_errors_total", 1);
     }
 }

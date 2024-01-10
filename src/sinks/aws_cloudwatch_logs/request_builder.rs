@@ -3,8 +3,8 @@ use std::num::NonZeroUsize;
 use bytes::BytesMut;
 use chrono::Utc;
 use tokio_util::codec::Encoder as _;
-use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
-use vector_core::{
+use vector_lib::request_metadata::{MetaDescriptive, RequestMetadata};
+use vector_lib::{
     event::{EventFinalizers, Finalizable},
     ByteSizeOf,
 };
@@ -12,7 +12,6 @@ use vector_core::{
 use super::TemplateRenderingError;
 use crate::{
     codecs::{Encoder, Transformer},
-    config::LogSchema,
     event::{Event, Value},
     internal_events::AwsCloudwatchLogsMessageSizeError,
     sinks::{aws_cloudwatch_logs::CloudwatchKey, util::metadata::RequestMetadataBuilder},
@@ -40,15 +39,18 @@ impl Finalizable for CloudwatchRequest {
 }
 
 impl MetaDescriptive for CloudwatchRequest {
-    fn get_metadata(&self) -> RequestMetadata {
-        self.metadata
+    fn get_metadata(&self) -> &RequestMetadata {
+        &self.metadata
+    }
+
+    fn metadata_mut(&mut self) -> &mut RequestMetadata {
+        &mut self.metadata
     }
 }
 
 pub struct CloudwatchRequestBuilder {
     pub group_template: Template,
     pub stream_template: Template,
-    pub log_schema: LogSchema,
     pub transformer: Transformer,
     pub encoder: Encoder<()>,
 }
@@ -80,7 +82,7 @@ impl CloudwatchRequestBuilder {
         };
         let key = CloudwatchKey { group, stream };
 
-        let timestamp = match event.as_mut_log().remove(self.log_schema.timestamp_key()) {
+        let timestamp = match event.as_mut_log().remove_timestamp() {
             Some(Value::Timestamp(ts)) => ts.timestamp_millis(),
             _ => Utc::now().timestamp_millis(),
         };
@@ -89,7 +91,7 @@ impl CloudwatchRequestBuilder {
         self.transformer.transform(&mut event);
         let mut message_bytes = BytesMut::new();
 
-        let builder = RequestMetadataBuilder::from_events(&event);
+        let builder = RequestMetadataBuilder::from_event(&event);
 
         if self.encoder.encode(event, &mut message_bytes).is_err() {
             // The encoder handles internal event emission for Error and EventsDropped.
@@ -122,7 +124,7 @@ impl CloudwatchRequestBuilder {
 /// ByteSizeOf is being abused to represent the encoded size of a request for the Partitioned Batcher
 ///
 /// The maximum batch size is 1,048,576 bytes. This size is calculated as the sum of all event messages in UTF-8, plus 26 bytes for each log event.
-/// source: https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_PutLogEvents.html
+/// source: <https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_PutLogEvents.html>
 impl ByteSizeOf for CloudwatchRequest {
     fn size_of(&self) -> usize {
         self.message.len() + 26
@@ -135,24 +137,24 @@ impl ByteSizeOf for CloudwatchRequest {
 
 #[cfg(test)]
 mod tests {
-    use vector_core::event::LogEvent;
+    use chrono::Utc;
+    use vector_lib::config::log_schema;
+    use vector_lib::event::LogEvent;
 
-    use super::*;
-    use crate::config::log_schema;
+    use super::CloudwatchRequestBuilder;
 
     #[test]
     fn test() {
         let mut request_builder = CloudwatchRequestBuilder {
             group_template: "group".try_into().unwrap(),
             stream_template: "stream".try_into().unwrap(),
-            log_schema: log_schema().clone(),
             transformer: Default::default(),
             encoder: Default::default(),
         };
         let timestamp = Utc::now();
         let message = "event message";
         let mut event = LogEvent::from(message);
-        event.insert(log_schema().timestamp_key(), timestamp);
+        event.insert(log_schema().timestamp_key_target_path().unwrap(), timestamp);
 
         let request = request_builder.build(event.into()).unwrap();
         assert_eq!(request.timestamp, timestamp.timestamp_millis());

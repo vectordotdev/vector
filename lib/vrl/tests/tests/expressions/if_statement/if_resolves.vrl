@@ -1,7 +1,0 @@
-# result: true
-
-result = if true {
-    "yes"
-}
-assert!(result == "yes")
-assert!(type_def(result) == {"bytes": true, "null": true})

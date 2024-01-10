@@ -12,7 +12,7 @@ use std::{
     time::Duration,
 };
 
-use serde::{de, Deserialize, Deserializer};
+use indexmap::IndexMap;
 use serde_with::serde_as;
 use vector_config::{
     component::GenerateConfig, configurable_component, schema::generate_root_schema,
@@ -36,6 +36,12 @@ pub struct Template {
 }
 
 impl ConfigurableString for Template {}
+
+impl ToString for Template {
+    fn to_string(&self) -> String {
+        self.src.clone()
+    }
+}
 
 impl TryFrom<String> for Template {
     type Error = String;
@@ -63,6 +69,97 @@ impl From<Template> for String {
 #[derive(Clone)]
 #[configurable_component]
 pub struct SpecialDuration(u64);
+
+/// IMDS Client Configuration for authenticating with AWS.
+#[configurable_component]
+#[derive(Clone, Debug)]
+pub struct ImdsAuthentication {
+    /// Number of IMDS retries for fetching tokens and metadata.
+    #[serde(default = "default_max_attempts")]
+    max_attempts: u32,
+}
+
+impl Default for ImdsAuthentication {
+    fn default() -> Self {
+        Self {
+            max_attempts: default_max_attempts(),
+        }
+    }
+}
+
+const fn default_max_attempts() -> u32 {
+    5
+}
+
+/// Configuration of the authentication strategy for interacting with AWS services.
+#[configurable_component]
+#[derive(Clone, Debug)]
+#[serde(untagged)]
+pub enum AwsAuthentication {
+    /// Authenticate using a fixed access key and secret pair.
+    AccessKey {
+        /// The AWS access key ID.
+        access_key_id: String,
+
+        /// The AWS secret access key.
+        secret_access_key: String,
+
+        /// The ARN of an IAM role to assume.
+        assume_role: Option<String>,
+
+        /// The AWS region to send STS requests to.
+        region: Option<String>,
+    },
+
+    /// Authenticate using credentials stored in a file.
+    File {
+        /// Path to the credentials file.
+        credentials_file: String,
+
+        /// The credentials profile to use.
+        #[serde(default = "default_profile")]
+        profile: String,
+    },
+
+    /// Assume the given role ARN.
+    Role {
+        /// The ARN of an IAM role to assume.
+        assume_role: String,
+
+        /// Timeout for assuming the role, in seconds.
+        load_timeout_secs: Option<u64>,
+
+        /// Configuration for authenticating with AWS through IMDS.
+        #[serde(default)]
+        imds: ImdsAuthentication,
+
+        /// The AWS region to send STS requests to.
+        region: Option<String>,
+    },
+
+    /// Default authentication strategy which tries a variety of substrategies in a one-after-the-other fashion.
+    Default {
+        /// Timeout for successfully loading any credentials, in seconds.
+        load_timeout_secs: Option<u64>,
+
+        /// Configuration for authenticating with AWS through IMDS.
+        #[serde(default)]
+        imds: ImdsAuthentication,
+    },
+}
+
+impl Default for AwsAuthentication {
+    fn default() -> Self {
+        Self::Default {
+            load_timeout_secs: None,
+            imds: ImdsAuthentication::default(),
+        }
+    }
+}
+
+fn default_profile() -> String {
+    "default".to_string()
+}
 
 /// Controls the batching behavior of events.
 #[derive(Clone)]
@@ -120,7 +217,7 @@ pub enum Encoding {
 #[derive(Clone)]
 #[configurable_component]
 #[configurable(metadata(docs::examples = "Self::default()"))]
-pub struct TlsEnablableConfig {
+pub struct TlsEnableableConfig {
     /// Whether or not TLS is enabled.
     pub enabled: bool,
 
@@ -128,7 +225,7 @@ pub struct TlsEnablableConfig {
     pub options: TlsConfig,
 }
 
-impl Default for TlsEnablableConfig {
+impl Default for TlsEnableableConfig {
     fn default() -> Self {
         Self {
             enabled: true,
@@ -152,31 +249,72 @@ pub struct TlsConfig {
 }
 
 /// A listening address that can optionally support being passed in by systemd.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[configurable_component]
-#[serde(untagged)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[serde(try_from = "String", into = "String")]
+#[configurable(metadata(docs::examples = "0.0.0.0:9000"))]
+#[configurable(metadata(docs::examples = "systemd"))]
+#[configurable(metadata(docs::examples = "systemd#3"))]
 pub enum SocketListenAddr {
-    /// A literal socket address.
+    /// An IPv4/IPv6 address and port.
     SocketAddr(SocketAddr),
 
-    /// A file descriptor identifier passed by systemd.
-    #[serde(deserialize_with = "parse_systemd_fd")]
+    /// A file descriptor identifier that is given from, and managed by, the socket activation feature of `systemd`.
     SystemdFd(usize),
 }
 
-fn parse_systemd_fd<'de, D>(des: D) -> Result<usize, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let s: &'de str = Deserialize::deserialize(des)?;
-    match s {
-        "systemd" => Ok(0),
-        s if s.starts_with("systemd#") => s[8..]
-            .parse::<usize>()
-            .map_err(de::Error::custom)?
-            .checked_sub(1)
-            .ok_or_else(|| de::Error::custom("systemd indices start from 1, found 0")),
-        _ => Err(de::Error::custom("must start with \"systemd\"")),
+impl From<SocketAddr> for SocketListenAddr {
+    fn from(addr: SocketAddr) -> Self {
+        Self::SocketAddr(addr)
+    }
+}
+
+impl From<usize> for SocketListenAddr {
+    fn from(fd: usize) -> Self {
+        Self::SystemdFd(fd)
+    }
+}
+
+impl TryFrom<String> for SocketListenAddr {
+    type Error = String;
+
+    fn try_from(input: String) -> Result<Self, Self::Error> {
+        // first attempt to parse the string into a SocketAddr directly
+        match input.parse::<SocketAddr>() {
+            Ok(socket_addr) => Ok(socket_addr.into()),
+
+            // then attempt to parse a systemd file descriptor
+            Err(_) => {
+                let fd: usize = match input.as_str() {
+                    "systemd" => Ok(0),
+                    s if s.starts_with("systemd#") => s[8..]
+                        .parse::<usize>()
+                        .map_err(|_| "failed to parse usize".to_string())?
+                        .checked_sub(1)
+                        .ok_or_else(|| "systemd indices start at 1".to_string()),
+
+                    // otherwise fail
+                    _ => Err("unable to parse".to_string()),
+                }?;
+
+                Ok(fd.into())
+            }
+        }
+    }
+}
+
+impl From<SocketListenAddr> for String {
+    fn from(addr: SocketListenAddr) -> String {
+        match addr {
+            SocketListenAddr::SocketAddr(addr) => addr.to_string(),
+            SocketListenAddr::SystemdFd(fd) => {
+                if fd == 0 {
+                    "systemd".to_owned()
+                } else {
+                    format!("systemd#{}", fd)
+                }
+            }
+        }
     }
 }
 
@@ -211,10 +349,7 @@ const fn default_simple_source_timeout() -> Duration {
 }
 
 fn default_simple_source_listen_addr() -> SocketListenAddr {
-    SocketListenAddr::SocketAddr(SocketAddr::V4(SocketAddrV4::new(
-        Ipv4Addr::new(127, 0, 0, 1),
-        9200,
-    )))
+    SocketListenAddr::SocketAddr(SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::LOCALHOST, 9200)))
 }
 
 /// A sink for sending events to the `simple` service.
@@ -275,33 +410,31 @@ fn default_simple_sink_endpoint() -> String {
     String::from("https://zalgo.io")
 }
 
-/// A sink for sending events to the `advanced` service.
+/// A sink for sending events to the AWS Bleep Bloop service.
 #[derive(Clone)]
-#[configurable_component(sink("advanced"))]
+#[configurable_component(sink("aws_bleep_bloop"))]
 #[configurable(metadata(status = "stable"))]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub struct AdvancedSinkConfig {
-    /// The endpoint to send events to.
-    #[serde(default = "default_advanced_sink_endpoint")]
-    endpoint: String,
+pub struct AwsBleepBloopSinkConfig {
+    #[configurable(derived)]
+    #[serde(default)]
+    auth: AwsAuthentication,
 
-    /// The agent version to simulate when sending events to the downstream service.
-    ///
-    /// Must match the pattern of "v\d+\.\d+\.\d+", which allows for values such as `v1.23.0` or `v0.1.3`, and so on.
-    #[configurable(validation(pattern = "foo"))]
-    agent_version: String,
+    /// The Bleep Bloop folder ID.
+    #[configurable(validation(pattern = "foo\\d+"))]
+    folder_id: String,
 
     #[configurable(derived)]
-    #[serde(default = "default_advanced_sink_batch")]
+    #[serde(default = "default_aws_bleep_bloop_sink_batch")]
     batch: BatchConfig,
 
     #[configurable(deprecated, derived)]
-    #[serde(default = "default_advanced_sink_encoding")]
+    #[serde(default = "default_aws_bleep_bloop_sink_encoding")]
     encoding: Encoding,
 
     /// Overridden TLS description.
     #[configurable(derived)]
-    tls: Option<TlsEnablableConfig>,
+    tls: Option<TlsEnableableConfig>,
 
     /// The partition key to use for each event.
     #[configurable(metadata(docs::templateable))]
@@ -310,6 +443,9 @@ pub struct AdvancedSinkConfig {
 
     /// The tags to apply to each event.
     tags: HashMap<String, TagConfig>,
+
+    /// The headers to apply to each event.
+    headers: HashMap<String, Vec<String>>,
 }
 
 /// Specification of the value of a created tag.
@@ -326,22 +462,23 @@ pub enum TagConfig {
     Multi(Vec<Option<Template>>),
 }
 
-impl GenerateConfig for AdvancedSinkConfig {
+impl GenerateConfig for AwsBleepBloopSinkConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
-            endpoint: default_advanced_sink_endpoint(),
-            agent_version: String::from("v1.2.3"),
-            batch: default_advanced_sink_batch(),
-            encoding: default_advanced_sink_encoding(),
+            auth: AwsAuthentication::default(),
+            folder_id: String::from("foo12"),
+            batch: default_aws_bleep_bloop_sink_batch(),
+            encoding: default_aws_bleep_bloop_sink_encoding(),
             tls: None,
             partition_key: default_partition_key(),
             tags: HashMap::new(),
+            headers: HashMap::new(),
         })
         .unwrap()
     }
 }
 
-fn default_advanced_sink_batch() -> BatchConfig {
+fn default_aws_bleep_bloop_sink_batch() -> BatchConfig {
     BatchConfig {
         max_events: Some(NonZeroU64::new(5678).expect("must be nonzero")),
         max_bytes: Some(NonZeroU64::new(36_000_000).expect("must be nonzero")),
@@ -353,11 +490,11 @@ fn default_partition_key() -> String {
     "foo".to_string()
 }
 
-const fn default_advanced_sink_encoding() -> Encoding {
+const fn default_aws_bleep_bloop_sink_encoding() -> Encoding {
     Encoding::Json { pretty: true }
 }
 
-fn default_advanced_sink_endpoint() -> String {
+fn default_aws_bleep_bloop_sink_endpoint() -> String {
     String::from("https://zalgohtml5.io")
 }
 
@@ -459,8 +596,8 @@ pub enum SinkConfig {
     /// Simple sink.
     Simple(SimpleSinkConfig),
 
-    /// Advanced sink.
-    Advanced(AdvancedSinkConfig),
+    /// AWS Bleep Bloop sink.
+    AwsBleepBloop(AwsBleepBloopSinkConfig),
 }
 
 #[derive(Clone)]
@@ -469,6 +606,9 @@ pub enum SinkConfig {
 pub struct GlobalOptions {
     /// The data directory where Vector will store state.
     data_dir: Option<String>,
+
+    /// A map of additional tags for metrics.
+    tags: Option<IndexMap<String, String>>,
 }
 
 /// The overall configuration for Vector.

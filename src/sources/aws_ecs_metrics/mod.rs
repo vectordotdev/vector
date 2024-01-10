@@ -1,19 +1,20 @@
-use std::{env, time::Duration, time::Instant};
+use std::{env, time::Duration};
 
 use futures::StreamExt;
-use hyper::{Body, Client, Request};
+use hyper::{Body, Request};
 use serde_with::serde_as;
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
-use vector_common::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
-use vector_config::configurable_component;
-use vector_core::{config::LogNamespace, EstimatedJsonEncodedSizeOf};
+use vector_lib::configurable::configurable_component;
+use vector_lib::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
+use vector_lib::{config::LogNamespace, EstimatedJsonEncodedSizeOf};
 
 use crate::{
-    config::{self, GenerateConfig, Output, SourceConfig, SourceContext},
+    config::{GenerateConfig, SourceConfig, SourceContext, SourceOutput},
+    http::HttpClient,
     internal_events::{
-        AwsEcsMetricsEventsReceived, AwsEcsMetricsHttpError, AwsEcsMetricsParseError,
-        AwsEcsMetricsResponseError, RequestCompleted, StreamClosedError,
+        AwsEcsMetricsEventsReceived, AwsEcsMetricsParseError, HttpClientHttpError,
+        HttpClientHttpResponseError, StreamClosedError,
     },
     shutdown::ShutdownSignal,
     SourceSender,
@@ -53,13 +54,16 @@ pub enum Version {
 
 /// Configuration for the `aws_ecs_metrics` source.
 #[serde_as]
-#[configurable_component(source("aws_ecs_metrics"))]
+#[configurable_component(source(
+    "aws_ecs_metrics",
+    "Collect Docker container stats for tasks running in AWS ECS and AWS Fargate."
+))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct AwsEcsMetricsSourceConfig {
     /// Base URI of the task metadata endpoint.
     ///
-    /// If empty, the URI will be automatically discovered based on the latest version detected.
+    /// If empty, the URI is automatically discovered based on the latest version detected.
     ///
     /// By default:
     /// - The version 4 endpoint base URI is stored in the environment variable `ECS_CONTAINER_METADATA_URI_V4`.
@@ -84,6 +88,7 @@ pub struct AwsEcsMetricsSourceConfig {
     /// The interval between scrapes, in seconds.
     #[serde(default = "default_scrape_interval_secs")]
     #[serde_as(as = "serde_with::DurationSeconds<u64>")]
+    #[configurable(metadata(docs::human_name = "Scrape Interval"))]
     scrape_interval_secs: Duration,
 
     /// The namespace of the metric.
@@ -142,11 +147,14 @@ impl GenerateConfig for AwsEcsMetricsSourceConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "aws_ecs_metrics")]
 impl SourceConfig for AwsEcsMetricsSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let namespace = Some(self.namespace.clone()).filter(|namespace| !namespace.is_empty());
+        let http_client = HttpClient::new(None, &cx.proxy)?;
 
         Ok(Box::pin(aws_ecs_metrics(
+            http_client,
             self.stats_endpoint(),
             self.scrape_interval_secs,
             namespace,
@@ -155,8 +163,8 @@ impl SourceConfig for AwsEcsMetricsSourceConfig {
         )))
     }
 
-    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
-        vec![Output::default(config::DataType::Metric)]
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
+        vec![SourceOutput::new_metrics()]
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -165,6 +173,7 @@ impl SourceConfig for AwsEcsMetricsSourceConfig {
 }
 
 async fn aws_ecs_metrics(
+    http_client: HttpClient,
     url: String,
     interval: Duration,
     namespace: Option<String>,
@@ -174,23 +183,15 @@ async fn aws_ecs_metrics(
     let mut interval = IntervalStream::new(time::interval(interval)).take_until(shutdown);
     let bytes_received = register!(BytesReceived::from(Protocol::HTTP));
     while interval.next().await.is_some() {
-        let client = Client::new();
-
         let request = Request::get(&url)
             .body(Body::empty())
             .expect("error creating request");
         let uri = request.uri().clone();
 
-        let start = Instant::now();
-        match client.request(request).await {
+        match http_client.send(request).await {
             Ok(response) if response.status() == hyper::StatusCode::OK => {
                 match hyper::body::to_bytes(response).await {
                     Ok(body) => {
-                        emit!(RequestCompleted {
-                            start,
-                            end: Instant::now()
-                        });
-
                         bytes_received.emit(ByteSize(body.len()));
 
                         match parser::parse(body.as_ref(), namespace.clone()) {
@@ -202,8 +203,8 @@ async fn aws_ecs_metrics(
                                     endpoint: uri.path(),
                                 });
 
-                                if let Err(error) = out.send_batch(metrics).await {
-                                    emit!(StreamClosedError { error, count });
+                                if (out.send_batch(metrics).await).is_err() {
+                                    emit!(StreamClosedError { count });
                                     return Err(());
                                 }
                             }
@@ -217,23 +218,23 @@ async fn aws_ecs_metrics(
                         }
                     }
                     Err(error) => {
-                        emit!(AwsEcsMetricsHttpError {
-                            error,
-                            endpoint: &url
+                        emit!(HttpClientHttpError {
+                            error: crate::Error::from(error),
+                            url: url.to_owned(),
                         });
                     }
                 }
             }
             Ok(response) => {
-                emit!(AwsEcsMetricsResponseError {
+                emit!(HttpClientHttpResponseError {
                     code: response.status(),
-                    endpoint: &url,
+                    url: url.to_owned(),
                 });
             }
             Err(error) => {
-                emit!(AwsEcsMetricsHttpError {
-                    error,
-                    endpoint: &url
+                emit!(HttpClientHttpError {
+                    error: crate::Error::from(error),
+                    url: url.to_owned(),
                 });
             }
         }
@@ -267,7 +268,7 @@ mod test {
         let make_svc = make_service_fn(|_| async {
             Ok::<_, Error>(service_fn(|_| async {
                 Ok::<_, Error>(Response::new(Body::from(
-                    r##"
+                    r#"
                     {
                         "0cf54b87-f0f0-4044-b9d6-20dc54d5c414-3822082590": {
                             "read": "2020-09-23T20:32:26.292561674Z",
@@ -558,7 +559,7 @@ mod test {
                             }
                         }
                     }
-                    "##,
+                    "#,
                 )))
             }))
         });

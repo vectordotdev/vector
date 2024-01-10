@@ -235,8 +235,8 @@ impl<'a> Container<'a> {
                 }
 
                 let original = input;
-                let name = serde.attrs.name().deserialize_name();
-                let default_value = get_serde_default_value(serde.attrs.default());
+                let name = serde.attrs.name().deserialize_name().to_string();
+                let default_value = get_serde_default_value(&serde.ident, serde.attrs.default());
 
                 let container = Container {
                     original,
@@ -368,7 +368,7 @@ impl<'a> Container<'a> {
     /// standard `#[deprecated]` attribute, neither automatically applying it nor deriving the
     /// deprecation status of a field when it is present.
     pub fn deprecated(&self) -> bool {
-        self.attrs.deprecated.is_some()
+        self.attrs.deprecated.is_present()
     }
 
     /// Metadata (custom attributes) for the container, if any.
@@ -584,7 +584,7 @@ mod tests {
         assert_eq!(literals_to_idents(&["T"]), idents);
 
         // We don't support parenthesized type parameters, like when using a function pointer type.
-        let parenthesized_type: Type = parse_quote! { Something<Fn(bool) -> String> };
+        let parenthesized_type: Type = parse_quote! { Something<fn(bool) -> String> };
         let idents = get_generic_type_param_idents(&parenthesized_type);
         assert_eq!(None, idents);
     }

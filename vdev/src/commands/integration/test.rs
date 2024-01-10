@@ -1,8 +1,7 @@
 use anyhow::{bail, Result};
 use clap::Args;
 
-use crate::testing::integration::{self, IntegrationTest, OldIntegrationTest};
-use crate::testing::{config::IntegrationTestConfig, state::EnvsDir};
+use crate::testing::{config::IntegrationTestConfig, integration::IntegrationTest, state::EnvsDir};
 
 /// Execute integration tests
 ///
@@ -21,34 +20,43 @@ pub struct Cli {
     /// The desired environment (optional)
     environment: Option<String>,
 
+    /// Whether to compile the test runner with all integration test features
+    #[arg(short = 'a', long)]
+    build_all: bool,
+
+    /// Number of retries to allow on each integration test case.
+    #[arg(short = 'r', long)]
+    retries: Option<u8>,
+
     /// Extra test command arguments
     args: Vec<String>,
 }
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
-        // Temporary hack to run old-style integration tests
-        if self.environment.is_none() && integration::old_exists(&self.integration)? {
-            let integration = OldIntegrationTest::new(&self.integration);
-            integration.build()?;
-            return integration.test();
-        }
-
         let (_test_dir, config) = IntegrationTestConfig::load(&self.integration)?;
         let envs = config.environments();
 
         let active = EnvsDir::new(&self.integration).active()?;
+
+        let retries = self.retries.unwrap_or_default();
+
         match (self.environment, active) {
             (Some(environment), Some(active)) if environment != active => {
                 bail!("Requested environment {environment:?} does not match active one {active:?}")
             }
             (Some(environment), _) => {
-                IntegrationTest::new(self.integration, environment)?.test(self.args)
+                IntegrationTest::new(self.integration, environment, self.build_all, retries)?
+                    .test(self.args)
             }
-            (None, Some(active)) => IntegrationTest::new(self.integration, active)?.test(self.args),
+            (None, Some(active)) => {
+                IntegrationTest::new(self.integration, active, self.build_all, retries)?
+                    .test(self.args)
+            }
             (None, None) => {
                 for env_name in envs.keys() {
-                    IntegrationTest::new(&self.integration, env_name)?.test(self.args.clone())?;
+                    IntegrationTest::new(&self.integration, env_name, self.build_all, retries)?
+                        .test(self.args.clone())?;
                 }
                 Ok(())
             }

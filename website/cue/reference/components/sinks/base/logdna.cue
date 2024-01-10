@@ -15,7 +15,7 @@ base: components: sinks: logdna: configuration: {
 				Whether or not end-to-end acknowledgements are enabled.
 
 				When enabled for a sink, any source connected to that sink, where the source supports
-				end-to-end acknowledgements as well, will wait for events to be acknowledged by the sink
+				end-to-end acknowledgements as well, waits for events to be acknowledged by the sink
 				before acknowledging them at the source.
 
 				Enabling or disabling acknowledgements at the sink level takes precedence over any global
@@ -38,10 +38,10 @@ base: components: sinks: logdna: configuration: {
 		type: object: options: {
 			max_bytes: {
 				description: """
-					The maximum size of a batch that will be processed by a sink.
+					The maximum size of a batch that is processed by a sink.
 
 					This is based on the uncompressed size of the batched events, before they are
-					serialized / compressed.
+					serialized/compressed.
 					"""
 				required: false
 				type: uint: {
@@ -65,7 +65,7 @@ base: components: sinks: logdna: configuration: {
 		}
 	}
 	default_app: {
-		description: "The default app that will be set for events that do not contain a `file` or `app` field."
+		description: "The default app that is set for events that do not contain a `file` or `app` field."
 		required:    false
 		type: string: {
 			default: "vector"
@@ -75,7 +75,7 @@ base: components: sinks: logdna: configuration: {
 		}
 	}
 	default_env: {
-		description: "The default environment that will be set for events that do not contain an `env` field."
+		description: "The default environment that is set for events that do not contain an `env` field."
 		required:    false
 		type: string: {
 			default: "production"
@@ -87,12 +87,12 @@ base: components: sinks: logdna: configuration: {
 		required:    false
 		type: object: options: {
 			except_fields: {
-				description: "List of fields that will be excluded from the encoded event."
+				description: "List of fields that are excluded from the encoded event."
 				required:    false
 				type: array: items: type: string: {}
 			}
 			only_fields: {
-				description: "List of fields that will be included in the encoded event."
+				description: "List of fields that are included in the encoded event."
 				required:    false
 				type: array: items: type: string: {}
 			}
@@ -100,8 +100,12 @@ base: components: sinks: logdna: configuration: {
 				description: "Format used for timestamp fields."
 				required:    false
 				type: string: enum: {
-					rfc3339: "Represent the timestamp as a RFC 3339 timestamp."
-					unix:    "Represent the timestamp as a Unix timestamp."
+					rfc3339:    "Represent the timestamp as a RFC 3339 timestamp."
+					unix:       "Represent the timestamp as a Unix timestamp."
+					unix_float: "Represent the timestamp as a Unix timestamp in floating point."
+					unix_ms:    "Represent the timestamp as a Unix timestamp in milliseconds."
+					unix_ns:    "Represent the timestamp as a Unix timestamp in nanoseconds."
+					unix_us:    "Represent the timestamp as a Unix timestamp in microseconds"
 				}
 			}
 		}
@@ -114,12 +118,12 @@ base: components: sinks: logdna: configuration: {
 			"""
 		required: false
 		type: string: {
-			default: "https://logs.logdna.com/"
+			default: "https://logs.mezmo.com/"
 			examples: ["http://127.0.0.1", "http://example.com"]
 		}
 	}
 	hostname: {
-		description: "The hostname that will be attached to each batch of events."
+		description: "The hostname that is attached to each batch of events."
 		required:    true
 		type: string: {
 			examples: ["${HOSTNAME}", "my-local-machine"]
@@ -127,12 +131,12 @@ base: components: sinks: logdna: configuration: {
 		}
 	}
 	ip: {
-		description: "The IP address that will be attached to each batch of events."
+		description: "The IP address that is attached to each batch of events."
 		required:    false
 		type: string: examples: ["0.0.0.0"]
 	}
 	mac: {
-		description: "The MAC address that will be attached to each batch of events."
+		description: "The MAC address that is attached to each batch of events."
 		required:    false
 		type: string: examples: ["my-mac-address"]
 	}
@@ -140,7 +144,9 @@ base: components: sinks: logdna: configuration: {
 		description: """
 			Middleware settings for outbound requests.
 
-			Various settings can be configured, such as concurrency and rate limits, timeouts, etc.
+			Various settings can be configured, such as concurrency and rate limits, timeouts, retry behavior, etc.
+
+			Note that the retry backoff policy follows the Fibonacci sequence.
 			"""
 		required: false
 		type: object: options: {
@@ -178,6 +184,26 @@ base: components: sinks: logdna: configuration: {
 						required: false
 						type: float: default: 0.4
 					}
+					initial_concurrency: {
+						description: """
+																The initial concurrency limit to use. If not specified, the initial limit will be 1 (no concurrency).
+
+																It is recommended to set this value to your service's average limit if you're seeing that it takes a
+																long time to ramp up adaptive concurrency after a restart. You can find this value by looking at the
+																`adaptive_concurrency_limit` metric.
+																"""
+						required: false
+						type: uint: default: 1
+					}
+					max_concurrency_limit: {
+						description: """
+																The maximum concurrency limit.
+
+																The adaptive request concurrency limit will not go above this bound. This is put in place as a safeguard.
+																"""
+						required: false
+						type: uint: default: 200
+					}
 					rtt_deviation_scale: {
 						description: """
 																Scale of RTT deviations which are not considered anomalous.
@@ -195,11 +221,16 @@ base: components: sinks: logdna: configuration: {
 				}
 			}
 			concurrency: {
-				description: "Configuration for outbound request concurrency."
-				required:    false
+				description: """
+					Configuration for outbound request concurrency.
+
+					This can be set either to one of the below enum values or to a positive integer, which denotes
+					a fixed concurrency limit.
+					"""
+				required: false
 				type: {
 					string: {
-						default: "none"
+						default: "adaptive"
 						enum: {
 							adaptive: """
 															Concurrency will be managed by Vector's [Adaptive Request Concurrency][arc] feature.
@@ -233,12 +264,8 @@ base: components: sinks: logdna: configuration: {
 				}
 			}
 			retry_attempts: {
-				description: """
-					The maximum number of retries to make for failed requests.
-
-					The default, for all intents and purposes, represents an infinite number of retries.
-					"""
-				required: false
+				description: "The maximum number of retries to make for failed requests."
+				required:    false
 				type: uint: {
 					default: 9223372036854775807
 					unit:    "retries"
@@ -248,7 +275,7 @@ base: components: sinks: logdna: configuration: {
 				description: """
 					The amount of time to wait before attempting the first retry for a failed request.
 
-					After the first retry has failed, the fibonacci sequence will be used to select future backoffs.
+					After the first retry has failed, the fibonacci sequence is used to select future backoffs.
 					"""
 				required: false
 				type: uint: {
@@ -256,11 +283,31 @@ base: components: sinks: logdna: configuration: {
 					unit:    "seconds"
 				}
 			}
+			retry_jitter_mode: {
+				description: "The jitter mode to use for retry backoff behavior."
+				required:    false
+				type: string: {
+					default: "Full"
+					enum: {
+						Full: """
+															Full jitter.
+
+															The random delay is anywhere from 0 up to the maximum current delay calculated by the backoff
+															strategy.
+
+															Incorporating full jitter into your backoff strategy can greatly reduce the likelihood
+															of creating accidental denial of service (DoS) conditions against your own systems when
+															many clients are recovering from a failure state.
+															"""
+						None: "No jitter."
+					}
+				}
+			}
 			retry_max_duration_secs: {
 				description: "The maximum amount of time to wait between retries."
 				required:    false
 				type: uint: {
-					default: 3600
+					default: 30
 					unit:    "seconds"
 				}
 			}
@@ -268,7 +315,7 @@ base: components: sinks: logdna: configuration: {
 				description: """
 					The time a request can take before being aborted.
 
-					It is highly recommended that you do not lower this value below the service’s internal timeout, as this could
+					Datadog highly recommends that you do not lower this value below the service's internal timeout, as this could
 					create orphaned requests, pile on retries, and result in duplicate data downstream.
 					"""
 				required: false
@@ -280,7 +327,7 @@ base: components: sinks: logdna: configuration: {
 		}
 	}
 	tags: {
-		description: "The tags that will be attached to each batch of events."
+		description: "The tags that are attached to each batch of events."
 		required:    false
 		type: array: items: type: string: {
 			examples: ["tag1", "tag2"]

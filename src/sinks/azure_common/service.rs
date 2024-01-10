@@ -12,7 +12,7 @@ use tracing::Instrument;
 use crate::sinks::azure_common::config::{AzureBlobRequest, AzureBlobResponse};
 
 #[derive(Clone)]
-pub(crate) struct AzureBlobService {
+pub struct AzureBlobService {
     client: Arc<ContainerClient>,
 }
 
@@ -57,8 +57,9 @@ impl Service<AzureBlobRequest> for AzureBlobService {
 
             result.map(|inner| AzureBlobResponse {
                 inner,
-                count: request.metadata.count,
-                events_byte_size: request.metadata.byte_size,
+                events_byte_size: request
+                    .request_metadata
+                    .into_events_estimated_json_encoded_byte_size(),
                 byte_size,
             })
         })

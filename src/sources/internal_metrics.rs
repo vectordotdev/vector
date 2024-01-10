@@ -4,13 +4,13 @@ use futures::StreamExt;
 use serde_with::serde_as;
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
-use vector_common::internal_event::{CountByteSize, InternalEventHandle as _};
-use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
-use vector_core::EstimatedJsonEncodedSizeOf;
+use vector_lib::configurable::configurable_component;
+use vector_lib::internal_event::{CountByteSize, InternalEventHandle as _};
+use vector_lib::lookup::lookup_v2::OptionalValuePath;
+use vector_lib::{config::LogNamespace, ByteSizeOf, EstimatedJsonEncodedSizeOf};
 
 use crate::{
-    config::{log_schema, DataType, Output, SourceConfig, SourceContext},
+    config::{log_schema, SourceConfig, SourceContext, SourceOutput},
     internal_events::{EventsReceived, InternalMetricsBytesReceived, StreamClosedError},
     metrics::Controller,
     shutdown::ShutdownSignal,
@@ -19,13 +19,17 @@ use crate::{
 
 /// Configuration for the `internal_metrics` source.
 #[serde_as]
-#[configurable_component(source("internal_metrics"))]
+#[configurable_component(source(
+    "internal_metrics",
+    "Expose internal metrics emitted by the running Vector instance."
+))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields, default)]
 pub struct InternalMetricsConfig {
     /// The interval between metric gathering, in seconds.
-    #[serde_as(as = "serde_with::DurationSeconds<f64>")]
+    #[serde_as(as = "serde_with::DurationSecondsWithFrac<f64>")]
     #[serde(default = "default_scrape_interval")]
+    #[configurable(metadata(docs::human_name = "Scrape Interval"))]
     pub scrape_interval_secs: Duration,
 
     #[configurable(derived)]
@@ -53,7 +57,7 @@ impl Default for InternalMetricsConfig {
 pub struct TagsConfig {
     /// Overrides the name of the tag used to add the peer host to each metric.
     ///
-    /// The value will be the peer host's address, including the port i.e. `1.2.3.4:9000`.
+    /// The value is the peer host's address, including the port. For example, `1.2.3.4:9000`.
     ///
     /// By default, the [global `log_schema.host_key` option][global_host_key] is used.
     ///
@@ -61,12 +65,12 @@ pub struct TagsConfig {
     ///
     /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
     #[serde(default = "default_host_key")]
-    pub host_key: String,
+    pub host_key: OptionalValuePath,
 
     /// Sets the name of the tag to use to add the current process ID to each metric.
     ///
     ///
-    /// By default, this is not set and the tag will not be automatically added.
+    /// By default, this is not set and the tag is not automatically added.
     #[configurable(metadata(docs::examples = "pid"))]
     pub pid_key: Option<String>,
 }
@@ -88,13 +92,14 @@ fn default_namespace() -> String {
     "vector".to_owned()
 }
 
-fn default_host_key() -> String {
-    log_schema().host_key().to_owned()
+fn default_host_key() -> OptionalValuePath {
+    log_schema().host_key().cloned().into()
 }
 
 impl_generate_config_from_default!(InternalMetricsConfig);
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "internal_metrics")]
 impl SourceConfig for InternalMetricsConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         if self.scrape_interval_secs.is_zero() {
@@ -107,10 +112,7 @@ impl SourceConfig for InternalMetricsConfig {
         // namespace for created metrics is already "vector" by default.
         let namespace = self.namespace.clone();
 
-        let host_key = match self.tags.host_key.as_str() {
-            "" => None,
-            s => Some(s.to_owned()),
-        };
+        let host_key = self.tags.host_key.clone();
 
         let pid_key = self
             .tags
@@ -132,8 +134,8 @@ impl SourceConfig for InternalMetricsConfig {
         ))
     }
 
-    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
-        vec![Output::default(DataType::Metric)]
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
+        vec![SourceOutput::new_metrics()]
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -143,7 +145,7 @@ impl SourceConfig for InternalMetricsConfig {
 
 struct InternalMetrics<'a> {
     namespace: String,
-    host_key: Option<String>,
+    host_key: OptionalValuePath,
     pid_key: Option<String>,
     controller: &'a Controller,
     interval: time::Duration,
@@ -162,10 +164,11 @@ impl<'a> InternalMetrics<'a> {
 
             let metrics = self.controller.capture_metrics();
             let count = metrics.len();
-            let byte_size = metrics.estimated_json_encoded_size_of();
+            let byte_size = metrics.size_of();
+            let json_size = metrics.estimated_json_encoded_size_of();
 
             emit!(InternalMetricsBytesReceived { byte_size });
-            events_received.emit(CountByteSize(count, byte_size));
+            events_received.emit(CountByteSize(count, json_size));
 
             let batch = metrics.into_iter().map(|mut metric| {
                 // A metric starts out with a default "vector" namespace, but will be overridden
@@ -174,9 +177,9 @@ impl<'a> InternalMetrics<'a> {
                     metric = metric.with_namespace(Some(self.namespace.clone()));
                 }
 
-                if let Some(host_key) = &self.host_key {
+                if let Some(host_key) = &self.host_key.path {
                     if let Ok(hostname) = &hostname {
-                        metric.replace_tag(host_key.to_owned(), hostname.to_owned());
+                        metric.replace_tag(host_key.to_string(), hostname.to_owned());
                     }
                 }
                 if let Some(pid_key) = &self.pid_key {
@@ -185,8 +188,8 @@ impl<'a> InternalMetrics<'a> {
                 metric
             });
 
-            if let Err(error) = self.out.send_batch(batch).await {
-                emit!(StreamClosedError { error, count });
+            if (self.out.send_batch(batch).await).is_err() {
+                emit!(StreamClosedError { count });
                 return Err(());
             }
         }
@@ -200,7 +203,7 @@ mod tests {
     use std::collections::BTreeMap;
 
     use metrics::{counter, gauge, histogram};
-    use vector_core::metric_tags;
+    use vector_lib::metric_tags;
 
     use super::*;
     use crate::{
@@ -312,7 +315,7 @@ mod tests {
     async fn sets_tags() {
         let event = event_from_config(InternalMetricsConfig {
             tags: TagsConfig {
-                host_key: String::from("my_host_key"),
+                host_key: OptionalValuePath::new("my_host_key"),
                 pid_key: Some(String::from("my_pid_key")),
             },
             ..Default::default()

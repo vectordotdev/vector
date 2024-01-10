@@ -1,0 +1,2 @@
+debug print of person_someone3.pb with prost
+Person { name: Some("someone"), id: None, email: None, data: {"data_phone": Home}, phones: [PhoneNumber { number: Some("1234"), r#type: Some(Mobile) }] }

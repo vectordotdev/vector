@@ -1,18 +1,18 @@
 use std::collections::BTreeMap;
-use std::fs;
 use std::path::{Path, PathBuf};
+use std::{env, fs};
 
 use anyhow::{bail, Context, Result};
-use hashlink::LinkedHashMap;
+use indexmap::IndexMap;
 use itertools::{self, Itertools};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
+use serde_yaml::Value;
 
 use crate::{app, util};
 
 const FILE_NAME: &str = "test.yaml";
 
-pub type Environment = BTreeMap<String, String>;
-pub type EnvConfig = Option<Environment>;
+pub type Environment = BTreeMap<String, Option<String>>;
 
 #[derive(Deserialize, Debug)]
 pub struct RustToolchainRootConfig {
@@ -37,18 +37,49 @@ impl RustToolchainConfig {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct ComposeConfig {
     pub services: BTreeMap<String, ComposeService>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub volumes: BTreeMap<String, Value>,
+    #[serde(default)]
+    pub networks: BTreeMap<String, BTreeMap<String, String>>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct ComposeService {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub image: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hostname: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub container_name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub build: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub command: Option<Command>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ports: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub env_file: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub volumes: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub environment: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub depends_on: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub healthcheck: Option<Value>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(untagged)]
+pub enum Command {
+    Single(String),
+    Multiple(Vec<String>),
 }
 
 impl ComposeConfig {
-    #[cfg(unix)]
     pub fn parse(path: &Path) -> Result<Self> {
         let contents =
             fs::read_to_string(path).with_context(|| format!("failed to read {path:?}"))?;
@@ -56,22 +87,45 @@ impl ComposeConfig {
     }
 }
 
-#[derive(Deserialize, Clone, Debug)]
+#[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct IntegrationTestConfig {
-    /// The list of arguments to add to the docker command line for the runner
-    pub args: Vec<String>,
-    /// The set of environment variables to set in both the services and the runner.
-    pub(super) env: EnvConfig,
+    /// The list of arguments to add to the command line for the test runner
+    pub args: Option<Vec<String>>,
+    /// The set of environment variables to set in both the services and the runner. Variables with
+    /// no value are treated as "passthrough" -- they must be set by the caller of `vdev` and are
+    /// passed into the containers.
+    #[serde(default)]
+    pub env: Environment,
+    /// The matrix of environment configurations values.
+    matrix: IndexMap<String, Vec<String>>,
+    /// Configuration specific to the compose services.
+    #[serde(default)]
+    pub runner: IntegrationRunnerConfig,
+
+    pub features: Vec<String>,
+
+    pub test: Option<String>,
+
+    pub test_filter: Option<String>,
+
+    pub paths: Option<Vec<String>>,
+}
+
+#[derive(Clone, Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct IntegrationRunnerConfig {
     /// The set of environment variables to set in just the runner. This is used for settings that
     /// might otherwise affect the operation of either docker or docker-compose but are needed in
     /// the runner.
-    pub(super) runner_env: EnvConfig,
-    /// The matrix of environment configurations values.
-    matrix: LinkedHashMap<String, Vec<String>>,
+    #[serde(default)]
+    pub env: Environment,
+    /// The set of volumes that need to be mounted into the runner.
+    #[serde(default)]
+    pub volumes: BTreeMap<String, String>,
     /// Does the test runner need access to the host's docker socket?
     #[serde(default)]
-    pub needs_docker_sock: bool,
+    pub needs_docker_socket: bool,
 }
 
 impl IntegrationTestConfig {
@@ -88,7 +142,7 @@ impl IntegrationTestConfig {
         Ok(config)
     }
 
-    pub fn environments(&self) -> LinkedHashMap<String, Environment> {
+    pub fn environments(&self) -> IndexMap<String, Environment> {
         self.matrix
             .values()
             .multi_cartesian_product()
@@ -97,8 +151,8 @@ impl IntegrationTestConfig {
                 let config: Environment = self
                     .matrix
                     .keys()
-                    .zip(product.into_iter())
-                    .map(|(variable, value)| (variable.clone(), value.clone()))
+                    .zip(product)
+                    .map(|(variable, value)| (variable.clone(), Some(value.clone())))
                     .collect();
                 (key, config)
             })
@@ -133,5 +187,22 @@ impl IntegrationTestConfig {
         }
 
         Ok(configs)
+    }
+
+    /// Ensure that all passthrough environment variables are set.
+    pub fn check_required(&self) -> Result<()> {
+        let missing: Vec<_> = self
+            .env
+            .iter()
+            .chain(self.runner.env.iter())
+            .filter_map(|(key, value)| value.is_none().then_some(key))
+            .filter(|var| env::var(var).is_err())
+            .collect();
+        if missing.is_empty() {
+            Ok(())
+        } else {
+            let missing = missing.into_iter().join(", ");
+            bail!("Required environment variables are not set: {missing}");
+        }
     }
 }

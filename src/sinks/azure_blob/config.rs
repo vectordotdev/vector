@@ -1,12 +1,13 @@
-use std::{convert::TryInto, sync::Arc};
+use std::sync::Arc;
 
 use azure_storage_blobs::prelude::*;
-use codecs::{encoding::Framer, JsonSerializerConfig, NewlineDelimitedEncoderConfig};
 use tower::ServiceBuilder;
-use vector_common::sensitive_string::SensitiveString;
-use vector_config::configurable_component;
+use vector_lib::codecs::{encoding::Framer, JsonSerializerConfig, NewlineDelimitedEncoderConfig};
+use vector_lib::configurable::configurable_component;
+use vector_lib::sensitive_string::SensitiveString;
 
 use super::request_builder::AzureBlobRequestOptions;
+use crate::sinks::util::service::TowerRequestConfigDefaults;
 use crate::{
     codecs::{Encoder, EncodingConfigWithFraming, SinkType},
     config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
@@ -20,11 +21,22 @@ use crate::{
         },
         Healthcheck, VectorSink,
     },
+    template::Template,
     Result,
 };
 
+#[derive(Clone, Copy, Debug)]
+pub struct AzureBlobTowerRequestConfigDefaults;
+
+impl TowerRequestConfigDefaults for AzureBlobTowerRequestConfigDefaults {
+    const RATE_LIMIT_NUM: u64 = 250;
+}
+
 /// Configuration for the `azure_blob` sink.
-#[configurable_component(sink("azure_blob"))]
+#[configurable_component(sink(
+    "azure_blob",
+    "Store your observability data in Azure Blob Storage."
+))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct AzureBlobSinkConfig {
@@ -33,6 +45,9 @@ pub struct AzureBlobSinkConfig {
     /// Authentication with access key is the only supported authentication method.
     ///
     /// Either `storage_account`, or this field, must be specified.
+    #[configurable(metadata(
+        docs::examples = "DefaultEndpointsProtocol=https;AccountName=mylogstorage;AccountKey=storageaccountkeybase64encoded;EndpointSuffix=core.windows.net"
+    ))]
     pub connection_string: Option<SensitiveString>,
 
     /// The Azure Blob Storage Account name.
@@ -48,6 +63,7 @@ pub struct AzureBlobSinkConfig {
     /// [env_cred_docs]: https://docs.rs/azure_identity/latest/azure_identity/struct.EnvironmentCredential.html
     /// [managed_ident_docs]: https://docs.microsoft.com/en-us/azure/active-directory/managed-identities-azure-resources/overview
     /// [az_cli_docs]: https://docs.microsoft.com/en-us/cli/azure/account?view=azure-cli-latest#az-account-get-access-token
+    #[configurable(metadata(docs::examples = "mylogstorage"))]
     pub storage_account: Option<String>,
 
     /// The Azure Blob Storage Endpoint URL.
@@ -57,19 +73,28 @@ pub struct AzureBlobSinkConfig {
     /// explicit connection_string (which already explicitly supports overriding the blob endpoint
     /// URL).
     ///
-    /// This may only be used with `storage_account` and will be ignored when used with
+    /// This may only be used with `storage_account` and is ignored when used with
     /// `connection_string`.
+    #[configurable(metadata(docs::examples = "https://test.blob.core.usgovcloudapi.net/"))]
+    #[configurable(metadata(docs::examples = "https://test.blob.core.windows.net/"))]
     pub endpoint: Option<String>,
 
     /// The Azure Blob Storage Account container name.
+    #[configurable(metadata(docs::examples = "my-logs"))]
     pub(super) container_name: String,
 
     /// A prefix to apply to all blob keys.
     ///
-    /// Prefixes are useful for partitioning objects, such as by creating an blob key that
-    /// stores blobs under a particular "directory". If using a prefix for this purpose, it must end
+    /// Prefixes are useful for partitioning objects, such as by creating a blob key that
+    /// stores blobs under a particular directory. If using a prefix for this purpose, it must end
     /// in `/` to act as a directory path. A trailing `/` is **not** automatically added.
-    pub blob_prefix: Option<String>,
+    #[configurable(metadata(docs::examples = "date/%F/hour/%H/"))]
+    #[configurable(metadata(docs::examples = "year=%Y/month=%m/day=%d/"))]
+    #[configurable(metadata(
+        docs::examples = "kubernetes/{{ metadata.cluster }}/{{ metadata.application_name }}/"
+    ))]
+    #[serde(default = "default_blob_prefix")]
+    pub blob_prefix: Template,
 
     /// The timestamp format for the time component of the blob key.
     ///
@@ -84,16 +109,17 @@ pub struct AzureBlobSinkConfig {
     /// Supports the common [`strftime`][chrono_strftime_specifiers] specifiers found in most
     /// languages.
     ///
-    /// When set to an empty string, no timestamp will be appended to the blob prefix.
+    /// When set to an empty string, no timestamp is appended to the blob prefix.
     ///
     /// [chrono_strftime_specifiers]: https://docs.rs/chrono/latest/chrono/format/strftime/index.html#specifiers
+    #[configurable(metadata(docs::syntax_override = "strftime"))]
     pub blob_time_format: Option<String>,
 
     /// Whether or not to append a UUID v4 token to the end of the blob key.
     ///
     /// The UUID is appended to the timestamp portion of the object key, such that if the blob key
-    /// being generated was `date=2022-07-18/1658176486`, setting this field to `true` would result
-    /// in an blob key that looked like
+    /// generated is `date=2022-07-18/1658176486`, setting this field to `true` results
+    /// in an blob key that looks like
     /// `date=2022-07-18/1658176486-30f6652c-71da-4f9f-800d-a1189c47c547`.
     ///
     /// This ensures there are no name collisions, and can be useful in high-volume workloads where
@@ -113,7 +139,7 @@ pub struct AzureBlobSinkConfig {
 
     #[configurable(derived)]
     #[serde(default)]
-    pub request: TowerRequestConfig,
+    pub request: TowerRequestConfig<AzureBlobTowerRequestConfigDefaults>,
 
     #[configurable(derived)]
     #[serde(
@@ -124,6 +150,10 @@ pub struct AzureBlobSinkConfig {
     pub(super) acknowledgements: AcknowledgementsConfig,
 }
 
+pub fn default_blob_prefix() -> Template {
+    Template::try_from(DEFAULT_KEY_PREFIX).unwrap()
+}
+
 impl GenerateConfig for AzureBlobSinkConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
@@ -131,7 +161,7 @@ impl GenerateConfig for AzureBlobSinkConfig {
             storage_account: Some(String::from("some-account-name")),
             container_name: String::from("logs"),
             endpoint: None,
-            blob_prefix: Some(String::from("blob")),
+            blob_prefix: default_blob_prefix(),
             blob_time_format: Some(String::from("%s")),
             blob_append_uuid: Some(true),
             encoding: (Some(NewlineDelimitedEncoderConfig::new()), JsonSerializerConfig::default()).into(),
@@ -145,6 +175,7 @@ impl GenerateConfig for AzureBlobSinkConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "azure_blob")]
 impl SinkConfig for AzureBlobSinkConfig {
     async fn build(&self, _cx: SinkContext) -> Result<(VectorSink, Healthcheck)> {
         let client = azure_common::config::build_client(
@@ -179,9 +210,7 @@ const DEFAULT_FILENAME_APPEND_UUID: bool = true;
 
 impl AzureBlobSinkConfig {
     pub fn build_processor(&self, client: Arc<ContainerClient>) -> crate::Result<VectorSink> {
-        let request_limits = self
-            .request
-            .unwrap_with(&TowerRequestConfig::default().rate_limit_num(250));
+        let request_limits = self.request.into_settings();
         let service = ServiceBuilder::new()
             .settings(request_limits, AzureBlobRetryLogic)
             .service(AzureBlobService::new(client));
@@ -221,12 +250,6 @@ impl AzureBlobSinkConfig {
     }
 
     pub fn key_partitioner(&self) -> crate::Result<KeyPartitioner> {
-        let blob_prefix = self
-            .blob_prefix
-            .as_ref()
-            .cloned()
-            .unwrap_or_else(|| DEFAULT_KEY_PREFIX.into())
-            .try_into()?;
-        Ok(KeyPartitioner::new(blob_prefix))
+        Ok(KeyPartitioner::new(self.blob_prefix.clone()))
     }
 }

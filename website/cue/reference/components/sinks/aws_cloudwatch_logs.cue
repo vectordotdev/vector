@@ -14,6 +14,7 @@ components: sinks: aws_cloudwatch_logs: components._aws & {
 
 	features: {
 		acknowledgements: true
+		auto_generated:   true
 		healthcheck: enabled: true
 		send: {
 			batch: {
@@ -72,35 +73,8 @@ components: sinks: aws_cloudwatch_logs: components._aws & {
 		warnings: []
 	}
 
-	configuration: {
-		create_missing_group: {
-			common:      true
-			description: "Dynamically create a [log group](\(urls.aws_cloudwatch_logs_group_name)) if it does not already exist. This will ignore `create_missing_stream` directly after creating the group and will create the first stream."
-			required:    false
-			type: bool: default: true
-		}
-		create_missing_stream: {
-			common:      true
-			description: "Dynamically create a [log stream](\(urls.aws_cloudwatch_logs_stream_name)) if it does not already exist."
-			required:    false
-			type: bool: default: true
-		}
-		group_name: {
-			description: "The [group name](\(urls.aws_cloudwatch_logs_group_name)) of the target CloudWatch Logs stream."
-			required:    true
-			type: string: {
-				examples: ["group-name", "{{ file }}"]
-				syntax: "template"
-			}
-		}
-		stream_name: {
-			description: "The [stream name](\(urls.aws_cloudwatch_logs_stream_name)) of the target CloudWatch Logs stream. Note that there can only be one writer to a log stream at a time so if you are running multiple vectors all writing to the same log group, include a identifier in the stream name that is guaranteed to be unique by vector instance (for example, you might choose `host`)"
-			required:    true
-			type: string: {
-				examples: ["{{ host }}", "%Y-%m-%d", "stream-name"]
-				syntax: "template"
-			}
-		}
+	configuration: base.components.sinks.aws_cloudwatch_logs.configuration & {
+		_aws_include: false
 	}
 
 	input: {
@@ -136,11 +110,4 @@ components: sinks: aws_cloudwatch_logs: components._aws & {
 			]
 		},
 	]
-
-	telemetry: metrics: {
-		component_sent_events_total:      components.sources.internal_metrics.output.metrics.component_sent_events_total
-		component_sent_event_bytes_total: components.sources.internal_metrics.output.metrics.component_sent_event_bytes_total
-		events_discarded_total:           components.sources.internal_metrics.output.metrics.events_discarded_total
-		processing_errors_total:          components.sources.internal_metrics.output.metrics.processing_errors_total
-	}
 }

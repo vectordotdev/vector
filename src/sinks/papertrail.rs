@@ -1,15 +1,14 @@
 use bytes::{BufMut, BytesMut};
 use syslog::{Facility, Formatter3164, LogFormat, Severity};
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
+use vrl::value::Kind;
 
 use crate::{
     codecs::{Encoder, EncodingConfig, Transformer},
-    config::{
-        log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig,
-        SinkContext,
-    },
+    config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
     event::Event,
     internal_events::TemplateRenderingError,
+    schema,
     sinks::util::{tcp::TcpSinkConfig, UriSerde},
     tcp::TcpKeepaliveConfig,
     template::Template,
@@ -17,11 +16,12 @@ use crate::{
 };
 
 /// Configuration for the `papertrail` sink.
-#[configurable_component(sink("papertrail"))]
+#[configurable_component(sink("papertrail", "Deliver log events to Papertrail from SolarWinds."))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct PapertrailConfig {
-    /// The endpoint to send logs to.
+    /// The TCP endpoint to send logs to.
+    #[configurable(metadata(docs::examples = "logs.papertrailapp.com:12345"))]
     endpoint: UriSerde,
 
     #[configurable(derived)]
@@ -37,7 +37,9 @@ pub struct PapertrailConfig {
     send_buffer_bytes: Option<usize>,
 
     /// The value to use as the `process` in Papertrail.
-    process: Option<Template>,
+    #[configurable(metadata(docs::examples = "{{ process }}", docs::examples = "my-process",))]
+    #[serde(default = "default_process")]
+    process: Template,
 
     #[configurable(derived)]
     #[serde(
@@ -46,6 +48,10 @@ pub struct PapertrailConfig {
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     acknowledgements: AcknowledgementsConfig,
+}
+
+fn default_process() -> Template {
+    Template::try_from("vector").unwrap()
 }
 
 impl GenerateConfig for PapertrailConfig {
@@ -59,6 +65,7 @@ impl GenerateConfig for PapertrailConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "papertrail")]
 impl SinkConfig for PapertrailConfig {
     async fn build(
         &self,
@@ -104,7 +111,10 @@ impl SinkConfig for PapertrailConfig {
     }
 
     fn input(&self) -> Input {
+        let requirement = schema::Requirement::empty().optional_meaning("host", Kind::bytes());
+
         Input::new(self.encoding.config().input_type() & DataType::Log)
+            .with_schema_requirement(requirement)
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
@@ -115,13 +125,13 @@ impl SinkConfig for PapertrailConfig {
 #[derive(Debug, Clone)]
 struct PapertrailEncoder {
     pid: u32,
-    process: Option<Template>,
+    process: Template,
     transformer: Transformer,
     encoder: Encoder<()>,
 }
 
 impl tokio_util::codec::Encoder<Event> for PapertrailEncoder {
-    type Error = codecs::encoding::Error;
+    type Error = vector_lib::codecs::encoding::Error;
 
     fn encode(
         &mut self,
@@ -130,23 +140,20 @@ impl tokio_util::codec::Encoder<Event> for PapertrailEncoder {
     ) -> Result<(), Self::Error> {
         let host = event
             .as_mut_log()
-            .remove(log_schema().host_key())
+            .get_host()
             .map(|host| host.to_string_lossy().into_owned());
 
         let process = self
             .process
-            .as_ref()
-            .and_then(|t| {
-                t.render_string(&event)
-                    .map_err(|error| {
-                        emit!(TemplateRenderingError {
-                            error,
-                            field: Some("process"),
-                            drop_event: false,
-                        })
-                    })
-                    .ok()
+            .render_string(&event)
+            .map_err(|error| {
+                emit!(TemplateRenderingError {
+                    error,
+                    field: Some("process"),
+                    drop_event: false,
+                })
             })
+            .ok()
             .unwrap_or_else(|| String::from("vector"));
 
         let formatter = Formatter3164 {
@@ -175,13 +182,14 @@ impl tokio_util::codec::Encoder<Event> for PapertrailEncoder {
 
 #[cfg(test)]
 mod tests {
+    use serde::Deserialize;
     use std::convert::TryFrom;
 
     use bytes::BytesMut;
-    use codecs::JsonSerializerConfig;
     use futures::{future::ready, stream};
     use tokio_util::codec::Encoder as _;
-    use vector_core::event::{Event, LogEvent};
+    use vector_lib::codecs::JsonSerializerConfig;
+    use vector_lib::event::{Event, LogEvent};
 
     use crate::test_util::{
         components::{run_and_assert_sink_compliance, SINK_TAGS},
@@ -200,12 +208,12 @@ mod tests {
         let mock_endpoint = spawn_blackhole_http_server(always_200_response).await;
 
         let config = PapertrailConfig::generate_config().to_string();
-        let mut config =
-            toml::from_str::<PapertrailConfig>(&config).expect("config should be valid");
+        let mut config = PapertrailConfig::deserialize(toml::de::ValueDeserializer::new(&config))
+            .expect("config should be valid");
         config.endpoint = mock_endpoint.into();
         config.tls = Some(TlsEnableableConfig::default());
 
-        let context = SinkContext::new_test();
+        let context = SinkContext::default();
         let (sink, _healthcheck) = config.build(context).await.unwrap();
 
         let event = Event::Log(LogEvent::from("simple message"));
@@ -220,7 +228,7 @@ mod tests {
 
         let mut encoder = PapertrailEncoder {
             pid: 0,
-            process: Some(Template::try_from("{{ process }}").unwrap()),
+            process: Template::try_from("{{ process }}").unwrap(),
             transformer: Transformer::new(None, Some(vec!["magic".into()]), None).unwrap(),
             encoder: Encoder::<()>::new(JsonSerializerConfig::default().build().into()),
         };

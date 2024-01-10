@@ -1,19 +1,14 @@
 use std::marker::PhantomData;
+use vector_lib::lookup::lookup_v2::ConfigValuePath;
 
-use tower::ServiceBuilder;
-use vector_config::configurable_component;
-use vector_core::{
-    config::{DataType, Input},
-    sink::VectorSink,
-    stream::BatcherSettings,
-};
+use vector_lib::stream::BatcherSettings;
 
 use crate::{
     aws::{AwsAuthentication, RegionOrEndpoint},
-    codecs::{Encoder, EncodingConfig},
-    config::AcknowledgementsConfig,
-    sinks::util::{retries::RetryLogic, Compression, ServiceBuilderExt, TowerRequestConfig},
-    tls::TlsConfig,
+    sinks::{
+        prelude::*,
+        util::{retries::RetryLogic, TowerRequestConfig},
+    },
 };
 
 use super::{
@@ -33,9 +28,11 @@ pub struct KinesisSinkBaseConfig {
     /// The [stream name][stream_name] of the target Kinesis Firehose delivery stream.
     ///
     /// [stream_name]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html
+    #[configurable(metadata(docs::examples = "my-stream"))]
     pub stream_name: String,
 
     #[serde(flatten)]
+    #[configurable(derived)]
     pub region: RegionOrEndpoint,
 
     #[configurable(derived)]
@@ -56,6 +53,11 @@ pub struct KinesisSinkBaseConfig {
     #[serde(default)]
     pub auth: AwsAuthentication,
 
+    /// Whether or not to retry successful requests containing partial failures.
+    #[serde(default)]
+    #[configurable(metadata(docs::advanced))]
+    pub request_retry_partial: bool,
+
     #[configurable(derived)]
     #[serde(
         default,
@@ -63,6 +65,12 @@ pub struct KinesisSinkBaseConfig {
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     pub acknowledgements: AcknowledgementsConfig,
+
+    /// The log field used as the Kinesis record’s partition key value.
+    ///
+    /// If not specified, a unique partition key is generated for each Kinesis record.
+    #[configurable(metadata(docs::examples = "user_id"))]
+    pub partition_key_field: Option<ConfigValuePath>,
 }
 
 impl KinesisSinkBaseConfig {
@@ -76,11 +84,12 @@ impl KinesisSinkBaseConfig {
 }
 
 /// Builds an aws_kinesis sink.
-pub async fn build_sink<C, R, RR, E, RT>(
+pub fn build_sink<C, R, RR, E, RT>(
     config: &KinesisSinkBaseConfig,
-    partition_key_field: Option<String>,
+    partition_key_field: Option<ConfigValuePath>,
     batch_settings: BatcherSettings,
     client: C,
+    retry_logic: RT,
 ) -> crate::Result<VectorSink>
 where
     C: SendRecord + Clone + Send + Sync + 'static,
@@ -92,11 +101,11 @@ where
     E: Send + 'static,
     RT: RetryLogic<Response = KinesisResponse> + Default,
 {
-    let request_limits = config.request.unwrap_with(&TowerRequestConfig::default());
+    let request_limits = config.request.into_settings();
 
     let region = config.region.region();
     let service = ServiceBuilder::new()
-        .settings::<RT, BatchKinesisRequest<RR>>(request_limits, RT::default())
+        .settings::<RT, BatchKinesisRequest<RR>>(request_limits, retry_logic)
         .service(KinesisService::<C, R, E> {
             client,
             stream_name: config.stream_name.clone(),

@@ -14,6 +14,7 @@ components: sinks: aws_s3: components._aws & {
 
 	features: {
 		acknowledgements: true
+		auto_generated:   true
 		healthcheck: enabled: true
 		send: {
 			batch: {
@@ -72,179 +73,8 @@ components: sinks: aws_s3: components._aws & {
 		warnings: []
 	}
 
-	configuration: {
-		acl: {
-			category:    "ACL"
-			common:      false
-			description: "Canned ACL to apply to the created objects. For more information, see [Canned ACL](\(urls.aws_s3_canned_acl))."
-			required:    false
-			type: string: {
-				default: null
-				enum: {
-					"private":                   "Owner gets `FULL_CONTROL`. No one else has access rights (default)."
-					"public-read":               "Owner gets `FULL_CONTROL`. The AllUsers group gets `READ` access."
-					"public-read-write":         "Owner gets `FULL_CONTROL`. The AllUsers group gets `READ` and `WRITE` access. Granting this on a bucket is generally not recommended."
-					"aws-exec-read":             "Owner gets `FULL_CONTROL`. Amazon EC2 gets `READ` access to `GET` an Amazon Machine Image (AMI) bundle from Amazon S3."
-					"authenticated-read":        "Owner gets `FULL_CONTROL`. The AuthenticatedUsers group gets `READ` access."
-					"bucket-owner-read":         "Object owner gets `FULL_CONTROL`. Bucket owner gets `READ. access."
-					"bucket-owner-full-control": "Both the object owner and the bucket owner get `FULL_CONTROL` over the object."
-					"log-delivery-write":        "The LogDelivery group gets `WRITE` and `READ_ACP` permissions on the bucket. For more information about logs, see [Amazon S3 Server Access Logging](\(urls.aws_s3_server_access_logs))."
-				}
-			}
-		}
-		bucket: {
-			description: "The S3 bucket name. Do not include a leading `s3://` or a trailing `/`."
-			required:    true
-			type: string: {
-				examples: ["my-bucket"]
-			}
-		}
-		content_encoding: {
-			category:    "Content Type"
-			common:      false
-			description: "Specifies what content encodings have been applied to the object and thus what decoding mechanisms must be applied to obtain the media-type referenced by the Content-Type header field. By default calculated from `compression` value."
-			required:    false
-			type: string: {
-				default: null
-				examples: ["gzip"]
-			}
-		}
-		content_type: {
-			category:    "Content Type"
-			common:      false
-			description: "A standard MIME type describing the format of the contents."
-			required:    false
-			type: string: {
-				default: "text/x-log"
-			}
-		}
-		filename_append_uuid: {
-			category:    "File Naming"
-			common:      false
-			description: "Whether or not to append a UUID v4 token to the end of the file. This ensures there are no name collisions high volume use cases."
-			required:    false
-			type: bool: default: true
-		}
-		filename_extension: {
-			category:    "File Naming"
-			common:      false
-			description: "The filename extension to use in the object name."
-			required:    false
-			type: string: {
-				default: "log"
-			}
-		}
-		filename_time_format: {
-			category:    "File Naming"
-			common:      false
-			description: "The format of the resulting object file name. [`strftime` specifiers](\(urls.strptime_specifiers)) are supported."
-			required:    false
-			type: string: {
-				default: "%s"
-				syntax:  "strftime"
-			}
-		}
-		grant_full_control: {
-			category:    "ACL"
-			common:      false
-			description: "Gives the named [grantee](\(urls.aws_s3_grantee)) READ, READ_ACP, and WRITE_ACP permissions on the created objects."
-			required:    false
-			type: string: {
-				default: null
-				examples: ["79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be", "person@email.com", "http://acs.amazonaws.com/groups/global/AllUsers"]
-			}
-		}
-		grant_read: {
-			category:    "ACL"
-			common:      false
-			description: "Allows the named [grantee](\(urls.aws_s3_grantee)) to read the created objects and their metadata."
-			required:    false
-			type: string: {
-				default: null
-				examples: ["79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be", "person@email.com", "http://acs.amazonaws.com/groups/global/AllUsers"]
-			}
-		}
-		grant_read_acp: {
-			category:    "ACL"
-			common:      false
-			description: "Allows the named [grantee](\(urls.aws_s3_grantee)) to read the created objects' ACL."
-			required:    false
-			type: string: {
-				default: null
-				examples: ["79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be", "person@email.com", "http://acs.amazonaws.com/groups/global/AllUsers"]
-			}
-		}
-		grant_write_acp: {
-			category:    "ACL"
-			common:      false
-			description: "Allows the named [grantee](\(urls.aws_s3_grantee)) to write the created objects' ACL."
-			required:    false
-			type: string: {
-				default: null
-				examples: ["79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be", "person@email.com", "http://acs.amazonaws.com/groups/global/AllUsers"]
-			}
-		}
-		key_prefix: {
-			category:    "File Naming"
-			common:      true
-			description: "A prefix to apply to all object key names. This should be used to partition your objects, and it's important to end this value with a `/` if you want this to be the root S3 \"folder\"."
-			required:    false
-			type: string: {
-				default: "date=%F/"
-				examples: ["date=%F/", "date=%F/hour=%H/", "year=%Y/month=%m/day=%d/", "application_id={{ application_id }}/date=%F/"]
-				syntax: "template"
-			}
-		}
-		server_side_encryption: {
-			category:    "Encryption"
-			common:      false
-			description: "The Server-side Encryption algorithm used when storing these objects."
-			required:    false
-			type: string: {
-				default: null
-				enum: {
-					"AES256":  "256-bit Advanced Encryption Standard"
-					"aws:kms": "AWS managed key encryption"
-				}
-			}
-		}
-		ssekms_key_id: {
-			category:    "Encryption"
-			common:      false
-			description: "If `server_side_encryption` has the value `\"aws.kms\"`, this specifies the ID of the AWS Key Management Service (AWS KMS) symmetrical customer managed customer master key (CMK) that will used for the created objects. If not specified, Amazon S3 uses the AWS managed CMK in AWS to protect the data."
-			required:    false
-			type: string: {
-				default: null
-				examples: ["abcd1234"]
-			}
-		}
-		storage_class: {
-			category:    "Storage"
-			common:      false
-			description: "The storage class for the created objects. See [the S3 Storage Classes](https://docs.aws.amazon.com/AmazonS3/latest/dev/storage-class-intro.html) for more details."
-			required:    false
-			type: string: {
-				default: null
-				enum: {
-					STANDARD:            "The default storage class. If you don't specify the storage class when you upload an object, Amazon S3 assigns the STANDARD storage class."
-					REDUCED_REDUNDANCY:  "Designed for noncritical, reproducible data that can be stored with less redundancy than the STANDARD storage class. AWS recommends that you not use this storage class. The STANDARD storage class is more cost effective. "
-					INTELLIGENT_TIERING: "Stores objects in two access tiers: one tier that is optimized for frequent access and another lower-cost tier that is optimized for infrequently accessed data."
-					STANDARD_IA:         "Amazon S3 stores the object data redundantly across multiple geographically separated Availability Zones (similar to the STANDARD storage class)."
-					ONEZONE_IA:          "Amazon S3 stores the object data in only one Availability Zone."
-					GLACIER:             "Use for archives where portions of the data might need to be retrieved in minutes."
-					DEEP_ARCHIVE:        "Use for archiving data that rarely needs to be accessed."
-				}
-			}
-		}
-		tags: {
-			common:      false
-			description: "The tag-set for the object."
-			required:    false
-			type: object: {
-				examples: [{"Tag1": "Value1"}]
-				options: {}
-			}
-		}
+	configuration: base.components.sinks.aws_s3.configuration & {
+		_aws_include: false
 	}
 
 	input: {
@@ -319,6 +149,15 @@ components: sinks: aws_s3: components._aws & {
 				You can control the resulting name via the [`key_prefix`](#key_prefix),
 				[`filename_time_format`](#filename_time_format), and
 				[`filename_append_uuid`](#filename_append_uuid) options.
+
+				For example, to store objects at the root S3 folder, without a timestamp or UUID use
+				these configuration options:
+
+				```text
+				key_prefix = "{{ my_file_name }}"
+				filename_time_format = ""
+				filename_append_uuid = false
+				```
 				"""
 		}
 
@@ -377,12 +216,4 @@ components: sinks: aws_s3: components._aws & {
 			]
 		},
 	]
-
-	telemetry: metrics: {
-		component_sent_bytes_total:       components.sources.internal_metrics.output.metrics.component_sent_bytes_total
-		component_sent_events_total:      components.sources.internal_metrics.output.metrics.component_sent_events_total
-		component_sent_event_bytes_total: components.sources.internal_metrics.output.metrics.component_sent_event_bytes_total
-		events_discarded_total:           components.sources.internal_metrics.output.metrics.events_discarded_total
-		processing_errors_total:          components.sources.internal_metrics.output.metrics.processing_errors_total
-	}
 }

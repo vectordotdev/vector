@@ -1,4 +1,0 @@
-# object: { "foo": true, "bar": "bar", "baz":   "", "qux": { "quux":   "", "derp": "derp" }, "quux": [{ "darp":   "" }] }
-# result: { "foo": true, "bar": "bar", "baz": null, "qux": { "quux": null, "derp": "derp" }, "quux": [{ "darp": null }] }
-
-map_values(., recursive: true) -> |value| { if value == "" { null } else { value } }

@@ -1,11 +1,17 @@
 use std::{convert::TryFrom, iter, num::NonZeroU8};
 
-use chrono::{TimeZone, Utc};
-use codecs::{JsonSerializerConfig, TextSerializerConfig};
+use chrono::{TimeZone, Timelike, Utc};
 use futures::{future::ready, stream};
 use serde_json::Value as JsonValue;
 use tokio::time::{sleep, Duration};
-use vector_core::event::{BatchNotifier, BatchStatus, Event, LogEvent};
+use vector_lib::codecs::{JsonSerializerConfig, TextSerializerConfig};
+use vector_lib::lookup::lookup_v2::{ConfigValuePath, OptionalTargetPath};
+use vector_lib::{
+    config::{init_telemetry, Tags, Telemetry},
+    event::{BatchNotifier, BatchStatus, Event, LogEvent},
+    lookup,
+};
+use vrl::path::OwnedTargetPath;
 
 use crate::{
     codecs::EncodingConfig,
@@ -24,7 +30,10 @@ use crate::{
     },
     template::Template,
     test_util::{
-        components::{run_and_assert_sink_compliance, HTTP_SINK_TAGS},
+        components::{
+            run_and_assert_data_volume_sink_compliance, run_and_assert_sink_compliance,
+            DATA_VOLUME_SINK_TAGS, HTTP_SINK_TAGS,
+        },
         random_lines_with_stream, random_string,
     },
 };
@@ -99,14 +108,17 @@ async fn find_entries(messages: &[String]) -> bool {
     found_all
 }
 
-async fn config(encoding: EncodingConfig, indexed_fields: Vec<String>) -> HecLogsSinkConfig {
+async fn config(
+    encoding: EncodingConfig,
+    indexed_fields: Vec<ConfigValuePath>,
+) -> HecLogsSinkConfig {
     let mut batch = BatchConfig::default();
     batch.max_events = Some(5);
 
     HecLogsSinkConfig {
         default_token: get_token().await.into(),
         endpoint: splunk_hec_address(),
-        host_key: "host".into(),
+        host_key: OptionalTargetPath::event("host"),
         indexed_fields,
         index: None,
         sourcetype: None,
@@ -124,9 +136,21 @@ async fn config(encoding: EncodingConfig, indexed_fields: Vec<String>) -> HecLog
     }
 }
 
+fn enable_telemetry() {
+    init_telemetry(
+        Telemetry {
+            tags: Tags {
+                emit_service: true,
+                emit_source: true,
+            },
+        },
+        true,
+    );
+}
+
 #[tokio::test]
 async fn splunk_insert_message() {
-    let cx = SinkContext::new_test();
+    let cx = SinkContext::default();
 
     let config = config(TextSerializerConfig::default().into(), vec![]).await;
     let (sink, _) = config.build(cx).await.unwrap();
@@ -145,8 +169,35 @@ async fn splunk_insert_message() {
 }
 
 #[tokio::test]
+async fn splunk_insert_message_data_volume() {
+    enable_telemetry();
+
+    let cx = SinkContext::default();
+
+    let config = config(TextSerializerConfig::default().into(), vec![]).await;
+    let (sink, _) = config.build(cx).await.unwrap();
+
+    let message = random_string(100);
+    let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+    let event = LogEvent::from(message.clone()).with_batch_notifier(&batch);
+    drop(batch);
+    run_and_assert_data_volume_sink_compliance(
+        sink,
+        stream::once(ready(event)),
+        &DATA_VOLUME_SINK_TAGS,
+    )
+    .await;
+    assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+
+    let entry = find_entry(message.as_str()).await;
+
+    assert_eq!(message, entry["_raw"].as_str().unwrap());
+    assert!(entry.get("message").is_none());
+}
+
+#[tokio::test]
 async fn splunk_insert_raw_message() {
-    let cx = SinkContext::new_test();
+    let cx = SinkContext::default();
 
     let config = HecLogsSinkConfig {
         endpoint_target: EndpointTarget::Raw,
@@ -170,8 +221,40 @@ async fn splunk_insert_raw_message() {
 }
 
 #[tokio::test]
+async fn splunk_insert_raw_message_data_volume() {
+    enable_telemetry();
+
+    let cx = SinkContext::default();
+
+    let config = HecLogsSinkConfig {
+        endpoint_target: EndpointTarget::Raw,
+        source: Some(Template::try_from("zork").unwrap()),
+        ..config(TextSerializerConfig::default().into(), vec![]).await
+    };
+    let (sink, _) = config.build(cx).await.unwrap();
+
+    let message = random_string(100);
+    let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+    let event = LogEvent::from(message.clone()).with_batch_notifier(&batch);
+    drop(batch);
+    run_and_assert_data_volume_sink_compliance(
+        sink,
+        stream::once(ready(event)),
+        &DATA_VOLUME_SINK_TAGS,
+    )
+    .await;
+    assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+
+    let entry = find_entry(message.as_str()).await;
+
+    assert_eq!(message, entry["_raw"].as_str().unwrap());
+    assert_eq!("zork", entry[SOURCE_FIELD].as_str().unwrap());
+    assert!(entry.get("message").is_none());
+}
+
+#[tokio::test]
 async fn splunk_insert_broken_token() {
-    let cx = SinkContext::new_test();
+    let cx = SinkContext::default();
 
     let mut config = config(TextSerializerConfig::default().into(), vec![]).await;
     config.default_token = "BROKEN_TOKEN".to_string().into();
@@ -187,7 +270,7 @@ async fn splunk_insert_broken_token() {
 
 #[tokio::test]
 async fn splunk_insert_source() {
-    let cx = SinkContext::new_test();
+    let cx = SinkContext::default();
 
     let mut config = config(TextSerializerConfig::default().into(), vec![]).await;
     config.source = Template::try_from("/var/log/syslog".to_string()).ok();
@@ -205,7 +288,7 @@ async fn splunk_insert_source() {
 
 #[tokio::test]
 async fn splunk_insert_index() {
-    let cx = SinkContext::new_test();
+    let cx = SinkContext::default();
 
     let mut config = config(TextSerializerConfig::default().into(), vec![]).await;
     config.index = Template::try_from("custom_index".to_string()).ok();
@@ -222,9 +305,9 @@ async fn splunk_insert_index() {
 
 #[tokio::test]
 async fn splunk_index_is_interpolated() {
-    let cx = SinkContext::new_test();
+    let cx = SinkContext::default();
 
-    let indexed_fields = vec!["asdf".to_string()];
+    let indexed_fields = vec!["asdf".into()];
     let mut config = config(JsonSerializerConfig::default().into(), indexed_fields).await;
     config.index = Template::try_from("{{ index_name }}".to_string()).ok();
 
@@ -243,7 +326,7 @@ async fn splunk_index_is_interpolated() {
 
 #[tokio::test]
 async fn splunk_insert_many() {
-    let cx = SinkContext::new_test();
+    let cx = SinkContext::default();
 
     let config = config(TextSerializerConfig::default().into(), vec![]).await;
     let (sink, _) = config.build(cx).await.unwrap();
@@ -256,7 +339,7 @@ async fn splunk_insert_many() {
 
 #[tokio::test]
 async fn splunk_custom_fields() {
-    let cx = SinkContext::new_test();
+    let cx = SinkContext::default();
 
     let indexed_fields = vec!["asdf".into()];
     let config = config(JsonSerializerConfig::default().into(), indexed_fields).await;
@@ -276,7 +359,7 @@ async fn splunk_custom_fields() {
 
 #[tokio::test]
 async fn splunk_hostname() {
-    let cx = SinkContext::new_test();
+    let cx = SinkContext::default();
 
     let indexed_fields = vec!["asdf".into()];
     let config = config(JsonSerializerConfig::default().into(), indexed_fields).await;
@@ -299,9 +382,9 @@ async fn splunk_hostname() {
 
 #[tokio::test]
 async fn splunk_sourcetype() {
-    let cx = SinkContext::new_test();
+    let cx = SinkContext::default();
 
-    let indexed_fields = vec!["asdf".to_string()];
+    let indexed_fields = vec!["asdf".into()];
     let mut config = config(JsonSerializerConfig::default().into(), indexed_fields).await;
     config.sourcetype = Template::try_from("_json".to_string()).ok();
 
@@ -323,15 +406,11 @@ async fn splunk_sourcetype() {
 
 #[tokio::test]
 async fn splunk_configure_hostname() {
-    let cx = SinkContext::new_test();
+    let cx = SinkContext::default();
 
     let config = HecLogsSinkConfig {
-        host_key: "roast".into(),
-        ..config(
-            JsonSerializerConfig::default().into(),
-            vec!["asdf".to_string()],
-        )
-        .await
+        host_key: OptionalTargetPath::event("roast"),
+        ..config(JsonSerializerConfig::default().into(), vec!["asdf".into()]).await
     };
 
     let (sink, _) = config.build(cx).await.unwrap();
@@ -354,7 +433,7 @@ async fn splunk_configure_hostname() {
 
 #[tokio::test]
 async fn splunk_indexer_acknowledgements() {
-    let cx = SinkContext::new_test();
+    let cx = SinkContext::default();
 
     let acknowledgements_config = HecClientAcknowledgementsConfig {
         query_interval: NonZeroU8::new(1).unwrap(),
@@ -365,11 +444,7 @@ async fn splunk_indexer_acknowledgements() {
     let config = HecLogsSinkConfig {
         default_token: String::from(ACK_TOKEN).into(),
         acknowledgements: acknowledgements_config,
-        ..config(
-            JsonSerializerConfig::default().into(),
-            vec!["asdf".to_string()],
-        )
-        .await
+        ..config(JsonSerializerConfig::default().into(), vec!["asdf".into()]).await
     };
     let (sink, _) = config.build(cx).await.unwrap();
 
@@ -384,13 +459,9 @@ async fn splunk_indexer_acknowledgements() {
 
 #[tokio::test]
 async fn splunk_indexer_acknowledgements_disabled_on_server() {
-    let cx = SinkContext::new_test();
+    let cx = SinkContext::default();
 
-    let config = config(
-        JsonSerializerConfig::default().into(),
-        vec!["asdf".to_string()],
-    )
-    .await;
+    let config = config(JsonSerializerConfig::default().into(), vec!["asdf".into()]).await;
     let (sink, _) = config.build(cx).await.unwrap();
 
     let (tx, mut rx) = BatchNotifier::new_with_receiver();
@@ -409,43 +480,51 @@ async fn splunk_auto_extracted_timestamp() {
     // The auto_extract_timestamp setting only works on version 8 and above of splunk.
     // If the splunk version is set to 7, we ignore this test.
     // This environment variable is set by the integration test docker-compose file.
-    if std::env::var("SPLUNK_VERSION")
+    if std::env::var("CONFIG_VERSION")
         .map(|version| !version.starts_with("7."))
         .unwrap_or(true)
     {
-        let cx = SinkContext::new_test();
+        let cx = SinkContext::default();
 
         let config = HecLogsSinkConfig {
             auto_extract_timestamp: Some(true),
-            timestamp_key: "timestamp".to_string(),
+            timestamp_key: OptionalTargetPath {
+                path: Some(OwnedTargetPath::event(lookup::owned_value_path!(
+                    "timestamp"
+                ))),
+            },
             ..config(JsonSerializerConfig::default().into(), vec![]).await
         };
 
         let (sink, _) = config.build(cx).await.unwrap();
 
         // With auto_extract_timestamp switched the timestamp comes from the message.
-        let message = "this message is on 2017-10-01 03:00:00";
-        let mut event = LogEvent::from(message);
+        // Note that as per <https://docs.splunk.com/Documentation/Splunk/latest/Data/Configuretimestamprecognition>
+        // by default, the max age of timestamps is 2,000 days old. So we will test with a timestamp that
+        // is within that limit.
+        let date = Utc::now().with_nanosecond(0).unwrap() - chrono::Duration::days(1999);
+        let message = format!("this message is on {}", date.format("%Y-%m-%d %H:%M:%S"));
+        let mut event = LogEvent::from(message.as_str());
 
         event.insert(
             "timestamp",
             Value::from(
-                Utc.ymd(2020, 3, 5)
-                    .and_hms_opt(0, 0, 0)
+                Utc.with_ymd_and_hms(2020, 3, 5, 0, 0, 0)
+                    .single()
                     .expect("invalid timestamp"),
             ),
         );
 
         run_and_assert_sink_compliance(sink, stream::once(ready(event)), &HTTP_SINK_TAGS).await;
 
-        let entry = find_entry(message).await;
+        let entry = find_entry(&message).await;
 
         assert_eq!(
             format!("{{\"message\":\"{}\"}}", message),
             entry["_raw"].as_str().unwrap()
         );
         assert_eq!(
-            "2017-10-01T03:00:00.000+00:00",
+            &format!("{}", date.format("%Y-%m-%dT%H:%M:%S%.3f%:z")),
             entry["_time"].as_str().unwrap()
         );
     }
@@ -456,35 +535,40 @@ async fn splunk_non_auto_extracted_timestamp() {
     // The auto_extract_timestamp setting only works on version 8 and above of splunk.
     // If the splunk version is set to 7, we ignore this test.
     // This environment variable is set by the integration test docker-compose file.
-    if std::env::var("SPLUNK_VERSION")
+    if std::env::var("CONFIG_VERSION")
         .map(|version| !version.starts_with("7."))
         .unwrap_or(true)
     {
-        let cx = SinkContext::new_test();
+        let cx = SinkContext::default();
 
         let config = HecLogsSinkConfig {
             auto_extract_timestamp: Some(false),
-            timestamp_key: "timestamp".to_string(),
+            timestamp_key: OptionalTargetPath {
+                path: Some(OwnedTargetPath::event(lookup::owned_value_path!(
+                    "timestamp"
+                ))),
+            },
             ..config(JsonSerializerConfig::default().into(), vec![]).await
         };
 
         let (sink, _) = config.build(cx).await.unwrap();
-        let message = "this message is on 2019-10-01 00:00:00";
-        let mut event = LogEvent::from(message);
+        let date = Utc::now().with_nanosecond(0).unwrap() - chrono::Duration::days(1999);
+        let message = format!("this message is on {}", date.format("%Y-%m-%d %H:%M:%S"));
+        let mut event = LogEvent::from(message.as_str());
 
         // With auto_extract_timestamp switched off the timestamp comes from the event timestamp.
         event.insert(
             "timestamp",
             Value::from(
-                Utc.ymd(2020, 3, 5)
-                    .and_hms_opt(0, 0, 0)
+                Utc.with_ymd_and_hms(2020, 3, 5, 0, 0, 0)
+                    .single()
                     .expect("invalid timestamp"),
             ),
         );
 
         run_and_assert_sink_compliance(sink, stream::once(ready(event)), &HTTP_SINK_TAGS).await;
 
-        let entry = find_entry(message).await;
+        let entry = find_entry(&message).await;
 
         assert_eq!(
             format!("{{\"message\":\"{}\"}}", message),

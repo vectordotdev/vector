@@ -1,8 +1,9 @@
 use metrics::counter;
-use vector_common::internal_event::{error_stage, error_type};
-use vector_core::internal_event::{ComponentEventsDropped, InternalEvent, UNINTENTIONAL};
-
-use crate::emit;
+use vector_lib::internal_event::{ComponentEventsDropped, InternalEvent, UNINTENTIONAL};
+use vector_lib::{
+    internal_event::{error_stage, error_type},
+    json_size::JsonSize,
+};
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 #[allow(dead_code)] // some features only use some variants
@@ -13,7 +14,7 @@ pub enum SocketMode {
 }
 
 impl SocketMode {
-    const fn as_str(self) -> &'static str {
+    pub const fn as_str(self) -> &'static str {
         match self {
             Self::Tcp => "tcp",
             Self::Udp => "udp",
@@ -45,7 +46,7 @@ impl InternalEvent for SocketBytesReceived {
 #[derive(Debug)]
 pub struct SocketEventsReceived {
     pub mode: SocketMode,
-    pub byte_size: usize,
+    pub byte_size: JsonSize,
     pub count: usize,
 }
 
@@ -55,13 +56,11 @@ impl InternalEvent for SocketEventsReceived {
         trace!(
             message = "Events received.",
             count = self.count,
-            byte_size = self.byte_size,
+            byte_size = self.byte_size.get(),
             %mode,
         );
         counter!("component_received_events_total", self.count as u64, "mode" => mode);
-        counter!("component_received_event_bytes_total", self.byte_size as u64, "mode" => mode);
-        // deprecated
-        counter!("events_in_total", self.count as u64, "mode" => mode);
+        counter!("component_received_event_bytes_total", self.byte_size.get() as u64, "mode" => mode);
     }
 }
 
@@ -90,14 +89,14 @@ impl InternalEvent for SocketBytesSent {
 pub struct SocketEventsSent {
     pub mode: SocketMode,
     pub count: u64,
-    pub byte_size: usize,
+    pub byte_size: JsonSize,
 }
 
 impl InternalEvent for SocketEventsSent {
     fn emit(self) {
-        trace!(message = "Events sent.", count = %self.count, byte_size = %self.byte_size);
+        trace!(message = "Events sent.", count = %self.count, byte_size = %self.byte_size.get());
         counter!("component_sent_events_total", self.count, "mode" => self.mode.as_str());
-        counter!("component_sent_event_bytes_total", self.byte_size as u64, "mode" => self.mode.as_str());
+        counter!("component_sent_event_bytes_total", self.byte_size.get() as u64, "mode" => self.mode.as_str());
     }
 }
 
@@ -126,8 +125,6 @@ impl<E: std::fmt::Display> InternalEvent for SocketBindError<E> {
             "stage" => error_stage::RECEIVING,
             "mode" => mode,
         );
-        // deprecated
-        counter!("connection_errors_total", 1, "mode" => mode);
     }
 }
 
@@ -156,8 +153,6 @@ impl<E: std::fmt::Display> InternalEvent for SocketReceiveError<E> {
             "stage" => error_stage::RECEIVING,
             "mode" => mode,
         );
-        // deprecated
-        counter!("connection_errors_total", 1, "mode" => mode);
     }
 }
 
@@ -187,8 +182,6 @@ impl<E: std::fmt::Display> InternalEvent for SocketSendError<E> {
             "stage" => error_stage::SENDING,
             "mode" => mode,
         );
-        // deprecated
-        counter!("connection_errors_total", 1, "mode" => mode);
 
         emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
     }

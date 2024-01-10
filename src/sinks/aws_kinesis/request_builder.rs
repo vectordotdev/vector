@@ -1,8 +1,8 @@
 use std::{io, marker::PhantomData};
 
 use bytes::Bytes;
-use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
-use vector_core::ByteSizeOf;
+use vector_lib::request_metadata::{MetaDescriptive, RequestMetadata};
+use vector_lib::ByteSizeOf;
 
 use super::{
     record::Record,
@@ -53,8 +53,12 @@ impl<R> MetaDescriptive for KinesisRequest<R>
 where
     R: Record,
 {
-    fn get_metadata(&self) -> RequestMetadata {
-        self.metadata
+    fn get_metadata(&self) -> &RequestMetadata {
+        &self.metadata
+    }
+
+    fn metadata_mut(&mut self) -> &mut RequestMetadata {
+        &mut self.metadata
     }
 }
 
@@ -102,7 +106,7 @@ where
             partition_key: processed_event.metadata.partition_key,
         };
         let event = Event::from(processed_event.event);
-        let builder = RequestMetadataBuilder::from_events(&event);
+        let builder = RequestMetadataBuilder::from_event(&event);
 
         (kinesis_metadata, builder, event)
     }

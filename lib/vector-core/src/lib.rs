@@ -36,7 +36,6 @@ pub mod schema;
 pub mod serde;
 pub mod sink;
 pub mod source;
-pub mod stream;
 pub mod tcp;
 #[cfg(test)]
 mod test_util;
@@ -46,17 +45,11 @@ pub mod transform;
 #[cfg(feature = "vrl")]
 mod vrl;
 
+use float_eq::FloatEq;
 use std::path::PathBuf;
 
-use float_eq::FloatEq;
-
 #[cfg(feature = "vrl")]
-pub use vrl::compile_vrl;
-
-pub use vector_buffers as buffers;
-#[cfg(any(test, feature = "test"))]
-pub use vector_common::event_test_util;
-pub use vector_common::{byte_size_of::ByteSizeOf, internal_event};
+pub use crate::vrl::compile_vrl;
 
 pub use event::EstimatedJsonEncodedSizeOf;
 
@@ -71,4 +64,44 @@ pub(crate) use vector_common::{Error, Result};
 
 pub(crate) fn float_eq(l_value: f64, r_value: f64) -> bool {
     (l_value.is_nan() && r_value.is_nan()) || l_value.eq_ulps(&r_value, &1)
+}
+
+// These macros aren't actually usable in lib crates without some `vector_lib` shenanigans.
+// This test version won't be needed once all `InternalEvent`s implement `name()`.
+#[cfg(feature = "test")]
+#[macro_export]
+macro_rules! emit {
+    ($event:expr) => {
+        vector_lib::internal_event::emit(vector_lib::internal_event::DefaultName {
+            event: $event,
+            name: stringify!($event),
+        })
+    };
+}
+
+#[cfg(not(feature = "test"))]
+#[macro_export]
+macro_rules! emit {
+    ($event:expr) => {
+        vector_lib::internal_event::emit($event)
+    };
+}
+
+#[cfg(feature = "test")]
+#[macro_export]
+macro_rules! register {
+    ($event:expr) => {
+        vector_lib::internal_event::register(vector_lib::internal_event::DefaultName {
+            event: $event,
+            name: stringify!($event),
+        })
+    };
+}
+
+#[cfg(not(feature = "test"))]
+#[macro_export]
+macro_rules! register {
+    ($event:expr) => {
+        vector_lib::internal_event::register($event)
+    };
 }

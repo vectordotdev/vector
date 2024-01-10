@@ -1,16 +1,18 @@
 args:
-- --features
-- shutdown-tests
-- --test
-- integration
 - --test-threads
 - '4'
+
+features:
+- shutdown-tests
+
+test: "integration"
 
 env:
   KAFKA_HOST: kafka
 
-runner_env:
-  DOCKER_HOST: "http://1.1.1.1:54321/"
+runner:
+  env:
+    DOCKER_HOST: "http://1.1.1.1:54321/"
 
 matrix:
   version: [latest]

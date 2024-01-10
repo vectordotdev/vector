@@ -1,17 +1,23 @@
+#![allow(missing_docs)]
 use std::{
     collections::{HashMap, HashSet},
     fmt::{self, Display, Formatter},
     hash::Hash,
     net::SocketAddr,
     path::PathBuf,
+    time::Duration,
 };
 
 use indexmap::IndexMap;
-pub use vector_config::component::{GenerateConfig, SinkDescription, TransformDescription};
-use vector_config::configurable_component;
-pub use vector_core::config::{
-    AcknowledgementsConfig, DataType, GlobalOptions, Input, Output, SourceAcknowledgementsConfig,
+use serde::Serialize;
+pub use vector_lib::config::{
+    AcknowledgementsConfig, DataType, GlobalOptions, Input, LogNamespace,
+    SourceAcknowledgementsConfig, SourceOutput, TransformOutput,
 };
+pub use vector_lib::configurable::component::{
+    GenerateConfig, SinkDescription, TransformDescription,
+};
+use vector_lib::configurable::configurable_component;
 
 use crate::{conditions, event::Metric, secrets::SecretBackends, serde::OneOrMany};
 
@@ -43,32 +49,34 @@ pub use cmd::{cmd, Opts};
 pub use diff::ConfigDiff;
 pub use enrichment_table::{EnrichmentTableConfig, EnrichmentTableOuter};
 pub use format::{Format, FormatHint};
-pub use id::{ComponentKey, Inputs, OutputId};
+pub use id::{ComponentKey, Inputs};
 pub use loading::{
     load, load_builder_from_paths, load_from_paths, load_from_paths_with_provider_and_secrets,
-    load_from_str, load_source_from_paths, merge_path_lists, process_paths, CONFIG_PATHS,
+    load_from_str, load_source_from_paths, merge_path_lists, process_paths, COLLECTOR,
+    CONFIG_PATHS, STRICT_ENV_VARS,
 };
 pub use provider::ProviderConfig;
 pub use secret::SecretBackend;
-pub use sink::{SinkConfig, SinkContext, SinkHealthcheckOptions, SinkOuter};
-pub use source::{SourceConfig, SourceContext, SourceOuter};
-pub use transform::{TransformConfig, TransformContext, TransformOuter};
+pub use sink::{BoxedSink, SinkConfig, SinkContext, SinkHealthcheckOptions, SinkOuter};
+pub use source::{BoxedSource, SourceConfig, SourceContext, SourceOuter};
+pub use transform::{
+    get_transform_output_ids, BoxedTransform, TransformConfig, TransformContext, TransformOuter,
+};
 pub use unit_test::{build_unit_tests, build_unit_tests_main, UnitTestResult};
 pub use validation::warnings;
-pub use vector_core::config::{log_schema, proxy::ProxyConfig, LogSchema};
+pub use vars::{interpolate, ENVIRONMENT_VARIABLE_INTERPOLATION_REGEX};
+pub use vector_lib::config::{
+    init_telemetry, log_schema, proxy::ProxyConfig, telemetry, LogSchema, OutputId,
+};
 
 /// Loads Log Schema from configurations and sets global schema.
 /// Once this is done, configurations can be correctly loaded using
 /// configured log schema defaults.
 /// If deny is set, will panic if schema has already been set.
 pub fn init_log_schema(config_paths: &[ConfigPath], deny_if_set: bool) -> Result<(), Vec<String>> {
-    vector_core::config::init_log_schema(
-        || {
-            let (builder, _) = load_builder_from_paths(config_paths)?;
-            Ok(builder.global.log_schema)
-        },
-        deny_if_set,
-    )
+    let (builder, _) = load_builder_from_paths(config_paths)?;
+    vector_lib::config::init_log_schema(builder.global.log_schema, deny_if_set);
+    Ok(())
 }
 
 #[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq)]
@@ -95,7 +103,7 @@ impl ConfigPath {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Serialize)]
 pub struct Config {
     #[cfg(feature = "api")]
     pub api: api::Options,
@@ -111,11 +119,16 @@ pub struct Config {
     pub enrichment_tables: IndexMap<ComponentKey, EnrichmentTableOuter>,
     tests: Vec<TestDefinition>,
     secret: IndexMap<ComponentKey, SecretBackends>,
+    pub graceful_shutdown_duration: Option<Duration>,
 }
 
 impl Config {
     pub fn builder() -> builder::ConfigBuilder {
         Default::default()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.sources.is_empty()
     }
 
     pub fn sources(&self) -> impl Iterator<Item = (&ComponentKey, &SourceOuter)> {
@@ -234,17 +247,6 @@ impl Default for HealthcheckOptions {
     }
 }
 
-#[macro_export]
-macro_rules! impl_generate_config_from_default {
-    ($type:ty) => {
-        impl $crate::config::GenerateConfig for $type {
-            fn generate_config() -> toml::Value {
-                toml::Value::try_from(&Self::default()).unwrap()
-            }
-        }
-    };
-}
-
 /// Unique thing, like port, of which only one owner can be.
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub enum Resource {
@@ -281,7 +283,7 @@ impl Resource {
             for resource in resources {
                 if let Resource::Port(address, protocol) = &resource {
                     if address.ip().is_unspecified() {
-                        unspecified.push((key.clone(), address.port(), *protocol));
+                        unspecified.push((key.clone(), *address, *protocol));
                     }
                 }
 
@@ -295,10 +297,13 @@ impl Resource {
         // Port with unspecified address will bind to all network interfaces
         // so we have to check for all Port resources if they share the same
         // port.
-        for (key, port, protocol0) in unspecified {
+        for (key, address0, protocol0) in unspecified {
             for (resource, components) in resource_map.iter_mut() {
                 if let Resource::Port(address, protocol) = resource {
-                    if address.port() == port && &protocol0 == protocol {
+                    // IP addresses can either be v4 or v6.
+                    // Therefore we check if the ip version matches, the port matches and if the protocol (TCP/UDP) matches
+                    // when checking for equality.
+                    if &address0 == address && &protocol0 == protocol {
                         components.insert(key.clone());
                     }
                 }
@@ -335,7 +340,7 @@ impl Display for Resource {
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
-pub struct TestDefinition<T = OutputId> {
+pub struct TestDefinition<T: 'static = OutputId> {
     /// The name of the unit test.
     pub name: String,
 
@@ -500,7 +505,7 @@ pub struct TestInput {
 
     /// The type of the input event.
     ///
-    /// Can be either `raw`, `log`, or `metric.
+    /// Can be either `raw`, `vrl`, `log`, or `metric.
     #[serde(default = "default_test_input_type", rename = "type")]
     pub type_str: String,
 
@@ -509,6 +514,11 @@ pub struct TestInput {
     /// Use this only when the input event should be a raw event (i.e. unprocessed/undecoded log
     /// event) and when the input type is set to `raw`.
     pub value: Option<String>,
+
+    /// The vrl expression to generate the input event.
+    ///
+    /// Only relevant when `type` is `vrl`.
+    pub source: Option<String>,
 
     /// The set of log fields to use when creating a log input event.
     ///
@@ -532,7 +542,7 @@ fn default_test_input_type() -> String {
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
-pub struct TestOutput<T = OutputId> {
+pub struct TestOutput<T: 'static = OutputId> {
     /// The transform outputs to extract events from.
     pub extract_from: OneOrMany<T>,
 
@@ -556,7 +566,8 @@ mod tests {
                 let c2 = config::load_from_str(config, format).unwrap();
                 match (
                     config::warnings(&c2),
-                    topology::builder::build_pieces(&c, &diff, HashMap::new()).await,
+                    topology::TopologyPieces::build(&c, &diff, HashMap::new(), Default::default())
+                        .await,
                 ) {
                     (warnings, Ok(_pieces)) => Ok(warnings),
                     (_, Err(errors)) => Err(errors),
@@ -834,14 +845,22 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!("host", config.global.log_schema.host_key().to_string());
+        assert_eq!(
+            "host",
+            config.global.log_schema.host_key().unwrap().to_string()
+        );
         assert_eq!(
             "message",
-            config.global.log_schema.message_key().to_string()
+            config.global.log_schema.message_key().unwrap().to_string()
         );
         assert_eq!(
             "timestamp",
-            config.global.log_schema.timestamp_key().to_string()
+            config
+                .global
+                .log_schema
+                .timestamp_key()
+                .unwrap()
+                .to_string()
         );
     }
 
@@ -865,9 +884,23 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!("this", config.global.log_schema.host_key().to_string());
-        assert_eq!("that", config.global.log_schema.message_key().to_string());
-        assert_eq!("then", config.global.log_schema.timestamp_key().to_string());
+        assert_eq!(
+            "this",
+            config.global.log_schema.host_key().unwrap().to_string()
+        );
+        assert_eq!(
+            "that",
+            config.global.log_schema.message_key().unwrap().to_string()
+        );
+        assert_eq!(
+            "then",
+            config
+                .global
+                .log_schema
+                .timestamp_key()
+                .unwrap()
+                .to_string()
+        );
     }
 
     #[test]
@@ -1092,7 +1125,7 @@ mod tests {
                     type = "filter"
                     inputs = ["internal_metrics"]
                     condition = """
-                        .name == "processed_bytes_total"
+                        .name == "component_received_bytes_total"
                     """
 
                 [sinks.out]
@@ -1123,7 +1156,7 @@ mod tests {
                     type = "filter"
                     inputs = ["internal_metrics"]
                     condition = """
-                        .name == "processed_bytes_total"
+                        .name == "component_received_bytes_total"
                     """
 
                 [sinks.out]
@@ -1258,20 +1291,38 @@ mod acknowledgements_tests {
     }
 }
 
-#[cfg(all(test, feature = "sources-stdin", feature = "sinks-console"))]
+#[cfg(test)]
 mod resource_tests {
     use std::{
         collections::{HashMap, HashSet},
-        net::{Ipv4Addr, SocketAddr},
+        net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
     };
 
-    use indoc::indoc;
-    use vector_config::schema::generate_root_schema;
+    use proptest::prelude::*;
 
-    use super::{load_from_str, Format, Resource};
+    use super::Resource;
 
-    fn localhost(port: u16) -> Resource {
-        Resource::tcp(SocketAddr::new(Ipv4Addr::LOCALHOST.into(), port))
+    fn tcp(addr: impl Into<IpAddr>, port: u16) -> Resource {
+        Resource::tcp(SocketAddr::new(addr.into(), port))
+    }
+
+    fn udp(addr: impl Into<IpAddr>, port: u16) -> Resource {
+        Resource::udp(SocketAddr::new(addr.into(), port))
+    }
+
+    fn unspecified() -> impl Strategy<Value = IpAddr> {
+        prop_oneof![
+            Just(Ipv4Addr::UNSPECIFIED.into()),
+            Just(Ipv6Addr::UNSPECIFIED.into()),
+        ]
+    }
+
+    fn specaddr() -> impl Strategy<Value = IpAddr> {
+        any::<IpAddr>().prop_filter("Must be specific address", |addr| !addr.is_unspecified())
+    }
+
+    fn specport() -> impl Strategy<Value = u16> {
+        any::<u16>().prop_filter("Must be specific port", |&port| port > 0)
     }
 
     fn hashmap(conflicts: Vec<(Resource, Vec<&str>)>) -> HashMap<Resource, HashSet<&str>> {
@@ -1281,104 +1332,99 @@ mod resource_tests {
             .collect()
     }
 
+    proptest! {
+        #[test]
+        fn valid(addr: IpAddr, port1 in specport(), port2 in specport()) {
+            prop_assume!(port1 != port2);
+            let components = vec![
+                ("sink_0", vec![tcp(addr, 0)]),
+                ("sink_1", vec![tcp(addr, port1)]),
+                ("sink_2", vec![tcp(addr, port2)]),
+            ];
+            let conflicting = Resource::conflicts(components);
+            assert_eq!(conflicting, HashMap::new());
+        }
+
+        #[test]
+        fn conflicting_pair(addr: IpAddr, port in specport()) {
+            let components = vec![
+                ("sink_0", vec![tcp(addr, 0)]),
+                ("sink_1", vec![tcp(addr, port)]),
+                ("sink_2", vec![tcp(addr, port)]),
+            ];
+            let conflicting = Resource::conflicts(components);
+            assert_eq!(
+                conflicting,
+                hashmap(vec![(tcp(addr, port), vec!["sink_1", "sink_2"])])
+            );
+        }
+
+        #[test]
+        fn conflicting_multi(addr: IpAddr, port in specport()) {
+            let components = vec![
+                ("sink_0", vec![tcp(addr, 0)]),
+                ("sink_1", vec![tcp(addr, port), tcp(addr, 0)]),
+                ("sink_2", vec![tcp(addr, port)]),
+            ];
+            let conflicting = Resource::conflicts(components);
+            assert_eq!(
+                conflicting,
+                hashmap(vec![
+                    (tcp(addr, 0), vec!["sink_0", "sink_1"]),
+                    (tcp(addr, port), vec!["sink_1", "sink_2"])
+                ])
+            );
+        }
+
+        #[test]
+        fn different_network_interface(addr1: IpAddr, addr2: IpAddr, port: u16) {
+            prop_assume!(addr1 != addr2);
+            let components = vec![
+                ("sink_0", vec![tcp(addr1, port)]),
+                ("sink_1", vec![tcp(addr2, port)]),
+            ];
+            let conflicting = Resource::conflicts(components);
+            assert_eq!(conflicting, HashMap::new());
+        }
+
+        #[test]
+        fn unspecified_network_interface(addr in specaddr(), unspec in unspecified(), port: u16) {
+            let components = vec![
+                ("sink_0", vec![tcp(addr, port)]),
+                ("sink_1", vec![tcp(unspec, port)]),
+            ];
+            let conflicting = Resource::conflicts(components);
+            assert_eq!(conflicting, HashMap::new());
+        }
+
+        #[test]
+        fn different_protocol(addr: IpAddr) {
+            let components = vec![
+                ("sink_0", vec![tcp(addr, 0)]),
+                ("sink_1", vec![udp(addr, 0)]),
+            ];
+            let conflicting = Resource::conflicts(components);
+            assert_eq!(conflicting, HashMap::new());
+        }
+    }
+
     #[test]
-    fn valid() {
+    fn different_unspecified_ip_version() {
         let components = vec![
-            ("sink_0", vec![localhost(0)]),
-            ("sink_1", vec![localhost(1)]),
-            ("sink_2", vec![localhost(2)]),
+            ("sink_0", vec![tcp(Ipv4Addr::UNSPECIFIED, 0)]),
+            ("sink_1", vec![tcp(Ipv6Addr::UNSPECIFIED, 0)]),
         ];
         let conflicting = Resource::conflicts(components);
         assert_eq!(conflicting, HashMap::new());
     }
+}
 
-    #[test]
-    fn conflicting_pair() {
-        let components = vec![
-            ("sink_0", vec![localhost(0)]),
-            ("sink_1", vec![localhost(2)]),
-            ("sink_2", vec![localhost(2)]),
-        ];
-        let conflicting = Resource::conflicts(components);
-        assert_eq!(
-            conflicting,
-            hashmap(vec![(localhost(2), vec!["sink_1", "sink_2"])])
-        );
-    }
+#[cfg(all(test, feature = "sources-stdin", feature = "sinks-console"))]
+mod resource_config_tests {
+    use indoc::indoc;
+    use vector_lib::configurable::schema::generate_root_schema;
 
-    #[test]
-    fn conflicting_multi() {
-        let components = vec![
-            ("sink_0", vec![localhost(0)]),
-            ("sink_1", vec![localhost(2), localhost(0)]),
-            ("sink_2", vec![localhost(2)]),
-        ];
-        let conflicting = Resource::conflicts(components);
-        assert_eq!(
-            conflicting,
-            hashmap(vec![
-                (localhost(0), vec!["sink_0", "sink_1"]),
-                (localhost(2), vec!["sink_1", "sink_2"])
-            ])
-        );
-    }
-
-    #[test]
-    fn different_network_interface() {
-        let components = vec![
-            ("sink_0", vec![localhost(0)]),
-            (
-                "sink_1",
-                vec![Resource::tcp(SocketAddr::new(
-                    Ipv4Addr::new(127, 0, 0, 2).into(),
-                    0,
-                ))],
-            ),
-        ];
-        let conflicting = Resource::conflicts(components);
-        assert_eq!(conflicting, HashMap::new());
-    }
-
-    #[test]
-    fn unspecified_network_interface() {
-        let components = vec![
-            ("sink_0", vec![localhost(0)]),
-            (
-                "sink_1",
-                vec![Resource::tcp(SocketAddr::new(
-                    Ipv4Addr::UNSPECIFIED.into(),
-                    0,
-                ))],
-            ),
-        ];
-        let conflicting = Resource::conflicts(components);
-        assert_eq!(
-            conflicting,
-            hashmap(vec![(localhost(0), vec!["sink_0", "sink_1"])])
-        );
-    }
-
-    #[test]
-    fn different_protocol() {
-        let components = vec![
-            (
-                "sink_0",
-                vec![Resource::tcp(SocketAddr::new(
-                    Ipv4Addr::LOCALHOST.into(),
-                    0,
-                ))],
-            ),
-            (
-                "sink_1",
-                vec![Resource::udp(SocketAddr::new(
-                    Ipv4Addr::LOCALHOST.into(),
-                    0,
-                ))],
-            ),
-        ];
-        let conflicting = Resource::conflicts(components);
-        assert_eq!(conflicting, HashMap::new());
-    }
+    use super::{load_from_str, Format};
 
     #[test]
     fn config_conflict_detected() {
@@ -1407,8 +1453,8 @@ mod resource_tests {
     fn generate_component_config_schema() {
         use crate::config::{SinkOuter, SourceOuter, TransformOuter};
         use indexmap::IndexMap;
-        use vector_common::config::ComponentKey;
-        use vector_config::configurable_component;
+        use vector_lib::config::ComponentKey;
+        use vector_lib::configurable::configurable_component;
 
         /// Top-level Vector configuration.
         #[configurable_component]

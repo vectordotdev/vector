@@ -14,8 +14,9 @@ pub struct Cli {
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
-        let features = features::load_and_extract(&self.config)?;
-        println!("{features}");
+        for feature in features::load_and_extract(&self.config)? {
+            println!("{feature}");
+        }
         Ok(())
     }
 }

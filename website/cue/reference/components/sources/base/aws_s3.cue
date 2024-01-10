@@ -45,6 +45,15 @@ base: components: sources: aws_s3: configuration: {
 				required:    true
 				type: string: examples: ["/my/aws/credentials"]
 			}
+			external_id: {
+				description: """
+					The optional unique external ID in conjunction with role to assume.
+
+					[external_id]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_create_for-user_externalid.html
+					"""
+				required: false
+				type: string: examples: ["randomEXAMPLEidString"]
+			}
 			imds: {
 				description: "Configuration for authenticating with AWS through IMDS."
 				required:    false
@@ -76,7 +85,7 @@ base: components: sources: aws_s3: configuration: {
 				description: """
 					Timeout for successfully loading any credentials, in seconds.
 
-					Relevant when the default credentials chain is used or `assume_role`.
+					Relevant when the default credentials chain or `assume_role` is used.
 					"""
 				required: false
 				type: uint: {
@@ -91,13 +100,16 @@ base: components: sources: aws_s3: configuration: {
 					Used to select AWS credentials from a provided credentials file.
 					"""
 				required: false
-				type: string: examples: ["develop"]
+				type: string: {
+					default: "default"
+					examples: ["develop"]
+				}
 			}
 			region: {
 				description: """
 					The [AWS region][aws_region] to send STS requests to.
 
-					If not set, this will default to the configured region
+					If not set, this defaults to the configured region
 					for the service itself.
 
 					[aws_region]: https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints
@@ -132,10 +144,271 @@ base: components: sources: aws_s3: configuration: {
 			}
 		}
 	}
+	decoding: {
+		description: "Configures how events are decoded from raw bytes."
+		required:    false
+		type: object: options: {
+			avro: {
+				description:   "Apache Avro-specific encoder options."
+				relevant_when: "codec = \"avro\""
+				required:      true
+				type: object: options: {
+					schema: {
+						description: """
+																The Avro schema definition.
+																Please note that the following [`apache_avro::types::Value`] variants are currently *not* supported:
+																* `Date`
+																* `Decimal`
+																* `Duration`
+																* `Fixed`
+																* `TimeMillis`
+																"""
+						required: true
+						type: string: examples: ["{ \"type\": \"record\", \"name\": \"log\", \"fields\": [{ \"name\": \"message\", \"type\": \"string\" }] }"]
+					}
+					strip_schema_id_prefix: {
+						description: """
+																For Avro datum encoded in Kafka messages, the bytes are prefixed with the schema ID.  Set this to true to strip the schema ID prefix.
+																According to [Confluent Kafka's document](https://docs.confluent.io/platform/current/schema-registry/fundamentals/serdes-develop/index.html#wire-format).
+																"""
+						required: true
+						type: bool: {}
+					}
+				}
+			}
+			codec: {
+				description: "The codec to use for decoding events."
+				required:    false
+				type: string: {
+					default: "bytes"
+					enum: {
+						avro: """
+															Decodes the raw bytes as as an [Apache Avro][apache_avro] message.
+
+															[apache_avro]: https://avro.apache.org/
+															"""
+						bytes: "Uses the raw bytes as-is."
+						gelf: """
+															Decodes the raw bytes as a [GELF][gelf] message.
+
+															[gelf]: https://docs.graylog.org/docs/gelf
+															"""
+						json: """
+															Decodes the raw bytes as [JSON][json].
+
+															[json]: https://www.json.org/
+															"""
+						native: """
+															Decodes the raw bytes as [native Protocol Buffers format][vector_native_protobuf].
+
+															This codec is **[experimental][experimental]**.
+
+															[vector_native_protobuf]: https://github.com/vectordotdev/vector/blob/master/lib/vector-core/proto/event.proto
+															[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
+															"""
+						native_json: """
+															Decodes the raw bytes as [native JSON format][vector_native_json].
+
+															This codec is **[experimental][experimental]**.
+
+															[vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
+															[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
+															"""
+						protobuf: """
+															Decodes the raw bytes as [protobuf][protobuf].
+
+															[protobuf]: https://protobuf.dev/
+															"""
+						syslog: """
+															Decodes the raw bytes as a Syslog message.
+
+															Decodes either as the [RFC 3164][rfc3164]-style format ("old" style) or the
+															[RFC 5424][rfc5424]-style format ("new" style, includes structured data).
+
+															[rfc3164]: https://www.ietf.org/rfc/rfc3164.txt
+															[rfc5424]: https://www.ietf.org/rfc/rfc5424.txt
+															"""
+					}
+				}
+			}
+			gelf: {
+				description:   "GELF-specific decoding options."
+				relevant_when: "codec = \"gelf\""
+				required:      false
+				type: object: options: lossy: {
+					description: """
+						Determines whether or not to replace invalid UTF-8 sequences instead of failing.
+
+						When true, invalid UTF-8 sequences are replaced with the [`U+FFFD REPLACEMENT CHARACTER`][U+FFFD].
+
+						[U+FFFD]: https://en.wikipedia.org/wiki/Specials_(Unicode_block)#Replacement_character
+						"""
+					required: false
+					type: bool: default: true
+				}
+			}
+			json: {
+				description:   "JSON-specific decoding options."
+				relevant_when: "codec = \"json\""
+				required:      false
+				type: object: options: lossy: {
+					description: """
+						Determines whether or not to replace invalid UTF-8 sequences instead of failing.
+
+						When true, invalid UTF-8 sequences are replaced with the [`U+FFFD REPLACEMENT CHARACTER`][U+FFFD].
+
+						[U+FFFD]: https://en.wikipedia.org/wiki/Specials_(Unicode_block)#Replacement_character
+						"""
+					required: false
+					type: bool: default: true
+				}
+			}
+			native_json: {
+				description:   "Vector's native JSON-specific decoding options."
+				relevant_when: "codec = \"native_json\""
+				required:      false
+				type: object: options: lossy: {
+					description: """
+						Determines whether or not to replace invalid UTF-8 sequences instead of failing.
+
+						When true, invalid UTF-8 sequences are replaced with the [`U+FFFD REPLACEMENT CHARACTER`][U+FFFD].
+
+						[U+FFFD]: https://en.wikipedia.org/wiki/Specials_(Unicode_block)#Replacement_character
+						"""
+					required: false
+					type: bool: default: true
+				}
+			}
+			protobuf: {
+				description:   "Protobuf-specific decoding options."
+				relevant_when: "codec = \"protobuf\""
+				required:      false
+				type: object: options: {
+					desc_file: {
+						description: "Path to desc file"
+						required:    false
+						type: string: default: ""
+					}
+					message_type: {
+						description: "message type. e.g package.message"
+						required:    false
+						type: string: default: ""
+					}
+				}
+			}
+			syslog: {
+				description:   "Syslog-specific decoding options."
+				relevant_when: "codec = \"syslog\""
+				required:      false
+				type: object: options: lossy: {
+					description: """
+						Determines whether or not to replace invalid UTF-8 sequences instead of failing.
+
+						When true, invalid UTF-8 sequences are replaced with the [`U+FFFD REPLACEMENT CHARACTER`][U+FFFD].
+
+						[U+FFFD]: https://en.wikipedia.org/wiki/Specials_(Unicode_block)#Replacement_character
+						"""
+					required: false
+					type: bool: default: true
+				}
+			}
+		}
+	}
 	endpoint: {
 		description: "Custom endpoint for use with AWS-compatible services."
 		required:    false
 		type: string: examples: ["http://127.0.0.0:5000/path/to/service"]
+	}
+	framing: {
+		description: """
+			Framing configuration.
+
+			Framing handles how events are separated when encoded in a raw byte form, where each event is
+			a frame that must be prefixed, or delimited, in a way that marks where an event begins and
+			ends within the byte stream.
+			"""
+		required: false
+		type: object: options: {
+			character_delimited: {
+				description:   "Options for the character delimited decoder."
+				relevant_when: "method = \"character_delimited\""
+				required:      true
+				type: object: options: {
+					delimiter: {
+						description: "The character that delimits byte sequences."
+						required:    true
+						type: uint: {}
+					}
+					max_length: {
+						description: """
+																The maximum length of the byte buffer.
+
+																This length does *not* include the trailing delimiter.
+
+																By default, there is no maximum length enforced. If events are malformed, this can lead to
+																additional resource usage as events continue to be buffered in memory, and can potentially
+																lead to memory exhaustion in extreme cases.
+
+																If there is a risk of processing malformed data, such as logs with user-controlled input,
+																consider setting the maximum length to a reasonably large value as a safety net. This
+																ensures that processing is not actually unbounded.
+																"""
+						required: false
+						type: uint: {}
+					}
+				}
+			}
+			method: {
+				description: "The framing method."
+				required:    false
+				type: string: {
+					default: "newline_delimited"
+					enum: {
+						bytes:               "Byte frames are passed through as-is according to the underlying I/O boundaries (for example, split between messages or stream segments)."
+						character_delimited: "Byte frames which are delimited by a chosen character."
+						length_delimited:    "Byte frames which are prefixed by an unsigned big-endian 32-bit integer indicating the length."
+						newline_delimited:   "Byte frames which are delimited by a newline character."
+						octet_counting: """
+															Byte frames according to the [octet counting][octet_counting] format.
+
+															[octet_counting]: https://tools.ietf.org/html/rfc6587#section-3.4.1
+															"""
+					}
+				}
+			}
+			newline_delimited: {
+				description:   "Options for the newline delimited decoder."
+				relevant_when: "method = \"newline_delimited\""
+				required:      false
+				type: object: options: max_length: {
+					description: """
+						The maximum length of the byte buffer.
+
+						This length does *not* include the trailing delimiter.
+
+						By default, there is no maximum length enforced. If events are malformed, this can lead to
+						additional resource usage as events continue to be buffered in memory, and can potentially
+						lead to memory exhaustion in extreme cases.
+
+						If there is a risk of processing malformed data, such as logs with user-controlled input,
+						consider setting the maximum length to a reasonably large value as a safety net. This
+						ensures that processing is not actually unbounded.
+						"""
+					required: false
+					type: uint: {}
+				}
+			}
+			octet_counting: {
+				description:   "Options for the octet counting decoder."
+				relevant_when: "method = \"octet_counting\""
+				required:      false
+				type: object: options: max_length: {
+					description: "The maximum length of the byte buffer."
+					required:    false
+					type: uint: {}
+				}
+			}
+		}
 	}
 	multiline: {
 		description: """
@@ -173,7 +446,7 @@ base: components: sources: aws_s3: configuration: {
 
 						The first line (the line that matched the start pattern) does not need to match the `ContinueThrough` pattern.
 
-						This is useful in cases such as a Java stack trace, where some indicator in the line (such as leading
+						This is useful in cases such as a Java stack trace, where some indicator in the line (such as a leading
 						whitespace) indicates that it is an extension of the proceeding line.
 						"""
 					halt_before: """
@@ -217,12 +490,8 @@ base: components: sources: aws_s3: configuration: {
 		type: string: examples: ["us-east-1"]
 	}
 	sqs: {
-		description: """
-			Configuration options for SQS.
-
-			Only relevant when `strategy = "sqs"`.
-			"""
-		required: false
+		description: "Configuration options for SQS."
+		required:    false
 		type: object: options: {
 			client_concurrency: {
 				description: """
@@ -255,8 +524,8 @@ base: components: sources: aws_s3: configuration: {
 				description: """
 					How long to wait while polling the queue for new messages, in seconds.
 
-					Generally should not be changed unless instructed to do so, as if messages are available,
-					they will always be consumed, regardless of the value of `poll_secs`.
+					Generally, this should not be changed unless instructed to do so, as if messages are available,
+					they are always consumed, regardless of the value of `poll_secs`.
 					"""
 				required: false
 				type: uint: {
@@ -277,8 +546,8 @@ base: components: sources: aws_s3: configuration: {
 						description: """
 																Sets the list of supported ALPN protocols.
 
-																Declare the supported ALPN protocols, which are used during negotiation with peer. Prioritized in the order
-																they are defined.
+																Declare the supported ALPN protocols, which are used during negotiation with peer. They are prioritized in the order
+																that they are defined.
 																"""
 						required: false
 						type: array: items: type: string: examples: ["h2"]
@@ -326,10 +595,10 @@ base: components: sources: aws_s3: configuration: {
 						description: """
 																Enables certificate verification.
 
-																If enabled, certificates must be valid in terms of not being expired, as well as being issued by a trusted
-																issuer. This verification operates in a hierarchical manner, checking that not only the leaf certificate (the
-																certificate presented by the client/server) is valid, but also that the issuer of that certificate is valid, and
-																so on until reaching a root certificate.
+																If enabled, certificates must not be expired and must be issued by a trusted
+																issuer. This verification operates in a hierarchical manner, checking that the leaf certificate (the
+																certificate presented by the client/server) is not only valid, but that the issuer of that certificate is also valid, and
+																so on until the verification process reaches a root certificate.
 
 																Relevant for both incoming and outgoing connections.
 
@@ -371,18 +640,6 @@ base: components: sources: aws_s3: configuration: {
 			}
 		}
 	}
-	strategy: {
-		description: "The strategy to use to consume objects from S3."
-		required:    false
-		type: string: {
-			default: "sqs"
-			enum: sqs: """
-				Consumes objects by processing bucket notification events sent to an [AWS SQS queue][aws_sqs].
-
-				[aws_sqs]: https://aws.amazon.com/sqs/
-				"""
-		}
-	}
 	tls_options: {
 		description: "TLS configuration."
 		required:    false
@@ -391,8 +648,8 @@ base: components: sources: aws_s3: configuration: {
 				description: """
 					Sets the list of supported ALPN protocols.
 
-					Declare the supported ALPN protocols, which are used during negotiation with peer. Prioritized in the order
-					they are defined.
+					Declare the supported ALPN protocols, which are used during negotiation with peer. They are prioritized in the order
+					that they are defined.
 					"""
 				required: false
 				type: array: items: type: string: examples: ["h2"]
@@ -440,10 +697,10 @@ base: components: sources: aws_s3: configuration: {
 				description: """
 					Enables certificate verification.
 
-					If enabled, certificates must be valid in terms of not being expired, as well as being issued by a trusted
-					issuer. This verification operates in a hierarchical manner, checking that not only the leaf certificate (the
-					certificate presented by the client/server) is valid, but also that the issuer of that certificate is valid, and
-					so on until reaching a root certificate.
+					If enabled, certificates must not be expired and must be issued by a trusted
+					issuer. This verification operates in a hierarchical manner, checking that the leaf certificate (the
+					certificate presented by the client/server) is not only valid, but that the issuer of that certificate is also valid, and
+					so on until the verification process reaches a root certificate.
 
 					Relevant for both incoming and outgoing connections.
 

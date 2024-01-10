@@ -1,11 +1,12 @@
 use darling::FromMeta;
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
-use schemars::schema::{InstanceType, SchemaObject};
-use syn::{Lit, Meta};
+use syn::{Expr, Lit, Meta};
 
-use crate::num::{
-    ERR_NUMERIC_OUT_OF_RANGE, NUMERIC_ENFORCED_LOWER_BOUND, NUMERIC_ENFORCED_UPPER_BOUND,
+use crate::{
+    configurable_package_name_hack,
+    num::{ERR_NUMERIC_OUT_OF_RANGE, NUMERIC_ENFORCED_LOWER_BOUND, NUMERIC_ENFORCED_UPPER_BOUND},
+    schema::{InstanceType, SchemaObject},
 };
 
 /// Well-known validator formats as described in the [JSON Schema Validation specification][jsvs].
@@ -23,6 +24,7 @@ pub enum Format {
     /// [rfc3339]: https://datatracker.ietf.org/doc/html/rfc3339#section-5.6
     /// [jsvs]: https://datatracker.ietf.org/doc/html/draft-handrews-json-schema-validation-02#section-7.3.1
     Date,
+
     /// A time.
     ///
     /// Conforms to the `full-time` production as outlined in [RFC 3339, section 5.6][rfc3339], and specified in the
@@ -31,6 +33,7 @@ pub enum Format {
     /// [rfc3339]: https://datatracker.ietf.org/doc/html/rfc3339#section-5.6
     /// [jsvs]: https://datatracker.ietf.org/doc/html/draft-handrews-json-schema-validation-02#section-7.3.1
     Time,
+
     /// A datetime.
     ///
     /// Conforms to the `date-time` production as outlined in [RFC 3339, section 5.6][rfc3339], and specified in the
@@ -40,6 +43,16 @@ pub enum Format {
     /// [jsvs]: https://datatracker.ietf.org/doc/html/draft-handrews-json-schema-validation-02#section-7.3.1
     #[darling(rename = "date-time")]
     DateTime,
+
+    /// A duration.
+    ///
+    /// Conforms to the `duration` production as outlined in [RFC 3339, appendix A][rfc3339], and specified in the
+    /// [JSON Schema Validation specification, section 7.3.1][jsvs].
+    ///
+    /// [rfc3339]: https://datatracker.ietf.org/doc/html/rfc3339#appendix-A
+    /// [jsvs]: https://datatracker.ietf.org/doc/html/draft-handrews-json-schema-validation-02#section-7.3.1
+    Duration,
+
     /// An email address.
     ///
     /// Conforms to the `addr-spec` production as outlined in [RFC 5322, section 3.4.1][rfc5322], and specified in the
@@ -48,6 +61,16 @@ pub enum Format {
     /// [rfc5322]: https://datatracker.ietf.org/doc/html/rfc5322#section-3.4.1
     /// [jsvs]: https://datatracker.ietf.org/doc/html/draft-handrews-json-schema-validation-02#section-7.3.2
     Email,
+
+    /// An Internet hostname.
+    ///
+    /// Conforms to the `hname` production as outlined in [RFC 952, section "GRAMMATICAL HOST TABLE SPECIFICATION"][rfc952],
+    /// and specified in the [JSON Schema Validation specification, section 7.3.3][jsvs].
+    ///
+    /// [rfc952]: https://datatracker.ietf.org/doc/html/rfc952
+    /// [jsvs]: https://datatracker.ietf.org/doc/html/draft-handrews-json-schema-validation-02#section-7.3.3
+    Hostname,
+
     /// A uniform resource identifier (URI).
     ///
     /// Conforms to the `URI` production as outlined in [RFC 3986, appendix A][rfc3986], and specified in the [JSON
@@ -56,6 +79,7 @@ pub enum Format {
     /// [rfc3986]: https://datatracker.ietf.org/doc/html/rfc3986#appendix-A
     /// [jsvs]: https://datatracker.ietf.org/doc/html/draft-handrews-json-schema-validation-02#section-7.3.5
     Uri,
+
     /// An IPv4 address.
     ///
     /// Conforms to the `dotted-quad` production as outlined in [RFC 2673, section 3.2][rfc2673], and specified in the
@@ -65,6 +89,7 @@ pub enum Format {
     /// [jsvs]: https://datatracker.ietf.org/doc/html/draft-handrews-json-schema-validation-02#section-7.3.4
     #[darling(rename = "ipv4")]
     IPv4,
+
     /// An IPv6 address.
     ///
     /// Conforms to the "conventional text forms" as outlined in [RFC 4291, section 2.2][rfc4291], and specified in the
@@ -74,6 +99,7 @@ pub enum Format {
     /// [jsvs]: https://datatracker.ietf.org/doc/html/draft-handrews-json-schema-validation-02#section-7.3.4
     #[darling(rename = "ipv6")]
     IPv6,
+
     /// A universally unique identifier (UUID).
     ///
     /// Conforms to the `UUID` production as outlined in [RFC 4122, section 3][rfc4122], and specified in the
@@ -82,6 +108,7 @@ pub enum Format {
     /// [rfc4122]: https://datatracker.ietf.org/doc/html/rfc4122#section-3
     /// [jsvs]: https://datatracker.ietf.org/doc/html/draft-handrews-json-schema-validation-02#section-7.3.5
     Uuid,
+
     /// A regular expression.
     ///
     /// Conforms to the specification as outlined in [ECMA 262][emca262], and specified in the
@@ -98,7 +125,9 @@ impl Format {
             Format::Date => "date",
             Format::Time => "time",
             Format::DateTime => "date-time",
+            Format::Duration => "duration",
             Format::Email => "email",
+            Format::Hostname => "hostname",
             Format::Uri => "uri",
             Format::IPv4 => "ipv4",
             Format::IPv6 => "ipv6",
@@ -110,16 +139,19 @@ impl Format {
 
 impl ToTokens for Format {
     fn to_tokens(&self, tokens: &mut TokenStream) {
+        let vector_config = configurable_package_name_hack();
         let format_tokens = match self {
-            Format::Date => quote! { ::vector_config::validation::Format::Date },
-            Format::Time => quote! { ::vector_config::validation::Format::Time },
-            Format::DateTime => quote! { ::vector_config::validation::Format::DateTime },
-            Format::Email => quote! { ::vector_config::validation::Format::Email },
-            Format::Uri => quote! { ::vector_config::validation::Format::Uri },
-            Format::IPv4 => quote! { ::vector_config::validation::Format::IPv4 },
-            Format::IPv6 => quote! { ::vector_config::validation::Format::IPv6 },
-            Format::Uuid => quote! { ::vector_config::validation::Format::Uuid },
-            Format::Regex => quote! { ::vector_config::validation::Format::Regex },
+            Format::Date => quote! { #vector_config::validation::Format::Date },
+            Format::Time => quote! { #vector_config::validation::Format::Time },
+            Format::DateTime => quote! { #vector_config::validation::Format::DateTime },
+            Format::Duration => quote! { #vector_config::validation::Format::Duration },
+            Format::Email => quote! { #vector_config::validation::Format::Email },
+            Format::Hostname => quote! { #vector_config::validation::Format::Hostname },
+            Format::Uri => quote! { #vector_config::validation::Format::Uri },
+            Format::IPv4 => quote! { #vector_config::validation::Format::IPv4 },
+            Format::IPv6 => quote! { #vector_config::validation::Format::IPv6 },
+            Format::Uuid => quote! { #vector_config::validation::Format::Uuid },
+            Format::Regex => quote! { #vector_config::validation::Format::Regex },
         };
 
         tokens.extend(format_tokens);
@@ -135,6 +167,7 @@ pub enum Validation {
     /// [jsvs]: https://datatracker.ietf.org/doc/html/draft-handrews-json-schema-validation-02
     #[darling(rename = "format")]
     KnownFormat(Format),
+
     /// A minimum and/or maximum length.
     ///
     /// Can be used for strings, arrays, and objects.
@@ -147,6 +180,7 @@ pub enum Validation {
         #[darling(default, rename = "max")]
         maximum: Option<u32>,
     },
+
     /// A minimum and/or maximum range, or bound.
     ///
     /// Can only be used for numbers.
@@ -156,6 +190,7 @@ pub enum Validation {
         #[darling(default, rename = "max", with = "maybe_float_or_int")]
         maximum: Option<f64>,
     },
+
     /// A regular expression pattern.
     ///
     /// Can only be used for strings.
@@ -259,24 +294,25 @@ impl Validation {
 
 impl ToTokens for Validation {
     fn to_tokens(&self, tokens: &mut TokenStream) {
+        let vector_config = configurable_package_name_hack();
         let validation_tokens = match self {
             Validation::KnownFormat(format) => {
-                quote! { ::vector_config::validation::Validation::KnownFormat(#format) }
+                quote! { #vector_config::validation::Validation::KnownFormat(#format) }
             }
             Validation::Length { minimum, maximum } => {
                 let min_tokens = option_as_token(*minimum);
                 let max_tokens = option_as_token(*maximum);
 
-                quote! { ::vector_config::validation::Validation::Length { minimum: #min_tokens, maximum: #max_tokens } }
+                quote! { #vector_config::validation::Validation::Length { minimum: #min_tokens, maximum: #max_tokens } }
             }
             Validation::Range { minimum, maximum } => {
                 let min_tokens = option_as_token(*minimum);
                 let max_tokens = option_as_token(*maximum);
 
-                quote! { ::vector_config::validation::Validation::Range { minimum: #min_tokens, maximum: #max_tokens } }
+                quote! { #vector_config::validation::Validation::Range { minimum: #min_tokens, maximum: #max_tokens } }
             }
             Validation::Pattern(pattern) => {
-                quote! { ::vector_config::validation::Validation::Pattern(#pattern.to_string()) }
+                quote! { #vector_config::validation::Validation::Pattern(#pattern.to_string()) }
             }
         };
 
@@ -303,17 +339,19 @@ fn maybe_float_or_int(meta: &Meta) -> darling::Result<Option<f64>> {
     // First make sure we can even get a valid f64 from this meta item.
     let result = match meta {
         Meta::Path(_) => Err(darling::Error::unexpected_type("path")),
-        Meta::List(_) => Err(darling::Error::unexpected_type("path")),
-        Meta::NameValue(nv) => match &nv.lit {
-            Lit::Str(s) => {
-                let s = s.value();
-                s.as_str()
-                    .parse()
-                    .map_err(|_| darling::Error::unknown_value(s.as_str()))
-            }
-            Lit::Int(i) => i.base10_parse::<f64>().map_err(Into::into),
-            Lit::Float(f) => f.base10_parse::<f64>().map_err(Into::into),
-            lit => Err(darling::Error::unexpected_lit_type(lit)),
+        Meta::List(_) => Err(darling::Error::unexpected_type("list")),
+        Meta::NameValue(nv) => match &nv.value {
+            Expr::Lit(expr) => match &expr.lit {
+                Lit::Str(s) => {
+                    let s = s.value();
+                    s.parse()
+                        .map_err(|_| darling::Error::unknown_value(s.as_str()))
+                }
+                Lit::Int(i) => i.base10_parse::<f64>().map_err(Into::into),
+                Lit::Float(f) => f.base10_parse::<f64>().map_err(Into::into),
+                lit => Err(darling::Error::unexpected_lit_type(lit)),
+            },
+            expr => Err(darling::Error::unexpected_expr_type(expr)),
         },
     };
 

@@ -3,7 +3,7 @@
 use crate::{
     amqp::AmqpConfig,
     codecs::{Decoder, DecodingConfig},
-    config::{Output, SourceConfig, SourceContext},
+    config::{SourceConfig, SourceContext, SourceOutput},
     event::{BatchNotifier, BatchStatus},
     internal_events::{
         source::{AmqpAckError, AmqpBytesReceived, AmqpEventError, AmqpRejectError},
@@ -16,25 +16,25 @@ use crate::{
 use async_stream::stream;
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
-use codecs::decoding::{DeserializerConfig, FramingConfig};
 use futures::{FutureExt, StreamExt};
 use futures_util::Stream;
 use lapin::{acker::Acker, message::Delivery, Channel};
-use lookup::{lookup_v2::OptionalValuePath, metadata_path, owned_value_path, path, PathPrefix};
 use snafu::Snafu;
 use std::{io::Cursor, pin::Pin};
 use tokio_util::codec::FramedRead;
-use value::Kind;
-use vector_common::{
-    finalizer::UnorderedFinalizer,
-    internal_event::{CountByteSize, EventsReceived, InternalEventHandle as _},
-};
-use vector_config::{configurable_component, NamedComponent};
-use vector_core::{
+use vector_lib::codecs::decoding::{DeserializerConfig, FramingConfig};
+use vector_lib::configurable::configurable_component;
+use vector_lib::lookup::{lookup_v2::OptionalValuePath, metadata_path, owned_value_path, path};
+use vector_lib::{
     config::{log_schema, LegacyKey, LogNamespace, SourceAcknowledgementsConfig},
     event::Event,
     EstimatedJsonEncodedSizeOf,
 };
+use vector_lib::{
+    finalizer::UnorderedFinalizer,
+    internal_event::{CountByteSize, EventsReceived, InternalEventHandle as _},
+};
+use vrl::value::Kind;
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -49,7 +49,10 @@ enum BuildError {
 /// Configuration for the `amqp` source.
 ///
 /// Supports AMQP version 0.9.1
-#[configurable_component(source("amqp"))]
+#[configurable_component(source(
+    "amqp",
+    "Collect events from AMQP 0.9.1 compatible brokers like RabbitMQ."
+))]
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(deny_unknown_fields)]
@@ -124,12 +127,13 @@ fn default_offset_key() -> OptionalValuePath {
 impl_generate_config_from_default!(AmqpSourceConfig);
 
 impl AmqpSourceConfig {
-    fn decoder(&self, log_namespace: LogNamespace) -> Decoder {
+    fn decoder(&self, log_namespace: LogNamespace) -> vector_lib::Result<Decoder> {
         DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace).build()
     }
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "amqp")]
 impl SourceConfig for AmqpSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let log_namespace = cx.log_namespace(self.log_namespace);
@@ -138,7 +142,7 @@ impl SourceConfig for AmqpSourceConfig {
         amqp_source(self, cx.shutdown, cx.out, log_namespace, acknowledgements).await
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
         let schema_definition = self
             .decoding
@@ -176,7 +180,10 @@ impl SourceConfig for AmqpSourceConfig {
                 None,
             );
 
-        vec![Output::default(self.decoding.output_type()).with_schema_definition(schema_definition)]
+        vec![SourceOutput::new_logs(
+            self.decoding.output_type(),
+            schema_definition,
+        )]
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -246,7 +253,7 @@ fn populate_event(
             .path
             .as_ref()
             .map(LegacyKey::InsertIfEmpty),
-        "routing",
+        path!("routing"),
         keys.routing.to_string(),
     );
 
@@ -257,7 +264,7 @@ fn populate_event(
             .path
             .as_ref()
             .map(LegacyKey::InsertIfEmpty),
-        "exchange",
+        path!("exchange"),
         keys.exchange.to_string(),
     );
 
@@ -265,13 +272,13 @@ fn populate_event(
         AmqpSourceConfig::NAME,
         log,
         keys.offset_key.path.as_ref().map(LegacyKey::InsertIfEmpty),
-        "offset",
+        path!("offset"),
         keys.delivery_tag,
     );
 
     log_namespace.insert_vector_metadata(
         log,
-        path!(log_schema().source_type_key()),
+        log_schema().source_type_key(),
         path!("source_type"),
         Bytes::from_static(AmqpSourceConfig::NAME.as_bytes()),
     );
@@ -291,10 +298,9 @@ fn populate_event(
             log.insert(metadata_path!("vector", "ingest_timestamp"), Utc::now());
         }
         LogNamespace::Legacy => {
-            log.try_insert(
-                (PathPrefix::Event, log_schema().timestamp_key()),
-                timestamp.unwrap_or_else(Utc::now),
-            );
+            if let Some(timestamp_key) = log_schema().timestamp_key_target_path() {
+                log.try_insert(timestamp_key, timestamp.unwrap_or_else(Utc::now));
+            }
         }
     };
 }
@@ -308,7 +314,8 @@ async fn receive_event(
     msg: Delivery,
 ) -> Result<(), ()> {
     let payload = Cursor::new(Bytes::copy_from_slice(&msg.data));
-    let mut stream = FramedRead::new(payload, config.decoder(log_namespace));
+    let decoder = config.decoder(log_namespace).map_err(|_e| ())?;
+    let mut stream = FramedRead::new(payload, decoder);
 
     // Extract timestamp from AMQP message
     let timestamp = msg
@@ -352,7 +359,7 @@ async fn receive_event(
                     }
                 }
                 Err(error) => {
-                    use codecs::StreamDecodingError as _;
+                    use vector_lib::codecs::StreamDecodingError as _;
 
                     // Error is logged by `codecs::Decoder`, no further handling
                     // is needed here.
@@ -383,8 +390,8 @@ async fn finalize_event_stream(
             let mut stream = stream.map(|event| event.with_batch_notifier(&batch));
 
             match out.send_event_stream(&mut stream).await {
-                Err(error) => {
-                    emit!(StreamClosedError { error, count: 1 });
+                Err(_) => {
+                    emit!(StreamClosedError { count: 1 });
                 }
                 Ok(_) => {
                     finalizer.add(msg.into(), receiver);
@@ -392,8 +399,8 @@ async fn finalize_event_stream(
             }
         }
         None => match out.send_event_stream(&mut stream).await {
-            Err(error) => {
-                emit!(StreamClosedError { error, count: 1 });
+            Err(_) => {
+                emit!(StreamClosedError { count: 1 });
             }
             Ok(_) => {
                 let ack_options = lapin::options::BasicAckOptions::default();
@@ -415,7 +422,7 @@ async fn run_amqp_source(
     acknowledgements: bool,
 ) -> Result<(), ()> {
     let (finalizer, mut ack_stream) =
-        UnorderedFinalizer::<FinalizerEntry>::maybe_new(acknowledgements, shutdown.clone());
+        UnorderedFinalizer::<FinalizerEntry>::maybe_new(acknowledgements, Some(shutdown.clone()));
 
     debug!("Starting amqp source, listening to queue {}.", config.queue);
     let mut consumer = channel
@@ -485,9 +492,10 @@ async fn handle_ack(status: BatchStatus, entry: FinalizerEntry) {
 
 #[cfg(test)]
 pub mod test {
-    use lookup::LookupBuf;
-    use value::kind::Collection;
-    use vector_core::schema::Definition;
+    use vector_lib::lookup::OwnedTargetPath;
+    use vector_lib::schema::Definition;
+    use vector_lib::tls::TlsConfig;
+    use vrl::value::kind::Collection;
 
     use super::*;
 
@@ -503,9 +511,32 @@ pub mod test {
         };
         let user = std::env::var("AMQP_USER").unwrap_or_else(|_| "guest".to_string());
         let pass = std::env::var("AMQP_PASSWORD").unwrap_or_else(|_| "guest".to_string());
+        let host = std::env::var("AMQP_HOST").unwrap_or_else(|_| "rabbitmq".to_string());
         let vhost = std::env::var("AMQP_VHOST").unwrap_or_else(|_| "%2f".to_string());
         config.connection.connection_string =
-            format!("amqp://{}:{}@rabbitmq:5672/{}", user, pass, vhost);
+            format!("amqp://{}:{}@{}:5672/{}", user, pass, host, vhost);
+
+        config
+    }
+
+    pub fn make_tls_config() -> AmqpSourceConfig {
+        let mut config = AmqpSourceConfig {
+            queue: "it".to_string(),
+            ..Default::default()
+        };
+        let user = std::env::var("AMQP_USER").unwrap_or_else(|_| "guest".to_string());
+        let pass = std::env::var("AMQP_PASSWORD").unwrap_or_else(|_| "guest".to_string());
+        let vhost = std::env::var("AMQP_VHOST").unwrap_or_else(|_| "%2f".to_string());
+        let host = std::env::var("AMQP_HOST").unwrap_or_else(|_| "rabbitmq".to_string());
+        let ca_file =
+            std::env::var("AMQP_CA_FILE").unwrap_or_else(|_| "/certs/ca.cert.pem".to_string());
+        config.connection.connection_string =
+            format!("amqps://{}:{}@{}/{}", user, pass, host, vhost);
+        let tls = TlsConfig {
+            ca_file: Some(ca_file.as_str().into()),
+            ..Default::default()
+        };
+        config.connection.tls = Some(tls);
         config
     }
 
@@ -516,35 +547,44 @@ pub mod test {
             ..Default::default()
         };
 
-        let definition = config.outputs(LogNamespace::Vector)[0]
-            .clone()
-            .log_schema_definition
-            .unwrap();
+        let definition = config
+            .outputs(LogNamespace::Vector)
+            .remove(0)
+            .schema_definition(true);
 
         let expected_definition =
             Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
-                .with_meaning(LookupBuf::root(), "message")
-                .with_metadata_field(&owned_value_path!("vector", "source_type"), Kind::bytes())
+                .with_meaning(OwnedTargetPath::event_root(), "message")
+                .with_metadata_field(
+                    &owned_value_path!("vector", "source_type"),
+                    Kind::bytes(),
+                    None,
+                )
                 .with_metadata_field(
                     &owned_value_path!("vector", "ingest_timestamp"),
                     Kind::timestamp(),
+                    None,
                 )
-                .with_metadata_field(&owned_value_path!("amqp", "timestamp"), Kind::timestamp())
-                .with_metadata_field(&owned_value_path!("amqp", "routing"), Kind::bytes())
-                .with_metadata_field(&owned_value_path!("amqp", "exchange"), Kind::bytes())
-                .with_metadata_field(&owned_value_path!("amqp", "offset"), Kind::integer());
+                .with_metadata_field(
+                    &owned_value_path!("amqp", "timestamp"),
+                    Kind::timestamp(),
+                    Some("timestamp"),
+                )
+                .with_metadata_field(&owned_value_path!("amqp", "routing"), Kind::bytes(), None)
+                .with_metadata_field(&owned_value_path!("amqp", "exchange"), Kind::bytes(), None)
+                .with_metadata_field(&owned_value_path!("amqp", "offset"), Kind::integer(), None);
 
-        assert_eq!(definition, expected_definition);
+        assert_eq!(definition, Some(expected_definition));
     }
 
     #[test]
     fn output_schema_definition_legacy_namespace() {
         let config = AmqpSourceConfig::default();
 
-        let definition = config.outputs(LogNamespace::Legacy)[0]
-            .clone()
-            .log_schema_definition
-            .unwrap();
+        let definition = config
+            .outputs(LogNamespace::Legacy)
+            .remove(0)
+            .schema_definition(true);
 
         let expected_definition = Definition::new_with_default_metadata(
             Kind::object(Collection::empty()),
@@ -561,7 +601,7 @@ pub mod test {
         .with_event_field(&owned_value_path!("exchange"), Kind::bytes(), None)
         .with_event_field(&owned_value_path!("offset"), Kind::integer(), None);
 
-        assert_eq!(definition, expected_definition);
+        assert_eq!(definition, Some(expected_definition));
     }
 }
 
@@ -572,6 +612,7 @@ mod integration_test {
     use super::test::*;
     use super::*;
     use crate::{
+        amqp::await_connection,
         shutdown::ShutdownSignal,
         test_util::{
             components::{run_and_assert_source_compliance, SOURCE_TAGS},
@@ -583,11 +624,28 @@ mod integration_test {
     use lapin::options::*;
     use lapin::BasicProperties;
     use tokio::time::Duration;
-    use vector_core::config::log_schema;
+    use vector_lib::config::log_schema;
 
     #[tokio::test]
     async fn amqp_source_create_ok() {
         let config = make_config();
+        await_connection(&config.connection).await;
+        assert!(amqp_source(
+            &config,
+            ShutdownSignal::noop(),
+            SourceSender::new_test().0,
+            LogNamespace::Legacy,
+            false,
+        )
+        .await
+        .is_ok());
+    }
+
+    #[tokio::test]
+    async fn amqp_tls_source_create_ok() {
+        let config = make_tls_config();
+        await_connection(&config.connection).await;
+
         assert!(amqp_source(
             &config,
             ShutdownSignal::noop(),
@@ -624,17 +682,16 @@ mod integration_test {
             .unwrap();
     }
 
-    #[tokio::test]
-    async fn amqp_source_consume_event() {
+    async fn source_consume_event(mut config: AmqpSourceConfig) {
         let exchange = format!("test-{}-exchange", random_string(10));
         let queue = format!("test-{}-queue", random_string(10));
         let routing_key = "my_key";
         trace!("Test exchange name: {}.", exchange);
         let consumer = format!("test-consumer-{}", random_string(10));
 
-        let mut config = make_config();
         config.consumer = consumer;
         config.queue = queue;
+
         let (_conn, channel) = config.connection.connect().await.unwrap();
         let exchange_opts = lapin::options::ExchangeDeclareOptions {
             auto_delete: true,
@@ -693,11 +750,27 @@ mod integration_test {
 
         let log = events[0].as_log();
         trace!("{:?}", log);
-        assert_eq!(log[log_schema().message_key()], "my message".into());
+        assert_eq!(*log.get_message().unwrap(), "my message".into());
         assert_eq!(log["routing"], routing_key.into());
-        assert_eq!(log[log_schema().source_type_key()], "amqp".into());
-        let log_ts = log[log_schema().timestamp_key()].as_timestamp().unwrap();
+        assert_eq!(*log.get_source_type().unwrap(), "amqp".into());
+        let log_ts = log[log_schema().timestamp_key().unwrap().to_string()]
+            .as_timestamp()
+            .unwrap();
         assert!(log_ts.signed_duration_since(now) < chrono::Duration::seconds(1));
         assert_eq!(log["exchange"], exchange.into());
+    }
+
+    #[tokio::test]
+    async fn amqp_source_consume_event() {
+        let config = make_config();
+        await_connection(&config.connection).await;
+        source_consume_event(config).await;
+    }
+
+    #[tokio::test]
+    async fn amqp_tls_source_consume_event() {
+        let config = make_tls_config();
+        await_connection(&config.connection).await;
+        source_consume_event(config).await;
     }
 }

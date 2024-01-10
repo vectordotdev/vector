@@ -1,10 +1,7 @@
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion, Throughput};
 use data_encoding::BASE64;
 use dnsmsg_parser::dns_message_parser::DnsMessageParser;
-use trust_dns_proto::{
-    rr::rdata::null,
-    serialize::binary::{BinDecoder, Restrict},
-};
+use hickory_proto::rr::rdata::NULL;
 
 fn benchmark_parse_as_query_message(c: &mut Criterion) {
     let raw_dns_message = "szgAAAABAAAAAAAAAmg1B2V4YW1wbGUDY29tAAAGAAE=";
@@ -64,8 +61,7 @@ fn benchmark_parse_apl_rdata(c: &mut Criterion) {
 fn benchmark_parse_rdata(c: &mut Criterion, data: &str, code: u16, id: &str) {
     let raw_rdata = BASE64.decode(data.as_bytes()).unwrap();
 
-    let mut decoder = BinDecoder::new(&raw_rdata);
-    let record_rdata = null::read(&mut decoder, Restrict::new(raw_rdata.len() as u16)).unwrap();
+    let record_rdata = NULL::with(raw_rdata.clone());
 
     let mut group = c.benchmark_group("dnstap");
     group.throughput(Throughput::Bytes(raw_rdata.len() as u64));

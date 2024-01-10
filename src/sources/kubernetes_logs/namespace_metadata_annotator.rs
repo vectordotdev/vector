@@ -4,10 +4,10 @@
 
 use k8s_openapi::{api::core::v1::Namespace, apimachinery::pkg::apis::meta::v1::ObjectMeta};
 use kube::runtime::reflector::{store::Store, ObjectRef};
-use lookup::lookup_v2::OptionalTargetPath;
-use lookup::{lookup_v2::ValuePath, owned_value_path, path, OwnedTargetPath};
-use vector_config::{configurable_component, NamedComponent};
-use vector_core::config::{LegacyKey, LogNamespace};
+use vector_lib::config::{LegacyKey, LogNamespace};
+use vector_lib::configurable::configurable_component;
+use vector_lib::lookup::lookup_v2::OptionalTargetPath;
+use vector_lib::lookup::{lookup_v2::ValuePath, owned_value_path, path, OwnedTargetPath};
 
 use crate::event::{Event, LogEvent};
 
@@ -63,7 +63,6 @@ impl NamespaceMetadataAnnotator {
 
 impl NamespaceMetadataAnnotator {
     /// Annotates an event with the information from the [`Namespace::metadata`].
-    /// The event has to have a [`POD_NAMESPACE`] field set.
     pub fn annotate(&self, event: &mut Event, pod_namespace: &str) -> Option<()> {
         let log = event.as_mut_log();
         let obj = ObjectRef::<Namespace>::new(pod_namespace);
@@ -105,8 +104,8 @@ fn annotate_from_metadata(
 
 #[cfg(test)]
 mod tests {
-    use lookup::{event_path, metadata_path};
     use similar_asserts::assert_eq;
+    use vector_lib::lookup::{event_path, metadata_path};
 
     use super::*;
 

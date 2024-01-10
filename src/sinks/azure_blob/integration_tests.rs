@@ -6,14 +6,14 @@ use std::{
 use azure_core::{error::HttpError, prelude::Range};
 use azure_storage_blobs::prelude::*;
 use bytes::{Buf, BytesMut};
-use codecs::{
-    encoding::FramingConfig, JsonSerializerConfig, NewlineDelimitedEncoderConfig,
-    TextSerializerConfig,
-};
 use flate2::read::GzDecoder;
 use futures::{stream, Stream, StreamExt};
 use http::StatusCode;
-use vector_core::ByteSizeOf;
+use vector_lib::codecs::{
+    encoding::FramingConfig, JsonSerializerConfig, NewlineDelimitedEncoderConfig,
+    TextSerializerConfig,
+};
+use vector_lib::ByteSizeOf;
 
 use super::config::AzureBlobSinkConfig;
 use crate::{
@@ -75,7 +75,7 @@ async fn azure_blob_insert_lines_into_blob() {
     let blob_prefix = format!("lines/into/blob/{}", random_string(10));
     let config = AzureBlobSinkConfig::new_emulator().await;
     let config = AzureBlobSinkConfig {
-        blob_prefix: Some(blob_prefix.clone()),
+        blob_prefix: blob_prefix.clone().try_into().unwrap(),
         ..config
     };
     let (lines, input) = random_lines_with_stream(100, 10, None);
@@ -95,7 +95,7 @@ async fn azure_blob_insert_json_into_blob() {
     let blob_prefix = format!("json/into/blob/{}", random_string(10));
     let config = AzureBlobSinkConfig::new_emulator().await;
     let config = AzureBlobSinkConfig {
-        blob_prefix: Some(blob_prefix.clone()),
+        blob_prefix: blob_prefix.clone().try_into().unwrap(),
         encoding: (
             Some(NewlineDelimitedEncoderConfig::new()),
             JsonSerializerConfig::default(),
@@ -111,10 +111,14 @@ async fn azure_blob_insert_json_into_blob() {
     assert_eq!(blobs.len(), 1);
     assert!(blobs[0].clone().ends_with(".log"));
     let (blob, blob_lines) = config.get_blob(blobs[0].clone()).await;
-    assert_eq!(blob.properties.content_type, String::from("text/plain"));
+    assert_eq!(blob.properties.content_encoding, None);
+    assert_eq!(
+        blob.properties.content_type,
+        String::from("application/x-ndjson")
+    );
     let expected = events
         .iter()
-        .map(|event| serde_json::to_string(&event.as_log().all_fields().unwrap()).unwrap())
+        .map(|event| serde_json::to_string(&event.as_log().all_event_fields().unwrap()).unwrap())
         .collect::<Vec<_>>();
     assert_eq!(expected, blob_lines);
 }
@@ -126,7 +130,7 @@ async fn azure_blob_insert_lines_into_blob_gzip() {
     let blob_prefix = format!("lines-gzip/into/blob/{}", random_string(10));
     let config = AzureBlobSinkConfig::new_emulator().await;
     let config = AzureBlobSinkConfig {
-        blob_prefix: Some(blob_prefix.clone()),
+        blob_prefix: blob_prefix.clone().try_into().unwrap(),
         compression: Compression::gzip_default(),
         ..config
     };
@@ -138,10 +142,8 @@ async fn azure_blob_insert_lines_into_blob_gzip() {
     assert_eq!(blobs.len(), 1);
     assert!(blobs[0].clone().ends_with(".log.gz"));
     let (blob, blob_lines) = config.get_blob(blobs[0].clone()).await;
-    assert_eq!(
-        blob.properties.content_type,
-        String::from("application/gzip")
-    );
+    assert_eq!(blob.properties.content_encoding, Some(String::from("gzip")));
+    assert_eq!(blob.properties.content_type, String::from("text/plain"));
     assert_eq!(lines, blob_lines);
 }
 
@@ -153,7 +155,7 @@ async fn azure_blob_insert_json_into_blob_gzip() {
     let blob_prefix = format!("json-gzip/into/blob/{}", random_string(10));
     let config = AzureBlobSinkConfig::new_emulator().await;
     let config = AzureBlobSinkConfig {
-        blob_prefix: Some(blob_prefix.clone()),
+        blob_prefix: blob_prefix.clone().try_into().unwrap(),
         encoding: (
             Some(NewlineDelimitedEncoderConfig::new()),
             JsonSerializerConfig::default(),
@@ -170,13 +172,14 @@ async fn azure_blob_insert_json_into_blob_gzip() {
     assert_eq!(blobs.len(), 1);
     assert!(blobs[0].clone().ends_with(".log.gz"));
     let (blob, blob_lines) = config.get_blob(blobs[0].clone()).await;
+    assert_eq!(blob.properties.content_encoding, Some(String::from("gzip")));
     assert_eq!(
         blob.properties.content_type,
-        String::from("application/gzip")
+        String::from("application/x-ndjson")
     );
     let expected = events
         .iter()
-        .map(|event| serde_json::to_string(&event.as_log().all_fields().unwrap()).unwrap())
+        .map(|event| serde_json::to_string(&event.as_log().all_event_fields().unwrap()).unwrap())
         .collect::<Vec<_>>();
     assert_eq!(expected, blob_lines);
 }
@@ -192,7 +195,7 @@ async fn azure_blob_rotate_files_after_the_buffer_size_is_reached() {
     config.batch.max_bytes = Some(size_per_group);
 
     let config = AzureBlobSinkConfig {
-        blob_prefix: Some(blob_prefix.clone() + "{{key}}"),
+        blob_prefix: (blob_prefix.clone() + "{{key}}").try_into().unwrap(),
         blob_append_uuid: Some(false),
         batch: config.batch,
         ..config
@@ -223,7 +226,7 @@ impl AzureBlobSinkConfig {
                 storage_account: None,
                 container_name: "logs".to_string(),
                 endpoint: None,
-                blob_prefix: None,
+                blob_prefix: Default::default(),
                 blob_time_format: None,
                 blob_append_uuid: None,
                 encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),

@@ -326,7 +326,7 @@ impl HostMetrics {
     }
 }
 
-/// Filters a Vec<Metric> by name, returning the inner `value` or 0.00 if not found
+/// Filters a [`Vec<Metric>`] by name, returning the inner `value` or 0.00 if not found
 fn filter_host_metric(metrics: &[Metric], name: &str) -> f64 {
     metrics
         .iter()

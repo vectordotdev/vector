@@ -1,0 +1,8 @@
+version: '3'
+
+services:
+  greptimedb:
+    image: docker.io/greptime/greptimedb:${CONFIG_VERSION}
+    command: "standalone start --http-addr=0.0.0.0:4000 --rpc-addr=0.0.0.0:4001"
+    healthcheck:
+      test: "curl -f localhost:4000/health || exit 1"

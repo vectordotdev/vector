@@ -1,6 +1,6 @@
 ---
 title: Concepts
-weight: 2
+weight: 3
 tags: ["concepts", "meta", "events", "logs", "metrics", "components", "sources", "transforms", "sinks", "pipeline", "roles", "agent", "aggregator", "topology"]
 ---
 
@@ -23,6 +23,12 @@ A **log** event is a generic key/value representation of an event.
 A **metric** event represents a numerical operation performed on a time series. Vector's metric events are fully interoperable.
 
 {{< jump "/docs/about/under-the-hood/architecture/data-model/metric" >}}
+
+### Traces
+
+A **trace** event can be thought of as a special kind of log event. The components that support trace events are: the `datadog_agent` source, the `datadog_traces` sink, and the `sample` and `remap` transforms. **Note**: Support for traces is limited and is in alpha.
+
+If you're interested in using traces with a Vector component that doesn't yet support them, please open an issue so we can have a better understanding of what components to prioritize adding trace support for.
 
 ## Components
 
@@ -74,8 +80,8 @@ View the full configuration options for buffers [here](/docs/reference/configura
 
 If a sink's buffer fills up and is configured to provide backpressure, that backpressure will propagate to any connected
 transforms, which will also propagate to the sources. The sources attempt to propagate backpressure to
-whichever system is providing data. The exact mechanism varies with the source. For example, HTTP sources may
-reject requests with an HTTP 429 error (Too Many Requests), or pull-based sources such as Kafka may slow down fetching new events.
+whichever system is providing data. The exact mechanism varies with the source. For example, HTTP sources _may_
+reject requests with an HTTP 429 error (Too Many Requests), or pull-based sources such as Kafka _may_ slow down fetching new events.
 
 Since Vector allows configuring components as a directed acyclic graph, understanding how backpressure works when there
 are multiple sinks or sources involved is important.

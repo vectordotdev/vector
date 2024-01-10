@@ -479,8 +479,8 @@ impl error::Error for ParseError {
 mod test {
     use chrono::{DateTime, Utc};
     use similar_asserts::assert_eq;
-    use vector_common::assert_event_data_eq;
-    use vector_core::metric_tags;
+    use vector_lib::assert_event_data_eq;
+    use vector_lib::metric_tags;
 
     use super::*;
     use crate::event::metric::{Metric, MetricKind, MetricValue};

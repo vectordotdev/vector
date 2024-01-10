@@ -32,7 +32,7 @@ module Vector
       @date = hash.fetch("date")
       @name = hash.fetch("name")
       @version = Util::Version.new(@name)
-      @whats_next = hash.fetch("whats_next")
+      @whats_next = hash.fetch("whats_next", [])
     end
   end
 end

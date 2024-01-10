@@ -1,16 +1,16 @@
 use std::{collections::HashMap, panic, str::FromStr, sync::Arc};
 
 use aws_sdk_sqs::{
-    model::{DeleteMessageBatchRequestEntry, MessageSystemAttributeName, QueueAttributeName},
+    types::{DeleteMessageBatchRequestEntry, MessageSystemAttributeName, QueueAttributeName},
     Client as SqsClient,
 };
 use chrono::{DateTime, TimeZone, Utc};
 use futures::{FutureExt, StreamExt};
 use tokio::{pin, select};
 use tracing_futures::Instrument;
-use vector_common::finalizer::UnorderedFinalizer;
-use vector_common::internal_event::{EventsReceived, Registered};
-use vector_core::config::LogNamespace;
+use vector_lib::config::LogNamespace;
+use vector_lib::finalizer::UnorderedFinalizer;
+use vector_lib::internal_event::{EventsReceived, Registered};
 
 use crate::{
     codecs::Decoder,
@@ -45,7 +45,7 @@ impl SqsSource {
     pub async fn run(self, out: SourceSender, shutdown: ShutdownSignal) -> Result<(), ()> {
         let mut task_handles = vec![];
         let finalizer = self.acknowledgements.then(|| {
-            let (finalizer, mut ack_stream) = Finalizer::new(shutdown.clone());
+            let (finalizer, mut ack_stream) = Finalizer::new(Some(shutdown.clone()));
             let client = self.client.clone();
             let queue_url = self.queue_url.clone();
             tokio::spawn(
@@ -110,7 +110,7 @@ impl SqsSource {
             .visibility_timeout(self.visibility_timeout_secs as i32)
             // I think this should be a known attribute
             // https://github.com/awslabs/aws-sdk-rust/issues/411
-            .attribute_names(QueueAttributeName::Unknown(String::from("SentTimestamp")))
+            .attribute_names(QueueAttributeName::from("SentTimestamp"))
             .send()
             .await;
 
@@ -180,7 +180,7 @@ impl SqsSource {
                         }
                     }
                 }
-                Err(error) => emit!(StreamClosedError { error, count }),
+                Err(_) => emit!(StreamClosedError { count }),
             }
         }
     }
@@ -208,7 +208,8 @@ async fn delete_messages(client: SqsClient, receipts: Vec<String>, queue_url: St
                 DeleteMessageBatchRequestEntry::builder()
                     .id(id.to_string())
                     .receipt_handle(receipt)
-                    .build(),
+                    .build()
+                    .expect("all required builder parameters specified"),
             );
         }
         if let Err(err) = batch.send().await {
@@ -219,14 +220,12 @@ async fn delete_messages(client: SqsClient, receipts: Vec<String>, queue_url: St
 
 #[cfg(test)]
 mod tests {
-    use crate::codecs::DecodingConfig;
-    use chrono::SecondsFormat;
-    use lookup::path;
-    use vector_config::NamedComponent;
-
     use super::*;
+    use crate::codecs::DecodingConfig;
     use crate::config::{log_schema, SourceConfig};
     use crate::sources::aws_sqs::AwsSqsConfig;
+    use chrono::SecondsFormat;
+    use vector_lib::lookup::path;
 
     #[tokio::test]
     async fn test_decode_vector_namespace() {
@@ -234,10 +233,10 @@ mod tests {
             log_namespace: Some(true),
             ..Default::default()
         };
-        let definition = config.outputs(LogNamespace::Vector)[0]
-            .clone()
-            .log_schema_definition
-            .unwrap();
+        let definitions = config
+            .outputs(LogNamespace::Vector)
+            .remove(0)
+            .schema_definition(true);
 
         let message = "test";
         let now = Utc::now();
@@ -247,7 +246,8 @@ mod tests {
                 config.decoding,
                 LogNamespace::Vector,
             )
-            .build(),
+            .build()
+            .unwrap(),
             "aws_sqs",
             b"test",
             Some(now),
@@ -277,7 +277,7 @@ mod tests {
                 .to_string_lossy(),
             now.to_rfc3339_opts(SecondsFormat::AutoSi, true)
         );
-        definition.assert_valid_for_event(&events[0]);
+        definitions.unwrap().assert_valid_for_event(&events[0]);
     }
 
     #[tokio::test]
@@ -286,10 +286,10 @@ mod tests {
             log_namespace: None,
             ..Default::default()
         };
-        let definition = config.outputs(LogNamespace::Legacy)[0]
-            .clone()
-            .log_schema_definition
-            .unwrap();
+        let definitions = config
+            .outputs(LogNamespace::Legacy)
+            .remove(0)
+            .schema_definition(true);
 
         let message = "test";
         let now = Utc::now();
@@ -299,7 +299,8 @@ mod tests {
                 config.decoding,
                 LogNamespace::Legacy,
             )
-            .build(),
+            .build()
+            .unwrap(),
             "aws_sqs",
             b"test",
             Some(now),
@@ -313,7 +314,7 @@ mod tests {
             events[0]
                 .clone()
                 .as_log()
-                .get(log_schema().message_key())
+                .get(log_schema().message_key_target_path().unwrap())
                 .unwrap()
                 .to_string_lossy(),
             message
@@ -322,12 +323,12 @@ mod tests {
             events[0]
                 .clone()
                 .as_log()
-                .get(log_schema().timestamp_key())
+                .get_timestamp()
                 .unwrap()
                 .to_string_lossy(),
             now.to_rfc3339_opts(SecondsFormat::AutoSi, true)
         );
-        definition.assert_valid_for_event(&events[0]);
+        definitions.unwrap().assert_valid_for_event(&events[0]);
     }
 
     #[test]

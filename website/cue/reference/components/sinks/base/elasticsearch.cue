@@ -15,7 +15,7 @@ base: components: sinks: elasticsearch: configuration: {
 				Whether or not end-to-end acknowledgements are enabled.
 
 				When enabled for a sink, any source connected to that sink, where the source supports
-				end-to-end acknowledgements as well, will wait for events to be acknowledged by the sink
+				end-to-end acknowledgements as well, waits for events to be acknowledged by the sink
 				before acknowledging them at the source.
 
 				Enabling or disabling acknowledgements at the sink level takes precedence over any global
@@ -33,15 +33,25 @@ base: components: sinks: elasticsearch: configuration: {
 		type: string: {
 			default: "auto"
 			enum: {
-				auto: "Auto-detect the api version. Will fail if endpoint isn't reachable."
-				v6:   "Use the Elasticsearch 6.x API."
-				v7:   "Use the Elasticsearch 7.x API."
-				v8:   "Use the Elasticsearch 8.x API."
+				auto: """
+					Auto-detect the API version.
+
+					If the [cluster state version endpoint][es_version] isn't reachable, a warning is logged to
+					stdout, and the version is assumed to be V6 if the `suppress_type_name` option is set to
+					`true`. Otherwise, the version is assumed to be V8. In the future, the sink instead
+					returns an error during configuration parsing, since a wrongly assumed version could lead to
+					incorrect API calls.
+
+					[es_version]: https://www.elastic.co/guide/en/elasticsearch/reference/current/cluster-state.html#cluster-state-api-path-params
+					"""
+				v6: "Use the Elasticsearch 6.x API."
+				v7: "Use the Elasticsearch 7.x API."
+				v8: "Use the Elasticsearch 8.x API."
 			}
 		}
 	}
 	auth: {
-		description: "Authentication strategies."
+		description: "Elasticsearch Authentication strategies."
 		required:    false
 		type: object: options: {
 			access_key_id: {
@@ -65,6 +75,16 @@ base: components: sinks: elasticsearch: configuration: {
 				relevant_when: "strategy = \"aws\""
 				required:      true
 				type: string: examples: ["/my/aws/credentials"]
+			}
+			external_id: {
+				description: """
+					The optional unique external ID in conjunction with role to assume.
+
+					[external_id]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_create_for-user_externalid.html
+					"""
+				relevant_when: "strategy = \"aws\""
+				required:      false
+				type: string: examples: ["randomEXAMPLEidString"]
 			}
 			imds: {
 				description:   "Configuration for authenticating with AWS through IMDS."
@@ -98,7 +118,7 @@ base: components: sinks: elasticsearch: configuration: {
 				description: """
 					Timeout for successfully loading any credentials, in seconds.
 
-					Relevant when the default credentials chain is used or `assume_role`.
+					Relevant when the default credentials chain or `assume_role` is used.
 					"""
 				relevant_when: "strategy = \"aws\""
 				required:      false
@@ -111,7 +131,7 @@ base: components: sinks: elasticsearch: configuration: {
 				description:   "Basic authentication password."
 				relevant_when: "strategy = \"basic\""
 				required:      true
-				type: string: {}
+				type: string: examples: ["${ELASTICSEARCH_PASSWORD}", "password"]
 			}
 			profile: {
 				description: """
@@ -121,13 +141,16 @@ base: components: sinks: elasticsearch: configuration: {
 					"""
 				relevant_when: "strategy = \"aws\""
 				required:      false
-				type: string: examples: ["develop"]
+				type: string: {
+					default: "default"
+					examples: ["develop"]
+				}
 			}
 			region: {
 				description: """
 					The [AWS region][aws_region] to send STS requests to.
 
-					If not set, this will default to the configured region
+					If not set, this defaults to the configured region
 					for the service itself.
 
 					[aws_region]: https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints
@@ -154,7 +177,7 @@ base: components: sinks: elasticsearch: configuration: {
 				description:   "Basic authentication username."
 				relevant_when: "strategy = \"basic\""
 				required:      true
-				type: string: {}
+				type: string: examples: ["${ELASTICSEARCH_USERNAME}", "username"]
 			}
 		}
 	}
@@ -184,10 +207,10 @@ base: components: sinks: elasticsearch: configuration: {
 		type: object: options: {
 			max_bytes: {
 				description: """
-					The maximum size of a batch that will be processed by a sink.
+					The maximum size of a batch that is processed by a sink.
 
 					This is based on the uncompressed size of the batched events, before they are
-					serialized / compressed.
+					serialized/compressed.
 					"""
 				required: false
 				type: uint: {
@@ -211,18 +234,32 @@ base: components: sinks: elasticsearch: configuration: {
 		}
 	}
 	bulk: {
-		description: "Bulk mode configuration."
+		description: "Elasticsearch bulk mode configuration."
 		required:    false
 		type: object: options: {
 			action: {
-				description: "The bulk action to use."
-				required:    false
-				type: string: {}
+				description: """
+					Action to use when making requests to the [Elasticsearch Bulk API][es_bulk].
+
+					Only `index` and `create` actions are supported.
+
+					[es_bulk]: https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html
+					"""
+				required: false
+				type: string: {
+					default: "index"
+					examples: ["create", "{{ action }}"]
+					syntax: "template"
+				}
 			}
 			index: {
-				description: "The name of the index to use."
+				description: "The name of the index to write events to."
 				required:    false
-				type: string: {}
+				type: string: {
+					default: "vector-%Y.%m.%d"
+					examples: ["application-{{ application_id }}-%Y-%m-%d", "{{ index }}"]
+					syntax: "template"
+				}
 			}
 		}
 	}
@@ -242,16 +279,26 @@ base: components: sinks: elasticsearch: configuration: {
 					[gzip]: https://www.gzip.org/
 					"""
 				none: "No compression."
+				snappy: """
+					[Snappy][snappy] compression.
+
+					[snappy]: https://github.com/google/snappy/blob/main/docs/README.md
+					"""
 				zlib: """
-					[Zlib]][zlib] compression.
+					[Zlib][zlib] compression.
 
 					[zlib]: https://zlib.net/
+					"""
+				zstd: """
+					[Zstandard][zstd] compression.
+
+					[zstd]: https://facebook.github.io/zstd/
 					"""
 			}
 		}
 	}
 	data_stream: {
-		description: "Data stream mode configuration."
+		description: "Elasticsearch data stream mode configuration."
 		required:    false
 		type: object: options: {
 			auto_routing: {
@@ -262,8 +309,8 @@ base: components: sinks: elasticsearch: configuration: {
 					from the `data_stream` configuration field of the same name.
 
 					If enabled, the value of the `data_stream.type`, `data_stream.dataset`, and
-					`data_stream.namespace` event fields will be used if they are present. Otherwise, the values
-					set here in the configuration will be used.
+					`data_stream.namespace` event fields are used if they are present. Otherwise, the values
+					set in this configuration are used.
 					"""
 				required: false
 				type: bool: default: true
@@ -273,7 +320,8 @@ base: components: sinks: elasticsearch: configuration: {
 				required:    false
 				type: string: {
 					default: "generic"
-					syntax:  "template"
+					examples: ["generic", "nginx", "{{ service }}"]
+					syntax: "template"
 				}
 			}
 			namespace: {
@@ -281,7 +329,8 @@ base: components: sinks: elasticsearch: configuration: {
 				required:    false
 				type: string: {
 					default: "default"
-					syntax:  "template"
+					examples: ["{{ environment }}"]
+					syntax: "template"
 				}
 			}
 			sync_fields: {
@@ -298,48 +347,57 @@ base: components: sinks: elasticsearch: configuration: {
 				required:    false
 				type: string: {
 					default: "logs"
-					syntax:  "template"
+					examples: ["metrics", "synthetics", "{{ type }}"]
+					syntax: "template"
 				}
 			}
 		}
 	}
 	distribution: {
-		description: "Options for determining health of an endpoint."
+		description: "Options for determining the health of an endpoint."
 		required:    false
 		type: object: options: {
 			retry_initial_backoff_secs: {
-				description: "Initial timeout, in seconds, between attempts to reactivate endpoints once they become unhealthy."
+				description: "Initial delay between attempts to reactivate endpoints once they become unhealthy."
 				required:    false
-				type: uint: {}
+				type: uint: {
+					default: 1
+					unit:    "seconds"
+				}
 			}
 			retry_max_duration_secs: {
-				description: "Maximum timeout, in seconds, between attempts to reactivate endpoints once they become unhealthy."
+				description: "Maximum delay between attempts to reactivate endpoints once they become unhealthy."
 				required:    false
-				type: uint: {}
+				type: uint: {
+					default: 3600
+					unit:    "seconds"
+				}
 			}
 		}
 	}
 	doc_type: {
 		description: """
-			The `doc_type` for your index data.
+			The [`doc_type`][doc_type] for your index data.
 
 			This is only relevant for Elasticsearch <= 6.X. If you are using >= 7.0 you do not need to
 			set this option since Elasticsearch has removed it.
+
+			[doc_type]: https://www.elastic.co/guide/en/elasticsearch/reference/6.8/actions-index.html
 			"""
 		required: false
-		type: string: {}
+		type: string: default: "_doc"
 	}
 	encoding: {
 		description: "Transformations to prepare an event for serialization."
 		required:    false
 		type: object: options: {
 			except_fields: {
-				description: "List of fields that will be excluded from the encoded event."
+				description: "List of fields that are excluded from the encoded event."
 				required:    false
 				type: array: items: type: string: {}
 			}
 			only_fields: {
-				description: "List of fields that will be included in the encoded event."
+				description: "List of fields that are included in the encoded event."
 				required:    false
 				type: array: items: type: string: {}
 			}
@@ -347,32 +405,39 @@ base: components: sinks: elasticsearch: configuration: {
 				description: "Format used for timestamp fields."
 				required:    false
 				type: string: enum: {
-					rfc3339: "Represent the timestamp as a RFC 3339 timestamp."
-					unix:    "Represent the timestamp as a Unix timestamp."
+					rfc3339:    "Represent the timestamp as a RFC 3339 timestamp."
+					unix:       "Represent the timestamp as a Unix timestamp."
+					unix_float: "Represent the timestamp as a Unix timestamp in floating point."
+					unix_ms:    "Represent the timestamp as a Unix timestamp in milliseconds."
+					unix_ns:    "Represent the timestamp as a Unix timestamp in nanoseconds."
+					unix_us:    "Represent the timestamp as a Unix timestamp in microseconds"
 				}
 			}
 		}
 	}
 	endpoint: {
-		deprecated: true
+		deprecated:         true
+		deprecated_message: "This option has been deprecated, the `endpoints` option should be used instead."
 		description: """
 			The Elasticsearch endpoint to send logs to.
 
-			This should be the full URL as shown in the example.
+			The endpoint must contain an HTTP scheme, and may specify a
+			hostname or IP address and port.
 			"""
 		required: false
 		type: string: {}
 	}
 	endpoints: {
 		description: """
-			The Elasticsearch endpoints to send logs to.
+			A list of Elasticsearch endpoints to send logs to.
 
-			Each endpoint should be the full URL as shown in the example.
+			The endpoint must contain an HTTP scheme, and may specify a
+			hostname or IP address and port.
 			"""
 		required: false
 		type: array: {
 			default: []
-			items: type: string: {}
+			items: type: string: examples: ["http://10.24.32.122:9000", "https://example.com", "https://user:password@example.com"]
 		}
 	}
 	id_key: {
@@ -386,7 +451,7 @@ base: components: sinks: elasticsearch: configuration: {
 			[perf_doc]: https://www.elastic.co/guide/en/elasticsearch/reference/master/tune-for-indexing-speed.html#_use_auto_generated_ids
 			"""
 		required: false
-		type: string: {}
+		type: string: examples: ["id", "_id"]
 	}
 	metrics: {
 		description: "Configuration for the `metric_to_log` transform."
@@ -396,8 +461,8 @@ base: components: sinks: elasticsearch: configuration: {
 				description: """
 					Name of the tag in the metric to use for the source host.
 
-					If present, the value of the tag is set on the generated log event in the "host" field,
-					where the field key will use the [global `host_key` option][global_log_schema_host_key].
+					If present, the value of the tag is set on the generated log event in the `host` field,
+					where the field key uses the [global `host_key` option][global_log_schema_host_key].
 
 					[global_log_schema_host_key]: https://vector.dev/docs/reference/configuration//global-options#log_schema.host_key
 					"""
@@ -408,8 +473,8 @@ base: components: sinks: elasticsearch: configuration: {
 				description: """
 					Controls how metric tag values are encoded.
 
-					When set to `single`, only the last non-bare value of tags will be displayed with the
-					metric.  When set to `full`, all metric tags will be exposed as separate assignments as
+					When set to `single`, only the last non-bare value of tags are displayed with the
+					metric.  When set to `full`, all metric tags are exposed as separate assignments as
 					described by [the `native_json` codec][vector_native_json].
 
 					[vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
@@ -418,22 +483,22 @@ base: components: sinks: elasticsearch: configuration: {
 				type: string: {
 					default: "single"
 					enum: {
-						full: "All tags will be exposed as arrays of either string or null values."
+						full: "All tags are exposed as arrays of either string or null values."
 						single: """
-															Tag values will be exposed as single strings, the same as they were before this config
-															option. Tags with multiple values will show the last assigned value, and null values will be
-															ignored.
+															Tag values are exposed as single strings, the same as they were before this config
+															option. Tags with multiple values show the last assigned value, and null values
+															are ignored.
 															"""
 					}
 				}
 			}
 			timezone: {
 				description: """
-					The name of the timezone to apply to timestamp conversions that do not contain an explicit
+					The name of the time zone to apply to timestamp conversions that do not contain an explicit
 					time zone.
 
 					This overrides the [global `timezone`][global_timezone] option. The time zone name may be
-					any name in the [TZ database][tz_database], or `local` to indicate system local time.
+					any name in the [TZ database][tz_database] or `local` to indicate system local time.
 
 					[global_timezone]: https://vector.dev/docs/reference/configuration//global-options#timezone
 					[tz_database]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
@@ -444,14 +509,14 @@ base: components: sinks: elasticsearch: configuration: {
 		}
 	}
 	mode: {
-		description: "Indexing mode."
+		description: "Elasticsearch Indexing mode."
 		required:    false
 		type: string: {
 			default: "bulk"
 			enum: {
-				bulk: "Ingests documents in bulk, via the bulk API `index` action."
+				bulk: "Ingests documents in bulk, using the bulk API `index` action."
 				data_stream: """
-					Ingests documents in bulk, via the bulk API `create` action.
+					Ingests documents in bulk, using the bulk API `create` action.
 
 					Elasticsearch Data Streams only support the `create` action.
 					"""
@@ -461,15 +526,20 @@ base: components: sinks: elasticsearch: configuration: {
 	pipeline: {
 		description: "The name of the pipeline to apply."
 		required:    false
-		type: string: {}
+		type: string: examples: ["pipeline-name"]
 	}
 	query: {
-		description: "Custom parameters to add to the query string of each request sent to Elasticsearch."
+		description: "Custom parameters to add to the query string for each HTTP request sent to Elasticsearch."
 		required:    false
-		type: object: options: "*": {
-			description: "A query string parameter."
-			required:    true
-			type: string: {}
+		type: object: {
+			examples: [{
+				"X-Powered-By": "Vector"
+			}]
+			options: "*": {
+				description: "A query string parameter."
+				required:    true
+				type: string: {}
+			}
 		}
 	}
 	request: {
@@ -510,6 +580,26 @@ base: components: sinks: elasticsearch: configuration: {
 						required: false
 						type: float: default: 0.4
 					}
+					initial_concurrency: {
+						description: """
+																The initial concurrency limit to use. If not specified, the initial limit will be 1 (no concurrency).
+
+																It is recommended to set this value to your service's average limit if you're seeing that it takes a
+																long time to ramp up adaptive concurrency after a restart. You can find this value by looking at the
+																`adaptive_concurrency_limit` metric.
+																"""
+						required: false
+						type: uint: default: 1
+					}
+					max_concurrency_limit: {
+						description: """
+																The maximum concurrency limit.
+
+																The adaptive request concurrency limit will not go above this bound. This is put in place as a safeguard.
+																"""
+						required: false
+						type: uint: default: 200
+					}
 					rtt_deviation_scale: {
 						description: """
 																Scale of RTT deviations which are not considered anomalous.
@@ -527,11 +617,16 @@ base: components: sinks: elasticsearch: configuration: {
 				}
 			}
 			concurrency: {
-				description: "Configuration for outbound request concurrency."
-				required:    false
+				description: """
+					Configuration for outbound request concurrency.
+
+					This can be set either to one of the below enum values or to a positive integer, which denotes
+					a fixed concurrency limit.
+					"""
+				required: false
 				type: {
 					string: {
-						default: "none"
+						default: "adaptive"
 						enum: {
 							adaptive: """
 															Concurrency will be managed by Vector's [Adaptive Request Concurrency][arc] feature.
@@ -580,12 +675,8 @@ base: components: sinks: elasticsearch: configuration: {
 				}
 			}
 			retry_attempts: {
-				description: """
-					The maximum number of retries to make for failed requests.
-
-					The default, for all intents and purposes, represents an infinite number of retries.
-					"""
-				required: false
+				description: "The maximum number of retries to make for failed requests."
+				required:    false
 				type: uint: {
 					default: 9223372036854775807
 					unit:    "retries"
@@ -595,7 +686,7 @@ base: components: sinks: elasticsearch: configuration: {
 				description: """
 					The amount of time to wait before attempting the first retry for a failed request.
 
-					After the first retry has failed, the fibonacci sequence will be used to select future backoffs.
+					After the first retry has failed, the fibonacci sequence is used to select future backoffs.
 					"""
 				required: false
 				type: uint: {
@@ -603,11 +694,31 @@ base: components: sinks: elasticsearch: configuration: {
 					unit:    "seconds"
 				}
 			}
+			retry_jitter_mode: {
+				description: "The jitter mode to use for retry backoff behavior."
+				required:    false
+				type: string: {
+					default: "Full"
+					enum: {
+						Full: """
+															Full jitter.
+
+															The random delay is anywhere from 0 up to the maximum current delay calculated by the backoff
+															strategy.
+
+															Incorporating full jitter into your backoff strategy can greatly reduce the likelihood
+															of creating accidental denial of service (DoS) conditions against your own systems when
+															many clients are recovering from a failure state.
+															"""
+						None: "No jitter."
+					}
+				}
+			}
 			retry_max_duration_secs: {
 				description: "The maximum amount of time to wait between retries."
 				required:    false
 				type: uint: {
-					default: 3600
+					default: 30
 					unit:    "seconds"
 				}
 			}
@@ -615,7 +726,7 @@ base: components: sinks: elasticsearch: configuration: {
 				description: """
 					The time a request can take before being aborted.
 
-					It is highly recommended that you do not lower this value below the service’s internal timeout, as this could
+					Datadog highly recommends that you do not lower this value below the service's internal timeout, as this could
 					create orphaned requests, pile on retries, and result in duplicate data downstream.
 					"""
 				required: false
@@ -636,18 +747,17 @@ base: components: sinks: elasticsearch: configuration: {
 		type: bool: default: false
 	}
 	suppress_type_name: {
-		deprecated: true
+		deprecated:         true
+		deprecated_message: "This option has been deprecated, the `api_version` option should be used instead."
 		description: """
 			Whether or not to send the `type` field to Elasticsearch.
 
-			`type` field was deprecated in Elasticsearch 7.x and removed in Elasticsearch 8.x.
+			The `type` field was deprecated in Elasticsearch 7.x and removed in Elasticsearch 8.x.
 
-			If enabled, the `doc_type` option will be ignored.
-
-			This option has been deprecated, the `api_version` option should be used instead.
+			If enabled, the `doc_type` option is ignored.
 			"""
 		required: false
-		type: bool: {}
+		type: bool: default: false
 	}
 	tls: {
 		description: "TLS configuration."
@@ -657,8 +767,8 @@ base: components: sinks: elasticsearch: configuration: {
 				description: """
 					Sets the list of supported ALPN protocols.
 
-					Declare the supported ALPN protocols, which are used during negotiation with peer. Prioritized in the order
-					they are defined.
+					Declare the supported ALPN protocols, which are used during negotiation with peer. They are prioritized in the order
+					that they are defined.
 					"""
 				required: false
 				type: array: items: type: string: examples: ["h2"]
@@ -706,10 +816,10 @@ base: components: sinks: elasticsearch: configuration: {
 				description: """
 					Enables certificate verification.
 
-					If enabled, certificates must be valid in terms of not being expired, as well as being issued by a trusted
-					issuer. This verification operates in a hierarchical manner, checking that not only the leaf certificate (the
-					certificate presented by the client/server) is valid, but also that the issuer of that certificate is valid, and
-					so on until reaching a root certificate.
+					If enabled, certificates must not be expired and must be issued by a trusted
+					issuer. This verification operates in a hierarchical manner, checking that the leaf certificate (the
+					certificate presented by the client/server) is not only valid, but that the issuer of that certificate is also valid, and
+					so on until the verification process reaches a root certificate.
 
 					Relevant for both incoming and outgoing connections.
 

@@ -1,22 +1,13 @@
 use std::task::{Context, Poll};
 
 use bytes::Bytes;
-use futures::future::BoxFuture;
 use http::StatusCode;
 use snafu::Snafu;
-use tower::Service;
 use tracing::Instrument;
-use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
-use vector_core::{
-    event::{EventFinalizers, EventStatus, Finalizable},
-    internal_event::CountByteSize,
-    stream::DriverResponse,
-};
 
-use crate::sinks::loki::config::{CompressionConfigAdapter, ExtendedCompression};
 use crate::{
     http::{Auth, HttpClient},
-    sinks::util::{retries::RetryLogic, UriSerde},
+    sinks::{prelude::*, util::UriSerde},
 };
 
 #[derive(Clone)]
@@ -57,11 +48,8 @@ impl DriverResponse for LokiResponse {
         EventStatus::Delivered
     }
 
-    fn events_sent(&self) -> CountByteSize {
-        CountByteSize(
-            self.metadata.event_count(),
-            self.metadata.events_estimated_json_encoded_byte_size(),
-        )
+    fn events_sent(&self) -> &GroupedCountByteSize {
+        self.metadata.events_estimated_json_encoded_byte_size()
     }
 
     fn bytes_sent(&self) -> Option<usize> {
@@ -71,7 +59,7 @@ impl DriverResponse for LokiResponse {
 
 #[derive(Clone)]
 pub struct LokiRequest {
-    pub compression: CompressionConfigAdapter,
+    pub compression: Compression,
     pub finalizers: EventFinalizers,
     pub payload: Bytes,
     pub tenant_id: Option<String>,
@@ -85,8 +73,12 @@ impl Finalizable for LokiRequest {
 }
 
 impl MetaDescriptive for LokiRequest {
-    fn get_metadata(&self) -> RequestMetadata {
-        self.metadata
+    fn get_metadata(&self) -> &RequestMetadata {
+        &self.metadata
+    }
+
+    fn metadata_mut(&mut self) -> &mut RequestMetadata {
+        &mut self.metadata
     }
 }
 
@@ -120,14 +112,12 @@ impl Service<LokiRequest> for LokiService {
 
     fn call(&mut self, request: LokiRequest) -> Self::Future {
         let content_type = match request.compression {
-            CompressionConfigAdapter::Original(_) => "application/json",
-            CompressionConfigAdapter::Extended(ExtendedCompression::Snappy) => {
-                "application/x-protobuf"
-            }
+            Compression::Snappy => "application/x-protobuf",
+            _ => "application/json",
         };
         let mut req = http::Request::post(&self.endpoint.uri).header("Content-Type", content_type);
 
-        let metadata = request.get_metadata();
+        let metadata = request.get_metadata().clone();
 
         if let Some(tenant_id) = request.tenant_id {
             req = req.header("X-Scope-OrgID", tenant_id);

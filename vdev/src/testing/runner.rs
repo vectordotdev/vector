@@ -3,12 +3,11 @@ use std::process::{Command, Stdio};
 use std::{env, ffi::OsStr, ffi::OsString, path::PathBuf};
 
 use anyhow::Result;
-use atty::Stream;
 use once_cell::sync::Lazy;
 
-use super::config::{EnvConfig, RustToolchainConfig};
+use super::config::{Environment, IntegrationRunnerConfig, RustToolchainConfig};
 use crate::app::{self, CommandExt as _};
-use crate::util::ChainArgs as _;
+use crate::util::{ChainArgs as _, IS_A_TTY};
 
 const MOUNT_PATH: &str = "/home/vector";
 const TARGET_PATH: &str = "/home/target";
@@ -30,7 +29,7 @@ const UPSTREAM_IMAGE: &str =
 pub static CONTAINER_TOOL: Lazy<OsString> =
     Lazy::new(|| env::var_os("CONTAINER_TOOL").unwrap_or_else(detect_container_tool));
 
-pub static DOCKER_SOCK: Lazy<PathBuf> = Lazy::new(detect_docker_sock);
+pub(super) static DOCKER_SOCKET: Lazy<PathBuf> = Lazy::new(detect_docker_socket);
 
 fn detect_container_tool() -> OsString {
     for tool in ["docker", "podman"] {
@@ -46,6 +45,13 @@ fn detect_container_tool() -> OsString {
         }
     }
     fatal!("No container tool could be detected.");
+}
+
+fn get_rust_version() -> String {
+    match RustToolchainConfig::parse() {
+        Ok(config) => config.channel,
+        Err(error) => fatal!("Could not read `rust-toolchain.toml` file: {error}"),
+    }
 }
 
 fn dockercmd<I: AsRef<OsStr>>(args: impl IntoIterator<Item = I>) -> Command {
@@ -74,7 +80,8 @@ pub fn get_agent_test_runner(container: bool) -> Result<Box<dyn TestRunner>> {
 }
 
 pub trait TestRunner {
-    fn test(&self, outer_env: &EnvConfig, inner_env: &EnvConfig, args: &[String]) -> Result<()>;
+    fn test(&self, outer_env: &Environment, inner_env: &Environment, args: &[String])
+        -> Result<()>;
 }
 
 pub trait ContainerTestRunner: TestRunner {
@@ -82,27 +89,22 @@ pub trait ContainerTestRunner: TestRunner {
 
     fn image_name(&self) -> String;
 
-    fn network_name(&self) -> Option<String>;
+    fn network_name(&self) -> Option<&str>;
 
-    fn needs_docker_sock(&self) -> bool;
+    fn needs_docker_socket(&self) -> bool;
+
+    fn volumes(&self) -> Vec<String>;
 
     fn stop(&self) -> Result<()> {
         dockercmd(["stop", "--time", "0", &self.container_name()])
             .wait(format!("Stopping container {}", self.container_name()))
     }
 
-    fn get_rust_version(&self) -> String {
-        match RustToolchainConfig::parse() {
-            Ok(config) => config.channel,
-            Err(error) => fatal!("Could not read `rust-toolchain.toml` file: {error}"),
-        }
-    }
-
     fn state(&self) -> Result<RunnerState> {
         let mut command = dockercmd(["ps", "-a", "--format", "{{.Names}} {{.State}}"]);
         let container_name = self.container_name();
 
-        for line in command.capture_output()?.lines() {
+        for line in command.check_output()?.lines() {
             if let Some((name, state)) = line.split_once(' ') {
                 if name == container_name {
                     return Ok(if state == "created" {
@@ -155,7 +157,7 @@ pub trait ContainerTestRunner: TestRunner {
         volumes.insert(VOLUME_TARGET);
         volumes.insert(VOLUME_CARGO_GIT);
         volumes.insert(VOLUME_CARGO_REGISTRY);
-        for volume in command.capture_output()?.lines() {
+        for volume in command.check_output()?.lines() {
             volumes.take(volume);
         }
 
@@ -172,7 +174,7 @@ pub trait ContainerTestRunner: TestRunner {
             .collect();
         let mut command = dockercmd(["build"]);
         command.current_dir(app::path());
-        if atty::is(Stream::Stdout) {
+        if *IS_A_TTY {
             command.args(["--progress", "tty"]);
         }
         command.args([
@@ -181,8 +183,10 @@ pub trait ContainerTestRunner: TestRunner {
             &self.image_name(),
             "--file",
             dockerfile.to_str().unwrap(),
+            "--label",
+            "vector-test-runner=true",
             "--build-arg",
-            &format!("RUST_VERSION={}", self.get_rust_version()),
+            &format!("RUST_VERSION={}", get_rust_version()),
             ".",
         ]);
 
@@ -210,34 +214,43 @@ pub trait ContainerTestRunner: TestRunner {
     }
 
     fn create(&self) -> Result<()> {
-        let network_args = match self.network_name() {
-            Some(name) => vec!["--network".into(), name],
-            None => vec![],
-        };
-        let docker_sock = format!("{}:/var/run/docker.sock", DOCKER_SOCK.display());
+        let network_name = self.network_name().unwrap_or("host");
+
+        let docker_socket = format!("{}:/var/run/docker.sock", DOCKER_SOCKET.display());
         let docker_args = self
-            .needs_docker_sock()
-            .then(|| vec!["--volume", &docker_sock])
+            .needs_docker_socket()
+            .then(|| vec!["--volume", &docker_socket])
             .unwrap_or_default();
+
+        let volumes = self.volumes();
+        let volumes: Vec<_> = volumes
+            .iter()
+            .flat_map(|volume| ["--volume", volume])
+            .collect();
+
         dockercmd(
-            ["create", "--name", &self.container_name()]
-                .chain_args(network_args)
-                .chain_args([
-                    "--hostname",
-                    RUNNER_HOSTNAME,
-                    "--workdir",
-                    MOUNT_PATH,
-                    "--volume",
-                    &format!("{}:{MOUNT_PATH}", app::path()),
-                    "--volume",
-                    &format!("{VOLUME_TARGET}:{TARGET_PATH}"),
-                    "--volume",
-                    &format!("{VOLUME_CARGO_GIT}:/usr/local/cargo/git"),
-                    "--volume",
-                    &format!("{VOLUME_CARGO_REGISTRY}:/usr/local/cargo/registry"),
-                ])
-                .chain_args(docker_args)
-                .chain_args([&self.image_name(), "/bin/sleep", "infinity"]),
+            [
+                "create",
+                "--name",
+                &self.container_name(),
+                "--network",
+                network_name,
+                "--hostname",
+                RUNNER_HOSTNAME,
+                "--workdir",
+                MOUNT_PATH,
+                "--volume",
+                &format!("{}:{MOUNT_PATH}", app::path()),
+                "--volume",
+                &format!("{VOLUME_TARGET}:{TARGET_PATH}"),
+                "--volume",
+                &format!("{VOLUME_CARGO_GIT}:/usr/local/cargo/git"),
+                "--volume",
+                &format!("{VOLUME_CARGO_REGISTRY}:/usr/local/cargo/registry"),
+            ]
+            .chain_args(volumes)
+            .chain_args(docker_args)
+            .chain_args([&self.image_name(), "/bin/sleep", "infinity"]),
         )
         .wait(format!("Creating container {}", self.container_name()))
     }
@@ -247,25 +260,32 @@ impl<T> TestRunner for T
 where
     T: ContainerTestRunner,
 {
-    fn test(&self, outer_env: &EnvConfig, inner_env: &EnvConfig, args: &[String]) -> Result<()> {
+    fn test(
+        &self,
+        outer_env: &Environment,
+        inner_env: &Environment,
+        args: &[String],
+    ) -> Result<()> {
         self.ensure_running()?;
 
         let mut command = dockercmd(["exec"]);
-        if atty::is(Stream::Stdout) {
+        if *IS_A_TTY {
             command.arg("--tty");
         }
 
         command.args(["--env", &format!("CARGO_BUILD_TARGET_DIR={TARGET_PATH}")]);
-        if let Some(env_vars) = outer_env {
-            for (key, value) in env_vars {
+        for (key, value) in outer_env {
+            if let Some(value) = value {
                 command.env(key, value);
-                command.args(["--env", key]);
             }
+            command.args(["--env", key]);
         }
-        if let Some(env_vars) = inner_env {
-            for (key, value) in env_vars {
-                command.args(["--env", &format!("{key}={value}")]);
-            }
+        for (key, value) in inner_env {
+            command.arg("--env");
+            match value {
+                Some(value) => command.arg(format!("{key}={value}")),
+                None => command.arg(key),
+            };
         }
 
         command.arg(&self.container_name());
@@ -276,34 +296,45 @@ where
     }
 }
 
-pub struct IntegrationTestRunner {
-    integration: String,
-    needs_docker_sock: bool,
-    needs_network: bool,
+pub(super) struct IntegrationTestRunner {
+    // The integration is None when compiling the runner image with the `all-integration-tests` feature.
+    integration: Option<String>,
+    needs_docker_socket: bool,
+    network: Option<String>,
+    volumes: Vec<String>,
 }
 
 impl IntegrationTestRunner {
-    pub fn new(integration: String, needs_docker_sock: bool, needs_network: bool) -> Result<Self> {
+    pub(super) fn new(
+        integration: Option<String>,
+        config: &IntegrationRunnerConfig,
+        network: Option<String>,
+    ) -> Result<Self> {
         Ok(Self {
             integration,
-            needs_docker_sock,
-            needs_network,
+            needs_docker_socket: config.needs_docker_socket,
+            network,
+            volumes: config
+                .volumes
+                .iter()
+                .map(|(a, b)| format!("{a}:{b}"))
+                .collect(),
         })
     }
 
     pub(super) fn ensure_network(&self) -> Result<()> {
-        if let Some(network_name) = self.network_name() {
+        if let Some(network_name) = &self.network {
             let mut command = dockercmd(["network", "ls", "--format", "{{.Name}}"]);
 
             if command
-                .capture_output()?
+                .check_output()?
                 .lines()
                 .any(|network| network == network_name)
             {
                 return Ok(());
             }
 
-            dockercmd(["network", "create", &network_name]).wait("Creating network")
+            dockercmd(["network", "create", network_name]).wait("Creating network")
         } else {
             Ok(())
         }
@@ -311,63 +342,75 @@ impl IntegrationTestRunner {
 }
 
 impl ContainerTestRunner for IntegrationTestRunner {
-    fn network_name(&self) -> Option<String> {
-        self.needs_network
-            .then(|| format!("vector-integration-tests-{}", self.integration))
+    fn network_name(&self) -> Option<&str> {
+        self.network.as_deref()
     }
 
     fn container_name(&self) -> String {
-        format!(
-            "vector-test-runner-{}-{}",
-            self.integration,
-            self.get_rust_version()
-        )
+        if let Some(integration) = self.integration.as_ref() {
+            format!("vector-test-runner-{}-{}", integration, get_rust_version())
+        } else {
+            format!("vector-test-runner-{}", get_rust_version())
+        }
     }
 
     fn image_name(&self) -> String {
         format!("{}:latest", self.container_name())
     }
 
-    fn needs_docker_sock(&self) -> bool {
-        self.needs_docker_sock
+    fn needs_docker_socket(&self) -> bool {
+        self.needs_docker_socket
+    }
+
+    fn volumes(&self) -> Vec<String> {
+        self.volumes.clone()
     }
 }
 
 pub struct DockerTestRunner;
 
 impl ContainerTestRunner for DockerTestRunner {
-    fn network_name(&self) -> Option<String> {
+    fn network_name(&self) -> Option<&str> {
         None
     }
 
     fn container_name(&self) -> String {
-        format!("vector-test-runner-{}", self.get_rust_version())
+        format!("vector-test-runner-{}", get_rust_version())
     }
 
     fn image_name(&self) -> String {
         env::var("ENVIRONMENT_UPSTREAM").unwrap_or_else(|_| UPSTREAM_IMAGE.to_string())
     }
 
-    fn needs_docker_sock(&self) -> bool {
+    fn needs_docker_socket(&self) -> bool {
         false
+    }
+
+    fn volumes(&self) -> Vec<String> {
+        Vec::default()
     }
 }
 
 pub struct LocalTestRunner;
 
 impl TestRunner for LocalTestRunner {
-    fn test(&self, outer_env: &EnvConfig, inner_env: &EnvConfig, args: &[String]) -> Result<()> {
+    fn test(
+        &self,
+        outer_env: &Environment,
+        inner_env: &Environment,
+        args: &[String],
+    ) -> Result<()> {
         let mut command = Command::new(TEST_COMMAND[0]);
         command.args(&TEST_COMMAND[1..]);
         command.args(args);
 
-        if let Some(env_vars) = outer_env {
-            for (key, value) in env_vars {
+        for (key, value) in outer_env {
+            if let Some(value) = value {
                 command.env(key, value);
             }
         }
-        if let Some(env_vars) = inner_env {
-            for (key, value) in env_vars {
+        for (key, value) in inner_env {
+            if let Some(value) = value {
                 command.env(key, value);
             }
         }
@@ -376,7 +419,7 @@ impl TestRunner for LocalTestRunner {
     }
 }
 
-fn detect_docker_sock() -> PathBuf {
+fn detect_docker_socket() -> PathBuf {
     match env::var_os("DOCKER_HOST") {
         Some(host) => host
             .into_string()

@@ -4,13 +4,12 @@ mod recency;
 mod recorder;
 mod storage;
 
-use std::time::Duration;
+use std::{sync::OnceLock, time::Duration};
 
 use chrono::Utc;
 use metrics::Key;
 use metrics_tracing_context::TracingContextLayer;
 use metrics_util::layers::Layer;
-use once_cell::sync::OnceCell;
 use snafu::Snafu;
 
 pub use self::ddsketch::{AgentDDSketch, BinMap, Config};
@@ -29,7 +28,7 @@ pub enum Error {
     TimeoutMustBePositive { timeout: f64 },
 }
 
-static CONTROLLER: OnceCell<Controller> = OnceCell::new();
+static CONTROLLER: OnceLock<Controller> = OnceLock::new();
 
 // Cardinality counter parameters, expose the internal metrics registry
 // cardinality. Useful for the end users to help understand the characteristics
@@ -160,28 +159,6 @@ impl Controller {
         let timestamp = Utc::now();
 
         let mut metrics = self.recorder.with_registry(Registry::visit_metrics);
-
-        // Add aliases for deprecated metrics
-        for i in 0..metrics.len() {
-            let metric = &metrics[i];
-            match metric.name() {
-                "component_sent_events_total" => {
-                    let alias = metric.clone().with_name("processed_events_total");
-                    metrics.push(alias);
-                }
-                "component_sent_bytes_total" if metric.tag_matches("component_kind", "sink") => {
-                    let alias = metric.clone().with_name("processed_bytes_total");
-                    metrics.push(alias);
-                }
-                "component_received_bytes_total"
-                    if metric.tag_matches("component_kind", "source") =>
-                {
-                    let alias = metric.clone().with_name("processed_bytes_total");
-                    metrics.push(alias);
-                }
-                _ => {}
-            }
-        }
 
         #[allow(clippy::cast_precision_loss)]
         let value = (metrics.len() + 2) as f64;

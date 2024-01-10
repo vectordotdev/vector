@@ -3,9 +3,9 @@ package metadata
 remap: functions: replace: {
 	category: "String"
 	description: """
-		Replaces all matching instances of `pattern` in the `value`.
+		Replaces all matching instances of `pattern` in `value`.
 
-		The `pattern` argument accepts regular expression capture groups. Note that `$foo` is interpreted in a Vector configuration file, instead use `$$foo`.
+		The `pattern` argument accepts regular expression capture groups. **Note**: Use `$$foo` instead of `$foo`, which is interpreted in a configuration file.
 		"""
 
 	arguments: [
@@ -29,7 +29,7 @@ remap: functions: replace: {
 		},
 		{
 			name:        "count"
-			description: "The maximum number of replacements to perform. -1 means replace all matches."
+			description: "The maximum number of replacements to perform. `-1` means replace all matches."
 			required:    false
 			default:     -1
 			type: ["integer"]
@@ -48,7 +48,7 @@ remap: functions: replace: {
 			return: "Apples not Bananas"
 		},
 		{
-			title: "Replace via regular expression"
+			title: "Replace using regular expression"
 			source: #"""
 				replace("Apples and Bananas", r'(?i)bananas', "Pineapples")
 				"""#

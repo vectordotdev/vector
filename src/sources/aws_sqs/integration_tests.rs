@@ -1,12 +1,11 @@
 #![cfg(feature = "aws-sqs-integration-tests")]
 #![cfg(test)]
 
-use std::{collections::HashSet, str::FromStr, time::Duration};
+use std::{collections::HashSet, time::Duration};
 
-use aws_sdk_sqs::{output::CreateQueueOutput, Endpoint};
+use aws_sdk_sqs::operation::create_queue::CreateQueueOutput;
 use aws_types::region::Region;
 use futures::StreamExt;
-use http::Uri;
 use tokio::time::timeout;
 
 use crate::{
@@ -54,13 +53,11 @@ async fn get_sqs_client() -> aws_sdk_sqs::Client {
     let config = aws_sdk_sqs::config::Builder::new()
         .credentials_provider(
             AwsAuthentication::test_auth()
-                .credentials_provider(Region::new("custom"))
+                .credentials_provider(Region::new("custom"), &Default::default(), &None)
                 .await
                 .unwrap(),
         )
-        .endpoint_resolver(Endpoint::immutable(
-            Uri::from_str(sqs_address().as_str()).unwrap(),
-        ))
+        .endpoint_url(sqs_address())
         .region(Some(Region::new("us-east-1")))
         .build();
 
@@ -112,7 +109,7 @@ pub(crate) async fn test() {
         for event in events {
             let message = event
                 .as_log()
-                .get(log_schema().message_key())
+                .get(log_schema().message_key_target_path().unwrap())
                 .unwrap()
                 .to_string_lossy();
             if !expected_messages.remove(message.as_ref()) {

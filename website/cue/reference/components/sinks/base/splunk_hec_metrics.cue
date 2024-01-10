@@ -10,7 +10,7 @@ base: components: sinks: splunk_hec_metrics: configuration: {
 					Whether or not end-to-end acknowledgements are enabled.
 
 					When enabled for a sink, any source connected to that sink, where the source supports
-					end-to-end acknowledgements as well, will wait for events to be acknowledged by the sink
+					end-to-end acknowledgements as well, waits for events to be acknowledged by the sink
 					before acknowledging them at the source.
 
 					Enabling or disabling acknowledgements at the sink level takes precedence over any global
@@ -23,7 +23,7 @@ base: components: sinks: splunk_hec_metrics: configuration: {
 			}
 			indexer_acknowledgements_enabled: {
 				description: """
-					Controls if the sink will integrate with [Splunk HEC indexer acknowledgements][splunk_indexer_ack_docs] for end-to-end acknowledgements.
+					Controls if the sink integrates with [Splunk HEC indexer acknowledgements][splunk_indexer_ack_docs] for end-to-end acknowledgements.
 
 					[splunk_indexer_ack_docs]: https://docs.splunk.com/Documentation/Splunk/8.2.3/Data/AboutHECIDXAck
 					"""
@@ -34,18 +34,21 @@ base: components: sinks: splunk_hec_metrics: configuration: {
 				description: """
 					The maximum number of pending acknowledgements from events sent to the Splunk HEC collector.
 
-					Once reached, the sink will begin applying backpressure.
+					Once reached, the sink begins applying backpressure.
 					"""
 				required: false
 				type: uint: default: 1000000
 			}
 			query_interval: {
-				description: "The amount of time, in seconds, to wait in between queries to the Splunk HEC indexer acknowledgement endpoint."
+				description: "The amount of time to wait between queries to the Splunk HEC indexer acknowledgement endpoint."
 				required:    false
-				type: uint: default: 10
+				type: uint: {
+					default: 10
+					unit:    "seconds"
+				}
 			}
 			retry_limit: {
-				description: "The maximum number of times an acknowledgement ID will be queried for its status."
+				description: "The maximum number of times an acknowledgement ID is queried for its status."
 				required:    false
 				type: uint: default: 30
 			}
@@ -57,10 +60,10 @@ base: components: sinks: splunk_hec_metrics: configuration: {
 		type: object: options: {
 			max_bytes: {
 				description: """
-					The maximum size of a batch that will be processed by a sink.
+					The maximum size of a batch that is processed by a sink.
 
 					This is based on the uncompressed size of the batched events, before they are
-					serialized / compressed.
+					serialized/compressed.
 					"""
 				required: false
 				type: uint: {
@@ -99,10 +102,20 @@ base: components: sinks: splunk_hec_metrics: configuration: {
 					[gzip]: https://www.gzip.org/
 					"""
 				none: "No compression."
+				snappy: """
+					[Snappy][snappy] compression.
+
+					[snappy]: https://github.com/google/snappy/blob/main/docs/README.md
+					"""
 				zlib: """
-					[Zlib]][zlib] compression.
+					[Zlib][zlib] compression.
 
 					[zlib]: https://zlib.net/
+					"""
+				zstd: """
+					[Zstandard][zstd] compression.
+
+					[zstd]: https://facebook.github.io/zstd/
 					"""
 			}
 		}
@@ -115,25 +128,32 @@ base: components: sinks: splunk_hec_metrics: configuration: {
 			present, it is used as a prefix to the metric name, and separated with a period (`.`).
 			"""
 		required: false
-		type: string: {}
+		type: string: examples: ["service"]
 	}
 	default_token: {
 		description: """
 			Default Splunk HEC token.
 
-			If an event has a token set in its metadata, it will prevail over the one set here.
+			If an event has a token set in its metadata, it prevails over the one set here.
 			"""
 		required: true
-		type: string: {}
+		type: string: examples: ["${SPLUNK_HEC_TOKEN}", "A94A8FE5CCB19BA61C4C08"]
 	}
 	endpoint: {
-		description: "The base URL of the Splunk instance."
-		required:    true
-		type: string: {}
+		description: """
+			The base URL of the Splunk instance.
+
+			The scheme (`http` or `https`) must be specified. No path should be included since the paths defined
+			by the [`Splunk`][splunk] API are used.
+
+			[splunk]: https://docs.splunk.com/Documentation/Splunk/8.0.0/Data/HECRESTendpoints
+			"""
+		required: true
+		type: string: examples: ["https://http-inputs-hec.splunkcloud.com", "https://hec.splunk.com:8088", "http://example.com"]
 	}
 	host_key: {
 		description: """
-			Overrides the name of the log field used to grab the hostname to send to Splunk HEC.
+			Overrides the name of the log field used to retrieve the hostname to send to Splunk HEC.
 
 			By default, the [global `log_schema.host_key` option][global_host_key] is used.
 
@@ -146,16 +166,21 @@ base: components: sinks: splunk_hec_metrics: configuration: {
 		description: """
 			The name of the index where to send the events to.
 
-			If not specified, the default index is used.
+			If not specified, the default index defined within Splunk is used.
 			"""
 		required: false
-		type: string: syntax: "template"
+		type: string: {
+			examples: ["{{ host }}", "custom_index"]
+			syntax: "template"
+		}
 	}
 	request: {
 		description: """
 			Middleware settings for outbound requests.
 
-			Various settings can be configured, such as concurrency and rate limits, timeouts, etc.
+			Various settings can be configured, such as concurrency and rate limits, timeouts, retry behavior, etc.
+
+			Note that the retry backoff policy follows the Fibonacci sequence.
 			"""
 		required: false
 		type: object: options: {
@@ -193,6 +218,26 @@ base: components: sinks: splunk_hec_metrics: configuration: {
 						required: false
 						type: float: default: 0.4
 					}
+					initial_concurrency: {
+						description: """
+																The initial concurrency limit to use. If not specified, the initial limit will be 1 (no concurrency).
+
+																It is recommended to set this value to your service's average limit if you're seeing that it takes a
+																long time to ramp up adaptive concurrency after a restart. You can find this value by looking at the
+																`adaptive_concurrency_limit` metric.
+																"""
+						required: false
+						type: uint: default: 1
+					}
+					max_concurrency_limit: {
+						description: """
+																The maximum concurrency limit.
+
+																The adaptive request concurrency limit will not go above this bound. This is put in place as a safeguard.
+																"""
+						required: false
+						type: uint: default: 200
+					}
 					rtt_deviation_scale: {
 						description: """
 																Scale of RTT deviations which are not considered anomalous.
@@ -210,11 +255,16 @@ base: components: sinks: splunk_hec_metrics: configuration: {
 				}
 			}
 			concurrency: {
-				description: "Configuration for outbound request concurrency."
-				required:    false
+				description: """
+					Configuration for outbound request concurrency.
+
+					This can be set either to one of the below enum values or to a positive integer, which denotes
+					a fixed concurrency limit.
+					"""
+				required: false
 				type: {
 					string: {
-						default: "none"
+						default: "adaptive"
 						enum: {
 							adaptive: """
 															Concurrency will be managed by Vector's [Adaptive Request Concurrency][arc] feature.
@@ -248,12 +298,8 @@ base: components: sinks: splunk_hec_metrics: configuration: {
 				}
 			}
 			retry_attempts: {
-				description: """
-					The maximum number of retries to make for failed requests.
-
-					The default, for all intents and purposes, represents an infinite number of retries.
-					"""
-				required: false
+				description: "The maximum number of retries to make for failed requests."
+				required:    false
 				type: uint: {
 					default: 9223372036854775807
 					unit:    "retries"
@@ -263,7 +309,7 @@ base: components: sinks: splunk_hec_metrics: configuration: {
 				description: """
 					The amount of time to wait before attempting the first retry for a failed request.
 
-					After the first retry has failed, the fibonacci sequence will be used to select future backoffs.
+					After the first retry has failed, the fibonacci sequence is used to select future backoffs.
 					"""
 				required: false
 				type: uint: {
@@ -271,11 +317,31 @@ base: components: sinks: splunk_hec_metrics: configuration: {
 					unit:    "seconds"
 				}
 			}
+			retry_jitter_mode: {
+				description: "The jitter mode to use for retry backoff behavior."
+				required:    false
+				type: string: {
+					default: "Full"
+					enum: {
+						Full: """
+															Full jitter.
+
+															The random delay is anywhere from 0 up to the maximum current delay calculated by the backoff
+															strategy.
+
+															Incorporating full jitter into your backoff strategy can greatly reduce the likelihood
+															of creating accidental denial of service (DoS) conditions against your own systems when
+															many clients are recovering from a failure state.
+															"""
+						None: "No jitter."
+					}
+				}
+			}
 			retry_max_duration_secs: {
 				description: "The maximum amount of time to wait between retries."
 				required:    false
 				type: uint: {
-					default: 3600
+					default: 30
 					unit:    "seconds"
 				}
 			}
@@ -283,7 +349,7 @@ base: components: sinks: splunk_hec_metrics: configuration: {
 				description: """
 					The time a request can take before being aborted.
 
-					It is highly recommended that you do not lower this value below the service’s internal timeout, as this could
+					Datadog highly recommends that you do not lower this value below the service's internal timeout, as this could
 					create orphaned requests, pile on retries, and result in duplicate data downstream.
 					"""
 				required: false
@@ -300,19 +366,25 @@ base: components: sinks: splunk_hec_metrics: configuration: {
 
 			This is typically the filename the logs originated from.
 
-			If unset, the Splunk collector will set it.
+			If unset, the Splunk collector sets it.
 			"""
 		required: false
-		type: string: syntax: "template"
+		type: string: {
+			examples: ["{{ file }}", "/var/log/syslog", "UDP:514"]
+			syntax: "template"
+		}
 	}
 	sourcetype: {
 		description: """
 			The sourcetype of events sent to this sink.
 
-			If unset, Splunk will default to `httpevent`.
+			If unset, Splunk defaults to `httpevent`.
 			"""
 		required: false
-		type: string: syntax: "template"
+		type: string: {
+			examples: ["{{ sourcetype }}", "_json"]
+			syntax: "template"
+		}
 	}
 	tls: {
 		description: "TLS configuration."
@@ -322,8 +394,8 @@ base: components: sinks: splunk_hec_metrics: configuration: {
 				description: """
 					Sets the list of supported ALPN protocols.
 
-					Declare the supported ALPN protocols, which are used during negotiation with peer. Prioritized in the order
-					they are defined.
+					Declare the supported ALPN protocols, which are used during negotiation with peer. They are prioritized in the order
+					that they are defined.
 					"""
 				required: false
 				type: array: items: type: string: examples: ["h2"]
@@ -371,10 +443,10 @@ base: components: sinks: splunk_hec_metrics: configuration: {
 				description: """
 					Enables certificate verification.
 
-					If enabled, certificates must be valid in terms of not being expired, as well as being issued by a trusted
-					issuer. This verification operates in a hierarchical manner, checking that not only the leaf certificate (the
-					certificate presented by the client/server) is valid, but also that the issuer of that certificate is valid, and
-					so on until reaching a root certificate.
+					If enabled, certificates must not be expired and must be issued by a trusted
+					issuer. This verification operates in a hierarchical manner, checking that the leaf certificate (the
+					certificate presented by the client/server) is not only valid, but that the issuer of that certificate is also valid, and
+					so on until the verification process reaches a root certificate.
 
 					Relevant for both incoming and outgoing connections.
 

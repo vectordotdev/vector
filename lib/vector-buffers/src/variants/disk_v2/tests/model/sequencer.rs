@@ -25,11 +25,9 @@ impl<T> TrackedFuture<T> {
     where
         F: Future<Output = T> + Send + 'static,
     {
-        let wrapped = async move { fut.await };
-
         Self {
             polled_once: false,
-            fut: spawn(wrapped.boxed()),
+            fut: spawn(fut.boxed()),
         }
     }
 

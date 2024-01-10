@@ -7,7 +7,7 @@ components: sources: apache_metrics: {
 		commonly_used: false
 		delivery:      "at_least_once"
 		deployment_roles: ["daemon", "sidecar"]
-		development:   "beta"
+		development:   "stable"
 		egress_method: "batch"
 		stateful:      false
 	}
@@ -78,7 +78,7 @@ components: sources: apache_metrics: {
 			description:       "The total number of time the Apache server has been accessed."
 			type:              "gauge"
 			default_namespace: "apache"
-			tags:              _apache_metrics_tags & {
+			tags: _apache_metrics_tags & {
 				state: {
 					description: "The state of the connection"
 					required:    true
@@ -98,7 +98,7 @@ components: sources: apache_metrics: {
 			relevant_when:     "`ExtendedStatus On`"
 			type:              "counter"
 			default_namespace: "apache"
-			tags:              _apache_metrics_tags & {
+			tags: _apache_metrics_tags & {
 				state: {
 					description: "The state of the connection"
 					required:    true
@@ -117,7 +117,7 @@ components: sources: apache_metrics: {
 			description:       "The amount of times various Apache server tasks have been run."
 			type:              "gauge"
 			default_namespace: "apache"
-			tags:              _apache_metrics_tags & {
+			tags: _apache_metrics_tags & {
 				state: {
 					description: "The connect state"
 					required:    true
@@ -148,7 +148,7 @@ components: sources: apache_metrics: {
 			description:       "Apache worker statuses."
 			type:              "gauge"
 			default_namespace: "apache"
-			tags:              _apache_metrics_tags & {
+			tags: _apache_metrics_tags & {
 				state: {
 					description: "The state of the worker"
 					required:    true
@@ -161,18 +161,7 @@ components: sources: apache_metrics: {
 	how_it_works: {}
 
 	telemetry: metrics: {
-		component_discarded_events_total:     components.sources.internal_metrics.output.metrics.component_discarded_events_total
-		component_errors_total:               components.sources.internal_metrics.output.metrics.component_errors_total
-		component_received_bytes_total:       components.sources.internal_metrics.output.metrics.component_received_bytes_total
-		component_received_events_total:      components.sources.internal_metrics.output.metrics.component_received_events_total
-		component_received_event_bytes_total: components.sources.internal_metrics.output.metrics.component_received_event_bytes_total
-		events_in_total:                      components.sources.internal_metrics.output.metrics.events_in_total
-		http_error_response_total:            components.sources.internal_metrics.output.metrics.http_error_response_total
-		http_request_errors_total:            components.sources.internal_metrics.output.metrics.http_request_errors_total
-		parse_errors_total:                   components.sources.internal_metrics.output.metrics.parse_errors_total
-		processed_bytes_total:                components.sources.internal_metrics.output.metrics.processed_bytes_total
-		processed_events_total:               components.sources.internal_metrics.output.metrics.processed_events_total
-		requests_completed_total:             components.sources.internal_metrics.output.metrics.requests_completed_total
-		request_duration_seconds:             components.sources.internal_metrics.output.metrics.request_duration_seconds
+		http_client_responses_total:      components.sources.internal_metrics.output.metrics.http_client_responses_total
+		http_client_response_rtt_seconds: components.sources.internal_metrics.output.metrics.http_client_response_rtt_seconds
 	}
 }

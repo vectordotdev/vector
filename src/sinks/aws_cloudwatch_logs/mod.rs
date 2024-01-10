@@ -6,6 +6,7 @@ mod retry;
 mod service;
 mod sink;
 
+#[cfg(all(test, feature = "aws-cloudwatch-logs-integration-tests"))]
 mod integration_tests;
 
 pub use self::config::CloudwatchLogsSinkConfig;

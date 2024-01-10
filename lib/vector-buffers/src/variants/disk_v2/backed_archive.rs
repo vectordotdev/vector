@@ -71,7 +71,7 @@ where
         for<'a> T::Archived: CheckBytes<DefaultValidator<'a>>,
     {
         // Validate that the input is, well, valid.
-        let _ = check_archived_root::<T>(backing.as_ref())?;
+        _ = check_archived_root::<T>(backing.as_ref())?;
 
         // Now that we know the buffer fits T, we're good to go!
         Ok(Self {
@@ -110,7 +110,7 @@ where
     {
         // Serialize our value so we can shove it into the backing.
         let mut serializer = DefaultSerializer::default();
-        let _ = serializer
+        _ = serializer
             .serialize_value(&value)
             .map_err(|e| SerializeError::FailedToSerialize(e.to_string()))?;
 

@@ -47,6 +47,37 @@ base: components: sources: prometheus_remote_write: configuration: {
 			}
 		}
 	}
+	keepalive: {
+		description: "Configuration of HTTP server keepalive parameters."
+		required:    false
+		type: object: options: {
+			max_connection_age_jitter_factor: {
+				description: """
+					The factor by which to jitter the `max_connection_age_secs` value.
+
+					A value of 0.1 means that the actual duration will be between 90% and 110% of the
+					specified maximum duration.
+					"""
+				required: false
+				type: float: default: 0.1
+			}
+			max_connection_age_secs: {
+				description: """
+					The maximum amount of time a connection may exist before it is closed
+					by sending a `Connection: close` header on the HTTP response.
+
+					A random jitter configured by `max_connection_age_jitter_factor` is added
+					to the specified duration to spread out connection storms.
+					"""
+				required: false
+				type: uint: {
+					default: 300
+					examples: [600]
+					unit: "seconds"
+				}
+			}
+		}
+	}
 	tls: {
 		description: "Configures the TLS options for incoming/outgoing connections."
 		required:    false
@@ -55,8 +86,8 @@ base: components: sources: prometheus_remote_write: configuration: {
 				description: """
 					Sets the list of supported ALPN protocols.
 
-					Declare the supported ALPN protocols, which are used during negotiation with peer. Prioritized in the order
-					they are defined.
+					Declare the supported ALPN protocols, which are used during negotiation with peer. They are prioritized in the order
+					that they are defined.
 					"""
 				required: false
 				type: array: items: type: string: examples: ["h2"]
@@ -84,7 +115,7 @@ base: components: sources: prometheus_remote_write: configuration: {
 			}
 			enabled: {
 				description: """
-					Whether or not to require TLS for incoming/outgoing connections.
+					Whether or not to require TLS for incoming or outgoing connections.
 
 					When enabled and used for incoming connections, an identity certificate is also required. See `tls.crt_file` for
 					more information.
@@ -114,10 +145,10 @@ base: components: sources: prometheus_remote_write: configuration: {
 				description: """
 					Enables certificate verification.
 
-					If enabled, certificates must be valid in terms of not being expired, as well as being issued by a trusted
-					issuer. This verification operates in a hierarchical manner, checking that not only the leaf certificate (the
-					certificate presented by the client/server) is valid, but also that the issuer of that certificate is valid, and
-					so on until reaching a root certificate.
+					If enabled, certificates must not be expired and must be issued by a trusted
+					issuer. This verification operates in a hierarchical manner, checking that the leaf certificate (the
+					certificate presented by the client/server) is not only valid, but that the issuer of that certificate is also valid, and
+					so on until the verification process reaches a root certificate.
 
 					Relevant for both incoming and outgoing connections.
 

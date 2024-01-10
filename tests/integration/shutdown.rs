@@ -1,4 +1,5 @@
 use std::{
+    fs::create_dir,
     fs::read_dir,
     io::Write,
     net::SocketAddr,
@@ -198,6 +199,77 @@ fn log_schema() {
     // Output
     let event: Value = serde_json::from_slice(output.stdout.as_slice()).unwrap();
     assert_eq!(event["test_msg"], json!("42"));
+}
+
+#[test]
+fn log_schema_multiple_config_files() {
+    // Vector command
+    let mut cmd = Command::cargo_bin("vector").unwrap();
+
+    let config_dir = create_directory();
+
+    let sinks_config_dir = config_dir.join("sinks");
+    create_dir(sinks_config_dir.clone()).unwrap();
+
+    let sources_config_dir = config_dir.join("sources");
+    create_dir(sources_config_dir.clone()).unwrap();
+
+    let input_dir = create_directory();
+    let input_file = input_dir.join("input_file");
+
+    overwrite_file(
+        config_dir.join("vector.toml"),
+        r#"
+    data_dir = "${VECTOR_DATA_DIR}"
+    log_schema.host_key = "test_host"
+    "#,
+    );
+
+    overwrite_file(
+        sources_config_dir.join("in_file.toml"),
+        r#"
+    type = "file"
+    include = ["${VECTOR_TEST_INPUT_FILE}"]
+    "#,
+    );
+
+    overwrite_file(
+        sinks_config_dir.join("out_console.toml"),
+        r#"
+    inputs = ["in_file"]
+    type = "console"
+    encoding.codec = "json"
+    "#,
+    );
+
+    overwrite_file(
+        input_file.clone(),
+        r#"42
+    "#,
+    );
+
+    cmd.arg("--quiet")
+        .env("VECTOR_CONFIG_DIR", config_dir)
+        .env("VECTOR_DATA_DIR", create_directory())
+        .env("VECTOR_TEST_INPUT_FILE", input_file.clone());
+
+    // Run vector
+    let vector = cmd.stdout(std::process::Stdio::piped()).spawn().unwrap();
+
+    // Give vector time to start.
+    sleep(STARTUP_TIME);
+
+    // Signal shutdown
+    kill(Pid::from_raw(vector.id() as i32), Signal::SIGTERM).unwrap();
+
+    // Wait for shutdown
+    let output = vector.wait_with_output().unwrap();
+    assert!(output.status.success(), "Vector didn't exit successfully.");
+
+    // Output
+    let event: Value = serde_json::from_slice(output.stdout.as_slice()).unwrap();
+    assert_eq!(event["message"], json!("42"));
+    assert_eq!(event["test_host"], json!("runner"));
 }
 
 #[test]

@@ -14,6 +14,7 @@ components: sinks: axiom: {
 
 	features: {
 		acknowledgements: true
+		auto_generated:   true
 		healthcheck: enabled: true
 		send: {
 			batch: {
@@ -64,48 +65,7 @@ components: sinks: axiom: {
 		notices: []
 	}
 
-	configuration: {
-		token: {
-			description: "Your Axiom token"
-			required:    true
-			warnings: []
-			type: string: {
-				examples: ["xxxx", "${AXIOM_TOKEN}"]
-				syntax: "literal"
-			}
-		}
-		dataset: {
-			description: "Your Axiom dataset"
-			required:    true
-			warnings: []
-			type: string: {
-				examples: ["vector.dev"]
-				syntax: "literal"
-			}
-		}
-		url: {
-			description: "Your Axiom URL (only required if not Axiom Cloud)"
-			common:      false
-			required:    false
-			warnings: []
-			type: string: {
-				examples: ["https://cloud.axiom.co", "${AXIOM_URL}"]
-				syntax:  "literal"
-				default: ""
-			}
-		}
-		org_id: {
-			description: "Your Axiom Org ID (only required for personal tokens)"
-			common:      false
-			required:    false
-			warnings: []
-			type: string: {
-				examples: ["xxxx", "${AXIOM_ORG_ID}"]
-				syntax:  "literal"
-				default: ""
-			}
-		}
-	}
+	configuration: base.components.sinks.axiom.configuration
 
 	input: {
 		logs: true
@@ -129,14 +89,5 @@ components: sinks: axiom: {
 				2. Once registered, create a new dataset and create an API token for it
 				"""
 		}
-	}
-
-	telemetry: metrics: {
-		component_sent_bytes_total:       components.sources.internal_metrics.output.metrics.component_sent_bytes_total
-		component_sent_events_total:      components.sources.internal_metrics.output.metrics.component_sent_events_total
-		component_sent_event_bytes_total: components.sources.internal_metrics.output.metrics.component_sent_event_bytes_total
-		events_discarded_total:           components.sources.internal_metrics.output.metrics.events_discarded_total
-		events_out_total:                 components.sources.internal_metrics.output.metrics.events_out_total
-		processing_errors_total:          components.sources.internal_metrics.output.metrics.processing_errors_total
 	}
 }

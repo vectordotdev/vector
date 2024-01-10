@@ -58,7 +58,7 @@ build() {
 
 echo "Building $REPO:* Docker images"
 
-if [[ "$CHANNEL" == "latest" ]]; then
+if [[ "$CHANNEL" == "release" ]]; then
   VERSION_EXACT="$VERSION"
   # shellcheck disable=SC2001
   VERSION_MINOR_X=$(echo "$VERSION" | sed 's/\.[0-9]*$/.X/g')
@@ -78,6 +78,11 @@ elif [[ "$CHANNEL" == "nightly" ]]; then
     build distroless-static "$VERSION_TAG"
     build distroless-libc "$VERSION_TAG"
   done
+elif [[ "$CHANNEL" == "custom" ]]; then
+  build alpine "$VERSION"
+  build debian "$VERSION"
+  build distroless-static "$VERSION"
+  build distroless-libc "$VERSION"
 elif [[ "$CHANNEL" == "test" ]]; then
   build "${BASE:-"alpine"}" "${TAG:-"test"}"
   build "${BASE:-"distroless-libc"}" "${TAG:-"test"}"

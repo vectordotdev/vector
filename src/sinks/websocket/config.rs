@@ -1,8 +1,8 @@
 use std::num::NonZeroU64;
 
-use codecs::JsonSerializerConfig;
 use snafu::ResultExt;
-use vector_config::configurable_component;
+use vector_lib::codecs::JsonSerializerConfig;
+use vector_lib::configurable::configurable_component;
 
 use crate::{
     codecs::EncodingConfig,
@@ -16,7 +16,10 @@ use crate::{
 };
 
 /// Configuration for the `websocket` sink.
-#[configurable_component(sink("websocket"))]
+#[configurable_component(sink(
+    "websocket",
+    "Deliver observability event data to a websocket listener."
+))]
 #[derive(Clone, Debug)]
 pub struct WebSocketSinkConfig {
     /// The WebSocket URI to connect to.
@@ -78,6 +81,7 @@ impl GenerateConfig for WebSocketSinkConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "websocket")]
 impl SinkConfig for WebSocketSinkConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let connector = self.build_connector()?;
@@ -90,7 +94,7 @@ impl SinkConfig for WebSocketSinkConfig {
     }
 
     fn input(&self) -> Input {
-        Input::log()
+        Input::new(self.encoding.config().input_type())
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {

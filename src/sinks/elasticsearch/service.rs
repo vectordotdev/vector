@@ -4,34 +4,35 @@ use std::{
     task::{Context, Poll},
 };
 
-use aws_types::credentials::SharedCredentialsProvider;
-use aws_types::region::Region;
 use bytes::Bytes;
 use futures::future::BoxFuture;
 use http::{Response, Uri};
 use hyper::{service::Service, Body, Request};
 use tower::ServiceExt;
-use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
-use vector_core::{internal_event::CountByteSize, stream::DriverResponse, ByteSizeOf};
+use vector_lib::stream::DriverResponse;
+use vector_lib::ByteSizeOf;
+use vector_lib::{
+    json_size::JsonSize,
+    request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata},
+};
 
-use crate::sinks::elasticsearch::sign_request;
+use super::{ElasticsearchCommon, ElasticsearchConfig};
 use crate::{
     event::{EventFinalizers, EventStatus, Finalizable},
-    http::{Auth, HttpClient},
+    http::HttpClient,
     sinks::util::{
+        auth::Auth,
         http::{HttpBatchService, RequestConfig},
         Compression, ElementCount,
     },
 };
-
-use super::{ElasticsearchCommon, ElasticsearchConfig};
 
 #[derive(Clone, Debug)]
 pub struct ElasticsearchRequest {
     pub payload: Bytes,
     pub finalizers: EventFinalizers,
     pub batch_size: usize,
-    pub events_byte_size: usize,
+    pub events_byte_size: JsonSize,
     pub metadata: RequestMetadata,
 }
 
@@ -54,13 +55,20 @@ impl Finalizable for ElasticsearchRequest {
 }
 
 impl MetaDescriptive for ElasticsearchRequest {
-    fn get_metadata(&self) -> RequestMetadata {
-        self.metadata
+    fn get_metadata(&self) -> &RequestMetadata {
+        &self.metadata
+    }
+
+    fn metadata_mut(&mut self) -> &mut RequestMetadata {
+        &mut self.metadata
     }
 }
 
 #[derive(Clone)]
 pub struct ElasticsearchService {
+    // TODO: `HttpBatchService` has been deprecated for direct use in sinks.
+    //       This sink should undergo a refactor to utilize the `HttpService`
+    //       instead, which extracts much of the boilerplate code for `Service`.
     batch_service: HttpBatchService<
         BoxFuture<'static, Result<http::Request<Bytes>, crate::Error>>,
         ElasticsearchRequest,
@@ -86,11 +94,9 @@ impl ElasticsearchService {
 pub struct HttpRequestBuilder {
     pub bulk_uri: Uri,
     pub query_params: HashMap<String, String>,
-    pub region: Option<Region>,
+    pub auth: Option<Auth>,
     pub compression: Compression,
     pub http_request_config: RequestConfig,
-    pub http_auth: Option<Auth>,
-    pub credentials_provider: Option<SharedCredentialsProvider>,
 }
 
 impl HttpRequestBuilder {
@@ -98,11 +104,9 @@ impl HttpRequestBuilder {
         HttpRequestBuilder {
             bulk_uri: common.bulk_uri.clone(),
             http_request_config: config.request.clone(),
-            http_auth: common.http_auth.clone(),
+            auth: common.auth.clone(),
             query_params: common.query_params.clone(),
-            region: common.region.clone(),
             compression: config.compression,
-            credentials_provider: common.aws_auth.clone(),
         }
     }
 
@@ -126,16 +130,28 @@ impl HttpRequestBuilder {
             builder = builder.header(&header[..], &value[..]);
         }
 
-        if let Some(auth) = &self.http_auth {
-            builder = auth.apply_builder(builder);
-        }
-
         let mut request = builder
             .body(es_req.payload)
             .expect("Invalid http request value used");
 
-        if let Some(credentials_provider) = &self.credentials_provider {
-            sign_request(&mut request, credentials_provider, &self.region).await?;
+        if let Some(auth) = &self.auth {
+            match auth {
+                Auth::Basic(auth) => {
+                    auth.apply(&mut request);
+                }
+                #[cfg(feature = "aws-core")]
+                Auth::Aws {
+                    credentials_provider: provider,
+                    region,
+                } => {
+                    crate::sinks::elasticsearch::sign_request(
+                        &mut request,
+                        provider,
+                        &Some(region.clone()),
+                    )
+                    .await?;
+                }
+            }
         }
 
         Ok(request)
@@ -146,7 +162,7 @@ pub struct ElasticsearchResponse {
     pub http_response: Response<Bytes>,
     pub event_status: EventStatus,
     pub batch_size: usize,
-    pub events_byte_size: usize,
+    pub events_byte_size: GroupedCountByteSize,
 }
 
 impl DriverResponse for ElasticsearchResponse {
@@ -154,8 +170,8 @@ impl DriverResponse for ElasticsearchResponse {
         self.event_status
     }
 
-    fn events_sent(&self) -> CountByteSize {
-        CountByteSize(self.batch_size, self.events_byte_size)
+    fn events_sent(&self) -> &GroupedCountByteSize {
+        &self.events_byte_size
     }
 }
 
@@ -170,12 +186,13 @@ impl Service<ElasticsearchRequest> for ElasticsearchService {
     }
 
     // Emission of internal events for errors and dropped events is handled upstream by the caller.
-    fn call(&mut self, req: ElasticsearchRequest) -> Self::Future {
+    fn call(&mut self, mut req: ElasticsearchRequest) -> Self::Future {
         let mut http_service = self.batch_service.clone();
         Box::pin(async move {
             http_service.ready().await?;
             let batch_size = req.batch_size;
-            let events_byte_size = req.events_byte_size;
+            let events_byte_size =
+                std::mem::take(req.metadata_mut()).into_events_estimated_json_encoded_byte_size();
             let http_response = http_service.call(req).await?;
 
             let event_status = get_event_status(&http_response);

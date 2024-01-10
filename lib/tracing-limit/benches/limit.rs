@@ -97,7 +97,7 @@ struct Visitor<'a>(MutexGuard<'a, String>);
 impl<'a> field::Visit for Visitor<'a> {
     fn record_debug(&mut self, _field: &field::Field, value: &dyn fmt::Debug) {
         use std::fmt::Write;
-        let _ = write!(&mut *self.0, "{:?}", value);
+        _ = write!(&mut *self.0, "{:?}", value);
     }
 }
 
@@ -110,7 +110,7 @@ where
     }
 
     fn enabled(&self, metadata: &Metadata<'_>, _ctx: Context<'_, S>) -> bool {
-        let _ = metadata;
+        _ = metadata;
         true
     }
 
@@ -130,23 +130,23 @@ where
     }
 
     fn on_follows_from(&self, id: &span::Id, follows: &span::Id, _ctx: Context<'_, S>) {
-        let _ = (id, follows);
+        _ = (id, follows);
     }
 
     fn on_enter(&self, id: &span::Id, _ctx: Context<'_, S>) {
-        let _ = id;
+        _ = id;
     }
 
     fn on_exit(&self, id: &span::Id, _ctx: Context<'_, S>) {
-        let _ = id;
+        _ = id;
     }
 
     fn on_close(&self, id: span::Id, _ctx: Context<'_, S>) {
-        let _ = id;
+        _ = id;
     }
 
     fn on_id_change(&self, old: &span::Id, new: &span::Id, _ctx: Context<'_, S>) {
-        let _ = (old, new);
+        _ = (old, new);
     }
 }
 

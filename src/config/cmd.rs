@@ -20,8 +20,8 @@ pub struct Opts {
 
     /// Read configuration from one or more files. Wildcard paths are supported.
     /// File format is detected from the file name.
-    /// If zero files are specified the default config path
-    /// `/etc/vector/vector.toml` will be targeted.
+    /// If zero files are specified, the deprecated default config path
+    /// `/etc/vector/vector.yaml` is targeted.
     #[arg(
         id = "config",
         short,
@@ -200,10 +200,14 @@ mod tests {
         SeedableRng,
     };
     use serde_json::json;
-    use vector_config::component::{SinkDescription, SourceDescription, TransformDescription};
+    use vector_lib::configurable::component::{
+        SinkDescription, SourceDescription, TransformDescription,
+    };
 
+    use crate::config::Format;
     use crate::{
         config::{cmd::serialize_to_json, vars, ConfigBuilder},
+        generate,
         generate::{generate_example, TransformInputsStrategy},
     };
 
@@ -251,6 +255,7 @@ mod tests {
                 (env_var.to_string(), "syslog".to_string()),
                 (env_var_in_arr.to_string(), "in".to_string()),
             ]),
+            true,
         )
         .unwrap();
 
@@ -325,13 +330,13 @@ mod tests {
                 .collect::<Vec<_>>()
                 .join(","),
         );
-        generate_example(
-            false,
-            generate_config_str.as_ref(),
-            &None,
-            TransformInputsStrategy::All,
-        )
-        .expect("invalid config generated")
+        let opts = generate::Opts {
+            fragment: true,
+            expression: generate_config_str.to_string(),
+            file: None,
+            format: Format::Toml,
+        };
+        generate_example(&opts, TransformInputsStrategy::All).expect("invalid config generated")
     }
 
     proptest! {

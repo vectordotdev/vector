@@ -7,9 +7,9 @@ use std::{
 
 use lookup::lookup_v2::OptionalValuePath;
 use openssl::{
-    pkcs12::{ParsedPkcs12, Pkcs12},
+    pkcs12::{ParsedPkcs12_2, Pkcs12},
     pkey::{PKey, Private},
-    ssl::{ConnectConfiguration, SslContextBuilder, SslVerifyMode},
+    ssl::{select_next_proto, AlpnError, ConnectConfiguration, SslContextBuilder, SslVerifyMode},
     stack::Stack,
     x509::{store::X509StoreBuilder, X509},
 };
@@ -39,9 +39,10 @@ pub const TEST_PEM_CLIENT_KEY_PATH: &str =
 
 /// Configures the TLS options for incoming/outgoing connections.
 #[configurable_component]
+#[configurable(metadata(docs::advanced))]
 #[derive(Clone, Debug, Default)]
 pub struct TlsEnableableConfig {
-    /// Whether or not to require TLS for incoming/outgoing connections.
+    /// Whether or not to require TLS for incoming or outgoing connections.
     ///
     /// When enabled and used for incoming connections, an identity certificate is also required. See `tls.crt_file` for
     /// more information.
@@ -67,7 +68,7 @@ impl TlsEnableableConfig {
     }
 }
 
-/// TlsEnableableConfig for `sources`, adding metadata from the client certificate
+/// TlsEnableableConfig for `sources`, adding metadata from the client certificate.
 #[configurable_component]
 #[derive(Clone, Debug, Default)]
 pub struct TlsSourceConfig {
@@ -80,15 +81,16 @@ pub struct TlsSourceConfig {
 
 /// TLS configuration.
 #[configurable_component]
+#[configurable(metadata(docs::advanced))]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct TlsConfig {
     /// Enables certificate verification.
     ///
-    /// If enabled, certificates must be valid in terms of not being expired, as well as being issued by a trusted
-    /// issuer. This verification operates in a hierarchical manner, checking that not only the leaf certificate (the
-    /// certificate presented by the client/server) is valid, but also that the issuer of that certificate is valid, and
-    /// so on until reaching a root certificate.
+    /// If enabled, certificates must not be expired and must be issued by a trusted
+    /// issuer. This verification operates in a hierarchical manner, checking that the leaf certificate (the
+    /// certificate presented by the client/server) is not only valid, but that the issuer of that certificate is also valid, and
+    /// so on until the verification process reaches a root certificate.
     ///
     /// Relevant for both incoming and outgoing connections.
     ///
@@ -107,8 +109,8 @@ pub struct TlsConfig {
 
     /// Sets the list of supported ALPN protocols.
     ///
-    /// Declare the supported ALPN protocols, which are used during negotiation with peer. Prioritized in the order
-    /// they are defined.
+    /// Declare the supported ALPN protocols, which are used during negotiation with peer. They are prioritized in the order
+    /// that they are defined.
     #[configurable(metadata(docs::examples = "h2"))]
     pub alpn_protocols: Option<Vec<String>>,
 
@@ -117,6 +119,7 @@ pub struct TlsConfig {
     /// The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
     #[serde(alias = "ca_path")]
     #[configurable(metadata(docs::examples = "/path/to/certificate_authority.crt"))]
+    #[configurable(metadata(docs::human_name = "CA File Path"))]
     pub ca_file: Option<PathBuf>,
 
     /// Absolute path to a certificate file used to identify this server.
@@ -127,6 +130,7 @@ pub struct TlsConfig {
     /// If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
     #[serde(alias = "crt_path")]
     #[configurable(metadata(docs::examples = "/path/to/host_certificate.crt"))]
+    #[configurable(metadata(docs::human_name = "Certificate File Path"))]
     pub crt_file: Option<PathBuf>,
 
     /// Absolute path to a private key file used to identify this server.
@@ -134,6 +138,7 @@ pub struct TlsConfig {
     /// The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
     #[serde(alias = "key_path")]
     #[configurable(metadata(docs::examples = "/path/to/host_certificate.key"))]
+    #[configurable(metadata(docs::human_name = "Key File Path"))]
     pub key_file: Option<PathBuf>,
 
     /// Passphrase used to unlock the encrypted key file.
@@ -141,6 +146,7 @@ pub struct TlsConfig {
     /// This has no effect unless `key_file` is set.
     #[configurable(metadata(docs::examples = "${KEY_PASS_ENV_VAR}"))]
     #[configurable(metadata(docs::examples = "PassWord1"))]
+    #[configurable(metadata(docs::human_name = "Key File Password"))]
     pub key_pass: Option<String>,
 }
 
@@ -200,7 +206,12 @@ impl TlsSettings {
         })
     }
 
-    fn identity(&self) -> Option<ParsedPkcs12> {
+    /// Returns the identity as PKCS12
+    ///
+    /// # Panics
+    ///
+    /// Panics if the identity is invalid.
+    fn identity(&self) -> Option<ParsedPkcs12_2> {
         // This data was test-built previously, so we can just use it
         // here and expect the results will not fail. This can all be
         // reworked when `openssl::pkcs12::ParsedPkcs12` gains the Clone
@@ -208,15 +219,24 @@ impl TlsSettings {
         self.identity.as_ref().map(|identity| {
             Pkcs12::from_der(&identity.0)
                 .expect("Could not build PKCS#12 archive from parsed data")
-                .parse(&identity.1)
+                .parse2(&identity.1)
                 .expect("Could not parse stored PKCS#12 archive")
         })
     }
 
+    /// Returns the identity as PEM data
+    ///
+    /// # Panics
+    ///
+    /// Panics if the identity is missing, invalid, or the authorities to chain are invalid.
     pub fn identity_pem(&self) -> Option<(Vec<u8>, Vec<u8>)> {
         self.identity().map(|identity| {
-            let mut cert = identity.cert.to_pem().expect("Invalid stored identity");
-            if let Some(chain) = identity.chain {
+            let mut cert = identity
+                .cert
+                .expect("Identity required")
+                .to_pem()
+                .expect("Invalid stored identity");
+            if let Some(chain) = identity.ca {
                 for authority in chain {
                     cert.extend(
                         authority
@@ -227,12 +247,18 @@ impl TlsSettings {
             }
             let key = identity
                 .pkey
+                .expect("Private key required")
                 .private_key_to_pem_pkcs8()
                 .expect("Invalid stored private key");
             (cert, key)
         })
     }
 
+    /// Returns the authorities as PEM data
+    ///
+    /// # Panics
+    ///
+    /// Panics if the authority is invalid.
     pub fn authorities_pem(&self) -> impl Iterator<Item = Vec<u8>> + '_ {
         self.authorities.iter().map(|authority| {
             authority
@@ -242,19 +268,28 @@ impl TlsSettings {
     }
 
     pub(super) fn apply_context(&self, context: &mut SslContextBuilder) -> Result<()> {
+        self.apply_context_base(context, false)
+    }
+
+    pub(super) fn apply_context_base(
+        &self,
+        context: &mut SslContextBuilder,
+        for_server: bool,
+    ) -> Result<()> {
         context.set_verify(if self.verify_certificate {
             SslVerifyMode::PEER | SslVerifyMode::FAIL_IF_NO_PEER_CERT
         } else {
             SslVerifyMode::NONE
         });
         if let Some(identity) = self.identity() {
-            context
-                .set_certificate(&identity.cert)
-                .context(SetCertificateSnafu)?;
-            context
-                .set_private_key(&identity.pkey)
-                .context(SetPrivateKeySnafu)?;
-            if let Some(chain) = identity.chain {
+            if let Some(cert) = &identity.cert {
+                context.set_certificate(cert).context(SetCertificateSnafu)?;
+            }
+            if let Some(pkey) = &identity.pkey {
+                context.set_private_key(pkey).context(SetPrivateKeySnafu)?;
+            }
+
+            if let Some(chain) = identity.ca {
                 for cert in chain {
                     context
                         .add_extra_chain_cert(cert)
@@ -283,9 +318,16 @@ impl TlsSettings {
         }
 
         if let Some(alpn) = &self.alpn_protocols {
-            context
-                .set_alpn_protos(alpn.as_slice())
-                .context(SetAlpnProtocolsSnafu)?;
+            if for_server {
+                let server_proto = alpn.clone();
+                context.set_alpn_select_callback(move |_, client_proto| {
+                    select_next_proto(server_proto.as_slice(), client_proto).ok_or(AlpnError::NOACK)
+                });
+            } else {
+                context
+                    .set_alpn_protos(alpn.as_slice())
+                    .context(SetAlpnProtocolsSnafu)?;
+            }
         }
 
         Ok(())
@@ -339,7 +381,7 @@ impl TlsConfig {
             None => Ok(None),
             Some(protocols) => {
                 let mut data: Vec<u8> = Vec::new();
-                for str in protocols.iter() {
+                for str in protocols {
                     data.push(str.len().try_into().context(EncodeAlpnProtocolsSnafu)?);
                     data.append(&mut str.clone().into_bytes());
                 }
@@ -366,15 +408,19 @@ impl TlsConfig {
                     ca_stack.push(intermediate).context(CaStackPushSnafu)?;
                 }
 
-                let mut builder = Pkcs12::builder();
-                builder.ca(ca_stack);
-                let pkcs12 = builder.build("", &name, &key, &crt).context(Pkcs12Snafu)?;
+                let pkcs12 = Pkcs12::builder()
+                    .ca(ca_stack)
+                    .name(&name)
+                    .pkey(&key)
+                    .cert(&crt)
+                    .build2("")
+                    .context(Pkcs12Snafu)?;
                 let identity = pkcs12.to_der().context(DerExportSnafu)?;
 
                 // Build the resulting parsed PKCS#12 archive,
                 // but don't store it, as it cannot be cloned.
                 // This is just for error checking.
-                pkcs12.parse("").context(TlsIdentitySnafu)?;
+                pkcs12.parse2("").context(TlsIdentitySnafu)?;
 
                 Ok(Some(IdentityStore(identity, String::new())))
             }
@@ -386,7 +432,7 @@ impl TlsConfig {
         let pkcs12 = Pkcs12::from_der(&der).context(ParsePkcs12Snafu)?;
         // Verify password
         let key_pass = self.key_pass.as_deref().unwrap_or("");
-        pkcs12.parse(key_pass).context(ParsePkcs12Snafu)?;
+        pkcs12.parse2(key_pass).context(ParsePkcs12Snafu)?;
         Ok(Some(IdentityStore(der, key_pass.to_string())))
     }
 }
@@ -482,7 +528,7 @@ impl fmt::Debug for TlsSettings {
         f.debug_struct("TlsSettings")
             .field("verify_certificate", &self.verify_certificate)
             .field("verify_hostname", &self.verify_hostname)
-            .finish()
+            .finish_non_exhaustive()
     }
 }
 
@@ -525,7 +571,7 @@ impl MaybeTlsSettings {
 
     pub const fn http_protocol_name(&self) -> &'static str {
         match self {
-            MaybeTls::Raw(_) => "http",
+            MaybeTls::Raw(()) => "http",
             MaybeTls::Tls(_) => "https",
         }
     }
@@ -614,6 +660,7 @@ mod test {
 
     #[test]
     fn from_options_pkcs12() {
+        let _provider = openssl::provider::Provider::try_load(None, "legacy", true).unwrap();
         let options = TlsConfig {
             crt_file: Some(TEST_PKCS12_PATH.into()),
             key_pass: Some("NOPASS".into()),

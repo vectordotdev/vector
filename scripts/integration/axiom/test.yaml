@@ -1,11 +1,21 @@
-args:
-- --features
+features:
 - axiom-integration-tests
-- --lib
-- 'sinks::axiom::'
 
-env:
-  AXIOM_URL: http://axiom-core
+test_filter: '::axiom::'
+
+runner:
+  env:
+    AXIOM_URL: https://api.axiom.co
+    AXIOM_ORG_ID: vector-integration-test-8gny
+    AXIOM_DATASET: events
+    AXIOM_TOKEN:
 
 matrix:
-  version: [13-alpine]
+  postgres: [13-alpine]
+
+# changes to these files/paths will invoke the integration test in CI
+# expressions are evaluated using https://github.com/micromatch/picomatch
+paths:
+- "src/sinks/axiom.rs"
+- "src/sinks/util/**"
+- "scripts/integration/axiom/**"

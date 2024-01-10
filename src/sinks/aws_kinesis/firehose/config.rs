@@ -1,13 +1,12 @@
-use aws_sdk_firehose::{
-    config::Config,
-    error::{DescribeDeliveryStreamError, PutRecordBatchErrorKind},
-    middleware::DefaultMiddleware,
-    types::SdkError,
+use aws_sdk_firehose::operation::{
+    describe_delivery_stream::DescribeDeliveryStreamError, put_record_batch::PutRecordBatchError,
 };
+use aws_smithy_runtime_api::client::{orchestrator::HttpResponse, result::SdkError};
 use futures::FutureExt;
 use snafu::Snafu;
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 
+use crate::sinks::util::retries::RetryAction;
 use crate::{
     aws::{create_client, is_retriable_error, ClientBuilder},
     config::{AcknowledgementsConfig, GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext},
@@ -28,7 +27,7 @@ use super::{
 enum HealthcheckError {
     #[snafu(display("DescribeDeliveryStream failed: {}", source))]
     DescribeDeliveryStreamFailed {
-        source: SdkError<DescribeDeliveryStreamError>,
+        source: SdkError<DescribeDeliveryStreamError, HttpResponse>,
     },
     #[snafu(display("Stream name does not match, got {}, expected {}", name, stream_name))]
     StreamNamesMismatch { name: String, stream_name: String },
@@ -37,16 +36,10 @@ enum HealthcheckError {
 pub struct KinesisFirehoseClientBuilder;
 
 impl ClientBuilder for KinesisFirehoseClientBuilder {
-    type Config = Config;
     type Client = KinesisClient;
-    type DefaultMiddleware = DefaultMiddleware;
 
-    fn default_middleware() -> Self::DefaultMiddleware {
-        DefaultMiddleware::new()
-    }
-
-    fn build(client: aws_smithy_client::Client, config: &aws_types::SdkConfig) -> Self::Client {
-        Self::Client::with_config(client, config.into())
+    fn build(config: &aws_types::SdkConfig) -> Self::Client {
+        Self::Client::new(config)
     }
 }
 
@@ -65,7 +58,10 @@ impl SinkBatchSettings for KinesisFirehoseDefaultBatchSettings {
 }
 
 /// Configuration for the `aws_kinesis_firehose` sink.
-#[configurable_component(sink("aws_kinesis_firehose"))]
+#[configurable_component(sink(
+    "aws_kinesis_firehose",
+    "Publish logs to AWS Kinesis Data Firehose topics."
+))]
 #[derive(Clone, Debug)]
 pub struct KinesisFirehoseSinkConfig {
     #[serde(flatten)]
@@ -92,7 +88,7 @@ impl KinesisFirehoseSinkConfig {
             Ok(resp) => {
                 let name = resp
                     .delivery_stream_description
-                    .and_then(|x| x.delivery_stream_name)
+                    .map(|x| x.delivery_stream_name)
                     .unwrap_or_default();
                 if name == stream_name {
                     Ok(())
@@ -108,16 +104,16 @@ impl KinesisFirehoseSinkConfig {
         create_client::<KinesisFirehoseClientBuilder>(
             &self.base.auth,
             self.base.region.region(),
-            self.base.region.endpoint()?,
+            self.base.region.endpoint(),
             proxy,
             &self.base.tls,
-            true,
         )
         .await
     }
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "aws_kinesis_firehose")]
 impl SinkConfig for KinesisFirehoseSinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let client = self.create_client(&cx.proxy).await?;
@@ -138,11 +134,13 @@ impl SinkConfig for KinesisFirehoseSinkConfig {
             KinesisRetryLogic,
         >(
             &self.base,
-            None,
+            self.base.partition_key_field.clone(),
             batch_settings,
             KinesisFirehoseClient { client },
-        )
-        .await?;
+            KinesisRetryLogic {
+                retry_partial: self.base.request_retry_partial,
+            },
+        )?;
 
         Ok((sink, healthcheck))
     }
@@ -167,18 +165,32 @@ impl GenerateConfig for KinesisFirehoseSinkConfig {
 }
 
 #[derive(Clone, Default)]
-struct KinesisRetryLogic;
+struct KinesisRetryLogic {
+    retry_partial: bool,
+}
 
 impl RetryLogic for KinesisRetryLogic {
-    type Error = SdkError<KinesisError>;
+    type Error = SdkError<KinesisError, HttpResponse>;
     type Response = KinesisResponse;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
-        if let SdkError::ServiceError { err, raw: _ } = error {
-            if let PutRecordBatchErrorKind::ServiceUnavailableException(_) = err.kind {
+        if let SdkError::ServiceError(inner) = error {
+            if matches!(
+                inner.err(),
+                PutRecordBatchError::ServiceUnavailableException(_)
+            ) {
                 return true;
             }
         }
         is_retriable_error(error)
+    }
+
+    fn should_retry_response(&self, response: &Self::Response) -> RetryAction {
+        if response.failure_count > 0 && self.retry_partial {
+            let msg = format!("partial error count {}", response.failure_count);
+            RetryAction::Retry(msg.into())
+        } else {
+            RetryAction::Successful
+        }
     }
 }

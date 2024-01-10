@@ -23,7 +23,7 @@ impl TempFile {
 impl Drop for TempFile {
     fn drop(&mut self) {
         if let Some(dir) = self.path.parent() {
-            let _ = std::fs::remove_dir_all(dir);
+            _ = std::fs::remove_dir_all(dir);
         }
     }
 }

@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 use std::{ffi::OsString, time::Duration};
 
 use windows_service::{
@@ -16,6 +17,7 @@ const SERVICE_NAME: &str = "vector";
 const SERVICE_TYPE: ServiceType = ServiceType::OWN_PROCESS;
 
 const NO_ERROR: u32 = 0;
+const ERROR: u32 = 121;
 
 pub mod service_control {
     use std::{ffi::OsString, fmt, fmt::Formatter, time::Duration};
@@ -360,14 +362,15 @@ fn win_main(arguments: Vec<OsString>) {
     if let Err(_e) = run_service(arguments) {}
 }
 
-pub fn run() -> Result<()> {
-    service_dispatcher::start(SERVICE_NAME, ffi_service_main)
+pub fn run() -> Result<i32> {
+    service_dispatcher::start(SERVICE_NAME, ffi_service_main).map(|()| 0_i32)
+    // Always returns 0 exit code as errors are handled by the service dispatcher.
 }
 
 fn run_service(_arguments: Vec<OsString>) -> Result<()> {
-    match Application::prepare() {
-        Ok(app) => {
-            let signal_tx = app.config.signal_handler.clone_tx();
+    match Application::prepare_start(Default::default()) {
+        Ok((runtime, app)) => {
+            let signal_tx = app.signals.handler.clone_tx();
             let event_handler = move |control_event| -> ServiceControlHandlerResult {
                 match control_event {
                     // Notifies a service to report its current status information to the service
@@ -376,7 +379,7 @@ fn run_service(_arguments: Vec<OsString>) -> Result<()> {
 
                     // Handle stop
                     ServiceControl::Stop => {
-                        while signal_tx.send(SignalTo::Shutdown).is_err() {}
+                        while signal_tx.send(SignalTo::Shutdown(None)).is_err() {}
                         ServiceControlHandlerResult::NoError
                     }
 
@@ -397,14 +400,21 @@ fn run_service(_arguments: Vec<OsString>) -> Result<()> {
                 process_id: None,
             })?;
 
-            app.run();
+            let program_completion_status = runtime.block_on(app.run());
 
             // Tell the system that service has stopped.
             status_handle.set_service_status(ServiceStatus {
                 service_type: SERVICE_TYPE,
                 current_state: ServiceState::Stopped,
                 controls_accepted: ServiceControlAccept::empty(),
-                exit_code: ServiceExitCode::Win32(NO_ERROR),
+                exit_code: {
+                    if program_completion_status.success() {
+                        ServiceExitCode::Win32(NO_ERROR)
+                    } else {
+                        // we didn't gracefully shutdown within grace period.
+                        ServiceExitCode::Win32(ERROR)
+                    }
+                },
                 checkpoint: 0,
                 wait_hint: Duration::default(),
                 process_id: None,

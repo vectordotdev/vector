@@ -4,7 +4,7 @@ use std::marker::{PhantomData, Unpin};
 use std::{fmt::Debug, future::Future, pin::Pin, sync::Arc, task::Context, task::Poll};
 
 use futures::stream::{BoxStream, FuturesOrdered, FuturesUnordered};
-use futures::{FutureExt, Stream, StreamExt};
+use futures::{future::OptionFuture, FutureExt, Stream, StreamExt};
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 use tokio::sync::Notify;
 
@@ -45,8 +45,16 @@ where
 {
     /// Produce a finalizer set along with the output stream of
     /// received acknowledged batch identifiers.
+    ///
+    /// The output stream will end when the source closes the producer side of the channel, and
+    /// acknowledgements in the channel are drained.
+    ///
+    /// If the optional shutdown signal is provided, the output stream will end immediately when a
+    /// shutdown signal is received. This is not recommended, and can cause some acknowledgements
+    /// to go unprocessed. Sources may process the message(s) that correspond to those
+    /// acknowledgements again.
     #[must_use]
-    pub fn new(shutdown: ShutdownSignal) -> (Self, BoxStream<'static, (BatchStatus, T)>) {
+    pub fn new(shutdown: Option<ShutdownSignal>) -> (Self, BoxStream<'static, (BatchStatus, T)>) {
         let (todo_tx, todo_rx) = mpsc::unbounded_channel();
         let flush1 = Arc::new(Notify::new());
         let flush2 = Arc::clone(&flush1);
@@ -54,7 +62,7 @@ where
             Self {
                 sender: Some(todo_tx),
                 flush: flush1,
-                _phantom: PhantomData::default(),
+                _phantom: PhantomData,
             },
             finalizer_stream(shutdown, todo_rx, S::default(), flush2).boxed(),
         )
@@ -67,7 +75,7 @@ where
     #[must_use]
     pub fn maybe_new(
         maybe: bool,
-        shutdown: ShutdownSignal,
+        shutdown: Option<ShutdownSignal>,
     ) -> (Option<Self>, BoxStream<'static, (BatchStatus, T)>) {
         if maybe {
             let (finalizer, stream) = Self::new(shutdown);
@@ -91,7 +99,7 @@ where
 }
 
 fn finalizer_stream<T, S>(
-    mut shutdown: ShutdownSignal,
+    shutdown: Option<ShutdownSignal>,
     mut new_entries: UnboundedReceiver<(BatchStatusReceiver, T)>,
     mut status_receivers: S,
     flush: Arc<Notify>,
@@ -99,14 +107,24 @@ fn finalizer_stream<T, S>(
 where
     S: Default + FuturesSet<FinalizerFuture<T>> + Unpin,
 {
+    let handle_shutdown = shutdown.is_some();
+    let mut shutdown = OptionFuture::from(shutdown);
+
     async_stream::stream! {
         loop {
             tokio::select! {
                 biased;
-                _ = &mut shutdown => break,
-                _ = flush.notified() => {
+                _ = &mut shutdown, if handle_shutdown => break,
+                () = flush.notified() => {
                     // Drop all the existing status receivers and start over.
                     status_receivers = S::default();
+                },
+                // Prefer to remove finalizers than to add new finalizers to prevent unbounded
+                // growth under load.
+                finished = status_receivers.next(), if !status_receivers.is_empty() => match finished {
+                    Some((status, entry)) => yield (status, entry),
+                    // The `is_empty` guard above prevents this from being reachable.
+                    None => unreachable!(),
                 },
                 // Only poll for new entries until shutdown is flagged.
                 new_entry = new_entries.recv() => match new_entry {
@@ -116,13 +134,8 @@ where
                             entry: Some(entry),
                         });
                     }
-                    // The new entry sender went away before shutdown, count it as a shutdown too.
+                    // The end of the new entry channel signals shutdown
                     None => break,
-                },
-                finished = status_receivers.next(), if !status_receivers.is_empty() => match finished {
-                    Some((status, entry)) => yield (status, entry),
-                    // The `is_empty` guard above prevents this from being reachable.
-                    None => unreachable!(),
                 },
             }
         }
@@ -186,7 +199,7 @@ pub struct EmptyStream<T>(PhantomData<T>);
 
 impl<T> Default for EmptyStream<T> {
     fn default() -> Self {
-        Self(PhantomData::default())
+        Self(PhantomData)
     }
 }
 

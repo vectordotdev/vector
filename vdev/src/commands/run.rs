@@ -17,6 +17,10 @@ pub struct Cli {
     #[arg(long)]
     release: bool,
 
+    /// Name an additional feature to add to the build
+    #[arg(short = 'F', long)]
+    feature: Vec<String>,
+
     /// Path to configuration file
     config: PathBuf,
 
@@ -30,7 +34,9 @@ impl Cli {
             bail!("Can only set one of `--debug` and `--release`");
         }
 
-        let features = features::load_and_extract(&self.config)?;
+        let mut features = features::load_and_extract(&self.config)?;
+        features.extend(self.feature);
+        let features = features.join(",");
         let mut command = Command::new("cargo");
         command.args(["run", "--no-default-features", "--features", &features]);
         if self.release {

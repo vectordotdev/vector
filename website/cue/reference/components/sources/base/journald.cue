@@ -49,12 +49,22 @@ base: components: sources: journald: configuration: {
 		required: false
 		type: string: examples: ["/var/lib/vector"]
 	}
+	emit_cursor: {
+		description: """
+			Whether to emit the [__CURSOR field][cursor]. See also [sd_journal_get_cursor][get_cursor].
+
+			[cursor]: https://www.freedesktop.org/software/systemd/man/latest/systemd.journal-fields.html#Address%20Fields
+			[get_cursor]: https://www.freedesktop.org/software/systemd/man/latest/sd_journal_get_cursor.html
+			"""
+		required: false
+		type: bool: default: false
+	}
 	exclude_matches: {
 		description: """
-			A list of sets of field/value pairs that, if any are present in a journal entry, will cause
-			the entry to be excluded from this source.
+			A list of sets of field/value pairs that, if any are present in a journal entry,
+			excludes the entry from this source.
 
-			If `exclude_units` is specified, it will be merged into this list.
+			If `exclude_units` is specified, it is merged into this list.
 			"""
 		required: false
 		type: object: {
@@ -73,7 +83,7 @@ base: components: sources: journald: configuration: {
 		description: """
 			A list of unit names to exclude from monitoring.
 
-			Unit names lacking a `.` will have `.service` appended to make them a valid service unit
+			Unit names lacking a `.` have `.service` appended to make them a valid service unit
 			name.
 			"""
 		required: false
@@ -82,13 +92,25 @@ base: components: sources: journald: configuration: {
 			items: type: string: examples: ["badservice", "sysinit.target"]
 		}
 	}
+	extra_args: {
+		description: """
+			A list of extra command line arguments to pass to `journalctl`.
+
+			If specified, it is merged to the command line arguments as-is.
+			"""
+		required: false
+		type: array: {
+			default: []
+			items: type: string: examples: ["--merge"]
+		}
+	}
 	include_matches: {
 		description: """
 			A list of sets of field/value pairs to monitor.
 
 			If empty or not present, all journal fields are accepted.
 
-			If `include_units` is specified, it will be merged into this list.
+			If `include_units` is specified, it is merged into this list.
 			"""
 		required: false
 		type: object: {
@@ -109,7 +131,7 @@ base: components: sources: journald: configuration: {
 
 			If empty or not present, all units are accepted.
 
-			Unit names lacking a `.` will have `.service` appended to make them a valid service unit name.
+			Unit names lacking a `.` have `.service` appended to make them a valid service unit name.
 			"""
 		required: false
 		type: array: {
@@ -121,7 +143,20 @@ base: components: sources: journald: configuration: {
 		description: """
 			The full path of the journal directory.
 
-			If not set, `journalctl` will use the default system journal path.
+			If not set, `journalctl` uses the default system journal path.
+			"""
+		required: false
+		type: string: {}
+	}
+	journal_namespace: {
+		description: """
+			The [journal namespace][journal-namespace].
+
+			This value is passed to `journalctl` through the [`--namespace` option][journalctl-namespace-option].
+			If not set, `journalctl` uses the default namespace.
+
+			[journal-namespace]: https://www.freedesktop.org/software/systemd/man/systemd-journald.service.html#Journal%20Namespaces
+			[journalctl-namespace-option]: https://www.freedesktop.org/software/systemd/man/journalctl.html#--namespace=NAMESPACE
 			"""
 		required: false
 		type: string: {}

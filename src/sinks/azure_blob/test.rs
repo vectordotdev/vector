@@ -1,10 +1,11 @@
 use bytes::Bytes;
 use chrono::Utc;
-use codecs::{
+use vector_lib::codecs::{
     encoding::{Framer, FramingConfig},
     NewlineDelimitedEncoder, TextSerializerConfig,
 };
-use vector_core::partition::Partitioner;
+use vector_lib::request_metadata::GroupedCountByteSize;
+use vector_lib::{partition::Partitioner, EstimatedJsonEncodedSizeOf};
 
 use super::config::AzureBlobSinkConfig;
 use super::request_builder::AzureBlobRequestOptions;
@@ -41,7 +42,7 @@ fn azure_blob_build_request_without_compression() {
     let compression = Compression::None;
     let container_name = String::from("logs");
     let sink_config = AzureBlobSinkConfig {
-        blob_prefix: Some("blob".into()),
+        blob_prefix: "blob".try_into().unwrap(),
         container_name: container_name.clone(),
         ..default_config((None::<FramingConfig>, TextSerializerConfig::default()).into())
     };
@@ -68,10 +69,13 @@ fn azure_blob_build_request_without_compression() {
         compression,
     };
 
+    let mut byte_size = GroupedCountByteSize::new_untagged();
+    byte_size.add_event(&log, log.estimated_json_encoded_size_of());
+
     let (metadata, request_metadata_builder, _events) =
         request_options.split_input((key, vec![log]));
 
-    let payload = EncodeResult::uncompressed(Bytes::new());
+    let payload = EncodeResult::uncompressed(Bytes::new(), byte_size);
     let request_metadata = request_metadata_builder.build(&payload);
     let request = request_options.build_request(metadata, request_metadata, payload);
 
@@ -86,7 +90,7 @@ fn azure_blob_build_request_with_compression() {
     let compression = Compression::gzip_default();
     let container_name = String::from("logs");
     let sink_config = AzureBlobSinkConfig {
-        blob_prefix: Some("blob".into()),
+        blob_prefix: "blob".try_into().unwrap(),
         container_name: container_name.clone(),
         ..default_config((None::<FramingConfig>, TextSerializerConfig::default()).into())
     };
@@ -112,16 +116,20 @@ fn azure_blob_build_request_with_compression() {
         ),
         compression,
     };
+
+    let mut byte_size = GroupedCountByteSize::new_untagged();
+    byte_size.add_event(&log, log.estimated_json_encoded_size_of());
+
     let (metadata, request_metadata_builder, _events) =
         request_options.split_input((key, vec![log]));
 
-    let payload = EncodeResult::uncompressed(Bytes::new());
+    let payload = EncodeResult::uncompressed(Bytes::new(), byte_size);
     let request_metadata = request_metadata_builder.build(&payload);
     let request = request_options.build_request(metadata, request_metadata, payload);
 
     assert_eq!(request.metadata.partition_key, "blob.log.gz".to_string());
     assert_eq!(request.content_encoding, Some("gzip"));
-    assert_eq!(request.content_type, "application/gzip");
+    assert_eq!(request.content_type, "text/plain");
 }
 
 #[test]
@@ -130,7 +138,7 @@ fn azure_blob_build_request_with_time_format() {
     let compression = Compression::None;
     let container_name = String::from("logs");
     let sink_config = AzureBlobSinkConfig {
-        blob_prefix: Some("blob".into()),
+        blob_prefix: "blob".try_into().unwrap(),
         container_name: container_name.clone(),
         ..default_config((None::<FramingConfig>, TextSerializerConfig::default()).into())
     };
@@ -157,10 +165,13 @@ fn azure_blob_build_request_with_time_format() {
         compression,
     };
 
+    let mut byte_size = GroupedCountByteSize::new_untagged();
+    byte_size.add_event(&log, log.estimated_json_encoded_size_of());
+
     let (metadata, request_metadata_builder, _events) =
         request_options.split_input((key, vec![log]));
 
-    let payload = EncodeResult::uncompressed(Bytes::new());
+    let payload = EncodeResult::uncompressed(Bytes::new(), byte_size);
     let request_metadata = request_metadata_builder.build(&payload);
     let request = request_options.build_request(metadata, request_metadata, payload);
 
@@ -178,7 +189,7 @@ fn azure_blob_build_request_with_uuid() {
     let compression = Compression::None;
     let container_name = String::from("logs");
     let sink_config = AzureBlobSinkConfig {
-        blob_prefix: Some("blob".into()),
+        blob_prefix: "blob".try_into().unwrap(),
         container_name: container_name.clone(),
         ..default_config((None::<FramingConfig>, TextSerializerConfig::default()).into())
     };
@@ -205,10 +216,13 @@ fn azure_blob_build_request_with_uuid() {
         compression,
     };
 
+    let mut byte_size = GroupedCountByteSize::new_untagged();
+    byte_size.add_event(&log, log.estimated_json_encoded_size_of());
+
     let (metadata, request_metadata_builder, _events) =
         request_options.split_input((key, vec![log]));
 
-    let payload = EncodeResult::uncompressed(Bytes::new());
+    let payload = EncodeResult::uncompressed(Bytes::new(), byte_size);
     let request_metadata = request_metadata_builder.build(&payload);
     let request = request_options.build_request(metadata, request_metadata, payload);
 

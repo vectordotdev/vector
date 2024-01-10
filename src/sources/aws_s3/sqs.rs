@@ -1,30 +1,36 @@
+use std::collections::HashMap;
 use std::{future::ready, num::NonZeroUsize, panic, sync::Arc};
 
-use aws_sdk_s3::{error::GetObjectError, Client as S3Client};
-use aws_sdk_sqs::{
-    error::{DeleteMessageBatchError, ReceiveMessageError},
-    model::{DeleteMessageBatchRequestEntry, Message},
-    output::DeleteMessageBatchOutput,
-    Client as SqsClient,
+use aws_sdk_s3::operation::get_object::GetObjectError;
+use aws_sdk_s3::Client as S3Client;
+use aws_sdk_sqs::operation::delete_message_batch::{
+    DeleteMessageBatchError, DeleteMessageBatchOutput,
 };
-use aws_smithy_client::SdkError;
+use aws_sdk_sqs::operation::receive_message::ReceiveMessageError;
+use aws_sdk_sqs::types::{DeleteMessageBatchRequestEntry, Message};
+use aws_sdk_sqs::Client as SqsClient;
+use aws_smithy_runtime_api::client::orchestrator::HttpResponse;
+use aws_smithy_runtime_api::client::result::SdkError;
 use aws_types::region::Region;
 use bytes::Bytes;
-use chrono::{TimeZone, Utc};
-use codecs::{decoding::FramingError, BytesDeserializer, CharacterDelimitedDecoder};
+use chrono::{DateTime, TimeZone, Utc};
 use futures::{FutureExt, Stream, StreamExt, TryFutureExt};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_with::serde_as;
+use smallvec::SmallVec;
 use snafu::{ResultExt, Snafu};
 use tokio::{pin, select};
 use tokio_util::codec::FramedRead;
 use tracing::Instrument;
-use vector_common::internal_event::{
+use vector_lib::codecs::decoding::FramingError;
+use vector_lib::configurable::configurable_component;
+use vector_lib::internal_event::{
     ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol, Registered,
 };
-use vector_config::{configurable_component, NamedComponent};
 
+use crate::codecs::Decoder;
+use crate::event::{Event, LogEvent};
 use crate::{
     config::{SourceAcknowledgementsConfig, SourceContext},
     event::{BatchNotifier, BatchStatus, EstimatedJsonEncodedSizeOf},
@@ -40,8 +46,9 @@ use crate::{
     tls::TlsConfig,
     SourceSender,
 };
-use lookup::{metadata_path, path, PathPrefix};
-use vector_core::config::{log_schema, LegacyKey, LogNamespace};
+use vector_lib::config::{log_schema, LegacyKey, LogNamespace};
+use vector_lib::event::MaybeAsLogMut;
+use vector_lib::lookup::{metadata_path, path, PathPrefix};
 
 static SUPPORTED_S3_EVENT_VERSION: Lazy<semver::VersionReq> =
     Lazy::new(|| semver::VersionReq::parse("~2").unwrap());
@@ -60,12 +67,13 @@ pub(super) struct Config {
     #[configurable(metadata(
         docs::examples = "https://sqs.us-east-2.amazonaws.com/123456789012/MyQueue"
     ))]
+    #[configurable(validation(format = "uri"))]
     pub(super) queue_url: String,
 
     /// How long to wait while polling the queue for new messages, in seconds.
     ///
-    /// Generally should not be changed unless instructed to do so, as if messages are available,
-    /// they will always be consumed, regardless of the value of `poll_secs`.
+    /// Generally, this should not be changed unless instructed to do so, as if messages are available,
+    /// they are always consumed, regardless of the value of `poll_secs`.
     // NOTE: We restrict this to u32 for safe conversion to i32 later.
     // NOTE: This value isn't used as a `Duration` downstream, so we don't bother using `serde_with`
     #[serde(default = "default_poll_secs")]
@@ -84,6 +92,7 @@ pub(super) struct Config {
     #[serde(default = "default_visibility_timeout_secs")]
     #[derivative(Default(value = "default_visibility_timeout_secs()"))]
     #[configurable(metadata(docs::type_unit = "seconds"))]
+    #[configurable(metadata(docs::human_name = "Visibility Timeout"))]
     pub(super) visibility_timeout_secs: u32,
 
     /// Whether to delete the message once it is processed.
@@ -147,7 +156,7 @@ pub enum ProcessingError {
     },
     #[snafu(display("Failed to fetch s3://{}/{}: {}", bucket, key, source))]
     GetObject {
-        source: SdkError<GetObjectError>,
+        source: SdkError<GetObjectError, HttpResponse>,
         bucket: String,
         key: String,
     },
@@ -194,6 +203,7 @@ pub struct State {
     client_concurrency: usize,
     visibility_timeout_secs: i32,
     delete_message: bool,
+    decoder: Decoder,
 }
 
 pub(super) struct Ingestor {
@@ -208,6 +218,7 @@ impl Ingestor {
         config: Config,
         compression: super::Compression,
         multiline: Option<line_agg::Config>,
+        decoder: Decoder,
     ) -> Result<Ingestor, IngestorNewError> {
         let state = Arc::new(State {
             region,
@@ -226,6 +237,7 @@ impl Ingestor {
                 .unwrap_or_else(crate::num_threads),
             visibility_timeout_secs: config.visibility_timeout_secs as i32,
             delete_message: config.delete_message,
+            decoder,
         });
 
         Ok(Ingestor { state })
@@ -339,7 +351,6 @@ impl IngestorProcess {
                 .message_id
                 .clone()
                 .unwrap_or_else(|| "<unknown>".to_owned());
-
             match self.handle_sqs_message(message).await {
                 Ok(()) => {
                     emit!(SqsMessageProcessingSucceeded {
@@ -350,7 +361,8 @@ impl IngestorProcess {
                             DeleteMessageBatchRequestEntry::builder()
                                 .id(message_id)
                                 .receipt_handle(receipt_handle)
-                                .build(),
+                                .build()
+                                .expect("all required builder params specified"),
                         );
                     }
                 }
@@ -370,20 +382,16 @@ impl IngestorProcess {
                 Ok(result) => {
                     // Batch deletes can have partial successes/failures, so we have to check
                     // for both cases and emit accordingly.
-                    if let Some(successful_entries) = &result.successful {
-                        if !successful_entries.is_empty() {
-                            emit!(SqsMessageDeleteSucceeded {
-                                message_ids: result.successful.unwrap_or_default(),
-                            });
-                        }
+                    if !result.successful.is_empty() {
+                        emit!(SqsMessageDeleteSucceeded {
+                            message_ids: result.successful,
+                        });
                     }
 
-                    if let Some(failed_entries) = &result.failed {
-                        if !failed_entries.is_empty() {
-                            emit!(SqsMessageDeletePartialError {
-                                entries: result.failed.unwrap_or_default()
-                            });
-                        }
+                    if !result.failed.is_empty() {
+                        emit!(SqsMessageDeletePartialError {
+                            entries: result.failed
+                        });
                     }
                 }
                 Err(err) => {
@@ -397,8 +405,12 @@ impl IngestorProcess {
     }
 
     async fn handle_sqs_message(&mut self, message: Message) -> Result<(), ProcessingError> {
-        let s3_event: Event = serde_json::from_str(message.body.unwrap_or_default().as_ref())
-            .context(InvalidSqsMessageSnafu {
+        let sqs_body = message.body.unwrap_or_default();
+        let sqs_body = serde_json::from_str::<SnsNotification>(sqs_body.as_ref())
+            .map(|notification| notification.message)
+            .unwrap_or(sqs_body);
+        let s3_event: SqsEvent =
+            serde_json::from_str(sqs_body.as_ref()).context(InvalidSqsMessageSnafu {
                 message_id: message
                     .message_id
                     .clone()
@@ -406,11 +418,11 @@ impl IngestorProcess {
             })?;
 
         match s3_event {
-            Event::TestEvent(_s3_test_event) => {
+            SqsEvent::TestEvent(_s3_test_event) => {
                 debug!(?message.message_id, message = "Found S3 Test Event.");
                 Ok(())
             }
-            Event::Event(s3_event) => self.handle_s3_event(s3_event).await,
+            SqsEvent::Event(s3_event) => self.handle_s3_event(s3_event).await,
         }
     }
 
@@ -503,7 +515,7 @@ impl IngestorProcess {
         let bytes_received = self.bytes_received.clone();
         let events_received = self.events_received.clone();
         let lines: Box<dyn Stream<Item = Bytes> + Send + Unpin> = Box::new(
-            FramedRead::new(object_reader, CharacterDelimitedDecoder::new(b'\n'))
+            FramedRead::new(object_reader, self.state.decoder.framer.clone())
                 .map(|res| {
                     res.map(|bytes| {
                         bytes_received.emit(ByteSize(bytes.len()));
@@ -518,93 +530,52 @@ impl IngestorProcess {
                 .map(|r| r.expect("validated by take_while")),
         );
 
-        let lines = match &self.state.multiline {
+        let lines: Box<dyn Stream<Item = Bytes> + Send + Unpin> = match &self.state.multiline {
             Some(config) => Box::new(
                 LineAgg::new(
                     lines.map(|line| ((), line, ())),
                     line_agg::Logic::new(config.clone()),
                 )
-                .map(|(_src, line, _context)| line),
+                .map(|(_src, line, _context, _lastline_context)| line),
             ),
             None => lines,
         };
 
-        let mut stream = lines.map(|line| {
-            let deserializer = BytesDeserializer::new();
-            let mut log = deserializer
-                .parse_single(line, log_namespace)
-                .with_batch_notifier_option(&batch);
-
-            log_namespace.insert_source_metadata(
-                AwsS3Config::NAME,
-                &mut log,
-                Some(LegacyKey::Overwrite(path!("bucket"))),
-                path!("bucket"),
-                Bytes::from(s3_event.s3.bucket.name.as_bytes().to_vec()),
-            );
-            log_namespace.insert_source_metadata(
-                AwsS3Config::NAME,
-                &mut log,
-                Some(LegacyKey::Overwrite(path!("object"))),
-                path!("object"),
-                Bytes::from(s3_event.s3.object.key.as_bytes().to_vec()),
-            );
-            log_namespace.insert_source_metadata(
-                AwsS3Config::NAME,
-                &mut log,
-                Some(LegacyKey::Overwrite(path!("region"))),
-                path!("region"),
-                Bytes::from(s3_event.aws_region.as_bytes().to_vec()),
-            );
-
-            if let Some(metadata) = &metadata {
-                for (key, value) in metadata {
-                    log_namespace.insert_source_metadata(
-                        AwsS3Config::NAME,
-                        &mut log,
-                        Some(LegacyKey::Overwrite(key.as_str())),
-                        path!("metadata", key.as_str()),
-                        value.clone(),
-                    );
-                }
-            }
-
-            log_namespace.insert_vector_metadata(
-                &mut log,
-                path!(log_schema().source_type_key()),
-                path!("source_type"),
-                Bytes::from_static(AwsS3Config::NAME.as_bytes()),
-            );
-
-            // This handles the transition from the original timestamp logic. Originally the
-            // `timestamp_key` was populated by the `last_modified` time on the object, falling
-            // back to calling `now()`.
-            match log_namespace {
-                LogNamespace::Vector => {
-                    if let Some(timestamp) = timestamp {
-                        log.insert(metadata_path!(AwsS3Config::NAME, "timestamp"), timestamp);
-                    }
-
-                    log.insert(metadata_path!("vector", "ingest_timestamp"), Utc::now());
-                }
-                LogNamespace::Legacy => {
-                    log.try_insert(
-                        (PathPrefix::Event, log_schema().timestamp_key()),
-                        timestamp.unwrap_or_else(Utc::now),
-                    );
+        let mut stream = lines.flat_map(|line| {
+            let events = match self.state.decoder.deserializer_parse(line) {
+                Ok((events, _events_size)) => events,
+                Err(_error) => {
+                    // Error is handled by `codecs::Decoder`, no further handling
+                    // is needed here.
+                    SmallVec::new()
                 }
             };
 
-            events_received.emit(CountByteSize(1, log.estimated_json_encoded_size_of()));
-
-            log
+            let events = events
+                .into_iter()
+                .map(|mut event: Event| {
+                    event = event.with_batch_notifier_option(&batch);
+                    if let Some(log_event) = event.maybe_as_log_mut() {
+                        handle_single_log(
+                            log_event,
+                            log_namespace,
+                            &s3_event,
+                            &metadata,
+                            timestamp,
+                        );
+                    }
+                    events_received.emit(CountByteSize(1, event.estimated_json_encoded_size_of()));
+                    event
+                })
+                .collect::<Vec<Event>>();
+            futures::stream::iter(events)
         });
 
         let send_error = match self.out.send_event_stream(&mut stream).await {
             Ok(_) => None,
-            Err(error) => {
+            Err(_) => {
                 let (count, _) = stream.size_hint();
-                emit!(StreamClosedError { error, count });
+                emit!(StreamClosedError { count });
                 Some(crate::source_sender::ClosedError)
             }
         };
@@ -612,6 +583,10 @@ impl IngestorProcess {
         // Up above, `lines` captures `read_error`, and eventually is captured by `stream`,
         // so we explicitly drop it so that we can again utilize `read_error` below.
         drop(stream);
+
+        // The BatchNotifier is cloned for each LogEvent in the batch stream, but the last
+        // reference must be dropped before the status of the batch is sent to the channel.
+        drop(batch);
 
         if let Some(error) = read_error {
             Err(ProcessingError::ReadObject {
@@ -628,20 +603,25 @@ impl IngestorProcess {
         } else {
             match receiver {
                 None => Ok(()),
-                Some(receiver) => match receiver.await {
-                    BatchStatus::Delivered => Ok(()),
-                    BatchStatus::Errored => Err(ProcessingError::ErrorAcknowledgement),
-                    BatchStatus::Rejected => {
-                        // Sinks are responsible for emitting ComponentEventsDropped.
-                        // Failed events cannot be retried, so continue to delete the SQS source message.
-                        Ok(())
+                Some(receiver) => {
+                    let result = receiver.await;
+                    match result {
+                        BatchStatus::Delivered => Ok(()),
+                        BatchStatus::Errored => Err(ProcessingError::ErrorAcknowledgement),
+                        BatchStatus::Rejected => {
+                            // Sinks are responsible for emitting ComponentEventsDropped.
+                            // Failed events cannot be retried, so continue to delete the SQS source message.
+                            Ok(())
+                        }
                     }
-                },
+                }
             }
         }
     }
 
-    async fn receive_messages(&mut self) -> Result<Vec<Message>, SdkError<ReceiveMessageError>> {
+    async fn receive_messages(
+        &mut self,
+    ) -> Result<Vec<Message>, SdkError<ReceiveMessageError, HttpResponse>> {
         self.state
             .sqs_client
             .receive_message()
@@ -657,7 +637,7 @@ impl IngestorProcess {
     async fn delete_messages(
         &mut self,
         entries: Vec<DeleteMessageBatchRequestEntry>,
-    ) -> Result<DeleteMessageBatchOutput, SdkError<DeleteMessageBatchError>> {
+    ) -> Result<DeleteMessageBatchOutput, SdkError<DeleteMessageBatchError, HttpResponse>> {
         self.state
             .sqs_client
             .delete_message_batch()
@@ -668,10 +648,88 @@ impl IngestorProcess {
     }
 }
 
+fn handle_single_log(
+    log: &mut LogEvent,
+    log_namespace: LogNamespace,
+    s3_event: &S3EventRecord,
+    metadata: &Option<HashMap<String, String>>,
+    timestamp: Option<DateTime<Utc>>,
+) {
+    log_namespace.insert_source_metadata(
+        AwsS3Config::NAME,
+        log,
+        Some(LegacyKey::Overwrite(path!("bucket"))),
+        path!("bucket"),
+        Bytes::from(s3_event.s3.bucket.name.as_bytes().to_vec()),
+    );
+
+    log_namespace.insert_source_metadata(
+        AwsS3Config::NAME,
+        log,
+        Some(LegacyKey::Overwrite(path!("object"))),
+        path!("object"),
+        Bytes::from(s3_event.s3.object.key.as_bytes().to_vec()),
+    );
+    log_namespace.insert_source_metadata(
+        AwsS3Config::NAME,
+        log,
+        Some(LegacyKey::Overwrite(path!("region"))),
+        path!("region"),
+        Bytes::from(s3_event.aws_region.as_bytes().to_vec()),
+    );
+
+    if let Some(metadata) = metadata {
+        for (key, value) in metadata {
+            log_namespace.insert_source_metadata(
+                AwsS3Config::NAME,
+                log,
+                Some(LegacyKey::Overwrite(path!(key))),
+                path!("metadata", key.as_str()),
+                value.clone(),
+            );
+        }
+    }
+
+    log_namespace.insert_vector_metadata(
+        log,
+        log_schema().source_type_key(),
+        path!("source_type"),
+        Bytes::from_static(AwsS3Config::NAME.as_bytes()),
+    );
+
+    // This handles the transition from the original timestamp logic. Originally the
+    // `timestamp_key` was populated by the `last_modified` time on the object, falling
+    // back to calling `now()`.
+    match log_namespace {
+        LogNamespace::Vector => {
+            if let Some(timestamp) = timestamp {
+                log.insert(metadata_path!(AwsS3Config::NAME, "timestamp"), timestamp);
+            }
+
+            log.insert(metadata_path!("vector", "ingest_timestamp"), Utc::now());
+        }
+        LogNamespace::Legacy => {
+            if let Some(timestamp_key) = log_schema().timestamp_key() {
+                log.try_insert(
+                    (PathPrefix::Event, timestamp_key),
+                    timestamp.unwrap_or_else(Utc::now),
+                );
+            }
+        }
+    };
+}
+
+// https://docs.aws.amazon.com/sns/latest/dg/sns-sqs-as-subscriber.html
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct SnsNotification {
+    pub message: String,
+}
+
 // https://docs.aws.amazon.com/AmazonS3/latest/userguide/how-to-enable-disable-notification-intro.html
 #[derive(Clone, Debug, Deserialize)]
 #[serde(untagged)]
-enum Event {
+enum SqsEvent {
     Event(S3Event),
     TestEvent(S3TestEvent),
 }
@@ -889,6 +947,31 @@ fn test_s3_testevent() {
      }"#,
     )
     .unwrap();
+
+    assert_eq!(value.service, "Amazon S3".to_string());
+    assert_eq!(value.bucket, "bucketname".to_string());
+    assert_eq!(value.event.kind, "s3".to_string());
+    assert_eq!(value.event.name, "TestEvent".to_string());
+}
+
+#[test]
+fn test_s3_sns_testevent() {
+    let sns_value: SnsNotification = serde_json::from_str(
+        r#"{
+        "Type" : "Notification",
+        "MessageId" : "63a3f6b6-d533-4a47-aef9-fcf5cf758c76",
+        "TopicArn" : "arn:aws:sns:us-west-2:123456789012:MyTopic",
+        "Subject" : "Testing publish to subscribed queues",
+        "Message" : "{\"Bucket\":\"bucketname\",\"Event\":\"s3:TestEvent\",\"HostId\":\"8cLeGAmw098X5cv4Zkwcmo8vvZa3eH3eKxsPzbB9wrR+YstdA6Knx4Ip8EXAMPLE\",\"RequestId\":\"5582815E1AEA5ADF\",\"Service\":\"Amazon S3\",\"Time\":\"2014-10-13T15:57:02.089Z\"}",
+        "Timestamp" : "2012-03-29T05:12:16.901Z",
+        "SignatureVersion" : "1",
+        "Signature" : "EXAMPLEnTrFPa3...",
+        "SigningCertURL" : "https://sns.us-west-2.amazonaws.com/SimpleNotificationService-f3ecfb7224c7233fe7bb5f59f96de52f.pem",
+        "UnsubscribeURL" : "https://sns.us-west-2.amazonaws.com/?Action=Unsubscribe&SubscriptionArn=arn:aws:sns:us-west-2:123456789012:MyTopic:c7fe3a54-ab0e-4ec2-88e0-db410a0f2bee"
+     }"#,
+    ).unwrap();
+
+    let value: S3TestEvent = serde_json::from_str(sns_value.message.as_ref()).unwrap();
 
     assert_eq!(value.service, "Amazon S3".to_string());
     assert_eq!(value.bucket, "bucketname".to_string());

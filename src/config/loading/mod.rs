@@ -8,17 +8,17 @@ use std::{
     fmt::Debug,
     fs::{File, ReadDir},
     path::{Path, PathBuf},
+    sync::atomic::{AtomicBool, Ordering},
     sync::Mutex,
 };
 
 use config_builder::ConfigBuilderLoader;
-pub use config_builder::*;
 use glob::glob;
 use loader::process::Process;
 pub use loader::*;
 pub use secret::*;
 pub use source::*;
-use vector_config::NamedComponent;
+use vector_lib::configurable::NamedComponent;
 
 use super::{
     builder::ConfigBuilder, format, validation, vars, Config, ConfigPath, Format, FormatHint,
@@ -26,6 +26,18 @@ use super::{
 use crate::{config::ProviderConfig, signal};
 
 pub static CONFIG_PATHS: Mutex<Vec<ConfigPath>> = Mutex::new(Vec::new());
+
+// Technically, this global should be a parameter to the `config::vars::interpolate` function, which
+// is passed in from its caller `prepare_input` below, etc. However:
+//
+// 1. That ended up needing to have the parameter added to literally dozens of functions, as
+// `prepare_input` has long chains of callers.
+//
+// 2. This variable is only ever set in one place, at program global startup from the command line.
+//
+// 3. This setting is intended to be transitional, anyways, and is marked as deprecated to be
+// removed in a future version after strict mode becomes the default.
+pub static STRICT_ENV_VARS: AtomicBool = AtomicBool::new(false);
 
 pub(super) fn read_dir<P: AsRef<Path> + Debug>(path: P) -> Result<ReadDir, Vec<String>> {
     path.as_ref()
@@ -69,17 +81,15 @@ pub fn merge_path_lists(
 /// Expand a list of paths (potentially containing glob patterns) into real
 /// config paths, replacing it with the default paths when empty.
 pub fn process_paths(config_paths: &[ConfigPath]) -> Option<Vec<ConfigPath>> {
-    let default_paths = default_config_paths();
-
     let starting_paths = if !config_paths.is_empty() {
-        config_paths
+        config_paths.to_owned()
     } else {
-        &default_paths
+        default_config_paths()
     };
 
     let mut paths = Vec::new();
 
-    for config_path in starting_paths {
+    for config_path in &starting_paths {
         let config_pattern: &PathBuf = config_path.into();
 
         let matches: Vec<PathBuf> = match glob(config_pattern.to_str().expect("No ability to glob"))
@@ -113,7 +123,7 @@ pub fn process_paths(config_paths: &[ConfigPath]) -> Option<Vec<ConfigPath>> {
     paths.sort();
     paths.dedup();
     // Ignore poison error and let the current main thread continue running to do the cleanup.
-    std::mem::drop(CONFIG_PATHS.lock().map(|mut guard| *guard = paths.clone()));
+    drop(CONFIG_PATHS.lock().map(|mut guard| *guard = paths.clone()));
 
     Some(paths)
 }
@@ -135,6 +145,7 @@ pub fn load_from_paths(config_paths: &[ConfigPath]) -> Result<Config, Vec<String
 pub async fn load_from_paths_with_provider_and_secrets(
     config_paths: &[ConfigPath],
     signal_handler: &mut signal::SignalHandler,
+    allow_empty: bool,
 ) -> Result<Config, Vec<String>> {
     // Load secret backends first
     let (mut secrets_backends_loader, secrets_warning) =
@@ -150,6 +161,8 @@ pub async fn load_from_paths_with_provider_and_secrets(
         debug!(message = "No secret placeholder found, skipping secret resolution.");
         load_builder_from_paths(config_paths)?
     };
+
+    builder.allow_empty = allow_empty;
 
     validation::check_provider(&builder)?;
     signal_handler.clear();
@@ -292,7 +305,11 @@ pub fn prepare_input<R: std::io::Read>(mut input: R) -> Result<(String, Vec<Stri
             vars.insert("HOSTNAME".into(), hostname);
         }
     }
-    vars::interpolate(&source_string, &vars)
+    vars::interpolate(
+        &source_string,
+        &vars,
+        STRICT_ENV_VARS.load(Ordering::Relaxed),
+    )
 }
 
 pub fn load<R: std::io::Read, T>(input: R, format: Format) -> Result<(T, Vec<String>), Vec<String>>
@@ -305,22 +322,24 @@ where
 }
 
 #[cfg(not(windows))]
-fn default_config_paths() -> Vec<ConfigPath> {
-    vec![ConfigPath::File(
-        "/etc/vector/vector.toml".into(),
-        Some(Format::Toml),
-    )]
+fn default_path() -> PathBuf {
+    "/etc/vector/vector.yaml".into()
 }
 
 #[cfg(windows)]
-fn default_config_paths() -> Vec<ConfigPath> {
+fn default_path() -> PathBuf {
     let program_files =
         std::env::var("ProgramFiles").expect("%ProgramFiles% environment variable must be defined");
-    let config_path = format!("{}\\Vector\\config\\vector.toml", program_files);
-    vec![ConfigPath::File(
-        PathBuf::from(config_path),
-        Some(Format::Toml),
-    )]
+    format!("{}\\Vector\\config\\vector.yaml", program_files).into()
+}
+
+fn default_config_paths() -> Vec<ConfigPath> {
+    #[cfg(not(windows))]
+    let default_path = default_path();
+    #[cfg(windows)]
+    let default_path = default_path();
+
+    vec![ConfigPath::File(default_path, Some(Format::Yaml))]
 }
 
 #[cfg(all(

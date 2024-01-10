@@ -9,8 +9,9 @@ use tokio::sync::{
     mpsc::error::{SendError, TrySendError},
     oneshot,
 };
+use tracing::{Instrument, Span};
 use uuid::Uuid;
-use vector_buffers::{topology::builder::TopologyBuilder, WhenFull};
+use vector_lib::buffers::{topology::builder::TopologyBuilder, WhenFull};
 
 use super::{
     schema::events::{
@@ -51,22 +52,22 @@ impl GlobMatcher<&str> for String {
 #[derive(Debug, Eq, PartialEq, Hash)]
 enum Pattern {
     /// A pattern used to tap into outputs of components
-    OutputPattern(String),
+    OutputPattern(glob::Pattern),
     /// A pattern used to tap into inputs of components.
     ///
     /// For a tap user, an input pattern is effectively a shortcut for specifying
     /// one or more output patterns since a component's inputs are other
     /// components' outputs. This variant captures the original user-supplied
     /// pattern alongside the output patterns it's translated into.
-    InputPattern(String, Vec<String>),
+    InputPattern(String, Vec<glob::Pattern>),
 }
 
 impl GlobMatcher<&str> for Pattern {
     fn matches_glob(&self, rhs: &str) -> bool {
         match self {
-            Pattern::OutputPattern(pattern) => pattern.matches_glob(rhs),
+            Pattern::OutputPattern(pattern) => pattern.matches(rhs),
             Pattern::InputPattern(_, patterns) => {
-                patterns.iter().any(|pattern| pattern.matches_glob(rhs))
+                patterns.iter().any(|pattern| pattern.matches(rhs))
             }
         }
     }
@@ -168,7 +169,14 @@ impl TapController {
     pub fn new(watch_rx: WatchRx, tap_tx: TapSender, patterns: TapPatterns) -> Self {
         let (_shutdown, shutdown_rx) = oneshot::channel();
 
-        tokio::spawn(tap_handler(patterns, tap_tx, watch_rx, shutdown_rx));
+        tokio::spawn(
+            tap_handler(patterns, tap_tx, watch_rx, shutdown_rx).instrument(error_span!(
+                "tap_handler",
+                component_kind = "sink",
+                component_id = "_tap", // It isn't clear what the component_id should be here other than "_tap"
+                component_type = "tap",
+            )),
+        );
 
         Self { _shutdown }
     }
@@ -179,7 +187,7 @@ fn shutdown_trigger(control_tx: ControlChannel, sink_id: ComponentKey) -> Shutdo
     let (shutdown_tx, shutdown_rx) = oneshot::channel();
 
     tokio::spawn(async move {
-        let _ = shutdown_rx.await;
+        _ = shutdown_rx.await;
         if control_tx
             .send(fanout::ControlMessage::Remove(sink_id.clone()))
             .is_err()
@@ -281,18 +289,23 @@ async fn tap_handler(
                     }
                 });
 
-                let mut component_id_patterns = patterns.for_outputs.iter().cloned().map(Pattern::OutputPattern).collect::<HashSet<_>>();
+                let mut component_id_patterns = patterns.for_outputs.iter()
+                                                                    .filter_map(|p| glob::Pattern::new(p).ok())
+                                                                    .map(Pattern::OutputPattern).collect::<HashSet<_>>();
 
                 // Matching an input pattern is equivalent to matching the outputs of the component's inputs
                 for pattern in patterns.for_inputs.iter() {
-                    match inputs.iter().filter(|(key, _)|
-                        pattern.matches_glob(&key.to_string())
-                    ).flat_map(|(_, related_inputs)| related_inputs.iter().map(|id| id.to_string()).collect::<Vec<_>>()).collect::<HashSet<_>>() {
-                        found if !found.is_empty() => {
-                            component_id_patterns.insert(Pattern::InputPattern(pattern.clone(), found.into_iter().collect::<Vec<_>>()));
-                        }
-                        _ => {
-                            debug!(message="Input pattern not expanded: no matching components.", ?pattern);
+                    if let Ok(glob) = glob::Pattern::new(pattern) {
+                        match inputs.iter().filter(|(key, _)|
+                            glob.matches(&key.to_string())
+                        ).flat_map(|(_, related_inputs)| related_inputs.iter().map(|id| id.to_string()).collect::<Vec<_>>()).collect::<HashSet<_>>() {
+                            found if !found.is_empty() => {
+                                component_id_patterns.insert(Pattern::InputPattern(pattern.clone(), found.into_iter()
+                                                                                                         .filter_map(|p| glob::Pattern::new(&p).ok()).collect::<Vec<_>>()));
+                            }
+                            _ => {
+                                debug!(message="Input pattern not expanded: no matching components.", ?pattern);
+                            }
                         }
                     }
                 }
@@ -315,7 +328,7 @@ async fn tap_handler(
                             // target for the component, and spawn our transformer task which will
                             // wrap each event payload with the necessary metadata before forwarding
                             // it to our global tap receiver.
-                            let (tap_buffer_tx, mut tap_buffer_rx) = TopologyBuilder::standalone_memory(TAP_BUFFER_SIZE, WhenFull::DropNewest).await;
+                            let (tap_buffer_tx, mut tap_buffer_rx) = TopologyBuilder::standalone_memory(TAP_BUFFER_SIZE, WhenFull::DropNewest, &Span::current()).await;
                             let mut tap_transformer = TapTransformer::new(tx.clone(), output.clone());
 
                             tokio::spawn(async move {
@@ -356,7 +369,7 @@ async fn tap_handler(
 
                             matched.extend(found.iter().map(|pattern| {
                                 match pattern {
-                                    Pattern::OutputPattern(p) => p.to_owned(),
+                                    Pattern::OutputPattern(p) => p.to_string(),
                                     Pattern::InputPattern(p, _) => p.to_owned(),
                                 }
                             }));
@@ -383,16 +396,21 @@ async fn tap_handler(
                 }
 
                 // Warnings on invalid matches.
+
                 for pattern in patterns.for_inputs.iter() {
-                    let invalid_matches = source_keys.iter().filter(|key| pattern.matches_glob(key)).cloned().collect::<Vec<_>>();
-                    if !invalid_matches.is_empty() {
-                        notifications.push(send_invalid_input_pattern_match(tx.clone(), pattern.clone(), invalid_matches).boxed())
+                    if let Ok(glob) = glob::Pattern::new(pattern) {
+                        let invalid_matches = source_keys.iter().filter(|key| glob.matches(key)).cloned().collect::<Vec<_>>();
+                        if !invalid_matches.is_empty() {
+                            notifications.push(send_invalid_input_pattern_match(tx.clone(), pattern.clone(), invalid_matches).boxed())
+                        }
                     }
                 }
                 for pattern in patterns.for_outputs.iter() {
-                    let invalid_matches = sink_keys.iter().filter(|key| pattern.matches_glob(key)).cloned().collect::<Vec<_>>();
-                    if !invalid_matches.is_empty() {
-                        notifications.push(send_invalid_output_pattern_match(tx.clone(), pattern.clone(), invalid_matches).boxed())
+                    if let Ok(glob) = glob::Pattern::new(pattern) {
+                        let invalid_matches = sink_keys.iter().filter(|key| glob.matches(key)).cloned().collect::<Vec<_>>();
+                        if !invalid_matches.is_empty() {
+                            notifications.push(send_invalid_output_pattern_match(tx.clone(), pattern.clone(), invalid_matches).boxed())
+                        }
                     }
                 }
 
@@ -415,6 +433,7 @@ async fn tap_handler(
     test,
     feature = "sinks-blackhole",
     feature = "sources-demo_logs",
+    feature = "transforms-log_to_metric",
     feature = "transforms-remap",
 ))]
 mod tests {
@@ -522,11 +541,11 @@ mod tests {
         );
 
         fanout
-            .send(vec![metric_event].into())
+            .send(vec![metric_event].into(), None)
             .await
             .expect("should not fail");
         fanout
-            .send(vec![log_event].into())
+            .send(vec![log_event].into(), None)
             .await
             .expect("should not fail");
 
@@ -637,6 +656,7 @@ mod tests {
                     tags: None,
                     metric: MetricTypeConfig::Gauge,
                 }],
+                all_metrics: None,
             },
         );
         config.add_sink(

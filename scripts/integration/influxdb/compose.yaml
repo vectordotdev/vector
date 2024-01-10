@@ -2,11 +2,11 @@ version: '3'
 
 services:
   influxdb-v1:
-    image: docker.io/influxdb:${INFLUXDB_VERSION}
+    image: docker.io/influxdb:${CONFIG_VERSION}
     environment:
     - INFLUXDB_REPORTING_DISABLED=true
   influxdb-v1-tls:
-    image: docker.io/influxdb:${INFLUXDB_VERSION}
+    image: docker.io/influxdb:${CONFIG_VERSION}
     environment:
     - INFLUXDB_REPORTING_DISABLED=true
     - INFLUXDB_HTTP_HTTPS_ENABLED=true
@@ -19,7 +19,3 @@ services:
     command: influxd --reporting-disabled
     environment:
     - INFLUXDB_REPORTING_DISABLED=true
-
-networks:
-  default:
-    name: ${VECTOR_NETWORK}

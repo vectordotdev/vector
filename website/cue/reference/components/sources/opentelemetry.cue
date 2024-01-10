@@ -136,7 +136,7 @@ components: sources: opentelemetry: {
 				severity_number: {
 					description: """
 						Numerical value of the severity.
-						
+
 						Smaller numerical values correspond to less severe events (such as debug events), larger numerical values correspond to more severe events (such as errors and critical events).
 						"""
 					required: false
@@ -168,7 +168,7 @@ components: sources: opentelemetry: {
 				timestamp: {
 					description: """
 						The UTC Datetime when the event occurred. If this value is unset, or `0`, it will be set to the `observed_timestamp` field.
-						
+
 						This field is converted from the `time_unix_nano` Protobuf field.
 						"""
 					required: true
@@ -177,7 +177,7 @@ components: sources: opentelemetry: {
 				observed_timestamp: {
 					description: """
 						The UTC Datetime when the event was observed by the collection system. If this value is unset, or `0`, it will be set to the current time.
-						
+
 						This field is converted from the `observed_time_unix_nano` Protobuf field.
 						"""
 					required: true
@@ -194,22 +194,24 @@ components: sources: opentelemetry: {
 		}
 	}
 
-	telemetry: metrics: {
-		component_discarded_events_total:     components.sources.internal_metrics.output.metrics.component_discarded_events_total
-		component_errors_total:               components.sources.internal_metrics.output.metrics.component_errors_total
-		component_received_bytes_total:       components.sources.internal_metrics.output.metrics.component_received_bytes_total
-		component_received_events_total:      components.sources.internal_metrics.output.metrics.component_received_events_total
-		component_received_event_bytes_total: components.sources.internal_metrics.output.metrics.component_received_event_bytes_total
-		events_in_total:                      components.sources.internal_metrics.output.metrics.events_in_total
-	}
-
 	how_it_works: {
 		tls: {
 			title: "Transport Layer Security (TLS)"
 			body:  """
-				  Vector uses [OpenSSL](\(urls.openssl)) for TLS protocols. You can
-				  adjust TLS behavior via the `grpc.tls.*` and `http.tls.*` options.
-				  """
+				Vector uses [OpenSSL](\(urls.openssl)) for TLS protocols due to OpenSSL's maturity. You can
+				enable and adjust TLS behavior via the `grpc.tls.*` and `http.tls.*` options and/or via an
+				[OpenSSL configuration file](\(urls.openssl_conf)). The file location defaults to
+				`/usr/local/ssl/openssl.cnf` or can be specified with the `OPENSSL_CONF` environment variable.
+				"""
 		}
+	}
+
+	telemetry: metrics: {
+		grpc_server_handler_duration_seconds: components.sources.internal_metrics.output.metrics.grpc_server_handler_duration_seconds
+		grpc_server_messages_received_total:  components.sources.internal_metrics.output.metrics.grpc_server_messages_received_total
+		grpc_server_messages_sent_total:      components.sources.internal_metrics.output.metrics.grpc_server_messages_sent_total
+		http_server_handler_duration_seconds: components.sources.internal_metrics.output.metrics.http_server_handler_duration_seconds
+		http_server_requests_received_total:  components.sources.internal_metrics.output.metrics.http_server_requests_received_total
+		http_server_responses_sent_total:     components.sources.internal_metrics.output.metrics.http_server_responses_sent_total
 	}
 }

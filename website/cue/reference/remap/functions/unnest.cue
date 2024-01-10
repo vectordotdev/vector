@@ -5,10 +5,10 @@ remap: functions: unnest: {
 	description: """
 		Unnest an array field from an object to create an array of objects using that field; keeping all other fields.
 
-		Assigning the array result of this to `.` will result in multiple events being emitted from `remap`. See the
+		Assigning the array result of this to `.` results in multiple events being emitted from `remap`. See the
 		[`remap` transform docs](\(urls.vector_remap_transform_multiple)) for more details.
 
-		This is also referred to as `explode`ing in some languages.
+		This is also referred to as `explode` in some languages.
 		"""
 
 	arguments: [
@@ -20,7 +20,7 @@ remap: functions: unnest: {
 		},
 	]
 	internal_failure_reasons: [
-		"Field path refers to is not an array",
+		"The field path referred to is not an array.",
 	]
 	notices: []
 	return: {

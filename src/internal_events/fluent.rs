@@ -1,8 +1,8 @@
 use metrics::counter;
-use vector_core::internal_event::InternalEvent;
+use vector_lib::internal_event::InternalEvent;
+use vector_lib::internal_event::{error_stage, error_type};
 
 use crate::sources::fluent::DecodeError;
-use vector_common::internal_event::{error_stage, error_type};
 
 #[derive(Debug)]
 pub struct FluentMessageReceived {
@@ -13,7 +13,6 @@ impl InternalEvent for FluentMessageReceived {
     fn emit(self) {
         trace!(message = "Received fluent message.", byte_size = %self.byte_size);
         counter!("component_received_events_total", 1);
-        counter!("events_in_total", 1);
     }
 }
 
@@ -38,7 +37,5 @@ impl<'a> InternalEvent for FluentMessageDecodeError<'a> {
             "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::PROCESSING,
         );
-        // deprecated
-        counter!("decode_errors_total", 1);
     }
 }

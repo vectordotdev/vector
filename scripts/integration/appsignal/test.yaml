@@ -1,0 +1,17 @@
+features:
+- appsignal-integration-tests
+
+test_filter: '::appsignal::integration_tests::'
+
+runner:
+  env:
+    TEST_APPSIGNAL_PUSH_API_KEY:
+
+matrix:
+  version: [latest]
+
+# changes to these files/paths will invoke the integration test in CI
+# expressions are evaluated using https://github.com/micromatch/picomatch
+paths:
+- "src/sinks/appsignal/**"
+- "src/sinks/util/**"

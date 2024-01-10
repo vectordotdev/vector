@@ -15,7 +15,7 @@ base: components: sinks: azure_blob: configuration: {
 				Whether or not end-to-end acknowledgements are enabled.
 
 				When enabled for a sink, any source connected to that sink, where the source supports
-				end-to-end acknowledgements as well, will wait for events to be acknowledged by the sink
+				end-to-end acknowledgements as well, waits for events to be acknowledged by the sink
 				before acknowledging them at the source.
 
 				Enabling or disabling acknowledgements at the sink level takes precedence over any global
@@ -33,10 +33,10 @@ base: components: sinks: azure_blob: configuration: {
 		type: object: options: {
 			max_bytes: {
 				description: """
-					The maximum size of a batch that will be processed by a sink.
+					The maximum size of a batch that is processed by a sink.
 
 					This is based on the uncompressed size of the batched events, before they are
-					serialized / compressed.
+					serialized/compressed.
 					"""
 				required: false
 				type: uint: {
@@ -64,8 +64,8 @@ base: components: sinks: azure_blob: configuration: {
 			Whether or not to append a UUID v4 token to the end of the blob key.
 
 			The UUID is appended to the timestamp portion of the object key, such that if the blob key
-			being generated was `date=2022-07-18/1658176486`, setting this field to `true` would result
-			in an blob key that looked like
+			generated is `date=2022-07-18/1658176486`, setting this field to `true` results
+			in an blob key that looks like
 			`date=2022-07-18/1658176486-30f6652c-71da-4f9f-800d-a1189c47c547`.
 
 			This ensures there are no name collisions, and can be useful in high-volume workloads where
@@ -78,12 +78,16 @@ base: components: sinks: azure_blob: configuration: {
 		description: """
 			A prefix to apply to all blob keys.
 
-			Prefixes are useful for partitioning objects, such as by creating an blob key that
-			stores blobs under a particular "directory". If using a prefix for this purpose, it must end
+			Prefixes are useful for partitioning objects, such as by creating a blob key that
+			stores blobs under a particular directory. If using a prefix for this purpose, it must end
 			in `/` to act as a directory path. A trailing `/` is **not** automatically added.
 			"""
 		required: false
-		type: string: {}
+		type: string: {
+			default: "blob/%F/"
+			examples: ["date/%F/hour/%H/", "year=%Y/month=%m/day=%d/", "kubernetes/{{ metadata.cluster }}/{{ metadata.application_name }}/"]
+			syntax: "template"
+		}
 	}
 	blob_time_format: {
 		description: """
@@ -100,12 +104,12 @@ base: components: sinks: azure_blob: configuration: {
 			Supports the common [`strftime`][chrono_strftime_specifiers] specifiers found in most
 			languages.
 
-			When set to an empty string, no timestamp will be appended to the blob prefix.
+			When set to an empty string, no timestamp is appended to the blob prefix.
 
 			[chrono_strftime_specifiers]: https://docs.rs/chrono/latest/chrono/format/strftime/index.html#specifiers
 			"""
 		required: false
-		type: string: {}
+		type: string: syntax: "strftime"
 	}
 	compression: {
 		description: """
@@ -123,10 +127,20 @@ base: components: sinks: azure_blob: configuration: {
 					[gzip]: https://www.gzip.org/
 					"""
 				none: "No compression."
+				snappy: """
+					[Snappy][snappy] compression.
+
+					[snappy]: https://github.com/google/snappy/blob/main/docs/README.md
+					"""
 				zlib: """
-					[Zlib]][zlib] compression.
+					[Zlib][zlib] compression.
 
 					[zlib]: https://zlib.net/
+					"""
+				zstd: """
+					[Zstandard][zstd] compression.
+
+					[zstd]: https://facebook.github.io/zstd/
 					"""
 			}
 		}
@@ -140,12 +154,12 @@ base: components: sinks: azure_blob: configuration: {
 			Either `storage_account`, or this field, must be specified.
 			"""
 		required: false
-		type: string: {}
+		type: string: examples: ["DefaultEndpointsProtocol=https;AccountName=mylogstorage;AccountKey=storageaccountkeybase64encoded;EndpointSuffix=core.windows.net"]
 	}
 	container_name: {
 		description: "The Azure Blob Storage Account container name."
 		required:    true
-		type: string: {}
+		type: string: examples: ["my-logs"]
 	}
 	encoding: {
 		description: "Configures how events are encoded into raw bytes."
@@ -170,6 +184,11 @@ base: components: sinks: azure_blob: configuration: {
 
 						[apache_avro]: https://avro.apache.org/
 						"""
+					csv: """
+						Encodes an event as a CSV message.
+
+						This codec must be configured with fields to encode.
+						"""
 					gelf: """
 						Encodes an event as a [GELF][gelf] message.
 
@@ -186,7 +205,7 @@ base: components: sinks: azure_blob: configuration: {
 						[logfmt]: https://brandur.org/logfmt
 						"""
 					native: """
-						Encodes an event in Vector’s [native Protocol Buffers format][vector_native_protobuf].
+						Encodes an event in the [native Protocol Buffers format][vector_native_protobuf].
 
 						This codec is **[experimental][experimental]**.
 
@@ -194,36 +213,123 @@ base: components: sinks: azure_blob: configuration: {
 						[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
 						"""
 					native_json: """
-						Encodes an event in Vector’s [native JSON format][vector_native_json].
+						Encodes an event in the [native JSON format][vector_native_json].
 
 						This codec is **[experimental][experimental]**.
 
 						[vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
 						[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
 						"""
+					protobuf: """
+						Encodes an event as a [Protobuf][protobuf] message.
+
+						[protobuf]: https://protobuf.dev/
+						"""
 					raw_message: """
 						No encoding.
 
-						This "encoding" simply uses the `message` field of a log event.
+						This encoding uses the `message` field of a log event.
 
-						Users should take care if they're modifying their log events (such as by using a `remap`
-						transform, etc) and removing the message field while doing additional parsing on it, as this
+						Be careful if you are modifying your log events (for example, by using a `remap`
+						transform) and removing the message field while doing additional parsing on it, as this
 						could lead to the encoding emitting empty strings for the given event.
 						"""
 					text: """
 						Plain text encoding.
 
-						This "encoding" simply uses the `message` field of a log event. For metrics, it uses an
+						This encoding uses the `message` field of a log event. For metrics, it uses an
 						encoding that resembles the Prometheus export format.
 
-						Users should take care if they're modifying their log events (such as by using a `remap`
-						transform, etc) and removing the message field while doing additional parsing on it, as this
+						Be careful if you are modifying your log events (for example, by using a `remap`
+						transform) and removing the message field while doing additional parsing on it, as this
 						could lead to the encoding emitting empty strings for the given event.
 						"""
 				}
 			}
+			csv: {
+				description:   "The CSV Serializer Options."
+				relevant_when: "codec = \"csv\""
+				required:      true
+				type: object: options: {
+					capacity: {
+						description: """
+																Set the capacity (in bytes) of the internal buffer used in the CSV writer.
+																This defaults to a reasonable setting.
+																"""
+						required: false
+						type: uint: default: 8192
+					}
+					delimiter: {
+						description: "The field delimiter to use when writing CSV."
+						required:    false
+						type: uint: default: 44
+					}
+					double_quote: {
+						description: """
+																Enable double quote escapes.
+
+																This is enabled by default, but it may be disabled. When disabled, quotes in
+																field data are escaped instead of doubled.
+																"""
+						required: false
+						type: bool: default: true
+					}
+					escape: {
+						description: """
+																The escape character to use when writing CSV.
+
+																In some variants of CSV, quotes are escaped using a special escape character
+																like \\ (instead of escaping quotes by doubling them).
+
+																To use this, `double_quotes` needs to be disabled as well otherwise it is ignored.
+																"""
+						required: false
+						type: uint: default: 34
+					}
+					fields: {
+						description: """
+																Configures the fields that will be encoded, as well as the order in which they
+																appear in the output.
+
+																If a field is not present in the event, the output will be an empty string.
+
+																Values of type `Array`, `Object`, and `Regex` are not supported and the
+																output will be an empty string.
+																"""
+						required: true
+						type: array: items: type: string: {}
+					}
+					quote: {
+						description: "The quote character to use when writing CSV."
+						required:    false
+						type: uint: default: 34
+					}
+					quote_style: {
+						description: "The quoting style to use when writing CSV data."
+						required:    false
+						type: string: {
+							default: "necessary"
+							enum: {
+								always: "Always puts quotes around every field."
+								necessary: """
+																			Puts quotes around fields only when necessary.
+																			They are necessary when fields contain a quote, delimiter, or record terminator.
+																			Quotes are also necessary when writing an empty record
+																			(which is indistinguishable from a record with one empty field).
+																			"""
+								never: "Never writes quotes, even if it produces invalid CSV data."
+								non_numeric: """
+																			Puts quotes around all fields that are non-numeric.
+																			Namely, when writing a field that does not parse as a valid float or integer,
+																			then quotes are used even if they aren't strictly necessary.
+																			"""
+							}
+						}
+					}
+				}
+			}
 			except_fields: {
-				description: "List of fields that will be excluded from the encoded event."
+				description: "List of fields that are excluded from the encoded event."
 				required:    false
 				type: array: items: type: string: {}
 			}
@@ -231,34 +337,59 @@ base: components: sinks: azure_blob: configuration: {
 				description: """
 					Controls how metric tag values are encoded.
 
-					When set to `single`, only the last non-bare value of tags will be displayed with the
-					metric.  When set to `full`, all metric tags will be exposed as separate assignments.
+					When set to `single`, only the last non-bare value of tags are displayed with the
+					metric.  When set to `full`, all metric tags are exposed as separate assignments.
 					"""
 				relevant_when: "codec = \"json\" or codec = \"text\""
 				required:      false
 				type: string: {
 					default: "single"
 					enum: {
-						full: "All tags will be exposed as arrays of either string or null values."
+						full: "All tags are exposed as arrays of either string or null values."
 						single: """
-															Tag values will be exposed as single strings, the same as they were before this config
-															option. Tags with multiple values will show the last assigned value, and null values will be
-															ignored.
+															Tag values are exposed as single strings, the same as they were before this config
+															option. Tags with multiple values show the last assigned value, and null values
+															are ignored.
 															"""
 					}
 				}
 			}
 			only_fields: {
-				description: "List of fields that will be included in the encoded event."
+				description: "List of fields that are included in the encoded event."
 				required:    false
 				type: array: items: type: string: {}
+			}
+			protobuf: {
+				description:   "Options for the Protobuf serializer."
+				relevant_when: "codec = \"protobuf\""
+				required:      true
+				type: object: options: {
+					desc_file: {
+						description: """
+																The path to the protobuf descriptor set file.
+
+																This file is the output of `protoc -o <path> ...`
+																"""
+						required: true
+						type: string: examples: ["/etc/vector/protobuf_descriptor_set.desc"]
+					}
+					message_type: {
+						description: "The name of the message type to use for serializing."
+						required:    true
+						type: string: examples: ["package.Message"]
+					}
+				}
 			}
 			timestamp_format: {
 				description: "Format used for timestamp fields."
 				required:    false
 				type: string: enum: {
-					rfc3339: "Represent the timestamp as a RFC 3339 timestamp."
-					unix:    "Represent the timestamp as a Unix timestamp."
+					rfc3339:    "Represent the timestamp as a RFC 3339 timestamp."
+					unix:       "Represent the timestamp as a Unix timestamp."
+					unix_float: "Represent the timestamp as a Unix timestamp in floating point."
+					unix_ms:    "Represent the timestamp as a Unix timestamp in milliseconds."
+					unix_ns:    "Represent the timestamp as a Unix timestamp in nanoseconds."
+					unix_us:    "Represent the timestamp as a Unix timestamp in microseconds"
 				}
 			}
 		}
@@ -272,11 +403,11 @@ base: components: sinks: azure_blob: configuration: {
 			explicit connection_string (which already explicitly supports overriding the blob endpoint
 			URL).
 
-			This may only be used with `storage_account` and will be ignored when used with
+			This may only be used with `storage_account` and is ignored when used with
 			`connection_string`.
 			"""
 		required: false
-		type: string: {}
+		type: string: examples: ["https://test.blob.core.usgovcloudapi.net/", "https://test.blob.core.windows.net/"]
 	}
 	framing: {
 		description: "Framing configuration."
@@ -312,7 +443,9 @@ base: components: sinks: azure_blob: configuration: {
 		description: """
 			Middleware settings for outbound requests.
 
-			Various settings can be configured, such as concurrency and rate limits, timeouts, etc.
+			Various settings can be configured, such as concurrency and rate limits, timeouts, retry behavior, etc.
+
+			Note that the retry backoff policy follows the Fibonacci sequence.
 			"""
 		required: false
 		type: object: options: {
@@ -350,6 +483,26 @@ base: components: sinks: azure_blob: configuration: {
 						required: false
 						type: float: default: 0.4
 					}
+					initial_concurrency: {
+						description: """
+																The initial concurrency limit to use. If not specified, the initial limit will be 1 (no concurrency).
+
+																It is recommended to set this value to your service's average limit if you're seeing that it takes a
+																long time to ramp up adaptive concurrency after a restart. You can find this value by looking at the
+																`adaptive_concurrency_limit` metric.
+																"""
+						required: false
+						type: uint: default: 1
+					}
+					max_concurrency_limit: {
+						description: """
+																The maximum concurrency limit.
+
+																The adaptive request concurrency limit will not go above this bound. This is put in place as a safeguard.
+																"""
+						required: false
+						type: uint: default: 200
+					}
 					rtt_deviation_scale: {
 						description: """
 																Scale of RTT deviations which are not considered anomalous.
@@ -367,11 +520,16 @@ base: components: sinks: azure_blob: configuration: {
 				}
 			}
 			concurrency: {
-				description: "Configuration for outbound request concurrency."
-				required:    false
+				description: """
+					Configuration for outbound request concurrency.
+
+					This can be set either to one of the below enum values or to a positive integer, which denotes
+					a fixed concurrency limit.
+					"""
+				required: false
 				type: {
 					string: {
-						default: "none"
+						default: "adaptive"
 						enum: {
 							adaptive: """
 															Concurrency will be managed by Vector's [Adaptive Request Concurrency][arc] feature.
@@ -400,17 +558,13 @@ base: components: sinks: azure_blob: configuration: {
 				description: "The maximum number of requests allowed within the `rate_limit_duration_secs` time window."
 				required:    false
 				type: uint: {
-					default: 9223372036854775807
+					default: 250
 					unit:    "requests"
 				}
 			}
 			retry_attempts: {
-				description: """
-					The maximum number of retries to make for failed requests.
-
-					The default, for all intents and purposes, represents an infinite number of retries.
-					"""
-				required: false
+				description: "The maximum number of retries to make for failed requests."
+				required:    false
 				type: uint: {
 					default: 9223372036854775807
 					unit:    "retries"
@@ -420,7 +574,7 @@ base: components: sinks: azure_blob: configuration: {
 				description: """
 					The amount of time to wait before attempting the first retry for a failed request.
 
-					After the first retry has failed, the fibonacci sequence will be used to select future backoffs.
+					After the first retry has failed, the fibonacci sequence is used to select future backoffs.
 					"""
 				required: false
 				type: uint: {
@@ -428,11 +582,31 @@ base: components: sinks: azure_blob: configuration: {
 					unit:    "seconds"
 				}
 			}
+			retry_jitter_mode: {
+				description: "The jitter mode to use for retry backoff behavior."
+				required:    false
+				type: string: {
+					default: "Full"
+					enum: {
+						Full: """
+															Full jitter.
+
+															The random delay is anywhere from 0 up to the maximum current delay calculated by the backoff
+															strategy.
+
+															Incorporating full jitter into your backoff strategy can greatly reduce the likelihood
+															of creating accidental denial of service (DoS) conditions against your own systems when
+															many clients are recovering from a failure state.
+															"""
+						None: "No jitter."
+					}
+				}
+			}
 			retry_max_duration_secs: {
 				description: "The maximum amount of time to wait between retries."
 				required:    false
 				type: uint: {
-					default: 3600
+					default: 30
 					unit:    "seconds"
 				}
 			}
@@ -440,7 +614,7 @@ base: components: sinks: azure_blob: configuration: {
 				description: """
 					The time a request can take before being aborted.
 
-					It is highly recommended that you do not lower this value below the service’s internal timeout, as this could
+					Datadog highly recommends that you do not lower this value below the service's internal timeout, as this could
 					create orphaned requests, pile on retries, and result in duplicate data downstream.
 					"""
 				required: false
@@ -468,6 +642,6 @@ base: components: sinks: azure_blob: configuration: {
 			[az_cli_docs]: https://docs.microsoft.com/en-us/cli/azure/account?view=azure-cli-latest#az-account-get-access-token
 			"""
 		required: false
-		type: string: {}
+		type: string: examples: ["mylogstorage"]
 	}
 }

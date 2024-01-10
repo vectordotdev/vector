@@ -84,6 +84,22 @@ representing multiple endpoints. If a component uses multiple options to
 automatically build the endpoint, then the `endpoint(s)` option MUST
 override that process.
 
+#### `listen`
+
+When a component listens for incoming connections, it SHOULD expose a `listen` configuration option that takes
+a `string` representing an address with `<protocol>:<address>`.
+
+Options for `protocol` are:
+
+- `unix+stream`, where `address` should be a file path
+- `unix+datagram`, where `address` should be a file path
+- `unix`, same as `unix+stream`
+- `tcp`, where `address` should be `<host>:<port>`
+- `udp`, where `address` should be `<host>:<port>`
+
+Components MAY have a default protocol. For example, a `statsd` component may default the protocol
+to `udp` and only require the `<host>:<port>` to bind to.
+
 ## Instrumentation
 
 **Extends the [Instrumentation Specification].**
@@ -114,7 +130,8 @@ _All components_ MUST emit a `ComponentEventsReceived` event that represents
 the reception of Vector events from an upstream component.
 
 - Emission
-  - MUST emit immediately after creating or receiving Vector events.
+  - MUST emit immediately after creating or receiving Vector events, before modification or metadata
+    is added.
 - Properties
   - `count` - The count of Vector events.
   - `byte_size` - The estimated JSON byte size of all events received.
@@ -130,9 +147,11 @@ the reception of Vector events from an upstream component.
 
 #### ComponentBytesReceived
 
-*Sources* MUST emit a `ComponentBytesReceived` event immediately after receiving, decompressing
-and filtering bytes from the upstream source and before the creation of a Vector event.
+*Sources* MUST emit a `ComponentBytesReceived` event that represent the reception of bytes.
 
+- Emission
+  - MUST emit immediately after receiving, decompressing and filtering bytes from the upstream
+    source and before the creation of a Vector event.
 - Properties
   - `byte_size`
     - For UDP, TCP, and Unix protocols, the total number of bytes received from
@@ -144,7 +163,6 @@ and filtering bytes from the upstream source and before the creation of a Vector
   - `protocol` - The protocol used to send the bytes (i.e., `tcp`, `udp`,
     `unix`, `http`, `https`, `file`, etc.).
   - `http_path` - If relevant, the HTTP path, excluding query strings.
-  - `socket` - If relevant, the socket number that bytes were received from.
 - Metrics
   - MUST increment the `component_received_bytes_total` counter by the defined value with
     the defined properties as metric tags.
@@ -155,13 +173,13 @@ and filtering bytes from the upstream source and before the creation of a Vector
 
 #### ComponentBytesSent
 
-*Sinks* that send events downstream, MUST emit a `ComponentBytesSent` event immediately after
-sending bytes to the downstream target, if the transmission was successful. The reported bytes MUST
-be before compression.
+*Sinks* MUST emit a `ComponentBytesSent` event that represent the transmission of bytes.
 
-Note that for sinks that simply expose data, but don't delete the data after
-sending it, like the `prometheus_exporter` sink, SHOULD NOT publish this metric.
-
+- Emission
+  - MUST emit a `ComponentBytesSent` event immediately after sending bytes to the downstream target,
+    if the transmission was successful. The reported bytes MUST be before compression.
+  - Note that sinks that simply expose data, but don't delete the data after sending it, like the
+    `prometheus_exporter` sink, SHOULD NOT emit this metric.
 - Properties
   - `byte_size`
     - For UDP, TCP, and Unix protocols, the total number of bytes placed on the

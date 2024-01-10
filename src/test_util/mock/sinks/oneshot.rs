@@ -3,8 +3,8 @@ use std::sync::{Arc, Mutex};
 use async_trait::async_trait;
 use futures_util::{stream::BoxStream, StreamExt};
 use tokio::sync::oneshot::Sender;
-use vector_config::configurable_component;
-use vector_core::{
+use vector_lib::configurable::configurable_component;
+use vector_lib::{
     config::{AcknowledgementsConfig, Input},
     event::EventArray,
     sink::{StreamSink, VectorSink},
@@ -16,7 +16,7 @@ use crate::{
 };
 
 /// Configurable for the `test_oneshot` sink.
-#[configurable_component(sink("test_oneshot"))]
+#[configurable_component(sink("test_oneshot", "Test (oneshot)."))]
 #[derive(Clone, Debug, Default)]
 pub struct OneshotSinkConfig {
     #[serde(skip)]
@@ -34,6 +34,7 @@ impl OneshotSinkConfig {
 }
 
 #[async_trait]
+#[typetag::serde(name = "test_oneshot")]
 impl SinkConfig for OneshotSinkConfig {
     fn input(&self) -> Input {
         Input::all()
@@ -68,7 +69,7 @@ impl StreamSink<EventArray> for OneshotSink {
             .next()
             .await
             .expect("must always get an item in oneshot sink");
-        let _ = tx.send(events);
+        _ = tx.send(events);
 
         Ok(())
     }

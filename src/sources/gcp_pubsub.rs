@@ -4,12 +4,10 @@ use std::{
     time::Duration,
 };
 
-use chrono::{DateTime, NaiveDateTime, Utc};
-use codecs::decoding::{DeserializerConfig, FramingConfig};
+use chrono::NaiveDateTime;
 use derivative::Derivative;
 use futures::{stream, stream::FuturesUnordered, FutureExt, Stream, StreamExt, TryFutureExt};
 use http::uri::{InvalidUri, Scheme, Uri};
-use lookup::owned_value_path;
 use once_cell::sync::Lazy;
 use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
@@ -20,17 +18,20 @@ use tonic::{
     transport::{Certificate, ClientTlsConfig, Endpoint, Identity},
     Code, Request, Status,
 };
-use value::{kind::Collection, Kind};
-use vector_common::internal_event::{
+use vector_lib::codecs::decoding::{DeserializerConfig, FramingConfig};
+use vector_lib::config::{LegacyKey, LogNamespace};
+use vector_lib::configurable::configurable_component;
+use vector_lib::internal_event::{
     ByteSize, BytesReceived, EventsReceived, InternalEventHandle as _, Protocol, Registered,
 };
-use vector_common::{byte_size_of::ByteSizeOf, finalizer::UnorderedFinalizer};
-use vector_config::{configurable_component, NamedComponent};
-use vector_core::config::{LegacyKey, LogNamespace};
+use vector_lib::lookup::owned_value_path;
+use vector_lib::{byte_size_of::ByteSizeOf, finalizer::UnorderedFinalizer};
+use vrl::path;
+use vrl::value::{kind::Collection, Kind};
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
-    config::{DataType, Output, SourceAcknowledgementsConfig, SourceConfig, SourceContext},
+    config::{DataType, SourceAcknowledgementsConfig, SourceConfig, SourceContext, SourceOutput},
     event::{BatchNotifier, BatchStatus, Event, MaybeAsLogMut, Value},
     gcp::{GcpAuthConfig, GcpAuthenticator, Scope, PUBSUB_URL},
     internal_events::{
@@ -61,11 +62,13 @@ type Finalizer = UnorderedFinalizer<Vec<String>>;
 // objects, which causes a clippy ding on this block. We don't
 // directly control the generated code, so allow this lint here.
 #[allow(clippy::clone_on_ref_ptr)]
+// https://github.com/hyperium/tonic/issues/1350
+#[allow(clippy::missing_const_for_fn)]
 #[allow(warnings)]
 mod proto {
     include!(concat!(env!("OUT_DIR"), "/google.pubsub.v1.rs"));
 
-    use vector_core::ByteSizeOf;
+    use vector_lib::ByteSizeOf;
 
     impl ByteSizeOf for StreamingPullResponse {
         fn allocated_bytes(&self) -> usize {
@@ -119,15 +122,20 @@ static CLIENT_ID: Lazy<String> = Lazy::new(|| uuid::Uuid::new_v4().to_string());
 
 /// Configuration for the `gcp_pubsub` source.
 #[serde_as]
-#[configurable_component(source("gcp_pubsub"))]
+#[configurable_component(source(
+    "gcp_pubsub",
+    "Fetch observability events from GCP's Pub/Sub messaging system."
+))]
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(deny_unknown_fields)]
 pub struct PubsubConfig {
     /// The project name from which to pull logs.
+    #[configurable(metadata(docs::examples = "my-log-source-project"))]
     pub project: String,
 
     /// The subscription within the project which is configured to receive logs.
+    #[configurable(metadata(docs::examples = "my-vector-source-subscription"))]
     pub subscription: String,
 
     /// The endpoint from which to pull data.
@@ -157,7 +165,8 @@ pub struct PubsubConfig {
     /// How often to poll the currently active streams to see if they
     /// are all busy and so open a new stream.
     #[serde(default = "default_poll_time")]
-    #[serde_as(as = "serde_with::DurationSeconds<f64>")]
+    #[serde_as(as = "serde_with::DurationSecondsWithFrac<f64>")]
+    #[configurable(metadata(docs::human_name = "Poll Time"))]
     pub poll_time_seconds: Duration,
 
     /// The acknowledgement deadline, in seconds, to use for this stream.
@@ -165,6 +174,7 @@ pub struct PubsubConfig {
     /// Messages that are not acknowledged when this deadline expires may be retransmitted.
     #[serde(default = "default_ack_deadline")]
     #[serde_as(as = "serde_with::DurationSeconds<u64>")]
+    #[configurable(metadata(docs::human_name = "Acknowledgement Deadline"))]
     pub ack_deadline_secs: Duration,
 
     /// The acknowledgement deadline, in seconds, to use for this stream.
@@ -177,7 +187,8 @@ pub struct PubsubConfig {
 
     /// The amount of time, in seconds, to wait between retry attempts after an error.
     #[serde(default = "default_retry_delay")]
-    #[serde_as(as = "serde_with::DurationSeconds<f64>")]
+    #[serde_as(as = "serde_with::DurationSecondsWithFrac<f64>")]
+    #[configurable(metadata(docs::human_name = "Retry Delay"))]
     pub retry_delay_secs: Duration,
 
     /// The amount of time, in seconds, to wait between retry attempts after an error.
@@ -190,7 +201,8 @@ pub struct PubsubConfig {
     /// before sending a keepalive request. If this is set larger than
     /// `60`, you may see periodic errors sent from the server.
     #[serde(default = "default_keepalive")]
-    #[serde_as(as = "serde_with::DurationSeconds<f64>")]
+    #[serde_as(as = "serde_with::DurationSecondsWithFrac<f64>")]
+    #[configurable(metadata(docs::human_name = "Keepalive"))]
     pub keepalive_secs: Duration,
 
     /// The namespace to use for logs. This overrides the global setting.
@@ -242,6 +254,7 @@ const fn default_poll_time() -> Duration {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "gcp_pubsub")]
 impl SourceConfig for PubsubConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<crate::sources::Source> {
         let log_namespace = cx.log_namespace(self.log_namespace);
@@ -304,7 +317,7 @@ impl SourceConfig for PubsubConfig {
                 self.decoding.clone(),
                 log_namespace,
             )
-            .build(),
+            .build()?,
             acknowledgements: cx.do_acknowledgements(self.acknowledgements),
             shutdown: cx.shutdown,
             out: cx.out,
@@ -322,7 +335,7 @@ impl SourceConfig for PubsubConfig {
         Ok(Box::pin(source))
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
         let schema_definition = self
             .decoding
@@ -350,7 +363,7 @@ impl SourceConfig for PubsubConfig {
                 None,
             );
 
-        vec![Output::default(DataType::Log).with_schema_definition(schema_definition)]
+        vec![SourceOutput::new_logs(DataType::Log, schema_definition)]
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -497,7 +510,7 @@ impl PubsubSource {
         let mut stream = stream.into_inner();
 
         let (finalizer, mut ack_stream) =
-            Finalizer::maybe_new(self.acknowledgements, self.shutdown.clone());
+            Finalizer::maybe_new(self.acknowledgements, Some(self.shutdown.clone()));
         let mut pending_acks = 0;
 
         loop {
@@ -608,7 +621,7 @@ impl PubsubSource {
 
         let count = events.len();
         match self.out.send_batch(events).await {
-            Err(error) => emit!(StreamClosedError { error, count }),
+            Err(_) => emit!(StreamClosedError { count }),
             Ok(()) => match notifier {
                 None => ack_ids
                     .send(ids)
@@ -653,7 +666,7 @@ impl PubsubSource {
             message
                 .attributes
                 .into_iter()
-                .map(|(key, value)| (key, Value::Bytes(value.into())))
+                .map(|(key, value)| (key.into(), Value::Bytes(value.into())))
                 .collect(),
         );
         let log_namespace = self.log_namespace;
@@ -662,11 +675,9 @@ impl PubsubSource {
             "gcp_pubsub",
             &message.data,
             message.publish_time.map(|dt| {
-                DateTime::from_utc(
-                    NaiveDateTime::from_timestamp_opt(dt.seconds, dt.nanos as u32)
-                        .expect("invalid timestamp"),
-                    Utc,
-                )
+                NaiveDateTime::from_timestamp_opt(dt.seconds, dt.nanos as u32)
+                    .expect("invalid timestamp")
+                    .and_utc()
             }),
             batch,
             log_namespace,
@@ -677,15 +688,15 @@ impl PubsubSource {
                 log_namespace.insert_source_metadata(
                     PubsubConfig::NAME,
                     log,
-                    Some(LegacyKey::Overwrite("message_id")),
-                    "message_id",
+                    Some(LegacyKey::Overwrite(path!("message_id"))),
+                    path!("message_id"),
                     message.message_id.clone(),
                 );
                 log_namespace.insert_source_metadata(
                     PubsubConfig::NAME,
                     log,
-                    Some(LegacyKey::Overwrite("attributes")),
-                    "attributes",
+                    Some(LegacyKey::Overwrite(path!("attributes"))),
+                    path!("attributes"),
                     attributes.clone(),
                 )
             }
@@ -735,8 +746,8 @@ impl Future for Task {
 
 #[cfg(test)]
 mod tests {
-    use lookup::LookupBuf;
-    use vector_core::schema::Definition;
+    use vector_lib::lookup::OwnedTargetPath;
+    use vector_lib::schema::Definition;
 
     use super::*;
 
@@ -752,43 +763,51 @@ mod tests {
             ..Default::default()
         };
 
-        let definition = config.outputs(LogNamespace::Vector)[0]
-            .clone()
-            .log_schema_definition
-            .unwrap();
+        let definitions = config
+            .outputs(LogNamespace::Vector)
+            .remove(0)
+            .schema_definition(true);
 
         let expected_definition =
             Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
-                .with_meaning(LookupBuf::root(), "message")
-                .with_metadata_field(&owned_value_path!("vector", "source_type"), Kind::bytes())
+                .with_meaning(OwnedTargetPath::event_root(), "message")
+                .with_metadata_field(
+                    &owned_value_path!("vector", "source_type"),
+                    Kind::bytes(),
+                    None,
+                )
                 .with_metadata_field(
                     &owned_value_path!("vector", "ingest_timestamp"),
                     Kind::timestamp(),
+                    None,
                 )
                 .with_metadata_field(
                     &owned_value_path!("gcp_pubsub", "timestamp"),
                     Kind::timestamp().or_undefined(),
+                    Some("timestamp"),
                 )
                 .with_metadata_field(
                     &owned_value_path!("gcp_pubsub", "attributes"),
                     Kind::object(Collection::empty().with_unknown(Kind::bytes())),
+                    None,
                 )
                 .with_metadata_field(
                     &owned_value_path!("gcp_pubsub", "message_id"),
                     Kind::bytes(),
+                    None,
                 );
 
-        assert_eq!(definition, expected_definition);
+        assert_eq!(definitions, Some(expected_definition));
     }
 
     #[test]
     fn output_schema_definition_legacy_namespace() {
         let config = PubsubConfig::default();
 
-        let definition = config.outputs(LogNamespace::Legacy)[0]
-            .clone()
-            .log_schema_definition
-            .unwrap();
+        let definitions = config
+            .outputs(LogNamespace::Legacy)
+            .remove(0)
+            .schema_definition(true);
 
         let expected_definition = Definition::new_with_default_metadata(
             Kind::object(Collection::empty()),
@@ -812,7 +831,7 @@ mod tests {
         )
         .with_event_field(&owned_value_path!("message_id"), Kind::bytes(), None);
 
-        assert_eq!(definition, expected_definition);
+        assert_eq!(definitions, Some(expected_definition));
     }
 }
 
@@ -821,13 +840,14 @@ mod integration_tests {
     use std::collections::{BTreeMap, HashSet};
 
     use base64::prelude::{Engine as _, BASE64_STANDARD};
+    use chrono::{DateTime, Utc};
     use futures::{Stream, StreamExt};
     use http::method::Method;
     use hyper::{Request, StatusCode};
     use once_cell::sync::Lazy;
     use serde_json::{json, Value};
     use tokio::time::{Duration, Instant};
-    use vector_common::btreemap;
+    use vrl::btreemap;
 
     use super::*;
     use crate::config::{ComponentKey, ProxyConfig};
@@ -984,10 +1004,9 @@ mod integration_tests {
     fn now_trunc() -> DateTime<Utc> {
         let start = Utc::now().timestamp();
         // Truncate the milliseconds portion, the hard way.
-        DateTime::<Utc>::from_utc(
-            NaiveDateTime::from_timestamp_opt(start, 0).expect("invalid timestamp"),
-            Utc,
-        )
+        NaiveDateTime::from_timestamp_opt(start, 0)
+            .expect("invalid timestamp")
+            .and_utc()
     }
 
     struct Tester {
@@ -1152,7 +1171,7 @@ mod integration_tests {
                 .clone();
             assert_eq!(logattr.len(), attributes.len());
             for (a, b) in logattr.into_iter().zip(&attributes) {
-                assert_eq!(&a.0, b.0);
+                assert_eq!(&a.0, b.0.as_str());
                 assert_eq!(a.1, b.1.clone().into());
             }
         }

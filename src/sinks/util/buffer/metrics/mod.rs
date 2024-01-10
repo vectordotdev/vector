@@ -1,8 +1,6 @@
-pub mod sort;
-
 use std::cmp::Ordering;
 
-use vector_core::event::metric::{Metric, MetricValue, Sample};
+use vector_lib::event::metric::{Metric, MetricValue, Sample};
 
 use crate::sinks::util::{
     batch::{Batch, BatchConfig, BatchError, BatchSize, PushResult},
@@ -125,10 +123,10 @@ pub fn compress_distribution(samples: &mut Vec<Sample>) -> Vec<Sample> {
 }
 
 #[cfg(test)]
-pub(self) mod tests {
+mod tests {
     use similar_asserts::assert_eq;
-    use vector_core::event::metric::{MetricKind, MetricKind::*, MetricValue, StatisticKind};
-    use vector_core::metric_tags;
+    use vector_lib::event::metric::{MetricKind, MetricKind::*, MetricValue, StatisticKind};
+    use vector_lib::metric_tags;
 
     use super::*;
     use crate::{
@@ -166,7 +164,7 @@ pub(self) mod tests {
             format!("dist-{}", num),
             kind,
             MetricValue::Distribution {
-                samples: vector_core::samples![num as f64 => rate],
+                samples: vector_lib::samples![num as f64 => rate],
                 statistic: StatisticKind::Histogram,
             },
         )
@@ -183,7 +181,7 @@ pub(self) mod tests {
             format!("buckets-{}", num),
             kind,
             MetricValue::AggregatedHistogram {
-                buckets: vector_core::buckets![
+                buckets: vector_lib::buckets![
                     1.0 => cfactor,
                     bpower.exp2() => cfactor * 2,
                     4.0f64.powf(bpower) => cfactor * 4
@@ -199,7 +197,7 @@ pub(self) mod tests {
             format!("quantiles-{}", num),
             kind,
             MetricValue::AggregatedSummary {
-                quantiles: vector_core::quantiles![
+                quantiles: vector_lib::quantiles![
                     0.0 => factor,
                     0.5 => factor * 2.0,
                     1.0 => factor * 4.0
@@ -567,7 +565,7 @@ pub(self) mod tests {
 
     #[test]
     fn compress_distributions() {
-        let mut samples = vector_core::samples![
+        let mut samples = vector_lib::samples![
             2.0 => 12,
             2.0 => 12,
             3.0 => 13,
@@ -579,7 +577,7 @@ pub(self) mod tests {
 
         assert_eq!(
             compress_distribution(&mut samples),
-            vector_core::samples![1.0 => 11, 2.0 => 48, 3.0 => 26]
+            vector_lib::samples![1.0 => 11, 2.0 => 48, 3.0 => 26]
         );
     }
 

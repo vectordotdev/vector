@@ -21,14 +21,14 @@ pub struct Cli {
     env: Option<Vec<String>>,
 }
 
-fn parse_env(env: Vec<String>) -> BTreeMap<String, String> {
+fn parse_env(env: Vec<String>) -> BTreeMap<String, Option<String>> {
     env.into_iter()
         .map(|entry| {
-            let split = entry.split_once('=');
-            #[allow(clippy::map_unwrap_or)]
-            split
-                .map(|(k, v)| (k.to_owned(), v.to_owned()))
-                .unwrap_or_else(|| (entry, String::new()))
+            #[allow(clippy::map_unwrap_or)] // Can't use map_or due to borrowing entry
+            entry
+                .split_once('=')
+                .map(|(k, v)| (k.to_owned(), Some(v.to_owned())))
+                .unwrap_or_else(|| (entry, None))
         })
         .collect()
 }
@@ -38,15 +38,20 @@ impl Cli {
         let runner = get_agent_test_runner(self.container)?;
 
         let mut args = vec!["--workspace".to_string()];
-        if let Some(extra_args) = &self.args {
-            args.extend(extra_args.clone());
 
-            if !(self.container || extra_args.contains(&"--features".to_string())) {
-                let features = platform::default_features();
-                args.extend(["--features".to_string(), features.to_string()]);
-            }
+        if let Some(mut extra_args) = self.args {
+            args.append(&mut extra_args);
         }
 
-        runner.test(&self.env.map(parse_env), &None, &args)
+        if !args.contains(&"--features".to_string()) {
+            let features = platform::default_features();
+            args.extend(["--features".to_string(), features.to_string()]);
+        }
+
+        runner.test(
+            &parse_env(self.env.unwrap_or_default()),
+            &BTreeMap::default(),
+            &args,
+        )
     }
 }

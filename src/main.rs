@@ -1,10 +1,12 @@
 #![deny(warnings)]
 
 extern crate vector;
-use vector::app::Application;
+use vector::{app::Application, extra_context::ExtraContext};
+
+use std::process::ExitCode;
 
 #[cfg(unix)]
-fn main() {
+fn main() -> ExitCode {
     #[cfg(feature = "allocation-tracing")]
     {
         use crate::vector::internal_telemetry::allocations::{
@@ -14,7 +16,7 @@ fn main() {
         let opts = vector::cli::Opts::get_matches()
             .map_err(|error| {
                 // Printing to stdout/err can itself fail; ignore it.
-                let _ = error.print();
+                _ = error.print();
                 exitcode::USAGE
             })
             .unwrap_or_else(|code| {
@@ -35,24 +37,22 @@ fn main() {
         }
     }
 
-    let app = Application::prepare().unwrap_or_else(|code| {
-        std::process::exit(code);
-    });
-
-    app.run();
+    let exit_code = Application::run(ExtraContext::default())
+        .code()
+        .unwrap_or(exitcode::UNAVAILABLE) as u8;
+    ExitCode::from(exit_code)
 }
 
 #[cfg(windows)]
-pub fn main() {
+pub fn main() -> ExitCode {
     // We need to be able to run vector in User Interactive mode. We first try
     // to run vector as a service. If we fail, we consider that we are in
     // interactive mode and then fallback to console mode.  See
     // https://docs.microsoft.com/en-us/dotnet/api/system.environment.userinteractive?redirectedfrom=MSDN&view=netcore-3.1#System_Environment_UserInteractive
-    vector::vector_windows::run().unwrap_or_else(|_| {
-        let app = Application::prepare().unwrap_or_else(|code| {
-            std::process::exit(code);
-        });
-
-        app.run();
+    let exit_code = vector::vector_windows::run().unwrap_or_else(|_| {
+        Application::run(ExtraContext::default())
+            .code()
+            .unwrap_or(exitcode::UNAVAILABLE)
     });
+    ExitCode::from(exit_code as u8)
 }

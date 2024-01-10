@@ -1,5 +1,6 @@
+//! Functionality supporting both the `[crate::sources::amqp]` source and `[crate::sinks::amqp]` sink.
 use lapin::tcp::{OwnedIdentity, OwnedTLSConfig};
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 
 /// AMQP connection options.
 #[configurable_component]
@@ -12,8 +13,8 @@ pub(crate) struct AmqpConfig {
     ///
     /// The default vhost can be specified by using a value of `%2f`.
     ///
-    /// In order to connect over TLS, a scheme of `amqps` can be specified instead i.e.
-    /// `amqps://...`. Additional TLS settings, such as client certificate verification, etc, can be
+    /// To connect over TLS, a scheme of `amqps` can be specified instead. For example,
+    /// `amqps://...`. Additional TLS settings, such as client certificate verification, can be
     /// configured under the `tls` section.
     #[configurable(metadata(
         docs::examples = "amqp://user:password@127.0.0.1:5672/%2f?timeout=10",
@@ -33,11 +34,34 @@ impl Default for AmqpConfig {
     }
 }
 
+/// Polls the connection until a connection can be made.
+/// Gives up after 5 attempts.
+#[cfg(feature = "amqp-integration-tests")]
+#[cfg(test)]
+pub(crate) async fn await_connection(connection: &AmqpConfig) {
+    let mut pause = tokio::time::Duration::from_millis(1);
+    let mut attempts = 0;
+
+    loop {
+        let connection = connection.clone();
+        if connection.connect().await.is_ok() {
+            return;
+        }
+        attempts += 1;
+
+        if attempts == 5 {
+            return;
+        }
+
+        tokio::time::sleep(pause).await;
+        pause *= 2;
+    }
+}
+
 impl AmqpConfig {
     pub(crate) async fn connect(
         &self,
     ) -> Result<(lapin::Connection, lapin::Channel), Box<dyn std::error::Error + Send + Sync>> {
-        debug!("Connecting to {}.", self.connection_string);
         let addr = self.connection_string.clone();
         let conn = match &self.tls {
             Some(tls) => {

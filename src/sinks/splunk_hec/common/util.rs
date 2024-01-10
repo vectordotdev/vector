@@ -5,7 +5,8 @@ use futures_util::future::BoxFuture;
 use http::{Request, StatusCode, Uri};
 use hyper::Body;
 use snafu::{ResultExt, Snafu};
-use vector_core::{config::proxy::ProxyConfig, event::EventRef};
+use vector_lib::lookup::lookup_v2::{OptionalTargetPath, OptionalValuePath};
+use vector_lib::{config::proxy::ProxyConfig, event::EventRef};
 
 use super::{
     request::HecRequest,
@@ -49,6 +50,9 @@ pub fn create_client(
     Ok(HttpClient::new(tls_settings, proxy_config)?)
 }
 
+// TODO: `HttpBatchService` has been deprecated for direct use in sinks.
+//       This sink should undergo a refactor to utilize the `HttpService`
+//       instead, which extracts much of the boilerplate code for `Service`.
 pub fn build_http_batch_service(
     client: HttpClient,
     http_request_builder: Arc<HttpRequestBuilder>,
@@ -131,12 +135,30 @@ pub fn build_uri(
     uri.parse::<Uri>()
 }
 
-pub fn host_key() -> String {
-    crate::config::log_schema().host_key().to_string()
+pub fn config_host_key_target_path() -> OptionalTargetPath {
+    OptionalTargetPath {
+        path: crate::config::log_schema().host_key_target_path().cloned(),
+    }
 }
 
-pub fn timestamp_key() -> String {
-    crate::config::log_schema().timestamp_key().to_string()
+pub fn config_host_key() -> OptionalValuePath {
+    OptionalValuePath {
+        path: crate::config::log_schema().host_key().cloned(),
+    }
+}
+
+pub fn config_timestamp_key_target_path() -> OptionalTargetPath {
+    OptionalTargetPath {
+        path: crate::config::log_schema()
+            .timestamp_key_target_path()
+            .cloned(),
+    }
+}
+
+pub fn config_timestamp_key() -> OptionalValuePath {
+    OptionalValuePath {
+        path: crate::config::log_schema().timestamp_key().cloned(),
+    }
 }
 
 pub fn render_template_string<'a>(
@@ -160,7 +182,7 @@ pub fn render_template_string<'a>(
 mod tests {
     use bytes::Bytes;
     use http::{HeaderValue, Uri};
-    use vector_core::config::proxy::ProxyConfig;
+    use vector_lib::config::proxy::ProxyConfig;
     use wiremock::{
         matchers::{header, method, path},
         Mock, MockServer, ResponseTemplate,
@@ -389,7 +411,7 @@ mod integration_tests {
 
     use http::StatusCode;
     use tokio::time::Duration;
-    use vector_core::config::proxy::ProxyConfig;
+    use vector_lib::config::proxy::ProxyConfig;
     use warp::Filter;
 
     use super::{

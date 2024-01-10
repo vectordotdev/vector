@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 pub mod prelude;
 
 mod adaptive_concurrency;
@@ -75,6 +76,7 @@ mod journald;
 mod kafka;
 #[cfg(feature = "sources-kubernetes_logs")]
 mod kubernetes_logs;
+#[cfg(feature = "transforms-log_to_metric")]
 mod log_to_metric;
 mod logplex;
 #[cfg(feature = "sinks-loki")]
@@ -96,7 +98,11 @@ mod parser;
 #[cfg(feature = "sources-postgresql_metrics")]
 mod postgresql_metrics;
 mod process;
-#[cfg(any(feature = "sources-prometheus", feature = "sinks-prometheus"))]
+#[cfg(any(
+    feature = "sources-prometheus-scrape",
+    feature = "sources-prometheus-remote-write",
+    feature = "sinks-prometheus"
+))]
 mod prometheus;
 #[cfg(feature = "sinks-pulsar")]
 mod pulsar;
@@ -137,7 +143,7 @@ pub(crate) use mongodb_metrics::*;
 
 #[cfg(feature = "transforms-aggregate")]
 pub(crate) use self::aggregate::*;
-#[cfg(any(feature = "sources-amqp", feature = "sinks-amqp"))]
+#[cfg(feature = "sources-amqp")]
 pub(crate) use self::amqp::*;
 #[cfg(feature = "sources-apache_metrics")]
 pub(crate) use self::apache_metrics::*;
@@ -195,13 +201,6 @@ pub(crate) use self::gcp_pubsub::*;
 pub(crate) use self::grpc::*;
 #[cfg(feature = "sources-host_metrics")]
 pub(crate) use self::host_metrics::*;
-#[cfg(any(
-    feature = "sources-utils-http",
-    feature = "sources-utils-http-encoding",
-    feature = "sources-datadog_agent",
-    feature = "sources-splunk_hec",
-))]
-pub(crate) use self::http::*;
 #[cfg(feature = "sources-utils-http-client")]
 pub(crate) use self::http_client_source::*;
 #[cfg(feature = "sinks-influxdb")]
@@ -216,6 +215,7 @@ pub(crate) use self::journald::*;
 pub(crate) use self::kafka::*;
 #[cfg(feature = "sources-kubernetes_logs")]
 pub(crate) use self::kubernetes_logs::*;
+#[cfg(feature = "transforms-log_to_metric")]
 pub(crate) use self::log_to_metric::*;
 #[cfg(feature = "sources-heroku_logs")]
 pub(crate) use self::logplex::*;
@@ -231,10 +231,15 @@ pub(crate) use self::mqtt::*;
 pub(crate) use self::nats::*;
 #[cfg(feature = "sources-nginx_metrics")]
 pub(crate) use self::nginx_metrics::*;
+#[allow(unused_imports)]
 pub(crate) use self::parser::*;
 #[cfg(feature = "sources-postgresql_metrics")]
 pub(crate) use self::postgresql_metrics::*;
-#[cfg(any(feature = "sources-prometheus", feature = "sinks-prometheus"))]
+#[cfg(any(
+    feature = "sources-prometheus-scrape",
+    feature = "sources-prometheus-remote-write",
+    feature = "sinks-prometheus"
+))]
 pub(crate) use self::prometheus::*;
 #[cfg(feature = "sinks-pulsar")]
 pub(crate) use self::pulsar::*;
@@ -256,63 +261,13 @@ pub(crate) use self::statsd_sink::*;
 pub(crate) use self::tag_cardinality_limit::*;
 #[cfg(feature = "transforms-throttle")]
 pub(crate) use self::throttle::*;
-#[cfg(all(
-    any(
-        feature = "sinks-socket",
-        feature = "sinks-statsd",
-        feature = "sources-dnstap",
-        feature = "sources-metrics",
-        feature = "sources-statsd",
-        feature = "sources-syslog",
-        feature = "sources-socket"
-    ),
-    unix
-))]
+#[cfg(unix)]
 pub(crate) use self::unix::*;
 #[cfg(feature = "sinks-websocket")]
 pub(crate) use self::websocket::*;
 #[cfg(windows)]
 pub(crate) use self::windows::*;
-pub(crate) use self::{
+pub use self::{
     adaptive_concurrency::*, batch::*, common::*, conditions::*, encoding_transcode::*,
-    heartbeat::*, open::*, process::*, socket::*, tcp::*, template::*, udp::*,
+    heartbeat::*, http::*, open::*, process::*, socket::*, tcp::*, template::*, udp::*,
 };
-
-// this version won't be needed once all `InternalEvent`s implement `name()`
-#[cfg(test)]
-#[macro_export]
-macro_rules! emit {
-    ($event:expr) => {
-        vector_common::internal_event::emit(vector_common::internal_event::DefaultName {
-            event: $event,
-            name: stringify!($event),
-        })
-    };
-}
-
-#[cfg(not(test))]
-#[macro_export]
-macro_rules! emit {
-    ($event:expr) => {
-        vector_common::internal_event::emit($event)
-    };
-}
-
-#[cfg(test)]
-#[macro_export]
-macro_rules! register {
-    ($event:expr) => {
-        vector_common::internal_event::register(vector_common::internal_event::DefaultName {
-            event: $event,
-            name: stringify!($event),
-        })
-    };
-}
-
-#[cfg(not(test))]
-#[macro_export]
-macro_rules! register {
-    ($event:expr) => {
-        vector_common::internal_event::register($event)
-    };
-}

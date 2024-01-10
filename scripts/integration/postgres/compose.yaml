@@ -2,7 +2,7 @@ version: '3'
 
 services:
   postgres:
-    image: docker.io/postgres:${POSTGRES_VERSION}
+    image: docker.io/postgres:${CONFIG_VERSION}
     command: /postgres-init.sh
     environment:
     - POSTGRES_USER=vector
@@ -12,6 +12,5 @@ services:
     - ../../../tests/data/postgres-init.sh:/postgres-init.sh:ro
     - ../../../tests/data/ca:/certs:ro
 
-networks:
-  default:
-    name: ${VECTOR_NETWORK}
+volumes:
+  socket: {}

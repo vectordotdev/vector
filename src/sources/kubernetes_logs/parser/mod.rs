@@ -2,10 +2,10 @@ mod cri;
 mod docker;
 mod test_util;
 
-use vector_core::config::LogNamespace;
+use vector_lib::config::LogNamespace;
 
+use crate::sources::kubernetes_logs::transform_utils::get_message_path;
 use crate::{
-    config::log_schema,
     event::{Event, Value},
     internal_events::KubernetesLogsFormatPickerEdgeCase,
     transforms::{FunctionTransform, OutputBuffer},
@@ -42,12 +42,8 @@ impl FunctionTransform for Parser {
     fn transform(&mut self, output: &mut OutputBuffer, event: Event) {
         match &mut self.state {
             ParserState::Uninitialized => {
-                let message_field = match self.log_namespace {
-                    LogNamespace::Vector => ".",
-                    LogNamespace::Legacy => log_schema().message_key(),
-                };
-
-                let message = match event.as_log().get(message_field) {
+                let message_field = get_message_path(self.log_namespace);
+                let message = match event.as_log().get(&message_field) {
                     Some(message) => message,
                     None => {
                         emit!(KubernetesLogsFormatPickerEdgeCase {
@@ -83,10 +79,11 @@ impl FunctionTransform for Parser {
 #[cfg(test)]
 mod tests {
     use bytes::Bytes;
-    use lookup::event_path;
+    use vector_lib::lookup::event_path;
+    use vrl::value;
 
     use super::*;
-    use crate::{event::Event, event::LogEvent, test_util::trace_init, transforms::Transform};
+    use crate::{event::Event, event::LogEvent, test_util::trace_init};
 
     /// Picker has to work for all test cases for underlying parsers.
     fn valid_cases(log_namespace: LogNamespace) -> Vec<(Bytes, Vec<Event>)> {
@@ -106,8 +103,8 @@ mod tests {
     fn test_parsing_valid_vector_namespace() {
         trace_init();
         test_util::test_parser(
-            || Transform::function(Parser::new(LogNamespace::Vector)),
-            |bytes| Event::Log(LogEvent::from(vrl::value!(bytes))),
+            || Parser::new(LogNamespace::Vector),
+            |bytes| Event::Log(LogEvent::from(value!(bytes))),
             valid_cases(LogNamespace::Vector),
         );
     }
@@ -116,7 +113,7 @@ mod tests {
     fn test_parsing_valid_legacy_namespace() {
         trace_init();
         test_util::test_parser(
-            || Transform::function(Parser::new(LogNamespace::Legacy)),
+            || Parser::new(LogNamespace::Legacy),
             |bytes| Event::Log(LogEvent::from(bytes)),
             valid_cases(LogNamespace::Legacy),
         );
@@ -146,7 +143,7 @@ mod tests {
             // No `message` field.
             (LogEvent::default(), LogNamespace::Legacy),
             // Non-bytes `message` field.
-            (LogEvent::from(vrl::value!(123)), LogNamespace::Vector),
+            (LogEvent::from(value!(123)), LogNamespace::Vector),
             (
                 {
                     let mut input = LogEvent::default();

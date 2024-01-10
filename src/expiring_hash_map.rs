@@ -47,7 +47,7 @@ where
         K: Borrow<Q>,
         Q: ?Sized + Hash + Eq,
     {
-        self.map.get(k).map(|&(ref v, _)| v)
+        self.map.get(k).map(|(v, _)| v)
     }
 
     /// Get a mut reference to the value by key.

@@ -1,7 +1,4 @@
-use std::{
-    future::ready,
-    time::{Duration, Instant},
-};
+use std::{future::ready, time::Duration};
 
 use chrono::Utc;
 use futures::{stream, FutureExt, StreamExt, TryFutureExt};
@@ -10,16 +7,16 @@ use hyper::{Body, Request};
 use serde_with::serde_as;
 use snafu::ResultExt;
 use tokio_stream::wrappers::IntervalStream;
-use vector_config::configurable_component;
-use vector_core::{metric_tags, EstimatedJsonEncodedSizeOf};
+use vector_lib::configurable::configurable_component;
+use vector_lib::{metric_tags, EstimatedJsonEncodedSizeOf};
 
 use crate::{
-    config::{self, GenerateConfig, Output, ProxyConfig, SourceConfig, SourceContext},
+    config::{GenerateConfig, ProxyConfig, SourceConfig, SourceContext, SourceOutput},
     event::metric::{Metric, MetricKind, MetricValue},
     http::HttpClient,
     internal_events::{
-        ApacheMetricsEventsReceived, ApacheMetricsHttpError, ApacheMetricsParseError,
-        ApacheMetricsResponseError, EndpointBytesReceived, RequestCompleted, StreamClosedError,
+        ApacheMetricsEventsReceived, ApacheMetricsParseError, EndpointBytesReceived,
+        HttpClientHttpError, HttpClientHttpResponseError, StreamClosedError,
     },
     shutdown::ShutdownSignal,
     SourceSender,
@@ -28,11 +25,11 @@ use crate::{
 mod parser;
 
 pub use parser::ParseError;
-use vector_core::config::LogNamespace;
+use vector_lib::config::LogNamespace;
 
 /// Configuration for the `apache_metrics` source.
 #[serde_as]
-#[configurable_component(source("apache_metrics"))]
+#[configurable_component(source("apache_metrics", "Collect metrics from Apache's HTTPD server."))]
 #[derive(Clone, Debug)]
 pub struct ApacheMetricsConfig {
     /// The list of `mod_status` endpoints to scrape metrics from.
@@ -42,6 +39,7 @@ pub struct ApacheMetricsConfig {
     /// The interval between scrapes.
     #[serde(default = "default_scrape_interval_secs")]
     #[serde_as(as = "serde_with::DurationSeconds<u64>")]
+    #[configurable(metadata(docs::human_name = "Scrape Interval"))]
     scrape_interval_secs: Duration,
 
     /// The namespace of the metric.
@@ -71,6 +69,7 @@ impl GenerateConfig for ApacheMetricsConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "apache_metrics")]
 impl SourceConfig for ApacheMetricsConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let urls = self
@@ -92,8 +91,8 @@ impl SourceConfig for ApacheMetricsConfig {
         ))
     }
 
-    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
-        vec![Output::default(config::DataType::Metric)]
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
+        vec![SourceOutput::new_metrics()]
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -169,7 +168,6 @@ fn apache_metrics(
                     "host" => url.sanitized_authority(),
                 };
 
-                let start = Instant::now();
                 let namespace = namespace.clone();
                 client
                     .send(request)
@@ -183,11 +181,6 @@ fn apache_metrics(
                     .filter_map(move |response| {
                         ready(match response {
                             Ok((header, body)) if header.status == hyper::StatusCode::OK => {
-                                emit!(RequestCompleted {
-                                    start,
-                                    end: Instant::now()
-                                });
-
                                 let byte_size = body.len();
                                 let body = String::from_utf8_lossy(&body);
                                 emit!(EndpointBytesReceived {
@@ -232,9 +225,9 @@ fn apache_metrics(
                                 Some(stream::iter(metrics))
                             }
                             Ok((header, _)) => {
-                                emit!(ApacheMetricsResponseError {
+                                emit!(HttpClientHttpResponseError {
                                     code: header.status,
-                                    endpoint: &sanitized_url,
+                                    url: sanitized_url.to_owned(),
                                 });
                                 Some(stream::iter(vec![Metric::new(
                                     "up",
@@ -246,9 +239,9 @@ fn apache_metrics(
                                 .with_timestamp(Some(Utc::now()))]))
                             }
                             Err(error) => {
-                                emit!(ApacheMetricsHttpError {
+                                emit!(HttpClientHttpError {
                                     error,
-                                    endpoint: &sanitized_url
+                                    url: sanitized_url.to_owned(),
                                 });
                                 Some(stream::iter(vec![Metric::new(
                                     "up",
@@ -271,9 +264,9 @@ fn apache_metrics(
                 debug!("Finished sending.");
                 Ok(())
             }
-            Err(error) => {
+            Err(_) => {
                 let (count, _) = stream.size_hint();
-                emit!(StreamClosedError { error, count });
+                emit!(StreamClosedError { count });
                 Err(())
             }
         }

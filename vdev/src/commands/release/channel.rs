@@ -1,8 +1,9 @@
 use anyhow::Result;
 
-use crate::util;
+use crate::util::get_channel;
 
-/// Determine the appropriate release channel (nightly or latest) based on Git HEAD.
+/// Provide the release channel (release/nightly/custom).
+/// This command is intended for use only within GitHub build workflows.
 // This script is used across various release scripts to determine where distribute archives,
 // packages, etc.
 #[derive(clap::Args, Debug)]
@@ -11,7 +12,9 @@ pub struct Cli {}
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
-        println!("{}", util::release_channel()?);
+        let channel = get_channel();
+
+        println!("{channel}");
         Ok(())
     }
 }

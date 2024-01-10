@@ -5,7 +5,7 @@ base: components: sources: dnstap: configuration: {
 		description: """
 			Overrides the name of the log field used to add the source path to each event.
 
-			The value will be the socket path itself.
+			The value is the socket path itself.
 
 			By default, the [global `log_schema.host_key` option][global_host_key] is used.
 
@@ -21,9 +21,9 @@ base: components: sources: dnstap: configuration: {
 	}
 	max_frame_length: {
 		description: """
-			Maximum DNSTAP frame length that the source will accept.
+			Maximum DNSTAP frame length that the source accepts.
 
-			If any frame is longer than this, it will be discarded.
+			If any frame is longer than this, it is discarded.
 			"""
 		required: false
 		type: uint: {
@@ -38,9 +38,9 @@ base: components: sources: dnstap: configuration: {
 	}
 	raw_data_only: {
 		description: """
-			Whether or not to skip parsing/decoding of DNSTAP frames.
+			Whether or not to skip parsing or decoding of DNSTAP frames.
 
-			If set to `true`, frames will not be parsed/decoded. The raw frame data will be set as a field on the event
+			If set to `true`, frames are not parsed or decoded. The raw frame data is set as a field on the event
 			(called `rawData`) and encoded as a base64 string.
 			"""
 		required: false
@@ -50,7 +50,7 @@ base: components: sources: dnstap: configuration: {
 		description: """
 			Unix file mode bits to be applied to the unix socket file as its designated file permissions.
 
-			Note that the file mode value can be specified in any numeric format supported by your configuration
+			Note: The file mode value can be specified in any numeric format supported by your configuration
 			language, but it is most intuitive to use an octal number.
 			"""
 		required: false
@@ -60,7 +60,7 @@ base: components: sources: dnstap: configuration: {
 		description: """
 			Absolute path to the socket file to read DNSTAP data from.
 
-			The DNS server must be configured to send its DNSTAP data to this socket file. The socket file will be created
+			The DNS server must be configured to send its DNSTAP data to this socket file. The socket file is created
 			if it doesn't already exist when the source first starts.
 			"""
 		required: true

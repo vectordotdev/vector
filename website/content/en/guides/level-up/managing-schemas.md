@@ -22,7 +22,7 @@ Data comes in all shapes and sizes. Vector has an array (let's call it a vector 
 decoding your events in the right format, transforming them into the right shape, and passing that data on downstream.
 
 While your first uses of Vector might be connecting `stdin` to `honeycomb`, eventually you're going to have other
-requirements. Maybe regional laws prevent you from shipping certain data, or you need to do some data mudging to conform
+requirements. Maybe regional laws prevent you from shipping certain data, or you need to do some data munging to conform
 some logs to the rest of your system. With a little configuration we can teach Vector to solve all these problems!
 
 ## Overriding Global Field Names
@@ -55,7 +55,7 @@ Not all sources use the `host` field.
 {{< /warning >}}
 
 We find this feature is useful when used with simple configs! As your number of components grows, your needs will change
-and you'll likely need to configure this at a more fine grained level.
+and you'll likely need to configure this at a more fine-grained level.
 
 
 ### Example: Custom timestamp field
@@ -135,9 +135,10 @@ type = "stdin"
 
 [transforms.parse]
 inputs = ["application"]
-drop_field = true
-drop_invalid = false
-type = "json_parser"
+type = "remap"
+source = '''
+. = parse_json!(.message)
+'''
 
 [transforms.not_gdpr]
 type = "filter"
@@ -328,8 +329,6 @@ Where are you deploying Vector? Let us know, maybe we can help optimize it!
 
 [docs.sinks.console]: /docs/reference/configuration/sinks/console/
 [docs.sources]: /docs/reference/configuration/sources/
-[docs.transforms.grok_parser]: /docs/reference/vrl/functions/#parse_grok
-[docs.transforms.json_parser]: /docs/reference/vrl/functions/#parse_json
 [docs.transforms.remap]: /docs/reference/configuration/transforms/remap/
 [docs.enrichment_functions]: /docs/reference/vrl/functions/#enrichment-functions
 

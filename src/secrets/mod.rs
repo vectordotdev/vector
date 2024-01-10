@@ -1,7 +1,8 @@
+#![allow(missing_docs)]
 use std::collections::{HashMap, HashSet};
 
 use enum_dispatch::enum_dispatch;
-use vector_config::{configurable_component, NamedComponent};
+use vector_lib::configurable::{configurable_component, NamedComponent};
 
 use crate::{config::SecretBackend, signal};
 
@@ -22,10 +23,8 @@ pub enum SecretBackends {
     Test(test::TestBackend),
 }
 
-// We can't use `enum_dispatch` here because it doesn't support associated constants.
+// TODO: Use `enum_dispatch` here.
 impl NamedComponent for SecretBackends {
-    const NAME: &'static str = "_invalid_usage";
-
     fn get_component_name(&self) -> &'static str {
         match self {
             Self::Exec(config) => config.get_component_name(),

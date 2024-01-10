@@ -2,15 +2,13 @@ use std::collections::BTreeMap;
 
 use mlua::prelude::*;
 
-use super::util::{table_to_timestamp, timestamp_to_table};
-use crate::event::metric::TagValue;
-use crate::{
-    event::{
-        metric::{self, MetricSketch, MetricTags, TagValueSet},
-        Metric, MetricKind, MetricValue, StatisticKind,
-    },
-    metrics::AgentDDSketch,
+use super::super::{
+    metric::TagValue,
+    metric::{self, MetricSketch, MetricTags, TagValueSet},
+    Metric, MetricKind, MetricValue, StatisticKind,
 };
+use super::util::{table_to_timestamp, timestamp_to_table};
+use crate::metrics::AgentDDSketch;
 
 pub struct LuaMetric {
     pub metric: Metric,
@@ -22,9 +20,9 @@ pub struct LuaMetricTags {
     pub multi_value_tags: bool,
 }
 
-impl<'a> ToLua<'a> for MetricKind {
+impl<'a> IntoLua<'a> for MetricKind {
     #![allow(clippy::wrong_self_convention)] // this trait is defined by mlua
-    fn to_lua(self, lua: &'a Lua) -> LuaResult<LuaValue> {
+    fn into_lua(self, lua: &'a Lua) -> LuaResult<LuaValue> {
         let kind = match self {
             MetricKind::Absolute => "absolute",
             MetricKind::Incremental => "incremental",
@@ -49,8 +47,8 @@ impl<'a> FromLua<'a> for MetricKind {
     }
 }
 
-impl<'a> ToLua<'a> for StatisticKind {
-    fn to_lua(self, lua: &'a Lua) -> LuaResult<LuaValue> {
+impl<'a> IntoLua<'a> for StatisticKind {
+    fn into_lua(self, lua: &'a Lua) -> LuaResult<LuaValue> {
         let kind = match self {
             StatisticKind::Summary => "summary",
             StatisticKind::Histogram => "histogram",
@@ -105,14 +103,14 @@ impl<'a> FromLua<'a> for MetricTags {
     }
 }
 
-impl<'a> ToLua<'a> for LuaMetricTags {
-    fn to_lua(self, lua: &'a Lua) -> LuaResult<LuaValue> {
+impl<'a> IntoLua<'a> for LuaMetricTags {
+    fn into_lua(self, lua: &'a Lua) -> LuaResult<LuaValue> {
         if self.multi_value_tags {
             Ok(LuaValue::Table(lua.create_table_from(
                 self.tags.0.into_iter().map(|(key, value)| {
                     let value: Vec<_> = value
                         .into_iter()
-                        .filter_map(|tag_value| tag_value.into_option().to_lua(lua).ok())
+                        .filter_map(|tag_value| tag_value.into_option().into_lua(lua).ok())
                         .collect();
                     (key, value)
                 }),
@@ -125,9 +123,9 @@ impl<'a> ToLua<'a> for LuaMetricTags {
     }
 }
 
-impl<'a> ToLua<'a> for LuaMetric {
+impl<'a> IntoLua<'a> for LuaMetric {
     #![allow(clippy::wrong_self_convention)] // this trait is defined by mlua
-    fn to_lua(self, lua: &'a Lua) -> LuaResult<LuaValue> {
+    fn into_lua(self, lua: &'a Lua) -> LuaResult<LuaValue> {
         let tbl = lua.create_table()?;
 
         tbl.raw_set("name", self.metric.name())?;
@@ -346,7 +344,7 @@ impl<'a> FromLua<'a> for Metric {
 
 #[cfg(test)]
 mod test {
-    use chrono::{offset::TimeZone, Utc};
+    use chrono::{offset::TimeZone, Timelike, Utc};
     use vector_common::assert_event_data_eq;
 
     use super::*;
@@ -373,7 +371,7 @@ mod test {
     }
 
     #[test]
-    fn to_lua_counter_full() {
+    fn into_lua_counter_full() {
         let metric = Metric::new(
             "example counter",
             MetricKind::Incremental,
@@ -382,8 +380,9 @@ mod test {
         .with_namespace(Some("namespace_example"))
         .with_tags(Some(crate::metric_tags!("example tag" => "example value")))
         .with_timestamp(Some(
-            Utc.ymd(2018, 11, 14)
-                .and_hms_nano_opt(8, 9, 10, 11)
+            Utc.with_ymd_and_hms(2018, 11, 14, 8, 9, 10)
+                .single()
+                .and_then(|t| t.with_nanosecond(11))
                 .expect("invalid timestamp"),
         ));
 
@@ -458,7 +457,7 @@ mod test {
     }
 
     #[test]
-    fn to_lua_counter_minimal() {
+    fn into_lua_counter_minimal() {
         let metric = Metric::new(
             "example counter",
             MetricKind::Absolute,
@@ -482,7 +481,7 @@ mod test {
     }
 
     #[test]
-    fn to_lua_gauge() {
+    fn into_lua_gauge() {
         let metric = Metric::new(
             "example gauge",
             MetricKind::Absolute,
@@ -496,7 +495,7 @@ mod test {
     }
 
     #[test]
-    fn to_lua_set() {
+    fn into_lua_set() {
         let metric = Metric::new(
             "example set",
             MetricKind::Incremental,
@@ -520,7 +519,7 @@ mod test {
     }
 
     #[test]
-    fn to_lua_distribution() {
+    fn into_lua_distribution() {
         let metric = Metric::new(
             "example distribution",
             MetricKind::Incremental,
@@ -545,7 +544,7 @@ mod test {
     }
 
     #[test]
-    fn to_lua_aggregated_histogram() {
+    fn into_lua_aggregated_histogram() {
         let metric = Metric::new(
             "example histogram",
             MetricKind::Incremental,
@@ -573,7 +572,7 @@ mod test {
     }
 
     #[test]
-    fn to_lua_aggregated_summary() {
+    fn into_lua_aggregated_summary() {
         let metric = Metric::new(
             "example summary",
             MetricKind::Incremental,
@@ -648,8 +647,8 @@ mod test {
         .with_namespace(Some("example_namespace"))
         .with_tags(Some(crate::metric_tags!("example tag" => "example value")))
         .with_timestamp(Some(
-            Utc.ymd(2018, 11, 14)
-                .and_hms_opt(8, 9, 10)
+            Utc.with_ymd_and_hms(2018, 11, 14, 8, 9, 10)
+                .single()
                 .expect("invalid timestamp"),
         ));
         assert_event_data_eq!(Lua::new().load(value).eval::<Metric>().unwrap(), expected);
@@ -690,8 +689,8 @@ mod test {
             ]),
         )]))))
         .with_timestamp(Some(
-            Utc.ymd(2018, 11, 14)
-                .and_hms_opt(8, 9, 10)
+            Utc.with_ymd_and_hms(2018, 11, 14, 8, 9, 10)
+                .single()
                 .expect("invalid timestamp"),
         ));
         assert_event_data_eq!(Lua::new().load(value).eval::<Metric>().unwrap(), expected);

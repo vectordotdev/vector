@@ -3,25 +3,24 @@ use std::io::Read;
 use base64::prelude::{Engine as _, BASE64_STANDARD};
 use bytes::Bytes;
 use chrono::Utc;
-use codecs::StreamDecodingError;
 use flate2::read::MultiGzDecoder;
 use futures::StreamExt;
-use lookup::{metadata_path, path, PathPrefix};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
-use vector_common::{
+use vector_lib::codecs::StreamDecodingError;
+use vector_lib::lookup::{metadata_path, path, PathPrefix};
+use vector_lib::{
+    config::{LegacyKey, LogNamespace},
+    event::BatchNotifier,
+    EstimatedJsonEncodedSizeOf,
+};
+use vector_lib::{
     finalization::AddBatchNotifier,
     internal_event::{
         ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Registered,
     },
 };
-use vector_config::NamedComponent;
-use vector_core::{
-    config::{LegacyKey, LogNamespace},
-    event::BatchNotifier,
-    EstimatedJsonEncodedSizeOf,
-};
-use vrl::SecretTarget;
+use vrl::compiler::SecretTarget;
 use warp::reject;
 
 use super::{
@@ -109,10 +108,12 @@ pub(super) async fn firehose(
                                     );
                                 }
                                 LogNamespace::Legacy => {
-                                    log.try_insert(
-                                        (PathPrefix::Event, log_schema().timestamp_key()),
-                                        request.timestamp,
-                                    );
+                                    if let Some(timestamp_key) = log_schema().timestamp_key() {
+                                        log.try_insert(
+                                            (PathPrefix::Event, timestamp_key),
+                                            request.timestamp,
+                                        );
+                                    }
                                 }
                             };
 
@@ -144,10 +145,7 @@ pub(super) async fn firehose(
 
                     let count = events.len();
                     if let Err(error) = context.out.send_batch(events).await {
-                        emit!(StreamClosedError {
-                            error: error.clone(),
-                            count,
-                        });
+                        emit!(StreamClosedError { count });
                         let error = RequestError::ShuttingDown {
                             request_id: request_id.clone(),
                             source: error,

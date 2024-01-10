@@ -1,4 +1,0 @@
-# result: 2
-
-foo = { "0bar": 2 }
-foo.(a | 0bar)

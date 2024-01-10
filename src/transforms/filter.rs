@@ -1,10 +1,13 @@
-use vector_common::internal_event::{Count, InternalEventHandle as _, Registered};
-use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
+use vector_lib::config::{clone_input_definitions, LogNamespace};
+use vector_lib::configurable::configurable_component;
+use vector_lib::internal_event::{Count, InternalEventHandle as _, Registered};
 
 use crate::{
     conditions::{AnyCondition, Condition},
-    config::{DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext},
+    config::{
+        DataType, GenerateConfig, Input, OutputId, TransformConfig, TransformContext,
+        TransformOutput,
+    },
     event::Event,
     internal_events::FilterEventsDropped,
     schema,
@@ -12,7 +15,7 @@ use crate::{
 };
 
 /// Configuration for the `filter` transform.
-#[configurable_component(transform("filter"))]
+#[configurable_component(transform("filter", "Filter events based on a set of conditions."))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct FilterConfig {
@@ -36,6 +39,7 @@ impl GenerateConfig for FilterConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "filter")]
 impl TransformConfig for FilterConfig {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
         Ok(Transform::function(Filter::new(
@@ -47,8 +51,16 @@ impl TransformConfig for FilterConfig {
         Input::all()
     }
 
-    fn outputs(&self, merged_definition: &schema::Definition, _: LogNamespace) -> Vec<Output> {
-        vec![Output::default(DataType::all()).with_schema_definition(merged_definition.clone())]
+    fn outputs(
+        &self,
+        _enrichment_tables: vector_lib::enrichment::TableRegistry,
+        input_definitions: &[(OutputId, schema::Definition)],
+        _: LogNamespace,
+    ) -> Vec<TransformOutput> {
+        vec![TransformOutput::new(
+            DataType::all(),
+            clone_input_definitions(input_definitions),
+        )]
     }
 
     fn enable_concurrency(&self) -> bool {
@@ -84,11 +96,15 @@ impl FunctionTransform for Filter {
 
 #[cfg(test)]
 mod test {
+    use std::sync::Arc;
+
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
-    use vector_core::event::{Metric, MetricKind, MetricValue};
+    use vector_lib::config::ComponentKey;
+    use vector_lib::event::{Metric, MetricKind, MetricValue};
 
     use super::*;
+    use crate::config::schema::Definition;
     use crate::{
         conditions::ConditionConfig,
         event::{Event, LogEvent},
@@ -110,8 +126,13 @@ mod test {
             let (topology, mut out) =
                 create_topology(ReceiverStream::new(rx), transform_config).await;
 
-            let log = Event::from(LogEvent::from("message"));
+            let mut log = Event::from(LogEvent::from("message"));
             tx.send(log.clone()).await.unwrap();
+
+            log.set_source_id(Arc::new(ComponentKey::from("in")));
+            log.set_upstream_id(Arc::new(OutputId::from("transform")));
+            log.metadata_mut()
+                .set_schema_definition(&Arc::new(Definition::default_legacy_namespace()));
 
             assert_eq!(out.recv().await.unwrap(), log);
 

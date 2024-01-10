@@ -88,21 +88,6 @@ end
 # Helpers for caching resolved/expanded schemas and detecting schema resolution cycles.
 @resolved_schema_cache = {}
 @expanded_schema_cache = {}
-@schema_resolution_queue = {}
-
-def add_to_schema_resolution_stack(schema_name)
-  @logger.debug "Adding '#{schema_name}' to resolution stack."
-  @schema_resolution_queue[schema_name] = true
-end
-
-def remove_from_schema_resolution_stack(schema_name)
-  @logger.debug "Removing '#{schema_name}' from resolution stack."
-  @schema_resolution_queue.delete(schema_name)
-end
-
-def schema_resolution_cycle?(schema_name)
-  @schema_resolution_queue.key?(schema_name)
-end
 
 # Gets the schema of the given `name` from the resolved schema cache, if it exists.
 def get_cached_resolved_schema(schema_name)
@@ -338,7 +323,7 @@ def find_nested_object_property_schema(schema, property_name)
   # recursively visit each of those subschemas, looking for object schemas along the way that we can
   # check for the given property within.
   matching_property_schemas = []
-  unvisited_subschemas = schema['oneOf'].dup || schema['allOf'].dup || []
+  unvisited_subschemas = schema['oneOf'].dup || schema['anyOf'].dup|| schema['allOf'].dup || []
   while !unvisited_subschemas.empty? do
     unvisited_subschema = unvisited_subschemas.pop
 
@@ -352,7 +337,7 @@ def find_nested_object_property_schema(schema, property_name)
 
     # If the subschema had no object properties, see if it's an `oneOf`/`allOf` subschema, and if
     # so, collect any of _those_ subschemas and add them to our list of subschemas to visit.
-    maybe_unvisited_subschemas = unvisited_subschema['oneOf'].dup || unvisited_subschema['allOf'].dup || []
+    maybe_unvisited_subschemas = unvisited_subschema['oneOf'].dup || unvisited_subschema['anyOf'].dup || unvisited_subschema['allOf'].dup || []
     unvisited_subschemas.concat(maybe_unvisited_subschemas) unless maybe_unvisited_subschemas.nil?
   end
 
@@ -378,6 +363,8 @@ def get_json_schema_type(schema)
     'all-of'
   elsif schema.key?('oneOf')
     'one-of'
+  elsif schema.key?('anyOf')
+    'any-of'
   elsif schema.key?('type')
     get_json_schema_instance_type(schema)
   elsif schema.key?('const')
@@ -517,11 +504,6 @@ end
 # For any overlapping fields in the given schema and the referenced schema, the fields from the
 # given schema will win.
 def expand_schema_references(root_schema, unexpanded_schema)
-  # Break any cycles during expansion, the same as we do during resolution.
-  if get_schema_metadata(unexpanded_schema, 'docs::cycle_entrypoint')
-    return unexpanded_schema
-  end
-
   schema = deep_copy(unexpanded_schema)
 
   # Grab the existing title/description from our unexpanded schema, and reset them after
@@ -592,6 +574,17 @@ def expand_schema_references(root_schema, unexpanded_schema)
 
     if !schema['oneOf'].nil?
       schema['oneOf'] = schema['oneOf'].map { |subschema|
+        new_subschema = expand_schema_references(root_schema, subschema)
+        if new_subschema != subschema
+          expanded = true
+        end
+
+        new_subschema
+      }
+    end
+
+    if !schema['anyOf'].nil?
+      schema['anyOf'] = schema['anyOf'].map { |subschema|
         new_subschema = expand_schema_references(root_schema, subschema)
         if new_subschema != subschema
           expanded = true
@@ -708,21 +701,9 @@ def resolve_schema_by_name(root_schema, schema_name)
   resolved = get_cached_resolved_schema(schema_name)
   return deep_copy(resolved) unless resolved.nil?
 
-  if schema_resolution_cycle?(schema_name)
-    @logger.error "Cycle detected while resolving schema '#{schema_name}'. \
-    \
-    Cycles must be broken manually at the source code level by annotating fields that induce \
-    cycles with `#[configurable(metadata(docs::cycle_entrypoint))]`. As such a field will have no type \
-    information rendered, it is advised to supply a sufficiently detailed field description that \
-    describes the allowable values, etc."
-    exit 1
-  end
-
   # It wasn't already cached, so we actually have to resolve it.
   schema = get_schema_by_name(root_schema, schema_name)
-  add_to_schema_resolution_stack(schema_name)
   resolved = resolve_schema(root_schema, schema)
-  remove_from_schema_resolution_stack(schema_name)
   @resolved_schema_cache[schema_name] = resolved
   deep_copy(resolved)
 end
@@ -752,21 +733,6 @@ def resolve_schema(root_schema, schema)
   if get_schema_metadata(schema, 'docs::hidden')
     @logger.debug 'Instructed to skip resolution for the given schema.'
     return
-  end
-
-  # Avoid schemas that represent a resolution cycle.
-  #
-  # When a schema is marked as a "cycle entrypoint", this means the schema is self-referential (i.e.
-  # the `pipelines` transform, which is part of `Transforms`, having a field that references
-  # `Transforms`) and we have to break the cycle.
-  #
-  # We have to return _something_, as it's a real part of the schema, so we just return a basic
-  # schema with no type information but with any description that is specified, etc.
-  if get_schema_metadata(schema, 'docs::cycle_entrypoint')
-    resolved = { 'type' => 'blank' }
-    description = get_rendered_description_from_schema(schema)
-    resolved['description'] = description unless description.empty?
-    return resolved
   end
 
   # Handle schemas that have type overrides.
@@ -839,7 +805,7 @@ def resolve_bare_schema(root_schema, schema)
       reduced = schema['allOf'].filter_map { |subschema| resolve_schema(root_schema, subschema) }
                               .reduce { |acc, item| nested_merge(acc, item) }
       reduced['type']
-    when 'one-of'
+    when 'one-of', 'any-of'
       @logger.debug 'Resolving enum schema.'
 
       # We completely defer resolution of enum schemas to `resolve_enum_schema` because there's a
@@ -912,10 +878,10 @@ def resolve_bare_schema(root_schema, schema)
           @logger.error "Relevant schema: #{JSON.pretty_generate(schema)}"
           exit 1
         end
-        additional_properties['description'] = singular_description
 
         resolved_additional_properties = resolve_schema(root_schema, additional_properties)
         resolved_additional_properties['required'] = true
+        resolved_additional_properties['description'] = singular_description
         options.push(['*', resolved_additional_properties])
       end
 
@@ -974,27 +940,55 @@ def resolve_bare_schema(root_schema, schema)
 end
 
 def resolve_enum_schema(root_schema, schema)
+  # Figure out if this is a one-of or any-of enum schema. Both at the same time is never correct.
+  subschemas = if schema.key?('oneOf')
+    schema['oneOf']
+  elsif schema.key?('anyOf')
+    schema['anyOf']
+  else
+    @logger.error "Enum schema had both `oneOf` and `anyOf` specified. Schema: #{schema}"
+    exit 1
+  end
+
   # Filter out all subschemas which are purely null schemas used for indicating optionality, as well
   # as any subschemas that are marked as being hidden.
-  subschemas = schema['oneOf']
+  is_optional = get_schema_metadata(schema, 'docs::optional')
+  subschemas = subschemas
     .reject { |subschema| subschema['type'] == 'null' }
     .reject { |subschema| get_schema_metadata(subschema, 'docs::hidden') }
   subschema_count = subschemas.count
 
-  # If we only have one subschema after filtering, check to see if it's an `allOf` schema. If so, we
-  # unwrap it such that we end up with a copy of `schema` that looks like it was an `allOf` schema
-  # all along. We do this to properly resolve `allOf` schemas that were wrapped as `oneOf` w/ a null
-  # schema in order to establish optionality.
-  if subschema_count == 1 && get_json_schema_type(subschemas[0]) == 'all-of'
-    @logger.debug "Detected optional all-of schema, unwrapping all-of schema to resolve..."
+  # If we only have one subschema after filtering, check to see if it's an `allOf` or `oneOf` schema
+  # and `is_optional` is true.
+  #
+  # If it's an `allOf` subschema, then that means we originally had an `allOf` schema that we had to
+  # make optional, thus converting it to a `oneOf` with subschemas in the shape of `[null, allOf]`.
+  # In this case, we'll just remove the `oneOf` and move the `allOf` subschema up, as if it this
+  # schema was a `allOf` one all along.
+  #
+  # If so, we unwrap it such that we end up with a copy of `schema` that looks like it was an
+  # `allOf` schema all along. We do this to properly resolve `allOf` schemas that were wrapped as
+  # `oneOf` w/ a null schema in order to establish optionality.
+  if is_optional && subschema_count == 1
+    if get_json_schema_type(subschemas[0]) == 'all-of'
+      @logger.debug "Detected optional all-of schema, unwrapping all-of schema to resolve..."
 
-    # Copy the current schema and drop `oneOf` and set `allOf`, which will get us the correct
-    # unwrapped structure.
-    unwrapped_schema = deep_copy(schema)
-    unwrapped_schema.delete('oneOf')
-    unwrapped_schema['allOf'] = deep_copy(subschemas[0]['allOf'])
+      # Copy the current schema and drop `oneOf` and set `allOf` with the subschema, which will get us the correct
+      # unwrapped structure.
+      unwrapped_schema = deep_copy(schema)
+      unwrapped_schema.delete('oneOf')
+      unwrapped_schema['allOf'] = deep_copy(subschemas[0]['allOf'])
 
-    return { '_resolved' => resolve_schema(root_schema, unwrapped_schema) }
+      return { '_resolved' => resolve_schema(root_schema, unwrapped_schema) }
+    else
+      # For all other subschema types, we copy the current schema, drop the `oneOf`, and merge the
+      # subschema into it. This essentially unnests the schema.
+      unwrapped_schema = deep_copy(schema)
+      unwrapped_schema.delete('oneOf')
+      unwrapped_schema = schema_aware_nested_merge(unwrapped_schema, subschemas[0])
+
+      return { '_resolved' => resolve_schema(root_schema, unwrapped_schema) }
+    end
   end
 
   # Collect all of the tagging mode information upfront.
@@ -1560,7 +1554,7 @@ def reconcile_resolved_schema!(resolved_schema)
     # This means that we can generate output for a field that says it has a default value of `null`
     # but is a required field, which is a logical inconsistency in terms of the Cue schema where we
     # import the generated output of this script: it doesn't allow setting a default value for a field
-    # if the field is required, and vise versa.
+    # if the field is required, and vice versa.
     if resolved_schema['required']
       # For all schema type fields, see if they have a default value equal to `nil`. If so, remove
       # the `default` field entirely.
@@ -1605,7 +1599,6 @@ def reconcile_resolved_schema!(resolved_schema)
         enum_values = if const_type_field.is_a?(Array)
           const_type_field
             .map { |const| [const['value'], const['description']] }
-            .add_to_schema_resolution_stack
         else
           # If the value isn't already an array, we'll create the enum values map directly.
           { const_type_field['value'] => const_type_field['description'] }

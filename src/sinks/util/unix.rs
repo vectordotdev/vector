@@ -6,8 +6,9 @@ use futures::{stream::BoxStream, SinkExt, StreamExt};
 use snafu::{ResultExt, Snafu};
 use tokio::{net::UnixStream, time::sleep};
 use tokio_util::codec::Encoder;
-use vector_config::configurable_component;
-use vector_core::ByteSizeOf;
+use vector_lib::configurable::configurable_component;
+use vector_lib::json_size::JsonSize;
+use vector_lib::{ByteSizeOf, EstimatedJsonEncodedSizeOf};
 
 use crate::{
     codecs::Transformer,
@@ -16,7 +17,7 @@ use crate::{
         ConnectionOpen, OpenGauge, SocketMode, UnixSocketConnectionEstablished,
         UnixSocketOutgoingConnectionError, UnixSocketSendError,
     },
-    sink::VecSinkExt,
+    sink_ext::VecSinkExt,
     sinks::{
         util::{
             retries::ExponentialBackoff,
@@ -55,7 +56,11 @@ impl UnixSinkConfig {
     pub fn build(
         &self,
         transformer: Transformer,
-        encoder: impl Encoder<Event, Error = codecs::encoding::Error> + Clone + Send + Sync + 'static,
+        encoder: impl Encoder<Event, Error = vector_lib::codecs::encoding::Error>
+            + Clone
+            + Send
+            + Sync
+            + 'static,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
         let connector = UnixConnector::new(self.path.clone());
         let sink = UnixSink::new(connector.clone(), transformer, encoder);
@@ -114,7 +119,7 @@ impl UnixConnector {
 
 struct UnixSink<E>
 where
-    E: Encoder<Event, Error = codecs::encoding::Error> + Clone + Send + Sync,
+    E: Encoder<Event, Error = vector_lib::codecs::encoding::Error> + Clone + Send + Sync,
 {
     connector: UnixConnector,
     transformer: Transformer,
@@ -123,7 +128,7 @@ where
 
 impl<E> UnixSink<E>
 where
-    E: Encoder<Event, Error = codecs::encoding::Error> + Clone + Send + Sync,
+    E: Encoder<Event, Error = vector_lib::codecs::encoding::Error> + Clone + Send + Sync,
 {
     pub const fn new(connector: UnixConnector, transformer: Transformer, encoder: E) -> Self {
         Self {
@@ -142,7 +147,7 @@ where
 #[async_trait]
 impl<E> StreamSink<Event> for UnixSink<E>
 where
-    E: Encoder<Event, Error = codecs::encoding::Error> + Clone + Send + Sync,
+    E: Encoder<Event, Error = vector_lib::codecs::encoding::Error> + Clone + Send + Sync,
 {
     // Same as TcpSink, more details there.
     async fn run(mut self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
@@ -151,6 +156,7 @@ where
         let mut input = input
             .map(|mut event| {
                 let byte_size = event.size_of();
+                let json_byte_size = event.estimated_json_encoded_size_of();
 
                 transformer.transform(&mut event);
 
@@ -164,9 +170,10 @@ where
                         item,
                         finalizers,
                         byte_size,
+                        json_byte_size,
                     }
                 } else {
-                    EncodedEvent::new(Bytes::new(), 0)
+                    EncodedEvent::new(Bytes::new(), 0, JsonSize::zero())
                 }
             })
             .peekable();
@@ -194,8 +201,8 @@ where
 
 #[cfg(test)]
 mod tests {
-    use codecs::{encoding::Framer, NewlineDelimitedEncoder, TextSerializerConfig};
     use tokio::net::UnixListener;
+    use vector_lib::codecs::{encoding::Framer, NewlineDelimitedEncoder, TextSerializerConfig};
 
     use super::*;
     use crate::{

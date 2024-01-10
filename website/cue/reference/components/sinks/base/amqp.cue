@@ -15,7 +15,7 @@ base: components: sinks: amqp: configuration: {
 				Whether or not end-to-end acknowledgements are enabled.
 
 				When enabled for a sink, any source connected to that sink, where the source supports
-				end-to-end acknowledgements as well, will wait for events to be acknowledged by the sink
+				end-to-end acknowledgements as well, waits for events to be acknowledged by the sink
 				before acknowledging them at the source.
 
 				Enabling or disabling acknowledgements at the sink level takes precedence over any global
@@ -36,8 +36,8 @@ base: components: sinks: amqp: configuration: {
 
 			The default vhost can be specified by using a value of `%2f`.
 
-			In order to connect over TLS, a scheme of `amqps` can be specified instead i.e.
-			`amqps://...`. Additional TLS settings, such as client certificate verification, etc, can be
+			To connect over TLS, a scheme of `amqps` can be specified instead. For example,
+			`amqps://...`. Additional TLS settings, such as client certificate verification, can be
 			configured under the `tls` section.
 			"""
 		required: true
@@ -66,6 +66,11 @@ base: components: sinks: amqp: configuration: {
 
 						[apache_avro]: https://avro.apache.org/
 						"""
+					csv: """
+						Encodes an event as a CSV message.
+
+						This codec must be configured with fields to encode.
+						"""
 					gelf: """
 						Encodes an event as a [GELF][gelf] message.
 
@@ -82,7 +87,7 @@ base: components: sinks: amqp: configuration: {
 						[logfmt]: https://brandur.org/logfmt
 						"""
 					native: """
-						Encodes an event in Vector’s [native Protocol Buffers format][vector_native_protobuf].
+						Encodes an event in the [native Protocol Buffers format][vector_native_protobuf].
 
 						This codec is **[experimental][experimental]**.
 
@@ -90,36 +95,123 @@ base: components: sinks: amqp: configuration: {
 						[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
 						"""
 					native_json: """
-						Encodes an event in Vector’s [native JSON format][vector_native_json].
+						Encodes an event in the [native JSON format][vector_native_json].
 
 						This codec is **[experimental][experimental]**.
 
 						[vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
 						[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
 						"""
+					protobuf: """
+						Encodes an event as a [Protobuf][protobuf] message.
+
+						[protobuf]: https://protobuf.dev/
+						"""
 					raw_message: """
 						No encoding.
 
-						This "encoding" simply uses the `message` field of a log event.
+						This encoding uses the `message` field of a log event.
 
-						Users should take care if they're modifying their log events (such as by using a `remap`
-						transform, etc) and removing the message field while doing additional parsing on it, as this
+						Be careful if you are modifying your log events (for example, by using a `remap`
+						transform) and removing the message field while doing additional parsing on it, as this
 						could lead to the encoding emitting empty strings for the given event.
 						"""
 					text: """
 						Plain text encoding.
 
-						This "encoding" simply uses the `message` field of a log event. For metrics, it uses an
+						This encoding uses the `message` field of a log event. For metrics, it uses an
 						encoding that resembles the Prometheus export format.
 
-						Users should take care if they're modifying their log events (such as by using a `remap`
-						transform, etc) and removing the message field while doing additional parsing on it, as this
+						Be careful if you are modifying your log events (for example, by using a `remap`
+						transform) and removing the message field while doing additional parsing on it, as this
 						could lead to the encoding emitting empty strings for the given event.
 						"""
 				}
 			}
+			csv: {
+				description:   "The CSV Serializer Options."
+				relevant_when: "codec = \"csv\""
+				required:      true
+				type: object: options: {
+					capacity: {
+						description: """
+																Set the capacity (in bytes) of the internal buffer used in the CSV writer.
+																This defaults to a reasonable setting.
+																"""
+						required: false
+						type: uint: default: 8192
+					}
+					delimiter: {
+						description: "The field delimiter to use when writing CSV."
+						required:    false
+						type: uint: default: 44
+					}
+					double_quote: {
+						description: """
+																Enable double quote escapes.
+
+																This is enabled by default, but it may be disabled. When disabled, quotes in
+																field data are escaped instead of doubled.
+																"""
+						required: false
+						type: bool: default: true
+					}
+					escape: {
+						description: """
+																The escape character to use when writing CSV.
+
+																In some variants of CSV, quotes are escaped using a special escape character
+																like \\ (instead of escaping quotes by doubling them).
+
+																To use this, `double_quotes` needs to be disabled as well otherwise it is ignored.
+																"""
+						required: false
+						type: uint: default: 34
+					}
+					fields: {
+						description: """
+																Configures the fields that will be encoded, as well as the order in which they
+																appear in the output.
+
+																If a field is not present in the event, the output will be an empty string.
+
+																Values of type `Array`, `Object`, and `Regex` are not supported and the
+																output will be an empty string.
+																"""
+						required: true
+						type: array: items: type: string: {}
+					}
+					quote: {
+						description: "The quote character to use when writing CSV."
+						required:    false
+						type: uint: default: 34
+					}
+					quote_style: {
+						description: "The quoting style to use when writing CSV data."
+						required:    false
+						type: string: {
+							default: "necessary"
+							enum: {
+								always: "Always puts quotes around every field."
+								necessary: """
+																			Puts quotes around fields only when necessary.
+																			They are necessary when fields contain a quote, delimiter, or record terminator.
+																			Quotes are also necessary when writing an empty record
+																			(which is indistinguishable from a record with one empty field).
+																			"""
+								never: "Never writes quotes, even if it produces invalid CSV data."
+								non_numeric: """
+																			Puts quotes around all fields that are non-numeric.
+																			Namely, when writing a field that does not parse as a valid float or integer,
+																			then quotes are used even if they aren't strictly necessary.
+																			"""
+							}
+						}
+					}
+				}
+			}
 			except_fields: {
-				description: "List of fields that will be excluded from the encoded event."
+				description: "List of fields that are excluded from the encoded event."
 				required:    false
 				type: array: items: type: string: {}
 			}
@@ -127,34 +219,59 @@ base: components: sinks: amqp: configuration: {
 				description: """
 					Controls how metric tag values are encoded.
 
-					When set to `single`, only the last non-bare value of tags will be displayed with the
-					metric.  When set to `full`, all metric tags will be exposed as separate assignments.
+					When set to `single`, only the last non-bare value of tags are displayed with the
+					metric.  When set to `full`, all metric tags are exposed as separate assignments.
 					"""
 				relevant_when: "codec = \"json\" or codec = \"text\""
 				required:      false
 				type: string: {
 					default: "single"
 					enum: {
-						full: "All tags will be exposed as arrays of either string or null values."
+						full: "All tags are exposed as arrays of either string or null values."
 						single: """
-															Tag values will be exposed as single strings, the same as they were before this config
-															option. Tags with multiple values will show the last assigned value, and null values will be
-															ignored.
+															Tag values are exposed as single strings, the same as they were before this config
+															option. Tags with multiple values show the last assigned value, and null values
+															are ignored.
 															"""
 					}
 				}
 			}
 			only_fields: {
-				description: "List of fields that will be included in the encoded event."
+				description: "List of fields that are included in the encoded event."
 				required:    false
 				type: array: items: type: string: {}
+			}
+			protobuf: {
+				description:   "Options for the Protobuf serializer."
+				relevant_when: "codec = \"protobuf\""
+				required:      true
+				type: object: options: {
+					desc_file: {
+						description: """
+																The path to the protobuf descriptor set file.
+
+																This file is the output of `protoc -o <path> ...`
+																"""
+						required: true
+						type: string: examples: ["/etc/vector/protobuf_descriptor_set.desc"]
+					}
+					message_type: {
+						description: "The name of the message type to use for serializing."
+						required:    true
+						type: string: examples: ["package.Message"]
+					}
+				}
 			}
 			timestamp_format: {
 				description: "Format used for timestamp fields."
 				required:    false
 				type: string: enum: {
-					rfc3339: "Represent the timestamp as a RFC 3339 timestamp."
-					unix:    "Represent the timestamp as a Unix timestamp."
+					rfc3339:    "Represent the timestamp as a RFC 3339 timestamp."
+					unix:       "Represent the timestamp as a Unix timestamp."
+					unix_float: "Represent the timestamp as a Unix timestamp in floating point."
+					unix_ms:    "Represent the timestamp as a Unix timestamp in milliseconds."
+					unix_ns:    "Represent the timestamp as a Unix timestamp in nanoseconds."
+					unix_us:    "Represent the timestamp as a Unix timestamp in microseconds"
 				}
 			}
 		}
@@ -163,6 +280,26 @@ base: components: sinks: amqp: configuration: {
 		description: "The exchange to publish messages to."
 		required:    true
 		type: string: syntax: "template"
+	}
+	properties: {
+		description: """
+			Configure the AMQP message properties.
+
+			AMQP message properties.
+			"""
+		required: false
+		type: object: options: {
+			content_encoding: {
+				description: "Content-Encoding for the AMQP messages."
+				required:    false
+				type: string: {}
+			}
+			content_type: {
+				description: "Content-Type for the AMQP messages."
+				required:    false
+				type: string: {}
+			}
+		}
 	}
 	routing_key: {
 		description: "Template used to generate a routing key which corresponds to a queue binding."
@@ -177,8 +314,8 @@ base: components: sinks: amqp: configuration: {
 				description: """
 					Sets the list of supported ALPN protocols.
 
-					Declare the supported ALPN protocols, which are used during negotiation with peer. Prioritized in the order
-					they are defined.
+					Declare the supported ALPN protocols, which are used during negotiation with peer. They are prioritized in the order
+					that they are defined.
 					"""
 				required: false
 				type: array: items: type: string: examples: ["h2"]
@@ -226,10 +363,10 @@ base: components: sinks: amqp: configuration: {
 				description: """
 					Enables certificate verification.
 
-					If enabled, certificates must be valid in terms of not being expired, as well as being issued by a trusted
-					issuer. This verification operates in a hierarchical manner, checking that not only the leaf certificate (the
-					certificate presented by the client/server) is valid, but also that the issuer of that certificate is valid, and
-					so on until reaching a root certificate.
+					If enabled, certificates must not be expired and must be issued by a trusted
+					issuer. This verification operates in a hierarchical manner, checking that the leaf certificate (the
+					certificate presented by the client/server) is not only valid, but that the issuer of that certificate is also valid, and
+					so on until the verification process reaches a root certificate.
 
 					Relevant for both incoming and outgoing connections.
 

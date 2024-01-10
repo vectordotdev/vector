@@ -15,7 +15,7 @@ base: components: sinks: prometheus_exporter: configuration: {
 				Whether or not end-to-end acknowledgements are enabled.
 
 				When enabled for a sink, any source connected to that sink, where the source supports
-				end-to-end acknowledgements as well, will wait for events to be acknowledged by the sink
+				end-to-end acknowledgements as well, waits for events to be acknowledged by the sink
 				before acknowledging them at the source.
 
 				Enabling or disabling acknowledgements at the sink level takes precedence over any global
@@ -34,13 +34,16 @@ base: components: sinks: prometheus_exporter: configuration: {
 			The metrics are exposed at the typical Prometheus exporter path, `/metrics`.
 			"""
 		required: false
-		type: string: default: "0.0.0.0:9598"
+		type: string: {
+			default: "0.0.0.0:9598"
+			examples: ["192.160.0.10:9598"]
+		}
 	}
 	auth: {
 		description: """
 			Configuration of the authentication strategy for HTTP requests.
 
-			HTTP authentication should almost always be used with HTTPS only, as the authentication credentials are passed as an
+			HTTP authentication should be used with HTTPS only, as the authentication credentials are passed as an
 			HTTP header without any additional encryption beyond what is provided by the transport itself.
 			"""
 		required: false
@@ -65,7 +68,7 @@ base: components: sinks: prometheus_exporter: configuration: {
 					bearer: """
 						Bearer authentication.
 
-						The bearer token value (OAuth2, JWT, etc) is passed as-is.
+						The bearer token value (OAuth2, JWT, etc.) is passed as-is.
 						"""
 				}
 			}
@@ -92,7 +95,7 @@ base: components: sinks: prometheus_exporter: configuration: {
 		required: false
 		type: array: {
 			default: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]
-			items: type: number: {}
+			items: type: float: {}
 		}
 	}
 	default_namespace: {
@@ -148,7 +151,7 @@ base: components: sinks: prometheus_exporter: configuration: {
 		required: false
 		type: array: {
 			default: [0.5, 0.75, 0.9, 0.95, 0.99]
-			items: type: number: {}
+			items: type: float: {}
 		}
 	}
 	suppress_timestamp: {
@@ -170,8 +173,8 @@ base: components: sinks: prometheus_exporter: configuration: {
 				description: """
 					Sets the list of supported ALPN protocols.
 
-					Declare the supported ALPN protocols, which are used during negotiation with peer. Prioritized in the order
-					they are defined.
+					Declare the supported ALPN protocols, which are used during negotiation with peer. They are prioritized in the order
+					that they are defined.
 					"""
 				required: false
 				type: array: items: type: string: examples: ["h2"]
@@ -199,7 +202,7 @@ base: components: sinks: prometheus_exporter: configuration: {
 			}
 			enabled: {
 				description: """
-					Whether or not to require TLS for incoming/outgoing connections.
+					Whether or not to require TLS for incoming or outgoing connections.
 
 					When enabled and used for incoming connections, an identity certificate is also required. See `tls.crt_file` for
 					more information.
@@ -229,10 +232,10 @@ base: components: sinks: prometheus_exporter: configuration: {
 				description: """
 					Enables certificate verification.
 
-					If enabled, certificates must be valid in terms of not being expired, as well as being issued by a trusted
-					issuer. This verification operates in a hierarchical manner, checking that not only the leaf certificate (the
-					certificate presented by the client/server) is valid, but also that the issuer of that certificate is valid, and
-					so on until reaching a root certificate.
+					If enabled, certificates must not be expired and must be issued by a trusted
+					issuer. This verification operates in a hierarchical manner, checking that the leaf certificate (the
+					certificate presented by the client/server) is not only valid, but that the issuer of that certificate is also valid, and
+					so on until the verification process reaches a root certificate.
 
 					Relevant for both incoming and outgoing connections.
 

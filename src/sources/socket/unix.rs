@@ -2,11 +2,11 @@ use std::path::PathBuf;
 
 use bytes::Bytes;
 use chrono::Utc;
-use codecs::decoding::{DeserializerConfig, FramingConfig};
-use lookup::{lookup_v2::OptionalValuePath, path};
-use vector_common::shutdown::ShutdownSignal;
-use vector_config::{configurable_component, NamedComponent};
-use vector_core::config::{LegacyKey, LogNamespace};
+use vector_lib::codecs::decoding::{DeserializerConfig, FramingConfig};
+use vector_lib::config::{LegacyKey, LogNamespace};
+use vector_lib::configurable::configurable_component;
+use vector_lib::lookup::{lookup_v2::OptionalValuePath, path};
+use vector_lib::shutdown::ShutdownSignal;
 
 use crate::{
     codecs::Decoder,
@@ -19,7 +19,7 @@ use crate::{
     SourceSender,
 };
 
-use super::{default_host_key, default_max_length, SocketConfig};
+use super::{default_host_key, SocketConfig};
 
 /// Unix domain socket configuration for the `socket` source.
 #[configurable_component]
@@ -34,25 +34,12 @@ pub struct UnixConfig {
 
     /// Unix file mode bits to be applied to the unix socket file as its designated file permissions.
     ///
-    /// Note that the file mode value can be specified in any numeric format supported by your configuration
+    /// Note: The file mode value can be specified in any numeric format supported by your configuration
     /// language, but it is most intuitive to use an octal number.
     #[configurable(metadata(docs::examples = 0o777))]
     #[configurable(metadata(docs::examples = 0o600))]
     #[configurable(metadata(docs::examples = 508))]
     pub socket_file_mode: Option<u32>,
-
-    /// The maximum buffer size of incoming messages.
-    ///
-    /// Messages larger than this are truncated.
-    // TODO: this option is noted as deprecated in the source build function in mod.rs , but
-    // behaviorally there are inconsistencies when adapting the new() function to use framing
-    // instead of max_length. Merits further investigation.
-    #[configurable(
-        deprecated = "This option has been deprecated. Configure `max_length` on the framing config instead."
-    )]
-    #[serde(default = "default_max_length")]
-    #[configurable(metadata(docs::type_unit = "bytes"))]
-    pub max_length: Option<usize>,
 
     /// Overrides the name of the log field used to add the peer host to each event.
     ///
@@ -85,7 +72,6 @@ impl UnixConfig {
         Self {
             path,
             socket_file_mode: None,
-            max_length: default_max_length(),
             host_key: default_host_key(),
             framing: None,
             decoding: default_decoding(),
@@ -138,12 +124,20 @@ pub(super) fn unix_datagram(
     out: SourceSender,
     log_namespace: LogNamespace,
 ) -> crate::Result<Source> {
+    let max_length = config
+        .framing
+        .and_then(|framing| match framing {
+            FramingConfig::CharacterDelimited(config) => config.character_delimited.max_length,
+            FramingConfig::NewlineDelimited(config) => config.newline_delimited.max_length,
+            FramingConfig::OctetCounting(config) => config.octet_counting.max_length,
+            _ => None,
+        })
+        .unwrap_or_else(crate::serde::default_max_length);
+
     build_unix_datagram_source(
         config.path,
         config.socket_file_mode,
-        config
-            .max_length
-            .unwrap_or_else(crate::serde::default_max_length),
+        max_length,
         decoder,
         move |events, received_from| {
             handle_events(events, &config.host_key, received_from, log_namespace)

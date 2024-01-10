@@ -1,9 +1,6 @@
-use std::str::FromStr;
-
-use aws_smithy_http::endpoint::Endpoint;
+//! Handles the region settings for AWS components.
 use aws_types::region::Region;
-use http::Uri;
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 
 /// Configuration of the region/endpoint to use when interacting with an AWS service.
 #[configurable_component]
@@ -18,10 +15,13 @@ pub struct RegionOrEndpoint {
 
     /// Custom endpoint for use with AWS-compatible services.
     #[configurable(metadata(docs::examples = "http://127.0.0.0:5000/path/to/service"))]
+    #[configurable(metadata(docs::advanced))]
     pub endpoint: Option<String>,
 }
 
 impl RegionOrEndpoint {
+    #[cfg(test)]
+    /// Creates with the given region.
     pub const fn with_region(region: String) -> Self {
         Self {
             region: Some(region),
@@ -29,6 +29,8 @@ impl RegionOrEndpoint {
         }
     }
 
+    #[cfg(test)]
+    /// Creates with both a region and an endpoint.
     pub fn with_both(region: impl Into<String>, endpoint: impl Into<String>) -> Self {
         Self {
             region: Some(region.into()),
@@ -36,11 +38,12 @@ impl RegionOrEndpoint {
         }
     }
 
-    pub fn endpoint(&self) -> crate::Result<Option<Endpoint>> {
-        let uri = self.endpoint.as_deref().map(Uri::from_str).transpose()?;
-        Ok(uri.map(Endpoint::immutable))
+    /// Returns the endpoint.
+    pub fn endpoint(&self) -> Option<String> {
+        self.endpoint.clone()
     }
 
+    /// Returns the region.
     pub fn region(&self) -> Option<Region> {
         self.region.clone().map(Region::new)
     }

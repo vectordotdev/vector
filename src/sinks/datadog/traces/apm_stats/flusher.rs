@@ -6,7 +6,7 @@ use std::{
 use bytes::Bytes;
 use snafu::ResultExt;
 use tokio::sync::oneshot::{Receiver, Sender};
-use vector_common::{finalization::EventFinalizers, request_metadata::RequestMetadata};
+use vector_lib::{finalization::EventFinalizers, request_metadata::RequestMetadata};
 
 use super::{
     aggregation::Aggregator, build_request, DDTracesMetadata, DatadogTracesEndpoint,
@@ -65,7 +65,7 @@ pub async fn flush_apm_stats_thread(
                 sender.flush_apm_stats(true).await;
 
                 // signal the sink (who tripped the tripwire), that we are done flushing
-                let _ = sink_shutdown_ack_sender.send(());
+                _ = sink_shutdown_ack_sender.send(());
                 break;
             }
             Err(_) => {

@@ -105,8 +105,8 @@ administration: {
 			}
 
 			sinks: out: {
-				type:   "console"
-				inputs: [string, ...string] | *[ for id, _source in sources {id}]
+				type: "console"
+				inputs: [string, ...string] | *[for id, _source in sources {id}]
 				encoding: codec: "json"
 			}
 		}

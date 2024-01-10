@@ -10,7 +10,10 @@ use futures::Sink;
 use pin_project::{pin_project, pinned_drop};
 use tokio::io::AsyncWrite;
 use tokio_util::codec::{BytesCodec, FramedWrite};
-use vector_common::finalization::{EventFinalizers, EventStatus};
+use vector_lib::{
+    finalization::{EventFinalizers, EventStatus},
+    json_size::JsonSize,
+};
 
 use super::EncodedEvent;
 use crate::internal_events::{SocketBytesSent, SocketEventsSent, SocketMode};
@@ -55,7 +58,7 @@ where
             shutdown_check: Box::new(shutdown_check),
             state: State {
                 events_total: 0,
-                event_bytes: 0,
+                event_bytes: JsonSize::zero(),
                 bytes_total: 0,
                 socket_mode,
                 finalizers: Vec::new(),
@@ -67,7 +70,7 @@ where
 struct State {
     socket_mode: SocketMode,
     events_total: usize,
-    event_bytes: usize,
+    event_bytes: JsonSize,
     bytes_total: usize,
     finalizers: Vec<EventFinalizers>,
 }
@@ -92,7 +95,7 @@ impl State {
             }
 
             self.events_total = 0;
-            self.event_bytes = 0;
+            self.event_bytes = JsonSize::zero();
             self.bytes_total = 0;
         }
     }
@@ -129,7 +132,7 @@ where
         let pinned = self.project();
         pinned.state.finalizers.push(item.finalizers);
         pinned.state.events_total += 1;
-        pinned.state.event_bytes += item.byte_size;
+        pinned.state.event_bytes += item.json_byte_size;
         pinned.state.bytes_total += item.item.len();
 
         let result = pinned.inner.start_send(item.item);

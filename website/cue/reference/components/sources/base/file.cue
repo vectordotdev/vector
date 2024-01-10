@@ -73,7 +73,7 @@ base: components: sources: file: configuration: {
 		description: """
 			Overrides the name of the log field used to add the file path to each event.
 
-			The value will be the full path to the file where the event was read message.
+			The value is the full path to the file where the event was read message.
 
 			Set to `""` to suppress this key.
 			"""
@@ -144,7 +144,7 @@ base: components: sources: file: configuration: {
 	}
 	glob_minimum_cooldown_ms: {
 		description: """
-			Delay between file discovery calls.
+			The delay between file discovery calls.
 
 			This controls the interval at which files are searched. A higher value results in greater
 			chances of some short-lived files being missed between searches, but a lower value increases
@@ -205,6 +205,20 @@ base: components: sources: file: configuration: {
 		required:    true
 		type: array: items: type: string: examples: ["/var/log/**/*.log"]
 	}
+	internal_metrics: {
+		description: "Configuration of internal metrics for file-based components."
+		required:    false
+		type: object: options: include_file_tag: {
+			description: """
+				Whether or not to include the "file" tag on the component's corresponding internal metrics.
+
+				This is useful for distinguishing between different files while monitoring. However, the tag's
+				cardinality is unbounded.
+				"""
+			required: false
+			type: bool: default: false
+		}
+	}
 	line_delimiter: {
 		description: "String sequence used to separate one file line from another."
 		required:    false
@@ -217,7 +231,7 @@ base: components: sources: file: configuration: {
 	}
 	max_line_bytes: {
 		description: """
-			The maximum size of a line before it will be discarded.
+			The maximum size of a line before it is discarded.
 
 			This protects against malformed lines or tailing incorrect files.
 			"""
@@ -228,8 +242,14 @@ base: components: sources: file: configuration: {
 		}
 	}
 	max_read_bytes: {
-		description: "An approximate limit on the amount of data read from a single file at a given time."
-		required:    false
+		description: """
+			Max amount of bytes to read from a single file before switching over to the next file.
+			**Note:** This does not apply when `oldest_first` is `true`.
+
+			This allows distributing the reads more or less evenly across
+			the files.
+			"""
+		required: false
 		type: uint: {
 			default: 2048
 			unit:    "bytes"
@@ -271,7 +291,7 @@ base: components: sources: file: configuration: {
 
 						The first line (the line that matched the start pattern) does not need to match the `ContinueThrough` pattern.
 
-						This is useful in cases such as a Java stack trace, where some indicator in the line (such as leading
+						This is useful in cases such as a Java stack trace, where some indicator in the line (such as a leading
 						whitespace) indicates that it is an extension of the proceeding line.
 						"""
 					halt_before: """
@@ -309,7 +329,7 @@ base: components: sources: file: configuration: {
 		description: """
 			Enables adding the file offset to each event and sets the name of the log field used.
 
-			The value will be the byte offset of the start of the line within the file.
+			The value is the byte offset of the start of the line within the file.
 
 			Off by default, the offset is only added to the event if this is set.
 			"""
@@ -319,7 +339,7 @@ base: components: sources: file: configuration: {
 		]
 	}
 	oldest_first: {
-		description: "Instead of balancing read capacity fairly across all watched files, prioritize draining the oldest files before moving on to read data from younger files."
+		description: "Instead of balancing read capacity fairly across all watched files, prioritize draining the oldest files before moving on to read data from more recent files."
 		required:    false
 		type: bool: default: false
 	}
@@ -336,9 +356,9 @@ base: components: sources: file: configuration: {
 	}
 	remove_after_secs: {
 		description: """
-			Timeout from reaching `EOF` after which file will be removed from filesystem, unless new data is written in the meantime.
+			After reaching EOF, the number of seconds to wait before removing the file, unless new data is written.
 
-			If not specified, files will not be removed.
+			If not specified, files are not removed.
 			"""
 		required: false
 		type: uint: {

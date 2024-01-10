@@ -17,7 +17,7 @@ base: components: sources: postgresql_metrics: configuration: {
 			Expressions](https://www.postgresql.org/docs/current/functions-matching.html#FUNCTIONS-POSIX-REGEXP)) against
 			the `datname` column for which you don’t want to collect metrics from.
 
-			Specifying `""` will include metrics where `datname` is `NULL`.
+			Specifying `""` includes metrics where `datname` is `NULL`.
 
 			This can be used in conjunction with `include_databases`.
 			"""
@@ -30,7 +30,7 @@ base: components: sources: postgresql_metrics: configuration: {
 			Expressions](https://www.postgresql.org/docs/current/functions-matching.html#FUNCTIONS-POSIX-REGEXP)) against
 			the `datname` column for which you want to collect metrics from.
 
-			If not set, metrics are collected from all databases. Specifying `""` will include metrics where `datname` is
+			If not set, metrics are collected from all databases. Specifying `""` includes metrics where `datname` is
 			`NULL`.
 
 			This can be used in conjunction with `exclude_databases`.

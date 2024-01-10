@@ -1,6 +1,7 @@
 #!/bin/bash
 
 ARCHIVE_VERSION=$1
+PACKAGE_VERSION=$2
 
 echo "Copying ZIP archive..."
 
@@ -14,7 +15,7 @@ sed 's/$/\\/' < vector-"${ARCHIVE_VERSION}"-x86_64-pc-windows-msvc/LICENSE.txt >
 echo -e '\n}' >> LICENSE.rtf
 
 echo "Substituting version..."
-VERSION="${ARCHIVE_VERSION}" envsubst < vector.wxs.tmpl > vector.wxs
+VERSION="${PACKAGE_VERSION}" envsubst < vector.wxs.tmpl > vector.wxs
 
 echo "Building the MSI package..."
 heat dir vector-"${ARCHIVE_VERSION}"-x86_64-pc-windows-msvc \

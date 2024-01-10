@@ -80,11 +80,11 @@ pub struct AllocationGroupToken {
 
 impl AllocationGroupToken {
     pub fn enter(&self) {
-        let _ = LOCAL_ALLOCATION_GROUP_STACK.try_with(|stack| stack.borrow_mut().push(self.id));
+        _ = LOCAL_ALLOCATION_GROUP_STACK.try_with(|stack| stack.borrow_mut().push(self.id));
     }
 
     pub fn exit(&self) {
-        let _ = LOCAL_ALLOCATION_GROUP_STACK.try_with(|stack| stack.borrow_mut().pop());
+        _ = LOCAL_ALLOCATION_GROUP_STACK.try_with(|stack| stack.borrow_mut().pop());
     }
 }
 

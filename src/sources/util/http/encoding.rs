@@ -8,7 +8,7 @@ use warp::http::StatusCode;
 use super::error::ErrorMessage;
 use crate::internal_events::HttpDecompressError;
 
-pub fn decode(header: &Option<String>, mut body: Bytes) -> Result<Bytes, ErrorMessage> {
+pub fn decode(header: Option<&str>, mut body: Bytes) -> Result<Bytes, ErrorMessage> {
     if let Some(encodings) = header {
         for encoding in encodings.rsplit(',').map(str::trim) {
             body = match encoding {
@@ -29,6 +29,9 @@ pub fn decode(header: &Option<String>, mut body: Bytes) -> Result<Bytes, ErrorMe
                 }
                 "snappy" => SnappyDecoder::new()
                     .decompress_vec(&body)
+                    .map_err(|error| handle_decode_error(encoding, error))?
+                    .into(),
+                "zstd" => zstd::decode_all(body.reader())
                     .map_err(|error| handle_decode_error(encoding, error))?
                     .into(),
                 encoding => {

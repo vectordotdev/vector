@@ -66,10 +66,4 @@ components: sinks: socket: {
 		metrics: null
 		traces:  false
 	}
-
-	telemetry: metrics: {
-		connection_errors_total: components.sources.internal_metrics.output.metrics.connection_errors_total
-		processed_bytes_total:   components.sources.internal_metrics.output.metrics.processed_bytes_total
-		processed_events_total:  components.sources.internal_metrics.output.metrics.processed_events_total
-	}
 }

@@ -131,7 +131,7 @@ impl Future for ShutdownHandle {
     type Output = ();
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let _ = ready!(self.0.poll_unpin(cx));
+        _ = ready!(self.0.poll_unpin(cx));
         Poll::Ready(())
     }
 }

@@ -6,7 +6,7 @@ components: sinks: honeycomb: {
 	classes: {
 		commonly_used: false
 		delivery:      "at_least_once"
-		development:   "beta"
+		development:   "stable"
 		egress_method: "batch"
 		service_providers: ["Honeycomb"]
 		stateful: false
@@ -14,6 +14,7 @@ components: sinks: honeycomb: {
 
 	features: {
 		acknowledgements: true
+		auto_generated:   true
 		healthcheck: enabled: true
 		send: {
 			batch: {
@@ -57,22 +58,7 @@ components: sinks: honeycomb: {
 		notices: []
 	}
 
-	configuration: {
-		api_key: {
-			description: "The team key that will be used to authenticate against Honeycomb."
-			required:    true
-			type: string: {
-				examples: ["${HONEYCOMB_API_KEY}", "some-api-key"]
-			}
-		}
-		dataset: {
-			description: "The dataset that Vector will send logs to."
-			required:    true
-			type: string: {
-				examples: ["my-honeycomb-dataset"]
-			}
-		}
-	}
+	configuration: base.components.sinks.honeycomb.configuration
 
 	input: {
 		logs:    true
@@ -90,12 +76,5 @@ components: sinks: honeycomb: {
 				curl option and use the key provided with the curl example.
 				"""
 		}
-	}
-
-	telemetry: metrics: {
-		component_sent_bytes_total:       components.sources.internal_metrics.output.metrics.component_sent_bytes_total
-		component_sent_events_total:      components.sources.internal_metrics.output.metrics.component_sent_events_total
-		component_sent_event_bytes_total: components.sources.internal_metrics.output.metrics.component_sent_event_bytes_total
-		events_out_total:                 components.sources.internal_metrics.output.metrics.events_out_total
 	}
 }

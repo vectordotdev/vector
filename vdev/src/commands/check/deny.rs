@@ -2,7 +2,7 @@ use anyhow::Result;
 
 use crate::app;
 
-/// Check advisories, licenses, and sources for crate dependencies
+/// Check for advisories, licenses, and sources for crate dependencies
 #[derive(clap::Args, Debug)]
 #[command()]
 pub struct Cli {}

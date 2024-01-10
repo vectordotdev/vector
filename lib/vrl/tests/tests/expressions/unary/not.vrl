@@ -1,3 +1,0 @@
-# result: [false, true]
-
-[!!!true, !("foo" == "bar")]

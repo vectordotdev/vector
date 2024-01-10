@@ -5,6 +5,10 @@ components: sources: splunk_hec: {
 
 	title: "Splunk HTTP Event Collector (HEC)"
 
+	description: """
+		This source exposes three HTTP endpoints at a configurable address that jointly implement the [Splunk HEC API](https://docs.splunk.com/Documentation/Splunk/9.0.3/Data/UsetheHTTPEventCollector): `/services/collector/event`, `/services/collector/raw`, and `/services/collector/health`.
+		"""
+
 	classes: {
 		commonly_used: false
 		delivery:      "at_least_once"
@@ -75,13 +79,9 @@ components: sources: splunk_hec: {
 	}
 
 	telemetry: metrics: {
-		component_errors_total:               components.sources.internal_metrics.output.metrics.component_errors_total
-		component_received_bytes_total:       components.sources.internal_metrics.output.metrics.component_received_bytes_total
-		component_received_event_bytes_total: components.sources.internal_metrics.output.metrics.component_received_event_bytes_total
-		component_received_events_total:      components.sources.internal_metrics.output.metrics.component_received_events_total
-		events_in_total:                      components.sources.internal_metrics.output.metrics.events_in_total
-		http_request_errors_total:            components.sources.internal_metrics.output.metrics.http_request_errors_total
-		requests_received_total:              components.sources.internal_metrics.output.metrics.requests_received_total
+		http_server_handler_duration_seconds: components.sources.internal_metrics.output.metrics.http_server_handler_duration_seconds
+		http_server_requests_received_total:  components.sources.internal_metrics.output.metrics.http_server_requests_received_total
+		http_server_responses_sent_total:     components.sources.internal_metrics.output.metrics.http_server_responses_sent_total
 	}
 
 	how_it_works: {

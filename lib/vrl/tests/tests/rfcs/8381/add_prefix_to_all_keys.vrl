@@ -1,4 +1,0 @@
-# object: {    "foo": true,    "bar": "bar",    "baz": "",    "qux_": {    "_quux": "",    "derp_": "derp" },    "quux": [{    "darp": "" }] }
-# result: { "my_foo": true, "my_bar": "bar", "my_baz": "", "my_qux_": { "my__quux": "", "my_derp_": "derp" }, "my_quux": [{ "my_darp": "" }] }
-
-map_keys(., recursive: true) -> |key| { "my_" + key }

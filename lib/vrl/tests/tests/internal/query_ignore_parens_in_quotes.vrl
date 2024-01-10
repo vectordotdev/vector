@@ -1,9 +1,0 @@
-# result: null
-
-r'\).'
-upcase(").")
-upcase(s').')
-replace("", r'\).', "")
-.foo.(bar | "baz)")
-.foo.(bar | "{foo}")
-.foo.(bar | "[{bar}]")

@@ -2,16 +2,15 @@ use std::collections::HashMap;
 
 use chrono::{DateTime, Utc};
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
-use indexmap::IndexMap;
 use vector::{
-    config::{DataType, Output},
+    config::{DataType, TransformOutput},
     event::{Event, LogEvent, Value},
     transforms::{
         remap::{Remap, RemapConfig},
         SyncTransform, TransformOutputsBuf,
     },
 };
-use vector_common::TimeZone;
+use vrl::event_path;
 use vrl::prelude::*;
 
 criterion_group!(
@@ -27,15 +26,26 @@ fn benchmark_remap(c: &mut Criterion) {
     let mut group = c.benchmark_group("remap");
 
     let add_fields_runner = |tform: &mut Box<dyn SyncTransform>, event: Event| {
-        let mut outputs =
-            TransformOutputsBuf::new_with_capacity(vec![Output::default(DataType::all())], 1);
+        let mut outputs = TransformOutputsBuf::new_with_capacity(
+            vec![TransformOutput::new(DataType::all(), HashMap::new())],
+            1,
+        );
         tform.transform(event, &mut outputs);
         let result = outputs.take_primary();
         let output_1 = result.first().unwrap().as_log();
 
-        debug_assert_eq!(output_1.get("foo").unwrap().to_string_lossy(), "bar");
-        debug_assert_eq!(output_1.get("bar").unwrap().to_string_lossy(), "baz");
-        debug_assert_eq!(output_1.get("copy").unwrap().to_string_lossy(), "buz");
+        debug_assert_eq!(
+            output_1.get(event_path!("foo")).unwrap().to_string_lossy(),
+            "bar"
+        );
+        debug_assert_eq!(
+            output_1.get(event_path!("bar")).unwrap().to_string_lossy(),
+            "baz"
+        );
+        debug_assert_eq!(
+            output_1.get(event_path!("copy")).unwrap().to_string_lossy(),
+            "buz"
+        );
 
         result
     };
@@ -52,7 +62,7 @@ fn benchmark_remap(c: &mut Criterion) {
                         .to_string(),
                     ),
                     file: None,
-                    timezone: TimeZone::default(),
+                    timezone: None,
                     drop_on_error: true,
                     drop_on_abort: true,
                     ..Default::default()
@@ -65,7 +75,9 @@ fn benchmark_remap(c: &mut Criterion) {
 
         let event = {
             let mut event = Event::Log(LogEvent::from("augment me"));
-            event.as_mut_log().insert("copy_from", "buz".to_owned());
+            event
+                .as_mut_log()
+                .insert(event_path!("copy_from"), "buz".to_owned());
             event
         };
 
@@ -77,18 +89,20 @@ fn benchmark_remap(c: &mut Criterion) {
     });
 
     let json_parser_runner = |tform: &mut Box<dyn SyncTransform>, event: Event| {
-        let mut outputs =
-            TransformOutputsBuf::new_with_capacity(vec![Output::default(DataType::all())], 1);
+        let mut outputs = TransformOutputsBuf::new_with_capacity(
+            vec![TransformOutput::new(DataType::all(), HashMap::new())],
+            1,
+        );
         tform.transform(event, &mut outputs);
         let result = outputs.take_primary();
         let output_1 = result.first().unwrap().as_log();
 
         debug_assert_eq!(
-            output_1.get("foo").unwrap().to_string_lossy(),
+            output_1.get(event_path!("foo")).unwrap().to_string_lossy(),
             r#"{"key": "value"}"#
         );
         debug_assert_eq!(
-            output_1.get("bar").unwrap().to_string_lossy(),
+            output_1.get(event_path!("bar")).unwrap().to_string_lossy(),
             r#"{"key":"value"}"#
         );
 
@@ -101,7 +115,7 @@ fn benchmark_remap(c: &mut Criterion) {
                 RemapConfig {
                     source: Some(".bar = parse_json!(string!(.foo))".to_owned()),
                     file: None,
-                    timezone: TimeZone::default(),
+                    timezone: None,
                     drop_on_error: true,
                     drop_on_abort: true,
                     ..Default::default()
@@ -129,16 +143,24 @@ fn benchmark_remap(c: &mut Criterion) {
 
     let coerce_runner =
         |tform: &mut Box<dyn SyncTransform>, event: Event, timestamp: DateTime<Utc>| {
-            let mut outputs =
-                TransformOutputsBuf::new_with_capacity(vec![Output::default(DataType::all())], 1);
+            let mut outputs = TransformOutputsBuf::new_with_capacity(
+                vec![TransformOutput::new(DataType::all(), HashMap::new())],
+                1,
+            );
             tform.transform(event, &mut outputs);
             let result = outputs.take_primary();
             let output_1 = result.first().unwrap().as_log();
 
-            debug_assert_eq!(output_1.get("number").unwrap(), &Value::Integer(1234));
-            debug_assert_eq!(output_1.get("bool").unwrap(), &Value::Boolean(true));
             debug_assert_eq!(
-                output_1.get("timestamp").unwrap(),
+                output_1.get(event_path!("number")).unwrap(),
+                &Value::Integer(1234)
+            );
+            debug_assert_eq!(
+                output_1.get(event_path!("bool")).unwrap(),
+                &Value::Boolean(true)
+            );
+            debug_assert_eq!(
+                output_1.get(event_path!("timestamp")).unwrap(),
                 &Value::Timestamp(timestamp),
             );
 
@@ -155,7 +177,7 @@ fn benchmark_remap(c: &mut Criterion) {
                 "#}
                 .to_owned()),
                 file: None,
-                timezone: TimeZone::default(),
+                timezone: None,
                 drop_on_error: true,
                 drop_on_abort: true,
                     ..Default::default()
@@ -170,7 +192,7 @@ fn benchmark_remap(c: &mut Criterion) {
             ("bool", "yes"),
             ("timestamp", "19/06/2019:17:20:49 -0400"),
         ] {
-            event.as_mut_log().insert(key, value.to_owned());
+            event.as_mut_log().insert(event_path!(key), value.to_owned());
         }
 
         let timestamp =

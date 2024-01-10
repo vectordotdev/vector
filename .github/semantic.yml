@@ -77,6 +77,7 @@ scopes:
   - traces # Anything related to Vectors' trace events
   - transforms # Anything related to Vector's transform components
   - unit tests # Anything related to Vector's unit testing feature
+  - vdev # Anything related to the vdev tooling
   - vrl # Anything related to the Vector Remap Language
 
   # platforms
@@ -116,7 +117,7 @@ scopes:
   - honeycomb service # Anything `honeycomb` service provider related
   - humio service # Anything `humio` service provider related
   - influxdata service # Anything `influxdata` service provider related
-  - logdna service # Anything `logdna` service provider related
+  - mezmo service # Anything `mezmo` service provider related
   - new relic service # Anything `new relic` service provider related
   - papertrail service # Anything `papertrail` service provider related
   - sematext service # Anything `sematext` service provider related
@@ -184,7 +185,7 @@ scopes:
 
   # sinks
   - amqp sink # Anything `amqp` sink related
-  - apex sink # Anything `apex` sink related
+  - appsignal sink # Anything `appsignal` sink related
   - aws_cloudwatch_logs sink # Anything `aws_cloudwatch_logs` sink related
   - aws_cloudwatch_metrics sink # Anything `aws_cloudwatch_metrics` sink related
   - aws_kinesis_firehose sink # Anything `aws_kinesis_firehose` sink related
@@ -198,7 +199,6 @@ scopes:
   - clickhouse sink # Anything `clickhouse` sink related
   - console sink # Anything `console` sink related
   - databend sink # Anything `databend` sink related
-  - datadog_archives sink # Anything `datadog_archives` sink related
   - datadog_events sink # Anything `datadog_events` sink related
   - datadog_logs sink # Anything `datadog_logs` sink related
   - datadog_metrics sink # Anything `datadog_metrics` sink related
@@ -216,8 +216,8 @@ scopes:
   - influxdb_logs sink # Anything `influxdb_logs` sink related
   - influxdb_metrics sink # Anything `influxdb_metrics` sink related
   - kafka sink # Anything `kafka` sink related
-  - logdna sink # Anything `logdna` sink related
   - loki sink # Anything `loki` sink related
+  - mezmo sink # Anything `mezmo` sink related
   - nats sink # Anything `nats` sink related
   - new sink # A request for a new sink
   - new_relic sink # Anything `new_relic` sink related
@@ -237,10 +237,17 @@ scopes:
   - websocket sink # Anything `websocket` sink related
 
   # website
+  - SEO website # Anything related to search engine optimization (SEO)
+  - analytics website # Anything related to website analytics
   - blog website # Anything related to the Vector blog
+  - copy website # Anything related to website copy
   - css website # Anything related to vector.dev's CSS and aesthetics
   - guides website # Anything related to Vector's guides
   - highlights website # Anything related to vector.dev highlights
   - javascript website # Anything related to the JavaScript functionality on vector.dev
+  - navigation website # Anything related to navigating the site
+  - operations website # Anything related to site operations: deploying, etc
+  - releases website # Anything related to the press page
   - search website # Anything related to the website's Algolia search indexing/config
+  - sitemap website # Anything related to the press page
   - template website # Anything related to website HTML and other templates

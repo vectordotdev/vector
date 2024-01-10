@@ -33,6 +33,7 @@ undertagline = "Collect, transform, and route all your observability data with o
 subtagline = "Vector is deployed over 1,000,000 times per month by Fortune 500 companies and startups"
 alpine_js_version = "2.8.2"
 ionicons_version = "5.4.0"
+openssl_version = "3.1"
 site_logo = "img/vector-open-graph.png"
 display_banner = false # Whether to display the top banner in layouts/partials/banner.html
 favicon = "favicon.ico"
@@ -143,8 +144,13 @@ weight = 5
 
 [[languages.en.menus.navbar]]
 name = "Support"
-url = "https://www.datadoghq.com/product/observability-pipelines"
+url = "/community"
 weight = 6
+
+[[languages.en.menus.navbar]]
+name = "Observability Pipelines"
+url = "https://www.datadoghq.com/product/observability-pipelines"
+weight = 7
 
 # Footer menu
 [[languages.en.menus.footer]]
@@ -159,16 +165,28 @@ parent = "about"
 weight = 1
 
 [[languages.en.menus.footer]]
+name = "What is Observability Pipelines?"
+url = "/docs/about/what-is-observability-pipelines"
+parent = "about"
+weight = 2
+
+[[languages.en.menus.footer]]
 name = "Contact us"
 url = "/community"
 parent = "about"
-weight = 2
+weight = 3
 
 [[languages.en.menus.footer]]
 name = "Privacy"
 url = "https://www.datadoghq.com/legal/privacy/"
 parent = "about"
-weight = 3
+weight = 4
+
+[[languages.en.menus.footer]]
+name = "Cookies"
+url = "https://www.datadoghq.com/legal/cookies/"
+parent = "about"
+weight = 5
 
 [[languages.en.menus.footer]]
 name = "Components"
@@ -253,6 +271,18 @@ name = "Chat"
 url = "https://chat.vector.dev"
 parent = "community"
 weight = 3
+
+[[languages.en.menus.footer]]
+name = "Download"
+url = "/download"
+identifier = "download"
+weight = 5
+
+[[languages.en.menus.footer]]
+name = "Releases"
+url = "/releases"
+weight = 1
+parent = "download"
 
 # Extra links under the "Meta" section in the docs
 [[languages.en.menus.meta]]

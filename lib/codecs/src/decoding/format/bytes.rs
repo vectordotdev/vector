@@ -1,15 +1,15 @@
 use bytes::Bytes;
-use lookup::lookup_v2::parse_value_path;
-use lookup::LookupBuf;
+use lookup::OwnedTargetPath;
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
-use value::Kind;
 use vector_core::config::LogNamespace;
+use vector_core::schema::meaning;
 use vector_core::{
     config::{log_schema, DataType},
     event::{Event, LogEvent},
     schema,
 };
+use vrl::value::Kind;
 
 use super::Deserializer;
 
@@ -25,7 +25,7 @@ impl BytesDeserializerConfig {
 
     /// Build the `BytesDeserializer` from this configuration.
     pub fn build(&self) -> BytesDeserializer {
-        BytesDeserializer::new()
+        BytesDeserializer
     }
 
     /// Return the type of event build by this deserializer.
@@ -36,14 +36,20 @@ impl BytesDeserializerConfig {
     /// The schema produced by the deserializer.
     pub fn schema_definition(&self, log_namespace: LogNamespace) -> schema::Definition {
         match log_namespace {
-            LogNamespace::Legacy => schema::Definition::empty_legacy_namespace().with_event_field(
-                &parse_value_path(log_schema().message_key()).expect("valid message key"),
-                Kind::bytes(),
-                Some("message"),
-            ),
+            LogNamespace::Legacy => {
+                let definition = schema::Definition::empty_legacy_namespace();
+                if let Some(message_key) = log_schema().message_key() {
+                    return definition.with_event_field(
+                        message_key,
+                        Kind::bytes(),
+                        Some(meaning::MESSAGE),
+                    );
+                }
+                definition
+            }
             LogNamespace::Vector => {
                 schema::Definition::new_with_default_metadata(Kind::bytes(), [log_namespace])
-                    .with_meaning(LookupBuf::root(), "message")
+                    .with_meaning(OwnedTargetPath::event_root(), "message")
             }
         }
     }
@@ -54,32 +60,16 @@ impl BytesDeserializerConfig {
 /// This deserializer can be considered as the no-op action for input where no
 /// further decoding has been specified.
 #[derive(Debug, Clone)]
-pub struct BytesDeserializer {
-    // Only used with the "Legacy" namespace. The "Vector" namespace decodes the data at the root of the event.
-    log_schema_message_key: &'static str,
-}
-
-impl Default for BytesDeserializer {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+pub struct BytesDeserializer;
 
 impl BytesDeserializer {
-    /// Creates a new `BytesDeserializer`.
-    pub fn new() -> Self {
-        Self {
-            log_schema_message_key: log_schema().message_key(),
-        }
-    }
-
     /// Deserializes the given bytes, which will always produce a single `LogEvent`.
     pub fn parse_single(&self, bytes: Bytes, log_namespace: LogNamespace) -> LogEvent {
         match log_namespace {
             LogNamespace::Vector => log_namespace.new_log_from_data(bytes),
             LogNamespace::Legacy => {
                 let mut log = LogEvent::default();
-                log.insert(self.log_schema_message_key, bytes);
+                log.maybe_insert(log_schema().message_key_target_path(), bytes);
                 log
             }
         }
@@ -99,15 +89,13 @@ impl Deserializer for BytesDeserializer {
 
 #[cfg(test)]
 mod tests {
-    use value::Value;
-    use vector_core::config::log_schema;
-
     use super::*;
+    use vrl::value::Value;
 
     #[test]
     fn deserialize_bytes_legacy_namespace() {
         let input = Bytes::from("foo");
-        let deserializer = BytesDeserializer::new();
+        let deserializer = BytesDeserializer;
 
         let events = deserializer.parse(input, LogNamespace::Legacy).unwrap();
         let mut events = events.into_iter();
@@ -115,7 +103,7 @@ mod tests {
         {
             let event = events.next().unwrap();
             let log = event.as_log();
-            assert_eq!(log[log_schema().message_key()], "foo".into());
+            assert_eq!(*log.get_message().unwrap(), "foo".into());
         }
 
         assert_eq!(events.next(), None);
@@ -124,7 +112,7 @@ mod tests {
     #[test]
     fn deserialize_bytes_vector_namespace() {
         let input = Bytes::from("foo");
-        let deserializer = BytesDeserializer::new();
+        let deserializer = BytesDeserializer;
 
         let events = deserializer.parse(input, LogNamespace::Vector).unwrap();
         assert_eq!(events.len(), 1);

@@ -5,7 +5,7 @@ base: components: sources: kubernetes_logs: configuration: {
 		description: """
 			Whether or not to automatically merge partial events.
 
-			Partial here is in respect to messages that were split by the Kubernetes Container Runtime
+			Partial events are messages that were split by the Kubernetes Container Runtime
 			log driver.
 			"""
 		required: false
@@ -26,9 +26,9 @@ base: components: sources: kubernetes_logs: configuration: {
 			How long to delay removing metadata entries from the cache when a pod deletion event
 			event is received from the watch stream.
 
-			A longer delay will allow for continued enrichment of logs after the originating Pod is
-			removed. If relevant metadata has been removed, the log will be forwarded un-enriched and a
-			warning will be emitted.
+			A longer delay allows for continued enrichment of logs after the originating Pod is
+			removed. If relevant metadata has been removed, the log is forwarded un-enriched and a
+			warning is emitted.
 			"""
 		required: false
 		type: uint: {
@@ -108,7 +108,7 @@ base: components: sources: kubernetes_logs: configuration: {
 		description: """
 			The interval at which the file system is polled to identify new files to read from.
 
-			This is quite efficient, yet might still create some load of the
+			This is quite efficient, yet might still create some load on the
 			file system; in addition, it is currently coupled with checksum dumping
 			in the underlying file server, so setting it too low may introduce
 			a significant overhead.
@@ -140,6 +140,20 @@ base: components: sources: kubernetes_logs: configuration: {
 		required: false
 		type: string: examples: [".ingest_timestamp", "ingest_ts"]
 	}
+	internal_metrics: {
+		description: "Configuration of internal metrics for file-based components."
+		required:    false
+		type: object: options: include_file_tag: {
+			description: """
+				Whether or not to include the "file" tag on the component's corresponding internal metrics.
+
+				This is useful for distinguishing between different files while monitoring. However, the tag's
+				cardinality is unbounded.
+				"""
+			required: false
+			type: bool: default: false
+		}
+	}
 	kube_config_file: {
 		description: """
 			Optional path to a readable [kubeconfig][kubeconfig] file.
@@ -165,8 +179,8 @@ base: components: sources: kubernetes_logs: configuration: {
 	}
 	max_read_bytes: {
 		description: """
-			Max amount of bytes to read from a single file before switching over
-			to the next file.
+			Max amount of bytes to read from a single file before switching over to the next file.
+			**Note:** This does not apply when `oldest_first` is `true`.
 
 			This allows distributing the reads more or less evenly across
 			the files.
@@ -209,6 +223,11 @@ base: components: sources: kubernetes_logs: configuration: {
 			}
 		}
 	}
+	oldest_first: {
+		description: "Instead of balancing read capacity fairly across all watched files, prioritize draining the oldest files before moving on to read data from more recent files."
+		required:    false
+		type: bool: default: true
+	}
 	pod_annotation_fields: {
 		description: "Configuration for how the events are enriched with Pod metadata."
 		required:    false
@@ -235,6 +254,18 @@ base: components: sources: kubernetes_logs: configuration: {
 				type: string: {
 					default: ".kubernetes.container_image"
 					examples: [".k8s.container_image", "k8s.container_image", ""]
+				}
+			}
+			container_image_id: {
+				description: """
+					Event field for the Container's image ID.
+
+					Set to `""` to suppress this key.
+					"""
+				required: false
+				type: string: {
+					default: ".kubernetes.container_image_id"
+					examples: [".k8s.container_image_id", "k8s.container_image_id", ""]
 				}
 			}
 			container_name: {
@@ -347,7 +378,7 @@ base: components: sources: kubernetes_logs: configuration: {
 			}
 			pod_uid: {
 				description: """
-					Event field for the Pod's uid.
+					Event field for the Pod's UID.
 
 					Set to `""` to suppress this key.
 					"""
@@ -386,5 +417,10 @@ base: components: sources: kubernetes_logs: configuration: {
 		description: "The default time zone for timestamps without an explicit zone."
 		required:    false
 		type: string: examples: ["local", "America/New_York", "EST5EDT"]
+	}
+	use_apiserver_cache: {
+		description: "Determines if requests to the kube-apiserver can be served by a cache."
+		required:    false
+		type: bool: default: false
 	}
 }

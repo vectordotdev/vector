@@ -84,8 +84,7 @@ pub mod ascii_char {
             Ok(character as u8)
         } else {
             Err(de::Error::custom(format!(
-                "invalid character: {}, expected character in ASCII range",
-                character
+                "invalid character: {character}, expected character in ASCII range"
             )))
         }
     }

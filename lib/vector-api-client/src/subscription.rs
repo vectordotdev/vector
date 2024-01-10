@@ -108,7 +108,7 @@ impl SubscriptionClient {
                     _ = &mut shutdown_rx => {
                         let subscriptions = subscriptions_clone.lock().unwrap();
                         for id in subscriptions.keys() {
-                            let _ = tx_clone.send(Payload::stop(*id));
+                            _ = tx_clone.send(Payload::stop(*id));
                         }
                         break
                     },
@@ -120,7 +120,7 @@ impl SubscriptionClient {
                                 let subscriptions = subscriptions_clone.lock().unwrap();
                                 let s: Option<&Sender<Payload>> = subscriptions.get::<Uuid>(&p.id);
                                 if let Some(s) = s {
-                                    let _ = s.send(p);
+                                    _ = s.send(p);
                                 }
                             }
                             None => {
@@ -159,8 +159,8 @@ impl SubscriptionClient {
         self.subscriptions.lock().unwrap().insert(id, tx);
 
         // Initialize the connection with the relevant control messages.
-        let _ = self.tx.send(Payload::init(id));
-        let _ = self.tx.send(Payload::start::<T>(id, request_body));
+        _ = self.tx.send(Payload::init(id));
+        _ = self.tx.send(Payload::start::<T>(id, request_body));
 
         Box::pin(
             BroadcastStream::new(rx)
@@ -185,7 +185,7 @@ pub async fn connect_subscription_client(
     // Forwarded received messages back upstream to the GraphQL server
     tokio::spawn(async move {
         while let Some(p) = send_rx.recv().await {
-            let _ = ws_tx
+            _ = ws_tx
                 .send(Message::Text(serde_json::to_string(&p).unwrap()))
                 .await;
         }
@@ -195,7 +195,7 @@ pub async fn connect_subscription_client(
     tokio::spawn(async move {
         while let Some(Ok(Message::Text(m))) = ws_rx.next().await {
             if let Ok(p) = serde_json::from_str::<Payload>(&m) {
-                let _ = recv_tx.send(p);
+                _ = recv_tx.send(p);
             }
         }
     });

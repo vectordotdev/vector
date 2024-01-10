@@ -25,16 +25,6 @@ fn exclude_self() {
 
 #[cfg(all(test, feature = "docker-logs-integration-tests"))]
 mod integration_tests {
-    use bollard::{
-        container::{
-            Config as ContainerConfig, CreateContainerOptions, KillContainerOptions,
-            RemoveContainerOptions, StartContainerOptions, WaitContainerOptions,
-        },
-        image::{CreateImageOptions, ListImagesOptions},
-    };
-    use futures::{stream::TryStreamExt, FutureExt};
-    use similar_asserts::assert_eq;
-
     use crate::sources::docker_logs::*;
     use crate::sources::docker_logs::{CONTAINER, CREATED_AT, IMAGE, NAME};
     use crate::{
@@ -46,6 +36,16 @@ mod integration_tests {
         },
         SourceSender,
     };
+    use bollard::{
+        container::{
+            Config as ContainerConfig, CreateContainerOptions, KillContainerOptions,
+            RemoveContainerOptions, StartContainerOptions, WaitContainerOptions,
+        },
+        image::{CreateImageOptions, ListImagesOptions},
+    };
+    use futures::{stream::TryStreamExt, FutureExt};
+    use similar_asserts::assert_eq;
+    use vrl::value;
 
     /// None if docker is not present on the system
     async fn source_with<'a, L: Into<Option<&'a str>>>(
@@ -224,7 +224,7 @@ mod integration_tests {
         trace!("Removing container.");
 
         // Don't panic, as this is unrelated to the test, and there are possibly other containers that need to be removed
-        let _ = docker
+        _ = docker
             .remove_container(id, None::<RemoveContainerOptions>)
             .await
             .map_err(|e| error!(%e));
@@ -279,7 +279,7 @@ mod integration_tests {
         // Wait for before message
         let events = collect_n(out, 1).await;
         assert_eq!(
-            events[0].as_log()[log_schema().message_key()],
+            events[0].as_log()[log_schema().message_key().unwrap().to_string()],
             "before".into()
         );
 
@@ -293,13 +293,12 @@ mod integration_tests {
     #[tokio::test]
     async fn container_with_tty_vector_namespace() {
         trace_init();
-        let schema_definition = DockerLogsConfig::default()
+        let schema_definitions = DockerLogsConfig::default()
             .outputs(LogNamespace::Vector)
             .first()
             .unwrap()
-            .log_schema_definition
-            .clone()
-            .unwrap();
+            .schema_definition
+            .clone();
 
         assert_source_compliance(&SOURCE_TAGS, async {
             let message = "log container_with_tty";
@@ -313,8 +312,10 @@ mod integration_tests {
             let events = collect_n(out, 1).await;
             container_remove(&id, &docker).await;
 
-            schema_definition.assert_valid_for_event(&events[0]);
-            assert_eq!(events[0].as_log().get(".").unwrap(), &vrl::value!(message));
+            schema_definitions
+                .unwrap()
+                .assert_valid_for_event(&events[0]);
+            assert_eq!(events[0].as_log().get(".").unwrap(), &value!(message));
         })
         .await;
     }
@@ -322,13 +323,12 @@ mod integration_tests {
     #[tokio::test]
     async fn container_with_tty_legacy_namespace() {
         trace_init();
-        let schema_definition = DockerLogsConfig::default()
+        let schema_definitions = DockerLogsConfig::default()
             .outputs(LogNamespace::Legacy)
             .first()
             .unwrap()
-            .log_schema_definition
-            .clone()
-            .unwrap();
+            .schema_definition
+            .clone();
 
         assert_source_compliance(&SOURCE_TAGS, async {
             let message = "log container_with_tty";
@@ -342,9 +342,11 @@ mod integration_tests {
             let events = collect_n(out, 1).await;
             container_remove(&id, &docker).await;
 
-            schema_definition.assert_valid_for_event(&events[0]);
+            schema_definitions
+                .unwrap()
+                .assert_valid_for_event(&events[0]);
             assert_eq!(
-                events[0].as_log()[log_schema().message_key()],
+                events[0].as_log()[log_schema().message_key().unwrap().to_string()],
                 message.into()
             );
         })
@@ -354,13 +356,12 @@ mod integration_tests {
     #[tokio::test]
     async fn newly_started_vector_namespace() {
         trace_init();
-        let schema_definition = DockerLogsConfig::default()
+        let schema_definitions = DockerLogsConfig::default()
             .outputs(LogNamespace::Vector)
             .first()
             .unwrap()
-            .log_schema_definition
-            .clone()
-            .unwrap();
+            .schema_definition
+            .clone();
 
         assert_source_compliance(&SOURCE_TAGS, async {
             let message = "9";
@@ -375,32 +376,34 @@ mod integration_tests {
             let events = collect_n(out, 1).await;
             container_remove(&id, &docker).await;
 
-            schema_definition.assert_valid_for_event(&events[0]);
+            schema_definitions
+                .unwrap()
+                .assert_valid_for_event(&events[0]);
 
             let log = events[0].as_log();
             let meta = log.metadata().value();
-            assert_eq!(log.get(".").unwrap(), &vrl::value!(message));
+            assert_eq!(log.get(".").unwrap(), &value!(message));
             assert_eq!(
                 meta.get(path!(DockerLogsConfig::NAME, CONTAINER)).unwrap(),
-                &vrl::value!(id)
+                &value!(id)
             );
             assert!(meta
                 .get(path!(DockerLogsConfig::NAME, CREATED_AT))
                 .is_some());
             assert_eq!(
                 meta.get(path!(DockerLogsConfig::NAME, IMAGE)).unwrap(),
-                &vrl::value!("busybox")
+                &value!("busybox")
             );
             assert!(meta
                 .get(path!(DockerLogsConfig::NAME, "labels", label))
                 .is_some());
             assert_eq!(
                 meta.get(path!(DockerLogsConfig::NAME, NAME)).unwrap(),
-                &vrl::value!(name)
+                &value!(name)
             );
             assert_eq!(
                 meta.get(path!("vector", "source_type")).unwrap(),
-                &vrl::value!(DockerLogsConfig::NAME)
+                &value!(DockerLogsConfig::NAME)
             );
             assert!(meta
                 .get(path!("vector", "ingest_timestamp"))
@@ -413,13 +416,12 @@ mod integration_tests {
     #[tokio::test]
     async fn newly_started_legacy_namespace() {
         trace_init();
-        let schema_definition = DockerLogsConfig::default()
+        let schema_definitions = DockerLogsConfig::default()
             .outputs(LogNamespace::Legacy)
             .first()
             .unwrap()
-            .log_schema_definition
-            .clone()
-            .unwrap();
+            .schema_definition
+            .clone();
 
         assert_source_compliance(&SOURCE_TAGS, async {
             let message = "9";
@@ -434,16 +436,18 @@ mod integration_tests {
             let events = collect_n(out, 1).await;
             container_remove(&id, &docker).await;
 
-            schema_definition.assert_valid_for_event(&events[0]);
+            schema_definitions
+                .unwrap()
+                .assert_valid_for_event(&events[0]);
             let log = events[0].as_log();
-            assert_eq!(log[log_schema().message_key()], message.into());
+            assert_eq!(*log.get_message().unwrap(), message.into());
             assert_eq!(log[CONTAINER], id.into());
             assert!(log.get(CREATED_AT).is_some());
             assert_eq!(log[IMAGE], "busybox".into());
             assert!(log.get(format!("label.{}", label).as_str()).is_some());
             assert_eq!(events[0].as_log()[&NAME], name.into());
             assert_eq!(
-                events[0].as_log()[log_schema().source_type_key()],
+                events[0].as_log()[log_schema().source_type_key().unwrap().to_string()],
                 DockerLogsConfig::NAME.into()
             );
         })
@@ -453,13 +457,12 @@ mod integration_tests {
     #[tokio::test]
     async fn restart_legacy_namespace() {
         trace_init();
-        let schema_definition = DockerLogsConfig::default()
+        let schema_definitions = DockerLogsConfig::default()
             .outputs(LogNamespace::Legacy)
             .first()
             .unwrap()
-            .log_schema_definition
-            .clone()
-            .unwrap();
+            .schema_definition
+            .clone();
 
         assert_source_compliance(&SOURCE_TAGS, async {
             let message = "10";
@@ -473,16 +476,13 @@ mod integration_tests {
             let events = collect_n(out, 2).await;
             container_remove(&id, &docker).await;
 
-            schema_definition.assert_valid_for_event(&events[0]);
-            assert_eq!(
-                events[0].as_log()[log_schema().message_key()],
-                message.into()
-            );
-            schema_definition.assert_valid_for_event(&events[1]);
-            assert_eq!(
-                events[1].as_log()[log_schema().message_key()],
-                message.into()
-            );
+            let definition = schema_definitions.unwrap();
+
+            definition.assert_valid_for_event(&events[0]);
+            let message_key = log_schema().message_key().unwrap().to_string();
+            assert_eq!(events[0].as_log()[&message_key], message.into());
+            definition.assert_valid_for_event(&events[1]);
+            assert_eq!(events[1].as_log()[message_key], message.into());
         })
         .await;
     }
@@ -490,13 +490,12 @@ mod integration_tests {
     #[tokio::test]
     async fn include_containers_legacy_namespace() {
         trace_init();
-        let schema_definition = DockerLogsConfig::default()
+        let schema_definitions = DockerLogsConfig::default()
             .outputs(LogNamespace::Legacy)
             .first()
             .unwrap()
-            .log_schema_definition
-            .clone()
-            .unwrap();
+            .schema_definition
+            .clone();
 
         assert_source_compliance(&SOURCE_TAGS, async {
             let message = "11";
@@ -513,9 +512,11 @@ mod integration_tests {
             container_remove(&id0, &docker).await;
             container_remove(&id1, &docker).await;
 
-            schema_definition.assert_valid_for_event(&events[0]);
+            schema_definitions
+                .unwrap()
+                .assert_valid_for_event(&events[0]);
             assert_eq!(
-                events[0].as_log()[log_schema().message_key()],
+                events[0].as_log()[log_schema().message_key().unwrap().to_string()],
                 message.into()
             );
         })
@@ -525,13 +526,12 @@ mod integration_tests {
     #[tokio::test]
     async fn exclude_containers_legacy_namespace() {
         trace_init();
-        let schema_definition = DockerLogsConfig::default()
+        let schema_definitions = DockerLogsConfig::default()
             .outputs(LogNamespace::Legacy)
             .first()
             .unwrap()
-            .log_schema_definition
-            .clone()
-            .unwrap();
+            .schema_definition
+            .clone();
 
         assert_source_compliance(&SOURCE_TAGS, async {
             let will_be_read = "12";
@@ -561,17 +561,14 @@ mod integration_tests {
 
             assert_eq!(events.len(), 2);
 
-            schema_definition.assert_valid_for_event(&events[0]);
-            assert_eq!(
-                events[0].as_log()[log_schema().message_key()],
-                will_be_read.into()
-            );
+            let definition = schema_definitions.unwrap();
+            definition.assert_valid_for_event(&events[0]);
 
-            schema_definition.assert_valid_for_event(&events[1]);
-            assert_eq!(
-                events[1].as_log()[log_schema().message_key()],
-                will_be_read.into()
-            );
+            let message_key = log_schema().message_key().unwrap().to_string();
+            assert_eq!(events[0].as_log()[&message_key], will_be_read.into());
+
+            definition.assert_valid_for_event(&events[1]);
+            assert_eq!(events[1].as_log()[message_key], will_be_read.into());
         })
         .await;
     }
@@ -579,13 +576,12 @@ mod integration_tests {
     #[tokio::test]
     async fn include_labels_legacy_namespace() {
         trace_init();
-        let schema_definition = DockerLogsConfig::default()
+        let schema_definitions = DockerLogsConfig::default()
             .outputs(LogNamespace::Legacy)
             .first()
             .unwrap()
-            .log_schema_definition
-            .clone()
-            .unwrap();
+            .schema_definition
+            .clone();
 
         assert_source_compliance(&SOURCE_TAGS, async {
             let message = "13";
@@ -603,9 +599,11 @@ mod integration_tests {
             container_remove(&id0, &docker).await;
             container_remove(&id1, &docker).await;
 
-            schema_definition.assert_valid_for_event(&events[0]);
+            schema_definitions
+                .unwrap()
+                .assert_valid_for_event(&events[0]);
             assert_eq!(
-                events[0].as_log()[log_schema().message_key()],
+                events[0].as_log()[log_schema().message_key().unwrap().to_string()],
                 message.into()
             );
         })
@@ -615,13 +613,12 @@ mod integration_tests {
     #[tokio::test]
     async fn currently_running_legacy_namespace() {
         trace_init();
-        let schema_definition = DockerLogsConfig::default()
+        let schema_definitions = DockerLogsConfig::default()
             .outputs(LogNamespace::Legacy)
             .first()
             .unwrap()
-            .log_schema_definition
-            .clone()
-            .unwrap();
+            .schema_definition
+            .clone();
 
         assert_source_compliance(&SOURCE_TAGS, async {
             let message = "14";
@@ -633,19 +630,21 @@ mod integration_tests {
             let out = source_with(&[name], None, None).await;
 
             let events = collect_n(out, 1).await;
-            let _ = container_kill(&id, &docker).await;
+            _ = container_kill(&id, &docker).await;
             container_remove(&id, &docker).await;
 
-            schema_definition.assert_valid_for_event(&events[0]);
+            schema_definitions
+                .unwrap()
+                .assert_valid_for_event(&events[0]);
             let log = events[0].as_log();
-            assert_eq!(log[log_schema().message_key()], message.into());
+            assert_eq!(*log.get_message().unwrap(), message.into());
             assert_eq!(log[CONTAINER], id.into());
             assert!(log.get(CREATED_AT).is_some());
             assert_eq!(log[IMAGE], "busybox".into());
             assert!(log.get(format!("label.{}", label).as_str()).is_some());
             assert_eq!(events[0].as_log()[&NAME], name.into());
             assert_eq!(
-                events[0].as_log()[log_schema().source_type_key()],
+                events[0].as_log()[log_schema().source_type_key().unwrap().to_string()],
                 DockerLogsConfig::NAME.into()
             );
         })
@@ -655,13 +654,12 @@ mod integration_tests {
     #[tokio::test]
     async fn include_image_legacy_namespace() {
         trace_init();
-        let schema_definition = DockerLogsConfig::default()
+        let schema_definitions = DockerLogsConfig::default()
             .outputs(LogNamespace::Legacy)
             .first()
             .unwrap()
-            .log_schema_definition
-            .clone()
-            .unwrap();
+            .schema_definition
+            .clone();
 
         assert_source_compliance(&SOURCE_TAGS, async {
             let message = "15";
@@ -680,9 +678,11 @@ mod integration_tests {
             let events = collect_n(out, 1).await;
             container_remove(&id, &docker).await;
 
-            schema_definition.assert_valid_for_event(&events[0]);
+            schema_definitions
+                .unwrap()
+                .assert_valid_for_event(&events[0]);
             assert_eq!(
-                events[0].as_log()[log_schema().message_key()],
+                events[0].as_log()[log_schema().message_key().unwrap().to_string()],
                 message.into()
             );
         })
@@ -736,8 +736,8 @@ mod integration_tests {
             let exclude_out = source_with_config(config_ex).await;
             let include_out = source_with_config(config_in).await;
 
-            let _ = collect_n(include_out, 1).await;
-            let _ = container_kill(&id, &docker).await;
+            _ = collect_n(include_out, 1).await;
+            _ = container_kill(&id, &docker).await;
             container_remove(&id, &docker).await;
 
             assert!(is_empty(exclude_out));
@@ -748,13 +748,12 @@ mod integration_tests {
     #[tokio::test]
     async fn flat_labels_legacy_namespace() {
         trace_init();
-        let schema_definition = DockerLogsConfig::default()
+        let schema_definitions = DockerLogsConfig::default()
             .outputs(LogNamespace::Legacy)
             .first()
             .unwrap()
-            .log_schema_definition
-            .clone()
-            .unwrap();
+            .schema_definition
+            .clone();
 
         assert_source_compliance(&SOURCE_TAGS, async {
             let message = "18";
@@ -766,12 +765,14 @@ mod integration_tests {
             let out = source_with(&[name], None, None).await;
 
             let events = collect_n(out, 1).await;
-            let _ = container_kill(&id, &docker).await;
+            _ = container_kill(&id, &docker).await;
             container_remove(&id, &docker).await;
 
-            schema_definition.assert_valid_for_event(&events[0]);
+            schema_definitions
+                .unwrap()
+                .assert_valid_for_event(&events[0]);
             let log = events[0].as_log();
-            assert_eq!(log[log_schema().message_key()], message.into());
+            assert_eq!(*log.get_message().unwrap(), message.into());
             assert_eq!(log[CONTAINER], id.into());
             assert!(log.get(CREATED_AT).is_some());
             assert_eq!(log[IMAGE], "busybox".into());
@@ -784,7 +785,7 @@ mod integration_tests {
                 .is_some());
             assert_eq!(events[0].as_log()[&NAME], name.into());
             assert_eq!(
-                events[0].as_log()[log_schema().source_type_key()],
+                events[0].as_log()[log_schema().source_type_key().unwrap().to_string()],
                 DockerLogsConfig::NAME.into()
             );
         })
@@ -794,13 +795,12 @@ mod integration_tests {
     #[tokio::test]
     async fn log_longer_than_16kb_legacy_namespace() {
         trace_init();
-        let schema_definition = DockerLogsConfig::default()
+        let schema_definitions = DockerLogsConfig::default()
             .outputs(LogNamespace::Legacy)
             .first()
             .unwrap()
-            .log_schema_definition
-            .clone()
-            .unwrap();
+            .schema_definition
+            .clone();
 
         assert_source_compliance(&SOURCE_TAGS, async {
             let mut message = String::with_capacity(20 * 1024);
@@ -817,9 +817,11 @@ mod integration_tests {
             let events = collect_n(out, 1).await;
             container_remove(&id, &docker).await;
 
-            schema_definition.assert_valid_for_event(&events[0]);
+            schema_definitions
+                .unwrap()
+                .assert_valid_for_event(&events[0]);
             let log = events[0].as_log();
-            assert_eq!(log[log_schema().message_key()], message.into());
+            assert_eq!(*log.get_message().unwrap(), message.into());
         })
         .await;
     }
@@ -828,11 +830,11 @@ mod integration_tests {
     async fn merge_multiline_vector_namespace() {
         assert_source_compliance(&SOURCE_TAGS, async {
             trace_init();
-            let schema_definition = DockerLogsConfig::default()
+            let schema_definitions = DockerLogsConfig::default()
                 .outputs(LogNamespace::Vector)
                 .first()
                 .unwrap()
-                .log_schema_definition
+                .schema_definition
                 .clone()
                 .unwrap();
 
@@ -881,7 +883,7 @@ mod integration_tests {
             let actual_messages = events
                 .into_iter()
                 .map(|event| {
-                    schema_definition.assert_valid_for_event(&event);
+                    schema_definitions.assert_valid_for_event(&event);
 
                     event
                         .into_log()
@@ -900,11 +902,11 @@ mod integration_tests {
     async fn merge_multiline_legacy_namespace() {
         assert_source_compliance(&SOURCE_TAGS, async {
             trace_init();
-            let schema_definition = DockerLogsConfig::default()
+            let schema_definitions = DockerLogsConfig::default()
                 .outputs(LogNamespace::Legacy)
                 .first()
                 .unwrap()
-                .log_schema_definition
+                .schema_definition
                 .clone()
                 .unwrap();
 
@@ -952,11 +954,11 @@ mod integration_tests {
             let actual_messages = events
                 .into_iter()
                 .map(|event| {
-                    schema_definition.assert_valid_for_event(&event);
+                    schema_definitions.assert_valid_for_event(&event);
 
                     event
                         .into_log()
-                        .remove(crate::config::log_schema().message_key())
+                        .remove(log_schema().message_key_target_path().unwrap())
                         .unwrap()
                         .to_string_lossy()
                         .into_owned()

@@ -1,8 +1,13 @@
 use std::{io, io::Write};
 
 use serde::Serialize;
-use vector_buffers::EventCount;
-use vector_core::{event::Event, ByteSizeOf, EstimatedJsonEncodedSizeOf};
+use vector_lib::buffers::EventCount;
+use vector_lib::{config::telemetry, event::Event, ByteSizeOf, EstimatedJsonEncodedSizeOf};
+use vector_lib::{
+    internal_event::TaggedEventsSent,
+    json_size::JsonSize,
+    request_metadata::{GetEventCountTags, GroupedCountByteSize},
+};
 
 use crate::{
     codecs::Transformer,
@@ -34,7 +39,7 @@ impl ByteSizeOf for ProcessedEvent {
 }
 
 impl EstimatedJsonEncodedSizeOf for ProcessedEvent {
-    fn estimated_json_encoded_size_of(&self) -> usize {
+    fn estimated_json_encoded_size_of(&self) -> JsonSize {
         self.log.estimated_json_encoded_size_of()
     }
 }
@@ -43,6 +48,12 @@ impl EventCount for ProcessedEvent {
     fn event_count(&self) -> usize {
         // An Elasticsearch ProcessedEvent is mapped one-to-one with an event.
         1
+    }
+}
+
+impl GetEventCountTags for ProcessedEvent {
+    fn get_tags(&self) -> TaggedEventsSent {
+        self.log.get_tags()
     }
 }
 
@@ -58,12 +69,15 @@ impl Encoder<Vec<ProcessedEvent>> for ElasticsearchEncoder {
         &self,
         input: Vec<ProcessedEvent>,
         writer: &mut dyn Write,
-    ) -> std::io::Result<usize> {
+    ) -> std::io::Result<(usize, GroupedCountByteSize)> {
         let mut written_bytes = 0;
+        let mut byte_size = telemetry().create_request_count_byte_size();
         for event in input {
             let log = {
                 let mut event = Event::from(event.log);
                 self.transformer.transform(&mut event);
+                byte_size.add_event(&event, event.estimated_json_encoded_size_of());
+
                 event.into_log()
             };
             written_bytes += write_bulk_action(
@@ -82,7 +96,8 @@ impl Encoder<Vec<ProcessedEvent>> for ElasticsearchEncoder {
                     Ok(())
                 })?;
         }
-        Ok(written_bytes)
+
+        Ok((written_bytes, byte_size))
     }
 }
 
@@ -134,7 +149,7 @@ mod tests {
     fn suppress_type_with_id() {
         let mut writer = Vec::new();
 
-        let _ = write_bulk_action(
+        _ = write_bulk_action(
             &mut writer,
             "ACTION",
             "INDEX",
@@ -162,7 +177,7 @@ mod tests {
     fn suppress_type_without_id() {
         let mut writer = Vec::new();
 
-        let _ = write_bulk_action(&mut writer, "ACTION", "INDEX", "TYPE", true, &None);
+        _ = write_bulk_action(&mut writer, "ACTION", "INDEX", "TYPE", true, &None);
 
         let value: serde_json::Value = serde_json::from_slice(&writer).unwrap();
         let value = value.as_object().unwrap();
@@ -182,7 +197,7 @@ mod tests {
     fn type_with_id() {
         let mut writer = Vec::new();
 
-        let _ = write_bulk_action(
+        _ = write_bulk_action(
             &mut writer,
             "ACTION",
             "INDEX",
@@ -211,7 +226,7 @@ mod tests {
     fn type_without_id() {
         let mut writer = Vec::new();
 
-        let _ = write_bulk_action(&mut writer, "ACTION", "INDEX", "TYPE", false, &None);
+        _ = write_bulk_action(&mut writer, "ACTION", "INDEX", "TYPE", false, &None);
 
         let value: serde_json::Value = serde_json::from_slice(&writer).unwrap();
         let value = value.as_object().unwrap();

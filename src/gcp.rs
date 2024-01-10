@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 use std::{
     sync::{Arc, RwLock},
     time::Duration,
@@ -16,8 +17,8 @@ use once_cell::sync::Lazy;
 use smpl_jwt::Jwt;
 use snafu::{ResultExt, Snafu};
 use tokio::{sync::watch, time::Instant};
-use vector_common::sensitive_string::SensitiveString;
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
+use vector_lib::sensitive_string::SensitiveString;
 
 use crate::{config::ProxyConfig, http::HttpClient, http::HttpError};
 
@@ -67,24 +68,28 @@ pub enum GcpError {
 #[configurable_component]
 #[derive(Clone, Debug, Default)]
 pub struct GcpAuthConfig {
-    /// An API key. ([documentation](https://cloud.google.com/docs/authentication/api-keys))
+    /// An [API key][gcp_api_key].
     ///
-    /// Either an API key, or a path to a service account credentials JSON file can be specified.
+    /// Either an API key or a path to a service account credentials JSON file can be specified.
     ///
     /// If both are unset, the `GOOGLE_APPLICATION_CREDENTIALS` environment variable is checked for a filename. If no
     /// filename is named, an attempt is made to fetch an instance service account for the compute instance the program is
     /// running on. If this is not on a GCE instance, then you must define it with an API key or service account
     /// credentials JSON file.
+    ///
+    /// [gcp_api_key]: https://cloud.google.com/docs/authentication/api-keys
     pub api_key: Option<SensitiveString>,
 
-    /// Path to a service account credentials JSON file. ([documentation](https://cloud.google.com/docs/authentication/production#manually))
+    /// Path to a [service account][gcp_service_account_credentials] credentials JSON file.
     ///
-    /// Either an API key, or a path to a service account credentials JSON file can be specified.
+    /// Either an API key or a path to a service account credentials JSON file can be specified.
     ///
     /// If both are unset, the `GOOGLE_APPLICATION_CREDENTIALS` environment variable is checked for a filename. If no
     /// filename is named, an attempt is made to fetch an instance service account for the compute instance the program is
     /// running on. If this is not on a GCE instance, then you must define it with an API key or service account
     /// credentials JSON file.
+    ///
+    /// [gcp_service_account_credentials]: https://cloud.google.com/docs/authentication/production#manually
     pub credentials_path: Option<String>,
 
     /// Skip all authentication handling. For use with integration tests only.

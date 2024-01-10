@@ -12,10 +12,16 @@ weight: 2
 curl \
   --proto '=https' \
   --tlsv1.2 -O \
-  https://packages.timber.io/vector/{{< version >}}/vector-{{< version >}}-amd64.deb
+  https://apt.vector.dev/pool/v/ve/vector_{{< version >}}-1_{arch}.deb
 
-sudo dpkg -i vector-{{< version >}}-amd64.deb
+sudo dpkg -i vector_{{< version >}}-1_{arch}.deb
 ```
+
+Make sure to replace `{arch}` with one of the following:
+
+* `amd64`
+* `arm64`
+* `armhf`
 
 ## Other actions
 
@@ -23,14 +29,14 @@ sudo dpkg -i vector-{{< version >}}-amd64.deb
 {{< tab title="Upgrade Vector" >}}
 
 ```shell
-dpkg -i vector-{{< version >}}-amd64
+dpkg -i vector-{{< version >}}-{arch}
 ```
 
 {{< /tab >}}
 {{< tab title="Uninstall Vector" >}}
 
 ```shell
-dpkg -r vector-{{< version >}}-amd64
+dpkg -r vector-{{< version >}}-{arch}
 ```
 
 {{< /tab >}}

@@ -26,7 +26,7 @@ base: components: sinks: configuration: {
 					"""
 				relevant_when: "type = \"disk\""
 				required:      true
-				type: uint: {}
+				type: uint: unit: "bytes"
 			}
 			type: {
 				description: "The type of buffer to use."
@@ -35,7 +35,7 @@ base: components: sinks: configuration: {
 					default: "memory"
 					enum: {
 						disk: """
-														Events are buffered on disk. (version 2)
+														Events are buffered on disk.
 
 														This is less performant, but more durable. Data that has been synchronized to disk will not
 														be lost if Vector is restarted forcefully or crashes.
@@ -118,7 +118,7 @@ base: components: sinks: configuration: {
 
 			Configure to proxy traffic through an HTTP(S) proxy when making external requests.
 
-			Similar to common proxy configuration convention, users can set different proxies
+			Similar to common proxy configuration convention, you can set different proxies
 			to use based on the type of traffic being proxied, as well as set specific hosts that
 			should not be proxied.
 			"""

@@ -35,7 +35,12 @@ components: sources: journald: {
 			"x86_64-pc-windows-msv": false
 		}
 
-		requirements: []
+		requirements: [
+			"""
+				This source requires permissions to run `journalctl`. When installed from a package manager this should be
+				handled automatically, otherwise ensure the running user is part of the `systemd-journal` group.
+				""",
+		]
 		warnings: []
 		notices: []
 	}
@@ -65,7 +70,9 @@ components: sources: journald: {
 						examples: ["journald"]
 					}
 				}
-				timestamp: fields._current_timestamp
+				timestamp: fields._current_timestamp & {
+					description: "The time at which the event appeared in the journal."
+				}
 				"*": {
 					common:      false
 					description: "Any Journald field"
@@ -141,16 +148,5 @@ components: sources: journald: {
 				are replaced with the Unicode replacement character, `�`.
 				"""
 		}
-	}
-
-	telemetry: metrics: {
-		component_received_bytes_total:       components.sources.internal_metrics.output.metrics.component_received_bytes_total
-		component_received_events_total:      components.sources.internal_metrics.output.metrics.component_received_events_total
-		component_received_event_bytes_total: components.sources.internal_metrics.output.metrics.component_received_event_bytes_total
-		events_in_total:                      components.sources.internal_metrics.output.metrics.events_in_total
-		invalid_record_total:                 components.sources.internal_metrics.output.metrics.invalid_record_total
-		invalid_record_bytes_total:           components.sources.internal_metrics.output.metrics.invalid_record_bytes_total
-		processed_bytes_total:                components.sources.internal_metrics.output.metrics.processed_bytes_total
-		processed_events_total:               components.sources.internal_metrics.output.metrics.processed_events_total
 	}
 }

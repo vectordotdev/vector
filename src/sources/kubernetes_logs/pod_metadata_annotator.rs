@@ -7,12 +7,12 @@ use k8s_openapi::{
     apimachinery::pkg::apis::meta::v1::ObjectMeta,
 };
 use kube::runtime::reflector::{store::Store, ObjectRef};
-use lookup::{
+use vector_lib::config::{LegacyKey, LogNamespace};
+use vector_lib::configurable::configurable_component;
+use vector_lib::lookup::{
     lookup_v2::{OptionalTargetPath, ValuePath},
     owned_value_path, path, OwnedTargetPath,
 };
-use vector_config::{configurable_component, NamedComponent};
-use vector_core::config::{LegacyKey, LogNamespace};
 
 use super::{
     path_helpers::{parse_log_file_path, LogFileInfo},
@@ -41,7 +41,7 @@ pub struct FieldsSpec {
     #[configurable(metadata(docs::examples = ""))]
     pub pod_namespace: OptionalTargetPath,
 
-    /// Event field for the Pod's uid.
+    /// Event field for the Pod's UID.
     ///
     /// Set to `""` to suppress this key.
     #[configurable(metadata(docs::examples = ".k8s.pod_uid"))]
@@ -120,6 +120,14 @@ pub struct FieldsSpec {
     #[configurable(metadata(docs::examples = "k8s.container_image"))]
     #[configurable(metadata(docs::examples = ""))]
     pub container_image: OptionalTargetPath,
+
+    /// Event field for the Container's image ID.
+    ///
+    /// Set to `""` to suppress this key.
+    #[configurable(metadata(docs::examples = ".k8s.container_image_id"))]
+    #[configurable(metadata(docs::examples = "k8s.container_image_id"))]
+    #[configurable(metadata(docs::examples = ""))]
+    pub container_image_id: OptionalTargetPath,
 }
 
 impl Default for FieldsSpec {
@@ -153,6 +161,11 @@ impl Default for FieldsSpec {
                 "container_image"
             ))
             .into(),
+            container_image_id: OwnedTargetPath::event(owned_value_path!(
+                "kubernetes",
+                "container_image_id"
+            ))
+            .into(),
         }
     }
 }
@@ -181,8 +194,6 @@ impl PodMetadataAnnotator {
 
 impl PodMetadataAnnotator {
     /// Annotates an event with the information from the [`Pod::metadata`].
-    /// The event has to be obtained from kubernetes log file, and have a
-    /// [`FILE_KEY`] field set with a file that the line came from.
     pub fn annotate<'a>(&self, event: &mut Event, file: &'a str) -> Option<LogFileInfo<'a>> {
         let log = event.as_mut_log();
         let file_info = parse_log_file_path(file)?;
@@ -424,6 +435,21 @@ fn annotate_from_container_status(
             value.to_owned(),
         )
     }
+
+    let legacy_key = fields_spec
+        .container_image_id
+        .path
+        .as_ref()
+        .map(|k| &k.path)
+        .map(LegacyKey::Overwrite);
+
+    log_namespace.insert_source_metadata(
+        Config::NAME,
+        log,
+        legacy_key,
+        path!("container_image_id"),
+        container_status.image_id.to_owned(),
+    )
 }
 
 fn annotate_from_container(
@@ -453,8 +479,8 @@ fn annotate_from_container(
 #[cfg(test)]
 mod tests {
     use k8s_openapi::api::core::v1::PodIP;
-    use lookup::{event_path, metadata_path};
     use similar_asserts::assert_eq;
+    use vector_lib::lookup::{event_path, metadata_path};
 
     use super::*;
 
@@ -921,7 +947,11 @@ mod tests {
             (
                 FieldsSpec::default(),
                 ContainerStatus::default(),
-                LogEvent::default(),
+                {
+                    let mut log = LogEvent::default();
+                    log.insert(event_path!("kubernetes", "container_image_id"), "");
+                    log
+                },
                 LogNamespace::Legacy,
             ),
             (
@@ -930,6 +960,7 @@ mod tests {
                 },
                 ContainerStatus {
                     container_id: Some("container_id_foo".to_owned()),
+                    image_id: "test_image_id".to_owned(),
                     ..ContainerStatus::default()
                 },
                 {
@@ -937,6 +968,10 @@ mod tests {
                     log.insert(
                         event_path!("kubernetes", "container_id"),
                         "container_id_foo",
+                    );
+                    log.insert(
+                        event_path!("kubernetes", "container_image_id"),
+                        "test_image_id",
                     );
                     log
                 },

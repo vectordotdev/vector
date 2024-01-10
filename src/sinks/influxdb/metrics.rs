@@ -4,17 +4,17 @@ use bytes::{Bytes, BytesMut};
 use futures::{future::BoxFuture, stream, SinkExt};
 use serde::Serialize;
 use tower::Service;
-use vector_config::configurable_component;
-use vector_core::{
+use vector_lib::configurable::configurable_component;
+use vector_lib::{
     event::metric::{MetricSketch, MetricTags, Quantile},
-    ByteSizeOf,
+    ByteSizeOf, EstimatedJsonEncodedSizeOf,
 };
 
 use crate::{
     config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext},
     event::{
         metric::{Metric, MetricValue, Sample, StatisticKind},
-        Event,
+        Event, KeyString,
     },
     http::HttpClient,
     internal_events::InfluxdbEncodingError,
@@ -52,7 +52,7 @@ impl SinkBatchSettings for InfluxDbDefaultBatchSettings {
 }
 
 /// Configuration for the `influxdb_metrics` sink.
-#[configurable_component(sink("influxdb_metrics"))]
+#[configurable_component(sink("influxdb_metrics", "Deliver metric event data to InfluxDB."))]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct InfluxDbConfig {
@@ -61,9 +61,13 @@ pub struct InfluxDbConfig {
     /// This namespace is only used if a metric has no existing namespace. When a namespace is
     /// present, it is used as a prefix to the metric name, and separated with a period (`.`).
     #[serde(alias = "namespace")]
+    #[configurable(metadata(docs::examples = "service"))]
     pub default_namespace: Option<String>,
 
     /// The endpoint to send data to.
+    ///
+    /// This should be a full HTTP URI, including the scheme, host, and port.
+    #[configurable(metadata(docs::examples = "http://localhost:8086/"))]
     pub endpoint: String,
 
     #[serde(flatten)]
@@ -80,8 +84,9 @@ pub struct InfluxDbConfig {
     #[serde(default)]
     pub request: TowerRequestConfig,
 
-    /// A map of additional tags, in the form of key/value pairs, to add to each measurement.
+    /// A map of additional tags, in the key/value pair format, to add to each measurement.
     #[configurable(metadata(docs::additional_props_description = "A tag key/value pair."))]
+    #[configurable(metadata(docs::examples = "example_tags()"))]
     pub tags: Option<HashMap<String, String>>,
 
     #[configurable(derived)]
@@ -104,6 +109,10 @@ pub fn default_summary_quantiles() -> Vec<f64> {
     vec![0.5, 0.75, 0.9, 0.95, 0.99]
 }
 
+pub fn example_tags() -> HashMap<String, String> {
+    HashMap::from([("region".to_string(), "us-west-1".to_string())])
+}
+
 // https://v2.docs.influxdata.com/v2.0/write-data/#influxdb-api
 #[derive(Debug, Clone, PartialEq, Serialize)]
 struct InfluxDbRequest {
@@ -113,6 +122,7 @@ struct InfluxDbRequest {
 impl_generate_config_from_default!(InfluxDbConfig);
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "influxdb_metrics")]
 impl SinkConfig for InfluxDbConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let tls_settings = TlsSettings::from_options(&self.tls)?;
@@ -149,10 +159,7 @@ impl InfluxDbSvc {
         let protocol_version = settings.protocol_version();
 
         let batch = config.batch.into_batch_settings()?;
-        let request = config.request.unwrap_with(&TowerRequestConfig {
-            retry_attempts: Some(5),
-            ..Default::default()
-        });
+        let request = config.request.into_settings();
 
         let uri = settings.write_uri(endpoint)?;
 
@@ -175,13 +182,16 @@ impl InfluxDbSvc {
             .with_flat_map(move |event: Event| {
                 stream::iter({
                     let byte_size = event.size_of();
+                    let json_size = event.estimated_json_encoded_size_of();
+
                     normalizer
                         .normalize(event.into_metric())
-                        .map(|metric| Ok(EncodedEvent::new(metric, byte_size)))
+                        .map(|metric| Ok(EncodedEvent::new(metric, byte_size, json_size)))
                 })
             })
             .sink_map_err(|error| error!(message = "Fatal influxdb sink error.", %error));
 
+        #[allow(deprecated)]
         Ok(VectorSink::from_event_sink(sink))
     }
 }
@@ -306,7 +316,7 @@ fn encode_events(
 fn get_type_and_fields(
     value: &MetricValue,
     quantiles: &[f64],
-) -> (&'static str, Option<HashMap<String, Field>>) {
+) -> (&'static str, Option<HashMap<KeyString, Field>>) {
     match value {
         MetricValue::Counter { value } => ("counter", Some(to_fields(*value))),
         MetricValue::Gauge { value } => ("gauge", Some(to_fields(*value))),
@@ -316,17 +326,17 @@ fn get_type_and_fields(
             count,
             sum,
         } => {
-            let mut fields: HashMap<String, Field> = buckets
+            let mut fields: HashMap<KeyString, Field> = buckets
                 .iter()
                 .map(|sample| {
                     (
-                        format!("bucket_{}", sample.upper_limit),
+                        format!("bucket_{}", sample.upper_limit).into(),
                         Field::UnsignedInt(sample.count),
                     )
                 })
                 .collect();
-            fields.insert("count".to_owned(), Field::UnsignedInt(*count));
-            fields.insert("sum".to_owned(), Field::Float(*sum));
+            fields.insert("count".into(), Field::UnsignedInt(*count));
+            fields.insert("sum".into(), Field::Float(*sum));
 
             ("histogram", Some(fields))
         }
@@ -335,17 +345,17 @@ fn get_type_and_fields(
             count,
             sum,
         } => {
-            let mut fields: HashMap<String, Field> = quantiles
+            let mut fields: HashMap<KeyString, Field> = quantiles
                 .iter()
                 .map(|quantile| {
                     (
-                        format!("quantile_{}", quantile.quantile),
+                        format!("quantile_{}", quantile.quantile).into(),
                         Field::Float(quantile.value),
                     )
                 })
                 .collect();
-            fields.insert("count".to_owned(), Field::UnsignedInt(*count));
-            fields.insert("sum".to_owned(), Field::Float(*sum));
+            fields.insert("count".into(), Field::UnsignedInt(*count));
+            fields.insert("sum".into(), Field::Float(*sum));
 
             ("summary", Some(fields))
         }
@@ -369,31 +379,25 @@ fn get_type_and_fields(
                             value: ddsketch.quantile(*q).unwrap_or(0.0),
                         };
                         (
-                            quantile.to_percentile_string(),
+                            quantile.to_percentile_string().into(),
                             Field::Float(quantile.value),
                         )
                     })
-                    .collect::<HashMap<_, _>>();
+                    .collect::<HashMap<KeyString, _>>();
                 fields.insert(
-                    "count".to_owned(),
+                    "count".into(),
                     Field::UnsignedInt(u64::from(ddsketch.count())),
                 );
                 fields.insert(
-                    "min".to_owned(),
+                    "min".into(),
                     Field::Float(ddsketch.min().unwrap_or(f64::MAX)),
                 );
                 fields.insert(
-                    "max".to_owned(),
+                    "max".into(),
                     Field::Float(ddsketch.max().unwrap_or(f64::MIN)),
                 );
-                fields.insert(
-                    "sum".to_owned(),
-                    Field::Float(ddsketch.sum().unwrap_or(0.0)),
-                );
-                fields.insert(
-                    "avg".to_owned(),
-                    Field::Float(ddsketch.avg().unwrap_or(0.0)),
-                );
+                fields.insert("sum".into(), Field::Float(ddsketch.sum().unwrap_or(0.0)));
+                fields.insert("avg".into(), Field::Float(ddsketch.avg().unwrap_or(0.0)));
 
                 ("sketch", Some(fields))
             }
@@ -401,34 +405,33 @@ fn get_type_and_fields(
     }
 }
 
-fn encode_distribution(samples: &[Sample], quantiles: &[f64]) -> Option<HashMap<String, Field>> {
+fn encode_distribution(samples: &[Sample], quantiles: &[f64]) -> Option<HashMap<KeyString, Field>> {
     let statistic = DistributionStatistic::from_samples(samples, quantiles)?;
 
-    let fields: HashMap<String, Field> = vec![
-        ("min".to_owned(), Field::Float(statistic.min)),
-        ("max".to_owned(), Field::Float(statistic.max)),
-        ("median".to_owned(), Field::Float(statistic.median)),
-        ("avg".to_owned(), Field::Float(statistic.avg)),
-        ("sum".to_owned(), Field::Float(statistic.sum)),
-        ("count".to_owned(), Field::Float(statistic.count as f64)),
-    ]
-    .into_iter()
-    .chain(
-        statistic
-            .quantiles
-            .iter()
-            .map(|&(p, val)| (format!("quantile_{:.2}", p), Field::Float(val))),
+    Some(
+        [
+            ("min".into(), Field::Float(statistic.min)),
+            ("max".into(), Field::Float(statistic.max)),
+            ("median".into(), Field::Float(statistic.median)),
+            ("avg".into(), Field::Float(statistic.avg)),
+            ("sum".into(), Field::Float(statistic.sum)),
+            ("count".into(), Field::Float(statistic.count as f64)),
+        ]
+        .into_iter()
+        .chain(
+            statistic
+                .quantiles
+                .iter()
+                .map(|&(p, val)| (format!("quantile_{:.2}", p).into(), Field::Float(val))),
+        )
+        .collect(),
     )
-    .collect();
-
-    Some(fields)
 }
 
-fn to_fields(value: f64) -> HashMap<String, Field> {
-    let fields: HashMap<String, Field> = vec![("value".to_owned(), Field::Float(value))]
+fn to_fields(value: f64) -> HashMap<KeyString, Field> {
+    [("value".into(), Field::Float(value))]
         .into_iter()
-        .collect();
-    fields
+        .collect()
 }
 
 #[cfg(test)]
@@ -530,7 +533,7 @@ mod tests {
             "requests",
             MetricKind::Absolute,
             MetricValue::AggregatedHistogram {
-                buckets: vector_core::buckets![1.0 => 1, 2.1 => 2, 3.0 => 3],
+                buckets: vector_lib::buckets![1.0 => 1, 2.1 => 2, 3.0 => 3],
                 count: 6,
                 sum: 12.5,
             },
@@ -571,7 +574,7 @@ mod tests {
             "requests",
             MetricKind::Absolute,
             MetricValue::AggregatedHistogram {
-                buckets: vector_core::buckets![1.0 => 1, 2.1 => 2, 3.0 => 3],
+                buckets: vector_lib::buckets![1.0 => 1, 2.1 => 2, 3.0 => 3],
                 count: 6,
                 sum: 12.5,
             },
@@ -612,7 +615,7 @@ mod tests {
             "requests_sum",
             MetricKind::Absolute,
             MetricValue::AggregatedSummary {
-                quantiles: vector_core::quantiles![0.01 => 1.5, 0.5 => 2.0, 0.99 => 3.0],
+                quantiles: vector_lib::quantiles![0.01 => 1.5, 0.5 => 2.0, 0.99 => 3.0],
                 count: 6,
                 sum: 12.0,
             },
@@ -653,7 +656,7 @@ mod tests {
             "requests_sum",
             MetricKind::Absolute,
             MetricValue::AggregatedSummary {
-                quantiles: vector_core::quantiles![0.01 => 1.5, 0.5 => 2.0, 0.99 => 3.0],
+                quantiles: vector_lib::quantiles![0.01 => 1.5, 0.5 => 2.0, 0.99 => 3.0],
                 count: 6,
                 sum: 12.0,
             },
@@ -695,7 +698,7 @@ mod tests {
                 "requests",
                 MetricKind::Incremental,
                 MetricValue::Distribution {
-                    samples: vector_core::samples![1.0 => 3, 2.0 => 3, 3.0 => 2],
+                    samples: vector_lib::samples![1.0 => 3, 2.0 => 3, 3.0 => 2],
                     statistic: StatisticKind::Histogram,
                 },
             )
@@ -822,7 +825,7 @@ mod tests {
             "requests",
             MetricKind::Incremental,
             MetricValue::Distribution {
-                samples: vector_core::samples![1.0 => 0, 2.0 => 0],
+                samples: vector_lib::samples![1.0 => 0, 2.0 => 0],
                 statistic: StatisticKind::Histogram,
             },
         )
@@ -840,7 +843,7 @@ mod tests {
             "requests",
             MetricKind::Incremental,
             MetricValue::Distribution {
-                samples: vector_core::samples![1.0 => 3, 2.0 => 3, 3.0 => 2],
+                samples: vector_lib::samples![1.0 => 3, 2.0 => 3, 3.0 => 2],
                 statistic: StatisticKind::Summary,
             },
         )
@@ -940,7 +943,7 @@ mod integration_tests {
     use chrono::{SecondsFormat, Utc};
     use futures::stream;
     use similar_asserts::assert_eq;
-    use vector_core::metric_tags;
+    use vector_lib::metric_tags;
 
     use crate::{
         config::{SinkConfig, SinkContext},
@@ -982,7 +985,7 @@ mod integration_tests {
         crate::test_util::trace_init();
         let database = onboarding_v1(url).await;
 
-        let cx = SinkContext::new_test();
+        let cx = SinkContext::default();
 
         let config = InfluxDbConfig {
             endpoint: url.to_string(),
@@ -1077,7 +1080,7 @@ mod integration_tests {
         let endpoint = address_v2();
         onboarding_v2(&endpoint).await;
 
-        let cx = SinkContext::new_test();
+        let cx = SinkContext::default();
 
         let config = InfluxDbConfig {
             endpoint,
@@ -1096,7 +1099,12 @@ mod integration_tests {
             acknowledgements: Default::default(),
         };
 
-        let metric = format!("counter-{}", Utc::now().timestamp_nanos());
+        let metric = format!(
+            "counter-{}",
+            Utc::now()
+                .timestamp_nanos_opt()
+                .expect("Timestamp out of range")
+        );
         let mut events = Vec::new();
         for i in 0..10 {
             let event = Event::Metric(

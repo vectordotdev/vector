@@ -97,7 +97,7 @@ The following additional source configuration will be added:
   type = "postgresql_metrics" # required
   endpoint = "postgres://postgres@localhost" # required - address of the PG server.
   included_databases = ["production", "testing"] # optional, list of databases to query. Defaults to all if not specified.
-  excluded_databases = [ "development" ] # optional, excludes specific databases. If a DB is exclude explictity but included in `included_databases` then it is excluded.
+  excluded_databases = [ "development" ] # optional, excludes specific databases. If a DB is excluded explicitly but included in `included_databases` then it is excluded.
   scrape_interval_secs = 15 # optional, default, seconds
   namespace = "postgresql" # optional, default is "postgresql", namespace to attach to metrics.
 ```

@@ -1,19 +1,19 @@
 use std::io;
 
-use codecs::decoding::{DeserializerConfig, FramingConfig};
-use lookup::lookup_v2::OptionalValuePath;
-use vector_config::{configurable_component, NamedComponent};
-use vector_core::config::LogNamespace;
+use vector_lib::codecs::decoding::{DeserializerConfig, FramingConfig};
+use vector_lib::config::LogNamespace;
+use vector_lib::configurable::configurable_component;
+use vector_lib::lookup::lookup_v2::OptionalValuePath;
 
 use crate::{
-    config::{Output, Resource, SourceConfig, SourceContext},
+    config::{Resource, SourceConfig, SourceContext, SourceOutput},
     serde::default_decoding,
 };
 
 use super::{outputs, FileDescriptorConfig};
 
 /// Configuration for the `stdin` source.
-#[configurable_component(source("stdin"))]
+#[configurable_component(source("stdin", "Collect logs sent via stdin."))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields, default)]
 pub struct StdinConfig {
@@ -78,6 +78,7 @@ impl Default for StdinConfig {
 impl_generate_config_from_default!(StdinConfig);
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "stdin")]
 impl SourceConfig for StdinConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<crate::sources::Source> {
         let log_namespace = cx.log_namespace(self.log_namespace);
@@ -89,7 +90,7 @@ impl SourceConfig for StdinConfig {
         )
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
 
         outputs(log_namespace, &self.host_key, &self.decoding, Self::NAME)
@@ -115,7 +116,8 @@ mod tests {
         SourceSender,
     };
     use futures::StreamExt;
-    use lookup::path;
+    use vector_lib::lookup::path;
+    use vrl::value;
 
     #[test]
     fn generate_config() {
@@ -140,17 +142,21 @@ mod tests {
             let event = stream.next().await;
             assert_eq!(
                 Some("hello world".into()),
-                event.map(|event| event.as_log()[log_schema().message_key()]
-                    .to_string_lossy()
-                    .into_owned())
+                event.map(
+                    |event| event.as_log()[log_schema().message_key().unwrap().to_string()]
+                        .to_string_lossy()
+                        .into_owned()
+                )
             );
 
             let event = stream.next().await;
             assert_eq!(
                 Some("hello world again".into()),
-                event.map(|event| event.as_log()[log_schema().message_key()]
-                    .to_string_lossy()
-                    .into_owned())
+                event.map(
+                    |event| event.as_log()[log_schema().message_key().unwrap().to_string()]
+                        .to_string_lossy()
+                        .into_owned()
+                )
             );
 
             let event = stream.next().await;
@@ -179,10 +185,10 @@ mod tests {
             let log = event.as_log();
             let meta = log.metadata().value();
 
-            assert_eq!(&vrl::value!("hello world"), log.value());
+            assert_eq!(&value!("hello world"), log.value());
             assert_eq!(
                 meta.get(path!("vector", "source_type")).unwrap(),
-                &vrl::value!("stdin")
+                &value!("stdin")
             );
             assert!(meta
                 .get(path!("vector", "ingest_timestamp"))
@@ -193,7 +199,7 @@ mod tests {
             let event = event.unwrap();
             let log = event.as_log();
 
-            assert_eq!(&vrl::value!("hello world again"), log.value());
+            assert_eq!(&value!("hello world again"), log.value());
 
             let event = stream.next().await;
             assert!(event.is_none());

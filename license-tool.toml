@@ -1,0 +1,19 @@
+[overrides]
+"backon" = { origin = "https://github.com/Xuanwo/backon" }
+"bollard-stubs" = { origin = "https://github.com/fussybeaver/bollard" }
+"openssl-macros" = { origin = "https://github.com/sfackler/rust-openssl" }
+"serde_nanos" = { origin = "https://github.com/caspervonb/serde_nanos" }
+
+# `ring` has a custom license that is mostly "ISC-style" but parts of it also fall under OpenSSL licensing.
+"ring-0.16.20" = { license = "ISC AND Custom" }
+"ring-0.17.5" = { license = "ISC AND Custom" }
+
+# `rustls-webpki` doesn't specify their license in the metadata, but the file contains the ISC terms.
+"rustls-webpki-0.100.1" = { license = "ISC" }
+
+# `webpki` doesn't specify their license in the metadata, but the file contains the ISC terms.
+"webpki-0.22.4" = { license = "ISC" }
+
+# `zerocopy` et al don't specify their licenses in the metadata, but the file contains the 2-clause BSD terms.
+"zerocopy-0.6.1" = { license = "BSD-2-Clause" }
+"zerocopy-derive-0.3.2" = { license = "BSD-2-Clause" }

@@ -21,11 +21,16 @@ pub(crate) use self::allocator::{
 };
 
 const NUM_GROUPS: usize = 128;
+
 // Allocations are not tracked during startup.
 // We use the Relaxed ordering for both stores and loads of this atomic as no other threads exist when
 // this code is running, and all future threads will have a happens-after relationship with
 // this thread -- the main thread -- ensuring that they see the latest value of TRACK_ALLOCATIONS.
 pub static TRACK_ALLOCATIONS: AtomicBool = AtomicBool::new(false);
+
+pub fn is_allocation_tracing_enabled() -> bool {
+    TRACK_ALLOCATIONS.load(Ordering::Acquire)
+}
 
 /// Track allocations and deallocations separately.
 struct GroupMemStatsStorage {
@@ -93,7 +98,7 @@ impl Tracer for MainTracer {
     #[inline(always)]
     fn trace_allocation(&self, object_size: usize, group_id: AllocationGroupId) {
         // Handle the case when thread local destructor is ran.
-        let _ = GROUP_MEM_STATS.try_with(|t| {
+        _ = GROUP_MEM_STATS.try_with(|t| {
             t.stats.allocations[group_id.as_raw() as usize]
                 .fetch_add(object_size as u64, Ordering::Relaxed)
         });
@@ -102,7 +107,7 @@ impl Tracer for MainTracer {
     #[inline(always)]
     fn trace_deallocation(&self, object_size: usize, source_group_id: AllocationGroupId) {
         // Handle the case when thread local destructor is ran.
-        let _ = GROUP_MEM_STATS.try_with(|t| {
+        _ = GROUP_MEM_STATS.try_with(|t| {
             t.stats.deallocations[source_group_id.as_raw() as usize]
                 .fetch_add(object_size as u64, Ordering::Relaxed)
         });
@@ -207,6 +212,6 @@ pub fn acquire_allocation_group_id(
     // TODO: Technically, `NUM_GROUPS` is lower (128) than the upper bound for the
     // `AllocationGroupId::register` call itself (253), so we can hardcode `NUM_GROUPS` here knowing
     // it's the lower of the two values and will trigger first.. but this may not always be true.
-    info!("Maximum number of registrable allocation group IDs reached ({}). Allocations for component '{}' will be attributed to the root allocation group.", NUM_GROUPS, component_id);
+    warn!("Maximum number of registrable allocation group IDs reached ({}). Allocations for component '{}' will be attributed to the root allocation group.", NUM_GROUPS, component_id);
     AllocationGroupId::ROOT
 }

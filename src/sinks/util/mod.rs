@@ -1,4 +1,7 @@
 pub mod adaptive_concurrency;
+pub mod auth;
+// https://github.com/mcarton/rust-derivative/issues/112
+#[allow(clippy::non_canonical_clone_impl)]
 pub mod batch;
 pub mod buffer;
 pub mod builder;
@@ -13,6 +16,7 @@ pub mod request_builder;
 pub mod retries;
 pub mod service;
 pub mod sink;
+pub mod snappy;
 pub mod socket_bytes_sink;
 pub mod statistic;
 pub mod tcp;
@@ -22,6 +26,7 @@ pub mod udp;
 #[cfg(all(any(feature = "sinks-socket", feature = "sinks-statsd"), unix))]
 pub mod unix;
 pub mod uri;
+pub mod zstd;
 
 use std::borrow::Cow;
 
@@ -47,8 +52,10 @@ pub use service::{
 pub use sink::{BatchSink, PartitionBatchSink, StreamSink};
 use snafu::Snafu;
 pub use uri::UriSerde;
+use vector_lib::{json_size::JsonSize, TimeZone};
 
 use crate::event::EventFinalizers;
+use chrono::{FixedOffset, Offset, Utc};
 
 #[derive(Debug, Snafu)]
 enum SinkBuildError {
@@ -63,16 +70,18 @@ pub struct EncodedEvent<I> {
     pub item: I,
     pub finalizers: EventFinalizers,
     pub byte_size: usize,
+    pub json_byte_size: JsonSize,
 }
 
 impl<I> EncodedEvent<I> {
     /// Create a trivial input with no metadata. This method will be
     /// removed when all sinks are converted.
-    pub fn new(item: I, byte_size: usize) -> Self {
+    pub fn new(item: I, byte_size: usize, json_byte_size: JsonSize) -> Self {
         Self {
             item,
             finalizers: Default::default(),
             byte_size,
+            json_byte_size,
         }
     }
 
@@ -89,6 +98,7 @@ impl<I> EncodedEvent<I> {
             item: I::from(that.item),
             finalizers: that.finalizers,
             byte_size: that.byte_size,
+            json_byte_size: that.json_byte_size,
         }
     }
 
@@ -98,6 +108,7 @@ impl<I> EncodedEvent<I> {
             item: doit(self.item),
             finalizers: self.finalizers,
             byte_size: self.byte_size,
+            json_byte_size: self.json_byte_size,
         }
     }
 }
@@ -122,5 +133,12 @@ pub trait ElementCount {
 impl<T> ElementCount for Vec<T> {
     fn element_count(&self) -> usize {
         self.len()
+    }
+}
+
+pub fn timezone_to_offset(tz: TimeZone) -> Option<FixedOffset> {
+    match tz {
+        TimeZone::Local => Some(*Utc::now().with_timezone(&chrono::Local).offset()),
+        TimeZone::Named(tz) => Some(Utc::now().with_timezone(&tz).offset().fix()),
     }
 }

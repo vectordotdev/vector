@@ -1,35 +1,48 @@
 # Generic component-level labels and high-level groupings.
 "domain: sources":
-- src/sources/**/*
+  - changed-files:
+    - any-glob-to-any-file: ["src/sources/**/*"]
 
 "domain: sinks":
-- src/sinks/**/*
+  - changed-files:
+    - any-glob-to-any-file: ["src/sinks/**/*"]
 
 "domain: transforms":
-- src/transforms/**/*
+  - changed-files:
+    - any-glob-to-any-file: ["src/transforms/**/*"]
 
 "domain: topology":
-- src/topology/**/*
+  - changed-files:
+    - any-glob-to-any-file: ["src/topology/**/*"]
 
 "domain: codecs":
-- src/codecs/**/*
+  - changed-files:
+    - any-glob-to-any-file: ["src/codecs/**/*"]
 
 "domain: core":
-- lib/vector-core/**/*
+  - changed-files:
+    - any-glob-to-any-file: ["lib/vector-core/**/*"]
 
 "domain: vrl":
-- lib/vrl/**/*
+  - changed-files:
+    - any-glob-to-any-file: ["lib/vrl/**/*"]
 
 "domain: ci":
-- scripts/**/*
+  - changed-files:
+    - any-glob-to-any-file: ["scripts/**/*"]
+
+"domain: vdev":
+  - changed-files:
+    - any-glob-to-any-file: ["vdev/**/*"]
 
 "domain: releasing":
-- distribution/**/*
-- scripts/package-*
-- scripts/release-*
+  - changed-files:
+    - any-glob-to-any-file: ["distribution/**/*", "scripts/package-*", "scripts/release-*"]
 
 "domain: rfc":
-- rfcs/**/*
+  - changed-files:
+    - any-glob-to-any-file: ["rfcs/**/*"]
 
 "domain: external docs":
-- website/cue/**/*
+  - changed-files:
+    - any-glob-to-any-file: ["website/cue/**/*"]

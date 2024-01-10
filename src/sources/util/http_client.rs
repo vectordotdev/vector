@@ -12,22 +12,23 @@ use bytes::Bytes;
 use futures_util::{stream, FutureExt, StreamExt, TryFutureExt};
 use http::{response::Parts, Uri};
 use hyper::{Body, Request};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 use std::{collections::HashMap, future::ready};
 use tokio_stream::wrappers::IntervalStream;
+use vector_lib::json_size::JsonSize;
 
 use crate::{
     http::{Auth, HttpClient},
     internal_events::{
         EndpointBytesReceived, HttpClientEventsReceived, HttpClientHttpError,
-        HttpClientHttpResponseError, RequestCompleted, StreamClosedError,
+        HttpClientHttpResponseError, StreamClosedError,
     },
     sources::util::http::HttpMethod,
     tls::TlsSettings,
-    Error, SourceSender,
+    SourceSender,
 };
-use vector_common::shutdown::ShutdownSignal;
-use vector_core::{config::proxy::ProxyConfig, event::Event, EstimatedJsonEncodedSizeOf};
+use vector_lib::shutdown::ShutdownSignal;
+use vector_lib::{config::proxy::ProxyConfig, event::Event, EstimatedJsonEncodedSizeOf};
 
 /// Contains the inputs generic to any http client.
 pub(crate) struct GenericHttpClientInputs {
@@ -35,6 +36,8 @@ pub(crate) struct GenericHttpClientInputs {
     pub urls: Vec<Uri>,
     /// Interval between calls.
     pub interval: Duration,
+    /// Timeout for the HTTP request.
+    pub timeout: Duration,
     /// Map of Header+Value to apply to HTTP request.
     pub headers: HashMap<String, Vec<String>>,
     /// Content type of the HTTP request, determined by the source.
@@ -48,6 +51,11 @@ pub(crate) struct GenericHttpClientInputs {
 /// The default interval to call the HTTP endpoint if none is configured.
 pub(crate) const fn default_interval() -> Duration {
     Duration::from_secs(15)
+}
+
+/// The default timeout for the HTTP request if none is configured.
+pub(crate) const fn default_timeout() -> Duration {
+    Duration::from_secs(5)
 }
 
 /// Builds the context, allowing the source-specific implementation to leverage data from the
@@ -66,6 +74,11 @@ pub(crate) trait HttpClientContext {
 
     /// (Optional) Called if the HTTP response is not 200 ('OK').
     fn on_http_response_error(&self, _uri: &Uri, _header: &Parts) {}
+
+    // This function can be defined to enrich events with additional HTTP
+    // metadata. This function should be used rather than internal enrichment so
+    // that accurate byte count metrics can be emitted.
+    fn enrich_events(&mut self, _events: &mut Vec<Event>) {}
 }
 
 /// Builds a url for the HTTP requests.
@@ -95,6 +108,17 @@ pub(crate) fn build_url(uri: &Uri, query: &HashMap<String, Vec<String>>) -> Uri 
         .expect("Failed to build URI from parsed arguments")
 }
 
+/// Warns if the scrape timeout is greater than the scrape interval.
+pub(crate) fn warn_if_interval_too_low(timeout: Duration, interval: Duration) {
+    if timeout > interval {
+        warn!(
+            interval_secs = %interval.as_secs_f64(),
+            timeout_secs = %timeout.as_secs_f64(),
+            message = "Having a scrape timeout that exceeds the scrape interval can lead to excessive resource consumption.",
+        );
+    }
+}
+
 /// Calls one or more urls at an interval.
 ///   - The HTTP request is built per the options in provided generic inputs.
 ///   - The HTTP response is decoded/parsed into events by the specific context.
@@ -108,15 +132,16 @@ pub(crate) async fn call<
     mut out: SourceSender,
     http_method: HttpMethod,
 ) -> Result<(), ()> {
+    // Building the HttpClient should not fail as it is just setting up the client with the
+    // proxy and tls settings.
+    let client =
+        HttpClient::new(inputs.tls.clone(), &inputs.proxy).expect("Building HTTP client failed");
     let mut stream = IntervalStream::new(tokio::time::interval(inputs.interval))
         .take_until(inputs.shutdown)
         .map(move |_| stream::iter(inputs.urls.clone()))
         .flatten()
         .map(move |url| {
-            // Building the HttpClient should not fail as it is just setting up the client with the
-            // proxy and tls settings.
-            let client = HttpClient::new(inputs.tls.clone(), &inputs.proxy)
-                .expect("Building HTTP client failed");
+            let client = client.clone();
             let endpoint = url.to_string();
 
             let context_builder = context_builder.clone();
@@ -150,10 +175,18 @@ pub(crate) async fn call<
                 auth.apply(&mut request);
             }
 
-            let start = Instant::now();
-            client
-                .send(request)
-                .map_err(Error::from)
+            tokio::time::timeout(inputs.timeout, client.send(request))
+                .then(move |result| async move {
+                    match result {
+                        Ok(Ok(response)) => Ok(response),
+                        Ok(Err(error)) => Err(error.into()),
+                        Err(_) => Err(format!(
+                            "Timeout error: request exceeded {}s",
+                            inputs.timeout.as_secs_f64()
+                        )
+                        .into()),
+                    }
+                })
                 .and_then(|response| async move {
                     let (header, body) = response.into_parts();
                     let body = hyper::body::to_bytes(body).await?;
@@ -168,16 +201,31 @@ pub(crate) async fn call<
                 .filter_map(move |response| {
                     ready(match response {
                         Ok((header, body)) if header.status == hyper::StatusCode::OK => {
-                            emit!(RequestCompleted {
-                                start,
-                                end: Instant::now()
-                            });
-                            context.on_response(&url, &header, &body).map(|events| {
+                            context.on_response(&url, &header, &body).map(|mut events| {
+                                let byte_size = if events.is_empty() {
+                                    // We need to explicitly set the byte size
+                                    // to 0 since
+                                    // `estimated_json_encoded_size_of` returns
+                                    // at least 1 for an empty collection. For
+                                    // the purposes of the
+                                    // HttpClientEventsReceived event, we should
+                                    // emit 0 when there aren't any usable
+                                    // metrics.
+                                    JsonSize::zero()
+                                } else {
+                                    events.estimated_json_encoded_size_of()
+                                };
+
                                 emit!(HttpClientEventsReceived {
-                                    byte_size: events.estimated_json_encoded_size_of(),
+                                    byte_size,
                                     count: events.len(),
                                     url: url.to_string()
                                 });
+
+                                // We'll enrich after receiving the events so
+                                // that the byte sizes are accurate.
+                                context.enrich_events(&mut events);
+
                                 stream::iter(events)
                             })
                         }
@@ -199,8 +247,9 @@ pub(crate) async fn call<
                     })
                 })
                 .flatten()
+                .boxed()
         })
-        .flatten()
+        .flatten_unordered(None)
         .boxed();
 
     match out.send_event_stream(&mut stream).await {
@@ -208,9 +257,9 @@ pub(crate) async fn call<
             debug!("Finished sending.");
             Ok(())
         }
-        Err(error) => {
+        Err(_) => {
             let (count, _) = stream.size_hint();
-            emit!(StreamClosedError { error, count });
+            emit!(StreamClosedError { count });
             Err(())
         }
     }

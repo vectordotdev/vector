@@ -1,6 +1,6 @@
 #![cfg(test)]
 
-use codecs::JsonSerializerConfig;
+use vector_lib::codecs::JsonSerializerConfig;
 
 use super::*;
 use crate::{
@@ -27,18 +27,20 @@ async fn check_batch_size() {
 
     let base = KinesisSinkBaseConfig {
         stream_name: String::from("test"),
-        region: RegionOrEndpoint::with_both("local", "http://localhost:4566"),
+        region: RegionOrEndpoint::with_both("us-east-1", "http://localhost:4566"),
         encoding: JsonSerializerConfig::default().into(),
         compression: Compression::None,
         request: Default::default(),
         tls: None,
         auth: Default::default(),
+        request_retry_partial: false,
         acknowledgements: Default::default(),
+        partition_key_field: None,
     };
 
     let config = KinesisFirehoseSinkConfig { batch, base };
 
-    let cx = SinkContext::new_test();
+    let cx = SinkContext::default();
     let res = config.build(cx).await;
 
     assert_eq!(
@@ -56,18 +58,20 @@ async fn check_batch_events() {
 
     let base = KinesisSinkBaseConfig {
         stream_name: String::from("test"),
-        region: RegionOrEndpoint::with_both("local", "http://localhost:4566"),
+        region: RegionOrEndpoint::with_both("us-east-1", "http://localhost:4566"),
         encoding: JsonSerializerConfig::default().into(),
         compression: Compression::None,
         request: Default::default(),
         tls: None,
         auth: Default::default(),
+        request_retry_partial: false,
         acknowledgements: Default::default(),
+        partition_key_field: None,
     };
 
     let config = KinesisFirehoseSinkConfig { batch, base };
 
-    let cx = SinkContext::new_test();
+    let cx = SinkContext::default();
     let res = config.build(cx).await;
 
     assert_eq!(

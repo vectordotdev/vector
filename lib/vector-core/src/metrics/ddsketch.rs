@@ -643,7 +643,8 @@ impl AgentDDSketch {
             // generally enforced at the source level by converting from cumulative buckets, or
             // enforced by the internal structures that hold bucketed data i.e. Vector's internal
             // `Histogram` data structure used for collecting histograms from `metrics`.
-            let count = u32::try_from(bucket.count).expect("count range has already been checked.");
+            let count = u32::try_from(bucket.count)
+                .unwrap_or_else(|_| unreachable!("count range has already been checked."));
 
             self.insert_interpolate_bucket(lower, upper, count);
             lower = bucket.upper_limit;
@@ -882,7 +883,7 @@ impl BinMap {
             Some(
                 self.keys
                     .into_iter()
-                    .zip(self.counts.into_iter())
+                    .zip(self.counts)
                     .map(|(k, n)| Bin { k, n })
                     .collect(),
             )
@@ -1291,9 +1292,7 @@ mod tests {
 
                 assert!(
                     (positive - negative).abs() <= 1.0e-6,
-                    "positive vs negative difference too great ({} vs {})",
-                    positive,
-                    negative
+                    "positive vs negative difference too great ({positive} vs {negative})",
                 );
             }
 
@@ -1499,18 +1498,14 @@ mod tests {
         let max_observed_rel_acc = check_max_relative_accuracy(config, min_value, max_value);
         assert!(
             max_observed_rel_acc <= rel_acc + FLOATING_POINT_ACCEPTABLE_ERROR,
-            "observed out of bound max relative acc: {}, target rel acc={}",
-            max_observed_rel_acc,
-            rel_acc
+            "observed out of bound max relative acc: {max_observed_rel_acc}, target rel acc={rel_acc}",
         );
     }
 
     fn compute_relative_accuracy(target: f64, actual: f64) -> f64 {
         assert!(
             !(target < 0.0 || actual < 0.0),
-            "expected/actual values must be greater than 0.0; target={}, actual={}",
-            target,
-            actual
+            "expected/actual values must be greater than 0.0; target={target}, actual={actual}",
         );
 
         if target == actual {

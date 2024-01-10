@@ -1,17 +1,20 @@
-use std::{
-    collections::{btree_map, BTreeMap},
-    fmt::Write as _,
-    iter, slice,
-};
+use std::{collections::btree_map, fmt::Write as _, iter, slice};
 
 use serde::{Serialize, Serializer};
+use vrl::path::PathPrefix;
 
-use super::Value;
+use crate::event::{KeyString, ObjectMap, Value};
 
 /// Iterates over all paths in form `a.b[0].c[1]` in alphabetical order
 /// and their corresponding values.
-pub fn all_fields(fields: &BTreeMap<String, Value>) -> FieldsIter {
+pub fn all_fields(fields: &ObjectMap) -> FieldsIter {
     FieldsIter::new(fields)
+}
+
+/// Same functionality as `all_fields` but it prepends a character that denotes the
+/// path type.
+pub fn all_metadata_fields(fields: &ObjectMap) -> FieldsIter {
+    FieldsIter::new_with_prefix(PathPrefix::Metadata, fields)
 }
 
 /// An iterator with a single "message" element
@@ -19,16 +22,16 @@ pub fn all_fields_non_object_root(value: &Value) -> FieldsIter {
     FieldsIter::non_object(value)
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 enum LeafIter<'a> {
-    Root(&'a Value),
-    Map(btree_map::Iter<'a, String, Value>),
+    Root((&'a Value, bool)),
+    Map(btree_map::Iter<'a, KeyString, Value>),
     Array(iter::Enumerate<slice::Iter<'a, Value>>),
 }
 
 #[derive(Clone, Copy)]
 enum PathComponent<'a> {
-    Key(&'a String),
+    Key(&'a KeyString),
     Index(usize),
 }
 
@@ -37,6 +40,8 @@ enum PathComponent<'a> {
 /// If a key maps to an empty collection, the key and the empty collection will be returned.
 #[derive(Clone)]
 pub struct FieldsIter<'a> {
+    /// If specified, this will be prepended to each path.
+    path_prefix: Option<PathPrefix>,
     /// Stack of iterators used for the depth-first traversal.
     stack: Vec<LeafIter<'a>>,
     /// Path components from the root up to the top of the stack.
@@ -44,8 +49,18 @@ pub struct FieldsIter<'a> {
 }
 
 impl<'a> FieldsIter<'a> {
-    fn new(fields: &'a BTreeMap<String, Value>) -> FieldsIter<'a> {
+    // TODO deprecate this in favor of `new_with_prefix`.
+    fn new(fields: &'a ObjectMap) -> FieldsIter<'a> {
         FieldsIter {
+            path_prefix: None,
+            stack: vec![LeafIter::Map(fields.iter())],
+            path: vec![],
+        }
+    }
+
+    fn new_with_prefix(path_prefix: PathPrefix, fields: &'a ObjectMap) -> FieldsIter<'a> {
+        FieldsIter {
+            path_prefix: Some(path_prefix),
             stack: vec![LeafIter::Map(fields.iter())],
             path: vec![],
         }
@@ -55,7 +70,8 @@ impl<'a> FieldsIter<'a> {
     /// will be treated as an object with a single "message" key
     fn non_object(value: &'a Value) -> FieldsIter<'a> {
         FieldsIter {
-            stack: vec![LeafIter::Root(value)],
+            path_prefix: None,
+            stack: vec![LeafIter::Root((value, false))],
             path: vec![],
         }
     }
@@ -81,12 +97,18 @@ impl<'a> FieldsIter<'a> {
         self.path.pop();
     }
 
-    fn make_path(&mut self, component: PathComponent<'a>) -> String {
-        let mut res = String::new();
+    fn make_path(&mut self, component: PathComponent<'a>) -> KeyString {
+        let mut res = match self.path_prefix {
+            None => String::new(),
+            Some(prefix) => match prefix {
+                PathPrefix::Event => String::from("."),
+                PathPrefix::Metadata => String::from("%"),
+            },
+        };
         let mut path_iter = self.path.iter().chain(iter::once(&component)).peekable();
         loop {
             match path_iter.next() {
-                None => return res,
+                None => break res.into(),
                 Some(PathComponent::Key(key)) => {
                     if key.contains('.') {
                         res.push_str(&key.replace('.', "\\."));
@@ -106,7 +128,7 @@ impl<'a> FieldsIter<'a> {
 }
 
 impl<'a> Iterator for FieldsIter<'a> {
-    type Item = (String, &'a Value);
+    type Item = (KeyString, &'a Value);
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
@@ -131,8 +153,10 @@ impl<'a> Iterator for FieldsIter<'a> {
                         }
                     }
                 },
-                Some(LeafIter::Root(value)) => {
-                    return Some(("message".to_owned(), value));
+                Some(LeafIter::Root((value, visited))) => {
+                    let result = (!*visited).then(|| ("message".into(), *value));
+                    *visited = true;
+                    break result;
                 }
             };
         }
@@ -176,6 +200,26 @@ mod test {
     }
 
     #[test]
+    fn metadata_keys_simple() {
+        let fields = fields_from_json(json!({
+            "field_1": 1,
+            "field_0": 0,
+            "field_2": 2
+        }));
+        let expected: Vec<_> = vec![
+            ("%field_0", &Value::Integer(0)),
+            ("%field_1", &Value::Integer(1)),
+            ("%field_2", &Value::Integer(2)),
+        ]
+        .into_iter()
+        .map(|(k, v)| (k.into(), v))
+        .collect();
+
+        let collected: Vec<_> = all_metadata_fields(&fields).collect();
+        assert_eq!(collected, expected);
+    }
+
+    #[test]
     fn keys_nested() {
         let fields = fields_from_json(json!({
             "a": {
@@ -199,7 +243,7 @@ mod test {
             ("a.array[3][0]", Value::Integer(2)),
             ("a.b.c", Value::Integer(5)),
             ("a\\.b\\.c", Value::Integer(6)),
-            ("d", Value::Object(BTreeMap::new())),
+            ("d", Value::Object(ObjectMap::new())),
             ("e", Value::Array(Vec::new())),
         ]
         .into_iter()
@@ -208,5 +252,14 @@ mod test {
 
         let collected: Vec<_> = all_fields(&fields).map(|(k, v)| (k, v.clone())).collect();
         assert_eq!(collected, expected);
+    }
+
+    #[test]
+    fn test_non_object_root() {
+        let value = Value::Integer(3);
+        let collected: Vec<_> = all_fields_non_object_root(&value)
+            .map(|(k, v)| (k.into(), v.clone()))
+            .collect();
+        assert_eq!(collected, vec![("message".to_owned(), value)]);
     }
 }

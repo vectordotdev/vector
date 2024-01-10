@@ -1,17 +1,16 @@
+#![allow(missing_docs)]
 use std::{
     collections::HashMap,
     marker::PhantomData,
     str::FromStr,
     sync::{
         atomic::{AtomicBool, Ordering},
-        Mutex, MutexGuard,
+        Mutex, MutexGuard, OnceLock,
     },
 };
 
 use futures_util::{future::ready, Stream, StreamExt};
-use lookup::event_path;
 use metrics_tracing_context::MetricsLayer;
-use once_cell::sync::OnceCell;
 use tokio::sync::{
     broadcast::{self, Receiver, Sender},
     oneshot,
@@ -27,7 +26,8 @@ use tracing_subscriber::{
     Layer,
 };
 pub use tracing_tower::{InstrumentableService, InstrumentedService};
-use value::Value;
+use vector_lib::lookup::event_path;
+use vrl::value::Value;
 
 use crate::event::LogEvent;
 
@@ -50,7 +50,7 @@ static SUBSCRIBERS: Mutex<Option<Vec<oneshot::Sender<Vec<LogEvent>>>>> =
 
 /// SENDER holds the sender/receiver handle that will receive a copy of all the internal log events *after* the topology
 /// has been initialized.
-static SENDER: OnceCell<Sender<LogEvent>> = OnceCell::new();
+static SENDER: OnceLock<Sender<LogEvent>> = OnceLock::new();
 
 fn metrics_layer_enabled() -> bool {
     !matches!(std::env::var("DISABLE_INTERNAL_METRICS_TRACING_INTEGRATION"), Ok(x) if x == "true")
@@ -99,7 +99,7 @@ pub fn init(color: bool, json: bool, levels: &str, internal_log_rate_limit: u64)
             RateLimitedLayer::new(formatter).with_default_limit(internal_log_rate_limit);
         let subscriber = subscriber.with(rate_limited.with_filter(fmt_filter));
 
-        let _ = subscriber.try_init();
+        _ = subscriber.try_init();
     } else {
         let formatter = tracing_subscriber::fmt::layer()
             .with_ansi(color)
@@ -112,7 +112,7 @@ pub fn init(color: bool, json: bool, levels: &str, internal_log_rate_limit: u64)
             RateLimitedLayer::new(formatter).with_default_limit(internal_log_rate_limit);
         let subscriber = subscriber.with(rate_limited.with_filter(fmt_filter));
 
-        let _ = subscriber.try_init();
+        _ = subscriber.try_init();
     }
 }
 
@@ -153,7 +153,7 @@ fn try_buffer_event(log: &LogEvent) -> bool {
 /// If no subscribers are connected, this does nothing.
 fn try_broadcast_event(log: LogEvent) {
     if let Some(sender) = maybe_get_trace_sender() {
-        let _ = sender.send(log);
+        _ = sender.send(log);
     }
 }
 
@@ -236,7 +236,7 @@ pub fn stop_early_buffering() {
         let buffered_events = consume_early_buffer();
         for subscriber_tx in subscribers_tx {
             // Ignore any errors sending since the caller may have dropped or something else.
-            let _ = subscriber_tx.send(buffered_events.clone());
+            _ = subscriber_tx.send(buffered_events.clone());
         }
     }
 }

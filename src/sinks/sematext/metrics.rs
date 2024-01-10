@@ -6,16 +6,16 @@ use http::{StatusCode, Uri};
 use hyper::{Body, Request};
 use indoc::indoc;
 use tower::Service;
-use vector_common::sensitive_string::SensitiveString;
-use vector_config::configurable_component;
-use vector_core::EstimatedJsonEncodedSizeOf;
+use vector_lib::configurable::configurable_component;
+use vector_lib::sensitive_string::SensitiveString;
+use vector_lib::{ByteSizeOf, EstimatedJsonEncodedSizeOf};
 
 use super::Region;
 use crate::{
     config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     event::{
         metric::{Metric, MetricValue},
-        Event,
+        Event, KeyString,
     },
     http::HttpClient,
     internal_events::{SematextMetricsEncodeEventError, SematextMetricsInvalidMetricError},
@@ -47,22 +47,30 @@ impl SinkBatchSettings for SematextMetricsDefaultBatchSettings {
 }
 
 /// Configuration for the `sematext_metrics` sink.
-#[configurable_component(sink("sematext_metrics"))]
-#[derive(Clone, Debug, Default)]
+#[configurable_component(sink("sematext_metrics", "Publish metric events to Sematext."))]
+#[derive(Clone, Debug)]
 pub struct SematextMetricsConfig {
     /// Sets the default namespace for any metrics sent.
     ///
     /// This namespace is only used if a metric has no existing namespace. When a namespace is
     /// present, it is used as a prefix to the metric name, and separated with a period (`.`).
+    #[configurable(metadata(docs::examples = "service"))]
     pub default_namespace: String,
 
+    #[serde(default = "super::default_region")]
     #[configurable(derived)]
-    pub region: Option<Region>,
+    pub region: Region,
 
     /// The endpoint to send data to.
+    ///
+    /// Setting this option overrides the `region` option.
+    #[configurable(metadata(docs::examples = "http://127.0.0.1"))]
+    #[configurable(metadata(docs::examples = "https://example.com"))]
     pub endpoint: Option<String>,
 
-    /// The token that will be used to write to Sematext.
+    /// The token that is used to write to Sematext.
+    #[configurable(metadata(docs::examples = "${SEMATEXT_TOKEN}"))]
+    #[configurable(metadata(docs::examples = "some-sematext-token"))]
     pub token: SensitiveString,
 
     #[configurable(derived)]
@@ -85,7 +93,6 @@ pub struct SematextMetricsConfig {
 impl GenerateConfig for SematextMetricsConfig {
     fn generate_config() -> toml::Value {
         toml::from_str(indoc! {r#"
-            region = "us"
             default_namespace = "vector"
             token = "${SEMATEXT_TOKEN}"
         "#})
@@ -109,24 +116,20 @@ async fn healthcheck(endpoint: String, client: HttpClient) -> Result<()> {
     }
 }
 
-const ENDPOINT: &str = "https://spm-receiver.sematext.com";
+// https://sematext.com/docs/monitoring/custom-metrics/
+const US_ENDPOINT: &str = "https://spm-receiver.sematext.com";
 const EU_ENDPOINT: &str = "https://spm-receiver.eu.sematext.com";
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "sematext_metrics")]
 impl SinkConfig for SematextMetricsConfig {
     async fn build(&self, cx: SinkContext) -> Result<(VectorSink, Healthcheck)> {
         let client = HttpClient::new(None, cx.proxy())?;
 
         let endpoint = match (&self.endpoint, &self.region) {
-            (Some(endpoint), None) => endpoint.clone(),
-            (None, Some(Region::Us)) => ENDPOINT.to_owned(),
-            (None, Some(Region::Eu)) => EU_ENDPOINT.to_owned(),
-            (None, None) => {
-                return Err("Either `region` or `endpoint` must be set.".into());
-            }
-            (Some(_), Some(_)) => {
-                return Err("Only one of `region` and `endpoint` can be set.".into());
-            }
+            (Some(endpoint), _) => endpoint.clone(),
+            (None, Region::Us) => US_ENDPOINT.to_owned(),
+            (None, Region::Eu) => EU_ENDPOINT.to_owned(),
         };
 
         let healthcheck = healthcheck(endpoint.clone(), client.clone()).boxed();
@@ -163,10 +166,7 @@ impl SematextMetricsService {
         client: HttpClient,
     ) -> Result<VectorSink> {
         let batch = config.batch.into_batch_settings()?;
-        let request = config.request.unwrap_with(&TowerRequestConfig {
-            retry_attempts: Some(5),
-            ..Default::default()
-        });
+        let request = config.request.into_settings();
         let http_service = HttpBatchService::new(client, create_build_request(endpoint));
         let sematext_service = SematextMetricsService {
             config,
@@ -183,14 +183,16 @@ impl SematextMetricsService {
             )
             .with_flat_map(move |event: Event| {
                 stream::iter({
-                    let byte_size = event.estimated_json_encoded_size_of();
+                    let byte_size = event.size_of();
+                    let json_byte_size = event.estimated_json_encoded_size_of();
                     normalizer
                         .normalize(event.into_metric())
-                        .map(|item| Ok(EncodedEvent::new(item, byte_size)))
+                        .map(|item| Ok(EncodedEvent::new(item, byte_size, json_byte_size)))
                 })
             })
             .sink_map_err(|error| error!(message = "Fatal sematext metrics sink error.", %error));
 
+        #[allow(deprecated)]
         Ok(VectorSink::from_event_sink(sink))
     }
 }
@@ -254,7 +256,8 @@ fn encode_events(
     metrics: Vec<Metric>,
 ) -> EncodedEvent<Bytes> {
     let mut output = BytesMut::new();
-    let byte_size = metrics.estimated_json_encoded_size_of();
+    let byte_size = metrics.size_of();
+    let json_byte_size = metrics.estimated_json_encoded_size_of();
     for metric in metrics.into_iter() {
         let (series, data, _metadata) = metric.into_parts();
         let namespace = series
@@ -290,21 +293,21 @@ fn encode_events(
     if !output.is_empty() {
         output.truncate(output.len() - 1);
     }
-    EncodedEvent::new(output.freeze(), byte_size)
+    EncodedEvent::new(output.freeze(), byte_size, json_byte_size)
 }
 
-fn to_fields(label: String, value: f64) -> HashMap<String, Field> {
+fn to_fields(label: String, value: f64) -> HashMap<KeyString, Field> {
     let mut result = HashMap::new();
-    result.insert(label, Field::Float(value));
+    result.insert(label.into(), Field::Float(value));
     result
 }
 
 #[cfg(test)]
 mod tests {
-    use chrono::{offset::TimeZone, Utc};
+    use chrono::{offset::TimeZone, Timelike, Utc};
     use futures::StreamExt;
     use indoc::indoc;
-    use vector_core::metric_tags;
+    use vector_lib::metric_tags;
 
     use super::*;
     use crate::{
@@ -330,8 +333,8 @@ mod tests {
         )
         .with_namespace(Some("jvm"))
         .with_timestamp(Some(
-            Utc.ymd(2020, 8, 18)
-                .and_hms_nano_opt(21, 0, 0, 0)
+            Utc.with_ymd_and_hms(2020, 8, 18, 21, 0, 0)
+                .single()
                 .expect("invalid timestamp"),
         ))];
 
@@ -349,8 +352,8 @@ mod tests {
             MetricValue::Counter { value: 42.0 },
         )
         .with_timestamp(Some(
-            Utc.ymd(2020, 8, 18)
-                .and_hms_nano_opt(21, 0, 0, 0)
+            Utc.with_ymd_and_hms(2020, 8, 18, 21, 0, 0)
+                .single()
                 .expect("invalid timestamp"),
         ))];
 
@@ -370,8 +373,8 @@ mod tests {
             )
             .with_namespace(Some("jvm"))
             .with_timestamp(Some(
-                Utc.ymd(2020, 8, 18)
-                    .and_hms_nano_opt(21, 0, 0, 0)
+                Utc.with_ymd_and_hms(2020, 8, 18, 21, 0, 0)
+                    .single()
                     .expect("invalid timestamp"),
             )),
             Metric::new(
@@ -381,8 +384,9 @@ mod tests {
             )
             .with_namespace(Some("jvm"))
             .with_timestamp(Some(
-                Utc.ymd(2020, 8, 18)
-                    .and_hms_nano_opt(21, 0, 0, 1)
+                Utc.with_ymd_and_hms(2020, 8, 18, 21, 0, 0)
+                    .single()
+                    .and_then(|t| t.with_nanosecond(1))
                     .expect("invalid timestamp"),
             )),
         ];
@@ -399,7 +403,6 @@ mod tests {
         assert_sink_compliance(&HTTP_SINK_TAGS, async {
 
         let (mut config, cx) = load_sink::<SematextMetricsConfig>(indoc! {r#"
-            region = "eu"
             default_namespace = "ns"
             token = "atoken"
             batch.max_events = 1
@@ -411,7 +414,6 @@ mod tests {
         // to our local server
         let endpoint = format!("http://{}", addr);
         config.endpoint = Some(endpoint.clone());
-        config.region = None;
 
         let (sink, _) = config.build(cx).await.unwrap();
 
@@ -441,7 +443,9 @@ mod tests {
                 )
                 .with_namespace(Some(*namespace))
                 .with_tags(Some(metric_tags!("os.host" => "somehost")))
-                .with_timestamp(Some(Utc.ymd(2020, 8, 18).and_hms_nano_opt(21, 0, 0, i as u32).expect("invalid timestamp"))),
+                    .with_timestamp(Some(Utc.with_ymd_and_hms(2020, 8, 18, 21, 0, 0).single()
+                                         .and_then(|t| t.with_nanosecond(i as u32))
+                                         .expect("invalid timestamp"))),
             );
             events.push(event);
         }

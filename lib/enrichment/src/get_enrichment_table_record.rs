@@ -1,15 +1,7 @@
 use std::collections::BTreeMap;
+use vrl::prelude::*;
 
-use value::{kind::Collection, Kind, Value};
-use vrl::prelude::FunctionExpression;
-use vrl::state::TypeState;
-use vrl::{
-    function::{ArgumentList, Compiled, Example, FunctionCompileContext, Parameter},
-    prelude::{expression, DiagnosticMessage, Resolved, Result, TypeDef, VrlValueConvert},
-    value::kind,
-    Context, Expression, Function,
-};
-
+use crate::vrl_util::is_case_sensitive;
 use crate::{
     vrl_util::{self, add_index, evaluate_condition},
     Case, Condition, IndexHandle, TableRegistry, TableSearch,
@@ -29,7 +21,7 @@ fn get_enrichment_table_record(
                 .iter()
                 .map(|value| Ok(value.try_bytes_utf8_lossy()?.to_string()))
                 .collect::<std::result::Result<Vec<_>, _>>(),
-            value => Err(vrl::value::Error::Expected {
+            value => Err(ValueError::Expected {
                 got: value.kind(),
                 expected: Kind::array(Collection::any()),
             }),
@@ -88,7 +80,7 @@ impl Function for GetEnrichmentTableRecord {
 
     fn compile(
         &self,
-        _state: &TypeState,
+        state: &TypeState,
         ctx: &mut FunctionCompileContext,
         arguments: ArgumentList,
     ) -> Compiled {
@@ -103,7 +95,7 @@ impl Function for GetEnrichmentTableRecord {
             .collect::<Vec<_>>();
 
         let table = arguments
-            .required_enum("table", &tables)?
+            .required_enum("table", &tables, state)?
             .try_bytes_utf8_lossy()
             .expect("table is not valid utf8")
             .into_owned();
@@ -111,21 +103,7 @@ impl Function for GetEnrichmentTableRecord {
 
         let select = arguments.optional("select");
 
-        let case_sensitive = arguments
-            .optional_literal("case_sensitive")?
-            .and_then(|literal| literal.as_value())
-            .map(|value| value.try_boolean())
-            .transpose()
-            .expect("case_sensitive should be boolean") // This will have been caught by the type checker.
-            .map(|case_sensitive| {
-                if case_sensitive {
-                    Case::Sensitive
-                } else {
-                    Case::Insensitive
-                }
-            })
-            .unwrap_or(Case::Sensitive);
-
+        let case_sensitive = is_case_sensitive(&arguments, state)?;
         let index = Some(
             add_index(registry, &table, case_sensitive, &condition)
                 .map_err(|err| Box::new(err) as Box<_>)?,
@@ -146,7 +124,7 @@ impl Function for GetEnrichmentTableRecord {
 #[derive(Debug, Clone)]
 pub struct GetEnrichmentTableRecordFn {
     table: String,
-    condition: BTreeMap<String, expression::Expr>,
+    condition: BTreeMap<KeyString, expression::Expr>,
     index: Option<IndexHandle>,
     select: Option<Box<dyn Expression>>,
     case_sensitive: Case,
@@ -162,7 +140,7 @@ impl FunctionExpression for GetEnrichmentTableRecordFn {
                 let value = value.resolve(ctx)?;
                 evaluate_condition(key, value)
             })
-            .collect::<Result<Vec<Condition>>>()?;
+            .collect::<ExpressionResult<Vec<Condition>>>()?;
 
         let select = self
             .select
@@ -192,9 +170,11 @@ impl FunctionExpression for GetEnrichmentTableRecordFn {
 
 #[cfg(test)]
 mod tests {
-    use value::Secrets;
-    use vector_common::TimeZone;
-    use vrl::TargetValue;
+    use vrl::compiler::prelude::TimeZone;
+    use vrl::compiler::state::RuntimeState;
+    use vrl::compiler::TargetValue;
+    use vrl::value;
+    use vrl::value::Secrets;
 
     use super::*;
     use crate::test_util::get_table_registry;
@@ -218,16 +198,16 @@ mod tests {
         let object: Value = BTreeMap::new().into();
         let mut target = TargetValue {
             value: object,
-            metadata: vrl::value!({}),
+            metadata: value!({}),
             secrets: Secrets::new(),
         };
-        let mut runtime_state = vrl::state::Runtime::default();
+        let mut runtime_state = RuntimeState::default();
         let mut ctx = Context::new(&mut target, &mut runtime_state, &tz);
 
         registry.finish_load();
 
         let got = func.resolve(&mut ctx);
 
-        assert_eq!(Ok(vrl::value! ({ "field": "result" })), got);
+        assert_eq!(Ok(value! ({ "field": "result" })), got);
     }
 }

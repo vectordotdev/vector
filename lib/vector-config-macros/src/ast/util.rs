@@ -1,6 +1,10 @@
-use darling::error::Accumulator;
+use darling::{ast::NestedMeta, error::Accumulator};
+use quote::{quote, ToTokens};
 use serde_derive_internals::{attr as serde_attr, Ctxt};
-use syn::{spanned::Spanned, Attribute, ExprPath, Lit, Meta, MetaNameValue, NestedMeta};
+use syn::{
+    punctuated::Punctuated, spanned::Spanned, token::Comma, Attribute, Expr, ExprLit, ExprPath,
+    Lit, Meta, MetaNameValue,
+};
 
 const ERR_FIELD_MISSING_DESCRIPTION: &str = "field must have a description -- i.e. `/// This is a widget...` or `#[configurable(description = \"...\")] -- or derive it from the underlying type of the field by specifying `#[configurable(derived)]`";
 const ERR_FIELD_IMPLICIT_TRANSPARENT: &str =
@@ -14,12 +18,16 @@ pub fn try_extract_doc_title_description(
     let doc_comments = attributes
         .iter()
         // We only care about `doc` attributes.
-        .filter(|attribute| attribute.path.is_ident("doc"))
+        .filter(|attribute| attribute.path().is_ident("doc"))
         // Extract the value of the attribute if it's in the form of `doc = "..."`.
-        .filter_map(|attribute| match attribute.parse_meta() {
-            Ok(Meta::NameValue(MetaNameValue {
-                lit: Lit::Str(s), ..
-            })) => Some(s.value()),
+        .filter_map(|attribute| match &attribute.meta {
+            Meta::NameValue(MetaNameValue {
+                value:
+                    Expr::Lit(ExprLit {
+                        lit: Lit::Str(s), ..
+                    }),
+                ..
+            }) => Some(s.value()),
             _ => None,
         })
         .collect::<Vec<_>>();
@@ -137,11 +145,6 @@ fn none_if_empty(s: String) -> Option<String> {
     }
 }
 
-pub fn get_default_exprpath() -> ExprPath {
-    syn::parse_str("::std::default::Default::default")
-        .expect("expression path for default should never be invalid")
-}
-
 pub fn err_field_missing_description<T: Spanned>(field: &T) -> darling::Error {
     darling::Error::custom(ERR_FIELD_MISSING_DESCRIPTION).with_span(field)
 }
@@ -150,10 +153,19 @@ pub fn err_field_implicit_transparent<T: Spanned>(field: &T) -> darling::Error {
     darling::Error::custom(ERR_FIELD_IMPLICIT_TRANSPARENT).with_span(field)
 }
 
-pub fn get_serde_default_value(default: &serde_attr::Default) -> Option<ExprPath> {
+pub fn get_serde_default_value<S: ToTokens>(
+    source: &S,
+    default: &serde_attr::Default,
+) -> Option<ExprPath> {
     match default {
         serde_attr::Default::None => None,
-        serde_attr::Default::Default => Some(get_default_exprpath()),
+        serde_attr::Default::Default => {
+            let qualified_path = syn::parse2(quote! {
+                <#source as ::std::default::Default>::default
+            })
+            .expect("should not fail to parse qualified default path");
+            Some(qualified_path)
+        }
         serde_attr::Default::Path(path) => Some(path.clone()),
     }
 }
@@ -204,12 +216,13 @@ fn find_name_value_attribute(
     attributes
         .iter()
         // Only take attributes whose name matches `attr_name`.
-        .filter(|attr| path_matches(&attr.path, attr_name))
-        // Make sure the contents actually parse as a normal structured attribute.
-        .filter_map(|attr| attr.parse_meta().ok())
+        .filter(|attr| path_matches(attr.path(), attr_name))
         // Derive macro helper attributes will always be in the list form.
-        .filter_map(|meta| match meta {
-            Meta::List(ml) => Some(ml.nested.into_iter()),
+        .filter_map(|attr| match &attr.meta {
+            Meta::List(ml) => ml
+                .parse_args_with(Punctuated::<NestedMeta, Comma>::parse_terminated)
+                .map(|nested| nested.into_iter())
+                .ok(),
             _ => None,
         })
         .flatten()
@@ -217,7 +230,10 @@ fn find_name_value_attribute(
         // name matches `name_key`, and return their value.
         .find_map(|nm| match nm {
             NestedMeta::Meta(meta) => match meta {
-                Meta::NameValue(nv) if path_matches(&nv.path, name_key) => Some(nv.lit),
+                Meta::NameValue(nv) if path_matches(&nv.path, name_key) => match nv.value {
+                    Expr::Lit(ExprLit { lit, .. }) => Some(lit),
+                    _ => None,
+                },
                 _ => None,
             },
             _ => None,
@@ -254,7 +270,7 @@ fn find_name_value_attribute(
 /// returned.
 pub fn find_delegated_serde_deser_ty(attributes: &[syn::Attribute]) -> Option<syn::Type> {
     // Make sure `#[serde_as(as = "...")]` is present.
-    find_name_value_attribute(attributes, "serde_as", "as")
+    find_name_value_attribute(attributes, "serde_as", "r#as")
         // Make sure `#[serde(with = "...")]` is present, and grab its value.
         .and_then(|_| find_name_value_attribute(attributes, "serde", "with"))
         // Try and parse the value as a type path.

@@ -42,8 +42,14 @@ components: sources: kubernetes_logs: {
 			"""
 				[Kubernetes](\(urls.kubernetes)) version `\(services.kubernetes.versions)` is required.
 				""",
+			"""
+				This source requires read access to the `/var/log/pods` directory. When run in a
+				Kubernetes cluster this can be provided with a [hostPath](\(urls.kubernetes_host_path)) volume.
+				""",
 		]
-		warnings: []
+		warnings: ["""
+				This source is only tested on Linux. Your mileage may vary for clusters on Windows.
+			"""]
 		notices: []
 	}
 
@@ -79,6 +85,15 @@ components: sources: kubernetes_logs: {
 				type: string: {
 					default: null
 					examples: ["busybox:1.30"]
+				}
+			}
+			"kubernetes.container_image_id": {
+				description: "Container image ID."
+				required:    false
+				common:      true
+				type: string: {
+					default: null
+					examples: ["busybox@sha256:1e7b63c09af457b93c17d25ef4e6aee96b5bb95f087840cffd7c4bb2fe8ae5c6"]
 				}
 			}
 			"kubernetes.container_name": {
@@ -452,10 +467,8 @@ components: sources: kubernetes_logs: {
 	}
 
 	telemetry: metrics: {
-		events_in_total:                        components.sources.internal_metrics.output.metrics.events_in_total
 		k8s_format_picker_edge_cases_total:     components.sources.internal_metrics.output.metrics.k8s_format_picker_edge_cases_total
 		k8s_docker_format_parse_failures_total: components.sources.internal_metrics.output.metrics.k8s_docker_format_parse_failures_total
-		k8s_event_annotation_failures_total:    components.sources.internal_metrics.output.metrics.k8s_event_annotation_failures_total
 		k8s_reflector_desyncs_total:            components.sources.internal_metrics.output.metrics.k8s_reflector_desyncs_total
 		k8s_state_ops_total:                    components.sources.internal_metrics.output.metrics.k8s_state_ops_total
 		k8s_stream_chunks_processed_total:      components.sources.internal_metrics.output.metrics.k8s_stream_chunks_processed_total
@@ -465,12 +478,5 @@ components: sources: kubernetes_logs: {
 		k8s_watch_stream_failed_total:          components.sources.internal_metrics.output.metrics.k8s_watch_stream_failed_total
 		k8s_watch_stream_items_obtained_total:  components.sources.internal_metrics.output.metrics.k8s_watch_stream_items_obtained_total
 		k8s_watcher_http_error_total:           components.sources.internal_metrics.output.metrics.k8s_watcher_http_error_total
-		processed_bytes_total:                  components.sources.internal_metrics.output.metrics.processed_bytes_total
-		processed_events_total:                 components.sources.internal_metrics.output.metrics.processed_events_total
-		component_discarded_events_total:       components.sources.internal_metrics.output.metrics.component_discarded_events_total
-		component_errors_total:                 components.sources.internal_metrics.output.metrics.component_errors_total
-		component_received_bytes_total:         components.sources.internal_metrics.output.metrics.component_received_bytes_total
-		component_received_event_bytes_total:   components.sources.internal_metrics.output.metrics.component_received_event_bytes_total
-		component_received_events_total:        components.sources.internal_metrics.output.metrics.component_received_events_total
 	}
 }

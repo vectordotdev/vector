@@ -1,12 +1,12 @@
 use crate::internal_events::HostMetricsScrapeDetailError;
 use futures::StreamExt;
 use heim::units::information::byte;
-use vector_config::configurable_component;
-use vector_core::metric_tags;
+use vector_lib::configurable::configurable_component;
+use vector_lib::metric_tags;
 
 use super::{default_all_devices, example_devices, filter_result, FilterList, HostMetrics};
 
-/// Options for the “disk” metrics collector.
+/// Options for the disk metrics collector.
 #[configurable_component]
 #[derive(Clone, Debug, Default)]
 pub struct DiskConfig {

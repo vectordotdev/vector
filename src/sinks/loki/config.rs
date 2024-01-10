@@ -1,57 +1,16 @@
 use std::collections::HashMap;
 
-use futures::future::FutureExt;
-use vector_config::configurable_component;
+use vrl::value::Kind;
 
 use super::{healthcheck::healthcheck, sink::LokiSink};
 use crate::{
-    codecs::EncodingConfig,
-    config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
     http::{Auth, HttpClient, MaybeAuth},
-    sinks::{
-        util::{BatchConfig, Compression, SinkBatchSettings, TowerRequestConfig, UriSerde},
-        VectorSink,
-    },
-    template::Template,
-    tls::{TlsConfig, TlsSettings},
+    schema,
+    sinks::{prelude::*, util::UriSerde},
 };
 
-/// Loki-specific compression.
-#[configurable_component]
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub enum ExtendedCompression {
-    /// Snappy compression.
-    ///
-    /// This implies sending push requests as Protocol Buffers.
-    #[serde(rename = "snappy")]
-    Snappy,
-}
-
-/// Compression configuration.
-#[configurable_component]
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
-#[serde(untagged)]
-pub enum CompressionConfigAdapter {
-    /// Basic compression.
-    Original(Compression),
-
-    /// Loki-specific compression.
-    Extended(ExtendedCompression),
-}
-
-impl CompressionConfigAdapter {
-    pub const fn content_encoding(self) -> Option<&'static str> {
-        match self {
-            CompressionConfigAdapter::Original(compression) => compression.content_encoding(),
-            CompressionConfigAdapter::Extended(_) => Some("snappy"),
-        }
-    }
-}
-
-impl Default for CompressionConfigAdapter {
-    fn default() -> Self {
-        CompressionConfigAdapter::Extended(ExtendedCompression::Snappy)
-    }
+const fn default_compression() -> Compression {
+    Compression::Snappy
 }
 
 fn default_loki_path() -> String {
@@ -59,7 +18,7 @@ fn default_loki_path() -> String {
 }
 
 /// Configuration for the `loki` sink.
-#[configurable_component(sink("loki"))]
+#[configurable_component(sink("loki", "Deliver log event data to the Loki aggregation system."))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct LokiConfig {
@@ -91,12 +50,14 @@ pub struct LokiConfig {
     ///
     /// Both keys and values are templateable, which enables you to attach dynamic labels to events.
     ///
-    /// Labels can be suffixed with a “*” to allow the expansion of objects into multiple labels,
-    /// see “How it works” for more information.
+    /// Valid label keys include `*`, and prefixes ending with `*`, to allow for the expansion of
+    /// objects into multiple labels. See [Label expansion][label_expansion] for more information.
     ///
     /// Note: If the set of labels has high cardinality, this can cause drastic performance issues
     /// with Loki. To prevent this from happening, reduce the number of unique label keys and
     /// values.
+    ///
+    /// [label_expansion]: https://vector.dev/docs/reference/configuration/sinks/loki/#label-expansion
     #[configurable(metadata(docs::examples = "loki_labels_examples()"))]
     #[configurable(metadata(docs::additional_props_description = "A Loki label."))]
     pub labels: HashMap<Template, Template>,
@@ -107,13 +68,14 @@ pub struct LokiConfig {
 
     /// Whether or not to remove the timestamp from the event payload.
     ///
-    /// The timestamp will still be sent as event metadata for Loki to use for indexing.
+    /// The timestamp is still sent as event metadata for Loki to use for indexing.
     #[serde(default = "crate::serde::default_true")]
     pub remove_timestamp: bool,
 
-    #[configurable(derived)]
-    #[serde(default)]
-    pub compression: CompressionConfigAdapter,
+    /// Compression configuration.
+    /// Snappy compression implies sending push requests as Protocol Buffers.
+    #[serde(default = "default_compression")]
+    pub compression: Compression,
 
     #[configurable(derived)]
     #[serde(default)]
@@ -146,9 +108,10 @@ fn loki_labels_examples() -> HashMap<String, String> {
     let mut examples = HashMap::new();
     examples.insert("source".to_string(), "vector".to_string());
     examples.insert(
-        "labels".to_string(),
+        "\"pod_labels_*\"".to_string(),
         "{{ kubernetes.pod_labels }}".to_string(),
     );
+    examples.insert("\"*\"".to_string(), "{{ metadata }}".to_string());
     examples.insert(
         "{{ event_field }}".to_string(),
         "{{ some_other_event_field }}".to_string(),
@@ -167,9 +130,9 @@ impl SinkBatchSettings for LokiDefaultBatchSettings {
 
 /// Out-of-order event behavior.
 ///
-/// Some sources may generate events with timestamps that aren’t in chronological order. While the
-/// sink will sort events before sending them to Loki, there is the chance another event comes in
-/// that is out-of-order with respective the latest events sent to Loki. Prior to Loki 2.4.0, this
+/// Some sources may generate events with timestamps that aren't in chronological order. Even though the
+/// sink sorts the events before sending them to Loki, there is a chance that another event could come in
+/// that is out of order with the latest events sent to Loki. Prior to Loki 2.4.0, this
 /// was not supported and would result in an error during the push request.
 ///
 /// If you're using Loki 2.4.0 or newer, `Accept` is the preferred action, which lets Loki handle
@@ -215,6 +178,7 @@ impl LokiConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "loki")]
 impl SinkConfig for LokiConfig {
     async fn build(
         &self,
@@ -245,7 +209,11 @@ impl SinkConfig for LokiConfig {
     }
 
     fn input(&self) -> Input {
+        let requirement =
+            schema::Requirement::empty().optional_meaning("timestamp", Kind::timestamp());
+
         Input::new(self.encoding.config().input_type() & DataType::Log)
+            .with_schema_requirement(requirement)
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
@@ -273,7 +241,7 @@ pub fn valid_label_name(label: &Template) -> bool {
             (ch.is_ascii_alphabetic() || ch == '_')
                 && label_chars.all(|ch| ch.is_ascii_alphanumeric() || ch == '_')
         } else {
-            false
+            label.get_ref().trim() == "*"
         }
     }
 }
@@ -292,9 +260,9 @@ mod tests {
         assert!(valid_label_name(&"a09b".try_into().unwrap()));
         assert!(valid_label_name(&"abc_*".try_into().unwrap()));
         assert!(valid_label_name(&"_*".try_into().unwrap()));
+        assert!(valid_label_name(&"*".try_into().unwrap()));
 
         assert!(!valid_label_name(&"0ab".try_into().unwrap()));
-        assert!(!valid_label_name(&"*".try_into().unwrap()));
         assert!(!valid_label_name(&"".try_into().unwrap()));
         assert!(!valid_label_name(&" ".try_into().unwrap()));
 

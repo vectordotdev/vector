@@ -1,7 +1,10 @@
-use tokio::sync::broadcast;
+#![allow(missing_docs)]
+
+use snafu::Snafu;
+use tokio::{runtime::Runtime, sync::broadcast};
 use tokio_stream::{Stream, StreamExt};
 
-use super::config::ConfigBuilder;
+use super::config::{ComponentKey, ConfigBuilder};
 
 pub type ShutdownTx = broadcast::Sender<()>;
 pub type SignalTx = broadcast::Sender<SignalTo>;
@@ -16,9 +19,41 @@ pub enum SignalTo {
     /// Signal to reload config from the filesystem.
     ReloadFromDisk,
     /// Signal to shutdown process.
-    Shutdown,
+    Shutdown(Option<ShutdownError>),
     /// Shutdown process immediately.
     Quit,
+}
+
+#[derive(Clone, Debug, Snafu)]
+pub enum ShutdownError {
+    // For future work: It would be nice if we could keep the actual errors in here, but
+    // `crate::Error` doesn't implement `Clone`, and adding `DynClone` for errors is tricky.
+    #[snafu(display("The API failed to start: {error}"))]
+    ApiFailed { error: String },
+    #[snafu(display("Reload failed, and then failed to restore the previous config"))]
+    ReloadFailedToRestore,
+    #[snafu(display(r#"The task for source "{key}" died during execution: {error}"#))]
+    SourceAborted { key: ComponentKey, error: String },
+    #[snafu(display(r#"The task for transform "{key}" died during execution: {error}"#))]
+    TransformAborted { key: ComponentKey, error: String },
+    #[snafu(display(r#"The task for sink "{key}" died during execution: {error}"#))]
+    SinkAborted { key: ComponentKey, error: String },
+}
+
+/// Convenience struct for app setup handling.
+pub struct SignalPair {
+    pub handler: SignalHandler,
+    pub receiver: SignalRx,
+}
+
+impl SignalPair {
+    /// Create a new signal handler pair, and set them up to receive OS signals.
+    pub fn new(runtime: &Runtime) -> Self {
+        let (handler, receiver) = SignalHandler::new();
+        let signals = os_signals(runtime);
+        handler.forever(runtime, signals);
+        Self { handler, receiver }
+    }
 }
 
 /// SignalHandler is a general `ControlTo` message receiver and transmitter. It's used by
@@ -31,7 +66,7 @@ pub struct SignalHandler {
 impl SignalHandler {
     /// Create a new signal handler with space for 128 control messages at a time, to
     /// ensure the channel doesn't overflow and drop signals.
-    pub fn new() -> (Self, SignalRx) {
+    fn new() -> (Self, SignalRx) {
         let (tx, rx) = broadcast::channel(128);
         let handler = Self {
             tx,
@@ -53,14 +88,14 @@ impl SignalHandler {
 
     /// Takes a stream who's elements are convertible to `SignalTo`, and spawns a permanent
     /// task for transmitting to the receiver.
-    pub fn forever<T, S>(&mut self, stream: S)
+    fn forever<T, S>(&self, runtime: &Runtime, stream: S)
     where
         T: Into<SignalTo> + Send + Sync,
         S: Stream<Item = T> + 'static + Send,
     {
         let tx = self.tx.clone();
 
-        tokio::spawn(async move {
+        runtime.spawn(async move {
             tokio::pin!(stream);
 
             while let Some(value) = stream.next().await {
@@ -112,42 +147,58 @@ impl SignalHandler {
     pub fn clear(&mut self) {
         for shutdown_tx in self.shutdown_txs.drain(..) {
             // An error just means the channel was already shut down; safe to ignore.
-            let _ = shutdown_tx.send(());
+            _ = shutdown_tx.send(());
         }
     }
 }
 
 /// Signals from OS/user.
 #[cfg(unix)]
-pub fn os_signals() -> impl Stream<Item = SignalTo> {
+fn os_signals(runtime: &Runtime) -> impl Stream<Item = SignalTo> {
     use tokio::signal::unix::{signal, SignalKind};
 
-    let mut sigint = signal(SignalKind::interrupt()).expect("Signal handlers should not panic.");
-    let mut sigterm = signal(SignalKind::terminate()).expect("Signal handlers should not panic.");
-    let mut sigquit = signal(SignalKind::quit()).expect("Signal handlers should not panic.");
-    let mut sighup = signal(SignalKind::hangup()).expect("Signal handlers should not panic.");
+    // The `signal` function must be run within the context of a Tokio runtime.
+    runtime.block_on(async {
+        let mut sigint = signal(SignalKind::interrupt()).expect("Failed to set up SIGINT handler.");
+        let mut sigterm =
+            signal(SignalKind::terminate()).expect("Failed to set up SIGTERM handler.");
+        let mut sigquit = signal(SignalKind::quit()).expect("Failed to set up SIGQUIT handler.");
+        let mut sighup = signal(SignalKind::hangup()).expect("Failed to set up SIGHUP handler.");
 
-    async_stream::stream! {
-        loop {
-            let signal = tokio::select! {
-                _ = sigint.recv() => SignalTo::Shutdown,
-                _ = sigterm.recv() => SignalTo::Shutdown,
-                _ = sigquit.recv() => SignalTo::Quit,
-                _ = sighup.recv() => SignalTo::ReloadFromDisk,
-            };
-            yield signal;
+        async_stream::stream! {
+            loop {
+                let signal = tokio::select! {
+                    _ = sigint.recv() => {
+                        info!(message = "Signal received.", signal = "SIGINT");
+                        SignalTo::Shutdown(None)
+                    },
+                    _ = sigterm.recv() => {
+                        info!(message = "Signal received.", signal = "SIGTERM");
+                        SignalTo::Shutdown(None)
+                    } ,
+                    _ = sigquit.recv() => {
+                        info!(message = "Signal received.", signal = "SIGQUIT");
+                        SignalTo::Quit
+                    },
+                    _ = sighup.recv() => {
+                        info!(message = "Signal received.", signal = "SIGHUP");
+                        SignalTo::ReloadFromDisk
+                    },
+                };
+                yield signal;
+            }
         }
-    }
+    })
 }
 
 /// Signals from OS/user.
 #[cfg(windows)]
-pub(crate) fn os_signals() -> impl Stream<Item = SignalTo> {
+fn os_signals(_: &Runtime) -> impl Stream<Item = SignalTo> {
     use futures::future::FutureExt;
 
     async_stream::stream! {
         loop {
-            let signal = tokio::signal::ctrl_c().map(|_| SignalTo::Shutdown).await;
+            let signal = tokio::signal::ctrl_c().map(|_| SignalTo::Shutdown(None)).await;
             yield signal;
         }
     }

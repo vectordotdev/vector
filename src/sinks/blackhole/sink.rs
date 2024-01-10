@@ -13,10 +13,10 @@ use tokio::{
     sync::watch,
     time::{interval, sleep_until},
 };
-use vector_common::internal_event::{
+use vector_lib::internal_event::{
     ByteSize, BytesSent, CountByteSize, EventsSent, InternalEventHandle as _, Output, Protocol,
 };
-use vector_core::EstimatedJsonEncodedSizeOf;
+use vector_lib::EstimatedJsonEncodedSizeOf;
 
 use crate::{
     event::{EventArray, EventContainer},
@@ -89,17 +89,17 @@ impl StreamSink<EventArray> for BlackholeSink {
 
             let message_len = events.estimated_json_encoded_size_of();
 
-            let _ = self.total_events.fetch_add(events.len(), Ordering::AcqRel);
-            let _ = self
+            _ = self.total_events.fetch_add(events.len(), Ordering::AcqRel);
+            _ = self
                 .total_raw_bytes
-                .fetch_add(message_len, Ordering::AcqRel);
+                .fetch_add(message_len.get(), Ordering::AcqRel);
 
             events_sent.emit(CountByteSize(events.len(), message_len));
-            bytes_sent.emit(ByteSize(message_len));
+            bytes_sent.emit(ByteSize(message_len.get()));
         }
 
         // Notify the reporting task to shutdown.
-        let _ = shutdown.send(());
+        _ = shutdown.send(());
 
         Ok(())
     }

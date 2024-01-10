@@ -19,5 +19,14 @@ remap: concepts: function: {
 				is a defining characteristic of VRL and a primary source of its safety guarantees.
 				"""
 		}
+		deprecation: {
+			title: "Deprecation"
+			description: """
+				VRL functions can be marked as "deprecated". When a function
+				is deprecated, a warning will be shown at runtime.
+
+				Suggestions on how to update the VRL program can usually be found in the actual warning and the function documentation.
+				"""
+		}
 	}
 }

@@ -1,11 +1,12 @@
 <p align="center">
   <strong>
-    <a href="https://vector.dev/docs/setup/quickstart/">Quickstart<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;
-    <a href="https://vector.dev/docs/">Docs<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;
-    <a href="https://vector.dev/guides/">Guides<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;
-    <a href="https://vector.dev/components/">Integrations<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;
-    <a href="https://chat.vector.dev">Chat<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;
-    <a href="https://vector.dev/releases/latest/download/">Download<a/>
+    <a href="https://vector.dev/docs/setup/quickstart/">Quickstart</a>&nbsp;&nbsp;&bull;&nbsp;&nbsp;
+    <a href="https://vector.dev/docs/">Docs</a>&nbsp;&nbsp;&bull;&nbsp;&nbsp;
+    <a href="https://vector.dev/guides/">Guides</a>&nbsp;&nbsp;&bull;&nbsp;&nbsp;
+    <a href="https://vector.dev/components/">Integrations</a>&nbsp;&nbsp;&bull;&nbsp;&nbsp;
+    <a href="https://chat.vector.dev">Chat</a>&nbsp;&nbsp;&bull;&nbsp;&nbsp;
+    <a href="https://vector.dev/releases/latest/download/">Download</a>&nbsp;&nbsp;&bull;&nbsp;&nbsp;
+    <a href="https://rust-doc.vector.dev/">Rust Crate Docs</a>
   </strong>
 </p>
 <p align="center">
@@ -17,7 +18,7 @@
 Vector is a high-performance, end-to-end (agent & aggregator) observability data
 pipeline that puts you in control of your observability data.
 [Collect][docs.sources], [transform][docs.transforms], and [route][docs.sinks]
-all your logs, metrics, and traces to any vendors you want today and any other
+all your logs and metrics to any vendors you want today and any other
 vendors you may want tomorrow. Vector enables dramatic cost reduction, novel
 data enrichment, and data security where you need it, not where it is most
 convenient for your vendors. Additionally, it is open source and up to 10x
@@ -30,7 +31,7 @@ Vector**][docs.installation].
 
 * **Reliable** - Built in [Rust][urls.rust], Vector's primary design goal is reliability.
 * **End-to-end** - Deploys as an [agent][docs.roles#agent] or [aggregator][docs.roles#aggregator]. Vector is a complete platform.
-* **Unified** - [Logs][docs.data-model.log], [metrics][docs.data-model.metric], and traces (coming soon). One tool for all of your data.
+* **Unified** - [Logs][docs.data-model.log], [metrics][docs.data-model.metric] (beta), and traces (coming soon). One tool for all of your data.
 
 ### Use cases
 
@@ -88,7 +89,6 @@ Vector**][docs.installation].
 
 * [**Community**][urls.vector_community] - [chat][urls.vector_chat], [calendar][urls.vector_calendar], [@vectordotdev][urls.vector_twitter]
 * [**Releases**][urls.vector_releases]
-* [**Roadmap**][urls.vector_roadmap] - [vote on new features][urls.vote_feature]
 * **Policies** - [Code of Conduct][urls.vector_code_of_conduct], [Privacy][urls.vector_privacy_policy], [Releases][urls.vector_releases_policy], [Security][urls.vector_security_policy], [Versioning][urls.vector_versioning_policy]
 
 ## Comparisons
@@ -220,7 +220,6 @@ Vector is an end-to-end, unified, open data platform.
 [urls.vector_release_policy]: https://github.com/vectordotdev/vector/blob/master/RELEASING.md
 [urls.vector_releases]: https://vector.dev/releases/
 [urls.vector_releases_policy]: https://github.com/vectordotdev/vector/blob/master/RELEASES.md
-[urls.vector_roadmap]: https://roadmap.vector.dev
 [urls.vector_security_policy]: https://github.com/vectordotdev/vector/security/policy
 [urls.vector_test_harness]: https://github.com/vectordotdev/vector-test-harness/
 [urls.vector_twitter]: https://twitter.com/vectordotdev

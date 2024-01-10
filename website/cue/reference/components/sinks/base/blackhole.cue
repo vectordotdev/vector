@@ -15,7 +15,7 @@ base: components: sinks: blackhole: configuration: {
 				Whether or not end-to-end acknowledgements are enabled.
 
 				When enabled for a sink, any source connected to that sink, where the source supports
-				end-to-end acknowledgements as well, will wait for events to be acknowledged by the sink
+				end-to-end acknowledgements as well, waits for events to be acknowledged by the sink
 				before acknowledging them at the source.
 
 				Enabling or disabling acknowledgements at the sink level takes precedence over any global
@@ -31,11 +31,11 @@ base: components: sinks: blackhole: configuration: {
 		description: """
 			The interval between reporting a summary of activity.
 
-			Set to `0` to disable reporting.
+			Set to `0` (default) to disable reporting.
 			"""
 		required: false
 		type: uint: {
-			default: 1
+			default: 0
 			examples: [
 				10,
 			]

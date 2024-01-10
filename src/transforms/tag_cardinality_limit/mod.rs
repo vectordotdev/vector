@@ -55,11 +55,11 @@ impl TagCardinalityLimit {
         }
 
         // Tag value not yet part of the accepted set.
-        if tag_value_set.len() < self.config.value_limit as usize {
+        if tag_value_set.len() < self.config.value_limit {
             // accept the new value
             tag_value_set.insert(value.clone());
 
-            if tag_value_set.len() == self.config.value_limit as usize {
+            if tag_value_set.len() == self.config.value_limit {
                 emit!(TagCardinalityValueLimitReached { key });
             }
 
@@ -76,7 +76,7 @@ impl TagCardinalityLimit {
         self.accepted_tags
             .get(key)
             .map(|value_set| {
-                !value_set.contains(value) && value_set.len() >= self.config.value_limit as usize
+                !value_set.contains(value) && value_set.len() >= self.config.value_limit
             })
             .unwrap_or(false)
     }
@@ -91,6 +91,7 @@ impl TagCardinalityLimit {
 
     fn transform_one(&mut self, mut event: Event) -> Option<Event> {
         let metric = event.as_mut_metric();
+        let metric_name = metric.name().to_string();
         if let Some(tags_map) = metric.tags_mut() {
             match self.config.limit_exceeded_action {
                 LimitExceededAction::DropEvent => {
@@ -100,6 +101,7 @@ impl TagCardinalityLimit {
                     for (key, value) in tags_map.iter_sets() {
                         if self.tag_limit_exceeded(key, value) {
                             emit!(TagCardinalityLimitRejectingEvent {
+                                metric_name: &metric_name,
                                 tag_key: key,
                                 tag_value: &value.to_string(),
                             });
@@ -116,6 +118,7 @@ impl TagCardinalityLimit {
                             true
                         } else {
                             emit!(TagCardinalityLimitRejectingTag {
+                                metric_name: &metric_name,
                                 tag_key: key,
                                 tag_value: &value.to_string(),
                             });

@@ -3,10 +3,10 @@ package metadata
 remap: functions: slice: {
 	category: "String"
 	description: """
-		Returns a slice of the `value` between the `start` and `end` positions.
+		Returns a slice of `value` between the `start` and `end` positions.
 
 		If the `start` and `end` parameters are negative, they refer to positions counting from the right of the
-		string or array. If `end` refers to a position that is greater than the length of the string or array
+		string or array. If `end` refers to a position that is greater than the length of the string or array,
 		a slice up to the end of the string or array is returned.
 		"""
 

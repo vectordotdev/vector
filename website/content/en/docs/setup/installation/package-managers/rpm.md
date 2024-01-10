@@ -9,14 +9,14 @@ RPM Package Manager is a free and open source package management system for inst
 ## Installation
 
 ```shell
-sudo rpm -i https://packages.timber.io/vector/{{< version >}}/vector-{{< version >}}-1.{arch}.rpm
+sudo rpm -i https://yum.vector.dev/stable/vector-0/{arch}/vector-{{< version >}}-1.{arch}.rpm
 ```
 
 Make sure to replace `{arch}` with one of the following:
 
 * `x86_64`
-* `arm64`
-* `armv7`
+* `aarch64`
+* `armv7hl`
 
 ## Other actions
 

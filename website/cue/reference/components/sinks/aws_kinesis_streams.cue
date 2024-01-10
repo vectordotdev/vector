@@ -14,6 +14,7 @@ components: sinks: aws_kinesis_streams: components._aws & {
 
 	features: {
 		acknowledgements: true
+		auto_generated:   true
 		healthcheck: enabled: true
 		send: {
 			batch: {
@@ -72,23 +73,8 @@ components: sinks: aws_kinesis_streams: components._aws & {
 		warnings: []
 	}
 
-	configuration: {
-		partition_key_field: {
-			common:      true
-			description: "The log field used as the Kinesis record's partition key value."
-			required:    false
-			type: string: {
-				default: null
-				examples: ["user_id"]
-			}
-		}
-		stream_name: {
-			description: "The [stream name](\(urls.aws_cloudwatch_logs_stream_name)) of the target Kinesis Logs stream."
-			required:    true
-			type: string: {
-				examples: ["my-stream"]
-			}
-		}
+	configuration: base.components.sinks.aws_kinesis_streams.configuration & {
+		_aws_include: false
 	}
 
 	input: {
@@ -155,12 +141,4 @@ components: sinks: aws_kinesis_streams: components._aws & {
 			]
 		},
 	]
-
-	telemetry: metrics: {
-		component_sent_events_total:      components.sources.internal_metrics.output.metrics.component_sent_events_total
-		component_sent_event_bytes_total: components.sources.internal_metrics.output.metrics.component_sent_event_bytes_total
-		component_sent_bytes_total:       components.sources.internal_metrics.output.metrics.component_sent_bytes_total
-		processed_bytes_total:            components.sources.internal_metrics.output.metrics.processed_bytes_total
-		processed_events_total:           components.sources.internal_metrics.output.metrics.processed_events_total
-	}
 }

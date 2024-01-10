@@ -1,7 +1,0 @@
-# object: { "message": "<13>Feb 13 20:07:26 74794bfb6795 root[8539]:syslog message" }
-# result: "f1a83003b01054c809844b19201b72d4e88cef9abe23f8323b884437a0601238b8f3895ae47eed01051660fcff7ab26461041c2237ba521de84ac1e2416271b0root"
-
-.message = to_string!(.message)
-result = parse_syslog!(.message)
-sha = sha3(value: result.message)
-sha + (result.appname || "<no app name>")

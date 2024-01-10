@@ -6,13 +6,14 @@ components: sinks: nats: {
 	classes: {
 		commonly_used: false
 		delivery:      "best_effort"
-		development:   "beta"
+		development:   "stable"
 		egress_method: "stream"
 		service_providers: []
 		stateful: false
 	}
 
 	features: {
+		auto_generated:   true
 		acknowledgements: true
 		healthcheck: enabled: true
 		send: {
@@ -52,25 +53,7 @@ components: sinks: nats: {
 		notices: []
 	}
 
-	configuration: components._nats.configuration & {
-		connection_name: {
-			common:      false
-			description: "A name assigned to the NATS connection."
-			required:    false
-			type: string: {
-				default: "vector"
-				examples: ["foo", "API Name Option Example"]
-			}
-		}
-		subject: {
-			description: "The NATS subject to publish messages to."
-			required:    true
-			type: string: {
-				examples: ["{{ host }}", "foo", "time.us.east", "time.*.east", "time.>", ">"]
-				syntax: "template"
-			}
-		}
-	}
+	configuration: base.components.sinks.nats.configuration
 
 	input: {
 		logs:    true
@@ -81,10 +64,6 @@ components: sinks: nats: {
 	how_it_works: components._nats.how_it_works
 
 	telemetry: metrics: {
-		events_discarded_total:  components.sources.internal_metrics.output.metrics.events_discarded_total
-		processing_errors_total: components.sources.internal_metrics.output.metrics.processing_errors_total
-		processed_bytes_total:   components.sources.internal_metrics.output.metrics.processed_bytes_total
-		processed_events_total:  components.sources.internal_metrics.output.metrics.processed_events_total
-		send_errors_total:       components.sources.internal_metrics.output.metrics.send_errors_total
+		send_errors_total: components.sources.internal_metrics.output.metrics.send_errors_total
 	}
 }

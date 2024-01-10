@@ -1,14 +1,15 @@
+use std::{cell::RefCell, fmt};
+
 use serde::Serializer;
-use std::fmt;
-use vector_config::{
+use serde_json::Value;
+use vector_lib::configurable::attributes::CustomAttribute;
+use vector_lib::configurable::{
     schema::{
-        apply_metadata, generate_const_string_schema, generate_number_schema,
-        generate_one_of_schema,
+        apply_base_metadata, generate_const_string_schema, generate_number_schema,
+        generate_one_of_schema, SchemaGenerator, SchemaObject,
     },
-    schemars::{gen::SchemaGenerator, schema::SchemaObject},
-    Configurable, GenerateError, Metadata,
+    Configurable, GenerateError, Metadata, ToValue,
 };
-use vector_config_common::attributes::CustomAttribute;
 
 use serde::{
     de::{self, Unexpected, Visitor},
@@ -16,6 +17,9 @@ use serde::{
 };
 
 /// Configuration for outbound request concurrency.
+///
+/// This can be set either to one of the below enum values or to a positive integer, which denotes
+/// a fixed concurrency limit.
 #[derive(Clone, Copy, Debug, Derivative, Eq, PartialEq)]
 pub enum Concurrency {
     /// A fixed concurrency of 1.
@@ -23,12 +27,12 @@ pub enum Concurrency {
     /// Only one request can be outstanding at any given time.
     None,
 
-    /// Concurrency will be managed by Vector's [Adaptive Request Concurrency][arc] feature.
+    /// Concurrency is managed by the [Adaptive Request Concurrency][arc] feature.
     ///
     /// [arc]: https://vector.dev/docs/about/under-the-hood/networking/arc/
     Adaptive,
 
-    /// A fixed amount of concurrency will be allowed.
+    /// A fixed amount of concurrency is allowed.
     Fixed(usize),
 }
 
@@ -47,28 +51,18 @@ impl Serialize for Concurrency {
 
 impl Default for Concurrency {
     fn default() -> Self {
-        Self::None
+        Self::Adaptive
     }
 }
 
 impl Concurrency {
-    pub const fn if_none(self, other: Self) -> Self {
+    pub const fn parse_concurrency(&self) -> Option<usize> {
         match self {
-            Self::None => other,
-            _ => self,
+            Concurrency::None => Some(1),
+            Concurrency::Adaptive => None,
+            Concurrency::Fixed(limit) => Some(*limit),
         }
     }
-
-    pub const fn parse_concurrency(&self, default: Self) -> Option<usize> {
-        match self.if_none(default) {
-            Concurrency::None | Concurrency::Adaptive => None,
-            Concurrency::Fixed(limit) => Some(limit),
-        }
-    }
-}
-
-pub const fn concurrency_is_none(concurrency: &Concurrency) -> bool {
-    matches!(concurrency, Concurrency::None)
 }
 
 impl<'de> Deserialize<'de> for Concurrency {
@@ -92,7 +86,7 @@ impl<'de> Deserialize<'de> for Concurrency {
                 } else if value == "none" {
                     Ok(Concurrency::None)
                 } else {
-                    Err(de::Error::unknown_variant(value, &["adaptive"]))
+                    Err(de::Error::unknown_variant(value, &["adaptive", "none"]))
                 }
             }
 
@@ -129,42 +123,53 @@ impl Configurable for Concurrency {
         Some(std::any::type_name::<Self>())
     }
 
-    fn metadata() -> Metadata<Self> {
+    fn metadata() -> Metadata {
         let mut metadata = Metadata::default();
-        metadata.set_description("Configuration for outbound request concurrency.");
+        metadata.set_description(
+            r#"Configuration for outbound request concurrency.
+
+This can be set either to one of the below enum values or to a positive integer, which denotes
+a fixed concurrency limit."#,
+        );
         metadata.add_custom_attribute(CustomAttribute::kv("docs::enum_tagging", "external"));
         metadata
     }
 
-    fn generate_schema(_: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
+    fn generate_schema(_: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
         let mut none_schema = generate_const_string_schema("none".to_string());
-        let mut none_metadata = Metadata::<()>::with_title("A fixed concurrency of 1.");
+        let mut none_metadata = Metadata::with_title("A fixed concurrency of 1.");
         none_metadata.set_description("Only one request can be outstanding at any given time.");
         none_metadata.add_custom_attribute(CustomAttribute::kv("logical_name", "None"));
-        apply_metadata(&mut none_schema, none_metadata);
+        apply_base_metadata(&mut none_schema, none_metadata);
 
         let mut adaptive_schema = generate_const_string_schema("adaptive".to_string());
-        let mut adaptive_metadata = Metadata::<()>::with_title(
+        let mut adaptive_metadata = Metadata::with_title(
             "Concurrency will be managed by Vector's [Adaptive Request Concurrency][arc] feature.",
         );
         adaptive_metadata
             .set_description("[arc]: https://vector.dev/docs/about/under-the-hood/networking/arc/");
         adaptive_metadata.add_custom_attribute(CustomAttribute::kv("logical_name", "Adaptive"));
-        apply_metadata(&mut adaptive_schema, adaptive_metadata);
+        apply_base_metadata(&mut adaptive_schema, adaptive_metadata);
 
         let mut fixed_schema = generate_number_schema::<usize>();
         let mut fixed_metadata =
-            Metadata::<()>::with_description("A fixed amount of concurrency will be allowed.");
+            Metadata::with_description("A fixed amount of concurrency will be allowed.");
         fixed_metadata.set_transparent();
         fixed_metadata.add_custom_attribute(CustomAttribute::kv("docs::numeric_type", "uint"));
         fixed_metadata.add_custom_attribute(CustomAttribute::kv("logical_name", "Fixed"));
-        apply_metadata(&mut fixed_schema, fixed_metadata);
+        apply_base_metadata(&mut fixed_schema, fixed_metadata);
 
         Ok(generate_one_of_schema(&[
             none_schema,
             adaptive_schema,
             fixed_schema,
         ]))
+    }
+}
+
+impl ToValue for Concurrency {
+    fn to_value(&self) -> Value {
+        serde_json::to_value(self).expect("Could not convert concurrency to JSON")
     }
 }
 

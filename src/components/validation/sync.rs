@@ -132,7 +132,7 @@ impl WaitTrigger {
         // We don't care if our trigger is actually received, because the receiver side may
         // intentionally not be used i.e. if the code is generic in a way where only some codepaths
         // wait to be triggered and others don't, but the trigger must always be called regardless.
-        let _ = self.tx.send(());
+        _ = self.tx.send(());
     }
 }
 

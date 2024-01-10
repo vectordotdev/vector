@@ -1,98 +1,93 @@
-use std::num::NonZeroUsize;
-
-use bytes::{Bytes, BytesMut};
+use bytes::Bytes;
 use rdkafka::message::{Header, OwnedHeaders};
-use tokio_util::codec::Encoder as _;
-use vector_core::config::LogSchema;
+use vector_lib::lookup::OwnedTargetPath;
 
 use crate::{
-    codecs::{Encoder, Transformer},
-    event::{Event, Finalizable, Value},
-    internal_events::{KafkaHeaderExtractionError, TemplateRenderingError},
+    internal_events::KafkaHeaderExtractionError,
     sinks::{
         kafka::service::{KafkaRequest, KafkaRequestMetadata},
-        util::metadata::RequestMetadataBuilder,
+        prelude::*,
     },
-    template::Template,
 };
 
 pub struct KafkaRequestBuilder {
-    pub key_field: Option<String>,
-    pub headers_key: Option<String>,
-    pub topic_template: Template,
-    pub transformer: Transformer,
-    pub encoder: Encoder<()>,
-    pub log_schema: &'static LogSchema,
+    pub key_field: Option<OwnedTargetPath>,
+    pub headers_key: Option<OwnedTargetPath>,
+    pub encoder: (Transformer, Encoder<()>),
 }
 
-impl KafkaRequestBuilder {
-    pub fn build_request(&mut self, mut event: Event) -> Option<KafkaRequest> {
-        let topic = self
-            .topic_template
-            .render_string(&event)
-            .map_err(|error| {
-                emit!(TemplateRenderingError {
-                    field: None,
-                    drop_event: true,
-                    error,
-                });
-            })
-            .ok()?;
+impl RequestBuilder<(String, Event)> for KafkaRequestBuilder {
+    type Metadata = KafkaRequestMetadata;
+    type Events = Event;
+    type Encoder = (Transformer, Encoder<()>);
+    type Payload = Bytes;
+    type Request = KafkaRequest;
+    type Error = std::io::Error;
 
-        let metadata_builder = RequestMetadataBuilder::from_events(&event);
+    fn compression(&self) -> Compression {
+        Compression::None
+    }
+
+    fn encoder(&self) -> &Self::Encoder {
+        &self.encoder
+    }
+
+    fn split_input(
+        &self,
+        input: (String, Event),
+    ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
+        let (topic, mut event) = input;
+        let builder = RequestMetadataBuilder::from_event(&event);
 
         let metadata = KafkaRequestMetadata {
             finalizers: event.take_finalizers(),
-            key: get_key(&event, &self.key_field),
-            timestamp_millis: get_timestamp_millis(&event, self.log_schema),
-            headers: get_headers(&event, &self.headers_key),
+            key: get_key(&event, self.key_field.as_ref()),
+            timestamp_millis: get_timestamp_millis(&event),
+            headers: get_headers(&event, self.headers_key.as_ref()),
             topic,
         };
-        self.transformer.transform(&mut event);
-        let mut body = BytesMut::new();
-        self.encoder.encode(event, &mut body).ok()?;
-        let body = body.freeze();
 
-        let bytes_len = NonZeroUsize::new(body.len()).expect("payload should never be zero length");
-        let request_metadata = metadata_builder.with_request_size(bytes_len);
+        (metadata, builder, event)
+    }
 
-        Some(KafkaRequest {
-            body,
+    fn build_request(
+        &self,
+        metadata: Self::Metadata,
+        request_metadata: RequestMetadata,
+        payload: EncodeResult<Self::Payload>,
+    ) -> Self::Request {
+        KafkaRequest {
+            body: payload.into_payload(),
             metadata,
             request_metadata,
-        })
+        }
     }
 }
 
-fn get_key(event: &Event, key_field: &Option<String>) -> Option<Bytes> {
-    key_field.as_ref().and_then(|key_field| match event {
-        Event::Log(log) => log
-            .get(key_field.as_str())
-            .map(|value| value.coerce_to_bytes()),
+fn get_key(event: &Event, key_field: Option<&OwnedTargetPath>) -> Option<Bytes> {
+    key_field.and_then(|key_field| match event {
+        Event::Log(log) => log.get(key_field).map(|value| value.coerce_to_bytes()),
         Event::Metric(metric) => metric
             .tags()
-            .and_then(|tags| tags.get(key_field))
+            .and_then(|tags| tags.get(key_field.to_string().as_str()))
             .map(|value| value.to_owned().into()),
         _ => None,
     })
 }
 
-fn get_timestamp_millis(event: &Event, log_schema: &'static LogSchema) -> Option<i64> {
+fn get_timestamp_millis(event: &Event) -> Option<i64> {
     match &event {
-        Event::Log(log) => log
-            .get(log_schema.timestamp_key())
-            .and_then(|v| v.as_timestamp())
-            .copied(),
+        Event::Log(log) => log.get_timestamp().and_then(|v| v.as_timestamp()).copied(),
         Event::Metric(metric) => metric.timestamp(),
         _ => None,
     }
     .map(|ts| ts.timestamp_millis())
 }
 
-fn get_headers(event: &Event, headers_key: &Option<String>) -> Option<OwnedHeaders> {
-    headers_key.as_ref().and_then(|headers_key| {
+fn get_headers(event: &Event, headers_key: Option<&OwnedTargetPath>) -> Option<OwnedHeaders> {
+    headers_key.and_then(|headers_key| {
         if let Event::Log(log) = event {
-            if let Some(headers) = log.get(headers_key.as_str()) {
+            if let Some(headers) = log.get(headers_key) {
                 match headers {
                     Value::Object(headers_map) => {
                         let mut owned_headers = OwnedHeaders::new_with_capacity(headers_map.len());
@@ -124,25 +119,23 @@ fn get_headers(event: &Event, headers_key: &Option<String>) -> Option<OwnedHeade
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeMap;
-
     use bytes::Bytes;
     use rdkafka::message::Headers;
 
     use super::*;
-    use crate::event::LogEvent;
+    use crate::event::{LogEvent, ObjectMap};
 
     #[test]
     fn kafka_get_headers() {
-        let headers_key = "headers";
-        let mut header_values = BTreeMap::new();
-        header_values.insert("a-key".to_string(), Value::Bytes(Bytes::from("a-value")));
-        header_values.insert("b-key".to_string(), Value::Bytes(Bytes::from("b-value")));
+        let headers_key = OwnedTargetPath::try_from("headers".to_string()).unwrap();
+        let mut header_values = ObjectMap::new();
+        header_values.insert("a-key".into(), Value::Bytes(Bytes::from("a-value")));
+        header_values.insert("b-key".into(), Value::Bytes(Bytes::from("b-value")));
 
         let mut event = Event::Log(LogEvent::from("hello"));
-        event.as_mut_log().insert(headers_key, header_values);
+        event.as_mut_log().insert(&headers_key, header_values);
 
-        let headers = get_headers(&event, &Some(headers_key.to_string())).unwrap();
+        let headers = get_headers(&event, Some(&headers_key)).unwrap();
         assert_eq!(headers.get(0).key, "a-key");
         assert_eq!(headers.get(0).value.unwrap(), "a-value".as_bytes());
         assert_eq!(headers.get(1).key, "b-key");
