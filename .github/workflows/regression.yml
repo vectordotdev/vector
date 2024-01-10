@@ -34,8 +34,8 @@ on:
   pull_request:
 
 concurrency:
-  # In flight runs will be canceled only by re-trigger through the merge queue. The comment.html_url should always be unique.
-  group: ${{ github.workflow }}-${{ github.event.comment.html_url || github.event.merge_group.head_sha }}
+  # In flight runs will be canceled only by re-trigger through the merge queue or if additional PR commits are pushed. The comment.html_url should always be unique.
+  group: ${{ github.workflow }}-${{ github.event.comment.html_url || github.event_number || github.event.merge_group.head_sha }}
   cancel-in-progress: true
 
 env:
