@@ -9997,6 +9997,7 @@ dependencies = [
  "typetag",
  "url",
  "uuid",
+ "vector-core",
  "vector-lib",
  "vector-vrl-functions",
  "vrl",

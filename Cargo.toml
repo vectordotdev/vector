@@ -134,6 +134,7 @@ fakedata = { path = "lib/fakedata", optional = true }
 portpicker = { path = "lib/portpicker" }
 tracing-limit = { path = "lib/tracing-limit" }
 vector-lib = { path = "lib/vector-lib", default-features = false, features = ["vrl"] }
+vector-core = { path = "lib/vector-core", default-features = false }
 vector-vrl-functions = { path = "lib/vector-vrl/functions" }
 loki-logproto = { path = "lib/loki-logproto", optional = true }
 
