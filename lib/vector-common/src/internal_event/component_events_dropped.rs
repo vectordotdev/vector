@@ -1,5 +1,5 @@
 use super::{Count, InternalEvent, InternalEventHandle, RegisterInternalEvent};
-use metrics::{register_counter, Counter};
+use metrics::{counter, Counter};
 
 pub const INTENTIONAL: bool = true;
 pub const UNINTENTIONAL: bool = false;
@@ -33,7 +33,7 @@ impl<'a, const INTENTIONAL: bool> RegisterInternalEvent
     type Handle = DroppedHandle<'a, INTENTIONAL>;
     fn register(self) -> Self::Handle {
         Self::Handle {
-            discarded_events: register_counter!(
+            discarded_events: counter!(
                 "component_discarded_events_total",
                 "intentional" => if INTENTIONAL { "true" } else { "false" },
             ),

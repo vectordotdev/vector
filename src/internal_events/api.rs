@@ -17,6 +17,6 @@ impl InternalEvent for ApiStarted {
             address = ?self.addr,
             playground = %if self.playground { playground } else { "off" }
         );
-        counter!("api_started_total", 1);
+        counter!("api_started_total").increment(1);
     }
 }

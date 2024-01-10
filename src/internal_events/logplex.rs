@@ -39,10 +39,11 @@ impl InternalEvent for HerokuLogplexRequestReadError {
             internal_log_rate_limit = true,
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_type" => error_type::READER_FAILED,
             "error_code" => io_error_code(&self.error),
             "stage" => error_stage::PROCESSING,
-        );
+        )
+        .increment(1);
     }
 }

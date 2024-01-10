@@ -631,12 +631,11 @@ mod tests {
     use std::sync::Arc;
 
     use indoc::{formatdoc, indoc};
-    use vector_lib::{config::GlobalOptions, event::EventMetadata, metric_tags};
+    use vector_lib::{config::GlobalOptions, event::EventMetadata, metric_tags, metrics};
     use vrl::value::kind::Collection;
     use vrl::{btreemap, event_path};
 
     use super::*;
-    use crate::metrics::Controller;
     use crate::{
         config::{build_unit_tests, ConfigBuilder},
         event::{
@@ -1532,10 +1531,12 @@ mod tests {
         "#})
         .unwrap();
 
-        let mut tests = build_unit_tests(config).await.unwrap();
-        assert!(tests.remove(0).run().await.errors.is_empty());
-        // Check that metrics were emitted with output tag
-        COMPONENT_MULTIPLE_OUTPUTS_TESTS.assert(&["output"]);
+        vector_lib::metrics::with_test_recorder_async(|controller| async move {
+            let mut tests = build_unit_tests(config).await.unwrap();
+            assert!(tests.remove(0).run().await.errors.is_empty());
+            // Check that metrics were emitted with output tag
+            COMPONENT_MULTIPLE_OUTPUTS_TESTS.assert(&controller, &["output"]);
+        });
     }
 
     struct CollectedOuput {
@@ -1989,31 +1990,31 @@ mod tests {
     }
 
     fn assert_no_metrics(source: String) {
-        vector_lib::metrics::init_test();
+        metrics::with_test_recorder(|controller| {
+            let config = RemapConfig {
+                source: Some(source),
+                drop_on_error: true,
+                drop_on_abort: true,
+                reroute_dropped: true,
+                ..Default::default()
+            };
+            let mut ast_runner = remap(config).unwrap();
+            let input_event =
+                Event::from_json_value(serde_json::json!({"a": 42}), LogNamespace::Vector).unwrap();
+            let dropped_event = transform_one_fallible(&mut ast_runner, input_event).unwrap_err();
+            let dropped_log = dropped_event.as_log();
+            assert_eq!(dropped_log.get(event_path!("a")), Some(&Value::from(42)));
 
-        let config = RemapConfig {
-            source: Some(source),
-            drop_on_error: true,
-            drop_on_abort: true,
-            reroute_dropped: true,
-            ..Default::default()
-        };
-        let mut ast_runner = remap(config).unwrap();
-        let input_event =
-            Event::from_json_value(serde_json::json!({"a": 42}), LogNamespace::Vector).unwrap();
-        let dropped_event = transform_one_fallible(&mut ast_runner, input_event).unwrap_err();
-        let dropped_log = dropped_event.as_log();
-        assert_eq!(dropped_log.get(event_path!("a")), Some(&Value::from(42)));
-
-        let controller = Controller::get().expect("no controller");
-        let metrics = controller
-            .capture_metrics()
-            .into_iter()
-            .map(|metric| (metric.name().to_string(), metric))
-            .collect::<BTreeMap<String, Metric>>();
-        assert_eq!(metrics.get("component_discarded_events_total"), None);
-        assert_eq!(metrics.get("component_errors_total"), None);
+            let metrics = controller
+                .capture_metrics()
+                .into_iter()
+                .map(|metric| (metric.name().to_string(), metric))
+                .collect::<BTreeMap<String, Metric>>();
+            assert_eq!(metrics.get("component_discarded_events_total"), None);
+            assert_eq!(metrics.get("component_errors_total"), None);
+        });
     }
+
     #[test]
     fn do_not_emit_metrics_when_dropped() {
         assert_no_metrics("abort".to_string());

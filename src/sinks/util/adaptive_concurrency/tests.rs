@@ -25,14 +25,12 @@ use serde::Deserialize;
 use snafu::Snafu;
 use tokio::time::{self, sleep, Duration, Instant};
 use tower::Service;
-use vector_lib::configurable::configurable_component;
-use vector_lib::json_size::JsonSize;
+use vector_lib::{configurable::configurable_component, json_size::JsonSize};
 
 use super::controller::ControllerStatistics;
 use crate::{
     config::{self, AcknowledgementsConfig, Input, SinkConfig, SinkContext},
     event::{metric::MetricValue, Event},
-    metrics,
     sinks::{
         util::{
             retries::{JitterMode, RetryLogic},
@@ -428,73 +426,73 @@ async fn run_test(params: TestParams) -> TestResults {
     let control = Arc::clone(&test_config.control);
     let cstats = Arc::clone(&test_config.controller_stats);
 
-    let mut config = config::Config::builder();
-    let demo_logs = DemoLogsConfig::repeat(
-        vec!["line 1".into()],
-        params.requests,
-        Duration::from_secs_f64(params.interval),
-        None,
-    );
-    config.add_source("in", demo_logs);
-    config.add_sink("out", &["in"], test_config);
+    vector_lib::metrics::with_test_recorder_async(|controller| async move {
+        let mut config = config::Config::builder();
+        let demo_logs = DemoLogsConfig::repeat(
+            vec!["line 1".into()],
+            params.requests,
+            Duration::from_secs_f64(params.interval),
+            None,
+        );
+        config.add_source("in", demo_logs);
+        config.add_sink("out", &["in"], test_config);
 
-    let (topology, _) = start_topology(config.build().unwrap(), false).await;
+        let (topology, _) = start_topology(config.build().unwrap(), false).await;
 
-    let controller = metrics::Controller::get().unwrap();
+        is_done.await.expect("Test failed to complete");
+        topology.stop().await;
 
-    is_done.await.expect("Test failed to complete");
-    topology.stop().await;
+        let control = Arc::try_unwrap(control)
+            .expect("Failed to unwrap control Arc")
+            .into_inner()
+            .expect("Failed to unwrap control Mutex");
+        let stats = control.stats;
 
-    let control = Arc::try_unwrap(control)
-        .expect("Failed to unwrap control Arc")
-        .into_inner()
-        .expect("Failed to unwrap control Mutex");
-    let stats = control.stats;
+        let cstats = Arc::try_unwrap(cstats)
+            .expect("Failed to unwrap controller_stats Arc")
+            .into_inner()
+            .expect("Failed to unwrap controller_stats Mutex");
+        let cstats = Arc::try_unwrap(cstats)
+            .expect("Failed to unwrap controller_stats Arc")
+            .into_inner()
+            .expect("Failed to unwrap controller_stats Mutex");
 
-    let cstats = Arc::try_unwrap(cstats)
-        .expect("Failed to unwrap controller_stats Arc")
-        .into_inner()
-        .expect("Failed to unwrap controller_stats Mutex");
-    let cstats = Arc::try_unwrap(cstats)
-        .expect("Failed to unwrap controller_stats Arc")
-        .into_inner()
-        .expect("Failed to unwrap controller_stats Mutex");
-
-    let metrics = controller
-        .capture_metrics()
-        .into_iter()
-        .map(|metric| (metric.name().to_string(), metric))
-        .collect::<HashMap<_, _>>();
-    // Ensure basic statistics are captured, don't actually examine them
-    assert!(matches!(
-        metrics
-            .get("adaptive_concurrency_observed_rtt")
-            .unwrap()
-            .value(),
-        &MetricValue::AggregatedHistogram { .. }
-    ));
-    assert!(matches!(
-        metrics
-            .get("adaptive_concurrency_averaged_rtt")
-            .unwrap()
-            .value(),
-        &MetricValue::AggregatedHistogram { .. }
-    ));
-    if params.concurrency == Concurrency::Adaptive {
+        let metrics = controller
+            .capture_metrics()
+            .into_iter()
+            .map(|metric| (metric.name().to_string(), metric))
+            .collect::<HashMap<_, _>>();
+        // Ensure basic statistics are captured, don't actually examine them
         assert!(matches!(
-            metrics.get("adaptive_concurrency_limit").unwrap().value(),
+            metrics
+                .get("adaptive_concurrency_observed_rtt")
+                .unwrap()
+                .value(),
             &MetricValue::AggregatedHistogram { .. }
         ));
-    }
-    assert!(matches!(
-        metrics
-            .get("adaptive_concurrency_in_flight")
-            .unwrap()
-            .value(),
-        &MetricValue::AggregatedHistogram { .. }
-    ));
+        assert!(matches!(
+            metrics
+                .get("adaptive_concurrency_averaged_rtt")
+                .unwrap()
+                .value(),
+            &MetricValue::AggregatedHistogram { .. }
+        ));
+        if params.concurrency == Concurrency::Adaptive {
+            assert!(matches!(
+                metrics.get("adaptive_concurrency_limit").unwrap().value(),
+                &MetricValue::AggregatedHistogram { .. }
+            ));
+        }
+        assert!(matches!(
+            metrics
+                .get("adaptive_concurrency_in_flight")
+                .unwrap()
+                .value(),
+            &MetricValue::AggregatedHistogram { .. }
+        ));
 
-    TestResults { stats, cstats }
+        TestResults { stats, cstats }
+    })
 }
 
 #[derive(Debug)]

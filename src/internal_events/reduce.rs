@@ -6,6 +6,6 @@ pub struct ReduceStaleEventFlushed;
 
 impl InternalEvent for ReduceStaleEventFlushed {
     fn emit(self) {
-        counter!("stale_events_flushed_total", 1);
+        counter!("stale_events_flushed_total").increment(1);
     }
 }

@@ -13,7 +13,7 @@ pub struct UdpSocketConnectionEstablished;
 impl InternalEvent for UdpSocketConnectionEstablished {
     fn emit(self) {
         debug!(message = "Connected.");
-        counter!("connection_established_total", 1, "mode" => "udp");
+        counter!("connection_established_total", "mode" => "udp").increment(1);
     }
 }
 
@@ -50,12 +50,13 @@ impl InternalEvent for UdpSendIncompleteError {
             internal_log_rate_limit = true,
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_type" => error_type::WRITER_FAILED,
             "stage" => error_stage::SENDING,
-        );
+        )
+        .increment(1);
         // deprecated
-        counter!("connection_send_errors_total", 1, "mode" => "udp");
+        counter!("connection_send_errors_total", "mode" => "udp").increment(1);
 
         emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
     }

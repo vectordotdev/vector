@@ -19,9 +19,9 @@ pub mod source {
             );
             counter!(
                 "component_received_bytes_total",
-                self.byte_size as u64,
                 "protocol" => self.protocol,
-            );
+            )
+            .increment(self.byte_size as u64);
         }
     }
 
@@ -39,10 +39,11 @@ pub mod source {
                    internal_log_rate_limit = true,
             );
             counter!(
-                "component_errors_total", 1,
+                "component_errors_total",
                 "error_type" => error_type::REQUEST_FAILED,
                 "stage" => error_stage::RECEIVING,
-            );
+            )
+            .increment(1);
         }
     }
 
@@ -60,10 +61,11 @@ pub mod source {
                    internal_log_rate_limit = true,
             );
             counter!(
-                "component_errors_total", 1,
+                "component_errors_total",
                 "error_type" => error_type::ACKNOWLEDGMENT_FAILED,
                 "stage" => error_stage::RECEIVING,
-            );
+            )
+            .increment(1);
         }
     }
 
@@ -81,10 +83,11 @@ pub mod source {
                    internal_log_rate_limit = true,
             );
             counter!(
-                "component_errors_total", 1,
+                "component_errors_total",
                 "error_type" => error_type::COMMAND_FAILED,
                 "stage" => error_stage::RECEIVING,
-            );
+            )
+            .increment(1);
         }
     }
 }
