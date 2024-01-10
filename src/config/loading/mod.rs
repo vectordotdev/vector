@@ -8,17 +8,17 @@ use std::{
     fmt::Debug,
     fs::{File, ReadDir},
     path::{Path, PathBuf},
+    sync::atomic::{AtomicBool, Ordering},
     sync::Mutex,
 };
 
 use config_builder::ConfigBuilderLoader;
-pub use config_builder::*;
 use glob::glob;
 use loader::process::Process;
 pub use loader::*;
 pub use secret::*;
 pub use source::*;
-use vector_config::NamedComponent;
+use vector_lib::configurable::NamedComponent;
 
 use super::{
     builder::ConfigBuilder, format, validation, vars, Config, ConfigPath, Format, FormatHint,
@@ -26,6 +26,18 @@ use super::{
 use crate::{config::ProviderConfig, signal};
 
 pub static CONFIG_PATHS: Mutex<Vec<ConfigPath>> = Mutex::new(Vec::new());
+
+// Technically, this global should be a parameter to the `config::vars::interpolate` function, which
+// is passed in from its caller `prepare_input` below, etc. However:
+//
+// 1. That ended up needing to have the parameter added to literally dozens of functions, as
+// `prepare_input` has long chains of callers.
+//
+// 2. This variable is only ever set in one place, at program global startup from the command line.
+//
+// 3. This setting is intended to be transitional, anyways, and is marked as deprecated to be
+// removed in a future version after strict mode becomes the default.
+pub static STRICT_ENV_VARS: AtomicBool = AtomicBool::new(false);
 
 pub(super) fn read_dir<P: AsRef<Path> + Debug>(path: P) -> Result<ReadDir, Vec<String>> {
     path.as_ref()
@@ -133,6 +145,7 @@ pub fn load_from_paths(config_paths: &[ConfigPath]) -> Result<Config, Vec<String
 pub async fn load_from_paths_with_provider_and_secrets(
     config_paths: &[ConfigPath],
     signal_handler: &mut signal::SignalHandler,
+    allow_empty: bool,
 ) -> Result<Config, Vec<String>> {
     // Load secret backends first
     let (mut secrets_backends_loader, secrets_warning) =
@@ -148,6 +161,8 @@ pub async fn load_from_paths_with_provider_and_secrets(
         debug!(message = "No secret placeholder found, skipping secret resolution.");
         load_builder_from_paths(config_paths)?
     };
+
+    builder.allow_empty = allow_empty;
 
     validation::check_provider(&builder)?;
     signal_handler.clear();
@@ -290,7 +305,11 @@ pub fn prepare_input<R: std::io::Read>(mut input: R) -> Result<(String, Vec<Stri
             vars.insert("HOSTNAME".into(), hostname);
         }
     }
-    vars::interpolate(&source_string, &vars)
+    vars::interpolate(
+        &source_string,
+        &vars,
+        STRICT_ENV_VARS.load(Ordering::Relaxed),
+    )
 }
 
 pub fn load<R: std::io::Read, T>(input: R, format: Format) -> Result<(T, Vec<String>), Vec<String>>

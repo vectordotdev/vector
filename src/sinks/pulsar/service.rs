@@ -106,7 +106,7 @@ impl<Exe: Executor> Service<PulsarRequest> for PulsarService<Exe> {
             let mut properties = HashMap::new();
             if let Some(props) = request.metadata.properties {
                 for (key, value) in props {
-                    properties.insert(key, String::from_utf8_lossy(&value).to_string());
+                    properties.insert(key.into(), String::from_utf8_lossy(&value).to_string());
                 }
             }
 

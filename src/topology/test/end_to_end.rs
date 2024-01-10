@@ -1,9 +1,5 @@
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 
-use crate::{
-    config::{self, ConfigDiff, Format},
-    test_util, topology, Error,
-};
 use hyper::{
     service::{make_service_fn, service_fn},
     Body, Request, Response, Server, StatusCode,
@@ -12,6 +8,12 @@ use tokio::{
     sync::{mpsc, oneshot, Mutex},
     task::JoinHandle,
     time::{timeout, Duration},
+};
+
+use super::{RunningTopology, TopologyPieces};
+use crate::{
+    config::{self, ConfigDiff, Format},
+    test_util, Error,
 };
 
 type Lock = Arc<Mutex<()>>;
@@ -101,10 +103,11 @@ uri = "http://{address2}/"
     )
     .unwrap();
     let diff = ConfigDiff::initial(&config);
-    let pieces = topology::build_or_log_errors(&config, &diff, HashMap::new())
-        .await
-        .unwrap();
-    let (_topology, _) = topology::start_validated(config, diff, pieces)
+    let pieces =
+        TopologyPieces::build_or_log_errors(&config, &diff, HashMap::new(), Default::default())
+            .await
+            .unwrap();
+    let (_topology, _) = RunningTopology::start_validated(config, diff, pieces)
         .await
         .unwrap();
 

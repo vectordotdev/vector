@@ -11,3 +11,7 @@ invocation of the end-to-end tests from the integration tests in `vdev`, to corr
 code separation and fundamental differences between the two classes of tests.
 
 See https://github.com/vectordotdev/vector/issues/18829 for more information.
+
+For now, any subdir here needs to be unique from the other integration tests outside this dir.
+For example there is already a `datadog-logs` integration test, hence the e2e test is in a sub-
+dir called `e2e-datadog-logs`.

@@ -8,8 +8,11 @@ use futures::{
 use http::Request;
 use hyper::Body;
 use tower::{Service, ServiceExt};
-use vector_common::request_metadata::{GroupedCountByteSize, MetaDescriptive};
-use vector_core::stream::DriverResponse;
+use vector_lib::stream::DriverResponse;
+use vector_lib::{
+    request_metadata::{GroupedCountByteSize, MetaDescriptive},
+    sensitive_string::SensitiveString,
+};
 
 use crate::{
     event::EventStatus,
@@ -53,7 +56,7 @@ pub struct DatadogEventsService {
 impl DatadogEventsService {
     pub fn new(
         endpoint: http::Uri,
-        default_api_key: String,
+        default_api_key: SensitiveString,
         http_client: HttpClient<Body>,
     ) -> Self {
         let batch_http_service = HttpBatchService::new(http_client, move |req| {
@@ -61,7 +64,7 @@ impl DatadogEventsService {
 
             let api_key = match req.metadata.api_key.as_ref() {
                 Some(x) => x.as_ref(),
-                None => default_api_key.as_str(),
+                None => default_api_key.inner(),
             };
 
             let request = Request::post(&endpoint)

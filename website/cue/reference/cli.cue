@@ -15,7 +15,7 @@ cli: {
 		required:    bool | *false
 		name:        Arg
 		type:        #ArgType
-		default?:    string | [...string]
+		default?: string | [...string]
 	}
 
 	#ArgType: "string" | "list"
@@ -113,13 +113,17 @@ cli: {
 			description: env_vars.VECTOR_NO_GRACEFUL_SHUTDOWN_LIMIT.description
 			env_var:     "VECTOR_NO_GRACEFUL_SHUTDOWN_LIMIT"
 		}
-		"openssl-legacy-provider": {
-			description: env_vars.VECTOR_OPENSSL_LEGACY_PROVIDER.description
-			env_var:     "VECTOR_OPENSSL_LEGACY_PROVIDER"
-		}
 		"openssl-no-probe": {
 			description: env_vars.VECTOR_OPENSSL_NO_PROBE.description
 			env_var:     "VECTOR_OPENSSL_NO_PROBE"
+		}
+		"allow-empty-config": {
+			description: env_vars.VECTOR_ALLOW_EMPTY_CONFIG.description
+			env_var:     "VECTOR_ALLOW_EMPTY_CONFIG"
+		}
+		"strict-env-vars": {
+			description: env_vars.VECTOR_STRICT_ENV_VARS.description
+			env_var:     "VECTOR_STRICT_ENV_VARS"
 		}
 	}
 
@@ -632,15 +636,23 @@ cli: {
 			description: "Never time out while waiting for graceful shutdown after SIGINT or SIGTERM received. This is useful when you would like for Vector to attempt to send data until terminated by a SIGKILL. Overrides/cannot be set with `--graceful-shutdown-limit-secs`."
 			type: bool: default: false
 		}
-		VECTOR_OPENSSL_LEGACY_PROVIDER: {
-			description: "Load the OpenSSL legacy provider."
-			type: bool: default: false
-		}
 		VECTOR_OPENSSL_NO_PROBE: {
 			description: """
 				Disable probing and configuration of root certificate locations on the system for OpenSSL.
 
 				The probe functionality manipulates the `SSL_CERT_FILE` and `SSL_CERT_DIR` environment variables in the Vector process. This behavior can be problematic for users of the `exec` source, which by default inherits the environment of the Vector process.
+				"""
+			type: bool: default: false
+		}
+		VECTOR_ALLOW_EMPTY_CONFIG: {
+			description: """
+				Allow the configuration to run without any components. This is useful for loading in an empty stub config that will later be replaced with actual components. Note that this is likely not useful without also watching for config file changes as described in `--watch-config`.
+				"""
+			type: bool: default: false
+		}
+		VECTOR_STRICT_ENV_VARS: {
+			description: """
+				Turn on strict mode for environment variable interpolation. When set, interpolation of a missing environment variable in configuration files will cause an error instead of a warning, which will result in a failure to load any such configuration file. This defaults to false, but that default is deprecated and will be changed to strict in future versions.
 				"""
 			type: bool: default: false
 		}

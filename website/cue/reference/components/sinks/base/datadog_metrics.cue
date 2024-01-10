@@ -66,9 +66,13 @@ base: components: sinks: datadog_metrics: configuration: {
 			If an event has a Datadog [API key][api_key] set explicitly in its metadata, it takes
 			precedence over this setting.
 
+			This value can also be set by specifying the `DD_API_KEY` environment variable.
+			The value specified here takes precedence over the environment variable.
+
 			[api_key]: https://docs.datadoghq.com/api/?lang=bash#authentication
+			[global_options]: /docs/reference/configuration/global-options/#datadog
 			"""
-		required: true
+		required: false
 		type: string: examples: ["${DATADOG_API_KEY_ENV_VAR}", "ef8d5de700e7989468166c40fc8a0ccd"]
 	}
 	default_namespace: {
@@ -94,21 +98,13 @@ base: components: sinks: datadog_metrics: configuration: {
 		required: false
 		type: string: examples: ["http://127.0.0.1:8080", "http://example.com:12345"]
 	}
-	region: {
-		deprecated:         true
-		deprecated_message: "This option has been deprecated, use the `site` option instead."
-		description:        "The Datadog region to send metrics to."
-		required:           false
-		type: string: enum: {
-			eu: "EU region."
-			us: "US region."
-		}
-	}
 	request: {
 		description: """
 			Middleware settings for outbound requests.
 
-			Various settings can be configured, such as concurrency and rate limits, timeouts, etc.
+			Various settings can be configured, such as concurrency and rate limits, timeouts, retry behavior, etc.
+
+			Note that the retry backoff policy follows the Fibonacci sequence.
 			"""
 		required: false
 		type: object: options: {
@@ -156,6 +152,15 @@ base: components: sinks: datadog_metrics: configuration: {
 																"""
 						required: false
 						type: uint: default: 1
+					}
+					max_concurrency_limit: {
+						description: """
+																The maximum concurrency limit.
+
+																The adaptive request concurrency limit will not go above this bound. This is put in place as a safeguard.
+																"""
+						required: false
+						type: uint: default: 200
 					}
 					rtt_deviation_scale: {
 						description: """
@@ -217,12 +222,8 @@ base: components: sinks: datadog_metrics: configuration: {
 				}
 			}
 			retry_attempts: {
-				description: """
-					The maximum number of retries to make for failed requests.
-
-					The default, for all intents and purposes, represents an infinite number of retries.
-					"""
-				required: false
+				description: "The maximum number of retries to make for failed requests."
+				required:    false
 				type: uint: {
 					default: 9223372036854775807
 					unit:    "retries"
@@ -240,11 +241,31 @@ base: components: sinks: datadog_metrics: configuration: {
 					unit:    "seconds"
 				}
 			}
+			retry_jitter_mode: {
+				description: "The jitter mode to use for retry backoff behavior."
+				required:    false
+				type: string: {
+					default: "Full"
+					enum: {
+						Full: """
+															Full jitter.
+
+															The random delay is anywhere from 0 up to the maximum current delay calculated by the backoff
+															strategy.
+
+															Incorporating full jitter into your backoff strategy can greatly reduce the likelihood
+															of creating accidental denial of service (DoS) conditions against your own systems when
+															many clients are recovering from a failure state.
+															"""
+						None: "No jitter."
+					}
+				}
+			}
 			retry_max_duration_secs: {
 				description: "The maximum amount of time to wait between retries."
 				required:    false
 				type: uint: {
-					default: 3600
+					default: 30
 					unit:    "seconds"
 				}
 			}
@@ -267,13 +288,16 @@ base: components: sinks: datadog_metrics: configuration: {
 		description: """
 			The Datadog [site][dd_site] to send observability data to.
 
+			This value can also be set by specifying the `DD_SITE` environment variable.
+			The value specified here takes precedence over the environment variable.
+
+			If not specified by the environment variable, a default value of
+			`datadoghq.com` is taken.
+
 			[dd_site]: https://docs.datadoghq.com/getting_started/site
 			"""
 		required: false
-		type: string: {
-			default: "datadoghq.com"
-			examples: ["us3.datadoghq.com", "datadoghq.eu"]
-		}
+		type: string: examples: ["us3.datadoghq.com", "datadoghq.eu"]
 	}
 	tls: {
 		description: "Configures the TLS options for incoming/outgoing connections."

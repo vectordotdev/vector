@@ -19,10 +19,9 @@ use pin_project::pin_project;
 use snafu::{ResultExt, Snafu};
 use tower::{Service, ServiceBuilder};
 use tower_http::decompression::DecompressionLayer;
-use vector_config::configurable_component;
-use vector_core::{
-    stream::batcher::limiter::ItemBatchSize, ByteSizeOf, EstimatedJsonEncodedSizeOf,
-};
+use vector_lib::configurable::configurable_component;
+use vector_lib::stream::batcher::limiter::ItemBatchSize;
+use vector_lib::{ByteSizeOf, EstimatedJsonEncodedSizeOf};
 
 use super::{
     retries::{RetryAction, RetryLogic},
@@ -654,8 +653,8 @@ impl ByteSizeOf for HttpRequest {
 /// Response type for use in the `Service` implementation of HTTP stream sinks.
 pub struct HttpResponse {
     pub http_response: Response<Bytes>,
-    events_byte_size: GroupedCountByteSize,
-    raw_byte_size: usize,
+    pub events_byte_size: GroupedCountByteSize,
+    pub raw_byte_size: usize,
 }
 
 impl DriverResponse for HttpResponse {
@@ -746,11 +745,10 @@ where
     fn call(&mut self, mut request: HttpRequest) -> Self::Future {
         let mut http_service = self.batch_service.clone();
 
-        let raw_byte_size = request.payload.len();
-
         // NOTE: By taking the metadata here, when passing the request to `call()` below,
         //       that function does not have access to the metadata anymore.
         let metadata = std::mem::take(request.metadata_mut());
+        let raw_byte_size = metadata.request_encoded_size();
         let events_byte_size = metadata.into_events_estimated_json_encoded_byte_size();
 
         Box::pin(async move {

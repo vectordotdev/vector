@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use snafu::Snafu;
-use vector_core::config::SourceOutput;
+use vector_lib::config::SourceOutput;
 
 pub(super) use crate::schema::Definition;
 
@@ -22,7 +22,7 @@ type Cache = HashMap<(bool, Vec<OutputId>), Vec<(OutputId, Definition)>>;
 pub fn possible_definitions(
     inputs: &[OutputId],
     config: &dyn ComponentContainer,
-    enrichment_tables: enrichment::TableRegistry,
+    enrichment_tables: vector_lib::enrichment::TableRegistry,
     cache: &mut Cache,
 ) -> Result<Vec<(OutputId, Definition)>, Error> {
     if inputs.is_empty() {
@@ -109,7 +109,7 @@ pub fn possible_definitions(
 /// 5` being expanded into two individual routes (So1 -> T3 -> T5 -> Si1 AND So1 -> T4 -> T5 ->
 /// Si1).
 pub(super) fn expanded_definitions(
-    enrichment_tables: enrichment::TableRegistry,
+    enrichment_tables: vector_lib::enrichment::TableRegistry,
     inputs: &[OutputId],
     config: &dyn ComponentContainer,
     cache: &mut Cache,
@@ -210,7 +210,7 @@ pub(super) fn expanded_definitions(
 pub(crate) fn input_definitions(
     inputs: &[OutputId],
     config: &Config,
-    enrichment_tables: enrichment::TableRegistry,
+    enrichment_tables: vector_lib::enrichment::TableRegistry,
     cache: &mut Cache,
 ) -> Result<Vec<(OutputId, Definition)>, Error> {
     if inputs.is_empty() {
@@ -301,7 +301,7 @@ pub(super) fn validate_sink_expectations(
     key: &ComponentKey,
     sink: &SinkOuter<OutputId>,
     config: &topology::Config,
-    enrichment_tables: enrichment::TableRegistry,
+    enrichment_tables: vector_lib::enrichment::TableRegistry,
 ) -> Result<(), Vec<String>> {
     let mut errors = vec![];
 
@@ -352,7 +352,7 @@ pub trait ComponentContainer {
     fn transform_outputs(
         &self,
         key: &ComponentKey,
-        enrichment_tables: enrichment::TableRegistry,
+        enrichment_tables: vector_lib::enrichment::TableRegistry,
         input_definitions: &[(OutputId, Definition)],
     ) -> Option<Vec<TransformOutput>>;
 
@@ -365,7 +365,7 @@ pub trait ComponentContainer {
         &self,
         key: &ComponentKey,
         port: &Option<String>,
-        enrichment_tables: enrichment::TableRegistry,
+        enrichment_tables: vector_lib::enrichment::TableRegistry,
         input_definitions: &[(OutputId, Definition)],
     ) -> Result<Option<TransformOutput>, ()> {
         if let Some(outputs) = self.transform_outputs(key, enrichment_tables, input_definitions) {
@@ -424,7 +424,7 @@ impl ComponentContainer for Config {
     fn transform_outputs(
         &self,
         key: &ComponentKey,
-        enrichment_tables: enrichment::TableRegistry,
+        enrichment_tables: vector_lib::enrichment::TableRegistry,
         input_definitions: &[(OutputId, Definition)],
     ) -> Option<Vec<TransformOutput>> {
         self.transform(key).map(|source| {
@@ -442,9 +442,9 @@ mod tests {
     use std::collections::HashMap;
 
     use indexmap::IndexMap;
-    use lookup::owned_value_path;
     use similar_asserts::assert_eq;
-    use vector_core::config::{DataType, SourceOutput, TransformOutput};
+    use vector_lib::config::{DataType, SourceOutput, TransformOutput};
+    use vector_lib::lookup::owned_value_path;
     use vrl::value::Kind;
 
     use super::*;
@@ -474,7 +474,7 @@ mod tests {
             fn transform_outputs(
                 &self,
                 key: &ComponentKey,
-                _: enrichment::TableRegistry,
+                _: vector_lib::enrichment::TableRegistry,
                 _: &[(OutputId, Definition)],
             ) -> Option<Vec<TransformOutput>> {
                 self.transforms.get(key.id()).cloned().map(|v| v.1)
@@ -818,7 +818,7 @@ mod tests {
                 .collect::<Vec<_>>();
 
             let got = expanded_definitions(
-                enrichment::TableRegistry::default(),
+                vector_lib::enrichment::TableRegistry::default(),
                 &inputs,
                 &case,
                 &mut HashMap::default(),

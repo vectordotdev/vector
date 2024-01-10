@@ -37,9 +37,10 @@ impl IntegrationTest {
         let environment = environment.into();
         let (test_dir, config) = IntegrationTestConfig::load(&integration)?;
         let envs_dir = EnvsDir::new(&integration);
-        let Some(env_config) = config.environments().get(&environment).map(Clone::clone) else {
+        let Some(mut env_config) = config.environments().get(&environment).map(Clone::clone) else {
             bail!("Could not find environment named {environment:?}");
         };
+
         let network_name = format!("vector-integration-tests-{integration}");
         let compose = Compose::new(test_dir, env_config.clone(), network_name.clone())?;
 
@@ -51,6 +52,8 @@ impl IntegrationTest {
             &config.runner,
             compose.is_some().then_some(network_name),
         )?;
+
+        env_config.insert("VECTOR_IMAGE".to_string(), Some(runner.image_name()));
 
         Ok(Self {
             integration,
@@ -115,8 +118,12 @@ impl IntegrationTest {
             args.push(self.retries.to_string());
         }
 
-        self.runner
-            .test(&env_vars, &self.config.runner.env, &args)?;
+        self.runner.test(
+            &env_vars,
+            &self.config.runner.env,
+            Some(&self.config.features),
+            &args,
+        )?;
 
         if !active {
             self.runner.remove()?;
@@ -126,6 +133,11 @@ impl IntegrationTest {
     }
 
     pub fn start(&self) -> Result<()> {
+        // For end-to-end tests, we want to run vector as a service, leveraging the
+        // image for the runner. So we must build that image before starting the
+        // compose so that it is available.
+        self.runner.build(Some(&self.config.features))?;
+
         self.config.check_required()?;
         if let Some(compose) = &self.compose {
             self.runner.ensure_network()?;

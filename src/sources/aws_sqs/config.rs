@@ -1,9 +1,9 @@
 use std::num::NonZeroUsize;
 
-use codecs::decoding::{DeserializerConfig, FramingConfig};
-use lookup::owned_value_path;
-use vector_config::configurable_component;
-use vector_core::config::{LegacyKey, LogNamespace};
+use vector_lib::codecs::decoding::{DeserializerConfig, FramingConfig};
+use vector_lib::config::{LegacyKey, LogNamespace};
+use vector_lib::configurable::configurable_component;
+use vector_lib::lookup::owned_value_path;
 use vrl::value::Kind;
 
 use crate::aws::create_client;
@@ -166,7 +166,6 @@ impl AwsSqsConfig {
             self.region.endpoint(),
             &cx.proxy,
             &self.tls,
-            false,
         )
         .await
     }

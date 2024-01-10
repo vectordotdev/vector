@@ -1,4 +1,5 @@
 use serde_json::Value;
+use tracing::info;
 
 use vector::test_util::trace_init;
 
@@ -44,12 +45,12 @@ fn assert_timestamp_hostname(payloads: &mut [Value]) -> usize {
 
 // runs assertions that each set of payloads should be true to regardless
 // of the pipeline
-fn common_assertions(payloads: &mut Vec<Value>) {
-    assert!(payloads.len() > 0);
+fn common_assertions(payloads: &mut [Value]) {
+    assert!(!payloads.is_empty());
 
     let n_log_events = assert_timestamp_hostname(payloads);
 
-    println!("log events received: {n_log_events}");
+    info!("log events received: {n_log_events}");
 
     assert!(n_log_events == expected_log_events());
 }
@@ -66,7 +67,11 @@ fn reduce_to_data(payloads: &mut Vec<FakeIntakePayload<Value>>) -> Vec<Value> {
 async fn validate() {
     trace_init();
 
-    println!("getting log payloads from agent-only pipeline");
+    // a small sleep here is kind of hard to avoid. Regardless of dependencies flagged for the
+    // containers, we need the events to flow between them.
+    std::thread::sleep(std::time::Duration::from_secs(5));
+
+    info!("getting log payloads from agent-only pipeline");
     let mut agent_payloads = get_fakeintake_payloads::<FakeIntakeResponseJson>(
         &fake_intake_agent_address(),
         LOGS_ENDPOINT,
@@ -75,18 +80,15 @@ async fn validate() {
     .payloads;
 
     // Not sure what this is but the logs endpoint receives an empty payload in the beginning
-    if agent_payloads.len() > 0 {
-        if agent_payloads[0].data.as_array().unwrap().len() == 0 && agent_payloads[0].encoding == ""
-        {
-            agent_payloads.remove(0);
-        }
+    if !agent_payloads.is_empty() {
+        agent_payloads.retain(|raw_payload| !raw_payload.data.as_array().unwrap().is_empty())
     }
 
     let mut agent_payloads = reduce_to_data(&mut agent_payloads);
 
     common_assertions(&mut agent_payloads);
 
-    println!("getting log payloads from agent-vector pipeline");
+    info!("getting log payloads from agent-vector pipeline");
     let mut vector_payloads = get_fakeintake_payloads::<FakeIntakeResponseJson>(
         &fake_intake_vector_address(),
         LOGS_ENDPOINT,

@@ -1,12 +1,14 @@
-use codecs::CharacterDelimitedDecoderConfig;
 use std::collections::HashMap;
 use tokio::time::Duration;
+use vector_lib::codecs::CharacterDelimitedDecoderConfig;
 use warp::{http::HeaderMap, Filter};
 
 use crate::sources::util::http::HttpMethod;
 use crate::{serde::default_decoding, serde::default_framing_message_based};
-use codecs::decoding::{CharacterDelimitedDecoderOptions, DeserializerConfig, FramingConfig};
-use vector_core::event::Event;
+use vector_lib::codecs::decoding::{
+    CharacterDelimitedDecoderOptions, DeserializerConfig, FramingConfig,
+};
+use vector_lib::event::Event;
 
 use super::HttpClientConfig;
 use crate::test_util::{
@@ -177,9 +179,7 @@ async fn request_query_applied() {
         for (k, v) in
             url::form_urlencoded::parse(query.as_bytes().expect("byte conversion should succeed"))
         {
-            got.entry(k.to_string())
-                .or_insert_with(Vec::new)
-                .push(v.to_string());
+            got.entry(k.to_string()).or_default().push(v.to_string());
         }
         for v in got.values_mut() {
             v.sort();

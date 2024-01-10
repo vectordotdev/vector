@@ -1,7 +1,7 @@
 use std::{fmt, sync::Arc};
 
 use serde::Serialize;
-use vector_core::event::{Metric, MetricValue};
+use vector_lib::event::{Metric, MetricValue};
 use vrl::path::OwnedValuePath;
 
 use super::request_builder::HecMetricsRequestBuilder;
@@ -39,6 +39,7 @@ where
         let index = self.index.as_ref();
         let host_key = self.host_key.as_ref();
         let default_namespace = self.default_namespace.as_deref();
+        let batch_settings = self.batch_settings;
 
         input
             .map(|event| (event.size_of(), event.into_metric()))
@@ -53,7 +54,7 @@ where
                     default_namespace,
                 ))
             })
-            .batched_partitioned(EventPartitioner, self.batch_settings)
+            .batched_partitioned(EventPartitioner, || batch_settings.as_byte_size_config())
             .request_builder(
                 default_request_builder_concurrency_limit(),
                 self.request_builder,

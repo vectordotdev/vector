@@ -25,5 +25,9 @@ paths:
 - "src/internal_events/datadog_*"
 - "src/sinks/datadog/logs/**"
 - "src/sinks/util/**"
+# NOTE: currently we need the prefix 'e2e' even though it looks redundant,
+# because the vdev code does not otherwise have a way to distinguish between
+# the other `datadog-logs` int test.
+# but once GH issue 18829 is completed, this will become unecessary.
 - "scripts/e2e/e2e-datadog-logs/**"
 - "tests/data/e2e/datadog/logs/**"

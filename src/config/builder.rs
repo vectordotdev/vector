@@ -5,8 +5,8 @@ use std::{path::Path, time::Duration};
 use indexmap::IndexMap;
 #[cfg(feature = "enterprise")]
 use serde_json::Value;
-use vector_config::configurable_component;
-use vector_core::config::GlobalOptions;
+use vector_lib::config::GlobalOptions;
+use vector_lib::configurable::configurable_component;
 
 use crate::{enrichment_tables::EnrichmentTables, providers::Providers, secrets::SecretBackends};
 
@@ -83,6 +83,11 @@ pub struct ConfigBuilder {
     #[serde(default, skip)]
     #[doc(hidden)]
     pub graceful_shutdown_duration: Option<Duration>,
+
+    /// Allow the configuration to be empty, resulting in a topology with no components.
+    #[serde(default, skip)]
+    #[doc(hidden)]
+    pub allow_empty: bool,
 }
 
 #[cfg(feature = "enterprise")]
@@ -232,6 +237,7 @@ impl From<Config> for ConfigBuilder {
             tests,
             secret,
             graceful_shutdown_duration,
+            allow_empty: false,
         }
     }
 }

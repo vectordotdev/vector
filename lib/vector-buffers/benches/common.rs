@@ -164,7 +164,7 @@ pub async fn wtr_measurement<const N: usize>(
     messages: Vec<Message<N>>,
 ) {
     for msg in messages.into_iter() {
-        sender.send(msg).await.unwrap();
+        sender.send(msg, None).await.unwrap();
     }
     drop(sender);
 
@@ -177,7 +177,7 @@ pub async fn war_measurement<const N: usize>(
     messages: Vec<Message<N>>,
 ) {
     for msg in messages.into_iter() {
-        sender.send(msg).await.unwrap();
+        sender.send(msg, None).await.unwrap();
         _ = receiver.next().await.unwrap();
     }
 }

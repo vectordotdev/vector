@@ -6,7 +6,7 @@ use std::{
 
 use tokio::sync::OwnedSemaphorePermit;
 use tower::timeout::error::Elapsed;
-use vector_common::internal_event::{InternalEventHandle as _, Registered};
+use vector_lib::internal_event::{InternalEventHandle as _, Registered};
 
 use super::{instant_now, semaphore::ShrinkableSemaphore, AdaptiveConcurrencySettings};
 #[cfg(test)]
@@ -68,7 +68,7 @@ impl<L> Controller<L> {
         // If a `concurrency` is specified, it becomes both the
         // current limit and the maximum, effectively bypassing all the
         // mechanisms. Otherwise, the current limit is set to 1 and the
-        // maximum to MAX_CONCURRENCY.
+        // maximum to `settings.max_concurrency_limit`.
         let current_limit = concurrency.unwrap_or(settings.initial_concurrency);
         Self {
             semaphore: Arc::new(ShrinkableSemaphore::new(current_limit)),
@@ -226,7 +226,7 @@ impl<L> Controller<L> {
         // concurrency limit. Note that we only check this if we had
         // requests to go beyond the current limit to prevent
         // increasing the limit beyond what we have evidence for.
-        if inner.current_limit < super::MAX_CONCURRENCY
+        if inner.current_limit < self.settings.max_concurrency_limit
             && inner.reached_limit
             && !inner.had_back_pressure
             && current_rtt.is_some()

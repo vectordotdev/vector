@@ -12,6 +12,7 @@ use crate::api;
 use crate::config::enterprise::{
     report_on_reload, EnterpriseError, EnterpriseMetadata, EnterpriseReporter,
 };
+use crate::extra_context::ExtraContext;
 use crate::internal_events::{
     VectorConfigLoadError, VectorRecoveryError, VectorReloadError, VectorReloaded,
 };
@@ -43,6 +44,7 @@ pub struct TopologyController {
     pub enterprise_reporter: Option<EnterpriseReporter<BoxFuture<'static, ()>>>,
     #[cfg(feature = "api")]
     pub api_server: Option<api::Server>,
+    pub extra_context: ExtraContext,
 }
 
 impl std::fmt::Debug for TopologyController {
@@ -132,7 +134,11 @@ impl TopologyController {
             }
         }
 
-        match self.topology.reload_config_and_respawn(new_config).await {
+        match self
+            .topology
+            .reload_config_and_respawn(new_config, self.extra_context.clone())
+            .await
+        {
             Ok(true) => {
                 #[cfg(feature = "api")]
                 // Pass the new config to the API server.

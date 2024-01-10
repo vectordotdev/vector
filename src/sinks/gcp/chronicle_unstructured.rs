@@ -12,9 +12,9 @@ use snafu::Snafu;
 use std::io;
 use tokio_util::codec::Encoder as _;
 use tower::{Service, ServiceBuilder};
-use vector_common::request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata};
-use vector_config::configurable_component;
-use vector_core::{
+use vector_lib::configurable::configurable_component;
+use vector_lib::request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata};
+use vector_lib::{
     config::{telemetry, AcknowledgementsConfig, Input},
     event::{Event, EventFinalizers, Finalizable},
     sink::VectorSink,
@@ -22,6 +22,7 @@ use vector_core::{
 };
 use vrl::value::Kind;
 
+use crate::sinks::util::service::TowerRequestConfigDefaults;
 use crate::{
     codecs::{self, EncodingConfig},
     config::{GenerateConfig, SinkConfig, SinkContext},
@@ -97,6 +98,12 @@ impl SinkBatchSettings for ChronicleUnstructuredDefaultBatchSettings {
     const TIMEOUT_SECS: f64 = 15.0;
 }
 
+#[derive(Clone, Copy, Debug)]
+pub struct ChronicleUnstructuredTowerRequestConfigDefaults;
+
+impl TowerRequestConfigDefaults for ChronicleUnstructuredTowerRequestConfigDefaults {
+    const RATE_LIMIT_NUM: u64 = 1_000;
+}
 /// Configuration for the `gcp_chronicle_unstructured` sink.
 #[configurable_component(sink(
     "gcp_chronicle_unstructured",
@@ -132,7 +139,7 @@ pub struct ChronicleUnstructuredConfig {
 
     #[configurable(derived)]
     #[serde(default)]
-    pub request: TowerRequestConfig,
+    pub request: TowerRequestConfig<ChronicleUnstructuredTowerRequestConfigDefaults>,
 
     #[configurable(derived)]
     pub tls: Option<TlsConfig>,
@@ -235,10 +242,7 @@ impl ChronicleUnstructuredConfig {
     ) -> crate::Result<VectorSink> {
         use crate::sinks::util::service::ServiceBuilderExt;
 
-        let request = self.request.unwrap_with(&TowerRequestConfig {
-            rate_limit_num: Some(1000),
-            ..Default::default()
-        });
+        let request = self.request.into_settings();
 
         let batch_settings = self.batch.into_batcher_settings()?;
 
@@ -512,7 +516,7 @@ impl Service<ChronicleRequest> for ChronicleService {
 mod integration_tests {
     use reqwest::{Client, Method, Response};
     use serde::{Deserialize, Serialize};
-    use vector_core::event::{BatchNotifier, BatchStatus};
+    use vector_lib::event::{BatchNotifier, BatchStatus};
 
     use super::*;
     use crate::test_util::{

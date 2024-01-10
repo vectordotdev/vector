@@ -1,8 +1,10 @@
-use std::{collections::BTreeMap, convert::TryFrom};
+use std::convert::TryFrom;
+
+use vector_lib::lookup::PathPrefix;
 
 use crate::{
     codecs::Transformer,
-    event::{LogEvent, Metric, MetricKind, MetricValue, Value},
+    event::{LogEvent, Metric, MetricKind, MetricValue, ObjectMap, Value},
     sinks::{
         elasticsearch::{
             sink::process_log, BulkAction, BulkConfig, DataStreamConfig, ElasticsearchApiVersion,
@@ -37,10 +39,7 @@ async fn sets_create_action_when_configured() {
 
     let mut log = LogEvent::from("hello there");
     log.insert(
-        (
-            lookup::PathPrefix::Event,
-            log_schema().timestamp_key().unwrap(),
-        ),
+        (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
         Utc.with_ymd_and_hms(2020, 12, 1, 1, 2, 3)
             .single()
             .expect("invalid timestamp"),
@@ -68,8 +67,8 @@ fn data_stream_body(
     dtype: Option<String>,
     dataset: Option<String>,
     namespace: Option<String>,
-) -> BTreeMap<String, Value> {
-    let mut ds = BTreeMap::<String, Value>::new();
+) -> ObjectMap {
+    let mut ds = ObjectMap::new();
 
     if let Some(dtype) = dtype {
         ds.insert("type".into(), Value::from(dtype));
@@ -106,10 +105,7 @@ async fn encode_datastream_mode() {
 
     let mut log = LogEvent::from("hello there");
     log.insert(
-        (
-            lookup::PathPrefix::Event,
-            log_schema().timestamp_key().unwrap(),
-        ),
+        (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
         Utc.with_ymd_and_hms(2020, 12, 1, 1, 2, 3)
             .single()
             .expect("invalid timestamp"),
@@ -173,10 +169,7 @@ async fn encode_datastream_mode_no_routing() {
         ),
     );
     log.insert(
-        (
-            lookup::PathPrefix::Event,
-            log_schema().timestamp_key().unwrap(),
-        ),
+        (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
         Utc.with_ymd_and_hms(2020, 12, 1, 1, 2, 3)
             .single()
             .expect("invalid timestamp"),
@@ -231,7 +224,7 @@ async fn handle_metrics() {
     let encoded_lines = encoded.split('\n').map(String::from).collect::<Vec<_>>();
     assert_eq!(encoded_lines.len(), 3); // there's an empty line at the end
     assert_eq!(
-        encoded_lines.get(0).unwrap(),
+        encoded_lines.first().unwrap(),
         r#"{"create":{"_index":"vector","_type":"_doc"}}"#
     );
     assert!(encoded_lines
@@ -324,10 +317,7 @@ async fn encode_datastream_mode_no_sync() {
         ),
     );
     log.insert(
-        (
-            lookup::PathPrefix::Event,
-            log_schema().timestamp_key().unwrap(),
-        ),
+        (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
         Utc.with_ymd_and_hms(2020, 12, 1, 1, 2, 3)
             .single()
             .expect("invalid timestamp"),

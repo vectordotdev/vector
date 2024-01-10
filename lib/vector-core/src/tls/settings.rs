@@ -9,7 +9,7 @@ use lookup::lookup_v2::OptionalValuePath;
 use openssl::{
     pkcs12::{ParsedPkcs12_2, Pkcs12},
     pkey::{PKey, Private},
-    ssl::{ConnectConfiguration, SslContextBuilder, SslVerifyMode},
+    ssl::{select_next_proto, AlpnError, ConnectConfiguration, SslContextBuilder, SslVerifyMode},
     stack::Stack,
     x509::{store::X509StoreBuilder, X509},
 };
@@ -268,6 +268,14 @@ impl TlsSettings {
     }
 
     pub(super) fn apply_context(&self, context: &mut SslContextBuilder) -> Result<()> {
+        self.apply_context_base(context, false)
+    }
+
+    pub(super) fn apply_context_base(
+        &self,
+        context: &mut SslContextBuilder,
+        for_server: bool,
+    ) -> Result<()> {
         context.set_verify(if self.verify_certificate {
             SslVerifyMode::PEER | SslVerifyMode::FAIL_IF_NO_PEER_CERT
         } else {
@@ -310,9 +318,16 @@ impl TlsSettings {
         }
 
         if let Some(alpn) = &self.alpn_protocols {
-            context
-                .set_alpn_protos(alpn.as_slice())
-                .context(SetAlpnProtocolsSnafu)?;
+            if for_server {
+                let server_proto = alpn.clone();
+                context.set_alpn_select_callback(move |_, client_proto| {
+                    select_next_proto(server_proto.as_slice(), client_proto).ok_or(AlpnError::NOACK)
+                });
+            } else {
+                context
+                    .set_alpn_protos(alpn.as_slice())
+                    .context(SetAlpnProtocolsSnafu)?;
+            }
         }
 
         Ok(())
@@ -556,7 +571,7 @@ impl MaybeTlsSettings {
 
     pub const fn http_protocol_name(&self) -> &'static str {
         match self {
-            MaybeTls::Raw(_) => "http",
+            MaybeTls::Raw(()) => "http",
             MaybeTls::Tls(_) => "https",
         }
     }

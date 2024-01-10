@@ -11,7 +11,7 @@ runner:
 matrix:
   # Temporarily pegging to the latest known stable release
   # since using `latest` is failing consistently.
-  version: [v0.4.0]
+  version: [v0.4.4]
 
 # changes to these files/paths will invoke the integration test in CI
 # expressions are evaluated using https://github.com/micromatch/picomatch

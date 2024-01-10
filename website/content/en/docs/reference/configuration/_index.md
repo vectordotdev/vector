@@ -213,7 +213,7 @@ vector --config /etc/vector/vector.yaml
 {{< tab title="TOML" >}}
 
 ```shell
-vector --config /etc/vector/vector.yaml
+vector --config /etc/vector/vector.toml
 ```
 
 {{< /tab >}}

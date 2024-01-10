@@ -6,18 +6,18 @@ use std::{
 };
 
 use bytes::{Buf, Bytes};
-use codecs::{
-    encoding::{Framer, FramingConfig},
-    JsonSerializerConfig, NewlineDelimitedEncoderConfig, TextSerializerConfig,
-};
 use flate2::{read::MultiGzDecoder, read::ZlibDecoder};
 use futures::{channel::mpsc, stream};
 use headers::{Authorization, HeaderMapExt};
 use http::request::Parts;
 use hyper::{Body, Method, Response, StatusCode};
 use serde::{de, Deserialize};
+use vector_lib::codecs::{
+    encoding::{Framer, FramingConfig},
+    JsonSerializerConfig, NewlineDelimitedEncoderConfig, TextSerializerConfig,
+};
 
-use vector_core::event::{BatchNotifier, BatchStatus, Event, LogEvent};
+use vector_lib::event::{BatchNotifier, BatchStatus, Event, LogEvent};
 
 use crate::{
     assert_downcast_matches,

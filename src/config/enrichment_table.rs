@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use enum_dispatch::enum_dispatch;
-use vector_config::{configurable_component, NamedComponent};
-use vector_core::config::GlobalOptions;
+use vector_lib::config::GlobalOptions;
+use vector_lib::configurable::{configurable_component, NamedComponent};
 
 use crate::enrichment_tables::EnrichmentTables;
 
@@ -37,5 +37,5 @@ pub trait EnrichmentTableConfig: NamedComponent + core::fmt::Debug + Send + Sync
     async fn build(
         &self,
         globals: &GlobalOptions,
-    ) -> crate::Result<Box<dyn enrichment::Table + Send + Sync>>;
+    ) -> crate::Result<Box<dyn vector_lib::enrichment::Table + Send + Sync>>;
 }

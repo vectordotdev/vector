@@ -2,15 +2,13 @@ use std::collections::BTreeMap;
 
 use mlua::prelude::*;
 
-use super::util::{table_to_timestamp, timestamp_to_table};
-use crate::event::metric::TagValue;
-use crate::{
-    event::{
-        metric::{self, MetricSketch, MetricTags, TagValueSet},
-        Metric, MetricKind, MetricValue, StatisticKind,
-    },
-    metrics::AgentDDSketch,
+use super::super::{
+    metric::TagValue,
+    metric::{self, MetricSketch, MetricTags, TagValueSet},
+    Metric, MetricKind, MetricValue, StatisticKind,
 };
+use super::util::{table_to_timestamp, timestamp_to_table};
+use crate::metrics::AgentDDSketch;
 
 pub struct LuaMetric {
     pub metric: Metric,

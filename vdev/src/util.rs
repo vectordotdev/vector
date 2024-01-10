@@ -1,4 +1,5 @@
 use std::ffi::{OsStr, OsString};
+use std::io::IsTerminal;
 use std::process::{Command, Output};
 use std::{collections::BTreeMap, fmt::Debug, fs, io::ErrorKind, path::Path};
 
@@ -7,7 +8,7 @@ use once_cell::sync::Lazy;
 use serde::Deserialize;
 use serde_json::Value;
 
-pub static IS_A_TTY: Lazy<bool> = Lazy::new(|| atty::is(atty::Stream::Stdout));
+pub static IS_A_TTY: Lazy<bool> = Lazy::new(|| std::io::stdout().is_terminal());
 
 #[derive(Deserialize)]
 pub struct CargoTomlPackage {
@@ -49,11 +50,6 @@ pub fn git_head() -> Result<Output> {
 
 pub fn get_channel() -> String {
     std::env::var("CHANNEL").unwrap_or_else(|_| "custom".to_string())
-}
-
-#[derive(Deserialize)]
-pub struct RustToolChain {
-    pub channel: String,
 }
 
 pub fn exists(path: impl AsRef<Path> + Debug) -> Result<bool> {

@@ -1,7 +1,7 @@
-use lookup::lookup_v2::ConfigValuePath;
 use std::marker::PhantomData;
+use vector_lib::lookup::lookup_v2::ConfigValuePath;
 
-use vector_core::stream::BatcherSettings;
+use vector_lib::stream::BatcherSettings;
 
 use crate::{
     aws::{AwsAuthentication, RegionOrEndpoint},
@@ -65,6 +65,12 @@ pub struct KinesisSinkBaseConfig {
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     pub acknowledgements: AcknowledgementsConfig,
+
+    /// The log field used as the Kinesis record’s partition key value.
+    ///
+    /// If not specified, a unique partition key is generated for each Kinesis record.
+    #[configurable(metadata(docs::examples = "user_id"))]
+    pub partition_key_field: Option<ConfigValuePath>,
 }
 
 impl KinesisSinkBaseConfig {
@@ -95,7 +101,7 @@ where
     E: Send + 'static,
     RT: RetryLogic<Response = KinesisResponse> + Default,
 {
-    let request_limits = config.request.unwrap_with(&TowerRequestConfig::default());
+    let request_limits = config.request.into_settings();
 
     let region = config.region.region();
     let service = ServiceBuilder::new()

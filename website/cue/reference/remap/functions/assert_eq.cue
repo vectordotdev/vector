@@ -5,7 +5,7 @@ remap: functions: assert_eq: {
 
 	description: """
 		Asserts that two expressions, `left` and `right`, have the same value. The program is
-		aborted with the `message` if they are unequal.
+		aborted with `message` if they do not have the same value.
 		"""
 
 	notices: [
@@ -15,6 +15,8 @@ remap: functions: assert_eq: {
 			you want the program to continue if the condition evaluates to `false`.
 			""",
 	]
+
+	pure: false
 
 	arguments: [
 		{
@@ -34,7 +36,7 @@ remap: functions: assert_eq: {
 			description: """
 				An optional custom error message. If the equality assertion fails, `message` is
 				appended to the default message prefix. See the [examples](#assert_eq-examples)
-				below for a sample fully formed log message.
+				below for a fully formed log message sample.
 				"""
 			required: false
 			type: ["string"]

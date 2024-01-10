@@ -25,6 +25,7 @@ Asus
 Atlassian
 Attab
 Audiosonic
+avsc
 Axioo
 Azend
 Bedove
@@ -108,11 +109,13 @@ Lifetab
 Lifetouch
 Lumia
 Malata
+manden
 Maxthon
 Mediacom
 Medion
 Meizu
 Mertz
+metakey
 Metakey
 Micromax
 Mito
@@ -139,6 +142,7 @@ PHILIPSTV
 POCs
 Panasonic
 Papyre
+pbs
 Phicomm
 Phototechnik
 Pingdom
@@ -399,6 +403,7 @@ podman
 postgresql
 proxyuser
 pseudocode
+pushgateway
 qwerty
 rabbitmq
 rclone
@@ -413,6 +418,7 @@ rsyslog
 rsyslogd
 security-tab
 servlet
+Sinjo
 sublocation
 snyk
 socketaddr

@@ -110,7 +110,7 @@ impl<T: Bufferable> TopologyBuilder<T> {
         span: Span,
     ) -> Result<(BufferSender<T>, BufferReceiver<T>), TopologyError> {
         // We pop stages off in reverse order to build from the inside out.
-        let mut buffer_usage = BufferUsage::from_span(span);
+        let mut buffer_usage = BufferUsage::from_span(span.clone());
         let mut current_stage = None;
 
         for (stage_idx, stage) in self.stages.into_iter().enumerate().rev() {
@@ -154,9 +154,10 @@ impl<T: Bufferable> TopologyBuilder<T> {
                 ),
             };
 
+            sender.with_send_duration_instrumentation(stage_idx, &span);
             if !provides_instrumentation {
-                sender.with_instrumentation(usage_handle.clone());
-                receiver.with_instrumentation(usage_handle);
+                sender.with_usage_instrumentation(usage_handle.clone());
+                receiver.with_usage_instrumentation(usage_handle);
             }
 
             current_stage = Some((sender, receiver));
@@ -188,6 +189,7 @@ impl<T: Bufferable> TopologyBuilder<T> {
     pub async fn standalone_memory(
         max_events: NonZeroUsize,
         when_full: WhenFull,
+        receiver_span: &Span,
     ) -> (BufferSender<T>, BufferReceiver<T>) {
         let usage_handle = BufferUsageHandle::noop();
 
@@ -201,7 +203,8 @@ impl<T: Bufferable> TopologyBuilder<T> {
             WhenFull::Overflow => WhenFull::Block,
             m => m,
         };
-        let sender = BufferSender::new(sender, mode);
+        let mut sender = BufferSender::new(sender, mode);
+        sender.with_send_duration_instrumentation(0, receiver_span);
         let receiver = BufferReceiver::new(receiver);
 
         (sender, receiver)
@@ -239,8 +242,8 @@ impl<T: Bufferable> TopologyBuilder<T> {
         let mut sender = BufferSender::new(sender, mode);
         let mut receiver = BufferReceiver::new(receiver);
 
-        sender.with_instrumentation(usage_handle.clone());
-        receiver.with_instrumentation(usage_handle);
+        sender.with_usage_instrumentation(usage_handle.clone());
+        receiver.with_usage_instrumentation(usage_handle);
 
         (sender, receiver)
     }

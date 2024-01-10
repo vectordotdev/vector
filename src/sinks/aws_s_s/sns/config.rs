@@ -5,7 +5,7 @@ use crate::aws::RegionOrEndpoint;
 use crate::config::{
     AcknowledgementsConfig, DataType, GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext,
 };
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 
 use super::{
     client::SnsMessagePublisher, message_deduplication_id, message_group_id, BaseSSSinkConfig,
@@ -53,7 +53,6 @@ impl SnsSinkConfig {
             self.region.endpoint(),
             proxy,
             &self.base_config.tls,
-            true,
         )
         .await
     }
@@ -106,16 +105,10 @@ impl SinkConfig for SnsSinkConfig {
 pub(super) struct SnsClientBuilder;
 
 impl ClientBuilder for SnsClientBuilder {
-    type Config = aws_sdk_sns::config::Config;
     type Client = aws_sdk_sns::client::Client;
-    type DefaultMiddleware = aws_sdk_sns::middleware::DefaultMiddleware;
 
-    fn default_middleware() -> Self::DefaultMiddleware {
-        aws_sdk_sns::middleware::DefaultMiddleware::new()
-    }
-
-    fn build(client: aws_smithy_client::Client, config: &aws_types::SdkConfig) -> Self::Client {
-        aws_sdk_sns::client::Client::with_config(client, config.into())
+    fn build(config: &aws_types::SdkConfig) -> Self::Client {
+        aws_sdk_sns::client::Client::new(config)
     }
 }
 

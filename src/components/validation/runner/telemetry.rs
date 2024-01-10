@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use tokio::{select, sync::mpsc, task::JoinHandle};
-use vector_core::event::Event;
+use vector_lib::event::Event;
 
 use crate::{
     components::validation::{
@@ -52,7 +52,7 @@ impl Telemetry {
         // disable retries, as we don't want to waste time performing retries,
         // especially when the test harness is shutting down.
         vector_sink.batch.timeout_secs = Some(0.1);
-        vector_sink.request.retry_attempts = Some(0);
+        vector_sink.request.retry_attempts = 0;
 
         config_builder.add_source(INTERNAL_LOGS_KEY, internal_logs);
         config_builder.add_source(INTERNAL_METRICS_KEY, internal_metrics);
