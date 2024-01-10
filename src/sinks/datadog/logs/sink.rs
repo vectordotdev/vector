@@ -143,17 +143,17 @@ struct LogRequestBuilder {
 impl LogRequestBuilder {
     fn build_request(
         &self,
-        mut events: Vec<Event>,
+        events: Vec<Event>,
         api_key: Arc<str>,
     ) -> Result<Vec<LogApiRequest>, RequestBuildError> {
         // Transform events and pre-compute their estimated size.
         let mut events_with_estimated_size: VecDeque<(Event, JsonSize)> = events
-            .iter_mut()
-            .map(|event| {
-                normalize_event(event);
-                self.transformer.transform(event);
+            .into_iter()
+            .map(|mut event| {
+                normalize_event(&mut event);
+                self.transformer.transform(&mut event);
                 let estimated_json_size = event.estimated_json_encoded_size_of();
-                (event.clone(), estimated_json_size)
+                (event, estimated_json_size)
             })
             .collect();
 
