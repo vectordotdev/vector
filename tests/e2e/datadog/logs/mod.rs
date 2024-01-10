@@ -58,6 +58,10 @@ fn common_assertions(payloads: &mut [Value]) {
 async fn validate() {
     trace_init();
 
+    // a small sleep here is kind of hard to avoid. Regardless of dependencies flagged for the
+    // containers, we need the events to flow between them.
+    std::thread::sleep(std::time::Duration::from_secs(5));
+
     println!("getting log payloads from agent-only pipeline");
     let mut agent_payloads = get_payloads_agent(LOGS_ENDPOINT).await;
 

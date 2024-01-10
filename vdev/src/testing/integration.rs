@@ -73,10 +73,6 @@ impl IntegrationTest {
         self.config.check_required()?;
 
         if !active {
-            // For end-to-end tests, we want to run vector as a service, leveraging the
-            // image for the runner. So we must build that image before starting the
-            // compose so that it is available.
-            self.runner.build(Some(&self.config.features))?;
             self.start()?;
         }
 
@@ -137,6 +133,11 @@ impl IntegrationTest {
     }
 
     pub fn start(&self) -> Result<()> {
+        // For end-to-end tests, we want to run vector as a service, leveraging the
+        // image for the runner. So we must build that image before starting the
+        // compose so that it is available.
+        self.runner.build(Some(&self.config.features))?;
+
         self.config.check_required()?;
         if let Some(compose) = &self.compose {
             self.runner.ensure_network()?;

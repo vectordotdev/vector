@@ -24,10 +24,8 @@ services:
       - fakeintake-vector
     build:
       context: ${PWD}
-      # dockerfile: tests/data/e2e/datadog/Dockerfile
-      # args:
-      #   - RUST_VERSION=${RUST_VERSION}
-      #   - FEATURES=e2e-tests-datadog
+    # re-using the integration test runner image since it already has
+    # compiled vector on it.
     image: ${CONFIG_VECTOR_IMAGE}
     environment:
       - FEATURES=e2e-tests-datadog
