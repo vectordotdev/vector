@@ -1,15 +1,17 @@
 use std::{convert::TryInto, io::ErrorKind};
 
 use async_compression::tokio::bufread;
-use aws_sdk_s3::types::ByteStream;
-use codecs::decoding::{DeserializerConfig, FramingConfig, NewlineDelimitedDecoderOptions};
-use codecs::NewlineDelimitedDecoderConfig;
+use aws_smithy_types::byte_stream::ByteStream;
 use futures::{stream, stream::StreamExt, TryStreamExt};
-use lookup::owned_value_path;
 use snafu::Snafu;
 use tokio_util::io::StreamReader;
-use vector_config::configurable_component;
-use vector_core::config::{LegacyKey, LogNamespace};
+use vector_lib::codecs::decoding::{
+    DeserializerConfig, FramingConfig, NewlineDelimitedDecoderOptions,
+};
+use vector_lib::codecs::NewlineDelimitedDecoderConfig;
+use vector_lib::config::{LegacyKey, LogNamespace};
+use vector_lib::configurable::configurable_component;
+use vector_lib::lookup::owned_value_path;
 use vrl::value::{kind::Collection, Kind};
 
 use super::util::MultilineConfig;
@@ -235,7 +237,6 @@ impl AwsS3Config {
             endpoint.clone(),
             proxy,
             &self.tls_options,
-            false,
         )
         .await?;
 
@@ -251,7 +252,6 @@ impl AwsS3Config {
                     endpoint,
                     proxy,
                     &sqs.tls_options,
-                    false,
                 )
                 .await?;
 
@@ -303,7 +303,11 @@ async fn s3_object_decoder(
 
     let r = tokio::io::BufReader::new(StreamReader::new(
         stream::iter(Some(first))
-            .chain(body)
+            .chain(Box::pin(async_stream::stream! {
+                while let Some(next) = body.next().await {
+                    yield next;
+                }
+            }))
             .map_err(|e| std::io::Error::new(ErrorKind::Other, e)),
     ));
 
@@ -377,10 +381,9 @@ fn object_key_to_compression(key: &str) -> Option<Compression> {
 
 #[cfg(test)]
 mod test {
-    use aws_sdk_s3::types::ByteStream;
     use tokio::io::AsyncReadExt;
 
-    use super::{s3_object_decoder, Compression};
+    use super::*;
 
     #[test]
     fn determine_compression() {
@@ -441,14 +444,14 @@ mod integration_tests {
         time::Duration,
     };
 
-    use aws_sdk_s3::{types::ByteStream, Client as S3Client};
-    use aws_sdk_sqs::{model::QueueAttributeName, Client as SqsClient};
-    use codecs::{decoding::DeserializerConfig, JsonDeserializerConfig};
-    use lookup::path;
+    use aws_sdk_s3::Client as S3Client;
+    use aws_sdk_sqs::{types::QueueAttributeName, Client as SqsClient};
     use similar_asserts::assert_eq;
+    use vector_lib::codecs::{decoding::DeserializerConfig, JsonDeserializerConfig};
+    use vector_lib::lookup::path;
     use vrl::value::Value;
 
-    use super::{sqs, AwsS3Config, Compression, Strategy};
+    use super::*;
     use crate::{
         aws::{create_client, AwsAuthentication, RegionOrEndpoint},
         common::sqs::SqsClientBuilder,
@@ -894,6 +897,10 @@ mod integration_tests {
                 assert_eq!(namespace.get_source_metadata(AwsS3Config::NAME, log, path!("region"), path!("region")).unwrap(), &"us-east-1".into());
             }
 
+            // Unfortunately we need a fairly large sleep here to ensure that the source has actually managed to delete the SQS message.
+            // The deletion of this message occurs after the Event has been sent out by the source and there is no way of knowing when this
+            // process has finished other than waiting around for a while.
+            tokio::time::sleep(Duration::from_secs(10)).await;
             // Make sure the SQS message is deleted
             match status {
                 Errored => {
@@ -970,7 +977,6 @@ mod integration_tests {
             region_endpoint.endpoint(),
             &proxy_config,
             &None,
-            false,
         )
         .await
         .unwrap()
@@ -989,7 +995,6 @@ mod integration_tests {
             region_endpoint.endpoint(),
             &proxy_config,
             &None,
-            false,
         )
         .await
         .unwrap()

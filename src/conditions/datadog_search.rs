@@ -1,8 +1,8 @@
 use std::borrow::Cow;
 
 use bytes::Bytes;
-use vector_config::configurable_component;
-use vector_core::event::{Event, LogEvent, Value};
+use vector_lib::configurable::configurable_component;
+use vector_lib::event::{Event, LogEvent, Value};
 use vrl::datadog_filter::{
     build_matcher,
     regex::{wildcard_regex, word_regex},
@@ -38,7 +38,10 @@ impl Conditional for DatadogSearchRunner {
 }
 
 impl ConditionalConfig for DatadogSearchConfig {
-    fn build(&self, _enrichment_tables: &enrichment::TableRegistry) -> crate::Result<Condition> {
+    fn build(
+        &self,
+        _enrichment_tables: &vector_lib::enrichment::TableRegistry,
+    ) -> crate::Result<Condition> {
         let node = parse(&self.source)?;
         let matcher = as_log(build_matcher(&node, &EventFilter));
 
@@ -325,7 +328,7 @@ where
 #[cfg(test)]
 mod test {
     use serde_json::json;
-    use vector_core::event::Event;
+    use vector_lib::event::Event;
     use vrl::datadog_filter::{build_matcher, Filter, Resolver};
     use vrl::datadog_search_syntax::parse;
 

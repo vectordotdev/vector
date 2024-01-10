@@ -1,0 +1,1 @@
+{"metric":{"name":"f","namespace":"t","kind":"absolute","sketch":{"sketch":{"AgentDDSketch":{"bins":{"k":[],"n":[]},"count":0,"min":1.7976931348623157e308,"max":-1.7976931348623157e308,"sum":555840.0,"avg":-479552.0}}}}}

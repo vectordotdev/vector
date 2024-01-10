@@ -2,7 +2,7 @@ use std::{fmt, str::FromStr};
 
 use http::uri::{Authority, PathAndQuery, Scheme, Uri};
 use percent_encoding::percent_decode_str;
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 
 use crate::http::Auth;
 

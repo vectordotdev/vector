@@ -3,8 +3,9 @@ use std::path::{Path, PathBuf};
 
 use rdkafka::{consumer::ConsumerContext, ClientConfig, ClientContext, Statistics};
 use snafu::Snafu;
-use vector_common::sensitive_string::SensitiveString;
-use vector_config::configurable_component;
+use tracing::Span;
+use vector_lib::configurable::configurable_component;
+use vector_lib::sensitive_string::SensitiveString;
 
 use crate::{
     internal_events::KafkaStatisticsReceived, tls::TlsEnableableConfig, tls::PEM_START_MARKER,
@@ -111,6 +112,20 @@ impl KafkaAuthConfig {
         if tls_enabled {
             let tls = self.tls.as_ref().unwrap();
 
+            if let Some(verify_certificate) = &tls.options.verify_certificate {
+                client.set(
+                    "enable.ssl.certificate.verification",
+                    &verify_certificate.to_string(),
+                );
+            }
+
+            if let Some(verify_hostname) = &tls.options.verify_hostname {
+                client.set(
+                    "ssl.endpoint.identification.algorithm",
+                    if *verify_hostname { "https" } else { "none" },
+                );
+            }
+
             if let Some(path) = &tls.options.ca_file {
                 let text = pathbuf_to_string(path)?;
                 if text.contains(PEM_START_MARKER) {
@@ -152,13 +167,16 @@ fn pathbuf_to_string(path: &Path) -> crate::Result<&str> {
         .ok_or_else(|| KafkaError::InvalidPath { path: path.into() }.into())
 }
 
-#[derive(Default)]
 pub(crate) struct KafkaStatisticsContext {
     pub(crate) expose_lag_metrics: bool,
+    pub span: Span,
 }
 
 impl ClientContext for KafkaStatisticsContext {
     fn stats(&self, statistics: Statistics) {
+        // This callback get executed on a separate thread within the rdkafka library, so we need
+        // to propagate the span here to attach the component tags to the emitted events.
+        let _entered = self.span.enter();
         emit!(KafkaStatisticsReceived {
             statistics: &statistics,
             expose_lag_metrics: self.expose_lag_metrics,

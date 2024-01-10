@@ -10,10 +10,10 @@ use colored::*;
 use indexmap::IndexMap;
 use serde::Serialize;
 use toml::{map::Map, Value};
-use vector_config::component::{
+use vector_lib::configurable::component::{
     ExampleError, SinkDescription, SourceDescription, TransformDescription,
 };
-use vector_core::{buffers::BufferConfig, config::GlobalOptions, default_data_dir};
+use vector_lib::{buffers::BufferConfig, config::GlobalOptions, default_data_dir};
 
 use crate::config::{format, Format, SinkHealthcheckOptions};
 
@@ -133,7 +133,7 @@ pub(crate) fn generate_example(
     let mut errs = Vec::new();
 
     let mut source_names = Vec::new();
-    if let Some(source_types) = components.get(0) {
+    if let Some(source_types) = components.first() {
         let mut sources = IndexMap::new();
 
         for (i, source_expr) in source_types.iter().enumerate() {

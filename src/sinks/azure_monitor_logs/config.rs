@@ -1,9 +1,9 @@
-use lookup::{lookup_v2::OptionalValuePath, OwnedValuePath};
 use openssl::{base64, pkey};
+use vector_lib::lookup::{lookup_v2::OptionalValuePath, OwnedValuePath};
 
-use vector_common::sensitive_string::SensitiveString;
-use vector_config::configurable_component;
-use vector_core::{config::log_schema, schema};
+use vector_lib::configurable::configurable_component;
+use vector_lib::sensitive_string::SensitiveString;
+use vector_lib::{config::log_schema, schema};
 use vrl::value::Kind;
 
 use crate::{
@@ -185,7 +185,7 @@ impl AzureMonitorLogsConfig {
 
         let retry_logic =
             HttpStatusRetryLogic::new(|res: &AzureMonitorLogsResponse| res.http_status);
-        let request_settings = self.request.unwrap_with(&Default::default());
+        let request_settings = self.request.into_settings();
         let service = ServiceBuilder::new()
             .settings(request_settings, retry_logic)
             .service(service);

@@ -2,14 +2,14 @@ use std::{cell::RefCell, fmt};
 
 use serde::Serializer;
 use serde_json::Value;
-use vector_config::{
+use vector_lib::configurable::attributes::CustomAttribute;
+use vector_lib::configurable::{
     schema::{
         apply_base_metadata, generate_const_string_schema, generate_number_schema,
         generate_one_of_schema, SchemaGenerator, SchemaObject,
     },
     Configurable, GenerateError, Metadata, ToValue,
 };
-use vector_config_common::attributes::CustomAttribute;
 
 use serde::{
     de::{self, Unexpected, Visitor},
@@ -56,24 +56,13 @@ impl Default for Concurrency {
 }
 
 impl Concurrency {
-    const fn if_adaptive(self, other: Self) -> Self {
+    pub const fn parse_concurrency(&self) -> Option<usize> {
         match self {
-            Self::Adaptive => other,
-            _ => self,
-        }
-    }
-
-    pub const fn parse_concurrency(&self, other: Self) -> Option<usize> {
-        match self.if_adaptive(other) {
             Concurrency::None => Some(1),
             Concurrency::Adaptive => None,
-            Concurrency::Fixed(limit) => Some(limit),
+            Concurrency::Fixed(limit) => Some(*limit),
         }
     }
-}
-
-pub const fn concurrency_is_adaptive(concurrency: &Concurrency) -> bool {
-    matches!(concurrency, Concurrency::Adaptive)
 }
 
 impl<'de> Deserialize<'de> for Concurrency {

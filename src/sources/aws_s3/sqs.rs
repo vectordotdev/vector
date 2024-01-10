@@ -1,18 +1,19 @@
 use std::collections::HashMap;
 use std::{future::ready, num::NonZeroUsize, panic, sync::Arc};
 
-use aws_sdk_s3::{error::GetObjectError, Client as S3Client};
-use aws_sdk_sqs::{
-    error::{DeleteMessageBatchError, ReceiveMessageError},
-    model::{DeleteMessageBatchRequestEntry, Message},
-    output::DeleteMessageBatchOutput,
-    Client as SqsClient,
+use aws_sdk_s3::operation::get_object::GetObjectError;
+use aws_sdk_s3::Client as S3Client;
+use aws_sdk_sqs::operation::delete_message_batch::{
+    DeleteMessageBatchError, DeleteMessageBatchOutput,
 };
-use aws_smithy_client::SdkError;
+use aws_sdk_sqs::operation::receive_message::ReceiveMessageError;
+use aws_sdk_sqs::types::{DeleteMessageBatchRequestEntry, Message};
+use aws_sdk_sqs::Client as SqsClient;
+use aws_smithy_runtime_api::client::orchestrator::HttpResponse;
+use aws_smithy_runtime_api::client::result::SdkError;
 use aws_types::region::Region;
 use bytes::Bytes;
 use chrono::{DateTime, TimeZone, Utc};
-use codecs::decoding::FramingError;
 use futures::{FutureExt, Stream, StreamExt, TryFutureExt};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -22,10 +23,11 @@ use snafu::{ResultExt, Snafu};
 use tokio::{pin, select};
 use tokio_util::codec::FramedRead;
 use tracing::Instrument;
-use vector_common::internal_event::{
+use vector_lib::codecs::decoding::FramingError;
+use vector_lib::configurable::configurable_component;
+use vector_lib::internal_event::{
     ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol, Registered,
 };
-use vector_config::configurable_component;
 
 use crate::codecs::Decoder;
 use crate::event::{Event, LogEvent};
@@ -44,9 +46,9 @@ use crate::{
     tls::TlsConfig,
     SourceSender,
 };
-use lookup::{metadata_path, path, PathPrefix};
-use vector_core::config::{log_schema, LegacyKey, LogNamespace};
-use vector_core::event::MaybeAsLogMut;
+use vector_lib::config::{log_schema, LegacyKey, LogNamespace};
+use vector_lib::event::MaybeAsLogMut;
+use vector_lib::lookup::{metadata_path, path, PathPrefix};
 
 static SUPPORTED_S3_EVENT_VERSION: Lazy<semver::VersionReq> =
     Lazy::new(|| semver::VersionReq::parse("~2").unwrap());
@@ -154,7 +156,7 @@ pub enum ProcessingError {
     },
     #[snafu(display("Failed to fetch s3://{}/{}: {}", bucket, key, source))]
     GetObject {
-        source: SdkError<GetObjectError>,
+        source: SdkError<GetObjectError, HttpResponse>,
         bucket: String,
         key: String,
     },
@@ -359,7 +361,8 @@ impl IngestorProcess {
                             DeleteMessageBatchRequestEntry::builder()
                                 .id(message_id)
                                 .receipt_handle(receipt_handle)
-                                .build(),
+                                .build()
+                                .expect("all required builder params specified"),
                         );
                     }
                 }
@@ -379,20 +382,16 @@ impl IngestorProcess {
                 Ok(result) => {
                     // Batch deletes can have partial successes/failures, so we have to check
                     // for both cases and emit accordingly.
-                    if let Some(successful_entries) = &result.successful {
-                        if !successful_entries.is_empty() {
-                            emit!(SqsMessageDeleteSucceeded {
-                                message_ids: result.successful.unwrap_or_default(),
-                            });
-                        }
+                    if !result.successful.is_empty() {
+                        emit!(SqsMessageDeleteSucceeded {
+                            message_ids: result.successful,
+                        });
                     }
 
-                    if let Some(failed_entries) = &result.failed {
-                        if !failed_entries.is_empty() {
-                            emit!(SqsMessageDeletePartialError {
-                                entries: result.failed.unwrap_or_default()
-                            });
-                        }
+                    if !result.failed.is_empty() {
+                        emit!(SqsMessageDeletePartialError {
+                            entries: result.failed
+                        });
                     }
                 }
                 Err(err) => {
@@ -537,7 +536,7 @@ impl IngestorProcess {
                     lines.map(|line| ((), line, ())),
                     line_agg::Logic::new(config.clone()),
                 )
-                .map(|(_src, line, _context)| line),
+                .map(|(_src, line, _context, _lastline_context)| line),
             ),
             None => lines,
         };
@@ -620,7 +619,9 @@ impl IngestorProcess {
         }
     }
 
-    async fn receive_messages(&mut self) -> Result<Vec<Message>, SdkError<ReceiveMessageError>> {
+    async fn receive_messages(
+        &mut self,
+    ) -> Result<Vec<Message>, SdkError<ReceiveMessageError, HttpResponse>> {
         self.state
             .sqs_client
             .receive_message()
@@ -636,7 +637,7 @@ impl IngestorProcess {
     async fn delete_messages(
         &mut self,
         entries: Vec<DeleteMessageBatchRequestEntry>,
-    ) -> Result<DeleteMessageBatchOutput, SdkError<DeleteMessageBatchError>> {
+    ) -> Result<DeleteMessageBatchOutput, SdkError<DeleteMessageBatchError, HttpResponse>> {
         self.state
             .sqs_client
             .delete_message_batch()

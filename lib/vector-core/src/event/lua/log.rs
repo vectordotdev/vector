@@ -1,6 +1,6 @@
 use mlua::prelude::*;
 
-use crate::event::{EventMetadata, LogEvent, Value};
+use super::super::{EventMetadata, LogEvent, Value};
 
 impl<'a> IntoLua<'a> for LogEvent {
     #![allow(clippy::wrong_self_convention)] // this trait is defined by mlua
@@ -53,7 +53,7 @@ mod test {
 
     #[test]
     fn from_lua() {
-        let lua_event = r#"
+        let lua_event = r"
         {
             a = 1,
             nested = {
@@ -61,7 +61,7 @@ mod test {
                 array = {'example value', '', 'another value'}
             }
         }
-        "#;
+        ";
 
         let event: LogEvent = Lua::new().load(lua_event).eval().unwrap();
 

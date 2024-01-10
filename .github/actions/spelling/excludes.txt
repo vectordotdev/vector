@@ -3,6 +3,9 @@
 (?:^|/)(?i)LICEN[CS]E
 (?:^|/)3rdparty/
 (?:^|/)amplify\.yml$
+(?:^|/)build_preview_sites\.yml$
+(?:^|/)create_preview_sites\.yml$
+(?:^|/)preview_site_trigger\.yml$
 (?:^|/)go\.sum$
 (?:^|/)package(?:-lock|)\.json$
 (?:^|/)Pipfile$
@@ -13,6 +16,7 @@
 \.ai$
 \.all-contributorsrc$
 \.avi$
+\.avro$
 \.bmp$
 \.bz2$
 \.class$

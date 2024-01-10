@@ -1,22 +1,17 @@
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    iter,
-};
+use std::{collections::BTreeSet, iter};
 
 use chrono::{DateTime, NaiveDateTime, Utc};
 use quickcheck::{empty_shrinker, Arbitrary, Gen};
+use vrl::value::{ObjectMap, Value};
 
-use crate::{
-    event::{
-        metric::{
-            Bucket, MetricData, MetricName, MetricSeries, MetricSketch, MetricTags, MetricTime,
-            Quantile, Sample,
-        },
-        Event, EventMetadata, LogEvent, Metric, MetricKind, MetricValue, StatisticKind, TraceEvent,
-        Value,
+use super::super::{
+    metric::{
+        Bucket, MetricData, MetricName, MetricSeries, MetricSketch, MetricTags, MetricTime,
+        Quantile, Sample,
     },
-    metrics::AgentDDSketch,
+    Event, EventMetadata, LogEvent, Metric, MetricKind, MetricValue, StatisticKind, TraceEvent,
 };
+use crate::metrics::AgentDDSketch;
 
 const MAX_F64_SIZE: f64 = 1_000_000.0;
 const MAX_MAP_SIZE: usize = 4;
@@ -84,7 +79,7 @@ impl Arbitrary for Event {
 impl Arbitrary for LogEvent {
     fn arbitrary(g: &mut Gen) -> Self {
         let mut gen = Gen::new(MAX_MAP_SIZE);
-        let map: BTreeMap<String, Value> = BTreeMap::arbitrary(&mut gen);
+        let map: ObjectMap = ObjectMap::arbitrary(&mut gen);
         let metadata: EventMetadata = EventMetadata::arbitrary(g);
         LogEvent::from_map(map, metadata)
     }

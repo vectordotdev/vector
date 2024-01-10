@@ -9,8 +9,8 @@ use tonic::{
     Status,
 };
 use tower::Service;
-use vector_common::shutdown::ShutdownSignal;
-use vector_core::{event::Event, tls::MaybeTlsSettings};
+use vector_lib::shutdown::ShutdownSignal;
+use vector_lib::{event::Event, tls::MaybeTlsSettings};
 
 use crate::{
     components::validation::{

@@ -1,1 +1,1 @@
-{"metric":{"name":"k","tags":{"b":"i"},"timestamp":"1970-01-01T04:35:16.000003282Z","interval_ms":3522450246,"kind":"incremental","counter":{"value":159360.0}}}
+{"metric":{"name":"_","namespace":"a","timestamp":"1970-01-01T00:50:32.000012772Z","interval_ms":2063678991,"kind":"incremental","gauge":{"value":-453888.0}}}

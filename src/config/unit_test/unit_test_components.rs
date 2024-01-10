@@ -3,8 +3,8 @@ use std::sync::Arc;
 use futures::{stream, Sink, Stream};
 use futures_util::{future, stream::BoxStream, FutureExt, StreamExt};
 use tokio::sync::{oneshot, Mutex};
-use vector_config::configurable_component;
-use vector_core::{
+use vector_lib::configurable::configurable_component;
+use vector_lib::{
     config::{DataType, Input, LogNamespace},
     event::Event,
     schema,
@@ -16,7 +16,6 @@ use crate::{
     config::{
         AcknowledgementsConfig, SinkConfig, SinkContext, SourceConfig, SourceContext, SourceOutput,
     },
-    impl_generate_config_from_default,
     sinks::Healthcheck,
     sources,
 };

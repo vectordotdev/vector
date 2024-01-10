@@ -730,7 +730,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic]
+    #[should_panic(expected = "overflowing unclaimed acknowledgements is a serious bug")]
     fn panic_when_unclaimed_acks_overflows() {
         let actions = vec![Action::Acknowledge(u64::MAX), Action::Acknowledge(1)];
 

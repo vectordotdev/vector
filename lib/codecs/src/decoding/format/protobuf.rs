@@ -1,4 +1,3 @@
-use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use bytes::Bytes;
@@ -14,7 +13,7 @@ use vector_core::{
     event::Event,
     schema,
 };
-use vrl::value::Kind;
+use vrl::value::{Kind, ObjectMap};
 
 use crate::common::protobuf::get_message_descriptor;
 
@@ -171,11 +170,11 @@ fn to_vrl(
             }
         }
         prost_reflect::Value::Message(v) => {
-            let mut obj_map = BTreeMap::new();
+            let mut obj_map = ObjectMap::new();
             for field_desc in v.descriptor().fields() {
                 let field_value = v.get_field(&field_desc);
                 let out = to_vrl(field_value.as_ref(), Some(&field_desc))?;
-                obj_map.insert(field_desc.name().to_string(), out);
+                obj_map.insert(field_desc.name().into(), out);
             }
             vrl::value::Value::from(obj_map)
         }
@@ -206,11 +205,11 @@ fn to_vrl(
                                             field_descriptor
                                         )
                                     })?
-                                    .to_string(),
+                                    .into(),
                                 to_vrl(kv.1, Some(&message_desc.map_entry_value_field()))?,
                             ))
                         })
-                        .collect::<vector_common::Result<BTreeMap<String, _>>>()?,
+                        .collect::<vector_common::Result<ObjectMap>>()?,
                 )
             } else {
                 Err("Expected valid field descriptor")?
@@ -265,8 +264,8 @@ mod tests {
 
     #[test]
     fn deserialize_protobuf() {
-        let protobuf_bin_message_path = test_data_dir().join("person_someone.pb");
-        let protobuf_desc_path = test_data_dir().join("test_protobuf.desc");
+        let protobuf_bin_message_path = test_data_dir().join("pbs/person_someone.pb");
+        let protobuf_desc_path = test_data_dir().join("protos/test_protobuf.desc");
         let message_type = "test_protobuf.Person";
         let validate_log = |log: &LogEvent| {
             assert_eq!(log["name"], "someone".into());
@@ -288,8 +287,8 @@ mod tests {
 
     #[test]
     fn deserialize_protobuf3() {
-        let protobuf_bin_message_path = test_data_dir().join("person_someone3.pb");
-        let protobuf_desc_path = test_data_dir().join("test_protobuf3.desc");
+        let protobuf_bin_message_path = test_data_dir().join("pbs/person_someone3.pb");
+        let protobuf_desc_path = test_data_dir().join("protos/test_protobuf3.desc");
         let message_type = "test_protobuf3.Person";
         let validate_log = |log: &LogEvent| {
             assert_eq!(log["name"], "someone".into());
@@ -316,7 +315,7 @@ mod tests {
     #[test]
     fn deserialize_empty_buffer() {
         let protobuf_bin_message = "".to_string();
-        let protobuf_desc_path = test_data_dir().join("test_protobuf.desc");
+        let protobuf_desc_path = test_data_dir().join("protos/test_protobuf.desc");
         let message_type = "test_protobuf.Person";
         let validate_log = |log: &LogEvent| {
             assert_eq!(log["name"], "".into());
@@ -334,7 +333,7 @@ mod tests {
     fn deserialize_error_invalid_protobuf() {
         let input = Bytes::from("{ foo");
         let message_descriptor = get_message_descriptor(
-            &test_data_dir().join("test_protobuf.desc"),
+            &test_data_dir().join("protos/test_protobuf.desc"),
             "test_protobuf.Person",
         )
         .unwrap();

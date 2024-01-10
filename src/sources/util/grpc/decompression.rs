@@ -18,7 +18,7 @@ use std::future::Future;
 use tokio::{pin, select};
 use tonic::{body::BoxBody, metadata::AsciiMetadataValue, Status};
 use tower::{Layer, Service};
-use vector_common::internal_event::{
+use vector_lib::internal_event::{
     ByteSize, BytesReceived, InternalEventHandle as _, Protocol, Registered,
 };
 
@@ -83,8 +83,7 @@ impl Default for State {
 fn new_decompressor() -> GzDecoder<Vec<u8>> {
     // Create the backing buffer for the decompressor and set the compression flag to false (0) and pre-allocate
     // the space for the length prefix, which we'll fill out once we've finalized the decompressor.
-    let mut buf = Vec::new();
-    buf.resize(GRPC_MESSAGE_HEADER_LEN, 0x00);
+    let buf = vec![0; GRPC_MESSAGE_HEADER_LEN];
 
     GzDecoder::new(buf)
 }

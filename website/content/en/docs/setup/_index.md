@@ -4,7 +4,7 @@ short: Setup
 weight: 2
 ---
 
-This section of the documentation covers everything you know to get up and running with Vector, from installation to deployment.
+This section of the documentation covers everything you know to get up and running with Vector, from installation to deployment. Alternatively, download [Observability Pipelines](https://www.datadoghq.com/product/observability-pipelines/) if you want to build, manage, and monitor your pipelines in the Datadog UI.
 
 ## Installing
 

@@ -12,7 +12,7 @@ use crate::{
 };
 use futures::StreamExt;
 use std::{collections::HashSet, sync::Arc, time::Duration};
-use vector_core::config::LogNamespace;
+use vector_lib::config::LogNamespace;
 
 pub fn make_config() -> AmqpSinkConfig {
     let mut config = AmqpSinkConfig {

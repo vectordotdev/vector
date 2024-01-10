@@ -4,9 +4,9 @@
 
 use std::path::PathBuf;
 
-use file_source::paths_provider::PathsProvider;
 use k8s_openapi::api::core::v1::{Namespace, Pod};
 use kube::runtime::reflector::{store::Store, ObjectRef};
+use vector_lib::file_source::paths_provider::PathsProvider;
 
 use super::path_helpers::build_pod_logs_directory;
 use crate::kubernetes::pod_manager_logic::extract_static_pod_config_hashsum;

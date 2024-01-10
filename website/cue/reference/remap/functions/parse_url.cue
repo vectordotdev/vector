@@ -17,7 +17,7 @@ remap: functions: parse_url: {
 			name: "default_known_ports"
 			description: """
 				If true and the port number is not specified in the input URL
-				string (or matches the default port for the scheme), it will be
+				string (or matches the default port for the scheme), it is
 				populated from well-known ports for the following schemes:
 				`http`, `https`, `ws`, `wss`, and `ftp`.
 				"""
@@ -27,7 +27,7 @@ remap: functions: parse_url: {
 		},
 	]
 	internal_failure_reasons: [
-		"`value` isn't a properly formatted URL",
+		"`value` is not a properly formatted URL.",
 	]
 	return: types: ["object"]
 

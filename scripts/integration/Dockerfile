@@ -28,6 +28,8 @@ RUN git clone https://github.com/rui314/mold.git \
     && cmake --build . -j $(nproc) \
     && cmake --install .
 
+RUN rustup run "${RUST_VERSION}" cargo install cargo-nextest --version 0.9.64 --locked
+
 COPY scripts/environment/install-protoc.sh /
 COPY tests/data/ca/certs /certs
 RUN bash /install-protoc.sh

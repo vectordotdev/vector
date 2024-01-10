@@ -205,6 +205,20 @@ base: components: sources: file: configuration: {
 		required:    true
 		type: array: items: type: string: examples: ["/var/log/**/*.log"]
 	}
+	internal_metrics: {
+		description: "Configuration of internal metrics for file-based components."
+		required:    false
+		type: object: options: include_file_tag: {
+			description: """
+				Whether or not to include the "file" tag on the component's corresponding internal metrics.
+
+				This is useful for distinguishing between different files while monitoring. However, the tag's
+				cardinality is unbounded.
+				"""
+			required: false
+			type: bool: default: false
+		}
+	}
 	line_delimiter: {
 		description: "String sequence used to separate one file line from another."
 		required:    false

@@ -1,15 +1,15 @@
 mod event;
 mod http;
 
-use codecs::{
+use tokio::sync::mpsc;
+use vector_lib::codecs::{
     decoding::{self, DeserializerConfig},
     encoding::{
         self, Framer, FramingConfig, JsonSerializerConfig, SerializerConfig, TextSerializerConfig,
     },
     BytesEncoder,
 };
-use tokio::sync::mpsc;
-use vector_core::{config::DataType, event::Event};
+use vector_lib::{config::DataType, event::Event};
 
 use crate::codecs::{Decoder, DecodingConfig, Encoder, EncodingConfig, EncodingConfigWithFraming};
 
@@ -96,7 +96,7 @@ impl ResourceCodec {
     ///
     /// The decoder is generated as an inverse to the input codec: if an encoding configuration was
     /// given, we generate a decoder that satisfies that encoding configuration, and vice versa.
-    pub fn into_decoder(&self) -> vector_common::Result<Decoder> {
+    pub fn into_decoder(&self) -> vector_lib::Result<Decoder> {
         let (framer, deserializer) = match self {
             Self::Decoding(config) => return config.build(),
             Self::Encoding(config) => (
@@ -143,8 +143,8 @@ fn deserializer_config_to_serializer(config: &DeserializerConfig) -> encoding::S
         DeserializerConfig::Bytes => SerializerConfig::Text(TextSerializerConfig::default()),
         DeserializerConfig::Json { .. } => SerializerConfig::Json(JsonSerializerConfig::default()),
         DeserializerConfig::Protobuf(config) => {
-            SerializerConfig::Protobuf(codecs::encoding::ProtobufSerializerConfig {
-                protobuf: codecs::encoding::ProtobufSerializerOptions {
+            SerializerConfig::Protobuf(vector_lib::codecs::encoding::ProtobufSerializerConfig {
+                protobuf: vector_lib::codecs::encoding::ProtobufSerializerOptions {
                     desc_file: config.protobuf.desc_file.clone(),
                     message_type: config.protobuf.message_type.clone(),
                 },
@@ -158,6 +158,7 @@ fn deserializer_config_to_serializer(config: &DeserializerConfig) -> encoding::S
         DeserializerConfig::Native => SerializerConfig::Native,
         DeserializerConfig::NativeJson { .. } => SerializerConfig::NativeJson,
         DeserializerConfig::Gelf { .. } => SerializerConfig::Gelf,
+        DeserializerConfig::Avro { avro } => SerializerConfig::Avro { avro: avro.into() },
     };
 
     serializer_config
@@ -187,7 +188,7 @@ fn decoder_framing_to_encoding_framer(framing: &decoding::FramingConfig) -> enco
 
 fn serializer_config_to_deserializer(
     config: &SerializerConfig,
-) -> vector_common::Result<decoding::Deserializer> {
+) -> vector_lib::Result<decoding::Deserializer> {
     let deserializer_config = match config {
         SerializerConfig::Avro { .. } => todo!(),
         SerializerConfig::Csv { .. } => todo!(),
@@ -197,8 +198,8 @@ fn serializer_config_to_deserializer(
         SerializerConfig::Native => DeserializerConfig::Native,
         SerializerConfig::NativeJson => DeserializerConfig::NativeJson(Default::default()),
         SerializerConfig::Protobuf(config) => {
-            DeserializerConfig::Protobuf(codecs::decoding::ProtobufDeserializerConfig {
-                protobuf: codecs::decoding::ProtobufDeserializerOptions {
+            DeserializerConfig::Protobuf(vector_lib::codecs::decoding::ProtobufDeserializerConfig {
+                protobuf: vector_lib::codecs::decoding::ProtobufDeserializerOptions {
                     desc_file: config.protobuf.desc_file.clone(),
                     message_type: config.protobuf.message_type.clone(),
                 },
@@ -328,7 +329,7 @@ impl ExternalResource {
         self,
         output_tx: mpsc::Sender<Vec<Event>>,
         task_coordinator: &TaskCoordinator<Configuring>,
-    ) -> vector_common::Result<()> {
+    ) -> vector_lib::Result<()> {
         match self.definition {
             ResourceDefinition::Http(http_config) => {
                 http_config.spawn_as_output(self.direction, self.codec, output_tx, task_coordinator)

@@ -1,22 +1,22 @@
 use chrono::Utc;
-use codecs::{
-    decoding::{DeserializerConfig, FramingConfig},
-    StreamDecodingError,
-};
 use fakedata::logs::*;
 use futures::StreamExt;
-use lookup::{owned_value_path, path};
 use rand::seq::SliceRandom;
 use serde_with::serde_as;
 use snafu::Snafu;
 use std::task::Poll;
 use tokio::time::{self, Duration};
 use tokio_util::codec::FramedRead;
-use vector_common::internal_event::{
+use vector_lib::codecs::{
+    decoding::{DeserializerConfig, FramingConfig},
+    StreamDecodingError,
+};
+use vector_lib::configurable::configurable_component;
+use vector_lib::internal_event::{
     ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol,
 };
-use vector_config::configurable_component;
-use vector_core::{
+use vector_lib::lookup::{owned_value_path, path};
+use vector_lib::{
     config::{LegacyKey, LogNamespace},
     EstimatedJsonEncodedSizeOf,
 };

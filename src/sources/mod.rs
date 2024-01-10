@@ -68,7 +68,8 @@ pub mod opentelemetry;
 pub mod postgresql_metrics;
 #[cfg(any(
     feature = "sources-prometheus-scrape",
-    feature = "sources-prometheus-remote-write"
+    feature = "sources-prometheus-remote-write",
+    feature = "sources-prometheus-pushgateway"
 ))]
 pub mod prometheus;
 #[cfg(feature = "sources-redis")]
@@ -86,7 +87,7 @@ pub mod vector;
 
 pub mod util;
 
-pub use vector_core::source::Source;
+pub use vector_lib::source::Source;
 
 /// Common build errors
 #[derive(Debug, Snafu)]

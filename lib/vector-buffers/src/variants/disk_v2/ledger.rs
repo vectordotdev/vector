@@ -92,16 +92,16 @@ pub enum LedgerLoadCreateError {
 pub struct LedgerState {
     /// Next record ID to use when writing a record.
     #[with(Atomic)]
-    writer_next_record_id: AtomicU64,
+    writer_next_record: AtomicU64,
     /// The current data file ID being written to.
     #[with(Atomic)]
-    writer_current_data_file_id: AtomicU16,
+    writer_current_data_file: AtomicU16,
     /// The current data file ID being read from.
     #[with(Atomic)]
-    reader_current_data_file_id: AtomicU16,
+    reader_current_data_file: AtomicU16,
     /// The last record ID read by the reader.
     #[with(Atomic)]
-    reader_last_record_id: AtomicU64,
+    reader_last_record: AtomicU64,
 }
 
 impl Default for LedgerState {
@@ -110,17 +110,17 @@ impl Default for LedgerState {
             // First record written is always 1, so that our default of 0 for
             // `reader_last_record_id` ensures we start up in a state of "alright, waiting to read
             // record #1 next".
-            writer_next_record_id: AtomicU64::new(1),
-            writer_current_data_file_id: AtomicU16::new(0),
-            reader_current_data_file_id: AtomicU16::new(0),
-            reader_last_record_id: AtomicU64::new(0),
+            writer_next_record: AtomicU64::new(1),
+            writer_current_data_file: AtomicU16::new(0),
+            reader_current_data_file: AtomicU16::new(0),
+            reader_last_record: AtomicU64::new(0),
         }
     }
 }
 
 impl ArchivedLedgerState {
     fn get_current_writer_file_id(&self) -> u16 {
-        self.writer_current_data_file_id.load(Ordering::Acquire)
+        self.writer_current_data_file.load(Ordering::Acquire)
     }
 
     fn get_next_writer_file_id(&self) -> u16 {
@@ -128,23 +128,21 @@ impl ArchivedLedgerState {
     }
 
     pub(super) fn increment_writer_file_id(&self) {
-        self.writer_current_data_file_id
+        self.writer_current_data_file
             .store(self.get_next_writer_file_id(), Ordering::Release);
     }
 
     pub(super) fn get_next_writer_record_id(&self) -> u64 {
-        self.writer_next_record_id.load(Ordering::Acquire)
+        self.writer_next_record.load(Ordering::Acquire)
     }
 
     pub(super) fn increment_next_writer_record_id(&self, amount: u64) -> u64 {
-        let previous = self
-            .writer_next_record_id
-            .fetch_add(amount, Ordering::AcqRel);
+        let previous = self.writer_next_record.fetch_add(amount, Ordering::AcqRel);
         previous.wrapping_add(amount)
     }
 
     fn get_current_reader_file_id(&self) -> u16 {
-        self.reader_current_data_file_id.load(Ordering::Acquire)
+        self.reader_current_data_file.load(Ordering::Acquire)
     }
 
     fn get_next_reader_file_id(&self) -> u16 {
@@ -157,18 +155,17 @@ impl ArchivedLedgerState {
 
     fn increment_reader_file_id(&self) -> u16 {
         let value = self.get_next_reader_file_id();
-        self.reader_current_data_file_id
+        self.reader_current_data_file
             .store(value, Ordering::Release);
         value
     }
 
     pub(super) fn get_last_reader_record_id(&self) -> u64 {
-        self.reader_last_record_id.load(Ordering::Acquire)
+        self.reader_last_record.load(Ordering::Acquire)
     }
 
     pub(super) fn increment_last_reader_record_id(&self, amount: u64) {
-        self.reader_last_record_id
-            .fetch_add(amount, Ordering::AcqRel);
+        self.reader_last_record.fetch_add(amount, Ordering::AcqRel);
     }
 
     #[cfg(test)]
@@ -184,7 +181,7 @@ impl ArchivedLedgerState {
         //
         // Despite it being test-only, we're really amping up the "this is only for testing!" factor
         // by making it an actual `unsafe` function, and putting "unsafe" in the name. :)
-        self.writer_next_record_id.store(id, Ordering::Release);
+        self.writer_next_record.store(id, Ordering::Release);
     }
 
     #[cfg(test)]
@@ -200,7 +197,7 @@ impl ArchivedLedgerState {
         //
         // Despite it being test-only, we're really amping up the "this is only for testing!" factor
         // by making it an actual `unsafe` function, and putting "unsafe" in the name. :)
-        self.reader_last_record_id.store(id, Ordering::Release);
+        self.reader_last_record.store(id, Ordering::Release);
     }
 }
 
@@ -213,7 +210,7 @@ where
     config: DiskBufferConfig<FS>,
     // Advisory lock for this buffer directory.
     #[allow(dead_code)]
-    ledger_lock: LockFile,
+    lock: LockFile,
     // Ledger state.
     state: BackedArchive<FS::MutableMemoryMap, LedgerState>,
     // The total size, in bytes, of all unread records in the buffer.
@@ -576,8 +573,8 @@ where
         // file I/O, but the code is so specific, including the drop guard for the lock file, that I
         // don't know if it's worth it.
         let ledger_lock_path = config.data_dir.join("buffer.lock");
-        let mut ledger_lock = LockFile::open(&ledger_lock_path).context(IoSnafu)?;
-        if !ledger_lock.try_lock().context(IoSnafu)? {
+        let mut lock = LockFile::open(&ledger_lock_path).context(IoSnafu)?;
+        if !lock.try_lock().context(IoSnafu)? {
             return Err(LedgerLoadCreateError::LedgerLockAlreadyHeld);
         }
 
@@ -640,7 +637,7 @@ where
         // what not.
         let mut ledger = Ledger {
             config,
-            ledger_lock,
+            lock,
             state: ledger_state,
             total_buffer_size: AtomicU64::new(0),
             reader_notify: Notify::new(),

@@ -1,7 +1,4 @@
-use std::{
-    future::ready,
-    time::{Duration, Instant},
-};
+use std::{future::ready, time::Duration};
 
 use chrono::Utc;
 use futures::{stream, FutureExt, StreamExt, TryFutureExt};
@@ -10,16 +7,16 @@ use hyper::{Body, Request};
 use serde_with::serde_as;
 use snafu::ResultExt;
 use tokio_stream::wrappers::IntervalStream;
-use vector_config::configurable_component;
-use vector_core::{metric_tags, EstimatedJsonEncodedSizeOf};
+use vector_lib::configurable::configurable_component;
+use vector_lib::{metric_tags, EstimatedJsonEncodedSizeOf};
 
 use crate::{
     config::{GenerateConfig, ProxyConfig, SourceConfig, SourceContext, SourceOutput},
     event::metric::{Metric, MetricKind, MetricValue},
     http::HttpClient,
     internal_events::{
-        ApacheMetricsEventsReceived, ApacheMetricsHttpError, ApacheMetricsParseError,
-        ApacheMetricsResponseError, EndpointBytesReceived, RequestCompleted, StreamClosedError,
+        ApacheMetricsEventsReceived, ApacheMetricsParseError, EndpointBytesReceived,
+        HttpClientHttpError, HttpClientHttpResponseError, StreamClosedError,
     },
     shutdown::ShutdownSignal,
     SourceSender,
@@ -28,7 +25,7 @@ use crate::{
 mod parser;
 
 pub use parser::ParseError;
-use vector_core::config::LogNamespace;
+use vector_lib::config::LogNamespace;
 
 /// Configuration for the `apache_metrics` source.
 #[serde_as]
@@ -171,7 +168,6 @@ fn apache_metrics(
                     "host" => url.sanitized_authority(),
                 };
 
-                let start = Instant::now();
                 let namespace = namespace.clone();
                 client
                     .send(request)
@@ -185,11 +181,6 @@ fn apache_metrics(
                     .filter_map(move |response| {
                         ready(match response {
                             Ok((header, body)) if header.status == hyper::StatusCode::OK => {
-                                emit!(RequestCompleted {
-                                    start,
-                                    end: Instant::now()
-                                });
-
                                 let byte_size = body.len();
                                 let body = String::from_utf8_lossy(&body);
                                 emit!(EndpointBytesReceived {
@@ -234,9 +225,9 @@ fn apache_metrics(
                                 Some(stream::iter(metrics))
                             }
                             Ok((header, _)) => {
-                                emit!(ApacheMetricsResponseError {
+                                emit!(HttpClientHttpResponseError {
                                     code: header.status,
-                                    endpoint: &sanitized_url,
+                                    url: sanitized_url.to_owned(),
                                 });
                                 Some(stream::iter(vec![Metric::new(
                                     "up",
@@ -248,9 +239,9 @@ fn apache_metrics(
                                 .with_timestamp(Some(Utc::now()))]))
                             }
                             Err(error) => {
-                                emit!(ApacheMetricsHttpError {
+                                emit!(HttpClientHttpError {
                                     error,
-                                    endpoint: &sanitized_url
+                                    url: sanitized_url.to_owned(),
                                 });
                                 Some(stream::iter(vec![Metric::new(
                                     "up",

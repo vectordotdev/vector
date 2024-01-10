@@ -7,7 +7,7 @@ use criterion::{
 };
 use indexmap::IndexMap;
 use vector::transforms::reduce::{Reduce, ReduceConfig};
-use vector_core::transform::Transform;
+use vector_lib::transform::Transform;
 
 use crate::common::{consume, FixedLogStream};
 
@@ -43,12 +43,13 @@ fn reduce(c: &mut Criterion) {
             slug: "proof_of_concept",
             input: fixed_stream.clone(),
             reduce_config: ReduceConfig {
-                expire_after_ms: None,
-                flush_period_ms: None,
+                expire_after_ms: Duration::from_secs(30),
+                flush_period_ms: Duration::from_secs(1),
                 group_by: vec![String::from("message")],
                 merge_strategies: IndexMap::default(),
                 ends_when: None,
                 starts_when: None,
+                max_events: None,
             },
         },
     ] {

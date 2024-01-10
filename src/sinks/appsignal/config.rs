@@ -2,9 +2,9 @@ use futures::FutureExt;
 use http::{header::AUTHORIZATION, Request, Uri};
 use hyper::Body;
 use tower::ServiceBuilder;
-use vector_common::sensitive_string::SensitiveString;
-use vector_config::configurable_component;
-use vector_core::{
+use vector_lib::configurable::configurable_component;
+use vector_lib::sensitive_string::SensitiveString;
+use vector_lib::{
     config::{proxy::ProxyConfig, AcknowledgementsConfig, DataType, Input},
     tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
@@ -102,7 +102,7 @@ impl AppsignalConfig {
         let service = AppsignalService::new(http_client, endpoint, push_api_key, compression);
 
         let request_opts = self.request;
-        let request_settings = request_opts.unwrap_with(&TowerRequestConfig::default());
+        let request_settings = request_opts.into_settings();
         let retry_logic = HttpStatusRetryLogic::new(|req: &AppsignalResponse| req.http_status);
 
         let service = ServiceBuilder::new()

@@ -10,7 +10,7 @@ use crossterm::{
 use num_format::{Locale, ToFormattedString};
 use number_prefix::NumberPrefix;
 use ratatui::{
-    backend::{Backend, CrosstermBackend},
+    backend::CrosstermBackend,
     layout::{Alignment, Constraint, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
@@ -164,12 +164,7 @@ impl<'a> Widgets<'a> {
     }
 
     /// Renders a title and the URL the dashboard is currently connected to.
-    fn title<B: Backend>(
-        &'a self,
-        f: &mut Frame<B>,
-        area: Rect,
-        connection_status: &ConnectionStatus,
-    ) {
+    fn title(&'a self, f: &mut Frame, area: Rect, connection_status: &ConnectionStatus) {
         let mut text = vec![
             Span::from(self.url_string),
             Span::styled(
@@ -195,7 +190,7 @@ impl<'a> Widgets<'a> {
 
     /// Renders a components table, showing sources, transforms and sinks in tabular form, with
     /// statistics pulled from `ComponentsState`,
-    fn components_table<B: Backend>(&self, f: &mut Frame<B>, state: &state::State, area: Rect) {
+    fn components_table(&self, f: &mut Frame, state: &state::State, area: Rect) {
         // Header columns
         let header = HEADER
             .iter()
@@ -267,41 +262,41 @@ impl<'a> Widgets<'a> {
             }
         }
 
-        let w = Table::new(items)
+        let widths: &[Constraint] = if is_allocation_tracking_enabled() {
+            &[
+                Constraint::Percentage(13), // ID
+                Constraint::Percentage(8),  // Output
+                Constraint::Percentage(4),  // Kind
+                Constraint::Percentage(9),  // Type
+                Constraint::Percentage(10), // Events In
+                Constraint::Percentage(12), // Bytes In
+                Constraint::Percentage(10), // Events Out
+                Constraint::Percentage(12), // Bytes Out
+                Constraint::Percentage(8),  // Errors
+                Constraint::Percentage(14), // Allocated Bytes
+            ]
+        } else {
+            &[
+                Constraint::Percentage(13), // ID
+                Constraint::Percentage(12), // Output
+                Constraint::Percentage(9),  // Kind
+                Constraint::Percentage(6),  // Type
+                Constraint::Percentage(12), // Events In
+                Constraint::Percentage(14), // Bytes In
+                Constraint::Percentage(12), // Events Out
+                Constraint::Percentage(14), // Bytes Out
+                Constraint::Percentage(8),  // Errors
+            ]
+        };
+        let w = Table::new(items, widths)
             .header(Row::new(header).bottom_margin(1))
             .block(Block::default().borders(Borders::ALL).title("Components"))
-            .column_spacing(2)
-            .widths(if is_allocation_tracking_enabled() {
-                &[
-                    Constraint::Percentage(13), // ID
-                    Constraint::Percentage(8),  // Output
-                    Constraint::Percentage(4),  // Kind
-                    Constraint::Percentage(9),  // Type
-                    Constraint::Percentage(10), // Events In
-                    Constraint::Percentage(12), // Bytes In
-                    Constraint::Percentage(10), // Events Out
-                    Constraint::Percentage(12), // Bytes Out
-                    Constraint::Percentage(8),  // Errors
-                    Constraint::Percentage(14), // Allocated Bytes
-                ]
-            } else {
-                &[
-                    Constraint::Percentage(13), // ID
-                    Constraint::Percentage(12), // Output
-                    Constraint::Percentage(9),  // Kind
-                    Constraint::Percentage(6),  // Type
-                    Constraint::Percentage(12), // Events In
-                    Constraint::Percentage(14), // Bytes In
-                    Constraint::Percentage(12), // Events Out
-                    Constraint::Percentage(14), // Bytes Out
-                    Constraint::Percentage(8),  // Errors
-                ]
-            });
+            .column_spacing(2);
         f.render_widget(w, area);
     }
 
     /// Alerts the user to resize the window to view columns
-    fn components_resize_window<B: Backend>(&self, f: &mut Frame<B>, area: Rect) {
+    fn components_resize_window(&self, f: &mut Frame, area: Rect) {
         let block = Block::default().borders(Borders::ALL).title("Components");
         let w = Paragraph::new("Expand the window to > 80 chars to view metrics")
             .block(block)
@@ -311,7 +306,7 @@ impl<'a> Widgets<'a> {
     }
 
     /// Renders a box showing instructions on how to exit from `vector top`.
-    fn quit_box<B: Backend>(&self, f: &mut Frame<B>, area: Rect) {
+    fn quit_box(&self, f: &mut Frame, area: Rect) {
         let text = vec![Line::from("To quit, press ESC or 'q'")];
 
         let block = Block::default()
@@ -326,7 +321,7 @@ impl<'a> Widgets<'a> {
     }
 
     /// Draw a single frame. Creates a layout and renders widgets into it.
-    fn draw<B: Backend>(&self, f: &mut Frame<B>, state: state::State) {
+    fn draw(&self, f: &mut Frame, state: state::State) {
         let size = f.size();
         let rects = Layout::default()
             .constraints(self.constraints.clone())

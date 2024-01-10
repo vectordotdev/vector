@@ -6,8 +6,8 @@ use futures_util::FutureExt;
 use http::{response::Parts, Uri};
 use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
-use vector_config::configurable_component;
-use vector_core::{config::LogNamespace, event::Event};
+use vector_lib::configurable::configurable_component;
+use vector_lib::{config::LogNamespace, event::Event};
 
 use super::parser;
 use crate::sources::util::http::HttpMethod;
@@ -534,7 +534,7 @@ mod test {
         .await;
         assert!(!events.is_empty());
 
-        let metrics: Vec<vector_core::event::Metric> = events
+        let metrics: Vec<vector_lib::event::Metric> = events
             .into_iter()
             .map(|event| event.into_metric())
             .collect();
@@ -616,9 +616,7 @@ mod test {
             let query = metric.tag_value("query").expect("query must be tagged");
             let mut got: HashMap<String, Vec<String>> = HashMap::new();
             for (k, v) in url::form_urlencoded::parse(query.as_bytes()) {
-                got.entry(k.to_string())
-                    .or_insert_with(Vec::new)
-                    .push(v.to_string());
+                got.entry(k.to_string()).or_default().push(v.to_string());
             }
             for v in got.values_mut() {
                 v.sort();

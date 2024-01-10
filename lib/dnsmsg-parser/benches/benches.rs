@@ -1,7 +1,7 @@
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion, Throughput};
 use data_encoding::BASE64;
 use dnsmsg_parser::dns_message_parser::DnsMessageParser;
-use trust_dns_proto::rr::rdata::NULL;
+use hickory_proto::rr::rdata::NULL;
 
 fn benchmark_parse_as_query_message(c: &mut Criterion) {
     let raw_dns_message = "szgAAAABAAAAAAAAAmg1B2V4YW1wbGUDY29tAAAGAAE=";

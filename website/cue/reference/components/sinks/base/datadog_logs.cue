@@ -76,6 +76,11 @@ base: components: sinks: datadog_logs: configuration: {
 				[gzip]: https://www.gzip.org/
 				"""
 			none: "No compression."
+			snappy: """
+				[Snappy][snappy] compression.
+
+				[snappy]: https://github.com/google/snappy/blob/main/docs/README.md
+				"""
 			zlib: """
 				[Zlib][zlib] compression.
 
@@ -95,9 +100,13 @@ base: components: sinks: datadog_logs: configuration: {
 			If an event has a Datadog [API key][api_key] set explicitly in its metadata, it takes
 			precedence over this setting.
 
+			This value can also be set by specifying the `DD_API_KEY` environment variable.
+			The value specified here takes precedence over the environment variable.
+
 			[api_key]: https://docs.datadoghq.com/api/?lang=bash#authentication
+			[global_options]: /docs/reference/configuration/global-options/#datadog
 			"""
-		required: true
+		required: false
 		type: string: examples: ["${DATADOG_API_KEY_ENV_VAR}", "ef8d5de700e7989468166c40fc8a0ccd"]
 	}
 	encoding: {
@@ -118,8 +127,12 @@ base: components: sinks: datadog_logs: configuration: {
 				description: "Format used for timestamp fields."
 				required:    false
 				type: string: enum: {
-					rfc3339: "Represent the timestamp as a RFC 3339 timestamp."
-					unix:    "Represent the timestamp as a Unix timestamp."
+					rfc3339:    "Represent the timestamp as a RFC 3339 timestamp."
+					unix:       "Represent the timestamp as a Unix timestamp."
+					unix_float: "Represent the timestamp as a Unix timestamp in floating point."
+					unix_ms:    "Represent the timestamp as a Unix timestamp in milliseconds."
+					unix_ns:    "Represent the timestamp as a Unix timestamp in nanoseconds."
+					unix_us:    "Represent the timestamp as a Unix timestamp in microseconds"
 				}
 			}
 		}
@@ -136,16 +149,6 @@ base: components: sinks: datadog_logs: configuration: {
 			"""
 		required: false
 		type: string: examples: ["http://127.0.0.1:8080", "http://example.com:12345"]
-	}
-	region: {
-		deprecated:         true
-		deprecated_message: "This option has been deprecated, use the `site` option instead."
-		description:        "The Datadog region to send logs to."
-		required:           false
-		type: string: enum: {
-			eu: "EU region."
-			us: "US region."
-		}
 	}
 	request: {
 		description: "Outbound HTTP request settings."
@@ -195,6 +198,15 @@ base: components: sinks: datadog_logs: configuration: {
 																"""
 						required: false
 						type: uint: default: 1
+					}
+					max_concurrency_limit: {
+						description: """
+																The maximum concurrency limit.
+
+																The adaptive request concurrency limit will not go above this bound. This is put in place as a safeguard.
+																"""
+						required: false
+						type: uint: default: 200
 					}
 					rtt_deviation_scale: {
 						description: """
@@ -271,12 +283,8 @@ base: components: sinks: datadog_logs: configuration: {
 				}
 			}
 			retry_attempts: {
-				description: """
-					The maximum number of retries to make for failed requests.
-
-					The default, for all intents and purposes, represents an infinite number of retries.
-					"""
-				required: false
+				description: "The maximum number of retries to make for failed requests."
+				required:    false
 				type: uint: {
 					default: 9223372036854775807
 					unit:    "retries"
@@ -294,11 +302,31 @@ base: components: sinks: datadog_logs: configuration: {
 					unit:    "seconds"
 				}
 			}
+			retry_jitter_mode: {
+				description: "The jitter mode to use for retry backoff behavior."
+				required:    false
+				type: string: {
+					default: "Full"
+					enum: {
+						Full: """
+															Full jitter.
+
+															The random delay is anywhere from 0 up to the maximum current delay calculated by the backoff
+															strategy.
+
+															Incorporating full jitter into your backoff strategy can greatly reduce the likelihood
+															of creating accidental denial of service (DoS) conditions against your own systems when
+															many clients are recovering from a failure state.
+															"""
+						None: "No jitter."
+					}
+				}
+			}
 			retry_max_duration_secs: {
 				description: "The maximum amount of time to wait between retries."
 				required:    false
 				type: uint: {
-					default: 3600
+					default: 30
 					unit:    "seconds"
 				}
 			}
@@ -321,13 +349,16 @@ base: components: sinks: datadog_logs: configuration: {
 		description: """
 			The Datadog [site][dd_site] to send observability data to.
 
+			This value can also be set by specifying the `DD_SITE` environment variable.
+			The value specified here takes precedence over the environment variable.
+
+			If not specified by the environment variable, a default value of
+			`datadoghq.com` is taken.
+
 			[dd_site]: https://docs.datadoghq.com/getting_started/site
 			"""
 		required: false
-		type: string: {
-			default: "datadoghq.com"
-			examples: ["us3.datadoghq.com", "datadoghq.eu"]
-		}
+		type: string: examples: ["us3.datadoghq.com", "datadoghq.eu"]
 	}
 	tls: {
 		description: "Configures the TLS options for incoming/outgoing connections."

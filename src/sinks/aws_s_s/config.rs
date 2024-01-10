@@ -2,7 +2,7 @@ use std::convert::TryFrom;
 
 use snafu::{ResultExt, Snafu};
 
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 
 use crate::{
     aws::AwsAuthentication,

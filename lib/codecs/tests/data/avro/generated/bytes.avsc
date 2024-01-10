@@ -1,0 +1,1 @@
+{"name":"test","type":"record","fields":[{"name":"bytes_field","type":"bytes"}]}

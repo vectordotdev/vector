@@ -12,6 +12,7 @@ use std::{
 
 use chrono::{DateTime, Utc};
 use vector_common::{
+    byte_size_of::ByteSizeOf,
     internal_event::{OptionalTag, TaggedEventsSent},
     json_size::JsonSize,
     request_metadata::GetEventCountTags,
@@ -19,14 +20,11 @@ use vector_common::{
 };
 use vector_config::configurable_component;
 
-use crate::{
-    config::telemetry,
-    event::{
-        estimated_json_encoded_size_of::EstimatedJsonEncodedSizeOf, BatchNotifier, EventFinalizer,
-        EventFinalizers, EventMetadata, Finalizable,
-    },
-    ByteSizeOf,
+use super::{
+    estimated_json_encoded_size_of::EstimatedJsonEncodedSizeOf, BatchNotifier, EventFinalizer,
+    EventFinalizers, EventMetadata, Finalizable,
 };
+use crate::config::telemetry;
 
 #[cfg(any(test, feature = "test"))]
 mod arbitrary;
@@ -941,7 +939,7 @@ mod test {
                 )
                 .with_namespace(Some("vector"))
             ),
-            r#"vector_namespace{} = 1.23"#
+            r"vector_namespace{} = 1.23"
         );
 
         assert_eq!(
@@ -982,7 +980,7 @@ mod test {
                     }
                 )
             ),
-            r#"four{} = histogram 3@1 4@2"#
+            r"four{} = histogram 3@1 4@2"
         );
 
         assert_eq!(
@@ -998,7 +996,7 @@ mod test {
                     }
                 )
             ),
-            r#"five{} = count=107 sum=103 53@51 54@52"#
+            r"five{} = count=107 sum=103 53@51 54@52"
         );
 
         assert_eq!(
@@ -1014,7 +1012,7 @@ mod test {
                     }
                 )
             ),
-            r#"six{} = count=2 sum=127 1@63 2@64"#
+            r"six{} = count=2 sum=127 1@63 2@64"
         );
     }
 
