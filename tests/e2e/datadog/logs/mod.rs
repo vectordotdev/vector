@@ -1,4 +1,5 @@
 use serde_json::Value;
+use tracing::info;
 
 use vector::test_util::trace_init;
 
@@ -45,11 +46,11 @@ fn assert_timestamp_hostname(payloads: &mut [Value]) -> usize {
 // runs assertions that each set of payloads should be true to regardless
 // of the pipeline
 fn common_assertions(payloads: &mut [Value]) {
-    assert!(payloads.len() > 0);
+    assert!(!payloads.is_empty());
 
     let n_log_events = assert_timestamp_hostname(payloads);
 
-    println!("log events received: {n_log_events}");
+    info!("log events received: {n_log_events}");
 
     assert!(n_log_events == expected_log_events());
 }
@@ -62,12 +63,12 @@ async fn validate() {
     // containers, we need the events to flow between them.
     std::thread::sleep(std::time::Duration::from_secs(5));
 
-    println!("getting log payloads from agent-only pipeline");
+    info!("getting log payloads from agent-only pipeline");
     let mut agent_payloads = get_payloads_agent(LOGS_ENDPOINT).await;
 
     common_assertions(&mut agent_payloads);
 
-    println!("getting log payloads from agent-vector pipeline");
+    info!("getting log payloads from agent-vector pipeline");
     let mut vector_payloads = get_payloads_vector(LOGS_ENDPOINT).await;
 
     common_assertions(&mut vector_payloads);

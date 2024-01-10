@@ -50,8 +50,8 @@ async fn get_payloads_agent(endpoint: &str) -> Vec<Value> {
         .payloads;
 
     // Not sure what this is but the logs endpoint receives an empty payload in the beginning
-    if raw_payloads.len() > 0 && endpoint == "/api/v2/logs" {
-        raw_payloads.retain(|raw_payload| raw_payload.data.as_array().unwrap().len() != 0);
+    if !raw_payloads.is_empty() && endpoint == "/api/v2/logs" {
+        raw_payloads.retain(|raw_payload| !raw_payload.data.as_array().unwrap().is_empty())
     }
 
     raw_payloads.into_iter().map(|raw| raw.data).collect()
