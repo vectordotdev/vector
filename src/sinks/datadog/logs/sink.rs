@@ -1,6 +1,5 @@
-use std::{fmt::Debug, io, sync::Arc};
+use std::{collections::VecDeque, fmt::Debug, io, sync::Arc};
 
-use serde::{ser::SerializeSeq, Serializer};
 use snafu::Snafu;
 use vector_lib::{
     internal_event::{ComponentEventsDropped, UNINTENTIONAL},
@@ -141,96 +140,42 @@ struct LogRequestBuilder {
     compression: Compression,
 }
 
-struct CountingWrite<'a, T> {
-    inner: T,
-    count: &'a std::cell::Cell<usize>,
-}
-
-impl<'a, T> CountingWrite<'a, T> {
-    fn into_inner(self) -> T {
-        self.inner
-    }
-}
-
-#[allow(clippy::disallowed_methods)]
-impl<'a, T: std::io::Write> std::io::Write for CountingWrite<'a, T> {
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.count.set(self.count.get() + buf.len());
-        self.inner.write(buf)
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        self.inner.flush()
-    }
-}
-
 impl LogRequestBuilder {
     fn build_request(
         &self,
         mut events: Vec<Event>,
         api_key: Arc<str>,
     ) -> Result<Vec<LogApiRequest>, RequestBuildError> {
-        // TODO: this estimated json size seems seems redundant with the one in
-        // RequestMetadataBuilder::from_events
-        let mut byte_size = telemetry().create_request_count_byte_size();
-        let mut total_estimated = 0;
-        for event in events.iter_mut() {
-            normalize_event(event);
-            self.transformer.transform(event);
-            let estimated = event.estimated_json_encoded_size_of();
-            byte_size.add_event(event, estimated);
-            total_estimated += estimated.get();
-        }
+        // Transform events and pre-compute their estimated size.
+        let mut events_with_estimated_size: VecDeque<(Event, JsonSize)> = events
+            .iter_mut()
+            .map(|event| {
+                normalize_event(event);
+                self.transformer.transform(event);
+                let estimated_json_size = event.estimated_json_encoded_size_of();
+                (event.clone(), estimated_json_size)
+            })
+            .collect();
 
-        let mut batches = vec![(events, byte_size)];
-        let mut requests = Vec::new();
-
-        while let Some((mut events, byte_size)) = batches.pop() {
-            if events.is_empty() {
-                continue;
-            }
-            match try_serialize(&events, total_estimated) {
-                Ok(buf) => {
-                    let request =
-                        self.finish_request(buf, events, byte_size, Arc::clone(&api_key))?;
-                    requests.push(request);
-                }
-                Err(RequestBuildError::PayloadTooBig { events_that_fit }) => {
-                    if events_that_fit == 0 {
-                        // first event was too large for whole request
-                        let _too_big = events.pop();
-                        emit!(ComponentEventsDropped::<UNINTENTIONAL> {
-                            count: 1,
-                            reason: "Event too large to encode."
-                        });
-
-                        let mut byte_size = telemetry().create_request_count_byte_size();
-                        for event in events.iter_mut() {
-                            let estimated = event.estimated_json_encoded_size_of();
-                            byte_size.add_event(event, estimated);
-                        }
-                        batches.push((events, byte_size));
-                    } else {
-                        let next = events.split_off(events_that_fit);
-
-                        let mut byte_size = telemetry().create_request_count_byte_size();
-                        for event in &events {
-                            let estimated = event.estimated_json_encoded_size_of();
-                            byte_size.add_event(event, estimated);
-                        }
-                        batches.push((events, byte_size));
-
-                        let mut byte_size = telemetry().create_request_count_byte_size();
-                        for event in &next {
-                            let estimated = event.estimated_json_encoded_size_of();
-                            byte_size.add_event(event, estimated);
-                        }
-                        batches.push((next, byte_size));
-                    }
-                }
-                Err(e) => return Err(e),
+        // Construct requests respecting the max payload size.
+        let mut requests: Vec<LogApiRequest> = Vec::new();
+        while !events_with_estimated_size.is_empty() {
+            let (events_serialized, body, byte_size) =
+                serialize_with_capacity(&mut events_with_estimated_size)?;
+            if events_serialized.is_empty() {
+                // first event was too large for whole request
+                let _too_big = events_with_estimated_size.pop_front();
+                emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+                    count: 1,
+                    reason: "Event too large to encode."
+                });
+            } else {
+                let request =
+                    self.finish_request(body, events_serialized, byte_size, Arc::clone(&api_key))?;
+                requests.push(request);
             }
         }
+
         Ok(requests)
     }
 
@@ -269,28 +214,48 @@ impl LogRequestBuilder {
     }
 }
 
-fn try_serialize(events: &[Event], total_estimated: usize) -> Result<Vec<u8>, RequestBuildError> {
-    let byte_count = std::cell::Cell::new(0);
-    let w = CountingWrite {
-        inner: Vec::with_capacity(total_estimated),
-        count: &byte_count,
-    };
+/// Serialize events into a buffer as a JSON array that has a maximum size of
+/// `MAX_PAYLOAD_BYTES`.
+///
+/// Returns the serialized events, the buffer, and the byte size of the events.
+/// Events that are not serialized remain in the `events` parameter.
+fn serialize_with_capacity(
+    events: &mut VecDeque<(Event, JsonSize)>,
+) -> Result<(Vec<Event>, Vec<u8>, GroupedCountByteSize), io::Error> {
+    // Compute estimated size, accounting for the size of the brackets and commas.
+    let total_estimated =
+        events.iter().map(|(_, size)| size.get()).sum::<usize>() + events.len() * 2;
 
-    let mut events_that_fit = 0;
-    let mut ser = serde_json::Serializer::new(w);
-    let mut seq = ser.serialize_seq(Some(events.len()))?;
-    for event in events.iter() {
-        seq.serialize_element(event.as_log())?;
-        if byte_count.get() < MAX_PAYLOAD_BYTES {
-            events_that_fit += 1;
+    // Initialize state.
+    let mut buf = Vec::with_capacity(total_estimated);
+    let mut byte_size = telemetry().create_request_count_byte_size();
+    let mut events_serialized = Vec::with_capacity(events.len());
+
+    // Write entries until the buffer is full.
+    buf.push(b'[');
+    let mut first = true;
+    while let Some((event, estimated_json_size)) = events.pop_front() {
+        // Track the existing length of the buffer so we can truncate it if we need to.
+        let existing_len = buf.len();
+        if first {
+            first = false;
         } else {
-            return Err(RequestBuildError::PayloadTooBig { events_that_fit });
+            buf.push(b',');
         }
+        serde_json::to_writer(&mut buf, event.as_log())?;
+        // If the buffer is too big, truncate it and break out of the loop.
+        if buf.len() >= MAX_PAYLOAD_BYTES {
+            events.push_front((event, estimated_json_size));
+            buf.truncate(existing_len);
+            break;
+        }
+        // Otherwise, track the size of the event and continue.
+        byte_size.add_event(&event, estimated_json_size);
+        events_serialized.push(event);
     }
-    seq.end()?;
+    buf.push(b']');
 
-    let buf = ser.into_inner().into_inner();
-    Ok(buf)
+    Ok((events_serialized, buf, byte_size))
 }
 
 impl<S> LogSink<S>
