@@ -10,7 +10,7 @@
 #
 #     /ci-run-integration-amqp
 #
-# 2. Run a two integration tests:
+# 2. Run two integration tests:
 #
 #     /ci-run-integration-datadog-logs
 #     /ci-run-integration-splunk
