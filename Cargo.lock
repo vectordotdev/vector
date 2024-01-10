@@ -3756,9 +3756,9 @@ dependencies = [
 
 [[package]]
 name = "h2"
-version = "0.4.0"
+version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e1d308f63daf4181410c242d34c11f928dcb3aa105852019e043c9d1f4e4368a"
+checksum = "991910e35c615d8cab86b5ab04be67e6ad24d2bf5f4f11fdbbed26da999bbeab"
 dependencies = [
  "bytes 1.5.0",
  "fnv",
@@ -9827,7 +9827,7 @@ dependencies = [
  "governor",
  "greptimedb-client",
  "grok",
- "h2 0.4.0",
+ "h2 0.4.1",
  "hash_hasher",
  "hashbrown 0.14.3",
  "headers",
