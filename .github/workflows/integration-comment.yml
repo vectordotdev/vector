@@ -1,24 +1,21 @@
 # Integration Test Comment
 #
 # This workflow runs one or more integration tests triggered by a comment in a PR.
-# The comment include '/ci-run-integration'.
-# Then, any if the integration names will trigger that specific integration.
-# 'all' will trigger every integration to run.
-# The order does not matter and can be anywhere inside the comment body.
+# The comment must include '/ci-run-integration'.
 #
 # Examples:
 #
 # 1. Run a single integration test:
 #
-#     /ci-run-integration amqp
+#     /ci-run-integration-amqp
 #
-# 2. Run three specific integration tests:
+# 2. Run all integration tests:
 #
-#     /ci-run-integration dnstap redis amqp
+#     /ci-run-integration-all
 #
-# 3. Run all integration tests:
+# 2. Run all CI (including all integration tests)
 #
-#     /ci-run-integration all
+#     /ci-run-all
 
 name: Integration Test Comment
 
