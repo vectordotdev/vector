@@ -26,8 +26,10 @@ base: components: sources: file: configuration: {
 		description: """
 			The directory used to persist file checkpoint positions.
 
-			By default, the [global `data_dir` option][global_data_dir] is used. Make sure the running user has write
-			permissions to this directory.
+			By default, the [global `data_dir` option][global_data_dir] is used.
+			Make sure the running user has write permissions to this directory.
+
+			If this directory is specified, then it will be created under the [global `data_dir`][global_data_dir].
 
 			[global_data_dir]: https://vector.dev/docs/reference/configuration/global-options/#data_dir
 			"""

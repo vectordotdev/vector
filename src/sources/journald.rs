@@ -149,8 +149,12 @@ pub struct JournaldConfig {
 
     /// The directory used to persist file checkpoint positions.
     ///
-    /// By default, the global `data_dir` option is used. Make sure the running user has write
-    /// permissions to this directory.
+    /// By default, the [global `data_dir` option][global_data_dir] is used.
+    /// Make sure the running user has write permissions to this directory.
+    ///
+    /// If this directory is specified, then it will be created under the [global `data_dir`][global_data_dir].
+    ///
+    /// [global_data_dir]: https://vector.dev/docs/reference/configuration/global-options/#data_dir
     #[serde(default)]
     #[configurable(metadata(docs::examples = "/var/lib/vector"))]
     #[configurable(metadata(docs::human_name = "Data Directory"))]
