@@ -70,6 +70,6 @@ pub(crate) static GELF_TARGET_PATHS: Lazy<GelfTargetPaths> = Lazy::new(|| GelfTa
 /// with an `_` , however that is intentionally omitted from this regex to be checked separately
 /// to create a specific error message.
 /// As Graylog itself will produce GELF with any existing field names on the Graylog GELF Output,
-/// vector is more lenient, too.
+/// vector is more lenient, too, at least allowing the additional `@` character.
 pub static VALID_FIELD_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^[\w\.\-@]*$").unwrap());
 
