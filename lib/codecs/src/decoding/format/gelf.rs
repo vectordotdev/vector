@@ -31,10 +31,7 @@ use crate::{gelf_fields::*, VALID_FIELD_REGEX};
 #[derive(Debug, Clone, Default)]
 pub struct GelfDeserializerConfig {
     /// GELF-specific decoding options.
-    #[serde(
-        default,
-        skip_serializing_if = "vector_core::serde::skip_serializing_if_default"
-    )]
+    #[serde(default, skip_serializing_if = "vector_core::serde::is_default")]
     pub gelf: GelfDeserializerOptions,
 }
 
@@ -90,7 +87,7 @@ pub struct GelfDeserializerOptions {
     /// [U+FFFD]: https://en.wikipedia.org/wiki/Specials_(Unicode_block)#Replacement_character
     #[serde(
         default = "default_lossy",
-        skip_serializing_if = "vector_core::serde::skip_serializing_if_default"
+        skip_serializing_if = "vector_core::serde::is_default"
     )]
     #[derivative(Default(value = "default_lossy()"))]
     pub lossy: bool,

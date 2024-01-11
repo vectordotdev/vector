@@ -105,10 +105,7 @@ pub struct Options {
     pub max_retries: u32,
 
     #[configurable(derived)]
-    #[serde(
-        default,
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
-    )]
+    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     proxy: ProxyConfig,
 
     /// A map of additional tags for metrics sent to Observability Pipelines.
