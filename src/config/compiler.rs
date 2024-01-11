@@ -1,5 +1,5 @@
-use fslock::LockFile;
 use indexmap::IndexSet;
+use std::fs::File;
 use std::path::Path;
 
 use super::{
@@ -7,15 +7,15 @@ use super::{
     validation, Config, OutputId,
 };
 
-fn acquire_exclusive_lock(path: &Path) -> Result<LockFile, String> {
+use fs4::FileExt;
+
+fn acquire_exclusive_lock(path: &Path) -> Result<File, String> {
     let lock_path = path.join(".lock");
-    let mut lock = LockFile::open(&lock_path).map_err(|e| e.to_string())?;
-    if lock.try_lock().is_err() {
-        return Err(format!(
-            "Could not acquire lock on global data directory {lock_path:?}"
-        ));
+    let lock = File::create(&lock_path).map_err(|e| e.to_string())?;
+    match lock.try_lock_exclusive() {
+        Ok(()) => Ok(lock),
+        Err(e) => Err(format!("Couldn't lock {lock_path:?}. Error: {e}")),
     }
-    Ok(lock)
 }
 
 pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<String>> {
