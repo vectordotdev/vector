@@ -18,7 +18,7 @@ use vrl::value::{Kind, Value};
 
 use super::{default_lossy, Deserializer};
 use crate::gelf::GELF_TARGET_PATHS;
-use crate::{gelf_fields::*, VALID_DECODE_FIELD_REGEX};
+use crate::{gelf_fields::*, VALID_FIELD_REGEX};
 
 // On GELF decoding behavior:
 //   Graylog has a relaxed decoding. They are much more lenient than the spec would
@@ -180,7 +180,7 @@ impl GelfDeserializer {
                     .into());
                 }
                 // per GELF spec, Additional field names must be characters dashes or dots
-                if !VALID_DECODE_FIELD_REGEX.is_match(key) {
+                if !VALID_FIELD_REGEX.is_match(key) {
                     return Err(format!("'{}' field contains invalid characters. Field names may \
                                        contain only letters, numbers, underscores, dashes and dots.", key).into());
                 }

@@ -28,7 +28,7 @@ pub use encoding::{
     NativeSerializerConfig, NewlineDelimitedEncoder, NewlineDelimitedEncoderConfig,
     RawMessageSerializer, RawMessageSerializerConfig, TextSerializer, TextSerializerConfig,
 };
-pub use gelf::{gelf_fields, VALID_FIELD_REGEX, VALID_DECODE_FIELD_REGEX };
+pub use gelf::{gelf_fields, VALID_FIELD_REGEX};
 use vector_config::configurable_component;
 
 /// The user configuration to choose the metric tag strategy.
