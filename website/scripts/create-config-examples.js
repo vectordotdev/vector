@@ -65,12 +65,53 @@ const getExampleValue = (param, deepFilter) => {
             }
           }
         });
+ } else {
+        // If the property has options
+        if ( p.options ) {
+          // Store the options in a variable
+          const options = p.options;
+          // Initialize an object to store the sub-options
+          let subObj = {};
+
+          // Iterate over each option
+          for ( let [ k, { type: type1 } ] of Object.entries( options ) ) {
+            // Iterate over each sub-option
+            for ( let [ key, { options: options2 } ] of Object.entries( type1 ) ) {
+              // If the sub-option has further options
+              if ( options2 ) {
+                // Iterate over each sub-sub-option
+                for ( let [ optionKey, { type: type2, required } ] of Object.entries( options2 ) ) {
+                  // If the sub-sub-option is required
+                  if ( required ) {
+                    // Iterate over each type of the sub-sub-option
+                    for ( let [ typeKey, typeValue ] of Object.entries( type2 ) ) {
+                      // If the type has items
+                      if ( typeValue.items ) {
+                        // Iterate over each item type
+                        for ( let [ itemTypeKey, itemTypeValue ] of Object.entries( typeValue.items.type ) ) {
+                          // Get the value for the item type and store it in the sub-object
+                          subObj[ k ] = getValue( itemTypeValue );
+                        }
+                      } else {
+                        // Get the value for the non-item type and store it in the sub-object
+                        subObj[ k ] = getValue( typeValue );
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+          // Set the value to the sub-object
+          value = subObj;
       } else {
         value = getValue(p);
       }
+    }
     } else {
       value = getValue(p);
     }
+    
   });
 
   return value;
