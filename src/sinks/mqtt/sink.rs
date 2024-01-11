@@ -1,29 +1,16 @@
-use std::{collections::VecDeque, fmt::Debug};
-
 use async_trait::async_trait;
-use bytes::BytesMut;
-use futures::{pin_mut, stream::BoxStream, Stream, StreamExt};
+use futures::{stream::BoxStream, StreamExt};
 use rumqttc::{AsyncClient, ClientError, ConnectionError, EventLoop, MqttOptions};
 use snafu::{ResultExt, Snafu};
-use tokio_util::codec::Encoder as _;
-use vector_common::internal_event::{ByteSize, CountByteSize, Output, Protocol};
-use vector_core::{
-    event::EventFinalizers,
-    internal_event::{BytesSent, EventsSent, InternalEventHandle},
-    ByteSizeOf,
-};
+use vector_lib::tls::TlsError;
 
-use crate::sinks::mqtt::config::{ConfigurationError, MqttQoS};
-use crate::{
-    codecs::{Encoder, Transformer},
-    emit,
-    event::{Event, EventStatus, Finalizable},
-    internal_events::TemplateRenderingError,
-    internal_events::{ConnectionOpen, MqttClientError, MqttConnectionError, OpenGauge},
-    sinks::mqtt::config::MqttSinkConfig,
-    sinks::util::StreamSink,
-    template::{Template, TemplateParseError},
-    tls::TlsError,
+use crate::sinks::prelude::*;
+
+use super::{
+    config::{ConfigurationError, MqttQoS},
+    request_builder::{MqttEncoder, MqttRequestBuilder},
+    service::MqttService,
+    MqttSinkConfig,
 };
 
 #[derive(Debug, Snafu)]
@@ -67,8 +54,12 @@ pub struct MqttSink {
     transformer: Transformer,
     encoder: Encoder<()>,
     connector: MqttConnector,
-    finalizers_queue: VecDeque<EventFinalizers>,
     quality_of_service: MqttQoS,
+}
+
+pub(super) struct MqttEvent {
+    pub(super) topic: String,
+    pub(super) event: Event,
 }
 
 impl MqttSink {
@@ -76,131 +67,81 @@ impl MqttSink {
         let transformer = config.encoding.transformer();
         let serializer = config.encoding.build()?;
         let encoder = Encoder::<()>::new(serializer);
-        let finalizers_queue = VecDeque::new();
 
         Ok(Self {
             transformer,
             encoder,
             connector,
-            finalizers_queue,
             quality_of_service: config.quality_of_service,
         })
     }
 
-    /// outgoing events main loop
-    async fn handle_events<I>(
-        &mut self,
-        input: &mut I,
-        client: &mut AsyncClient,
-        connection: &mut EventLoop,
-    ) -> Result<(), ()>
-    where
-        I: Stream<Item = Event> + Unpin,
-    {
-        let events_sent = register!(EventsSent::from(Output(None)));
-        let bytes_sent = register!(BytesSent::from(Protocol("mqtt".into())));
+    fn make_mqtt_event(&self, event: Event) -> Option<MqttEvent> {
+        let topic = self
+            .connector
+            .topic
+            .render_string(&event)
+            .map_err(|missing_keys| {
+                emit!(TemplateRenderingError {
+                    error: missing_keys,
+                    field: Some("topic"),
+                    drop_event: true,
+                })
+            })
+            .ok()?;
 
-        loop {
-            tokio::select! {
-                // handle connection errors
-                msg = connection.poll() => {
-                    match msg {
-                        Ok(rumqttc::Event::Outgoing(rumqttc::Outgoing::PubRel(_))) => {
-                            // publish has been acknowledged by the MQTT server
-                            if let Some(finalizers) = self.finalizers_queue.pop_front() {
-                                finalizers.update_status(EventStatus::Delivered);
-                            }
-                        }
-                        Ok(_) => {}
-                        Err(error) => {
-                            emit!(MqttConnectionError { error });
-                            return Err(());
-                        }
-                    }
-                },
+        Some(MqttEvent { topic, event })
+    }
 
-                // handle outgoing events
-                event = input.next() => {
-                    let mut event = if let Some(event) = event {
-                        event
-                    } else {
-                        break;
-                    };
+    async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
+        let (client, mut connection) = self.connector.connect();
 
-                    let finalizers = event.take_finalizers();
-
-                    let topic = match self.connector.topic.render_string(&event) {
-                        Ok(topic) => topic,
-                        Err(error) => {
-                            emit!(TemplateRenderingError {
-                                error,
-                                field: Some("topic"),
-                                drop_event: true,
-                            });
-                            finalizers.update_status(EventStatus::Errored);
-                            continue;
-                        }
-                    };
-
-                    self.transformer.transform(&mut event);
-
-                    let event_byte_size = event.size_of();
-
-                    let mut bytes = BytesMut::new();
-                    let message = match self.encoder.encode(event, &mut bytes) {
-                        Ok(()) => {
-                            bytes.to_vec()
-                        }
-                        Err(_) => {
-                            finalizers.update_status(EventStatus::Errored);
-                            continue;
-                        }
-                    };
-                    let message_len = message.len();
-
-                    let retain = false;
-                    match client.publish(&topic, self.quality_of_service.into(), retain, message).await {
-                        Ok(()) => {
-                            events_sent.emit(CountByteSize(1, event_byte_size));
-                            bytes_sent.emit(ByteSize(message_len));
-
-                            self.finalizers_queue.push_back(finalizers);
-                        }
-                        Err(error) => {
-                            emit!(MqttClientError { error });
-                            finalizers.update_status(EventStatus::Errored);
-                            return Err(());
-                        }
-                    }
-                },
-
-                else => break,
+        // This is necessary to keep the mqtt event loop moving forward.
+        tokio::spawn(async move {
+            loop {
+                // If an error is returned here there is currently no way to tie this back
+                // to the event that was posted which means we can't accurately provide
+                // delivery guarantees.
+                // We need this issue resolved first:
+                // https://github.com/bytebeamio/rumqtt/issues/349
+                let _ = connection.poll().await;
             }
-        }
+        });
 
-        Ok(())
+        let service = ServiceBuilder::new().service(MqttService {
+            client,
+            quality_of_service: self.quality_of_service,
+        });
+
+        let request_builder = MqttRequestBuilder {
+            encoder: MqttEncoder {
+                encoder: self.encoder.clone(),
+                transformer: self.transformer.clone(),
+            },
+        };
+
+        input
+            .filter_map(|event| std::future::ready(self.make_mqtt_event(event)))
+            .request_builder(default_request_builder_concurrency_limit(), request_builder)
+            .filter_map(|request| async move {
+                match request {
+                    Err(e) => {
+                        error!("Failed to build MQTT request: {:?}.", e);
+                        None
+                    }
+                    Ok(req) => Some(req),
+                }
+            })
+            .into_driver(service)
+            .protocol("mqtt")
+            .run()
+            .await
     }
 }
 
 #[async_trait]
 impl StreamSink<Event> for MqttSink {
     async fn run(mut self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
-        let input = input.fuse().peekable();
-        pin_mut!(input);
-
-        let (client, connection) = self.connector.connect();
-        pin_mut!(client);
-        pin_mut!(connection);
-        while input.as_mut().peek().await.is_some() {
-            let _open_token = OpenGauge::new().open(|count| emit!(ConnectionOpen { count }));
-
-            let _result = self
-                .handle_events(&mut input, &mut client, &mut connection)
-                .await;
-        }
-
-        let _ = client.disconnect().await;
-
-        Ok(())
+        self.run_inner(input).await
     }
 }

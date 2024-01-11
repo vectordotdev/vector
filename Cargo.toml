@@ -300,7 +300,7 @@ rdkafka = { version = "0.35.0", default-features = false, features = ["tokio", "
 redis = { version = "0.24.0", default-features = false, features = ["connection-manager", "tokio-comp", "tokio-native-tls-comp"], optional = true }
 regex = { version = "1.10.2", default-features = false, features = ["std", "perf"] }
 roaring = { version = "0.10.2", default-features = false, optional = true }
-rumqttc = { version = "0.20.0", default-features = false, features = ["use-rustls"], optional = true }
+rumqttc = { version = "0.23.0", default-features = false, features = ["use-rustls"], optional = true }
 seahash = { version = "4.1.0", default-features = false }
 semver = { version = "1.0.21", default-features = false, features = ["serde", "std"], optional = true }
 smallvec = { version = "1", default-features = false, features = ["union", "serde"] }

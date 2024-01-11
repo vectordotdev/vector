@@ -1,9 +1,8 @@
 use std::time::Duration;
 
-use codecs::JsonSerializerConfig;
 use rumqttc::{MqttOptions, QoS, TlsConfiguration, Transport};
 use snafu::{ResultExt, Snafu};
-use vector_config::configurable_component;
+use vector_lib::codecs::JsonSerializerConfig;
 
 use crate::template::Template;
 use crate::{
@@ -11,6 +10,7 @@ use crate::{
     config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext},
     sinks::{
         mqtt::sink::{ConfigurationSnafu, MqttConnector, MqttError, MqttSink, TlsSnafu},
+        prelude::*,
         Healthcheck, VectorSink,
     },
     tls::{MaybeTlsSettings, TlsEnableableConfig},
@@ -133,6 +133,7 @@ impl Default for MqttSinkConfig {
 impl_generate_config_from_default!(MqttSinkConfig);
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "mqtt")]
 impl SinkConfig for MqttSinkConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let connector = self.build_connector()?;

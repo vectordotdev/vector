@@ -1,8 +1,11 @@
-args:
-- --features
+features:
 - mqtt-integration-tests
-- --lib
-- '::mqtt::'
+
+test_filter: '::mqtt::'
 
 matrix:
   version: ['5.0.15']
+
+paths:
+- "src/internal_events/mqtt.rs"
+- "src/sinks/mqtt/**"

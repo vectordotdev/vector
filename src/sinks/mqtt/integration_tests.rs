@@ -33,7 +33,7 @@ async fn mqtt_happy() {
         ..Default::default()
     };
 
-    let cx = SinkContext::new_test();
+    let cx = SinkContext::default();
     let (sink, healthcheck) = cnf.build(cx).await.expect("Cannot build the sink");
     healthcheck.await.expect("Health check failed");
 
