@@ -3,7 +3,6 @@ const cueJsonOutput = "data/docs.json";
 const chalk = require( 'chalk' );
 const TOML = require( '@iarna/toml' );
 const YAML = require( 'yaml' );
-const { log } = require( 'console' );
 
 // Helper functions
 const getExampleValue = ( param, deepFilter ) => {
