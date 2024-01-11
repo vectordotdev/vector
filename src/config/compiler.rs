@@ -1,9 +1,22 @@
+use fslock::LockFile;
 use indexmap::IndexSet;
+use std::path::Path;
 
 use super::{
     builder::ConfigBuilder, graph::Graph, id::Inputs, transform::get_transform_output_ids,
     validation, Config, OutputId,
 };
+
+fn acquire_exclusive_lock(path: &Path) -> Result<LockFile, String> {
+    let lock_path = path.join(".lock");
+    let mut lock = LockFile::open(&lock_path).map_err(|e| e.to_string())?;
+    if lock.try_lock().is_err() {
+        return Err(format!(
+            "Could not acquire lock on global data directory {lock_path:?}"
+        ));
+    }
+    Ok(lock)
+}
 
 pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<String>> {
     let mut errors = Vec::new();
@@ -97,9 +110,21 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
         .map(|test| test.resolve_outputs(&graph))
         .collect::<Result<Vec<_>, Vec<_>>>()?;
 
+    let data_dir_lock = if let Some(data_dir) = &global.data_dir {
+        match acquire_exclusive_lock(data_dir) {
+            Ok(lock) => Some(lock),
+            Err(e) => {
+                errors.push(e);
+                None
+            }
+        }
+    } else {
+        None
+    };
     if errors.is_empty() {
         let mut config = Config {
             global,
+            data_dir_lock,
             #[cfg(feature = "api")]
             api,
             schema,

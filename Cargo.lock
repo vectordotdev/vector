@@ -9852,6 +9852,7 @@ dependencies = [
  "exitcode",
  "fakedata",
  "flate2",
+ "fslock",
  "futures 0.3.30",
  "futures-util",
  "glob",
