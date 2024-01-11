@@ -32,7 +32,7 @@ const getExampleValue = (param, deepFilter) => {
       const topType = k;
 
       if (p.items && p.items.type) {
-        const typeInfo = p.items?.type;
+        const typeInfo = p.items.type;
 
         Object.keys(typeInfo).forEach(k => {
           if (['array', 'object'].includes(k)) {
