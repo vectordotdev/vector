@@ -24,7 +24,7 @@ components: sources: splunk_hec: {
 		multiline: enabled: false
 		receive: {
 			from: {
-				service: services.splunk
+				service: services.splunk_client
 
 				interface: socket: {
 					api: {
