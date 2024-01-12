@@ -1,5 +1,6 @@
 use std::{borrow::Borrow, cell::RefCell, fmt};
 
+use bytes::Bytes;
 use protobuf::Chars;
 use serde::{de::Visitor, Deserialize, Serialize};
 use serde_json::Value;
@@ -12,15 +13,37 @@ use vector_config::{
 #[derive(Clone, Debug, Eq)]
 pub enum VectorString {
     Owned(String),
-    Shared(Chars),
+    Shared(Bytes),
     Static(&'static str),
 }
 
 impl VectorString {
+    pub fn split_once(&self, delimiter: char) -> Option<(Self, Self)> {
+        match self {
+            Self::Owned(s) => s
+                .split_once(delimiter)
+                .map(|(s1, s2)| (s1.to_string().into(), s2.to_string().into())),
+            Self::Shared(buf) => {
+                // SAFETY: We never create this variant unless the source has already validated that
+                // the byte buffer contains valid UTF-8.
+                let s = unsafe { std::str::from_utf8_unchecked(&buf) };
+                s.split_once(delimiter).map(|(s1, s2)| {
+                    (
+                        Self::Shared(buf.slice_ref(s1.as_bytes())),
+                        Self::Shared(buf.slice_ref(s2.as_bytes())),
+                    )
+                })
+            }
+            Self::Static(s) => s
+                .split_once(delimiter)
+                .map(|(s1, s2)| (Self::Static(s1), Self::Static(s2))),
+        }
+    }
+
     pub fn as_bytes(&self) -> &[u8] {
         match self {
             Self::Owned(s) => s.as_bytes(),
-            Self::Shared(s) => s.as_bytes(),
+            Self::Shared(buf) => &buf,
             Self::Static(s) => s.as_bytes(),
         }
     }
@@ -28,7 +51,11 @@ impl VectorString {
     pub fn as_str(&self) -> &str {
         match self {
             Self::Owned(s) => s.as_str(),
-            Self::Shared(s) => s,
+            Self::Shared(buf) => {
+                // SAFETY: We never create this variant unless the source has already validated that
+                // the byte buffer contains valid UTF-8.
+                unsafe { std::str::from_utf8_unchecked(&buf) }
+            }
             Self::Static(s) => s,
         }
     }
@@ -36,7 +63,7 @@ impl VectorString {
     pub fn len(&self) -> usize {
         match self {
             Self::Owned(s) => s.len(),
-            Self::Shared(s) => s.len(),
+            Self::Shared(buf) => buf.len(),
             Self::Static(s) => s.len(),
         }
     }
@@ -44,7 +71,7 @@ impl VectorString {
     pub fn is_empty(&self) -> bool {
         match self {
             Self::Owned(s) => s.is_empty(),
-            Self::Shared(s) => s.is_empty(),
+            Self::Shared(buf) => buf.is_empty(),
             Self::Static(s) => s.is_empty(),
         }
     }
@@ -52,7 +79,12 @@ impl VectorString {
     pub fn into_string(self) -> String {
         match self {
             Self::Owned(s) => s,
-            Self::Shared(s) => s.to_string(),
+            Self::Shared(buf) => {
+                // SAFETY: We never create this variant unless the source has already validated that
+                // the byte buffer contains valid UTF-8.
+                let s = unsafe { std::str::from_utf8_unchecked(&buf) };
+                s.to_string()
+            }
             Self::Static(s) => s.to_string(),
         }
     }
@@ -114,7 +146,11 @@ impl From<&String> for VectorString {
 
 impl From<Chars> for VectorString {
     fn from(value: Chars) -> Self {
-        Self::Shared(value)
+        // SAFETY:: We don't do anything with the returned `Bytes` before wrapping it, after which
+        // is is held immutably, so the validity of the UTF-8 holds between `Chars` and `VectorString`.
+        let buf = unsafe { value.into_bytes() };
+
+        Self::Shared(buf)
     }
 }
 
@@ -128,14 +164,7 @@ impl From<VectorString> for vrl::value::Value {
     fn from(value: VectorString) -> Self {
         match value {
             VectorString::Owned(s) => s.into(),
-            VectorString::Shared(s) => unsafe {
-                // SAFETY: `Chars::into_bytes` is unsafe because it means giving up the invariant
-                // that the string data is known, valid UTF-8. Since we're _immediately_ sticking it
-                // into `Value::Bytes`, we're not actually handing over an invalid UTF-8 string...
-                // and VRL is going to do UTF-8 validity checks anytime it needs to do string-y
-                // things to `Values::Bytes` anyways.
-                s.into_bytes().into()
-            },
+            VectorString::Shared(buf) => buf.into(),
             VectorString::Static(s) => bytes::Bytes::from_static(s.as_bytes()).into(),
         }
     }
@@ -145,9 +174,11 @@ impl From<VectorString> for vrl::value::KeyString {
     fn from(value: VectorString) -> Self {
         match value {
             VectorString::Owned(s) => s.into(),
-            VectorString::Shared(s) => {
-                let s: &str = &s;
-                s.into()
+            VectorString::Shared(buf) => {
+                // SAFETY: We never create this variant unless the source has already validated that
+                // the byte buffer contains valid UTF-8.
+                let s = unsafe { std::str::from_utf8_unchecked(&buf) };
+                s.to_string().into()
             }
             VectorString::Static(s) => s.into(),
         }
@@ -178,6 +209,7 @@ impl ToValue for VectorString {
     }
 }
 
+#[cfg(feature = "lua")]
 impl<'a> mlua::prelude::IntoLua<'a> for VectorString {
     fn into_lua(
         self,
@@ -188,6 +220,7 @@ impl<'a> mlua::prelude::IntoLua<'a> for VectorString {
     }
 }
 
+#[cfg(feature = "lua")]
 impl<'a> mlua::prelude::FromLua<'a> for VectorString {
     fn from_lua(
         value: mlua::prelude::LuaValue<'a>,

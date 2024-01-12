@@ -620,6 +620,16 @@ impl FromIterator<(String, TagValue)> for MetricTags {
     }
 }
 
+impl FromIterator<(VectorString, TagValue)> for MetricTags {
+    fn from_iter<T: IntoIterator<Item = (VectorString, TagValue)>>(tags: T) -> Self {
+        let mut result = Self::default();
+        for (key, value) in tags {
+            result.0.entry(key).or_default().insert(value);
+        }
+        result
+    }
+}
+
 impl ByteSizeOf for MetricTags {
     fn allocated_bytes(&self) -> usize {
         self.0.allocated_bytes()
