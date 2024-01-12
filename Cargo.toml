@@ -236,7 +236,7 @@ arc-swap = { version = "1.6", default-features = false, optional = true }
 async-compression = { version = "0.4.5", default-features = false, features = ["tokio", "gzip", "zstd"], optional = true }
 apache-avro = { version = "0.16.0", default-features = false, optional = true }
 axum = { version = "0.6.20", default-features = false }
-base64 = { version = "0.21.6", default-features = false, optional = true }
+base64 = { version = "0.21.7", default-features = false, optional = true }
 bloomy  = { version = "1.2.0", default-features = false, optional = true }
 bollard = { version = "0.15.0", default-features = false, features = ["ssl", "chrono"], optional = true }
 bytes = { version = "1.5.0", default-features = false, features = ["serde"] }
@@ -349,7 +349,7 @@ azure_core = { version = "0.17", default-features = false, features = ["enable_r
 azure_identity = { version = "0.17", default-features = false, features = ["enable_reqwest"] }
 azure_storage_blobs = { version = "0.17", default-features = false, features = ["azurite_workaround"] }
 azure_storage = { version = "0.17", default-features = false }
-base64 = "0.21.6"
+base64 = "0.21.7"
 criterion = { version = "0.5.1", features = ["html_reports", "async_tokio"] }
 itertools = { version = "0.12.0", default-features = false, features = ["use_alloc"] }
 libc = "0.2.152"
