@@ -126,6 +126,24 @@ components: sources: [Name=string]: {
 									}
 								}
 							}
+							length_delimited: {
+								description:   "Options for `length_delimited` framing."
+								required:      false
+								common:        false
+								relevant_when: "method = `length_delimited`"
+								type: object: options: {
+									max_length: {
+										description: "The maximum frame length limit. A connection that sends a frame larger than `max_frame_length` will be closed."
+										required:    false
+										common:      false
+										type: uint: {
+											default: null
+											examples: [65535, 102400]
+											unit: "bytes"
+										}
+									}
+								}
+							}
 							newline_delimited: {
 								description:   "Options for `newline_delimited` framing."
 								required:      false
