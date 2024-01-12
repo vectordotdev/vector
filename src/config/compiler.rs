@@ -1,17 +1,40 @@
-use indexmap::IndexSet;
-use std::fs::File;
-use std::path::Path;
-
 use super::{
     builder::ConfigBuilder, graph::Graph, id::Inputs, transform::get_transform_output_ids,
     validation, Config, OutputId,
 };
+use std::fs::File;
+use std::path::PathBuf;
 
+use indexmap::IndexSet;
+
+#[cfg(not(test))]
 use fs4::FileExt;
 
-fn acquire_exclusive_lock(path: &Path) -> Result<File, String> {
+#[cfg(not(test))]
+fn create_data_dir_lock(data_dir: &Option<PathBuf>, errors: &mut Vec<String>) -> Option<File> {
+    if let Some(data_dir) = data_dir {
+        match acquire_exclusive_lock(data_dir) {
+            Ok(lock) => Some(lock),
+            Err(e) => {
+                errors.push(e);
+                None
+            }
+        }
+    } else {
+        None
+    }
+}
+
+#[cfg(test)]
+fn create_data_dir_lock(_data_dir: &Option<PathBuf>, _errors: &mut Vec<String>) -> Option<File> {
+    // We should make all tests work with unique directories but this requires extensive changes.
+    None
+}
+
+#[cfg(not(test))]
+fn acquire_exclusive_lock(path: &std::path::Path) -> Result<std::fs::File, String> {
     let lock_path = path.join(".lock");
-    let lock = File::create(&lock_path).map_err(|e| e.to_string())?;
+    let lock = std::fs::File::create(&lock_path).map_err(|e| e.to_string())?;
     match lock.try_lock_exclusive() {
         Ok(()) => Ok(lock),
         Err(e) => Err(format!("Couldn't lock {lock_path:?}. Error: {e}")),
@@ -110,17 +133,8 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
         .map(|test| test.resolve_outputs(&graph))
         .collect::<Result<Vec<_>, Vec<_>>>()?;
 
-    let data_dir_lock = if let Some(data_dir) = &global.data_dir {
-        match acquire_exclusive_lock(data_dir) {
-            Ok(lock) => Some(lock),
-            Err(e) => {
-                errors.push(e);
-                None
-            }
-        }
-    } else {
-        None
-    };
+    let data_dir_lock = create_data_dir_lock(&global.data_dir, &mut errors);
+
     if errors.is_empty() {
         let mut config = Config {
             global,
