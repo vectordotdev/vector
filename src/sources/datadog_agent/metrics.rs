@@ -1,4 +1,4 @@
-use std::{num::NonZeroU32, ops::Deref as _, sync::Arc};
+use std::{num::NonZeroU32, sync::Arc};
 
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
@@ -7,7 +7,11 @@ use protobuf::{Chars, Message as _};
 use serde::{Deserialize, Serialize};
 use warp::{filters::BoxedFilter, path, path::FullPath, reply::Response, Filter};
 
-use vector_lib::internal_event::{CountByteSize, InternalEventHandle as _, Registered};
+use vector_lib::{
+    event::metric::TagValue,
+    internal_event::{CountByteSize, InternalEventHandle as _, Registered},
+    string::VectorString,
+};
 use vector_lib::{
     event::{DatadogMetricOriginMetadata, EventMetadata},
     metrics::AgentDDSketch,
@@ -29,7 +33,7 @@ use crate::{
             proto::metrics::{metric_payload, Metadata, MetricPayload, SketchPayload},
             ApiKeyQueryParams, DatadogAgentSource,
         },
-        util::{extract_tag_key_and_value, ErrorMessage},
+        util::ErrorMessage,
     },
     SourceSender,
 };
@@ -263,7 +267,7 @@ pub(crate) fn decode_ddseries_v2(
         .into_iter()
         .flat_map(|serie| {
             let (namespace, name) = namespace_name_from_dd_metric(&serie.metric);
-            let mut tags = into_metric_tags(serie.tags);
+            let mut tags = into_metric_tags_shared(serie.tags);
 
             let event_metadata = get_event_metadata(serie.metadata.as_ref());
 
@@ -434,11 +438,34 @@ fn decode_datadog_series_v1(
     Ok(decoded_metrics)
 }
 
-fn into_metric_tags(tags: Vec<Chars>) -> MetricTags {
-    // TODO: inefficient conversion (in `extract_tag_key_and_value`) to `String` when `Bytes` would
-    // suffice. address once we have solution for getting original `Bytes` from `Chars`~`
-    tags.iter()
-        .map(|tag| extract_tag_key_and_value(tag.deref()))
+
+fn into_metric_tags(tags: Vec<String>) -> MetricTags {
+    tags.into_iter()
+        .map(|full_tag| {
+            // tag_chunk is expected to be formatted as "tag_name:tag_value"
+            // If no colon is found, then it is classified as a Bare tag.
+            match full_tag.split_once(':') {
+                // the notation `tag:` is valid for StatsD. The effect is an empty string value.
+                Some((prefix, suffix)) => (prefix.to_string().into(), suffix.to_string().into()),
+                None => (full_tag, TagValue::Bare),
+            }
+        })
+        .collect()
+}
+
+fn into_metric_tags_shared(tags: Vec<Chars>) -> MetricTags {
+    tags.into_iter()
+        .map(|full_tag| {
+            let full_tag = VectorString::from(full_tag);
+
+            // tag_chunk is expected to be formatted as "tag_name:tag_value"
+            // If no colon is found, then it is classified as a Bare tag.
+            match full_tag.split_once(':') {
+                // the notation `tag:` is valid for StatsD. The effect is an empty string value.
+                Some((prefix, suffix)) => (prefix, TagValue::Value(suffix)),
+                None => (full_tag, TagValue::Bare),
+            }
+        })
         .collect()
 }
 
@@ -447,12 +474,7 @@ fn into_vector_metric(
     api_key: Option<Arc<str>>,
     schema_definition: &Arc<schema::Definition>,
 ) -> Vec<Event> {
-    let mut tags: MetricTags = dd_metric
-        .tags
-        .unwrap_or_default()
-        .into_iter()
-        .map(extract_tag_key_and_value)
-        .collect();
+    let mut tags = into_metric_tags(dd_metric.tags.unwrap_or_default());
 
     if let Some(key) = log_schema().host_key() {
         dd_metric
@@ -566,7 +588,7 @@ pub(crate) fn decode_ddsketch(
         .into_iter()
         .flat_map(|sketch_series| {
             // sketch_series.distributions is also always empty from payload coming from dd agents
-            let mut tags = into_metric_tags(sketch_series.tags);
+            let mut tags = into_metric_tags_shared(sketch_series.tags);
             log_schema()
                 .host_key()
                 .and_then(|key| tags.replace(key.to_string(), sketch_series.host.clone()));

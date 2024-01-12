@@ -71,7 +71,7 @@ pub use self::message_decoding::decode_message;
 /// be part of the tag value), is to remove any additional colons from the tag value.
 /// Thus Vector expects only one colon character to be present per chunk, so the find()
 /// operation locating the first position is sufficient.
-#[cfg(any(feature = "sources-statsd", feature = "sources-datadog_agent"))]
+#[cfg(any(feature = "sources-statsd"))]
 pub fn extract_tag_key_and_value<S: AsRef<str>>(
     tag_chunk: S,
 ) -> (String, vector_lib::event::metric::TagValue) {

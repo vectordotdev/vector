@@ -40,7 +40,7 @@ required-features = ["secret-backend-example"]
 # This results in roughly a 5% reduction in performance when compiling locally vs when
 # compiled via the CI pipeline.
 [profile.release]
-debug = false # Do not include debug symbols in the executable.
+debug = true # Do not include debug symbols in the executable.
 
 [profile.bench]
 debug = true
@@ -378,6 +378,7 @@ nix = { git = "https://github.com/vectordotdev/nix.git", branch = "memfd/gnu/mus
 # The `heim` crates depend on `ntapi` 0.3.7 on Windows, but that version has an
 # unaligned access bug fixed in the following revision.
 ntapi = { git = "https://github.com/MSxDOS/ntapi.git", rev = "24fc1e47677fc9f6e38e5f154e6011dc9b270da6" }
+protobuf = { git = "https://github.com/vectordotdev/rust-protobuf.git", branch = "tobz/chars-into-bytes" }
 
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin

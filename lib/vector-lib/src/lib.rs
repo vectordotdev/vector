@@ -19,7 +19,7 @@ pub use vector_config::impl_generate_config_from_default;
 pub use vector_core::compile_vrl;
 pub use vector_core::{
     buckets, default_data_dir, emit, event, fanout, metric_tags, metrics, partition, quantiles,
-    register, samples, schema, serde, sink, source, tcp, tls, transform, update_counter,
+    register, samples, schema, serde, sink, source, string, tcp, tls, transform, update_counter,
     EstimatedJsonEncodedSizeOf,
 };
 pub use vector_lookup as lookup;
