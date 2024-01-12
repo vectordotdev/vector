@@ -49,6 +49,4 @@ async fn validate() {
     series::validate().await;
 
     sketches::validate().await;
-
-    // std::thread::sleep(std::time::Duration::from_secs(120));
 }

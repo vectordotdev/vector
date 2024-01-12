@@ -25,7 +25,6 @@ services:
       - fakeintake-agent
     environment:
     - DD_API_KEY=${TEST_DATADOG_API_KEY:?TEST_DATADOG_API_KEY required}
-    # - DD_API_KEY=DEADBEEF
     - DD_HOSTNAME=datadog-agent
     volumes:
     # The Agent config file
@@ -38,7 +37,6 @@ services:
       - vector
     environment:
     - DD_API_KEY=${TEST_DATADOG_API_KEY:?TEST_DATADOG_API_KEY required}
-    # - DD_API_KEY=DEADBEEF
     - DD_HOSTNAME=datadog-agent-vector
     volumes:
     # The Agent config file
