@@ -130,10 +130,10 @@ base: components: sources: gcp_pubsub: configuration: {
 															Vector's decoder currently adheres more strictly to the GELF spec, with
 															the exception that some characters such as `@`  are allowed in field names.
 
-															Other GELF codecs such as Loki's, use an [implementation][implementation] that is maintained
+															Other GELF codecs such as Loki's, use a [Go SDK][implementation] that is maintained
 															by Graylog, and is much more relaxed than the GELF spec.
 
-															Going forward, Vector will use that as the reference implementation, which means
+															Going forward, Vector will use that [Go SDK][implementation] as the reference implementation, which means
 															the codec may continue to relax the enforcement of specification.
 
 															[gelf]: https://docs.graylog.org/docs/gelf
