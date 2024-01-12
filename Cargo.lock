@@ -5237,6 +5237,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "metrics"
+version = "0.22.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "77b9e10a211c839210fd7f99954bda26e5f8e26ec686ad68da6a32df7c80e782"
+dependencies = [
+ "ahash 0.8.6",
+ "portable-atomic",
+]
+
+[[package]]
 name = "metrics-macros"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5255,8 +5265,8 @@ checksum = "8fec95d1490f2b7e2d49462f9d75aa4fed52cc21e0b40aefc5987c6f404d40a2"
 dependencies = [
  "itoa",
  "lockfree-object-pool",
- "metrics",
- "metrics-util",
+ "metrics 0.21.1",
+ "metrics-util 0.15.1",
  "once_cell",
  "tracing 0.1.40",
  "tracing-core 0.1.32",
@@ -5274,12 +5284,27 @@ dependencies = [
  "crossbeam-utils",
  "hashbrown 0.13.1",
  "indexmap 1.9.3",
- "metrics",
+ "metrics 0.21.1",
  "num_cpus",
  "ordered-float 3.9.2",
  "quanta 0.11.1",
  "radix_trie",
  "sketches-ddsketch",
+]
+
+[[package]]
+name = "metrics-util"
+version = "0.16.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2670b8badcc285d486261e2e9f1615b506baff91427b61bd336a472b65bbf5ed"
+dependencies = [
+ "crossbeam-epoch",
+ "crossbeam-utils",
+ "hashbrown 0.13.1",
+ "indexmap 1.9.3",
+ "metrics 0.22.0",
+ "num_cpus",
+ "ordered-float 4.2.0",
 ]
 
 [[package]]
@@ -9944,7 +9969,7 @@ dependencies = [
  "lru",
  "maxminddb",
  "md-5",
- "metrics",
+ "metrics 0.21.1",
  "metrics-tracing-context",
  "mlua",
  "mongodb",
@@ -10075,9 +10100,9 @@ dependencies = [
  "futures 0.3.30",
  "hdrhistogram",
  "memmap2",
- "metrics",
+ "metrics 0.21.1",
  "metrics-tracing-context",
- "metrics-util",
+ "metrics-util 0.16.0",
  "num-traits",
  "once_cell",
  "paste",
@@ -10114,7 +10139,7 @@ dependencies = [
  "derivative",
  "futures 0.3.30",
  "indexmap 2.1.0",
- "metrics",
+ "metrics 0.21.1",
  "nom",
  "ordered-float 4.2.0",
  "paste",
@@ -10215,9 +10240,9 @@ dependencies = [
  "http 0.2.9",
  "hyper-proxy",
  "indexmap 2.1.0",
- "metrics",
+ "metrics 0.21.1",
  "metrics-tracing-context",
- "metrics-util",
+ "metrics-util 0.16.0",
  "mlua",
  "ndarray",
  "ndarray-stats",
