@@ -27,8 +27,16 @@ pub trait RetryLogic: Clone + Send + Sync + 'static {
     type Error: std::error::Error + Send + Sync + 'static;
     type Response;
 
+    /// When the Service call returns an `Err` respoonse, this function allows
+    /// implementors to specify what kinds of errors can be retried.
     fn is_retriable_error(&self, error: &Self::Error) -> bool;
 
+    /// When the Service call returns an `Ok` resppnse, this function allows
+    /// implementors to specify additional logic to determine if the success response
+    /// is actually an error. This is particularly useful when the downstream service
+    /// of a sink returns a transport protocol layer success but error data in the
+    /// response body. For example, an HTTP 200 status, but the body of the response
+    /// contains a list of errors encountered while processing.
     fn should_retry_response(&self, _response: &Self::Response) -> RetryAction {
         // Treat the default as the request is successful
         RetryAction::Successful
