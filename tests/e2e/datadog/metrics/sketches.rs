@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{btree_map::Entry, BTreeMap};
 
 #[allow(warnings, clippy::pedantic, clippy::nursery)]
 mod ddmetric_proto {
@@ -6,10 +6,13 @@ mod ddmetric_proto {
 }
 
 use ddmetric_proto::{sketch_payload::Sketch, SketchPayload};
+use tracing::info;
 
 use super::*;
 
 const SKETCHES_ENDPOINT: &str = "/api/beta/sketches";
+
+// TODO this needs a re-work to align with the SeriesIntake model in series.rs
 
 // unique identification of a Sketch
 #[derive(Clone, Debug, Eq, Hash, PartialEq, PartialOrd, Ord)]
@@ -39,9 +42,9 @@ fn aggregate_normalize_sketches(
                 sketch.host.truncate(sketch.host.len() - "-vector".len());
             }
 
-            if !aggregate.contains_key(&ctx) {
-                aggregate.insert(ctx, sketch.clone());
-                println!("{:?}", sketch);
+            if let Entry::Vacant(e) = aggregate.entry(ctx) {
+                e.insert(sketch.clone());
+                info!("{:?}", sketch);
             }
         }
     }
@@ -53,51 +56,42 @@ fn aggregate_normalize_sketches(
 // of the pipeline
 fn common_sketch_assertions(sketches: &BTreeMap<SketchContext, Sketch>) {
     // we should have received some metrics from the emitter
-    assert!(sketches.len() > 0);
-    println!("metric sketch received: {}", sketches.len());
+    assert!(!sketches.is_empty());
+    info!("metric sketch received: {}", sketches.len());
 
-    // specifically we should have received each of these
-    let mut found = vec![(false, "distribution")];
+    let mut found = false;
     sketches.keys().for_each(|ctx| {
-        found.iter_mut().for_each(|found| {
-            if ctx
-                .metric_name
-                .starts_with(&format!("foo_metric.{}", found.1))
-            {
-                println!("received {}", found.1);
-                found.0 = true;
-            }
-        });
+        if ctx.metric_name.starts_with("foo_metric.distribution") {
+            found = true;
+        }
     });
 
-    found
-        .iter()
-        .for_each(|(found, mtype)| assert!(found, "Didn't receive metric type {}", *mtype));
+    assert!(found, "Didn't receive metric type distribution");
 }
 
 async fn get_sketches_from_pipeline(address: String) -> BTreeMap<SketchContext, Sketch> {
-    println!("getting sketch payloads");
+    info!("getting sketch payloads");
     let payloads =
         get_fakeintake_payloads::<FakeIntakeResponseRaw>(&address, SKETCHES_ENDPOINT).await;
 
-    println!("unpacking payloads");
+    info!("unpacking payloads");
     let mut payloads = unpack_proto_payloads(&payloads);
 
-    println!("aggregating payloads");
+    info!("aggregating payloads");
     let sketches = aggregate_normalize_sketches(&mut payloads);
 
     common_sketch_assertions(&sketches);
 
-    println!("{:?}", sketches.keys());
+    info!("{:?}", sketches.keys());
 
     sketches
 }
 
 pub(super) async fn validate() {
-    println!("==== getting sketch data from agent-only pipeline ==== ");
+    info!("==== getting sketch data from agent-only pipeline ==== ");
     let agent_sketches = get_sketches_from_pipeline(fake_intake_agent_address()).await;
 
-    println!("==== getting sketch data from agent-vector pipeline ====");
+    info!("==== getting sketch data from agent-vector pipeline ====");
     let vector_sketches = get_sketches_from_pipeline(fake_intake_vector_address()).await;
 
     assert_eq!(agent_sketches, vector_sketches);

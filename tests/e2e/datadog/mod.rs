@@ -19,7 +19,8 @@ fn fake_intake_agent_address() -> String {
 struct FakeIntakePayload<D> {
     // When string, base64 encoded
     data: D,
-    encoding: String,
+    #[serde(rename = "encoding")]
+    _encoding: String,
     #[serde(rename = "timestamp")]
     _timestamp: String,
 }

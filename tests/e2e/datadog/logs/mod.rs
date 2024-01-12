@@ -56,9 +56,9 @@ fn common_assertions(payloads: &mut [Value]) {
 }
 
 // reduces the payload down to just the log data
-fn reduce_to_data(payloads: &mut Vec<FakeIntakePayload<Value>>) -> Vec<Value> {
+fn reduce_to_data(payloads: &mut [FakeIntakePayload<Value>]) -> Vec<Value> {
     payloads
-        .into_iter()
+        .iter_mut()
         .map(|payload| payload.data.take())
         .collect()
 }
