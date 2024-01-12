@@ -49,7 +49,7 @@ impl LengthDelimitedDecoderConfig {
         if let Some(max_length) = self.length_delimited.max_frame_length {
             LengthDelimitedDecoder::new_with_max_frame_length(max_length)
         } else {
-            LengthDelimitedDecoder::new()
+            LengthDelimitedDecoder::default()
         }
     }
 }
