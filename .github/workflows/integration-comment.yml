@@ -203,7 +203,9 @@ jobs:
           command: bash scripts/ci-integration-test.sh datadog-traces
 
       - name: e2e-datadog-logs
-        if: ${{ contains(github.event.comment.body, '/ci-run-integration-e2e-datadog-logs') || contains(github.event.comment.body, '/ci-run-all') }}
+        if: ${{ contains(github.event.comment.body, '/ci-run-integration-e2e-datadog-logs')
+          || contains(github.event.comment.body, '/ci-run-integration-all')
+          || contains(github.event.comment.body, '/ci-run-all') }}
         uses: nick-fields/retry@v2
         with:
           timeout_minutes: 30
@@ -211,7 +213,9 @@ jobs:
           command: bash scripts/ci-integration-test.sh e2e-datadog-logs
 
       - name: datadog-e2e-metrics
-        if: ${{ contains(github.event.comment.body, '/ci-run-integration-datadog-e2e-metrics') || contains(github.event.comment.body, '/ci-run-all') }}
+        if: ${{ contains(github.event.comment.body, '/ci-run-integration-datadog-e2e-metrics')
+          || contains(github.event.comment.body, '/ci-run-integration-all')
+          || contains(github.event.comment.body, '/ci-run-all') }}
         uses: nick-fields/retry@v2
         with:
           timeout_minutes: 30
