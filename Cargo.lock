@@ -7284,9 +7284,9 @@ dependencies = [
 
 [[package]]
 name = "rdkafka"
-version = "0.35.0"
+version = "0.36.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f16c17f411935214a5870e40aff9291f8b40a73e97bf8de29e5959c473d5ef33"
+checksum = "630c0065f6fca81773883fe78e7a7d14af1b1c5ed11907a28fbf12b1385e0c50"
 dependencies = [
  "futures-channel",
  "futures-util",
