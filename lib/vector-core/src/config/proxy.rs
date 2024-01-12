@@ -54,7 +54,7 @@ pub struct ProxyConfig {
     /// Enables proxying support.
     #[serde(
         default = "ProxyConfig::default_enabled",
-        skip_serializing_if = "skip_serializing_if_default"
+        skip_serializing_if = "is_enabled"
     )]
     pub enabled: bool,
 
@@ -103,6 +103,11 @@ impl Default for ProxyConfig {
             no_proxy: NoProxy::default(),
         }
     }
+}
+
+#[allow(clippy::trivially_copy_pass_by_ref)] // Calling convention is required by serde
+fn is_enabled(e: &bool) -> bool {
+    e == &true
 }
 
 impl ProxyConfig {
@@ -204,10 +209,43 @@ mod tests {
         header::{AUTHORIZATION, PROXY_AUTHORIZATION},
         HeaderName, HeaderValue, Uri,
     };
+    use proptest::prelude::*;
 
     const PROXY_HEADERS: [HeaderName; 2] = [AUTHORIZATION, PROXY_AUTHORIZATION];
 
     use super::*;
+
+    impl Arbitrary for ProxyConfig {
+        type Parameters = ();
+        type Strategy = BoxedStrategy<Self>;
+
+        fn arbitrary_with((): Self::Parameters) -> Self::Strategy {
+            (
+                any::<bool>(),
+                any::<Option<String>>(),
+                any::<Option<String>>(),
+            )
+                .prop_map(|(enabled, http, https)| Self {
+                    enabled,
+                    http,
+                    https,
+                    // TODO: Neither NoProxy nor IpCidr contained with in it supports proptest. Once
+                    // they support proptest, add another any here.
+                    no_proxy: Default::default(),
+                })
+                .boxed()
+        }
+    }
+
+    proptest! {
+        #[test]
+        fn encodes_and_decodes_through_yaml(config:ProxyConfig) {
+            let yaml = serde_yaml::to_string(&config).expect("Could not serialize config");
+            let reloaded: ProxyConfig = serde_yaml::from_str(&yaml)
+                .expect("Could not deserialize config");
+            assert_eq!(config, reloaded);
+        }
+    }
 
     #[test]
     fn merge_simple() {
