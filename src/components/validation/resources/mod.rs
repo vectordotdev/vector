@@ -176,7 +176,7 @@ fn decoder_framing_to_encoding_framer(framing: &decoding::FramingConfig) -> enco
                 },
             })
         }
-        decoding::FramingConfig::LengthDelimited => encoding::FramingConfig::LengthDelimited,
+        decoding::FramingConfig::LengthDelimited(_) => encoding::FramingConfig::LengthDelimited,
         decoding::FramingConfig::NewlineDelimited(_) => encoding::FramingConfig::NewlineDelimited,
         // TODO: There's no equivalent octet counting framer for encoding... although
         // there's no particular reason that would make it hard to write.
@@ -222,7 +222,9 @@ fn encoder_framing_to_decoding_framer(framing: encoding::FramingConfig) -> decod
                 },
             })
         }
-        encoding::FramingConfig::LengthDelimited => decoding::FramingConfig::LengthDelimited,
+        encoding::FramingConfig::LengthDelimited => {
+            decoding::FramingConfig::LengthDelimited(Default::default())
+        }
         encoding::FramingConfig::NewlineDelimited => {
             decoding::FramingConfig::NewlineDelimited(Default::default())
         }

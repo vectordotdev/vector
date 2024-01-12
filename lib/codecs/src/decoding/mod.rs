@@ -88,7 +88,7 @@ pub enum FramingConfig {
     CharacterDelimited(CharacterDelimitedDecoderConfig),
 
     /// Byte frames which are prefixed by an unsigned big-endian 32-bit integer indicating the length.
-    LengthDelimited,
+    LengthDelimited(LengthDelimitedDecoderConfig),
 
     /// Byte frames which are delimited by a newline character.
     NewlineDelimited(NewlineDelimitedDecoderConfig),
@@ -112,8 +112,8 @@ impl From<CharacterDelimitedDecoderConfig> for FramingConfig {
 }
 
 impl From<LengthDelimitedDecoderConfig> for FramingConfig {
-    fn from(_: LengthDelimitedDecoderConfig) -> Self {
-        Self::LengthDelimited
+    fn from(config: LengthDelimitedDecoderConfig) -> Self {
+        Self::LengthDelimited(config)
     }
 }
 
@@ -135,9 +135,7 @@ impl FramingConfig {
         match self {
             FramingConfig::Bytes => Framer::Bytes(BytesDecoderConfig.build()),
             FramingConfig::CharacterDelimited(config) => Framer::CharacterDelimited(config.build()),
-            FramingConfig::LengthDelimited => {
-                Framer::LengthDelimited(LengthDelimitedDecoderConfig.build())
-            }
+            FramingConfig::LengthDelimited(config) => Framer::LengthDelimited(config.build()),
             FramingConfig::NewlineDelimited(config) => Framer::NewlineDelimited(config.build()),
             FramingConfig::OctetCounting(config) => Framer::OctetCounting(config.build()),
         }
@@ -312,7 +310,7 @@ impl DeserializerConfig {
     pub fn default_stream_framing(&self) -> FramingConfig {
         match self {
             DeserializerConfig::Avro { .. } => FramingConfig::Bytes,
-            DeserializerConfig::Native => FramingConfig::LengthDelimited,
+            DeserializerConfig::Native => FramingConfig::LengthDelimited(Default::default()),
             DeserializerConfig::Bytes
             | DeserializerConfig::Json(_)
             | DeserializerConfig::Gelf(_)
