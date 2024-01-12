@@ -128,13 +128,13 @@ mod tests {
 
     #[test]
     fn test_format_s3_key() {
-        let s3_key: String = String::from("s3_key");
+        let s3_key: String = String::from("s3_key_");
         let filename: String = String::from("filename");
         let empty_extension: String = String::from("");
         let non_empty_extension: String = String::from("txt");
         
-        let result_with_extension: String = String::from("s3_keyfilename.txt");
-        let result_without_extension: String = String::from("s3_keyfilename");
+        let result_with_extension: String = String::from("s3_key_filename.txt");
+        let result_without_extension: String = String::from("s3_key_filename");
 
        assert_eq!(result_with_extension, format_s3_key(&s3_key, &filename, &non_empty_extension));
        assert_eq!(result_without_extension, format_s3_key(&s3_key, &filename, &empty_extension));
