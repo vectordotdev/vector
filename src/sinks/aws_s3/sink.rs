@@ -114,7 +114,7 @@ impl RequestBuilder<(S3PartitionKey, Vec<Event>)> for S3RequestOptions {
     }
 }
 
-fn format_s3_key(s3_key: &String, filename: &String, extension: &String) -> String{
+fn format_s3_key(s3_key: &str, filename: &str, extension: &str) -> String {
     if extension.is_empty() {
         format!("{}{}", s3_key, filename)
     } else {
@@ -128,16 +128,10 @@ mod tests {
 
     #[test]
     fn test_format_s3_key() {
-        let s3_key: String = String::from("s3_key_");
-        let filename: String = String::from("filename");
-        let empty_extension: String = String::from("");
-        let non_empty_extension: String = String::from("txt");
-        
-        let result_with_extension: String = String::from("s3_key_filename.txt");
-        let result_without_extension: String = String::from("s3_key_filename");
-
-       assert_eq!(result_with_extension, format_s3_key(&s3_key, &filename, &non_empty_extension));
-       assert_eq!(result_without_extension, format_s3_key(&s3_key, &filename, &empty_extension));
-
+        assert_eq!(
+            "s3_key_filename.txt",
+            format_s3_key("s3_key_", "filename", "txt")
+        );
+        assert_eq!("s3_key_filename", format_s3_key("s3_key_", "filename", ""));
     }
 }
