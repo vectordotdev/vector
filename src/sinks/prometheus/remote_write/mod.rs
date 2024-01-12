@@ -1,5 +1,5 @@
-//! The Prometheus Remote Write [`vector_core::sink::VectorSink`].
-//! Contains the [`vector_core::sink::VectorSink`] instance that is responsible
+//! The Prometheus Remote Write.
+//! Contains the [`VectorSink`] instance that is responsible
 //! for taking a stream of [`vector_core::event::Event`] and forwarding
 //! them to a server via the [Prometheus Remote Write protocol][remote_write].
 //!
