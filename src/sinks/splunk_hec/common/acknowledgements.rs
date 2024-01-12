@@ -48,7 +48,7 @@ pub struct HecClientAcknowledgementsConfig {
         default,
         deserialize_with = "crate::serde::bool_or_struct",
         flatten,
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+        skip_serializing_if = "crate::serde::is_default"
     )]
     pub inner: AcknowledgementsConfig,
 }

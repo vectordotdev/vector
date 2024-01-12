@@ -124,10 +124,7 @@ pub struct ElasticsearchConfig {
     #[configurable(derived)]
     pub compression: Compression,
 
-    #[serde(
-        skip_serializing_if = "crate::serde::skip_serializing_if_default",
-        default
-    )]
+    #[serde(skip_serializing_if = "crate::serde::is_default", default)]
     #[configurable(derived)]
     #[configurable(metadata(docs::advanced))]
     pub encoding: Transformer,
@@ -183,7 +180,7 @@ pub struct ElasticsearchConfig {
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+        skip_serializing_if = "crate::serde::is_default"
     )]
     #[configurable(derived)]
     pub acknowledgements: AcknowledgementsConfig,
