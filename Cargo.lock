@@ -10215,6 +10215,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_with 3.4.0",
+ "serde_yaml 0.9.30",
  "similar-asserts",
  "smallvec",
  "snafu",
