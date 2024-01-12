@@ -1,3 +1,6 @@
+// Workaround for a false positive. The function `create_data_dir_lock` cannot be const.
+#![allow(clippy::missing_const_for_fn)]
+
 use super::{
     builder::ConfigBuilder, graph::Graph, id::Inputs, transform::get_transform_output_ids,
     validation, Config, OutputId,
@@ -11,24 +14,21 @@ use indexmap::IndexSet;
 use fs4::FileExt;
 
 #[cfg(not(test))]
-fn create_data_dir_lock(data_dir: &Option<PathBuf>, errors: &mut Vec<String>) -> Option<File> {
+fn create_data_dir_lock(data_dir: &Option<PathBuf>) -> Result<Option<File>, String> {
     if let Some(data_dir) = data_dir {
         match acquire_exclusive_lock(data_dir) {
-            Ok(lock) => Some(lock),
-            Err(e) => {
-                errors.push(e);
-                None
-            }
+            Ok(lock) => Ok(Some(lock)),
+            Err(e) => Err(e),
         }
     } else {
-        None
+        Ok(None)
     }
 }
 
 #[cfg(test)]
-fn create_data_dir_lock(_data_dir: &Option<PathBuf>, _errors: &mut Vec<String>) -> Option<File> {
+fn create_data_dir_lock(_data_dir: &Option<PathBuf>) -> Result<Option<File>, String> {
     // We should make all tests work with unique directories but this requires extensive changes.
-    None
+    Ok(None)
 }
 
 #[cfg(not(test))]
@@ -133,7 +133,13 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
         .map(|test| test.resolve_outputs(&graph))
         .collect::<Result<Vec<_>, Vec<_>>>()?;
 
-    let data_dir_lock = create_data_dir_lock(&global.data_dir, &mut errors);
+    let data_dir_lock = match create_data_dir_lock(&global.data_dir) {
+        Ok(lock) => lock,
+        Err(e) => {
+            errors.push(e);
+            None
+        }
+    };
 
     if errors.is_empty() {
         let mut config = Config {
