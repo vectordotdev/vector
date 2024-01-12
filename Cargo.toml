@@ -235,7 +235,7 @@ greptimedb-client = { git = "https://github.com/GreptimeTeam/greptimedb-ingester
 arc-swap = { version = "1.6", default-features = false, optional = true }
 async-compression = { version = "0.4.5", default-features = false, features = ["tokio", "gzip", "zstd"], optional = true }
 apache-avro = { version = "0.16.0", default-features = false, optional = true }
-axum = { version = "0.6.20", default-features = false }
+axum = { version = "0.7.3", default-features = false }
 base64 = { version = "0.21.7", default-features = false, optional = true }
 bloomy  = { version = "1.2.0", default-features = false, optional = true }
 bollard = { version = "0.15.0", default-features = false, features = ["ssl", "chrono"], optional = true }
