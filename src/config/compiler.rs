@@ -16,9 +16,11 @@ use fs4::FileExt;
 #[cfg(not(test))]
 fn create_data_dir_lock(data_dir: &Option<PathBuf>) -> Result<Option<File>, String> {
     if let Some(data_dir) = data_dir {
-        match acquire_exclusive_lock(data_dir) {
-            Ok(lock) => Ok(Some(lock)),
-            Err(e) => Err(e),
+        let lock_path = data_dir.join(".lock");
+        let lock = File::create(&lock_path).map_err(|e| e.to_string())?;
+        match lock.try_lock_exclusive() {
+            Ok(()) => Ok(Some(lock)),
+            Err(e) => Err(format!("Couldn't lock {lock_path:?}. Error: {e}")),
         }
     } else {
         Ok(None)
@@ -27,18 +29,8 @@ fn create_data_dir_lock(data_dir: &Option<PathBuf>) -> Result<Option<File>, Stri
 
 #[cfg(test)]
 fn create_data_dir_lock(_data_dir: &Option<PathBuf>) -> Result<Option<File>, String> {
-    // We should make all tests work with unique directories but this requires extensive changes.
+    // TODO: We should make all tests work with unique directories but this requires extensive changes.
     Ok(None)
-}
-
-#[cfg(not(test))]
-fn acquire_exclusive_lock(path: &std::path::Path) -> Result<std::fs::File, String> {
-    let lock_path = path.join(".lock");
-    let lock = std::fs::File::create(&lock_path).map_err(|e| e.to_string())?;
-    match lock.try_lock_exclusive() {
-        Ok(()) => Ok(lock),
-        Err(e) => Err(format!("Couldn't lock {lock_path:?}. Error: {e}")),
-    }
 }
 
 pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<String>> {
