@@ -274,15 +274,22 @@ impl SourceConfig for DatadogAgentConfig {
             )
             .with_standard_vector_source_metadata();
 
+        let mut output = Vec::new();
+
         if self.multiple_outputs {
-            vec![
-                SourceOutput::new_logs(DataType::Log, definition).with_port(LOGS),
-                SourceOutput::new_metrics().with_port(METRICS),
-                SourceOutput::new_traces().with_port(TRACES),
-            ]
+            if !self.disable_logs {
+                output.push(SourceOutput::new_logs(DataType::Log, definition).with_port(LOGS))
+            }
+            if !self.disable_metrics {
+                output.push(SourceOutput::new_metrics().with_port(METRICS))
+            }
+            if !self.disable_traces {
+                output.push(SourceOutput::new_traces().with_port(TRACES))
+            }
         } else {
-            vec![SourceOutput::new_logs(DataType::all(), definition)]
+            output.push(SourceOutput::new_logs(DataType::all(), definition))
         }
+        output
     }
 
     fn resources(&self) -> Vec<Resource> {
