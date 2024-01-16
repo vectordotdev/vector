@@ -58,7 +58,7 @@ impl LengthDelimitedDecoderConfig {
 ///
 /// Currently, this expects a length header in 32-bit MSB by default; options to
 /// control the format of the header can be added in the future.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct LengthDelimitedDecoder(tokio_util::codec::LengthDelimitedCodec);
 
 impl LengthDelimitedDecoder {
@@ -77,26 +77,6 @@ impl LengthDelimitedDecoder {
 
 impl Default for LengthDelimitedDecoder {
     fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl Clone for LengthDelimitedDecoder {
-    fn clone(&self) -> Self {
-        // This has been fixed with https://github.com/tokio-rs/tokio/pull/4089,
-        // however we are blocked on upgrading to a new release of `tokio-util`
-        // that includes the `Clone` implementation:
-        // https://github.com/vectordotdev/vector/issues/11257.
-        //
-        // This is an awful implementation for `Clone` since it resets the
-        // internal state. However, it works for our use case because we
-        // generally only clone a codec that has not been mutated yet.
-        //
-        // Ideally, `tokio_util::codec::LengthDelimitedCodec` should implement
-        // `Clone` and it doesn't look like it was a deliberate decision to
-        // leave out the implementation. All of its internal fields implement
-        // `Clone`, so adding an implementation for `Clone` could be contributed
-        // to the upstream repo easily by adding it to the `derive` macro.
         Self::new()
     }
 }
