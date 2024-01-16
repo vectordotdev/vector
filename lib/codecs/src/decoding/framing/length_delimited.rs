@@ -58,7 +58,7 @@ impl LengthDelimitedDecoderConfig {
 ///
 /// Currently, this expects a length header in 32-bit MSB by default; options to
 /// control the format of the header can be added in the future.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct LengthDelimitedDecoder(tokio_util::codec::LengthDelimitedCodec);
 
 impl LengthDelimitedDecoder {
@@ -78,6 +78,12 @@ impl LengthDelimitedDecoder {
 impl Default for LengthDelimitedDecoder {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl Clone for LengthDelimitedDecoder {
+    fn clone(&self) -> Self {
+        Self::new_with_max_frame_length(self.0.max_frame_length())
     }
 }
 
