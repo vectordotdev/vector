@@ -274,7 +274,7 @@ impl SourceConfig for DatadogAgentConfig {
             )
             .with_standard_vector_source_metadata();
 
-        let mut output = Vec::new();
+        let mut output = Vec::with_capacity(1);
 
         if self.multiple_outputs {
             if !self.disable_logs {
