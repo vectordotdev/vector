@@ -1,11 +1,11 @@
 // Workaround for a false positive. The function `create_data_dir_lock` cannot be const.
 #![allow(clippy::missing_const_for_fn)]
-
+#![allow(unused_imports)]
 use super::{
     builder::ConfigBuilder, graph::Graph, id::Inputs, transform::get_transform_output_ids,
     validation, Config, OutputId,
 };
-use std::fs::File;
+// use std::fs::File;
 use std::path::PathBuf;
 
 use indexmap::IndexSet;
@@ -14,11 +14,16 @@ use indexmap::IndexSet;
 use fs4::FileExt;
 
 #[cfg(not(test))]
-fn create_data_dir_lock(data_dir: &Option<PathBuf>) -> Result<Option<File>, String> {
+// fn create_data_dir_lock(data_dir: &Option<PathBuf>) -> Result<Option<File>, String> {
+fn create_data_dir_lock(data_dir: &Option<PathBuf>) -> Result<Option<fslock::LockFile>, String> {
     if let Some(data_dir) = data_dir {
-        match acquire_exclusive_lock(data_dir) {
-            Ok(lock) => Ok(Some(lock)),
-            Err(e) => Err(e),
+        let lock_path = data_dir.join(".lock");
+        let mut lock = fslock::LockFile::open(&lock_path).map_err(|e| e.to_string())?;
+        match lock.try_lock() {
+            //let lock = std::fs::File::open(&lock_path).map_err(|e| e.to_string())?;
+            //match lock.try_lock_exclusive() {
+            Ok(_is) => Ok(Some(lock)),
+            Err(e) => Err(e.to_string()),
         }
     } else {
         Ok(None)
@@ -26,19 +31,9 @@ fn create_data_dir_lock(data_dir: &Option<PathBuf>) -> Result<Option<File>, Stri
 }
 
 #[cfg(test)]
-fn create_data_dir_lock(_data_dir: &Option<PathBuf>) -> Result<Option<File>, String> {
-    // We should make all tests work with unique directories but this requires extensive changes.
+fn create_data_dir_lock(_data_dir: &Option<PathBuf>) -> Result<Option<fslock::LockFile>, String> {
+    // TODO: We should make all tests work with unique directories but this requires extensive changes.
     Ok(None)
-}
-
-#[cfg(not(test))]
-fn acquire_exclusive_lock(path: &std::path::Path) -> Result<std::fs::File, String> {
-    let lock_path = path.join(".lock");
-    let lock = std::fs::File::create(&lock_path).map_err(|e| e.to_string())?;
-    match lock.try_lock_exclusive() {
-        Ok(()) => Ok(lock),
-        Err(e) => Err(format!("Couldn't lock {lock_path:?}. Error: {e}")),
-    }
 }
 
 pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<String>> {

@@ -9863,6 +9863,7 @@ dependencies = [
  "fakedata",
  "flate2",
  "fs4",
+ "fslock",
  "futures 0.3.30",
  "futures-util",
  "glob",
