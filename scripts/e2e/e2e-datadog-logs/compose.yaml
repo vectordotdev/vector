@@ -54,9 +54,9 @@ services:
     - DD_CONTAINER_EXCLUDE="name:.*"
     volumes:
     # The Agent config file
-    - ../../../tests/data/e2e/datadog/logs/agent_only.yaml:/etc/datadog-agent/datadog.yaml
+    - ${PWD}/tests/data/e2e/datadog/logs/agent_only.yaml:/etc/datadog-agent/datadog.yaml
     # The custom logs check
-    - ../../../tests/data/e2e/datadog/logs/logs.conf.d:/conf.d:ro
+    - ${PWD}/tests/data/e2e/datadog/logs/logs.conf.d:/conf.d:ro
     # The custom log to tail, created by the `log_generator` service
     - log_path:/var/log/
 
@@ -75,9 +75,9 @@ services:
     - DD_CONTAINER_EXCLUDE="name:.*"
     volumes:
     # The Agent config file
-    - ../../../tests/data/e2e/datadog/logs/agent_vector.yaml:/etc/datadog-agent/datadog.yaml
+    - ${PWD}/tests/data/e2e/datadog/logs/agent_vector.yaml:/etc/datadog-agent/datadog.yaml
     # The custom logs check
-    - ../../../tests/data/e2e/datadog/logs/logs.conf.d:/conf.d:ro
+    - ${PWD}/tests/data/e2e/datadog/logs/logs.conf.d:/conf.d:ro
     # The custom log to tail, created by the `log_generator` service
     - log_path:/var/log/
 
