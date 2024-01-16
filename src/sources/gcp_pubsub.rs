@@ -847,7 +847,7 @@ mod integration_tests {
     use once_cell::sync::Lazy;
     use serde_json::{json, Value};
     use tokio::time::{Duration, Instant};
-    use vector_lib::metrics::{self, Controller};
+    use vector_lib::metrics::Controller;
     use vrl::btreemap;
 
     use super::*;
@@ -863,11 +863,11 @@ mod integration_tests {
 
     #[tokio::test]
     async fn oneshot() {
-        assert_source_compliance(&SOURCE_TAGS, async {
+        assert_source_compliance(&SOURCE_TAGS, |controller| async move {
             let (tester, mut rx, shutdown) = setup(EventStatus::Delivered).await;
             let test_data = tester.send_test_events(99, BTreeMap::new()).await;
             receive_events(&mut rx, test_data).await;
-            tester.shutdown_check(shutdown).await;
+            tester.shutdown_check(shutdown, controller).await;
         })
         .await;
     }
@@ -886,13 +886,13 @@ mod integration_tests {
 
     #[tokio::test]
     async fn shuts_down_after_data_received() {
-        assert_source_compliance(&SOURCE_TAGS, async {
+        assert_source_compliance(&SOURCE_TAGS, |controller| async move {
             let (tester, mut rx, shutdown) = setup(EventStatus::Delivered).await;
 
             let test_data = tester.send_test_events(1, BTreeMap::new()).await;
             receive_events(&mut rx, test_data).await;
 
-            tester.shutdown_check(shutdown).await;
+            tester.shutdown_check(shutdown, controller).await;
 
             assert!(rx.next().await.is_none());
             tester.send_test_events(1, BTreeMap::new()).await;
@@ -909,20 +909,20 @@ mod integration_tests {
 
     #[tokio::test]
     async fn streams_data() {
-        assert_source_compliance(&SOURCE_TAGS, async {
+        assert_source_compliance(&SOURCE_TAGS, |controller| async move {
             let (tester, mut rx, shutdown) = setup(EventStatus::Delivered).await;
             for _ in 0..10 {
                 let test_data = tester.send_test_events(9, BTreeMap::new()).await;
                 receive_events(&mut rx, test_data).await;
             }
-            tester.shutdown_check(shutdown).await;
+            tester.shutdown_check(shutdown, controller).await;
         })
         .await;
     }
 
     #[tokio::test]
     async fn sends_attributes() {
-        assert_source_compliance(&SOURCE_TAGS, async {
+        assert_source_compliance(&SOURCE_TAGS, |controller| async move {
             let (tester, mut rx, shutdown) = setup(EventStatus::Delivered).await;
             let attributes = btreemap![
                 random_string(8) => random_string(88),
@@ -931,20 +931,20 @@ mod integration_tests {
             ];
             let test_data = tester.send_test_events(1, attributes).await;
             receive_events(&mut rx, test_data).await;
-            tester.shutdown_check(shutdown).await;
+            tester.shutdown_check(shutdown, controller).await;
         })
         .await;
     }
 
     #[tokio::test]
     async fn acks_received() {
-        assert_source_compliance(&SOURCE_TAGS, async {
+        assert_source_compliance(&SOURCE_TAGS, |controller| async move {
             let (tester, mut rx, shutdown) = setup(EventStatus::Delivered).await;
 
             let test_data = tester.send_test_events(1, BTreeMap::new()).await;
             receive_events(&mut rx, test_data).await;
 
-            tester.shutdown_check(shutdown).await;
+            tester.shutdown_check(shutdown, controller).await;
 
             // Make sure there are no messages left in the queue
             assert_eq!(tester.pull_count(10).await, 0);
@@ -964,7 +964,7 @@ mod integration_tests {
     // to verify the events are not acknowledged through the emulator.
     #[ignore]
     async fn does_not_ack_rejected() {
-        assert_source_compliance(&SOURCE_TAGS, async {
+        assert_source_compliance(&SOURCE_TAGS, |_| async {
             let (tester, mut rx, shutdown) = setup(EventStatus::Rejected).await;
 
             let test_data = tester.send_test_events(1, BTreeMap::new()).await;
@@ -1127,7 +1127,7 @@ mod integration_tests {
         async fn shutdown_check(
             &self,
             shutdown: shutdown::SourceShutdownCoordinator,
-            controller: &Controller,
+            controller: Controller,
         ) {
             self.shutdown(shutdown).await;
             components::SOURCE_TESTS.assert(controller, &components::HTTP_PULL_SOURCE_TAGS);

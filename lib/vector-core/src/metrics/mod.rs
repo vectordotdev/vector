@@ -29,7 +29,7 @@ pub enum Error {
     TimeoutMustBePositive { timeout: f64 },
 }
 
-static CONTROLLER: OnceLock<Controller> = OnceLock::new();
+static GLOBAL_CONTROLLER: OnceLock<Controller> = OnceLock::new();
 
 // Cardinality counter parameters, expose the internal metrics registry
 // cardinality. Useful for the end users to help understand the characteristics
@@ -42,6 +42,7 @@ const CARDINALITY_COUNTER_KEY_NAME: &str = "internal_metrics_cardinality_total";
 static CARDINALITY_COUNTER_KEY: Key = Key::from_static_name(CARDINALITY_COUNTER_KEY_NAME);
 
 /// Controller allows capturing metric snapshots.
+#[derive(Clone)]
 pub struct Controller {
     recorder: VectorRecorder,
 }
@@ -75,7 +76,7 @@ fn init(recorder: VectorRecorder) -> Result<()> {
     let controller = Controller {
         recorder: recorder.clone(),
     };
-    let Ok(()) = CONTROLLER.set(controller) else {
+    let Ok(()) = GLOBAL_CONTROLLER.set(controller) else {
         return Err(Error::AlreadyInitialized);
     };
 
@@ -140,7 +141,7 @@ impl Controller {
     /// This function will fail if the metrics subsystem has not been correctly
     /// initialized.
     pub fn get_global() -> Result<&'static Self> {
-        CONTROLLER.get().ok_or(Error::NotInitialized)
+        GLOBAL_CONTROLLER.get().ok_or(Error::NotInitialized)
     }
 
     /// Set or clear the expiry time after which idle metrics are dropped from the set of captured
