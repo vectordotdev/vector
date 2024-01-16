@@ -1,1 +1,1 @@
-Acquire and hold an exclusive lock to the global data directory until the config is dropped.
+Vector now acquires an exclusive lock to the data directory. This avoids two Vector processes accidentally using the same data directory.
