@@ -42,7 +42,7 @@ services:
   # Tails a custom log created by `log_generator` and sends log data to
   # the `fakeintake-agent` service
   datadog-agent:
-    image: docker.io/datadog/agent:${CONFIG_VERSION}
+    image: docker.io/datadog/agent:${CONFIG_AGENT_VERSION}
     depends_on:
       - log_generator
       - fakeintake-agent
@@ -63,7 +63,7 @@ services:
   # Tails a custom log created by `log_generator` and sends log data to
   # the `vector` service
   datadog-agent-vector:
-    image: docker.io/datadog/agent:${CONFIG_VERSION}
+    image: docker.io/datadog/agent:${CONFIG_AGENT_VERSION}
     depends_on:
       - log_generator
       - vector
