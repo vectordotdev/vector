@@ -4,6 +4,9 @@ services:
   # Generates random log data for consumption by the custom Agent check
   log_generator:
     image: docker.io/mingrammer/flog
+    depends_on:
+      - datadog-agent-vector
+      - datadog-agent
     command:
       - "-f"
       - "json"
@@ -16,35 +19,11 @@ services:
     volumes:
       - log_path:/var/log/
 
-  # Receives log data from the `datadog-agent-vector` service and sends
-  # to the `fakeintake-vector` service.
-  vector:
-    depends_on:
-      - log_generator
-      - fakeintake-vector
-    build:
-      context: ${PWD}
-    # re-using the integration test runner image since it already has
-    # compiled vector on it.
-    image: ${CONFIG_VECTOR_IMAGE}
-    environment:
-      - FEATURES=e2e-tests-datadog
-    working_dir: /home/vector
-    network_mode: host
-    command:
-      - "/usr/bin/vector"
-      - "-vvv"
-      - "-c"
-      - "/home/vector/tests/data/e2e/datadog/logs/vector.toml"
-    volumes:
-      - ${PWD}:/home/vector
-
   # Tails a custom log created by `log_generator` and sends log data to
   # the `fakeintake-agent` service
   datadog-agent:
     image: docker.io/datadog/agent:${CONFIG_VERSION}
     depends_on:
-      - log_generator
       - fakeintake-agent
     environment:
     - DD_API_KEY=${TEST_DATADOG_API_KEY:?TEST_DATADOG_API_KEY required}
@@ -65,7 +44,6 @@ services:
   datadog-agent-vector:
     image: docker.io/datadog/agent:${CONFIG_VERSION}
     depends_on:
-      - log_generator
       - vector
     environment:
     - DD_API_KEY=${TEST_DATADOG_API_KEY:?TEST_DATADOG_API_KEY required}
@@ -80,6 +58,28 @@ services:
     - ../../../tests/data/e2e/datadog/logs/logs.conf.d:/conf.d:ro
     # The custom log to tail, created by the `log_generator` service
     - log_path:/var/log/
+
+  # Receives log data from the `datadog-agent-vector` service and sends
+  # to the `fakeintake-vector` service.
+  vector:
+    depends_on:
+      - fakeintake-vector
+    build:
+      context: ${PWD}
+    # re-using the integration test runner image since it already has
+    # compiled vector on it.
+    image: ${CONFIG_VECTOR_IMAGE}
+    environment:
+      - FEATURES=e2e-tests-datadog
+    working_dir: /home/vector
+    network_mode: host
+    command:
+      - "/usr/bin/vector"
+      - "-vvv"
+      - "-c"
+      - "/home/vector/tests/data/e2e/datadog/logs/vector.toml"
+    volumes:
+      - ${PWD}:/home/vector
 
   # Receives log data from the `datadog-agent` service. Is queried by the test runner
   # which does the validation of consistency with the other fakeintake service.

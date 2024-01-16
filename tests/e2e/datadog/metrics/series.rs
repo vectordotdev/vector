@@ -194,7 +194,7 @@ async fn get_v1_series_from_pipeline(address: String) -> SeriesIntake {
     info!("converting payloads");
     let payloads = convert_v1_payloads_v2(&payloads);
 
-    info!("aggregating payloads");
+    info!("generating series intake");
     let intake = generate_series_intake(&payloads);
 
     common_series_assertions(&intake);
@@ -212,7 +212,7 @@ async fn get_v2_series_from_pipeline(address: String) -> SeriesIntake {
     info!("unpacking payloads");
     let payloads = unpack_proto_payloads::<MetricPayload>(&payloads);
 
-    info!("aggregating payloads");
+    info!("generating series intake");
     let intake = generate_series_intake(&payloads);
 
     common_series_assertions(&intake);

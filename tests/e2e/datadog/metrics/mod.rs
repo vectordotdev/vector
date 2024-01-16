@@ -43,9 +43,6 @@ where
 async fn validate() {
     trace_init();
 
-    // TODO need to see if can configure the agent flush interval
-    std::thread::sleep(std::time::Duration::from_secs(20));
-
     series::validate().await;
 
     sketches::validate().await;
