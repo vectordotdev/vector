@@ -101,7 +101,7 @@ impl RequestBuilder<(S3PartitionKey, Vec<Event>)> for S3RequestOptions {
             .cloned()
             .unwrap_or_else(|| self.compression.extension().into());
 
-        s3metadata.s3_key = format!("{}{}.{}", s3metadata.s3_key, filename, extension);
+        s3metadata.s3_key = format_s3_key(&s3metadata.s3_key, &filename, &extension);
 
         S3Request {
             body: payload.into_payload(),
@@ -111,5 +111,27 @@ impl RequestBuilder<(S3PartitionKey, Vec<Event>)> for S3RequestOptions {
             content_encoding: self.compression.content_encoding(),
             options: s3_options,
         }
+    }
+}
+
+fn format_s3_key(s3_key: &str, filename: &str, extension: &str) -> String {
+    if extension.is_empty() {
+        format!("{}{}", s3_key, filename)
+    } else {
+        format!("{}{}.{}", s3_key, filename, extension)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_format_s3_key() {
+        assert_eq!(
+            "s3_key_filename.txt",
+            format_s3_key("s3_key_", "filename", "txt")
+        );
+        assert_eq!("s3_key_filename", format_s3_key("s3_key_", "filename", ""));
     }
 }

@@ -25,6 +25,9 @@ use crate::{gelf_fields::*, VALID_FIELD_REGEX};
 //   suggest. We've elected to take a more strict approach to maintain backwards compatibility
 //   in the event that we need to change the behavior to be more relaxed, so that prior versions
 //   of vector will still work with the new relaxed decoding.
+//
+//   Additionally, Graylog's own GELF Output produces GELF messages with any field names present
+//   in the sending Stream, exceeding the specified field name character set.
 
 /// Config used to build a `GelfDeserializer`.
 #[configurable_component]
