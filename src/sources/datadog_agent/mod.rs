@@ -165,8 +165,7 @@ impl SourceConfig for DatadogAgentConfig {
             .schema_definitions
             .get(&Some(LOGS.to_owned()))
             .or_else(|| cx.schema_definitions.get(&None))
-            .expect("registered log schema required")
-            .clone();
+            .cloned();
 
         let decoder =
             DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace)
@@ -324,7 +323,7 @@ pub(crate) struct DatadogAgentSource {
     pub(crate) log_namespace: LogNamespace,
     pub(crate) decoder: Decoder,
     protocol: &'static str,
-    logs_schema_definition: Arc<schema::Definition>,
+    logs_schema_definition: Option<Arc<schema::Definition>>,
     events_received: Registered<EventsReceived>,
 }
 
@@ -360,7 +359,7 @@ impl DatadogAgentSource {
         store_api_key: bool,
         decoder: Decoder,
         protocol: &'static str,
-        logs_schema_definition: schema::Definition,
+        logs_schema_definition: Option<schema::Definition>,
         log_namespace: LogNamespace,
     ) -> Self {
         Self {
@@ -379,7 +378,7 @@ impl DatadogAgentSource {
                 .clone(),
             decoder,
             protocol,
-            logs_schema_definition: Arc::new(logs_schema_definition),
+            logs_schema_definition: logs_schema_definition.map(Arc::new),
             log_namespace,
             events_received: register!(EventsReceived),
         }

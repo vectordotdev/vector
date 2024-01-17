@@ -95,7 +95,7 @@ fn test_decode_log_body() {
             true,
             decoder,
             "http",
-            test_logs_schema_definition(),
+            Some(test_logs_schema_definition()),
             LogNamespace::Legacy,
         );
 
@@ -136,7 +136,7 @@ fn test_decode_log_body_empty_object() {
         true,
         decoder,
         "http",
-        test_logs_schema_definition(),
+        Some(test_logs_schema_definition()),
         LogNamespace::Legacy,
     );
 
