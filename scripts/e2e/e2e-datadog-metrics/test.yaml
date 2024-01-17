@@ -12,8 +12,8 @@ runner:
     FAKE_INTAKE_VECTOR_ENDPOINT: 'http://fakeintake-vector:80'
 
 matrix:
-  # validate against the latest nightly and also stable v6 and v7
-  version: ['latest', '6', '7']
+  # validate against the Agent latest nightly and also stable v6 and v7
+  agent_version: ['latest', '6', '7']
 
 # changes to these files/paths will invoke the integration test in CI
 # expressions are evaluated using https://github.com/micromatch/picomatch

@@ -221,7 +221,7 @@ jobs:
         name: e2e-datadog-metrics
         uses: nick-fields/retry@v2
         with:
-          timeout_minutes: 60
+          timeout_minutes: 35
           max_attempts: 3
           command: bash scripts/ci-integration-test.sh  e2e-datadog-metrics
 

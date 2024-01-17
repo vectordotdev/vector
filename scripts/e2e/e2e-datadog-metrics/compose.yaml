@@ -20,7 +20,7 @@ services:
 
   # Sends metric data received from the Emitter to the `fakeintake-agent` service
   datadog-agent:
-    image: docker.io/datadog/agent:${CONFIG_VERSION}
+    image: docker.io/datadog/agent:${CONFIG_AGENT_VERSION}
     depends_on:
       - fakeintake-agent
     environment:
@@ -28,11 +28,11 @@ services:
     - DD_HOSTNAME=datadog-agent
     volumes:
     # The Agent config file
-    - ../../../tests/data/e2e/datadog/metrics/agent_only.yaml:/etc/datadog-agent/datadog.yaml
+    - ${PWD}/tests/data/e2e/datadog/metrics/agent_only.yaml:/etc/datadog-agent/datadog.yaml
 
   # Sends metric data received from the Emitter to the `vector` service
   datadog-agent-vector:
-    image: docker.io/datadog/agent:${CONFIG_VERSION}
+    image: docker.io/datadog/agent:${CONFIG_AGENT_VERSION}
     depends_on:
       - vector
     environment:
@@ -40,7 +40,7 @@ services:
     - DD_HOSTNAME=datadog-agent-vector
     volumes:
     # The Agent config file
-    - ../../../tests/data/e2e/datadog/metrics/agent_vector.yaml:/etc/datadog-agent/datadog.yaml
+    - ${PWD}/tests/data/e2e/datadog/metrics/agent_vector.yaml:/etc/datadog-agent/datadog.yaml
 
   # Receives metric data from the `datadog-agent-vector` service and sends
   # to the `fakeintake-vector` service.
