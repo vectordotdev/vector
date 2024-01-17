@@ -11,7 +11,7 @@
     - [Panics](#panics)
   - [Feature flags](#feature-flags)
   - [Dependencies](#dependencies)
-  - [Dependencies](#minimum-supported-rust-version)
+  - [Minimum Supported Rust Version](#minimum-supported-rust-version)
 - [Guidelines](#guidelines)
   - [Sink healthchecks](#sink-healthchecks)
 - [Testing](#testing)
