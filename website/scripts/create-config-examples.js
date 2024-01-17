@@ -66,35 +66,63 @@ const getExampleValue = (param, deepFilter) => {
           }
         });
       } else {
-        // If the property has options
         if (p.options) {
-          // Store the options in a variable
           const options = p.options;
-          // Initialize an object to store the sub-options
           let subObj = {};
 
-          // Iterate over each option
+          // Iterate over each key-value pair in the options object
           for (let [k, { type: type1 }] of Object.entries(options)) {
-            // Iterate over each sub-option
-            for (let [key, { options: options2 }] of Object.entries(type1)) {
-              // If the sub-option has further options
-              if (options2) {
-                // Iterate over each sub-sub-option
-                for (let [optionKey, { type: type2, required }] of Object.entries(options2)) {
-                  // If the sub-sub-option is required
-                  if (required) {
-                    // Iterate over each type of the sub-sub-option
-                    for (let [typeKey, typeValue] of Object.entries(type2)) {
-                      // If the type has items
-                      if (typeValue.items) {
-                        // Iterate over each item type
-                        for (let [itemTypeKey, itemTypeValue] of Object.entries(typeValue.items.type)) {
-                          // Get the value for the item type and store it in the sub-object
-                          subObj[k] = getValue(itemTypeValue);
+            // If the current option is required
+            if (options[k].required) {
+              // Iterate over each key-value pair in the type1 object
+              for (let [key, { options: options2 }] of Object.entries(type1)) {
+                // If the current type1 key has examples and there is at least one example
+                if (type1[key].examples && type1[key].examples.length > 0) {
+                  // Get the value from the type1 key
+                  let valueFromGetType = getValue(type1[key]);
+                  // If the value is not null, add it to the subObj
+                  if (valueFromGetType !== null) {
+                    subObj[k] = valueFromGetType;
+                  }
+                }
+                // If there are no examples for the current type1 key, but there are options2
+                else if (options2) {
+                  // Iterate over each key-value pair in the options2 object
+                  for (let [optionKey, { type: type2, required }] of Object.entries(options2)) {
+                    // If the current option2 is required
+                    if (required) {
+                      // Iterate over each key-value pair in the type2 object
+                      for (let [typeKey, typeValue] of Object.entries(type2)) {
+                        // If the current type2 key has examples and there is at least one example
+                        if (typeValue.examples && typeValue.examples.length > 0) {
+                          // Get the value from the type2 key
+                          let valueFromGetType = getValue(typeValue);
+                          // If the value is not null, add it to the subObj
+                          if (valueFromGetType !== null) {
+                            subObj[k] = valueFromGetType;
+                          }
                         }
-                      } else {
-                        // Get the value for the non-item type and store it in the sub-object
-                        subObj[k] = getValue(typeValue);
+                        // If there are no examples for the current type2 key, but there are items
+                        else if (typeValue.items) {
+                          // Iterate over each key-value pair in the items type object
+                          for (let [itemTypeKey, itemTypeValue] of Object.entries(typeValue.items.type)) {
+                            // Get the value from the itemType key
+                            let valueFromGetType = getValue(itemTypeValue);
+                            // If the value is not null, add it to the subObj
+                            if (valueFromGetType !== null) {
+                              subObj[k] = valueFromGetType;
+                            }
+                          }
+                        }
+                        // If there are no examples or items for the current type2 key
+                        else {
+                          // Get the value from the type2 key
+                          let valueFromGetType = getValue(typeValue);
+                          // If the value is not null, add it to the subObj
+                          if (valueFromGetType !== null) {
+                            subObj[k] = valueFromGetType;
+                          }
+                        }
                       }
                     }
                   }
@@ -102,7 +130,7 @@ const getExampleValue = (param, deepFilter) => {
               }
             }
           }
-          // Set the value to the sub-object
+          // Set the value to the subObj
           value = subObj;
         } else {
           value = getValue(p);
