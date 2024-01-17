@@ -45,7 +45,7 @@ jobs:
           # check-version needs tags
           fetch-depth: 0 # fetch everything
 
-      - uses: actions/cache@v3
+      - uses: actions/cache@v4
         name: Cache Cargo registry + index
         with:
           path: |
