@@ -35,6 +35,9 @@ fn assert_timestamp_hostname(payloads: &mut [Value]) -> usize {
                     .as_object_mut()
                     .expect("log entries should be objects");
 
+                // timestamp is available in the flog generated logs as a datetime but
+                // there does not appear to be a way to add a custom parser in the Agent
+                // to handle it.
                 assert!(log.remove("timestamp").is_some());
                 assert!(log.remove("hostname").is_some());
             })
@@ -67,6 +70,10 @@ fn reduce_to_data(payloads: &mut [FakeIntakePayload<Value>]) -> Vec<Value> {
 async fn validate() {
     trace_init();
 
+    // Even with configuring docker service dependencies, we need a small buffer of time
+    // to ensure events flow through to fakeintake before asking for them
+    std::thread::sleep(std::time::Duration::from_secs(2));
+
     info!("getting log payloads from agent-only pipeline");
     let mut agent_payloads = get_fakeintake_payloads::<FakeIntakeResponseJson>(
         &fake_intake_agent_address(),
@@ -75,7 +82,7 @@ async fn validate() {
     .await
     .payloads;
 
-    // Not sure what this is but the logs endpoint receives an empty payload in the beginning
+    // the logs endpoint receives an empty healthcheck payload in the beginning
     if !agent_payloads.is_empty() {
         agent_payloads.retain(|raw_payload| !raw_payload.data.as_array().unwrap().is_empty())
     }

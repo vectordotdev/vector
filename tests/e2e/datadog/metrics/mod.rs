@@ -43,6 +43,10 @@ where
 async fn validate() {
     trace_init();
 
+    // Even with configuring docker service dependencies, we need a small buffer of time
+    // to ensure events flow through to fakeintake before asking for them
+    std::thread::sleep(std::time::Duration::from_secs(2));
+
     series::validate().await;
 
     sketches::validate().await;
