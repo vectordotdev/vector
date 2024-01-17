@@ -17,7 +17,6 @@ const getExampleValue = (param, deepFilter) => {
   }
 
   const getValue = (obj) => {
-
     const enumVal = (obj.enum != null) ? Object.keys(obj.enum)[0] : null;
 
     const examplesVal = (obj.examples != null && obj.examples.length > 0) ? obj.examples[0] : null;
@@ -139,7 +138,6 @@ const getExampleValue = (param, deepFilter) => {
     } else {
       value = getValue(p);
     }
-
   });
 
   return value;
@@ -363,7 +361,6 @@ const main = () => {
         );
 
         const useCaseExamples = makeUseCaseExamples(component);
-
         const keyName = `my_${kind.substring(0, kind.length - 1)}_id`;
 
         let commonExampleConfig, advancedExampleConfig;
