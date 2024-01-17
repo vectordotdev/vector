@@ -57,18 +57,14 @@ fn generate_sketch_intake(payloads: &mut [SketchPayload]) -> SketchIntake {
 
             sketch.dogsketches.iter_mut().for_each(|ds| {
                 let ts = ds.ts;
-                if !entry.0.contains_key(&ts) {
-                    entry.0.insert(ts, vec![]);
-                }
+                entry.0.entry(ts).or_default();
                 ds.ts = 0;
                 entry.0.get_mut(&ts).unwrap().push(ds.clone());
             });
 
             sketch.distributions.iter_mut().for_each(|dt| {
                 let ts = dt.ts;
-                if !entry.1.contains_key(&ts) {
-                    entry.1.insert(ts, vec![]);
-                }
+                entry.1.entry(ts).or_default();
                 dt.ts = 0;
                 entry.1.get_mut(&ts).unwrap().push(dt.clone());
             });
