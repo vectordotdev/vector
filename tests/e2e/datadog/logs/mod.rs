@@ -55,7 +55,7 @@ fn common_assertions(payloads: &mut [Value]) {
 
     info!("log events received: {n_log_events}");
 
-    assert!(n_log_events == expected_log_events());
+    assert_eq!(n_log_events, expected_log_events());
 }
 
 #[tokio::test]
