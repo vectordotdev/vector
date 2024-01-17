@@ -19,6 +19,10 @@ pub struct Options {
     /// Whether or not to expose the GraphQL playground on the API endpoint.
     #[serde(default = "default_playground")]
     pub playground: bool,
+
+    /// Whether or not the GraphQL endpoint is enabled
+    #[serde(default = "default_graphql")]
+    pub graphql: bool,
 }
 
 impl Default for Options {
@@ -27,6 +31,7 @@ impl Default for Options {
             enabled: default_enabled(),
             playground: default_playground(),
             address: default_address(),
+            graphql: default_graphql(),
         }
     }
 }
@@ -50,6 +55,10 @@ pub fn default_graphql_url() -> Url {
 }
 
 const fn default_playground() -> bool {
+    true
+}
+
+const fn default_graphql() -> bool {
     true
 }
 
@@ -78,6 +87,7 @@ impl Options {
             address,
             enabled: self.enabled | other.enabled,
             playground: self.playground & other.playground,
+            graphql: self.graphql & other.graphql,
         };
 
         *self = options;
@@ -91,6 +101,7 @@ fn bool_merge() {
         enabled: true,
         address: None,
         playground: false,
+        graphql: false,
     };
 
     a.merge(Options::default()).unwrap();
@@ -101,6 +112,7 @@ fn bool_merge() {
             enabled: true,
             address: default_address(),
             playground: false,
+            graphql: false
         }
     );
 }
@@ -112,6 +124,7 @@ fn bind_merge() {
         enabled: true,
         address: Some(address),
         playground: true,
+        graphql: true,
     };
 
     a.merge(Options::default()).unwrap();
@@ -122,6 +135,7 @@ fn bind_merge() {
             enabled: true,
             address: Some(address),
             playground: true,
+            graphql: true,
         }
     );
 }
