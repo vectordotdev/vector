@@ -49,7 +49,7 @@ async fn get_payloads_agent(endpoint: &str) -> Vec<Value> {
         .await
         .payloads;
 
-    // Not sure what this is but the logs endpoint receives an empty payload in the beginning
+    // the logs endpoint receives an empty healthcheck payload in the beginning
     if !raw_payloads.is_empty() && endpoint == "/api/v2/logs" {
         raw_payloads.retain(|raw_payload| !raw_payload.data.as_array().unwrap().is_empty())
     }

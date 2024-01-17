@@ -35,6 +35,9 @@ fn assert_timestamp_hostname(payloads: &mut [Value]) -> usize {
                     .as_object_mut()
                     .expect("log entries should be objects");
 
+                // timestamp is available in the flog generated logs as a datetime but
+                // there does not appear to be a way to add a custom parser in the Agent
+                // to handle it.
                 assert!(log.remove("timestamp").is_some());
                 assert!(log.remove("hostname").is_some());
             })
