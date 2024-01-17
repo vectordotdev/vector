@@ -2091,6 +2091,7 @@ dependencies = [
  "dyn-clone",
  "futures 0.3.30",
  "indoc",
+ "influxdb-line-protocol",
  "memchr",
  "once_cell",
  "ordered-float 4.2.1",
@@ -4553,6 +4554,19 @@ name = "infer"
 version = "0.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bc150e5ce2330295b8616ce0e3f53250e53af31759a9dbedad1621ba29151847"
+
+[[package]]
+name = "influxdb-line-protocol"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "22fa7ee6be451ea0b1912b962c91c8380835e97cf1584a77e18264e908448dcb"
+dependencies = [
+ "bytes 1.6.0",
+ "log",
+ "nom",
+ "smallvec",
+ "snafu 0.7.5",
+]
 
 [[package]]
 name = "inotify"
