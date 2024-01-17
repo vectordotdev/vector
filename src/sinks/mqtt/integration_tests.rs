@@ -60,7 +60,7 @@ async fn mqtt_happy() {
     tokio::spawn(async move {
         loop {
             if let Ok(try_msg) =
-                tokio::time::timeout(Duration::from_secs(10), eventloop.poll()).await
+                tokio::time::timeout(Duration::from_secs(1), eventloop.poll()).await
             {
                 let msg = try_msg.expect("Cannot extract the message");
                 if let Event::Incoming(Incoming::Publish(publish)) = msg {
