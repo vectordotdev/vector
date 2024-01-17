@@ -11,6 +11,7 @@
     - [Panics](#panics)
   - [Feature flags](#feature-flags)
   - [Dependencies](#dependencies)
+  - [Dependencies](#minimum-supported-rust-version)
 - [Guidelines](#guidelines)
   - [Sink healthchecks](#sink-healthchecks)
 - [Testing](#testing)
@@ -262,6 +263,14 @@ see how dependencies are reviewed in the
 If a dependency is required only by one or multiple components, but not by
 Vector's core, make it optional and add it to the list of dependencies of
 the features corresponding to these components in `Cargo.toml`.
+
+### Minimum Supported Rust Version
+
+Vector's Minimum Supported Rust Version (MSRV) is indicated by the `rust-version` specified in
+`Cargo.toml`.
+
+Currently, Vector has no policy around MSRV. It can be bumped at any time if required by
+a dependency or to take advantage of a new language feature in Vector's codebase.
 
 ## Guidelines
 
