@@ -10,6 +10,7 @@ use std::{
 use futures_util::{stream::FuturesUnordered, StreamExt};
 use indexmap::IndexMap;
 use ordered_float::NotNan;
+use tempfile::TempDir;
 use tokio::sync::{
     oneshot::{self, Receiver},
     Mutex,
@@ -39,6 +40,8 @@ use crate::{
 
 pub struct UnitTest {
     pub name: String,
+    #[allow(dead_code)]
+    temp_dir: TempDir,
     config: Config,
     pieces: TopologyPieces,
     test_result_rxs: Vec<Receiver<UnitTestSinkResult>>,
@@ -422,12 +425,15 @@ async fn build_unit_test(
             .sinks
             .insert(ComponentKey::from(Uuid::new_v4().to_string()), sink);
     }
+    let temp_dir = TempDir::new().unwrap();
+    config_builder.set_data_dir(temp_dir.path());
     let config = config_builder.build()?;
     let diff = config::ConfigDiff::initial(&config);
     let pieces = TopologyPieces::build(&config, &diff, HashMap::new(), Default::default()).await?;
 
     Ok(UnitTest {
         name: test.name,
+        temp_dir,
         config,
         pieces,
         test_result_rxs,
