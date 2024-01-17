@@ -4,7 +4,7 @@ use crate::sinks::mqtt::MqttSinkConfig;
 use crate::template::Template;
 use crate::test_util::components::{run_and_assert_sink_compliance, SINK_TAGS};
 use crate::test_util::{random_lines_with_stream, trace_init};
-use rumqttc::{AsyncClient, MqttOptions, QoS};
+use rumqttc::{AsyncClient, Event, Incoming, MqttOptions, QoS};
 use std::time::Duration;
 
 fn mqtt_broker_address() -> String {
@@ -55,18 +55,37 @@ async fn mqtt_happy() {
     let (input, events) = random_lines_with_stream(100, num_events, None);
     run_and_assert_sink_compliance(sink, events, &SINK_TAGS).await;
 
-    // loop instead of iter so we can set a timeout
+    let (tx, mut rx) = tokio::sync::mpsc::channel(10);
+
+    tokio::spawn(async move {
+        loop {
+            if let Ok(try_msg) =
+                tokio::time::timeout(Duration::from_secs(10), eventloop.poll()).await
+            {
+                let msg = try_msg.expect("Cannot extract the message");
+                if let Event::Incoming(Incoming::Publish(publish)) = msg {
+                    let message =
+                        serde_json::from_slice::<serde_json::Value>(&publish.payload).unwrap();
+                    tx.send(Ok(message["message"].as_str().unwrap().to_string()))
+                        .await
+                        .unwrap();
+                }
+            } else {
+                tx.send(Err("oh no")).await.unwrap();
+                tokio::time::sleep(Duration::from_millis(50)).await;
+            }
+        }
+    });
+
+    let mut messages = Vec::new();
+
     let mut failures = 0;
-    let mut message_count = 0;
-    while failures < 5 && message_count < input.len() {
-        if let Ok(try_msg) = tokio::time::timeout(Duration::from_secs(1), eventloop.poll()).await {
-            let _msg = try_msg.expect("Cannot extract the message");
-            message_count += 1;
-        } else {
-            failures += 1;
-            tokio::time::sleep(Duration::from_millis(50)).await;
+    while failures < 5 && messages.len() < input.len() {
+        match rx.recv().await.unwrap() {
+            Ok(message) => messages.push(message),
+            Err(_) => failures += 1,
         }
     }
 
-    assert_eq!(message_count, input.len());
+    assert_eq!(messages, input);
 }
