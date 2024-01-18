@@ -417,8 +417,8 @@ impl From<super::MetricValue> for MetricValue {
 impl From<super::Metric> for WithMetadata<Metric> {
     fn from(metric: super::Metric) -> Self {
         let (series, data, metadata) = metric.into_parts();
-        let name = series.name.name;
-        let namespace = series.name.namespace.unwrap_or_default();
+        let name = series.name.name.into_string();
+        let namespace = series.name.namespace.unwrap_or_default().into_string();
 
         let timestamp = data.time.timestamp.map(|ts| prost_types::Timestamp {
             seconds: ts.timestamp(),

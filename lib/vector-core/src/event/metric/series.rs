@@ -96,7 +96,7 @@ pub struct MetricName {
     /// This would typically be a name for the metric itself, unrelated to where the metric
     /// originates from. For example, if the metric represented the amount of used system memory, it
     /// may be called `memory.used`.
-    pub name: String,
+    pub name: VectorString,
 
     /// The namespace of the metric.
     ///
@@ -106,7 +106,7 @@ pub struct MetricName {
     /// of used memory across the system, or `vector` for the amount of used system memory specific
     /// to Vector, and so on.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub namespace: Option<String>,
+    pub namespace: Option<VectorString>,
 }
 
 impl MetricName {
@@ -117,17 +117,17 @@ impl MetricName {
 
     /// Gets a mutable reference to the name component of this name.
     pub fn name_mut(&mut self) -> &mut String {
-        &mut self.name
+        self.name.as_mut()
     }
 
     /// Gets a reference to the namespace component of this name.
-    pub fn namespace(&self) -> Option<&String> {
-        self.namespace.as_ref()
+    pub fn namespace(&self) -> Option<&str> {
+        self.namespace.as_ref().map(|s| s.as_str())
     }
 
     /// Gets a mutable reference to the namespace component of this name.
-    pub fn namespace_mut(&mut self) -> &mut Option<String> {
-        &mut self.namespace
+    pub fn namespace_mut(&mut self) -> Option<&mut String> {
+        self.namespace.as_mut().map(|namespace| namespace.as_mut())
     }
 }
 
@@ -139,10 +139,10 @@ impl fmt::Display for MetricSeries {
     /// ```
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
         if let Some(namespace) = &self.name.namespace {
-            write_word(fmt, namespace)?;
+            write_word(fmt, namespace.as_str())?;
             write!(fmt, "_")?;
         }
-        write_word(fmt, &self.name.name)?;
+        write_word(fmt, &self.name.name.as_str())?;
         write!(fmt, "{{")?;
         if let Some(tags) = &self.tags {
             write_list(fmt, ",", tags.iter_all(), |fmt, (tag, value)| {

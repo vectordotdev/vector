@@ -60,7 +60,7 @@ mod tests {
         ddsketch.insert_many(&samples);
 
         Metric::new(
-            name,
+            name.into(),
             kind,
             MetricValue::Sketch {
                 sketch: MetricSketch::AgentDDSketch(ddsketch),

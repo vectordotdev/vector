@@ -60,6 +60,31 @@ impl VectorString {
         }
     }
 
+    pub fn as_mut(&mut self) -> &mut String {
+        // Fast path when we're already an owned variant.
+        if let Self::Owned(s) = self {
+            return s;
+        }
+
+        // Convert ourselves to an owned variant otherwise.
+        let owned = match self {
+            Self::Owned(_) => unreachable!("fast path should be taken"),
+            Self::Shared(buf) => {
+                // SAFETY: We never create this variant unless the source has already validated that
+                // the byte buffer contains valid UTF-8.
+                unsafe { std::str::from_utf8_unchecked(&buf).to_string() }
+            }
+            Self::Static(s) => s.to_string(),
+        };
+
+        let _ = std::mem::replace(self, Self::Owned(owned));
+
+        match self {
+            Self::Owned(s) => s,
+            _ => unreachable!("should be owned variant"),
+        }
+    }
+
     pub fn len(&self) -> usize {
         match self {
             Self::Owned(s) => s.len(),

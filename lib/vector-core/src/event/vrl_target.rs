@@ -308,12 +308,12 @@ impl Target for VrlTarget {
                             ["name"] => {
                                 let value = value.clone().try_bytes().map_err(|e| e.to_string())?;
                                 metric.series.name.name =
-                                    String::from_utf8_lossy(&value).into_owned();
+                                    String::from_utf8_lossy(&value).into_owned().into();
                             }
                             ["namespace"] => {
                                 let value = value.clone().try_bytes().map_err(|e| e.to_string())?;
                                 metric.series.name.namespace =
-                                    Some(String::from_utf8_lossy(&value).into_owned());
+                                    Some(String::from_utf8_lossy(&value).into_owned().into());
                             }
                             ["timestamp"] => {
                                 let value =

@@ -517,13 +517,13 @@ impl Arbitrary for MetricSeries {
 impl Arbitrary for MetricName {
     fn arbitrary(g: &mut Gen) -> Self {
         let namespace = if bool::arbitrary(g) {
-            Some(String::from(Name::arbitrary(g)))
+            Some(String::from(Name::arbitrary(g)).into())
         } else {
             None
         };
 
         MetricName {
-            name: String::from(Name::arbitrary(g)),
+            name: String::from(Name::arbitrary(g)).into(),
             namespace,
         }
     }

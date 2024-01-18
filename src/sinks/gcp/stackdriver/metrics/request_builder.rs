@@ -69,10 +69,8 @@ impl encoding::Encoder<Vec<Metric>> for StackdriverMetricsEncoder {
                 byte_size.add_event(&metric, metric.estimated_json_encoded_size_of());
 
                 let (series, data, _metadata) = metric.into_parts();
-                let namespace = series
-                    .name
-                    .namespace
-                    .unwrap_or_else(|| self.default_namespace.clone());
+                let namespace = series.name().namespace()
+                    .unwrap_or_else(|| self.default_namespace.as_str());
                 let metric_type = format!(
                     "custom.googleapis.com/{}/metrics/{}",
                     namespace, series.name.name

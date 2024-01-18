@@ -6,8 +6,8 @@ use http::{StatusCode, Uri};
 use hyper::{Body, Request};
 use indoc::indoc;
 use tower::Service;
-use vector_lib::configurable::configurable_component;
 use vector_lib::sensitive_string::SensitiveString;
+use vector_lib::configurable::configurable_component;
 use vector_lib::{ByteSizeOf, EstimatedJsonEncodedSizeOf};
 
 use super::Region;
@@ -259,20 +259,18 @@ fn encode_events(
     let byte_size = metrics.size_of();
     let json_byte_size = metrics.estimated_json_encoded_size_of();
     for metric in metrics.into_iter() {
-        let (series, data, _metadata) = metric.into_parts();
-        let namespace = series
-            .name
-            .namespace
-            .unwrap_or_else(|| default_namespace.into());
-        let label = series.name.name;
+        let (mut series, data, _metadata) = metric.into_parts();
+        let mut tags = series.tags.take().unwrap_or_default();
+        let namespace = series.name().namespace()
+            .unwrap_or_else(|| default_namespace);
+        let label = series.name().name();
         let ts = encode_timestamp(data.time.timestamp);
 
         // Authentication in Sematext is by inserting the token as a tag.
-        let mut tags = series.tags.unwrap_or_default();
         tags.replace("token", token.to_string());
         let (metric_type, fields) = match data.value {
-            MetricValue::Counter { value } => ("counter", to_fields(label, value)),
-            MetricValue::Gauge { value } => ("gauge", to_fields(label, value)),
+            MetricValue::Counter { value } => ("counter", to_fields(label.to_string(), value)),
+            MetricValue::Gauge { value } => ("gauge", to_fields(label.to_string(), value)),
             _ => unreachable!(), // handled by SematextMetricNormalize
         };
 
@@ -280,7 +278,7 @@ fn encode_events(
 
         if let Err(error) = influx_line_protocol(
             ProtocolVersion::V1,
-            &namespace,
+            namespace,
             Some(tags),
             Some(fields),
             ts,

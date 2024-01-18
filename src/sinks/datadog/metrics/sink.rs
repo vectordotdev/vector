@@ -263,14 +263,14 @@ mod tests {
 
     fn create_counter(name: &str, value: f64) -> Metric {
         Metric::new(
-            name,
+            name.to_string(),
             MetricKind::Incremental,
             MetricValue::Counter { value },
         )
     }
 
     fn create_gauge(name: &str, value: f64) -> Metric {
-        Metric::new(name, MetricKind::Incremental, MetricValue::Gauge { value })
+        Metric::new(name.to_string(), MetricKind::Incremental, MetricValue::Gauge { value })
     }
 
     #[test]

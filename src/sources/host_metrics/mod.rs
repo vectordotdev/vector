@@ -466,7 +466,7 @@ impl MetricsBuffer {
 
     fn counter(&mut self, name: &str, value: f64, tags: MetricTags) {
         self.metrics.push(
-            Metric::new(name, MetricKind::Absolute, MetricValue::Counter { value })
+            Metric::new(name.to_string(), MetricKind::Absolute, MetricValue::Counter { value })
                 .with_namespace(self.namespace.clone())
                 .with_tags(Some(self.tags(tags)))
                 .with_timestamp(Some(self.timestamp)),
@@ -475,7 +475,7 @@ impl MetricsBuffer {
 
     fn gauge(&mut self, name: &str, value: f64, tags: MetricTags) {
         self.metrics.push(
-            Metric::new(name, MetricKind::Absolute, MetricValue::Gauge { value })
+            Metric::new(name.to_string(), MetricKind::Absolute, MetricValue::Gauge { value })
                 .with_namespace(self.namespace.clone())
                 .with_tags(Some(self.tags(tags)))
                 .with_timestamp(Some(self.timestamp)),

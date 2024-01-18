@@ -266,7 +266,7 @@ pub(crate) fn decode_ddseries_v2(
         .series
         .into_iter()
         .flat_map(|serie| {
-            let (namespace, name) = namespace_name_from_dd_metric(&serie.metric);
+            let (namespace, name) = namespace_name_from_dd_metric_shared(serie.metric);
             let mut tags = into_metric_tags_shared(serie.tags);
 
             let event_metadata = get_event_metadata(serie.metadata.as_ref());
@@ -320,7 +320,7 @@ pub(crate) fn decode_ddseries_v2(
                     .iter()
                     .map(|dd_point| {
                         Metric::new_with_metadata(
-                            name.to_string(),
+                            name.clone(),
                             MetricKind::Incremental,
                             MetricValue::Counter {
                                 value: dd_point.value,
@@ -333,7 +333,7 @@ pub(crate) fn decode_ddseries_v2(
                                 .expect("invalid timestamp"),
                         ))
                         .with_tags(Some(tags.clone()))
-                        .with_namespace(namespace)
+                        .with_namespace(namespace.clone())
                     })
                     .collect::<Vec<_>>(),
                 Ok(metric_payload::MetricType::GAUGE) => serie
@@ -341,7 +341,7 @@ pub(crate) fn decode_ddseries_v2(
                     .iter()
                     .map(|dd_point| {
                         Metric::new_with_metadata(
-                            name.to_string(),
+                            name.clone(),
                             MetricKind::Absolute,
                             MetricValue::Gauge {
                                 value: dd_point.value,
@@ -354,7 +354,7 @@ pub(crate) fn decode_ddseries_v2(
                                 .expect("invalid timestamp"),
                         ))
                         .with_tags(Some(tags.clone()))
-                        .with_namespace(namespace)
+                        .with_namespace(namespace.clone())
                         .with_interval_ms(non_rate_interval)
                     })
                     .collect::<Vec<_>>(),
@@ -367,7 +367,7 @@ pub(crate) fn decode_ddseries_v2(
                             .map(|v| v as u32)
                             .unwrap_or(1);
                         Metric::new_with_metadata(
-                            name.to_string(),
+                            name.clone(),
                             MetricKind::Incremental,
                             MetricValue::Counter {
                                 value: dd_point.value * (i as f64),
@@ -382,7 +382,7 @@ pub(crate) fn decode_ddseries_v2(
                         // serie.interval is in seconds, convert to ms
                         .with_interval_ms(NonZeroU32::new(i * 1000))
                         .with_tags(Some(tags.clone()))
-                        .with_namespace(namespace)
+                        .with_namespace(namespace.clone())
                     })
                     .collect::<Vec<_>>(),
                 Ok(metric_payload::MetricType::UNSPECIFIED) | Err(_) => {
@@ -437,7 +437,6 @@ fn decode_datadog_series_v1(
 
     Ok(decoded_metrics)
 }
-
 
 fn into_metric_tags(tags: Vec<String>) -> MetricTags {
     tags.into_iter()
@@ -505,7 +504,7 @@ fn into_vector_metric(
                         .expect("invalid timestamp"),
                 ))
                 .with_tags(Some(tags.clone()))
-                .with_namespace(namespace)
+                .with_namespace(namespace.map(|s| s.to_string()))
             })
             .collect::<Vec<_>>(),
         DatadogMetricType::Gauge => dd_metric
@@ -523,7 +522,7 @@ fn into_vector_metric(
                         .expect("invalid timestamp"),
                 ))
                 .with_tags(Some(tags.clone()))
-                .with_namespace(namespace)
+                .with_namespace(namespace.map(|s| s.to_string()))
             })
             .collect::<Vec<_>>(),
         // Agent sends rate only for dogstatsd counter https://github.com/DataDog/datadog-agent/blob/f4a13c6dca5e2da4bb722f861a8ac4c2f715531d/pkg/metrics/counter.go#L8-L10
@@ -548,7 +547,7 @@ fn into_vector_metric(
                 // dd_metric.interval is in seconds, convert to ms
                 .with_interval_ms(NonZeroU32::new(i * 1000))
                 .with_tags(Some(tags.clone()))
-                .with_namespace(namespace)
+                .with_namespace(namespace.map(|s| s.to_string()))
             })
             .collect::<Vec<_>>(),
     }
@@ -577,6 +576,20 @@ fn namespace_name_from_dd_metric(dd_metric_name: &str) -> (Option<&str>, &str) {
     }
 }
 
+/// Parses up to the first '.' of the input metric name into a namespace.
+/// If no delimiter, the namespace is None type.
+fn namespace_name_from_dd_metric_shared(
+    dd_metric_name: Chars,
+) -> (Option<VectorString>, VectorString) {
+    let dd_metric_name = VectorString::from(dd_metric_name);
+
+    // ex: "system.fs.util" -> ("system", "fs.util")
+    match dd_metric_name.split_once('.') {
+        Some((namespace, name)) => (Some(namespace), name),
+        None => (None, dd_metric_name),
+    }
+}
+
 pub(crate) fn decode_ddsketch(
     frame: Bytes,
     api_key: &Option<Arc<str>>,
@@ -587,11 +600,11 @@ pub(crate) fn decode_ddsketch(
         .sketches
         .into_iter()
         .flat_map(|sketch_series| {
-            // sketch_series.distributions is also always empty from payload coming from dd agents
+            let (namespace, name) = namespace_name_from_dd_metric_shared(sketch_series.metric);
             let mut tags = into_metric_tags_shared(sketch_series.tags);
             log_schema()
                 .host_key()
-                .and_then(|key| tags.replace(key.to_string(), sketch_series.host.clone()));
+                .and_then(|key| tags.replace(key.to_string(), sketch_series.host));
 
             let event_metadata = get_event_metadata(sketch_series.metadata.as_ref());
 
@@ -610,9 +623,8 @@ pub(crate) fn decode_ddsketch(
                     )
                     .unwrap_or_else(AgentDDSketch::with_agent_defaults),
                 );
-                let (namespace, name) = namespace_name_from_dd_metric(&sketch_series.metric);
                 let mut metric = Metric::new_with_metadata(
-                    name.to_string(),
+                    name.clone(),
                     MetricKind::Incremental,
                     val,
                     event_metadata.clone(),
@@ -623,7 +635,7 @@ pub(crate) fn decode_ddsketch(
                         .single()
                         .expect("invalid timestamp"),
                 ))
-                .with_namespace(namespace);
+                .with_namespace(namespace.clone());
                 if let Some(k) = &api_key {
                     metric.metadata_mut().set_datadog_api_key(Arc::clone(k));
                 }

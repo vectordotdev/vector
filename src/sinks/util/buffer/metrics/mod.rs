@@ -142,7 +142,7 @@ mod tests {
             kind,
             MetricValue::Counter { value },
         )
-        .with_tags(Some(metric_tags!(tagstr => "true")))
+        .with_tags(Some(metric_tags!(tagstr.to_string() => "true")))
     }
 
     pub fn sample_gauge(num: usize, kind: MetricKind, value: f64) -> Metric {

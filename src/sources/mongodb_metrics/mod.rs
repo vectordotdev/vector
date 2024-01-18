@@ -234,7 +234,7 @@ impl MongoDbMetrics {
     }
 
     fn create_metric(&self, name: &str, value: MetricValue, tags: MetricTags) -> Metric {
-        Metric::new(name, MetricKind::Absolute, value)
+        Metric::new(name.to_string(), MetricKind::Absolute, value)
             .with_namespace(self.namespace.clone())
             .with_tags(Some(tags))
             .with_timestamp(Some(Utc::now()))

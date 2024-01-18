@@ -14,7 +14,7 @@ use futures::{stream, FutureExt, SinkExt};
 use futures_util::{future, future::BoxFuture};
 use std::task::{Context, Poll};
 use tower::Service;
-use vector_lib::configurable::configurable_component;
+use vector_lib::{configurable::configurable_component, string::VectorString};
 use vector_lib::{sink::VectorSink, ByteSizeOf, EstimatedJsonEncodedSizeOf};
 
 use crate::{
@@ -251,7 +251,7 @@ impl CloudWatchMetricsSvc {
                         let namespace = metric
                             .take_namespace()
                             .take()
-                            .unwrap_or_else(|| default_namespace.clone());
+                            .unwrap_or_else(|| default_namespace.clone().into());
                         Ok(EncodedEvent::new(
                             PartitionInnerBuffer::new(metric, namespace),
                             byte_size,
@@ -319,7 +319,7 @@ impl CloudWatchMetricsSvc {
     }
 }
 
-impl Service<PartitionInnerBuffer<Vec<Metric>, String>> for CloudWatchMetricsSvc {
+impl Service<PartitionInnerBuffer<Vec<Metric>, VectorString>> for CloudWatchMetricsSvc {
     type Response = ();
     type Error = SdkError<PutMetricDataError>;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
@@ -330,7 +330,7 @@ impl Service<PartitionInnerBuffer<Vec<Metric>, String>> for CloudWatchMetricsSvc
     }
 
     // Emission of internal events for errors and dropped events is handled upstream by the caller.
-    fn call(&mut self, items: PartitionInnerBuffer<Vec<Metric>, String>) -> Self::Future {
+    fn call(&mut self, items: PartitionInnerBuffer<Vec<Metric>, VectorString>) -> Self::Future {
         let (items, namespace) = items.into_parts();
         let metric_data = self.encode_events(items);
         if metric_data.is_empty() {
@@ -342,7 +342,7 @@ impl Service<PartitionInnerBuffer<Vec<Metric>, String>> for CloudWatchMetricsSvc
         Box::pin(async move {
             client
                 .put_metric_data()
-                .namespace(namespace)
+                .namespace(namespace.into_string())
                 .set_metric_data(Some(metric_data))
                 .send()
                 .await?;

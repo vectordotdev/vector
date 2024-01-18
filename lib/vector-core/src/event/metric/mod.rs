@@ -71,12 +71,12 @@ pub struct Metric {
 
 impl Metric {
     /// Creates a new `Metric` with the given `name`, `kind`, and `value`.
-    pub fn new<T: Into<String>>(name: T, kind: MetricKind, value: MetricValue) -> Self {
+    pub fn new<T: Into<VectorString>>(name: T, kind: MetricKind, value: MetricValue) -> Self {
         Self::new_with_metadata(name, kind, value, EventMetadata::default())
     }
 
     /// Creates a new `Metric` with the given `name`, `kind`, `value`, and `metadata`.
-    pub fn new_with_metadata<T: Into<String>>(
+    pub fn new_with_metadata<T: Into<VectorString>>(
         name: T,
         kind: MetricKind,
         value: MetricValue,
@@ -105,7 +105,7 @@ impl Metric {
     /// Consumes this metric, returning it with an updated series based on the given `name`.
     #[inline]
     #[must_use]
-    pub fn with_name(mut self, name: impl Into<String>) -> Self {
+    pub fn with_name(mut self, name: impl Into<VectorString>) -> Self {
         self.series.name.name = name.into();
         self
     }
@@ -113,7 +113,7 @@ impl Metric {
     /// Consumes this metric, returning it with an updated series based on the given `namespace`.
     #[inline]
     #[must_use]
-    pub fn with_namespace<T: Into<String>>(mut self, namespace: Option<T>) -> Self {
+    pub fn with_namespace<T: Into<VectorString>>(mut self, namespace: Option<T>) -> Self {
         self.series.name.namespace = namespace.map(Into::into);
         self
     }
@@ -202,18 +202,18 @@ impl Metric {
     /// The name of the metric does not include the namespace or tags.
     #[inline]
     pub fn name(&self) -> &str {
-        &self.series.name.name
+        self.series.name.name.as_str()
     }
 
     /// Gets a reference to the namespace of this metric, if it exists.
     #[inline]
     pub fn namespace(&self) -> Option<&str> {
-        self.series.name.namespace.as_deref()
+        self.series.name.namespace.as_ref().map(|s| s.as_str())
     }
 
     /// Takes the namespace out of this metric, if it exists, leaving it empty.
     #[inline]
-    pub fn take_namespace(&mut self) -> Option<String> {
+    pub fn take_namespace(&mut self) -> Option<VectorString> {
         self.series.name.namespace.take()
     }
 
