@@ -141,15 +141,19 @@ fn make_routes(
     // a subscription and if so, an attempt will be made to upgrade the connection to WebSockets.
     // All other queries will fall back to the default HTTP handler.
     let graphql_handler = if api.graphql {
-        warp::path("graphql").and(graphql_subscription_handler.or(
-            async_graphql_warp::graphql(schema::build_schema().finish()).and_then(
-                |(schema, request): (Schema<_, _, _>, Request)| async move {
-                    Ok::<_, Infallible>(GraphQLResponse::from(schema.execute(request).await))
-                },
-            ),
-        )).boxed()
+        warp::path("graphql")
+            .and(graphql_subscription_handler.or(
+                async_graphql_warp::graphql(schema::build_schema().finish()).and_then(
+                    |(schema, request): (Schema<_, _, _>, Request)| async move {
+                        Ok::<_, Infallible>(GraphQLResponse::from(schema.execute(request).await))
+                    },
+                ),
+            ))
+            .boxed()
     } else {
-        warp::any().and_then(|| async { Err(warp::reject::not_found()) }).boxed()
+        warp::any()
+            .and_then(|| async { Err(warp::reject::not_found()) })
+            .boxed()
     };
 
     // Provide a playground for executing GraphQL queries/mutations/subscriptions.
