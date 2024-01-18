@@ -1,6 +1,7 @@
 use std::{fs::read_dir, process::Command};
 
 use assert_cmd::prelude::*;
+use hashbrown::HashSet;
 
 use crate::{create_directory, create_file, overwrite_file};
 
@@ -105,11 +106,11 @@ fn validate_cleanup() {
 
     // Assert that data folder didn't change
     assert_eq!(
-        vec![path, dir.join(".lock")],
+        HashSet::from([path, dir.join(".lock")]),
         read_dir(dir)
             .unwrap()
             .map(|entry| entry.unwrap().path())
-            .collect::<Vec<_>>()
+            .collect::<HashSet<_>>()
     );
 }
 
