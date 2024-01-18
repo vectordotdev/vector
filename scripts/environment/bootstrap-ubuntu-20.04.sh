@@ -208,4 +208,4 @@ EOF
 fi
 
 mkdir -p /var/lib/vector
-chmod 755 /var/lib/vector
+chmod 777 /var/lib/vector
