@@ -45,7 +45,7 @@ api: {
 				Whether the [GraphQL Playground](\(urls.graphql_playground)) is enabled
 				for the API. The Playground is accessible via the `/playground` endpoint
 				of the address set using the `bind` parameter. Note that the `playground`
-				endpoint will only be enabled if the `graphql` endpoint is enabled.
+				endpoint will only be enabled if the `graphql` endpoint is also enabled.
 				"""
 		}
 		graphql: {
