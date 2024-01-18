@@ -44,7 +44,7 @@ api: {
 			description: """
 				Whether the [GraphQL Playground](\(urls.graphql_playground)) is enabled
 				for the API. The Playground is accessible via the `/playground` endpoint
-				of the address set using the `bind` parameter. Note that the `playground` 
+				of the address set using the `bind` parameter. Note that the `playground`
 				endpoint will only be enabled if the `graphql` endpoint is enabled.
 				"""
 		}
@@ -53,7 +53,7 @@ api: {
 			required: false
 			type: bool: default: true
 			description: """
-				Whether the endpoint for receiving and processing GraphQL queries is 
+				Whether the endpoint for receiving and processing GraphQL queries is
 				enabled for the API. The endpoint is accessible via the `/graphql`
 				endpoint of the address set using the `bind` parameter.
 				"""
