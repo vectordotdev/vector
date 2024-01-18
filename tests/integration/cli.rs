@@ -1,7 +1,7 @@
+use std::collections::HashSet;
 use std::{fs::read_dir, process::Command};
 
 use assert_cmd::prelude::*;
-use hashbrown::HashSet;
 
 use crate::{create_directory, create_file, overwrite_file};
 
