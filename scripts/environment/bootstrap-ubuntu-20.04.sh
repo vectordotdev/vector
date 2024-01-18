@@ -207,4 +207,5 @@ rustc-wrapper = "$RUSTC_WRAPPER"
 EOF
 fi
 
-sudo chmod 755 /var/lib/vector
+mkdir -p /var/lib/vector
+chmod 755 /var/lib/vector
