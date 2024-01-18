@@ -105,7 +105,7 @@ fn validate_cleanup() {
 
     // Assert that data folder didn't change
     assert_eq!(
-        vec![path],
+        vec![path, dir.join(".lock")],
         read_dir(dir)
             .unwrap()
             .map(|entry| entry.unwrap().path())
