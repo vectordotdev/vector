@@ -1,6 +1,6 @@
 #![deny(missing_docs)]
 
-use std::{borrow::Cow, collections::BTreeMap, fmt, sync::Arc};
+use std::{borrow::Cow, collections::BTreeMap, fmt, sync::{Arc, OnceLock}};
 
 use serde::{Deserialize, Serialize};
 use vector_common::{byte_size_of::ByteSizeOf, config::ComponentKey, EventDataEq};
@@ -232,10 +232,12 @@ impl Default for EventMetadata {
 }
 
 fn default_schema_definition() -> Arc<schema::Definition> {
-    Arc::new(schema::Definition::new_with_default_metadata(
+    static DEFAULT_SCHEMA_DEFINITION: OnceLock<Arc<schema::Definition>> = OnceLock::new();
+    let default = DEFAULT_SCHEMA_DEFINITION.get_or_init(|| Arc::new(schema::Definition::new_with_default_metadata(
         Kind::any(),
         [LogNamespace::Legacy, LogNamespace::Vector],
-    ))
+    )));
+    Arc::clone(&default)
 }
 
 impl ByteSizeOf for EventMetadata {
