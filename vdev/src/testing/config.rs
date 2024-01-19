@@ -12,6 +12,9 @@ use crate::{app, util};
 
 const FILE_NAME: &str = "test.yaml";
 
+pub const INTEGRATION_TESTS_DIR: &str = "integration";
+pub const E2E_TESTS_DIR: &str = "e2e";
+
 pub type Environment = BTreeMap<String, Option<String>>;
 
 #[derive(Deserialize, Debug)]
@@ -96,7 +99,7 @@ impl ComposeConfig {
 
 #[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct IntegrationTestConfig {
+pub struct ComposeTestConfig {
     /// The list of arguments to add to the command line for the test runner
     pub args: Option<Vec<String>>,
     /// The set of environment variables to set in both the services and the runner. Variables with
@@ -135,11 +138,11 @@ pub struct IntegrationRunnerConfig {
     pub needs_docker_socket: bool,
 }
 
-impl IntegrationTestConfig {
+impl ComposeTestConfig {
     fn parse_file(config_file: &Path) -> Result<Self> {
         let contents = fs::read_to_string(config_file)
             .with_context(|| format!("failed to read {}", config_file.display()))?;
-        let config: IntegrationTestConfig = serde_yaml::from_str(&contents).with_context(|| {
+        let config: ComposeTestConfig = serde_yaml::from_str(&contents).with_context(|| {
             format!(
                 "failed to parse integration test configuration file {}",
                 config_file.display()
@@ -166,22 +169,13 @@ impl IntegrationTestConfig {
             .collect()
     }
 
-    pub fn load(integration: &str) -> Result<(PathBuf, Self)> {
-        let mut test_dir: PathBuf = [app::path(), "scripts", "integration", integration]
+    pub fn load(root_dir: &str, integration: &str) -> Result<(PathBuf, Self)> {
+        let test_dir: PathBuf = [app::path(), "scripts", root_dir, integration]
             .iter()
             .collect();
-        if !test_dir.is_dir() {
-            // try the e2e dir now
 
-            // TODO: This is a temporary solution, looking in both dirs. When this GH issue
-            // https://github.com/vectordotdev/vector/issues/18829 , is worked, we will refactor
-            // to have a separate e2e subcommand that both int and e2e will leverage.
-            test_dir = [app::path(), "scripts", "e2e", integration]
-                .iter()
-                .collect();
-            if !test_dir.is_dir() {
-                bail!("unknown integration: {}", integration);
-            }
+        if !test_dir.is_dir() {
+            bail!("unknown integration: {}", integration);
         }
 
         let config = Self::parse_file(&test_dir.join(FILE_NAME))?;
@@ -203,17 +197,12 @@ impl IntegrationTestConfig {
         Ok(())
     }
 
-    pub fn collect_all() -> Result<BTreeMap<String, Self>> {
+    pub fn collect_all(root_dir: &str) -> Result<BTreeMap<String, Self>> {
         let mut configs = BTreeMap::new();
 
-        // TODO: This is a temporary solution, looking in both dirs. When this GH issue
-        // https://github.com/vectordotdev/vector/issues/18829 , is worked, we will refactor
-        // to have a separate e2e subcommand that both int and e2e will leverage.
-        let int_tests_dir: PathBuf = [app::path(), "scripts", "integration"].iter().collect();
-        let e2e_tests_dir: PathBuf = [app::path(), "scripts", "e2e"].iter().collect();
+        let tests_dir: PathBuf = [app::path(), "scripts", root_dir].iter().collect();
 
-        Self::collect_all_dir(&int_tests_dir, &mut configs)?;
-        Self::collect_all_dir(&e2e_tests_dir, &mut configs)?;
+        Self::collect_all_dir(&tests_dir, &mut configs)?;
 
         Ok(configs)
     }

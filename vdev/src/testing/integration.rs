@@ -3,8 +3,7 @@ use std::{collections::BTreeMap, fs, path::Path, path::PathBuf, process::Command
 use anyhow::{bail, Context, Result};
 use tempfile::{Builder, NamedTempFile};
 
-use super::config::ComposeConfig;
-use super::config::{Environment, IntegrationTestConfig};
+use super::config::{ComposeConfig, ComposeTestConfig, Environment};
 use super::runner::{
     ContainerTestRunner as _, IntegrationTestRunner, TestRunner as _, CONTAINER_TOOL, DOCKER_SOCKET,
 };
@@ -17,7 +16,7 @@ const NETWORK_ENV_VAR: &str = "VECTOR_NETWORK";
 pub struct IntegrationTest {
     integration: String,
     environment: String,
-    config: IntegrationTestConfig,
+    config: ComposeTestConfig,
     envs_dir: EnvsDir,
     runner: IntegrationTestRunner,
     compose: Option<Compose>,
@@ -29,13 +28,14 @@ pub struct IntegrationTest {
 impl IntegrationTest {
     pub fn new(
         integration: impl Into<String>,
+        path: &str,
         environment: impl Into<String>,
         build_all: bool,
         retries: u8,
     ) -> Result<Self> {
         let integration = integration.into();
         let environment = environment.into();
-        let (test_dir, config) = IntegrationTestConfig::load(&integration)?;
+        let (test_dir, config) = ComposeTestConfig::load(path, &integration)?;
         let envs_dir = EnvsDir::new(&integration);
         let Some(mut env_config) = config.environments().get(&environment).map(Clone::clone) else {
             bail!("Could not find environment named {environment:?}");
