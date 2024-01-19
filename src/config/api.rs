@@ -41,6 +41,7 @@ impl Default for Options {
 const fn is_true(value: &bool) -> bool {
     *value
 }
+
 const fn default_enabled() -> bool {
     false
 }
