@@ -188,7 +188,7 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ inputs.int_tests }}
     outputs:
-      all-int: ${{ steps.filter.outputs.all-int}}
+      all-int: ${{ steps.filter.outputs.all-tests}}
       amqp: ${{ steps.filter.outputs.amqp }}
       appsignal: ${{ steps.filter.outputs.appsignal}}
       aws: ${{ steps.filter.outputs.aws }}
