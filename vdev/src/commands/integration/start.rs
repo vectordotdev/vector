@@ -1,7 +1,7 @@
 use anyhow::Result;
 use clap::Args;
 
-use crate::testing::config::INTEGRATION_TESTS_DIR;
+use crate::testing::integration::IntegrationTest;
 
 /// Start an environment
 #[derive(Args, Debug)]
@@ -16,9 +16,8 @@ pub struct Cli {
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
-        crate::commands::compose_tests::start::exec(
+        crate::commands::compose_tests::start::exec::<IntegrationTest>(
             &self.integration,
-            INTEGRATION_TESTS_DIR,
             &self.environment,
         )
     }

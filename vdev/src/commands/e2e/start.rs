@@ -1,7 +1,7 @@
 use anyhow::Result;
 use clap::Args;
 
-use crate::testing::config::E2E_TESTS_DIR;
+use crate::testing::integration::E2ETest;
 
 /// Start an environment
 #[derive(Args, Debug)]
@@ -16,10 +16,6 @@ pub struct Cli {
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
-        crate::commands::compose_tests::start::exec(
-            &self.e2e_test,
-            E2E_TESTS_DIR,
-            &self.environment,
-        )
+        crate::commands::compose_tests::start::exec::<E2ETest>(&self.e2e_test, &self.environment)
     }
 }

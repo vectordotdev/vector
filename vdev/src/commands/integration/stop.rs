@@ -1,7 +1,7 @@
 use anyhow::Result;
 use clap::Args;
 
-use crate::testing::config::INTEGRATION_TESTS_DIR;
+use crate::testing::integration::IntegrationTest;
 
 /// Stop an integration test environment
 #[derive(Args, Debug)]
@@ -17,9 +17,8 @@ pub struct Cli {
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
-        crate::commands::compose_tests::stop::exec(
+        crate::commands::compose_tests::stop::exec::<IntegrationTest>(
             &self.integration,
-            INTEGRATION_TESTS_DIR,
             self.all_features,
         )
     }

@@ -1,7 +1,7 @@
 use anyhow::Result;
 use clap::Args;
 
-use crate::testing::config::E2E_TESTS_DIR;
+use crate::testing::integration::E2ETest;
 
 /// Stop an e2e-test environment
 #[derive(Args, Debug)]
@@ -17,6 +17,6 @@ pub struct Cli {
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
-        crate::commands::compose_tests::stop::exec(&self.e2e_test, E2E_TESTS_DIR, self.all_features)
+        crate::commands::compose_tests::stop::exec::<E2ETest>(&self.e2e_test, self.all_features)
     }
 }
