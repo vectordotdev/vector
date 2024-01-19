@@ -36,6 +36,8 @@ impl Default for Options {
     }
 }
 
+// serde passes struct fields as reference
+#[allow(clippy::trivially_copy_pass_by_ref)]
 const fn is_true(value: &bool) -> bool {
     *value
 }
