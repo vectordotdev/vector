@@ -21,7 +21,7 @@ pub struct Options {
     pub playground: bool,
 
     /// Whether or not the GraphQL endpoint is enabled
-    #[serde(default = "default_graphql")]
+    #[serde(default = "default_graphql", skip_serializing_if = "is_true")]
     pub graphql: bool,
 }
 
@@ -36,6 +36,9 @@ impl Default for Options {
     }
 }
 
+const fn is_true(value: &bool) -> bool {
+    *value
+}
 const fn default_enabled() -> bool {
     false
 }

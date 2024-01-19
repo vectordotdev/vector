@@ -108,7 +108,8 @@ fn make_routes(
         .and_then(handler::health);
 
     // 404.
-    let not_found = warp::any().and_then(|| async { Err(warp::reject::not_found()) });
+    let not_found_graphql = warp::any().and_then(|| async { Err(warp::reject::not_found()) });
+    let not_found_playground = warp::any().and_then(|| async { Err(warp::reject::not_found()) });
 
     // GraphQL subscription handler. Creates a Warp WebSocket handler and for each connection,
     // parses the required headers for GraphQL and builds per-connection context based on the
@@ -151,13 +152,11 @@ fn make_routes(
             ))
             .boxed()
     } else {
-        warp::any()
-            .and_then(|| async { Err(warp::reject::not_found()) })
-            .boxed()
+        not_found_graphql.boxed()
     };
 
     // Provide a playground for executing GraphQL queries/mutations/subscriptions.
-    let graphql_playground = if api.playground & api.graphql {
+    let graphql_playground = if api.playground && api.graphql {
         warp::path("playground")
             .map(move || {
                 Response::builder()
@@ -168,7 +167,7 @@ fn make_routes(
             })
             .boxed()
     } else {
-        not_found.boxed()
+        not_found_playground.boxed()
     };
 
     // Wire up the health + GraphQL endpoints. Provides a permissive CORS policy to allow for
@@ -176,7 +175,7 @@ fn make_routes(
     health
         .or(graphql_handler)
         .or(graphql_playground)
-        .or(not_found)
+        .or(not_found_graphql)
         .with(
             warp::cors()
                 .allow_any_origin()

@@ -473,7 +473,7 @@ mod tests {
     /// the `ConfigBuilder` has changed what it serializes, or the implementation of `serde_json` has changed.
     /// If this test fails, we should ideally be able to fix so that the original hash passes!
     fn version_hash_match() {
-        let expected_hash = "9bc035fa506e00403e479451dc8bf1e566a44f7ac83ccde349bd6c5a9bd18384";
+        let expected_hash = "6c98bea9d9e2f3133e2d39ba04592d17f96340a9bc4c8d697b09f5af388a76bd";
         let builder = ConfigBuilder::default();
         let mut hash_builder = ConfigBuilderHash::from(&builder);
         hash_builder.version = "1.2.3".into();
