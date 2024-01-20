@@ -58,7 +58,20 @@ base: components: sources: exec: configuration: {
 						gelf: """
 															Decodes the raw bytes as a [GELF][gelf] message.
 
+															This codec is experimental for the following reason:
+
+															The GELF specification is more strict than the actual Graylog receiver.
+															Vector's decoder currently adheres more strictly to the GELF spec, with
+															the exception that some characters such as `@`  are allowed in field names.
+
+															Other GELF codecs such as Loki's, use a [Go SDK][implementation] that is maintained
+															by Graylog, and is much more relaxed than the GELF spec.
+
+															Going forward, Vector will use that [Go SDK][implementation] as the reference implementation, which means
+															the codec may continue to relax the enforcement of specification.
+
 															[gelf]: https://docs.graylog.org/docs/gelf
+															[implementation]: https://github.com/Graylog2/go-gelf/blob/v2/gelf/reader.go
 															"""
 						json: """
 															Decodes the raw bytes as [JSON][json].
