@@ -54,8 +54,9 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
         &self,
         _events: &mut [Event],
         _request_path: &str,
-        _headers_config: &HeaderMap,
+        _headenrich_eventsers_config: &HeaderMap,
         _query_parameters: &HashMap<String, String>,
+        _source_ip: Option<SocketAddr>,
     ) {
     }
 
@@ -127,13 +128,15 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                 .and(warp::header::headers_cloned())
                 .and(warp::body::bytes())
                 .and(warp::query::<HashMap<String, String>>())
+                .and(warp::filters::ext::optional())
                 .and_then(
                     move |path: FullPath,
                           auth_header,
                           encoding_header: Option<String>,
                           headers: HeaderMap,
                           body: Bytes,
-                          query_parameters: HashMap<String, String>| {
+                          query_parameters: HashMap<String, String>,
+                          addr: Option<PeerAddr>| {
                         debug!(message = "Handling HTTP request.", headers = ?headers);
                         let http_path = path.as_str();
 
@@ -161,6 +164,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                                     path.as_str(),
                                     &headers,
                                     &query_parameters,
+                                    addr.map(|PeerAddr(inner_addr)| inner_addr),
                                 );
 
                                 events
@@ -186,6 +190,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
 
             let span = Span::current();
             let make_svc = make_service_fn(move |conn: &MaybeTlsIncomingStream<TcpStream>| {
+                let remote_addr = conn.peer_addr();
                 let svc = ServiceBuilder::new()
                     .layer(build_http_trace_layer(span.clone()))
                     .option_layer(keepalive_settings.max_connection_age_secs.map(|secs| {
@@ -195,6 +200,10 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                             conn.peer_addr(),
                         )
                     }))
+                    .map_request(move |mut request: hyper::Request<_>| {
+                        request.extensions_mut().insert(PeerAddr(remote_addr));
+                        request
+                    })
                     .service(warp::service(routes.clone()));
                 futures_util::future::ok::<_, Infallible>(svc)
             });
@@ -217,6 +226,10 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
         }))
     }
 }
+
+#[derive(Clone)]
+#[repr(transparent)]
+struct PeerAddr(SocketAddr);
 
 struct RejectShuttingDown;
 

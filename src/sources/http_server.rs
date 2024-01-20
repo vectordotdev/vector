@@ -421,6 +421,7 @@ impl HttpSource for SimpleHttpSource {
         request_path: &str,
         headers_config: &HeaderMap,
         query_parameters: &HashMap<String, String>,
+        source_ip: Option<SocketAddr>,
     ) {
         let now = Utc::now();
         for event in events.iter_mut() {
@@ -484,6 +485,16 @@ impl HttpSource for SimpleHttpSource {
                         SimpleHttpConfig::NAME,
                         now,
                     );
+
+                    source_ip.map(|addr| {
+                        self.log_namespace.insert_source_metadata(
+                            SimpleHttpConfig::NAME,
+                            log,
+                            Some(LegacyKey::Overwrite(path!("host"))),
+                            path!("host"),
+                            addr,
+                        );
+                    });
                 }
                 _ => {
                     continue;

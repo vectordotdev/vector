@@ -287,6 +287,7 @@ impl HttpSource for LogplexSource {
         _request_path: &str,
         _headers_config: &HeaderMap,
         query_parameters: &HashMap<String, String>,
+        _source_ip: Option<SocketAddr>,
     ) {
         add_query_parameters(
             events,
