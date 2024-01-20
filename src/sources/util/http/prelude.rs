@@ -54,7 +54,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
         &self,
         _events: &mut [Event],
         _request_path: &str,
-        _headenrich_eventsers_config: &HeaderMap,
+        _headers_config: &HeaderMap,
         _query_parameters: &HashMap<String, String>,
         _source_ip: Option<SocketAddr>,
     ) {

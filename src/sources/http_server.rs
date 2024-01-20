@@ -492,7 +492,7 @@ impl HttpSource for SimpleHttpSource {
                             log,
                             Some(LegacyKey::Overwrite(path!("host"))),
                             path!("host"),
-                            addr,
+                            addr.to_string(),
                         );
                     });
                 }
