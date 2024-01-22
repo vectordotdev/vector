@@ -108,6 +108,7 @@ fn make_routes(
         .and_then(handler::health);
 
     // 404.
+    let not_found_graphql = warp::any().and_then(|| async { Err(warp::reject::not_found()) });
     let not_found = warp::any().and_then(|| async { Err(warp::reject::not_found()) });
 
     // GraphQL subscription handler. Creates a Warp WebSocket handler and for each connection,
