@@ -20,7 +20,6 @@ pub struct RegionOrEndpoint {
 }
 
 impl RegionOrEndpoint {
-    #[cfg(test)]
     /// Creates with the given region.
     pub const fn with_region(region: String) -> Self {
         Self {
@@ -29,7 +28,6 @@ impl RegionOrEndpoint {
         }
     }
 
-    #[cfg(test)]
     /// Creates with both a region and an endpoint.
     pub fn with_both(region: impl Into<String>, endpoint: impl Into<String>) -> Self {
         Self {
