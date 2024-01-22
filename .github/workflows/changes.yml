@@ -251,9 +251,7 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ inputs.e2e_tests }}
     outputs:
-      all-e2e: ${{ steps.filter.outputs.all-int}}
-      # TODO: when https://github.com/vectordotdev/vector/issues/18829 is undertaken,
-      # part of that will involve updating this job to also run `cargo vdev e2e ci-paths`
+      all-e2e: ${{ steps.filter.outputs.all-tests}}
       datadog-logs: ${{ steps.filter.outputs.e2e-datadog-logs }}
       datadog-metrics: ${{ steps.filter.outputs.e2e-datadog-metrics }}
     steps:
@@ -263,7 +261,7 @@ jobs:
       # extracted from the output of the `vdev int ci-paths` command, which
       # sources the paths from the scripts/integration/.../test.yaml files
       - name: Create filter rules for e2e tests
-        run: cargo vdev int ci-paths > int_test_filters.yaml
+        run: cargo vdev e2e ci-paths > int_test_filters.yaml
 
       - uses: dorny/paths-filter@v2
         id: filter
