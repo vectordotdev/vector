@@ -83,6 +83,16 @@ jobs:
           max_attempts: 3
           command: bash scripts/ci-integration-test.sh e2e-datadog-logs
 
+      - if: (github.event_name == 'schedule' || needs.changes.outputs.all-e2e == 'true' || needs.changes.outputs.e2e-datadog-metrics == 'true') &&
+          (github.event_name != 'pull_request' || env.PR_HAS_ACCESS_TO_SECRETS == 'true')
+        name: e2e-datadog-metrics
+        uses: nick-fields/retry@v2
+        with:
+          timeout_minutes: 35
+          max_attempts: 3
+          command: bash scripts/ci-integration-test.sh e2e-datadog-metrics
+
+
   e2e-test-suite:
     name: E2E Test Suite
     runs-on: ubuntu-latest

@@ -72,10 +72,6 @@ on:
         value: ${{ jobs.int_tests.outputs.dnstap }}
       docker-logs:
         value: ${{ jobs.int_tests.outputs.docker-logs }}
-      e2e-datadog-logs:
-        value: ${{ jobs.int_tests.outputs.e2e-datadog-logs }}
-      e2e-datadog-metrics:
-        value: ${{ jobs.int_tests.outputs.e2e-datadog-metrics }}
       elasticsearch:
         value: ${{ jobs.int_tests.outputs.elasticsearch }}
       eventstoredb:
@@ -123,6 +119,8 @@ on:
         value: ${{ jobs.e2e_tests.outputs.all-e2e }}
       e2e-datadog-logs:
         value: ${{ jobs.e2e_tests.outputs.datadog-logs }}
+      e2e-datadog-metrics:
+        value: ${{ jobs.e2e_tests.outputs.datadog-metrics }}
 
 jobs:
   # Detects changes that are not specific to integration tests
@@ -211,11 +209,6 @@ jobs:
       datadog-traces: ${{ steps.filter.outputs.datadog-traces }}
       dnstap: ${{ steps.filter.outputs.dnstap }}
       docker-logs: ${{ steps.filter.outputs.docker-logs }}
-
-      # TODO: when https://github.com/vectordotdev/vector/issues/18829 is undertaken,
-      # part of that will involve updating this job to also run `cargo vdev e2e ci-paths`
-      e2e-datadog-logs: ${{ steps.filter.outputs.e2e-datadog-logs }}
-      e2e-datadog-metrics: ${{ steps.filter.outputs.e2e-datadog-metrics }}
       elasticsearch: ${{ steps.filter.outputs.elasticsearch }}
       eventstoredb: ${{ steps.filter.outputs.eventstoredb }}
       fluent: ${{ steps.filter.outputs.fluent }}
@@ -259,7 +252,10 @@ jobs:
     if: ${{ inputs.e2e_tests }}
     outputs:
       all-e2e: ${{ steps.filter.outputs.all-int}}
+      # TODO: when https://github.com/vectordotdev/vector/issues/18829 is undertaken,
+      # part of that will involve updating this job to also run `cargo vdev e2e ci-paths`
       datadog-logs: ${{ steps.filter.outputs.e2e-datadog-logs }}
+      datadog-metrics: ${{ steps.filter.outputs.e2e-datadog-metrics }}
     steps:
       - uses: actions/checkout@v3
 
