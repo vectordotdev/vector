@@ -1,7 +1,7 @@
 This directory contains a set of end-to-end test frameworks for vector which are executed by the
 `vdev` tool.
 
-These end-to-end (e2e) tests are executed with the same `vdev e2e` subcommand, which behaves
+These end-to-end (e2e) tests are executed with the `vdev e2e` subcommand, which behaves
 identically to the `vdev integration` subcommand. See the README in the `scripts/integration`
 subdirectory for more information.
 
