@@ -133,10 +133,18 @@ impl IntegrationTest {
     }
 
     pub fn start(&self) -> Result<()> {
-        // For end-to-end tests, we want to run vector as a service, leveraging the
-        // image for the runner. So we must build that image before starting the
-        // compose so that it is available.
-        self.runner.build(Some(&self.config.features))?;
+        // TODO this is a hack until https://github.com/vectordotdev/vector/pull/18840
+        // During that PR, will be able to conditionally call this based on the trait
+        // definition for the E2E tests.
+        // The reason we need this temporary hack is because adding the features as a build
+        // argument results in each integration's runner container being unique, and thus
+        // the job in CI runs out of space.
+        if self.integration.contains("e2e-") {
+            // For end-to-end tests, we want to run vector as a service, leveraging the
+            // image for the runner. So we must build that image before starting the
+            // compose so that it is available.
+            self.runner.build(Some(&self.config.features))?;
+        }
 
         self.config.check_required()?;
         if let Some(compose) = &self.compose {
